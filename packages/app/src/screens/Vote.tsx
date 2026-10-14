@@ -8,6 +8,7 @@ import {
   voteZoneAt,
   voteZoneBox,
   voteZoneCentre,
+  voteZoneFor,
   voteZoneSpot,
   type BoardSpot,
   type ItemLook,
@@ -46,8 +47,8 @@ function onScreen(p: BoardSpot, orientation: Orientation) {
 }
 
 /** A zone's box on screen (percent), from this side. */
-function zoneOnScreen(option: number, orientation: Orientation) {
-  const z = voteZoneBox(option);
+function zoneOnScreen(zone: number, orientation: Orientation) {
+  const z = voteZoneBox(zone);
   const a = onScreen({ x: z.x0, y: z.y1 }, orientation);
   const b = onScreen({ x: z.x1, y: z.y0 }, orientation);
   return { left: Math.min(a.left, b.left), top: Math.min(a.top, b.top), width: 25, height: 25 };
@@ -134,6 +135,8 @@ export function VoteScreen({
   const animate = useCrowdAnimations();
   const side = match.standings().find((s) => s.isYou)?.team ?? "w";
   const orientation: Orientation = side === "w" ? "white" : "black";
+  // Option to zone and back, for this screen: the options run left to right whichever side you're on (voteZoneFor).
+  const zoneOf = (option: number) => voteZoneFor(option, side, def.options.length);
   const counting = vote.result === null;
   const open = counting && now < vote.until;
   const last = vote.index + 1 >= vote.count;
@@ -246,7 +249,7 @@ export function VoteScreen({
     setDragAt(null);
     const zone = at ? voteZoneAt(at) : null;
     // Let go in a zone: that's your vote, and the pawn stays where you put it. Anywhere else, it walks back.
-    if (at && zone !== null) cast(zone, clampToZone(zone, at, side));
+    if (at && zone !== null) cast(zoneOf(zone), clampToZone(zone, at, side));
   };
   const onCancel = () => {
     press.current = null;
@@ -258,10 +261,11 @@ export function VoteScreen({
   // (Yours is a little bigger than the others: its spot keeps it inside the board's edge.)
   const seeded = me ? spots.get(me.id) : undefined;
   const myHome = seeded && { x: Math.min(7.64, Math.max(0.36, seeded.x)), y: seeded.y };
-  const myVoted = mine && !home ? (myDrop?.key === vote.key && myDrop.option === mine.option ? myDrop.spot : voteZoneCentre(mine.option, side)) : null;
+  const myVoted = mine && !home ? (myDrop?.key === vote.key && myDrop.option === mine.option ? myDrop.spot : voteZoneCentre(zoneOf(mine.option), side)) : null;
   const myAt = dragAt ? { x: dragAt.x, y: dragAt.y + (orientation === "white" ? 0.3 : -0.3) } : (myVoted ?? myHome);
   const myLook = me ? looks.get(me.id)! : pawnLook({ id: "", isYou: true, isBot: false });
   const overZone = dragAt ? voteZoneAt(dragAt) : null;
+  const overOption = overZone === null ? null : zoneOf(overZone);
 
   const nextLabel = next ? next(vote.index + 1) : vote.index + 1 < vote.count ? PREGAME_VOTES[vote.index + 1]!.title : "The game begins";
   const nextIn = vote.nextAt ? Math.max(0, Math.ceil((vote.nextAt - now) / 1000)) : null;
@@ -311,12 +315,12 @@ export function VoteScreen({
             >
               <div class="vote-zones" aria-hidden="true">
                 {def.options.map((o, i) => {
-                  const box = zoneOnScreen(i, orientation);
+                  const box = zoneOnScreen(zoneOf(i), orientation);
                   const state = vote.result === null ? "" : vote.result === i ? " win" : " lose";
                   return (
                     <div
                       key={o.id}
-                      class={`vote-zone${state}${mine?.option === i ? " mine" : ""}${overZone === i && !o.disabled ? " over" : ""}${o.disabled ? " disabled" : ""}`}
+                      class={`vote-zone${state}${mine?.option === i ? " mine" : ""}${overOption === i && !o.disabled ? " over" : ""}${o.disabled ? " disabled" : ""}`}
                       style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.width}%`, height: `${box.height}%` }}
                     />
                   );
@@ -328,7 +332,7 @@ export function VoteScreen({
                   const at = landing.current.spot.get(p.id);
                   const voted = !home && !!at && votedIds.has(p.id);
                   const pawnSide = p.team === "b" ? "b" : "w";
-                  const spot = voted ? voteZoneSpot(at!.option, pawnSide, at!.k) : spots.get(p.id)!;
+                  const spot = voted ? voteZoneSpot(zoneOf(at!.option), pawnSide, at!.k) : spots.get(p.id)!;
                   const { left, top } = onScreen(spot, orientation);
                   const look = looks.get(p.id)!;
                   return <VotePawn key={p.id} id={p.id} left={left} top={top} look={look.look} side={pawnSide} voted={voted} />;
@@ -338,7 +342,7 @@ export function VoteScreen({
                   land on the near half, in full view. */}
               <div class="vote-labels" aria-hidden="true">
                 {def.options.map((o, i) => {
-                  const box = zoneOnScreen(i, orientation);
+                  const box = zoneOnScreen(zoneOf(i), orientation);
                   const state = vote.result === null ? "" : vote.result === i ? " win" : " lose";
                   return (
                     <div key={o.id} class={`vote-label${state}${o.disabled ? " disabled" : ""}`} style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.width}%`, height: `${box.height / 2}%` }}>
@@ -350,7 +354,7 @@ export function VoteScreen({
               </div>
               {selected &&
                 def.options.map((o, i) => {
-                  const box = zoneOnScreen(i, orientation);
+                  const box = zoneOnScreen(zoneOf(i), orientation);
                   if (o.disabled) return null;
                   return (
                     <button
@@ -361,7 +365,7 @@ export function VoteScreen({
                       style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.width}%`, height: `${box.height}%` }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        cast(i, voteZoneCentre(i, side));
+                        cast(i, voteZoneCentre(zoneOf(i), side));
                       }}
                     />
                   );
@@ -393,7 +397,7 @@ export function VoteScreen({
           </Board>
         </div>
       </div>
-      <div class={`vote-cards${orientation === "black" ? " flipped" : ""}${leaving ? " leaving" : ""}`} role="radiogroup" aria-label={def.title}>
+      <div class={`vote-cards${leaving ? " leaving" : ""}`} role="radiogroup" aria-label={def.title}>
         {def.options.map((o, i) => {
           const total = Math.max(1, counts.reduce((s, x) => s + x, 0));
           const state = vote.result === null ? "" : vote.result === i ? " win" : " lose";
@@ -406,7 +410,7 @@ export function VoteScreen({
               class={`vote-card${mine?.option === i ? " on" : ""}${state}${o.disabled ? " disabled" : ""}`}
               disabled={!canAct || !!o.disabled}
               aria-disabled={o.disabled ? true : undefined}
-              onClick={() => cast(i, voteZoneCentre(i, side))}
+              onClick={() => cast(i, voteZoneCentre(zoneOf(i), side))}
             >
               <span class="vote-card-icon" aria-hidden="true">
                 {o.icon}

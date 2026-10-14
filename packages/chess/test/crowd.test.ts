@@ -388,7 +388,8 @@ describe("Crowd mode", () => {
       library,
       entrants: Array.from({ length: 100 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: true, skill: 1 + (i % 20) })),
     });
-    const [bullet, , rapid] = PREGAME_VOTES.find((v) => v.id === "speed")!.options;
+    const speedOpts = PREGAME_VOTES.find((v) => v.id === "speed")!.options;
+    const [bullet, rapid] = (["bullet", "rapid"] as const).map((id) => speedOpts.find((o) => o.id === id));
     // Made with the default bank (Rapid's 10:00); Bullet wins the vote before move 1: everyone's bank is 3:00.
     expect(new Set(runner.state.players.map((p) => p.bankMs))).toEqual(new Set([600_000]));
     runner.patchSettings(bullet!.patch);

@@ -204,15 +204,15 @@ describe("the FAQ's numbers come from the settings", () => {
 
   it("the clock vote's time controls, the default, and the clock without the vote", () => {
     const t = section("modes");
-    expect(t).toContain("Bullet 3+2 (3 minutes, +2 s a move, at most 10 s on a move), Blitz 5+3 (5 minutes, +3 s a move, at most 15 s on a move) or Rapid 10+5 (10 minutes, +5 s a move, at most 20 s on a move)");
+    expect(t).toContain("Rapid 10+5 (10 minutes, +5 s a move, at most 20 s on a move), Blitz 5+3 (5 minutes, +3 s a move, at most 15 s on a move) or Bullet 3+2 (3 minutes, +2 s a move, at most 10 s on a move)");
     expect(t).toContain("Nobody voting means Blitz 5+3.");
     expect(t).toContain("as on a chess clock");
     expect(t).toContain("Pre-game votes off) it's 10 minutes, +5 s a move, at most 20 s on a move; a boss raid is 10 minutes, +5 s a move, at most 20 s on a move.");
     expect(t).not.toMatch(/Variable|Normal \(/);
     // Changed time controls (and a changed default) change the words.
     const V = FAQ_DEFAULTS.clockVote;
-    const options = V.options.map((o, i) => (i === 0 ? { ...o, label: "Bullet 2+1", patch: { ...o.patch, timeBankSeconds: 120, timeIncrementSeconds: 1, moveClockSeconds: 8 } } : o));
-    const moved = section("modes", { ...FAQ_DEFAULTS, clockVote: { options, defaultOption: 2 } });
+    const options = V.options.map((o) => (o.id === "bullet" ? { ...o, label: "Bullet 2+1", patch: { ...o.patch, timeBankSeconds: 120, timeIncrementSeconds: 1, moveClockSeconds: 8 } } : o));
+    const moved = section("modes", { ...FAQ_DEFAULTS, clockVote: { options, defaultOption: options.findIndex((o) => o.id === "rapid") } });
     expect(moved).toContain("Bullet 2+1 (2 minutes, +1 s a move, at most 8 s on a move)");
     expect(moved).toContain("Nobody voting means Rapid 10+5.");
   });
@@ -245,22 +245,23 @@ describe("the FAQ on Squads' team clock (Oct 13: three chess time controls)", ()
       expect(t).toContain(`${c.label} ${c.bankSeconds / 60}+${c.incrementSeconds} (${mins(c.bankSeconds)}, +${c.incrementSeconds} s a move, at most ${c.capSeconds} s on a move)`);
     }
     expect(t).toContain(`The first ${Q.clocks[0]!.delaySeconds} s of every move are free`);
-    const def = Q.clocks[Q.clockDefault]!;
+    const def = Q.clocks.find((c) => c.id === Q.clockDefault)!;
     expect(t).toContain(`Nobody voting means ${def.label} ${def.bankSeconds / 60}+${def.incrementSeconds}.`);
     expect(t).toContain("Every move made in time adds its seconds back");
     expect(t).toContain("sudden death: every move within the free seconds, until moves made in time earn some back");
     expect(t).not.toMatch(/\b(Fast|Normal|Long) \d/);
     // Changed settings: the words follow (an odd bank in m:ss, free seconds and top-ups that differ between options).
+    const by = (id: string) => Q.clocks.find((c) => c.id === id)!;
     const clocks = [
-      { ...Q.clocks[0]!, bankSeconds: 90, incrementSeconds: 1, capSeconds: 8, delaySeconds: 2, topUpSeconds: 20 },
-      { ...Q.clocks[1]!, bankSeconds: 240, incrementSeconds: 2, capSeconds: 12, delaySeconds: 3, topUpSeconds: 60 },
-      { ...Q.clocks[2]!, bankSeconds: 600, incrementSeconds: 5, capSeconds: 25, delaySeconds: 3, topUpSeconds: 120 },
+      { ...by("rapid"), bankSeconds: 600, incrementSeconds: 5, capSeconds: 25, delaySeconds: 3, topUpSeconds: 120 },
+      { ...by("blitz"), bankSeconds: 240, incrementSeconds: 2, capSeconds: 12, delaySeconds: 3, topUpSeconds: 60 },
+      { ...by("bullet"), bankSeconds: 90, incrementSeconds: 1, capSeconds: 8, delaySeconds: 2, topUpSeconds: 20 },
     ];
-    const changed = section("modes", { ...FAQ_DEFAULTS, squads: { ...Q, clocks, clockDefault: 2 } });
-    expect(changed).toContain("Bullet 1:30+1 (1:30 minutes, +1 s a move, at most 8 s on a move), Blitz 4+2 (4 minutes, +2 s a move, at most 12 s on a move) or Rapid 10+5 (10 minutes, +5 s a move, at most 25 s on a move)");
+    const changed = section("modes", { ...FAQ_DEFAULTS, squads: { ...Q, clocks, clockDefault: "rapid" } });
+    expect(changed).toContain("Rapid 10+5 (10 minutes, +5 s a move, at most 25 s on a move), Blitz 4+2 (4 minutes, +2 s a move, at most 12 s on a move) or Bullet 1:30+1 (1:30 minutes, +1 s a move, at most 8 s on a move)");
     expect(changed).toContain("Nobody voting means Rapid 10+5.");
-    expect(changed).toContain("The first few seconds of every move are free (Bullet 2 s, Blitz 3 s, Rapid 3 s); then your squad's clock runs");
-    expect(changed).toContain("plus a top-up (Bullet 20 s, Blitz 1 minute, Rapid 2 minutes) as you go through");
+    expect(changed).toContain("The first few seconds of every move are free (Rapid 3 s, Blitz 3 s, Bullet 2 s); then your squad's clock runs");
+    expect(changed).toContain("plus a top-up (Rapid 2 minutes, Blitz 1 minute, Bullet 20 s) as you go through");
   });
 });
 
