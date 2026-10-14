@@ -126,6 +126,8 @@ test("online: a Crowd boss final meets him: his intro by name for everyone, four
   await page.getByRole("button", { name: /God King: tap to summon/ }).click();
   await page.getByRole("menuitem", { name: /Strike/ }).click();
   await expect.poll(async () => (await bossNow(page)).kingCharges).toBe(charges - 1);
+  // (The dock's crowns too, at once.)
+  await expect(page.locator(".gk-unit-charges")).toHaveAttribute("aria-label", new RegExp(`^${charges - 1} charge`));
   expect(await phase(page)).toBe("play");
   expect(await page.evaluate(() => (window as any).match.kingCalled)).toBe(false);
   await expect(page.getByLabel("The God King strikes the boss")).toHaveCount(0);

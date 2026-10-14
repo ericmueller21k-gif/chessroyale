@@ -622,9 +622,9 @@ function crowdFinalBlock(src: FaqSources, b: BossDef): string {
   const P = src.phase2;
   const n2 = crowdFinalists("boss", src.crowdKnockouts, src.crowd.lobbySize);
   const clock = (sec: number) => (sec % 60 ? `${num(sec)} s` : n(sec / 60, "minute"));
-  const increment = p.bulletIncrementSeconds > 0 ? `; its first ${n(p.bulletPlainMoves, "move")} add no time, then each move made in time adds ${num(p.bulletIncrementSeconds)} s` : ", and nothing adds time";
+  const increment = p.bulletIncrementSeconds > 0 ? `; the first ${n(p.bulletPlainMoves, "move")} on it add no time, then each move made in time adds ${num(p.bulletIncrementSeconds)} s` : ", and nothing adds time";
   return `
-Met only in the Crowd's boss final, where it's always him, against the top ${n2}. He plays from the starting position (he has no memorized openings), with the crowd as White, and his strength never follows anyone's rating: Maia at its top, raw ([how strong](#boss-strength)).
+Met only in the Crowd's boss final, where it's always him, against the top ${n2}. He plays from the starting position (he has no memorized openings), with the crowd as White, and his strength never follows anyone's rating: Maia at its top, raw ([his strength and brain](#boss-strength)).
 
 - **No help** (passive): the God King's help doesn't work against him: his move, his strike and his Last Stand never come. Calling him spends a charge all the same, and ${b.name} mocks it. He never strikes anyone down either: all ${n2} of you play to the end.
 - **Bullet** (ultimate): a meter of his own, full as turn ${p.bulletTurn} begins, when it comes with no warning. From then on every bank is ${clock(p.bulletBankSeconds)}, with no cap on a move${increment}. If everyone still in runs out of time, he wins on time.
