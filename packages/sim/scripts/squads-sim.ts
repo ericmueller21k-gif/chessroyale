@@ -8,7 +8,8 @@
  * Run: npm run sim:squads -- [lobbies per setting = 12] [nodes = 10000] [clocks: "bank|top-up|free|increment|cap,..."
  * with the bank and top-up as m:ss, e.g. "2:00|0:30|3|1|10"] (about 35 minutes on 4 cores). Writes reports/squads-sim.md,
  * or the file in SQUADS_SIM_OUT (tuning runs). SQUADS_SIM_MIXES limits the mixes (e.g. "mixed"); SQUADS_SIM_SET overrides
- * settings for a tuning run (JSON merged into SQUADS, e.g. '{"roundBreakSeconds":20}'). SQUADS_SIM_MODE=mercenary plays
+ * settings for a tuning run (JSON merged into SQUADS, e.g. '{"roundBreakSeconds":20}'); SQUADS_SIM_SEEDS gives every
+ * option one clock's seeds (below). SQUADS_SIM_MODE=mercenary plays
  * Mercenary (coins, catch-up, the shop as bots shop, kits, Stockfish tokens; DECISIONS.md, "Squads modes: Mercenary")
  * and adds the economy's tables; its report goes to reports/squads-mercenary.md unless SQUADS_SIM_OUT says otherwise.
  */
@@ -105,6 +106,11 @@ function parseClock(text: string, i: number): SquadsClock {
 }
 const S: SquadsSettings = { ...SQUADS, ...(process.env.SQUADS_SIM_SET ? (JSON.parse(process.env.SQUADS_SIM_SET) as Partial<SquadsSettings>) : {}) };
 const CLOCKS: readonly SquadsClock[] = process.argv[4] ? process.argv[4].split(",").map(parseClock) : S.clocks;
+/**
+ * SQUADS_SIM_SEEDS="5:00|1:00|2|3|20": every option's lobbies use the seeds that clock's numbers give (the same squads,
+ * skills, openings and draws), so tuning candidates replay the same lobbies as a calibration run and compare in pairs.
+ */
+const SEEDS_OF: SquadsClock | undefined = process.env.SQUADS_SIM_SEEDS ? parseClock(process.env.SQUADS_SIM_SEEDS, 0) : undefined;
 const MODE: SquadsMode = process.env.SQUADS_SIM_MODE === "mercenary" ? "mercenary" : "classic";
 const MERC = MODE === "mercenary";
 const OUT = process.env.SQUADS_SIM_OUT
@@ -291,7 +297,8 @@ const showSeconds: Record<SquadsFormat, (s: SquadsSettings) => number> = {
 
 async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings): Promise<LobbyStat> {
   const c = cfg.clock;
-  const seed = (index + 1) * 7919 + ALL_MIXES.findIndex((m) => m.id === cfg.mix) * 104729 + c.bankSeconds * 31 + c.topUpSeconds * 7 + c.delaySeconds * 3 + c.incrementSeconds;
+  const k = SEEDS_OF ?? c;
+  const seed = (index + 1) * 7919 + ALL_MIXES.findIndex((m) => m.id === cfg.mix) * 104729 + k.bankSeconds * 31 + k.topUpSeconds * 7 + k.delaySeconds * 3 + k.incrementSeconds;
   const rng = squadsRng(seed, "sim");
   const range = ALL_MIXES.find((m) => m.id === cfg.mix)!.range;
   const skills = shuffle(rng, botSkillSpread(32, { ...DEFAULT_SETTINGS, botSkillRange: range }));
@@ -607,10 +614,11 @@ await Promise.all(
     const lab = new Lab(engine);
     while (next < jobs.length) {
       const job = jobs[next++]!;
-      results.push(await simLobby(job.cfg, job.i, lab, S));
+      const r = await simLobby(job.cfg, job.i, lab, S);
+      results.push(r);
       const done = results.length;
       const eta = ((Date.now() - started) / done) * (jobs.length - done);
-      process.stdout.write(`lobby ${done}/${jobs.length} (${job.cfg.mix}, ${job.cfg.clock.label}) ~${Math.round(eta / 60000)} min left\n`);
+      process.stdout.write(`lobby ${done}/${jobs.length} (${job.cfg.mix} #${job.i + 1}, ${job.cfg.clock.label}: ${(r.totalSeconds / 60).toFixed(1)} min) ~${Math.round(eta / 60000)} min left\n`);
     }
   }),
 );
