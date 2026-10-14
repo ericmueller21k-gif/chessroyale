@@ -153,7 +153,8 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       the pieces fly to their new squares as the pages turn. Phase 2 then plays as above.
     - **Decided (Eric, Oct 14: "your pick is fine, we want easier code and less lag over all else, fewer bug
       risks"):** the split reuses Sawyer's board saw (crack lines, then the quarters slide apart). The book's symbol
-      is a red star or a Cyrillic letter, not the hammer and sickle.
+      is the gold Cyrillic **"ШАХМАТЫ"** ("chess" in Russian) on the shop item's larger icon, and its first
+      letter **"Ш"** as a gold monogram on the book in the sprites: clearly Russian, about chess, and not political.
     - **Effort, easiest to hardest:**
       - a slam, a flash, then a cross-fade into four boards;
       - crack lines, then the quarters sliding apart (the pick, reusing the saw);
