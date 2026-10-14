@@ -182,6 +182,18 @@ export function follow(prev: readonly BoardPiece[], next: ReadonlyMap<string, Pi
   return { pieces, gone: missing.filter((m) => !taken.has(m.id)), moved };
 }
 
+/**
+ * The captured pieces still fading and the pieces still sliding at `now` (those that are over are let go), and when the
+ * next of them ends (null: none), when the board draws again by itself. (A fade kept after it ended had the board drawn
+ * again every 20 ms until the next move: Oct 14, 2026.)
+ */
+export function stillRunning<F extends { until: number }>(fading: readonly F[], sliding: ReadonlyMap<number, number>, now: number): { fading: F[]; sliding: Map<number, number>; next: number | null } {
+  const f = fading.filter((x) => x.until > now);
+  const s = new Map([...sliding].filter(([, until]) => until > now));
+  const next = Math.min(...f.map((x) => x.until), ...s.values());
+  return { fading: f, sliding: s, next: Number.isFinite(next) ? next : null };
+}
+
 // ---------------- Taps and drags ----------------
 
 /** What a press needs to know about the board as it is. */

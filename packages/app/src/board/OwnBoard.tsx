@@ -19,7 +19,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/ho
 import { BOARD } from "@chessroyale/core";
 import { applyMove, inCheck, legalMoves, pieceAt, sideToMove, touchesDark } from "@chessroyale/chess";
 import { BoardTurn, coordLabel, type QuarterTurn } from "../board-view.ts";
-import { BRUSHES, FILES, SLIDE_MS, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, pieceClass, pieceCloseTo, positionKey, pressDown, pressMove, pressUp, readPieces, slidePiece, squareAtPoint, type BoardPiece, type Box, type PieceCode, type Press, type PressBoard } from "./logic.ts";
+import { BRUSHES, FILES, SLIDE_MS, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, pieceClass, pieceCloseTo, positionKey, pressDown, pressMove, pressUp, readPieces, slidePiece, squareAtPoint, stillRunning, type BoardPiece, type Box, type PieceCode, type Press, type PressBoard } from "./logic.ts";
 import type { BoardProps } from "./types.ts";
 
 let nextPieceId = 1;
@@ -192,14 +192,16 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   landNext.current = false;
   tr.orientation = orientation;
   tr.turn = turn;
-  const fading = tr.fading.filter((f) => f.until > now);
-  for (const [id, until] of tr.sliding) if (until <= now) tr.sliding.delete(id);
+  // (The fades and slides that are over let go: a finished fade kept would draw the board again every 20 ms.)
+  const run = stillRunning(tr.fading, tr.sliding, now);
+  tr.fading = run.fading;
+  tr.sliding = run.sliding;
+  const fading = run.fading;
 
   // Captured pieces fade and sliding ones settle: drawn again once they're done.
   useEffect(() => {
-    const next = Math.min(...tr.fading.map((f) => f.until), ...tr.sliding.values());
-    if (!Number.isFinite(next)) return;
-    const t = setTimeout(redraw, Math.max(0, next - performance.now()) + 20);
+    if (run.next === null) return;
+    const t = setTimeout(redraw, Math.max(0, run.next - performance.now()) + 20);
     return () => clearTimeout(t);
   });
   // After a jump, the browser takes the new places before anything slides again (else the next change, in the same

@@ -23,6 +23,7 @@ import {
   slidePiece,
   squareAt,
   squareAtPoint,
+  stillRunning,
   type BoardPiece,
   type PressBoard,
 } from "../src/board/logic.ts";
@@ -317,6 +318,28 @@ describe("arrows", () => {
     expect(a!.label!.text).toBe("52.1");
     expect(a!.label!.x).toBeCloseTo(0.5, 6);
     expect(a!.label!.y).toBeCloseTo(0.5 + 33 / 64, 6);
+  });
+});
+
+describe("the fades and slides still running (stillRunning)", () => {
+  it("keeps those still running and says when the next ends", () => {
+    const r = stillRunning([{ until: 300, id: 1 }, { until: 150, id: 2 }], new Map([[5, 200]]), 100);
+    expect(r.fading.map((f) => f.id)).toEqual([1, 2]);
+    expect([...r.sliding.keys()]).toEqual([5]);
+    expect(r.next).toBe(150);
+  });
+
+  it("lets go of those that are over: nothing left, the board doesn't draw again by itself", () => {
+    const r = stillRunning([{ until: 100 }], new Map([[5, 90]]), 100 + SLIDE_MS);
+    expect(r.fading).toEqual([]);
+    expect(r.sliding.size).toBe(0);
+    expect(r.next).toBeNull();
+  });
+
+  it("a fade over and a slide still going: only the slide is waited for", () => {
+    const r = stillRunning([{ until: 100 }], new Map([[7, 400]]), 250);
+    expect(r.fading).toEqual([]);
+    expect(r.next).toBe(400);
   });
 });
 
