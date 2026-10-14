@@ -99,19 +99,46 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 | Sawyer (`sawyer`) | the game so far; his first move is a pawn's, then the **split pawn**: that pawn sawn in two, a second pawn of his on an empty square beside it (a seeded side; never where it attacks a crowd piece or gives check), both tracked. On screen (`SAWYER_LOOKS`, Oct 11) the sawn pawn morphs into two smaller whole pawns that hop to their squares and grow back to a pawn's size as they land (my call: they're ordinary pawns); `split: "halves"` brings back the old look (cut in two halves, drawn as halves wherever they go), `settle: "small"` keeps them small. If that pawn has no such square, another of his that has one (the most central, from the seed: `chooseSplit`); none, or a first move that wasn't a pawn's (a check left him none): it waits for his next pawn move. With no room for another pawn of his (8 already, or 32 pieces: the engine's limit) it waits for his first pawn move once there is | **Saw cuts:** every `sawEvery` turns from `sawFirst` (turn 3), an edge between two squares of the crowd's half that one of its moves crosses, for `sawTurns`: no straight move across it (a slide, a pawn's step, the king's, castling's way), either side; knights and diagonal moves pass; taped over as it heals | **Board saw:** the meter full, turn `boardSawFrom` or later, and a half of the board (a-d or e-h) his on material: the warning, then for `boardSawTurns` no move crosses between the d and e files (knights included), either side; then the halves rejoin |
 
 **The Hidden Boss's phase 2** (Oct 14; DECISIONS.md, "The Hidden Boss, phase 2"; admins only, Boss alone):
-- **The phase change** (Eric, Oct 14, reworked; `PHASE_CHANGE` in `packages/app/src/recluse-phase2.ts`, about 10.4 s
-  after a 1.8 s fall, one timeline, not skippable like a boss's intro; drawn by `screens/Recluse2.tsx`,
-  `PhaseChangeScreen`): where he stands he gets up in a rage (`rage`, a figure run in `BossCharacter.tsx`, both
-  drawings); then the board draws his whole figure (a phone too; `.rc-fig`, his place empty meanwhile: `.rc-away`) for
-  his leap onto the middle (`leap`: a thud, dust, the board jolts), the book brandished and thrown down open at his
-  feet (`drop`), his chant over it (`chantRaise`, `chant`: arms raised, his hair lifting into phase 2's) as light pours
-  up out of it (CSS only: `.rc-light`, a pulsing cone behind him, and `.rc-glow` on the pages; only opacity and
-  transform move) and one chant line (`RECLUSE_LINES.chant`); Sawyer's board-saw gap runs down and across the middle,
-  the quarters part and each grows into a whole board (a transform and a clip only) as the light dies; the book snaps
-  shut and flies up into his hands (`pickup`, his revive's frames) while every board's pieces fly to their Chess960
-  squares; he leaps back to his place (`leap2`) and rests in `idle2`; "PHASE 2". One book on screen throughout, in his
-  frames (`RECLUSE_BOOK` isn't shown). His frames are drawn ahead from his battle's start (`prewarmRecluse`). Sounds:
-  his rustle, `recluseThump` (landing), `recluseShut` (the book), `recluseGlow` (the light), the saw's crack.
+- **The phase change** (Eric, Oct 14, reworked, then opened with the God King's absorption; `PHASE_CHANGE` in
+  `packages/app/src/recluse-phase2.ts`, about 14.8 s after a 1.8 s fall, one timeline, not skippable like a boss's
+  intro; drawn by `screens/Recluse2.tsx`, `PhaseChangeScreen`):
+  - **The absorption** (Eric, Oct 14: he plays with an engine in phase 2, so he takes the God King's; DECISIONS.md, "The
+    Hidden Boss absorbs the God King"): in his place in the dock (BossDock's `king`, from `absorbKing`) the God King
+    raises his sword, his golden aura swelling (`.gk-aura`), and gloats (`KING_VS_RECLUSE.triumph`, a `lead` cue: his
+    cry cuts in on it); still kneeling, the boss's head snaps up and he raises his open hand to him (`seize`, then
+    `seizeLoop`, a figure run step held for the drain, `phaseChangeRun`); a golden stream runs from the God King into
+    that hand (`AbsorbStream`: a beam of two strokes and motes moved by transform, over the page, measured from both
+    drawings) while he's drained through his Last Stand's blows, flashing and cracking (his own frames, `lastStand`
+    from its blows, drawn ahead by `prewarmKing`), flickering, his aura shrinking, and cries out
+    (`KING_VS_RECLUSE.drained`); as it lands the boss's fist closes (`seized`, its spark `recluseSpark`), his half-engine
+    look ignites (`setEngineAt`) and he says so (`RECLUSE_LINES.absorb`), and the God King fades up and away in light
+    (`gkLeave`). Sounds: `gkHyuah`, `recluseDrain`, `gkLastGrunt2`, `recluseSpark`, `gkLeave`.
+  - **Then**, where he stands, he gets up in a rage (`rage`, both drawings); then the board draws his whole figure (a
+    phone too; `.rc-fig`, his place empty meanwhile: `.rc-away`) for his leap onto the middle (`leap`: a thud, dust, the
+    board jolts), the book brandished and thrown down open at his feet (`drop`), his chant over it (`chantRaise`,
+    `chant`: arms raised, his hair lifting into phase 2's) as light pours up out of it (CSS only: `.rc-light`, a pulsing
+    cone behind him, and `.rc-glow` on the pages; only opacity and transform move) and one chant line
+    (`RECLUSE_LINES.chant`); Sawyer's board-saw gap runs down and across the middle, the quarters part and each grows
+    into a whole board (a transform and a clip only) as the light dies, while blue arcs strike the cracks from his
+    raised hands (`Arcs`, `ARC_STRIKES`: a thin bright core in two soft glows, smooth paths redrawn every 70 ms, gone in
+    260 ms, two big ones as the board cracks and as it parts, a blue flash where each lands and a blue pulse on the
+    board; one SVG, no filter; `recluseArc`); the book snaps shut and flies up into his hands (`pickup`, his revive's
+    frames) while every board's pieces fly to their Chess960 squares; he leaps back to his place (`leap2`) and rests in
+    `idle2`; "PHASE 2".
+  - One book on screen throughout, in his frames (`RECLUSE_BOOK` isn't shown). His frames and the God King's are drawn
+    ahead from his battle's start (`prewarmRecluse`), its sounds made ahead in the sound worker. Other sounds: his
+    rustle, `recluseThump` (landing), `recluseShut` (the book), `recluseGlow` (the light), the saw's crack.
+- **His half-engine look** (Eric, Oct 14: "if we can avoid doing any sort of changing to the sprite and just do an
+  overlay, that would be sick"): from the absorption to the end of the battle (the result screen too), over every
+  drawing of him (the bust, his figure by the board, his figure on the board, the results): his left eye (our right)
+  glows cold blue, faint circuit lines run from it to his temple and down his cheek, and now and then it flickers
+  (`EngineOverlay` in `components/Recluse.tsx`: a box his drawing's size holding one his head's size, moved onto his head
+  each frame by a transform, `placeEngine`, from the head part's place in the frame, `headOf`; the kit's `engine`;
+  styles `.bc-engine`, opacity and transform animations only). It ignites only as it comes (`fresh`); a new battle
+  clears it (`resetBeats`).
+- **The God King is gone in phase 2** (absorbed): his place in the dock stays, empty (`king="gone"`, so the dock doesn't
+  move), no button, no charges, and not a word from him (his phase 2 lines are gone; a board's result is on the board's
+  own tag, and his word on it is the boss's).
 - **Phase 2** (rules `packages/chess/src/bosses/recluse-phase2.ts`; driver `Phase2Game`; screen `SimulScreen`): four
   boards, each its own Chess960 start (`phase2Numbers`, from the battle's seed, all different), each a BoardState from
   a base at ply 0 (`phase2Board`). The players are White; you play board 0, bots the other three. His brain is
@@ -120,8 +147,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   has no clock. A board ends by mate, a draw, time (`phase2Flags`) or resigning (`phase2Resign`); the others play on;
   the battle ends when every board is decided, won only with all four won (`phase2Outcome`). Then his reaction
   (`RECLUSE_PHASE2.endMs`: beaten, the spellbook's glow as a placeholder for his transformation; he won, his laugh) and
-  the result (`results.simul`: "won N of 4"). No power-ups, no items; the God King's help stays blocked and mocked
-  (`slam2`), a try spending its charge as in phase 1. Engine move (admins) works on your board.
+  the result (`results.simul`: "won N of 4"). No power-ups, no items, no God King (absorbed). Engine move (admins)
+  works on your board.
 - **His phase 2 ultimate** (Eric, Oct 14): a move longer than `slowMoveSeconds` (5 s; anyone's, any board, before it
   comes) is a slow move for the team (`Phase2State.slow`; his line, `slow`, low priority: it never stacks; a soft sound,
   `recluseSlow`; the marks flash and that board gets a "slow move" note); each shows as a red pixel X beside your board
@@ -133,8 +160,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   time). The dock counts it down. Bots think past 5 s now and then before it (`botSlowChance`, `botSlowMs`). The
   admins' trigger brings it at once.
 - **His collusion lines** (Eric, Oct 14): every `talkEvery` (8) of his moves on all the boards, give or take
-  `talkJitter` (2), a line about the team against him (`Talk`, `RECLUSE_LINES.collusion`), in three stages by his moves
-  so far (`talkStage`: early muttering, accusations from `talkMiddleFrom` 24, paranoid ranting from `talkLateFrom` 64).
+  `talkJitter` (2), a line (`Talk`): every third, from the first, mocks the engine he took (`RECLUSE_LINES.engine`, in
+  turn: "Fun, isn't it?"); the rest are about the team against him (`RECLUSE_LINES.collusion`), in three stages by his
+  moves so far (`talkStage`: early muttering, accusations from `talkMiddleFrom` 24, paranoid ranting from `talkLateFrom` 64).
   The lowest priority (`CHATTER` in `speech.tsx`): skipped while any line of his is up, and any other line cuts in on
   it. His rivals' last names are fine; never their country or its people; nothing says Korchnoi threw games.
 - **Layouts:** a phone: the other three boards small above yours (tap one to watch it; "Back to my board"); a computer:
@@ -374,7 +402,9 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 - The Hidden Boss: unit `packages/chess/test/recluse.test.ts` (hidden from players, his brain, the bullet clock and
   its increment, the loss on time, the God King blocked and a try spending its charge, no strikes), `packages/chess/test/recluse-phase2.test.ts` (phase 2's starts, ply-0 bases,
   clocks, time, resign, all four must win, the Stockfish-only brain), `packages/app/test/recluse-phase2.test.ts` (the
-  phase change's beats and its one book, the four boards driven, his lines, the collusion lines' stages and priority),
+  phase change's beats and its one book, the absorption's (his figure run, the God King's look at each moment and gone
+  for good, his triumph giving way to his cry), the arcs, the four boards driven, his lines, the God King silent in
+  phase 2, the chatter's engine lines and the collusion lines' stages and priority),
   frames `npm run frames:recluse2 -- <dir> [phone|desktop|both] [light|dark] [only=change]` (phase 2; the phase change
   alone with `only=change`), `packages/app/test/recluse-boss.test.ts` (kit, collapse loop, the run in place,
   the mocks, the quotes word for word, sounds), `recluse.test.ts` (art); e2e `e2e/recluse.spec.ts`; frames
