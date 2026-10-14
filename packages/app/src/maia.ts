@@ -87,8 +87,11 @@ export function fileTotal(built: number | undefined, contentLength: string | nul
 
 /** The download as the loading step shows it. */
 export interface MaiaDownload {
-  /** "fetching": not all here yet; "done": all here (just fetched, or saved already); "failed": the worker tries itself. */
-  state: "idle" | "fetching" | "done" | "failed";
+  /**
+   * "checking": looking in the service worker's cache; "fetching": not all here yet; "done": all here (just fetched, or
+   * saved already); "failed": the worker fetches what it needs itself.
+   */
+  state: "idle" | "checking" | "fetching" | "done" | "failed";
   /** Every file was saved on this device already: nothing came down. */
   saved: boolean;
   files: FileProgress[];
@@ -139,12 +142,13 @@ async function readCounting(url: string, slot: FileProgress): Promise<void> {
 export function prefetchMaia() {
   if (prefetching || typeof fetch === "undefined") return;
   const files: FileProgress[] = [];
-  download = { state: "fetching", saved: false, files };
+  download = { state: "checking", saved: false, files };
   const done: Promise<void> = (async () => {
     if (await allSaved()) {
       download = { state: "done", saved: true, files };
       return;
     }
+    download = { state: "fetching", saved: false, files };
     await Promise.all(
       FILES.map((f) => {
         const slot: FileProgress = { loaded: 0, total: null };

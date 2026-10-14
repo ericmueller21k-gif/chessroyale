@@ -182,6 +182,8 @@ test("the loading step: Stockfish's workers end, Maia loads alone behind \"Loadi
   await asAdmin(page);
   await page.addInitScript(workerLog);
   await page.goto("/?debug&clock=40&bossMoves=4&laststand=0&boss=gingerbread");
+  // (The service worker in control, so it keeps Maia's files for the next battle.)
+  await page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 30_000 });
   // (The app's Stockfish is up before the battle: the pool made as the app opens.)
   await expect.poll(() => page.evaluate(() => (window as any).__workers.filter((w: any) => w.what === "send isready" && w.url.includes("stockfish")).length)).toBeGreaterThan(0);
   const seen = await watchFor(page, { overlay: { selector: ".boss-loading", text: /Loading the boss…/ }, starting: { selector: ".boss-loading", text: /Starting…/ } });
@@ -239,6 +241,13 @@ test("the loading step: Stockfish's workers end, Maia loads alone behind \"Loadi
     lines.push(await page.evaluate(() => ((window as any).match.brainLine as string | null) ?? ""));
   }
   expect(lines.filter((l) => /Maia \d+ · no guard · Maia's #\d+ · \d+ ms/.test(l)).length, lines.join(" | ")).toBeGreaterThanOrEqual(1);
+  // The next battle on this device: its files are saved, so it's straight to "Starting…", with no word of a download.
+  await page.goto("/?debug&clock=40&bossMoves=4&laststand=0&boss=gingerbread");
+  const again = await watchFor(page, { first: { selector: ".boss-loading-first" }, download: { selector: '.boss-loading[data-stage="download"]' }, starting: { selector: ".boss-loading", text: /Starting…/ } });
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 60_000 });
+  expect(await again.seen()).toEqual({ first: false, download: false, starting: true });
+  expect(await page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/· ready$/);
 });
 
 test("the loading step gives up when Maia can't load (its model missing): the battle goes on with Stockfish, the admins' line says why", async ({ browser }) => {

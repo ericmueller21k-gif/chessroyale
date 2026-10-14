@@ -17,10 +17,13 @@ const mb = (bytes: number) => Math.round(bytes / 1e6);
 export function BrainLoading({ match, boss }: { match: GameView; boss: BossView }) {
   const d = maiaDownload();
   const fetching = d.state === "fetching";
+  // (A moment looking for the files on this device first: saved, it's straight to "Starting…", with no word of a
+  // download.)
+  const checking = d.state === "checking";
   const p = downloadProgress(d.files);
-  const share = fetching ? p.share : 1;
+  const share = checking ? null : fetching ? p.share : 1;
   return (
-    <div class="boss-loading" role="status" aria-live="polite" data-stage={fetching ? "download" : "starting"}>
+    <div class="boss-loading" role="status" aria-live="polite" data-stage={checking ? "checking" : fetching ? "download" : "starting"}>
       <span class="boss-loading-icon" aria-hidden="true">
         <BossFace boss={boss} />
       </span>
@@ -28,7 +31,7 @@ export function BrainLoading({ match, boss }: { match: GameView; boss: BossView 
       <span class={`boss-loading-bar${share === null ? " busy" : ""}`} role="progressbar" aria-label="Loading the boss" aria-valuemin={0} aria-valuemax={100} aria-valuenow={share === null ? undefined : Math.round(share * 100)}>
         <i style={share === null ? undefined : { transform: `scaleX(${share})` }} />
       </span>
-      <span class="boss-loading-note">{!fetching ? "Starting…" : p.total ? `${mb(p.loaded)} of ${mb(p.total)} MB` : "Downloading…"}</span>
+      <span class="boss-loading-note">{checking ? "\u00a0" : !fetching ? "Starting…" : p.total ? `${mb(p.loaded)} of ${mb(p.total)} MB` : "Downloading…"}</span>
       {fetching && <span class="boss-loading-first">First time only: about {BOSS_BRAIN.downloadMb} MB, then it's saved on this device.</span>}
       {match.exit === "leave" && match.exitHome && (
         <button type="button" class="btn btn-secondary boss-loading-leave" onClick={exitMatch}>
