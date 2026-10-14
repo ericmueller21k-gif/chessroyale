@@ -72,6 +72,32 @@ describe("crates", () => {
     expect(itemChance(beta, "antlers")).toBe(0);
   });
 
+  it("Beta, complete (28 items): each box's items and every item's chance, each tier's items rarer than the one below's", () => {
+    const boxes = Object.fromEntries((["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const).map((t) => [t, beta.items.filter((id) => itemDef(id)?.tier === t)]));
+    expect(boxes).toEqual({
+      common: ["party-hat", "wizard-hat", "top-hat", "fake-mustache", "fedora", "bandana", "ninja-headband", "shuriken"],
+      uncommon: ["viking-helm", "little-crown", "briefcase", "eyepatch", "hook", "ninja-mask", "nunchucks"],
+      rare: ["dark-shades", "wire-earpiece", "cutlass", "spyglass", "katana"],
+      epic: ["suit-and-tie", "captains-coat", "ninja-hood", "ninja-gi"],
+      legendary: ["pirate-hat", "smiley-face"],
+      mythic: ["tommy-gun", "parrot"],
+    });
+    expect(beta.items).toHaveLength(28);
+    // Boxes 40/26/18/14 shared evenly (5, 3.71, 3.6 and 3.5% each); Fischer Random 2%: Legendary 80 (0.8% each),
+    // Mythic 20 (0.2% each).
+    const chance: Record<string, number> = { common: 0.05, uncommon: 0.26 / 7, rare: 0.036, epic: 0.035, legendary: 0.008, mythic: 0.002 };
+    for (const [tier, ids] of Object.entries(boxes)) for (const id of ids) expect(itemChance(beta, id), id).toBeCloseTo(chance[tier]!, 6);
+    // The ladder holds item by item: any one item is rarer than any one item of the tier below.
+    const each = TIERS.map((t) => chance[t.id]!);
+    for (let i = 1; i < each.length; i++) expect(each[i]!).toBeLessThan(each[i - 1]!);
+    expect(fischerOdds(beta)).toEqual([
+      { item: "pirate-hat", weight: 40 },
+      { item: "smiley-face", weight: 40 },
+      { item: "tommy-gun", weight: 10 },
+      { item: "parrot", weight: 10 },
+    ]);
+  });
+
   it("the strip: a box per tier, each rarer than the one below, then Fischer Random at 2%; every tier holds something", () => {
     for (const c of CRATES) {
       const tiers = c.strip.map((x) => x.tier);
@@ -216,13 +242,15 @@ describe("crates", () => {
     }
     expect(twos["present"]).toBeGreaterThan(100);
     expect(twos["ski-goggles"]).toBeGreaterThan(300);
-    // Beta's: the suit (and its tie), and the Tommy Gun (metal and wood).
+    // Beta's: the suit (and its tie), the Tommy Gun (metal and wood) and the Parrot (body, wings and tail).
     for (let i = 0; i < 400; i++) {
       const r = rollCrate(rng, beta, { fischer: i % 2 === 0 });
       expect(r.color2 !== undefined, r.def).toBe(itemDef(r.def)?.colors === 2);
     }
     expect(itemDef("suit-and-tie")?.colors).toBe(2);
     expect(itemDef("tommy-gun")?.colors).toBe(2);
+    expect(itemDef("parrot")?.colors).toBe(2);
+    expect(ITEM_DEFS.filter((d) => crateDef("beta-001")!.items.includes(d.id) && d.colors === 2).map((d) => d.id)).toEqual(["suit-and-tie", "tommy-gun", "parrot"]);
     expect(cleanLook({ head: { def: "present", color: "red", color2: "cobalt", blemish: 3, seed: 1 } }).head?.color2).toBe("cobalt");
     expect(cleanLook({ head: { def: "santa-hat", color: "red", color2: "cobalt", blemish: 3, seed: 1 } }).head?.color2).toBeUndefined();
   });

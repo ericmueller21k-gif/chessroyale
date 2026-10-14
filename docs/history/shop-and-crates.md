@@ -210,7 +210,7 @@ Color column: which part takes the rolled color (everything else is fixed, with 
 
 | Item | Tier | Slot | Color | Description |
 | --- | --- | --- | --- | --- |
-| Fake Moustache | Common | face | the moustache | A flawless disguise. Nobody will ever know it's you. |
+| Fake Mustache | Common | face | the mustache | A flawless disguise. Nobody will ever know it's you. |
 | Fedora | Common | head | the hat (dark band) | For trench-coat weather and shadowy endgames. |
 | Briefcase | Uncommon | weapon | the case (gold clasps) | Contents classified. Mostly sandwiches. |
 | Dark Shades | Rare | face | the frames (dark lenses) | Can't see the board. Looks great, though. |
@@ -259,7 +259,7 @@ Color column: which part takes the rolled color (everything else is fixed, with 
 
 | Box | Chance | Items | Each |
 | --- | --- | --- | --- |
-| Common (gray) | 40% | Party Hat, Wizard Hat, Top Hat, Fake Moustache, Fedora, Bandana, Ninja Headband, Shuriken | 5.0% |
+| Common (gray) | 40% | Party Hat, Wizard Hat, Top Hat, Fake Mustache, Fedora, Bandana, Ninja Headband, Shuriken | 5.0% |
 | Uncommon (green) | 26% | Viking Helm, Little Crown, Briefcase, Eyepatch, Hook, Ninja Mask, Nunchucks | 3.71% |
 | Rare (blue) | 18% | Dark Shades, Wire Earpiece, Cutlass, Spyglass, Katana | 3.6% |
 | Epic (purple) | 14% | Suit and Tie, Captain's Coat, Ninja Hood, Ninja Gi | 3.5% |
@@ -284,9 +284,24 @@ Winter, with the Scarf: the Uncommon present holds Antlers and Scarf, 13% each (
 
 ### Batches
 
-| Batch | Items | Running total |
-| --- | --- | --- |
-| 1 | Crate, supply box, two-crate page; Winter Scarf; the 5 Classics; Smiley Face, Tommy Gun, Dark Shades, Suit and Tie, Eyepatch | 10 of 28 |
-| 2 | Agent: Fake Moustache, Fedora, Briefcase, Wire Earpiece; Pirate: Bandana, Hook | 16 (agent complete) |
-| 3 | Pirate: Cutlass, Spyglass, Captain's Coat, Pirate Hat, Parrot | 21 (pirate complete) |
-| 4 | Ninja: Headband, Shuriken, Ninja Mask, Nunchucks, Katana, Ninja Hood, Ninja Gi | 28 (complete) |
+As shipped (Oct 14: Eric approved finishing it, so the planned batches 2 and 3 went out as one, and the ninja as the
+last):
+
+| Batch | Items | Running total | Status |
+| --- | --- | --- | --- |
+| 1 | Crate, supply box, two-crate page; Winter Scarf; the 5 Classics; Smiley Face, Tommy Gun, Dark Shades, Suit and Tie, Eyepatch | 10 of 28 | Live (PR #141) |
+| 2 | Agent: Fake Mustache, Fedora, Briefcase, Wire Earpiece; Pirate: Bandana, Hook, Cutlass, Spyglass, Captain's Coat, Pirate Hat, Parrot | 21 (agent and pirate complete) | Live (PR #181) |
+| 3 | Ninja: Headband, Shuriken, Ninja Mask, Nunchucks, Katana, Ninja Hood, Ninja Gi | 28 (complete) | Built: the crate is complete, at the final odds above |
+
+### Odds after batch 2
+
+| Box | Chance | Items | Each |
+| --- | --- | --- | --- |
+| Common | 40% | Party Hat, Wizard Hat, Top Hat, Fake Mustache, Fedora, Bandana | 6.67% |
+| Uncommon | 26% | Viking Helm, Little Crown, Briefcase, Eyepatch, Hook | 5.2% |
+| Rare | 18% | Dark Shades, Wire Earpiece, Cutlass, Spyglass | 4.5% |
+| Epic | 14% | Suit and Tie, Captain's Coat | 7% |
+| Fischer Random | 2% | Legendary 80%: Pirate Hat, Smiley Face | 0.8% each |
+| | | Mythic 20%: Tommy Gun, Parrot | 0.2% each |
+
+(The two Epic items were each likelier than a Common one until the ninja's two Epics joined in batch 3.)

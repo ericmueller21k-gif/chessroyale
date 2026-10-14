@@ -4582,19 +4582,24 @@ button.history-label {
    feet. The board keeps the room it had (310 px of the height for the rest). The column beside the board (chat, or from
    900 to 1099 px the scoreboard) keeps clear of him: `--gk-clear`, how far he reaches past the board's column, worked
    out from the same sums as the board's size (the screen's width less its gutters, the 28 px gap and the 340 px
-   column; the board's width in what's left). */
+   column; the board's width in what's left).
+   The boss by the board's corner stays inside the window (Eric, Oct 14: at 1024 px he was half off it): `--bs-need`,
+   how much more room he needs left of the board's row than the screen's margin gives (`--bs-reach`, how far he can
+   reach left of the row, from his widest frame: Sawyer's 44 sprite px; set with .boss-side below). Where it's more
+   than nothing, the board gives up that much on each side, only when the window's width is what limits it. */
 @media (min-width: 900px) and (min-height: 600px) {
   .screen.game:has(> .boss-dock) {
     --gk-off: 2px;
     --gk-screen: var(--col);
     --gk-column: calc(var(--gk-screen) - 2 * var(--gutter) - 368px);
-    --gk-board: min(var(--gk-column), 100dvh - 310px);
+    --bs-need: calc(var(--bs-reach, 0px) - (100vw - var(--col)) / 2 - var(--gutter));
+    --gk-board: min(var(--gk-column) - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
     /* (His box is 120 px; his cape reaches a few pixels past it.) */
     --gk-clear: max(0px, var(--gk-off) + 128px - (var(--gk-column) - var(--gk-board)) / 2 - 28px);
   }
   .screen.game:has(> .boss-dock):has(.board-row > .eval-bar) {
     --gk-off: 26px;
-    --gk-board: min(var(--gk-column) - 48px, 100dvh - 310px);
+    --gk-board: min(var(--gk-column) - 48px - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
   }
   .screen.game:has(> .boss-dock) > .board-area {
     grid-row: 3;
@@ -4604,17 +4609,17 @@ button.history-label {
     grid-row: 4;
     align-self: start;
     width: 100%;
-    max-width: min(100%, 100dvh - 310px);
+    max-width: min(100% - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
     justify-self: center;
   }
   .screen.game:has(.board-row > .eval-bar) > .boss-dock {
-    max-width: min(100% - 48px, 100dvh - 310px);
+    max-width: min(100% - 48px - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
   }
   .screen.game:has(> .boss-dock) .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 310px));
+    width: min(100% - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
   }
   .screen.game:has(> .boss-dock) .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 48px), calc(100dvh - 310px));
+    width: min(100% - 48px - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
   }
   .screen.game:has(> .boss-dock) > .under-board,
   .screen.game:has(> .boss-dock) > .mini-tower {
@@ -10718,6 +10723,32 @@ img.qicon {
     bottom: 0;
     width: 96px;
     height: 120px;
+  }
+  /* (How far he can reach left of the board's row: his box's middle 62 px out, Sawyer's 44 sprite px past it, at 2
+     screen px each; see .boss-dock.) */
+  .screen.game:has(.board-row > .boss-side) {
+    --bs-reach: 152px;
+  }
+}
+/* From 900 to 1099 px the window has no room for him at 2× (Eric, Oct 14: Ginger was half off it at 1024 px), so he's
+   drawn at 1× (one screen px a sprite px, as in the boss bar on a phone), nearer the eval bar: his box's middle 26 px
+   out, so 70 px with Sawyer's reach (plus 2). The board makes room only if the screen's margin and the board's own
+   slack don't (at 1024 × 768 it doesn't move). */
+@media (min-width: 900px) and (max-width: 1099px) and (min-height: 600px) {
+  .boss-char.place-side {
+    --bc-scale: 1;
+    right: 2px;
+    width: 48px;
+    height: 60px;
+  }
+  .screen.game:has(.board-row > .boss-side) {
+    --bs-reach: 72px;
+  }
+}
+/* Beside the leaderboard (1100 px and up) he stands over its edge, as before: the window's edge is far off. */
+@media (min-width: 1100px) and (min-height: 600px) {
+  .arena .screen.game:has(.board-row > .boss-side) {
+    --bs-reach: 0px;
   }
 }
 /* His words: a pixel text box beside him (above him by the board), like the God King's. */

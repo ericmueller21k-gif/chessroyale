@@ -32,6 +32,17 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
     measured without transforms (a board in a turning or jolting row keeps its size) and written on the wrap as
     `--board-width` (read as `--board-size`, styles.css): **everything drawn over the squares sizes and places itself
     in eighths of `--board-size`**, never in % of the wrap.
+  - **When it draws** (Oct 14, 2026; DECISIONS.md, "The board draws its pieces only when they change"): the board is
+    two parts. `OwnBoard` is the wrap, what the screen draws over the board (`children`, under the `BoardTurn`
+    context) and the promotion picker; it's drawn again whenever the screen is (a boss screen draws every frame while an
+    effect plays). Its drawing layer (`BoardLayer`: the squares and highlights, the pieces, the arrows, the coordinates,
+    taps and drags) is drawn again only when what it shows changes: `boardInputs` (logic.ts) lists those, as plain
+    values (the position, the way up and turn, the last move, the moves allowed, the arrows, the marks, the dark,
+    `interactive`, `small`, `animate`); lists and objects count by what's in them, so a screen building fresh ones each
+    time changes nothing. Or by itself: a tap, a drag, a slide or a fade ending (its own timer), a move you made. A move
+    you made still goes back as before: the first time the screen hands the board anything new (`arrows` by identity
+    too), it's let go and the layer draws again. The layer counts its drawings on `.hb-board` (`hbDraws`, read by
+    `e2e/perf.spec.ts`).
   - **Its elements and stacking:** `<piece class="white pawn">` (z-index 2; sliding `anim` 8; `dragging` 11; a
     captured one `fading` 1), `<square>` highlights (`last-move`, `selected`, `move-dest`, `oc`, and each `marks` class), arrows in `svg.hb-shapes`
     (see-through, z-index 2) and their labels (`svg.hb-labels`, 9), the coordinates (`.hb-coords`) under the pieces.
@@ -63,14 +74,25 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
 
 ## Tests and tools
 
-- Unit: `packages/app/test/board-logic.test.ts` (every square's place at every orientation and turn, against
+- Unit: `packages/app/test/board-logic.test.ts` (when it draws again: the same board from fresh lists and handlers
+  doesn't, every input it shows does; every square's place at every orientation and turn, against
   `squareXY`; the square under a point; the board's size; the 3 px drag threshold; taps, tap-tap, drags, drops and
   what each lets go of; the move dots, a power's moves and Hollow's dark; which piece slides where, a capture's fade,
   castling, a promotion; arrows), `board-view.test.ts`, `pieces.test.ts` (the pieces' files, sources and license).
-- e2e: every test that touches the board finds its parts through `BOARD_SEL` in `e2e/helpers.ts`.
+- e2e: every test that touches the board finds its parts through `BOARD_SEL` in `e2e/helpers.ts`. `e2e/perf.spec.ts`
+  checks the board isn't drawn every frame while Jefferson's Roman candle plays over it (`hbDraws`).
+- Perf: `npm run perf:boss -- <dir> <boss id> [phone|desktop|both] [moves] [power]` reports each boss effect's frames
+  and long tasks (`fxBy`); `PERF_DIST`, `PERF_NO_BUILD` compare two builds.
 - Frames: every `npm run frames:*` script.
 
 ## Rules for this area (from `.claude/LESSONS.md`)
+
+- **The rendering rule:** the board's pieces are drawn only when the position, the way up or turn, the size or the
+  highlights change, never once a frame. Anything that animates over the board does it in its own layer: a child of
+  `Board` (it may take `now` and draw every frame), one of `BoardEffects`' shared canvas (bosses.md), or a CSS
+  animation or transform. Never animate by handing the board a new value each frame (a `fen`, `lastMove`, `marks`,
+  `arrows` or `animate` that changes every frame redraws every piece every frame). A new prop the board draws from goes
+  in `boardInputs` (and its test in `board-logic.test.ts`), or the board won't show it changing.
 
 - Anything drawn over the squares sizes and places itself in eighths of `--board-size`, never % of the wrap.
 - Board coordinates sit inside their edge squares, either way up and turned; `expectCoordsInSquares` measures them.

@@ -141,6 +141,7 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
   // Through the sparkler and the candle: the launch itself measured (he slams the candle down and fires 24 shots that
   // fan out, each whistling; the first wave's shadows appear as he jumps off).
   let launch: { p95: number; slow: number } | null = null;
+  let draws = 0;
   for (let i = 0; i < 3; i++) {
     await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
     const { fen, allowed } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: ((window as any).match.boss?.powers?.allowed ?? null) as string[] | null }));
@@ -149,12 +150,21 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
     await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
     if (i === 1) {
       await page.locator(".pm-rex").waitFor({ timeout: 30_000 });
+      // (How many times the board draws its pieces through the launch: the board under the moment, kept.)
+      await page.evaluate((sel) => {
+        const el = document.querySelector(sel) as (HTMLElement & { hbDraws?: number }) | null;
+        Object.assign(window, { __launchBoard: el, __launchDraws: el?.hbDraws ?? 0 });
+      }, BOARD_SEL.squares);
       await page.evaluate(() => ((window as any).__perf.frames = []));
       await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
       launch = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((f) => f[0]));
+      draws = await page.evaluate(() => ((window as any).__launchBoard?.hbDraws ?? 0) - (window as any).__launchDraws);
     }
   }
-  console.log(`G-REX's Roman candle launch (slowed phone): p95 ${launch!.p95} ms, ${Math.round(launch!.slow * 100)}% dropped`);
+  console.log(`G-REX's Roman candle launch (slowed phone): p95 ${launch!.p95} ms, ${Math.round(launch!.slow * 100)}% dropped, the board drawn ${draws} times`);
+  // The screen draws every frame while the candle plays over the board; the board's pieces only when they change
+  // (docs/areas/board.md): a few times at most, not once a frame (Oct 14: it was every frame).
+  expect(draws, "the board's pieces drawn during the launch").toBeLessThan(10);
   expect(launch!.p95, "the launch: 95th percentile frame (ms)").toBeLessThan(50);
   expect(launch!.slow, "the launch: share of dropped frames").toBeLessThan(0.15);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");

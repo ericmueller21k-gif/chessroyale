@@ -1,11 +1,11 @@
 import { BOSS_POWERS } from "@chessroyale/core";
 import { FIRE_BURN_MS } from "@chessroyale/chess";
 import { bossKit, type BossKit } from "../characters/kits.ts";
-import { EFFECTS, animLength, cueAt } from "../characters/power-art.ts";
+import { EFFECTS, animLength, cueAt, type EffectName } from "../characters/power-art.ts";
 import { CANDLE_SHOTS, candleMuzzle } from "../characters/grex.ts";
 import type { BossView } from "../game.ts";
 import { BossFace } from "./BossCharacter.tsx";
-import { BoardEffects, BossEffect, BossMoment, type BoardItem } from "./BossEffect.tsx";
+import { BoardEffects, BossEffect, BossMoment, prewarm, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
 import { Flight, onSquare, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
 import { CRITICAL } from "../speech.tsx";
@@ -135,6 +135,22 @@ export function candleShotPath(i: number): { left: number; top: number; deg: num
   // (Its reach in its own box's size, two squares: five to seven squares.)
   return { left, top, deg: deg * 1.25 + jitter, reach: 260 + ((i * 53) % 4) * 30 };
 }
+let warmed = false;
+/**
+ * His Roman candle's frames drawn ahead, a slice each animation frame, as his battle starts: his own, a shot's rocket,
+ * the column of shots still up and the fireballs, so the launch doesn't stall a slow phone the first time it shows
+ * (Oct 14: drawing them as it went up took about 650 ms of a phone's time slowed 4x; .claude/LESSONS.md, "A stall the
+ * first time an effect shows").
+ */
+export function prewarmGrex(name: string): void {
+  const kit = bossKit(name);
+  if (!kit || warmed) return;
+  warmed = true;
+  const all = (fx: EffectName) => Object.entries(EFFECTS[fx].ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const));
+  prewarmSprite(kit.ch, kit.ch.anims[kit.anims.ultimate ?? ""]?.frames ?? []);
+  for (const fx of ["candleShot", "candleShots", "fireballFall"] as const) prewarm(fx, all(fx));
+}
+
 function CandleShot({ i, since }: { i: number; since: number }) {
   const { left, top, deg, reach } = candleShotPath(i);
   const a = (deg * Math.PI) / 180;
