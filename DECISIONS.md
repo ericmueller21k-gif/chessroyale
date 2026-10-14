@@ -2937,6 +2937,81 @@ pull; SHOWDOWN!'s ropes reaching pieces anywhere on the board (a rook hauled fro
 the pairs landing; the duels glowing on edge files (a6-b6); the meter full on the duel's turn. (The computer's
 screencast had 0.4-0.55 s gaps throughout, the machine shared with other sessions' e2e runs, none tied to his moments.)
 
+### The Hidden Boss: no chess piece, a natural free arm (Eric, Oct 14, 2026)
+
+Eric, on the approved sprite: "that chess piece in his hand, we can do away with that... his hand looks all weird with
+the chess piece... The one with the book is fine." Art only (`characters/recluse.ts`); this replaces the piece in "The
+Hidden Boss, a sprite preview" above.
+
+- **No piece anywhere:** every animation, phase 1 and 2, the full figure and the bust (a test checks that no frame
+  draws one).
+- **His free arm** (his left, our right) now hangs relaxed: the same sleeve, rolled cuff and shading as his book arm,
+  a fuller forearm (it was 3 to 4 px, reading as a stick next to the sleeve; now about 5) and a typed hand, open and
+  relaxed, its thumb in front towards his body and parted by a shade line, the fingers loosely curled. The hand carries
+  its own outline, open at the top, so no line crosses the wrist. When he holds the book out in front of him, that hand
+  grips its edge as before.
+- **The animations that used the piece:** the idle's piece-turning is now two small curls of his free hand's fingers
+  while his eyes are down; phase 2's idle keeps his fingers drumming on the book. The stare never held the piece out
+  (it already only leans in), so it is unchanged. The slam stays the book slammed shut with its puff of dust: he has
+  stood without the stone since Eric's redesign, so a palm slam on the stone isn't possible, and bringing the book down
+  is the slam Eric approved. The book animations are untouched.
+
+### The Maia box's source on the site (Eric, Oct 13–14, 2026)
+
+Eric's OK on Oct 13 ("Publish it."): publish the Maia box's source, then turn `BOSS_BRAIN.forPlayers` on. **The source
+is published** (below). **`forPlayers` stays off for now:** the session doing this work wasn't permitted to change
+that value (its permission check treated it as a feature-flag change needing the owner's own approval), so the flip is
+a separate one-line change once Eric approves it himself. It's ready: the FAQ, the credits and the tests already
+cover both states (`packages/app/test/maia-players.test.ts`, `faq.test.ts`, `boss-powers-lobby.test.ts`). My calls:
+
+- **Where:** the site itself serves the box's complete source next to the worker it builds:
+  **`/engine/maia/maia-box-source.tar.gz`** (about 57 KB), so it stays public when the GitHub repository goes private.
+  It's a static file (Workers static assets), behind nothing but Zero Trust Access, which covers the whole site until
+  launch: no Worker route, no admin check.
+- **Built at build time by the box's own build** (`packages/maia-worker/scripts/source-archive.mjs`, called by
+  `build.mjs`), so it can't drift from what's served: the app's build copies the box's `dist/` as it is. Under
+  `maia-box/`: every file of the box (worker code, `build.mjs` and the archive script, `convert.py` and its
+  `requirements.txt`, `package.json`, `tsconfig.json`, the AGPL `LICENSE`, the README with the upstream Maia-3 commit,
+  the checkpoint's revision and sha256 and every conversion step, the bundled libraries' license texts, the tests and
+  their fixtures), minus `dist/`, `node_modules/` and the model; plus three files written for it: `package-lock.json`
+  (the box's own packages cut from the workspace's lockfile, so `npm ci` installs exactly what the site's build used),
+  `model/README.txt` (the model's name, size, sha256 and where to get it) and `SHA256SUMS.txt` (every file the build
+  wrote, to check a rebuild against the site). The same files make the same bytes (sorted entries, fixed times and
+  owners).
+- **Checked by rebuilding:** extracted, the model put in `model/`, `npm ci`, `node scripts/build.mjs`: all five served
+  files came out byte for byte the same (`sha256sum -c SHA256SUMS.txt`), and so did the archive; npm leaves the
+  cut lockfile exactly as it is.
+- **The model is linked, not bundled again.** The AGPL (section 6(d)) lets the Corresponding Source sit on a different
+  server, a third party's included, with clear directions next to the object code, as long as we make sure it stays
+  available. The converted int8 file is itself served next to the archive (`/engine/maia/maia3-23m-int8.onnx`, the
+  same bytes the build takes from `model/`); what it's made from is CSSLab's own release (Hugging Face
+  `UofTCSSLab/Maia3-23M` and the `CSSLab/maia3` code), pinned by revision, commit and sha256, with `convert.py` doing
+  every step. A second copy in the archive (20.3 MB packed) would only make the same bytes download twice. Flagged: if
+  CSSLab ever removed that checkpoint revision, we'd have to host it ourselves (92 MB, over a static file's 25 MiB
+  limit: R2 or split files).
+- **Bundled libraries** (onnxruntime-web 1.30.0, MIT; chess.js 1.4.0, BSD) are pinned by the archive's lockfile
+  (exact versions and integrity hashes), not copied in: generally available packages, used unchanged.
+- **Caching:** the archive isn't precached by the service worker, isn't kept in the Maia cache, and doesn't count
+  toward that cache's name, so editing the box's README or tests never makes a player download Maia again.
+- **Stockfish too (my call: cheap, same mechanism).** The credits pointed upstream only (Stockfish's repository and
+  stockfish.js's, not the exact version), while the GPL-3.0 asks for the source of the very build we serve. Now
+  **`/engine/stockfish-source.tar.gz`** (1.6 MB): stockfish.js at its tag `v19.0.0` (commit `9cb3e506…`, as `git
+  archive` writes it), the lite network the build embeds (`src/nn-61e7af4bb97d.nnue`, which its build would otherwise
+  download) and a note on what it is and how to build the two files (emscripten 3.1.7, `node build.js --lite
+  --single-threaded --no-split`). The npm package's files are byte for byte the tag's GitHub release, and the network
+  is inside the shipped `.wasm`. The npm package has no source, so the archive is committed
+  (`packages/app/stockfish-source/`, with how it was made) and the build refuses a `stockfish` version without one. Not
+  rebuilt by us (it needs emscripten 3.1.7): the provenance above is the check.
+- **Links:** Settings' credits ("this build and its source"; "Our Maia box's source code is free to download"), the
+  FAQ (one plain line in the Maia section, and both archives in its credits), `/licenses/third-party.txt` and the
+  Maia box's `NOTICE.txt` link the archives; nothing says "on request" any more.
+- **Tests:** `packages/maia-worker/test/source-archive.test.ts` (the build writes it; what it holds; nothing from the
+  game; the lockfile against the workspace's; the hashes; the same bytes twice), `packages/app/test/engine-source.test.ts`
+  (Stockfish's archive matches the installed version, its license, its network), `faq.test.ts` (the line, the links,
+  every Maia line live when it's on), `maia-players.test.ts` and `boss-powers-lobby.test.ts` (with `forPlayers` on for
+  the test: a player's boss on Maia by the same rule as an admin's, solo and online), and `e2e/maia.spec.ts` (the
+  archives served as gzip files that hold the source, a tap saving one).
+
 ### Beta Crate · Series 001, batch 2: the secret agent and the pirate (Oct 14, 2026)
 
 Eric approved finishing the Beta crate, so the planned batches 2 and 3 ship together (agent and pirate complete,

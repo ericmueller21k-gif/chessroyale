@@ -55,9 +55,20 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
 - **Test lanes** (Eric, Oct 13: "why are we going through so many checks for changing numbers?"):
   - **Light lane** (numbers or data in settings or vote data, copy, CSS-only, docs): `check`, plus the e2e specs for
     the screens touched, plus the live check after the deploy. No sims: estimate instead.
-  - **Full lane** (rules logic, the server, the protocol, stored data, the board or shared components, anything
-    spanning many screens): the whole `npm run e2e`.
-  - When unsure, the full lane.
+  - **Targeted lane** (pre-launch default for logic: rules, the board, shared components, screens, boss powers):
+    `check`, plus the e2e specs of every area the change touches (the PR lists them and why), plus the live check.
+    Eric, Oct 14: "if an agent is confident in its code we can reduce token usage and testing to a minimum". What a
+    change touches decides its lane, never how confident its author is: the misses (the resign confirm over the
+    board, Wrangler's showdown never firing, Oct 13-14) were all confident code.
+  - **Batch full run:** the director runs the whole `npm run e2e` on `main` after a batch of targeted-lane merges, at
+    least once a day and before Eric playtests a big feature. A red spec: re-run it alone once; if it's real, find
+    the PR that caused it and fix it forward (or revert) before the next batch.
+  - **Full lane per PR** (the whole `npm run e2e` before merging) stays for the riskiest: stored data (D1 schema,
+    migrations), money, odds and wallets, sign-in and security, the client-server protocol, and anything the
+    director marks.
+  - When unsure, the targeted lane, and say so in the PR: the director decides.
+  - **Pre-launch only.** `main` deploys to Eric alone (Zero Trust), so a slip costs a playtest, not players. At
+    launch every logic change goes back to the full lane per PR.
 - Classic (8 boards) will be reworked (Eric, Oct 5, 2026): don't invest in it until he decides the new design.
 - Merge PRs with a **merge commit**, not squash: the working branch then stays part of `main`'s history, so the next
   push is a plain fast-forward (squash merges left the branch diverged, needing a force-push). After merging, bring

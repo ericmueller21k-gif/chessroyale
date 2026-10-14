@@ -39,6 +39,11 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   share-alike compiled into the game's own code (the engines are separate programs with their own notices). A PR that
   adds or removes a third-party piece updates it, and the notices in `public/licenses/` and the credits in Settings and
   the FAQ.
+- **The engines' source, served by the site** (Oct 14, DECISIONS.md "The Maia box's source on the site"): the Maia
+  box's (AGPL-3.0) at `/engine/maia/maia-box-source.tar.gz`, written by its build; Stockfish's (GPL-3.0) at
+  `/engine/stockfish-source.tar.gz`, from `packages/app/stockfish-source/`. Static files, so they stay public when the
+  repository goes private; not precached by the service worker. Updating the `stockfish` package needs its source
+  archive first (the build stops without one).
 
 ## Where the code is
 
