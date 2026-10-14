@@ -1873,10 +1873,12 @@ p {
   background: var(--danger);
   color: #fff;
 }
+/* (A computer's: beside the flag, out into the column next to the board, its top level with the title line. The flag
+   sits over the board's right edge, so a confirm dropping under it would cover the board; Eric, Oct 13.) */
 .mm-confirm.mm-pop {
   position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
+  top: 0;
+  left: calc(100% + 28px);
   z-index: 66;
   width: 300px;
   display: grid;

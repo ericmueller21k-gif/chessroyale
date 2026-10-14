@@ -2679,4 +2679,5 @@ blinks.
 
 On a computer every match's title line spans the board's column (the boss bar's width) and ends in an admin's testing
 items, then sound, then the flag, so they sit next to the title, not at the window's corner (Eric: "utilize the space
-next to 'BOSS · move 1'"); when tight, the brain's pill ellipsizes first. Phones unchanged.
+next to 'BOSS · move 1'"); when tight, the brain's pill ellipsizes first. The flag's confirm now opens beside it, into
+the column next to the board (under it, it would cover the board). Phones unchanged.
