@@ -22,7 +22,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   (`knockoutsPerStage`; in 50 v 50 the same number from each team). The cut is a judgment: every player's pawn in a
   10 × 10 grid, the gavel, the verdict, "Why was I cut?" (the elimination breakdown). `stageBreakSeconds` 10.
 - **Pre-game votes (50 v 50, `augments`).** Before move 1 everyone votes by dragging their pawn into one of three zones
-  on an empty board (or tapping a card): how it ends (**team final**, **boss battle**, **duel**), then "How fast?", a
+  on an empty board (or tapping a card): how it ends (**team final**, **the Hidden Boss** (the boss final), **duel**), then "How fast?", a
   chess time control (**Rapid 10+5**, **Blitz 5+3**, **Bullet 3+2**; Blitz when nobody votes). The options and what
   they change are plain data in `packages/core/src/votes.ts` (a time control is one `timeControl(...)` entry: its bank,
   increment and cap; the card's label and blurb are made from them). **Every vote's options keep one order** on every
@@ -31,9 +31,23 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   flip. A default is named by its option's id (`optionIndex`), never by its place. Non-voters (and `voteBotSkip` of the bots) join
   the winner. `?speed=bullet|blitz|rapid` skips the vote for tests (old ids map over: normal → rapid, variable →
   blitz; an unknown id gets Blitz).
-- **The endings.** Team final: `teamFinalSizes` players a side, the weakest out every `teamFinalMovesPerStep`.
-  Boss battle: the last 10 against a boss (the God King joins). Duel: the last two. `finalMaxTurns` caps a final; the
-  engine adjudicates.
+- **The endings.** Each leaves `crowdFinalists(format)` players (the lobby less `CROWD_KNOCKOUTS[format]`). Team final:
+  `teamFinalSizes` players a side, the weakest out every `teamFinalMovesPerStep`. **The boss final** (Eric, Oct 14):
+  always the Hidden Boss, the top 4 against him (the duel's cuts, stopping at four), for everyone, solo and online; his
+  card in the vote is his roster name and icon ("Hidden Boss", 📕) with "Top 4 team up against him" (`bossFinalOption`
+  in `votes.ts`: renaming him is one edit, in `BOSS_ROSTER`). The rule: `BossDef.crowdFinal` and `crowdFinalBoss()`
+  (`boss.ts`), which the runner's `startBoss` meets whatever boss was picked or met last; he stays hidden from players
+  everywhere else (`adminOnly`). His rules there are his phase 1 (from the starting position, Maia at its top, raw, the
+  God King blocked, no strikes, the bullet clock; [bosses.md](bosses.md)). **Online** the lobby runs them through the
+  shared runner, his brain on the host's device; beaten, the board holds `RECLUSE_FALL_MS` for his collapse (the boss
+  message's `fall`), then the results (`timeout` when he won on time). **Phase 2 isn't online:** phase 1 won is the
+  crowd's victory there. **Solo** (you and bots), if you reached him, his phase 2 follows as in Boss alone, the other
+  three finalists on the other boards (`phase2Follows`, `phase2Mates` in `recluse-phase2.ts`). No reward comes from this
+  path (rewards only via Squads: ROADMAP.md). Duel: the last two. `finalMaxTurns` caps a final; the engine
+  adjudicates.
+- **Online, the vote's result** patches the app's settings as the server's (`NetMatch`'s "vote"), so the last cut names
+  the right ending and the leaderboard's cut line follows the right knockouts (a reload mid-match falls back to the
+  queue's settings: the team final's).
 - **The clock is a chess time control** (Eric, Oct 13): a **time bank** for the match (`timeBankSeconds`), an
   **increment added at the start of every move** (`timeIncrementSeconds`) and a **cap** on any one move
   (`moveClockSeconds`, read through `moveClockAt`), because 50 people pick together and every turn has to end. A move
@@ -87,7 +101,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 
 ## Settings
 
-`LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS`, `CROWD_EVERYONE_KNOCKOUTS`, `PACE_SETTINGS`
+`LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `CROWD_EVERYONE_KNOCKOUTS`, `PACE_SETTINGS`
 (relaxed/quick; tests use quick), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
 `moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
 time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
@@ -101,6 +115,11 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   and `formats.spec.ts` (the cards set the clock).
 - Resigning: `packages/server/test/resign.test.ts`, `lobby-life.test.ts`, `packages/chess/test/crowd.test.ts` ("leaving");
   e2e `e2e/resign.spec.ts` (Boss alone, a Solo 50 v 50, Squads, an online raid; phone and computer).
+- The boss final (the Hidden Boss): unit `packages/core/test/votes.test.ts` (his card, the knockouts), `boss.test.ts`
+  (`crowdFinalBoss`), `packages/chess/test/crowd.test.ts` ("50 v 50 boss final"), `packages/server/test/crowd-hidden-boss.test.ts`
+  (online: his brain and strength, the God King tried, the bullet clock and a loss on time, his fall then the results),
+  `packages/app/test/recluse-phase2.test.ts` (phase 2 in a solo Crowd's final), `faq.test.ts`; e2e
+  `e2e/crowd-hidden.spec.ts` (the card; solo through phase 2; online), `formats.spec.ts`.
 - e2e: `e2e/crowd.spec.ts`, `formats.spec.ts`, `votes.spec.ts`, `match-screen.spec.ts`, `panel.spec.ts`,
   `solo.spec.ts`, `multiplayer.spec.ts`, `castling.spec.ts`, `perf.spec.ts`.
 - Frames: `npm run frames:boss` (one move, real taps), `frames:flash` (white flashes), `frames:vote`, `frames:chat`.

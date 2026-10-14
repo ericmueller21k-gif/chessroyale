@@ -800,8 +800,9 @@ export const HOLLOW_LIGHTS: { readonly colours: readonly { readonly name: string
 
 /**
  * The Hidden Boss's phase 2 (Eric, Oct 14; DECISIONS.md, "The Hidden Boss, phase 2"): four boards of Chess960 at once,
- * each from its own start position, against Stockfish (never Maia: it can't play Chess960). Today an admin's fight in
- * Boss alone, on this device: you on one board, bots on the other three.
+ * each from its own start position, against Stockfish (never Maia: it can't play Chess960). Solo only, on this device:
+ * an admin's Boss alone (you on one board, bots on the other three) and a solo Crowd's boss final (the other finalists on
+ * the other three; Oct 14). Not online yet: there phase 1 won is the crowd's victory.
  */
 export const RECLUSE_PHASE2 = {
   /** How many boards (all of them must be won to beat him). */
@@ -838,7 +839,10 @@ export const RECLUSE_PHASE2 = {
   slowMoveSeconds: 5,
   slowMovesForUlt: 10,
   ultMoveSeconds: 5,
-  /** The bots on the other boards (Boss alone): Stockfish at this strength, this many nodes, within `botMoveMs`. */
+  /**
+   * The bots on the other boards (Boss alone's, or a solo Crowd's finalists beside you): Stockfish at this strength, this
+   * many nodes, within `botMoveMs`.
+   */
   botElo: 2200,
   botNodes: 100_000,
   /** A bot's thinking per move (ms, its own clock running): a random time in this range, as a bullet player's. */

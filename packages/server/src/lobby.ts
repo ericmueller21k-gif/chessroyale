@@ -1072,9 +1072,10 @@ export class LobbyCore {
       case "king": {
         const round = this.r.round;
         if (this.r.phase !== "play" || round?.key !== msg.key || !this.runner?.boss?.kingCharges || !this.runner.player(playerId)?.alive) return;
-        // (A boss the God King's help doesn't work against, the Hidden Boss: a call is never a turn, a strike or a tally.
-        // The caller's own app has him mock it.)
-        if (bossRules(this.runner.boss)?.blocksKing) return;
+        // (A boss the God King's help doesn't work against, the Hidden Boss: a call is never a turn, a strike or a tally,
+        // but each try spends a charge as if it had worked (runner.kingTried; Eric, Oct 14), as solo's does. The caller's
+        // own app has him mock it and shows the charge gone; everyone else sees it with the move's reveal.)
+        if (bossRules(this.runner.boss)?.blocksKing) return void this.runner.kingTried();
         if (msg.strike) return this.callStrike(playerId);
         // Calling the King to play the move is this player's whole turn: no move of their own.
         if (this.doneThisRound(playerId)) return;

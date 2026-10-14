@@ -165,7 +165,7 @@ describe("the Crowd's boss final online: always the Hidden Boss (Eric, Oct 14)",
     expect(L.bossRequests[0]!.stumble).toBeUndefined();
   });
 
-  it("a call for the God King against him is never a turn or a strike: the caller still picks, and nothing is sent about it", () => {
+  it("a call for the God King against him is never a turn or a strike: the caller still picks, nothing is sent about it, and each try spends a charge (as solo's)", () => {
     const L = crowdFinal();
     // Past the intro, to the crowd's first move of the battle.
     for (let i = 0; i < 100 && !(L.core.record.phase === "play" && L.core.save().runner!.state.boss!.crowdMoves === 0); i++) L.advance(1000);
@@ -175,8 +175,16 @@ describe("the Crowd's boss final online: always the Hidden Boss (Eric, Oct 14)",
     expect(me, "a person reached the final").toBeTruthy();
     const key = L.core.record.round!.key;
     const strikes = L.all("p1", "strike").length + L.all("p2", "strike").length;
+    const charges = () => L.core.save().runner!.state.boss!.kingCharges!;
+    const before = charges();
+    expect(before).toBeGreaterThanOrEqual(1);
     L.core.message(me!, { t: "king", key });
+    expect(charges()).toBe(before - 1);
     L.core.message(me!, { t: "king", key, strike: true });
+    expect(charges()).toBe(Math.max(0, before - 2));
+    // (Never below none.)
+    for (let i = 0; i < 4; i++) L.core.message(me!, { t: "king", key });
+    expect(charges()).toBe(0);
     expect(L.core.record.round!.kingCalls).toBeUndefined();
     expect(L.core.record.round!.kingStrikes).toBeUndefined();
     expect(L.all("p1", "strike").length + L.all("p2", "strike").length).toBe(strikes);
@@ -189,18 +197,27 @@ describe("the Crowd's boss final online: always the Hidden Boss (Eric, Oct 14)",
   it("his bullet clock online (?power=bullet: from turn 2): each person's deadline is their bank, the bullet bank, with no cap; everyone out of time, he wins on time (the results say so)", () => {
     const L = crowdFinal({ bossPowerTest: "bullet" });
     let deadline: number | null = null;
+    let plus: { allowed: number; bank: number } | null = null;
     for (let i = 0; i < 6000 && L.core.record.phase !== "results"; i++) {
       const b = L.core.save().runner!.state.boss!;
       const round = L.core.record.round;
-      if (deadline === null && L.core.record.phase === "play" && b.powers?.ultAt !== undefined && b.crowdMoves === b.powers.ultAt - 1 && round) {
-        // The turn it came: every bank was set to the bullet bank; a person's deadline is all of it.
-        const id = ["p1", "p2"].find((x) => L.core.save().runner!.state.players.find((p) => p.id === x)!.alive);
-        if (id) deadline = round.deadlines[id]! - round.startedAt;
+      const id = ["p1", "p2"].find((x) => L.core.save().runner!.state.players.find((p) => p.id === x)!.alive);
+      const turn = b.crowdMoves + 1;
+      if (L.core.record.phase === "play" && round && b.powers?.ultAt !== undefined && id) {
+        // The turn it came: every bank was set to the bullet bank; a person's deadline is all of it (no increment yet).
+        if (deadline === null && turn === b.powers.ultAt) deadline = round.deadlines[id]! - round.startedAt;
+        // Its first moves played (1+0), each move adds the increment (1+2): the bank and the increment, still no cap.
+        if (plus === null && turn === b.powers.ultAt + BOSS_POWERS.bulletPlainMoves) {
+          plus = { allowed: round.deadlines[id]! - round.startedAt, bank: L.core.save().runner!.state.players.find((p) => p.id === id)!.bankMs };
+          expect(b.powers.events.some((e) => e.kind === "bulletPlus")).toBe(true);
+        }
       }
       // (Nobody picks in the battle: each person's whole bank goes on a missed move.)
       L.step(!!L.core.save().runner?.state.boss && L.core.record.phase === "play");
     }
     expect(deadline).toBe(BOSS_POWERS.bulletBankSeconds * 1000);
+    expect(plus).not.toBeNull();
+    expect(plus!.allowed).toBe(plus!.bank + BOSS_POWERS.bulletIncrementSeconds * 1000);
     expect(L.core.record.phase).toBe("results");
     const res = L.last("p1", "results")!;
     expect(res.bossResult).toBe("boss");

@@ -1113,8 +1113,15 @@ export class NetMatch implements GameView {
 
   kingCalled = false;
   callKing(strike = false) {
-    // (The Hidden Boss can't be met online: no server path takes a try against him, so nothing is sent.)
-    if (this.phase.kind !== "play" || !this.key || !this.boss?.kingCharges || this.kingCalled || kingHelpBlocked(this.boss)) return;
+    if (this.phase.kind !== "play" || !this.key || !this.boss?.kingCharges || this.kingCalled) return;
+    if (kingHelpBlocked(this.boss)) {
+      // The Hidden Boss (the Crowd's boss final): the God King doesn't come, but the try spends a charge as if he had
+      // (Eric, Oct 14), as solo's does: the server spends it; it's gone here at once, and the next boss view says what
+      // the server holds. Your move goes on, its clock too; the dock has him mock it.
+      this.send({ t: "king", key: this.key, ...(strike ? { strike: true } : {}) });
+      this.boss = { ...this.boss, kingCharges: this.boss.kingCharges - 1 };
+      return this.emit();
+    }
     if (strike) {
       // A strike isn't your turn: you still pick once he's done (the server says when he strikes).
       if (this.phase.strike?.mine) return;

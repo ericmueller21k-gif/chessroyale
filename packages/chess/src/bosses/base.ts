@@ -194,7 +194,7 @@ export interface BossRules {
    * who must all reach phase 2's four boards (Oct 14).
    */
   noStrikes?: boolean;
-  /** Beaten (Boss alone): the board holds this long for its fall before the result screen (the Hidden Boss's collapse). */
+  /** Beaten: the board holds this long for its fall before the result screen, solo and online (the Hidden Boss's collapse). */
   fallMs?: number;
   /**
    * Its own meter instead of the rage meter (Wrangler's: his moves fill it, nothing else): how full (0-1) as crowd turn

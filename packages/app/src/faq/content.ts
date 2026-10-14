@@ -622,7 +622,7 @@ function crowdFinalBlock(src: FaqSources, b: BossDef): string {
   const P = src.phase2;
   const n2 = crowdFinalists("boss", src.crowdKnockouts, src.crowd.lobbySize);
   const clock = (sec: number) => (sec % 60 ? `${num(sec)} s` : n(sec / 60, "minute"));
-  const increment = ", and nothing adds time";
+  const increment = p.bulletIncrementSeconds > 0 ? `; its first ${n(p.bulletPlainMoves, "move")} add no time, then each move made in time adds ${num(p.bulletIncrementSeconds)} s` : ", and nothing adds time";
   return `
 Met only in the Crowd's boss final, where it's always him, against the top ${n2}. He plays from the starting position (he has no memorized openings), with the crowd as White, and his strength never follows anyone's rating: Maia at its top, raw ([how strong](#boss-strength)).
 
