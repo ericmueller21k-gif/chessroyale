@@ -55,6 +55,10 @@ export const RECLUSE_LINES = {
   ],
   /** He loses a board (placeholders). */
   boardLost: ["Hm. A lucky one.", "That board was nothing. Watch the others.", "So one of you can play."],
+  /** A slow move (more than slowMoveSeconds, anyone's), before his ultimate: one, in turn (placeholders). */
+  slow: ["Still thinking? Move!", "You think too hard. Play!", "The clock is ticking. So am I.", "Stop staring. Make a move!", "Faster! This isn't correspondence chess."],
+  /** His phase 2 ultimate as it comes: a few seconds a move from now on (placeholders). */
+  ult2: ["That's enough! Five seconds a move, all of you!", "Enough thinking! Five seconds, or I move for you!"],
   /** Beaten on all four boards (placeholders; his "super saiyan" transformation comes later). */
   beaten2: ["Impossible... all four...", "Four boards... and not one book among them..."],
 } as const;

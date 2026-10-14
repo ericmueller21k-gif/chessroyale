@@ -204,6 +204,10 @@ export interface SimulView {
   /** Every board is decided (his reaction holds the boards, then the result). */
   decided: boolean;
   beaten: boolean;
+  /** Slow moves so far (his ultimate comes past RECLUSE_PHASE2.slowMovesForUlt). */
+  slow: number;
+  /** When his ultimate came (then every move has ultMoveSeconds, no bank), or null. */
+  ultAt: number | null;
 }
 
 /** How you left a match before its end (the results screen says so). */

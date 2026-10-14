@@ -1,5 +1,6 @@
 import { useLayoutEffect, useState } from "preact/hooks";
-import { bankLeft } from "@chessroyale/chess";
+import { RECLUSE_PHASE2 } from "@chessroyale/core";
+import { moveLeft } from "@chessroyale/chess";
 import { RECLUSE_BOOK } from "../characters/recluse.ts";
 import { RECLUSE_LINES } from "../characters/recluse-lines.ts";
 import { EFFECTS } from "../characters/power-art.ts";
@@ -12,7 +13,8 @@ import { FightBanner } from "../components/FightBanner.tsx";
 import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import type { GameView, SimulBoardView, SimulView } from "../game.ts";
-import { PHASE_CHANGE } from "../recluse-phase2.ts";
+import type { ComponentChildren } from "preact";
+import { PHASE2_ULT_BANNER_MS, PHASE_CHANGE } from "../recluse-phase2.ts";
 import { play } from "../sound.ts";
 import { CRITICAL, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
@@ -161,11 +163,13 @@ const RESULT_WORD = (b: SimulBoardView) => {
 };
 
 /** A board's tag over its corner: who plays it and their clock (or its result). */
-function Tag({ b, now, playing, small }: { b: SimulBoardView; now: number; playing: boolean; small?: boolean }) {
-  const left = bankLeft(b, now);
-  const running = playing && b.toMove === "crowd";
+function Tag({ b, v, now, small }: { b: SimulBoardView; v: SimulView; now: number; small?: boolean }) {
+  // (His ultimate: the move's own few seconds, not the bank.)
+  const left = moveLeft(v, b, now);
+  const running = v.playing && b.toMove === "crowd";
+  const low = running && left < (v.ultAt !== null ? 2_000 : 15_000);
   return (
-    <span class={`rc-tag${b.you ? " you" : ""}${running ? " running" : ""}${left < 15_000 && running ? " low" : ""}`}>
+    <span class={`rc-tag${b.you ? " you" : ""}${running ? " running" : ""}${low ? " low" : ""}`}>
       {/* (A phone's small boards: the clock only; the board's button says whose it is.) */}
       {!small && <span class="rc-tag-name">{b.name} </span>}
       <span class="rc-tag-clock">{clock(left)}</span>
@@ -179,12 +183,13 @@ function Outcome({ b }: { b: SimulBoardView }) {
 }
 
 /** One phase 2 board: yours takes moves on your turn. */
-function SimulBoard({ match, v, b, now, small }: { match: GameView; v: SimulView; b: SimulBoardView; now: number; small?: boolean }) {
+function SimulBoard({ match, v, b, now, small, children }: { match: GameView; v: SimulView; b: SimulBoardView; now: number; small?: boolean; children?: ComponentChildren }) {
   const mine = b.you && v.playing && b.toMove === "crowd";
   return (
     <Board fen={b.fen} orientation="white" lastMove={b.lastMove} interactive={mine} onMove={(m) => match.simulMove?.(b.id, m)} small={small} silent={!b.you}>
-      <Tag b={b} now={now} playing={v.playing} small={small} />
+      <Tag b={b} v={v} now={now} small={small} />
       <Outcome b={b} />
+      {children}
     </Board>
   );
 }
@@ -200,6 +205,10 @@ export function SimulScreen({ match }: { match: GameView }) {
   const big = v.boards.find((b) => b.id === watch) ?? mine;
   const others = v.boards.filter((b) => b.id !== big.id);
   const yourTurn = v.playing && mine.toMove === "crowd";
+  // His ultimate as it comes: "5 SECONDS!" over the boards.
+  const ultBanner = v.ultAt !== null && now - v.ultAt < PHASE2_ULT_BANNER_MS && (
+    <FightBanner text={`${RECLUSE_PHASE2.ultMoveSeconds} SECONDS!`} sub="A move every 5 s, or a random one" tone="boss" sound="bannerStart" />
+  );
   const status = v.decided
     ? v.beaten
       ? "All four boards won!"
@@ -235,9 +244,12 @@ export function SimulScreen({ match }: { match: GameView }) {
                   <SimulBoard match={match} v={v} b={v.boards[id]!} now={now} />
                 </div>
               ))}
+              {ultBanner}
             </div>
           ) : (
-            <SimulBoard key={big.id} match={match} v={v} b={big} now={now} />
+            <SimulBoard key={big.id} match={match} v={v} b={big} now={now}>
+              {ultBanner}
+            </SimulBoard>
           )}
         </div>
       </div>
@@ -257,8 +269,11 @@ export function SimulScreen({ match }: { match: GameView }) {
                 </button>
               ) : mine.result ? (
                 ""
+              ) : v.ultAt !== null ? (
+                // (His ultimate: a few seconds a move, then a random one is played for you.)
+                `${RECLUSE_PHASE2.ultMoveSeconds} s a move · ${yourTurn ? `${(moveLeft(v, mine, now) / 1000).toFixed(1)} s left` : "then a random move"}`
               ) : (
-                `Your clock ${clock(bankLeft(mine, now))} · no added time`
+                `Your clock ${clock(moveLeft(v, mine, now))} · slow moves ${v.slow} of ${RECLUSE_PHASE2.slowMovesForUlt}`
               )}
             </span>
           </>

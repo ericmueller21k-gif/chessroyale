@@ -803,11 +803,28 @@ export const RECLUSE_PHASE2 = {
    * sim-tested.
    */
   bankSeconds: 120,
+  /**
+   * His ultimate (Eric, Oct 14): a move that takes longer than `slowMoveSeconds` (anyone's, on any board, before it
+   * comes) is a slow move: he says so (one of his lines about playing faster). Once the team's slow moves pass
+   * `slowMovesForUlt` (it fires on the next one), his ultimate: from then on every move on every board has
+   * `ultMoveSeconds`, no bank; when they run out, a random legal move is played for that player (never a loss on
+   * time). Before it, the bank above applies. Estimates, not yet sim-tested: with a 2:00 bank (about 3 s a move over a
+   * game) slow moves will be common, so it will likely come early in the fight.
+   */
+  slowMoveSeconds: 5,
+  slowMovesForUlt: 5,
+  ultMoveSeconds: 5,
   /** The bots on the other boards (Boss alone): Stockfish at this strength, this many nodes, within `botMoveMs`. */
   botElo: 2200,
   botNodes: 100_000,
   /** A bot's thinking per move (ms, its own clock running): a random time in this range, as a bullet player's. */
   botMoveMs: [900, 2600] as readonly [number, number],
+  /**
+   * Now and then (this share of its moves, before his ultimate) a bot thinks longer, `botSlowMs` (past
+   * `slowMoveSeconds`), so his slow-move count and his ultimate come in Boss alone too, not only from you.
+   */
+  botSlowChance: 0.12,
+  botSlowMs: [5400, 7000] as readonly [number, number],
   /** Once every board is decided: how long his reaction holds the boards before the result screen (ms). */
   endMs: 3200,
 };

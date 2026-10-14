@@ -109,6 +109,36 @@ describe("phase 2's four boards on this device", () => {
     g.stop();
   });
 
+  it("his ultimate (the admins' trigger): from then on, out of your few seconds, a random legal move is played for you (no loss)", async () => {
+    const ult = vi.fn();
+    const { g } = make({ onUlt: ult });
+    g.start();
+    g.ult();
+    expect(ult).toHaveBeenCalledTimes(1);
+    expect(g.state.ultAt).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(RECLUSE_PHASE2.ultMoveSeconds * 1000 + 300);
+    expect(g.board(0)!.result).toBeNull();
+    expect(g.board(0)!.board.history.length).toBeGreaterThanOrEqual(1);
+    g.ult();
+    expect(ult).toHaveBeenCalledTimes(1);
+    g.stop();
+  });
+
+  it("slow moves count, yours and the bots' (now and then a bot thinks past slowMoveSeconds); past slowMovesForUlt his ultimate comes", async () => {
+    const slow = vi.fn();
+    const ult = vi.fn();
+    // (rng 0.05: every bot's move is a slow one.)
+    const { g } = make({ onSlow: slow, onUlt: ult, rng: () => 0.05 });
+    g.start();
+    await vi.advanceTimersByTimeAsync(RECLUSE_PHASE2.botSlowMs[1] + 500);
+    expect(slow).toHaveBeenCalled();
+    expect(g.state.slow).toBeGreaterThanOrEqual(3);
+    await vi.advanceTimersByTimeAsync(3 * RECLUSE_PHASE2.botSlowMs[1]);
+    expect(ult).toHaveBeenCalledTimes(1);
+    expect(g.state.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt + 1);
+    g.stop();
+  });
+
   it("resigning your board: lost; the battle ends only once every board is decided", async () => {
     const { g, done } = make();
     g.start();

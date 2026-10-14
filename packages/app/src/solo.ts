@@ -3,15 +3,15 @@ import { GUARD_WORDS, MatchRunner, ShowdownScout, brainLine as brainWords, board
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, SimulView, Standing, VoteView } from "./game.ts";
-import { PHASE_CHANGE, Phase2Game } from "./recluse-phase2.ts";
+import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
-import { setFigureRun } from "./components/BossCharacter.tsx";
+import { playInPlace, setFigureRun } from "./components/BossCharacter.tsx";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
 import { ownEngine, warmEngineServer, withServerRecheck } from "./engine.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
 import { crowdMoveCues, kingSay, resetKingSpeech } from "./godKing.ts";
-import { CRITICAL, bossVoice } from "./speech.tsx";
+import { CRITICAL, LOW, NORMAL, bossVoice } from "./speech.tsx";
 import { SoloLobbyChat } from "./chat.ts";
 import { account } from "./account.ts";
 import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
@@ -658,6 +658,8 @@ export class SoloMatch implements GameView {
   /** Testing (admins): the boss's ultimate as the next crowd turn begins. */
   triggerUltimate() {
     if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin) return;
+    // (The Hidden Boss's phase 2: his ultimate now.)
+    if (this.phase.kind === "simul") return void (this.phase2Playing && this.phase2?.ult());
     if (this.runner.triggerUltimate()) this.emit();
   }
   get boss(): BossView | null {
@@ -814,6 +816,8 @@ export class SoloMatch implements GameView {
       rng: this.rng,
       onChange: () => this.emit(),
       onResult: (b) => this.phase2Result(b.result!.winner),
+      onSlow: () => this.phase2Slow(),
+      onUlt: () => this.phase2Ult(),
       onDone: () => this.phase2Done(),
     });
     // He stays slumped until he starts to rise, then revives as the book comes back to him, and rests in phase 2's idle.
@@ -830,11 +834,26 @@ export class SoloMatch implements GameView {
     this.set({ kind: "simul", at: Date.now() });
     this.phase2.start();
     const lines = RECLUSE_LINES.phase2;
-    bossVoice.say(lines[Math.floor(this.rng() * lines.length)]!, "recluse:phase2", CRITICAL);
+    // (NORMAL: his ultimate's line, if it comes this soon, cuts in.)
+    bossVoice.say(lines[Math.floor(this.rng() * lines.length)]!, "recluse:phase2", NORMAL);
     kingSay("foePhase2", "recluse:phase2");
   }
 
-  private phase2Lines = { won: 0, lost: 0 };
+  private phase2Lines = { won: 0, lost: 0, slow: 0 };
+
+  /** A slow move: his word on it, if nothing else is being said (one bubble: it waits a little, then lapses). */
+  private phase2Slow() {
+    const lines = RECLUSE_LINES.slow;
+    bossVoice.say(lines[this.phase2Lines.slow++ % lines.length]!, `recluse:p2:slow:${this.phase2Lines.slow}`, LOW);
+  }
+
+  /** His ultimate: his line, the spellbook where he stands; from now on a few seconds a move on every board. */
+  private phase2Ult() {
+    const at = Date.now();
+    playInPlace(`recluse:ult2:${at}`, PHASE2_ULT_ANIMS, at);
+    const lines = RECLUSE_LINES.ult2;
+    bossVoice.say(lines[Math.floor(this.rng() * lines.length)]!, `recluse:p2:ult:${at}`, CRITICAL);
+  }
   /** A board decided: his word on it, and the God King's (a draw: nothing). */
   private phase2Result(winner: "crowd" | "boss" | "draw") {
     if (winner === "draw" || this.phase2?.outcome.decided) return;
@@ -892,6 +911,8 @@ export class SoloMatch implements GameView {
       from: this.phase2From,
       playing: this.phase2Playing,
       ...o,
+      slow: g.state.slow,
+      ultAt: g.state.ultAt,
       boards: g.state.boards.map((b) => ({
         id: b.id,
         you: b.player === HUMAN,

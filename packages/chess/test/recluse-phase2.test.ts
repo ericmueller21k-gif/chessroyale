@@ -17,6 +17,9 @@ import {
   phase2Numbers,
   phase2Outcome,
   phase2Resign,
+  phase2Timeouts,
+  phase2Ult,
+  moveLeft,
   phase2ToMove,
   recentMoves,
   startPhase2,
@@ -29,7 +32,7 @@ const PLAYERS = ["you", "bot1", "bot2", "bot3"];
 const T0 = 1_000_000;
 const start = (numbers = phase2Numbers(42), win = false): Phase2State => startPhase2({ players: PLAYERS, numbers, now: T0, win });
 /** A board's state with a few edits (results, as if played). */
-const withBoards = (st: Phase2State, edit: (id: number) => Partial<Phase2State["boards"][number]>): Phase2State => ({ boards: st.boards.map((b) => ({ ...b, ...edit(b.id) })) });
+const withBoards = (st: Phase2State, edit: (id: number) => Partial<Phase2State["boards"][number]>): Phase2State => ({ ...st, boards: st.boards.map((b) => ({ ...b, ...edit(b.id) })) });
 
 describe("the Hidden Boss's phase 2: four boards, each its own Chess960 start", () => {
   it("draws four different start positions from the battle's seed: the same seed, the same four", () => {
@@ -89,7 +92,7 @@ describe("the Hidden Boss's phase 2: four boards, each its own Chess960 start", 
     // King on g1, its rook on h1, f1 clear: castling short puts the king on g1 and the rook on f1.
     const ready = "bbqnnrkr/pppppppp/8/8/8/8/PPPPPPPP/BBQNN1KR w Hhf - 0 1";
     const b0 = start().boards[0]!;
-    const st: Phase2State = { boards: [{ ...b0, board: { ...b0.board, fen: ready, bases: [{ ply: 0, fen: ready }] } }] };
+    const st: Phase2State = { slow: 0, ultAt: null, boards: [{ ...b0, board: { ...b0.board, fen: ready, bases: [{ ply: 0, fen: ready }] } }] };
     expect(legalMoves(ready)).toContain("g1h1");
     const after = phase2Move(st, 0, "g1h1", T0 + 500);
     expect(after.boards[0]!.board.fen.split(" ")[0]).toBe("bbqnnrkr/pppppppp/8/8/8/8/PPPPPPPP/BBQNNRK1");
@@ -177,6 +180,65 @@ describe("the Hidden Boss's phase 2: four boards, each its own Chess960 start", 
     expect(phase2Next(st, [2, 0, 1], "you")).toBe(0);
     expect(phase2Next(st, [2, 1], "you")).toBe(2);
     expect(phase2Next(st, [3], "you")).toBeNull();
+  });
+});
+
+describe("his phase 2 ultimate: slow moves, then a few seconds a move, a random move when they run out", () => {
+  const SLOW = RECLUSE_PHASE2.slowMoveSeconds * 1000;
+  /** Board 0 moves, then he answers at once: one move each, the player's taking `ms`. */
+  const round = (st: Phase2State, id: number, ms: number, at: number): { st: Phase2State; at: number } => {
+    const b = st.boards[id]!;
+    const t = (b.turnAt ?? at) + ms;
+    let next = phase2Move(st, id, [...legalMoves(b.board.fen)].sort()[0]!, t);
+    next = phase2Move(next, id, [...legalMoves(next.boards[id]!.board.fen)].sort()[0]!, t);
+    return { st: next, at: t };
+  };
+
+  it("counts a move longer than slowMoveSeconds (anyone's, any board) as slow; a quick one doesn't count", () => {
+    let st = start([518, 1, 2, 3]);
+    let r = round(st, 0, SLOW, T0);
+    expect(r.st.slow).toBe(0);
+    r = round(r.st, 0, SLOW + 1, r.at);
+    expect(r.st.slow).toBe(1);
+    st = phase2Move(r.st, 2, [...legalMoves(r.st.boards[2]!.board.fen)].sort()[0]!, T0 + 60_000);
+    expect(st.slow).toBe(2);
+  });
+
+  it("fires on the slow move after slowMovesForUlt: from then on, no slow moves count and no flag falls", () => {
+    let st = start([518, 1, 2, 3]);
+    let at = T0;
+    for (let i = 0; i < RECLUSE_PHASE2.slowMovesForUlt; i++) ({ st, at } = round(st, 0, SLOW + 100, at));
+    expect(st.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt);
+    expect(st.ultAt).toBeNull();
+    ({ st, at } = round(st, 0, SLOW + 100, at));
+    expect(st.ultAt).not.toBeNull();
+    const ultAt = st.ultAt!;
+    // Every player whose move it is starts their few seconds as it comes.
+    for (const b of st.boards.slice(1)) expect(b.turnAt).toBe(ultAt);
+    ({ st } = round(st, 0, SLOW + 100, at));
+    expect(st.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt + 1);
+    expect(phase2Flags(st, ultAt + 10 * 60_000)).toBe(st);
+  });
+
+  it("then each move has ultMoveSeconds, no bank; out of them, a random legal move is played for that player (never a loss)", () => {
+    const st = phase2Ult(start([518, 1, 2, 3]), T0 + 1000);
+    expect(phase2Ult(st, T0 + 2000)).toBe(st);
+    const b = st.boards[0]!;
+    expect(moveLeft(st, b, T0 + 3000)).toBe(RECLUSE_PHASE2.ultMoveSeconds * 1000 - 2000);
+    expect(phase2Timeouts(st, T0 + 1000 + RECLUSE_PHASE2.ultMoveSeconds * 1000 - 1, () => 0)).toBe(st);
+    const out = phase2Timeouts(st, T0 + 1000 + RECLUSE_PHASE2.ultMoveSeconds * 1000, () => 0.5);
+    for (const x of out.boards) {
+      expect(x.result).toBeNull();
+      expect(x.board.history).toHaveLength(1);
+      expect(legalMoves(x.board.fen === b.board.fen ? b.board.fen : st.boards[x.id]!.board.fen)).toContain(x.board.history[0]);
+      expect(phase2ToMove(x)).toBe("boss");
+    }
+    // (The rng picks it: the same rng, the same move.)
+    const legal = legalMoves(b.board.fen);
+    expect(out.boards[0]!.board.history[0]).toBe(legal[Math.floor(0.5 * legal.length)]);
+    // A move made in time is played as usual; the bank isn't touched.
+    const mine = phase2Move(st, 0, "e2e4", T0 + 3000);
+    expect(mine.boards[0]!.bankMs).toBe(b.bankMs);
   });
 });
 

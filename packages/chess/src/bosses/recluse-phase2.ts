@@ -43,6 +43,13 @@ export interface Phase2Board {
 
 export interface Phase2State {
   boards: Phase2Board[];
+  /** Slow moves so far (anyone's, any board, longer than slowMoveSeconds), until his ultimate comes. */
+  slow: number;
+  /**
+   * When his ultimate came (null: not yet): from then on every move has ultMoveSeconds, no bank; out of time, a random
+   * legal move is played for that player (phase2Timeouts).
+   */
+  ultAt: number | null;
 }
 
 /** The players' side on every board: White (they move first, as the crowd does in Boss alone); he's Black. */
@@ -89,6 +96,8 @@ export function phase2Board(id: number, fen: string): BoardState {
 export function startPhase2(opts: { players: readonly string[]; numbers: readonly number[]; now: number; win?: boolean; s?: Pick<Phase2Settings, "bankSeconds"> }): Phase2State {
   const s = opts.s ?? RECLUSE_PHASE2;
   return {
+    slow: 0,
+    ultAt: null,
     boards: opts.players.map((player, id) => {
       const number = opts.win ? -1 : opts.numbers[id]!;
       const board = phase2Board(id, opts.win ? PHASE2_WIN_FEN : chess960Fen(number));
@@ -116,22 +125,45 @@ function resultAfter(board: BoardState): Phase2Result | null {
   return { winner: "draw", how: end === "stalemate" ? "stalemate" : "draw" };
 }
 
-const replace = (st: Phase2State, b: Phase2Board): Phase2State => ({ boards: st.boards.map((x) => (x.id === b.id ? b : x)) });
+const replace = (st: Phase2State, b: Phase2Board): Phase2State => ({ ...st, boards: st.boards.map((x) => (x.id === b.id ? b : x)) });
+
+type UltSettings = Pick<Phase2Settings, "slowMoveSeconds" | "slowMovesForUlt" | "ultMoveSeconds">;
+
+/** The time left for the player's move on a board at `now` (ms): their bank, or once his ultimate has come, the move's own few seconds. */
+export function moveLeft(st: Pick<Phase2State, "ultAt">, b: Pick<Phase2Board, "bankMs" | "turnAt">, now: number, s: Pick<UltSettings, "ultMoveSeconds"> = RECLUSE_PHASE2): number {
+  if (st.ultAt === null) return bankLeft(b, now);
+  return b.turnAt === null ? s.ultMoveSeconds * 1000 : Math.max(0, s.ultMoveSeconds * 1000 - Math.max(0, now - b.turnAt));
+}
+
+/**
+ * His ultimate comes at `now` (the slow moves past slowMovesForUlt, or the admins' trigger): every player whose move it
+ * is starts their few seconds now. Unchanged (the same object) once it has come.
+ */
+export function phase2Ult(st: Phase2State, now: number): Phase2State {
+  if (st.ultAt !== null) return st;
+  return { ...st, ultAt: now, boards: st.boards.map((b) => (!b.result && b.turnAt !== null ? { ...b, turnAt: now } : b)) };
+}
 
 /**
  * A move on a board at `now`, by whoever's move it is there: the player's (their clock stops; out of time, the board is
  * lost and the move isn't played) or his (the player's clock starts). Unchanged (the same object) if the board is
  * decided or the move isn't legal there.
  */
-export function phase2Move(st: Phase2State, boardId: number, move: string, now: number): Phase2State {
+export function phase2Move(st: Phase2State, boardId: number, move: string, now: number, s: UltSettings = RECLUSE_PHASE2): Phase2State {
   const b = st.boards.find((x) => x.id === boardId);
   const who = b ? phase2ToMove(b) : null;
   if (!b || !who || !legalMoves(b.board.fen).includes(move)) return st;
   if (who === "crowd") {
+    const board = playOnBoard(b.board, move, 0.5);
+    // (His ultimate: the bank is gone; the move's few seconds are checked by phase2Timeouts. No slow moves count now.)
+    if (st.ultAt !== null) return replace(st, { ...b, board, turnAt: null, result: resultAfter(board) });
     const left = bankLeft(b, now);
     if (left <= 0) return replace(st, { ...b, bankMs: 0, turnAt: null, result: { winner: "boss", how: "time" } });
-    const board = playOnBoard(b.board, move, 0.5);
-    return replace(st, { ...b, board, bankMs: left, turnAt: null, result: resultAfter(board) });
+    const next = replace(st, { ...b, board, bankMs: left, turnAt: null, result: resultAfter(board) });
+    // A slow move (longer than slowMoveSeconds): one more; past slowMovesForUlt, his ultimate comes.
+    if (b.turnAt === null || now - b.turnAt <= s.slowMoveSeconds * 1000) return next;
+    const slow = next.slow + 1;
+    return slow > s.slowMovesForUlt ? phase2Ult({ ...next, slow }, now) : { ...next, slow };
   }
   const board = playOnBoard(b.board, move, 0.5);
   const result = resultAfter(board);
@@ -140,8 +172,25 @@ export function phase2Move(st: Phase2State, boardId: number, move: string, now: 
 
 /** Every board whose player is out of time at `now` is lost on time. Unchanged (the same object) if none is. */
 export function phase2Flags(st: Phase2State, now: number): Phase2State {
+  // (Once his ultimate has come no flag falls: a move out of time is played at random instead, phase2Timeouts.)
+  if (st.ultAt !== null) return st;
   if (!st.boards.some((b) => !b.result && b.turnAt !== null && bankLeft(b, now) <= 0)) return st;
-  return { boards: st.boards.map((b) => (!b.result && b.turnAt !== null && bankLeft(b, now) <= 0 ? { ...b, bankMs: 0, turnAt: null, result: { winner: "boss", how: "time" } } : b)) };
+  return { ...st, boards: st.boards.map((b) => (!b.result && b.turnAt !== null && bankLeft(b, now) <= 0 ? { ...b, bankMs: 0, turnAt: null, result: { winner: "boss", how: "time" } } : b)) };
+}
+
+/**
+ * Once his ultimate has come: every player out of their few seconds at `now` has a random legal move played for them
+ * (`rng` picks it, as Squads plays a missed move: never a loss on time). Unchanged (the same object) if nobody is.
+ */
+export function phase2Timeouts(st: Phase2State, now: number, rng: () => number, s: UltSettings = RECLUSE_PHASE2): Phase2State {
+  if (st.ultAt === null) return st;
+  let next = st;
+  for (const b of st.boards) {
+    if (phase2ToMove(b) !== "crowd" || b.turnAt === null || now - b.turnAt < s.ultMoveSeconds * 1000) continue;
+    const legal = legalMoves(b.board.fen);
+    next = phase2Move(next, b.id, legal[Math.min(legal.length - 1, Math.floor(rng() * legal.length))]!, now, s);
+  }
+  return next;
 }
 
 /** The player resigns a board: it's lost, the others play on. Unchanged if it's already decided. */

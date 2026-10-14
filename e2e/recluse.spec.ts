@@ -214,7 +214,7 @@ test("a player in Boss alone never sees Engine move", async ({ page }) => {
 });
 
 /** Your phase 2 board: big on a phone, at the bottom left of the four on a computer. */
-const myBoard = (page: Page) => page.locator(".rc-simul .board-row > .board-wrap .hb-board, .rc-simul .rc-q2 .hb-board").first();
+const myBoard = (page: Page) => page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .board-row > .board-wrap:not(.rc-stage) .hb-board").first();
 const simulNow = (p: Page) => p.evaluate(() => (window as any).match?.simul ?? null);
 /** A move on your phase 2 board with real taps (White's side down), until it's taken. */
 async function simulPlay(page: Page, move: string) {
@@ -277,7 +277,7 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   const v = await simulNow(page);
   expect(v.boards).toHaveLength(4);
   // (Every board from a base at ply 0 with its start: here the test switch's mate in one, written as Chess960.)
-  for (const b of v.boards) expect(b.bases).toEqual([{ ply: 0, fen: b.fen }]);
+  for (const b of v.boards) expect(b.bases).toEqual([{ ply: 0, fen: "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w HAha - 4 4" }]);
   if (test.info().project.name === "phone") await expect(page.locator(".rc-mini")).toHaveCount(3);
   else await expect(page.locator(".rc-played .hb-board")).toHaveCount(4);
   // Your Qxf7 mates on your board; the bots mate on theirs: every board won.
@@ -341,5 +341,30 @@ test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defea
   await expect(page.locator(".results h1")).toHaveText("Defeated");
   await expect(page.locator(".team-result")).toContainText("Hidden Boss won. You won 3 of 4 boards: all 4 must be won.");
   await expect(page.locator(".boss-char.place-results")).toHaveAttribute("data-anim", /laugh2|idle2/, { timeout: 10_000 });
+  expect(errors).toEqual([]);
+});
+
+test("phase 2's ultimate (the admins' trigger): \"5 SECONDS!\", his line and spellbook; then 5 s a move, and out of time a random move is played for you, never a loss", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await meetHim(page, "phase=2");
+  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 60_000 }).toBe(true);
+  // Before it: your bank, and the slow moves counted in the dock.
+  await expect(page.locator(".boss-dock-status")).toContainText(/Your clock \d:\d\d · slow moves \d of 5/);
+  const ult = await watchFor(page, {
+    banner: { selector: ".fight-banner", text: /5 SECONDS!/ },
+    spell: { selector: `${figure()}[data-anim="spellbook2"]` },
+    line: { selector: ".bc-bubble", text: /That's enough!|Enough thinking!/ },
+  });
+  await page.getByRole("button", { name: "Trigger ultimate (testing)" }).click();
+  await expect.poll(async () => (await simulNow(page))?.ultAt ?? null, { timeout: 5_000 }).not.toBeNull();
+  await expect(page.getByRole("button", { name: "Ultimate under way (testing)" })).toBeDisabled();
+  await expect(page.locator(".boss-dock-status")).toContainText(/5 s a move/);
+  await expect.poll(() => ult.seen(), { timeout: 10_000 }).toEqual({ banner: true, spell: true, line: true });
+  // You don't move: within 5 s (and the clock check's beat) a random legal move is played for you, and the board goes on.
+  const before = (await simulNow(page)).boards[0].history.length;
+  await expect.poll(async () => (await simulNow(page)).boards[0].history.length, { timeout: 12_000 }).toBeGreaterThan(before);
+  expect((await simulNow(page)).boards[0].result).toBeNull();
   expect(errors).toEqual([]);
 });

@@ -9,7 +9,9 @@ import {
   phase2Next,
   phase2Outcome,
   phase2Resign,
+  phase2Timeouts,
   phase2ToMove,
+  phase2Ult,
   startPhase2,
   type MoveScore,
   type Phase2Board,
@@ -47,6 +49,11 @@ export const PHASE_CHANGE = (() => {
   return { flyMs, slamAt, slamMs, crackAt, partAt, growAt, growMs, flipAt, shuffleAt, shuffleMs, closeAt, bookGoneAt, reviveAt, bannerAt, bannerMs, total: bannerAt + bannerMs };
 })();
 
+/** His ultimate where he stands (playInPlace): the spellbook opened, held, slammed shut. */
+export const PHASE2_ULT_ANIMS = ["spellbook2", "spellLoop2", "spellClose2"] as const;
+/** "5 SECONDS!" shows this long as his ultimate comes (ms). */
+export const PHASE2_ULT_BANNER_MS = 1800;
+
 /** What the bots' engine must do: play at a strength (UciEngine), or its best (the test switch, ?win=1). */
 export interface Phase2BotEngine extends Phase2Engine {
   topMoves(fen: string, n: number): Promise<MoveScore[]>;
@@ -83,6 +90,9 @@ export class Phase2Game {
       onChange: () => void;
       /** A board has just been decided (its result is set). */
       onResult: (b: Phase2Board) => void;
+      /** A slow move (anyone's) before his ultimate; then his ultimate as it comes. */
+      onSlow?: () => void;
+      onUlt?: () => void;
       onDone: () => void;
     },
   ) {
@@ -93,7 +103,11 @@ export class Phase2Game {
   start() {
     this.state = startPhase2({ players: this.opts.players, numbers: this.opts.numbers, now: Date.now(), win: this.opts.win });
     for (const b of this.state.boards) if (b.player !== this.opts.human) this.botTurn(b.id);
-    this.tick = setInterval(() => this.update(phase2Flags(this.state, Date.now())), 200);
+    // (Before his ultimate a bank that runs out loses the board; after it, a move out of time is played at random.)
+    this.tick = setInterval(() => {
+      const now = Date.now();
+      this.update(phase2Timeouts(phase2Flags(this.state, now), now, this.opts.rng ?? Math.random));
+    }, 200);
     this.opts.onChange();
   }
 
@@ -120,6 +134,11 @@ export class Phase2Game {
     this.update(phase2Move(this.state, boardId, move, Date.now()));
   }
 
+  /** Testing (admins): his ultimate now. */
+  ult() {
+    this.update(phase2Ult(this.state, Date.now()));
+  }
+
   /** You resign your board: it's lost; the others play on. */
   resign(boardId: number) {
     this.update(phase2Resign(this.state, boardId, Date.now()));
@@ -129,6 +148,8 @@ export class Phase2Game {
     if (this.stopped || next === this.state) return;
     const before = this.state;
     this.state = next;
+    if (next.ultAt !== null && before.ultAt === null) this.opts.onUlt?.();
+    else if (next.slow > before.slow) this.opts.onSlow?.();
     for (const b of next.boards) {
       const was = before.boards.find((x) => x.id === b.id)!;
       if (was === b) continue;
@@ -171,8 +192,11 @@ export class Phase2Game {
   /** A bot's move: it thinks a bullet player's while (its clock running), then plays. Late, its board is lost on time. */
   private botTurn(id: number) {
     const fen = this.board(id)!.board.fen;
-    const [lo, hi] = RECLUSE_PHASE2.botMoveMs;
-    const think = lo + (this.opts.rng ?? Math.random)() * (hi - lo);
+    const rng = this.opts.rng ?? Math.random;
+    // (Now and then a slow one before his ultimate, so his count comes from the bots too.)
+    const slow = this.state.ultAt === null && !this.opts.win && rng() < RECLUSE_PHASE2.botSlowChance;
+    const [lo, hi] = slow ? RECLUSE_PHASE2.botSlowMs : RECLUSE_PHASE2.botMoveMs;
+    const think = lo + rng() * (hi - lo);
     const engine = this.opts.bots;
     const search = this.opts.win
       ? engine.topMoves(fen, 1).then((t) => t[0]?.move ?? legalMoves(fen)[0]!)
