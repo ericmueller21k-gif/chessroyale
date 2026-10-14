@@ -10,6 +10,23 @@ import { BOARD_SEL, createLobbyFromHome, engineTop, expectCoordsInSquares, test 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers ?? null).catch(() => null);
 
+/** Whether a move mates from this position (a test that needs the battle to last avoids it). */
+function mates(fen: string, mv: string): boolean {
+  const c = new Chess(fen);
+  try {
+    c.move({ from: mv.slice(0, 2), to: mv.slice(2, 4), promotion: mv[4] ?? "q" });
+  } catch {
+    return false;
+  }
+  return c.isCheckmate();
+}
+
+/** The first of these moves that doesn't mate (else any legal one that doesn't; else the first). */
+function firstNoMate(fen: string, moves: string[], legal?: string[] | null): string {
+  const all = legal ?? new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
+  return moves.find((mv) => all.includes(mv) && !mates(fen, mv)) ?? all.find((mv) => !mates(fen, mv)) ?? moves[0]!;
+}
+
 /**
  * Waits for your move, then plays the engine's best allowed move (a power-up's hints follow the same rules). With
  * `noMate`, the best one that doesn't mate: a test that needs the battle to last (bosses play Maia for players too, and
@@ -28,19 +45,7 @@ async function playBest(page: Page, noMate = false) {
   let move = solo ? (top[0]?.move ?? null) : ((allowed ? top.find((t) => allowed.includes(t.move))?.move : top[0]?.move) ?? allowed?.[0] ?? null);
   if (noMate && move) {
     const fen: string = await page.evaluate(() => (window as any).match.phase.board.fen);
-    const mates = (mv: string) => {
-      const c = new Chess(fen);
-      try {
-        c.move({ from: mv.slice(0, 2), to: mv.slice(2, 4), promotion: mv[4] ?? "q" });
-      } catch {
-        return false;
-      }
-      return c.isCheckmate();
-    };
-    if (mates(move)) {
-      const legal = (allowed ?? new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? "")));
-      move = top.map((t) => t.move).find((mv) => legal.includes(mv) && !mates(mv)) ?? legal.find((mv) => !mates(mv)) ?? move;
-    }
+    if (mates(fen, move)) move = firstNoMate(fen, top.map((t) => t.move), allowed);
   }
   if (allowed && move && !allowed.includes(move)) throw new Error(`hint ${move} isn't allowed`);
   await page.evaluate((mv) => {
@@ -291,12 +296,17 @@ async function touchDrag(page: Page, from: { x: number; y: number }, to: { x: nu
  * Your move, played by hand on the board as it's drawn now: the engine's best allowed move, by two taps (`tap`) or a
  * drag (`drag`; on a phone a finger's, on a computer the mouse's). Returns the move, once the game has it.
  */
-async function playByHand(page: Page, how: "tap" | "drag", phone: boolean): Promise<string> {
+async function playByHand(page: Page, how: "tap" | "drag", phone: boolean, noMate = false): Promise<string> {
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   await page.locator(".cc-banner", { hasText: "Round start" }).waitFor({ state: "detached", timeout: 15_000 }).catch(() => undefined);
   await page.waitForTimeout(400);
   const { top } = await engineTop(page);
-  const move = top[0]!.move;
+  let move = top[0]!.move;
+  if (noMate) {
+    const fen: string = await page.evaluate(() => (window as any).match.phase.board.fen);
+    const allowed: string[] | null = await page.evaluate(() => (window as any).match.boss?.powers?.allowed ?? null);
+    if (mates(fen, move)) move = firstNoMate(fen, top.map((t) => t.move), allowed);
+  }
   const plies: number = await page.evaluate(() => (window as any).match.runner.boards.get(0).history.length);
   const a = await squareOnScreen(page, move.slice(0, 2));
   const b = await squareOnScreen(page, move.slice(2, 4));
@@ -398,8 +408,8 @@ test("Boingo's funhouse at every angle: a move by tap and a move by drag, the co
     expect(pies.count).toBeLessThanOrEqual(2);
     // At each angle: the step's first turn of yours by taps, its second by a drag; the rest by the engine's best move.
     const step = turn - [15, 11, 7, 4, 1].find((first) => turn >= first)!;
-    if (step === 0) played.push(`${p.angle}:tap:${await playByHand(page, "tap", phone)}`);
-    else if (step === 1) played.push(`${p.angle}:drag:${await playByHand(page, "drag", phone)}`);
+    if (step === 0) played.push(`${p.angle}:tap:${await playByHand(page, "tap", phone, true)}`);
+    else if (step === 1) played.push(`${p.angle}:drag:${await playByHand(page, "drag", phone, true)}`);
     else await playBest(page, true);
   }
   expect(turns).toEqual([1, 2, ...Array.from({ length: 13 }, (_, i) => i + 4)]);
