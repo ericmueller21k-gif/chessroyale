@@ -56,7 +56,7 @@ import {
   type Settings,
   type SquadsSettings,
 } from "@chessroyale/core";
-import { clockLabel, minutesName } from "@chessroyale/chess/squads";
+import { clockLabel, defaultClock, minutesName } from "@chessroyale/chess/squads";
 import { anchorsOf, parse, plainText, type Block } from "./markdown.ts";
 
 /** Everything the FAQ quotes. The defaults are the game's; tests pass changed ones. */
@@ -228,7 +228,7 @@ function squadsClocks(Q: SquadsSettings): string {
   const free = one((c) => c.delaySeconds) ? `The first ${num(cs[0]!.delaySeconds)} s of every move are free` : `The first few seconds of every move are free (${perOption((c) => `${num(c.delaySeconds)} s`)})`;
   const topUp = (c: (typeof cs)[number]) => (c.topUpSeconds % 60 ? `${num(c.topUpSeconds)} s` : n(c.topUpSeconds / 60, "minute"));
   const topUps = one((c) => c.topUpSeconds) ? `plus ${topUp(cs[0]!)}` : `plus a top-up (${perOption(topUp)})`;
-  const def = cs[Q.clockDefault] ?? cs[0]!;
+  const def = defaultClock(Q);
   return `Each squad has **one clock for the whole tournament**, a chess time control voted before round 1: ${list}. Nobody voting means ${clockLabel(def)}. ${free}; then your squad's clock runs, twice as fast while two of you are moving. Every move made in time adds its seconds back, so a quick move saves time for later, as on a chess clock. What's left carries into the next round, ${topUps} as you go through. When it runs out, it's **sudden death**: every move within the free seconds, until moves made in time earn some back.`;
 }
 
@@ -487,6 +487,8 @@ A Maia boss doesn't slip on purpose: its own mistakes take the slips' place. Its
 | Full | ${guard(M.full)} |
 | Strict | ${guard(M.strict)} |
 
+Maia runs in your browser as its own program, under the AGPL-3.0, and [its source code](/engine/maia/maia-box-source.tar.gz) is free to download.
+
 ### The handover: from Maia to Stockfish {#handover}
 
 A boss's strength is on Stockfish's scale, the one your rating is on; Maia's ratings are on a human scale, and the two don't line up one to one. So a Maia boss plays at a Maia rating that rises with its **level**, along straight lines. The level is the boss's strength${margin ? `, plus ${num(margin)} when a crowd plays it (a raid or the Crowd's boss battle: a crowd voting together plays above its average member); in Boss alone it's the strength itself` : ""}.
@@ -583,7 +585,7 @@ Plays from the game so far, and his first move is a pawn's. Then the **split paw
 Plays from the starting position. His first move, after yours, is the **long pull**: a center pawn's double step, then he lassos it one square further, three squares in one move (d7 to d4 or e7 to e4; if you're Black, e2 to e5 or d2 to d5). The engine picks the pawn that suits the position; if neither would be safe there (it would just be taken, or its way is blocked), he plays an ordinary first move. It's worth about nothing either way: flavor. His lassos are why he plays ${Math.abs(b.offset)} under the usual strength.
 
 - **Lasso drag** (passive): from turn ${p.dragFirst}, every ${n(p.dragEvery, "turn")}, after his move he ropes one of your pieces (never your king) and drags it one square up, down, left or right onto an empty square. It never leaves you in check or without a move, and a pawn never ends on the first or last rank. The engine picks a drag that costs you only a little: between ${num(p.dragLoss[0])} and ${num(p.dragLoss[1])} of a pawn. If none fits (or the game is already decided), there's no drag that turn and he tries again after his next move.
-- **SHOWDOWN!** (ultimate): the warning, then after his move he lines up three pairs facing each other in the middle of the board: your queen against his, a rook against a rook, and a bishop or knight against its match. His three are always protected. **Your next move must be one of the three duels**: one of your three takes the piece facing it. The three glow, and nothing else can be played. The engine sets it up so that even the right duel tips the game a little his way (about ${num(p.showdownEdge[0])} to ${num(p.showdownEdge[1])} of a pawn) and a wrong one costs you ${num(p.showdownTrap)} pawns or more on top, so look before you take. If he can't find such a line-up, he says "Not yet..." and tries again after his next move (up to ${n(p.showdownHolds, "time")}), then with two pairs, and failing that he drags a piece instead.`,
+- **SHOWDOWN!** (ultimate): Wrangler has a meter of his own instead of the rage meter. His moves fill it, ${n(p.showdownMeterTurns, "move")} from empty to full, and nothing else adds to it. When it's full he says "I've got you in my sights." and swings both ropes. From then on, after the first of his moves where he finds a line-up that suits him, he fires with no other warning: three pairs facing each other anywhere on the board off the back ranks, a rook against a rook, a bishop against a bishop and a knight against a knight (two pairs when three won't work; never queens). His pieces are always protected. **Your next move must be one of the duels**: one of your pieces takes the one facing it. The duels glow, and nothing else can be played. The engine sets it up so that even the right duel leaves the game about where it was or tips it his way (${p.showdownEdge[0] < 0 ? `from ${num(-p.showdownEdge[0])} of a pawn your way to ${num(p.showdownEdge[1])} his way` : `${num(p.showdownEdge[0])} to ${num(p.showdownEdge[1])} of a pawn his way`}), and a wrong one costs you ${num(p.showdownTrap)} pawns or more on top, so look before you take. He answers your duel with the engine's best move, and keeps playing the engine's moves while pieces from the line-up can still be taken (up to ${n(p.showdownEngineMoves, "move")}). Then his meter empties and fills again: at most ${n(p.showdownMax, "showdown")} a battle.`,
 };
 
 function bossPowers(src: FaqSources): FaqSection {
@@ -593,7 +595,8 @@ function bossPowers(src: FaqSources): FaqSection {
   const level = Math.ceil(p.rageFull / (p.ragePerMove || 1));
   const ahead = Math.ceil(p.rageFull / (p.ragePerMove + p.rageAheadMax || 1));
   const queen = 9 * p.ragePerMaterial >= p.rageFull;
-  const speeds = playable.map((b) => `${b.name} ×${num(p.rageSpeed[b.id] ?? 1)}`).join(", ");
+  // (Wrangler's meter is his own: below.)
+  const speeds = playable.filter((b) => b.id !== "pig").map((b) => `${b.name} ×${num(p.rageSpeed[b.id] ?? 1)}`).join(", ");
   const blocks = playable
     .map((b) => {
       const words = BOSS_BLOCKS[b.id];
@@ -630,7 +633,7 @@ In a level game (at ×1) it's full after about ${n(level, "crowd move")}; with t
 `
     : ""
 }
-When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Hollow's and Big Boy's ultimates come at the start of their own turn instead (Lights out's only warning is the full meter), Sawyer's needs more than a full meter, and Wrangler's can wait a turn or two for a line-up (below).
+When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Hollow's and Big Boy's ultimates come at the start of their own turn instead (Lights out's only warning is the full meter), Sawyer's needs more than a full meter, and Wrangler has a meter of his own with no warning (below).
 
 Then the meter empties and fills again for the next one. While an ultimate is still under way (the blizzard's ${n(Math.max(2, Math.round(p.blizzardTurns)), "turn")}, the Roman candle's fireballs still falling or burning, the board flipped or sawn in two, Lights out and the extra move after it) the meter stays empty, dimmed, and nothing adds to it, so two ultimates never overlap.
 
@@ -668,7 +671,7 @@ The crowd's champion in every boss battle: raids, the Crowd's boss battle and Bo
 He has up to ${n(S.kingChargesMax, "charge")}. In a raid or Boss alone he starts with ${S.kingChargesMax}. In the Crowd's boss battle, the finalists' leftover power-ups become his charges: one for every ${S.kingPowerUpsPerCharge}, rounded, at least ${kingCharges(0, S)} and at most ${S.kingChargesMax}. Tap him to open his menu:
 
 - **Play this move:** he plays the engine's best move for the crowd, at full strength (stronger than the boss).
-- **Strike the boss:** three bolts on the boss's king, and the boss's next move is one that gives away ${range(S.kingStrikeLoss)} points (never a piece for nothing). One strike a move. It enrages the boss too: ${src.powers.rageStrike} on its [rage meter](#rage-meter) (unless an ultimate is under way).
+- **Strike the boss:** three bolts on the boss's king, and the boss's next move is one that gives away ${range(S.kingStrikeLoss)} points (never a piece for nothing). One strike a move. It enrages the boss too: ${src.powers.rageStrike} on its [rage meter](#rage-meter) (unless an ultimate is under way; Wrangler's meter is his own, and a strike adds nothing to it).
 
 Either needs **more than half the crowd** to call him. Bots back a person's call ${pct(S.kingBotFollow, 0)} of the time, and call him to play themselves when the crowd's popular move would give away ${n(S.kingBotLoss, "point")} or more. In Boss alone, your call is enough. If you call him to play instead of picking, you sit that turn out: no score either way, and it isn't a miss. The clock stands still while he acts, and a move he plays is never brilliant.
 
@@ -778,8 +781,8 @@ function credits(src: FaqSources): FaqSection {
     id: "credits",
     title: "Credits and licenses",
     body: `
-- **Stockfish**, the chess engine behind the judge, the bosses and the bots: free software under the GPL-3.0 ([stockfishchess.org](https://stockfishchess.org), [source](https://github.com/official-stockfish/Stockfish), [this build's source](https://github.com/nmrugg/stockfish.js): stockfish.js 19, [license](/engine/COPYING.txt)). It runs as a separate program in your browser.
-- **Maia-3**, the human-like model ${src.brain.forPlayers ? "behind [the bosses](#maia-brain)" : "[being tested](#maia-brain) for bosses"}: by the CSSLab, University of Toronto, under the AGPL-3.0 ([Maia-3](https://github.com/CSSLab/maia3)). It runs as its own separate program in your browser; the source of our Maia box is available on request ([notice](/engine/maia/NOTICE.txt), [license](/engine/maia/LICENSE.txt)).
+- **Stockfish**, the chess engine behind the judge, the bosses and the bots: free software under the GPL-3.0 ([stockfishchess.org](https://stockfishchess.org), [source](https://github.com/official-stockfish/Stockfish), this build: [stockfish.js](https://github.com/nmrugg/stockfish.js) 19, [its source](/engine/stockfish-source.tar.gz), [license](/engine/COPYING.txt)). It runs as a separate program in your browser.
+- **Maia-3**, the human-like model ${src.brain.forPlayers ? "behind [the bosses](#maia-brain)" : "[being tested](#maia-brain) for bosses"}: by the CSSLab, University of Toronto, under the AGPL-3.0 ([Maia-3](https://github.com/CSSLab/maia3)). It runs as its own separate program in your browser; our Maia box's [source code](/engine/maia/maia-box-source.tar.gz) is free to download ([notice](/engine/maia/NOTICE.txt), [license](/engine/maia/LICENSE.txt)).
 - **The chess pieces**: drawn by Colin M.L. Burnett, from [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces), under the BSD license ([license](/licenses/pieces.txt)).
 - **Classic piece sounds** and their variations: [PyChess](https://github.com/pychess/pychess/tree/master/sounds) (GPL-3.0). The variations are made from PyChess's sounds by our own script ([license](/engine/COPYING.txt), [how each was made](/sounds/SOURCES.md)). Like the engines, they're separate files the game plays, not part of its code.
 - **The app** is built with Preact (MIT) and chess.js (BSD), in the Archivo, Archivo Black and Press Start 2P fonts (SIL Open Font License) ([licenses](/licenses/third-party.txt)). Its other sounds are free of rights (CC0) or the game's own.

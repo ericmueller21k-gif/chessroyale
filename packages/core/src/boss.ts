@@ -373,8 +373,14 @@ export interface BossPowerState {
   drag?: LassoDrag | null;
   /** Wrangler's last showdown: the pairs he lined up after his move, as crowd turn `turn` began (its forced duel). */
   showdown?: ShowdownResult | null;
-  /** Wrangler's showdown not found yet: the crowd turns he has held it ("Not yet...") this time (0 once it comes). */
-  holds?: number;
+  /**
+   * Wrangler's meter (his own: BOSS_POWERS.showdownMeterTurns of his moves fill it; nothing else adds to it): his moves
+   * made when it last emptied (0 as the battle starts; his move that lined up a showdown). Full once he has made
+   * showdownMeterTurns more.
+   */
+  sdBase?: number;
+  /** Wrangler's "I've got you in my sights.": the fill (its `sdBase`) he said it for, once a fill. */
+  sdReady?: number;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -467,6 +473,10 @@ export interface ShowdownResult {
   pairs: ShowdownPair[];
   before: string;
   edge: number | null;
+  /** The board's ply the line-up was put on (the crowd's duel is the move played from it). */
+  ply?: number;
+  /** The admins' test trigger fired it outside the band (none inside it found): marked on their debug line. */
+  outside?: true;
 }
 
 /** One of Hollow's dark squares: the crowd turn it fell as, and the last crowd turn it covers (darkTurns in all). */
@@ -555,8 +565,8 @@ export interface BurnEvent {
  * Boy's toy block landing; `bounce`: his Big Bounce (at the start of his turn, after the crowd's move). `split`:
  * Sawyer saws the pawn of his first move in two; `cut`: a saw cut on an edge; `boardsaw`: his board saw. `pull`:
  * Wrangler's long pull (his first move, a center pawn three squares); `drag`: his lasso drag (a crowd piece dragged a
- * square after his move; `ult`: the showdown's last fallback); `showdown`: his showdown (three pairs lined up, a forced
- * duel); `hold`: "Not yet..." (no line-up found this time: he searches again next turn).
+ * square after his move; `ult`: standing in for the test trigger's showdown when the board can't hold one); `showdown`:
+ * his showdown (pairs lined up, a forced duel).
  */
 export type PowerEventKind =
   | "freeze"
@@ -579,8 +589,7 @@ export type PowerEventKind =
   | "boardsaw"
   | "pull"
   | "drag"
-  | "showdown"
-  | "hold";
+  | "showdown";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
@@ -597,7 +606,7 @@ export interface PowerEvent {
    * Boingo's joke as his funhouse plays the crowd's move.
    */
   pick?: number;
-  /** Wrangler's drag that stands in for his showdown (none could be found after his holds). */
+  /** Wrangler's drag that stands in for the test trigger's showdown (the board couldn't hold a line-up). */
   ult?: true;
 }
 

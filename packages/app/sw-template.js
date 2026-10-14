@@ -39,7 +39,8 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (url.pathname.startsWith("/engine/maia/")) {
+  // (Not its source archive, which the game never fetches: from the network, like any other file not precached.)
+  if (url.pathname.startsWith("/engine/maia/") && !url.pathname.endsWith(".tar.gz")) {
     event.respondWith(
       caches.open(MAIA).then((cache) =>
         cache.match(request).then(

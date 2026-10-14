@@ -690,3 +690,26 @@ checks his reply is exactly the engine's best. That e2e also showed the engine's
 **The rule:**
 - When a power's engine search scores an outcome that depends on the boss's next move, that move is the engine's
   (`bestReply`), and a test plays the move after the power, on the weakest brain the boss can have.
+
+## A showdown that never came (Oct 13, 2026)
+
+**What Eric saw:** he played Wrangler for 30 turns and his SHOWDOWN! never fired. Every try (mostly the admins'
+"Trigger ultimate" button) ended in "Not yet...".
+
+**The cause:** three things. The search at his turn ran in rounds (scan until three promising line-ups, confirm them,
+go again), and each round started its seeded generator from the beginning, so after the first three promising line-ups
+it only ever re-scanned the same ones: the rest of its budget was spent on repeats. The line-ups were the rarer kind
+(queens in the middle: 14% fit the goal, as low as 6% in some positions). And the tests checked the search on a fake
+engine where the first line-ups qualified, and the e2e used the test switch in a position where one was found at once;
+nothing measured how often it fired in real games.
+
+**The fix:** one run of the generator a size, carried on round after round (the Wrangler rage test went from 15 s to
+1 s); rook, bishop and knight line-ups anywhere; his own meter and no warning or "Not yet..." (Eric's calls); and a sim
+that plays real battles with his scout and his turn's search (`packages/sim/scripts/showdown-sim.ts`): a showdown in
+every one of 21 battles on a phone's budget.
+
+**The rule:**
+- A search in rounds carries its source on from round to round; one that starts it again re-scans the same candidates.
+  Test that a later round sees new candidates.
+- A power that fires only when a search finds something is measured in real battles (a sim through the match runner,
+  on a phone's budget) before it ships: how often it fires, and how long after it may. A fixed position doesn't show it.

@@ -13,6 +13,7 @@ import { powerLine } from "../src/components/BossPowers.tsx";
 import { squareXY } from "../src/components/GodKing.tsx";
 import { POWER_WORDS, powersLine } from "../src/power-words.ts";
 import { holdMs } from "../src/speech.tsx";
+import { bossBeat, type BeatState } from "../src/characters/boss-beats.ts";
 import type { BossView } from "../src/game.ts";
 
 // Wrangler (code id `pig`): his art (the checks characters.test.ts makes of every character, and his own), his kit, his
@@ -242,20 +243,40 @@ describe("his lines", () => {
         expect(holdMs(line)).toBeGreaterThan(SPEECH.readMs);
       }
     }
-    expect(PIG_LINES.hold).toContain("Not yet...");
+    // (Eric, Oct 13: no "Not yet...", no warning; his line as his meter fills.)
+    expect(PIG_LINES).not.toHaveProperty("hold");
+    expect(PIG_LINES).not.toHaveProperty("spent");
+    expect(PIG_LINES).not.toHaveProperty("ultimateWarn");
+    expect(PIG_LINES.ready).toEqual(["I've got you in my sights."]);
     expect(PIG_LINES.ultimate).toContain("This board ain't big enough for the six of us.");
     expect(PIG_LINES.smug!.some((l) => /snort/i.test(l))).toBe(true);
   });
 
-  it("his powers' lines: the pull's, a drag's, the drag standing in for a showdown, \"Not yet...\" only while he holds it", () => {
+  it("his powers' lines: the pull's, a drag's, the drag standing in for the test trigger's showdown, the showdown's", () => {
     const line = (kind: string, ult?: true) => powerLine(kit, { kind: kind as never, key: `pig:${kind}:5`, ...(ult ? { ult } : {}) });
     expect(PIG_LINES.pull).toContain(line("pull"));
     expect(PIG_LINES.power).toContain(line("drag"));
     expect(PIG_LINES.tug).toContain(line("drag", true));
-    expect(PIG_LINES.hold).toContain(line("hold"));
-    // (His showdown spent with neither a line-up nor a drag: not "Not yet...", since there's no next try.)
-    expect(PIG_LINES.spent).toContain(line("hold", true));
     expect(PIG_LINES.ultimate).toContain(line("showdown"));
+  });
+
+  it("his meter full: his line once a fill, then his ready loop (both ropes swinging, no throw) until he fires", () => {
+    const base: BeatState = { stage: "crowd", fen: START_FEN, history: [], crowdSide: "w", lastMove: null };
+    expect(bossBeat(kit, { ...base, ready: 0 })).toEqual({ anim: "ready", loop: "ready", key: "ready:0", line: "I've got you in my sights." });
+    // Later turns of the same fill: the same moment (said once; the loop runs by the clock).
+    expect(bossBeat(kit, { ...base, history: ["e2e4", "d7d5"], ready: 0 }).key).toBe("ready:0");
+    // His move while he waits: its own beat, then back to the ready loop; thinking as ever.
+    expect(bossBeat(kit, { ...base, stage: "bossMove", ready: 0 }).loop).toBe("ready");
+    expect(bossBeat(kit, { ...base, stage: "thinking", ready: 0 }).loop).toBe("thinking");
+    // After a showdown, the next fill: said again.
+    expect(bossBeat(kit, { ...base, ready: 6 }).key).toBe("ready:6");
+    // Not full: his mood, as before.
+    expect(bossBeat(kit, { ...base, ready: null }).loop).toBe("idle");
+    // The ready loop: the wind-up's spin, both loops, looped, no cue (no throw, no sound of its own).
+    const ready = PIG.anims.ready!;
+    expect(ready.loop).toBe(true);
+    expect(kit.anims.ready).toBe("ready");
+    expect(ready.frames.every((f) => !f.cue)).toBe(true);
   });
 });
 

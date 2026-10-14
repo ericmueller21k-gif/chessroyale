@@ -1,4 +1,4 @@
-import { SQUADS, type BotVote, type PregameVote, type Rng, type SquadsClock, type SquadsSettings, type VoteOption } from "@chessroyale/core";
+import { SQUADS, optionIndex, type BotVote, type PregameVote, type Rng, type SquadsClock, type SquadsSettings, type VoteOption } from "@chessroyale/core";
 
 /**
  * Squads' pre-game votes: Mode, Start and Clock. Plain data like Crowd's (`core/votes.ts`), so the same machinery runs
@@ -82,8 +82,8 @@ const OLD_CLOCKS: ReadonlyMap<string, string> = new Map([
   ["long", "rapid"],
 ]);
 
-/** The Clock option if nobody votes (Blitz). */
-export const defaultClock = (s: SquadsSettings = SQUADS): SquadsClock => s.clocks[s.clockDefault] ?? s.clocks[0]!;
+/** The Clock option if nobody votes (Blitz), by its id. */
+export const defaultClock = (s: SquadsSettings = SQUADS): SquadsClock => s.clocks.find((c) => c.id === s.clockDefault) ?? s.clocks[0]!;
 
 /**
  * A Clock option by its id (a test link's ?clock=bullet|blitz|rapid). Old ids map to the new ones (fast → bullet,
@@ -123,7 +123,13 @@ export function upgradeRules<R extends SquadsRules | null>(r: R, s: SquadsSettin
   return clock === r.clock ? r : { ...r, clock };
 }
 
-/** The mode vote's options: Classic, Mercenary, and a third mode shown as "Coming soon" (it can't be voted for). */
+/** The Clock options' icons, as the 50 v 50's. */
+const CLOCK_ICONS: Readonly<Record<string, string>> = { rapid: "⏱️", blitz: "🔥", bullet: "⚡" };
+
+/**
+ * The mode vote's options, left to right (fixed): Classic, Mercenary, and a third mode shown as "Coming soon" (it can't
+ * be voted for).
+ */
 export const MODE_OPTIONS: readonly SquadsVoteOption[] = [
   {
     id: "classic",
@@ -146,36 +152,40 @@ export const MODE_OPTIONS: readonly SquadsVoteOption[] = [
   { id: "soon", icon: "🔒", label: "Coming soon", blurb: "A third mode is on its way", patch: {}, rule: {}, disabled: true },
 ];
 
+/** The Start vote's options, left to right (fixed). */
+const START_OPTIONS: readonly SquadsVoteOption[] = [
+  { id: "standard", icon: "♟️", label: "Normal", blurb: "The usual starting position", patch: {}, rule: { start: "standard" } },
+  { id: "same", icon: "📖", label: "One opening", blurb: "Every board from the same opening", patch: {}, rule: { start: "same" } },
+  {
+    id: "random",
+    icon: "🎲",
+    label: "Random openings",
+    blurb: "Each board its own opening",
+    detail: "Each opening is played on two boards of a match, colors swapped",
+    patch: {},
+    rule: { start: "random" },
+  },
+];
+
 /** The votes, left to right, with their numbers from settings: Mode, then Start, then Clock. */
 export function squadsVotes(s: SquadsSettings = SQUADS): readonly SquadsVote[] {
   return [
-    { id: "mode", title: "Which mode?", defaultOption: 0, options: MODE_OPTIONS },
+    { id: "mode", title: "Which mode?", defaultOption: optionIndex(MODE_OPTIONS, "classic"), options: MODE_OPTIONS },
     {
       id: "start",
       title: "How do the boards start?",
-      defaultOption: 0,
-      options: [
-        { id: "standard", icon: "♟️", label: "Normal", blurb: "The usual starting position", patch: {}, rule: { start: "standard" } },
-        { id: "same", icon: "📖", label: "One opening", blurb: "Every board from the same opening", patch: {}, rule: { start: "same" } },
-        {
-          id: "random",
-          icon: "🎲",
-          label: "Random openings",
-          blurb: "Each board its own opening",
-          detail: "Each opening is played on two boards of a match, colors swapped",
-          patch: {},
-          rule: { start: "random" },
-        },
-      ],
+      defaultOption: optionIndex(START_OPTIONS, "standard"),
+      options: START_OPTIONS,
     },
     {
       id: "clock",
       title: "How fast?",
-      defaultOption: s.clockDefault,
-      // (Icons as the 50 v 50's: ⚡ Bullet, 🔥 Blitz, ⏱️ Rapid.)
-      options: s.clocks.map((c, i) => ({
+      // (By its id: the option a reorder can't move.)
+      defaultOption: Math.max(0, s.clocks.indexOf(defaultClock(s))),
+      // Slowest on the left, fastest on the right, in the settings' order. (Icons as the 50 v 50's, by id.)
+      options: s.clocks.map((c) => ({
         id: c.id,
-        icon: ["⚡", "🔥", "⏱️"][i] ?? "⏱️",
+        icon: CLOCK_ICONS[c.id] ?? "⏱️",
         label: clockLabel(c),
         blurb: teamClockLine(c),
         detail: teamClockDetail(c),

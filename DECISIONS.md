@@ -2711,8 +2711,9 @@ slip or stumble (`BossMoveKind` "best", `bestReplyFrom` in `runner.ts`). All his
 too, so after a duel his best reply can be another capture first (in one e2e game all three duels' best replies were
 his knight taking the crowd's line-up knight, the queen to be taken back a move later). The fix plays that move, as the
 search scored it; but his moves after it are his brain's again, so where the engine's line needs a second move of his
-(taking the queen back next), a weak brain can still miss it. Not changed here (the brief: one reply); the three-round
-Showdown (his replies Stockfish's on every duel turn) covers it.
+(taking the queen back next), a weak brain can still miss it. Not changed here (the brief: one reply); covered since by
+his engine moves after the duel, while the line-up's tactics are live ("Wrangler's showdown: his own meter, no warning,
+fired when ready", below).
 
 **Other powers checked for the same gap** (a power whose engine check assumes a boss reply that his brain might not
 play). None is as clear-cut; recorded, not changed:
@@ -2736,6 +2737,330 @@ in `packages/server/test/boss-powers-lobby.test.ts` (a lobby of admins on Maia w
 the brain's again). Both fail without the fix. e2e: `e2e/pig.spec.ts` plays a duel and checks his reply is exactly
 the engine's best at full strength, taking back when that's the best (solo on a phone as an admin, on his Maia brain;
 on a computer; and online).
+
+## Vote options never move (Oct 13, 2026)
+
+Eric: "The voting rounds in all modes should never change position. They should always be slowest on the left, fastest on the right; for the mode type, just pick one order." Every vote now keeps its data order on every screen (Black's turned board no longer mirrors the zones and cards), speeds run Rapid, Blitz, Bullet in the 50 v 50 and Squads, Mode stays Classic, Mercenary, Coming soon, and each default is named by id (Blitz, Classic, Team final, Normal start).
+
+### A computer's title line: testing items, sound, the flag (Eric, Oct 13, 2026)
+
+On a computer every match's title line spans the board's column (the boss bar's width) and ends in an admin's testing
+items, then sound, then the flag, so they sit next to the title, not at the window's corner (Eric: "utilize the space
+next to 'BOSS · move 1'"); when tight, the brain's pill ellipsizes first. The flag's confirm now opens beside it, into
+the column next to the board (under it, it would cover the board). Phones unchanged.
+
+### The Hidden Boss, a sprite preview (art only, Oct 14, 2026)
+
+Eric approved it (Oct 14: "wow it looks PERFECT"). It's in main unregistered, so the approved drawing is kept safe
+until he's built.
+
+Eric's future hidden boss, a chess legend (ROADMAP.md, "The hidden boss"), drawn so Eric can review him before his
+rules are designed. Art only: no rules, kit, lines, sounds or roster entry; he is in no character, kit or effect list,
+so nothing in the game shows him (`packages/app/test/recluse.test.ts` checks that, and makes the checks
+`characters.test.ts` makes of every character). His working code id is `recluse` and his label "Hidden Boss": Eric
+will name him later, and no real name appears in any code, file, label or on the book.
+
+- **Where he comes from:** the outfit from Eric's own reference sprite (a white shirt with rolled sleeves, a blue tie
+  with light-blue rings and a gold clip, navy trousers, brown shoes); the face from a photo Eric sent, used only as a
+  likeness reference (original pixel art, not traced; the photo is not in the repo): the head tilted down, the eyes
+  rolled up at us from under heavy brows with the whites showing beneath the irises, swept hair parted on our left
+  with a loose lock towards his brow, a long face, a long straight nose, strong cheekbones, a narrow chin, thin lips in
+  a half-smirk. Eric then replaced the first pose (seated on a stone block, a piece held out): he **stands, tall and
+  lanky**, with **the red book** (a red cloth hardcover of his rival's games) and a small dark-wood bishop in his
+  other hand. The book's only marking (Eric): a gold-stamped Cyrillic "Ш" (for "шахматы", chess) in a thin gold
+  border on its cover, faint gold bands on its spine; no title, no names.
+- **Sizes and the phone crop:**
+  - `RECLUSE`, the whole figure (a computer, 2x by the board's corner): a 64 x 146 frame, 129 px tall above his feet
+    at rest, 137 at most (his hair in the wind; the cast is 67 to 88: Sawyer 67, Wrangler 68, Hollow 75, Jefferson
+    88), 42 px wide with the book at his side. His head is 25 px wide (the brief suggested 18 to 22; Eric then asked
+    for "a little larger again" so the face reads). At 2x he is about 258 CSS px tall by the board's corner on a
+    1280 px screen: he fits beside the board, clear of it, the God King at the other corner as usual.
+  - `RECLUSE_BUST`, the phone crop (the boss bar at 1x): a figure his height can't fit the bar (56 px, 88 when
+    `tall`), so the phone gets a bust from the same rig: head, shoulders and the top of the book, cut at the chest, 50
+    x 70, 61 px above its foot at rest and 69 at most (within the cast's 75), the same face and animations. When he
+    gets a kit, the phone should draw the bust and the computer the full figure (a kit holds one character today, so
+    the kit needs a second one for the bar), with the `wide` box (58 px).
+  - `RECLUSE_BOOK`, the book alone for board effects later: 32 x 32 (one square, as the other one-square effects).
+- **Animations** (`RECLUSE` and `RECLUSE_BUST` alike; cues in brackets):
+  - Phase 1: `idle` (loop, 4.8 s, silent: a slow breath, the stare, his eyes down to the piece he turns in his fingers
+    and back, a blink, a brow twitch, the book clutched at his side); `consult` (`lift`, `open`, `snap`: the book out,
+    opened, a page scanned with a flick of the eyes, a knowing look, snapped shut); `stare` (the entrance: `dip`, then
+    the upward stare held 1.3 s, `stare`); `laugh` (`laugh`, `cackle`: head back, shoulders shaking, forward with a
+    wild-eyed grin); `spellbook` then `spellLoop` then `spellClose` (the ultimate: `raise`, `open`, `laugh`, `cackle`;
+    the book falls open to us, its pages glowing and turning, motes and little stars rising, his hair lifting in the
+    wind, his eyes wide; the loop holds as long as the ultimate runs; `slam` shuts it with a puff of page dust); `slam`
+    (`open`, `slam`: a decisive move, the book flipped open and slammed shut).
+  - The fall (Eric): `collapse` (`reel`, `drop`, `thud`, `book`: to his knees in four steps, the book falling flat in
+    front of him) then `collapseLoop` (slumped, rocking, his lips moving fast: mumbling); `revive` (`rise`, `snap`,
+    `catch`: up slowly with his head down, then upright, his hair lifting, his eyes narrowed, the book flying up
+    spinning into his hands).
+  - Phase 2 (revived): `idle2` (loop, 4.7 s) and `consult2`, `stare2`, `laugh2`, `spellbook2`, `spellLoop2`,
+    `spellClose2`, `slam2`: his hair streaming in a constant wind in every frame (a test checks), deeper shadows on his
+    face, a glint in his eyes, a wider stance, the book held ready in front of him. Nothing in phase 2 falls back to
+    calm hair.
+  - The book (`RECLUSE_BOOK`): `fly` (loop, spinning a turn in 8 frames), `slam` (dropping flat: `slam`, dust, a
+    shockwave ring), `flip` (loop, pages flipping fast), `close` (`snap`), `idle` (lying closed).
+- **Simplified for size:** the tie's rings are 4-pixel crosses round a dark middle (5 down the tie); the clip and the
+  buckle are 1 to 2 px of gold; the piece is a 5 x 12 bishop (its turn shown by its shine and mitre slit moving round);
+  the moves on the pages are dashes; the hair in the wind is three hand-drawn phases of streaming locks; the kneeling
+  legs are short thighs with his heels behind (his shins hidden); when he holds the book in both hands the piece is
+  tucked in his palm (not drawn). In the bust, the book he reads is mostly below the picture (its top edge shows) and
+  kneeling he sinks only part way, so his mumbling face stays in the bar.
+- **Previews:** `npm run preview:characters -- <dir> extra=packages/app/src/characters/recluse.ts
+  only=recluse,recluse-bust,recluse-book`. He was checked in the real game on a 390 px phone and a 1280 px computer by
+  swapping his drawing into a boss's kit from a scratch script, not from the app's code.
+
+### Wrangler's showdown: his own meter, no warning, fired when ready (Eric, Oct 13, 2026)
+
+**Eric's report:** he tested Wrangler for 30 turns straight and the ultimate never fired. Every try (mostly the admins'
+"Trigger ultimate" button) said "Not yet...". **Eric's decisions**, in order:
+- "he checks every turn after three or four moves, and the moment it's ready he fires it with no warning."
+- No meter at first: "the meter for him doesn't matter, because if we wait for the meter, then we might miss an
+  opportunity. I think that's the problem." Then his final call: a special meter that fills steadily over his first 5
+  turns ("I've got you in my sights." as it fills, both ropes swinging until he fires), and once full he fires on the
+  first turn a line-up is ready; Eric expects that to "only take a few turns at most".
+- The line-up is always a rook, a bishop and a knight (no queens), anywhere on the board (ranks 2-7), backed by the
+  director's test (`showdown_v2.py`, 3 middlegames, 60 random line-ups each, depth 10): today's queen, rook and bishop in
+  the middle fit the goal 14% of the time (6-28% by position); rook, bishop and knight anywhere 19% (15-21%), his median
+  edge +0.33.
+- After a duel, the engine keeps playing his moves while the showdown's tactics are live (the coordinator, after
+  #174's finding that his best reply can be another capture first), up to 3.
+
+**Why it said "Not yet..." so often (found while building this):**
+- **His turn's search re-scanned the same line-ups.** It ran in rounds (scan until three promising, confirm them, go
+  again), but each round started the seeded generator from the beginning, so after the first three promising ones it
+  only ever saw the same line-ups again. It now carries one run of the generator on, round after round. (The Wrangler
+  rage test went from 15 s to 1 s: the same bug, burning its budget on repeats.)
+- **Queens in the middle**, the rarer line-up (14% against 19%, and far from steady by position).
+
+**What was built** (`packages/chess/src/bosses/pig.ts`; numbers in `BOSS_POWERS.showdown*`):
+- **His meter** (`BossRules.meter`, `showdownMeter`): his moves fill it, `showdownMeterTurns` (5) from empty, and
+  nothing else (no rage over time, no eval speed-up, no material, no King's strike: `strikeRage` adds nothing to a
+  boss with a meter of its own). The rage meter in his boss bar shows it. Full: he says "I've got you in my sights."
+  once a fill (a beat of his, `ready`, from his view's `ready`; normal priority, so a moment's line can't make it lapse)
+  and his idle becomes the `ready` loop (the wind-up's spin, both loops, looped; no throw) until he fires.
+- **Firing:** with the meter full, after each of his moves the host's engine (solo: this device's) looks for a line-up;
+  the first turn one qualifies, it goes on the board and SHOWDOWN! comes as the next crowd turn begins, no warning, no
+  "Not yet..." (both gone). None: he plays on, his lasso drags carry on, and he looks again after his next move. Then
+  the meter empties and fills again over 5 more of his moves; at most `showdownMax` (2) a battle, after which he has no
+  meter (none shown). `showdownGap` was never kept (the meter is the gap).
+- **The search** (from his move `showdownFrom`, 4): the scout searches every crowd turn while one may still come (the
+  view's `scout`), three pairs then two, and keeps what it found from turn to turn (those that qualified first), dropping
+  each once it no longer holds; at his turn those first, then fresh ones (three pairs the first 60% of
+  `showdownTurnMs`, then two). Same time budgets as before (`showdownSearchMs` 8 s while the crowd thinks,
+  `showdownTurnMs` 3 s at his turn). With the meter full and nothing qualifying, each of his turns spends up to its 3 s.
+- **The line-up** (`pairKinds`, `lineupTry`, `checkLineup`): a rook, a bishop and a knight pair, placed a pair at a time
+  anywhere on ranks 2-7 (no more middle, no more five-file span), same facing rules, his pieces protected, no queens
+  (the server refuses one). **Substitutes (my order):** a pair that can't be formed (bishops on different colors or gone,
+  say) is replaced by a second rook pair, then a second knight pair, then a second bishop pair (one on each color);
+  still short of three: two pairs only (the rook and, seeded, a bishop or knight). **Two pairs by default:** at his turn
+  three pairs are tried first; none qualifying, two pairs under the same rule.
+- **The band:** the coordinator's starting point, kept: the crowd's best duel leaves him from −0.2 to +1.5 pawns
+  against the position before (`showdownEdge`; it was +0.1 to +1.2), a wrong first duel costs the crowd 1.5 more
+  (`showdownTrap`; it was 2), target +0.5. Why kept: with it the sim below has a first showdown in every battle, at
+  his first chance in 33 of 36, and the edges came out −0.19 to +1.45, median +0.2 (13 of 60 a little below level), so
+  the right duel stays about level or a little his way, as Eric wants, and a wrong one still costs a piece's worth.
+  The second showdowns that never came were in decided battles, where no band could help (below). No reason to widen
+  it.
+- **His moves after the duel** (`engineMoveDue`, `BossRules.bestReply`, the `best` kind and request from #174): his reply,
+  then each next move while the showdown's tactics are live, up to `showdownEngineMoves` (3) in all, are the engine's
+  best at full strength; then his brain again. **"Live", my reading:** a line-up piece of either side (followed as it
+  moves, gone once taken) is still attacked by any piece of the other side. The coordinator's wording was "attacked by a
+  line-up piece of the other, or his engine line still has a capture inside the line-up"; the server decides the kind
+  with no engine, so it can't read his engine line, and the capture his line needs next (often his protector, not a
+  line-up piece, taking back) is always of an attacked line-up piece: "attacked by any piece" covers both, and the cap
+  bounds it.
+- **The admins' trigger:** his meter full at once (shown full), fired at his next turn ignoring the cap: up to
+  `showdownTestMs` (10 s) of searching, and none qualifying, the line-up nearest the goal it saw (`missBy`), marked
+  `outside` and shown on their debug line as "Showdown (test: outside the band)". The server records `outside` only on
+  the trigger's turn, so a player's showdown is never marked so (the host's word on the band was always trusted). No two
+  matched pairs on the board: the old stand-in drag (LASSO!, "No showdown this time: a tug instead"), admins only now.
+- **My calls:**
+  - **The line comes first.** His meter fills with his 5th move; "I've got you in my sights." comes as the crowd's next
+    turn begins, and he fires from his 6th move on, so the line is always his tell (Eric's "no further warning" after
+    it). The earliest showdown is lined up after his 6th move.
+  - **The scout starts at `showdownFrom`** (his move 4) even though the meter is full only after his 5th: two turns of
+    search are ready when it fills, as Eric asked.
+  - `?power=showdown` (the test switch) fills his meter from turn 2, his showdown searched from his next move.
+
+**Measured** (`packages/sim/scripts/showdown-sim.ts`: battles through the match runner, a crowd of 10 bots against him,
+his scout and his turn's search for real; boss and judge at 120,000 nodes; the searches' budgets on a device's own
+clock, a phone's 200,000 nodes a second or a computer's 800,000, so a busy machine doesn't skew it). 36 battles against
+crowds of three strengths (expert, club, casual), up to 40 crowd moves: 21 on a phone's budget (7 a strength), 6 on a
+computer's, and 9 more on a phone's that also recorded the positions where his full meter waited
+(`reports/boss-sim/showdown-{phone1,computer1,diag1,diag2}.jsonl`):
+- **His meter full:** as crowd turn 6 began in every battle (his 5 moves); again 5 of his moves after each showdown.
+- **The first showdown:** in all 36. At his first chance (crowd turn 7) in 33; 3 and 5 turns after full in the others.
+- **The second:** in 24 of 36. When it came: at his first chance in 17, after 2 of his turns in 5, then 4 and 5.
+  Not in 12: one battle ended (move 11) before his meter filled again; in 11 it stayed full, waiting, for the rest of
+  the battle (2 to 28 turns). The positions recorded show why: the battle was decided. The crowd had lost its queen and
+  he was past the engine's top score (0.999 expected, 7.27 pawns), so every duel of every line-up read the same, and no
+  duel could cost the crowd anything more (some also had no rook, bishop or knight pairs left once its bishops were on
+  different colors). 8 of the 11 ended as his wins, 2 as draws at the move limit with him far ahead, 1 as the crowd's.
+- **Size:** 40 of three pairs, 20 of two.
+- **Edges** (his, after the crowd's best duel): −0.19 to +1.45, median +0.2 (13 of 60 a little below level).
+- **The engine's moves after the duel:** 3 (the cap) after 38 duels, 2 after 19, 1 after 3: the other pairs still
+  face each other after one duel, so the tactics usually stay live to the cap.
+- **A battle already decided his way** (my call): Eric's rule is kept (no showdown that doesn't meet his goal; the
+  second simply doesn't come), but the search stops there: when his edge is so high that no duel could cost the crowd
+  `showdownTrap` more against the engine's top score (`showdownHopeless`: above 5.98 pawns, an exact bound, so it never
+  skips a showdown that could qualify), his turn and the scout stop after the one search of the position, instead of
+  his phone (the host's, online) searching 3 s every turn and 8 s every crowd turn for the rest of the battle. The
+  admins' trigger still searches (its line-up outside the band). If Eric wants a second showdown even in a decided
+  battle, the nearest line-up could be fired there as the trigger does; not done (it reverses his goal).
+
+**Player-visible text.** Added: his line "I've got you in my sights.". Removed: "Not yet...", "Not yet... snort.",
+"Not yet, partner..." (and the dock's "Not yet…"), "Next time, varmints.", "Dang. No showdown.", "Snort. Not today.",
+his warning lines ("High noon's comin'.", "Reach for yer pieces…", "Snort. Get ready.") and the "RAGE!" warning
+banner for his ultimate. Changed: the FAQ's SHOWDOWN! paragraph (his meter, his line, rook, bishop and knight anywhere,
+two pairs, the band, the engine's moves after the duel, at most two), the rage meter section ("Wrangler has a meter of
+his own with no warning"; Wrangler out of its speeds list) and the King's strike line ("Wrangler's meter is his own, and
+a strike adds nothing to it"). Admins only: "Showdown (test: outside the band)" on the debug line; LASSO!'s "No
+showdown this time: a tug instead" now only for the trigger. Unchanged: SHOWDOWN!, DRAW!, "Three duels: you must take
+one" ("Two duels…"), "Showdown! Take one of his three." ("two").
+
+**Testing.** The full lane. Unit: `packages/chess/test/pig.test.ts` (the kinds, zone and substitutes; the band and
+`missBy`; three pairs then two; none qualifying and the trigger's nearest outside the band; the scout's kept line-ups;
+his turn's rounds scanning new line-ups, none twice (on the old code, 15 different duel positions in 300 scans); no
+search in a battle decided his way, the trigger's still;
+his meter (his moves only, not a strike), firing when full and a line-up qualifies, playing on when none does, the cap,
+the trigger, host and solo agreeing; his reply on Maia at 600 with slips, and a two-capture line completed by the engine
+on a brain that never captures), `maia-bosses.test.ts` (his moves after the duel not Maia's; his showdowns spent
+after the trigger, so his turns don't each search for seconds on its fake engine: 59 s, near its 60 s limit, to 13 s),
+`rage.test.ts`, the lobby ("Wrangler online": asked with his
+meter full, no warning or "Not yet...", the trigger's `test` and `outside`, his engine moves asked as `best`), the app
+(his line and ready loop, the lines gone, the FAQ). e2e `e2e/pig.spec.ts`: his line and ready loop, a showdown with no
+warning (solo on a phone as an admin on Maia, and on a computer; online), the duel and his reply, the admins' trigger.
+Frames: `npm run frames:pig` on a 390 px phone and a 1280 px computer, light: his line typing out and held in his box,
+both loops whirling over his head in the ready loop (in view on the phone's bar, not clipped), his meter full; the long
+pull; SHOWDOWN!'s ropes reaching pieces anywhere on the board (a rook hauled from h8 to b6, a bishop from f1 to h5) and
+the pairs landing; the duels glowing on edge files (a6-b6); the meter full on the duel's turn. (The computer's
+screencast had 0.4-0.55 s gaps throughout, the machine shared with other sessions' e2e runs, none tied to his moments.)
+
+### The Hidden Boss: no chess piece, a natural free arm (Eric, Oct 14, 2026)
+
+Eric, on the approved sprite: "that chess piece in his hand, we can do away with that... his hand looks all weird with
+the chess piece... The one with the book is fine." Art only (`characters/recluse.ts`); this replaces the piece in "The
+Hidden Boss, a sprite preview" above.
+
+- **No piece anywhere:** every animation, phase 1 and 2, the full figure and the bust (a test checks that no frame
+  draws one).
+- **His free arm** (his left, our right) now hangs relaxed: the same sleeve, rolled cuff and shading as his book arm,
+  a fuller forearm (it was 3 to 4 px, reading as a stick next to the sleeve; now about 5) and a typed hand, open and
+  relaxed, its thumb in front towards his body and parted by a shade line, the fingers loosely curled. The hand carries
+  its own outline, open at the top, so no line crosses the wrist. When he holds the book out in front of him, that hand
+  grips its edge as before.
+- **The animations that used the piece:** the idle's piece-turning is now two small curls of his free hand's fingers
+  while his eyes are down; phase 2's idle keeps his fingers drumming on the book. The stare never held the piece out
+  (it already only leans in), so it is unchanged. The slam stays the book slammed shut with its puff of dust: he has
+  stood without the stone since Eric's redesign, so a palm slam on the stone isn't possible, and bringing the book down
+  is the slam Eric approved. The book animations are untouched.
+
+### The Maia box's source on the site (Eric, Oct 13–14, 2026)
+
+Eric's OK on Oct 13 ("Publish it."): publish the Maia box's source, then turn `BOSS_BRAIN.forPlayers` on. **The source
+is published** (below). **`forPlayers` stays off for now:** the session doing this work wasn't permitted to change
+that value (its permission check treated it as a feature-flag change needing the owner's own approval), so the flip is
+a separate one-line change once Eric approves it himself. It's ready: the FAQ, the credits and the tests already
+cover both states (`packages/app/test/maia-players.test.ts`, `faq.test.ts`, `boss-powers-lobby.test.ts`). My calls:
+
+- **Where:** the site itself serves the box's complete source next to the worker it builds:
+  **`/engine/maia/maia-box-source.tar.gz`** (about 57 KB), so it stays public when the GitHub repository goes private.
+  It's a static file (Workers static assets), behind nothing but Zero Trust Access, which covers the whole site until
+  launch: no Worker route, no admin check.
+- **Built at build time by the box's own build** (`packages/maia-worker/scripts/source-archive.mjs`, called by
+  `build.mjs`), so it can't drift from what's served: the app's build copies the box's `dist/` as it is. Under
+  `maia-box/`: every file of the box (worker code, `build.mjs` and the archive script, `convert.py` and its
+  `requirements.txt`, `package.json`, `tsconfig.json`, the AGPL `LICENSE`, the README with the upstream Maia-3 commit,
+  the checkpoint's revision and sha256 and every conversion step, the bundled libraries' license texts, the tests and
+  their fixtures), minus `dist/`, `node_modules/` and the model; plus three files written for it: `package-lock.json`
+  (the box's own packages cut from the workspace's lockfile, so `npm ci` installs exactly what the site's build used),
+  `model/README.txt` (the model's name, size, sha256 and where to get it) and `SHA256SUMS.txt` (every file the build
+  wrote, to check a rebuild against the site). The same files make the same bytes (sorted entries, fixed times and
+  owners).
+- **Checked by rebuilding:** extracted, the model put in `model/`, `npm ci`, `node scripts/build.mjs`: all five served
+  files came out byte for byte the same (`sha256sum -c SHA256SUMS.txt`), and so did the archive; npm leaves the
+  cut lockfile exactly as it is.
+- **The model is linked, not bundled again.** The AGPL (section 6(d)) lets the Corresponding Source sit on a different
+  server, a third party's included, with clear directions next to the object code, as long as we make sure it stays
+  available. The converted int8 file is itself served next to the archive (`/engine/maia/maia3-23m-int8.onnx`, the
+  same bytes the build takes from `model/`); what it's made from is CSSLab's own release (Hugging Face
+  `UofTCSSLab/Maia3-23M` and the `CSSLab/maia3` code), pinned by revision, commit and sha256, with `convert.py` doing
+  every step. A second copy in the archive (20.3 MB packed) would only make the same bytes download twice. Flagged: if
+  CSSLab ever removed that checkpoint revision, we'd have to host it ourselves (92 MB, over a static file's 25 MiB
+  limit: R2 or split files).
+- **Bundled libraries** (onnxruntime-web 1.30.0, MIT; chess.js 1.4.0, BSD) are pinned by the archive's lockfile
+  (exact versions and integrity hashes), not copied in: generally available packages, used unchanged.
+- **Caching:** the archive isn't precached by the service worker, isn't kept in the Maia cache, and doesn't count
+  toward that cache's name, so editing the box's README or tests never makes a player download Maia again.
+- **Stockfish too (my call: cheap, same mechanism).** The credits pointed upstream only (Stockfish's repository and
+  stockfish.js's, not the exact version), while the GPL-3.0 asks for the source of the very build we serve. Now
+  **`/engine/stockfish-source.tar.gz`** (1.6 MB): stockfish.js at its tag `v19.0.0` (commit `9cb3e506…`, as `git
+  archive` writes it), the lite network the build embeds (`src/nn-61e7af4bb97d.nnue`, which its build would otherwise
+  download) and a note on what it is and how to build the two files (emscripten 3.1.7, `node build.js --lite
+  --single-threaded --no-split`). The npm package's files are byte for byte the tag's GitHub release, and the network
+  is inside the shipped `.wasm`. The npm package has no source, so the archive is committed
+  (`packages/app/stockfish-source/`, with how it was made) and the build refuses a `stockfish` version without one. Not
+  rebuilt by us (it needs emscripten 3.1.7): the provenance above is the check.
+- **Links:** Settings' credits ("this build and its source"; "Our Maia box's source code is free to download"), the
+  FAQ (one plain line in the Maia section, and both archives in its credits), `/licenses/third-party.txt` and the
+  Maia box's `NOTICE.txt` link the archives; nothing says "on request" any more.
+- **Tests:** `packages/maia-worker/test/source-archive.test.ts` (the build writes it; what it holds; nothing from the
+  game; the lockfile against the workspace's; the hashes; the same bytes twice), `packages/app/test/engine-source.test.ts`
+  (Stockfish's archive matches the installed version, its license, its network), `faq.test.ts` (the line, the links,
+  every Maia line live when it's on), `maia-players.test.ts` and `boss-powers-lobby.test.ts` (with `forPlayers` on for
+  the test: a player's boss on Maia by the same rule as an admin's, solo and online), and `e2e/maia.spec.ts` (the
+  archives served as gzip files that hold the source, a tap saving one).
+
+### Beta Crate · Series 001, batch 2: the secret agent and the pirate (Oct 14, 2026)
+
+Eric approved finishing the Beta crate, so the planned batches 2 and 3 ship together (agent and pirate complete,
+21 of 28 items) and the ninja follows as the last batch. Colors and descriptions are the plan's
+(`docs/history/shop-and-crates.md`). The calls:
+
+- **Fake Mustache, not Moustache:** American English (CLAUDE.md). The id is `fake-mustache`.
+- **A `mouth` anchor:** a mustache goes under the nose, and no anchor put it there on every piece (the eye line put it
+  on the snowman's carrot, the neck under the gingerbread man's smile). Pawn 33, snowman 27, gingerbread 28.
+- **The Wire Earpiece follows the eye line** (it's a head item, but sits at the ear), just below where shades' arms
+  go, so it shows with Dark Shades on.
+- **The Parrot perches on the left shoulder (as we see it),** facing out: on the right it covered the eyepatch, and
+  the left is free whatever else is worn. Weapons don't move with the piece, so it's drawn where every piece's
+  shoulder is (pawn, snowman, gingerbread).
+- **The Pirate Hat** is a tricorn seen from the front, its brim turned up to a point at each side, so it doesn't read
+  as a sombrero; its gold trim and the skull stay unblotched (fixed parts), as do the Bandana's white dots.
+- **The Fedora's band is dark,** a light shade of the hat on a very dark one (Midnight), where a dark band vanishes.
+- **The Captain's Coat** opens at the hem to show the pawn, so it reads as white or black; its lapels and cuffs are a
+  shade of its color.
+- **Batch 2 odds (Beta):** Common (6) 6.67% each, Uncommon (5) 5.2%, Rare (4) 4.5%, Epic (2) 7%, Pirate Hat and
+  Smiley Face 0.8%, Tommy Gun and Parrot 0.2%. Until the ninja's two Epics join, an Epic item is likelier than a
+  Common one, as in batch 1.
+- **The fitting sheet** takes `scale=1|2`, to look at the art at 1× and 2×.
+
+### The boss by the board's corner stays in the window (Eric, Oct 14, 2026)
+
+From 900 to 1099 px (no leaderboard beside the screen) the boss there is drawn at 1× (as in a phone's boss bar) next to
+the eval bar, and the board gives up room only if the margin still falls short of his widest frame (Sawyer's), so he's
+whole at every width (he was half off a 1024 px window). At 1024 × 768 the board doesn't move; at 900 × 700 it is 50 px
+smaller. From 1100 px he stays 2× over the leaderboard's edge and nothing moves. The God King keeps his size and place.
+
+### Beta Crate · Series 001, batch 3: the ninja; the crate is complete (Oct 14, 2026)
+
+The last seven items, so Beta holds all 28 of the plan, at the plan's final odds. Colors and descriptions are the
+plan's (`docs/history/shop-and-crates.md`). The calls:
+
+- **The Ninja Hood's eye slit is a hole,** so the piece shows through it (white or black), with two eyes drawn in it
+  (dark on white, light on black). It meets the piece's eye line, so on a snowman or a gingerbread man its eyes land
+  on theirs. It drapes to the shoulders; worn over the Ninja Mask, the slit shows the mask instead of the piece.
+- **The Ninja Mask** covers the lower half of the head from the eye line, so it goes with the headband (head) and
+  with Dark Shades.
+- **The Ninja Gi** shows the pawn's head, its base and a V at the neck, so it reads as white or black; the collar is
+  a shade of its color, and the belt stays black on every color (its knot outlined in gray on a black pawn).
+- **The Katana** is sheathed, a hand's width of steel showing between the guard and the scabbard: the hilt's wrap
+  and the scabbard take the color, as the plan says, and a bare blade would leave nothing in the color but the grip.
+- **The blurb** names the ninjas: "Secret agents, pirates, ninjas, the old shop's hats and a smile".
+- **The final odds (Beta, 28 items):** Common (8) 5% each, Uncommon (7) 3.71%, Rare (5) 3.6%, Epic (4) 3.5%, Pirate
+  Hat and Smiley Face 0.8%, Tommy Gun and Parrot 0.2%. Each tier's items are now rarer than the one below's, and a
+  test keeps it so.
 
 ### The board draws its pieces only when they change (Oct 14, 2026)
 

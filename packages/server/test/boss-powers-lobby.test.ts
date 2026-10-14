@@ -792,6 +792,21 @@ describe("the boss's brain online (BOSS_BRAIN: Maia while it's off for players o
     try {
       const L = raidOf({ bossId: "clown" }, [false, false]);
       expect(L.last("p1", "bossBrain")!.brain.brain).toBe("maia-raw");
+      // The same plan an admins' lobby gets: the rule's Maia rating for a crowd, told to the host only, on every
+      // request for the boss's own move.
+      const b = L.core.save().runner!.state.boss!;
+      const plan = bossBrainFor("clown", b.elo, "", true, { crowd: true });
+      expect(L.last("p1", "bossBrain")!.brain).toEqual({ brain: plan.brain, rating: plan.rating });
+      expect(plan.rating).toBe(maiaRatingFor(b.elo + BOSS_BRAIN.crowdMargin));
+      expect(L.last("p2", "bossBrain")).toBeUndefined();
+      L.advance(60_000);
+      crowdMove(L);
+      expect(hostBoss(L).brain).toEqual({ brain: plan.brain, rating: plan.rating });
+      // A player alone (no crowd margin), and a mixed lobby, too.
+      const alone = raidOf({ bossId: "gingerbread" }, [false]);
+      const a = alone.core.save().runner!.state.boss!;
+      expect(alone.last("p1", "bossBrain")!.brain).toEqual({ brain: "maia-raw", rating: maiaRatingFor(a.elo) });
+      expect(raidOf({ bossId: "gingerbread" }, [true, false]).last("p1", "bossBrain")!.brain.brain).toBe("maia-raw");
     } finally {
       (BOSS_BRAIN as { forPlayers: boolean }).forPlayers = was;
     }
@@ -851,7 +866,7 @@ describe("Wrangler online", () => {
     return L.last("p1", "round")!;
   };
   /** The host answers the boss request: `move` (else the first legal), with `extras` (Wrangler's drag or showdown). */
-  const answer = (L: ReturnType<typeof setup>, move?: string, extras: { drag?: string; showdown?: string } = {}) => {
+  const answer = (L: ReturnType<typeof setup>, move?: string, extras: { drag?: string; showdown?: string; outside?: boolean } = {}) => {
     const req = L.last("p1", "bossRequest")!;
     L.inbox.set("p1", (L.inbox.get("p1") ?? []).filter((m) => m.t !== "bossRequest"));
     L.core.message("p1", { t: "bossMove", key: req.key, move: move ?? legalMoves(req.fen).sort()[0]!, ...extras });
@@ -920,12 +935,15 @@ describe("Wrangler online", () => {
     }
   });
 
-  it("SHOWDOWN! (the test switch): warned on turn 2; at his turn the host is asked for the line-up; everyone gets it, and the crowd's picks and jobs are the duels", () => {
+  it("SHOWDOWN! (the test switch: his meter full from turn 2, no warning): at his turn the host is asked for the line-up; everyone gets it, and the crowd's picks and jobs are the duels", () => {
     const L = raid({ bossId: "pig", bossPowerTest: "showdown", bossKillEvery: 99 });
     crowdMove(L);
     answer(L);
     const r2 = toRound(L);
-    expect(r2.boss!.powers!.warned).toBe(true);
+    expect(r2.boss!.powers!.warned).toBe(false);
+    expect(r2.boss!.powers!.events.map((e) => e.kind)).not.toContain("warn");
+    expect(r2.boss!.powers!.ready).not.toBeNull();
+    expect(r2.boss!.powers!.rage).toBe(1);
     crowdMove(L);
     const req = L.last("p1", "bossRequest")!;
     expect(req.showdown).toBe("try");
@@ -936,6 +954,7 @@ describe("Wrangler online", () => {
     answer(L, move, { showdown: lineup.spec });
     const b = L.last("p2", "boss")!;
     expect(b.boss.powers!.showdown).toMatchObject({ turn: 3, pairs: lineup.pairs, before: after });
+    expect(b.boss.powers!.showdown!.outside).toBeUndefined();
     expect(b.boss.board.fen).toBe(lineup.fen);
     expect(b.boss.powers!.events).toContainEqual({ kind: "showdown", turn: 3, squares: lineup.pairs.flatMap((p) => [p.crowd, p.boss]) });
     expect(b.boss.powers).toEqual(L.last("p1", "boss")!.boss.powers);
@@ -949,36 +968,38 @@ describe("Wrangler online", () => {
     expect([...job.jobs[0]!.allowed!].sort()).toEqual([...lineup.duels].sort());
   });
 
-  it("no line-up (\"\", junk, or no host): \"Not yet...\", the host asked again next turn; after his holds, his last try", () => {
+  it("no line-up (\"\", junk, or no host): he plays on, no moment, no warning; asked again next turn; the test trigger: \"test\", its line-up outside the band marked so", () => {
     const L = raid({ bossId: "pig", bossPowerTest: "showdown", bossKillEvery: 99 });
     crowdMove(L);
     answer(L);
     toRound(L);
-    const asks: string[] = [];
     for (const reply of ["", "d1d4d8d5 a1c3a8c5 c1e3c8f5"]) {
       crowdMove(L);
       for (let i = 0; i < 10 && !L.last("p1", "bossRequest"); i++) L.advance(5_000);
       const req = L.last("p1", "bossRequest")!;
-      asks.push(req.showdown!);
+      expect(req.showdown).toBe("try");
       answer(L, undefined, { showdown: reply });
       const b = L.last("p2", "boss")!;
-      expect(b.boss.powers!.events.map((e) => e.kind)).toContain("hold");
+      expect(b.boss.powers!.events.map((e) => e.kind)).toEqual([]);
       expect(b.boss.powers!.showdown ?? null).toBeNull();
-      expect(b.until - b.now).toBe(bossShowMs(b.boss.lastMove) + POWER_FX.hold);
+      expect(b.boss.powers!.ready).not.toBeNull();
+      expect(b.until - b.now).toBe(bossShowMs(b.boss.lastMove));
       toRound(L);
     }
+    // The test trigger (an admin's): asked as "test"; a line-up the host found outside the band is marked so.
+    expect(L.core.ultimateTrigger("p1", true)).toBe(true);
     crowdMove(L);
     for (let i = 0; i < 10 && !L.last("p1", "bossRequest"); i++) L.advance(5_000);
-    asks.push(L.last("p1", "bossRequest")!.showdown!);
-    expect(asks).toEqual(["try", "try", "last"]);
-    // His last try: no line-up and no drag either: the ultimate is spent all the same.
-    answer(L, undefined, { showdown: "", drag: "" });
+    const req = L.last("p1", "bossRequest")!;
+    expect(req.showdown).toBe("test");
+    const move = legalMoves(req.fen).sort()[0]!;
+    const lineup = [...lineups(applyMove(req.fen, move), 2, 3, 3000)].find(Boolean)!;
+    answer(L, move, { showdown: lineup.spec, outside: true });
     const b = L.last("p2", "boss")!;
-    expect(b.boss.powers!.ultAt).toBe(b.boss.powers!.turn);
-    expect(b.boss.powers!.holds).toBe(0);
+    expect(b.boss.powers!.showdown).toMatchObject({ pairs: lineup.pairs, outside: true });
   });
 
-  it("his reply to the duel (Eric, Oct 13): the host is asked for the engine's best, without his brain or a slip; everyone gets it; then his brain again", async () => {
+  it("his reply to the duel (Eric, Oct 13), and his moves while its tactics are live: the host is asked for the engine's best, without his brain or a slip; everyone gets it; then his brain again", async () => {
     // A lobby of admins (his brain: Maia), slips on (every move of his a stumble).
     const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "pig", bossPowerTest: "showdown", bossKillEvery: 99, bossStumbleBelow: 9999, bossStumbleMax: 1 });
     for (const [i, name] of ["P1", "P2"].entries()) L.core.connect(undefined, name, i ? "phone" : "computer", false, 1500, undefined, undefined, null, null, true);
@@ -1034,11 +1055,22 @@ describe("Wrangler online", () => {
     for (let i = 0; i < 10 && L.last("p2", "boss")!.boss.lastMove?.move !== played; i++) L.advance(1000);
     for (const id of ["p1", "p2"]) expect(L.last(id, "boss")!.boss.lastMove).toMatchObject({ move: played });
     expect(pieceAt(L.last("p2", "boss")!.boss.board.fen, duel.slice(2, 4))?.color).toBe("b");
-    // Only that one move: his next is his brain's again (and a slip's chance).
-    toRound(L);
-    crowdMove(L);
-    const later = nextRequest();
-    expect(later.best).toBeUndefined();
-    expect(later).toMatchObject({ stumble: true, brain: { brain: "maia-raw" } });
+    // While a line-up piece is still attacked, his next moves are the engine's too (up to showdownEngineMoves in all);
+    // then his brain's again (and a slip's chance).
+    let engineMoves = 1;
+    for (let i = 0; i < BOSS_POWERS.showdownEngineMoves + 1; i++) {
+      toRound(L);
+      crowdMove(L);
+      const req = nextRequest();
+      if (!req.best) {
+        expect(req).toMatchObject({ stumble: true, brain: { brain: "maia-raw" } });
+        break;
+      }
+      expect(req.brain).toBeUndefined();
+      engineMoves++;
+      answer(L);
+    }
+    expect(engineMoves).toBeLessThanOrEqual(BOSS_POWERS.showdownEngineMoves);
+    expect(L.last("p1", "bossRequest")!.best).toBeUndefined();
   });
 });

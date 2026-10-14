@@ -127,6 +127,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 - **A queen won for free** (Oct 13, [story](../docs/history/lessons.md#a-queen-won-for-free-oct-13-2026)): a power's
   follow-up move that its engine search scored is played by the engine (`BossRules.bestReply`), never the boss's brain
   or a slip; a test plays the move after the power, on the weakest brain the boss can have.
+- **A showdown that never came** (Oct 13, [story](../docs/history/lessons.md#a-showdown-that-never-came-oct-13-2026)):
+  a search in rounds carries its source on (one that starts again re-scans the same candidates; test that a later round
+  sees new ones); a power that fires only when a search finds something is measured in real battles, on a phone's
+  budget, before it ships (`showdown-sim.ts`).
 
 ## Servers: everything ends
 

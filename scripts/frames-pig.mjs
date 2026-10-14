@@ -1,7 +1,7 @@
 // Wrangler, the cowboy pig, frame by frame in a real solo match (Boss alone), on a phone and a computer, with real taps:
-// his long pull after your first move (and the warning: ?power=showdown), SHOWDOWN! as the 3rd turn begins (or "Not
-// yet..." while he searches, then the showdown), your duel, and his first lasso drag after it. Records every painted
-// frame (Chrome's screencast) and saves stills and a GIF of each moment, plus a timeline.
+// his long pull after your first move (and his meter full: ?power=showdown fills it from turn 2: "I've got you in my
+// sights." and his ready loop), SHOWDOWN! once a line-up qualifies (no warning), your duel, and his first lasso drag
+// after it. Records every painted frame (Chrome's screencast) and saves stills and a GIF of each moment, plus a timeline.
 //   npm run frames:pig -- <out-dir> [phone|desktop|both] [light|dark] [side=b] [power=drag]
 // Read the frames before calling a moment done (.claude/LESSONS.md: watch it frame by frame).
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
@@ -118,8 +118,6 @@ async function run(name, context) {
     pull: [0, 600, 1200, 1800, 2300, 2500, 2700, 2900, 3300, 3600, 4200, 5000],
     drag: [0, 600, 1200, 1800, 2300, 2500, 2700, 2900, 3300, 3600, 4200, 5000],
     showdown: [0, 800, 1200, 1600, 2000, 2400, 2700, 3000, 3150, 3300, 3500, 3650, 3800, 4000, 4150, 4300, 4500, 4700, 5000, 5500, 6000, 6500, 7000],
-    hold: [0, 600, 1200, 1800],
-    warn: [0, 800, 1600],
   };
   const done = new Set();
   const plan = ["e2e4", "g1f3", "f1c4", "b1c3", "d2d3", "c1e3", "h2h3", "a2a3", "e1g1", "f1e1"];
@@ -128,14 +126,22 @@ async function run(name, context) {
     const s = await waitUntil((x) => x.kind === "boss" && !x.thinking && !x.intro, 150_000);
     const ev = (s.boss?.powers?.events ?? []).map((e) => e.kind);
     // (The moments play back to back after his move shows, ending at `until`, in their order: a pull or drag, then the
-    // warning or "Not yet...", then the showdown.)
-    const MS = { pull: 3500, drag: 3500, showdown: 6000, hold: 1900, warn: 1700 };
-    const ORDER = { pull: 0, drag: 0, warn: 1, hold: 1, showdown: 2 };
+    // showdown.)
+    const MS = { pull: 3500, drag: 3500, showdown: 6000 };
+    const ORDER = { pull: 0, drag: 0, showdown: 2 };
     const seq = [...ev].sort((a, b) => (ORDER[a] ?? 0) - (ORDER[b] ?? 0));
     const startOf = (k) => s.until - seq.slice(seq.indexOf(k)).reduce((t, x) => t + (MS[x] ?? 0), 0);
     const labels = ev.filter((k) => want[k] && !done.has(k));
     for (const l of labels) for (const ms of want[l]) stills.push({ label: `${l}-${String(ms).padStart(4, "0")}`, t: startOf(l) + ms });
     const end = await waitUntil((x) => x.kind === "play", 60_000);
+    // His meter full (the first turn it is): his line typing out and holding, his ready loop; a few seconds of it.
+    if (end.boss?.powers?.ready !== null && end.boss?.powers?.ready !== undefined && !done.has("ready")) {
+      done.add("ready");
+      mark("ready", end.now - 300, end.now + 4500);
+      for (const ms of [0, 400, 800, 1200, 1600, 2400, 3200, 4000]) stills.push({ label: `ready-${String(ms).padStart(4, "0")}`, t: end.now + ms });
+      log(`ready: his meter full (fill ${end.boss.powers.ready}), rage ${end.boss.powers.rage}`);
+      await p.waitForTimeout(4600);
+    }
     for (const l of labels) {
       done.add(l);
       mark(l, s.now - 300, end.now + 800);
