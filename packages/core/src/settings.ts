@@ -1886,10 +1886,11 @@ export const SQUADS: SquadsSettings = {
   voteBotSkip: 0.1,
   // Eric, Oct 10: one team clock per squad for the whole tournament; Oct 13: three chess time controls, Bullet, Blitz
   // and Rapid, each with an increment that banks and its own cap on a move. Tuned by reports/squads-sim.md
-  // (DECISIONS.md, "Squads: three chess time controls").
+  // (DECISIONS.md, "Squads: three chess time controls"). Eric, Oct 14: Rapid was too long ("It shouldn't be 55
+  // minutes"): 5+2, was 5+3 (DECISIONS.md, "Squads: Rapid 5+2").
   clocks: [
     // Left to right, slowest to fastest (Eric, Oct 13: "always slowest on the left, fastest on the right").
-    { id: "rapid", label: "Rapid", bankSeconds: 300, topUpSeconds: 60, delaySeconds: 2, incrementSeconds: 3, capSeconds: 20 },
+    { id: "rapid", label: "Rapid", bankSeconds: 300, topUpSeconds: 60, delaySeconds: 2, incrementSeconds: 2, capSeconds: 20 },
     { id: "blitz", label: "Blitz", bankSeconds: 180, topUpSeconds: 30, delaySeconds: 2, incrementSeconds: 2, capSeconds: 15 },
     { id: "bullet", label: "Bullet", bankSeconds: 60, topUpSeconds: 15, delaySeconds: 2, incrementSeconds: 1, capSeconds: 10 },
   ],
