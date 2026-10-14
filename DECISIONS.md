@@ -2737,7 +2737,21 @@ the brain's again). Both fail without the fix. e2e: `e2e/pig.spec.ts` plays a du
 the engine's best at full strength, taking back when that's the best (solo on a phone as an admin, on his Maia brain;
 on a computer; and online).
 
+## Vote options never move (Oct 13, 2026)
+
+Eric: "The voting rounds in all modes should never change position. They should always be slowest on the left, fastest on the right; for the mode type, just pick one order." Every vote now keeps its data order on every screen (Black's turned board no longer mirrors the zones and cards), speeds run Rapid, Blitz, Bullet in the 50 v 50 and Squads, Mode stays Classic, Mercenary, Coming soon, and each default is named by id (Blitz, Classic, Team final, Normal start).
+
+### A computer's title line: testing items, sound, the flag (Eric, Oct 13, 2026)
+
+On a computer every match's title line spans the board's column (the boss bar's width) and ends in an admin's testing
+items, then sound, then the flag, so they sit next to the title, not at the window's corner (Eric: "utilize the space
+next to 'BOSS · move 1'"); when tight, the brain's pill ellipsizes first. The flag's confirm now opens beside it, into
+the column next to the board (under it, it would cover the board). Phones unchanged.
+
 ### The Hidden Boss, a sprite preview (art only, Oct 14, 2026)
+
+Eric approved it (Oct 14: "wow it looks PERFECT"). It's in main unregistered, so the approved drawing is kept safe
+until he's built.
 
 Eric's future hidden boss, a chess legend (ROADMAP.md, "The hidden boss"), drawn so Eric can review him before his
 rules are designed. Art only: no rules, kit, lines, sounds or roster entry; he is in no character, kit or effect list,

@@ -61,7 +61,7 @@ const MERCY = "4r1k1/1b3ppp/3q4/2b5/8/N7/3n1PPP/6K1 w - - 0 1";
 const ONE_MOVE = "k7/8/8/8/8/8/1q6/K7 w - - 0 1";
 /** White a pawn up. */
 const PAWN_UP = "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1";
-const NORMAL = SQUADS.clocks[SQUADS.clockDefault]!;
+const NORMAL = SQUADS.clocks.find((c) => c.id === SQUADS.clockDefault)!;
 const rules = (start: "standard" | "same" | "random") => ({ start, clock: NORMAL });
 
 function match(format: "relay" | "pairs", starts: string[], o: Partial<MatchSetup> = {}, s?: SquadsSettings): SquadsMatch {

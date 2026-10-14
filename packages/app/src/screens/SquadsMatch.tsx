@@ -503,7 +503,7 @@ function MatchView({
             Next round
           </button>
         )}
-        {/* Sound, and Resign (a phone: "⋯" and its sheet; a computer: the flag). */}
+        {/* Sound, and Resign (a phone: "⋯" and its sheet; a computer: the sound button, then the flag). */}
         <MatchMenu exit={exit} />
       </div>
       <StandingsStrip client={client} onLeave={onLeave} exit={exit} />

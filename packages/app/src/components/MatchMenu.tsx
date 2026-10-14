@@ -8,11 +8,11 @@ import { useMedia } from "./QuickChat.tsx";
  * every mode"). In the top line of every match screen, at its right end:
  *   - a phone: a "⋯" button (where the sound button was) opening a small sheet at the foot of the screen: Sound, and
  *     Resign with its flag (Leave before move 1, or once you're out). A home for later options.
- *   - a computer (the game's two-column layout): the flag button beside the sound button, over the panel beside the
- *     board.
+ *   - a computer (the game's two-column layout): the sound button, then the flag, at the right end of the title line
+ *     over the board's column; an admin's testing items sit just before them (Hud.tsx, .match-tools; Eric, Oct 13).
  * Either way, a second step that says what will happen ("Resign? You'll leave this match and it counts as a loss.")
  * with Cancel and Resign. Nothing dims or covers the board, its moves or the clock meanwhile: the phone's sheet sits
- * at the foot of the screen, the computer's under the flag. No undo, no draw offers (Eric: not now).
+ * at the foot of the screen, the computer's beside the flag (out into the column next to the board). No undo, no draw offers (Eric: not now).
  */
 
 /** What leaving means right now, for the control and its confirm (null: nothing to leave). */
@@ -41,7 +41,7 @@ export function FlagIcon({ size = 18 }: { size?: number }) {
 const title = (e: MatchExit) => (e.kind === "resign" ? "Resign?" : "Leave the match?");
 const word = (e: MatchExit) => (e.kind === "resign" ? "Resign" : "Leave");
 
-/** The second step: what happens, Cancel and Resign (or Leave). `place`: at the foot of the screen, or under the flag. */
+/** The second step: what happens, Cancel and Resign (or Leave). `place`: at the foot of the screen, or beside the flag. */
 export function ConfirmExit({ exit, place, onCancel }: { exit: MatchExit; place: "sheet" | "pop"; onCancel: () => void }) {
   const cancel = useRef<HTMLButtonElement>(null);
   // (Focus on Cancel: Enter or a stray tap never resigns by itself.)
@@ -135,8 +135,8 @@ function useOpen(): [Open, (o: Open) => void] {
 }
 
 /**
- * The control at the right end of a match screen's top line: on a phone "⋯" and its sheet, on a computer the flag
- * and the sound button. `exit` null: nothing to leave right now (only the sound switch).
+ * The control at the right end of a match screen's top line: on a phone "⋯" and its sheet, on a computer the sound
+ * button and the flag (in that order, the flag last). `exit` null: nothing to leave right now (only the sound switch).
  */
 export function MatchMenu({ exit }: { exit: MatchExit | null }) {
   const computer = useMedia(COMPUTER_LAYOUT);
@@ -154,6 +154,7 @@ export function MatchMenu({ exit }: { exit: MatchExit | null }) {
   if (computer)
     return (
       <span class="mm mm-computer">
+        <MuteButton />
         {exit && (
           <button
             type="button"
@@ -167,7 +168,6 @@ export function MatchMenu({ exit }: { exit: MatchExit | null }) {
             <FlagIcon />
           </button>
         )}
-        <MuteButton />
         {open === "confirm" && exit && (
           <>
             <div class="mm-scrim" onClick={() => setOpen(null)} />

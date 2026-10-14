@@ -200,8 +200,15 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
   - **His real red book:** in 1972 he prepared from what he called "the red book" of his rival's games (a red cloth
     hardcover). In the game it's an unlabeled red book that he holds at his side, consults at logical moments, and
     opens like a spell book for his ultimate.
-  - **His art:** Eric's sprite (Oct 14): seated on a stone block, white shirt, patterned blue tie, a chess piece in hand,
-    an intense stare. An in-game version is being drawn (art only, not in the game).
+  - **His art (approved, Eric, Oct 14: "it looks PERFECT"):** tall and lanky, standing, white shirt, patterned blue
+    tie, the red book with its gold "Ш" at his side; the face from Eric's photo reference. Drawn and in the code
+    (`characters/recluse.ts`, `effects/recluse.ts`) but not registered, so nothing in the game shows him yet.
+    - **Sets:** phase 1 (idle, consult, stare, laugh, slam, the spellbook ultimate), the collapse and revive, phase 2
+      with the hair always flowing, and the book as its own effect sprite (fly, slam, page flip, close).
+    - **Sizes:** 129 px tall on a computer (64×146 frame); on a phone, a head-and-shoulders crop for the boss bar.
+    - **When he's built:** his kit needs two drawings (the crop for the phone bar, the full figure for the computer);
+      a kit holds one today. Phase 1's idle holds the book at his side and phase 2's in front, so the revive must
+      play between them.
   - **Director's flags:** use a different name (agreed). A recognizable likeness and real quotes carry the same
     rights question as the name, so check before launch (his estate; post-mortem publicity rights vary). Keep his lines
     to his chess views; never his hateful public statements from later life.
