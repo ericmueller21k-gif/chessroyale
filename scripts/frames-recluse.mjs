@@ -2,8 +2,9 @@
 // with real taps: his intro (the stare), his ultimate on the admins' trigger (the book consulted, opened like a spell
 // book, slammed shut; "BULLET!"; then the dock's bullet clock), the God King's help tried and mocked (the book slammed
 // shut), and, in a second battle (?win=1: you mate in one), his collapse and mumbling, then his phase change. Records every
-// painted frame (Chrome's screencast) and saves stills, a GIF of each moment, and screenshots.
-//   npm run frames:recluse -- <out-dir> [phone|desktop|both] [light|dark] [base=http://localhost:8788]
+// painted frame (Chrome's screencast) and saves stills, a GIF of each moment, and screenshots. `only=plus`: instead, the
+// bullet clock from turn 2 (?power=bullet), its 3 moves at 1+0, then his increment ("+2 s a move from now on").
+//   npm run frames:recluse -- <out-dir> [phone|desktop|both] [light|dark] [base=http://localhost:8788] [only=plus]
 // Needs the app and its API running (npx wrangler dev): his menu entry is for admins, and the admin flag comes from
 // /api/me (faked here as an admin's, as e2e/recluse.spec.ts does). Read the frames before calling a moment done
 // (.claude/LESSONS.md: watch it frame by frame).
@@ -14,6 +15,7 @@ import { chromium, devices } from "@playwright/test";
 
 const args = process.argv.slice(2).filter((a) => !a.includes("="));
 const base = process.argv.find((a) => a.startsWith("base="))?.slice(5) ?? "http://localhost:8788";
+const only = process.argv.find((a) => a.startsWith("only="))?.slice(5) ?? "";
 const [out = "recluse-frames", which = "both", scheme = "light"] = args;
 const outDir = resolve(out);
 mkdirSync(outDir, { recursive: true });
@@ -157,7 +159,7 @@ const fight = async ({ p, st, waitUntil, play, pick, log, mark, shot }) => {
   mark("ultimate", boss.now - 300, after.now + 2500);
   await p.waitForTimeout(2600);
   await shot("2-bullet-clock");
-  // The God King's help tried: his strike. Blocked, nothing spent; the boss mocks it (the book slammed shut).
+  // The God King's help tried: his strike. Blocked, its charge spent all the same; the boss mocks it (the book slammed shut).
   const t = Date.now();
   await p.getByRole("button", { name: /God King: tap to summon/ }).click();
   await p.getByRole("menuitem", { name: /Strike/ }).click();
@@ -187,10 +189,30 @@ const beaten = async ({ p, waitUntil, play, log, mark, shot }) => {
   mark("collapse", t - 200, res.now + 500);
 };
 
+/** ?power=bullet: the bullet clock as turn 2 begins, its 3 moves at 1+0, then (turn 5) he adds time per move. */
+const plus = async ({ p, waitUntil, play, pick, log, mark, shot }) => {
+  for (const want of [["g1f3"], ["b1c3"], ["d2d3", "h2h3"], ["h2h3", "a2a3"]]) await play(await pick(...want, "a2a3", "h2h3", "b2b3"));
+  const boss = await waitUntil((s) => s.kind === "boss" && !s.thinking && (s.boss?.powers?.events ?? []).some((e) => e.kind === "bulletPlus"), 150_000);
+  log("his increment's moment");
+  await p.locator(".rc-plus").waitFor({ timeout: 10_000 });
+  await p.waitForTimeout(250);
+  await shot("plus-1-text");
+  await p.waitForTimeout(1000);
+  await shot("plus-2-text-later");
+  const after = await waitUntil((s) => s.kind === "play", 30_000);
+  mark("plus", boss.now - 300, after.now + 1500);
+  await p.waitForTimeout(1500);
+  await shot("plus-3-dock");
+};
+
 const runs = [];
 if (which !== "desktop") runs.push(["phone", { ...devices["iPhone 13"] }]);
 if (which !== "phone") runs.push(["desktop", { viewport: { width: 1280, height: 800 } }]);
 for (const [name, context] of runs) {
+  if (only === "plus") {
+    await battle(name, context, "laststand=0&power=bullet", plus);
+    continue;
+  }
   await battle(name, context, "laststand=0", fight);
   await battle(`${name}-win`, context, "win=1", beaten);
 }

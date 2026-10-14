@@ -156,8 +156,9 @@ export function BossDock({
               onPick={(s) => {
                 play("menuSelect");
                 setMenu(false);
-                // (The Hidden Boss: the God King's help doesn't work against him. Nothing is spent; he mocks the try.)
-                if (boss && kingBlocked(boss)) return mockKingHelp(boss);
+                // (The Hidden Boss: the God King's help doesn't work against him. He mocks the try, and it spends the
+                // charge as if it had worked: callKing.)
+                if (boss && kingBlocked(boss)) mockKingHelp(boss);
                 match.callKing(s);
               }}
             />
