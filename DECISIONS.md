@@ -3761,7 +3761,13 @@ the width, moved back into view if it would run off). Measured with the longest 
 at 1280 and 1024 px: nothing covers it, all of it on screen.
 
 **Measured** (the slow-phone perf case, `e2e/perf.spec.ts`, 4x CPU throttling, three runs each on this machine):
-PERF_NUMBERS
+- Before, on a quiet machine (origin/main, 3 runs): the phase change p95 33 ms, 5 to 8% of frames dropped; four
+  boards in play 2 to 3%.
+- A/B, alternating runs of main and this branch while other sessions' engine sims loaded the machine (load 6 to 8 on 4
+  cores; even main failed its budget then): the phase change main 17, 10, 10% dropped (p95 50, 33, 33 ms), this branch
+  16, 14, 9% (p95 33 ms each); four boards in play main 14, 11, 15%, this branch 15, 13, 22% (that part's code is
+  unchanged: it's the machine). So no worse than main under the same conditions; the light's layers move only their
+  opacity and transform, his figure carries no filter, and his frames are drawn ahead from his battle's start.
 
 **Testing.** Targeted lane (animation, art and lines, and one rule number: the ultimate's threshold): typecheck, the
 app's unit tests
