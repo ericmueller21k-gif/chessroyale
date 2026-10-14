@@ -13,7 +13,8 @@
  *   same kind) lined up facing each other in the middle of the board, his always protected, and the crowd's next move
  *   must be one of the duels: its piece taking his. The engine picks a line-up where the best duel still leaves him a
  *   little ahead and a wrong one costs the crowd dearly. Nothing found: he holds it ("Not yet...") and tries again,
- *   then two pairs, then a lasso drag, so it never fizzles.
+ *   then two pairs, then a lasso drag, so it never fizzles. His reply to the duel is the engine's best at full strength,
+ *   the reply the search scored (duelReplyDue), never his brain's.
  *
  * The engine's part runs where the boss's moves are worked out (the host's device online, this device in solo) and
  * reaches everyone through the shared match state (each change is a base on the board); the server checks every
@@ -21,6 +22,7 @@
  * moments are the app's (characters/pig.ts, components/Pig.tsx).
  */
 import { BOSS_POWERS, mulberry32, type BossPowerSettings, type BossState, type LassoDrag, type ShowdownPair, type ShowdownResult } from "@chessroyale/core";
+import type { BoardState } from "../boards.ts";
 import { applyMove, gameEnd, legalMoves, pieceAt } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
@@ -970,6 +972,20 @@ export const showdownNow = (boss: Pick<BossState, "powers" | "crowdMoves"> | nul
 /** The duel moves of a showdown (the crowd's piece taking his, pair by pair). */
 export const duelMovesOf = (sd: Pick<ShowdownResult, "pairs">): string[] => sd.pairs.map((p) => p.crowd + p.boss);
 
+/**
+ * His move now answers the showdown's duel: the crowd has just played one (its piece took his), on the showdown's own
+ * turn. The search scored every line-up with his best reply to each duel (scoreLineups), so that's the move he plays
+ * (BossRules.bestReply): on his brain he once took another piece instead of taking back, and the crowd won his queen
+ * for free (Eric, Oct 13: Maia at 600). Two pairs or three alike; a duel the God King's Last Stand took back isn't on
+ * the board, so it waits for the one that is.
+ */
+export const duelReplyDue = (boss: Pick<BossState, "powers" | "crowdMoves">, board: Pick<BoardState, "history">): boolean => {
+  const sd = boss.powers?.showdown;
+  if (!sd || sd.turn !== boss.crowdMoves) return false;
+  const last = board.history.at(-1)?.slice(0, 4);
+  return !!last && duelMovesOf(sd).includes(last);
+};
+
 /** Wrangler: the long pull, the lasso drag every few turns, and SHOWDOWN! */
 export const PIG: BossRules = {
   id: "pig",
@@ -1039,6 +1055,8 @@ export const PIG: BossRules = {
     if (!firstMoveDue(boss) || !pullOptions(fen).includes(move)) return null;
     return { play: pullStep(move), san: `${move.slice(2, 4)}` };
   },
+  // His reply to the showdown's duel: the engine's best, as the search scored it.
+  bestReply: (boss, board) => duelReplyDue(boss, board),
   // After his move: his first one, the long pull (or nothing: an ordinary first move); later, the showdown's line-up or
   // the lasso drag he found, each checked against the rules here and put on the board as a base.
   afterBossMove(b, move, extras) {

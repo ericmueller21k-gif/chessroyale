@@ -276,10 +276,11 @@ export interface LobbyRecord {
   bossKey?: string;
   bossStumble?: boolean;
   /**
-   * "funhouse": the host plays the crowd's move for Boingo (his ultimate); "extra": it plays Hollow's extra move;
-   * "bounce": it picks Big Boy's Big Bounce.
+   * How the boss's own move is played (the runner's bossMoveKind: "best" is a power's follow-up its engine search
+   * scored, Wrangler's reply to the showdown's duel). "funhouse": the host plays the crowd's move for Boingo (his
+   * ultimate); "extra": it plays Hollow's extra move; "bounce": it picks Big Boy's Big Bounce.
    */
-  bossKind?: "elo" | "stumble" | "stagger" | "funhouse" | "extra" | "bounce";
+  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce";
   /** Big Boy's Big Bounce: the candidates the host was sent (the answer must be one of them). */
   bounceCandidates?: string[];
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
@@ -1348,7 +1349,7 @@ export class LobbyCore {
   /** What the boss's own turn asks the host for besides its move (Wrangler's long pull, drag or showdown), or null. */
   private bossAsks() {
     const kind = this.r.bossKind;
-    return kind === "elo" || kind === "stumble" || kind === "stagger" ? (this.runner?.bossAsks() ?? null) : null;
+    return kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best" ? (this.runner?.bossAsks() ?? null) : null;
   }
 
   private sendBossRequest(host: string) {
@@ -1365,14 +1366,14 @@ export class LobbyCore {
       fen,
       elo: runner.boss!.elo,
       nodes: this.settings.bossNodes,
-      ...(this.r.bossKind === "stumble" ? { stumble: true } : this.r.bossKind === "stagger" ? { stagger: true } : {}),
+      ...(this.r.bossKind === "stumble" ? { stumble: true } : this.r.bossKind === "stagger" ? { stagger: true } : this.r.bossKind === "best" ? { best: true } : {}),
       ...(funhouse ? { funhouse: true } : {}),
       ...(this.r.bossKind === "extra" ? { extra: true } : {}),
       ...(this.r.bossKind === "bounce" ? { bounce: this.r.bounceCandidates ?? [] } : {}),
       ...(allowed && this.r.bossKind !== "bounce" ? { allowed } : {}),
       // (Only the boss's own moves are Maia's: the funhouse's move for the crowd, Hollow's extra move and Big Boy's
-      // bounce keep their own engine picks.)
-      ...(this.r.bossBrain && !funhouse && this.r.bossKind !== "extra" && this.r.bossKind !== "bounce" ? { brain: this.r.bossBrain } : {}),
+      // bounce keep their own engine picks, and so does Wrangler's reply to the showdown's duel: the engine's best.)
+      ...(this.r.bossBrain && !funhouse && this.r.bossKind !== "extra" && this.r.bossKind !== "bounce" && this.r.bossKind !== "best" ? { brain: this.r.bossBrain } : {}),
       ...(asks ? { ...(asks.pull ? { pull: asks.pull } : {}), ...(asks.drag ? { drag: true as const } : {}), ...(asks.showdown ? { showdown: asks.showdown } : {}), seed: asks.seed } : {}),
     });
   }
