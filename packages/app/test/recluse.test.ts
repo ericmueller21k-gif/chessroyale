@@ -6,20 +6,21 @@ import { BOSS_KITS } from "../src/characters/kits.ts";
 import { RECLUSE, RECLUSE_BOOK, RECLUSE_BUST } from "../src/characters/recluse.ts";
 import { frameKeys, renderFrame, type Character } from "../src/characters/sprite.ts";
 
-// The Hidden Boss (code id `recluse`), art only: the checks characters.test.ts makes of every character in the game,
-// made here because he isn't in it, and that he shows nowhere in the game.
+// The Hidden Boss (code id `recluse`): his art. Since phase 1 (Oct 14) he's registered (his kit, his full figure among the
+// characters), hidden from players (boss-menu tests: recluse-boss.test.ts). His bust is cut at its foot on purpose and his
+// book is phase 2's, so neither is in a character or effect list; the checks characters.test.ts makes of every character
+// are made here for all three.
 const top = (keys: (string | null)[][]) => keys.findIndex((r) => r.some(Boolean));
 const ALL: readonly Character[] = [RECLUSE, RECLUSE_BUST, RECLUSE_BOOK];
 
-describe("the Hidden Boss (art only)", () => {
-  it("is in no roster, kit, character or effect list, so the game never shows him or his book", () => {
+describe("the Hidden Boss's art", () => {
+  it("is his kit's drawing (the bust in a phone's bar), one roster entry hidden from players; his book isn't on the board yet", () => {
     expect(RECLUSE.name).toBe("Hidden Boss");
-    for (const ch of ALL) {
-      expect(CHARACTERS).not.toContain(ch);
-      expect(Object.values(BOSS_KITS).some((k) => k.ch === ch)).toBe(false);
-      expect(Object.values(EFFECT_SPRITES)).not.toContain(ch);
-    }
-    expect(BOSS_ROSTER.some((b) => b.id === "recluse" || b.name === "Hidden Boss")).toBe(false);
+    expect(CHARACTERS).toContain(RECLUSE);
+    expect(CHARACTERS).not.toContain(RECLUSE_BUST);
+    expect(BOSS_KITS["Hidden Boss"]).toMatchObject({ ch: RECLUSE, bar: RECLUSE_BUST });
+    expect(Object.values(EFFECT_SPRITES)).not.toContain(RECLUSE_BOOK);
+    expect(BOSS_ROSTER.filter((b) => b.id === "recluse" || b.name === "Hidden Boss")).toEqual([expect.objectContaining({ id: "recluse", name: "Hidden Boss", kit: "Hidden Boss", adminOnly: true })]);
   });
 
   it("draws every part only with colours in its palette", () => {

@@ -14,6 +14,7 @@ import { GREX_UI } from "./Grex.tsx";
 import { HOLLOW_UI } from "./Hollow.tsx";
 import { SAWYER_UI } from "./Sawyer.tsx";
 import { PIG_UI } from "./Pig.tsx";
+import { RECLUSE_UI } from "./Recluse.tsx";
 import { PowerBanner, kitLine, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 
@@ -40,7 +41,7 @@ export { DARK, DarkCost, HOLLOW_CASTER, hollowCastFrom } from "./Hollow.tsx";
 export { PowerBanner, type Moment } from "./PowerParts.tsx";
 
 /** Every boss with powers on screen, by its BOSS_ROSTER id. */
-const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI] as BossUi[]).map((u) => [u.id, u]));
+const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI] as BossUi[]).map((u) => [u.id, u]));
 const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
 
 /** The rage warning, the same for every boss: the meter full, its ultimate coming. */
@@ -70,6 +71,7 @@ const MOMENT_UI: Record<PowerEventKind, MomentUi> = {
   ...BIGBOY_UI.moments,
   ...SAWYER_UI.moments,
   ...PIG_UI.moments,
+  ...RECLUSE_UI.moments,
 };
 
 /** The moments that play on a screen of their own, in the order they're looked for. */

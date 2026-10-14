@@ -23,6 +23,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
   const team = myTeam(match);
   const gameWinner = match.phase.kind === "results" ? match.phase.gameWinner : undefined;
   const bossResult = match.phase.kind === "results" ? match.phase.bossResult : undefined;
+  // (The bullet clock ran out: the Hidden Boss won on time.)
+  const onTime = match.phase.kind === "results" && !!match.phase.timeout;
   // Boss battle: those still standing at the end share the result.
   const survived = !!match.boss && !match.boss.kills.some((k) => match.isYou(k.id)) && placement <= 10;
   const me = standings.find((s) => s.isYou);
@@ -92,7 +94,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
           {bossResult === "crowd"
             ? `The crowd beat ${match.boss.name}!${survived ? " A win on your record." : ""}`
             : bossResult === "boss"
-              ? `${match.boss.name} won.`
+              ? `${match.boss.name} won${onTime ? " on time" : ""}.`
               : `A draw with ${match.boss.name}.`}
         </p>
       )}

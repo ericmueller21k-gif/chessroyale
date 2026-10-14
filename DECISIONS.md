@@ -2955,3 +2955,157 @@ Hidden Boss, a sprite preview" above.
   (it already only leans in), so it is unchanged. The slam stays the book slammed shut with its puff of dust: he has
   stood without the stone since Eric's redesign, so a palm slam on the stone isn't possible, and bringing the book down
   is the slam Eric approved. The book animations are untouched.
+
+### The Hidden Boss, phase 1: an admin's fight in Boss alone (Eric, Oct 14, 2026)
+
+Eric approved building him (Oct 14: "feel free to even build [him] in once animations are done, I trust this run of
+it"), then specified his phase-1 ultimate himself. Phase 1 only: the 4-board simul, Chess960, the red book item, the
+special crate and Squads come later. ROADMAP.md, "The hidden boss", has the whole design.
+
+**Who and where.**
+- Roster id `recluse`, name "Hidden Boss" (Eric names him later), icon 📕, kit "Hidden Boss". No real name anywhere.
+- **Hidden from players** (`BossDef.adminOnly`): `isPlayable` is false for him, so every place that asks it skips him
+  (a random boss, raids, the Crowd's boss final, the server's lobby creation, the FAQ, a player's boss menu,
+  `maia.spec.ts`'s list). `adminPlayable`, `hiddenBosses` and `menuBosses` add him to the boss menu, after the rest,
+  for an admin picking for Boss alone only (not "for your raid"). The app sets `bossHidden` for an admin's Boss alone,
+  and only then does the runner meet him (`chooseBoss`'s `hidden`). A player's `?boss=recluse`, a stored pick or
+  `?wip=1` gets a random boss instead.
+- **Online:** not reachable (the server makes a raid only with a playable boss), so the host and server paths are
+  untouched and no message changed (no protocol constant to bump: the lobby protocol has none, and Squads' is
+  untouched). His rules live in the shared match runner (the clock, the God King's block), so an online fight later
+  gets them as they are; he asks the host for no engine work besides his move.
+
+**His brain: Maia-3 at its strongest, raw** (Eric, Oct 14: "so it feels like an aggressive human playing").
+- `BOSS_BRAIN.fixed` (`{ recluse: "maia-raw" }`): Maia at its top rating (the last point of `maiaRating`: 2500), no
+  guard, no Stockfish share, whatever his strength, the crowd, the difficulty or an admin's Brain picker. Stockfish only
+  where Maia isn't on offer, and while it loads (as for every boss).
+- **Why not `byBoss`:** it keeps the bridge band (the light and strict guards from 2400, Stockfish's share from 2500),
+  which isn't raw.
+- His strength is fixed too, at 2650, the level where Maia reaches 2500 (`fixedLevel`), whatever the player's rating
+  or the difficulty. So the menu shows 2650 and four skulls, he never slips, and Stockfish's moves while Maia loads are
+  at 2650.
+- Unchanged once `BOSS_BRAIN.forPlayers` turns on (a test checks the plan with it on).
+
+**His passive, "nohelp": the God King's help doesn't work against him** (Eric, Oct 14).
+- `BossRules.blocksKing`: the runner's `kingDecision` (his move), `callStrike` and `lastStandFor` never let him act.
+  Nothing is spent: no charge, no strike, no turn. Solo's `callKing` refuses too.
+- **The try is mocked:** the dock's "Play move" or "Strike" doesn't call him. Instead the boss slams the book shut
+  where he stands and mocks it (his lines in turn), and the God King says his help won't take hold.
+- **The Last Stand** never comes. It isn't something the player calls, so it isn't mocked (my call: simplest).
+- Power-ups are the crowd's own, not the God King's, and Boss alone has none anyway (a raid starts with none, and the
+  Last Stand that leaves some can't come).
+- **The God King in this fight:** his own opening line (`foeIntro`) and his blocked line (`foeBlocked`). His lines about
+  calling him (the "Tap me" nudge, "spent", "A charge might turn it") are left out of this fight.
+
+**His ultimate: the bullet clock** (Eric, Oct 14, replacing the brief's "a few seconds a move for N moves": "Meter
+builds starting turn 1, about 7 turns in he says something about how you're thinking too much and to just play pure
+chess etc, true to him, then for the rest of phase 1 it's bullet with no added time per move so it's a true race
+against the clock but it should be bearable for a strong team").
+- **His own meter** (`BossRules.meter`, as Wrangler's), not the rage meter: empty at crowd turn 1, full at
+  `BOSS_POWERS.bulletTurn` (7). Nothing else fills it (no strikes, no eval). It comes as that turn begins: no warning,
+  no "RAGE!". The admins' trigger brings it as the next turn begins; `?power=bullet` on turn 2.
+- **From then to the end of the battle:** every bank still in is set to `bulletBankSeconds` (180 s) as it comes
+  (`turnBegun`). Then no increment, no per-move cap (a move may take the whole bank: `allowedMsFor` is the bank), and
+  nothing adds time. The God King's strike, which stops the clock, can't come; time chips are Squads'.
+- **Running out loses on time** (my call). Today a move that runs out of time is a missed move, and the engine's best
+  is played for the crowd (`scoreGroup`); Boss alone has no loss on time. With no increment, an empty bank would make
+  every move time out, and the engine would play the rest of the game. So in the bullet phase, a bank that runs out
+  (everyone still in at 0: `bossOutOfTime`) ends the battle at once. The move isn't played, the boss wins, and the
+  result screen says "Hidden Boss won on time." (`bossTimedOut`, kept on the runner: nothing stored or sent changed).
+- **The numbers, by estimate (not yet sim-tested):**
+  - 180 s for the rest of phase 1: the clock starts only after his move and its moments have shown (Boss alone: a
+    0.45 s show), so nothing but thinking comes out of it.
+  - A strong player at 3 to 5 s a move gets 36 to 60 more moves out of it. A battle is capped at 60 crowd moves (53
+    after turn 7), and a typical one is over well before.
+  - Turn 7: Eric's "about 7 turns in".
+- **On screen** (`RECLUSE_FX.bullet`, 4.6 s; the clock starts after it, as after every power):
+  - Where he stands (the bust in a phone's bar, the whole figure by the board on a computer; he never steps onto the
+    board): he consults the red book, opens it like a spell book (pages glowing and turning, hair in the wind, the
+    laugh), holds the spell, slams it shut.
+  - His line as it begins; "BULLET!" with "No added time." as the book falls open.
+  - From then on, the dock says "Bullet · 2:41 left" on every move: your bank, ticking (text a player must read to play
+    stays on screen; the timer bar above the board is the bank too).
+  - **How:** `playInPlace`, a run of his own animations played over his beat by his figure, both placements alike.
+
+**Animations used.**
+- `idle`.
+- `stare`: his entrance.
+- `consult`: the first beat of his ultimate ("right before his ultimate"), and when he's behind on material (his
+  `rattled` mood, sometimes with a line).
+- `laugh`: when he wins.
+- The spellbook set: his ultimate.
+- `slam`: as he mocks the God King's help. It's a decisive moment the player causes, during their own move, so it plays
+  whole. His own move shows for only 0.45 s in Boss alone, which would cut a slam on a capture short.
+- `collapse`, then `collapseLoop`: beaten.
+- Phase 2's sets aren't used.
+
+**Beaten.**
+- The battle ends as the crowd's win. The board holds 4.5 s (`BossRules.fallMs`, solo's `fall` phase: "You beat him!")
+  while he collapses and his first mumbled line comes. Then the normal result screen, where he stays slumped
+  (`kit.loops.defeat`) and mumbles on (`kit.fall`: three lines in turn, each as the last one goes).
+- Phase 2 isn't built, so nothing follows: no book slam, no split, no revive.
+
+**His kit and the screens.**
+- `kit.bar` is a drawing of its own for the phone's boss bar: his bust (in the wide box). `ch` is his whole figure: a
+  computer (2x by the board's corner) and the results (1.25x, in a taller box). Other bosses' kits are untouched (a
+  kit without `bar`, `loops`, `fall` or `lineOf` works as before).
+- His words go above his head on a computer, and beside him (never over him) on the results.
+- **Fit:** 390 px phone: the bust sits in the bar like the cast. 1280 and 1920: his whole figure by the board's corner,
+  clear of it. 900 and 1024: half off the window's left edge, as every boss is there today. The sprite-fit fix for
+  1024 px in progress draws every boss at 1x there; his bubble rule follows the scale.
+- **A fix for every boss:** a new battle's intro now forgets the last battle's moments and sounds (`resetBeats`).
+  Their keys repeat from battle to battle (`intro:N`, `over:crowd`), so a second battle in one visit skipped the
+  entrance and the defeat or victory animation.
+
+**Sounds:** five, synthesized (no files, cheap, made ahead with `warmSounds`, all under a move's loudness): the pages
+fluttering, the book shut, a rustle of cloth, his laugh as breath through the nose (no voice) and a low swell under his
+stare. Every cue has one, as for every boss.
+
+**His lines** (one table, `characters/recluse-lines.ts`; Eric, Oct 14: real quotes "keeping them intact is a must").
+- **Real quotes, word for word,** only the research report's Tier A (verified), never shortened, adapted or
+  re-punctuated:
+  - Intro, only when he's White and the game opened 1.e4 (the one place it reads right): "Best by test." His note to
+    1 P-K4 in his game against Bisguier (NY State Open 1963), *Chess Life*, Dec 1963, pp. 302–303; repeated in his book
+    of his sixty memorable games (1969).
+  - Mocking the God King's help: "I don't believe in psychology. I believe in good moves." Peter Kihss in the
+    *New York Times*, Jul 4, 1972, p. 14 (Winter, C.N. 5830).
+  - Mocking the God King's help: "A genuine beginner's move" (a fragment as published). On 6 Be2 in the Grünfeld,
+    in his game against Greenwald, *Chess Life*, Oct 1963, pp. 237–238.
+  - When he wins: "He played book lines, but didn't know them very well." On Alekhine, "The Ten Greatest Masters in
+    History", *Chessworld*, Jan–Feb 1964, pp. 56–61.
+  - Mumbling, beaten: "Morphy, I think everyone agrees, was probably the greatest genius of them all." Press
+    conference, Sep 21, 1992, in Seirawan & Stefanovic, *No Regrets*.
+  - The player-move triggers (1.d4, the King's Gambit) can't come in phase 1: Boss alone starts five moves into a named
+    opening. Not built.
+- **Placeholders for Eric's own lines** (ours, in his chess persona; not his words, no near-copies of real quotes,
+  nothing political, national or hateful):
+  - Intro: "Sit down. Let's find out if you can really play.", "Forget your opening book. Here we play chess.", "Show
+    me one move you didn't copy from somewhere."
+  - His ultimate (no verified quote fits): "You're thinking too much. Stop calculating and play!", "Enough staring at
+    the board. Pure chess now. Move!", "All that thinking, and still no idea. Play fast!"
+  - Mocking the God King's help: "Engine moves? Keep that crutch away from my board.", "Theory, engines, a king in
+    armor. None of it is chess!"
+  - Consulting the book when behind: "Hm. I've seen this before.", "Interesting. Very interesting."
+  - When he wins: "Memorized moves. I knew it."
+  - Mumbling, beaten: "No... the book said... bishop takes... no...", "Sixty-four squares... I counted every one..."
+- **The God King:** "I sense a tremendous power within this foe." (Eric's own, from ROADMAP.md). Placeholders: "Careful.
+  My strength feels faint against this one.", "This is no ordinary boss. Trust your own moves." (his opening line);
+  "My power... it won't take hold!", "Nothing! He shrugs off my strength.", "I can't reach him. This fight is yours
+  alone." (his help blocked).
+- **Screen text:** "BULLET!", "No added time.", "Bullet · m:ss left" (the dock), "You beat him!" (the dock, beaten),
+  "the boss is beaten" (the line above the board), "… won on time." (results), "Bullet!" (the dock's word for the
+  moment), the menu's "no God King help · bullet clock".
+
+**Test tools:** `?win=1` (solo): the battle starts after 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6, your move: Qxf7 mates him (to see
+him beaten). `npm run frames:recluse -- <dir> [phone|desktop|both]` (against `npx wrangler dev`, as an admin): his
+intro, the trigger's ultimate, the God King's help mocked, and ?win=1's collapse, frame by frame, with GIFs.
+
+**Testing.** The targeted lane (no protocol or stored-data change): `check`; unit
+`packages/chess/test/recluse.test.ts` (hidden from players and the menu, his brain plan and strength, the meter and the
+bullet clock's bank, increment and cap, the trigger and the switch, the loss on time, the God King blocked with nothing
+spent, `?win=1`), `packages/app/test/recluse-boss.test.ts` (the kit, the collapse loop, the run in place within its
+moment, the mock lines in both voices, the God King's cues, the quotes word for word, the sounds) and his art test
+updated; e2e `e2e/recluse.spec.ts` (a player never sees him; an admin's fight on a phone and a computer: the stare, Maia
+2500, the help mocked, the bullet clock on the trigger; beaten: the collapse and the result). Frames on a 390 px phone
+and a 1280 px computer (intro, ultimate, mock, collapse; the machine was loaded, so the boss's thinking was slow and the
+screencast had 0.25–0.7 s gaps, none tied to his moments).

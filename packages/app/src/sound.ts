@@ -15,6 +15,7 @@ import { hollowSound, type HollowSound } from "./characters/hollow-sounds.ts";
 import { bigBoySound, type BigBoySound } from "./characters/bigboy-sounds.ts";
 import { sawyerSound, type SawyerSound } from "./characters/sawyer-sounds.ts";
 import { pigSound, type PigSound } from "./characters/pig-sounds.ts";
+import { recluseSound, type RecluseSound } from "./characters/recluse-sounds.ts";
 import { CASTLE_SOUND, MOVE_SOUNDS, CAPTURE_SOUNDS, defaultPieceSound, onPieceSoundChange, pieceSound, pieceSoundOption, type PieceSoundKind } from "./piece-sounds.ts";
 
 let ctx: AudioContext | null = null;
@@ -230,6 +231,7 @@ const hollow = (name: HollowSound) => (t: number) => buffer(hollowSound(name, ct
 const bigBoy = (name: BigBoySound) => (t: number) => buffer(bigBoySound(name, ctx!.sampleRate), t);
 const sawyer = (name: SawyerSound) => (t: number) => buffer(sawyerSound(name, ctx!.sampleRate), t);
 const pig = (name: PigSound) => (t: number) => buffer(pigSound(name, ctx!.sampleRate), t);
+const recluse = (name: RecluseSound) => (t: number) => buffer(recluseSound(name, ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
 function grexWhistle(t: number) {
   const w = whistlePick(Math.random(), Math.random(), Math.random());
@@ -550,6 +552,12 @@ export type SoundName =
   | "pigHop"
   | "pigDraw"
   | "pigYank"
+  // The Hidden Boss (admins only, for now): synthesised, see characters/recluse-sounds.ts.
+  | "recluseFlip"
+  | "recluseShut"
+  | "recluseRustle"
+  | "recluseHuff"
+  | "recluseHum"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
   | "sqSting";
@@ -672,6 +680,11 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   pigHop: pig("hop"),
   pigDraw: pig("draw"),
   pigYank: pig("yank"),
+  recluseFlip: recluse("flip"),
+  recluseShut: recluse("shut"),
+  recluseRustle: recluse("rustle"),
+  recluseHuff: recluse("huff"),
+  recluseHum: recluse("hum"),
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
   // Every board's move landing after a round: a quick ripple of soft knocks (the picked move sound), one per board.
@@ -725,6 +738,11 @@ const MAKE: Partial<Record<SoundName, (rate: number) => unknown>> = {
   pigHop: (r) => pigSound("hop", r),
   pigDraw: (r) => pigSound("draw", r),
   pigYank: (r) => pigSound("yank", r),
+  recluseFlip: (r) => recluseSound("flip", r),
+  recluseShut: (r) => recluseSound("shut", r),
+  recluseRustle: (r) => recluseSound("rustle", r),
+  recluseHuff: (r) => recluseSound("huff", r),
+  recluseHum: (r) => recluseSound("hum", r),
 };
 /**
  * Makes a boss's synthesised sounds ahead of time, one per idle moment, so the first time one plays (a bulb smashed in

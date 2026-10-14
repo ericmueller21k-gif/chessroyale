@@ -1,7 +1,7 @@
 import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
-import { botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
+import { botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
@@ -222,7 +222,8 @@ export class SoloMatch implements GameView {
 
   get exit(): ExitKind | null {
     const k = this.phase.kind;
-    if (this.stopped || k === "results" || k === "loading") return null;
+    // (Nor while a beaten boss falls: the battle is over, its result on its way.)
+    if (this.stopped || k === "results" || k === "loading" || (k === "boss" && this.phase.kind === "boss" && this.phase.fall)) return null;
     if (!this.begun) return "leave";
     return this.you.alive ? "resign" : "leave";
   }
@@ -445,6 +446,8 @@ export class SoloMatch implements GameView {
    */
   callKing(strike = false) {
     if (this.phase.kind !== "play" || !this.runner.boss?.kingCharges || this.kingCalled) return;
+    // (The Hidden Boss: the God King's help doesn't work against him; the dock has him mock the try, nothing spent.)
+    if (kingHelpBlocked(this.runner.boss)) return;
     if (strike) return this.callStrike();
     this.kingCalled = true;
     this.runner.kingCallers.add(HUMAN);
@@ -714,6 +717,14 @@ export class SoloMatch implements GameView {
       }
       if (this.runner.stageComplete()) {
         this.runner.finishBossBattle();
+        // (A boss with a fall beaten, the Hidden Boss: the board holds while he collapses and starts to mumble, then the
+        // result screen, where he goes on mumbling. Phase 2 isn't built: nothing follows.)
+        const fallMs = this.runner.boss?.result === "crowd" ? bossRules(this.runner.boss)?.fallMs : undefined;
+        if (fallMs) {
+          this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + fallMs, fall: true });
+          this.timer = setTimeout(() => this.finish(), fallMs);
+          return;
+        }
         return this.finish();
       }
       // (Hollow's Lights out and Big Boy's Big Bounce come at the start of his turn, before his move.)
@@ -990,6 +1001,8 @@ export class SoloMatch implements GameView {
       youWon: this.you.placement === 1,
       ...(this.settings.mode === "crowd" ? { gameWinner: this.runner.gameWinner() } : {}),
       ...(this.runner.boss?.result ? { bossResult: this.runner.boss.result } : {}),
+      // (The bullet clock ran out: the Hidden Boss won on time.)
+      ...(this.runner.bossTimedOut ? { timeout: true } : {}),
     });
   }
 }

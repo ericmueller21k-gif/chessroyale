@@ -27,6 +27,7 @@ import { showBanNotice } from "./components/FairPlay.tsx";
 import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
 import { account, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult } from "./account.ts";
+import { isAdmin } from "./boss-brain.ts";
 import { difficultyElo } from "./boss-difficulty.ts";
 import { startLive } from "./live.ts";
 import { SettingsScreen } from "./screens/Settings.tsx";
@@ -59,6 +60,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
   const mode = { ...chosenMode(), ...(modeId ? { mode: modeId } : {}) };
   const raid = mode.mode === "raid";
   const crowd = mode.mode === "crowd" || raid;
+  // Testing, admins: Boss alone (a raid alone, the boss picked) may meet a boss hidden from players (the Hidden Boss).
+  const hidden = raid && !matchBoss && isAdmin();
   // ?format=team|boss|duel: skip the pre-game votes and play that ending (for testing).
   const format = q.get("format") as FinalFormat | null;
   const forced = crowd && format && format in CROWD_KNOCKOUTS ? { finalFormat: format, knockoutsPerStage: CROWD_KNOCKOUTS[format], augments: false } : {};
@@ -73,7 +76,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
           // A step above your rating (a test link's ?boss=<tier> fixes it), plus the boss's own offset.
           bossFixedElo: bossTierFromUrl() || raidBossElo([account().profile?.rating ?? null]),
           // Boss alone: the boss picked from the menu ("" random); a Solo raid's is random. Random avoids your last.
-          bossId: matchBoss && !bossInUrl() ? "" : chosenBoss(),
+          bossId: matchBoss && !bossInUrl() ? "" : chosenBoss(hidden),
+          ...(hidden ? { bossHidden: true } : {}),
           // Boss alone: the difficulty chosen next to the boss picker (Easy to Hardest) on top of that strength.
           bossDifficulty: matchBoss || bossTierFromUrl() ? 0 : difficultyElo(),
         }
@@ -97,6 +101,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     ...(raid ? {} : chosenBoss() && bossInUrl() ? { bossId: chosenBoss() } : {}),
     // Testing, solo: ?mate=1, the boss mates you at once (1.f3 e5 2.g4, its move): its attack on your king, then the result.
     ...(q.get("mate") === "1" ? { bossMateTest: true } : {}),
+    // Testing, solo: ?win=1, you mate the boss at once (1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6, your move: Qxf7): a boss beaten.
+    ...(q.get("win") === "1" ? { bossWinTest: true } : {}),
     // Testing: ?laststand=0, the God King never makes his Last Stand (a test that leaves a piece to burn on purpose).
     ...(q.get("laststand") === "0" ? { lastStandFrom: 999 } : {}),
     // Testing, solo: ?boss=<id>&wip=1 meets a boss whose powers are built before its art is (placeholders show).
@@ -1189,7 +1195,7 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
     case "vote":
       return <VoteScreen match={match} vote={p.vote} menu={<MatchMenu exit={exitFor(match)} />} />;
     case "boss":
-      return <BossScreen match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} lights={p.lights} />;
+      return <BossScreen match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} lights={p.lights} fall={p.fall} />;
     case "results":
       return (
         <ResultsScreen

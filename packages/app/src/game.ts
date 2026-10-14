@@ -157,13 +157,13 @@ export type Phase =
    * Boss battle: the boss thinking, its move, or its strike (`until`: when the next crowd move starts). `lights`:
    * Hollow's Lights out, at the start of his turn (the clocks stopped), before his move.
    */
-  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; lights?: LightsView }
+  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; lights?: LightsView; fall?: boolean }
   /**
    * `gameWinner`: Crowd, who won the game on the board (null for a draw). `bossResult`: who won a boss battle. `left`:
    * you left before the end (see GameView.resign): you resigned (a loss; `bot`: online, a bot plays your seat), or you
    * left once you were already out (your place as it stood; the winner isn't known).
    */
-  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult };
+  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult; timeout?: boolean };
 
 /** How you left a match before its end (the results screen says so). */
 export interface LeftResult {

@@ -9,7 +9,7 @@ import { prewarmBigBoy } from "./BigBoy.tsx";
 import { prewarmGinger } from "./Ginger.tsx";
 import { prewarmSawyer } from "./Sawyer.tsx";
 import { prewarmPig } from "./Pig.tsx";
-import { CRITICAL, LOW, NORMAL, SpeechBox, bossVoice, useVoice, type Priority } from "../speech.tsx";
+import { CRITICAL, LOW, NORMAL, SpeechBox, bossVoice, holdMs, useVoice, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 import { lightsId, syncLights } from "../characters/lights.ts";
 
@@ -37,6 +37,42 @@ const startOf = (key: string, now = Date.now()) => {
 };
 /** Sounds already played: the phone and computer placements, or a new screen, never play one twice. */
 const played = new Set<string>();
+
+/**
+ * A new boss battle (its intro, with the voices' reset): the moments seen and sounds played in the last one are
+ * forgotten, so its entrance, and its defeat or victory, play again (their keys repeat from battle to battle).
+ */
+export function resetBeats() {
+  started.clear();
+  played.clear();
+  inPlace.run = null;
+}
+
+/**
+ * A run of the boss's own animations played where it stands, over its beat (the Hidden Boss: his spellbook as his
+ * ultimate comes, the book slammed shut as he mocks the God King's help): from `since`, each in turn, then its beat
+ * again. Set by what plays it (a moment's view, the dock); read by its figure every frame, both placements alike.
+ */
+const inPlace: { run: { key: string; since: number; anims: readonly string[] } | null } = { run: null };
+export function playInPlace(key: string, anims: readonly string[], since = Date.now()) {
+  if (inPlace.run?.key !== key) inPlace.run = { key, since, anims };
+}
+/** What a run in place shows at `now`, or null once it's over (or before it starts). */
+function inPlaceShowing(ch: Character, now: number): { anim: string; frame: number; tag: string } | null {
+  const run = inPlace.run;
+  if (!run || now < run.since) return null;
+  let t = now - run.since;
+  for (let i = 0; i < run.anims.length; i++) {
+    const a = ch.anims[run.anims[i]!];
+    if (!a) continue;
+    if (t < length(a)) {
+      const frame = frameAt(a, t);
+      return { anim: run.anims[i]!, frame, tag: `${run.key}:${i}:${frame}` };
+    }
+    t -= length(a);
+  }
+  return null;
+}
 
 /**
  * Each frame's pixels, made once per look ("" its own colors; Hollow's `bulbs2` puts a bulb out) and per recolor
@@ -74,11 +110,13 @@ export function showing(kit: BossKit, beat: Pick<BeatResult, "anim" | "loop" | "
     const frame = frameAt(shot, now - since);
     return { anim: shotName, frame, tag: `${beat.key}:${frame}` };
   }
-  const loop = kit.ch.anims[beat.loop] ?? kit.ch.anims.idle!;
+  // (A loop by another name in its kit: the Hidden Boss beaten slumps in his collapseLoop.)
+  const loopName = kit.loops?.[beat.loop] ?? beat.loop;
+  const loop = kit.ch.anims[loopName] ?? kit.ch.anims.idle!;
   const total = length(loop);
   const cycle = Math.floor(now / total);
   const frame = frameAt(loop, now - cycle * total);
-  return { anim: kit.ch.anims[beat.loop] ? beat.loop : "idle", frame, tag: `${beat.loop}:${cycle}:${frame}` };
+  return { anim: kit.ch.anims[loopName] ? loopName : "idle", frame, tag: `${loopName}:${cycle}:${frame}` };
 }
 
 /** How much a reaction's line matters (speech.tsx): the battle's start and end over the rest, which wait their turn. */
@@ -101,7 +139,9 @@ export function BossCharacter({ match, place }: { match: GameView; place: "bar" 
 }
 
 function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place: "bar" | "side" | "results" }) {
-  const kit = bossKit(boss.name);
+  const full = bossKit(boss.name);
+  // (A phone's boss bar may have a drawing of its own: the Hidden Boss's bust, with the same animations.)
+  const kit = useMemo(() => (full && place === "bar" && full.bar ? { ...full, ch: full.bar } : full), [full, place]);
   // This battle's lights (Hollow's bulbs), for everything of his drawn from now on.
   syncLights(boss);
   const beat = useMemo(
@@ -152,7 +192,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     let last = "";
     const draw = () => {
       const now = Date.now();
-      const s = showing(kit, beat, now, since);
+      // (A run of its own animations in place, over its beat, while one lasts: the Hidden Boss's spellbook, his slam.)
+      const s = inPlaceShowing(kit.ch, now) ?? showing(kit, beat, now, since);
       const look = lookRef.current();
       const id = `${s.anim}:${s.frame}:${look}:${lightsId()}`;
       if (id !== last) {
@@ -178,13 +219,32 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   // (Nor does its mate when it attacks the crowd's king: the attack's line is its word then.)
   const quiet = stage === "bossMove" && (!!boss.powers?.events.length || mateAttack(boss));
   useLayoutEffect(() => {
-    if (beat?.line && !quiet) bossVoice.say(beat.line, `${boss.id}:${boss.startMove}:${beat.key}`, BEAT_PRIORITY[beat.anim] ?? LOW);
+    // (A line of its own for the moment, from the battle, over its kit's: the Hidden Boss's "Best by test.")
+    const said = beat ? (kit?.lineOf?.(beat.anim, boss) ?? beat.line) : null;
+    if (said && !quiet) bossVoice.say(said, `${boss.id}:${boss.startMove}:${beat!.key}`, BEAT_PRIORITY[beat!.anim] ?? LOW);
   }, [beat?.key]);
+  // Beaten: its fall lines (the Hidden Boss's mumbling), one after another once its defeat's animation is over, each
+  // as the last one goes; carried on by whichever screen draws it next (the result screen), from the same moment.
+  const fallAt = useMemo(() => {
+    if (!kit?.fall?.length || beat?.anim !== "defeat") return null;
+    const shot = kit.ch.anims[kit.anims.defeat ?? "defeat"];
+    let t = since + (shot && !shot.loop ? length(shot) : 0);
+    return kit.fall.map((text) => {
+      const at = t;
+      t += holdMs(text) + 150;
+      return { text, at };
+    });
+  }, [kit, beat?.key, since]);
+  useEffect(() => {
+    if (!fallAt) return;
+    const timers = fallAt.map(({ text, at }, i) => setTimeout(() => bossVoice.say(text, `${boss.id}:${boss.startMove}:fall:${i}`, NORMAL), Math.max(0, at - Date.now())));
+    return () => timers.forEach(clearTimeout);
+  }, [fallAt]);
   const { line, now } = useVoice(bossVoice);
   if (!kit || !beat) return null;
   const { ch } = kit;
   return (
-    <div ref={box} class={`boss-char place-${place}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}`} data-anim={beat.anim} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1] }}>
+    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}`} data-anim={beat.anim} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1] }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
       {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). */}
       {line && <SpeechBox key={line.key} class="bc-bubble" text={line.text} at={line.at} until={line.until} now={now} fits={1} />}

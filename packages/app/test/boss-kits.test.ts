@@ -23,7 +23,8 @@ describe("the playable rule: a complete character and its powers", () => {
   });
 
   it("a boss with a kit but no powers, or powers but no kit, is never playable", () => {
-    for (const b of BOSS_ROSTER) expect(isPlayable(b)).toBe(b.kit !== null && b.powers !== null);
+    // (A boss hidden from players, the Hidden Boss, is never playable either: only an admin meets him, in Boss alone.)
+    for (const b of BOSS_ROSTER) expect(isPlayable(b)).toBe(b.kit !== null && b.powers !== null && !b.adminOnly);
     expect(playableBosses().every((b) => b.powers)).toBe(true);
   });
 });

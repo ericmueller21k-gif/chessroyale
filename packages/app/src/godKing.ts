@@ -20,6 +20,7 @@
 import { KING_SPEECH } from "@chessroyale/core";
 import { applyMove, blunderCost, inCheck, legalMoves, pieceAt, queenInDanger, toSan, type BlunderCost } from "@chessroyale/chess";
 import { CRITICAL, LOW, NORMAL, Voice, type Priority, type Spoken } from "./speech.tsx";
+import { KING_VS_RECLUSE } from "./characters/recluse-lines.ts";
 
 export type KingCue =
   | "intro"
@@ -53,7 +54,9 @@ export type KingCue =
   | "fireTile"
   | "mateThreat"
   | "queenLost"
-  | "queenWon";
+  | "queenWon"
+  | "foeIntro"
+  | "foeBlocked";
 
 export const KING_LINES: Record<KingCue, readonly string[]> = {
   // One of these as the battle begins (Eric, Oct 9: one opening line, from a much bigger pool).
@@ -123,6 +126,10 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   mateThreat: ["Mate is near! Shield the king.", "It threatens mate. Look again!", "Danger at the gate. Guard the king!"],
   queenLost: ["Our queen has fallen. Fight on!", "The queen! She'll be avenged.", "They took the queen. Hold the line."],
   queenWon: ["Their queen falls!", "The tyrant's queen is ours!", "Down goes the queen. Press on!"],
+  // The Hidden Boss (characters/recluse-lines.ts, every line of his fight in one table): his opening line in this fight,
+  // and his help tried and blocked (it doesn't work against him).
+  foeIntro: KING_VS_RECLUSE.intro,
+  foeBlocked: KING_VS_RECLUSE.blocked,
   // G-REX: the first time a piece of ours steps onto a burning tile (once a match).
   fireTile: [
     "Careful on that tile, don't stand there too long!",
@@ -167,6 +174,8 @@ const KIND: Record<KingCue, Kind> = {
   funhouse: "critical",
   showdown: "critical",
   fireTile: "critical",
+  foeIntro: "critical",
+  foeBlocked: "critical",
 };
 
 /** How much each kind of line matters to his voice: critical cuts in; a remark waits its turn ahead of small talk. */
@@ -292,20 +301,21 @@ export function mateThreatened(fen: string): boolean {
  * (your queen attacked, your king in check, a mate threatened: each only when it wasn't so at the crowd's last move,
  * `prevFen`), his opening line, out of charges, how it's going, the nudge, small talk. `ours`: the crowd's chances.
  */
-export function turnCues(s: { fen: string; side: "w" | "b"; charges: number; ply: number; ours?: number; struckAt?: number; prevFen?: string }): { cue: KingCue; key: string }[] {
+export function turnCues(s: { fen: string; side: "w" | "b"; charges: number; ply: number; ours?: number; struckAt?: number; prevFen?: string; noHelp?: boolean }): { cue: KingCue; key: string }[] {
   const { fen, side, prevFen } = s;
   const out: { cue: KingCue; key: string }[] = [];
   if (s.struckAt) out.push({ cue: "struck", key: `struck-${s.struckAt}` });
   if (queenInDanger(fen, side) && !(prevFen && queenInDanger(prevFen, side))) out.push({ cue: "queenDanger", key: `queen-${fen}` });
   if (inCheck(fen) && !(prevFen && inCheck(prevFen))) out.push({ cue: "inCheck", key: `check-${fen}` });
   if (mateThreatened(fen) && !(prevFen && mateThreatened(prevFen))) out.push({ cue: "mateThreat", key: `mate-${fen}` });
-  out.push({ cue: "intro", key: "intro" });
-  if (s.charges <= 0) out.push({ cue: "spent", key: "spent" });
+  // (A boss his help doesn't work against, the Hidden Boss: his own opening line, and nothing about calling him.)
+  out.push({ cue: s.noHelp ? "foeIntro" : "intro", key: "intro" });
+  if (s.charges <= 0 && !s.noHelp) out.push({ cue: "spent", key: "spent" });
   if (s.ours !== undefined) {
     if (s.ours >= 0.85) out.push({ cue: "winning", key: `winning-${fen}` });
-    else if (s.ours <= 0.15) out.push({ cue: "losing", key: `losing-${fen}` });
+    else if (s.ours <= 0.15 && !s.noHelp) out.push({ cue: "losing", key: `losing-${fen}` });
   }
-  if (s.charges > 0 && s.ply >= 6) out.push({ cue: "nudge", key: `nudge-${Math.floor(s.ply / 12)}` });
+  if (s.charges > 0 && s.ply >= 6 && !s.noHelp) out.push({ cue: "nudge", key: `nudge-${Math.floor(s.ply / 12)}` });
   out.push({ cue: "idle", key: `idle-${fen}` });
   return out;
 }
