@@ -205,9 +205,13 @@ export function UltimateTest({ match }: { match: GameView }) {
  * Waits while it searches and when it isn't your move. A phone: under the dock; a computer: in the title line (Hud.tsx).
  */
 export function EngineMove({ match }: { match: GameView }) {
-  if (!match.engineMoveShown || !match.engineMove || match.boss?.result) return null;
+  // (The Hidden Boss's phase 2 too: on your board, while it's your move there.)
+  const simul = match.simul;
+  if (!match.engineMoveShown || !match.engineMove || (match.boss?.result && !simul)) return null;
+  if (simul && (simul.decided || !simul.playing)) return null;
+  const ready = simul ? simul.playing && simul.boards[0]?.toMove === "crowd" : match.phase.kind === "play";
   return (
-    <button type="button" class="engine-move" disabled={match.phase.kind !== "play" || !!match.engineThinking} onClick={() => match.engineMove?.()}>
+    <button type="button" class="engine-move" disabled={!ready || !!match.engineThinking} onClick={() => match.engineMove?.()}>
       Engine move
     </button>
   );

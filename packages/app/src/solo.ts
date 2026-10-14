@@ -619,6 +619,8 @@ export class SoloMatch implements GameView {
    * the boss's reply and powers as usual). The power-up hints' search: the moves this turn allows, already under way.
    */
   engineMove() {
+    // (The Hidden Boss's phase 2: your board, its Chess960 position, on this device's engine; then your move as usual.)
+    if (this.phase.kind === "simul") return this.engineMove960();
     if (!this.engineMoveShown || this.engineThinking || this.phase.kind !== "play") return;
     if (Date.now() < this.playStartedAt - 300) return;
     const fen = this.phase.board.fen;
@@ -632,6 +634,24 @@ export class SoloMatch implements GameView {
         const best = top[0]?.move;
         if (best && !this.stopped && this.phase.kind === "play" && this.phase.board.fen === fen) this.submit(best);
         else this.emit();
+      });
+  }
+
+  /** Engine move on your phase 2 board: Stockfish's best (UCI_Chess960 on for the position), played as your move. */
+  private engineMove960() {
+    const b = this.phase2?.board(0);
+    if (!this.engineMoveShown || this.engineThinking || !this.phase2Playing || !b || b.result || b.turnAt === null) return;
+    const fen = b.board.fen;
+    this.engineThinking = true;
+    this.emit();
+    void this.engines[this.engines.length - 1]!
+      .topMoves(fen, 1)
+      .catch(() => [])
+      .then((top) => {
+        this.engineThinking = false;
+        const best = top[0]?.move;
+        if (best && !this.stopped && this.phase2?.board(0)?.board.fen === fen) this.simulMove(0, best);
+        this.emit();
       });
   }
 
@@ -775,7 +795,9 @@ export class SoloMatch implements GameView {
     this.begun = true;
     this.freeBrain();
     this.brainShown = isAdmin();
+    // (Phase 1's words are over: neither voice carries a line into the phase change.)
     bossVoice.reset();
+    resetKingSpeech();
     const at = Date.now();
     const seed = this.runner.state.boss?.powers?.seed ?? Math.floor(this.rng() * 2 ** 32);
     this.phase2From = this.runner.boards.get(this.runner.state.boards[0]!)!.fen;

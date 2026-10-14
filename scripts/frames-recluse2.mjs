@@ -213,7 +213,7 @@ const loss = async (ctx) => {
     await p.getByRole("button", { name: "Match options" }).click();
     await p.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^Resign$/ }).click();
   } else await p.getByRole("button", { name: "Resign", exact: true }).click();
-  await p.getByRole("dialog").getByRole("button", { name: /Resign/ }).last().click();
+  await p.getByRole("alertdialog").getByRole("button", { name: /Resign/ }).click();
   const res = await waitUntil((s) => s.kind === "results", 30_000);
   await p.waitForTimeout(4000);
   await shot("11-defeat");
