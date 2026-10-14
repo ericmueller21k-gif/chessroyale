@@ -229,44 +229,46 @@ const X_PIXELS = [[1, 1], [5, 1], [2, 2], [4, 2], [3, 3], [2, 4], [4, 4], [1, 5]
 
 /**
  * The team's slow moves (Eric, Oct 14): a slot each up to his ultimate (RECLUSE_PHASE2.slowMovesForUlt), a red pixel X
- * for each slow move so far, the rest dim; beside every board, as Jefferson's candle shots stand beside his: a column by
- * its right edge, or a row above a phone's small boards (no room beside them). The board the last one was on flashes.
+ * for each slow move so far, the rest dim; in a column by the right edge of your board only (Eric, Oct 14: the count is the
+ * team's, the same on every board, so once is enough), as Jefferson's candle shots stand beside his. On a phone, by the
+ * big board (yours, or the one you're watching). They flash at every slow move, whoever's.
  */
-function SlowMarks({ n, flash, row }: { n: number; flash: boolean; row?: boolean }) {
+function SlowMarks({ n, flash }: { n: number; flash: boolean }) {
   const of = RECLUSE_PHASE2.slowMovesForUlt;
   const cells = Array.from({ length: of }, (_, i) => {
-    const [x, y] = row ? [i * 8, 0] : [0, i * 8];
     return (
-      <g key={i} transform={`translate(${x} ${y})`}>
+      <g key={i} transform={`translate(0 ${i * 8})`}>
         <rect width="7" height="7" class="rc-slow-cell" />
         {i < n ? X_PIXELS.map(([px, py]) => <rect key={`${px}${py}`} x={px} y={py} width="1" height="1" class="rc-slow-x" />) : <rect x="2" y="2" width="3" height="3" class="rc-slow-empty" />}
       </g>
     );
   });
   return (
-    <span class={`rc-slow ${row ? "row" : "col"}${flash ? " flash" : ""}`} role="img" aria-label={`Slow moves: ${n} of ${of}`} data-slow={n}>
+    <span class={`rc-slow col${flash ? " flash" : ""}`} role="img" aria-label={`Slow moves: ${n} of ${of}`} data-slow={n}>
       <span class="rc-slow-label" aria-hidden="true">
         slow
       </span>
-      <svg viewBox={row ? `0 0 ${of * 8 - 1} 7` : `0 0 7 ${of * 8 - 1}`} shape-rendering="crispEdges" aria-hidden="true">
+      <svg viewBox={`0 0 7 ${of * 8 - 1}`} shape-rendering="crispEdges" aria-hidden="true">
         {cells}
       </svg>
     </span>
   );
 }
 
-/** One phase 2 board: yours takes moves on your turn. Beside it, the team's slow moves. */
-function SimulBoard({ match, v, b, now, small, children }: { match: GameView; v: SimulView; b: SimulBoardView; now: number; small?: boolean; children?: ComponentChildren }) {
+/** One phase 2 board: yours takes moves on your turn. `marks`: the team's slow moves beside it (one board shows them). */
+function SimulBoard({ match, v, b, now, small, marks: withMarks, children }: { match: GameView; v: SimulView; b: SimulBoardView; now: number; small?: boolean; marks?: boolean; children?: ComponentChildren }) {
   const mine = b.you && v.playing && b.toMove === "crowd";
-  const flash = !!v.lastSlow && v.lastSlow.board === b.id && now - v.lastSlow.at < SLOW_NOTE_MS;
+  const recent = !!v.lastSlow && now - v.lastSlow.at < SLOW_NOTE_MS;
+  // (The note marks the board the slow move was on; the marks flash at any slow move.)
+  const flash = recent && v.lastSlow!.board === b.id;
   const n = Math.min(v.slow, RECLUSE_PHASE2.slowMovesForUlt);
   // (The same element while its count and flash stand: the screen draws every frame, the marks only when they change.)
-  const marks = useMemo(() => <SlowMarks n={n} flash={flash} row={small} />, [n, flash, small]);
+  const marks = useMemo(() => <SlowMarks n={n} flash={recent} />, [n, recent]);
   return (
     <Board fen={b.fen} orientation="white" lastMove={b.lastMove} interactive={mine} onMove={(m) => match.simulMove?.(b.id, m)} small={small} silent={!b.you}>
       <Tag b={b} v={v} now={now} small={small} />
       <Outcome b={b} />
-      {v.playing && marks}
+      {v.playing && withMarks && marks}
       {/* (Which board the last slow move was on: a small note over its top-right corner, for a moment.) */}
       {flash && <span class="rc-slow-note">slow move</span>}
       {children}
@@ -322,13 +324,13 @@ export function SimulScreen({ match }: { match: GameView }) {
             <div class="board-wrap rc-stage">
               {QUARTER_BOARD.map((id, q) => (
                 <div key={q} class={`rc-cell rc-q${q} rc-played`}>
-                  <SimulBoard match={match} v={v} b={v.boards[id]!} now={now} />
+                  <SimulBoard match={match} v={v} b={v.boards[id]!} now={now} marks={v.boards[id]!.you} />
                 </div>
               ))}
               {ultBanner}
             </div>
           ) : (
-            <SimulBoard key={big.id} match={match} v={v} b={big} now={now}>
+            <SimulBoard key={big.id} match={match} v={v} b={big} now={now} marks>
               {ultBanner}
             </SimulBoard>
           )}

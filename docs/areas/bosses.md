@@ -124,9 +124,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   (`slam2`). Engine move (admins) works on your board.
 - **His phase 2 ultimate** (Eric, Oct 14): a move longer than `slowMoveSeconds` (5 s; anyone's, any board, before it
   comes) is a slow move for the team (`Phase2State.slow`; his line, `slow`, low priority: it never stacks; a soft sound,
-  `recluseSlow`; that board's marks flash with a "slow move" note); each shows as a red pixel X beside every board
-  (`SlowMarks`: ten slots in a column by each board's right edge, as Jefferson's candle shots; a row above a phone's
-  small boards). The team's `slowMovesForUlt`-th (10; Eric, Oct 14) brings it (`phase2Ult`): his line (`ult2`), the
+  `recluseSlow`; the marks flash and that board gets a "slow move" note); each shows as a red pixel X beside your board
+  only (`SlowMarks`: ten slots in a column by its right edge, as Jefferson's candle shots; on a phone, by the big board;
+  once, since the count is the team's: Eric, Oct 14). The team's `slowMovesForUlt`-th (10; Eric, Oct 14) brings it (`phase2Ult`): his line (`ult2`), the
   spellbook where he stands, "5 SECONDS!" over every board, held a second longer (`FightBanner`'s `long`); everyone
   whose move it is gets a fresh 5 s from then; from then on every move has `ultMoveSeconds` (5 s), no bank, and out of
   time a random legal move is played for that player (`phase2Timeouts`, as Squads plays a missed move; never a loss on
