@@ -118,7 +118,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   `?power=<id>` brings its ultimate early (warned as turn 2 begins, unleashed on turn 3; its passive as usual; Wrangler's
   `?power=showdown` fills his meter from turn 2, his showdown searched from his next move); admins
   see "Trigger ultimate (testing)" in any boss battle (`ultimateTestButton`, `triggerUltimate`: the ultimate as the next
-  crowd turn begins, no warning). A boss's attack on a king: `?boss=hollow&laststand=1` (Boss alone: your first move
+  crowd turn begins, no warning; on a computer in the title line with the brain's pill, before sound and the flag; on a
+  phone under the dock). A boss's attack on a king: `?boss=hollow&laststand=1` (Boss alone: your first move
   calls the God King's Last Stand, and Hollow lashes him) and `?boss=hollow&mate=1` (Boss alone from 1.f3 e5 2.g4, the
   boss to move: he mates at once, lashes your king, then the result; `settings.bossMateTest`, solo only).
 - **Resigning never waits for a moment** (Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): the top
@@ -304,6 +305,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   `frames:rage -- <dir> [boss] [phone|desktop] [moves] [strikes]` (the rage meter: strikes, the warning, the
   ultimate, its slide down and refill, every frame, with the meter's own numbers sampled each frame).
 - Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect; `only=pig` for Wrangler).
+  Art not yet in the game (the Hidden Boss, `characters/recluse.ts`, his book `characters/effects/recluse.ts`): add
+  `extra=packages/app/src/characters/recluse.ts only=recluse,recluse-bust,recluse-book`.
 - Perf: `npm run perf:boss -- <dir> <boss id> [phone|desktop|both] 25`.
 - Sims: `packages/sim/scripts/showdown-sim.ts` (Wrangler's showdowns in real battles: a crowd of bots at three
   strengths, his scout and his turn's search at a computer's or a phone's budget; showdowns a battle, when, the wait

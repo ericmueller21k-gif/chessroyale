@@ -26,7 +26,7 @@ async function whole(page: Page, selector: string) {
   expect(cut).toEqual([]);
 }
 
-test("the Clock vote: Bullet, Blitz and Rapid in chess form, whole on a 320 px phone; the winner is the lobby's clock, on the match's card and in its deadlines", async ({ page }) => {
+test("the Clock vote: Rapid, Blitz and Bullet (slowest to fastest) in chess form, whole on a 320 px phone; the winner is the lobby's clock, on the match's card and in its deadlines", async ({ page }) => {
   test.setTimeout(240_000);
   await named(page, "Eric");
   await page.goto("/squads/test?nolanding&debug");
@@ -40,9 +40,12 @@ test("the Clock vote: Bullet, Blitz and Rapid in chess form, whole on a 320 px p
     await expect(cards.nth(i).locator("strong")).toHaveText(clockLabel(c));
     await expect(cards.nth(i).locator(".vote-card-blurb")).toHaveText(teamClockLine(c));
   }
-  await expect(cards.nth(0).locator("strong")).toHaveText(/^Bullet \d/);
+  // Slowest on the left, fastest on the right, the same every game.
+  await expect(cards.nth(0).locator("strong")).toHaveText(/^Rapid \d/);
   await expect(cards.nth(1).locator("strong")).toHaveText(/^Blitz \d/);
-  await expect(cards.nth(2).locator("strong")).toHaveText(/^Rapid \d/);
+  await expect(cards.nth(2).locator("strong")).toHaveText(/^Bullet \d/);
+  const xs = await cards.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().x));
+  expect(xs).toEqual([...xs].sort((a, b) => a - b));
   await whole(page, ".vote-card, .vote-card strong, .vote-card-blurb");
   const phone = test.info().project.name === "phone";
   if (phone) {

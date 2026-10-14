@@ -2738,6 +2738,77 @@ the brain's again). Both fail without the fix. e2e: `e2e/pig.spec.ts` plays a du
 the engine's best at full strength, taking back when that's the best (solo on a phone as an admin, on his Maia brain;
 on a computer; and online).
 
+## Vote options never move (Oct 13, 2026)
+
+Eric: "The voting rounds in all modes should never change position. They should always be slowest on the left, fastest on the right; for the mode type, just pick one order." Every vote now keeps its data order on every screen (Black's turned board no longer mirrors the zones and cards), speeds run Rapid, Blitz, Bullet in the 50 v 50 and Squads, Mode stays Classic, Mercenary, Coming soon, and each default is named by id (Blitz, Classic, Team final, Normal start).
+
+### A computer's title line: testing items, sound, the flag (Eric, Oct 13, 2026)
+
+On a computer every match's title line spans the board's column (the boss bar's width) and ends in an admin's testing
+items, then sound, then the flag, so they sit next to the title, not at the window's corner (Eric: "utilize the space
+next to 'BOSS · move 1'"); when tight, the brain's pill ellipsizes first. The flag's confirm now opens beside it, into
+the column next to the board (under it, it would cover the board). Phones unchanged.
+
+### The Hidden Boss, a sprite preview (art only, Oct 14, 2026)
+
+Eric approved it (Oct 14: "wow it looks PERFECT"). It's in main unregistered, so the approved drawing is kept safe
+until he's built.
+
+Eric's future hidden boss, a chess legend (ROADMAP.md, "The hidden boss"), drawn so Eric can review him before his
+rules are designed. Art only: no rules, kit, lines, sounds or roster entry; he is in no character, kit or effect list,
+so nothing in the game shows him (`packages/app/test/recluse.test.ts` checks that, and makes the checks
+`characters.test.ts` makes of every character). His working code id is `recluse` and his label "Hidden Boss": Eric
+will name him later, and no real name appears in any code, file, label or on the book.
+
+- **Where he comes from:** the outfit from Eric's own reference sprite (a white shirt with rolled sleeves, a blue tie
+  with light-blue rings and a gold clip, navy trousers, brown shoes); the face from a photo Eric sent, used only as a
+  likeness reference (original pixel art, not traced; the photo is not in the repo): the head tilted down, the eyes
+  rolled up at us from under heavy brows with the whites showing beneath the irises, swept hair parted on our left
+  with a loose lock towards his brow, a long face, a long straight nose, strong cheekbones, a narrow chin, thin lips in
+  a half-smirk. Eric then replaced the first pose (seated on a stone block, a piece held out): he **stands, tall and
+  lanky**, with **the red book** (a red cloth hardcover of his rival's games) and a small dark-wood bishop in his
+  other hand. The book's only marking (Eric): a gold-stamped Cyrillic "Ш" (for "шахматы", chess) in a thin gold
+  border on its cover, faint gold bands on its spine; no title, no names.
+- **Sizes and the phone crop:**
+  - `RECLUSE`, the whole figure (a computer, 2x by the board's corner): a 64 x 146 frame, 129 px tall above his feet
+    at rest, 137 at most (his hair in the wind; the cast is 67 to 88: Sawyer 67, Wrangler 68, Hollow 75, Jefferson
+    88), 42 px wide with the book at his side. His head is 25 px wide (the brief suggested 18 to 22; Eric then asked
+    for "a little larger again" so the face reads). At 2x he is about 258 CSS px tall by the board's corner on a
+    1280 px screen: he fits beside the board, clear of it, the God King at the other corner as usual.
+  - `RECLUSE_BUST`, the phone crop (the boss bar at 1x): a figure his height can't fit the bar (56 px, 88 when
+    `tall`), so the phone gets a bust from the same rig: head, shoulders and the top of the book, cut at the chest, 50
+    x 70, 61 px above its foot at rest and 69 at most (within the cast's 75), the same face and animations. When he
+    gets a kit, the phone should draw the bust and the computer the full figure (a kit holds one character today, so
+    the kit needs a second one for the bar), with the `wide` box (58 px).
+  - `RECLUSE_BOOK`, the book alone for board effects later: 32 x 32 (one square, as the other one-square effects).
+- **Animations** (`RECLUSE` and `RECLUSE_BUST` alike; cues in brackets):
+  - Phase 1: `idle` (loop, 4.8 s, silent: a slow breath, the stare, his eyes down to the piece he turns in his fingers
+    and back, a blink, a brow twitch, the book clutched at his side); `consult` (`lift`, `open`, `snap`: the book out,
+    opened, a page scanned with a flick of the eyes, a knowing look, snapped shut); `stare` (the entrance: `dip`, then
+    the upward stare held 1.3 s, `stare`); `laugh` (`laugh`, `cackle`: head back, shoulders shaking, forward with a
+    wild-eyed grin); `spellbook` then `spellLoop` then `spellClose` (the ultimate: `raise`, `open`, `laugh`, `cackle`;
+    the book falls open to us, its pages glowing and turning, motes and little stars rising, his hair lifting in the
+    wind, his eyes wide; the loop holds as long as the ultimate runs; `slam` shuts it with a puff of page dust); `slam`
+    (`open`, `slam`: a decisive move, the book flipped open and slammed shut).
+  - The fall (Eric): `collapse` (`reel`, `drop`, `thud`, `book`: to his knees in four steps, the book falling flat in
+    front of him) then `collapseLoop` (slumped, rocking, his lips moving fast: mumbling); `revive` (`rise`, `snap`,
+    `catch`: up slowly with his head down, then upright, his hair lifting, his eyes narrowed, the book flying up
+    spinning into his hands).
+  - Phase 2 (revived): `idle2` (loop, 4.7 s) and `consult2`, `stare2`, `laugh2`, `spellbook2`, `spellLoop2`,
+    `spellClose2`, `slam2`: his hair streaming in a constant wind in every frame (a test checks), deeper shadows on his
+    face, a glint in his eyes, a wider stance, the book held ready in front of him. Nothing in phase 2 falls back to
+    calm hair.
+  - The book (`RECLUSE_BOOK`): `fly` (loop, spinning a turn in 8 frames), `slam` (dropping flat: `slam`, dust, a
+    shockwave ring), `flip` (loop, pages flipping fast), `close` (`snap`), `idle` (lying closed).
+- **Simplified for size:** the tie's rings are 4-pixel crosses round a dark middle (5 down the tie); the clip and the
+  buckle are 1 to 2 px of gold; the piece is a 5 x 12 bishop (its turn shown by its shine and mitre slit moving round);
+  the moves on the pages are dashes; the hair in the wind is three hand-drawn phases of streaming locks; the kneeling
+  legs are short thighs with his heels behind (his shins hidden); when he holds the book in both hands the piece is
+  tucked in his palm (not drawn). In the bust, the book he reads is mostly below the picture (its top edge shows) and
+  kneeling he sinks only part way, so his mumbling face stays in the bar.
+- **Previews:** `npm run preview:characters -- <dir> extra=packages/app/src/characters/recluse.ts
+  only=recluse,recluse-bust,recluse-book`. He was checked in the real game on a 390 px phone and a 1280 px computer by
+  swapping his drawing into a boss's kit from a scratch script, not from the app's code.
 
 ### Wrangler's showdown: his own meter, no warning, fired when ready (Eric, Oct 13, 2026)
 

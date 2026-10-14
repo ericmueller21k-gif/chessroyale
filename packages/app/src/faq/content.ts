@@ -56,7 +56,7 @@ import {
   type Settings,
   type SquadsSettings,
 } from "@chessroyale/core";
-import { clockLabel, minutesName } from "@chessroyale/chess/squads";
+import { clockLabel, defaultClock, minutesName } from "@chessroyale/chess/squads";
 import { anchorsOf, parse, plainText, type Block } from "./markdown.ts";
 
 /** Everything the FAQ quotes. The defaults are the game's; tests pass changed ones. */
@@ -228,7 +228,7 @@ function squadsClocks(Q: SquadsSettings): string {
   const free = one((c) => c.delaySeconds) ? `The first ${num(cs[0]!.delaySeconds)} s of every move are free` : `The first few seconds of every move are free (${perOption((c) => `${num(c.delaySeconds)} s`)})`;
   const topUp = (c: (typeof cs)[number]) => (c.topUpSeconds % 60 ? `${num(c.topUpSeconds)} s` : n(c.topUpSeconds / 60, "minute"));
   const topUps = one((c) => c.topUpSeconds) ? `plus ${topUp(cs[0]!)}` : `plus a top-up (${perOption(topUp)})`;
-  const def = cs[Q.clockDefault] ?? cs[0]!;
+  const def = defaultClock(Q);
   return `Each squad has **one clock for the whole tournament**, a chess time control voted before round 1: ${list}. Nobody voting means ${clockLabel(def)}. ${free}; then your squad's clock runs, twice as fast while two of you are moving. Every move made in time adds its seconds back, so a quick move saves time for later, as on a chess clock. What's left carries into the next round, ${topUps} as you go through. When it runs out, it's **sudden death**: every move within the free seconds, until moves made in time earn some back.`;
 }
 

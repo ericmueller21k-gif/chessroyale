@@ -8,7 +8,9 @@ import { play } from "../sound.ts";
 import { useFrameNow } from "./Countdown.tsx";
 import { GodKingFallen, GodKingSprite, kingCommandAct } from "./GodKing.tsx";
 import { Chevrons, type useHistoryView } from "./HistoryNav.tsx";
+import { COMPUTER_LAYOUT } from "./MatchMenu.tsx";
 import { Bolt } from "./PowerUpButton.tsx";
+import { useMedia } from "./QuickChat.tsx";
 import { SpeechBox } from "../speech.tsx";
 
 /**
@@ -84,6 +86,8 @@ export function BossDock({
   const left = inUse ? Math.max(0, held - 1) : held;
   const power = fallen && (left > 0 || inUse) ? { left, inUse, enabled: !!powerUp?.enabled && !inUse && left > 0 } : null;
   const [menu, setMenu] = useState(false);
+  // (A computer has the admins' testing items in the title line instead: Hud.tsx, .match-tools.)
+  const computer = useMedia(COMPUTER_LAYOUT);
   const view = nav?.view;
   const moveNo = (p: number) => `${Math.ceil(p / 2)}${p % 2 === 1 ? "" : "…"}`;
   const ready = canCall && charges > 0 && !match.kingCalled && !fallen;
@@ -153,8 +157,8 @@ export function BossDock({
         }}
       />
     </div>
-    <UltimateTest match={match} />
-    <BrainDebug match={match} />
+    {!computer && <UltimateTest match={match} />}
+    {!computer && <BrainDebug match={match} />}
     </>
   );
 }
@@ -163,7 +167,7 @@ export function BossDock({
  * Testing, admins only (ADMIN_EMAILS, as for the fair-play review; online the server checks too): a small plain button
  * that brings the boss's ultimate as the next crowd turn begins, without the warning. Grayed out while one is on its
  * way or under way (its effect still running); ready again once it's over, as the meter fills again.
- * BOSS_POWERS.ultimateTestButton false removes it.
+ * BOSS_POWERS.ultimateTestButton false removes it. A phone: under the dock; a computer: in the title line (Hud.tsx).
  */
 export function UltimateTest({ match }: { match: GameView }) {
   const boss = match.boss;
@@ -192,9 +196,10 @@ export function UltimateTest({ match }: { match: GameView }) {
 }
 
 /**
- * Testing, admins: the boss's brain at work, e.g. "Maia 1450 · no guard · Maia's #1 · 120 ms"; and Wrangler's
- * showdown when the test trigger fired it outside the band (none inside it found), so it isn't taken for one a player
- * would get.
+ * Testing, admins (Boss alone): the boss's brain at work, e.g. "Maia 1450 · no guard · Maia's #1 · 120 ms"; and
+ * Wrangler's showdown when the test trigger fired it outside the band (none inside it found), so it isn't taken for one
+ * a player would get. A phone: a line under the dock; a computer: a small pill in the title line (Hud.tsx), the first
+ * thing to shrink there.
  */
 export function BrainDebug({ match }: { match: GameView }) {
   const p = match.boss?.powers;
@@ -202,7 +207,7 @@ export function BrainDebug({ match }: { match: GameView }) {
   const line = [match.brainLine, outside].filter(Boolean).join(" · ");
   if (!line || !account().profile?.admin) return null;
   return (
-    <div class="brain-debug" aria-label="Boss brain (testing)">
+    <div class="brain-debug" aria-label="Boss brain (testing)" title={line}>
       🧠 {line}
     </div>
   );
