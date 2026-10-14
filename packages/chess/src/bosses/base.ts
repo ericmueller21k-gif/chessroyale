@@ -183,6 +183,13 @@ export interface BossRules {
   /** The test trigger is worked out at his turn, after his move (Wrangler's line-up): kept until its ultimate comes. */
   triggerAtHisTurn?: boolean;
   /**
+   * The God King's help doesn't work against this boss (the Hidden Boss's passive): his move, his strike and his Last
+   * Stand never come, and nothing is spent (the runner's kingDecision, callStrike, lastStandFor).
+   */
+  blocksKing?: boolean;
+  /** Beaten (Boss alone): the board holds this long for its fall before the result screen (the Hidden Boss's collapse). */
+  fallMs?: number;
+  /**
    * Its own meter instead of the rage meter (Wrangler's: his moves fill it, nothing else): how full (0-1) as crowd turn
    * `turn` is picked, or null (none shown). The King's strike adds nothing to it.
    */
@@ -225,6 +232,8 @@ export interface BossRules {
   };
   /** In the match: what happens after any crowd move (G-REX's fire burns what was left on a tile ablaze). */
   afterCrowdMove?(b: Battle, move: string | null): void;
+  /** In the match: a crowd turn has just been set up (prepareTurn): the Hidden Boss's bullet clock sets every bank as it comes. */
+  turnBegun?(b: Battle): void;
   /**
    * In the match: what happens after the boss's own move, before the crowd's next turn is set up (Sawyer saws the pawn of
    * his first move in two; the halves follow every move; Wrangler's long pull, drag and showdown line-up). `extras`:

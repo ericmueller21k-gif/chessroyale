@@ -213,9 +213,20 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
     - **When he's built:** his kit needs two drawings (the crop for the phone bar, the full figure for the computer);
       a kit holds one today. Phase 1's idle holds the book at his side and phase 2's in front, so the revive must
       play between them.
-  - **Director's flags:** use a different name (agreed). A recognizable likeness and real quotes carry the same
-    rights question as the name, so check before launch (his estate; post-mortem publicity rights vary). Keep his lines
-    to his chess views; never his hateful public statements from later life.
+  - **Director's flags:** use a different name (agreed). A recognizable likeness carries the same rights question as
+    the name, so check before launch (his estate; post-mortem publicity rights vary). **Real quotes (Eric, Oct 14):**
+    used verbatim, never altered ("keeping them intact is a must"); Eric checked the law. Only verified ones, with their
+    source recorded (DECISIONS.md, "The Hidden Boss, phase 1"); his hateful and political statements stay excluded.
+  - **Phase 1 is built (Oct 14), for admins only, in Boss alone** (DECISIONS.md, "The Hidden Boss, phase 1"): pick
+    "Hidden Boss" from the boss menu (admins see him after the rest). Maia-3 at its top rating, raw, at a fixed
+    strength; the God King's help blocked and mocked; his ultimate at turn 7, the bullet clock for the rest of the
+    battle (3:00, no added time, out of time loses); beaten, he collapses and mumbles, then the result. Placeholder
+    lines (and five verified quotes) in one table, `characters/recluse-lines.ts`, for Eric's own.
+    - **Left for later:** his real name and lines; how players reach him (the red book Mercenary item and the
+      Squads win); phase 2 (the book's slam, the board split into four with the saw, his revive, the Chess960
+      shuffle, the four boards, his Stockfish brain at about 3000, its bullet clock); his book as a board effect; the
+      special crate and its reward; a server-side brain and fair-play review for real fights; online play (today the
+      server never makes a battle with him); sim-tuning his numbers (turn 7, 180 s).
 
 ## Needs Eric
 

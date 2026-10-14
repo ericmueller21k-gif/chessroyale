@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, bossDef, bossIdFromLink, bossStrength, bossThreat, isPlayable, playableBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
+import { BOSS_TIERS, adminPlayable, bossDef, bossIdFromLink, bossStrength, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { chosenDifficulty, difficultyElo, rememberDifficulty } from "../boss-difficulty.ts";
 import { powersLine } from "../power-words.ts";
@@ -109,8 +109,12 @@ export function bossInUrl(): boolean {
   return new URLSearchParams(location.search).has("boss");
 }
 
-/** Boss raid: the boss you picked (a playable one), or "" for a random one. ?boss=<id>, else this device's choice. */
-export function chosenBoss(): string {
+/**
+ * Boss raid: the boss you picked (a playable one), or "" for a random one. ?boss=<id>, else this device's choice.
+ * `hidden`: an admin's Boss alone, where the pick may be a boss hidden from players (the Hidden Boss); anywhere else such
+ * a pick is "" (random), so a raid or a lobby never asks for him.
+ */
+export function chosenBoss(hidden = false): string {
   const q = bossIdFromLink(new URLSearchParams(location.search).get("boss"));
   let v = q ?? pickedBoss;
   if (v === null) {
@@ -120,7 +124,7 @@ export function chosenBoss(): string {
       v = null;
     }
   }
-  return v && isPlayable(bossDef(v)) ? v : "";
+  return v && (isPlayable(bossDef(v)) || (hidden && adminPlayable(bossDef(v)))) ? v : "";
 }
 
 /** A test link's fixed strength (?boss=1600: one of the tiers), else 0: the boss plays a step above you. */
@@ -158,7 +162,8 @@ export function BossMenu({
 }) {
   const you = rating ?? PRIOR_RATING;
   const base = raidBossElo([rating]);
-  const bosses = playableBosses();
+  // (Admins, Boss alone: the bosses hidden from players too, after the rest: the Hidden Boss, for testing.)
+  const bosses = menuBosses({ admin: isAdmin(), raid: forRaid });
   // Solo: a difficulty on top of the boss's strength (online, the lobby's strength stands).
   const [difficulty, setDifficulty] = useState(chosenDifficulty);
   const extra = forRaid ? 0 : difficultyElo(difficulty);
@@ -730,7 +735,7 @@ export function HomeScreen({
         />
       )}
       {bossMenu && (
-        <BossMenu forRaid={bossMenu === "raid"} value={chosenBoss()} rating={profile?.rating ?? null} onPick={pickBoss} onClose={() => setBossMenu(null)} />
+        <BossMenu forRaid={bossMenu === "raid"} value={chosenBoss(bossMenu === "solo" && isAdmin())} rating={profile?.rating ?? null} onPick={pickBoss} onClose={() => setBossMenu(null)} />
       )}
     </div>
   );

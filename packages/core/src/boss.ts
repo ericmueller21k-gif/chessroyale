@@ -74,9 +74,9 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet";
 /** Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual). */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -94,6 +94,12 @@ export interface BossDef {
   offset: number;
   /** Its passive and its ultimate; null until they're built. */
   powers: { passive: PowerId; ultimate: PowerId } | null;
+  /**
+   * Hidden from players (the Hidden Boss, Eric, Oct 14: "for testing available in boss mode with bots for now"): only an
+   * admin meets it, in Boss alone, picked from the boss menu (`adminPlayable`). Never chosen at random, never in a raid
+   * or the Crowd's boss final, never in a player's list (the FAQ, the menu).
+   */
+  adminOnly?: true;
 }
 
 /**
@@ -117,6 +123,10 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // engine's measure (more if it picks the wrong duel), so he plays as far under the lobby's strength as Big Boy and
   // Sawyer (DECISIONS.md: "Wrangler, built": the estimate).
   { id: "pig", name: "Wrangler", icon: "🤠", kit: "Wrangler", offset: -250, powers: { passive: "drag", ultimate: "showdown" } },
+  // The Hidden Boss (working id "recluse"; Eric names him later), phase 1: hidden from players (admins, Boss alone only).
+  // His strength is fixed whatever the player's rating (BOSS_BRAIN.fixed: Maia at its top), so his offset is unused. The
+  // God King's help doesn't work against him ("nohelp"), and his ultimate turns the clock into bullet ("bullet").
+  { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
   { id: "knight", name: "The Black Knight", icon: "🐴", kit: null, offset: 0, powers: null },
@@ -128,8 +138,17 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "eternal", name: "The Engine Eternal", icon: "👹", kit: null, offset: 0, powers: null },
 ];
 
-/** The one rule for choosing a boss: it has a complete character and its powers. */
-export const isPlayable = (b: BossDef | null | undefined): b is BossDef => !!b && b.kit !== null && b.powers !== null;
+/** The one rule for choosing a boss: it has a complete character and its powers, and isn't hidden from players. */
+export const isPlayable = (b: BossDef | null | undefined): b is BossDef => !!b && b.kit !== null && b.powers !== null && !b.adminOnly;
+/** An admin may meet it in Boss alone: a playable boss, or one hidden from players with its character and powers. */
+export const adminPlayable = (b: BossDef | null | undefined): b is BossDef => !!b && b.kit !== null && b.powers !== null;
+/** The bosses only admins meet (in Boss alone), in roster order. */
+export const hiddenBosses = (roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] => roster.filter((b) => b.adminOnly && adminPlayable(b));
+/**
+ * The boss menu's bosses: the playable ones; for an admin picking for Boss alone (not a raid), the hidden ones after them
+ * (the Hidden Boss, for testing).
+ */
+export const menuBosses = (opts: { admin: boolean; raid: boolean }, roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] => [...playableBosses(roster), ...(opts.admin && !opts.raid ? hiddenBosses(roster) : [])];
 
 /** The bosses that can be met, in roster order. */
 export function playableBosses(roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] {
@@ -149,12 +168,14 @@ export const bossIdFromLink = (q: string | null | undefined): string | null => (
 /**
  * Which boss a match meets: `wanted` if it's playable, else a random playable one (from `roll`, 0-1), not `avoid`
  * when there's another to meet (no repeats: solo avoids your last boss, online the one most of the lobby met last).
+ * `hidden`: an admin's Boss alone, where `wanted` may be a boss hidden from players (adminPlayable); never at random.
  */
-export function chooseBoss(roll: number, wanted?: string | null, avoid?: string | null, roster: readonly BossDef[] = BOSS_ROSTER, unfinished = false): BossDef {
+export function chooseBoss(roll: number, wanted?: string | null, avoid?: string | null, roster: readonly BossDef[] = BOSS_ROSTER, unfinished = false, hidden = false): BossDef {
   const pick = roster.find((b) => b.id === wanted);
-  // (Testing, solo only: a boss whose powers are built but whose art isn't yet, with placeholders.)
-  if (unfinished && pick?.powers) return pick;
-  if (isPlayable(pick)) return pick;
+  // (Testing, solo only: a boss whose powers are built but whose art isn't yet, with placeholders. Never a hidden one
+  // but for an admin's Boss alone.)
+  if (unfinished && pick?.powers && (!pick.adminOnly || hidden)) return pick;
+  if (isPlayable(pick) || (hidden && adminPlayable(pick))) return pick;
   const all = playableBosses(roster);
   if (!all.length) throw new Error("No playable boss");
   const pool = all.length > 1 ? all.filter((b) => b.id !== avoid) : all;
@@ -168,11 +189,18 @@ export const ENGINE_MIN_ELO = 1320;
 
 /**
  * The boss's strength: the lobby's (the usual calculation) plus its own offset, plus solo's difficulty (`extra`:
- * Easy −300 to Hardest +500), within what Stockfish plays.
+ * Easy −300 to Hardest +500), within what Stockfish plays. A boss whose brain is fixed (BOSS_BRAIN.fixed: the Hidden
+ * Boss) has a fixed strength instead, whatever the player's rating or the difficulty: the level where Maia reaches its
+ * top rating (fixedLevel).
  */
-export function bossStrength(base: number, def: Pick<BossDef, "offset"> | null, extra = 0): number {
+export function bossStrength(base: number, def: (Pick<BossDef, "offset"> & { id?: string }) | null, extra = 0, s: Pick<BossBrainSettings, "fixed" | "maiaRating"> = BOSS_BRAIN): number {
+  if (def?.id && s.fixed[def.id]) return fixedLevel(s);
   return Math.max(800, Math.min(ENGINE_MAX_ELO, Math.round(base + (def?.offset ?? 0) + extra)));
 }
+
+/** Maia's top rating in our setup (BOSS_BRAIN.maiaRating's last point: 2500), and the level it's reached at (2650). */
+export const maiaTopRating = (s: Pick<BossBrainSettings, "maiaRating"> = BOSS_BRAIN): number => s.maiaRating[s.maiaRating.length - 1]![1];
+export const fixedLevel = (s: Pick<BossBrainSettings, "maiaRating"> = BOSS_BRAIN): number => s.maiaRating[s.maiaRating.length - 1]![0];
 
 /**
  * Maia's rating for a strength on the game's rating scale (BOSS_BRAIN.maiaRating's lines): below the first point along
@@ -219,6 +247,10 @@ export function bandBrain(bossId: string, strength: number, level: number = stre
  * offer (`maia` false: a player while forPlayers is off, a lobby with one). The level is the strength, plus
  * crowdMargin when a crowd (`crowd`: more than one picking its moves) plays the boss: Maia plays at the level's rating,
  * and the bridge's guard follows the level too.
+ *
+ * A boss with a fixed brain (BOSS_BRAIN.fixed: the Hidden Boss) plays it at Maia's top rating, with no guard and no
+ * Stockfish share, whatever the strength, the crowd, the difficulty or an admin's pick; Stockfish only where Maia isn't
+ * on offer (and while Maia loads, as every boss).
  */
 export function bossBrainFor(
   bossId: string,
@@ -229,6 +261,8 @@ export function bossBrainFor(
   s: BossBrainSettings = BOSS_BRAIN,
 ): BossBrainPlan {
   const stockfish: BossBrainPlan = { brain: "stockfish", rating: null, stockfishShare: 0 };
+  const fixed = s.fixed[bossId];
+  if (fixed) return !maia || fixed === "stockfish" ? stockfish : { brain: fixed, rating: maiaTopRating(s), stockfishShare: 0 };
   if (!maia || strength >= s.stockfishFrom) return stockfish;
   const level = strength + (opts.crowd ? s.crowdMargin : 0);
   const { brain, stockfishShare } = picked ? { brain: picked, stockfishShare: 0 } : bandBrain(bossId, strength, level, s);
@@ -566,7 +600,8 @@ export interface BurnEvent {
  * Sawyer saws the pawn of his first move in two; `cut`: a saw cut on an edge; `boardsaw`: his board saw. `pull`:
  * Wrangler's long pull (his first move, a center pawn three squares); `drag`: his lasso drag (a crowd piece dragged a
  * square after his move; `ult`: standing in for the test trigger's showdown when the board can't hold one); `showdown`:
- * his showdown (pairs lined up, a forced duel).
+ * his showdown (pairs lined up, a forced duel). `bullet`: the Hidden Boss's ultimate (his clock speech and spellbook; the
+ * crowd's clock is bullet from then on).
  */
 export type PowerEventKind =
   | "freeze"
@@ -589,7 +624,8 @@ export type PowerEventKind =
   | "boardsaw"
   | "pull"
   | "drag"
-  | "showdown";
+  | "showdown"
+  | "bullet";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;

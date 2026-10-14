@@ -10787,6 +10787,21 @@ img.qicon {
   left: calc(100% + 8px);
   top: 0;
 }
+/* The Hidden Boss (admins only, for now): his whole figure is far taller than the cast (129 px above his feet, 137 with
+   his hair in the wind), so on a computer his words go above his head, whatever his scale; on the results he's drawn
+   at 1.25x in a taller box (beaten, he kneels there and mumbles; winning, he laughs). A phone's bar has his bust (kits.ts),
+   in the wide box. */
+.place-side.ch-recluse .bc-bubble {
+  bottom: calc(137px * var(--bc-scale) + 6px);
+}
+.boss-char.place-results.ch-recluse {
+  --bc-scale: 1.25;
+  height: 172px;
+}
+/* (Beside him on the results, never over him: as wide as the room to his right, so it needn't move into view.) */
+.place-results.ch-recluse .bc-bubble {
+  max-width: min(220px, 50vw - 64px);
+}
 
 /* ---------------- Boss powers (BossPowers.tsx) ---------------- */
 
