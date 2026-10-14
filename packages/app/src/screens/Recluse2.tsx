@@ -103,17 +103,13 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
           <BossSide match={match} />
           <div class="eval-bar rc-evalgap" aria-hidden="true" />
           <div class="board-wrap rc-stage" data-step={shuffled ? "shuffle" : split ? "split" : cracking ? "crack" : "slam"}>
-            {!split ? (
-              <div class="rc-cell rc-whole">
-                <Board fen={v.from} orientation="white" animate={false} />
+            {/* (The four boards from the start, each clipped to its quarter: together they are the whole board until they
+                part, so the split mounts nothing new on a slow phone.) */}
+            {QUARTER_BOARD.map((id, q) => (
+              <div key={q} class={`rc-cell rc-split rc-q${q}`} style={quarterStyle(q, t)}>
+                <Board fen={shuffled ? v.boards[id]!.fen : v.from} orientation="white" silent />
               </div>
-            ) : (
-              QUARTER_BOARD.map((id, q) => (
-                <div key={q} class={`rc-cell rc-split rc-q${q}`} style={quarterStyle(q, t)}>
-                  <Board fen={shuffled ? v.boards[id]!.fen : v.from} orientation="white" silent />
-                </div>
-              ))
-            )}
+            ))}
             {cracking && (
               <>
                 <span class="rc-crack">
