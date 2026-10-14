@@ -2936,3 +2936,22 @@ both loops whirling over his head in the ready loop (in view on the phone's bar,
 pull; SHOWDOWN!'s ropes reaching pieces anywhere on the board (a rook hauled from h8 to b6, a bishop from f1 to h5) and
 the pairs landing; the duels glowing on edge files (a6-b6); the meter full on the duel's turn. (The computer's
 screencast had 0.4-0.55 s gaps throughout, the machine shared with other sessions' e2e runs, none tied to his moments.)
+
+### The Hidden Boss: no chess piece, a natural free arm (Eric, Oct 14, 2026)
+
+Eric, on the approved sprite: "that chess piece in his hand, we can do away with that... his hand looks all weird with
+the chess piece... The one with the book is fine." Art only (`characters/recluse.ts`); this replaces the piece in "The
+Hidden Boss, a sprite preview" above.
+
+- **No piece anywhere:** every animation, phase 1 and 2, the full figure and the bust (a test checks that no frame
+  draws one).
+- **His free arm** (his left, our right) now hangs relaxed: the same sleeve, rolled cuff and shading as his book arm,
+  a fuller forearm (it was 3 to 4 px, reading as a stick next to the sleeve; now about 5) and a typed hand, open and
+  relaxed, its thumb in front towards his body and parted by a shade line, the fingers loosely curled. The hand carries
+  its own outline, open at the top, so no line crosses the wrist. When he holds the book out in front of him, that hand
+  grips its edge as before.
+- **The animations that used the piece:** the idle's piece-turning is now two small curls of his free hand's fingers
+  while his eyes are down; phase 2's idle keeps his fingers drumming on the book. The stare never held the piece out
+  (it already only leans in), so it is unchanged. The slam stays the book slammed shut with its puff of dust: he has
+  stood without the stone since Eric's redesign, so a palm slam on the stone isn't possible, and bringing the book down
+  is the slam Eric approved. The book animations are untouched.

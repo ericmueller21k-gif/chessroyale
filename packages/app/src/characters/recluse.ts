@@ -6,8 +6,9 @@
  * up at us from under heavy brows, the whites showing under the irises; thin lips pressed into a knowing half-smirk. A
  * white dress shirt with its sleeves rolled up, a blue tie with light-blue rings and a gold clip, a belt, navy
  * trousers, brown shoes. Clutched at his side, the red book (effects/recluse.ts: a red cloth hardcover of his rival's
- * games, a faint gold band on its spine, a gold border and one gold letter, a Cyrillic "Ш" for chess, on its cover, no other marking); in his other hand a small dark-wood bishop he turns in
- * his fingers. Drawn facing front, light from the top left.
+ * games, a faint gold band on its spine, a gold border and one gold letter, a Cyrillic "Ш" for chess, on its cover,
+ * no other marking); his other arm hangs relaxed at his side (no chess piece: Eric, Oct 14). Drawn facing front, light
+ * from the top left.
  *
  * ART ONLY (Oct 14, 2026): he is in no roster, kit or character list, so the game never shows him (a test checks).
  * Eric is still designing him (ROADMAP.md, "The hidden boss"). Previews:
@@ -26,10 +27,10 @@
  * phase-2 version (`idle2`, `consult2`...), so once revived his hair never falls calm again.
  *
  * Rigging: the head (one per face, per lift of the hair in the wind and per phase: eyes, brows and mouth stamped on a
- * typed base), the torso, the tie (from its sway), the legs (standing, wide, four steps down to kneeling) and the shoes are painted
- * once; the arms from their points (a shoulder, an elbow and a wrist, the sleeve rolled up below the elbow); the book
- * from its state; the piece from its turn. Every part is painted the first time a frame that uses it shows
- * (sprite.ts lazyParts).
+ * typed base), the torso, the tie (from its sway), the legs (standing, wide, four steps down to kneeling) and the
+ * shoes are painted once; the arms from their points (a shoulder, an elbow and a wrist, the sleeve rolled up below the
+ * elbow); the hands are typed; the book from its state. Every part is painted the first time a frame that uses it
+ * shows (sprite.ts lazyParts).
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
@@ -70,10 +71,6 @@ export const RECLUSE_PALETTE: Record<string, string> = {
   E: "#43210f",
   F: "#6a3a20",
   G: "#a87452",
-  u: "#26140b", // the piece (dark wood), dark to light
-  v: "#58331d",
-  z: "#8a5732",
-  Z: "#c79566",
   "8": "#fff3b8", // the spell's glow (and the glint in his eyes): pale, gold, ember
   "9": "#ffc44a",
   "0": "#ff7a3c",
@@ -344,9 +341,10 @@ function boxOf(pts: readonly Pt[], pad: number): { x0: number; y0: number; w: nu
 /**
  * An arm, slim: the sleeve from the shoulder to the elbow, then the rolled-up cuff (a fat band, a crease at each end)
  * over the first part of the forearm, then the bare forearm to the wrist. `fore`: the forearm only (drawn again in
- * front of the book he clutches).
+ * front of the book he clutches). `full`: a fuller forearm, for his free arm hanging in full view (the book arm's
+ * forearm is mostly behind the book or across it).
  */
-function paintArm(sh: Pt, el: Pt, wr: Pt, fore: boolean): Part {
+function paintArm(sh: Pt, el: Pt, wr: Pt, fore: boolean, full = false): Part {
   const cuff = 0.36;
   const b = boxOf([sh, el, wr], 6);
   const cv = canvas(b.w, b.h);
@@ -357,7 +355,7 @@ function paintArm(sh: Pt, el: Pt, wr: Pt, fore: boolean): Part {
       const lo = nearest(p, el, wr);
       const rUp = 3.5 - up.t * 0.5;
       const inCuff = lo.t < cuff;
-      const rLo = inCuff ? 3.7 - lo.t * 0.6 : 2.2 - lo.t * 0.3;
+      const rLo = inCuff ? 3.7 - lo.t * 0.6 : full ? 2.8 - lo.t * 0.4 : 2.2 - lo.t * 0.3;
       const inUp = !fore && up.d <= rUp;
       const inLo = lo.d <= rLo;
       if (!inUp && !inLo) continue;
@@ -456,9 +454,9 @@ function shadow(): Part {
   return { grid: toGrid(cv), outline: false };
 }
 
-// ---- Hands and the piece.
+// ---- Hands.
 
-/** A fist round the piece (or a book's edge): knuckles to us, the fingers in bands; two ways (the fingers rolling it). */
+/** A fist round a book's edge: knuckles to us, the fingers in bands; two ways (his fingers drumming on it). */
 const FIST: Record<"a" | "b", readonly string[]> = {
   a: [".cddc.", "cdeedc", "bccccb", "cddddb", "bccccb", ".bbbb."],
   b: ["..cddc", "cdeedc", "bccccb", "cddddb", "bccccb", ".bbbb."],
@@ -466,20 +464,16 @@ const FIST: Record<"a" | "b", readonly string[]> = {
 /** His hand clutching the book: fingers curled over its front edge. */
 const CLUTCH = ["cddc..", "cdddcb", "bcbcbb", "cdcdcb", ".bbbb."];
 
-/** The piece (a small bishop in dark wood): `turn` (0 to 3) moves its shine and its mitre's slit round as it turns. */
-function piece(turn: number): Part {
-  const rows = ["..v..", ".vZv.", "..v..", ".vzv.", "vzzzv", "vzzzv", "vzzzv", ".vzv.", "..v..", "uvvvu", ".vzv.", ".vvv."];
-  const cv: Canvas = rows.map((r) => [...r]);
-  const shine = 2 + [-1, 0, 1, 0][turn % 4]!;
-  for (let y = 3; y <= 7; y++) for (let x = 0; x < 5; x++) if (cv[y]![x] === "z") cv[y]![x] = x === shine ? "Z" : x > shine + 1 ? "v" : "z";
-  const slit = [-1, null, 1, 0][turn % 4];
-  if (slit !== null && slit !== undefined) {
-    const sx = 2 + slit;
-    cv[4]![sx] = "u";
-    cv[5]![sx + (slit <= 0 ? 1 : -1)] = "u";
-  }
-  return { grid: toGrid(cv) };
-}
+/**
+ * His free hand (his left, our right), hanging relaxed by his thigh: the back of the hand turned out, the thumb in
+ * front of it towards his body (lit, parted from the hand by a shade line), the fingers loosely curled below; `flex`:
+ * the fingers curled in a little more (a small, idle movement). It carries its own outline, open at the top, so it
+ * runs on from the forearm with no line across the wrist; its top row sits on the wrist, 4 to the left of it.
+ */
+const HAND: Record<"rest" | "flex", readonly string[]> = {
+  rest: [".kcddck.", ".kcdddbk", "kddcddbk", "kdbcddbk", ".kkcddbk", "..kbcdbk", "..kbcbbk", "...kbbk.", "....kk.."],
+  flex: [".kcddck.", ".kcdddbk", "kddcddbk", "kdbcddbk", ".kkcddbk", "..kbccbk", "...kbbk.", "....kk..", "........"],
+};
 
 // ---- Parts.
 
@@ -494,7 +488,8 @@ add("shadow", shadow);
 add("fist:a", () => ({ grid: FIST.a }));
 add("fist:b", () => ({ grid: FIST.b }));
 add("clutch", () => ({ grid: CLUTCH }));
-for (let t = 0; t < 4; t++) add(`piece:${t}`, () => piece(t));
+add("hand:rest", () => ({ grid: HAND.rest, outline: false }));
+add("hand:flex", () => ({ grid: HAND.flex, outline: false }));
 add("book:closed", () => bookTurned(0));
 for (const d of [45, 90, 135, 180, 225, 270, 315]) add(`book:spin${d}`, () => bookTurned(d));
 add("book:flat", bookFlat);
@@ -507,10 +502,10 @@ const r2 = (v: number) => Math.round(v * 2) / 2;
 const headName = (f: Face, wind: Wind, dark: boolean) => add(`head:${f.eyes}.${f.brows}.${f.mouth}:${wind}${dark ? ":dark" : ""}`, () => head(f, wind, dark));
 const tieName = (sway: number) => add(`tie:${sway}`, () => tie(sway));
 const ARM_AT = new Map<string, Pt>();
-function armPart(sh: Pt, el: Pt, wr: Pt, fore = false): { name: string; at: Pt } {
+function armPart(sh: Pt, el: Pt, wr: Pt, fore = false, full = false): { name: string; at: Pt } {
   const q = [sh, el, wr].map((p): Pt => [r2(p[0]), r2(p[1])]) as [Pt, Pt, Pt];
-  const name = `arm${fore ? "fore" : ""}:${q.map((p) => p.join(",")).join(";")}`;
-  add(name, () => paintArm(q[0], q[1], q[2], fore));
+  const name = `arm${fore ? "fore" : ""}${full ? "full" : ""}:${q.map((p) => p.join(",")).join(";")}`;
+  add(name, () => paintArm(q[0], q[1], q[2], fore, full));
   let at = ARM_AT.get(name);
   if (!at) {
     const b = boxOf(q, 6);
@@ -543,11 +538,11 @@ export interface Hold {
   /** The book arm (his right, our left): elbow and wrist. */
   elbowR: Pt;
   wristR: Pt;
-  /** The piece arm (his left, our right): elbow and wrist. */
+  /** The free arm (his left, our right): elbow and wrist. */
   elbowL: Pt;
   wristL: Pt;
 }
-/** Phase 1 at rest: the book clutched against his side under his right arm, the piece in his left hand by his thigh. */
+/** Phase 1 at rest: the book clutched against his side under his right arm, his left arm hanging relaxed. */
 export const REST: Hold = { book: "closed", at: [33, 50], clutched: true, elbowR: [31, 60], wristR: [41, 62], elbowL: [60, 60], wristL: [60, 81] };
 /** The book held upright in front of him, its cover to us, a hand on each side (its middle at height `y`). */
 const upHold = (book: BookState, y: number): Partial<Hold> => ({ book, at: [46, y], clutched: false, loose: false, elbowR: [31, 56], wristR: [38, y + 3], elbowL: [61, 56], wristL: [54, y + 3] });
@@ -570,7 +565,7 @@ export interface ReclusePose {
   /** His shoulders shaking or rocking: everything above his belt sideways. */
   shake?: number;
   hold?: Partial<Hold>;
-  turn?: number;
+  /** His free hand: on the book, its fingers drumming (`b`); hanging, its fingers curled in a little (`b`). */
   grip?: "a" | "b";
   tie?: number;
 }
@@ -592,11 +587,12 @@ export function recluseLayers(p: ReclusePose, bust = false): Layer[] {
   const elL = up(h.elbowL);
   const wrL = up(h.wristL);
   const armR = armPart(up(SHOULDER_R), elR, wrR);
-  const armL = armPart(up(SHOULDER_L), elL, wrL);
+  // His free hand grips the book's edge when he holds it out in front of him; otherwise it hangs (or rests) open.
+  const onBook = !h.clutched && !h.loose;
+  const armL = armPart(up(SHOULDER_L), elL, wrL, false, !onBook);
   const [bw, bh] = h.book.startsWith("spin") ? [25, 25] : BOOK_SIZE[h.book as BookPart];
   const bc = h.loose ? h.at : up(h.at);
   const book = at(`book:${h.book}`, bc[0] - Math.floor(bw / 2), bc[1] - Math.floor(bh / 2));
-  const hanging = h.wristL[1] > 74;
   const layers: Layer[] = [];
   if (!bust) {
     layers.push(at("shadow", 26, GROUND - 2));
@@ -613,17 +609,14 @@ export function recluseLayers(p: ReclusePose, bust = false): Layer[] {
   layers.push(at(headName(face, p.wind ?? 0, phase === 2), HEAD_AT[0] + shake + (p.headDx ?? 0), HEAD_AT[1] + upY + (p.dip ?? 0) + (p.headDy ?? 0)));
   layers.push(at(armL.name, armL.at[0], armL.at[1]), at(armR.name, armR.at[0], armR.at[1]));
   // Clutched: the book against his side, his forearm across it and his fingers over its edge. Held out: in front of
-  // him, his fists on its sides (the piece still in his left). Loose: his hand empty.
+  // him, his fists on its sides. Loose: his hand empty.
   if (h.loose) layers.push(at("fist:a", wrR[0] - 3, wrR[1] - 1));
   else if (h.clutched) {
     const fore = armPart(up(SHOULDER_R), elR, wrR, true);
     layers.push(book, at(fore.name, fore.at[0], fore.at[1]), at("clutch", wrR[0] - 2, wrR[1] - 3));
   } else layers.push(book, at("fist:a", wrR[0] - 3, wrR[1] - 3));
-  // The piece hand: hanging, the fist below the wrist, the piece up out of it; on the book, the fist on its edge.
-  // (On the book, the piece is tucked in his palm.)
-  const fist = hanging ? ([wrL[0] - 3, wrL[1] - 1] as Pt) : ([wrL[0] - 3, wrL[1] - 3] as Pt);
-  if (hanging) layers.push(at(`piece:${(p.turn ?? 0) % 4}`, fist[0] + 0.5, fist[1] - 9));
-  layers.push(at(`fist:${p.grip ?? "a"}`, fist[0], fist[1]));
+  if (onBook) layers.push(at(`fist:${p.grip ?? "a"}`, wrL[0] - 3, wrL[1] - 3));
+  else layers.push(at(`hand:${p.grip === "b" ? "flex" : "rest"}`, wrL[0] - 4, wrL[1] - 1));
   return layers;
 }
 
@@ -683,27 +676,27 @@ const build = (specs: readonly Spec[], bust: boolean, ph: Ph = 1): Frame[] =>
 const lift = (ph: Ph): Partial<Hold> => (ph === 1 ? { at: [38, 60], elbowR: [31, 60], wristR: [37, 67] } : upHold("closed", 57));
 
 /**
- * Idle (loop, silent): standing, a slow breath; the stare at us, then his eyes drop to the piece he turns in his
- * fingers, then back up at us; a blink, and once a brow twitches. Phase 1: 4.8 s, the book clutched at his side.
+ * Idle (loop, silent): standing, a slow breath; the stare at us, then his eyes drop (to the board) and back up at us;
+ * his free hand's fingers curl in a little twice; a blink, and once a brow twitches. Phase 1: 4.8 s, the book
+ * clutched at his side.
  */
 const IDLE: Spec[] = Array.from({ length: 40 }, (_, i) => {
   const breath = i >= 8 && i < 28 ? 1 : 0;
   const eyes: Eyes = i === 5 || i === 34 ? "shut" : i >= 12 && i < 26 ? "down" : "ahead";
   const brows: Brows = i === 30 || i === 31 ? "twitch" : "stern";
-  const turning = i >= 12 && i < 28;
-  return { ms: 120, p: { breath, face: { eyes, brows }, turn: turning ? (Math.floor((i - 12) / 2) + 1) % 4 : 0, grip: turning && i % 2 ? "b" : "a" } };
+  const flex = (i >= 15 && i < 18) || (i >= 22 && i < 25);
+  return { ms: 120, p: { breath, face: { eyes, brows }, grip: flex ? "b" : "a" } };
 });
 /**
  * Phase 2's idle (loop, 4.7 s): his hair streaming the whole time, the book held ready in front of him, his fingers
- * drumming on its edge (the piece tucked in his palm); the stare, a glint in his eyes; once his eyes narrow, once a
- * brow twitches.
+ * drumming on its edge; the stare, a glint in his eyes; once his eyes narrow, once a brow twitches.
  */
 const IDLE2: Spec[] = Array.from({ length: 36 }, (_, i) => {
   const breath = i >= 6 && i < 24 ? 1 : 0;
   const eyes: Eyes = i === 4 ? "shut" : i >= 14 && i < 20 ? "narrow" : "ahead";
   const brows: Brows = i === 28 || i === 29 ? "twitch" : i >= 14 && i < 20 ? "hard" : "stern";
-  const turning = i >= 20 && i < 32;
-  return { ms: 130, p: { breath, face: { eyes, brows }, turn: turning ? (Math.floor((i - 20) / 2) + 1) % 4 : 0, grip: turning && i % 2 ? "b" : "a" } };
+  const drumming = i >= 20 && i < 32;
+  return { ms: 130, p: { breath, face: { eyes, brows }, grip: drumming && i % 2 ? "b" : "a" } };
 });
 
 /** Holding the book out in front of him under his chest, both hands on it (its pages' top edge in the bust). */
