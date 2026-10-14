@@ -41,6 +41,26 @@ export const RECLUSE_LINES = {
     "Morphy, I think everyone agrees, was probably the greatest genius of them all.",
     "Sixty-four squares... I counted every one...",
   ],
+  // ---- Phase 2 (DECISIONS.md, "The Hidden Boss, phase 2"): four boards of Chess960. ----
+  /** He revives, as he snaps upright and the book flies back to his hand (placeholders). */
+  revive: ["Not yet. Now we play real chess.", "On your feet, all of you. Again!"],
+  /** Phase 2 begins, the four boards set up (placeholders). */
+  phase2: ["No more memorized openings. Find your moves now!", "Four boards. No theory. Let's see who can play.", "Now nobody has a book. Except me."],
+  /** He wins a board (mate, time or resign): one, in turn. */
+  boardWon: [
+    // QUOTE (A5): "A Bust to the King's Gambit", American Chess Quarterly 1:1, Summer 1961, p. 9 (whole, parenthetical included).
+    "Of course White can always play differently, in which case he merely loses differently. (Thank you, Weaver Adams!)",
+    "One down. Who's next?",
+    "Too slow. The clock doesn't wait.",
+  ],
+  /** He loses a board (placeholders). */
+  boardLost: ["Hm. A lucky one.", "That board was nothing. Watch the others.", "So one of you can play."],
+  /** A slow move (more than slowMoveSeconds, anyone's), before his ultimate: one, in turn (placeholders). */
+  slow: ["Still thinking? Move!", "You think too hard. Play!", "The clock is ticking. So am I.", "Stop staring. Make a move!", "Faster! This isn't correspondence chess."],
+  /** His phase 2 ultimate as it comes: a few seconds a move from now on (placeholders). */
+  ult2: ["That's enough! Five seconds a move, all of you!", "Enough thinking! Five seconds, or I move for you!"],
+  /** Beaten on all four boards (placeholders; his "super saiyan" transformation comes later). */
+  beaten2: ["Impossible... all four...", "Four boards... and not one book among them..."],
 } as const;
 
 /** The God King's lines in this fight (his usual ones about calling him are left out: his help doesn't work here). */
@@ -49,4 +69,12 @@ export const KING_VS_RECLUSE = {
   intro: ["I sense a tremendous power within this foe.", "Careful. My strength feels faint against this one.", "This is no ordinary boss. Trust your own moves."],
   /** His help tried, and blocked (placeholders). */
   blocked: ["My power... it won't take hold!", "Nothing! He shrugs off my strength.", "I can't reach him. This fight is yours alone."],
+  /** Phase 2 begins: he's back, on four boards (placeholders). */
+  phase2: ["He rises again! Four boards now. Win them all!", "His power has doubled. Every board must fall!"],
+  /** A board won by the players (placeholders). */
+  boardWon: ["A board is ours! Keep going!", "One falls! Finish the rest!"],
+  /** A board lost (placeholders). */
+  boardLost: ["A board is lost... the others fight on!", "We lost one. Play on, all of you!"],
+  /** All four won: he's beaten (placeholders). */
+  victory2: ["All four boards! You've done the impossible!", "He's beaten at last. Legendary!"],
 } as const;

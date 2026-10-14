@@ -6,7 +6,7 @@
  * clink, the twang low and damped). Each is a pure function of the sample rate (its noise is seeded), so a test can
  * measure it: every one stays quieter than a piece's move (peak and loudness).
  */
-import { bandpass, lowpass, noise, osc, render, rng, saw, sine, soft, type Voice } from "./synth.ts";
+import { bandpass, lowpass, noise, osc, render, rng, saw, sine, soft, type Voice, soundCache } from "./synth.ts";
 
 export type PigSound = "whirl" | "throw" | "catch" | "tug" | "tip" | "laugh" | "snort" | "stomp" | "windup" | "hop" | "draw" | "yank";
 
@@ -140,7 +140,7 @@ const SOUNDS: Record<PigSound, (rate: number) => Float32Array> = {
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
 const LEVEL: Record<PigSound, number> = { whirl: 0.206, throw: 0.204, catch: 0.284, tug: 0.148, tip: 0.29, laugh: 0.212, snort: 0.186, stomp: 0.213, windup: 0.19, hop: 0.25, draw: 0.33, yank: 0.207 };
 
-const cache = new Map<string, Float32Array>();
+const cache = soundCache("pig");
 /** The samples for one of his sounds at a sample rate (made once, then reused). Each sits under a move's mean loudness, its peaks under half a move's. */
 export function pigSound(name: PigSound, rate: number): Float32Array {
   const key = `${name}@${rate}`;

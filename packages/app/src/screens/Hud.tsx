@@ -1,7 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { LeaderboardSheet } from "../components/LeaderboardSheet.tsx";
 import { LiveNumber } from "../components/LiveNumber.tsx";
-import { BrainDebug, UltimateTest } from "../components/BossDock.tsx";
+import { BrainDebug, EngineMove, UltimateTest } from "../components/BossDock.tsx";
 import { COMPUTER_LAYOUT, MatchMenu } from "../components/MatchMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { exitFor } from "../match-exit.ts";
@@ -85,7 +85,7 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
               "FINAL"
             ) : boss ? (
               <>
-                BOSS<span class="muted"> · move {Math.min(boss.crowdMoves + 1, boss.maxMoves)}</span>
+                BOSS<span class="muted"> · {match.bossNote ? "phase 2" : `move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`}</span>
               </>
             ) : crowd ? (
               <>
@@ -134,6 +134,7 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
           <span class="match-tools">
             <BrainDebug match={match} />
             <UltimateTest match={match} />
+            <EngineMove match={match} />
           </span>
         )}
         {/* Sound, and Resign (a phone: "⋯" and its sheet; a computer: the sound button, then the flag). */}

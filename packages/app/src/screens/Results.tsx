@@ -25,6 +25,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
   const bossResult = match.phase.kind === "results" ? match.phase.bossResult : undefined;
   // (The bullet clock ran out: the Hidden Boss won on time.)
   const onTime = match.phase.kind === "results" && !!match.phase.timeout;
+  // (The Hidden Boss's phase 2: how many of the four boards were won.)
+  const simul = match.phase.kind === "results" ? match.phase.simul : undefined;
   // Boss battle: those still standing at the end share the result.
   const survived = !!match.boss && !match.boss.kills.some((k) => match.isYou(k.id)) && placement <= 10;
   const me = standings.find((s) => s.isYou);
@@ -91,7 +93,12 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
       {bossResult && match.boss && (
         <p class={`team-result ${bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
           {hasCharacter(match) ? null : <>{match.boss.icon} </>}
-          {bossResult === "crowd"
+          {simul
+            ? // (The Hidden Boss's phase 2: every board must be won.)
+              simul.won === simul.of
+              ? `You beat ${match.boss.name} on all ${simul.of} boards!`
+              : `${match.boss.name} won. You won ${simul.won} of ${simul.of} boards: all ${simul.of} must be won.`
+            : bossResult === "crowd"
             ? `The crowd beat ${match.boss.name}!${survived ? " A win on your record." : ""}`
             : bossResult === "boss"
               ? `${match.boss.name} won${onTime ? " on time" : ""}.`

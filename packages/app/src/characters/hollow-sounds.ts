@@ -6,7 +6,7 @@
  * (a dull thud), the lights coming back (a deep rising swell), and his strand knocking. Each is a pure function of the sample rate (its
  * noise is seeded), so a test can measure it: every one stays quieter than a piece's move sound (peak and loudness).
  */
-import { bandpass, lowpass, noise, osc, render, rng, sine, soft, type Voice } from "./synth.ts";
+import { bandpass, lowpass, noise, osc, render, rng, sine, soft, type Voice, soundCache } from "./synth.ts";
 
 export type HollowSound = "hum" | "cast" | "whisper" | "pop" | "smash" | "tick" | "found" | "miss" | "relight" | "clink" | "lash";
 
@@ -154,7 +154,7 @@ const SOUNDS: Record<HollowSound, (rate: number) => Float32Array> = {
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
 const LEVEL: Record<HollowSound, number> = { hum: 0.095, cast: 0.22, whisper: 0.75, pop: 0.32, smash: 0.26, tick: 0.255, found: 0.21, miss: 0.185, relight: 0.116, clink: 0.25, lash: 0.22 };
 
-const cache = new Map<string, Float32Array>();
+const cache = soundCache("hollow");
 /** The samples for one of his sounds at a sample rate (made once, then reused). */
 export function hollowSound(name: HollowSound, rate: number): Float32Array {
   const key = `${name}@${rate}`;

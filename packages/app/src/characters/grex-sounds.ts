@@ -6,7 +6,7 @@
  * so a test can measure it: every one stays quieter than a piece's move sound (peak and loudness), and so does the
  * whole volley of 24 whistles at once (see test/grex.test.ts).
  */
-import { bandpass, lowpass, noise, osc, render, rng, saw, sine, soft, type Voice } from "./synth.ts";
+import { bandpass, lowpass, noise, osc, render, rng, saw, sine, soft, type Voice, soundCache } from "./synth.ts";
 
 export type GrexSound = "crackle" | "whoosh" | "fizz" | "poof" | "pop" | "roar" | "smack" | "whistle1" | "whistle2" | "whistle3" | "sparkle";
 
@@ -141,7 +141,7 @@ const SOUNDS: Record<GrexSound, (rate: number) => Float32Array> = {
 /** Trims each to sit a little under a move's loudness (as Ginger's and Boingo's do); a soft ceiling keeps the peaks well under its. */
 const LEVEL: Record<GrexSound, number> = { crackle: 0.9, whoosh: 0.27, fizz: 0.18, poof: 0.33, pop: 0.31, roar: 0.15, smack: 0.3, whistle1: 0.018, whistle2: 0.02, whistle3: 0.017, sparkle: 0.2 };
 
-const cache = new Map<string, Float32Array>();
+const cache = soundCache("grex");
 /** The samples for one of his sounds at a sample rate (made once, then reused). */
 export function grexSound(name: GrexSound, rate: number): Float32Array {
   const key = `${name}@${rate}`;

@@ -89,12 +89,15 @@ export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
               💀
             </i>
           ))}
-          <RageMeter boss={boss} />
-          <BossBarExtra boss={boss} until={match?.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0} />
+          {/* (The Hidden Boss's phase 2 has no meter: his bullet clock is phase 1's.) */}
+          {!match?.bossNote && <RageMeter boss={boss} />}
+          {!match?.bossNote && <BossBarExtra boss={boss} until={match?.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0} />}
         </span>
       </span>
       <span class="boss-next">
-        {boss.result
+        {match?.bossNote
+          ? match.bossNote
+          : boss.result
           ? boss.result === "crowd"
             ? "Defeated!"
             : boss.result === "boss"

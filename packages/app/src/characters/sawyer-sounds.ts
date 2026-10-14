@@ -5,7 +5,7 @@
  * bright: no chimes, no dings (the saw's whine is filtered down to a buzz). Each is a pure function of the sample rate
  * (its noise is seeded), so a test can measure it: every one stays quieter than a piece's move (peak and loudness).
  */
-import { bandpass, lowpass, noise, osc, render, rng, saw, sine, soft, type Voice } from "./synth.ts";
+import { bandpass, lowpass, noise, osc, render, rng, saw, sine, soft, type Voice, soundCache } from "./synth.ts";
 
 export type SawyerSound = "rev" | "swing" | "cut" | "crack" | "tape" | "bigsaw" | "hop" | "rejoin";
 
@@ -95,7 +95,7 @@ const SOUNDS: Record<SawyerSound, (rate: number) => Float32Array> = {
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
 const LEVEL: Record<SawyerSound, number> = { rev: 0.148, swing: 0.195, cut: 0.126, crack: 0.28, tape: 0.24, bigsaw: 0.116, hop: 0.22, rejoin: 0.23 };
 
-const cache = new Map<string, Float32Array>();
+const cache = soundCache("sawyer");
 /** The samples for one of his sounds at a sample rate (made once, then reused). Each sits under a move's mean loudness, its peaks under half a move's. */
 export function sawyerSound(name: SawyerSound, rate: number): Float32Array {
   const key = `${name}@${rate}`;

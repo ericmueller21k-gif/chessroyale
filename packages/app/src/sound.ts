@@ -16,6 +16,8 @@ import { bigBoySound, type BigBoySound } from "./characters/bigboy-sounds.ts";
 import { sawyerSound, type SawyerSound } from "./characters/sawyer-sounds.ts";
 import { pigSound, type PigSound } from "./characters/pig-sounds.ts";
 import { recluseSound, type RecluseSound } from "./characters/recluse-sounds.ts";
+import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
+import { soundCache } from "./characters/synth.ts";
 import { CASTLE_SOUND, MOVE_SOUNDS, CAPTURE_SOUNDS, defaultPieceSound, onPieceSoundChange, pieceSound, pieceSoundOption, type PieceSoundKind } from "./piece-sounds.ts";
 
 let ctx: AudioContext | null = null;
@@ -696,95 +698,139 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
 /**
  * Synthesised sounds that can be made ahead (warmSounds), by name: Boingo's, Ginger's, Jefferson's (his three candle
  * whistles and the crackle took about 180 ms to make the first time a shot went up, on a computer: Oct 14), Hollow's
- * (his smash took 150 ms on a computer), Big Boy's, Sawyer's, Wrangler's. A list: each made in an idle moment of its own.
+ * (his smash took 150 ms on a computer), Big Boy's, Sawyer's, Wrangler's. Each a list of its module and name (a few for one cue).
  */
-const MAKE: Partial<Record<SoundName, ((rate: number) => unknown) | ((rate: number) => unknown)[]>> = {
-  clownBoing: (r) => clownSound("boing", r),
-  clownHonk: (r) => clownSound("honk", r),
-  clownSqueak: (r) => clownSound("squeak", r),
-  clownSlideUp: (r) => clownSound("slideUp", r),
-  clownSlideDown: (r) => clownSound("slideDown", r),
-  clownLaugh: (r) => clownSound("laugh", r),
-  clownSplat: (r) => clownSound("splat", r),
-  clownFlip: (r) => clownSound("flip", r),
-  gingerCrunch: (r) => gingerSound("crunch", r),
-  gingerJingle: (r) => gingerSound("jingle", r),
-  gingerCrackle: (r) => gingerSound("crackle", r),
-  gingerWind: (r) => gingerSound("wind", r),
-  grexCrackle: (r) => grexSound("crackle", r),
-  grexWhoosh: (r) => grexSound("whoosh", r),
-  grexFizz: (r) => grexSound("fizz", r),
-  grexPoof: (r) => grexSound("poof", r),
-  grexPop: (r) => grexSound("pop", r),
-  grexRoar: (r) => grexSound("roar", r),
-  grexSmack: (r) => grexSound("smack", r),
-  grexWhistle: [...WHISTLES, "sparkle" as const].map((w) => (r: number) => grexSound(w, r)),
-  hollowHum: (r) => hollowSound("hum", r),
-  hollowCast: (r) => hollowSound("cast", r),
-  hollowWhisper: (r) => hollowSound("whisper", r),
-  hollowPop: (r) => hollowSound("pop", r),
-  hollowSmash: (r) => hollowSound("smash", r),
-  hollowTick: (r) => hollowSound("tick", r),
-  hollowFound: (r) => hollowSound("found", r),
-  hollowMiss: (r) => hollowSound("miss", r),
-  hollowRelight: (r) => hollowSound("relight", r),
-  hollowClink: (r) => hollowSound("clink", r),
-  hollowLash: (r) => hollowSound("lash", r),
-  bigboyGiggle: (r) => bigBoySound("giggle", r),
-  bigboySlurp: (r) => bigBoySound("slurp", r),
-  bigboyWail: (r) => bigBoySound("wail", r),
-  bigboyBoing: (r) => bigBoySound("boing", r),
-  bigboyCrash: (r) => bigBoySound("crash", r),
-  bigboyNom: (r) => bigBoySound("nom", r),
-  bigboyToss: (r) => bigBoySound("toss", r),
-  bigboyClack: (r) => bigBoySound("clack", r),
-  bigboySwish: (r) => bigBoySound("swish", r),
-  bigboyBonk: (r) => bigBoySound("bonk", r),
-  bigboyStomp: (r) => bigBoySound("stomp", r),
-  bigboyPoof: (r) => bigBoySound("poof", r),
-  sawyerRev: (r) => sawyerSound("rev", r),
-  sawyerSwing: (r) => sawyerSound("swing", r),
-  sawyerCut: (r) => sawyerSound("cut", r),
-  sawyerCrack: (r) => sawyerSound("crack", r),
-  sawyerTape: (r) => sawyerSound("tape", r),
-  sawyerBigSaw: (r) => sawyerSound("bigsaw", r),
-  sawyerHop: (r) => sawyerSound("hop", r),
-  sawyerRejoin: (r) => sawyerSound("rejoin", r),
-  pigWhirl: (r) => pigSound("whirl", r),
-  pigThrow: (r) => pigSound("throw", r),
-  pigCatch: (r) => pigSound("catch", r),
-  pigTug: (r) => pigSound("tug", r),
-  pigTip: (r) => pigSound("tip", r),
-  pigLaugh: (r) => pigSound("laugh", r),
-  pigSnort: (r) => pigSound("snort", r),
-  pigStomp: (r) => pigSound("stomp", r),
-  pigWindup: (r) => pigSound("windup", r),
-  pigHop: (r) => pigSound("hop", r),
-  pigDraw: (r) => pigSound("draw", r),
-  pigYank: (r) => pigSound("yank", r),
-  recluseFlip: (r) => recluseSound("flip", r),
-  recluseShut: (r) => recluseSound("shut", r),
-  recluseRustle: (r) => recluseSound("rustle", r),
-  recluseHuff: (r) => recluseSound("huff", r),
-  recluseHum: (r) => recluseSound("hum", r),
+const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
+  clownBoing: [["clown", "boing"]],
+  clownHonk: [["clown", "honk"]],
+  clownSqueak: [["clown", "squeak"]],
+  clownSlideUp: [["clown", "slideUp"]],
+  clownSlideDown: [["clown", "slideDown"]],
+  clownLaugh: [["clown", "laugh"]],
+  clownSplat: [["clown", "splat"]],
+  clownFlip: [["clown", "flip"]],
+  gingerCrunch: [["ginger", "crunch"]],
+  gingerJingle: [["ginger", "jingle"]],
+  gingerCrackle: [["ginger", "crackle"]],
+  gingerWind: [["ginger", "wind"]],
+  grexCrackle: [["grex", "crackle"]],
+  grexWhoosh: [["grex", "whoosh"]],
+  grexFizz: [["grex", "fizz"]],
+  grexPoof: [["grex", "poof"]],
+  grexPop: [["grex", "pop"]],
+  grexRoar: [["grex", "roar"]],
+  grexSmack: [["grex", "smack"]],
+  grexWhistle: [...WHISTLES, "sparkle" as const].map((w): BossSound => ["grex", w]),
+  hollowHum: [["hollow", "hum"]],
+  hollowCast: [["hollow", "cast"]],
+  hollowWhisper: [["hollow", "whisper"]],
+  hollowPop: [["hollow", "pop"]],
+  hollowSmash: [["hollow", "smash"]],
+  hollowTick: [["hollow", "tick"]],
+  hollowFound: [["hollow", "found"]],
+  hollowMiss: [["hollow", "miss"]],
+  hollowRelight: [["hollow", "relight"]],
+  hollowClink: [["hollow", "clink"]],
+  hollowLash: [["hollow", "lash"]],
+  bigboyGiggle: [["bigBoy", "giggle"]],
+  bigboySlurp: [["bigBoy", "slurp"]],
+  bigboyWail: [["bigBoy", "wail"]],
+  bigboyBoing: [["bigBoy", "boing"]],
+  bigboyCrash: [["bigBoy", "crash"]],
+  bigboyNom: [["bigBoy", "nom"]],
+  bigboyToss: [["bigBoy", "toss"]],
+  bigboyClack: [["bigBoy", "clack"]],
+  bigboySwish: [["bigBoy", "swish"]],
+  bigboyBonk: [["bigBoy", "bonk"]],
+  bigboyStomp: [["bigBoy", "stomp"]],
+  bigboyPoof: [["bigBoy", "poof"]],
+  sawyerRev: [["sawyer", "rev"]],
+  sawyerSwing: [["sawyer", "swing"]],
+  sawyerCut: [["sawyer", "cut"]],
+  sawyerCrack: [["sawyer", "crack"]],
+  sawyerTape: [["sawyer", "tape"]],
+  sawyerBigSaw: [["sawyer", "bigsaw"]],
+  sawyerHop: [["sawyer", "hop"]],
+  sawyerRejoin: [["sawyer", "rejoin"]],
+  pigWhirl: [["pig", "whirl"]],
+  pigThrow: [["pig", "throw"]],
+  pigCatch: [["pig", "catch"]],
+  pigTug: [["pig", "tug"]],
+  pigTip: [["pig", "tip"]],
+  pigLaugh: [["pig", "laugh"]],
+  pigSnort: [["pig", "snort"]],
+  pigStomp: [["pig", "stomp"]],
+  pigWindup: [["pig", "windup"]],
+  pigHop: [["pig", "hop"]],
+  pigDraw: [["pig", "draw"]],
+  pigYank: [["pig", "yank"]],
+  recluseFlip: [["recluse", "flip"]],
+  recluseShut: [["recluse", "shut"]],
+  recluseRustle: [["recluse", "rustle"]],
+  recluseHuff: [["recluse", "huff"]],
+  recluseHum: [["recluse", "hum"]],
 };
+/** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */
+let worker: Worker | null | undefined;
+/** Sounds sent to the worker and not back yet: made in idle moments instead if it fails. */
+const pending = new Set<string>();
+const cached = ([module, name]: BossSound, rate: number) => soundCache(module).has(`${name}@${rate}`);
+
+function soundWorker(): Worker | null {
+  if (worker !== undefined) return worker;
+  try {
+    worker = new Worker(new URL("./sound-worker.ts", import.meta.url), { type: "module" });
+    worker.onmessage = (e: MessageEvent<{ sound: BossSound; rate: number; data: Float32Array | null }>) => {
+      const { sound, rate, data } = e.data;
+      pending.delete(JSON.stringify([sound, rate]));
+      if (data && !cached(sound, rate)) soundCache(sound[0]).set(`${sound[1]}@${rate}`, data);
+    };
+    worker.onerror = () => {
+      worker?.terminate();
+      worker = null;
+      const left = [...pending].map((k) => JSON.parse(k) as [BossSound, number]);
+      pending.clear();
+      for (const [sound, rate] of left) makeIdle(sound, rate);
+    };
+  } catch {
+    worker = null;
+  }
+  return worker;
+}
+
+/** Without the worker: one sound per idle moment (each still one task, as long as it takes to make). */
+const idleQueue: [BossSound, number][] = [];
+function makeIdle(sound: BossSound, rate: number) {
+  const idle = (fn: () => void) => (typeof requestIdleCallback === "function" ? requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 60));
+  const next = () => {
+    const job = idleQueue.shift();
+    if (!job) return;
+    if (!cached(...job)) makeBossSound(...job);
+    if (idleQueue.length) idle(next);
+  };
+  idleQueue.push([sound, rate]);
+  if (idleQueue.length === 1) idle(next);
+}
+
 /**
- * Makes a boss's synthesised sounds ahead of time, one per idle moment, so the first time one plays (a bulb smashed in
- * the middle of his ultimate) a slow phone doesn't stall making it. Needs the audio context (for its sample rate): a
- * no-op before the first tap.
+ * Makes a boss's synthesized sounds ahead of time, so the first time one plays (a bulb smashed in the middle of his
+ * ultimate) a slow phone doesn't stall making it. They're made in the sound worker, off the page's thread: one can take
+ * 50 to 180 ms on a slowed phone, a dropped frame or ten if it were made on the page during the intro (Big Boy's, Oct 14).
+ * Without a worker, one per idle moment. Needs the audio context (for its sample rate): a no-op before the first tap.
  */
 export function warmSounds(names: readonly SoundName[]): void {
   if (!ctx) return;
   const rate = ctx.sampleRate;
-  const todo = [...new Set(names)].flatMap((n) => MAKE[n] ?? []);
-  const idle = (fn: () => void) => (typeof requestIdleCallback === "function" ? requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 60));
-  const next = () => {
-    const make = todo.shift();
-    if (!make) return;
-    make(rate);
-    idle(next);
-  };
-  if (todo.length) idle(next);
+  const todo = [...new Set(names)].flatMap((n) => MAKE[n] ?? []).filter((s) => !cached(s, rate) && !pending.has(JSON.stringify([s, rate])));
+  const w = soundWorker();
+  for (const sound of todo) {
+    if (!w) {
+      makeIdle(sound, rate);
+      continue;
+    }
+    pending.add(JSON.stringify([sound, rate]));
+    w.postMessage({ sound, rate });
+  }
 }
 
 /** Plays a sound; `voice` previews a roulette voice without choosing it (the sound lab). */

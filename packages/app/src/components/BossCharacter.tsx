@@ -47,6 +47,43 @@ export function resetBeats() {
   started.clear();
   played.clear();
   inPlace.run = null;
+  figure.run = null;
+}
+
+/**
+ * What the boss's figure shows instead of its beat, for as long as it's set (the Hidden Boss's phase 2): `before` (a loop)
+ * until `since`, then `anims` in turn, then `loop` for good. Its beat's lines and fall lines are quiet meanwhile (his
+ * phase 2 says its own). Runs in place (playInPlace) still play over it. Cleared by a new battle (resetBeats).
+ */
+const figure: { run: { since: number; anims: readonly string[]; loop: string; before?: string } | null } = { run: null };
+export function setFigureRun(run: { since: number; anims: readonly string[]; loop: string; before?: string } | null) {
+  figure.run = run;
+}
+/** The loop the figure rests in now, when a figure run is set (phase 2's `idle2`), else null. */
+export const figureLoop = (): string | null => figure.run?.loop ?? null;
+/** What a figure run shows at `now`, or null: none is set. */
+function figureShowing(ch: Character, now: number): { anim: string; frame: number; tag: string } | null {
+  const run = figure.run;
+  if (!run) return null;
+  const loopAt = (name: string, from: number) => {
+    const a = ch.anims[name] ?? ch.anims.idle!;
+    const total = length(a);
+    const cycle = Math.floor(Math.max(0, now - from) / total);
+    const frame = frameAt(a, now - from - cycle * total);
+    return { anim: ch.anims[name] ? name : "idle", frame, tag: `fig:${name}:${cycle}:${frame}` };
+  };
+  if (now < run.since) return loopAt(run.before ?? run.loop, 0);
+  let t = now - run.since;
+  for (let i = 0; i < run.anims.length; i++) {
+    const a = ch.anims[run.anims[i]!];
+    if (!a) continue;
+    if (t < length(a)) {
+      const frame = frameAt(a, t);
+      return { anim: run.anims[i]!, frame, tag: `fig:${run.since}:${i}:${frame}` };
+    }
+    t -= length(a);
+  }
+  return loopAt(run.loop, 0);
 }
 
 /**
@@ -196,7 +233,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     const draw = () => {
       const now = Date.now();
       // (A run of its own animations in place, over its beat, while one lasts: the Hidden Boss's spellbook, his slam.)
-      const s = inPlaceShowing(kit.ch, now) ?? showing(kit, beat, now, since);
+      const s = inPlaceShowing(kit.ch, now) ?? figureShowing(kit.ch, now) ?? showing(kit, beat, now, since);
       const look = lookRef.current();
       const id = `${s.anim}:${s.frame}:${look}:${lightsId()}`;
       if (id !== last) {
@@ -224,12 +261,12 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   useLayoutEffect(() => {
     // (A line of its own for the moment, from the battle, over its kit's: the Hidden Boss's "Best by test.")
     const said = beat ? (kit?.lineOf?.(beat.anim, boss) ?? beat.line) : null;
-    if (said && !quiet) bossVoice.say(said, `${boss.id}:${boss.startMove}:${beat!.key}`, BEAT_PRIORITY[beat!.anim] ?? LOW);
+    if (said && !quiet && !figure.run) bossVoice.say(said, `${boss.id}:${boss.startMove}:${beat!.key}`, BEAT_PRIORITY[beat!.anim] ?? LOW);
   }, [beat?.key]);
   // Beaten: its fall lines (the Hidden Boss's mumbling), one after another once its defeat's animation is over, each
   // as the last one goes; carried on by whichever screen draws it next (the result screen), from the same moment.
   const fallAt = useMemo(() => {
-    if (!kit?.fall?.length || beat?.anim !== "defeat") return null;
+    if (!kit?.fall?.length || beat?.anim !== "defeat" || figure.run) return null;
     const shot = kit.ch.anims[kit.anims.defeat ?? "defeat"];
     let t = since + (shot && !shot.loop ? length(shot) : 0);
     return kit.fall.map((text) => {

@@ -513,12 +513,12 @@ export const BOSS_POWERS = {
    * team"). His own meter, not the rage meter: it fills from crowd turn 1 and is full as crowd turn bulletTurn begins,
    * when it comes (his line and the spellbook, no warning); nothing else fills it (no strikes, no eval). From then to the
    * end of phase 1 everyone's clock is a bank of bulletBankSeconds: no increment, no per-move cap, nothing adds time; a
-   * bank that runs out loses the battle on time. By estimate (DECISIONS.md, "The Hidden Boss, phase 1"): a strong player
-   * at 3 to 5 s a move gets 36 to 60 more moves out of 180 s, and a battle is capped at bossMaxMoves (60) crowd moves.
-   * Not yet sim-tested.
+   * bank that runs out loses the battle on time. Eric, Oct 14, after playing it: 3:00 "feels like too much", so 1:00
+   * ("1+0"), was 180 s. A player at 2 to 3 s a move gets 20 to 30 more moves out of it, and a battle is capped at
+   * bossMaxMoves (60) crowd moves. Not yet sim-tested.
    */
   bulletTurn: 7,
-  bulletBankSeconds: 180,
+  bulletBankSeconds: 60,
   /** The meter glows from this full (0-1) as it nears its ultimate. */
   rageGlowFrom: 0.75,
   /**
@@ -526,6 +526,12 @@ export const BOSS_POWERS = {
    * brings the boss's ultimate as the next crowd turn begins (no warning). false removes it everywhere, server too.
    */
   ultimateTestButton: true,
+  /**
+   * Testing, admins only, Boss alone (Eric, Oct 14): an "Engine move" button that plays Stockfish's best move for you
+   * through the normal move path. Its search is the power-up hints' (`engineNodes`, 250,000 nodes: well under a second
+   * on a phone, already under way as your move starts), so it adds no engine work. false removes it.
+   */
+  engineMoveButton: true,
   /**
    * The funhouse (Boingo's ultimate; Eric, Oct 11): he turns the board round in steps, funhouseStepTurns crowd turns
    * apart: upside down (180°) as it comes, then a quarter turn to a side picked from the seed (90° or 270°), then a half
@@ -767,6 +773,60 @@ export const HOLLOW_LIGHTS: { readonly colours: readonly { readonly name: string
     { name: "pink", glass: "#ff7dcf", shade: "#c22f8b" },
     { name: "cyan", glass: "#45ecef", shade: "#0f97a3" },
   ],
+};
+
+/**
+ * The Hidden Boss's phase 2 (Eric, Oct 14; DECISIONS.md, "The Hidden Boss, phase 2"): four boards of Chess960 at once,
+ * each from its own start position, against Stockfish (never Maia: it can't play Chess960). Today an admin's fight in
+ * Boss alone, on this device: you on one board, bots on the other three.
+ */
+export const RECLUSE_PHASE2 = {
+  /** How many boards (all of them must be won to beat him). */
+  boards: 4,
+  /**
+   * His strength (Stockfish's UCI_Elo, its own engine-calibrated scale, not a FIDE rating). Eric, Oct 14: about 2750 to
+   * start ("at that very fast pace 2750 may be sufficient"; the roadmap's earlier figure was 3000). A starting value, to
+   * tune once real players have tried him; the next step is the engine-against-engine sim at the real clock.
+   */
+  elo: 2750,
+  /** His search per move: at most this many nodes, and never longer than `moveMs` (a phone stays responsive). */
+  nodes: 250_000,
+  /**
+   * His most time for one move (ms): one engine serves the four boards in turn, so a phone keeps up. Short enough that
+   * four boards on a slow phone never wait more than about 3 s for him; at a phone's speed it caps his search below
+   * `nodes`, so his strength there is less than the number says (an estimate, not yet measured on a real phone).
+   */
+  moveMs: 900,
+  /**
+   * Each player's bank on each board (s): ultra-fast bullet, no increment, nothing adds time; out of time loses that
+   * board. His own moves take no time from it (he has no clock, as in phase 1). An estimate (2:00 a board): not yet
+   * sim-tested.
+   */
+  bankSeconds: 120,
+  /**
+   * His ultimate (Eric, Oct 14): a move that takes longer than `slowMoveSeconds` (anyone's, on any board, before it
+   * comes) is a slow move: he says so (one of his lines about playing faster). Once the team's slow moves pass
+   * `slowMovesForUlt` (it fires on the next one), his ultimate: from then on every move on every board has
+   * `ultMoveSeconds`, no bank; when they run out, a random legal move is played for that player (never a loss on
+   * time). Before it, the bank above applies. Estimates, not yet sim-tested: with a 2:00 bank (about 3 s a move over a
+   * game) slow moves will be common, so it will likely come early in the fight.
+   */
+  slowMoveSeconds: 5,
+  slowMovesForUlt: 5,
+  ultMoveSeconds: 5,
+  /** The bots on the other boards (Boss alone): Stockfish at this strength, this many nodes, within `botMoveMs`. */
+  botElo: 2200,
+  botNodes: 100_000,
+  /** A bot's thinking per move (ms, its own clock running): a random time in this range, as a bullet player's. */
+  botMoveMs: [900, 2600] as readonly [number, number],
+  /**
+   * Now and then (this share of its moves, before his ultimate) a bot thinks longer, `botSlowMs` (past
+   * `slowMoveSeconds`), so his slow-move count and his ultimate come in Boss alone too, not only from you.
+   */
+  botSlowChance: 0.12,
+  botSlowMs: [5400, 7000] as readonly [number, number],
+  /** Once every board is decided: how long his reaction holds the boards before the result screen (ms). */
+  endMs: 3200,
 };
 
 /** BOSS_POWERS with room for other numbers (tests, and the switch turned off). */

@@ -1,4 +1,4 @@
-import { BOSS_BRAIN, BOSS_BRAINS, type BossBrain } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_BRAINS, BOSS_POWERS, type BossBrain } from "@chessroyale/core";
 import { account } from "./account.ts";
 
 /**
@@ -18,6 +18,12 @@ export const BRAIN_LABELS: Record<BossBrain, string> = {
 };
 
 export const isAdmin = () => !!account().profile?.admin;
+
+/**
+ * Testing, admins only: the "Engine move" button (Stockfish's best move played for you) shows in Boss alone
+ * (`bossAlone`: you alone against a boss, on this device) and nowhere else. Online matches never have it.
+ */
+export const engineMoveAllowed = (bossAlone: boolean) => BOSS_POWERS.engineMoveButton && bossAlone && isAdmin();
 
 /** The brain an admin picked ("" for the boss's own). */
 export function pickedBrain(): BossBrain | "" {

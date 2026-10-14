@@ -3,7 +3,7 @@
  * crackle and the blizzard's wind. Each is a pure function of the sample rate (its noise is seeded), so a test can
  * measure it: every one stays quieter than a piece's move sound (peak and loudness; see test/gingerbread.test.ts).
  */
-import { bandpass, lowpass, noise, osc, render, rng, sine, soft, type Voice } from "./synth.ts";
+import { bandpass, lowpass, noise, osc, render, rng, sine, soft, type Voice, soundCache } from "./synth.ts";
 
 export type GingerSound = "crunch" | "jingle" | "crackle" | "wind";
 
@@ -68,7 +68,7 @@ const SOUNDS: Record<GingerSound, (rate: number) => Float32Array> = {
 /** Trims each to sit a little under a move's loudness (as Boingo's do); a soft ceiling keeps the peaks well under its. */
 const LEVEL: Record<GingerSound, number> = { crunch: 1.31, jingle: 0.35, crackle: 0.55, wind: 0.38 };
 
-const cache = new Map<string, Float32Array>();
+const cache = soundCache("ginger");
 /** The samples for one of his sounds at a sample rate (made once, then reused). */
 export function gingerSound(name: GingerSound, rate: number): Float32Array {
   const key = `${name}@${rate}`;
