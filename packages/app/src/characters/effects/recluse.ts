@@ -4,8 +4,8 @@
  * cover and one gold-stamped letter, a Cyrillic "Ш" (for "шахматы", chess): no other marking, no names.
  *
  * `RECLUSE_BOOK` is the book alone as an effect sprite, one board square across (32 x 32, as the other one-square
- * effects), for the board effects built later. ART ONLY (Oct 14, 2026): it is not in EFFECT_SPRITES, and nothing plays
- * it yet. Its animations: `fly` (spinning as it travels), `slam` (dropping flat onto a square: dust and a shockwave
+ * effects). ART ONLY: it is not in EFFECT_SPRITES, and nothing plays it now (the phase change flew it to the board
+ * until Oct 14, 2026; since its rework he carries his own book down, so only one is ever on screen). Its animations: `fly` (spinning as it travels), `slam` (dropping flat onto a square: dust and a shockwave
  * ring), `flip` (lying open, its pages flipping fast), `close` (snapping shut), and `idle` (lying closed).
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "../paint.ts";

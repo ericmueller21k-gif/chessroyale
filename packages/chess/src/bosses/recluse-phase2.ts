@@ -136,8 +136,9 @@ export function moveLeft(st: Pick<Phase2State, "ultAt">, b: Pick<Phase2Board, "b
 }
 
 /**
- * His ultimate comes at `now` (the slow moves past slowMovesForUlt, or the admins' trigger): every player whose move it
- * is starts their few seconds now. Unchanged (the same object) once it has come.
+ * His ultimate comes at `now` (the team's slowMovesForUlt-th slow move, or the admins' trigger): every player whose
+ * move it is starts their few seconds afresh now, however long they'd thought. Unchanged (the same object) once it has
+ * come.
  */
 export function phase2Ult(st: Phase2State, now: number): Phase2State {
   if (st.ultAt !== null) return st;
@@ -160,10 +161,10 @@ export function phase2Move(st: Phase2State, boardId: number, move: string, now: 
     const left = bankLeft(b, now);
     if (left <= 0) return replace(st, { ...b, bankMs: 0, turnAt: null, result: { winner: "boss", how: "time" } });
     const next = replace(st, { ...b, board, bankMs: left, turnAt: null, result: resultAfter(board) });
-    // A slow move (longer than slowMoveSeconds): one more; past slowMovesForUlt, his ultimate comes.
+    // A slow move (longer than slowMoveSeconds): one more for the team; the slowMovesForUlt-th brings his ultimate.
     if (b.turnAt === null || now - b.turnAt <= s.slowMoveSeconds * 1000) return next;
     const slow = next.slow + 1;
-    return slow > s.slowMovesForUlt ? phase2Ult({ ...next, slow }, now) : { ...next, slow };
+    return slow >= s.slowMovesForUlt ? phase2Ult({ ...next, slow }, now) : { ...next, slow };
   }
   const board = playOnBoard(b.board, move, 0.5);
   const result = resultAfter(board);

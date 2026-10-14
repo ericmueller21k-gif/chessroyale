@@ -1,33 +1,120 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RECLUSE_PHASE2 } from "@chessroyale/core";
 import { legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
-import { PHASE_CHANGE, Phase2Game } from "../src/recluse-phase2.ts";
-import { RECLUSE } from "../src/characters/recluse.ts";
+import { PHASE_CHANGE, Phase2Game, Talk, talkStage } from "../src/recluse-phase2.ts";
+import { ON_BOARD_ANIMS, RECLUSE, RECLUSE_BUST } from "../src/characters/recluse.ts";
+import { CHATTER, LOW, Voice } from "../src/speech.tsx";
 import { KING_VS_RECLUSE, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
-import { animLength, cueAt } from "../src/characters/power-art.ts";
+import { animLength } from "../src/characters/power-art.ts";
 
 // The Hidden Boss's phase 2 on this device (recluse-phase2.ts): the phase change's beats, and the four boards driven
 // with pretend engines and a pretend clock. Its rules: packages/chess/test/recluse-phase2.test.ts.
 
 describe("the phase change", () => {
-  it("is short (6 to 8 s), its beats in order, his revive's catch as the book goes back to him", () => {
+  it("is about 10 to 12 s after a short fall, its beats in order: rage, leap, the book thrown down, the chant, the split, the book back, the leap back", () => {
     const C = PHASE_CHANGE;
-    expect(C.total).toBeGreaterThanOrEqual(6000);
-    expect(C.total).toBeLessThanOrEqual(8000);
-    const order = [0, C.slamAt, C.crackAt, C.partAt, C.growAt, C.growAt + C.growMs, C.flipAt, C.shuffleAt, C.shuffleAt + C.shuffleMs, C.closeAt, C.bookGoneAt, C.bannerAt, C.total];
+    expect(C.fallMs).toBeGreaterThanOrEqual(1500);
+    expect(C.fallMs).toBeLessThanOrEqual(2000);
+    expect(C.total).toBeGreaterThanOrEqual(10_000);
+    expect(C.total).toBeLessThanOrEqual(12_000);
+    const order = [0, C.leapAt, C.upAt, C.landAt, C.dropAt, C.thudAt, C.chantAt, C.crackAt, C.partAt, C.growAt, C.growAt + C.growMs, C.pickupAt, C.catchAt, C.backAt, C.homeAt, C.bannerAt, C.total];
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    const revive = RECLUSE.anims.revive!;
-    expect(C.reviveAt + cueAt(revive, "catch")!).toBe(C.bookGoneAt);
-    expect(C.reviveAt + animLength(revive)).toBeLessThanOrEqual(C.bannerAt);
-    // (Phase 2's frames, all drawn already: his revive and his phase 2 idle, his slam and laugh, the placeholder's glow.)
-    for (const a of ["revive", "idle2", "slam2", "laugh2", "spellbook2", "spellLoop2", "collapseLoop"]) expect(RECLUSE.anims[a], a).toBeDefined();
+    // He gets up where he stands, then the board takes him over; the light is up through the cracks and the split.
+    expect(C.leapAt).toBe(animLength(RECLUSE.anims.rage!));
+    expect(C.chantAt + C.lightMs).toBeLessThanOrEqual(C.crackAt);
+    // (The pieces fly to their Chess960 squares as the book comes back to him, and land before "PHASE 2".)
+    expect(C.shuffleAt).toBeGreaterThanOrEqual(C.pickupAt);
+    expect(C.shuffleAt + C.shuffleMs).toBeLessThanOrEqual(C.bannerAt);
+    // (Phase 2's frames, all drawn: his idle, his slam and laugh, the placeholder's glow.)
+    for (const a of ["idle2", "slam2", "laugh2", "spellbook2", "spellLoop2", "collapseLoop"]) expect(RECLUSE.anims[a], a).toBeDefined();
+  });
+
+  it("one book on screen: his own, in his frames; the board draws his whole figure (a phone too), his place only his rage", () => {
+    for (const a of ON_BOARD_ANIMS) {
+      expect(RECLUSE.anims[a], a).toBeDefined();
+      expect(RECLUSE_BUST.anims[a], `${a} (the bust)`).toBeUndefined();
+    }
+    for (const ch of [RECLUSE, RECLUSE_BUST]) expect(ch.anims.rage!.frames.at(-1)!.layers.some((l) => l.part.startsWith("book:")), ch.id).toBe(true);
+    // In every frame of it, the book is drawn once: held, falling, lying open, or flying back up.
+    for (const a of ["rage", ...ON_BOARD_ANIMS]) RECLUSE.anims[a]!.frames.forEach((f, i) => expect(f.layers.filter((l) => l.part.startsWith("book:")), `${a} ${i}`).toHaveLength(1));
+    // He leaps with no shadow under him, and lands in a cloud of dust.
+    const leap = RECLUSE.anims.leap!.frames;
+    expect(leap.some((f) => !f.layers.some((l) => l.part === "shadow"))).toBe(true);
+    expect(leap.find((f) => f.cue === "land")!.specks?.length).toBeGreaterThan(0);
   });
 });
 
 describe("his phase 2 lines", () => {
   it("has a line for each moment, his and the God King's", () => {
-    for (const k of ["revive", "phase2", "boardWon", "boardLost", "beaten2"] as const) expect(RECLUSE_LINES[k].length, k).toBeGreaterThan(0);
+    for (const k of ["revive", "phase2", "boardWon", "boardLost", "beaten2", "chant"] as const) expect(RECLUSE_LINES[k].length, k).toBeGreaterThan(0);
+    for (const k of ["early", "middle", "late"] as const) expect(RECLUSE_LINES.collusion[k].length, k).toBeGreaterThan(0);
     for (const k of ["phase2", "boardWon", "boardLost", "victory2"] as const) expect(KING_VS_RECLUSE[k].length, k).toBeGreaterThan(0);
+  });
+
+  it("names his rivals but never their country or its people (Eric, Oct 14); his own words from the article word for word", () => {
+    const all = (o: unknown): string[] => (typeof o === "string" ? [o] : Array.isArray(o) ? o.flatMap(all) : o && typeof o === "object" ? Object.values(o).flatMap(all) : []);
+    for (const line of all(RECLUSE_LINES)) expect(line, line).not.toMatch(/soviet|russia/i);
+    expect(RECLUSE_LINES.chant.some((l) => /Petrosian/.test(l) && /Keres/.test(l) && /Geller/.test(l))).toBe(true);
+    // (Verified on the printed pages of his Sports Illustrated article, Aug 20, 1962: never altered.)
+    expect(RECLUSE_LINES.chant).toContain("They worked as a team.");
+    expect(RECLUSE_LINES.collusion.middle).toEqual(expect.arrayContaining(["They consulted during the games.", "They would openly analyze my game while I was still playing it.", "They agreed ahead of time to draw the games they played against each other."]));
+    expect(RECLUSE_LINES.collusion.late).toEqual(expect.arrayContaining(["They worked as a team.", "It made me mad that they thought they could get away with it.", "I will never again play in one of these tournaments."]));
+    // (Korchnoi only among the names, never with a word about a game he played.)
+    for (const line of all(RECLUSE_LINES).filter((l) => /Korchnoi/.test(l))) expect(line.replace(/[.\s]/g, "")).toMatch(/^(Petrosian|Keres|Geller|Tal|Korchnoi)+$/);
+  });
+});
+
+describe("his collusion lines in phase 2", () => {
+  it("picks the stage by his moves so far: early, middle from talkMiddleFrom, late from talkLateFrom", () => {
+    const { talkMiddleFrom: mid, talkLateFrom: late } = RECLUSE_PHASE2;
+    expect(talkStage(0)).toBe("early");
+    expect(talkStage(mid - 1)).toBe("early");
+    expect(talkStage(mid)).toBe("middle");
+    expect(talkStage(late - 1)).toBe("middle");
+    expect(talkStage(late)).toBe("late");
+    expect(talkStage(10_000)).toBe("late");
+  });
+
+  it("speaks every talkEvery of his moves, give or take talkJitter, each stage's lines in turn", () => {
+    const { talkEvery, talkJitter } = RECLUSE_PHASE2;
+    for (const r of [0, 0.5, 0.999]) {
+      const talk = new Talk(() => r);
+      const at: number[] = [];
+      const said: string[] = [];
+      for (let n = 1; n <= 200; n++) {
+        const line = talk.lineAfter(n, false);
+        if (line) at.push(n), said.push(line);
+      }
+      const gaps = at.slice(1).map((n, i) => n - at[i]!);
+      expect(at[0]!).toBeGreaterThanOrEqual(talkEvery - talkJitter);
+      for (const g of gaps) expect(g).toBeGreaterThanOrEqual(talkEvery - talkJitter), expect(g).toBeLessThanOrEqual(talkEvery + talkJitter);
+      // Each line from its stage's pool, in turn.
+      at.forEach((n, i) => expect(RECLUSE_LINES.collusion[talkStage(n)]).toContain(said[i]));
+      const pool = RECLUSE_LINES.collusion.early;
+      const early = said.filter((_, i) => talkStage(at[i]!) === "early");
+      expect(early).toEqual(early.map((_, i) => pool[i % pool.length]));
+    }
+  });
+
+  it("is the lowest priority: skipped (not queued) while anything is being said; anything he says cuts in on it", () => {
+    const talk = new Talk(() => 0.5);
+    const due = RECLUSE_PHASE2.talkEvery;
+    // A line is up (a slow move's): this one is skipped, and the next comes a few moves later.
+    expect(talk.lineAfter(due, true)).toBeNull();
+    expect(talk.lineAfter(due + 1, false)).toBeNull();
+    expect(talk.lineAfter(due * 2, false)).not.toBeNull();
+    // In the voice: chatter is cut by any other line of his (a slow move's is LOW), and never cuts one in turn.
+    const voice = new Voice();
+    voice.say("Who told you that move?", "talk", CHATTER, 1000);
+    voice.say("Still thinking? Move!", "slow", LOW, 1500);
+    expect(voice.line(1500)?.text).toBe("Still thinking? Move!");
+    voice.say("Who told you that move?", "talk2", CHATTER, 1600);
+    expect(voice.line(1700)?.text).toBe("Still thinking? Move!");
+    // (Chatter said over chatter waits its turn, as any other line.)
+    const v2 = new Voice();
+    v2.say("A", "a", CHATTER, 0);
+    v2.say("B", "b", CHATTER, 10);
+    expect(v2.line(20)?.text).toBe("A");
   });
 });
 
@@ -84,7 +171,8 @@ describe("phase 2's four boards on this device", () => {
   });
 
   it("he answers on every board with Stockfish at his strength and budget only; your move is yours alone", async () => {
-    const { g, e } = make();
+    const moved: number[] = [];
+    const { g, e } = make({ onBossMove: (n) => moved.push(n) });
     g.start();
     // (Your move on a bot's board, or an illegal one, does nothing.)
     g.move(1, legalMoves(g.board(1)!.board.fen)[0]!);
@@ -95,6 +183,10 @@ describe("phase 2's four boards on this device", () => {
     for (const b of g.state.boards) expect(b.board.history.length).toBeGreaterThanOrEqual(2);
     expect(e.asked.length).toBeGreaterThanOrEqual(4);
     for (const a of e.asked) expect(a).toMatchObject({ elo: RECLUSE_PHASE2.elo, nodes: RECLUSE_PHASE2.nodes, moveMs: RECLUSE_PHASE2.moveMs });
+    // (Each of his moves counted, on all the boards together: what his collusion lines go by.)
+    const his = g.state.boards.reduce((n, b) => n + Math.floor(b.board.history.length / 2), 0);
+    expect(moved).toEqual(Array.from({ length: his }, (_, i) => i + 1));
+    expect(g.bossMoves).toBe(his);
     g.stop();
   });
 
@@ -124,18 +216,22 @@ describe("phase 2's four boards on this device", () => {
     g.stop();
   });
 
-  it("slow moves count, yours and the bots' (now and then a bot thinks past slowMoveSeconds); past slowMovesForUlt his ultimate comes", async () => {
-    const slow = vi.fn();
+  it("slow moves count for the team, yours and the bots' (now and then a bot thinks past slowMoveSeconds), each on its board; the 10th brings his ultimate", async () => {
+    const slow: [number, boolean][] = [];
     const ult = vi.fn();
     // (rng 0.05: every bot's move is a slow one.)
-    const { g } = make({ onSlow: slow, onUlt: ult, rng: () => 0.05 });
+    const { g } = make({ onSlow: (id, u) => slow.push([id, u]), onUlt: ult, rng: () => 0.05 });
     g.start();
     await vi.advanceTimersByTimeAsync(RECLUSE_PHASE2.botSlowMs[1] + 500);
-    expect(slow).toHaveBeenCalled();
     expect(g.state.slow).toBeGreaterThanOrEqual(3);
-    await vi.advanceTimersByTimeAsync(3 * RECLUSE_PHASE2.botSlowMs[1]);
+    expect(ult).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(4 * RECLUSE_PHASE2.botSlowMs[1]);
     expect(ult).toHaveBeenCalledTimes(1);
-    expect(g.state.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt + 1);
+    expect(g.state.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt);
+    // One call a slow move, naming its board (the bots' here, never yours: you haven't moved); the last one brought it.
+    expect(slow).toHaveLength(RECLUSE_PHASE2.slowMovesForUlt);
+    for (const [id] of slow) expect([1, 2, 3]).toContain(id);
+    expect(slow.map(([, u]) => u)).toEqual([...Array(RECLUSE_PHASE2.slowMovesForUlt - 1).fill(false), true]);
     g.stop();
   });
 

@@ -204,8 +204,10 @@ export interface SimulView {
   /** Every board is decided (his reaction holds the boards, then the result). */
   decided: boolean;
   beaten: boolean;
-  /** Slow moves so far (his ultimate comes past RECLUSE_PHASE2.slowMovesForUlt). */
+  /** Slow moves so far, the team's (the RECLUSE_PHASE2.slowMovesForUlt-th brings his ultimate). */
   slow: number;
+  /** The last slow move: on which board (id) and when, or null. */
+  lastSlow: { board: number; at: number } | null;
   /** When his ultimate came (then every move has ultMoveSeconds, no bank), or null. */
   ultAt: number | null;
 }
