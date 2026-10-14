@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_TIERS, bossDef, isPlayable, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, PREGAME_VOTES, type Settings } from "@chessroyale/core";
-import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, moveNumber, START_FEN, sanLineToUci, withoutPiece, type EngineLike, type Opening } from "../src/index.ts";
+import { BOSS_TIERS, bossDef, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaTopRating, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, PREGAME_VOTES, type Settings } from "@chessroyale/core";
+import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, moveNumber, START_FEN, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
 
 const hash = (s: string) => {
   let h = 2166136261;
@@ -170,95 +170,70 @@ describe("Crowd mode", () => {
     expect(runner.state.players.map((p) => p.placement).sort((a, b) => a! - b!)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
   });
 
-  it("50 v 50 boss battle against Big Boy: from the starting position, less the pawn of the crowd's he ate", async () => {
-    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20, bossId: "bigboy" };
-    const { runner } = await playKnockouts(settings, 4);
+  it("50 v 50 boss final: always the Hidden Boss (whatever boss was picked), the top 4 against him, from the starting position, at his fixed strength and brain", async () => {
+    // (A boss picked or met last makes no difference: Eric, Oct 14, "that mode is always just versus [him]".)
+    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20, bossId: "bigboy", bossAvoid: "recluse" };
+    const { runner, sizes, plies } = await playKnockouts(settings, 4);
+    expect(crowdFinalists("boss")).toBe(4);
+    expect(sizes.at(-1)).toBe(4);
+    // The duel's cuts, stopping at four: two from each team at the last two.
+    expect(sizes).toEqual([84, 70, 58, 48, 40, 32, 26, 20, 16, 12, 8, 6, 4]);
+    expect(plies).toBe(20 + 2 * 12);
     const boss = runner.boss!;
-    expect(boss.id).toBe("bigboy");
+    expect(boss.id).toBe(crowdFinalBoss()!.id);
+    expect(boss.id).toBe("recluse");
+    expect(runner.bossView()!.name).toBe(bossDef("recluse")!.name);
     expect(boss.crowdSide).toBe("w");
+    // From the starting position (he has no book openings), White to move, the four as one crowd.
     const board = runner.boards.get(runner.state.boards[0]!)!;
-    const snack = boss.powers!.snack!.square;
-    expect(["d2", "e2"]).toContain(snack);
     expect(board.history).toEqual([]);
-    expect(board.fen).toBe(withoutPiece(START_FEN, snack));
-    expect(board.bases).toEqual([{ ply: 0, fen: board.fen }]);
+    expect(board.fen).toBe(START_FEN);
+    expect(runner.alive()).toHaveLength(4);
+    expect(runner.alive().every((p) => p.colour === null)).toBe(true);
+    // His strength and brain are fixed: Maia at its top, raw, whatever the crowd (a crowd of four too).
+    expect(boss.elo).toBe(fixedLevel());
+    expect(runner.bossBrainPlan("", true)).toEqual({ brain: "maia-raw", rating: maiaTopRating(), stockfishShare: 0 });
+    expect(runner.bossBrainPlan("", false)).toMatchObject({ brain: "stockfish" });
+    // His ultimate is the bullet clock, his passive the God King blocked.
+    expect(runner.bossView()!.powers).toMatchObject({ passive: "nohelp", ultimate: "bullet" });
   });
 
-  it("50 v 50 boss battle: the top 10 play White from an even position of their own game, the boss replies and strikes every 3 moves", async () => {
-    // (Boingo, the boss this seed met before Hollow joined the draw.)
-    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20, bossId: "clown" };
-    const { runner, sizes, plies } = await playKnockouts(settings, 4);
-    expect(sizes.at(-1)).toBe(10);
+  it("50 v 50 boss final: the four play the battle out against him; the God King's help never comes, nobody is struck, and everyone is placed", async () => {
+    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 9 };
+    const { runner } = await playKnockouts(settings, 4);
     const boss = runner.boss!;
-    expect(boss.crowdSide).toBe("w");
-    expect(boss.elo).toBeGreaterThanOrEqual(settings.bossEloRange[0]);
-    // A position from the game just played: White to move, between moves 5 and 12 (or the start).
-    const board = runner.boards.get(runner.state.boards[0]!)!;
-    expect(plies).toBe(40);
-    expect(board.history.length % 2).toBe(0);
-    expect(board.history.length === 0 || (board.history.length >= 10 && board.history.length <= 24)).toBe(true);
-    expect(board.fen.split(" ")[1]).toBe("w");
-    expect(runner.alive().every((p) => p.colour === null)).toBe(true);
-    // The King: charges from the ten's leftover power-ups; when the crowd calls him he plays the engine's best move.
-    const charges = boss.kingCharges!;
-    expect(charges).toBeGreaterThanOrEqual(1);
-    expect(charges).toBeLessThanOrEqual(3);
+    expect(boss.id).toBe("recluse");
+    // His charges still come from the finalists' leftover power-ups (they only spend against him).
+    expect(boss.kingCharges).toBeGreaterThanOrEqual(1);
     expect(runner.alive().every((p) => p.powerUps === 0)).toBe(true);
-    runner.deal();
-    for (const p of runner.alive()) runner.kingCallers.add(p.id);
-    const kingRound = await runner.score(new Map());
-    expect(kingRound.boards[0]!.king).toBe(true);
-    expect(kingRound.boards[0]!.result.playedMove).toBe(kingRound.boards[0]!.bestMove);
-    expect(runner.boss!.kingCharges).toBe(charges - 1);
-    expect(runner.boss!.kingMoves).toEqual([1]);
     const struck: string[] = [];
+    let crowdMoves = 0;
     while (!runner.stageComplete()) {
       if (runner.bossToMove()) {
         await runner.playBoss();
-        expect(runner.bossToMove()).toBe(false);
         continue;
       }
       const groups = runner.deal();
-      // Everyone left picks the crowd's move.
       expect([...groups.values()][0]!.length).toBe(runner.alive().length);
-      await runner.score(new Map());
-      if (runner.bossKillDue()) {
-        const alive = runner.alive().length;
-        const victim = runner.bossKill()!;
-        struck.push(victim);
-        expect(runner.player(victim).placement).toBe(alive);
-      }
+      // Everyone calls the God King, and calls for his strike: neither comes.
+      for (const p of runner.alive()) runner.kingCallers.add(p.id);
+      expect(runner.callStrike(runner.alive()[0]!.id).struck).toBe(false);
+      const round = await runner.score(new Map());
+      expect(round.boards[0]!.king).toBeFalsy();
+      crowdMoves++;
+      if (runner.bossKillDue()) struck.push(runner.bossKill()!);
     }
-    // 20 crowd moves: a strike after moves 3, 6, ... down to the 3 survivors at least.
-    expect(struck.length).toBe(Math.min(6, 10 - settings.bossMinSurvivors));
-    const view = runner.bossView()!;
-    expect(view.kills.map((k) => k.id)).toEqual(struck);
+    expect(crowdMoves).toBeGreaterThan(0);
+    expect(runner.boss!.kingMoves).toEqual([]);
+    expect(runner.boss!.kingStrikes ?? []).toEqual([]);
+    expect(runner.boss!.lastStand ?? null).toBeNull();
+    // He never strikes: all four play to the end.
+    expect(struck).toEqual([]);
+    expect(runner.bossView()!.strikeIn).toBeNull();
     const result = runner.finishBossBattle();
     expect(["crowd", "boss", "draw"]).toContain(result);
     expect(runner.isOver()).toBe(true);
     expect(runner.state.players.map((p) => p.placement).sort((a, b) => a! - b!)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
-  });
-
-  it("boss battle timing: the intro replays the game, and the boss taking your queen stays up longer for its banner", async () => {
-    // A 10-ply opening: the card, ten moves at 240 ms, a beat, then "START!".
-    expect(bossIntroTimeline(10)).toEqual({ step: 240, replayAt: 2600, claimAt: 5000, bannerAt: 5250, total: 6750 });
-    // A long game replays faster, a short one no slower than the cap.
-    expect(bossIntroTimeline(24).step).toBe(110);
-    expect(bossIntroTimeline(0).total).toBe(2600 + 250 + 1500);
-    expect(bossShowMs({ captured: "q" })).toBeGreaterThan(bossShowMs({ captured: "b" }));
-    expect(bossShowMs(null)).toBe(1800);
-    // Alone (a solo raid), the boss's move just lands and it's your turn, unless it took your queen (the banner plays).
-    expect(bossShowMs(null, true)).toBeLessThan(600);
-    expect(bossShowMs({ captured: "b" }, true)).toBeLessThan(600);
-    expect(bossShowMs({ captured: "q" }, true)).toBe(bossShowMs({ captured: "q" }));
-    // The boss's move records what it took. (G-REX: the boss this seed met before Big Boy joined the draw.)
-    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "grex" } as Settings;
-    const lib: Opening[] = [{ ...library[0]!, moves: sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1"]), expected: { 10: 0.52 } }];
-    const runner = new MatchRunner({ settings, rng: mulberry32(3), engines: [fake], library: lib, entrants: [{ id: "h0", name: "H0", isBot: false }] });
-    runner.deal();
-    await runner.score(new Map([["h0", { move: "a4c6", thinkMs: 1000 }]]));
-    runner.applyBossMove("d7c6");
-    expect(runner.bossView()!.lastMove).toMatchObject({ san: "dxc6", captured: "b" });
   });
 
   it("boss raid: humans only, the boss from the first move on a named opening, strikes down to half, the King's strike staggers the boss", async () => {
@@ -409,7 +384,8 @@ describe("Crowd mode", () => {
       if (runner.stageComplete()) runner.endStage();
       rounds++;
     }
-    expect(rounds).toBe(40);
+    // (The knockouts: the first stage's rounds, then the rest a stage each.)
+    expect(rounds).toBe(settings.firstStageRounds + (CROWD_KNOCKOUTS.boss.length - 1) * settings.roundsPerStage);
     // Each bot paid what it thought beyond the 2 s increment, never more than 8 s a move, from its 3:00.
     for (const p of runner.state.players.filter((x) => x.movesTimed > 0)) {
       expect(p.bankMs).toBe(Math.max(0, 180_000 + p.movesTimed * 2_000 - p.thinkMsTotal));
@@ -451,12 +427,13 @@ describe("Crowd mode", () => {
       await runner.score(new Map());
       if (runner.stageComplete()) runner.endStage();
     }
-    // The knockouts end after move 20 (40 plies).
-    expect([1, 5, 6, 10, 11, 15, 16, 20].map((m) => seen.get(m))).toEqual([10, 10, 15, 15, 20, 20, 25, 25]);
-    // The boss battle goes back to a position from moves 5-12, but its clock counts on from where the game was: 30 s.
-    expect(runner.boss!.clockFromMove).toBe(21);
+    // The knockouts end after move 22 (44 plies).
+    expect([1, 5, 6, 10, 11, 15, 16, 20, 21, 22].map((m) => seen.get(m))).toEqual([10, 10, 15, 15, 20, 20, 25, 25, 30, 30]);
+    // The boss battle starts again from the starting position (the Hidden Boss's), but its clock counts on from where the
+    // game was: 30 s.
+    expect(runner.boss!.clockFromMove).toBe(23);
     runner.deal();
-    expect(runner.clockMove()).toBe(21);
+    expect(runner.clockMove()).toBe(23);
     expect(runner.moveClock()).toBe(30);
   });
 

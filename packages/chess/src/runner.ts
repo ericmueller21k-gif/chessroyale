@@ -37,6 +37,7 @@ import {
   bossStrength,
   bossThreat,
   chooseBoss,
+  crowdFinalBoss,
   BOSS_POWERS,
   bossStumbleChance,
   bossStartPly,
@@ -1334,8 +1335,9 @@ export class MatchRunner {
   }
 
   /**
-   * The boss battle was lost on time (the bullet clock ran out): for the result screen (solo). Kept on the runner, not in
-   * the match state: nothing stored or sent changes (online the Hidden Boss can't be met).
+   * The boss battle was lost on time (the bullet clock ran out): for the result screen. Kept on the runner, not in the
+   * match state, so nothing stored changes: solo reads it at the end, and online the lobby reads it as it sends the
+   * results (finishBossBattle and finishMatch run in the same event), as the results' `timeout`.
    */
   bossTimedOut = false;
 
@@ -1437,16 +1439,24 @@ export class MatchRunner {
     // From the game just played: a roughly even position between moves 5 and 12, White (the crowd) to move.
     let startPly = bossStartPly(old.evals ?? [], old.history.length);
     const alive = this.alive();
-    // Which boss: a random playable one (as in a raid), at the crowd's strength plus its own offset. (Never a hidden one:
-    // the Crowd's boss final isn't Boss alone.)
+    // Which boss: always the Hidden Boss (Eric, Oct 14: crowdFinalBoss, for everyone, though he's hidden from players
+    // everywhere else), whatever was picked or met last; with none marked, a random playable one, as in a raid. Its
+    // strength: the crowd's plus its own offset (his is fixed). One draw from the match's random source either way, which
+    // also seeds its powers.
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
-    const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
-    // (A boss who plays from the starting position: Hollow; Big Boy too, less the pawn he eats.)
+    const def = crowdFinalBoss() ?? chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
+    // (A boss who plays from the starting position: Hollow, the Hidden Boss; Big Boy too, less the pawn he eats.)
     const start = bossRules(def)?.opening;
     if (start?.fromStart) startPly = 0;
     const opening = { ...BOSS_OPENING, moves: old.history.slice(0, startPly), expected: { [startPly]: old.evals?.[startPly] ?? 0.5 } };
     this.boards.set(id, { ...newBoard(id, opening, startPly, old.generation + 1), opening: BOSS_OPENING });
-    const setUp = start?.setUp?.(this.battle, { boardId: id, seed, crowdSide: "w", generation: old.generation + 1 }) ?? null;
+    let setUp = start?.setUp?.(this.battle, { boardId: id, seed, crowdSide: "w", generation: old.generation + 1 }) ?? null;
+    // (Test switch, solo: the crowd White to move, mating in one, as in a raid; to see the final's boss beaten.)
+    if (this.settings.bossWinTest) {
+      startPly = WIN_TEST_MOVES.length;
+      this.boards.set(id, { ...newBoard(id, { ...BOSS_OPENING, moves: [...WIN_TEST_MOVES] }, startPly, old.generation + 1), opening: BOSS_OPENING });
+      setUp = null;
+    }
     // From the people's ratings (Eric, Oct 12: "the crowd's ratings, people only"); all bots left: theirs.
     const people = alive.filter((p) => !p.isBot);
     const tier = bossElo((people.length ? people : alive).map((p) => estimateRating(p.lossesByStage.flat())), this.settings);

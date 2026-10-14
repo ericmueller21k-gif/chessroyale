@@ -101,6 +101,28 @@ export const PHASE2_ULT_ANIMS = ["spellbook2", "spellLoop2", "spellClose2"] as c
 /** "5 SECONDS!" shows this long as his ultimate comes (ms): a second longer than usual (Eric, Oct 14; FightBanner `long`). */
 export const PHASE2_ULT_BANNER_MS = 2800;
 
+/**
+ * Whether his phase 2 follows phase 1 won, on this device (solo): alone (Boss alone), or in a solo Crowd's boss final
+ * (Oct 14: it's always him there), whose other finalists take the other boards. Never a Solo raid (its 49 bots have no
+ * boards), and never online, where phase 2 isn't built yet: there phase 1 won is the crowd's victory.
+ */
+export function phase2Follows(o: { bossId: string | null | undefined; result: string | null | undefined; raid: boolean; raidBots: boolean; crowdFinal: boolean }): boolean {
+  if (o.bossId !== "recluse" || o.result !== "crowd" || RECLUSE_PHASE2.boards < 1) return false;
+  return o.raid ? !o.raidBots : o.crowdFinal;
+}
+
+/**
+ * Phase 2's other players (boards 1 on): those who fought phase 1 beside you, in the order given (a solo Crowd's
+ * finalists), then fresh bots (`fresh`: Boss alone's, every one) for any board still empty, each under an id of its own;
+ * one player a board, never more than the boards.
+ */
+export function phase2Mates(mates: readonly { id: string; name: string }[], boards: number, fresh: (n: number) => readonly { id: string; name: string }[]): { id: string; name: string }[] {
+  const kept = mates.slice(0, Math.max(0, boards - 1)).map((m) => ({ id: m.id, name: m.name }));
+  const need = Math.max(0, boards - 1 - kept.length);
+  const added = need ? fresh(need).map((b) => ({ id: kept.some((k) => k.id === b.id) ? `${b.id}-p2` : b.id, name: b.name })) : [];
+  return [...kept, ...added];
+}
+
 /** What the bots' engine must do: play at a strength (UciEngine), or its best (the test switch, ?win=1). */
 export interface Phase2BotEngine extends Phase2Engine {
   topMoves(fen: string, n: number): Promise<MoveScore[]>;

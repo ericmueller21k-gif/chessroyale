@@ -23,7 +23,7 @@ export type ModeChoiceId = GameMode | "raid";
 /**
  * How a Crowd 50 v 50 match ends (chosen by the pre-game vote):
  * - team: the top 8 play on, 4v4 with teammates taking turns, shrinking to 3v3 and then 2v2, which plays to the end
- * - boss: the top 10 team up on a fresh board against a boss (BOSS_BRAIN: Maia or Stockfish), which strikes down the weakest every few moves
+ * - boss: the top 4 team up on a fresh board against the Hidden Boss (Eric, Oct 14: always him, `crowdFinalBoss` in boss.ts)
  * - duel: the best player on each side plays 1v1 to the end
  */
 export type FinalFormat = "team" | "boss" | "duel";
@@ -90,7 +90,8 @@ export interface Settings {
   bossUnfinished: boolean;
   /**
    * Testing, admins only, Boss alone: `bossId` may be a boss hidden from players (BossDef.adminOnly: the Hidden Boss,
-   * Eric, Oct 14: "for testing available in boss mode with bots for now"). Off everywhere else, so he's never met there.
+   * Eric, Oct 14: "for testing available in boss mode with bots for now"). Off everywhere else. (The Crowd's boss final
+   * meets him for everyone without it: `crowdFinalBoss` in boss.ts.)
    */
   bossHidden?: boolean;
   /**
@@ -392,10 +393,14 @@ export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRo
  * Scores carry over all game (a stage is only one move long). 3 power-ups,
  * none earned.
  */
-/** Crowd 50 v 50 knockouts for each way to end: they leave 8 (team final), 10 (boss battle) or 2 (duel). */
+/**
+ * Crowd 50 v 50 knockouts for each way to end: they leave 8 (team final), 4 (the boss final, against the Hidden Boss) or
+ * 2 (duel); `crowdFinalists` says how many. The boss final's are the duel's cuts stopping at four (Eric, Oct 14: "the top
+ * four always battle versus [him]"; it was the top 10 against a random boss).
+ */
 export const CROWD_KNOCKOUTS: Record<FinalFormat, readonly number[]> = {
   team: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4],
-  boss: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 2],
+  boss: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2],
   duel: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2, 2],
 };
 /** Crowd "everyone moves": down to 4 for the 2v2 final. */
@@ -428,6 +433,14 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   stageBreakSeconds: 10,
   botThinkSeconds: [2, 14],
 };
+
+/**
+ * How many play a Crowd 50 v 50's ending (`format`): the lobby less every knockout (the team final 8, the boss final 4,
+ * the duel 2). The vote's cards, the FAQ and the screens take the number from here, never typed.
+ */
+export function crowdFinalists(format: FinalFormat, knockouts: Readonly<Record<FinalFormat, readonly number[]>> = CROWD_KNOCKOUTS, lobbySize = CROWD_SETTINGS.lobbySize ?? DEFAULT_SETTINGS.lobbySize): number {
+  return lobbySize - knockouts[format].reduce((a, b) => a + b, 0);
+}
 
 /**
  * Boss raid: everyone (up to 50, no bots) picks the crowd's moves together

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, DEFAULT_SETTINGS, LEAVING, isPlayable, maiaRatingFor } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, LEAVING, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
 import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
@@ -241,6 +241,46 @@ describe("the FAQ's numbers come from the settings", () => {
     const moved = section("modes", { ...FAQ_DEFAULTS, clockVote: { options, defaultOption: options.findIndex((o) => o.id === "rapid") } });
     expect(moved).toContain("Bullet 2+1 (2 minutes, +1 s a move, at most 8 s on a move)");
     expect(moved).toContain("Nobody voting means Rapid 10+5.");
+  });
+});
+
+describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Boss, the top 4)", () => {
+  const him = crowdFinalBoss()!;
+  it("names him (the roster's name) and the number who face him (the knockouts), never typed", () => {
+    const t = section("modes");
+    expect(t).toContain(`a boss battle (the top ${crowdFinalists("boss")} team up against ${him.name})`);
+    expect(t).toContain(`The Crowd's boss battle is always ${him.name}, for the last ${crowdFinalists("boss")} of a 50 v 50.`);
+    // No strikes in the Crowd's final: the strike line is the raid's only.
+    expect(t).toContain("until half the raid is left.");
+    // Other knockouts, another name: the words follow.
+    const renamed = BOSS_ROSTER.map((b) => (b.id === him.id ? { ...b, name: "A Powerful Foe" } : b));
+    const moved = section("modes", { ...FAQ_DEFAULTS, roster: renamed, crowdKnockouts: { ...CROWD_KNOCKOUTS, boss: CROWD_KNOCKOUTS.team } });
+    expect(moved).toContain("a boss battle (the top 8 team up against A Powerful Foe)");
+    expect(moved).not.toContain(him.name);
+  });
+
+  it("his block: met only in the Crowd's final; no God King help, no strikes; the bullet clock and his second phase, numbers from the settings", () => {
+    const t = section("boss-powers");
+    expect(anchorsOf(faqPage().sections.find((s) => s.id === "boss-powers")!.blocks)).toContain(`boss-${him.id}`);
+    expect(t).toContain(`Met only in the Crowd's boss final, where it's always him, against the top ${crowdFinalists("boss")}.`);
+    expect(t).toContain(`full as turn ${BOSS_POWERS.bulletTurn} begins`);
+    expect(t).toContain(`every bank is ${BOSS_POWERS.bulletBankSeconds / 60} minute`);
+    expect(t).toContain(`${RECLUSE_PHASE2.boards} boards of Chess960 at once`);
+    expect(t).toContain(`against Stockfish at ${RECLUSE_PHASE2.elo}`);
+    expect(t).toContain("online, that's the crowd's victory");
+    // "Still to come" lists only bosses without their art and powers.
+    expect(t).toMatch(/Still to come/);
+    expect(t.slice(t.indexOf("Still to come"))).not.toContain(him.name);
+    const moved = section("boss-powers", { ...FAQ_DEFAULTS, powers: { ...BOSS_POWERS, bulletTurn: 9 }, phase2: { ...RECLUSE_PHASE2, slowMovesForUlt: 6 } });
+    expect(moved).toContain("full as turn 9 begins");
+    expect(moved).toContain("the team's 6th brings his last power");
+  });
+
+  it("his strength and brain are fixed (the Crowd's battle no longer follows the finalists' ratings); the God King can't help against him", () => {
+    const t = section("boss-brain");
+    expect(t).toContain(`The Crowd's boss battle is always ${him.name}, whose strength is fixed at ${fixedLevel()}`);
+    expect(t).toContain(`Maia at its top rating, ${maiaTopRating()}, with no guard`);
+    expect(section("god-king")).toContain(`His help doesn't work against ${him.name}, the Crowd's boss`);
   });
 });
 

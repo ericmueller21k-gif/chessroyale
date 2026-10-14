@@ -6,6 +6,7 @@ import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type Ju
 import {
   MatchRunner,
   BOT_NAMES,
+  bossRules,
   botRoster,
   bossIntroTimeline,
   bossTurnShowMs,
@@ -1071,6 +1072,9 @@ export class LobbyCore {
       case "king": {
         const round = this.r.round;
         if (this.r.phase !== "play" || round?.key !== msg.key || !this.runner?.boss?.kingCharges || !this.runner.player(playerId)?.alive) return;
+        // (A boss the God King's help doesn't work against, the Hidden Boss: a call is never a turn, a strike or a tally.
+        // The caller's own app has him mock it.)
+        if (bossRules(this.runner.boss)?.blocksKing) return;
         if (msg.strike) return this.callStrike(playerId);
         // Calling the King to play the move is this player's whole turn: no move of their own.
         if (this.doneThisRound(playerId)) return;
@@ -1325,8 +1329,8 @@ export class LobbyCore {
 
   // ---------------- Boss battle ----------------
 
-  private bossMessage(until: number, opts: { thinking?: boolean; justKilled?: string | null } = {}): Outgoing {
-    return { t: "boss", boss: this.runner!.bossView(opts.justKilled ?? null)!, standings: this.standings(), until, ...(opts.thinking ? { thinking: true } : {}) };
+  private bossMessage(until: number, opts: { thinking?: boolean; justKilled?: string | null; fall?: boolean } = {}): Outgoing {
+    return { t: "boss", boss: this.runner!.bossView(opts.justKilled ?? null)!, standings: this.standings(), until, ...(opts.thinking ? { thinking: true } : {}), ...(opts.fall ? { fall: true } : {}) };
   }
 
   /** The boss's turn: everyone sees it thinking while the host's engine plays its move. */
@@ -1533,6 +1537,16 @@ export class LobbyCore {
       }
       if (runner.stageComplete()) {
         runner.finishBossBattle();
+        // Beaten, a boss with a fall (the Hidden Boss, BossRules.fallMs): the board holds while he collapses and mumbles,
+        // as solo's does, then the results (this again, the match over). Online he has no phase 2 yet: phase 1 won is the
+        // crowd's victory.
+        const fallMs = runner.boss.result === "crowd" ? bossRules(runner.boss)?.fallMs : undefined;
+        if (fallMs) {
+          this.r.phase = "boss";
+          const until = this.io.now() + fallMs;
+          this.broadcast(this.bossMessage(until, { fall: true }));
+          return this.setTimer("nextRound", until);
+        }
         return this.finishMatch();
       }
       // (Hollow's Lights out and Big Boy's Big Bounce come at the start of his turn, before his move.)
@@ -2846,6 +2860,8 @@ export class LobbyCore {
       standings: this.standings(),
       ...(this.settings.mode === "crowd" ? { gameWinner: runner.gameWinner() } : {}),
       ...(runner.boss?.result ? { bossResult: runner.boss.result } : {}),
+      // (The Hidden Boss's bullet clock ran out: he won on time. Read in the same event as the battle ended.)
+      ...(runner.bossTimedOut ? { timeout: true } : {}),
       // Whether it counted for ranking (the results say so in words).
       ranked: this.ranked(),
     };

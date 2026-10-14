@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, RAID_SETTINGS as R, BOSS_TIERS, PREGAME_VOTES } from "@chessroyale/core";
+import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, RAID_SETTINGS as R, BOSS_TIERS, PREGAME_VOTES, crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
@@ -47,6 +47,9 @@ export function HowToPlay() {
   const HIGH = BOSS_TIERS[BOSS_TIERS.length - 1]!;
   // The clock vote's time controls, from the vote's own data.
   const speed = PREGAME_VOTES.find((v) => v.id === "speed")!;
+  // The endings: how many play each (the knockouts), the boss final's boss by its roster name (the Hidden Boss).
+  const teamSizes = S.teamFinalSizes.map((x) => `${x}v${x}`);
+  const finalBoss = crowdFinalBoss()?.name ?? "a boss";
   return (
     <div class="fd-rules">
       <h3>Crowd · 50 v 50</h3>
@@ -68,8 +71,8 @@ export function HowToPlay() {
         </li>
         <li>
           <strong>You vote on the ending.</strong> Before the first move everyone drags their own pawn into a zone (or taps a card): a team
-          final (top 8 play 4v4, 3v3, then 2v2 to the end), a boss battle (top 10 against a boss) or a duel (the best of each side,
-          1v1). You have {S.voteSeconds} seconds; if you don't vote, you go with the crowd (the most popular choice). Winning the game goes on
+          final (top {crowdFinalists("team")} play {teamSizes.slice(0, -1).join(", ")}, then {teamSizes.at(-1)} to the end), a boss battle (top{" "}
+          {crowdFinalists("boss")} against {finalBoss}) or a duel (the best of each side, 1v1). You have {S.voteSeconds} seconds; if you don't vote, you go with the crowd (the most popular choice). Winning the game goes on
           your record; your own move quality places you.
         </li>
         <li>

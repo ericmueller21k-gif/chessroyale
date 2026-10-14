@@ -28,6 +28,11 @@ import { BossHeading } from "./Play.tsx";
 import { ordinal } from "./StageBreak.tsx";
 import { CRITICAL, bossVoice } from "../speech.tsx";
 import { kingBlocked } from "../components/Recluse.tsx";
+import { crowdFinalists } from "@chessroyale/core";
+
+/** The Crowd's boss final as it starts: how many face the boss (crowdFinalists: the top 4), as a word. */
+const NUMBER_WORDS = ["None", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
+export const finalistsLine = (n = crowdFinalists("boss")) => `${NUMBER_WORDS[n] ?? n} of you vs the boss.`;
 
 /** For the raid's opening roulette: famous lines flicking past before the real one lands. */
 const ROULETTE = [
@@ -372,7 +377,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                   {boss.icon} <strong>{snackLine(boss)}</strong>
                 </>
               ) : intro ? (
-                <strong>{boss.raid ? "All of you vs the boss." : "Ten of you vs the boss."}</strong>
+                <strong>{boss.raid ? "All of you vs the boss." : finalistsLine()}</strong>
               ) : fall ? (
                 // (Beaten, the Hidden Boss collapses and mumbles before the result.)
                 <>

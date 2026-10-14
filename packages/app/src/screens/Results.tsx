@@ -7,7 +7,7 @@ import { ordinal } from "./StageBreak.tsx";
 import { GodKingEpilogue, LastStandCard } from "../components/LastStand.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { ChatSection } from "../components/QuickChat.tsx";
-import { rankedMinHumans } from "@chessroyale/core";
+import { crowdFinalists, rankedMinHumans } from "@chessroyale/core";
 import { BossCharacter, hasCharacter } from "../components/BossCharacter.tsx";
 import { FlagIcon } from "../components/MatchMenu.tsx";
 
@@ -27,8 +27,9 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
   const onTime = match.phase.kind === "results" && !!match.phase.timeout;
   // (The Hidden Boss's phase 2: how many of the four boards were won.)
   const simul = match.phase.kind === "results" ? match.phase.simul : undefined;
-  // Boss battle: those still standing at the end share the result.
-  const survived = !!match.boss && !match.boss.kills.some((k) => match.isYou(k.id)) && placement <= 10;
+  // Boss battle: those still standing at the end share the result (a raid's whole crowd fought; the Crowd's, its
+  // finalists: crowdFinalists, the top 4).
+  const survived = !!match.boss && !match.boss.kills.some((k) => match.isYou(k.id)) && (match.boss.raid || placement <= crowdFinalists("boss"));
   const me = standings.find((s) => s.isYou);
   const scariest = standings
     .filter((s) => s.rating !== null)

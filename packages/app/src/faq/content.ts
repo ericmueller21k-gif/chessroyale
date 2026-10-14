@@ -33,6 +33,7 @@ import {
   PURITY_BANDS,
   RAID_SETTINGS,
   RANKING,
+  RECLUSE_PHASE2,
   RATING_MIN_MOVES,
   SHOP_FREE,
   SQUADS,
@@ -41,7 +42,11 @@ import {
   bossBrainFor,
   bossStrength,
   bossStumbleChance,
+  crowdFinalBoss,
+  crowdFinalists,
+  fixedLevel,
   isPlayable,
+  maiaTopRating,
   kingCharges,
   lastStandBar,
   liveStrip,
@@ -91,6 +96,8 @@ export interface FaqSources {
   leaving: { awayMs: number };
   /** Squads' "Jump to my next board" (Relay): on for a device that hasn't set it. */
   squadsWatching: { jumpToNext: boolean };
+  /** The Hidden Boss's second phase (the Crowd's boss final, solo): its boards, clock and ultimate. */
+  phase2: typeof RECLUSE_PHASE2;
 }
 
 export const FAQ_DEFAULTS: FaqSources = {
@@ -119,6 +126,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   clockVote: PREGAME_VOTES.find((v) => v.id === "speed")!,
   leaving: LEAVING,
   squadsWatching: SQUADS_LOBBY.watching,
+  phase2: RECLUSE_PHASE2,
 };
 
 // ---------------- Numbers as words ----------------
@@ -171,6 +179,9 @@ function modes(src: FaqSources): FaqSection {
   const timeControls = V.options.map((o) => `**${o.label}** (${timeControl(o.patch)})`);
   const teamSizes = S.teamFinalSizes.map((x) => `${x}v${x}`);
   const clocks = squadsClocks(Q);
+  // The boss final's boss (Eric, Oct 14: always the Hidden Boss), by his roster name, linked to his block.
+  const finalBoss = crowdFinalBoss(src.roster);
+  const finalFoe = finalBoss ? `[${finalBoss.name}](#boss-${finalBoss.id})` : "a boss, with the God King";
   return {
     id: "modes",
     title: "The modes",
@@ -180,7 +191,7 @@ function modes(src: FaqSources): FaqSection {
 - **${C.lobbySize} players, one game of chess**, from the first move. Two teams of ${team}: your team plays White or Black all game.
 - Each turn, everyone on the side to move picks a move before the clock runs out, and the **most popular pick is played** (a tie is settled at random).
 - Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(C.firstStageRounds / 2, "move")}; after that, the lowest scorers are cut after every move, the same number from each team. Scores carry over all game.
-- **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss battle (the top ${left(src.crowdKnockouts.boss)} team up against a boss, with the God King) or a duel (the best of each side, 1v1). Then on the clock.
+- **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss battle (the top ${left(src.crowdKnockouts.boss)} team up against ${finalFoe}) or a duel (the best of each side, 1v1). Then on the clock.
 - **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. Without the vote (Everyone moves, or Pre-game votes off) it's ${timeControl(C)}; a boss raid is ${timeControl(R)}.
 - **${n(C.powerUpsAtStart, "power-up")}** each: a power-up shows the engine's top 3 moves for that turn.
 - **Everyone moves** (Settings, Crowd) is the other way to play: everyone picks for whichever side is to move, down to a 2v2 final of the last ${left(src.everyoneKnockouts)}. It's for solo games and lobbies you create; PLAY is always 50 v 50.
@@ -189,11 +200,11 @@ function modes(src: FaqSources): FaqSection {
 ### Boss raid and Boss alone {#mode-boss}
 
 - **Boss raid:** up to ${R.lobbySize} players pick the crowd's moves together against a [boss](#boss-brain); the most popular pick is played. Most bosses start from a named opening, ${n(R.openingMoves, "move")} in. An online raid is people only; a Solo raid fills the other seats with bots.
-- **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} it knocks out the player who gave away the most points since its last strike (a missed move counts as ${n(S.finalMissLoss, "point")}), until half the raid is left (in the Crowd's boss battle, until ${S.bossMinSurvivors} are left).
+- **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} it knocks out the player who gave away the most points since its last strike (a missed move counts as ${n(S.finalMissLoss, "point")}), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss battle, until ${S.bossMinSurvivors} are left)`}.
 - **The God King** fights on your side, with ${n(S.kingChargesMax, "charge")} ([more on him](#god-king)).
 - The battle ends in checkmate or a draw, or after ${n(S.bossMaxMoves, "crowd move")}, when the engine judges the position.
 - **Boss alone:** just you against a boss you choose from the boss menu, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move.
-- **The Crowd's boss battle** is the same fight for the last ${left(src.crowdKnockouts.boss)} of a 50 v 50.
+- **The Crowd's boss battle** is ${finalBoss ? `always ${finalFoe}, for` : "the same fight for"} the last ${left(src.crowdKnockouts.boss)} of a 50 v 50.${finalBoss ? " He's met nowhere else." : ""}
 
 ### Squads {#mode-squads}
 
@@ -357,6 +368,9 @@ function bossBrain(src: FaqSources): FaqSection {
   const playable = src.roster.filter(isPlayable);
   const bossById = (id: string) => playable.find((b) => b.id === id) ?? playable[0]!;
   const finalists = src.crowd.lobbySize - sum(src.crowdKnockouts.boss);
+  // The Crowd's boss final (always the Hidden Boss): his brain and strength are fixed (BOSS_BRAIN.fixed).
+  const finalBoss = crowdFinalBoss(src.roster);
+  const fixed = finalBoss && M.fixed[finalBoss.id] ? finalBoss : null;
   const floor = bossStrength(-1e9, null);
   const ceiling = bossStrength(1e9, null);
   // The worked example: a player rated 1750.
@@ -439,7 +453,11 @@ A boss's strength is a rating on Stockfish's scale, set as the battle starts:
 
 - **A boss raid** is matched to the people in it (bots never count): the boss comes in at the weakest of its tiers that's stronger than their average rating. The tiers: ${tiers.join(", ")}.
 - **A Solo raid and Boss alone** work the same way from your own rating (unrated, ${src.priorRating}).
-- **The Crowd's boss battle** comes from how the people among the last ${finalists} played that match (bots count only if no person is left among them): a weighted average of their ratings (the best counts ${finalists} times, the next ${finalists - 1}, down to the weakest once), ${S.bossEloOffset < 0 ? "minus" : "plus"} ${Math.abs(S.bossEloOffset)} (a crowd picking together plays better than its average member), kept within ${range(S.bossEloRange)}. The weighting makes it a real fight for the best players.
+${
+  fixed
+    ? `- **The Crowd's boss battle** is always ${fixed.name}, whose strength is fixed at ${fixedLevel(M)}, whatever anyone's rating: no tier, offset or difficulty ([his block](#boss-${fixed.id})).`
+    : `- **The Crowd's boss battle** comes from how the people among the last ${finalists} played that match (bots count only if no person is left among them): a weighted average of their ratings (the best counts ${finalists} times, the next ${finalists - 1}, down to the weakest once), ${S.bossEloOffset < 0 ? "minus" : "plus"} ${Math.abs(S.bossEloOffset)} (a crowd picking together plays better than its average member), kept within ${range(S.bossEloRange)}. The weighting makes it a real fight for the best players.`
+}
 - Then each boss's **offset** is added: bosses with nastier powers play a little weaker underneath.
 - **Boss alone** adds your difficulty too: ${diffs}.
 - The result always stays between ${floor} and ${ceiling}.
@@ -483,7 +501,9 @@ ${maiaNote}
 3. A **guard**, where there is one ([the bridge](#handover)), may veto that move, judged against the boss's own Stockfish search of its best moves (a move outside that search is turned down). Maia's next likeliest moves are then tried in turn (at most ${M.candidates} in all, each at least ${pct(M.minP, 0)} likely); if none passes, the boss plays Stockfish's best.
 4. If Maia hasn't loaded, fails, or takes more than ${num(M.timeoutMs / 1000)} s (an older phone, say), the boss plays its usual Stockfish move. Nobody ever waits for it.
 
-A Maia boss doesn't slip on purpose: its own mistakes take the slips' place. Its special moments keep their own engine picks: the move it makes when the God King strikes it, Boingo's move for the crowd as his funhouse comes, Hollow's extra move after Lights out and Big Boy's Big Bounce.
+${fixed ? `**${fixed.name}** has a brain of his own: Maia at its top rating, ${maiaTopRating(M)}, with no guard and none of Stockfish's moves, whatever the crowd (Stockfish only while Maia loads, or where it can't run).
+
+` : ""}A Maia boss doesn't slip on purpose: its own mistakes take the slips' place. Its special moments keep their own engine picks: the move it makes when the God King strikes it, Boingo's move for the crowd as his funhouse comes, Hollow's extra move after Lights out and Big Boy's Big Bounce.
 
 | Guard | Never gives away more than | Nor more log-odds than |
 |---|---|---|
@@ -496,7 +516,7 @@ Maia runs in your browser as its own program, under the AGPL-3.0, and [its sourc
 
 ### The handover: from Maia to Stockfish {#handover}
 
-A boss's strength is on Stockfish's scale, the one your rating is on; Maia's ratings are on a human scale, and the two don't line up one to one. So a Maia boss plays at a Maia rating that rises with its **level**, along straight lines. The level is the boss's strength${margin ? `, plus ${num(margin)} when a crowd plays it (a raid or the Crowd's boss battle: a crowd voting together plays above its average member); in Boss alone it's the strength itself` : ""}.
+A boss's strength is on Stockfish's scale, the one your rating is on; Maia's ratings are on a human scale, and the two don't line up one to one. So a Maia boss plays at a Maia rating that rises with its **level**, along straight lines. The level is the boss's strength${margin ? `, plus ${num(margin)} when a crowd plays it (a raid${fixed ? "" : " or the Crowd's boss battle"}: a crowd voting together plays above its average member); in Boss alone it's the strength itself` : ""}.
 
 $ level = strength${margin ? ` + ${num(margin)} (a crowd)` : ""}
 ${lines.join("\n")}
@@ -593,10 +613,30 @@ Plays from the starting position. His first move, after yours, is the **long pul
 - **SHOWDOWN!** (ultimate): Wrangler has a meter of his own instead of the rage meter. His moves fill it, ${n(p.showdownMeterTurns, "move")} from empty to full, and nothing else adds to it. When it's full he says "I've got you in my sights." and swings both ropes. From then on, after the first of his moves where he finds a line-up that suits him, he fires with no other warning: three pairs facing each other anywhere on the board off the back ranks, a rook against a rook, a bishop against a bishop and a knight against a knight (two pairs when three won't work; never queens). His pieces are always protected. **Your next move must be one of the duels**: one of your pieces takes the one facing it. The duels glow, and nothing else can be played. The engine sets it up so that even the right duel leaves the game about where it was or tips it his way (${p.showdownEdge[0] < 0 ? `from ${num(-p.showdownEdge[0])} of a pawn your way to ${num(p.showdownEdge[1])} his way` : `${num(p.showdownEdge[0])} to ${num(p.showdownEdge[1])} of a pawn his way`}), and a wrong one costs you ${num(p.showdownTrap)} pawns or more on top, so look before you take. He answers your duel with the engine's best move, and keeps playing the engine's moves while pieces from the line-up can still be taken (up to ${n(p.showdownEngineMoves, "move")}). Then his meter empties and fills again: at most ${n(p.showdownMax, "showdown")} a battle.`,
 };
 
+/**
+ * The Crowd's boss final's boss (Eric, Oct 14: always the Hidden Boss, met nowhere else by players): his opening, his
+ * passive and ultimate, and his second phase, every number from the settings (BOSS_POWERS, RECLUSE_PHASE2, BOSS_BRAIN).
+ */
+function crowdFinalBlock(src: FaqSources, b: BossDef): string {
+  const p = src.powers;
+  const P = src.phase2;
+  const n2 = crowdFinalists("boss", src.crowdKnockouts, src.crowd.lobbySize);
+  const clock = (sec: number) => (sec % 60 ? `${num(sec)} s` : n(sec / 60, "minute"));
+  const increment = ", and nothing adds time";
+  return `
+Met only in the Crowd's boss final, where it's always him, against the top ${n2}. He plays from the starting position (he has no memorized openings), with the crowd as White, and his strength never follows anyone's rating: Maia at its top, raw ([how strong](#boss-strength)).
+
+- **No help** (passive): the God King's help doesn't work against him: his move, his strike and his Last Stand never come. Calling him spends a charge all the same, and ${b.name} mocks it. He never strikes anyone down either: all ${n2} of you play to the end.
+- **Bullet** (ultimate): a meter of his own, full as turn ${p.bulletTurn} begins, when it comes with no warning. From then on every bank is ${clock(p.bulletBankSeconds)}, with no cap on a move${increment}. If everyone still in runs out of time, he wins on time.
+- **Beaten:** online, that's the crowd's victory. In a Solo game, if you reached him, his second phase follows: ${n(P.boards, "board")} of Chess960 at once, each from its own start, you on one and the bots who reached him with you on the rest, against Stockfish at ${num(P.elo)}. ${clock(P.bankSeconds)} a board with no added time, and a board whose clock runs out is lost; all ${num(P.boards)} must be won. A move slower than ${num(P.slowMoveSeconds)} s counts against the team, and the team's ${ordinal(P.slowMovesForUlt)} brings his last power: from then on ${num(P.ultMoveSeconds)} s a move on every board, and a move out of time is played at random for you.`;
+}
+
 function bossPowers(src: FaqSources): FaqSection {
   const p = src.powers;
   const playable = src.roster.filter(isPlayable);
-  const later = src.roster.filter((b) => !playable.includes(b)).map((b) => b.name);
+  // (Still to come: those without their art and powers. The Crowd's boss final's boss has his own block, after the rest.)
+  const later = src.roster.filter((b) => b.kit === null || b.powers === null).map((b) => b.name);
+  const finalBoss = crowdFinalBoss(src.roster);
   const level = Math.ceil(p.rageFull / (p.ragePerMove || 1));
   const ahead = Math.ceil(p.rageFull / (p.ragePerMove + p.rageAheadMax || 1));
   const queen = 9 * p.ragePerMaterial >= p.rageFull;
@@ -607,6 +647,7 @@ function bossPowers(src: FaqSources): FaqSection {
       const words = BOSS_BLOCKS[b.id];
       return `### ${b.name} {#boss-${b.id}}\n${words ? words(p, b) : ""}`;
     })
+    .concat(finalBoss && !playable.includes(finalBoss) ? [`### ${finalBoss.name} {#boss-${finalBoss.id}}\n${crowdFinalBlock(src, finalBoss)}`] : [])
     .join("\n\n");
   return {
     id: "boss-powers",
@@ -650,6 +691,8 @@ ${later.length ? `\n### Still to come {#bosses-later}\n\n${n(later.length, "more
 
 function godKing(src: FaqSources): FaqSection {
   const S = src.settings;
+  // (The Crowd's boss final's boss, the Hidden Boss: the God King's help doesn't work against him.)
+  const finalBoss = crowdFinalBoss(src.roster);
   const bar = (best: number, moves: number, charges: number) => (best * 100 < S.lastStandFrom ? "no save" : num(lastStandBar(best, moves, charges, S), 1));
   // Sample positions: comfortable, the edge of the weak band, two inside it, and just under the no-save line.
   const mid = (S.lastStandFrom + S.lastStandShareBelow) / 200;
@@ -669,7 +712,7 @@ function godKing(src: FaqSources): FaqSection {
     body: `
 ### Who he is {#king-who}
 
-The crowd's champion in every boss battle: raids, the Crowd's boss battle and Boss alone. He stands by the board in your side's colors, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you.
+The crowd's champion in every boss battle: raids, the Crowd's boss battle and Boss alone. He stands by the board in your side's colors, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you.${finalBoss ? ` His help doesn't work against [${finalBoss.name}](#boss-${finalBoss.id}), the Crowd's boss: calling him there only spends a charge.` : ""}
 
 ### Strike or play: his charges {#king-charges}
 

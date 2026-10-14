@@ -627,8 +627,12 @@ export type ServerMessage = { now: number } & (
   | { t: "vote"; vote: NetVote; standings: NetStanding[] }
   /** A human's vote in the open vote. */
   | { t: "voteCast"; key: string; playerId: string; option: number; at: number; side: "w" | "b" }
-  /** Boss battle: the boss's move or strike (`until`: when the next crowd move starts). */
-  | { t: "boss"; boss: NetBoss; standings: NetStanding[]; until: number; thinking?: boolean; intro?: boolean }
+  /**
+   * Boss battle: the boss's move or strike (`until`: when the next crowd move starts). `fall`: beaten, a boss with a fall
+   * (the Hidden Boss, BossRules.fallMs) collapses on the board until `until`, then the results come (an older app shows
+   * the board with the result in it meanwhile).
+   */
+  | { t: "boss"; boss: NetBoss; standings: NetStanding[]; until: number; thinking?: boolean; intro?: boolean; fall?: boolean }
   /**
    * Hollow's dark, to the player who tried: `ok` the attempt was legal and is their pick (`move`, as played); else it
    * cost darkTryCost (`tries` wrong so far this turn) and they pick again, or (`out`) their turn is over, as a miss.
@@ -702,6 +706,8 @@ export type ServerMessage = { now: number } & (
       gameWinner?: "w" | "b" | null;
       /** Boss battle: who won it. */
       bossResult?: "crowd" | "boss" | "draw";
+      /** Boss battle: the boss won on time (the Hidden Boss's bullet clock ran out). Missing: not on time, or an older server. */
+      timeout?: boolean;
       /** It counted for ranking (real players filled at least RANKING.rankedMinHumanShare of the seats). Missing: an older server. */
       ranked?: boolean;
     }

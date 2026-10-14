@@ -1,5 +1,6 @@
 import type { Rng } from "./rng.ts";
-import { CROWD_KNOCKOUTS, type Settings } from "./settings.ts";
+import { crowdFinalBoss } from "./boss.ts";
+import { CROWD_KNOCKOUTS, crowdFinalists, type Settings } from "./settings.ts";
 
 /**
  * Crowd 50 v 50's pre-game votes. Before the first move, everyone (both teams) votes by dragging their own pawn into
@@ -81,6 +82,23 @@ function speedVote(): PregameVote {
   return { id: "speed", title: "How fast?", defaultOption: optionIndex(options, "blitz"), options };
 }
 
+/**
+ * The boss final's card (Eric, Oct 14: "instead of saying boss raid it'll say hidden boss"): the boss it always meets
+ * (crowdFinalBoss: the Hidden Boss), named and drawn as the roster has him, so renaming him is one edit there; the blurb
+ * says how many face him (crowdFinalists: the top 4) without naming him again. With no such boss: a random one.
+ */
+function bossFinalOption(): VoteOption {
+  const boss = crowdFinalBoss();
+  const n = crowdFinalists("boss");
+  return {
+    id: "boss",
+    icon: boss?.icon ?? "👹",
+    label: boss?.name ?? "Boss battle",
+    blurb: boss ? `Top ${n} team up against him` : `Top ${n} team up against a boss`,
+    patch: { finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss },
+  };
+}
+
 /** "How does it end?": its listed order, fixed. Nobody votes: Team final, by its id. */
 function formatVote(): PregameVote {
   const options: VoteOption[] = [
@@ -91,13 +109,7 @@ function formatVote(): PregameVote {
       blurb: "Top 8 play on: 4v4, 3v3, then 2v2 to the end",
       patch: { finalFormat: "team", knockoutsPerStage: CROWD_KNOCKOUTS.team },
     },
-    {
-      id: "boss",
-      icon: "👹",
-      label: "Boss battle",
-      blurb: "Top 10 team up against a boss",
-      patch: { finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss },
-    },
+    bossFinalOption(),
     {
       id: "duel",
       icon: "⚔️",

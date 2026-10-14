@@ -621,8 +621,12 @@ export class NetMatch implements GameView {
       case "vote": {
         this.standingsList = m.standings;
         const v = m.vote;
-        // (The crowd voted for a boss battle at the end: Maia's files ahead, on a device that may play it.)
-        if (v.result !== null && PREGAME_VOTES[v.index]?.options[v.result]?.patch.finalFormat === "boss") this.maiaAhead();
+        // The vote's result sets the rest of the match, as on the server (how it ends: what the last cut leads to, the
+        // leaderboard's cut line; the clock). The crowd voted for the boss final: Maia's files ahead, on a device that may
+        // play him with it.
+        const won = v.result !== null ? PREGAME_VOTES[v.index]?.options[v.result] : undefined;
+        if (won) this.settings = { ...this.settings, ...won.patch };
+        if (won?.patch.finalFormat === "boss") this.maiaAhead();
         this.voteState = { ...v, startsAt: this.local(v.startsAt), until: this.local(v.until), votes: v.votes.map((x) => ({ ...x, at: this.local(x.at) })), ...(v.nextAt ? { nextAt: this.local(v.nextAt) } : {}) };
         // Keep your own vote if the server's copy hasn't caught up yet.
         if (this.myVoteLocal && this.myVoteLocal.key === v.key && !this.voteState.votes.some((x) => x.playerId === this.myId)) {
@@ -646,7 +650,8 @@ export class NetMatch implements GameView {
         this.standingsList = m.standings;
         this.currentBoard = m.boss.board;
         this.lights = null;
-        return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro });
+        // (`fall`: beaten, the Hidden Boss collapses on the board until the results come.)
+        return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro, ...(m.fall ? { fall: true } : {}) });
       case "darkTry": {
         if (m.key !== this.key || this.phase.kind !== "play") return;
         if (m.ok) {
@@ -714,7 +719,16 @@ export class NetMatch implements GameView {
 
   private showResults(m: Extract<ServerMessage, { t: "results" }>) {
     const placement = (this.myId && m.placements[this.myId]) || this.placement || this.totalPlayers;
-    this.setPhase({ kind: "results", placement, winner: m.winner, youWon: placement === 1, gameWinner: m.gameWinner, ...(m.bossResult ? { bossResult: m.bossResult } : {}) });
+    this.setPhase({
+      kind: "results",
+      placement,
+      winner: m.winner,
+      youWon: placement === 1,
+      gameWinner: m.gameWinner,
+      ...(m.bossResult ? { bossResult: m.bossResult } : {}),
+      // (The Hidden Boss's bullet clock ran out: he won on time.)
+      ...(m.timeout ? { timeout: true } : {}),
+    });
   }
 
   private onReveal(m: Extract<ServerMessage, { t: "reveal" }>) {
