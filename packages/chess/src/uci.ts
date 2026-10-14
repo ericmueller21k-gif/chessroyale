@@ -71,6 +71,34 @@ export function parseInfo(line: string): InfoLine | null {
   };
 }
 
+/**
+ * Each line of a search, from its output: each move once, with the numbers of its own latest exact line. Read by
+ * MultiPV slot alone (a slot's last exact line), a move could come out twice and another not at all: Stockfish
+ * re-sorts its lines as it deepens, and a search cut off mid-line prints that slot as a bound (skipped), so the slot's
+ * last exact line can be from an earlier depth, naming a move that has since moved to another slot (about 1 search
+ * in 5 of the judge's top 8 at 250k nodes). The moves are the ones in the last line printed for each slot, bound lines
+ * included, in the slots' order; a search with no such mix-up reads exactly as before.
+ */
+export function searchLines(lines: readonly string[]): InfoLine[] {
+  const exactSlots = new Map<number, string>();
+  const lastSlots = new Map<number, string>();
+  const exact = new Map<string, InfoLine>();
+  const bound = new Map<string, InfoLine>();
+  for (const l of lines) {
+    const info = parseInfo(l);
+    const any = info ?? parseInfo(l.replace(/ (?:lower|upper)bound/, ""));
+    if (!any) continue;
+    lastSlots.set(any.multipv, any.move);
+    if (info) {
+      exactSlots.set(info.multipv, info.move);
+      exact.set(info.move, info);
+    } else bound.set(any.move, any);
+  }
+  const bySlot = (slots: Map<number, string>) => [...slots].sort((a, b) => a[0] - b[0]).map(([, move]) => move);
+  const listed = new Set(lastSlots.values());
+  return [...new Set([...bySlot(exactSlots), ...bySlot(lastSlots)])].filter((m) => listed.has(m)).map((m) => exact.get(m) ?? bound.get(m)!);
+}
+
 /** The speed check's position: a quiet Italian middlegame. */
 const SPEED_FEN = "r1bq1rk1/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 4 6";
 
@@ -143,7 +171,7 @@ export class UciEngine {
     this.transport.send(`position fen ${fen}`);
   }
 
-  /** One fixed-budget search with a cleared hash. Returns the last score per line. */
+  /** One fixed-budget search with a cleared hash. Returns each line's latest score (searchLines). */
   private async search(fen: string, multipv: number, searchMoves?: readonly string[], nodes = this.options.nodes): Promise<MoveScore[]> {
     this.transport.send("ucinewgame");
     this.transport.send(`setoption name MultiPV value ${multipv}`);
@@ -153,13 +181,7 @@ export class UciEngine {
     this.transport.send(
       `go nodes ${nodes}` + (searchMoves?.length ? ` searchmoves ${searchMoves.join(" ")}` : ""),
     );
-    const lines = await done;
-    const last = new Map<number, InfoLine>();
-    for (const l of lines) {
-      const info = parseInfo(l);
-      if (info) last.set(info.multipv, info);
-    }
-    return [...last.values()].sort((a, b) => a.multipv - b.multipv).map(({ multipv: _, ...score }) => score);
+    return searchLines(await done).map(({ multipv: _, ...score }) => score);
   }
 
   /**
