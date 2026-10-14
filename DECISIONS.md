@@ -3011,3 +3011,13 @@ cover both states (`packages/app/test/maia-players.test.ts`, `faq.test.ts`, `bos
   every Maia line live when it's on), `maia-players.test.ts` and `boss-powers-lobby.test.ts` (with `forPlayers` on for
   the test: a player's boss on Maia by the same rule as an admin's, solo and online), and `e2e/maia.spec.ts` (the
   archives served as gzip files that hold the source, a tap saving one).
+
+### Maia for players: on (Eric, Oct 14, 2026)
+
+`BOSS_BRAIN.forPlayers` is on: every player's bosses play their normal moves with Maia-3 by the same rule admins had
+(`bossBrainFor`, `maiaRatingFor`, the guards by level, Stockfish from 2800), solo and online. Eric's go: "flip it", on
+Oct 14, after the Maia box's source went up on the site (#183). The session that published the source wasn't
+permitted to change the flag, so the director made this one-value change with Eric's explicit OK. A player's device
+now downloads the Maia model (24 MiB, cached) when a boss battle needs it; a device that can't run it plays
+Stockfish's move as before. The FAQ's Maia section reads as live (it follows the flag). Left for Eric: the real-phone
+check (`TESTING.md`, "Maia").

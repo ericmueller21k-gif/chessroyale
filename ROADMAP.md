@@ -219,12 +219,10 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
 
 ## Needs Eric
 
-- **Maia-3 bosses for players:** the source is published (done Oct 14: the site serves the Maia box's complete source
-  at `/engine/maia/maia-box-source.tar.gz`, and Stockfish's at `/engine/stockfish-source.tar.gz`; the credits, the FAQ
-  and `/licenses/third-party.txt` link them; DECISIONS.md, "The Maia box's source on the site"). What remains is yours:
-  approving `BOSS_BRAIN.forPlayers` on (one value; the session that published the source wasn't permitted to change
-  it), and your real-phone check (`TESTING.md`, "Maia"). Every boss is on Maia for admins already, calibrated against
-  bot crowds (DECISIONS.md, "Every boss on Maia"; `reports/maia-calibration.md`).
+- **Maia-3 bosses for players:** done Oct 14. The site serves the Maia box's complete source
+  (`/engine/maia/maia-box-source.tar.gz`) and Stockfish's (`/engine/stockfish-source.tar.gz`), and `BOSS_BRAIN.forPlayers`
+  is on (Eric: "flip it"), so every player's bosses play with Maia as admins' did. What remains is yours: the
+  real-phone check (`TESTING.md`, "Maia").
 - **privacy@hunchess.com:** forward it to yourself with Cloudflare Email Routing (free), or name another address.
 - **Workers Paid ($5 a month):** only when real traffic outgrows the free limits.
 - **Privacy policy and terms:** drafted at /privacy and /terms; Eric to read them over.

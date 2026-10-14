@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { Chess } from "chess.js";
 import { BOARD_SEL, createLobbyFromHome, engineTop, expectCoordsInSquares, test } from "./helpers.ts";
 
 /**
@@ -9,8 +10,12 @@ import { BOARD_SEL, createLobbyFromHome, engineTop, expectCoordsInSquares, test 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers ?? null).catch(() => null);
 
-/** Waits for your move, then plays the engine's best allowed move (a power-up's hints follow the same rules). */
-async function playBest(page: Page) {
+/**
+ * Waits for your move, then plays the engine's best allowed move (a power-up's hints follow the same rules). With
+ * `noMate`, the best one that doesn't mate: a test that needs the battle to last (bosses play Maia for players too, and
+ * a human-like boss can be mated sooner than Stockfish was).
+ */
+async function playBest(page: Page, noMate = false) {
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   await page.waitForTimeout(300);
   // (The engine's answer is polled for, never awaited inside the page: see engineTop.)
@@ -20,7 +25,23 @@ async function playBest(page: Page) {
     return { allowed: (m.boss?.powers?.allowed ?? null) as string[] | null, solo: !!m.runner };
   });
   // (Solo, the runner's are already the allowed moves, as the judge sees them; online, this device's engine's are filtered.)
-  const move = solo ? (top[0]?.move ?? null) : ((allowed ? top.find((t) => allowed.includes(t.move))?.move : top[0]?.move) ?? allowed?.[0] ?? null);
+  let move = solo ? (top[0]?.move ?? null) : ((allowed ? top.find((t) => allowed.includes(t.move))?.move : top[0]?.move) ?? allowed?.[0] ?? null);
+  if (noMate && move) {
+    const fen: string = await page.evaluate(() => (window as any).match.phase.board.fen);
+    const mates = (mv: string) => {
+      const c = new Chess(fen);
+      try {
+        c.move({ from: mv.slice(0, 2), to: mv.slice(2, 4), promotion: mv[4] ?? "q" });
+      } catch {
+        return false;
+      }
+      return c.isCheckmate();
+    };
+    if (mates(move)) {
+      const legal = (allowed ?? new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? "")));
+      move = top.map((t) => t.move).find((mv) => legal.includes(mv) && !mates(mv)) ?? legal.find((mv) => !mates(mv)) ?? move;
+    }
+  }
   if (allowed && move && !allowed.includes(move)) throw new Error(`hint ${move} isn't allowed`);
   await page.evaluate((mv) => {
     const m = (window as any).match;
@@ -379,7 +400,7 @@ test("Boingo's funhouse at every angle: a move by tap and a move by drag, the co
     const step = turn - [15, 11, 7, 4, 1].find((first) => turn >= first)!;
     if (step === 0) played.push(`${p.angle}:tap:${await playByHand(page, "tap", phone)}`);
     else if (step === 1) played.push(`${p.angle}:drag:${await playByHand(page, "drag", phone)}`);
-    else await playBest(page);
+    else await playBest(page, true);
   }
   expect(turns).toEqual([1, 2, ...Array.from({ length: 13 }, (_, i) => i + 4)]);
   const side = angles[5];

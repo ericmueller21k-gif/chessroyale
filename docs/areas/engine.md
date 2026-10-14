@@ -63,9 +63,9 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   - **Where:** every boss battle, solo (`startBrain` in `solo.ts`, the runner's `humanBrain`) and online (the lobby
     decides the battle's plan once, `bossBrainNow`; the host is told as the intro starts, `bossBrain`, and each boss
     request carries it; the host's device plays Maia's move and the server sends that one move to everyone).
-  - **Who:** players meet Stockfish until `forPlayers` is on (the source is published, Oct 14; the flip itself awaits
-    Eric's own approval, ROADMAP.md "Needs Eric"); an admin's device meets Maia on every boss in every mode, online in a
-    lobby of admins only (`MAIA_TEST=1` in `wrangler dev` for the e2e). A device that may not run Maia never downloads
+  - **Who:** everyone. `forPlayers` is on since Oct 14 (Eric: "flip it", once the source was published), so players
+    meet Maia by the same rule as admins, in every mode; admins also get the Brain picker and the debug line
+    (`MAIA_TEST=1` in `wrangler dev` for the e2e). A device that may not run Maia never downloads
     it and plays Stockfish's move as host. `forPlayers` is the only gate: on, a player's device runs the same rule
     (`maiaAllowed`, `soloBrain`; online `bossBrainNow`), with no admin's pick and no debug line.
   - **Loading:** the files are fetched ahead when a battle on Maia may come (the boss menu, a Solo raid's queue, a raid
