@@ -2,6 +2,8 @@
 // POST /score {fen, moves[], nodes} -> {moves: [{move, expected}]}: one search restricted to those moves,
 // the same numbers the game's own engine gives (expected score from Stockfish's win/draw/loss, mover's side).
 // One search at a time (Stockfish is single-threaded here); requests queue.
+// Chess960 positions (castling rooks named by file, Shredder-FEN: packages/chess/src/chess960.ts) are searched with
+// UCI_Chess960 on, castling written as the king taking its own rook (e1h1); normal positions exactly as before.
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 
@@ -60,11 +62,19 @@ async function ready() {
   await done;
 }
 
+// Whether UCI_Chess960 is on now, and whether a FEN is a Chess960 one (the same test as isChess960Fen).
+let chess960 = false;
+const isChess960Fen = (fen) => /[A-Ha-h]/.test(fen.split(" ")[2] ?? "");
+
 function score(fen, moves, nodes) {
   return serial(async () => {
     send("ucinewgame");
     send(`setoption name MultiPV value ${moves.length}`);
     await ready();
+    if (isChess960Fen(fen) !== chess960) {
+      chess960 = !chess960;
+      send(`setoption name UCI_Chess960 value ${chess960}`);
+    }
     send(`position fen ${fen}`);
     const done = until((l) => l.startsWith("bestmove"));
     send(`go nodes ${nodes} searchmoves ${moves.join(" ")}`);
@@ -77,7 +87,7 @@ function score(fen, moves, nodes) {
   });
 }
 
-const FEN = /^[1-8pnbrqkPNBRQK/]+ [wb] (-|[KQkq]+) (-|[a-h][36]) \d+ \d+$/;
+const FEN = /^[1-8pnbrqkPNBRQK/]+ [wb] (-|[KQkq]+|[A-Ha-h]+) (-|[a-h][36]) \d+ \d+$/;
 const UCI = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 
 createServer((req, res) => {

@@ -13,6 +13,7 @@ import {
   dragStarted,
   drawArrows,
   follow,
+  gestureMoves,
   pieceClass,
   pieceCloseTo,
   positionKey,
@@ -211,6 +212,85 @@ describe("the move dots", () => {
     expect(destsFor(START_FEN, undefined, ["e2"]).has("e2")).toBe(false);
     expect(destsFor(START_FEN, undefined, ["e3"]).get("e2") ?? []).toEqual([]);
     expect(destsFor(START_FEN, undefined, ["f3"]).get("g1")).toEqual(["h3"]);
+  });
+});
+
+describe("Chess960 castling on the board", () => {
+  // King b1 between rooks a1 and h1, the back rank otherwise empty, every right on (Shredder-FEN).
+  const open = "r5kr/pppppppp/8/8/8/8/PPPPPPPP/RK5R w HAha - 0 1";
+
+  it("the king's dots: onto either rook, and onto g1 (nothing else goes there); c1 stays an ordinary step", () => {
+    expect(destsFor(open).get("b1")!.sort()).toEqual(["a1", "c1", "g1", "h1"]);
+    expect(gestureMoves(open, undefined, "b1", "h1")).toEqual(["b1h1"]);
+    expect(gestureMoves(open, undefined, "b1", "g1")).toEqual(["b1h1"]);
+    expect(gestureMoves(open, undefined, "b1", "a1")).toEqual(["b1a1"]);
+    expect(gestureMoves(open, undefined, "b1", "c1")).toEqual(["b1c1"]);
+    expect(gestureMoves(open, undefined, "b1", "d1")).toEqual([]);
+  });
+
+  it("the edge cases: a swap, the king already on its square, and its rook standing on it", () => {
+    // King f1 and rook g1 swap: the rook's square is the king's square, one dot.
+    const swap = "6k1/8/8/8/8/8/8/5KR1 w G - 0 1";
+    expect(gestureMoves(swap, undefined, "f1", "g1")).toEqual(["f1g1"]);
+    expect(destsFor(swap).get("f1")!.filter((d) => d === "g1")).toEqual(["g1"]);
+    // King already on g1: only onto the rook.
+    const still = "6k1/8/8/8/8/8/8/6KR w H - 0 1";
+    expect(destsFor(still).get("g1")).toContain("h1");
+    expect(gestureMoves(still, undefined, "g1", "h1")).toEqual(["g1h1"]);
+    // King f1, rook h1: g1 is the king's ordinary step, so dragging there steps; onto the rook castles.
+    const step = "6k1/8/8/8/8/8/8/5K1R w H - 0 1";
+    expect(gestureMoves(step, undefined, "f1", "g1")).toEqual(["f1g1"]);
+    expect(gestureMoves(step, undefined, "f1", "h1")).toEqual(["f1h1"]);
+  });
+
+  it("only from the moves allowed: no castling dot when a screen leaves castling out", () => {
+    expect(destsFor(open, ["b1c1", "a2a3"]).get("b1")).toEqual(["c1"]);
+    expect(gestureMoves(open, ["b1c1", "a2a3"], "b1", "g1")).toEqual([]);
+  });
+
+  it("a tap on the king then its rook castles, and so does a drag onto the rook or onto g1", () => {
+    const pieces = readPieces(open);
+    const dests = destsFor(open);
+    const board: PressBoard = {
+      piece: (sq) => pieces.get(sq),
+      movable: (sq) => pieces.get(sq)?.[0] === "w",
+      canMove: (a, b) => a !== b && pieces.get(a)?.[0] === "w" && !!dests.get(a)?.includes(b),
+      interactive: true,
+    };
+    const tap = pressDown(board, "b1", "h1", 0, 0);
+    expect(tap.move).toEqual(["b1", "h1"]);
+    for (const to of ["h1", "g1"]) {
+      const down = pressDown(board, null, "b1", 0, 0, true);
+      const up = pressUp(board, down.selected, pressMove(down.press!, 300, 0, to), to);
+      expect(up.move).toEqual(["b1", to]);
+      expect(gestureMoves(open, undefined, "b1", to)).toEqual(["b1h1"]);
+    }
+  });
+
+  it("the king and the rook both slide, whichever way they go", () => {
+    let id = 1000;
+    const ids = () => id++;
+    const by = (list: BoardPiece[], sq: string) => list.find((p) => p.square === sq)!;
+    const a = follow([], readPieces(open), ids);
+    const short = follow(a.pieces, readPieces(applyMove(open, "b1h1")), ids);
+    expect(by(short.pieces, "g1").id).toBe(by(a.pieces, "b1").id);
+    expect(by(short.pieces, "f1").id).toBe(by(a.pieces, "h1").id);
+    const long = follow(a.pieces, readPieces(applyMove(open, "b1a1")), ids);
+    expect(by(long.pieces, "c1").id).toBe(by(a.pieces, "b1").id);
+    expect(by(long.pieces, "d1").id).toBe(by(a.pieces, "a1").id);
+    // The swap: each takes the other's square.
+    const swap = "6k1/8/8/8/8/8/8/5KR1 w G - 0 1";
+    const s0 = follow([], readPieces(swap), ids);
+    const s1 = follow(s0.pieces, readPieces(applyMove(swap, "f1g1")), ids);
+    expect(by(s1.pieces, "g1").id).toBe(by(s0.pieces, "f1").id);
+    expect(by(s1.pieces, "f1").id).toBe(by(s0.pieces, "g1").id);
+  });
+
+  it("a normal game's castling is untouched: e1g1, with no shortcuts", () => {
+    const f = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+    expect(gestureMoves(f, undefined, "e1", "g1")).toEqual(["e1g1"]);
+    expect(gestureMoves(f, undefined, "e1", "h1")).toEqual([]);
+    expect(destsFor(f).get("e1")!.sort()).toEqual(["c1", "d1", "d2", "e2", "f1", "f2", "g1"]);
   });
 });
 

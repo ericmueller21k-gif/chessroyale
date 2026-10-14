@@ -17,9 +17,9 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { BOARD } from "@chessroyale/core";
-import { applyMove, inCheck, legalMoves, pieceAt, sideToMove, touchesDark } from "@chessroyale/chess";
+import { applyMove, inCheck, pieceAt, sideToMove, touchesDark } from "@chessroyale/chess";
 import { BoardTurn, coordLabel, type QuarterTurn } from "../board-view.ts";
-import { BRUSHES, FILES, SLIDE_MS, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, pieceClass, pieceCloseTo, positionKey, pressDown, pressMove, pressUp, readPieces, slidePiece, squareAtPoint, stillRunning, type BoardPiece, type Box, type PieceCode, type Press, type PressBoard } from "./logic.ts";
+import { BRUSHES, FILES, SLIDE_MS, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, gestureMoves, pieceClass, pieceCloseTo, positionKey, pressDown, pressMove, pressUp, readPieces, slidePiece, squareAtPoint, stillRunning, type BoardPiece, type Box, type PieceCode, type Press, type PressBoard } from "./logic.ts";
 import type { BoardProps } from "./types.ts";
 
 let nextPieceId = 1;
@@ -249,7 +249,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
       if (piece?.type === "p" && !s.darkList.includes(from) && (to[1] === "8" || to[1] === "1")) return setPromotion({ from, to, dark: true });
       return acts.darkTry(from + to);
     }
-    const legal = (moves ?? legalMoves(s.fen)).filter((m) => m.startsWith(from + to));
+    const legal = gestureMoves(s.fen, moves, from, to);
     // (Hollow's dark takes a drop anywhere: an ordinary move that isn't on stays where it was.)
     if (!legal.length) return;
     landNext.current = dropped;

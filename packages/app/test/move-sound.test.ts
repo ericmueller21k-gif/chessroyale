@@ -18,6 +18,15 @@ describe("the knock as a move appears on the board", () => {
     expect(moveKnock(castle, after(castle, "e1g1"), "e1g1")).toBe("castle");
     expect(moveKnock(e4, e4, "e2e4")).toBeNull();
   });
+
+  it("Chess960's castling, written as the king taking its own rook, knocks as castling, not a capture", () => {
+    const open = "r5kr/pppppppp/8/8/8/8/PPPPPPPP/RK5R w HAha - 0 1";
+    expect(moveKnock(open, after(open, "b1h1"), "b1h1", true)).toBe("castle");
+    expect(moveKnock(open, after(open, "b1a1"), "b1a1")).toBe("castle");
+    expect(moveKnock(open, after(open, "b1c1"), "b1c1")).toBe("move");
+    const take = "r5kr/pppppp1p/8/8/8/8/PBPPPPPP/RK5R w HAha - 0 1";
+    expect(moveKnock(take, after(take, "b2h8"), "b2h8")).toBe("capture");
+  });
 });
 
 describe("a board that takes over from another screen (Eric, Oct 10: your move against Hollow made no sound)", () => {

@@ -3426,3 +3426,72 @@ style, layout and paint, and the screen's render; none alone brings them to 16.7
 
 **Testing.** Unit: `long-match.test.ts`. e2e (targeted lane: the boss view is read by every boss screen, solo and the
 lobby server): `perf.spec.ts`, every boss spec, `king-attack.spec.ts`, `resign.spec.ts`, `multiplayer.spec.ts`.
+
+### Chess960's rules: true Fischer Random castling, the rules foundation (Oct 14, 2026)
+
+The hidden boss's phase 2 is played in Fischer Random (Chess960), and Eric wants a true tribute, so it gets real
+Chess960 castling, not random back ranks with castling switched off (ROADMAP.md, "The hidden boss"). This is the rules
+foundation only: no boss, no screen and no phase change use it yet. Nothing changes for normal games.
+
+- **Our own small Chess960 rules, used only for Chess960 positions** (`packages/chess/src/chess960.ts`, about 540 lines with its comments).
+  chess.js 1.4 can't be extended cleanly: it hard-codes castling (the king from e1 two squares, rooks on a1 and h1) and
+  its FEN check refuses any castling field but KQkq. Wrapping it (its moves without castling, plus castling of our own)
+  was the other choice, but its public move list builds every move's SAN (about 1.8 ms a position), too slow to check
+  move generation to depth 4, and the fast path is a private method. So the rules are ours: move generation with
+  castling, making a move (a position is a value: "undo" is the one before, kept), SAN both ways, check, mate,
+  stalemate and the draws, the same checks in the same order as chess.js. Correctness is pinned by perft against the
+  published Chess960 numbers (all 960 of chessprogramming.org's positions to depth 4 matched while building; 12 chosen
+  for their castling to depth 4 in the tests), by Stockfish's own perft and move list on the same positions, and by
+  random games from the normal setup checked move by move against chess.js (same legal moves, FENs, SAN and endings).
+- **Normal games keep today's code, unchanged.** `rules.ts` sends a position to the Chess960 rules only when its FEN's
+  castling field names rooks by file, which a normal FEN never does; every normal FEN runs exactly the code it ran
+  before (the existing tests pass unchanged, and the engine sends Stockfish exactly the same commands). The read-only
+  questions castling can't change (a piece on a square, check, a queen in danger) ask chess.js about the same position
+  with its castling rights blanked, so the board, its sounds and the boss's animations read a Chess960 position too.
+  A Chess960 game whose rights are all gone plays identically under either.
+- **FEN: Shredder-FEN** (each castling rook by its file, White's in capitals, the king's side first: "HAha" for the
+  normal setup, "HFhf" for a king on g1 between rooks on f1 and h1), rather than X-FEN (KQkq unless that's ambiguous,
+  then a file). One rule, never ambiguous, no "outermost rook" inference; it's what Stockfish writes in Chess960 mode,
+  character for character (a test compares them), and what the published perft tables use. Reading also takes KQkq
+  (the outermost rook), so a normal FEN can be read. The en passant square is written only when the capture is legal,
+  as chess.js writes it, so a position always has one FEN and repetition counts it right.
+- **Start positions by the standard (Scharnagl) numbering,** 0 to 959, 518 the normal setup
+  (`chess960BackRank`, `chess960Fen`), or drawn from a seeded random source (`randomChess960(rng)`, the same seed giving
+  the same setup).
+- **Moves in and out.** UCI writes castling as the king taking its own rook (e1h1, b1a1), as Stockfish does with
+  `UCI_Chess960`, so the engine's moves need no translation; SAN writes O-O and O-O-O. Never ambiguous: a king can't
+  otherwise move onto its own piece.
+- **Castling's rules** (each with a test): the king lands on g1 or c1 and the rook beside it on f1 or d1 (mirrored for
+  Black); every square either crosses or lands on is empty but for those two; the king isn't in check and no square
+  from where it stands to where it lands is attacked, judged with the king and that rook lifted off, so a rook can't
+  shield the king from a line it opens by leaving (king c1, rook b1, a queen on a1: no castling); the right goes when
+  the king moves, that rook moves, or that rook is taken. The king or rook already on its square, and the two swapping,
+  all work. A castling can be the only legal move, so a Chess960 stalemate is judged by these rules, never chess.js.
+- **The board's input: both gestures, only for Chess960.** The king dragged (or tapped) onto its own rook castles,
+  which is the move as it's written; the king dragged onto the square it castles to (g1 or c1, as in normal chess) also
+  castles wherever that can't mean anything else: the king isn't already there, its rook isn't standing there, and no
+  ordinary king move goes there (king f1, rook h1: g1 is a plain king step, so castling is onto the rook). The dots show
+  both squares. The change is two helpers in `board/logic.ts` (`destsFor` adds the shortcut squares, `gestureMoves`
+  resolves a gesture) and one line in `OwnBoard.tsx`; for a normal FEN both return exactly what they did. The move
+  sound knocks castling (not a capture) for a king onto its own rook.
+- **Stockfish.** `UciEngine` (the browser's workers and Node) and the engine server (`engine/server.mjs`) switch
+  `UCI_Chess960` on just before a Chess960 position and off before the next normal one, judged from the FEN, so a
+  shared engine can't be left in the wrong mode; a normal search after a normal one sends nothing new. The engine
+  server's request check now takes a Chess960 castling field. Its scores, top moves and `playAtElo` (the boss's
+  strength later) work on Chess960 positions as they are. Not wired into any boss.
+- **No settings:** nothing here is a tunable (the 960 numbering is the variant's own); the boss's strength and clock
+  will be settings when he's built.
+- **For whoever builds phase 2:** a Chess960 board starts from a base at ply 0 holding its start FEN
+  (`bases: [{ ply: 0, fen }]`), because `baseAt` otherwise assumes the normal start; then `fenAtPly`, `boardEnd`,
+  `recentMoves` and the rest work as they are. The FAQ explains Chess960 when a player can meet it.
+
+**Testing.** Targeted lane (CLAUDE.md, Oct 14): typecheck, every unit test (the normal-chess ones unchanged), and the
+e2e specs that play moves on the board (listed in the PR). Unit: `packages/chess/test/chess960.test.ts` (the numbering
+and seeded draw; FEN round trips, X-FEN reading and refused rights; perft on 12 published positions to depth 4, the
+FEN functions to depth 3, normal positions read as Chess960; each castling rule and edge case; rights lost; castling as
+the only move; O-O / O-O-O both ways and every move's SAN read back; random games against chess.js; `rules.ts`'s
+routing, repetition with rights), `chess960-engine.test.ts` (the exact commands a normal and a Chess960 search send;
+Stockfish's FEN, perft and move lists against ours; scoring, a castling found and written e1h1-style, `playAtElo` at
+3000, and back to normal castling after), `packages/app/test/board-logic.test.ts` ("Chess960 castling on the board":
+the dots, both gestures, the edge cases, a screen's limited moves, tap and drag, both pieces sliding, normal castling
+untouched) and `move-sound.test.ts` (the castle knock).

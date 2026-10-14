@@ -75,6 +75,14 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   (`judgeTop`, `judgeCandidates`, `allowedSearch` in `boss-powers.ts`); Jefferson's fire counts a piece left to burn as
   gone (`fireJudged`). Shared with the `god-king` lane by agreement.
 - **Brilliant moves** never come from a power-up move.
+- **Chess960 (Fischer Random)** (DECISIONS.md, "Chess960's rules", Oct 14): the rules foundation for the hidden boss's
+  phase 2, not wired into any boss yet. A Chess960 position is a FEN whose castling field names its rooks by file
+  (Shredder-FEN: "HAha", "HFhf"); `UciEngine` and the engine server switch `UCI_Chess960` on just before one and off
+  before the next normal position, judged from the FEN (a normal search sends exactly the commands it always did).
+  With it on, Stockfish writes castling as the king taking its own rook (e1h1), which is how our Chess960 rules
+  (`packages/chess/src/chess960.ts`) write it, so its moves need no translation; scores, top moves and `playAtElo` work
+  as they are. `rules.ts` routes Chess960 positions to those rules (normal ones run chess.js as before), so the judge's
+  `scoreAfter` fallback works on them too.
 
 ## Where the code is
 
@@ -92,6 +100,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 | The online plan | `packages/server/src/lobby.ts` (`bossBrainNow`, the `bossBrain` message, the boss request's `brain`) |
 | The Maia box (AGPL: worker, conversion, model) | `packages/maia-worker/` (README.md), built into `/engine/maia/` |
 | The engines' source archives | `packages/maia-worker/scripts/source-archive.mjs` (→ `/engine/maia/maia-box-source.tar.gz`); `packages/app/stockfish-source/` (→ `/engine/stockfish-source.tar.gz`, copied by `vite.config.ts`) |
+| Chess960: start positions, rules, SAN, perft; `UCI_Chess960` | `packages/chess/src/chess960.ts`, routed from `rules.ts`; `setPosition` in `uci.ts`; `engine/server.mjs` |
 
 ## Settings
 
@@ -103,6 +112,9 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 - Unit: `packages/chess/test/uci.test.ts`, `judge.test.ts`, `boss-guard.test.ts`, `top-cache.test.ts`, `bots.test.ts`,
   `packages/server/test/judges.test.ts`. (Engine tests run real Stockfish.)
 - e2e: `e2e/judges.spec.ts` (with containers off).
+- Chess960: `packages/chess/test/chess960.test.ts` (perft against the published table, each castling rule, FEN, SAN,
+  random games against chess.js), `chess960-engine.test.ts` (the commands sent, Stockfish's FEN, perft and moves
+  against ours, scoring and `playAtElo` on Chess960).
 - The container: Docker locally, or live via `/api/engine/ping` and `/api/engine/score` with the Access service-token
   headers (never print their values).
 - The brain: `packages/chess/test/boss-brain.test.ts` (the rating lines, the bridge, the brains' choices with made-up
