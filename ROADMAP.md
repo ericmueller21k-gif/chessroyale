@@ -132,6 +132,40 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
   - **Beating him:** a "super saiyan" transformation with special animations (details later). Every player on the
     winning squad gets a special **Fischer Random crate** with a tiny chance at an item that doesn't exist yet. One
     victory reward per account, ever.
+  - **How you reach him (Eric, Oct 14):**
+    - **For real:** a **fifth Mercenary item**, an ominous **red book**, for **1,000 coins**. Its description is
+      along the lines of "A strange red book. It looks powerful..."
+    - The squad must **buy it AND win the Squads tournament** to trigger the hidden boss.
+    - **Price:** 1,000 is more than one round earns (about 600–700), so a squad has to save across rounds.
+    - **The book's symbol:** Eric wants a Russian symbol on it. The director suggests a red star or a Cyrillic
+      letter rather than the hammer and sickle, which is banned in some countries (e.g. Lithuania, Latvia, Ukraine).
+      Eric's call.
+    - **For testing until then:** he's reachable from the boss menu, playing with bots.
+  - **Phase 1 to phase 2 (Eric, Oct 14):**
+    - **Phase 1** is one board against him. Beat him there and **he collapses**: he drops to his knees, slumps and
+      mumbles nonsense to himself (lines from Eric later).
+    - **The red book takes over:** it flies off and **slams onto the center of the board** (dust, a shockwave).
+      Then **the board divides into four**. The director suggests reusing Sawyer's board-saw split: crack lines along
+      the middle, then the quarters slide apart and grow into full boards (desktop: all 4; phone: yours big, 3 up top).
+    - **He revives:** one sprite only, even with 4 boards. In the revived state his hair is **always flowing**, and
+      he isn't evil, but he looks scarier.
+    - **The book flips its pages again** and all four boards shuffle into random openings (Fischer Random setups):
+      the pieces fly to their new squares as the pages turn. Phase 2 then plays as above.
+    - **Decided (Eric, Oct 14: "your pick is fine, we want easier code and less lag over all else, fewer bug
+      risks"):** the split reuses Sawyer's board saw (crack lines, then the quarters slide apart). The book's symbol
+      is the gold Cyrillic **"ШАХМАТЫ"** ("chess" in Russian) on the shop item's larger icon, and its first
+      letter **"Ш"** as a gold monogram on the book in the sprites: clearly Russian, about chess, and not political.
+    - **Effort, easiest to hardest:**
+      - a slam, a flash, then a cross-fade into four boards;
+      - crack lines, then the quarters sliding apart (the pick, reusing the saw);
+      - a true tear or 3D split (not worth it).
+  - **The God King against him (Eric, Oct 14):** the God King's help **doesn't work** against him (his strike, Last
+    Stand and any other help), and when the crowd tries to use it, **he mocks it** as "theory" and "engine" crutches
+    (lines from Eric later). The God King gets **unique lines** for this fight, e.g. "I sense a tremendous power
+    within this foe."
+  - **His real red book:** in 1972 he prepared from what he called "the red book" of his rival's games (a red cloth
+    hardcover). In the game it's an unlabeled red book that he holds at his side, consults at logical moments, and
+    opens like a spell book for his ultimate.
   - **His art:** Eric's sprite (Oct 14): seated on a stone block, white shirt, patterned blue tie, a chess piece in hand,
     an intense stare. An in-game version is being drawn (art only, not in the game).
   - **Director's flags:** use a different name (agreed). A recognizable likeness and real quotes carry the same

@@ -1045,10 +1045,23 @@ export class MatchRunner {
     return this.opts.rng() < bossStumbleChance(this.state.boss!.elo, this.settings);
   }
 
-  /** How the boss plays its next move: staggered by the King's strike, stumbling (a weak boss), or at its strength. */
+  /**
+   * How the boss plays its next move: staggered by the King's strike, the engine's best (a power's follow-up its search
+   * scored: Wrangler's reply to the showdown's duel), stumbling (a weak boss), or at its strength.
+   */
   bossMoveKind(): BossMoveKind {
     if (this.state.boss?.staggerNext) return "stagger";
-    return this.bossStumbles() ? "stumble" : "elo";
+    // (The stumble's draw comes first, as ever: a best reply moves nothing else the match's random source draws.)
+    const stumbles = this.bossStumbles();
+    if (this.bossBestReply()) return "best";
+    return stumbles ? "stumble" : "elo";
+  }
+
+  /** The boss's move now is a power's follow-up its engine search scored (BossRules.bestReply): the engine's best. */
+  bossBestReply(): boolean {
+    const b = this.state.boss;
+    if (!b?.powers || !this.bossToMove()) return false;
+    return bossRules(b)?.bestReply?.(b, this.boards.get(this.state.boards[0]!)!) ?? false;
   }
 
   /**
@@ -1619,7 +1632,11 @@ export class MatchRunner {
   }
 }
 
-export type BossMoveKind = "elo" | "stumble" | "stagger";
+/**
+ * How the boss plays a move (bossMoveFrom): at its strength ("elo"), a slip ("stumble"), the King's strike ("stagger"),
+ * or the engine's best at full strength ("best": a power's follow-up its search scored, BossRules.bestReply).
+ */
+export type BossMoveKind = "elo" | "stumble" | "stagger" | "best";
 
 /**
  * A human-like brain for the boss's move (bossMoveFrom): Maia's own move (maia-raw) or a guarded one, at `rating`.
@@ -1679,7 +1696,8 @@ function pickByLoss(top: readonly MoveScore[], range: readonly [number, number],
  * swapped for a slip. A boss loses on mistakes, never by throwing material away.
  * With a human-like `brain` (Maia, BOSS_BRAIN), its moves replace the "elo" and "stumble" ones (Maia's own mistakes
  * take the slips' place), within what `allowed` leaves; the strike, the bridge band's share and every fallback are
- * Stockfish's, as above.
+ * Stockfish's, as above. "best" (a power's follow-up its engine search scored: Wrangler's reply to the showdown's
+ * duel) is the engine's best move at full strength (bestReplyFrom): never the brain's, a slip or the guard's.
  */
 export async function bossMoveFrom(
   engine: EngineLike,
@@ -1694,6 +1712,11 @@ export async function bossMoveFrom(
   brain?: BossBrainCall,
 ): Promise<string> {
   const k: BossMoveKind = kind === true ? "stumble" : kind === false ? "elo" : kind;
+  if (k === "best") {
+    // (Maia isn't asked. The admins' debug line says whose move it was.)
+    if (brain && brain.brain !== "stockfish") brain.onNote?.({ brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { share: brain.stockfishShare } : {}), by: "stockfish", why: "power" });
+    return bestReplyFrom(engine, fen, nodes, allowed);
+  }
   // A human-like brain (Maia, BOSS_BRAIN) is asked at once, alongside the top-8 search: never waited on to load,
   // never longer than its timeout. The King's strike stays Stockfish's (its own step back), and so does the bridge
   // band's share of moves (drawn first: Maia isn't asked for those).
@@ -1752,6 +1775,21 @@ export async function bossMoveFrom(
   const best = top[0]!.expected;
   const got = top.find((m) => m.move === move)?.expected ?? (await engine.scoreMoves(fen, [move]))[0]?.expected ?? 0;
   return confirm(withinGuard(moveLoss(best, got), guard) ? move : pickByLoss(top, guard.slipLoss, guard), guard);
+}
+
+/**
+ * The engine's best move at full strength (BossMoveKind "best": a power's follow-up its engine search scored, such as
+ * Wrangler's reply to the showdown's duel): one line at `nodes` (the boss's own budget, deeper than any power's
+ * scoring), so the move is the one the search assumed. A power that limits his moves (`allowed`) and that line's move
+ * not one of them, or no line: the best scored of those he may play.
+ */
+export async function bestReplyFrom(engine: EngineLike, fen: string, nodes: number, allowed: readonly string[] | null = null): Promise<string> {
+  const [line] = await (engine.topMovesAt ? engine.topMovesAt(fen, 1, nodes) : engine.topMoves(fen, 1));
+  if (line && (!allowed || allowed.includes(line.move))) return line.move;
+  const options = allowed ?? legalMoves(fen);
+  if (options.length <= 1) return options[0]!;
+  const scored = await engine.scoreMoves(fen, options);
+  return [...scored].sort((a, b) => b.expected - a.expected)[0]?.move ?? options[0]!;
 }
 
 /** A board as sent to (and shown in) the app. */
