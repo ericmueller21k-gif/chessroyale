@@ -3159,6 +3159,54 @@ now downloads the Maia model (24 MiB, cached) when a boss battle needs it; a dev
 Stockfish's move as before. The FAQ's Maia section reads as live (it follows the flag). Left for Eric: the real-phone
 check (`TESTING.md`, "Maia").
 
+### Squads: Rapid 5+2 (Eric, Oct 14, 2026)
+
+Eric, Oct 14, of Squads' Rapid: "It shouldn't be 55 minutes, because, yeah, that's just a little too long... find a way
+to reduce that." (Bullet and Blitz stay as they are.) The call, made without Eric: **Rapid 5+2, was 5+3.** One number
+changes (`SQUADS.clocks`, Rapid's `incrementSeconds`, 3 to 2): the bank (5:00), the top-up (+1:00), the free seconds
+(2 s) and the cap (20 s) stay. The aim was Rapid's 90th percentile at about 45 minutes or under, with Rapid still the
+slowest option.
+
+- **The comparison** (`npm run sim:squads`; Classic 72 lobbies an option, 24 per skill mix; Mercenary 24, Mixed; all on
+  the 5+3 calibration's seeds, `SQUADS_SIM_SEEDS="5:00|1:00|2|3|20"`, so every candidate starts from the same lobbies;
+  minutes):
+
+  | Option | Classic median | 90th pct | Longest | Mercenary median | 90th pct | Squads reaching sudden death | Moves in it | Random for want of time |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | Rapid 5+3 (before) | 40.7 | 51.3 | 63.7 | 42.9 | 49.1 | 21% (Merc 20%) | 0.3% (0.3%) | 0.4% (0.3%) |
+  | **Rapid 5+2 (chosen)** | **36.3** | **45.3** | 82.0 | **37.4** | **48.2** | 22% (22%) | 0.4% (0.4%) | 0.5% (0.4%) |
+  | Rapid 4+2 | 35.4 | 48.4 | 100.4 | | | 22% | 0.3% | 0.5% |
+  | Rapid 6+2 | 36.3 | 47.3 | 86.7 | 38.1 | 44.6 | 22% (20%) | 0.3% (0.3%) | 0.4% (0.3%) |
+  | Blitz 3+2 (unchanged) | 33.5 | 45.5 | 74.7 | 36.0 | 41.6 | 22% (23%) | 0.3% (0.3%) | 0.5% (0.5%) |
+
+  By skill mix (Classic medians), 5+2 against Blitz: Strong 41.6 and 34.9, Mixed 35.8 and 33.8, Casual 33.9 and 32.5
+  (5+3: 42.9, 40.3, 38.7). Rapid 5+3 with a 17 s cap (36 lobbies on its own seeds) ran 40.6 minutes, 90th percentile
+  56.5: no help, so it was dropped. 4+3 wasn't run: the time controls' tuning had 4+3 within half a minute of 5+3.
+- **The increment is the lever, as the time controls' tuning found.** One second less a move took 4-5 minutes off
+  the median and 6 off the 90th percentile. The bank barely matters: 4+2, 5+2 and 6+2 are within a minute of each
+  other at the median, and their 90th percentiles (45-48) differ by no more than the noise. So the simplest change
+  wins: one number, and the card still reads like a chess clock ("Rapid 5+2").
+- **The long tail is long games.** The 90th percentile comes from the few lobbies whose games run long. With 36
+  lobbies it's about the fourth longest, and it moves 4-7 minutes from one set of lobbies to another. Blitz 3+2 ran 40.9 on the calibration's lobbies and 45.5 on these, and 5+2 ran 52.6 on 36
+  lobbies of its own seeds and 45.3 on these 72. So these numbers compare candidates on the same 72 lobbies. They
+  don't promise a number for one lobby.
+- **Still the slowest, but closer to Blitz.** Rapid's median stays above Blitz's for every skill mix (2.8 minutes overall,
+  6.7 for strong squads, 1.4 in Mercenary), from its bigger bank, top-up and cap. With the same increment as Blitz, it
+  can't be much further apart without bringing back the long tail: a bigger bank adds almost nothing (6+2), and a
+  bigger increment is what made 5+3 long.
+- **Sudden death and random moves: as Blitz's.** 22% of squads reach it (Blitz 22%), 0.4% of moves are made in it
+  (Blitz 0.3%; 5+3 itself 0.3-0.4%), and 0.5% of actions become random moves for want of time (Blitz 0.5%; 0.6% in the
+  calibration). Near zero a squad lives on 2 s free plus 2 s back a move, as on Blitz.
+- **Labels follow the setting** (`clockLabel`, `teamClockLine`, `teamClockDetail`, `matchClockLine`, the FAQ): the
+  vote card "Rapid 5+2", "5 min + 2 s a move · max 20 s"; each match's card "Rapid 5+2 · +2 s a move · max 20 s"; the
+  result's banner "... each move made in time adds 2 s ..."; the FAQ "Rapid 5+2 (5 minutes, +2 s a move, at most 20 s
+  on a move)". The vote order (Rapid, Blitz, Bullet) and the default (Blitz, by its id) stay.
+- **Lobbies in play keep their clock.** Each match carries its own increment (`incrementMs`), and a lobby's rules
+  carry its voted clock, so a lobby that voted 5+3 before the deploy finishes on 5+3.
+- **The sim:** `SQUADS_SIM_SEEDS` (every option on one clock's seeds) and each lobby's minutes in the progress lines,
+  for comparisons like this one. `reports/squads-sim.md` was regenerated with the new Rapid (Bullet and Blitz came out
+  the same as before: the sim is deterministic, and the 5+3 calibration reproduced exactly).
+
 ### The boss screen's lag: the boss view free to read (Oct 14, 2026)
 
 Eric, Oct 14 ("make do the boss screen lag fixes"), after "The board draws its pieces only when they change": the boss

@@ -11,9 +11,10 @@ the final a majority vote of the whole squad; the old Pick and Block is gone. **
 "Squads modes: Classic and Mercenary"): the first vote picks **Classic** (just chess: same-move tokens, no blocks, no
 coins) or **Mercenary** (coins, a team shop between rounds, items for the next match; blocks on), and shows a third
 mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `mercenary` everywhere. **Time controls**
-(Eric, Oct 13; DECISIONS.md, "Squads: three chess time controls"): the Clock vote picks **Rapid 5+3**, **Blitz 3+2** or
-**Bullet 1+1** (left to right, slowest to fastest; nobody voting: Blitz), each a team bank with a chess increment
-that banks and its own cap on a move.
+(Eric, Oct 13; DECISIONS.md, "Squads: three chess time controls"): the Clock vote picks **Rapid 5+2** (5+3 until Eric's Oct 14
+"It shouldn't be 55 minutes"; DECISIONS.md, "Squads: Rapid 5+2"), **Blitz 3+2** or **Bullet 1+1** (left to right,
+slowest to fastest; nobody voting: Blitz), each a team bank with a chess increment that banks and its own cap on a
+move.
 
 ## How it works today
 
@@ -46,7 +47,7 @@ that banks and its own cap on a move.
 
     | Option | Bank | Increment | Free seconds | Cap on a move | Top-up a round |
     | --- | --- | --- | --- | --- | --- |
-    | Rapid 5+3 | 5:00 | +3 s | 2 s | 20 s | +1:00 |
+    | Rapid 5+2 (5+3 until Oct 14) | 5:00 | +2 s | 2 s | 20 s | +1:00 |
     | Blitz 3+2 (nobody votes) | 3:00 | +2 s | 2 s | 15 s | +30 s |
     | Bullet 1+1 | 1:00 | +1 s | 2 s | 10 s | +15 s |
   - **Old ids** (`clockById`): fast → bullet, normal → blitz, long → rapid; one we don't know gets Blitz, never an
@@ -62,7 +63,7 @@ that banks and its own cap on a move.
   - **The increment** banks, as on a chess clock: each move made in time earns it, credited after the half (`earned`;
     a missed move earns none, `incrementOnMiss`). A move quicker than the free seconds and the increment together
     adds to the bank (not capped at its start); a slower one costs only what's past them. So a squad's bank settles
-    where its drain and its increments meet (in the sim about 20 s on Bullet, 35 on Blitz, 45 on Rapid), and the
+    where its drain and its increments meet (in the sim about 20 s on Bullet, 35 on Blitz, 40 on Rapid), and the
     increment, more than the bank, sets an option's pace.
   - **Sudden death.** If the bank runs out during a half, the squad's moves still being thought about are cut off
     (random moves). At zero, each move must be made within the free seconds, or it's missed. There are no flag
@@ -156,8 +157,11 @@ that banks and its own cap on a move.
     and then plays the best move. It taps a Time chip on a move in sudden death (60%) or with under 20 s of bank (30%),
     0.7-1.8 s in, and thinks on into it. Never for a squad with people playing.
 - **What the sim says** (`reports/squads-sim.md`, the time controls, Classic):
-  - Median lobbies take 26.9 (Bullet), 33.5 (Blitz) and 43.9 (Rapid) minutes; 90th percentiles 34.7, 40.9 and 54.5.
-    Mercenary: 29.9, 37.8 and 43.9. Bullet can't reach 20: about 11 minutes of every lobby is reveals, votes and the
+  - Median lobbies take 26.9 (Bullet), 33.5 (Blitz) and 35.9 (Rapid 5+2) minutes; 90th percentiles 34.7, 40.9 and
+    52.6 (36 lobbies each; the 90th percentile swings 4-7 minutes between sets of lobbies). On the same 72 lobbies
+    Rapid 5+2 runs 36.3 (90th percentile 45.3), against 5+3's 40.7 (51.3) and Blitz's 33.5 (45.5); Mercenary 37.4
+    (48.2), against 42.9 (49.1) and 36.0 (41.6) (DECISIONS.md, "Squads: Rapid 5+2"). Mercenary on Oct 13's clocks:
+    29.9, 37.8 and 43.9. Bullet can't reach 20: about 11 minutes of every lobby is reveals, votes and the
     bracket (shorter reveals in Bullet: 24.0, Eric's call). Through the real server a Bullet bot lobby took 32.9
     minutes (one 13-minute Relay match), its bots never out of time.
   - 17-31% of squads reach sudden death, mostly in Pairs, but only 0.2-0.5% of moves are made in it (the increment lifts
@@ -218,7 +222,8 @@ gives a match its own block banks (`MatchSetup.blockBanks`: 0 in Classic) withou
   wallet carried on; the shop's caps, prices and putting back; the kit for the next match only; every item; the
   Stockfish token never showing the other squad's moves; fair play leaving assisted moves out; the bots' shopping).
 - Sim: `npm run sim:squads -- [lobbies] [nodes] [clocks]` (about 30 minutes at the defaults; `SQUADS_SIM_SET`,
-  `SQUADS_SIM_MIXES` and `SQUADS_SIM_OUT` for tuning runs). Its tables are generated; the notes after the marker in
+  `SQUADS_SIM_MIXES` and `SQUADS_SIM_OUT` for tuning runs; `SQUADS_SIM_SEEDS="5:00|1:00|2|3|20"` gives every option
+  one clock's seeds, so candidates replay the same lobbies; each lobby's minutes are in the progress lines). Its tables are generated; the notes after the marker in
   `reports/squads-sim.md` are written by hand and kept across runs.
 
 ## Rules for this area
@@ -507,6 +512,9 @@ storage (SQLITE_BUSY), and the e2e's lobbies fail.
 ## The design (Eric, Oct 10, 2026)
 
 The brief, as given (calls marked "director's call"). Phase 1's own calls are in `DECISIONS.md`, "Squads".
+
+**Changed since (Eric, Oct 14, Rapid):** Rapid 5+3 became 5+2, its long lobbies too long ("It shouldn't be 55
+minutes"; DECISIONS.md, "Squads: Rapid 5+2").
 
 **Changed since (Eric, Oct 13, time controls):** the Clock vote's Fast, Normal and Long became three chess time
 controls, Bullet, Blitz and Rapid, each a team bank with an increment that banks and its own cap on a move
