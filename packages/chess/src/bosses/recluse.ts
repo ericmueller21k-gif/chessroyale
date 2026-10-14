@@ -46,6 +46,9 @@ export const RECLUSE: BossRules = {
   id: "recluse",
   blocksKing: true,
   fallMs: RECLUSE_FALL_MS,
+  // From the starting position, never a book opening: he has no memorized lines (Eric, Oct 14). Sides as usual (the
+  // crowd White in Boss alone; ?side=b: he's White and makes the first move from the start).
+  opening: { fromStart: true },
   meter: (p, turn, s) => bulletMeter(p, turn, s),
   // Full (crowd turn bulletTurn), the admins' trigger or the test switch (?power=bullet: turn 2): it comes now, no warning.
   ultimate(next, t) {

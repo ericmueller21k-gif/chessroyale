@@ -110,6 +110,23 @@ describe("who meets him: hidden from players, an admin's Boss alone only", () =>
     for (const [admin, raid] of [[false, false], [false, true], [true, true]] as const) expect(ids(admin, raid)).toEqual(playableBosses().map((b) => b.id));
   });
 
+  it("starts from the starting position, never a book opening (he has no memorized lines); as White he moves first", async () => {
+    const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    const r = alone();
+    expect(r.boards.get(0)!.fen).toBe(START);
+    expect(r.boards.get(0)!.history).toEqual([]);
+    expect(r.boss!.crowdSide).toBe("w");
+    // (Another boss still gets the book opening.)
+    expect(alone({ bossId: "clown", bossHidden: false }).boards.get(0)!.history.length).toBeGreaterThan(0);
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1400, bossId: "recluse", bossHidden: true } as Settings;
+    const white = new MatchRunner({ settings, rng: mulberry32(5), engines: [fakeEngine()], library: [opening(sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1"]))], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "b" });
+    expect(white.boards.get(0)!.fen).toBe(START);
+    expect(white.boss!.crowdSide).toBe("b");
+    expect(white.bossToMove()).toBe(true);
+    await white.playBoss();
+    expect(white.boards.get(0)!.history).toHaveLength(1);
+  });
+
   it("in the match: Boss alone for an admin (bossHidden) meets him; without it (a player, a raid, the Crowd's final), never", () => {
     expect(alone().boss!.id).toBe("recluse");
     for (const extra of [{ bossHidden: false }, { bossHidden: undefined }] as Partial<Settings>[]) expect(alone(extra).boss!.id).not.toBe("recluse");

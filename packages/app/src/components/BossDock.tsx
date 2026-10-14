@@ -161,6 +161,7 @@ export function BossDock({
       />
     </div>
     {!computer && <UltimateTest match={match} />}
+    {!computer && <EngineMove match={match} />}
     {!computer && <BrainDebug match={match} />}
     </>
   );
@@ -194,6 +195,19 @@ export function UltimateTest({ match }: { match: GameView }) {
       }}
     >
       {underWay ? "Ultimate under way (testing)" : coming ? "Ultimate next turn (testing)" : "Trigger ultimate (testing)"}
+    </button>
+  );
+}
+
+/**
+ * Testing, admins only, Boss alone (Eric, Oct 14): "Engine move" plays Stockfish's best move for you (SoloMatch.engineMove).
+ * Waits while it searches and when it isn't your move. A phone: under the dock; a computer: in the title line (Hud.tsx).
+ */
+export function EngineMove({ match }: { match: GameView }) {
+  if (!match.engineMoveShown || !match.engineMove || match.boss?.result) return null;
+  return (
+    <button type="button" class="engine-move" disabled={match.phase.kind !== "play" || !!match.engineThinking} onClick={() => match.engineMove?.()}>
+      Engine move
     </button>
   );
 }

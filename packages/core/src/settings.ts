@@ -527,6 +527,12 @@ export const BOSS_POWERS = {
    */
   ultimateTestButton: true,
   /**
+   * Testing, admins only, Boss alone (Eric, Oct 14): an "Engine move" button that plays Stockfish's best move for you
+   * through the normal move path. Its search is the power-up hints' (`engineNodes`, 250,000 nodes: well under a second
+   * on a phone, already under way as your move starts), so it adds no engine work. false removes it.
+   */
+  engineMoveButton: true,
+  /**
    * The funhouse (Boingo's ultimate; Eric, Oct 11): he turns the board round in steps, funhouseStepTurns crowd turns
    * apart: upside down (180°) as it comes, then a quarter turn to a side picked from the seed (90° or 270°), then a half
    * turn to the other side, then back to the start, where it stays. As it comes he plays the crowd's first move for it
