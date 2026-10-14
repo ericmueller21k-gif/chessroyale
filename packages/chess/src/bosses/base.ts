@@ -230,6 +230,13 @@ export interface BossRules {
    */
   specialMove?(boss: BossState, fen: string, move: string): { play: string; san: string } | null;
   /**
+   * The boss's move now (`board`: him to move) is the follow-up its power's engine search scored (Wrangler's reply to
+   * the showdown's duel): it must be the engine's best move at full strength (BossMoveKind "best": never the brain's, a
+   * slip or a stumble), or the power plays out other than it was scored. The server decides it, so the host and solo
+   * play it alike. The King's strike still staggers it.
+   */
+  bestReply?(boss: BossState, board: BoardState): boolean;
+  /**
    * What the boss's turn must work out besides its move, with the engine (Wrangler's long pull, drag and showdown), in
    * the position before its move: the server asks the host's device for it with the move; solo works it out. Null:
    * nothing.

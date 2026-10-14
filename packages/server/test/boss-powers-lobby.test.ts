@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, type Settings } from "@chessroyale/core";
-import { FIRE_BURN_MS, POWER_FX, applyMove, bossShowMs, dragOptions, extraMoveCandidates, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, sanLineToUci, sideToMove, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { FIRE_BURN_MS, POWER_FX, applyMove, bossMoveFrom, bossShowMs, dragOptions, extraMoveCandidates, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, sanLineToUci, sideToMove, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 const hash = (s: string) => {
@@ -991,5 +991,69 @@ describe("Wrangler online", () => {
     const b = L.last("p2", "boss")!;
     expect(b.boss.powers!.ultAt).toBe(b.boss.powers!.turn);
     expect(b.boss.powers!.holds).toBe(0);
+  });
+
+  it("his reply to the duel (Eric, Oct 13): the host is asked for the engine's best, without his brain or a slip; everyone gets it; then his brain again", async () => {
+    // A lobby of admins (his brain: Maia), slips on (every move of his a stumble).
+    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "pig", bossPowerTest: "showdown", bossKillEvery: 99, bossStumbleBelow: 9999, bossStumbleMax: 1 });
+    for (const [i, name] of ["P1", "P2"].entries()) L.core.connect(undefined, name, i ? "phone" : "computer", false, 1500, undefined, undefined, null, null, true);
+    L.core.message("p1", { t: "start" });
+    L.advance(1000);
+    L.advance(60_000);
+    expect(L.core.record.bossBrain?.brain).toBe("maia-raw");
+    const nextRequest = () => {
+      for (let i = 0; i < 10 && !L.last("p1", "bossRequest"); i++) L.advance(5_000);
+      return L.last("p1", "bossRequest")!;
+    };
+    crowdMove(L);
+    expect(nextRequest()).toMatchObject({ stumble: true, brain: { brain: "maia-raw" } });
+    answer(L);
+    toRound(L);
+    crowdMove(L);
+    const req = nextRequest();
+    expect(req.showdown).toBe("try");
+    const move = legalMoves(req.fen).sort()[0]!;
+    const lineup = [...lineups(applyMove(req.fen, move), 1, 3, 3000)].find(Boolean)!;
+    answer(L, move, { showdown: lineup.spec });
+    toRound(L);
+    // The crowd's duel, then his reply: the engine's best, no brain sent, no slip.
+    crowdMove(L);
+    const reply = nextRequest();
+    const duel = lineup.duels.find((d) => applyMove(lineup.fen, d) === reply.fen)!;
+    expect(duel).toBeTruthy();
+    expect(reply.best).toBe(true);
+    expect(reply.brain).toBeUndefined();
+    expect(reply.stumble).toBeUndefined();
+    expect(reply.stagger).toBeUndefined();
+    // The host (as net.ts plays a request): its engine's best takes back on the duel's square; his brain (Maia, which
+    // the host still has loaded) and a slip would take something else.
+    const worth: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
+    const legal = legalMoves(reply.fen);
+    const best = legal.filter((m) => m.slice(2, 4) === duel.slice(2, 4)).sort((a, b) => worth[pieceAt(reply.fen, a.slice(0, 2))!.type]! - worth[pieceAt(reply.fen, b.slice(0, 2))!.type]!)[0]!;
+    const other = legal.filter((m) => m.slice(2, 4) !== duel.slice(2, 4)).sort()[0]!;
+    expect(best).toBeTruthy();
+    const engine: EngineLike = {
+      topMoves: async (_fen, n) => [best, other].slice(0, n).map((m, i) => ({ move: m, expected: i ? 0.555 : 0.6 })),
+      topMovesAt: async (fen, n) => engine.topMoves(fen, n),
+      scoreMoves: async (_fen, moves) => moves.map((m) => ({ move: m, expected: m === best ? 0.6 : 0.555 })),
+      playAtElo: async () => other,
+    };
+    const maia: HumanEngineLike = { ready: () => true, candidates: async () => ({ best: other, moves: [{ move: other, p: 0.9 }], ms: 5 }) };
+    const kind: BossMoveKind = reply.best ? "best" : reply.stumble ? "stumble" : reply.stagger ? "stagger" : "elo";
+    const host = (k: BossMoveKind) => bossMoveFrom(engine, reply.fen, reply.elo, reply.nodes, k, Math.random, DEFAULT_SETTINGS.kingStrikeLoss, undefined, reply.allowed ?? null, { brain: "maia-raw", rating: 600, engine: maia });
+    expect(await host("stumble")).toBe(other);
+    const played = await host(kind);
+    expect(played).toBe(best);
+    answer(L, played);
+    // (Your queen banner first, if the duel took his queen: the move is held until then.)
+    for (let i = 0; i < 10 && L.last("p2", "boss")!.boss.lastMove?.move !== played; i++) L.advance(1000);
+    for (const id of ["p1", "p2"]) expect(L.last(id, "boss")!.boss.lastMove).toMatchObject({ move: played });
+    expect(pieceAt(L.last("p2", "boss")!.boss.board.fen, duel.slice(2, 4))?.color).toBe("b");
+    // Only that one move: his next is his brain's again (and a slip's chance).
+    toRound(L);
+    crowdMove(L);
+    const later = nextRequest();
+    expect(later.best).toBeUndefined();
+    expect(later).toMatchObject({ stumble: true, brain: { brain: "maia-raw" } });
   });
 });

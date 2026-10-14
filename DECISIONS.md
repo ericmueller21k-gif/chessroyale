@@ -2675,6 +2675,68 @@ bars and the clocks. Frame by frame (`npm run frames:resign`, phone 390 and comp
 and a Crowd match): the sheet and confirm never cover the board or the line above it, the board never moves, no frame
 blinks.
 
+### Wrangler's reply to the showdown's duel: the engine's best (Eric, Oct 13, 2026)
+
+**Eric's report:** Wrangler's SHOWDOWN! came, Eric took his queen in the forced duel, and Wrangler didn't take back: he
+took a different piece, so Eric won a queen for free. The admins' debug line said "Maia 600 · no guard".
+
+**The cause:** the showdown's search scores every line-up as if he answers each duel with the engine's best move (each
+position after a duel is read from the engine's top move: `scoreLineups`, `qualifies`). His actual next move came from
+his normal brain (`bossBrainFor`): at Eric's level Maia at 600 with no guard, which can miss the recapture (with
+Stockfish as the brain, a slip could miss it too). So the power played out other than it was scored.
+
+**The fix:** his one reply right after a showdown duel (two pairs or three) is the engine's best move at full strength:
+one Stockfish line at the boss's own budget (`bossNodes`, deeper than the search's own reads), no Maia, no guard, no
+slip or stumble (`BossMoveKind` "best", `bestReplyFrom` in `runner.ts`). All his other moves are unchanged.
+- **Where it's decided:** a new hook on the base boss, `BossRules.bestReply` (Wrangler's: `duelReplyDue` in `pig.ts`:
+  the crowd's last move is one of the showdown's duels, on the showdown's own turn), read by the runner's
+  `bossMoveKind`. The server works out the kind as for a slip or the King's strike and tells the host
+  (`bossRequest.best`, sent without a `brain`, as the funhouse's, the bounce's and the extra move's requests are);
+  solo's runner plays it the same way. Everyone sees the host's one move, as before.
+- **My calls:**
+  - **The King's strike still staggers it.** The crowd paid a charge for that step back; the strike's own guard still
+    never gives a piece away for nothing, so a staggered reply still takes back or near enough.
+  - **The slip's random draw is still made** before the kind is decided, so the match's random source moves on as it
+    did before and nothing else drawn after it changes.
+  - **The Last Stand:** a duel the God King takes back isn't on the board, so the reply waits for the duel that is.
+  - **The admins' debug line** says "Stockfish's best (power reply)" for that move (admins only; no player text
+    changes).
+- **When the engine is slow or missing:** in solo this device's Stockfish always plays it (Maia isn't asked at all).
+  Online, a host that doesn't answer in time is replaced and the next one gets the same "best" request, so the move is
+  still Stockfish's best. Only when no device in the lobby can run the engine at all does the server play a random
+  allowed move, as it does for every boss move then; that case can't be Stockfish quality, and the engine server isn't
+  asked for boss moves.
+
+**Found while testing: the engine's best reply isn't always taking back.** In a line-up the other pairs face each other
+too, so after a duel his best reply can be another capture first (in one e2e game all three duels' best replies were
+his knight taking the crowd's line-up knight, the queen to be taken back a move later). The fix plays that move, as the
+search scored it; but his moves after it are his brain's again, so where the engine's line needs a second move of his
+(taking the queen back next), a weak brain can still miss it. Not changed here (the brief: one reply); the three-round
+Showdown (his replies Stockfish's on every duel turn) covers it.
+
+**Other powers checked for the same gap** (a power whose engine check assumes a boss reply that his brain might not
+play). None is as clear-cut; recorded, not changed:
+- **The long pull** and **the lasso drag:** measured against his best ordinary move or with the crowd to move, with no
+  forced reply of his built in. If his brain misses a chance afterwards, the crowd simply loses less.
+- **Boingo's funhouse move:** the crowd's forced move is picked as a 1 to 2.5 pawn loss assuming his best reply, and
+  that reply is his brain's. Same shape, lower stakes: if it misses the punishment the crowd gets off lightly (a capture
+  he fails to answer could even gain it a little).
+- **Big Boy's Big Bounce:** scored with him to move, assuming his best move, which is his brain's. A bounce can leave a
+  crowd piece attacking one of his (only the crowd's hanging material is filtered), and a weak brain may not answer it.
+  Same shape, less clear-cut than a forced capture.
+- **Hollow's extra move** is the engine's own pick; Ginger's, Jefferson's and Sawyer's powers aren't scored on his
+  reply.
+
+**Testing.** The full lane (rules, the server and the protocol). Unit: `packages/chess/test/pig.test.ts` (on his brain,
+Maia at 600, with every move a slip: after the queens' duel he takes back, the move the search assumed; the brain and a
+slip on the same position would take another piece; Maia isn't asked; his next move is Maia's again; only right after a
+duel on the showdown's turn; the King's strike still staggers; the host's path agrees with solo), and "Wrangler online"
+in `packages/server/test/boss-powers-lobby.test.ts` (a lobby of admins on Maia with slips on: the reply's request says
+`best`, without the brain or a slip, the host's answer is the recapture and everyone gets it, and the next request is
+the brain's again). Both fail without the fix. e2e: `e2e/pig.spec.ts` plays a duel and checks his reply is exactly
+the engine's best at full strength, taking back when that's the best (solo on a phone as an admin, on his Maia brain;
+on a computer; and online).
+
 ### The Maia box's source on the site (Eric, Oct 13–14, 2026)
 
 Eric's OK on Oct 13 ("Publish it."): publish the Maia box's source, then turn `BOSS_BRAIN.forPlayers` on. **The source
