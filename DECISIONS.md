@@ -3850,3 +3850,11 @@ a burst coalesced, views naming no board, disconnecting, coming back, leaving, a
 default and storage; the FAQ line), e2e `e2e/squads-watch.spec.ts` (the jump on by default and off, remembered; a
 second player's pawn with the eye over your board, the board not moving, gone when they look away or disconnect),
 `squads-play.spec.ts` and `squads-v2.spec.ts` adapted to the jump, and the whole e2e suite.
+
+### The Hidden Boss's slow moves: once, beside your board (Eric, Oct 14, 2026)
+
+Eric, after playing it: "Why show the same slow moves 4 times each player just needs to see one on the right of their
+board since they all are the same total right?" The count is the team's, so the ten marks now show once: a column by
+the right edge of your board (on a phone, the big board, yours or the one you're watching). The small boards and the
+other three on a computer show none. The marks flash at every slow move, whoever's; the short "slow move" note still
+sits on the board it was on, so you see which board was slow.

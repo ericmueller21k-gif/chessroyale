@@ -14511,9 +14511,9 @@ button.sq-tiny {
   text-shadow: 2px 2px 0 #1a0a00;
   pointer-events: none;
 }
-/* The team's slow moves beside each board (SlowMarks): ten slots, a red pixel X each, the rest dim. A column by the
-   board's right edge, in the gutter beside it (never over it), as Jefferson's candle shots stand; a phone's small
-   boards have no room beside them, so a row above each. The board the last one was on flashes its marks. */
+/* The team's slow moves beside your board (SlowMarks; on a phone, the big board): ten slots, a red pixel X each, the rest
+   dim. A column by the board's right edge, in the gutter beside it (never over it), as Jefferson's candle shots stand.
+   They flash at every slow move. */
 .rc-slow {
   position: absolute;
   z-index: 9;
@@ -14555,15 +14555,6 @@ button.sq-tiny {
 .rc-slow.col .rc-slow-label {
   writing-mode: vertical-rl;
   rotate: 180deg;
-}
-.rc-slow.row {
-  left: 0;
-  bottom: calc(100% + 3px);
-  width: 100%;
-}
-.rc-slow.row svg {
-  flex: 1;
-  min-width: 0;
 }
 .rc-slow.flash svg {
   animation: rc-slow-flash 600ms ease-out 3;

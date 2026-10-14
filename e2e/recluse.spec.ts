@@ -364,10 +364,10 @@ test("phase 2's ultimate (the admins' trigger): \"5 SECONDS!\", his line and spe
   page.on("pageerror", (e) => errors.push(e.message));
   await meetHim(page, "phase=2");
   await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 60_000 }).toBe(true);
-  // Before it: your bank in the dock; the team's slow moves beside every board (no longer in the dock).
+  // Before it: your bank in the dock; the team's slow moves beside your board only (no longer in the dock).
   await expect(page.locator(".boss-dock-status")).toContainText(/Your clock \d:\d\d/);
   await expect(page.locator(".boss-dock-status")).not.toContainText(/slow moves \d of/);
-  await expect(page.locator(".rc-slow")).toHaveCount(4);
+  await expect(page.locator(".rc-slow")).toHaveCount(1);
   const ult = await watchFor(page, {
     // (Held a second longer than other banners: FightBanner's `long`.)
     banner: { selector: ".fight-banner.long", text: /5 SECONDS!/ },
@@ -386,7 +386,7 @@ test("phase 2's ultimate (the admins' trigger): \"5 SECONDS!\", his line and spe
   expect(errors).toEqual([]);
 });
 
-test("phase 2's slow moves (?phase=2): each marks a red X beside every board for the team (a column by each board, a row over a phone's small ones), its board flashes with a note, a soft sound; the 10th brings his ultimate on every board", async ({ page }) => {
+test("phase 2's slow moves (?phase=2): each marks a red X for the team in one column beside your board (a phone's big board), the slow board gets a note, a soft sound; the 10th brings his ultimate on every board", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -394,11 +394,9 @@ test("phase 2's slow moves (?phase=2): each marks a red X beside every board for
   await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 60_000 }).toBe(true);
   await page.evaluate(() => ((window as any).__soundLog = []));
   const phone = test.info().project.name === "phone";
-  // Ten slots beside every board, all empty: a column by each of a computer's four; on a phone, by yours, and a row above
-  // each small one.
-  await expect(page.locator(".rc-slow")).toHaveCount(4);
-  await expect(page.locator(".rc-slow.col")).toHaveCount(phone ? 1 : 4);
-  await expect(page.locator(".rc-slow.row")).toHaveCount(phone ? 3 : 0);
+  // Ten slots, all empty, once: a column beside your board (Eric, Oct 14: the count is the team's, so once is enough).
+  await expect(page.locator(".rc-slow")).toHaveCount(1);
+  await expect(page.locator(".rc-slow.col")).toHaveCount(1);
   await expect(page.locator(".rc-slow").first().locator("svg > g")).toHaveCount(10);
   const seen = await watchFor(page, {
     flash: { selector: ".rc-slow.flash" },
@@ -422,9 +420,9 @@ test("phase 2's slow moves (?phase=2): each marks a red X beside every board for
     const before = (await simulNow(page)).slow;
     await page.evaluate((m) => (window as any).match.simulMove(0, m), move);
     await expect.poll(async () => (await simulNow(page)).slow, { timeout: 5_000 }).toBeGreaterThan(before);
-    // Every board's marks say the same count at once.
+    // The marks say the team's count at once.
     const n = Math.min(10, (await simulNow(page)).slow);
-    await expect(page.locator(`.rc-slow[data-slow="${n}"]`)).toHaveCount(4);
+    await expect(page.locator(`.rc-slow[data-slow="${n}"]`)).toHaveCount(1);
     marked = n;
   }
   // (Your board decided first, by any chance: the bots' slow moves bring the rest.)
@@ -432,7 +430,7 @@ test("phase 2's slow moves (?phase=2): each marks a red X beside every board for
   const v = await simulNow(page);
   expect(v.slow).toBe(10);
   expect(marked).toBeGreaterThan(0);
-  await expect(page.locator('.rc-slow[data-slow="10"]')).toHaveCount(4);
+  await expect(page.locator('.rc-slow[data-slow="10"]')).toHaveCount(1);
   // Ten red X's, the slow board noted, a soft sound each time, and the banner on every board (a phone's small ones too).
   await expect(page.locator('.rc-slow[data-slow="10"]').first().locator(".rc-slow-x")).toHaveCount(10 * 9);
   await expect.poll(() => seen.seen(), { timeout: 10_000 }).toEqual({ flash: true, note: true, banner: true, minis: phone });
