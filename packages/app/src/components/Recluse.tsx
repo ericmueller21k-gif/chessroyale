@@ -1,11 +1,12 @@
 import { useLayoutEffect } from "preact/hooks";
 import { kingHelpBlocked } from "@chessroyale/chess";
-import { RECLUSE } from "../characters/recluse.ts";
+import { ON_BOARD_ANIMS, RECLUSE, RECLUSE_BUST } from "../characters/recluse.ts";
 import { RECLUSE_LINES } from "../characters/recluse-lines.ts";
 import { animLength, cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { kingSay } from "../godKing.ts";
 import { CRITICAL, bossVoice } from "../speech.tsx";
+import { prewarmSprite } from "./BossEffect.tsx";
 import { figureLoop, playInPlace } from "./BossCharacter.tsx";
 import type { BossUi, KitMoment, MomentProps } from "./PowerParts.tsx";
 
@@ -63,6 +64,21 @@ export function mockKingHelp(boss: BossView): void {
   playInPlace(key, [figureLoop() === "idle2" ? "slam2" : "slam"]);
   bossVoice.say(RECLUSE_LINES.mock[n % RECLUSE_LINES.mock.length], key, CRITICAL);
   kingSay("foeBlocked", key);
+}
+
+let warmed = false;
+/**
+ * His phase change's frames drawn ahead, a slice each animation frame, from when his battle shows (it comes only once
+ * he's beaten, minutes later): his rage where he stands, then his whole figure's on the board, so none stalls a slow
+ * phone the first time it shows (.claude/LESSONS.md: "A stall the first time an effect shows").
+ */
+export function prewarmRecluse(): void {
+  if (warmed) return;
+  warmed = true;
+  const frames = (ch: typeof RECLUSE, names: readonly string[]) => names.flatMap((n) => ch.anims[n]?.frames ?? []);
+  // (His rage plays where he stands, from his own figure's cache: drawn here, its new parts are painted ahead.)
+  prewarmSprite(RECLUSE_BUST, frames(RECLUSE_BUST, ["rage"]));
+  prewarmSprite(RECLUSE, frames(RECLUSE, ON_BOARD_ANIMS));
 }
 
 export const RECLUSE_UI = {

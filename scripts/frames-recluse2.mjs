@@ -1,10 +1,11 @@
 // The Hidden Boss's phase 2, frame by frame in a real Boss alone battle, as an admin, on a phone (390 px) and a computer
-// (1280 px), with real taps: the phase change (?win=1: you mate him in phase 1; the book's slam, the split into four, his
-// revive, the Chess960 shuffle), the four boards in play (?phase=2: a few of your moves against him), a win (?win=1: your
-// Qxf7 mates on your board, the bots mate on theirs: "Victory!") and a loss (?win=1, then you resign your board: "won 3 of
-// 4"), and his phase 2 ultimate on the admins' trigger. Records every painted frame (Chrome's screencast) and saves
+// (1280 px), with real taps: the phase change (?win=1: you mate him in phase 1; he gets up in a rage, leaps onto the board,
+// throws the book down, chants over its light, the split into four, the book back in his hands, the Chess960 shuffle),
+// the four boards in play (?phase=2: a few of your moves against him), a win (?win=1: your Qxf7 mates on your board, the
+// bots mate on theirs: "Victory!") and a loss (?win=1, then you resign your board: "won 3 of 4"), and his phase 2
+// ultimate on the admins' trigger. Records every painted frame (Chrome's screencast) and saves
 // stills, a GIF of each moment, and screenshots.
-//   npm run frames:recluse2 -- <out-dir> [phone|desktop|both] [light|dark] [base=http://localhost:8788]
+//   npm run frames:recluse2 -- <out-dir> [phone|desktop|both] [light|dark] [base=http://localhost:8788] [only=change]
 // Needs the app and its API running (npx wrangler dev), as frames:recluse does.
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -134,8 +135,9 @@ async function battle(name, context, query, script) {
     mkdirSync(tdir, { recursive: true });
     tick.forEach((f, i) => writeFileSync(join(tdir, `${String(i).padStart(4, "0")}.jpg`), Buffer.from(f.data, "base64")));
     if (tick.length > 2) gif(tdir, join(outDir, `${tag}.gif`), width);
-    const gaps = list.slice(1).map((f, i) => f.t - list[i].t).filter((g) => g > 250);
-    log(`${m.label}: ${list.length} frames, ${tick.length} ticks; gaps over 250 ms: ${gaps.map(Math.round).join(", ") || "none"}`);
+    // (Each gap with where it began, ms into the moment.)
+    const gaps = list.slice(1).map((f, i) => [f.t - list[i].t, list[i].t - m.from]).filter(([g]) => g > 250);
+    log(`${m.label}: ${list.length} frames, ${tick.length} ticks; gaps over 250 ms: ${gaps.map(([g, at]) => `${Math.round(g)} at +${Math.round(at)}`).join(", ") || "none"}`);
   }
   if (errors.length) console.log(`${name}: ${errors.length} page errors`);
   await ctx.close();
@@ -166,14 +168,17 @@ const change = async (ctx) => {
   await waitUntil((s) => s.kind === "play", 60_000);
   await p.waitForTimeout(800);
   await play("h5f7");
+  const fall = await waitUntil((s) => s.fall, 30_000);
   const ch = await waitUntil((s) => s.kind === "phaseChange", 30_000);
-  for (const [ms, label] of [[400, "1-book"], [1300, "2-slam"], [2200, "3-crack"], [3000, "4-split"], [4100, "5-shuffle"], [5200, "6-revive"], [6300, "7-banner"]]) {
+  // (PHASE_CHANGE's beats: his rage, the leap, landed, the book brandished, thrown down, the chant and its light, the
+  // cracks, the split, the book back in his hands, the leap back, "PHASE 2".)
+  for (const [ms, label] of [[700, "01-rage"], [1700, "02-leap"], [2150, "03-landed"], [2750, "04-brandish"], [3250, "05-thrown"], [4300, "06-chant"], [5500, "07-crack"], [6800, "08-split"], [7800, "09-book-back"], [8550, "10-leap-back"], [9400, "11-banner"]]) {
     const wait = ch.now + ms - Date.now();
     if (wait > 0) await p.waitForTimeout(wait);
     await shot(`change-${label}`);
   }
   const s2 = await waitUntil((s) => s.kind === "simul" && s.simul?.playing, 30_000);
-  mark("change", ch.now - 300, s2.now + 1200);
+  mark("change", fall.now - 300, s2.now + 1200);
   await p.waitForTimeout(800);
   await shot("8-four-boards");
   const t = Date.now();
@@ -240,8 +245,11 @@ const loss = async (ctx) => {
 const runs = [];
 if (which !== "desktop") runs.push(["phone", { ...devices["iPhone 13"] }]);
 if (which !== "phone") runs.push(["desktop", { viewport: { width: 1280, height: 800 } }]);
+// (`only=change`: the phase change alone.)
+const onlyChange = process.argv.includes("only=change");
 for (const [name, context] of runs) {
   await battle(`${name}-change`, context, "win=1&laststand=0", change);
+  if (onlyChange) continue;
   await battle(`${name}-play`, context, "phase=2", playing);
   await battle(`${name}-ult`, context, "phase=2", ult);
   await battle(`${name}-loss`, context, "win=1&laststand=0", loss);

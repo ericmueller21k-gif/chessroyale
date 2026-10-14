@@ -46,7 +46,19 @@ describe("the Hidden Boss's art", () => {
       expect(cues("revive")).toEqual(["rise", "snap", "catch"]);
       // Every phase-1 animation he has once revived has a phase-2 version with the same cues.
       for (const name of ["consult", "stare", "laugh", "spellbook", "spellClose", "slam"]) expect(cues(`${name}2`), name).toEqual(cues(name));
+      // The phase change: up in a rage where he stands (both drawings).
+      expect(cues("rage")).toEqual(["rise", "snatch", "catch"]);
     }
+    // ...and on the board, his whole figure only: the leap in, the book thrown down, the chant (its loop silent), the
+    // book back in his hands, the leap back.
+    const cues = (name: string) => RECLUSE.anims[name]!.frames.map((f) => f.cue).filter(Boolean);
+    expect(cues("leap")).toEqual(["jump", "land"]);
+    expect(cues("drop")).toEqual(["raise", "throw", "thud"]);
+    expect(cues("chantRaise")).toEqual(["light"]);
+    expect(RECLUSE.anims.chant!.loop).toBe(true);
+    expect(cues("chant")).toEqual([]);
+    expect(cues("pickup")).toEqual(["snap", "catch"]);
+    expect(cues("leap2")).toEqual(["jump"]);
     expect(RECLUSE_BOOK.anims.slam!.frames.map((f) => f.cue).filter(Boolean)).toEqual(["slam"]);
     expect(RECLUSE_BOOK.anims.close!.frames.map((f) => f.cue).filter(Boolean)).toEqual(["snap"]);
   });

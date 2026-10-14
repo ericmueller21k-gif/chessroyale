@@ -303,6 +303,12 @@ export const BOSS_KITS: Record<string, BossKit> = {
       book: "recluseShut",
       rise: "recluseRustle",
       catch: "recluseShut",
+      // (The phase change: up in a rage, the leap onto the board, the book thrown down, the chant's light.)
+      snatch: "recluseRustle",
+      jump: "recluseRustle",
+      land: "recluseThump",
+      throw: "recluseRustle",
+      light: "recluseGlow",
     },
     lines: { entrance: RECLUSE_LINES.intro, rattled: RECLUSE_LINES.rattled, victory: RECLUSE_LINES.victory, ultimate: RECLUSE_LINES.bullet },
     chance: { entrance: 1, rattled: 0.3, victory: 1 },

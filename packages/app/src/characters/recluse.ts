@@ -19,12 +19,13 @@
  *   board's corner).
  * - `RECLUSE_BUST`: head, shoulders and the top of the book, cut at the chest, for a phone's boss bar (too short for a
  *   figure his height). The same face and the same animations.
- * And the book alone, one board square across, for the board: `RECLUSE_BOOK` (effects/recluse.ts).
+ * And the book alone, one board square across: `RECLUSE_BOOK` (effects/recluse.ts; art only, not shown).
  *
  * His story in two phases (Eric, Oct 14): phase 1 calm, the book clutched at his side; beaten, he `collapse`s to his
- * knees and mumbles (`collapseLoop`); he `revive`s into phase 2, his hair streaming in a constant wind, his face in
- * deeper shadow with a glint in his eyes, a wider stance, the book held ready in front of him. Each animation has a
- * phase-2 version (`idle2`, `consult2`...), so once revived his hair never falls calm again.
+ * knees and mumbles (`collapseLoop`); then his phase change (Eric, Oct 14, reworked): up in a `rage`, he leaps onto the
+ * board, throws the book down and chants over its light, his hair lifting into phase 2's: his hair streaming in a
+ * constant wind, his face in deeper shadow with a glint in his eyes, a wider stance, the book held ready in front of
+ * him. Each animation has a phase-2 version (`idle2`, `consult2`...), so once changed his hair never falls calm again.
  *
  * Rigging: the head (one per face, per lift of the hair in the wind and per phase: eyes, brows and mouth stamped on a
  * typed base), the torso, the tie (from its sway), the legs (standing, wide, four steps down to kneeling) and the
@@ -102,9 +103,9 @@ const mirror = (rows: readonly string[]) => rows.map((r) => [...r].reverse().joi
 // ---- The head: one per face, typed (the face is what must read, so every pixel of it is placed by hand). Head space:
 // 25 x 35 (5 rows on top for the hair lifting in the wind), the face's middle on x 12 (the nose).
 
-export type Eyes = "ahead" | "down" | "readL" | "readR" | "shut" | "hard" | "narrow" | "wild" | "squeeze";
-export type Brows = "stern" | "hard" | "twitch" | "up" | "wild";
-export type Mouth = "stern" | "tight" | "grin" | "laugh" | "grit" | "mumble1" | "mumble2" | "mumble3";
+export type Eyes = "ahead" | "down" | "readL" | "readR" | "shut" | "hard" | "narrow" | "wild" | "squeeze" | "glare";
+export type Brows = "stern" | "hard" | "twitch" | "up" | "wild" | "fury";
+export type Mouth = "stern" | "tight" | "grin" | "laugh" | "grit" | "mumble1" | "mumble2" | "mumble3" | "scowl" | "shout";
 export interface Face {
   eyes: Eyes;
   brows: Brows;
@@ -163,6 +164,8 @@ const BROWS: Record<Brows, { l: readonly string[]; r?: readonly string[] }> = {
   twitch: { l: ["......", "BBBBB.", ".BBBBB"], r: ["BBBB..", ".BBBBB", "cccccc"] },
   up: { l: [".BBBB.", "B....B", "dddddd"], r: [".BBBB.", "B....B", "cccccc"] },
   wild: { l: [".BBB..", "B...BB", "dddddd"], r: ["..BBBB", "BBB...", "cccccc"] },
+  // Rage: drawn down hard to the bridge of his nose, a V.
+  fury: { l: ["BB....", "BBBB..", "..BBBB"] },
 };
 /**
  * Each eye, 4 wide, rows 12 to 15 (the lid, the iris, the white under it, the shade under the eye): the left from x 7,
@@ -179,6 +182,8 @@ const EYES: Record<Eyes, { l: readonly string[]; r?: readonly string[] }> = {
   narrow: { l: ["bbbb", "xxxx", "wxxw", "bbbb"] },
   wild: { l: ["wwww", "wwxw", "wwww", "bwwb"], r: ["wwww", "wxww", "wwww", "bwwb"] },
   squeeze: { l: ["bbbb", "bxxb", "x..x", "cccc"] },
+  // Glaring straight at us under the drawn brows: a heavy lid, the iris full, white either side.
+  glare: { l: ["bbbb", "wxxw", "wxxw", "cbbc"] },
 };
 /** The mouth, 7 wide, rows 23 to 27 from x 9: thin lips, at rest pressed into a knowing half-smirk. */
 const MOUTHS: Record<Mouth, readonly string[]> = {
@@ -191,6 +196,9 @@ const MOUTHS: Record<Mouth, readonly string[]> = {
   mumble1: [".......", ".mmmmm.", ".mXXXm.", "..mmm.."],
   mumble2: [".......", "..mmm..", "..mXm..", "...m..."],
   mumble3: [".......", "mmmmmm.", ".ddddd.", "..bbb.."],
+  // Rage: the corners pulled down; and shouting, the mouth wide, the teeth bared.
+  scowl: ["..mmm..", ".m...m.", "m.ddd.m", "..bbb.."],
+  shout: [".mmmmm.", "mwwwwwm", "mXXXXXm", "mwwwwwm", ".mmmmm."],
 };
 
 /**
@@ -474,6 +482,13 @@ const HAND: Record<"rest" | "flex", readonly string[]> = {
   rest: [".kcddck.", ".kcdddbk", "kddcddbk", "kdbcddbk", ".kkcddbk", "..kbcdbk", "..kbcbbk", "...kbbk.", "....kk.."],
   flex: [".kcddck.", ".kcdddbk", "kddcddbk", "kdbcddbk", ".kkcddbk", "..kbccbk", "...kbbk.", "....kk..", "........"],
 };
+/**
+ * His left hand (our right) raised open, its palm to us (the chant over the book): the fingers up and together, a shade
+ * line between them, the thumb out towards his body; lit on its top left. It carries its own outline, open at the
+ * foot, so it runs on from the forearm; its bottom row sits on the wrist, 3 to the left of it. His right hand is its
+ * mirror.
+ */
+const PALM = ["..kkkk.", ".kdeddk", ".kdcdck", ".kdcdck", "kkdcdck", "kdbdddk", "kddddck", ".kdddck", "..kccbk", "..kcbbk"];
 
 // ---- Parts.
 
@@ -490,6 +505,7 @@ add("fist:b", () => ({ grid: FIST.b }));
 add("clutch", () => ({ grid: CLUTCH }));
 add("hand:rest", () => ({ grid: HAND.rest, outline: false }));
 add("hand:flex", () => ({ grid: HAND.flex, outline: false }));
+add("hand:palm", () => ({ grid: PALM, outline: false }));
 add("book:closed", () => bookTurned(0));
 for (const d of [45, 90, 135, 180, 225, 270, 315]) add(`book:spin${d}`, () => bookTurned(d));
 add("book:flat", bookFlat);
@@ -535,6 +551,8 @@ export interface Hold {
   clutched?: boolean;
   /** On its own (falling, on the ground, flying back): `at` is where it is, whatever his body does. */
   loose?: boolean;
+  /** Held up in his book hand alone (brandished), his free arm left free. */
+  oneHand?: boolean;
   /** The book arm (his right, our left): elbow and wrist. */
   elbowR: Pt;
   wristR: Pt;
@@ -568,6 +586,12 @@ export interface ReclusePose {
   /** His free hand: on the book, its fingers drumming (`b`); hanging, its fingers curled in a little (`b`). */
   grip?: "a" | "b";
   tie?: number;
+  /** His free hand, when it isn't on the book, clenched in a fist (angry). */
+  fist?: boolean;
+  /** Both hands raised open, palms to us (the chant; the book lies on the ground). */
+  palms?: boolean;
+  /** Off the ground (a leap): no shadow under his feet (the board draws one where he'll land). */
+  air?: boolean;
 }
 
 /** Layers for a pose. `bust`: only what the bust shows (no legs, shoes, shadow or a book on the ground). */
@@ -588,14 +612,14 @@ export function recluseLayers(p: ReclusePose, bust = false): Layer[] {
   const wrL = up(h.wristL);
   const armR = armPart(up(SHOULDER_R), elR, wrR);
   // His free hand grips the book's edge when he holds it out in front of him; otherwise it hangs (or rests) open.
-  const onBook = !h.clutched && !h.loose;
+  const onBook = !h.clutched && !h.loose && !h.oneHand;
   const armL = armPart(up(SHOULDER_L), elL, wrL, false, !onBook);
   const [bw, bh] = h.book.startsWith("spin") ? [25, 25] : BOOK_SIZE[h.book as BookPart];
   const bc = h.loose ? h.at : up(h.at);
   const book = at(`book:${h.book}`, bc[0] - Math.floor(bw / 2), bc[1] - Math.floor(bh / 2));
   const layers: Layer[] = [];
   if (!bust) {
-    layers.push(at("shadow", 26, GROUND - 2));
+    if (!p.air) layers.push(at("shadow", 26, GROUND - 2));
     if (stance === "kneel") layers.push(at("heels", 27, GROUND - 4), at("heels", 59, GROUND - 4, true));
     layers.push(at(`legs:${stance}`, LEGS[stance].at[0], LEGS[stance].at[1]));
     if (stance !== "kneel") {
@@ -610,12 +634,16 @@ export function recluseLayers(p: ReclusePose, bust = false): Layer[] {
   layers.push(at(armL.name, armL.at[0], armL.at[1]), at(armR.name, armR.at[0], armR.at[1]));
   // Clutched: the book against his side, his forearm across it and his fingers over its edge. Held out: in front of
   // him, his fists on its sides. Loose: his hand empty.
-  if (h.loose) layers.push(at("fist:a", wrR[0] - 3, wrR[1] - 1));
+  // (Raised open, palms to us: each hand on its wrist, the right one the left's mirror.)
+  const palm = (wr: Pt, right: boolean) => at("hand:palm", wr[0] - (right ? PALM[0]!.length - 4 : 3), wr[1] - PALM.length + 1, right);
+  if (h.loose) layers.push(p.palms ? palm(wrR, true) : at("fist:a", wrR[0] - 3, wrR[1] - 1));
   else if (h.clutched) {
     const fore = armPart(up(SHOULDER_R), elR, wrR, true);
     layers.push(book, at(fore.name, fore.at[0], fore.at[1]), at("clutch", wrR[0] - 2, wrR[1] - 3));
   } else layers.push(book, at("fist:a", wrR[0] - 3, wrR[1] - 3));
   if (onBook) layers.push(at(`fist:${p.grip ?? "a"}`, wrL[0] - 3, wrL[1] - 3));
+  else if (p.palms) layers.push(palm(wrL, false));
+  else if (p.fist) layers.push(at("fist:a", wrL[0] - 3, wrL[1] - 1));
   else layers.push(at(`hand:${p.grip === "b" ? "flex" : "rest"}`, wrL[0] - 4, wrL[1] - 1));
   return layers;
 }
@@ -875,6 +903,126 @@ const REVIVE: Spec[] = [
   { ms: 130, p: { phase: 2, wind: 2 } },
 ];
 
+// ---- The phase change (Eric, Oct 14): beaten, he gets up in a rage, leaps onto the middle of the board, throws the book
+// down at his feet, and chants over it as light pours out of it (his hair lifting: phase 2 begins); the boards crack and
+// split; the book flies back up into his hands and he leaps back to his place. The board draws him (Recluse2.tsx);
+// only `rage` plays where he stands, so it alone is in the bust too.
+
+const ANGRY: Partial<Face> = { eyes: "glare", brows: "fury", mouth: "scowl" };
+/**
+ * Up in a rage (one-shot, from `collapseLoop`; his place, both drawings): his brows come down, his head snaps up
+ * glaring at us, teeth gritted, shaking (cue `rise`); he gets up, and the book flies up off the ground (cue `snatch`)
+ * into his hand, clutched at his side again (cue `catch`); he stands trembling, his free hand a fist.
+ */
+const RAGE: Spec[] = [
+  { ms: 160, p: { stance: "kneel", dip: 6, face: { eyes: "down", brows: "hard", mouth: "tight" }, hold: SLUMP } },
+  { ms: 180, p: { stance: "kneel", dip: 3, shake: 1, face: ANGRY, hold: SLUMP }, extra: { cue: "rise" } },
+  { ms: 120, p: { stance: "kneel", dip: 3, shake: -1, face: ANGRY, hold: SLUMP } },
+  { ms: 110, p: { stance: "low", dip: 2, face: ANGRY, hold: { ...SLUMP, elbowR: [32, 58], wristR: [35, 77], elbowL: [61, 58], wristL: [57, 78] } } },
+  { ms: 80, p: { stance: "bend", dip: 1, face: ANGRY, hold: flyBack("spin45", [38, 112]) }, extra: { cue: "snatch" } },
+  { ms: 70, p: { stance: "rise", face: ANGRY, hold: flyBack("spin135", [31, 96]) } },
+  { ms: 70, p: { face: ANGRY, hold: flyBack("spin225", [29, 80]) } },
+  { ms: 90, p: { face: ANGRY, fist: true }, extra: { cue: "catch", shake: [1, 0] } },
+  { ms: 150, p: { face: ANGRY, fist: true, shake: 1, breath: 1 } },
+  { ms: 150, p: { face: ANGRY, fist: true, shake: -1, breath: 1 } },
+  { ms: 150, p: { face: ANGRY, fist: true, shake: 1, breath: 1 } },
+];
+
+/** Where his feet raise the dust as he lands. */
+const LANDING: Pt = [46, 127];
+/**
+ * A leap (the board draws it along its arc): a crouch (cue `jump`), off the ground at its end, up and through the air
+ * (no shadow under him: the board draws one where he'll come down), landing hard in a deep crouch (cue `land`) with a
+ * burst of dust, and up again. Phase 1 (`leap`, onto the middle) in his rage; phase 2 (`leap2`, back to his place) just
+ * the crouch and the flight: he's gone before he lands.
+ */
+const LEAP = (ph: Ph): Spec[] => {
+  const f: ReclusePose = { face: ph === 1 ? ANGRY : { eyes: "hard", brows: "hard", mouth: "stern" }, fist: true };
+  return [
+    { ms: 120, p: { ...f, stance: "bend", dip: 1 }, extra: { cue: "jump" } },
+    { ms: 80, p: { ...f, air: true, breath: 1, headDy: -1 } },
+    { ms: 480, p: { ...f, air: true, stance: "bend", tie: 1 } },
+    { ms: 90, p: { ...f, stance: "low", dip: 1 }, extra: { cue: "land", shake: [0, 1], specks: puff(LANDING, 0, 28) } },
+    { ms: 90, p: { ...f, stance: "bend" }, extra: { specks: puff(LANDING, 1, 28) } },
+    { ms: 110, p: f, extra: { specks: puff(LANDING, 2, 28) } },
+  ];
+};
+
+/** Where the book lies open at his feet (a little higher than closed: it is taller, and it lands with a jolt). */
+const OPEN_ON_GROUND: Pt = [ON_GROUND[0], ON_GROUND[1] - 2];
+/** Brandished over his head in his book hand (his free hand a fist). */
+const BRANDISH: Partial<Hold> = { book: "closed", at: [27, 12], clutched: false, loose: false, oneHand: true, elbowR: [24, 32], wristR: [27, 23] };
+/** The book lying open on the ground at his feet, his arms down, his hands fists. */
+const AT_HIS_FEET: Partial<Hold> = { book: "read", at: OPEN_ON_GROUND, loose: true, clutched: false, elbowR: [31, 60], wristR: [34, 80], elbowL: [61, 60], wristL: [59, 80] };
+/**
+ * Throwing the book down (one-shot, on the board): he lifts it from his side (cue `raise`) and brandishes it over his
+ * head, shaking, shouting at us; then swings it down at his feet (cue `throw`), where it lands open (cue `thud`) in a
+ * puff of dust, and he glares down at it.
+ */
+const DROP: Spec[] = [
+  { ms: 100, p: { face: ANGRY, fist: true, hold: { at: [40, 54], elbowR: [31, 58], wristR: [37, 61] } }, extra: { cue: "raise" } },
+  { ms: 80, p: { face: ANGRY, fist: true, breath: 1, hold: { ...BRANDISH, at: [30, 32], elbowR: [26, 44], wristR: [30, 43] } } },
+  { ms: 240, p: { face: ANGRY, fist: true, breath: 1, shake: 1, hold: BRANDISH } },
+  { ms: 130, p: { face: { ...ANGRY, mouth: "shout" }, fist: true, breath: 1, shake: -1, headDy: -1, hold: BRANDISH } },
+  { ms: 130, p: { face: ANGRY, fist: true, breath: 1, shake: 1, hold: BRANDISH } },
+  { ms: 60, p: { face: ANGRY, fist: true, hold: { book: "spin90", at: [27, 72], loose: true, clutched: false, elbowR: [28, 52], wristR: [31, 66] } }, extra: { cue: "throw" } },
+  { ms: 60, p: { face: { ...ANGRY, eyes: "down" }, fist: true, dip: 1, hold: { book: "spin180", at: [38, 104], loose: true, clutched: false, elbowR: [31, 58], wristR: [34, 76] } } },
+  { ms: 90, p: { face: { ...ANGRY, eyes: "down" }, fist: true, dip: 2, hold: AT_HIS_FEET }, extra: { cue: "thud", shake: [0, 1], specks: puff(OPEN_ON_GROUND, 0, 26) } },
+  { ms: 90, p: { face: { ...ANGRY, eyes: "down" }, fist: true, dip: 2, hold: AT_HIS_FEET }, extra: { specks: puff(OPEN_ON_GROUND, 1, 26) } },
+  { ms: 220, p: { face: { ...ANGRY, eyes: "down" }, fist: true, dip: 2, hold: AT_HIS_FEET }, extra: { specks: puff(OPEN_ON_GROUND, 2, 26) } },
+];
+
+/**
+ * Light rising off the book lying open at his feet (its middle in drawing space), at a point of its loop (0 to 7):
+ * motes and little four-point stars climbing in front of his legs, pale to gold to ember as they rise, never as high as
+ * his face; a glow along the pages' top edge.
+ */
+function rising([x, y]: Pt, i: number): Speck[] {
+  const out: Speck[] = [];
+  for (let n = 0; n < 14; n++) {
+    const life = (i + n * 3) % 8; // 0 just off the pages .. 7 gone
+    if (life > 6) continue;
+    const X = x - 13 + ((n * 7) % 27) + Math.round(Math.sin((life + n) * 1.3) * 1.2);
+    const Y = y - 5 - life * (6 + (n % 3) * 2);
+    const k = life < 2 ? "8" : life < 5 ? "9" : "0";
+    out.push(sp([X, Y], k));
+    if (n % 3 === 0 && life > 0 && life < 4) out.push(sp([X - 1, Y], k), sp([X + 1, Y], k), sp([X, Y - 1], k), sp([X, Y + 1], k));
+  }
+  for (let dx = -12; dx <= 12; dx += 2) if ((dx / 2 + i) % 3) out.push(sp([x + dx + (i % 2), y - 5], (dx / 2 + i) % 3 === 1 ? "9" : "8"));
+  return out;
+}
+/** The book open at his feet, lit from within, his arms raised (elbows out, forearms up) and his hands open. */
+const overBook = (elbowR: Pt, wristR: Pt, elbowL: Pt, wristL: Pt): Partial<Hold> => ({ book: "read", at: OPEN_ON_GROUND, loose: true, clutched: false, elbowR, wristR, elbowL, wristL });
+/**
+ * The chant begins (one-shot, phase 2's face from here: the light is his power coming back): the pages light up (cue
+ * `light`), his hair lifts, his eyes go wild, his arms rise.
+ */
+const CHANT_RAISE: Spec[] = [
+  { ms: 110, p: { wind: 1, fist: true, face: { eyes: "wild", brows: "up", mouth: "tight" }, hold: { ...AT_HIS_FEET, elbowR: [29, 56], wristR: [27, 70], elbowL: [63, 56], wristL: [65, 70] } }, extra: { cue: "light", specks: rising(OPEN_ON_GROUND, 0), pal: LIT(0) } },
+  { ms: 110, p: { wind: 2, palms: true, face: { eyes: "wild", brows: "up", mouth: "laugh" }, hold: overBook([25, 44], [22, 30], [67, 44], [70, 30]) }, extra: { specks: rising(OPEN_ON_GROUND, 1), pal: LIT(1) } },
+];
+/** The chant (loop, 0.8 s): his arms raised over the book, swaying, his mouth working, his hair streaming in the light. */
+const CHANT: Spec[] = Array.from({ length: 8 }, (_, i) => {
+  const sway = [0, 1, 2, 1, 0, -1, -2, -1][i]!;
+  return {
+    ms: 100,
+    p: { wind: ((i % 3) + 1) as Wind, palms: true, headDy: -1, tie: sway > 0 ? 1 : sway < 0 ? -1 : 0, face: { eyes: "wild", brows: "up", mouth: (["laugh", "mumble1", "mumble2", "mumble1"] as const)[i % 4] }, hold: overBook([24, 33 - sway], [22 + sway, 15 - sway], [68, 33 + sway], [70 + sway, 15 + sway]) },
+    extra: { specks: rising(OPEN_ON_GROUND, i), pal: LIT(i) },
+  };
+});
+/**
+ * The book back in his hands (one-shot, phase 2): his arms come down as the light dies, and the book snaps shut and
+ * flies up spinning into his hands (his revive's own frames: cues `snap`, `catch`), held ready in front of him.
+ */
+const PICKUP: Spec[] = [{ ms: 120, p: { wind: 3, face: { eyes: "narrow", brows: "hard", mouth: "tight" }, hold: { ...AT_HIS_FEET, elbowR: [31, 58], wristR: [33, 78], elbowL: [61, 58], wristL: [59, 78] } }, extra: { pal: LIT(0) } }, ...REVIVE.slice(6)];
+
+/** His leaps' beats (ms into `leap`, `leap2`): off the ground (the crouch's end) and landing (cue `land`). */
+export const RECLUSE_JUMP = (() => {
+  const specs = LEAP(1);
+  const landAt = specs.slice(0, specs.findIndex((s) => s.extra?.cue === "land")).reduce((t, s) => t + s.ms, 0);
+  return { upAt: specs[0]!.ms, landAt };
+})();
+
 const anims = (bust: boolean): Record<string, Anim> => ({
   idle: { loop: true, frames: build(IDLE, bust) },
   consult: { loop: false, frames: build(CONSULT(1), bust) },
@@ -895,7 +1043,23 @@ const anims = (bust: boolean): Record<string, Anim> => ({
   spellLoop2: { loop: true, frames: build(SPELL_LOOP, bust, 2) },
   spellClose2: { loop: false, frames: build(SPELL_CLOSE(2), bust, 2) },
   slam2: { loop: false, frames: build(SLAM(2), bust, 2) },
+  // The phase change: up in a rage where he stands; the rest only on the board, as the whole figure.
+  rage: { loop: false, frames: build(RAGE, bust) },
+  ...(bust
+    ? {}
+    : {
+        leap: { loop: false, frames: build(LEAP(1), bust) },
+        drop: { loop: false, frames: build(DROP, bust) },
+        chantRaise: { loop: false, frames: build(CHANT_RAISE, bust, 2) },
+        chant: { loop: true, frames: build(CHANT, bust, 2) },
+        pickup: { loop: false, frames: build(PICKUP, bust, 2) },
+        leap2: { loop: false, frames: build(LEAP(2).slice(0, 3), bust, 2) },
+      }),
 });
+/** The phase change's animations the board plays (the whole figure only). */
+export const ON_BOARD_ANIMS = ["leap", "drop", "chantRaise", "chant", "pickup", "leap2"] as const;
+/** Where the book lies open at his feet (`drop`, the chant, `pickup`'s start), in the whole figure's frame pixels. */
+export const BOOK_ON_GROUND = [OX + OPEN_ON_GROUND[0], OY + OPEN_ON_GROUND[1]] as const;
 
 /** The whole standing figure (a computer, at 2x by the board's corner). */
 export const RECLUSE: Character = {

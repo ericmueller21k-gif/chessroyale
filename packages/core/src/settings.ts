@@ -805,14 +805,15 @@ export const RECLUSE_PHASE2 = {
   bankSeconds: 120,
   /**
    * His ultimate (Eric, Oct 14): a move that takes longer than `slowMoveSeconds` (anyone's, on any board, before it
-   * comes) is a slow move: he says so (one of his lines about playing faster). Once the team's slow moves pass
-   * `slowMovesForUlt` (it fires on the next one), his ultimate: from then on every move on every board has
-   * `ultMoveSeconds`, no bank; when they run out, a random legal move is played for that player (never a loss on
-   * time). Before it, the bank above applies. Estimates, not yet sim-tested: with a 2:00 bank (about 3 s a move over a
-   * game) slow moves will be common, so it will likely come early in the fight.
+   * comes) is a slow move: he says so (one of his lines about playing faster), counted once for the team as the move
+   * is made (the X marks beside every board). The team's `slowMovesForUlt`-th slow move brings his ultimate (Eric, Oct
+   * 14, after playtesting: at 10 of 10; it was the 6th, then the 5th): from then on every move on every board has
+   * `ultMoveSeconds`, no bank, everyone's few seconds starting fresh as it comes; when they run out, a random legal
+   * move is played for that player (never a loss on time). Before it, the bank above applies. Estimates, not yet
+   * sim-tested: with a 2:00 bank (about 3 s a move over a game) slow moves will be common.
    */
   slowMoveSeconds: 5,
-  slowMovesForUlt: 5,
+  slowMovesForUlt: 10,
   ultMoveSeconds: 5,
   /** The bots on the other boards (Boss alone): Stockfish at this strength, this many nodes, within `botMoveMs`. */
   botElo: 2200,
@@ -827,6 +828,17 @@ export const RECLUSE_PHASE2 = {
   botSlowMs: [5400, 7000] as readonly [number, number],
   /** Once every board is decided: how long his reaction holds the boards before the result screen (ms). */
   endMs: 3200,
+  /**
+   * His collusion lines in phase 2 (Eric, Oct 14: the four boards against a team fit his story): one every `talkEvery`
+   * of his moves (all four boards together), give or take `talkJitter` (a random pick each time); a line comes only if
+   * no other is up (the lowest priority: skipped, never queued). Which stage by his moves so far: early, then middle
+   * from `talkMiddleFrom`, late from `talkLateFrom`. Estimates: on four boards he moves about once a second, so a line
+   * every 6 to 10 s, the middle from about half a minute in, the late after about a minute.
+   */
+  talkEvery: 8,
+  talkJitter: 2,
+  talkMiddleFrom: 24,
+  talkLateFrom: 64,
 };
 
 /** BOSS_POWERS with room for other numbers (tests, and the switch turned off). */

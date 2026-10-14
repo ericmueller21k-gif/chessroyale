@@ -1,13 +1,14 @@
 /**
  * The Hidden Boss's sounds, synthesized (no files, no licenses): the red book's pages fluttering as it opens, the book
  * slammed shut (a dull thump with a slap of paper), a soft rustle of cloth as he moves it or himself, his laugh as breath
- * through the nose (no real voice: a few huffs), and a low swell under his stare. Each is a pure function of the sample
- * rate (its noise is seeded), so a test can measure it: every one stays quieter than a piece's move (peak and loudness).
- * Made ahead in idle moments as his battle starts (warmSounds).
+ * through the nose (no real voice: a few huffs), a low swell under his stare, and for his phase change a thump as he
+ * lands on the board and the light pouring out of the book (a soft chord swelling over the hum), and phase 2's slow move
+ * (two soft notes falling). Each is a pure function of the sample rate (its noise is seeded), so a test can measure
+ * it: every one stays quieter than a piece's move (peak and loudness). Made ahead in the sound worker (warmSounds).
  */
 import { bandpass, lowpass, noise, osc, render, sine, soft, type Voice, soundCache } from "./synth.ts";
 
-export type RecluseSound = "flip" | "shut" | "rustle" | "huff" | "hum";
+export type RecluseSound = "flip" | "shut" | "rustle" | "huff" | "hum" | "thump" | "glow" | "slow";
 
 /** Noise with its highs rolled off: paper, never a hiss. */
 const paper = (rate: number, cut: number, seed: number): Voice => lowpass(rate, cut, noise(seed));
@@ -57,10 +58,41 @@ const SOUNDS: Record<RecluseSound, (rate: number) => Float32Array> = {
     const b = osc(rate, () => 75.5, sine);
     return render(rate, 1.2, (t) => Math.sin((Math.PI * t) / 1.2) ** 2 * (a(t) + b(t)));
   },
+  // Landing from his leap onto the board: a deep thump of his shoes, a scuff of dust.
+  thump: (rate) => {
+    const body = osc(rate, (t) => 52 + 70 * Math.exp(-t / 0.03), sine);
+    const scuff = bandpass(rate, () => 700, 1.1, paper(rate, 2400, 619));
+    return render(rate, 0.32, (t) => Math.exp(-t / 0.08) * body(t) + (t < 0.12 ? Math.exp(-t / 0.035) * 1.6 * scuff(t) : 0));
+  },
+  // The light pouring out of the book as he chants: three soft tones (a minor chord) swelling and shimmering, the
+  // stare's low beating hum under them; it fades as the boards split.
+  glow: (rate) => {
+    const tones = [220, 261.6, 329.6].map((f) => osc(rate, () => f, sine));
+    const a = osc(rate, () => 73, sine);
+    const b = osc(rate, () => 75.5, sine);
+    return render(rate, 2.6, (t) => {
+      const env = Math.min(1, t / 0.7) ** 1.5 * Math.min(1, (2.6 - t) / 0.9);
+      const shimmer = 0.75 + 0.25 * Math.sin(2 * Math.PI * 6 * t);
+      return env * (shimmer * (tones[0]!(t) + 0.8 * tones[1]!(t) + 0.7 * tones[2]!(t)) + 0.8 * (a(t) + b(t)));
+    });
+  },
+  // A slow move in phase 2 (Eric, Oct 14: never a harsh buzzer): two soft, low notes falling, D to A, each a quick
+  // pluck dying away (a little of its octave, so a phone's speaker carries it), well under a move's loudness.
+  slow: (rate) => {
+    const note = (f: number) => {
+      const o1 = osc(rate, () => f, sine);
+      const o2 = osc(rate, () => 2 * f, sine);
+      return (t: number) => o1(t) + 0.35 * o2(t);
+    };
+    const d = note(293.7);
+    const a = note(220);
+    const pluck = (age: number, decay: number) => (age < 0 ? 0 : Math.min(1, age / 0.01) * Math.exp(-age / decay));
+    return render(rate, 0.42, (t) => pluck(t, 0.06) * d(t) + pluck(t - 0.13, 0.09) * a(t));
+  },
 };
 
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
-const LEVEL: Record<RecluseSound, number> = { flip: 0.11, shut: 0.26, rustle: 0.18, huff: 0.1, hum: 0.09 };
+const LEVEL: Record<RecluseSound, number> = { flip: 0.11, shut: 0.26, rustle: 0.18, huff: 0.1, hum: 0.09, thump: 0.24, glow: 0.05, slow: 0.12 };
 
 const cache = soundCache("recluse");
 /** The samples for one of his sounds at a sample rate (made once, then reused). */

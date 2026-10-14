@@ -8,7 +8,9 @@
  *   it away (a new screen picks it up where it was).
  * - **Taking turns.** Each speaker (the boss, the God King) has one Voice, and says one line at a time. A line said
  *   while another is up waits its turn, highest priority first, unless it's critical and the one up isn't: then it
- *   cuts in. A line that can't start within `waitMs` of being said is dropped (it would be stale).
+ *   cuts in. A line that can't start within `waitMs` of being said is dropped (it would be stale). Chatter (the
+ *   lowest, the Hidden Boss's muttering in phase 2) is said only when nothing else is (its caller checks), and any
+ *   other line cuts in on it.
  * - **Never hidden by a fit check.** A box that would run off the screen takes a smaller size, a step at a time, and
  *   past the last step is moved back into view (SpeechBox). Its size is settled once per line, before its first paint.
  *
@@ -19,11 +21,12 @@ import type { ComponentChildren, JSX } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { SPEECH } from "@chessroyale/core";
 
-/** How much a line matters: only a critical line cuts in on another; the rest wait their turn. */
+/** How much a line matters: only a critical line cuts in on another (and any line on chatter); the rest wait their turn. */
+export const CHATTER = -1;
 export const LOW = 0;
 export const NORMAL = 1;
 export const CRITICAL = 2;
-export type Priority = typeof LOW | typeof NORMAL | typeof CRITICAL;
+export type Priority = typeof CHATTER | typeof LOW | typeof NORMAL | typeof CRITICAL;
 
 /** A line on screen: its words, its moment (`key`), when it started and when it's gone (its fade included). */
 export interface Spoken {
@@ -68,7 +71,7 @@ export class Voice {
     if (this.said.size > 400) this.said.delete(this.said.values().next().value!);
     this.advance(at);
     const cur = this.now;
-    if (!cur || at >= cur.until || (priority === CRITICAL && cur.priority < CRITICAL)) this.start({ text, key, priority, saidAt: at }, at);
+    if (!cur || at >= cur.until || (priority === CRITICAL && cur.priority < CRITICAL) || (cur.priority === CHATTER && priority > CHATTER)) this.start({ text, key, priority, saidAt: at }, at);
     else {
       this.queue.push({ text, key, priority, saidAt: at });
       // Highest priority first; in the order said within one.
