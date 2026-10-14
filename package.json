@@ -28,6 +28,7 @@
     "frames:sawyer": "node scripts/frames-sawyer.mjs",
     "frames:pig": "node scripts/frames-pig.mjs",
     "frames:recluse": "node scripts/frames-recluse.mjs",
+    "frames:recluse2": "node scripts/frames-recluse2.mjs",
     "frames:queue": "node scripts/frames-queue-pop.mjs",
     "frames:flash": "node scripts/frames-flash.mjs",
     "frames:chat": "node scripts/frames-chat-move.mjs",
