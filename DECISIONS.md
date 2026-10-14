@@ -3495,3 +3495,24 @@ Stockfish's FEN, perft and move lists against ours; scoring, a castling found an
 3000, and back to normal castling after), `packages/app/test/board-logic.test.ts` ("Chess960 castling on the board":
 the dots, both gestures, the edge cases, a screen's limited moves, tap and drag, both pieces sliding, normal castling
 untouched) and `move-sound.test.ts` (the castle knock).
+
+### An admin's Engine move button (Eric, Oct 14, 2026)
+
+Eric wants to beat the Hidden Boss's phase 1 himself while playtesting, and a 2650 Maia is beyond him. So admins get
+one small button, **"Engine move"**, in Boss alone only: one tap plays Stockfish's best move as theirs, through the
+normal move path (clocks, the boss's reply, its powers and the Hidden Boss's bullet clock all as usual). It works against
+every boss (simpler, and Eric can use it anywhere), never for players and never online (raids, Crowd, Squads,
+multiplayer: `NetMatch` has no such method), and `BOSS_POWERS.engineMoveButton` false removes it.
+
+- **The search is the power-up hints'** (`runner.topMovesFor`, 250,000 nodes at `engineNodes`): it already starts as
+  your move begins (the judge's prefetch), so a tap usually answers at once and adds no engine work, and it only picks
+  moves the turn allows (a power's limits). A separate fixed search would queue behind that one on the device's single
+  engine and be slower, so there's no new number; the setting's comment says what the search is.
+- It waits (grayed) while searching and whenever it isn't your move, so a double tap sends one move.
+- **The Hidden Boss starts from the starting position** (Eric, Oct 14, same PR): never a book opening, since his lines
+  say he has no memorized lines. His rules' `opening.fromStart` (the flag Wrangler, Big Boy and Hollow already use);
+  sides as usual, so in Boss alone the crowd is White, and with `?side=b` he's White and makes the first move from the
+  start (his "Best by test." fits when Maia plays 1.e4). Other bosses unchanged.
+- **Testing:** targeted lane. `packages/app/test/engine-move.test.ts` (the gate), `packages/chess/test/recluse.test.ts`
+  (his board starts at the standard FEN, as White he moves first; another boss still gets its opening), `e2e/recluse.spec.ts` (an admin's tap
+  plays a move on phone and computer; a player's Boss alone has no button) and `e2e/resign.spec.ts`.

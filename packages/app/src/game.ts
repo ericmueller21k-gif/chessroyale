@@ -291,6 +291,12 @@ export interface GameView {
   simulMove?(boardId: number, move: string): void;
   /** A word in the boss bar instead of the move count (the Hidden Boss's phase 2: "Phase 2 · 1 of 4 won"). */
   readonly bossNote?: string | null;
+  /** Testing, admins in Boss alone (solo only; online has none): the "Engine move" button shows. */
+  readonly engineMoveShown?: boolean;
+  /** Its search is running (the button waits). */
+  readonly engineThinking?: boolean;
+  /** Plays Stockfish's best move as your own, through the normal move path. */
+  engineMove?(): void;
   /** You called the King to play this move. */
   readonly kingCalled: boolean;
   /** Testing, admins (Boss alone): what the boss's brain did with its last move (Maia or Stockfish), or null. */

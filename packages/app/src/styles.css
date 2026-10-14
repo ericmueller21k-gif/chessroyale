@@ -1691,7 +1691,8 @@ p {
   background: var(--surface-2);
   line-height: 16px;
 }
-.match-tools > .ult-test {
+.match-tools > .ult-test,
+.match-tools > .engine-move {
   flex: none;
   margin: 0;
   white-space: nowrap;
@@ -11366,8 +11367,9 @@ img.qicon {
   color: var(--bad);
 }
 
-/* Testing (admins only): the test trigger, small and plain. */
-.ult-test {
+/* Testing (admins only): the test trigger and Engine move, small and plain. */
+.ult-test,
+.engine-move {
   display: block;
   margin: 6px auto 0;
   padding: 4px 10px;
@@ -11379,7 +11381,8 @@ img.qicon {
   font-size: 12px;
   cursor: pointer;
 }
-.ult-test:disabled {
+.ult-test:disabled,
+.engine-move:disabled {
   opacity: 0.55;
   cursor: default;
 }
