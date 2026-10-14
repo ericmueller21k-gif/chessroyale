@@ -3165,7 +3165,7 @@ The hidden boss's phase 2 is played in Fischer Random (Chess960), and Eric wants
 Chess960 castling, not random back ranks with castling switched off (ROADMAP.md, "The hidden boss"). This is the rules
 foundation only: no boss, no screen and no phase change use it yet. Nothing changes for normal games.
 
-- **Our own small Chess960 rules, used only for Chess960 positions** (`packages/chess/src/chess960.ts`, about 400 lines).
+- **Our own small Chess960 rules, used only for Chess960 positions** (`packages/chess/src/chess960.ts`, about 540 lines with its comments).
   chess.js 1.4 can't be extended cleanly: it hard-codes castling (the king from e1 two squares, rooks on a1 and h1) and
   its FEN check refuses any castling field but KQkq. Wrapping it (its moves without castling, plus castling of our own)
   was the other choice, but its public move list builds every move's SAN (about 1.8 ms a position), too slow to check
