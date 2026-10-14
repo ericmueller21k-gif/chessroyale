@@ -54,8 +54,9 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  // (Two rounds a stage: with one, the team that hasn't moved yet is a coin flip at the first cut.)
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=2&clock=30&win=1");
+  // (Two rounds a stage: with one, the team that hasn't moved yet is a coin flip at the first cut. Loose bots, ?weakbots=1:
+  // the strongest bots play the engine's best as often as you do, and only two of each team reach the final.)
+  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=2&clock=30&win=1&weakbots=1");
   await soloFromHome(page);
   await knockouts(page, 8);
   // (The battle is set up at the last cut; its intro comes after the cut's screen. Its line counts the finalists.)
@@ -66,7 +67,7 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   expect(boss.name).toBe(him.name);
   expect(boss.raid).toBe(false);
   expect(await alive(page)).toBe(crowdFinalists("boss"));
-  expect(await mine(page), "you reached the final (strong play: the engine's best move every time)").toBe(true);
+  expect(await mine(page), "you reached the final (the engine's best move every time, the bots loose)").toBe(true);
   await expect(page.locator(".boss-name").filter({ hasText: him.name }).first()).toBeVisible();
   // The other finalists: phase 2's other players later.
   const mates: string[] = await page.evaluate(() => (window as any).match.standings().filter((s: any) => !s.out && !s.isYou).map((s: any) => s.name));
@@ -106,7 +107,7 @@ test("online: a Crowd boss final meets him: his intro by name for everyone, four
   test.skip(test.info().project.name !== "desktop", "one run is enough: a computer");
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=2&clock=30&bossMoves=8&power=bullet");
+  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=2&clock=30&bossMoves=8&power=bullet&weakbots=1");
   await createLobbyFromHome(page);
   await page.getByRole("button", { name: /Start with 1 player/ }).click();
   await knockouts(page, 9);

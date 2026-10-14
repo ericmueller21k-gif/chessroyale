@@ -370,6 +370,12 @@ export const DEFAULT_SETTINGS: Settings = {
   finalMissLoss: 25,
 };
 
+/**
+ * Test switch ?weakbots=1 (solo, and a lobby you create): every bot at least this loose (`botSkillRange`), so a test
+ * playing the engine's best move is sure to survive the cuts (to the Crowd's top 4, say). Never for players.
+ */
+export const WEAK_BOT_SKILL: readonly [number, number] = [8, 32];
+
 /** `count` bot skills spread evenly on a log scale across `botSkillRange`, strongest first. */
 export function botSkillSpread(count: number, settings: Settings = DEFAULT_SETTINGS): number[] {
   const [lo, hi] = settings.botSkillRange;
