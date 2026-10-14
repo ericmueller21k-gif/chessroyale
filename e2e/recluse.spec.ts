@@ -22,9 +22,14 @@ const figure = () => (test.info().project.name === "phone" ? ".boss-char.place-b
 async function asAdmin(page: Page) {
   await page.route("**/api/me*", async (route) => {
     if (route.request().method() !== "GET") return route.continue();
-    const res = await route.fetch();
-    const body = await res.json().catch(() => null);
-    await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
+    // (A battle's result refetches your profile as it ends: the test may close the page while that's in flight.)
+    try {
+      const res = await route.fetch();
+      const body = await res.json().catch(() => null);
+      await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
+    } catch {
+      // The page is gone: nothing to answer.
+    }
   });
 }
 
@@ -61,14 +66,18 @@ async function quietMove(page: Page): Promise<string> {
 }
 
 /** Into Boss alone against him through the boss menu, as an admin. */
-async function meetHim(page: Page, query = "laststand=0") {
+async function meetHim(page: Page, query = "laststand=0&clock=60") {
   await asAdmin(page);
+  // (The menu lists him once your profile says you're an admin: wait for it.)
+  const me = page.waitForResponse((r) => r.url().includes("/api/me") && r.request().method() === "GET");
   await page.goto(`/?debug&${query}`);
+  await me;
+  await page.waitForTimeout(500);
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
   await expect(menu).toBeVisible();
   // (After the rest, for an admin.)
-  const rows = menu.locator(".boss-row strong");
+  const rows = menu.locator(".boss-row .br-main strong");
   await expect(rows.last()).toHaveText("Hidden Boss");
   await menu.getByRole("button", { name: /^Hidden Boss, 2650/ }).click();
 }
@@ -80,7 +89,7 @@ test("a player never sees him: not in the boss menu, and ?boss=recluse meets ano
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
   await expect(menu).toBeVisible();
-  await expect(menu.locator(".boss-row strong").first()).toBeVisible();
+  await expect(menu.locator(".boss-row .br-main strong").first()).toBeVisible();
   await expect(menu.getByText("Hidden Boss")).toHaveCount(0);
   await page.goto("/?debug&boss=recluse");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
@@ -93,16 +102,19 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, the God Kin
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await meetHim(page);
-  // His intro: the stare (his figure where it stands on this screen), his line.
+  // His intro: the stare (his figure where it stands on this screen). The God King's opening line in this fight is his
+  // own (said on the first turn no new danger comes first: checked at the end), never one of his usual ones.
   const intro = await watchFor(page, { stare: { selector: `${figure()}[data-anim="stare"]` } });
+  const kingIntro = await watchFor(page, {
+    foe: { selector: ".gk-bubble", text: /tremendous power|faint against this one|no ordinary boss/ },
+    usual: { selector: ".gk-bubble", text: /Tap me when it counts|Call me if it gets ugly|Say the word|My blade is yours/ },
+  });
   await yourMove(page);
   expect(await intro.seen()).toEqual({ stare: true });
   let b = await bossNow(page);
   expect(b).toMatchObject({ id: "recluse", name: "Hidden Boss" });
   // His brain: Maia at its top rating (2500 here), no guard, whatever your rating.
   await expect.poll(() => page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/^Maia 2500 · no guard/);
-  // The God King's opening line in this fight.
-  await expect(page.locator(".gk-bubble")).toContainText(/tremendous power|faint against this one|no ordinary boss/, { timeout: 10_000 });
 
   // The God King's help tried: his strike, then his move. Blocked, nothing spent; the boss mocks it, slamming the book.
   const charges = b.kingCharges;
@@ -113,6 +125,8 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, the God Kin
     king: { selector: ".gk-bubble", text: /won't take hold|shrugs off my strength|can't reach him/ },
   });
   const king = page.getByRole("button", { name: /God King: tap to summon/ });
+  // (Once he has finished what he was saying: a line said while another is up waits its turn, and lapses after 5 s.)
+  await expect(page.locator(".gk-bubble")).toHaveCount(0, { timeout: 20_000 });
   await king.click();
   await page.getByRole("menuitem", { name: /Strike/ }).click();
   await expect.poll(() => mocked.seen(), { timeout: 10_000 }).toEqual({ slam: true, mock: true, king: true });
@@ -156,12 +170,14 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, the God Kin
   // No increment: a move's time comes out of the bank, nothing goes back.
   await page.waitForTimeout(1500);
   await play(page, await quietMove(page));
+  // (Your move is scored, then the boss replies: by your next move the bank has the time you took out of it.)
+  await yourMove(page);
   const bank = await page.evaluate(() => (window as any).match.runner.player("you").bankMs as number);
   expect(bank).toBeLessThan(BANK - 1500);
   expect(bank).toBeGreaterThan(BANK - 20_000);
-  await yourMove(page);
   expect(await page.evaluate(() => (window as any).match.phase.allowedMs as number)).toBe(bank);
   await expect(page.locator(".boss-dock-status .bullet-note")).toBeVisible();
+  await expect.poll(() => kingIntro.seen(), { timeout: 15_000 }).toEqual({ foe: true, usual: false });
   expect(errors).toEqual([]);
 });
 
