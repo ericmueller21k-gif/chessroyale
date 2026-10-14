@@ -3148,3 +3148,67 @@ targeted lane): `perf.spec.ts` (with the board's drawings counted through the ca
 a plain move, and every boss effect (the candle and its waves, the blizzard and both thaws, the funhouse and its turns,
 the bounce, the split, the board saw and the cuts, Lights out, the pull, the drag and the Showdown): the same on both,
 no piece flickers, jumps back or slides twice, and the funhouse's forced move still slides after the board turns.
+
+### The boss screen's lag: the boss view free to read (Oct 14, 2026)
+
+Eric, Oct 14 ("make do the boss screen lag fixes"), after "The board draws its pieces only when they change": the boss
+screen still renders everything every frame, and the solo match's boss view was checked by serializing the battle.
+
+**What changed.** `MatchRunner.bossView` (asked many times a frame by a boss screen: the header's tower, the dock, the
+boss's figure) built its cache key by serializing the boss's whole state and the move history on every ask, a cost
+that grew with the match. The runner replaces the boss's state, its boards and its last move rather than changing them
+in place, so the same objects with the same position and history now give the same view after comparing a few values;
+anything else goes on to the full key as before (the guarantee stays: a cached view is the one a fresh build gives).
+Tested in `long-match.test.ts` (no serializing when nothing changed; each input changed gives the fresh view; a board
+changed in place, as tests do, is caught).
+
+**What wasn't changed, and why.** The plan was also to stop the boss screen rendering its header, figure and chat
+every frame, keeping the per-frame clock for the parts that animate. Looking at what those parts draw from, several
+depend on being drawn every frame without saying so: Hollow's bulb strip relights at a time it reads while drawing, the
+admins' brain line reads a note the engine writes without telling the screen, and the chat's "Next in N s" counts down
+only as it's drawn. Each could be given its own timer, but every one found suggests more, and a miss is a visible
+change (a bulb relighting late, a line frozen). Measured, the header, the figure and the chat together are about
+1.5 ms of a 4x-slowed phone's frame (a fifth of the screen's render work), short of what the remaining effects need
+to reach 16.7 ms there. Following "simple beats flashy", it's left for Eric and the director to decide.
+
+**Measured** under the shared lock, base (main) and after side by side, three rounds, medians, as in the board's
+section:
+
+*Phone (iPhone 13 size, CPU slowed 4x):*
+| Effect | p95 frame, ms (before → after) | long tasks > 50 ms (before → after) | main-thread CPU a frame, ms: mean / p95 | tasks over 50 ms of CPU | runs |
+| --- | --- | --- | --- | --- | --- |
+| Jefferson's Roman candle | 33.3 → 33.3 | 2 → 1 (max 71 → 53) | 12.8 → 12.3 / 27.6 → 26.6 | 1 → 0 | 3/3 |
+| Ginger's blizzard | 33.4 → 50 | 3 → 2 (max 81 → 77) | 13.2 → 14.8 / 29.4 → 37.6 | 1 → 1 | 3/3 |
+| Ginger's thaw | 33.4 → 33.4 | 3 → 1 (max 91 → 65) | 12.4 → 13.2 / 25.6 → 29.2 | 0 → 0 | 3/3 |
+| Boingo's funhouse | 33.3 → 16.8 | 0 → 0 (max 0 → 0) | 10.2 → 10 / 16.4 → 15.9 | 0 → 0 | 3/3 |
+| Boingo's funhouse turn | 33.3 → 16.8 | 0 → 0 (max 0 → 0) | 9.2 → 8 / 15.2 → 14.8 | 0 → 0 | 3/3 |
+| Big Boy's bounce | 33.3 → 16.8 | 0 → 1 (max 0 → 51) | 13.1 → 12 / 25.1 → 16.5 | 0 → 0 | 3/3 |
+| Sawyer's board saw | 16.8 → 16.8 | 1 → 1 (max 68 → 51) | 9.8 → 9.8 / 15.6 → 15 | 0 → 0 | 3/3 |
+| Hollow's Lights out | 33.3 → 16.8 | 3 → 4 (max 139 → 105) | 12.2 → 12 / 23.4 → 16.6 | 3 → 4 | 3/3 |
+| Wrangler's lasso drag | 33.3 → 33.3 | 1 → 0 (max 51 → 0) | 10.4 → 10 / 16.2 → 17.3 | 0 → 0 | 3/3 |
+| Wrangler's Showdown | 33.3 → 33.3 | 1 → 1 (max 65 → 68) | 11.8 → 11.6 / 21.2 → 26.1 | 1 → 1 | 3/3 |
+
+*Computer (1280 x 800):*
+| Effect | p95 frame, ms (before → after) | long tasks > 50 ms (before → after) | main-thread CPU a frame, ms: mean / p95 | tasks over 50 ms of CPU | runs |
+| --- | --- | --- | --- | --- | --- |
+| Jefferson's Roman candle | 16.8 → 16.7 | 0 → 0 (max 0 → 0) | 3.6 → 3.5 / 5.5 → 5.6 | 0 → 0 | 3/3 |
+| Ginger's blizzard | 16.7 → 16.8 | 0 → 0 (max 0 → 0) | 3.7 → 3.6 / 6.9 → 6.4 | 0 → 0 | 3/3 |
+| Ginger's thaw | 16.8 → 16.8 | 0 → 0 (max 0 → 0) | 3.4 → 3.3 / 4.9 → 5 | 0 → 0 | 3/3 |
+| Boingo's funhouse | 16.8 → 16.7 | 0 → 0 (max 0 → 0) | 2.4 → 2.7 / 3.7 → 4.4 | 0 → 0 | 3/3 |
+| Boingo's funhouse turn | 16.7 → 16.7 | 0 → 0 (max 0 → 0) | 2.7 → 2.8 / 4.8 → 5.9 | 0 → 0 | 3/3 |
+| Big Boy's bounce | 16.8 → 16.8 | 0 → 0 (max 0 → 0) | 3.6 → 3.6 / 5.2 → 5.2 | 0 → 0 | 3/3 |
+| Sawyer's board saw | 16.7 → 16.8 | 0 → 0 (max 0 → 0) | 3 → 2.8 / 4.5 → 4.2 | 0 → 0 | 3/3 |
+| Hollow's Lights out | 16.8 → 16.7 | 0 → 0 (max 0 → 0) | 3.1 → 3.1 / 6.1 → 6.3 | 0 → 0 | 3/3 |
+| Wrangler's lasso drag | 16.7 → 16.7 | 0 → 0 (max 0 → 0) | 3.1 → 3 / 4.5 → 4.6 | 0 → 0 | 3/3 |
+| Wrangler's Showdown | 16.8 → 16.8 | 0 → 0 (max 0 → 0) | 3.5 → 3.6 / 6 → 6.8 | 0 → 0 | 3/3 |
+
+On a computer every effect now holds 16.7 ms at the 95th percentile. On the slowed phone the boss view's cost in a
+short Boss alone game is small, so most rows move within the rounds' noise; it grows with a match's length and with a
+raid's players, which these runs don't reach. The render counter (a diagnostic build) showed the boss screen's render
+work during the candle, blizzard and Showdown down from 4.1-4.7 ms to 3.1-3.8 ms a frame on the slowed phone. Jefferson's
+candle, Ginger's blizzard and Wrangler's Showdown stay at about 33 ms there: their frames' main-thread time is spread over
+the effects' own drawing (two dozen rocket sprites and their canvases, the blizzard's full-board snow), the browser's
+style, layout and paint, and the screen's render; none alone brings them to 16.7 ms.
+
+**Testing.** Unit: `long-match.test.ts`. e2e (targeted lane: the boss view is read by every boss screen, solo and the
+lobby server): `perf.spec.ts`, every boss spec, `king-attack.spec.ts`, `resign.spec.ts`, `multiplayer.spec.ts`.
