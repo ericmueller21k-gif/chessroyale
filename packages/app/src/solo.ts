@@ -19,6 +19,7 @@ import { crumb } from "./problems.ts";
 import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
 import { prefetchMaia, startMaia } from "./maia.ts";
 import { MaiaGate, type GateEnd } from "./maia-gate.ts";
+import { testParams } from "./test-switches.ts";
 
 export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
@@ -71,9 +72,9 @@ export class SoloMatch implements GameView {
   readonly seen = new Map<string, number>();
   private progress = new RoundProgress(() => this.emit());
   /** Test switch (?laststand=1): the boss battle's first crowd move calls for the God King's Last Stand, whatever it is. */
-  forceLastStand = typeof location !== "undefined" && new URLSearchParams(location.search).get("laststand") === "1";
+  forceLastStand = testParams().get("laststand") === "1";
   /** Test switch (?side=b): a boss raid alone, playing Black (to see the God King in black). */
-  private raidSide = typeof location !== "undefined" && new URLSearchParams(location.search).get("side") === "b" ? ("b" as const) : undefined;
+  private raidSide = testParams().get("side") === "b" ? ("b" as const) : undefined;
 
   constructor(
     private readonly engines: UciEngine[],
@@ -837,7 +838,7 @@ export class SoloMatch implements GameView {
   // ---------------- The Hidden Boss's phase 2 ----------------
 
   /** Testing (?phase=2): an admin's Hidden Boss starts at his phase change, skipping phase 1. */
-  private phase2Jump = typeof location !== "undefined" && new URLSearchParams(location.search).get("phase") === "2";
+  private phase2Jump = testParams().get("phase") === "2";
   /** Phase 2's boards (from the phase change on), and whether its clocks have started. */
   private phase2: Phase2Game | null = null;
   private phase2Playing = false;

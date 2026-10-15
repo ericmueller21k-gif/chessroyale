@@ -15,6 +15,7 @@ import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { LiveWindow } from "../components/LiveWindow.tsx";
 import { LIVE_WINDOW_MEDIA } from "../bot-replays.ts";
+import { testParams } from "../test-switches.ts";
 
 export const OPENING_KEY = "brc.openingMoves";
 const MODE_KEY = "brc.mode";
@@ -104,18 +105,19 @@ export function rememberBossPick(id: string) {
   }
 }
 
-/** ?boss=<id> or ?boss=<strength> picks the boss, so the boss menu is skipped (handy for tests). */
+/** ?boss=<id> or ?boss=<strength> picks the boss, so the boss menu is skipped (a test switch: test-switches.ts). */
 export function bossInUrl(): boolean {
-  return new URLSearchParams(location.search).has("boss");
+  return testParams().has("boss");
 }
 
 /**
- * Boss raid: the boss you picked (a playable one), or "" for a random one. ?boss=<id>, else this device's choice.
+ * Boss raid: the boss you picked (a playable one), or "" for a random one. ?boss=<id> (a test switch), else this
+ * device's choice.
  * `hidden`: an admin's Boss alone, where the pick may be a boss hidden from players (the Hidden Boss); anywhere else such
  * a pick is "" (random), so a raid or a lobby never asks for him.
  */
 export function chosenBoss(hidden = false): string {
-  const q = bossIdFromLink(new URLSearchParams(location.search).get("boss"));
+  const q = bossIdFromLink(testParams().get("boss"));
   let v = q ?? pickedBoss;
   if (v === null) {
     try {
@@ -127,9 +129,9 @@ export function chosenBoss(hidden = false): string {
   return v && (isPlayable(bossDef(v)) || (hidden && adminPlayable(bossDef(v)))) ? v : "";
 }
 
-/** A test link's fixed strength (?boss=1600: one of the tiers), else 0: the boss plays a step above you. */
+/** A test link's fixed strength (?boss=1600: one of the tiers, a test switch), else 0: the boss plays a step above you. */
 export function bossTierFromUrl(): number {
-  const n = Number(new URLSearchParams(location.search).get("boss"));
+  const n = Number(testParams().get("boss"));
   return BOSS_TIERS.includes(n) ? n : 0;
 }
 

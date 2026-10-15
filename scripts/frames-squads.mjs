@@ -1,5 +1,5 @@
 // Frame-by-frame check of Squads' screens, played the way a player plays them (real taps), against a running server
-// with the test switch on (npx wrangler dev --var SQUADS_TEST:1 ...):
+// with the test switch on (npx wrangler dev --var SQUADS_TEST:1 --var TEST_SWITCHES:1 ...):
 //   npm run frames:squads -- <out-dir> <relay|pairs|final|block|token|menu|standings|modevote|shop|stockfish|shield|chip|clockvote|clockline> [url=http://localhost:8787] [width=390] [scheme=dark] [clock=rapid]
 // relay: your move (it must show at once and never snap back), a beat later the board you play next (Jump to my next
 // board, on by default), then scouting a tiny board and back.

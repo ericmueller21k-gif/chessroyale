@@ -1,7 +1,7 @@
 // Frame-by-frame check of the queue's lobby chat (see .claude/LESSONS.md): a phone in a Default queue while it fills,
 // other players' lines arriving, a real tap on a line, people popping in, then the bots' fill and their hellos.
 //   npm run frames:lobbychat -- <out-dir> [scheme=dark|light] [base url]
-// Needs the Worker running (npx wrangler dev --port 8788 --enable-containers=false --var MATCH_FILL_SECONDS:20 ...).
+// Needs the Worker running (npx wrangler dev --port 8788 --enable-containers=false --var MATCH_FILL_SECONDS:20 --var TEST_SWITCHES:1 ...).
 // Writes f<ms>.jpg for every painted frame and timeline.txt, and prints: every change of the boxes of the count, the
 // grid, the chat and Cancel (with what was going on), every line arriving, frames whose brightness jumps (a flash),
 // and any moment the chat covers the count, the grid or Cancel. Exits 1 if the chat ever covers one of them, or if

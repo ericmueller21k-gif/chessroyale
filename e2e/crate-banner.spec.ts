@@ -88,6 +88,8 @@ test("crates: the Fischer Random banner fits its words, phone and computer, with
     await page.setViewportSize({ width, height: 800 });
     await page.goto("/shop?crates&fischer=1");
     await page.locator('.crate-row[data-crate="beta-001"]').click();
+    // (The test switch applies once your account says you may: this server's TEST_SWITCHES.)
+    await expect(page.getByLabel("Land on Fischer Random")).toBeChecked();
     await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
     await expect(page.locator(".fischer-stage")).toBeVisible({ timeout: 20_000 });
     await page.evaluate(() => ((window as any).__fb.length = 0));

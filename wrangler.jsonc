@@ -56,8 +56,9 @@
   "env": {
     // Staging, for load tests only (never load-test production): its own Worker (chessroyale-staging on workers.dev),
     // Durable Objects and D1 database; no engine server, no sign-in (guests play online), the per-address rate
-    // limit off for a test from one machine. scripts/load/staging.sh creates it, deploys, and tears it down
-    // (DEPLOY.md, "Load testing"). The database id is filled in by that script.
+    // limit off for a test from one machine, the test switches on (a load test's own queue, ?pool=).
+    // scripts/load/staging.sh creates it, deploys, and tears it down (DEPLOY.md, "Load testing"). The database id is
+    // filled in by that script.
     "staging": {
       "routes": [],
       "workers_dev": true,
@@ -71,7 +72,7 @@
         ]
       },
       "d1_databases": [{ "binding": "DB", "database_name": "hunchess-staging", "database_id": "STAGING_D1_ID" }],
-      "vars": { "ENGINE_OFF": "1", "LOAD_TEST": "1" },
+      "vars": { "ENGINE_OFF": "1", "LOAD_TEST": "1", "TEST_SWITCHES": "1" },
       "observability": { "enabled": true }
     }
   }

@@ -11,7 +11,8 @@
  *   --session S        each leaves after this long, 0 = plays to the results (default 0)
  *   --home S           up to this long on the home screen before PLAY (default 10)
  *   --mode crowd|raid  the queue (default crowd)
- *   --pool NAME        a queue of its own (default: a fresh one per run, so runs never meet)
+ *   --pool NAME        a queue of its own (default: a fresh one per run, so runs never meet; needs TEST_SWITCHES=1,
+ *                      as staging has)
  *   --chat P           chance per round of a quick-chat line (default 0.1)
  *   --name NAME        writes reports/load/NAME.md and .json
  *   --ops-key KEY      reads the server's counters (/api/ops/stats; the OPS_STATS variable) before and after

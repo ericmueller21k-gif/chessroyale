@@ -1,5 +1,5 @@
 import { stockfishRefuses } from "@chessroyale/chess";
-import { BOSS_TIERS, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { RAID_SETTINGS, modeSettings } from "@chessroyale/core";
 import { Lobby } from "./lobby-do.ts";
 import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
@@ -11,7 +11,8 @@ import { d1Sql, ensureSchema, lobbyResult, type User } from "./accounts.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
-import { handleAdmin, isAdmin, type AdminEnv } from "./admin.ts";
+import { handleAdmin, isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
+import { asksTestSwitches, lobbyOptions } from "./lobby-options.ts";
 import { deepCheckRun } from "./fairplay-deep.ts";
 import { containerSearch } from "./fairplay-engine.ts";
 import { REGION_HINT, queueName, regionOf } from "./queue.ts";
@@ -171,10 +172,10 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const raid = url.searchParams.get("mode") === "raid";
       const type = url.searchParams.get("type") === "botsoff" ? "botsoff" : "default";
       const overrides = raid ? RAID_SETTINGS : modeSettings("crowd", { crowdTeams: true, augments: true });
-      // ?pool=NAME: a queue of its own (tests run several queues at once without meeting). Split by region when
-      // that's on (queue.ts). ?ticket=ID: a player in line asking again (they keep their place).
+      // ?pool=NAME: a queue of its own (a test switch: tests run several queues at once without meeting). Split by
+      // region when that's on (queue.ts). ?ticket=ID: a player in line asking again (they keep their place).
       const region = regionOf(request.cf as { continent?: unknown } | undefined);
-      const name = queueName(raid ? "raid" : "crowd", type, url.searchParams.get("pool"), region);
+      const name = queueName(raid ? "raid" : "crowd", type, await testPool(request, env, url, waitUntil), region);
       const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(name), region ? { locationHint: REGION_HINT[region] } : undefined);
       const ticket = url.searchParams.get("ticket");
       let since: number | undefined;
@@ -193,58 +194,13 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
         return json({ message: "Couldn't find a match. Try again." }, 500);
       }
     }
-    // POST /api/lobby → { code }
+    // POST /api/lobby → { code }: the creator's choices, and the test switches for those allowed them (lobby-options.ts).
     if (url.pathname === "/api/lobby" && request.method === "POST") {
       const refused = await mayPlay(request, env, waitUntil);
       if (refused) return refused;
-      // Playtest overrides, e.g. POST /api/lobby?rounds=2&clock=15
-      const n = (k: string) => (url.searchParams.has(k) ? Math.max(1, Math.min(600, Number(url.searchParams.get(k)) || 0)) : undefined);
-      const draw = url.searchParams.get("draw") as DrawRule | null;
-      // The mode first (its own pace and rules), then pace and playtest overrides on top.
-      const raid = url.searchParams.get("mode") === "raid";
-      const mode = raid || url.searchParams.get("mode") === "crowd" ? "crowd" : "classic";
-      const overrides = {
-        ...(raid ? RAID_SETTINGS : modeSettings(mode, { crowdTeams: url.searchParams.get("turns") !== "all", augments: url.searchParams.get("augments") !== "0" })),
-        ...(url.searchParams.get("pace") === "quick" ? (mode === "crowd" ? { revealSeconds: 2, drawnMoveSeconds: 1.2, stageBreakSeconds: 4 } : PACE_SETTINGS.quick) : {}),
-        // Playtest overrides and the creator's choices: only the ones that are set.
-        ...definedOnly({
-          // Boss raid: the boss the creator picked (a playable one), else a random one; a test link's tier fixes its
-          // strength (else a step above the group, plus the boss's offset). ?power= brings a power at once (tests).
-          ...(() => {
-            const q = bossIdFromLink(url.searchParams.get("boss"));
-            const b = Number(q);
-            if (raid && BOSS_TIERS.includes(b)) return { bossFixedElo: b, bossFixed: b };
-            return q && isPlayable(bossDef(q)) ? { bossId: q, bossPicked: q } : {};
-          })(),
-          ...(() => {
-            const p = url.searchParams.get("power");
-            return p && (POWER_IDS as readonly string[]).includes(p) ? { bossPowerTest: p } : {};
-          })(),
-          roundsPerStage: n("rounds"),
-          firstStageRounds: n("rounds"),
-          moveClockSeconds: n("clock"),
-          finalMaxTurns: n("finalTurns"),
-          bossMaxMoves: n("bossMoves"),
-          drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
-          // Opening moves per side on each board (0-10), chosen by the lobby's creator.
-          openingMoves: mode === "classic" && url.searchParams.has("moves")
-            ? Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(Number(url.searchParams.get("moves")) || 0)))
-            : undefined,
-        }),
-        // ?format=team|boss|duel: skip the pre-game votes and play that ending (for testing).
-        ...(() => {
-          const f = url.searchParams.get("format") as FinalFormat | null;
-          return mode === "crowd" && f && f in CROWD_KNOCKOUTS ? { finalFormat: f, knockoutsPerStage: CROWD_KNOCKOUTS[f], augments: false } : {};
-        })(),
-        // ?speed=bullet|blitz|rapid: that time control (for testing, with ?format=; old ids map over, unknown ones are Blitz).
-        ...(mode === "crowd" ? (speedOption(url.searchParams.get("speed"))?.patch ?? {}) : {}),
-        // ?weakbots=1: every bot plays loosely (for testing: a strong player surely survives the cuts).
-        ...(url.searchParams.get("weakbots") === "1" ? { botSkillRange: WEAK_BOT_SKILL } : {}),
-      };
-      // ?keep=SECONDS: its results stay up this long (5 s up to the usual 15 minutes), for tests.
-      const keep = url.searchParams.has("keep") ? Math.max(5, Math.min(LOBBY_LIFE.lobbyResultsKeepMinutes * 60, Number(url.searchParams.get("keep")) || 0)) * 1000 : undefined;
-      const plain = JSON.parse(JSON.stringify(overrides));
-      const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, plain, undefined, keep)) !== false);
+      const test = asksTestSwitches(url.searchParams) && (await testSwitches(request, env, waitUntil));
+      const { overrides, keepMs } = lobbyOptions(url.searchParams, test);
+      const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, overrides, undefined, keepMs)) !== false);
       return code ? json({ code }) : json({ message: "Couldn't create a lobby. Try again." }, 500);
     }
     // Squads (docs/areas/squads.md, "The server"): its queue, parties and lobbies, and the test lobby.
@@ -290,11 +246,11 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
   if (!url.pathname.startsWith("/api/squads/")) return null;
   const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
   const region = regionOf(request.cf as { continent?: unknown } | undefined);
-  const queue = queueName("squads", "default", url.searchParams.get("pool"), region);
+  const queue = async () => queueName("squads", "default", await testPool(request, env, url, waitUntil), region);
   if (url.pathname === "/api/squads/play" && request.method === "POST") {
     const refused = await mayPlay(request, env, waitUntil);
     if (refused) return refused;
-    const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(queue), region ? { locationHint: REGION_HINT[region] } : undefined);
+    const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(await queue()), region ? { locationHint: REGION_HINT[region] } : undefined);
     const ticket = url.searchParams.get("ticket");
     try {
       return json(await mm.next({}, fill * 1000, { squads: true }, ticket && /^[\w-]{8,64}$/.test(ticket) ? ticket : null, { size: 1, pass: "" }));
@@ -305,7 +261,8 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
   if (url.pathname === "/api/squads/party" && request.method === "POST") {
     const refused = await mayPlay(request, env, waitUntil);
     if (refused) return refused;
-    const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, queue, fill * 1000));
+    const name = await queue();
+    const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, name, fill * 1000));
     return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
   }
   if (url.pathname === "/api/squads/lobby" && request.method === "POST") {
@@ -328,6 +285,21 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
   if (m[3]) return (await stub.exists()) ? stub.fetch(request) : json({ message: "We couldn't find that lobby." }, 404);
   const status = request.method === "GET" ? await stub.status() : null;
   return status ? json({ open: true, phase: status.phase }) : json({ open: false, message: MATCH_ENDED }, 404);
+}
+
+/**
+ * Whether this request may use the test switches (testSwitchesOn in admin.ts): TEST_SWITCHES on here, or an admin's.
+ * Asked only when a request carries one, so other requests never look up who's asking for it.
+ */
+async function testSwitches(request: Request, env: Env, waitUntil: WaitUntil): Promise<boolean> {
+  if (env.TEST_SWITCHES === "1") return true;
+  return testSwitchesOn(env, await accountOf(request, env, waitUntil).catch(() => null));
+}
+
+/** ?pool=NAME, a queue of its own: a test switch (else the usual queue). */
+async function testPool(request: Request, env: Env, url: URL, waitUntil: WaitUntil): Promise<string | null> {
+  const pool = url.searchParams.get("pool");
+  return pool && (await testSwitches(request, env, waitUntil)) ? pool : null;
 }
 
 /**
