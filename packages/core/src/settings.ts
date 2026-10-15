@@ -1634,19 +1634,21 @@ export const OPS = {
   store: {
     /**
      * Each Worker instance (and Durable Object instance) counts its errors in memory and writes them to D1 at most
-     * this often (the first at once), at most `maxRowsPerFlush` rows a time (the most frequent; the rest are dropped
-     * and logged as a number). Kept under 30 s: a flush waits in the request's waitUntil.
+     * this often (the first at once), at most `maxRowsPerFlush` rows a time (the most frequent; the rest wait for the
+     * next write). Kept under 30 s: a flush waits in the request's waitUntil.
      */
     flushMs: 20_000,
     maxRowsPerFlush: 5,
-    /** Different errors held in memory between writes, at most (more are dropped). */
+    /** Different errors held in memory between writes, at most (more are dropped and logged as a number). */
     maxGroups: 100,
+    /** The breadcrumbs an error's row keeps with its latest occurrence (a bug report keeps all `client.breadcrumbs`). */
+    sampleCrumbs: 10,
     /** Player reports (bugs, feedback, ideas) each instance writes a minute, at most (one row each, written at once). */
     maxReportsPerMinute: 20,
     /**
      * Caps for the whole database, whatever the instances (a flood from many addresses can't grow D1 without bound):
-     * new kinds of error an hour (one already stored keeps counting) and player reports a day. At most about 300 MB
-     * of errors and 240 MB of reports over keepDays.
+     * new kinds of error an hour (one already stored keeps counting) and player reports a day, each in its insert.
+     * Under 0.9 GB in all over keepDays with every cap hit every hour (docs/areas/ops.md, "Small rows").
      */
     maxNewErrorsPerHour: 100,
     maxReportsPerDay: 2_000,

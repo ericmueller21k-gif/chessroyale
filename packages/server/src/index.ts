@@ -75,22 +75,23 @@ export default {
   /**
    * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), and
    * fair play's deep re-check of flagged players' moves on the engine server (cases in review at once, the rest
-   * off-peak; fairplay-deep.ts). An error is logged and counted like any other.
+   * off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(_event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
     if (!rawEnv.DB) return;
     const db = rawEnv.DB;
+    const failed = (route: string) => (e: unknown) => serverError(rawEnv, { kind: "cron", route }, e, (p) => ctx.waitUntil(p));
     ctx.waitUntil(
       (async () => {
         const sql = d1Sql(db);
         await ensureSchema(sql, db);
-        await pruneProblems(sql, Date.now());
+        await pruneProblems(sql, Date.now()).catch(failed("prune"));
         const env = await withSecrets(rawEnv);
         const search = containerSearch(env);
         if (!search) return;
         const r = await deepCheckRun(sql, search, Date.now(), { mail: caseMailer(env) });
         if (r.searches) console.log(`fair play deep re-check: ${r.searches} searches, ${r.matches} matches done`);
-      })().catch((e: unknown) => serverError(rawEnv, { kind: "cron", route: "scheduled" }, e, (p) => ctx.waitUntil(p))),
+      })().catch(failed("scheduled")),
     );
   },
 } satisfies ExportedHandler<Env>;
