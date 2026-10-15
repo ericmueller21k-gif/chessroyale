@@ -4896,6 +4896,14 @@ button.history-label {
 .dock-line:empty {
   display: none;
 }
+/* With nothing under it, the first line has the box's two lines: it wraps rather than being cut ("The boss is
+   think…" at 360 px). */
+.dk-text > .dock-line:first-child:has(+ .dock-line:empty) {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+}
 .boss-dock-status .gold {
   color: #d4a531;
 }
