@@ -1,5 +1,5 @@
 # Runs on every pull request (and on main): the typecheck and the unit tests. A red check means don't merge.
-# The phone tests (e2e) are slower and run in the Claude Code session before each merge.
+# The e2e suite (Playwright on emulated phones and computers) runs in its own workflow: e2e.yml.
 name: check
 on:
   pull_request:

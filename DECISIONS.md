@@ -4821,6 +4821,141 @@ My calls:
 and the Chess960 games; `engine-server.test.ts`, `fairplay-deep.test.ts` unchanged); the new CI check green on the PR.
 No app or Worker code changed (`server.mjs` only logs differently), so no e2e.
 
+### Privacy policy and terms: drafts from the code (Oct 15, 2026)
+
+The director asked for launch-ready drafts, written from what the code does, with the legal research's decisions
+folded in (its plan, section 4.5). `/privacy` and `/terms` existed since Oct 8 as a few lines each; they're rewritten,
+and `/copyright` is new (`packages/app/src/screens/Legal.tsx`). The calls:
+
+- **Marked as drafts on every page:** "DRAFT — not yet reviewed" at the top, then the decisions only Eric or a lawyer
+  can make: who runs HunChess (the controller: a person or company, and a postal address), the contact address
+  (privacy@hunchess.com must reach an inbox), the minimum age, governing law (Eric's state; courts or arbitration),
+  a DMCA agent ($6 at the US Copyright Office, renewed every 3 years), real-money purchases, the EU/UK points (legal
+  bases and transfer wording, EU and UK representatives, the UK Online Safety Act's short assessments), and how long
+  fair-play records are kept. Placeholders are in bold [brackets]. `main` deploys to Eric only (Zero Trust), so
+  showing the list costs nothing before launch.
+- **The inventory, one block per kind of data, each with what, why and how long:** the account, sessions, sign-in
+  codes, matches and stats, online now and last seen, the locker and wallet, chat, fair play (judged moves, match
+  summaries, reports, cases, appeals, the device marker, banned identities' hashes), scoring on players' devices (the
+  judge), and three stores still being built, marked "(being built)" as the FAQ marks unfinished things: error reports
+  and "Report a problem" (ops; device facts and breadcrumbs, the optional note, never an IP), chat moderation's
+  reports, bans and mutes, and friends (requests, friends, blocks, invite and online settings, invites, the counts
+  that limit them). Their retention reads "[set when … ships]" until their code sets one. Then what other players see,
+  the legal reasons for EU and UK players (running the game: what you asked for; fair play, security and bug fixing:
+  legitimate interest, which you can object to), cookies and local storage, who else handles data (Cloudflare,
+  Google, Resend: checked in the code, nobody else gets anything), the US transfer, children, rights (access, a copy,
+  correction, deletion, objection, restriction, a complaint to a regulator; 30 days), changes and contact.
+- **Cookies: essential only, so no banner.** Checked in the code: `hc_session` (sign-in), `hc_device` (fair play's
+  device marker), `hc_oauth` and `hc_next` (10 minutes during Google sign-in), all first-party; no analytics, ads or
+  third-party scripts (fonts are self-hosted). Adding analytics later means revisiting this.
+- **Minimum age, proposed and not built:** 13, or the local minimum if higher; a neutral birth month and year asked
+  before signing in, choosing a name or drawing an icon; under 13, guest play only with a default name. It reads as
+  "[Proposed, for Eric to decide]" on both pages. The policy says the game is for a general audience, not directed to
+  children under 13, and that a child's information is deleted when we learn of it. The gate is a separate task.
+- **Names and drawn icons:** no personal information, nothing offensive, no one else's marks or art, no
+  impersonation; players own their drawings and give us a license to show them; we can rename or reset; reported
+  through the report sheet's existing reason (read from `FAIRPLAY.reports.reasons`).
+- **Copyright (DMCA):** `/copyright` has the agent's placeholders, what a notice and a counter-notice need (17 U.S.C.
+  §512(c)(3) and (g)(3), in plain words), what we do, and the repeat-infringer policy; the terms point to it.
+- **Virtual items:** cosmetic, no cash value, no selling or trading, a license and not ownership, gone with the
+  account, odds in the FAQ and rolled on the server, earned or free today (ROADMAP item 7), testing-period items may be
+  reset at launch; purchases would need the terms first. **Not affiliated** with FIDE, Chess.com, Lichess or any real
+  person or organization; the characters are fictional.
+- **Numbers come from settings.ts where they live there** (fair play's evidence days, global chat's kept lines and
+  age, a lobby's results minutes), so a tuned setting changes the page with it, as the FAQ does. The cookie lifetimes
+  and the code limits are the server's constants (`api.ts`, `accounts.ts`), typed in.
+- **Honest about what's true today,** even where it's not ideal: sign-in code records are kept one per address with no
+  end date, fair-play records with no end date, and a brand-new account made at sign-in takes its name from Google or
+  the email's local part. The account-deletion PR (next) changes the first and last; the decisions list carries the
+  second.
+- **Reached from** the landing page's footer (now with Copyright), Settings (a new "Privacy and terms" section, always
+  shown) and the FAQ (a short last section). All plain links, so Back on a legal page is the browser's back to the page
+  that linked it, and home when it was opened any other way (`leaveLegal`). The FAQ's links to the game's own pages
+  open in the same tab (files and other sites still open a new one).
+- **The landing FAQ's email answer** said "Sign-in only"; fair-play notices go to that address too, so it now says so.
+- **LICENSES.md said the game's source "isn't published".** The GitHub repository is public with no license file, so
+  it now says that: all rights reserved, no license granted; Eric decides later whether it goes private.
+- **Testing:** light lane (copy, CSS, links, a static file): typecheck, the unit suite (`faq.test.ts`: the new
+  section's three links; `sounds-source.test.ts`, below), and the specs for the screens touched: `landing.spec.ts`,
+  `faq.spec.ts`, and a new `legal.spec.ts` (each page's draft notice and decisions, every data block says why and how
+  long, no sideways scroll at a phone's width, the copyright page's agent, and Back from Settings, the FAQ, the other
+  legal pages and a direct open).
+
+### The PyChess sounds' source on the site (Oct 15, 2026)
+
+The legal research found one gap in the licenses: the PyChess knocks (GPL-3.0) and our six variations of them ship as
+separate files, which is sound, but the GPL asks for their corresponding source, the preferred form for changing
+them: PyChess's original WAVs (public at PyChess) and `scripts/piece-sounds.py`, which made the variations and lived
+only in the repository. It's now served as the engines' source is, so it holds when the repository goes private:
+
+- **`/sounds/pychess-sounds-source.tar.gz`** (56 KB): PyChess's `mov2.wav`, `capture2.wav` and `castle.wav` from the
+  commit the variations were made from (their hashes in its README), `scripts/piece-sounds.py`, the classic mp3s the
+  script levels against, the GPL text, and the command. Running that command from the archive makes the six
+  variations again **byte for byte** (checked). It mirrors the repository's layout, so the script runs unchanged.
+- **Written by `scripts/sounds-source.py`**, the same bytes on any machine (fixed times, owners and order). A unit test
+  (`sounds-source.test.ts`) fails when `piece-sounds.py` changes and the archive wasn't made again, and checks the link
+  is in Settings, the FAQ, `/licenses/third-party.txt` and `sounds/SOURCES.md`.
+- Not precached by the service worker (the build leaves out every `.tar.gz`), like the engines' archives.
+
+## One clock format; the dev tools run from the repo root (Oct 15, 2026)
+
+- **Every clock on screen is `clockShown`** (`packages/app/src/clock-text.ts`): m:ss in whole seconds rounded up, the
+  dock's rounding (.claude/LESSONS.md, "A countdown that seemed to fire early"). The scoreboard's Bank, the board's
+  clock and the HUD rounded down, so at the same moment they could show a second less than the dock. Its copies are
+  gone (RaceTower's `clockText`, Recluse2's and the queue's `clock`); Squads' `bankText` is `clockShown` with
+  `tenths`, unchanged: a chess clock's style, rounded down throughout ("3:05", then "9.4" under ten seconds), since
+  rounding up there would jump from "0:11" to "9.9" as the bank crosses ten seconds. The queue's "waiting 1:05" counts up, and rounding up there is a second ahead at most; one
+  formatter is worth more than that second.
+- **`vite.config.ts` finds its files from its own folder** (`APP`), not the folder Vite started in. From the repo root,
+  `npm run preview:items`, `frames:flash`, `frames:vote` and `node scripts/preview-god-king.mjs` failed with
+  "Stockfish 19.0.0 has no source archive"; the other frames scripts worked around it with
+  `process.chdir("packages/app")`. Those workarounds are gone: the scripts pass `root: "packages/app"` and the config's
+  path. `perf-boss.mjs`'s `PERF_DIST` is now read from the folder you run it in (the repo root).
+- **Testing:** light lane plus the clock specs: typecheck, the unit suite, `boss-dock`, `squads-clocks`, `crowd`,
+  `recluse` and `votes` (its bank check now rounds up), and each changed script run once from the repo root.
+
+## e2e on GitHub Actions for every PR (Oct 15, 2026)
+
+Eric approved running the Playwright suite on GitHub Actions for every PR. The repository is public, so standard
+runners are free. Seven helpers queuing for one local e2e machine was the bottleneck. CI runs the full e2e on every
+PR; local runs are for targeted checks and perf (CLAUDE.md "Test lanes"; how it works: docs/areas/ops.md, "CI e2e").
+The calls:
+
+- **One workflow, `e2e.yml`, on every PR to `main` and every push to `main`:** both projects, 5 `shard` jobs side by
+  side, then a `result` job that is red if any shard is. Not a required check yet: the director decides once it has
+  proven itself over a few PRs. If it becomes one, require `result` (one name, whatever the shard count).
+- **5 shards, whole files spread by measured time** (`e2e/ci-shard.mjs`, `e2e/ci-timings.json`), not Playwright's
+  `--shard`. Playwright splits by test count in file order. In the first CI run (4 shards) that put formats (11
+  minutes on the phone alone), crowd and crowd-hidden in one shard: 21 minutes against 15-18 for the others. From
+  that run's per-file times, any number of count-based shards still left that shard at 21 minutes. Balanced by file:
+  4 shards would take about 18.4 minutes of tests, 5 about 15, 6 about 13.4. 5 keeps a run inside 15-20 minutes
+  with setup (about a minute: npm ci, the cached browser, the build) with fewer jobs at once. Inside a file the tests
+  still run in order on one worker, as locally (no `fullyParallel`, which would change how tests run). A new spec
+  counts as the table's median until the table is refreshed from a run's summary.
+- **Retries: 1 until the flaky-test batch lands; the goal is 0** (the director, Oct 15). `playwright.config.ts` sets
+  none, and stays so for local runs. A test that passes only on its retry is "flaky": `result`'s summary lists those
+  first, with their shard and first error, so they stay in view rather than hidden. Flaky in CI so far:
+  `boss-dock.spec.ts:96` and `boss-powers.spec.ts:384` (both desktop: the match had already ended when the test
+  expected a move); the batch also covers Sawyer's split, `crowd.spec.ts:178`, `lobby-chat.spec.ts:28` and
+  `crowd-hidden.spec.ts:106`.
+- **Traces only on the retry** (`on-first-retry`). Measured in the first run, with the same shards run both ways:
+  retain-on-failure (recording every test) made each shard 6-10% slower (1.3-1.6 minutes). On the retry it costs
+  nothing for a passing test, and a flaky or failing test comes with its trace. A shard with a failed or flaky test
+  uploads its HTML report with those traces (kept 7 days); nothing is uploaded for a clean shard.
+- **Left out: the `@perf` specs** (`e2e/perf.spec.ts`, 5 frame-budget tests on a 4x-slowed phone, now tagged
+  `@perf`), because they measure the machine as much as the code, and 2 workers share a runner's CPU. They run
+  locally, or by hand: Actions → e2e → Run workflow, "perf" ticked (one runner, 1 worker; they passed there in 3.4
+  minutes on the first try). Nothing else is left out.
+- **The build is a step of its own** (`E2E_PREBUILT=1` tells Playwright's web server to start wrangler without
+  building again): one build per runner, its time and errors shown on their own. The server is the same
+  `wrangler dev` with the same test variables as locally.
+- **Caches:** npm (setup-node) and Playwright's Chromium (headless shell only, which headless runs use; keyed by
+  Playwright's version). Workers: Playwright's default, half the runner's 4 CPUs (2), as locally.
+- **Concurrency:** a new push to a PR cancels its older run; every push to `main` gets its own run (none skipped).
+  A run takes 6 jobs at once; the account's limit on jobs at once (20 on GitHub Free) queues the rest.
+- **Docs:** CLAUDE.md's test lanes (the batch full run is now CI's run on each push to `main`; the full lane per PR
+  is the PR's own run) and the agents' ship steps: locally only the specs you touched and `@perf`; CI runs the rest.
+
 ## The test switches: admins and test servers only (Oct 15, 2026)
 
 Before launch (ROADMAP.md, the Hidden Boss's internal note (d)): anyone who reached the site could use the playtest

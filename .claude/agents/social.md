@@ -44,7 +44,8 @@ Not yours:
   - Unit tests for the phrase list, unlocks and rate limiting.
   - A lobby test for relaying (team only, all-chat phrases, rejection of unknown or locked phrases).
   - An e2e case in a 50 v 50 match on phone and desktop.
-  - Run `npm test`, `npm run typecheck` and `npm run e2e` before merging.
+  - Run `npm test`, `npm run typecheck` and, locally, the e2e specs you touched (under the shared e2e lock).
+    CI runs the whole e2e suite on the PR (`.github/workflows/e2e.yml`): read its `result` before merging.
 - **Record it** in `DECISIONS.md` (New decisions) and keep `docs/areas/chat.md` true, and **ship it** per `CLAUDE.md`.
 
 ## Reporting back

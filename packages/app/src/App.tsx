@@ -38,7 +38,7 @@ import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, type FrontNav } from "./components/FrontMenu.tsx";
 import { useAccount } from "./screens/Profile.tsx";
 import { LandingScreen } from "./screens/Landing.tsx";
-import { LegalScreen } from "./screens/Legal.tsx";
+import { LegalScreen, leaveLegal, legalPageOf, type LegalPage } from "./screens/Legal.tsx";
 import { CrowdCut, CrowdReveal, WatchScreen } from "./screens/Crowd.tsx";
 import { VoteScreen } from "./screens/Vote.tsx";
 import { BossScreen } from "./screens/Boss.tsx";
@@ -226,9 +226,7 @@ export function App() {
   const [showFaq, setShowFaq] = useState(() => location.pathname === "/faq");
   /** The computer's side menu: open the home screen's boss menu or Play with friends. */
   const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(null);
-  const [legal, setLegal] = useState<"privacy" | "terms" | null>(() =>
-    location.pathname === "/privacy" ? "privacy" : location.pathname === "/terms" ? "terms" : null,
-  );
+  const [legal, setLegal] = useState<LegalPage | null>(() => legalPageOf(location.pathname));
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
   const [inviteSkipped, setInviteSkipped] = useState(false);
@@ -884,13 +882,7 @@ export function App() {
   if (!match && soundLab) return <SoundLab onBack={() => setSoundLab(false)} />;
   if (!match && legal) {
     return (
-      <LegalScreen
-        page={legal}
-        onBack={() => {
-          setLegal(null);
-          history.replaceState(null, "", "/");
-        }}
-      />
+      <LegalScreen page={legal} onBack={() => leaveLegal(() => setLegal(null))} />
     );
   }
   if (!match && showFaq) {

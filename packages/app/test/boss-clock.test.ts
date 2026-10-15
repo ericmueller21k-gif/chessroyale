@@ -3,7 +3,8 @@ import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@ch
 import { bulletIncrementAt, legalMoves, type UciEngine } from "@chessroyale/chess";
 import { HUMAN, SoloMatch } from "../src/solo.ts";
 import { COUNT_FROM_SECONDS } from "../src/components/Countdown.tsx";
-import { DOCK_PLUS_MS, clockLeft, clockShown } from "../src/components/BossDock.tsx";
+import { DOCK_PLUS_MS, clockLeft } from "../src/components/BossDock.tsx";
+import { clockShown } from "../src/clock-text.ts";
 
 /** Whether this device's profile says admin (Engine move and the Hidden Boss are admins'). */
 vi.mock("../src/account.ts", async (orig) => {

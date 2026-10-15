@@ -16,7 +16,7 @@ const FAQ: [string, string][] = [
     "How do you deal with cheating?",
     "Accounts are the first step. Every move is also scored by the engine, so a player who matches it move after move stands out. Automatic checks that flag those players are being built next.",
   ],
-  ["What do you do with my email?", "Sign-in only. No newsletters, and we never sell or share it. See the privacy policy."],
+  ["What do you do with my email?", "Signing in, and an email if a fair-play decision is made about your account. No newsletters, and we never sell it or share it for advertising. See the privacy policy."],
   ["Can I play on my phone?", "It's made for phones. Add it to your home screen and it opens like an app."],
 ];
 
@@ -103,7 +103,7 @@ export function LandingScreen({
         ))}
       </section>
       <footer class="landing-foot muted small">
-        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · Engine: <a href="https://stockfishchess.org">Stockfish</a> (GPL-3.0)
+        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/copyright">Copyright</a> · Engine: <a href="https://stockfishchess.org">Stockfish</a> (GPL-3.0)
       </footer>
     </div>
   );

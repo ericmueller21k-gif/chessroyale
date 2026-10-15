@@ -27,6 +27,10 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   page, the boss battle's "Trigger ultimate (testing)" button, and the test switches in the address (`?debug`,
   `?rounds=`, …; [ops.md](ops.md), "Test switches").
 - **Bans** (from [fairplay.md](fairplay.md)) stop online play; solo stays open.
+- **The privacy policy, terms and copyright page** (`/privacy`, `/terms`, `/copyright`, `screens/Legal.tsx`) are drafts
+  written from the code, with the decisions still to make at the top. They list every kind of personal data the game keeps, why and for how long:
+  a PR that stores something new, or keeps it for a different time, changes the policy in the same PR. Linked from the
+  landing page's footer, Settings and the FAQ.
 
 ## Where the code is
 
@@ -35,6 +39,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 | Accounts, sessions, identities, profiles, results (D1, behind a tiny SQL interface) | `packages/server/src/accounts.ts` |
 | The account API (`/api/me`, `/api/auth/*`, `/api/profile/*`, `/api/results`, …) | `packages/server/src/api.ts`, routed from `index.ts` |
 | App side: your account, signing in | `packages/app/src/account.ts`, `components/SignIn.tsx` |
+| The privacy policy, terms and copyright page | `packages/app/src/screens/Legal.tsx` |
 | Fair play's tables (made with the rest of the schema) | `packages/server/src/fairplay-schema.ts` |
 
 ## Settings
@@ -45,7 +50,7 @@ Worker variables and secrets (see `DEPLOY.md`): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIE
 ## Tests
 
 - Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`).
-- e2e: `e2e/account.spec.ts`, `profile.spec.ts`.
+- e2e: `e2e/account.spec.ts`, `profile.spec.ts`, `legal.spec.ts` (the privacy policy, terms and copyright page).
 
 ## Rules for this area
 
