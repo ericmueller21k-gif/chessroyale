@@ -388,8 +388,20 @@ export interface NetChatLine {
   lobby?: true;
 }
 
-/** Why the server dropped a chat line (the app mirrors the limits, so this is rare). */
-export type ChatRefusal = "unknown" | "locked" | "team" | "gap" | "burst" | "repeat" | "closed" | "off";
+/**
+ * Why the server dropped a chat line (the app mirrors the limits, so this is rare). "mod": the sender's chat is
+ * paused (a moderator's chat ban, or reports waiting for a moderator; see ChatBlock).
+ */
+export type ChatRefusal = "unknown" | "locked" | "team" | "gap" | "burst" | "repeat" | "closed" | "off" | "mod";
+
+/**
+ * A player's chat paused, so they can't send (they still read): a moderator's chat ban until `until` (server time;
+ * null: no end), or, `auto`, reports from several players waiting for a moderator (`until`: at the latest).
+ */
+export interface ChatBlock {
+  until: number | null;
+  auto?: true;
+}
 
 export type ClientMessage =
   /** `look`: the crate items you wear (others see them on the cut screen). */
@@ -693,8 +705,11 @@ export type ServerMessage = { now: number } & (
    * and the chat packs the server knows you own (the buttons to show).
    */
   | { t: "chatLog"; lines: NetChatLine[]; packs: string[] }
-  /** Quick chat: your line was dropped; `retryAt` (server time) is when it (or anything, for the gap and burst limits) could go. */
-  | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number }
+  /**
+   * Quick chat: your line was dropped; `retryAt` (server time) is when it (or anything, for the gap and burst limits)
+   * could go. `block`: why your chat is paused (reason "mod").
+   */
+  | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock }
   | {
       t: "results";
       placements: Record<string, number>;

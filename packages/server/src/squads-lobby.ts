@@ -120,6 +120,7 @@ import {
   type SquadsVoteId,
   type Wallet,
 } from "@chessroyale/chess/squads";
+import { seatName } from "./text-filter.ts";
 import { cleanTop, distanceFromVerdict, fallbackTop, topsAgree, verdictMovesOf } from "./squads-bots.ts";
 
 /**
@@ -649,7 +650,7 @@ export class SquadsCore {
       this.r.parties[partyId] = { pass: "", size: 1, members: [] };
     }
     this.r.parties[partyId]!.members.push(id);
-    const name = (opts.name ?? "").replace(/\s+/g, " ").trim().slice(0, 16) || `Player ${this.r.humans.length + 1}`;
+    const name = seatName(opts.name, `Player ${this.r.humans.length + 1}`);
     const newToken = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("");
     this.r.humans.push({
       id,

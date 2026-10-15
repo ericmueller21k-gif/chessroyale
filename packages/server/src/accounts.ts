@@ -33,6 +33,10 @@ import {
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, type LockerState } from "./locker.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA } from "./fairplay-schema.ts";
+import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
+import { isBlockedText } from "./text-filter.ts";
+import { chatStanding, type ChatNotice } from "./chat-mod.ts";
+import type { ChatBlock } from "@chessroyale/chess";
 
 export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
@@ -137,6 +141,8 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS reports_reporter ON reports (reporter, at)`,
   // Fair play: cases and their log (fairplay.ts).
   ...FAIRPLAY_SCHEMA,
+  // Chat moderation: reports of chat lines and the moderators' decisions (chat-mod.ts).
+  ...CHAT_MOD_SCHEMA,
 ];
 
 /**
@@ -290,11 +296,11 @@ export function isPixelIcon(icon: unknown): icon is string {
   return signature && ihdr && u32(16) === PIXEL_ICON_SIZE && u32(20) === PIXEL_ICON_SIZE;
 }
 
-/** A display name: trimmed, 1-16 visible characters, no control characters. */
+/** A display name: trimmed, 1-16 visible characters, no control characters, nothing the name filter refuses (text-filter.ts). */
 export function cleanName(name: unknown): string | null {
   if (typeof name !== "string") return null;
   const n = name.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 16);
-  return n.length ? n : null;
+  return n.length && !isBlockedText(n) ? n : null;
 }
 
 /** A normalized email address, or null if it doesn't look like one. */
@@ -409,7 +415,7 @@ export async function signInWithIdentity(
   await sql.run(
     `INSERT INTO users (id, name, ${col}, created_at, last_seen) VALUES (?, ?, ?, ?, ?)`,
     id,
-    cleanName(extra.name) ?? (kind === "email" ? value.split("@")[0]!.slice(0, 16) : "Player"),
+    cleanName(extra.name) ?? (kind === "email" ? cleanName(value.split("@")[0]) : null) ?? "Player",
     value,
     now,
     now,
@@ -590,6 +596,8 @@ export interface Profile {
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss: ModeStats };
   rating: number | null;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
+  /** Your chat's pause in force and a moderator's notice you haven't seen (chat-mod.ts); missing when neither. */
+  chatMod?: { block?: ChatBlock; notice?: ChatNotice };
 }
 
 export async function profile(sql: Sql, user: User): Promise<Profile> {
@@ -605,6 +613,7 @@ export async function profile(sql: Sql, user: User): Promise<Profile> {
     best: rs.length ? Math.min(...rs.map((r) => r.placement)) : null,
     teamWins: rs.filter((r) => r.team_won === 1).length,
   });
+  const chatMod = await chatStanding(sql, user.id, Date.now()).catch(() => null);
   return {
     user: { id: user.id, name: user.name, icon: user.icon, signedIn: !!(user.email || user.google_sub), email: user.email, google: !!user.google_sub },
     shop: await shopState(sql, user.id),
@@ -619,6 +628,7 @@ export async function profile(sql: Sql, user: User): Promise<Profile> {
       teamWon: r.team_won === null ? null : r.team_won === 1,
       playedAt: r.played_at,
     })),
+    ...(chatMod ? { chatMod } : {}),
   };
 }
 

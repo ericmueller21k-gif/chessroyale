@@ -9,7 +9,9 @@ import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
 import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
-import { CAPACITY, DEFAULT_SETTINGS } from "@chessroyale/core";
+import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS } from "@chessroyale/core";
+import type { ChatBlock } from "@chessroyale/chess";
+import { chatBlock, type ReportedLine } from "./chat-mod.ts";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { isAdmin } from "./admin.ts";
@@ -51,6 +53,8 @@ export class Lobby extends DurableObject<Env> {
    * its own key "fair" and only when a round added to it, so a pick or a chat line never rewrites it.
    */
   private fairStored = 0;
+  /** Chat moderation: when each account's chat standing was last read (in memory: a wake reads it again). */
+  private chatChecked = new Map<string, number>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -71,12 +75,15 @@ export class Lobby extends DurableObject<Env> {
     });
   }
 
-  /** Quick chat: a person's icon and the shop items they own (their chat packs), from their account. */
-  private async chatProfileOf(userId: string): Promise<{ icon: string | null; owned: string[] }> {
+  /** Quick chat: a person's icon, the shop items they own (their chat packs) and any chat pause, from their account. */
+  private async chatProfileOf(userId: string): Promise<{ icon: string | null; owned: string[]; block: ChatBlock | null }> {
     const sql = d1Sql(this.env.DB!);
     const row = await sql.first<{ icon: string }>("SELECT icon FROM users WHERE id = ?", userId);
     const icon = row && (isPixelIcon(row.icon) || (ICONS as readonly string[]).includes(row.icon)) ? row.icon : null;
-    return { icon, owned: (await shopState(sql, userId)).owned };
+    const now = Date.now();
+    const block = await chatBlock(sql, userId, now).catch(() => null);
+    this.chatChecked.set(userId, now);
+    return { icon, owned: (await shopState(sql, userId)).owned, block };
   }
 
   private core(code: string): LobbyCore {
@@ -365,6 +372,24 @@ export class Lobby extends DurableObject<Env> {
     return give;
   }
 
+  /**
+   * Chat moderation (POST /api/chat/report): the line numbered `n` as this account saw it here, with the lines around
+   * it, or why it can't be reported.
+   */
+  async chatReportLine(userId: string, n: number): Promise<{ line: ReportedLine } | { error: string }> {
+    if (!this.record || (await this.closeIfDue())) return { error: "gone" };
+    return this.core(this.record.code).chatReportLine(userId, n);
+  }
+
+  /** Chat moderation: an account's chat pause changed (a moderator's decision, or reports): it applies here at once. */
+  async chatStandingChanged(userId: string, block: ChatBlock | null): Promise<void> {
+    if (!this.record || (await this.closeIfDue())) return;
+    const core = this.core(this.record.code);
+    core.chatStanding(userId, block);
+    this.chatChecked.set(userId, Date.now());
+    await this.persist(core);
+  }
+
   /** Bots off → Default: this seat leaves (see LobbyCore.release); when its person first joined, or null. */
   async release(token: string): Promise<{ joinedAt: number } | null> {
     if (!this.record || (await this.closeIfDue())) return null;
@@ -420,6 +445,11 @@ export class Lobby extends DurableObject<Env> {
     }
     // Quick chat: who's joining (their icon and chat packs), read before the lobby is touched, as above.
     const chatProfile = msg.t === "hello" && this.env.DB && attached?.userId && !attached.guest ? await this.chatProfileOf(attached.userId).catch(() => null) : null;
+    // Chat moderation: a chatting player's pause, read again now and then (CHAT_MOD.recheckMs), as above.
+    const uid = attached?.userId;
+    const recheck = msg.t === "chat" && this.env.DB && uid && Date.now() - (this.chatChecked.get(uid) ?? -Infinity) >= CHAT_MOD.recheckMs;
+    const block = recheck ? await chatBlock(d1Sql(this.env.DB!), uid, Date.now()).catch(() => undefined) : undefined;
+    if (uid && block !== undefined) this.chatChecked.set(uid, Date.now());
     // (Closed while that was being read.)
     if (!this.record) return;
     const core = this.core(this.record.code);
@@ -448,6 +478,7 @@ export class Lobby extends DurableObject<Env> {
       ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId, ...(attached?.admin ? { admin: true } : {}) });
       if (chatProfile) {
         core.chatOwned(result.playerId, chatProfile.owned);
+        core.chatStanding(attached!.userId!, chatProfile.block);
         if (chatProfile.icon && this.icons.get(result.playerId) !== chatProfile.icon) {
           this.icons.set(result.playerId, chatProfile.icon);
           await this.ctx.storage.put(`icon:${result.playerId}`, chatProfile.icon);
@@ -460,6 +491,7 @@ export class Lobby extends DurableObject<Env> {
     }
     const playerId = attached?.playerId;
     if (!playerId) return;
+    if (uid && block !== undefined) core.chatStanding(uid, block);
     if (msg.t === "ultimate") core.ultimateTrigger(playerId, !!attached?.admin);
     else core.message(playerId, msg);
     await this.persist(core);

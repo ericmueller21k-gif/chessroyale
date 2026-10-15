@@ -16,7 +16,8 @@ import {
   type ChatTo,
   type StoredChatPicks,
 } from "@chessroyale/core";
-import type { ChatRefusal, ClientMessage, NetChatLine } from "@chessroyale/chess";
+import type { ChatBlock, ChatRefusal, ClientMessage, NetChatLine } from "@chessroyale/chess";
+import { chatBlockNow, mutes, reportChatLine, setChatBlock } from "./chat-mod.ts";
 import { chatBubbles, chatOff, onPrefsChange, setChatOff } from "./prefs.ts";
 import { play } from "./sound.ts";
 
@@ -45,12 +46,15 @@ export interface ChatHost {
   teams: () => boolean;
   /** The lines and emoji this player picked in their profile (their account's; missing: the defaults). */
   picks: () => StoredChatPicks | null | undefined;
+  /** A person's account (a seat's player in this lobby): mutes are by account (chat-mod.ts). Missing: a bot, or no account. */
+  uidOf?: (playerId: string) => string | undefined;
 }
 
 /**
  * Quick chat in one online match: the lines this player can see, the icons that came with them, their packs, who
  * they muted, and the limits mirrored from the server (so the buttons gray out instead of failing). The server
- * decides everything; this only shows it.
+ * decides everything; this only shows it. A mute is by account, on this device, for every chat (chat-mod.ts); a
+ * player without an account (a bot) is muted for this match only.
  */
 export class MatchChat {
   /** The server opened chat for this match (Crowd and boss raids, once the match has begun). */
@@ -76,7 +80,7 @@ export class MatchChat {
 
   constructor(private readonly host: ChatHost) {}
 
-  /** Muted for this match (kept on the device with the lobby's code, so a reload keeps them). */
+  /** Players without an account muted for this match (kept on the device with the lobby's code, so a reload keeps them). */
   private get muted(): Set<string> {
     if (!this.mutedSet) {
       this.mutedSet = new Set(this.loadMuted());
@@ -114,8 +118,9 @@ export class MatchChat {
     else this.arrived(l);
   }
 
-  /** The server dropped a line: gray the buttons until it says. */
-  onRefused(say: string, reason: ChatRefusal, retryAt: number) {
+  /** The server dropped a line: gray the buttons until it says (or, your chat paused, say why instead of them). */
+  onRefused(say: string, reason: ChatRefusal, retryAt: number, block?: ChatBlock) {
+    if (reason === "mod") setChatBlock(block ? { ...block, until: block.until === null ? null : this.host.local(block.until) } : { until: null });
     if (reason === "gap" || reason === "burst") this.blockedUntil = Math.max(this.blockedUntil, this.host.local(retryAt));
     if (reason === "repeat") this.sent = { ...this.sent, last: { say, at: this.host.local(retryAt) - QUICK_CHAT.repeatMs } };
     this.wakeAt(this.readyAt());
@@ -144,10 +149,15 @@ export class MatchChat {
     return Math.max(chatReadyAt(this.sent), this.blockedUntil);
   }
 
+  /** Your chat's pause (a moderator's chat ban, or reports waiting for one): the panel says why instead of its buttons. */
+  paused(now = Date.now()): ChatBlock | null {
+    return chatBlockNow(now);
+  }
+
   /** Whether this line's button works right now (chat open, owned, the switch allows it, within the limits). */
   canSay(id: string, now = Date.now()): boolean {
     const say = chatSay(id);
-    if (!this.enabled || !say || !this.packs.includes(say.pack) || chatOff()) return false;
+    if (!this.enabled || !say || !this.packs.includes(say.pack) || chatOff() || this.paused(now)) return false;
     if (this.to === "all" && this.host.teams() && !canSayToAll(id)) return false;
     return now >= this.blockedUntil && chatCheck(this.sent, id, now).ok;
   }
@@ -174,24 +184,45 @@ export class MatchChat {
     return this.host.teams();
   }
 
-  // ---------------- Muting and off ----------------
+  // ---------------- Muting, reporting and off ----------------
+
+  /** A player whose lines don't show here: muted (their account on this device, or a bot for this match). */
+  hidden(id: string): boolean {
+    return this.muted.has(id) || mutes.has(this.host.uidOf?.(id));
+  }
 
   isMuted(id: string) {
-    return this.muted.has(id);
+    return this.hidden(id);
   }
 
+  /** The players muted here: this match's, and those with a line in this chat whose account is muted. */
   mutedIds(): string[] {
-    return [...this.muted];
+    return [...new Set([...this.muted, ...this.list.map((l) => l.from).filter((id) => id !== this.host.me() && this.hidden(id))])];
   }
 
-  /** Mutes (or unmutes) a player for this match: their lines and emoji disappear, and the server stops sending them. */
+  /**
+   * Mutes (or unmutes) a player: their account on this device for every chat, or a player without one (a bot) for
+   * this match. Their lines and emoji disappear, and the server stops sending them to this match.
+   */
   mute(id: string, on: boolean) {
     if (id === this.host.me()) return;
-    if (on) this.muted.add(id);
+    const uid = this.host.uidOf?.(id);
+    if (uid) mutes.set(uid, on);
+    if (on && !uid) this.muted.add(id);
     else this.muted.delete(id);
     this.saveMuted();
-    this.host.send({ t: "chatPrefs", muted: [...this.muted] });
+    this.host.send({ t: "chatPrefs", muted: this.mutedIds() });
     this.host.emit();
+  }
+
+  /** A person's line here can be reported: someone else's, with an account, in an online lobby (not Solo's queue). */
+  canReport(id: string): boolean {
+    return !!this.host.code() && id !== this.host.me() && !!this.host.uidOf?.(id);
+  }
+
+  /** Reports the line numbered `n` (the server finds it in its own copy); answers with what to tell the player. */
+  report(n: number): Promise<string> {
+    return reportChatLine(n, this.host.code());
   }
 
   get off() {
@@ -208,7 +239,7 @@ export class MatchChat {
 
   /** The feed: the last lines this player can see (shown now, not muted). */
   lines(now = Date.now()): ChatLine[] {
-    return this.list.filter((l) => l.at <= now && !this.muted.has(l.from)).slice(-QUICK_CHAT.feedSize);
+    return this.list.filter((l) => l.at <= now && !this.hidden(l.from)).slice(-QUICK_CHAT.feedSize);
   }
 
   /** Lines that arrived while no chat was on screen (not your own). */
@@ -287,7 +318,7 @@ export class MatchChat {
   private arrived(l: ChatLine) {
     const me = this.host.me();
     if (this.visible) this.markSeen();
-    if (l.from !== me && l.to === "team" && !chatOff() && !this.muted.has(l.from) && Date.now() - this.lastTick > QUICK_CHAT.tickGapMs) {
+    if (l.from !== me && l.to === "team" && !chatOff() && !this.hidden(l.from) && Date.now() - this.lastTick > QUICK_CHAT.tickGapMs) {
       this.lastTick = Date.now();
       play("chat");
     }

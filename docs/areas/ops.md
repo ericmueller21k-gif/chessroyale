@@ -65,7 +65,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 
 `CAPACITY` (queue, overload, presence, rate limits), `LOBBY_LIFE` in settings.ts; Worker variables
 `MATCH_FILL_SECONDS`, `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`, `OPS_STATS`, `LOAD_TEST` (staging only), `SQUADS_TEST`
-(local and e2e only: anyone may use Squads' test controls). Squads lobbies aren't on the live line yet, so the
+(local and e2e only: anyone may use Squads' test controls), `CHAT_MOD_TEST` (local and e2e only, and only without
+sign-in: anyone may use the chat review page, chat.md). Squads lobbies aren't on the live line yet, so the
 overload limit doesn't count their players.
 
 ## Tests and tools

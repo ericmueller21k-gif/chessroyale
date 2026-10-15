@@ -12,6 +12,9 @@ import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccoun
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, isAdmin, type AdminEnv } from "./admin.ts";
+import { pruneChatMod } from "./chat-mod.ts";
+import { handleChatMod } from "./chat-mod-api.ts";
+import { handleChatAdmin } from "./chat-mod-admin.ts";
 import { deepCheckRun } from "./fairplay-deep.ts";
 import { containerSearch } from "./fairplay-engine.ts";
 import { REGION_HINT, queueName, regionOf } from "./queue.ts";
@@ -47,6 +50,8 @@ export interface Env extends AccountEnv, EngineEnv, AdminEnv {
   OPS_STATS?: string;
   /** "1" on staging for load tests from one machine: the per-address rate limit is off (never in production). */
   LOAD_TEST?: string;
+  /** "1" (local and e2e only): anyone may use the chat review page while no sign-in is set up (chat-mod-admin.ts). */
+  CHAT_MOD_TEST?: string;
 }
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
@@ -55,8 +60,8 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
 export default {
   async fetch(request: Request, rawEnv: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    // (The fair-play review page is the Worker's own; everything else outside /api is the app.)
-    const admin = url.pathname === "/admin/fairplay" || url.pathname.startsWith("/admin/fairplay/");
+    // (The fair-play and chat review pages are the Worker's own; everything else outside /api is the app.)
+    const admin = /^\/admin\/(fairplay|chat)(\/|$)/.test(url.pathname);
     if (!url.pathname.startsWith("/api/") && !admin) return rawEnv.ASSETS.fetch(request);
     // Load-test counters (OPS_STATS set, and the matching key): see ops.ts.
     if (url.pathname === "/api/ops/stats" && rawEnv.OPS_STATS && request.headers.get("x-ops-key") === rawEnv.OPS_STATS) {
@@ -89,14 +94,16 @@ export default {
 
   /**
    * The Worker's schedule (wrangler.jsonc, every 15 minutes): fair play's deep re-check of flagged players' moves on
-   * the engine server (cases in review at once, the rest off-peak; fairplay-deep.ts).
+   * the engine server (cases in review at once, the rest off-peak; fairplay-deep.ts), and chat moderation's pruning.
    */
   async scheduled(_event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
     if (!rawEnv.DB) return;
+    const sql = d1Sql(rawEnv.DB);
+    // Chat moderation's records past keeping go, whatever else runs (chat-mod.ts).
+    ctx.waitUntil(ensureSchema(sql, rawEnv.DB).then(() => pruneChatMod(sql, Date.now())).catch(() => undefined));
     const env = await withSecrets(rawEnv);
     const search = containerSearch(env);
     if (!search) return;
-    const sql = d1Sql(rawEnv.DB);
     ctx.waitUntil(
       ensureSchema(sql, rawEnv.DB)
         .then(() => deepCheckRun(sql, search, Date.now(), { mail: caseMailer(env) }))
@@ -113,6 +120,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // Fair play's review page and the automated reviewer's API (admins and the reviewer's token only).
     const review = await handleAdmin(request, env, caseMailer(env), waitUntil, containerSearch(env));
     if (review) return review;
+    // Chat moderation: reports, a player's notice, and the chat review page (chat-mod-api.ts, chat-mod-admin.ts).
+    const chatMod = (await handleChatAdmin(request, env, waitUntil)) ?? (await handleChatMod(request, env));
+    if (chatMod) return chatMod;
     // Accounts: /api/me, /api/results, /api/auth/*
     const account = await handleAccountApi(request, env, fetch, waitUntil);
     if (account) return account;

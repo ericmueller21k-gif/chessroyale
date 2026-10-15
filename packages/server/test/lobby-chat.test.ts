@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, FRONT_DOOR, LOBBY_LIFE, QUICK_CHAT, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
 import { sanLineToUci, type NetChatLine, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, lobbyClosing, newLobbyRecord } from "../src/lobby.ts";
+import { rot13 } from "../src/text-filter.ts";
 
 /**
  * Quick chat in the lobby before the match (DECISIONS.md, "Lobby chat"): the queue, a private lobby, the full grid's
@@ -299,5 +300,96 @@ describe("lobby: quick chat before the match", () => {
     L.core.disconnect(bo);
     L.core.resendTo(bo);
     expect(L.last(bo, "chatLog")!.lines.find((l) => l.from === ann)).toMatchObject({ lobby: true, icon: "♞" });
+  });
+});
+
+describe("lobby: chat moderation", () => {
+  it("a paused account can't send (and is told why) but still reads; the pause follows the account to a new seat and ends at its time or when lifted", () => {
+    // (A private lobby: nothing starts while the test waits.)
+    const L = setup(CROWD);
+    const [ann, bo] = [L.join("Ann", "u-ann"), L.join("Bo", "u-bo")] as [string, string];
+    L.clear();
+    const until = L.now + 60_000;
+    L.core.chatStanding("u-ann", { until });
+    L.say(ann, "hi-all");
+    expect(L.last(ann, "chatNo")).toMatchObject({ reason: "mod", retryAt: until, block: { until } });
+    expect(L.people(bo)).toEqual([]);
+    L.say(bo, "hi-all");
+    expect(L.people(ann).map((l) => [l.from, l.say])).toEqual([[bo, "hi-all"]]);
+    // Cancel, PLAY again: a new seat, the same account, still paused.
+    L.core.message(ann, { t: "leave" });
+    const again = L.join("Ann", "u-ann");
+    L.say(again, "wow");
+    expect(L.last(again, "chatNo")).toMatchObject({ reason: "mod" });
+    L.advance(until - L.now);
+    L.say(again, "wow");
+    expect(L.people(bo).at(-1)).toMatchObject({ from: again, say: "wow" });
+    // With no end, until it's lifted; a pause from reports says so.
+    L.core.chatStanding("u-ann", { until: null });
+    L.advance(3_000);
+    L.say(again, "oops");
+    expect(L.last(again, "chatNo")).toMatchObject({ reason: "mod", block: { until: null } });
+    L.core.chatStanding("u-ann", { until: L.now + 1000, auto: true });
+    L.say(again, "oops");
+    expect(L.last(again, "chatNo")).toMatchObject({ reason: "mod", block: { auto: true } });
+    L.core.chatStanding("u-ann", null);
+    L.say(again, "oops");
+    expect(L.people(bo).at(-1)).toMatchObject({ from: again, say: "oops" });
+    // Someone else's pause is theirs alone.
+    L.core.chatStanding("u-bo", { until: null });
+    L.advance(3_000);
+    L.say(again, "lets-go");
+    expect(L.people(bo).at(-1)).toMatchObject({ from: again, say: "lets-go" });
+  });
+
+  it("a report takes the line as the reporter saw it, with the lines around it: never a bot's line, their own, or one they couldn't see", () => {
+    const L = setup(CROWD);
+    L.core.setAuto(L.now + 60_000);
+    const people = ["Ann", "Bo", "Cy", "Di", "Ed", "Flo"].map((n) => L.join(n, `u-${n.toLowerCase()}`));
+    const [ann, bo, cy] = people as [string, string, string];
+    L.say(ann, "hi-all");
+    L.say(bo, "go-mate");
+    L.say(cy, "e-fire");
+    const lines = L.core.record.chat!.lines;
+    const boLine = lines.find((l) => l.from === bo)!;
+    const r = L.core.chatReportLine("u-cy", boLine.n);
+    expect(r).toEqual({
+      line: {
+        target: "u-bo",
+        name: "Bo",
+        text: "Go for mate!",
+        saidAt: boLine.at,
+        context: [
+          { at: lines[0]!.at, name: "Ann", text: "Hi all!" },
+          { at: boLine.at, name: "Bo", text: "Go for mate!", mark: "this" },
+          { at: lines[2]!.at, name: "Cy", text: "🔥", mark: "reporter" },
+        ],
+      },
+    });
+    expect(L.core.chatReportLine("u-bo", boLine.n)).toEqual({ error: "self" });
+    expect(L.core.chatReportLine("u-cy", 999)).toEqual({ error: "gone" });
+    expect(L.core.chatReportLine("u-stranger", boLine.n)).toEqual({ error: "gone" });
+    // The bots' hello as they fill the seats: not a person's line.
+    L.advance(60_000);
+    const hello = L.core.record.chat!.lines.find((l) => l.from.startsWith("bot"))!;
+    expect(L.core.chatReportLine("u-ann", hello.n)).toEqual({ error: "bot" });
+    // In the match, a team's plan is for that team: someone on the other side can't have seen it.
+    L.advance(FRONT_DOOR.fillShowMs);
+    L.advance(3_000);
+    for (const id of people) L.say(id, "push-pawns");
+    const team = (id: string) => L.core.record.chat!.lines.filter((l) => l.from === id).at(-1)!;
+    const other = people.find((id) => team(id).team !== team(ann).team);
+    expect(other).toBeDefined();
+    const otherUid = L.core.record.accounts![other!]!;
+    expect(L.core.chatReportLine(otherUid, team(ann).n)).toEqual({ error: "gone" });
+    const mate = people.find((id) => id !== ann && team(id).team === team(ann).team)!;
+    expect(L.core.chatReportLine(L.core.record.accounts![mate]!, team(ann).n)).toMatchObject({ line: { target: "u-ann", text: "Push the pawns!" } });
+  });
+
+  it("a name the filter refuses takes a seat as Player N", () => {
+    const L = setup(CROWD);
+    const ann = L.join("Ann");
+    const id = L.join(`${rot13("avttre").replace("e", "3")} 1`);
+    expect(L.last(ann, "lobby")!.players.find((p) => p.id === id)!.name).toBe("Player 2");
   });
 });

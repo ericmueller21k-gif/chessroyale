@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GLOBAL_CHAT } from "@chessroyale/core";
 import { GlobalChatStore, type GlobalLine } from "../src/global-chat.ts";
+import { chatBlockNow, mutes, setChatBlock } from "../src/chat-mod.ts";
 
 const T0 = 1_800_000_000_000;
 const line = (n: number, patch: Partial<GlobalLine> = {}): GlobalLine => ({ n, at: T0 + n, from: `p${n}`, name: `P${n}`, rating: null, icon: "♟", say: "gg", ...patch });
@@ -52,5 +53,31 @@ describe("global chat in the app", () => {
     expect(c.mutedCount()).toBe(1);
     c.unmuteAll();
     expect(c.lines()).toHaveLength(3);
+  });
+
+  it("mutes from before every chat shared one list are kept (read once from the global chat's old key)", () => {
+    const m = new Map<string, string>([["brc.globalChatMuted", JSON.stringify(["ann"])]]);
+    vi.stubGlobal("localStorage", { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) });
+    try {
+      mutes.reload();
+      const c = new GlobalChatStore();
+      c.take({ n: 2, lines: [line(1, { from: "ann" }), line(2, { from: "bo" })] });
+      expect(c.lines().map((l) => l.from)).toEqual(["bo"]);
+      expect([...m.keys()]).toEqual(["brc.muted"]);
+      expect(JSON.parse(m.get("brc.muted")!)).toEqual(["ann"]);
+    } finally {
+      vi.unstubAllGlobals();
+      mutes.reload();
+    }
+  });
+
+  it("a paused chat: the server's answer pauses the panel and says why", async () => {
+    vi.useFakeTimers({ now: T0 });
+    setChatBlock(null);
+    const c = new GlobalChatStore();
+    await c.say("gg", answer(403, { message: "Your chat is paused: a moderator's decision.", block: { until: T0 + 86_400_000 } }));
+    expect(chatBlockNow()).toEqual({ until: T0 + 86_400_000 });
+    expect(c.error).toMatch(/^Your chat is off until .+: a moderator's decision\.$/);
+    setChatBlock(null);
   });
 });

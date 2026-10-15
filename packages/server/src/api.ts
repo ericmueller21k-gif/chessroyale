@@ -3,6 +3,7 @@ import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, markSeen } from "./presence.ts";
 import { REPORT_THANKS, appeal, fairStatus, reportPlayer } from "./fairplay.ts";
+import { NAME_NOT_ALLOWED, isBlockedText } from "./text-filter.ts";
 import { isAdmin, type AdminEnv } from "./admin.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
 import {
@@ -231,6 +232,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // PATCH /api/me {name?, icon?}
   if (path === "/api/me" && request.method === "PATCH") {
     const body = (await request.json().catch(() => ({}))) as { name?: unknown; icon?: unknown };
+    // (A name with a slur or a hate term in it: text-filter.ts.)
+    if (typeof body.name === "string" && isBlockedText(body.name)) return json({ message: NAME_NOT_ALLOWED }, 400);
     return json(await profile(sql, await updateProfile(sql, current.id, body)));
   }
 

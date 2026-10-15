@@ -10057,6 +10057,23 @@ img.qicon {
 .qopt-muted .muted {
   color: var(--qc-muted);
 }
+/* Chat moderation: your chat paused (in the buttons' place), and a report's answer in a name's menu. */
+.qpaused {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--qc-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+.qmenu-note {
+  flex: 1 1 140px;
+  color: var(--qc-text);
+  font-size: 12px;
+  line-height: 16px;
+}
+.chat-notice-note {
+  font-style: italic;
+}
 
 /* The newest message for a moment under the top bar (phone, chat hidden). It never takes a tap. */
 .qbubble {

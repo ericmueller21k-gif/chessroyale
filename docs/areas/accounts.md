@@ -23,9 +23,12 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 - **Squads' placements** (unranked): a result with mode "squads" (placement 1, 2, 3 or 5 of 8 squads) and its reward:
   coins into `wallets.coins`, crates counted in `wallets.crates` (for when crates stop being free), both carried over
   when a guest signs in (`grantReward`).
-- **Admins** are the emails in `ADMIN_EMAILS` (a Worker variable or secret, never in the repo): the fair-play review
-  page and the boss battle's "Trigger ultimate (testing)" button.
+- **Admins** are the emails in `ADMIN_EMAILS` (a Worker variable or secret, never in the repo): the fair-play and chat
+  review pages and the boss battle's "Trigger ultimate (testing)" button.
 - **Bans** (from [fairplay.md](fairplay.md)) stop online play; solo stays open.
+- **Names** pass the server's name filter (slurs and hate: [chat.md](chat.md), "Moderation"): a profile can't take
+  such a name, and a new account or sign-in gets "Player" instead. A moderator can reset a name and icon from the chat
+  review page.
 
 ## Where the code is
 

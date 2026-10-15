@@ -77,11 +77,17 @@ test("global chat: post a line, everyone on the home page sees it, then the 30 s
   await expect(chat.locator(".gline.bot .gline-bot").first()).toHaveText(/bot/i, { timeout: 40_000 });
 
   // Muting someone hides their lines here only.
-  await seen.getByRole("button", { name: /profile or mute/ }).click();
+  await seen.getByRole("button", { name: /profile, mute or report/ }).click();
   await theirChat.getByRole("button", { name: "Mute", exact: true }).click();
   await expect(seen).toHaveCount(0);
   await expect(theirChat.getByRole("button", { name: /muted · unmute/ })).toBeVisible();
   await theirChat.getByRole("button", { name: /muted · unmute/ }).click();
   await expect(seen).toBeVisible();
+
+  // Reporting a line: a short confirmation (a moderator reads it on the review page).
+  await seen.getByRole("button", { name: /profile, mute or report/ }).click();
+  await theirChat.getByRole("button", { name: "Report", exact: true }).click();
+  await expect(theirChat.locator(".gchat-note")).toHaveText("Reported. Thanks: a moderator will look at it.");
+  await theirChat.getByRole("button", { name: "Close" }).click();
   await other.close();
 });

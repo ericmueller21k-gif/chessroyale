@@ -340,12 +340,13 @@ export function policy() {
 
 // ---------------- HTML ----------------
 
-const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-const when = (t: number | null | undefined) => (t ? new Date(t).toISOString().slice(0, 16).replace("T", " ") : "");
-const html = (body: string) =>
+export const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+export const when = (t: number | null | undefined) => (t ? new Date(t).toISOString().slice(0, 16).replace("T", " ") : "");
+/** An admin page (the chat review, chat-mod-admin.ts, uses it too): server-rendered, light and dark, phone-sized. */
+export const html = (body: string, title = "Fair play") =>
   new Response(
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
-<title>Fair play · HunChess</title><style>
+<title>${esc(title)} · HunChess</title><style>
 :root{color-scheme:light dark;--bg:#fafaf7;--fg:#1d1d1b;--muted:#6b6b66;--line:#ddd9cf;--card:#fff;--gold:#b8860b;--bad:#b3261e;--ok:#1e7b34}
 @media (prefers-color-scheme:dark){:root{--bg:#141412;--fg:#ecebe6;--muted:#a3a29b;--line:#34332e;--card:#1d1d1a;--gold:#e0b44c;--bad:#f2867d;--ok:#7fd18f}}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif}main{max-width:1100px;margin:0 auto;padding:16px}

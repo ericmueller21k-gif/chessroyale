@@ -218,9 +218,9 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   const line = desk.locator(".qchat-side .qline", { hasText: "Have fun!" }).filter({ hasText: "Phoney" });
   await expect(line).toBeVisible();
   await line.locator(".qline-name").click();
-  await desk.locator(".qmenu").getByRole("button", { name: "Mute for this match" }).click();
+  await desk.locator(".qmenu").getByRole("button", { name: "Mute", exact: true }).click();
   await expect(line).toHaveCount(0);
-  await expect(desk.locator(".qchat-side .qfeed-empty", { hasText: "Muted this match: Phoney" })).toBeVisible();
+  await expect(desk.locator(".qchat-side .qfeed-empty", { hasText: "Muted: Phoney" })).toBeVisible();
   await phone.waitForTimeout(3100);
   await phone.locator(".qchat-split .qchip", { hasText: "Good luck!" }).click();
   await expect(phone.locator(".qchat-split .qline.you", { hasText: "Good luck!" })).toBeVisible();

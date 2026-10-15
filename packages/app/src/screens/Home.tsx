@@ -15,6 +15,7 @@ import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { LiveWindow } from "../components/LiveWindow.tsx";
 import { LIVE_WINDOW_MEDIA } from "../bot-replays.ts";
+import { ChatNotice } from "../components/ChatNotice.tsx";
 
 export const OPENING_KEY = "brc.openingMoves";
 const MODE_KEY = "brc.mode";
@@ -737,6 +738,8 @@ export function HomeScreen({
       {bossMenu && (
         <BossMenu forRaid={bossMenu === "raid"} value={chosenBoss(bossMenu === "solo" && isAdmin())} rating={profile?.rating ?? null} onPick={pickBoss} onClose={() => setBossMenu(null)} />
       )}
+      {/* (A moderator's warning or chat ban, once: chat moderation's.) */}
+      <ChatNotice />
     </div>
   );
 }

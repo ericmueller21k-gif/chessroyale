@@ -1,5 +1,6 @@
 import type { ChatPicks, ShopState } from "@chessroyale/core";
 import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankEffect } from "@chessroyale/core";
+import type { ChatBlock } from "@chessroyale/chess";
 import { evalBarOn } from "./prefs.ts";
 
 /**
@@ -29,6 +30,19 @@ export interface Profile {
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
   /** An admin (ADMIN_EMAILS, as for the fair-play review): sees the boss battle's test trigger. */
   admin?: boolean;
+  /** Your chat's pause in force, and a moderator's warning or chat ban you haven't seen yet (chat-mod.ts). */
+  chatMod?: { block?: ChatBlock; notice?: ChatNotice };
+}
+
+/** A moderator's warning or chat ban, shown to you once (components/ChatNotice.tsx). */
+export interface ChatNotice {
+  id: number;
+  kind: "warn" | "ban";
+  at: number;
+  /** A chat ban's end (server time); null: no end. */
+  until: number | null;
+  /** The moderator's words to you, if any. */
+  note: string | null;
 }
 
 export interface AccountState {

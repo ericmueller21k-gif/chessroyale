@@ -4730,3 +4730,66 @@ Eric opened crates on his iPhone and asked for three fixes. The calls:
 - **Testing:** light/targeted lane (art and CSS): typecheck, the unit suite (a new `gift-tube.test.ts`: the stripes
   tile the tube with no gaps or overlaps, and blotches match the purity on each painted set; `crates.test.ts`: the
   second color is stable, never the first, follows the odds, and stacks), and the crate e2e specs.
+
+## Chat moderation for launch (Oct 15, 2026)
+
+The director asked for chat moderation, "simple and solid", before launch. What there was: chat is preset lines and
+emoji only everywhere (quick chat in Crowd matches and raids, the lobby before them, the home page's global chat;
+Squads has no chat), with per-account send limits on the server (a lobby: one line every 3 s, 5 in 30 s, no repeats;
+the global chat: one every 30 s). Mute existed per match (by seat, kept per lobby code) and in the global chat (by
+account). There was no chat report, no review of chat, no chat ban and no filter on anything players type. The calls:
+
+- **Nothing new to type.** Chat stays preset lines: no free text added, so the filter has nothing to read in chat. The
+  free text others see is display names (a profile, and the name a device sends when it takes a lobby or Squads seat),
+  so the server filter checks those. Abuse in a preset chat is spam, taunts, a name or an icon, so that's what reports
+  and decisions are about.
+- **Mute is by account, on the device, for every chat.** One list (`localStorage` `brc.muted`; the global chat's old
+  list is folded in once), so a player muted in one match stays muted in the next one and in the global chat until
+  unmuted. Bots and seats without an account keep the old per-match mute. Nothing about mutes goes to the server beyond
+  a match's own `chatPrefs`: the brief said "on your device", and it stores nothing about who muted whom. The friends
+  helper's block reuses `uidOf` and counts as muted (`MatchChat.hidden`).
+- **Report a line, not a free-form complaint.** One tap from the line's menu, no reason picker: with preset lines the
+  stored lines around it show what happened, and fewer taps means more reports of real problems. The server takes the
+  line from its own copy (a lobby's log, the global chat's last 50), never from the device, so nobody can report
+  words that weren't said; only a line the reporter could see (not the other team's plan), never a bot's or their own.
+  The lines around it are stored with the report because the server doesn't keep them (a lobby is deleted 15 minutes
+  after its results; the global chat keeps 50 lines).
+- **Who can report, and how often.** Accounts that may chat (signed in wherever sign-in is set up): guests cost
+  nothing to make, and the automatic pause would let one person pause anyone with a few. One report per reporter,
+  player and place a day (the same again says so, nothing is stored), 20 a day per reporter (`CHAT_MOD.reportsPerDay`,
+  as fair play's reports).
+- **The automatic pause:** 3 different players, each with a report still open, within 7 days, pause the chat until a
+  moderator looks, for 72 hours at most (`CHAT_MOD.autoMute*`): "until reviewed", but temporary, so a slow review
+  never silences someone for good. A dismissal ends it and starts the count again; a ban replaces it.
+- **Its own review page, `/admin/chat`, not a section of fair play's.** A chat ban isn't a fair-play ban (that holds
+  results and blocks online play), so fair play's case can't hold it; its table of decisions (`chat_mod_log`) is both
+  the log and how a pause is in force. It reuses fair play's plumbing where it fits: `isAdmin` (`ADMIN_EMAILS`), the
+  page shell (`html`, `esc`, `when`, now exported from `admin.ts`), the origin check on posts, "admin:<email>" in the
+  log, a written reason for every decision but a dismissal.
+- **The decisions:** dismiss, warn, chat ban for 1, 7 or 30 days or with no end, lift, and reset the name and icon
+  (they're the only free-form things others see, so a moderator needs a way to clear them). A chat ban only stops
+  sending: the player still reads chat and plays. A decision reaches the lobbies the player was reported in within the
+  day at once (a call to each lobby); any other lobby reads a chatting player's standing when they join and every 30 s
+  as they chat (`CHAT_MOD.recheckMs`: at most one database read per chatting player per 30 s).
+- **The player is told,** never over a match: the chat panels show why instead of their buttons, and a warning or a
+  chat ban shows once on the home screen with the moderator's note. No appeal form for chat bans (fair play's appeal
+  is for play bans); a lift is there for a moderator who hears from them.
+- **The filter is a small list of our own**, slurs and hate terms only, ROT13-encoded in `server/src/text-filter.ts`
+  so the words don't show in searches, diffs or screenshots. The well-known open lists (LDNOOBW, CC-BY-4.0, for one)
+  are mostly swearing and sexual words, which would refuse many ordinary names and need a credit; Eric's brief was
+  slurs and hate. Matching folds case, accents, look-alike letters, invisible characters, leetspeak and spacing; short
+  words count only as whole words, and the few ordinary words that contain a long one are let through, so ordinary
+  names (Niger, Raccoon, Japan) pass. Nothing third-party, so `LICENSES.md` is unchanged.
+- **Where it applies:** a profile can't save such a name (it says so); a new account or a sign-in's name falls back to
+  "Player"; a lobby or Squads seat asked for with one is "Player N"; the global chat shows an old one as "Player".
+- **Keeping:** a report until it's resolved, then 30 days; a decision 180 days after it ended (a chat ban with no end
+  while it's in force). Pruned by the Worker's 15-minute schedule and as reports and reviews come in. The details are
+  in `docs/areas/chat.md` ("What's stored") for the privacy page.
+- **Testing the page:** `CHAT_MOD_TEST` "1" lets anyone open `/admin/chat`, but only while no way to sign in is set
+  up, so it can't open the page where accounts are real; `wrangler dev` sets it for the e2e (`playwright.config.ts`).
+- **Not done:** no AI moderation, nothing paid, no free text. Fair play's profile report ("Offensive name or icon")
+  stays as it was; it and chat reports are separate queues for now.
+- **Testing:** full lane (stored data, a protocol change, security): typecheck, the whole unit suite (new
+  `chat-mod.test.ts`, `text-filter.test.ts`, more in `lobby-chat.test.ts` and the app's `chat.test.ts` and
+  `global-chat.test.ts`), and the whole `npm run e2e` (new `chat-mod.spec.ts`; `chat.spec.ts` and `global-chat.spec.ts`
+  updated for the new labels and the report step).
