@@ -114,6 +114,7 @@ export const RECLUSE_LINES = {
         "You and your golden friend, picking my games apart together.",
         "Two against one. Curaçao all over again.",
         "A king in armor whispering moves. Is that chess?",
+        "You two have been talking about my games. I know it.",
       ],
       late: [
         // QUOTE: the same article, p. 65 (scan of the printed page).

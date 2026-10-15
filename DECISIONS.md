@@ -4150,7 +4150,8 @@ your side) against him, or the team in the Crowd final; lines about four boards 
 - **New, PLACEHOLDERS** (ours, not his words), phase 1: early "That came quickly. Too quickly.", "Is someone whispering to
   you?", "You keep looking over at him. Why?", "I know an engine move when I see one."; middle "He's feeding you moves.
   Don't think I can't see it.", "You and your golden friend, picking my games apart together.", "Two against one.
-  Curaçao all over again.", "A king in armor whispering moves. Is that chess?"; late "Petrosian did this. Keres did this.
+  Curaçao all over again.", "A king in armor whispering moves. Is that chess?", "You two have been talking about my games. I know it." (seven:
+  the middle runs 1:45, about seven lines; a played run said all six it had, then one again); late "Petrosian did this. Keres did this.
   Now you!", "Teamwork! Always teamwork against me!", "Analyze it together, then! It won't save you!", "Geller, Keres,
   Petrosian... and now a king in armor!", "Enough whispering! Play your own moves!", "A whole team against me, as
   always!". Phase 2's late stage, which a long phase 2 ran through: "Whispering across the boards again! I hear you!",
@@ -4165,4 +4166,7 @@ now and then; 400 to 450 s), five seeds: 23 to 28 lines, a mean gap of 15.6 to 1
 his bullet line was up when one came due: his own words first), never quiet (no line of his up) more than 18.5 s. Phase
 2 down to one board, a move every 10 to 20 s for ten minutes, slow-move and board lines now and then: 39 lines, mean gap
 15.2 to 15.5 s, the longest 18 to 21 s, never quiet more than 17 s (the old counter: one every 60 to 200 s there). E2e
-`recluse.spec.ts` logs his lines over about three minutes of a played phase 1 (the PR has the times).
+`recluse.spec.ts` logs his lines over about three minutes of a played phase 1 (a phone, Stockfish's moves at a person's
+pace, 34 moves): his entrance at 0.1 s; chatter at 14.0, 30.0, 44.0, 63.5, 77.0, 90.5, 103.5, 121.0, 134.0, 149.5 and
+167.5 s; the bullet clock's line at 37.3 s and "time per move" at 55.3 s, each whole, the chatter around them (gaps 13
+to 19.5 s).
