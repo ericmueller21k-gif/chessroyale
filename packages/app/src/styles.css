@@ -3621,6 +3621,10 @@ button.history-label {
 .legal {
   line-height: 1.5;
 }
+/* A readable line on a computer. */
+.screen.legal {
+  width: min(var(--col), 760px);
+}
 .legal h1 {
   margin: 8px 0 0;
 }
@@ -3639,6 +3643,62 @@ button.history-label {
 .legal .btn {
   flex: none;
   margin-top: 10px;
+}
+.legal h3 {
+  margin: 6px 0 0;
+  font-size: 15px;
+}
+.legal ol {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+}
+.legal li + li {
+  margin-top: 4px;
+}
+/* The draft notice: unmistakable at the top of both pages. */
+.legal-draft {
+  font-size: 14px;
+  line-height: 1.4;
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.legal-draft h3 {
+  margin: 2px 0 0;
+  font-size: 14px;
+}
+.legal-draft li + li {
+  margin-top: 2px;
+}
+.legal-draft h2 {
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+.legal-draft p,
+.legal-draft ol {
+  color: inherit;
+}
+.legal-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.legal-blank {
+  font-weight: 700;
+  color: var(--text, inherit);
+}
+.legal-other {
+  margin-top: 6px;
+}
+.legal-other a + a::before {
+  content: " · ";
+  display: inline-block;
+  white-space: pre;
 }
 @media (min-width: 900px) {
   .screen.landing {
@@ -8290,6 +8350,12 @@ button.fd-logo {
   text-align: left;
   padding: 0 12px;
   cursor: pointer;
+}
+/* A row link that goes to another page (the privacy policy, the terms): the same row as the buttons. */
+a.fd-row-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
 }
 .fd-seg {
   display: grid;

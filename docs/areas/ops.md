@@ -45,8 +45,10 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   the FAQ.
 - **The engines' source, served by the site** (Oct 14, DECISIONS.md "The Maia box's source on the site"): the Maia
   box's (AGPL-3.0) at `/engine/maia/maia-box-source.tar.gz`, written by its build; Stockfish's (GPL-3.0) at
-  `/engine/stockfish-source.tar.gz`, from `packages/app/stockfish-source/`. Static files, so they stay public when the
-  repository goes private; not precached by the service worker. Updating the `stockfish` package needs its source
+  `/engine/stockfish-source.tar.gz`, from `packages/app/stockfish-source/`. The PyChess sounds' (GPL-3.0, Oct 15) at
+  `/sounds/pychess-sounds-source.tar.gz`, written by `scripts/sounds-source.py` (run it after changing
+  `scripts/piece-sounds.py`; `sounds-source.test.ts` checks). Static files, so they stay public when the repository
+  goes private; not precached by the service worker. Updating the `stockfish` package needs its source
   archive first (the build stops without one).
 
 ## Errors and player reports

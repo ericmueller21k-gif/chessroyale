@@ -37,6 +37,11 @@ other sounds in this folder have their own `CREDITS.md` (`god-king/`, `banner/`,
   `scripts/piece-sounds.py`.
   The license's full text is served with the game at `/engine/COPYING.txt` (the same GPL-3.0 text Stockfish ships);
   the notice is in `/licenses/third-party.txt`; the credit is in Settings and the FAQ.
+- **Their source is served with the game** at `/sounds/pychess-sounds-source.tar.gz` (Oct 15, 2026): PyChess's
+  original `mov2.wav`, `capture2.wav` and `castle.wav` from that commit, `scripts/piece-sounds.py`, the classic mp3s
+  it levels against, the license, and a README with the command that makes the six variations again (checked: byte
+  for byte). Written by `scripts/sounds-source.py`; run it again after changing `piece-sounds.py` (a unit test,
+  `packages/app/test/sounds-source.test.ts`, fails until then). It stays available when the repository goes private.
 - **Why the game can ship them** (Eric, Oct 12, 2026: "classic PyChess knocks back as the default, GPL-3.0,
   credited"): a sound file is data the game plays, not code compiled into it, so the GPL covers these files, not the
   game, the same separate-file reasoning as Stockfish.

@@ -164,7 +164,7 @@ function ThemeChoice() {
 
 /**
  * Settings: the theme, sound, how you play, Crowd's options, Feedback (bugs, feedback, ideas), how to play (and the FAQ),
- * installing, and your sign-in.
+ * installing, your sign-in, privacy and terms.
  */
 export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => void; onSoundLab?: () => void; onFaq?: () => void }) {
   const { config, profile } = useAccount();
@@ -410,6 +410,19 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
         </section>
       )}
 
+      <section class="fd-section">
+        <h2 class="fd-label">PRIVACY AND TERMS</h2>
+        <a class="fd-row-link" href="/privacy">
+          Privacy policy: what we keep about you, and why ›
+        </a>
+        <a class="fd-row-link" href="/terms">
+          Terms of service ›
+        </a>
+        <a class="fd-row-link" href="/copyright">
+          Copyright: report a name or icon that copies your work ›
+        </a>
+      </section>
+
       <p class="fd-note maia-credit">
         Bosses and bots use <a href="https://stockfishchess.org">Stockfish</a> (GPL-3.0,{" "}
         <a href="https://github.com/official-stockfish/Stockfish">source</a>, <a href="https://github.com/nmrugg/stockfish.js">this build</a> and{" "}
@@ -425,7 +438,7 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
       <p class="fd-note sounds-credit">
         Classic piece sounds and their variations: <a href="https://github.com/pychess/pychess/tree/master/sounds">PyChess</a> (GPL-3.0). The
         variations are made from PyChess's sounds by our own script (<a href="/engine/COPYING.txt">license</a>,{" "}
-        <a href="/sounds/SOURCES.md">how each was made</a>).
+        <a href="/sounds/SOURCES.md">how each was made</a>, <a href="/sounds/pychess-sounds-source.tar.gz" download>their source</a>).
       </p>
       <p class="fd-note licences-credit">
         Built with Preact (MIT) and chess.js (BSD), in the Archivo and Press Start 2P fonts (SIL Open Font License):{" "}
