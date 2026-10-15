@@ -488,6 +488,7 @@ the test link `?wip=1&kit=Sawyer`.
   blink and smirk, silent; the rev and saw down's cues and where the cut lands; the portrait), plus the shared
   character tests.
 
+
 ### Sawyer, built (Oct 10, 2026)
 
 Sawyer becomes a playable boss (`sawyer`, 🪚): his rules, his moments, his art for them, his sounds and lines, on the
@@ -3654,6 +3655,7 @@ but it's a riskier change to the boss screen (many lessons apply), so it's held 
 raised.
 
 **So:** a red Big Boy perf run is re-run alone on a quiet machine before a PR is blamed.
+
 
 ## The Hidden Boss's phase change, reworked (Eric, Oct 14, 2026)
 
