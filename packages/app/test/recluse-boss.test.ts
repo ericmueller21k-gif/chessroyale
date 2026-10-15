@@ -94,7 +94,8 @@ describe("then he adds time per move (Eric, Oct 14)", () => {
     for (const l of RECLUSE_LINES.bulletPlus) expect(l).not.toMatch(/\d/);
     expect(momentPriority({ kind: "bulletPlus" })).toBe(CRITICAL);
     expect(BULLET_PLUS.text()).toBe("+2 s a move from now on");
-    expect(dockLine({ kind: "bulletPlus" })).toBe("+2 s a move");
+    // (The board says it: the dock keeps the turn's own line, never the increment a second time.)
+    expect(dockLine({ kind: "bulletPlus" })).toBeNull();
     // Within its moment: the consult, and the text up for a couple of seconds before the clock starts.
     expect(BULLET_PLUS.anims).toEqual(["consult"]);
     expect(animLength(RECLUSE_BUST.anims.consult!)).toBeLessThanOrEqual(RECLUSE_FX.bulletPlus);

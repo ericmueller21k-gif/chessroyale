@@ -1169,7 +1169,7 @@ export function App() {
           return (
             <>
               {v.teamLabel && <div class="tower-team">{v.teamLabel}</div>}
-              <RaceTower standings={v.standings} cutoff={v.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={match.chat?.floats()} />
+              <RaceTower standings={v.standings} cutoff={v.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={match.chat?.floats()} bank={!(match as GameView).simul} />
             </>
           );
         })()}

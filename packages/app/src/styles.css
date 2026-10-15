@@ -2444,6 +2444,15 @@ button.history-label {
 .tower-mini .t-bank {
   display: none;
 }
+/* No bank column (RaceTower's `bank`: the Hidden Boss's phase 2, where each clock is its board's). */
+.tower-nobank:not(.tower-mini) .tower-head,
+.tower-nobank:not(.tower-mini) .tower-row {
+  grid-template-columns: 30px minmax(0, 1fr) 46px 40px 46px 20px;
+}
+.tower-nobank .tower-head span:nth-child(6),
+.tower-nobank .t-bank {
+  display: none;
+}
 .tower-mini .t-avg {
   font-size: 11px;
 }
@@ -4805,11 +4814,12 @@ button.history-label {
   }
 }
 /* Any screen but a computer's (where he stands by the board's corner: see the computer layout below): the God King on a
-   line of his own under the row, in its middle, so the box has the board's whole width (Eric, Oct 15). His words and
-   his menu open above the row, over the board's bottom edge as they did beside it (--gk-lift: the row and the gap), so
-   they never cover the box. Where the screen's column has room right of the board for him (his 58 px and a gap: a
-   phone on its side, its board smaller than the column), he stands beside the row instead, as he always has; BossDock
-   measures that room (`dk-beside`). */
+   line of his own under the row, in its middle, so the box has the board's whole width (Eric, Oct 15). His menu opens
+   above the row, over the board's bottom edge (--gk-lift: the row and the gap), never over the box; his words beside him
+   on his own line, to his right (the room up to the row's right edge), never over the board or the box: they had covered
+   ranks 1 and 2 while you chose a move (Oct 15). A long line runs down past his line, over what's under the dock. Where
+   the screen's column has room right of the board for him (his 58 px and a gap: a phone on its side, its board smaller
+   than the column), he stands beside the row instead, as he always has; BossDock measures that room (`dk-beside`). */
 @media (max-width: 899px), (max-height: 599px) {
   .boss-dock > .gk-unit {
     width: 58px;
@@ -4825,6 +4835,24 @@ button.history-label {
   .boss-dock > .gk-unit > .gk-bubble::after,
   .boss-dock > .gk-unit > .gk-command::after {
     right: calc(50% - 7px);
+  }
+  .boss-dock:not(.dk-beside) > .gk-unit > .gk-bubble {
+    top: 0;
+    bottom: auto;
+    left: calc(100% + 10px);
+    translate: none;
+    max-width: calc(var(--dk-w, 100vw) / 2 - 29px - 10px);
+    padding: 8px 9px 7px;
+    font-size: 8px;
+  }
+  .boss-dock:not(.dk-beside) > .gk-unit > .gk-bubble::after {
+    top: 13px;
+    right: auto;
+    bottom: auto;
+    left: -11px;
+    border: 0;
+    border-left: 3px solid #1a1406;
+    border-bottom: 3px solid #1a1406;
   }
   /* (Absorbed by the Hidden Boss, phase 2: his empty place takes no line; his last words still open above the row.) */
   .boss-dock > .gk-unit.gone {
@@ -4867,6 +4895,14 @@ button.history-label {
 }
 .dock-line:empty {
   display: none;
+}
+/* The first line wraps to two rather than being cut ("The boss is think…" at 360 px): the box holds two of its lines and
+   the muted one under them. */
+.dk-text > .dock-line:first-child {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
 }
 .boss-dock-status .gold {
   color: #d4a531;
@@ -11030,7 +11066,8 @@ img.qicon {
   width: 14cqw;
 }
 @media (min-width: 900px) and (min-height: 600px) {
-  .boss-char.place-bar {
+  .boss-char.place-bar,
+  .bc-bar-bubble {
     display: none;
   }
   .boss-bar.has-char {
@@ -11107,9 +11144,21 @@ img.qicon {
 .bc-bubble.leaving {
   opacity: 0;
 }
-.place-bar .bc-bubble {
-  left: calc(100% + 6px);
-  top: 4px;
+/* A phone's boss bar: his words in his name's room, from just above the bar's bottom edge upwards (over his name and the
+   title line above the bar), never over the status at its right or the line and the board under it. (A box laid out at
+   its full size from its first letter would otherwise cover them for the whole line.) */
+.boss-bar.has-char .boss-name {
+  position: relative;
+  align-self: stretch;
+  align-content: center;
+}
+/* (At least his name's room high, so a short line covers the name and skulls whole, never half of them; nothing under it
+   is hidden, it's only covered while he speaks, as before.) */
+.bc-bar-bubble {
+  left: 0;
+  bottom: -2px;
+  min-height: calc(100% + 4px);
+  max-width: 100%;
 }
 .place-side .bc-bubble {
   right: 0;
@@ -14559,18 +14608,19 @@ button.sq-tiny {
 .rc-stage > .rc-split {
   will-change: transform, clip-path;
 }
-/* Played on a computer: each board at its corner, 48% of the square (as the phase change leaves them). */
+/* Played on a computer: each board at its corner, as the phase change leaves them (Recluse2.tsx's DESK: --rc-cell of the
+   square, the top two a tag's row down, --rc-tagrow, so each board's tag sits above it, off its back rank). */
 .rc-stage > .rc-played {
   inset: auto;
-  width: 48%;
-  height: 48%;
+  width: var(--rc-cell, 48%);
+  height: var(--rc-cell, 48%);
 }
 .rc-stage > .rc-played.rc-q0 {
-  top: 0;
+  top: var(--rc-tagrow, 0);
   left: 0;
 }
 .rc-stage > .rc-played.rc-q1 {
-  top: 0;
+  top: var(--rc-tagrow, 0);
   right: 0;
 }
 .rc-stage > .rc-played.rc-q2 {
@@ -15097,6 +15147,22 @@ button.sq-tiny {
 .rc-tag.low .rc-tag-clock {
   color: #ff7a7a;
 }
+/* A computer's four boards: the tag in the row above each (DESK in Recluse2.tsx), at its left, off its back rank; its
+   text in the board's own width (cqw), so it fits the row at any size. The slow-move note likewise, at its right. */
+.rc-played .rc-tag {
+  top: auto;
+  bottom: calc(100% + 1px);
+  left: 0;
+  font-size: min(12px, 5.9cqw);
+  line-height: 1.3;
+}
+.rc-played .rc-slow-note {
+  top: auto;
+  bottom: calc(100% + 1px);
+  right: calc(100% - var(--board-size, 100%));
+  font-size: min(11px, 5.4cqw);
+  line-height: 1.3;
+}
 /* A phone's small boards: the clock just above each, off its pieces (Eric, Oct 15), in the room over the row. */
 .rc-mini .rc-tag {
   top: auto;
@@ -15156,9 +15222,10 @@ button.sq-tiny {
   background: none;
   cursor: pointer;
 }
-/* His ultimate, on a phone's small boards too: "5 s!" across each as the banner shows over yours. */
+/* His ultimate, on a phone's small boards too: "5 s!" across each as the banner shows over yours (the seconds from the
+   setting: --rc-ult-note, set by the screen). */
 .rc-ult .rc-mini::after {
-  content: "5 s!";
+  content: var(--rc-ult-note, "5 s!");
   position: absolute;
   inset: 0;
   z-index: 10;

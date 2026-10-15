@@ -279,18 +279,23 @@ export const GREX_UI = {
   id: "grex",
   ultimate: { name: "the Roman Candle" },
   moments: {
-    spark: { order: 0, kit: "power", dock: "Sparkler!", appearAt: (m, square) => (m.square === square ? m.at + SPARK.landAt : undefined), view: sparkMoment },
+    spark: { order: 0, kit: "power", appearAt: (m, square) => (m.square === square ? m.at + SPARK.landAt : undefined), view: sparkMoment },
     // (A fireball's landing ends on the tile's first stage: the tile carries on from there.)
     fireball: {
       order: 0,
       kit: "ultimateHit",
-      dock: "Fireballs!",
+      // (No banner: where the fire lands, in the dock, one line on a phone: two squares by name, more by how many; one
+      // on your king's square fizzles out.)
+      dock: (m) => {
+        const lit = (m.squares ?? []).filter((sq) => !m.fizzled?.includes(sq));
+        return lit.length > 2 ? `Fire on ${lit.length} squares` : lit.length ? `Fire on ${lit.join(" and ")}` : "Your king is fireproof.";
+      },
       appearAt: (m, square) => (m.squares?.includes(square) ? m.at + fireballLandAt(m.squares.indexOf(square)) + LAND_MS : undefined),
       view: fireballMoment,
     },
-    candle: { order: 2, kit: "ultimate", dock: "Roman candle!", view: candleMoment },
+    candle: { order: 2, kit: "ultimate", view: candleMoment },
     // (Once a match, so it isn't lost in a queue: it cuts in like an ultimate's line.)
-    fireproof: { order: 4, kit: "ultimateHit", dock: "Fireproof!", line: (_kit, m) => fireproofLine(m.pick), lineAt: 150, priority: () => CRITICAL, view: fireproofMoment },
+    fireproof: { order: 4, kit: "ultimateHit", dock: () => "Fire burns only your pieces.", line: (_kit, m) => fireproofLine(m.pick), lineAt: 150, priority: () => CRITICAL, view: fireproofMoment },
   },
   board: ({ boss, p, orientation, moments, now, appearAt }) => {
     // His fire tiles, each in its stage (a singe, more burn, ablaze), drawn as it lands: all on one canvas.
