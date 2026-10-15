@@ -3977,6 +3977,11 @@ it if they need to wait 5 or 10 seconds." Then, Oct 14: tell players about the d
   (TESTING.md, "Maia").
 - **The admins' line** says more: "loading (waited 20 s)" when the step gave up, "… (2nd try; the 1st: <reason>)" after
   a retry, "Stockfish (Maia closed: Stockfish didn't start again beside it)" after the last resort.
+- **Measured** (Chromium, the CPU slowed 4x, a local server): the step took 3.6 s the first time (the download 2.3 s,
+  Maia's start 1.3 s) and 1.2-1.3 s after that (a quarter second looking in the cache, then "Starting…"); unslowed in
+  the e2e, 2.3-2.8 s the first time. A boss intro on a slowed phone (`perf.spec.ts`, Big Boy's snack, one run each):
+  main p95 33.4 ms, 13% of frames dropped; this branch p95 16.8 ms, 2% (twice): the intro no longer shares the phone
+  with Maia's load. The other perf cases within their usual spread.
 - **The FAQ** (Brain 2) says why Maia (a human-like engine, so a boss plays more like a person than Stockfish does),
   that it's a bigger download, about 40 MB, fetched once and kept, and that on a slow connection or if it can't load
   the boss plays Stockfish; its rule 4 now says a Solo or Boss alone battle waits for Maia, 20 s at most, and online
