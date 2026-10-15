@@ -1,6 +1,6 @@
-/** Lobby codes: 5 characters with no look-alikes (no I, L, O, 0, 1). */
+/** Lobby codes (5 characters) and player reports' ids (6): no look-alikes (no I, L, O, 0, 1). */
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-export const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(5)), (b) => ALPHABET[b % ALPHABET.length]).join("");
+export const randomCode = (length = 5) => Array.from(crypto.getRandomValues(new Uint8Array(length)), (b) => ALPHABET[b % ALPHABET.length]).join("");
 
 /**
  * A new lobby under a code nobody is using: random codes until `create` takes one. `create` refuses a code whose lobby

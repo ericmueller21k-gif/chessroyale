@@ -1639,6 +1639,57 @@ export const CAPACITY = {
 } as const;
 
 /**
+ * Error capture and the feedback sheet (the `ops` delegate; docs/areas/ops.md, "Errors and player reports"): what a
+ * device sends, how POST /api/problems guards itself, and how D1 writes stay bounded in an error storm.
+ */
+export const OPS = {
+  client: {
+    /** Different errors one page load reports at most (each one once, however often it happens). */
+    maxErrorsPerPage: 10,
+    /** Errors wait this long to go in one request (or until the page is hidden: then sendBeacon). */
+    batchMs: 3_000,
+    /** The breadcrumbs kept: the last app events (screens and moments, moves sent). */
+    breadcrumbs: 20,
+  },
+  endpoint: {
+    /** A request's body, at most (bigger: 413). */
+    maxBytes: 20_000,
+    /** Errors in one request, at most (the rest are dropped). */
+    maxErrorsPerPost: 5,
+    /**
+     * Requests per window, counted per Worker instance: per address (generous, as for the API: many players can share
+     * one) and per account (its session). A page load sends at most two error requests.
+     */
+    errors: { perIp: { limit: 120, windowMs: 60_000 }, perUser: { limit: 10, windowMs: 60_000 } },
+    reports: { perIp: { limit: 30, windowMs: 3_600_000 }, perUser: { limit: 5, windowMs: 3_600_000 } },
+  },
+  store: {
+    /**
+     * Each Worker instance (and Durable Object instance) counts its errors in memory and writes them to D1 at most
+     * this often (the first at once), at most `maxRowsPerFlush` rows a time (the most frequent; the rest wait for the
+     * next write). Kept under 30 s: a flush waits in the request's waitUntil.
+     */
+    flushMs: 20_000,
+    maxRowsPerFlush: 5,
+    /** Different errors held in memory between writes, at most (more are dropped and logged as a number). */
+    maxGroups: 100,
+    /** The breadcrumbs an error's row keeps with its latest occurrence (a bug report keeps all `client.breadcrumbs`). */
+    sampleCrumbs: 10,
+    /** Player reports (bugs, feedback, ideas) each instance writes a minute, at most (one row each, written at once). */
+    maxReportsPerMinute: 20,
+    /**
+     * Caps for the whole database, whatever the instances (a flood from many addresses can't grow D1 without bound):
+     * new kinds of error an hour (one already stored keeps counting) and player reports a day, each in its insert.
+     * Under 0.9 GB in all over keepDays with every cap hit every hour (docs/areas/ops.md, "Small rows").
+     */
+    maxNewErrorsPerHour: 100,
+    maxReportsPerDay: 2_000,
+    /** Errors and player reports are deleted after this many days (the 15-minute cron). */
+    keepDays: 30,
+  },
+} as const;
+
+/**
  * Fair play (the `fairplay` delegate): reports, cases and what each level does. See DECISIONS.md, "Fair play".
  *   - watch: recorded only (the player's moves are kept as evidence);
  *   - review: a person (or the automated reviewer) looks; meanwhile their results are held off ranking (the rating,

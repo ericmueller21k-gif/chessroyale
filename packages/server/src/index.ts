@@ -1,10 +1,10 @@
 import { stockfishRefuses } from "@chessroyale/chess";
 import { RAID_SETTINGS, modeSettings } from "@chessroyale/core";
-import type { Lobby } from "./lobby-do.ts";
-import type { SquadsLobby, SquadsParty } from "./squads-do.ts";
+import { Lobby } from "./lobby-do.ts";
+import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
-import type { Matchmaker } from "./matchmaker.ts";
-import type { LiveHub } from "./live-hub.ts";
+import { Matchmaker } from "./matchmaker.ts";
+import { LiveHub } from "./live-hub.ts";
 import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
 import { d1Sql, ensureSchema, lobbyResult, type User } from "./accounts.ts";
@@ -19,13 +19,20 @@ import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
 import { handleFriendsApi } from "./friends-api.ts";
 import { countRoute, opsStats, routeOf } from "./ops.ts";
+import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
+import { handleOpsAdmin } from "./ops-admin.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 
-export { Lobby } from "./lobby-do.ts";
-export { SquadsLobby, SquadsParty } from "./squads-do.ts";
-export { Matchmaker } from "./matchmaker.ts";
+export { Lobby, SquadsLobby, SquadsParty, Matchmaker, LiveHub };
 export { EngineServer } from "./engine.ts";
-export { LiveHub } from "./live-hub.ts";
+
+// The Durable Objects' entry points (their fetch, WebSocket handlers, alarm and the methods the Worker calls): an
+// error in one is logged and counted (problems.ts), then thrown on as before.
+guardEntries(Lobby, "Lobby", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "joinable", "reserve", "release", "hurry"]);
+guardEntries(SquadsLobby, "SquadsLobby", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "reserve"]);
+guardEntries(SquadsParty, "SquadsParty", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "create", "status"]);
+guardEntries(Matchmaker, "Matchmaker", ["next"]);
+guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
 
 export interface Env extends AccountEnv, EngineEnv, AdminEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
@@ -57,67 +64,88 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...headers } });
 
 export default {
+  /** Every request: an error anywhere in it is logged and counted (problems.ts), and the answer is a plain 500. */
   async fetch(request: Request, rawEnv: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-    // (The fair-play review page is the Worker's own; everything else outside /api is the app.)
-    const admin = url.pathname === "/admin/fairplay" || url.pathname.startsWith("/admin/fairplay/");
-    if (!url.pathname.startsWith("/api/") && !admin) return rawEnv.ASSETS.fetch(request);
-    // Load-test counters (OPS_STATS set, and the matching key): see ops.ts.
-    if (url.pathname === "/api/ops/stats" && rawEnv.OPS_STATS && request.headers.get("x-ops-key") === rawEnv.OPS_STATS) {
-      return json(opsStats(url.searchParams.get("reset") === "1"));
+    try {
+      return await handle(request, rawEnv, ctx);
+    } catch (e) {
+      const url = new URL(request.url);
+      serverError(rawEnv, { kind: "fetch", route: routeOf(request.method, url.pathname), code: codeInPath(url.pathname) }, e, (p) => ctx.waitUntil(p));
+      return json({ message: "Something went wrong. Try again." }, 500);
     }
-    const t = Date.now();
-    // Rate limits (limits.ts): a friendly 429 with when to try again.
-    const wait = rateLimited(
-      {
-        ip: request.headers.get("cf-connecting-ip"),
-        session: readCookie(request, SESSION_COOKIE),
-        play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname)),
-        friends: request.method === "POST" && url.pathname.startsWith("/api/friends/"),
-      },
-      t,
-      rawEnv.LOAD_TEST === "1",
-    );
-    if (wait !== null) {
-      countRoute("429", 0);
-      return json({ message: TOO_MANY, retryMs: wait }, 429, { "retry-after": String(Math.ceil(wait / 1000)) });
-    }
-    const res = await route(request, rawEnv, url, (p) => ctx.waitUntil(p));
-    const ms = Date.now() - t;
-    countRoute(routeOf(request.method, url.pathname), ms);
-    // How long the Worker took (the load test reads it; browsers show it in their network panel).
-    if (res.status === 101 || res.webSocket) return res;
-    const out = new Response(res.body, res);
-    out.headers.append("server-timing", `app;dur=${ms}`);
-    return out;
   },
 
   /**
-   * The Worker's schedule (wrangler.jsonc, every 15 minutes): fair play's deep re-check of flagged players' moves on
-   * the engine server (cases in review at once, the rest off-peak; fairplay-deep.ts).
+   * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), and
+   * fair play's deep re-check of flagged players' moves on the engine server (cases in review at once, the rest
+   * off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(_event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
     if (!rawEnv.DB) return;
-    const env = await withSecrets(rawEnv);
-    const search = containerSearch(env);
-    if (!search) return;
-    const sql = d1Sql(rawEnv.DB);
+    const db = rawEnv.DB;
+    const failed = (route: string) => (e: unknown) => serverError(rawEnv, { kind: "cron", route }, e, (p) => ctx.waitUntil(p));
     ctx.waitUntil(
-      ensureSchema(sql, rawEnv.DB)
-        .then(() => deepCheckRun(sql, search, Date.now(), { mail: caseMailer(env) }))
-        .then((r) => r.searches && console.log(`fair play deep re-check: ${r.searches} searches, ${r.matches} matches done`))
-        .catch((e: unknown) => console.log(`fair play deep re-check: ${String(e)}`)),
+      (async () => {
+        const sql = d1Sql(db);
+        await ensureSchema(sql, db);
+        await pruneProblems(sql, Date.now()).catch(failed("prune"));
+        const env = await withSecrets(rawEnv);
+        const search = containerSearch(env);
+        if (!search) return;
+        const r = await deepCheckRun(sql, search, Date.now(), { mail: caseMailer(env) });
+        if (r.searches) console.log(`fair play deep re-check: ${r.searches} searches, ${r.matches} matches done`);
+      })().catch(failed("scheduled")),
     );
   },
 } satisfies ExportedHandler<Env>;
 
+async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Promise<Response> {
+  const url = new URL(request.url);
+  // (The admin pages, fair play's and ops', are the Worker's own; everything else outside /api is the app.)
+  const admin = /^\/admin\/(fairplay|ops)(\/|$)/.test(url.pathname);
+  if (!url.pathname.startsWith("/api/") && !admin) return rawEnv.ASSETS.fetch(request);
+  // Load-test counters (OPS_STATS set, and the matching key): see ops.ts.
+  if (url.pathname === "/api/ops/stats" && rawEnv.OPS_STATS && request.headers.get("x-ops-key") === rawEnv.OPS_STATS) {
+    return json(opsStats(url.searchParams.get("reset") === "1"));
+  }
+  const t = Date.now();
+  // Rate limits (limits.ts): a friendly 429 with when to try again.
+  const wait = rateLimited(
+    {
+      ip: request.headers.get("cf-connecting-ip"),
+      session: readCookie(request, SESSION_COOKIE),
+      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname)),
+      friends: request.method === "POST" && url.pathname.startsWith("/api/friends/"),
+    },
+    t,
+    rawEnv.LOAD_TEST === "1",
+  );
+  if (wait !== null) {
+    countRoute("429", 0);
+    return json({ message: TOO_MANY, retryMs: wait }, 429, { "retry-after": String(Math.ceil(wait / 1000)) });
+  }
+  const res = await route(request, rawEnv, url, (p) => ctx.waitUntil(p));
+  const ms = Date.now() - t;
+  countRoute(routeOf(request.method, url.pathname), ms);
+  // How long the Worker took (the load test reads it; browsers show it in their network panel).
+  if (res.status === 101 || res.webSocket) return res;
+  const out = new Response(res.body, res);
+  out.headers.append("server-timing", `app;dur=${ms}`);
+  return out;
+}
+
 async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUntil): Promise<Response> {
   {
+    // POST /api/problems: errors a device caught, or the feedback sheet's report (a bug, feedback, an idea: problems.ts).
+    if (url.pathname === "/api/problems") return handleProblems(request, rawEnv, waitUntil);
     // (The sign-in secrets may live in the Secrets Store: read them as strings.)
     const env = await withSecrets(rawEnv);
     // Fair play's review page and the automated reviewer's API (admins and the reviewer's token only).
     const review = await handleAdmin(request, env, caseMailer(env), waitUntil, containerSearch(env));
     if (review) return review;
+    // The ops page: errors and player reports (admins only).
+    const ops = await handleOpsAdmin(request, env);
+    if (ops) return ops;
     // Accounts: /api/me, /api/results, /api/auth/*
     const account = await handleAccountApi(request, env, fetch, waitUntil);
     if (account) return account;

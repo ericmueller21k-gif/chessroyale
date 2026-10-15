@@ -31,9 +31,9 @@ test("privacy, terms and copyright: drafts, from Settings and the FAQ, Back retu
   // The other page is one tap away; Back goes back through them to Settings.
   await page.getByRole("link", { name: "Terms of service" }).click();
   await expectDraft(page, "Terms of service");
-  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Privacy policy" })).toBeVisible();
-  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await expect(page).toHaveURL(/\/settings$/);
 
@@ -43,7 +43,7 @@ test("privacy, terms and copyright: drafts, from Settings and the FAQ, Back retu
   await expectDraft(page, "Copyright");
   await expect(page.getByRole("heading", { name: "Our designated agent" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Repeat infringers" })).toBeVisible();
-  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Terms of service" })).toBeVisible();
 
   // The FAQ's last section links all three, in this tab.
@@ -51,12 +51,12 @@ test("privacy, terms and copyright: drafts, from Settings and the FAQ, Back retu
   const section = page.locator("section").filter({ has: page.locator("#faq-privacy") });
   await section.getByRole("link", { name: "Terms of service", exact: true }).click();
   await expectDraft(page, "Terms of service");
-  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "FAQ · How it works" })).toBeVisible();
 
   // Opened straight from its address, Back goes home.
   await page.goto("/terms");
   await expectDraft(page, "Terms of service");
-  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
 });

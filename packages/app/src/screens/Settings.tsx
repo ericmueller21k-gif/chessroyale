@@ -3,6 +3,7 @@ import type { ComponentChildren } from "preact";
 import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, RAID_SETTINGS as R, BOSS_TIERS, PREGAME_VOTES, crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
 import { FriendSettings } from "../components/Friends.tsx";
+import { openReport } from "../components/Problems.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { AccountData } from "../components/AccountData.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
@@ -158,8 +159,9 @@ function ThemeChoice() {
 
 /**
  * Settings (Eric, Oct 15: "smoothness, quickness, with some variety offered"): the theme, sound (the move, capture and
- * reveal sounds), the board (animations, motion trail), quick chat, friends, how to play (and the FAQ), installing,
- * your sign-in, privacy and terms; and for admins, testing (practice mode, the eval bar).
+ * reveal sounds), the board (animations, motion trail), quick chat, friends, how to play (and the FAQ), help (the
+ * feedback sheet: bugs, feedback, ideas), installing, your sign-in, privacy and terms; and for admins, testing
+ * (practice mode, the eval bar).
  */
 export function SettingsScreen({ onBack, onFaq }: { onBack: () => void; onFaq?: () => void }) {
   const { config, profile } = useAccount();
@@ -278,6 +280,13 @@ export function SettingsScreen({ onBack, onFaq }: { onBack: () => void; onFaq?: 
           </button>
         )}
         <HowToPlay />
+      </section>
+
+      <section class="fd-section">
+        <h2 class="fd-label">HELP</h2>
+        <button type="button" class="fd-row-link" onClick={() => openReport("feedback")}>
+          💬 Feedback ›
+        </button>
       </section>
 
       <InstallCard />

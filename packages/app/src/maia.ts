@@ -1,4 +1,5 @@
 import { HumanUciEngine, type UciTransport } from "@chessroyale/chess";
+import { captureWorkerError } from "./problems.ts";
 
 /**
  * The Maia box: Maia-3 (CSSLab, University of Toronto), a separate program under the GNU AGPL in its own worker
@@ -21,10 +22,11 @@ function workerTransport(onError: (reason: string) => void): UciTransport {
     if (typeof e.data !== "string") return;
     for (const line of e.data.split("\n")) for (const l of listeners) l(line.trim());
   };
-  // (Handled: Maia fails, the boss plays Stockfish; the error never reaches the page as one of its own.)
+  // (Handled: Maia fails, the boss plays Stockfish; the error never reaches the page as one of its own. Reported.)
   worker.onerror = (e) => {
     e.preventDefault();
     onError(e.message || "worker error");
+    captureWorkerError("maia", e);
   };
   return {
     send: (c) => worker.postMessage(c),

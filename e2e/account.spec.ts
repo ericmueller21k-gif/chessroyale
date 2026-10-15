@@ -35,7 +35,7 @@ test("a guest profile: icon and name stick, a solo match goes on it", async ({ p
   await expect.poll(() => page.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.user.name))).toBe("Hunter");
   // Without Google or Resend secrets, no sign-in buttons are offered.
   await expect(page.locator(".signin")).toHaveCount(0);
-  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   // It's still there after a reload (the session cookie).
   await page.reload();
   await expect(page.locator(".fd-hero-name")).toHaveText("Hunter");
