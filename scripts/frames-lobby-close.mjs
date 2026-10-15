@@ -2,7 +2,7 @@
 // finished lobbies"): a short online match (a boss raid of one), a reload on its results, then every painted frame
 // while the keep time runs out and the app goes home with the note, and a real tap on "See your result".
 //   npm run frames:close -- <out-dir> [scheme=dark|light] [base url, default http://localhost:8788]
-// Needs the Worker running (npx wrangler dev --port 8788 --enable-containers=false --var ENGINE_OFF:1). Saves:
+// Needs the Worker running (npx wrangler dev --port 8788 --enable-containers=false --var ENGINE_OFF:1 --var TEST_SWITCHES:1). Saves:
 //   results-reopened.png   the results after a reload, while the lobby is still open
 //   home-note-result.png   home with the note and "See your result" (you played it)
 //   home-note.png          home with the note only (someone who wasn't in it opens the link)

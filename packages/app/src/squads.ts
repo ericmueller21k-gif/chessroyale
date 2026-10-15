@@ -26,6 +26,7 @@ import { account, playerName } from "./account.ts";
 import { enginePool, engineSpeed } from "./engine.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { play } from "./sound.ts";
+import { testParams } from "./test-switches.ts";
 import { LOW_BANK_MS, blockName, coinText, dutyOf, freeMs, itemText, liveBank, movesOfHalf, sideIn, squadName, squadOf, type LocalBoard, type LocalMatch } from "./squads-view.ts";
 
 /**
@@ -88,7 +89,8 @@ export type SquadsSeatAnswer = { code: string } | { error: string } | { banned: 
  */
 export async function squadsQueue(onBusy: (waitSeconds: number) => void, cancelled: () => boolean): Promise<SquadsSeatAnswer | null> {
   const q = new URLSearchParams();
-  const pool = new URLSearchParams(location.search).get("pool");
+  // (?pool=NAME: a queue of its own, a test switch.)
+  const pool = testParams().get("pool");
   if (pool) q.set("pool", pool);
   for (;;) {
     const res = await fetch(`/api/squads/play${q.size ? `?${q}` : ""}`, { method: "POST" }).catch(() => null);
@@ -993,8 +995,8 @@ export async function partyStatus(code: string): Promise<boolean | null> {
 
 /** POST /api/squads/party: a new party's code. */
 export async function createParty(): Promise<{ code: string } | { error: string } | { banned: true }> {
-  // (?pool=NAME: a queue of its own, for tests.)
-  const pool = new URLSearchParams(location.search).get("pool");
+  // (?pool=NAME: a queue of its own, a test switch.)
+  const pool = testParams().get("pool");
   try {
     const res = await fetch(`/api/squads/party${pool ? `?pool=${encodeURIComponent(pool)}` : ""}`, { method: "POST" });
     const body = (await res.json().catch(() => ({}))) as { code?: string; message?: string; banned?: boolean };
