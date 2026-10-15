@@ -82,12 +82,14 @@ poor, and not punish players not playing precise engine lines or slight variatio
   becomes a queen, en passant both ways. Simple on purpose (and the calibration used this same check).
 - **Squads is untouched:** it doesn't score moves. Its points come from games won and drawn; the engine only judges a
   same-move token's refund (and Mercenary's brilliant move), never a loss that counts for points.
-- **Players see it.** The reveal says it in one line (`allowanceNote`), tested at 320 px: "−2.4 → 0 · opening" (or
-  "−9.6 → −1.6 · opening"), "−4.1 · gave up material", "−4.1 · missed a capture". Crowd: its own line under the poll's
-  result; Classic: under the round score; a boss battle: the dock's second line is the note alone (it holds about 18
-  characters on a 320 px phone, where it shortens to "−9.6 → −1.6" and "−4.1 · all counts"; measured at 320, 390 and
-  1280 with the widest losses: nothing spills). "Why was
-  I cut?" says what counted for each move. The FAQ's "The opening allowance" says both rules in two sentences, and its
+- **Players see it.** The reveal says it in one line (`allowanceNote`), tested at 320 px, in plain words with one
+  number at most (the director, Oct 15: the first version, "−46.2 · gave up material" under the round score's
+  "−44.8", stacked two negatives that read as a mistake): "1.2 forgiven · opening", "8 of 9.6 forgiven · opening",
+  "no allowance · gave up material", "no allowance · missed a capture". Crowd: its own line under the poll's result;
+  Classic: under the round score; a boss battle: the dock's second line is the note alone (it holds about 18
+  characters on a 320 px phone, where it shortens to "8 of 9.6 forgiven" and "no allowance"). Measured at 320, 390 and
+  1280 with the widest cases ("8 of 99.9 forgiven · opening", "no allowance · missed a capture"): nothing spills.
+  "Why was I cut?" says what counted for each move (kept as it was: the director found it reads well). The FAQ's "The opening allowance" says both rules in two sentences, and its
   Crowd section says ties go through. Nothing in Settings: its How to play is becoming links to the FAQ (#232).
 
 ## Part 2: ties at the cut line survive
@@ -96,8 +98,13 @@ poor, and not punish players not playing precise engine lines or slight variatio
   nobody goes out on thinking time or a coin flip. "Exactly" is to 1e-9 (`sameScore`): players with the same counted
   losses every move get bit-for-bit the same sum, but different moves can add up to the same score in different
   orders.
-- **What's owed carries** (`cutCarry`, per team in 50 v 50): the next cut takes its own plus what the last one left
-  over, so the endings keep their sizes (the team final's 8, the boss final's 4, the duel's 2, Classic's final four).
+- **What's owed carries, spread evenly** (`cutCarry`, per team in 50 v 50): each cut takes its own plus its share of
+  what earlier cuts left over, divided evenly over the cuts still to come (rounded up; all of it by the last), so the
+  endings keep their sizes (the team final's 8, the boss final's 4, the duel's 2, Classic's final four). First built as
+  "the next cut takes it all": the sims showed the owed places piling into the cut after move 14, the first move the
+  allowance no longer covers (12 out instead of 8), where the field arrives nearly tied and one small loss decides
+  (the strongest bot went out over a single 3.4-point move). The director chose to spread it (Oct 15): Eric's bar is
+  that a player who goes out thinks "yeah, I messed up".
 - **The last cut before a fixed-size ending** (`isLastCut`) takes exactly what's owed. An exact tie at its line goes to
   less **raw** loss over the match (`rawLossTotal`: every raw loss, a miss counting `finalMissLoss`), then less
   thinking time (over the match in Crowd, the stage in Classic), and only then a coin (two players with the same score,
@@ -134,25 +141,45 @@ raw, or a miss; "slight variations" are picks among the engine's top 8.
 | Cut 1: cut players with a negative score | 100% | 97% |
 | Cut 1: players out (mean) | 16.0 | 15.1 |
 | Cut 2 (after move 11): of those who played only top-8 moves, went through | 92% | 97% |
-| Cut 2: cut players who had played poorly | 66% | 86% |
-| Cut 2: players out (mean) | 14.0 | 12.2 |
-| Cuts with an exact tie at a team's line | 8% | 67% |
+| Cut 2: cut players who had played poorly | 66% | 85% |
+| Cut 2: players out (mean) | 14.0 | 11.9 |
+| Cuts with an exact tie at a team's line | 8% | 56% |
 | Most owed at once (mean of each match's largest) | 0 | 9.3 |
-| Out at each cut (mean) | 16 · 14 · 12 · 10 · 8 · 8 · 6 · 6 · 4 · 4 · 4 | 15.1 · 12.2 · 10.2 · 8.3 · 12.2 · 7.8 · 6.3 · 4.6 · 5.3 · 3.8 · 6.5 |
+| Out at each cut (mean) | 16 · 14 · 12 · 10 · 8 · 8 · 6 · 6 · 4 · 4 · 4 | 15.1 · 11.9 · 10.1 · 8.2 · 8.2 · 8.4 · 6.0 · 7.5 · 4.8 · 5.1 · 6.8 |
+| The move-14 cut (the 5th) | 8 | 8.2 |
 | The ending's size (every match) | 8 | 8 |
-| Plies per match (mean) | 160.3 | 158.8 |
-| Placement against bot skill (Spearman) | 0.763 | 0.634 |
+| Plies per match (mean) | 160.3 | 150.5 |
 
 - **Both halves of Eric's goal move the right way:** fewer players who only played the engine's top moves go out (4%
   to 1% at the first cut, 8% to 3% at the second), and more of those who do go out played poorly (83% to 91%, 66% to
-  86%). Only 3% of the first cut's players had a score of 0 or more (they were the lowest of a team whose rest was tied
+  85%). Only 3% of the first cut's players had a score of 0 or more (they were the lowest of a team whose rest was tied
   above them).
-- **What it costs:** exact ties are common (two players with the same counted losses every move tie to the bit), so
-  most cuts keep someone in, and the owed players go when the allowance runs out: the 5th cut (move 14) takes 12
-  rather than 8. The endings keep their sizes, and a match is as long as before.
-- **Placement tracks the bots' skill less (0.763 to 0.634).** A bot's skill shows the same in every move, the opening
-  included, so forgiving the opening's small losses takes real signal away from bots; for people the opening's
-  precision is the memorized lines Eric doesn't want to decide a match. ARMS_PLACEHOLDER
+- **What's owed, spread over the cuts still to come**, keeps every cut near its planned size; the move-14 cut takes 8.2
+  (it took 12.2 when the next cut owed it all). The last cut takes what's left (6.8 instead of 4).
+
+**Which part does what** (the director asked, Oct 15). The same seeds with only part of the change: `ties-only` (the
+allowance's points 0), `allowance-only` (every cut exact, ties broken as at the last cut), `after-next-cut` (both, the
+owed places all due at the next cut, as first built). Spearman of each bot's temperature against its placement:
+
+| | before | ties only | allowance only | both, next cut | both (this PR) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| All 100 (± standard error) | 0.763 ±0.020 | 0.761 ±0.019 | 0.676 ±0.028 | 0.634 ±0.021 | 0.640 ±0.023 |
+| The last 20 | 0.500 | 0.526 | 0.464 | 0.465 | 0.476 |
+| The 8 finalists | 0.226 | 0.198 | 0.264 | 0.268 | 0.236 |
+| Winner in the strongest quarter of the bots | 11/12 | 11/12 | 12/12 | 12/12 | 11/12 |
+| The move-14 cut: out | 8.0 | 8.0 | 8.0 | 12.2 | 8.2 |
+| Plies per match | 160 | 155 | 160 | 159 | 151 |
+
+- **Ties are free** (0.761 against 0.763). **The allowance is the cost**, and the intended one: a bot's skill is a
+  steady trickle of small losses, which the allowance forgives for moves 1-13, so the early cuts take the bots who made
+  material or big errors rather than those who trickle. For people, that trickle is the precision of memorized lines
+  Eric doesn't want to decide a match. The late game still separates skill (the last 20, the finalists, the winner).
+- **Classic in one-round stages** (the `?rounds=1` test switch): a stage's score is one round against one board's group,
+  so whole groups tie exactly, nearly nobody is cut, and the owed places pile into the last cuts, where the luck of the
+  groups decides (measured headless, the engine's best every move: through to the final in 0 of 6 matches at one
+  round a stage, 3 of 6 at two or three; the last cut took 20 to 35). At Classic's own 8 and 5 rounds a stage the cuts
+  stay at 8 and the engine's best wins 3 of 3. Classic is off the menu;
+  the e2e that played it at one round a stage now asserts the rule rather than the final (below).
 
 ## Testing
 
@@ -164,4 +191,10 @@ a capture giving check and one that mates, castling; two judges agree), `runner.
 more boards, groups at most 10, the final four), the strike tests that leaned on a coin flip among tied players
 (`crowd.test.ts`, `last-stand.test.ts`, `recluse.test.ts`, `resign.test.ts`: their players now differ), `lobby.test.ts`
 (the cut is exactly the rows marked), `faq.test.ts`. e2e: `crowd.spec.ts` (the reveal's line at 320 px, real and
-widest; the cut's "+N" from the real count).
+widest; the cut's "+N" from the real count); `solo.spec.ts`'s Classic strong-play test asserted that strong play always
+reaches the final, which rested on the old tie-break (its comment: "Strong play wins exact ties at a cut by thinking
+less"); it now asserts the new rule: never cut while tied with or above the last player through except at the last
+cut, the final played, your turns in it when you're there. The first CI run also caught two layout shifts the
+allowance caused: the computer's panel beside the board now keeps room for the allowance's line (so chat under it
+stays put), and the top bar's cut pill stays through a stage even while nobody would be cut (ties), so the board
+never moves.

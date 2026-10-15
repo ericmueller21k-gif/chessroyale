@@ -64,11 +64,17 @@ describe("ties at a cut line go through", () => {
     expect(end.state.cutCarry).toEqual({ all: 2 });
   });
 
-  it("the next cut takes what's owed on top of its own", () => {
-    const state = { ...withScores(S, [9, 8, 7, 6, 5, 4, 3].map((score) => ({ score })), 1), cutCarry: { all: 2 } };
-    const end = endStage(state, mulberry32(1), [0], S);
-    // 4 + 2 owed = 6.
-    expect(ids(end.knockedOut)).toEqual(["p1", "p2", "p3", "p4", "p5", "p6"]);
+  it("what's owed is spread evenly over the cuts still to come, all of it by the last", () => {
+    // Stage 2 of 3 (two cuts left, this one included), 2 owed: this cut takes its 4 and 1 more.
+    const state = { ...withScores(S, [9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map((score) => ({ score })), 1), cutCarry: { all: 2 } };
+    let end = endStage(state, mulberry32(1), [0], S);
+    expect(ids(end.knockedOut)).toEqual(["p5", "p6", "p7", "p8", "p9"]);
+    expect(end.state.cutCarry).toEqual({ all: 1 });
+    // The last cut: its 2 and the 1 still owed, exactly.
+    const last = { ...end.state, players: end.state.players.map((p) => (p.alive ? { ...p, stageScore: 10 - Number(p.id.slice(1)) } : p)) };
+    end = endStage(last, mulberry32(2), [0], S);
+    expect(ids(end.knockedOut)).toEqual(["p2", "p3", "p4"]);
+    expect(alivePlayers(end.state)).toHaveLength(2);
     expect(end.state.cutCarry).toBeUndefined();
   });
 
@@ -114,7 +120,7 @@ describe("ties at a cut line go through", () => {
 describe("Crowd 50 v 50: each team's cut", () => {
   const C: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, knockoutsPerStage: [4, 4, 2] };
 
-  it("ties survive within a team, the shortfall is owed by that team's next cut, and the ending is still reached exactly", () => {
+  it("ties survive within a team, the shortfall is owed by that team's later cuts, and the ending is still reached exactly", () => {
     // 12 players, 6 a side. White: a 3-way tie at the line keeps everyone; Black: two clearly lowest go.
     const white = [9, 8, 7, 2, 2, 2].map((score) => ({ score, colour: "w" as const }));
     const black = [9, 8, 7, 6, 1, 0].map((score) => ({ score, colour: "b" as const }));
@@ -123,12 +129,12 @@ describe("Crowd 50 v 50: each team's cut", () => {
     expect(end.knockedOut.filter((p) => p.colour === "w")).toHaveLength(0);
     expect(ids(end.knockedOut)).toEqual(["p10", "p11"]);
     expect(end.state.cutCarry).toEqual({ w: 2 });
-    // Next cut (2 a team, White owes 2 more): White's 4 lowest go, Black's 2.
+    // Next cut (2 a team; White's 2 owed spread over the two cuts left): White's 3 lowest go, Black's 2, White still owes 1.
     state = { ...end.state, players: end.state.players.map((p) => (p.alive ? { ...p, stageScore: Number(p.id.slice(1)) } : p)) };
     end = endStage(state, mulberry32(2), [0], C);
-    expect(end.knockedOut.filter((p) => p.colour === "w")).toHaveLength(4);
+    expect(end.knockedOut.filter((p) => p.colour === "w")).toHaveLength(3);
     expect(end.knockedOut.filter((p) => p.colour === "b")).toHaveLength(2);
-    expect(end.state.cutCarry).toBeUndefined();
+    expect(end.state.cutCarry).toEqual({ w: 1 });
     // The last cut: one a team, exactly, whatever the ties: the duel's two (one a side) are left.
     const duel: Settings = { ...C, finalFormat: "duel" };
     state = { ...end.state, players: end.state.players.map((p) => (p.alive ? { ...p, stageScore: 0 } : p)) };

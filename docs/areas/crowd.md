@@ -31,15 +31,16 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   pick's allowance. Counted losses make the round scores (and the group average), standings, cuts, the boss's strikes
   (`finalLosses`), `matchLoss` (`countedLossSum`) and final placements; **raw** losses stay for the board's draw,
   brilliance, ratings and fair play (`lossesByStage`), and a miss costs as before. Bots unchanged. The reveal says it
-  in one line (`allowanceNote` in `game.ts`): "−2.4 → 0 · opening", "−4.1 · gave up material", "−4.1 · missed a
-  capture" (Crowd under the poll, Classic under the round score, a boss battle as the dock's second line, shortened
-  under 380 px: "−9.6 → −1.6", "−4.1 · all counts"); the breakdown says what counted, and the group's average as it
-  counted. Squads isn't scored per move: untouched.
+  in one line of plain words, one number at most (`allowanceNote` in `game.ts`): "1.2 forgiven · opening", "8 of 9.6
+  forgiven · opening", "no allowance · gave up material", "no allowance · missed a capture" (Crowd under the poll,
+  Classic under the round score, a boss battle as the dock's second line, shortened under 380 px: "8 of 9.6
+  forgiven", "no allowance"); the breakdown says what counted, and the group's average as it counted. Squads isn't scored per move: untouched.
 - **The cut.** After each stage (`firstStageRounds`, then `roundsPerStage`) the lowest scorers are knocked out
   (`knockoutsPerStage`; in 50 v 50 the same number from each team). **Ties at the line go through** (`cutPlan` in
   `match.ts`): everyone tied exactly (`sameScore`) with the last player through stays in; nobody goes out on thinking
-  time or a coin flip. What that leaves over is owed by the next cut (`cutCarry`, per team in 50 v 50), so the endings
-  keep their sizes. **The last cut before a fixed-size ending** (`isLastCut`) takes exactly what's owed: an exact tie
+  time or a coin flip. What that leaves over is owed by the cuts still to come, spread evenly over them (`cutCarry`, per
+  team in 50 v 50; each cut takes its share rounded up), so the endings keep their sizes and no one cut takes a
+  pile-up of owed places. **The last cut before a fixed-size ending** (`isLastCut`) takes exactly what's owed: an exact tie
   there goes to less raw loss over the match (`rawLossTotal`, a miss counting `finalMissLoss`), then less thinking time
   (over the match in Crowd, the stage in Classic), then a coin. `standings()` orders by the same keys, so a cut is always
   the bottom of the list. The team final's steps break a tie the same way. Classic keeps enough boards for its

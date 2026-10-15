@@ -169,8 +169,8 @@ export interface MatchState {
   /** Set once the knockout stages are over in a boss battle. */
   boss?: BossState;
   /**
-   * Knockouts a cut left over because players tied with the last one through (they all went through): owed by the
-   * next cut, in each pool (a team in Crowd 50 v 50, else "all"). See cutPlan.
+   * Knockouts cuts left over because players tied with the last one through (they all went through): owed by the cuts
+   * still to come, spread evenly over them, in each pool (a team in Crowd 50 v 50, else "all"). See cutPlan.
    */
   cutCarry?: Partial<Record<CutPool, number>>;
 }
@@ -478,13 +478,14 @@ export const isLastCut = (state: Pick<MatchState, "stage">, settings: Pick<Setti
 
 /**
  * Who a stage's cut takes, from `ranked` (best first, as `standings`):
- * - Each pool owes its share of the stage's knockouts (half each in Crowd 50 v 50) plus what earlier cuts left over
- *   (`cutCarry`).
+ * - Each pool owes its share of the stage's knockouts (half each in Crowd 50 v 50) plus its part of what earlier cuts
+ *   left over (`cutCarry`), spread evenly over the cuts still to come (rounded up), so no one cut takes them all at once
+ *   (Eric's bar: a player who goes out should think "yeah, I messed up", not lose to a pile-up of owed places).
  * - It takes the bottom of the pool, except that everyone tied exactly with the last player through goes through too:
- *   nobody goes out on thinking time or a coin flip. What that leaves over is owed by the next cut.
+ *   nobody goes out on thinking time or a coin flip. What that leaves over is owed by the cuts after it.
  * - The last cut before a fixed-size ending takes exactly what's owed, so the ending has its size: an exact tie at
  *   its line goes to less raw loss over the match, then less thinking time (the order of `ranked`).
- * Returns the ids going out (in ranked order) and each pool's leftover for the next cut.
+ * Returns the ids going out (in ranked order) and what each pool still owes the cuts to come.
  */
 export function cutPlan(state: MatchState, ranked: readonly PlayerState[], settings: Settings = DEFAULT_SETTINGS): { out: string[]; carry: Partial<Record<CutPool, number>> } {
   const k = settings.knockoutsPerStage[state.stage] ?? 0;
@@ -492,16 +493,21 @@ export function cutPlan(state: MatchState, ranked: readonly PlayerState[], setti
   const exact = isLastCut(state, settings);
   const out = new Set<string>();
   const carry: Partial<Record<CutPool, number>> = {};
+  // Cuts left, this one included: what earlier cuts left over is spread evenly over them (all of it at the last).
+  const remaining = Math.max(1, settings.knockoutsPerStage.length - state.stage);
   for (const pool of teams ? (["w", "b"] as const) : (["all"] as const)) {
     const members = ranked.filter((p) => poolOf(p, teams) === pool);
-    const owed = (teams ? Math.floor(k / 2) : k) + (state.cutCarry?.[pool] ?? 0);
+    const carried = state.cutCarry?.[pool] ?? 0;
+    const dueNow = Math.ceil(carried / remaining);
+    const owed = (teams ? Math.floor(k / 2) : k) + dueNow;
     // (At least one stays in every pool.)
     const n = Math.max(0, Math.min(owed, members.length - 1));
     const bottom = members.slice(members.length - n);
     const line = members[members.length - n - 1];
     const going = exact || !line ? bottom : bottom.filter((p) => !sameScore(standingPoints(p, settings), standingPoints(line, settings)));
     for (const p of going) out.add(p.id);
-    if (owed - going.length > 0) carry[pool] = owed - going.length;
+    const left = carried - dueNow + (owed - going.length);
+    if (left > 0) carry[pool] = left;
   }
   return { out: ranked.filter((p) => out.has(p.id)).map((p) => p.id), carry };
 }

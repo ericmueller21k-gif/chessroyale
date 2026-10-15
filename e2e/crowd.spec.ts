@@ -77,7 +77,7 @@ test("narrow phones: the top bar's numbers stay clear of the options button, and
   }
 });
 
-test("the opening allowance on the reveal: a sound move off the engine's line counts 0, said in one line at 320 px", async ({ browser }) => {
+test("the opening allowance on the reveal: a sound move off the engine's line is forgiven, said in one line at 320 px", async ({ browser }) => {
   test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   // The narrowest phone we support (320 px).
@@ -95,7 +95,7 @@ test("the opening allowance on the reveal: a sound move off the engine's line co
   // Hold the reveal (solo moves on by a timer).
   await page.evaluate(() => clearTimeout((window as any).match.timer));
   const line = page.locator(".poll-result .allowance-line");
-  await expect(line).toHaveText(/^−\d+\.\d → 0 · opening$/);
+  await expect(line).toHaveText(/^\d+(\.\d)? forgiven · opening$/);
   const oneLine = () =>
     line.evaluate((el) => {
       const r = el.getBoundingClientRect();
@@ -104,16 +104,23 @@ test("the opening allowance on the reveal: a sound move off the engine's line co
   const forgiven = await oneLine();
   expect(forgiven.spill).toBeLessThanOrEqual(0);
   expect(forgiven.height).toBeLessThan(forgiven.lineHeight * 1.5);
-  // The widest notes a move can get (a loss of 100, refused the allowance for material): still one line, on screen.
-  for (const [material, words] of [["missed", "missed a capture"], ["gave", "gave up material"]] as const) {
-    await page.evaluate((mat) => {
+  // The widest notes a move can get (refused the allowance for material; partly forgiven on a loss of nearly 100): still
+  // one line, on screen.
+  const notes = [
+    [{ loss: 100, material: "missed" }, "no allowance · missed a capture"],
+    [{ loss: 100, material: "gave" }, "no allowance · gave up material"],
+    [{ loss: 99.9, counted: 91.9 }, "8 of 99.9 forgiven · opening"],
+  ] as const;
+  for (const [patch, words] of notes) {
+    await page.evaluate((patch) => {
       const m = (window as any).match;
       const me = m.phase.mine.result.players.find((p: any) => m.isYou(p.playerId));
-      Object.assign(me, { loss: 100, material: mat });
       delete me.counted;
+      delete me.material;
+      Object.assign(me, patch);
       m.emit();
-    }, material);
-    await expect(line).toHaveText(`−100.0 · ${words}`);
+    }, patch);
+    await expect(line).toHaveText(words);
     const wide = await oneLine();
     expect(wide.spill, wide.text).toBeLessThanOrEqual(0);
     expect(wide.height, wide.text).toBeLessThan(wide.lineHeight * 1.5);

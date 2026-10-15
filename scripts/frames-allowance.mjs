@@ -1,6 +1,6 @@
 // The opening allowance and the cut, frame by frame (docs/decisions/2026-10-15-opening-allowance-and-ties.md): a solo
-// Crowd 50 v 50 with a cut after every move. Move 1: a sound move off the engine's line ("−2.4 → 0 · opening" on the
-// reveal), then the first cut (ties go through). Move 2: a move that leaves a piece to be taken ("· gave up material"),
+// Crowd 50 v 50 with a cut after every move. Move 1: a sound move off the engine's line ("2.4 forgiven · opening" on the
+// reveal), then the first cut (ties go through). Move 2: a move that leaves a piece to be taken ("no allowance · gave up material"),
 // then the cut, and "Why was I cut?" if it takes you.
 //   npm run frames:allowance -- <out-dir> [device=phone|desktop|narrow] [port=5231]
 // Writes f<ms>.jpg for every painted frame, shots of the moments (reveal-1.png, cut-1.png, reveal-2.png, cut-2.png,
@@ -25,7 +25,7 @@ const use =
 const ctx = await b.newContext({ ...use, colorScheme: "dark" });
 const p = await ctx.newPage();
 p.on("pageerror", (e) => console.log("pageerror", e.message));
-await p.goto(url + "?debug&clock=40&nolanding&mode=crowd&format=team&rounds=2&augments=0");
+await p.goto(url + "?debug&clock=40&nolanding&mode=crowd&format=team&rounds=2&augments=0", { timeout: 180_000 });
 await p.getByRole("radio", { name: /^Solo/ }).click();
 await p.getByRole("button", { name: "PLAY", exact: true }).click();
 
@@ -113,10 +113,17 @@ for (let move = 1; move <= 2; move++) {
     // A sound move off the engine's line: 0.5 to 6 points.
     pick = t.find((m) => (best - m.expected) * 100 >= 0.5 && (best - m.expected) * 100 <= 6)?.move ?? t[1]?.move;
   } else {
-    // A knight or bishop to a square an enemy pawn attacks: a piece left to be taken.
+    // A piece left to be taken: a knight or bishop to a square an enemy pawn attacks, else any move to a square the other
+    // side attacks and nothing defends.
     const c = new Chess(fen);
-    const them = c.turn() === "w" ? "b" : "w";
-    const hang = c.moves({ verbose: true }).find((m) => (m.piece === "n" || m.piece === "b") && !m.captured && c.attackers(m.to, them).some((s) => c.get(s)?.type === "p"));
+    const us = c.turn();
+    const them = us === "w" ? "b" : "w";
+    const moves = c.moves({ verbose: true }).filter((m) => !m.captured && m.piece !== "k");
+    const left = (m) => {
+      const after = new Chess(m.after);
+      return after.attackers(m.to, them).length > 0 && after.attackers(m.to, us).length === 0;
+    };
+    const hang = moves.find((m) => (m.piece === "n" || m.piece === "b") && c.attackers(m.to, them).some((s) => c.get(s)?.type === "p")) ?? moves.find(left);
     pick = hang ? hang.from + hang.to : t.at(-1)?.move;
   }
   await tap(pick);

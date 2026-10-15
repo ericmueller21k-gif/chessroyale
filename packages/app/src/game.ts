@@ -64,17 +64,18 @@ export interface MoveRecord {
 }
 
 /**
- * The opening allowance on a pick, in a few words for the reveal (one line, even at 320 px): what it took off
- * ("−2.4 → 0 · opening"), or why it didn't cover the pick ("−4.1 · gave up material", "−4.1 · missed a capture").
- * Null when it made no difference (no loss, or no allowance on this move).
+ * The opening allowance on a pick, in a few plain words for the reveal (one line, even at 320 px), one number at most:
+ * what it forgave ("1.2 forgiven · opening", "8 of 9.6 forgiven · opening"), or why it didn't cover the pick
+ * ("no allowance · gave up material", "no allowance · missed a capture"). `short`: the boss dock on the narrowest
+ * phones ("8 of 9.6 forgiven", "no allowance"). Null when it made no difference (no loss, or no allowance on this move).
  */
 export function allowanceNote(p: { loss: number | null; counted?: number; material?: MaterialSlip }, short = false): string | null {
   if (p.loss === null || p.loss < 0.05) return null;
-  const pts = (x: number) => (x < 0.05 ? "0" : `−${x.toFixed(1)}`);
-  // (Short, for the boss dock on the narrowest phones, whose line holds about 18 characters.)
-  if (p.material) return `${pts(p.loss)} · ${short ? "all counts" : p.material === "missed" ? "missed a capture" : "gave up material"}`;
+  if (p.material) return short ? "no allowance" : `no allowance · ${p.material === "missed" ? "missed a capture" : "gave up material"}`;
   if (p.counted === undefined) return null;
-  return short && p.counted >= 0.05 ? `${pts(p.loss)} → ${pts(p.counted)}` : `${pts(p.loss)} → ${pts(p.counted)} · opening`;
+  const pts = (x: number) => x.toFixed(1).replace(/\.0$/, "");
+  const forgiven = p.counted < 0.05 ? `${pts(p.loss)} forgiven` : `${pts(p.loss - p.counted)} of ${pts(p.loss)} forgiven`;
+  return short ? forgiven : `${forgiven} · opening`;
 }
 
 /** Your move from a reveal, with what the elimination breakdown needs (null if you weren't picking). */

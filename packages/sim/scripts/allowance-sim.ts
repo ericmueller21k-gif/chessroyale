@@ -6,7 +6,7 @@
  *
  *   npx tsx packages/sim/scripts/allowance-sim.ts run <label> <matches> [engines=3] [nodes=250000] [format=team]
  *       -> reports/allowance-sim/<label>.jsonl (one line per match)
- *   npx tsx packages/sim/scripts/allowance-sim.ts summary <before> <after>   -> reports/allowance-sim.md
+ *   npx tsx packages/sim/scripts/allowance-sim.ts summary <before> <after> [arm ...]   -> reports/allowance-sim.md
  *
  * `run` uses only what the match runner had before the change, so it runs on either side of it. Eric's goal: "the goal is
  * simply to still cut players playing poor, and not punish players not playing precise engine lines or slight
@@ -125,7 +125,7 @@ function materialError(r: RoundRec, move: string): boolean {
   return b !== null && m !== null && b - m >= 1;
 }
 
-function summary(beforeLabel: string, afterLabel: string) {
+function summary(beforeLabel: string, afterLabel: string, arms: readonly string[] = []) {
   // (The committed data is gzipped: <label>.jsonl.gz; a fresh run writes <label>.jsonl.)
   const load = (label: string) =>
     (existsSync(`${dir}${label}.jsonl`) ? readFileSync(`${dir}${label}.jsonl`, "utf8") : gunzipSync(readFileSync(`${dir}${label}.jsonl.gz`)).toString("utf8"))
@@ -212,7 +212,7 @@ function summary(beforeLabel: string, afterLabel: string) {
       add("Cut players' bot temperature (median; higher is looser)", cutSkill.length ? cutSkill.sort((a, b) => a - b)[Math.floor(cutSkill.length / 2)]!.toFixed(1) : "–");
       add("Survivors who played only top-8 moves", pctOf(survTop8, surv));
       add("Survivors who had played poorly", pctOf(survPoor, surv));
-      add("Kept in by a tie at the line, owed by the next cut (per match)", (tiedThrough / Math.max(1, cuts)).toFixed(1));
+      add("Still owed after this cut: kept in by ties (per match)", (tiedThrough / Math.max(1, cuts)).toFixed(1));
     }
     for (const [k, v] of Object.entries(rows)) lines.push(`| ${k} | ${v.join(" | ")} |`);
     lines.push("");
@@ -228,7 +228,7 @@ function summary(beforeLabel: string, afterLabel: string) {
     addW("Plies per match (mean)", mean(ms.map((m) => m.plies)).toFixed(1));
     addW("Cuts with fewer out than the plan (share)", pctOf(ms.flatMap((m) => m.cuts.filter((c, i) => c.out.length < CROWD_KNOCKOUTS.team[i]!)).length, ms.flatMap((m) => m.cuts).length));
     addW("Cuts with an exact tie at a team's line (share)", pctOf(ms.flatMap((m) => cutLines(m).filter((l) => l.tie)).length, ms.flatMap((m) => m.cuts).length));
-    addW("Owed to the next cut after each cut (mean: kept in by ties, not yet taken)", CROWD_KNOCKOUTS.team.map((_, i) => mean(ms.flatMap((m) => (cutLines(m)[i] ? [cutLines(m)[i]!.kept] : []))).toFixed(1)).join(" · "));
+    addW("Still owed after each cut (mean: kept in by ties, not yet taken)", CROWD_KNOCKOUTS.team.map((_, i) => mean(ms.flatMap((m) => (cutLines(m)[i] ? [cutLines(m)[i]!.kept] : []))).toFixed(1)).join(" · "));
     addW("Most owed at once (mean of each match's largest)", mean(ms.map((m) => Math.max(0, ...cutLines(m).map((l) => l.kept)))).toFixed(1));
     const outs = CROWD_KNOCKOUTS.team.map((_, i) => mean(ms.flatMap((m) => (m.cuts[i] ? [m.cuts[i]!.out.length] : []))).toFixed(1));
     addW("Out at each cut (mean)", outs.join(" · "));
@@ -238,16 +238,52 @@ function summary(beforeLabel: string, afterLabel: string) {
   }
   for (const [k, v] of Object.entries(whole)) lines.push(`| ${k} | ${v.join(" | ")} |`);
   lines.push("");
+  if (arms.length) {
+    // Which part costs what: the same seeds with only part of the change (an arm is a run of this script on a copy of
+    // the code with the rest switched off), then the change itself.
+    const all = [["before", sides[0][1]] as const, ...arms.map((a) => [a, load(a)] as const), [afterLabel, sides[1][1]] as const];
+    lines.push("## Which part does what");
+    lines.push("");
+    lines.push(
+      "Arms, the same seeds: `ties-only` (the allowance's points set to 0), `allowance-only` (every cut takes exactly what it owes, ties broken as at the last cut), `after-next-cut` (both, with what a cut leaves over owed by the next cut, as first built). Spearman of each bot's temperature against its placement (± its standard error over the matches), among the last 20 placed and among the 8 finalists; the winner among the strongest quarter of the bots.",
+    );
+    lines.push("");
+    lines.push(`| | ${all.map(([l]) => l).join(" | ")} |`);
+    lines.push(`| --- | ${all.map(() => "---:").join(" | ")} |`);
+    const sp = (m: MatchRec, ids: string[]) => spearman(ids.map((id) => m.skills[id]!), ids.map((id) => m.placements[id]!));
+    const se = (xs: number[]) => Math.sqrt(xs.reduce((s, x) => s + (x - mean(xs)) ** 2, 0) / (xs.length - 1) / xs.length);
+    const row = (k: string, f: (ms: readonly MatchRec[]) => string) => lines.push(`| ${k} | ${all.map(([, ms]) => f(ms)).join(" | ")} |`);
+    row("Spearman, all 100", (ms) => {
+      const xs = ms.map((m) => sp(m, Object.keys(m.skills)));
+      return `${mean(xs).toFixed(3)} ±${se(xs).toFixed(3)}`;
+    });
+    row("Spearman, the last 20", (ms) => mean(ms.map((m) => sp(m, Object.keys(m.skills).filter((id) => m.placements[id]! <= 20)))).toFixed(3));
+    row("Spearman, the 8 finalists", (ms) => mean(ms.map((m) => sp(m, Object.keys(m.skills).filter((id) => m.placements[id]! <= 8)))).toFixed(3));
+    row("Winner in the strongest quarter", (ms) => {
+      const n = ms.filter((m) => {
+        const quarter = Object.values(m.skills).sort((a, b) => a - b)[Math.floor(Object.keys(m.skills).length / 4) - 1]!;
+        const winner = Object.keys(m.placements).find((id) => m.placements[id] === 1)!;
+        return m.skills[winner]! <= quarter;
+      }).length;
+      return `${n}/${ms.length}`;
+    });
+    row("Out at each cut (mean)", (ms) => CROWD_KNOCKOUTS.team.map((_, i) => mean(ms.flatMap((m) => (m.cuts[i] ? [m.cuts[i]!.out.length] : []))).toFixed(1)).join(" · "));
+    row("The move-14 cut (the 5th): out (mean)", (ms) => mean(ms.flatMap((m) => (m.cuts[4] ? [m.cuts[4]!.out.length] : []))).toFixed(1));
+    row("Plies per match (mean)", (ms) => mean(ms.map((m) => m.plies)).toFixed(0));
+    lines.push("");
+  }
   writeFileSync(root + "reports/allowance-sim.md", lines.join("\n"));
   console.log(lines.join("\n"));
 }
 
 /**
- * Each cut's line, team by team: what it owed (its half of the plan, plus what the team's last cut left over), whether
- * the last one through and the first one below were tied exactly there, and how many it kept in (owed, less those out).
+ * Each cut's line, team by team, as the change draws it: what it owed (its half of the plan, plus its share of what the
+ * team's earlier cuts left over, spread evenly over the cuts still to come), whether the last one through and the first
+ * one below were tied exactly there, and how much the team still owes after it (kept in by ties, not yet taken).
  */
 function cutLines(m: MatchRec): { tie: boolean; kept: number }[] {
   const carry: Record<string, number> = { w: 0, b: 0 };
+  const cuts = CROWD_KNOCKOUTS.team.length;
   return m.cuts.map((c, i) => {
     let tie = false;
     let kept = 0;
@@ -255,13 +291,14 @@ function cutLines(m: MatchRec): { tie: boolean; kept: number }[] {
       const team = Object.keys(c.scores)
         .filter((id) => c.colour[id] === side)
         .sort((a, b) => c.scores[b]! - c.scores[a]!);
-      const owed = Math.floor(CROWD_KNOCKOUTS.team[i]! / 2) + carry[side]!;
+      const due = Math.ceil(carry[side]! / Math.max(1, cuts - i));
+      const owed = Math.floor(CROWD_KNOCKOUTS.team[i]! / 2) + due;
       const out = c.out.filter((id) => c.colour[id] === side).length;
       const last = team[team.length - owed - 1];
       const first = team[team.length - owed];
       if (last && first && Math.abs(c.scores[last]! - c.scores[first]!) < 1e-9) tie = true;
-      kept += Math.max(0, owed - out);
-      carry[side] = Math.max(0, owed - out);
+      carry[side] = Math.max(0, carry[side]! - due + owed - out);
+      kept += carry[side]!;
     }
     return { tie, kept };
   });
@@ -283,4 +320,4 @@ function spearman(a: number[], b: number[]): number {
 
 const [cmd, a, b, c, d, e] = process.argv.slice(2);
 if (cmd === "run") await run(a ?? "after", Number(b ?? 10), Number(c ?? 3), Number(d ?? 250_000), (e ?? "team") as FinalFormat);
-else summary(a ?? "before", b ?? "after");
+else summary(a ?? "before", b ?? "after", process.argv.slice(5));
