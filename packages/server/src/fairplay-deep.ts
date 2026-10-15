@@ -9,6 +9,7 @@
  * runs from the Worker's schedule: cases in review at once, the rest off-peak, within its own daily budget, on its own
  * container instance ("fairplay-1", fairplay-engine.ts), so a match's re-checks never wait behind it.
  */
+import { stockfishRefuses } from "@chessroyale/chess";
 import { FAIRPLAY, matchSignals, referenceStrength, skipReason, type FairMove } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { relevel, type CaseMailer } from "./fairplay.ts";
@@ -84,7 +85,9 @@ export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, op
     let complete = true;
     let changed = false;
     for (const m of moves) {
-      if (m.deep || skipReason(m) !== null) continue;
+      // (A position Stockfish refuses is never sent, so it never gets an answer: passed over rather than waited on, or
+      // the queue would stop at it every run. No game makes one: engine.ts, containerScore.)
+      if (m.deep || skipReason(m) !== null || stockfishRefuses(m.fen)) continue;
       if (searches >= perRun || !(await takeBudget(sql, now))) {
         complete = false;
         break;

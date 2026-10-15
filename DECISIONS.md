@@ -4182,3 +4182,48 @@ My calls:
   move stays quiet (the knock test). The board saw's dots check is skipped when no piece has moves both across the
   middle and not (a position now and then). A last test sends a refused position to a worker on purpose: no page
   error, and the engine answers on.
+
+### The engine server never gets a position Stockfish refuses (Oct 15, 2026)
+
+#216 kept the positions Stockfish refuses from players' devices. The engine server (native Stockfish in a Cloudflare
+Container, `engine/server.mjs`) still searched whatever it was handed, and `POST /api/engine/score` passed a client's
+FEN straight through. When Stockfish exits, `server.mjs` exits with it and the container is down until it restarts, so
+one bad request could stop every lobby's re-checks. Today only Eric can reach the site (Cloudflare Access); at launch
+players can.
+
+My calls:
+
+- **One way in, one check.** Two places posted searches to the container: `serverScoreAt` (`engine.ts`) and fair
+  play's deep search (`fairplay-engine.ts`, its own instance `fairplay-1`, with its own copy of the request). Every
+  other path goes through `serverScoreAt`: the match re-checks (`serverRecheck`, `serverEngine`), the judges' verdicts,
+  re-checks and spot checks (`lobby-do.ts`), Squads' bot verdicts (`squads-do.ts`) and `/api/engine/score`. Both now
+  search through `containerScore` (`engine.ts`), the only code that sends the container a search (`warmEngine` only
+  pings it). It checks `stockfishRefuses(fen)` first: a refused position isn't sent, it logs one line ("engine
+  server: not sent, a position Stockfish refuses (…): <fen>"), and the answer is "no answer" (null), which every caller
+  already handles (the host's or the device's numbers stand). `serverScoreAt` takes the day's budget before calling it,
+  so a refused position from a lobby would spend one search; no game makes one, and client ones are turned away first
+  (next point).
+- **`/api/engine/score` answers 400 "Bad request"** for a refused position, along with its other input checks, before
+  the day's budget is touched. The app treats any answer but 200 as no answer and re-checks on its own device (whose
+  engine refuses the position too, since #216), so players see no difference.
+- **Fair play passes a refused position over.** Fair play's deep re-check takes "no answer" to mean "try again on a
+  later run" and stops the run there. A position that can never be answered would stop every run at that match
+  (spending a search of fair play's budget each time) and hold back the older matches queued behind it. `deepCheckRun`
+  now skips a move in a position Stockfish refuses, as it skips a move that doesn't count: not searched, and the match
+  can finish. Its positions are the server's own record of a match, so none should be refused; this keeps a slip
+  elsewhere from jamming the queue.
+- **No guard in `engine/server.mjs`.** The container has no address of its own. It's reached only through the
+  Worker's `ENGINE` binding, and every search the Worker sends goes through `containerScore`, so the Worker's check
+  covers every way in. A guard in the container would need a JavaScript copy of `stockfishRefuses` and of the check
+  test it borrows from chess.js: a second set of rules to keep the same as the first. Its check of the request's shape
+  (the FEN pattern, at most 8 moves in UCI) stays.
+- **Open: the container's Stockfish isn't the one measured.** `stockfishRefuses` was measured against Stockfish 19,
+  the browsers' build; the container runs native Stockfish 17.1, which wasn't measured here. Every rule refuses a
+  position no game reaches, so refusing them costs nothing. But a position 17.1 trips on and 19 merely ignores isn't
+  covered. One to check: castling rights with no rook on that side, which 19 ignores and an older Stockfish's FEN
+  reader may not handle. To close it before launch, either measure the container's binary against the same cases
+  (Docker, locally) or move the container to Stockfish 19 so the measured rules are its rules.
+
+Tests: `packages/server/test/engine-server.test.ts` (a refused position never reaches the container stub, from the
+endpoint (400, the budget untouched), `serverScoreAt` (one line logged) or fair play's search; a legal one does,
+Chess960 included); `fairplay-deep.test.ts`'s last test (passed over, the match done).

@@ -1,3 +1,4 @@
+import { stockfishRefuses } from "@chessroyale/chess";
 import { BOSS_TIERS, POWER_IDS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
 import type { SquadsLobby, SquadsParty } from "./squads-do.ts";
@@ -116,11 +117,12 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     const account = await handleAccountApi(request, env, fetch, waitUntil);
     if (account) return account;
     // POST /api/engine/score {fen, moves} → {moves}: the engine server's deeper look at a few moves (solo games'
-    // re-checks); 503 when there's no server or today's budget is spent (the device then re-checks itself).
+    // re-checks); 503 when there's no server or today's budget is spent (the device then re-checks itself). A position
+    // Stockfish refuses is a bad request, turned away before the budget (it would end the server's Stockfish: engine.ts).
     if (url.pathname === "/api/engine/score" && request.method === "POST") {
       const body = (await request.json().catch(() => null)) as { fen?: unknown; moves?: unknown; boards?: unknown } | null;
       const moves = Array.isArray(body?.moves) ? body.moves.filter((m): m is string => typeof m === "string").slice(0, 8) : [];
-      if (typeof body?.fen !== "string" || !moves.length) return json({ message: "Bad request" }, 400);
+      if (typeof body?.fen !== "string" || !moves.length || stockfishRefuses(body.fen)) return json({ message: "Bad request" }, 400);
       // Several boards re-checked at once (Classic) share the budget, so the round still takes a few seconds.
       const boards = Math.max(1, Math.min(8, Math.round(Number(body.boards) || 1)));
       const out = await serverScoreAt(env, body.fen, moves, Math.max(400_000, Math.round(SERVER_RECHECK_NODES / boards)));
