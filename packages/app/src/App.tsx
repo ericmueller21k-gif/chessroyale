@@ -53,6 +53,7 @@ import { SquadsQueue, SquadsScreen, squadsWaiting } from "./screens/Squads.tsx";
 import { PartySheet } from "./screens/SquadsParty.tsx";
 import { measureSound } from "./sound.ts";
 import { testParams } from "./test-switches.ts";
+import { pausedBosses } from "./status.ts";
 
 /**
  * A match's settings: the mode and the choices made on the home screen, plus playtest overrides from the URL, e.g.
@@ -105,6 +106,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     ...speed,
     // Any boss battle: not the boss you met last (when it's random); ?power= brings a boss power at once (tests).
     bossAvoid: lastBoss() ?? "",
+    // Never a boss that's resting (a kill switch, status.ts): a solo game skips them as the server's lobbies do.
+    ...(pausedBosses().length ? { bossesOff: pausedBosses() } : {}),
     ...((POWER_IDS as readonly string[]).includes(q.get("power") ?? "") ? { bossPowerTest: q.get("power")! } : {}),
     ...(raid ? {} : chosenBoss() && bossInUrl() ? { bossId: chosenBoss() } : {}),
     // Testing, solo: ?mate=1, the boss mates you at once (1.f3 e5 2.g4, its move): its attack on your king, then the result.

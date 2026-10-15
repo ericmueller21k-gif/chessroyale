@@ -1,11 +1,12 @@
 import { useState } from "preact/hooks";
-import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, shopItem, wornFromLocker, type ShopSlot } from "@chessroyale/core";
+import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, pausedLine, shopItem, wornFromLocker, type ShopSlot } from "@chessroyale/core";
 import { account, buyShopItem } from "../account.ts";
 import { openProfile } from "../profile-nav.ts";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
 import { CratesPanel, LockerPanel } from "./Crates.tsx";
+import { isPaused, useServerStatus } from "../status.ts";
 
 /**
  * The shop: cosmetics by category. Get an item (free while we test); it goes to your locker, where you wear it
@@ -14,6 +15,7 @@ import { CratesPanel, LockerPanel } from "./Crates.tsx";
  */
 export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: "shop" | "crates" | "locker" | "chat" }) {
   const { profile, config } = useAccount();
+  useServerStatus();
   // (A profile's locked quick chat line opens it on the chat packs.)
   const [slot, setSlot] = useState<ShopSlot>(initial === "chat" ? "chat" : "king");
   // (A profile's "Open locker" opens it on the locker.)
@@ -66,7 +68,10 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
           </button>
         ))}
       </div>
-      {config?.accounts && profile && area === "crates" ? (
+      {/* (The shop resting, a kill switch: the shop and crates say so; your locker stays.) */}
+      {area !== "locker" && isPaused("shop") ? (
+        <p class="shop-note">{pausedLine("shop")}</p>
+      ) : config?.accounts && profile && area === "crates" ? (
         <CratesPanel />
       ) : config?.accounts && profile && area === "locker" ? (
         <LockerPanel onShop={() => setArea("shop")} />
