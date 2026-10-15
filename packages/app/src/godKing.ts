@@ -57,10 +57,8 @@ export type KingCue =
   | "queenWon"
   | "foeIntro"
   | "foeBlocked"
-  | "foePhase2"
-  | "foeBoardWon"
-  | "foeBoardLost"
-  | "foeVictory2";
+  | "foeTriumph"
+  | "foeDrained";
 
 export const KING_LINES: Record<KingCue, readonly string[]> = {
   // One of these as the battle begins (Eric, Oct 9: one opening line, from a much bigger pool).
@@ -131,13 +129,12 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   queenLost: ["Our queen has fallen. Fight on!", "The queen! She'll be avenged.", "They took the queen. Hold the line."],
   queenWon: ["Their queen falls!", "The tyrant's queen is ours!", "Down goes the queen. Press on!"],
   // The Hidden Boss (characters/recluse-lines.ts, every line of his fight in one table): his opening line in this fight,
-  // and his help tried and blocked (it doesn't work against him).
+  // his help tried and blocked (it doesn't work against him), and his last words: triumphant over the beaten boss, then
+  // his cry as the boss drains his power (the phase change: he's absorbed, and says nothing in phase 2).
   foeIntro: KING_VS_RECLUSE.intro,
   foeBlocked: KING_VS_RECLUSE.blocked,
-  foePhase2: KING_VS_RECLUSE.phase2,
-  foeBoardWon: KING_VS_RECLUSE.boardWon,
-  foeBoardLost: KING_VS_RECLUSE.boardLost,
-  foeVictory2: KING_VS_RECLUSE.victory2,
+  foeTriumph: KING_VS_RECLUSE.triumph,
+  foeDrained: KING_VS_RECLUSE.drained,
   // G-REX: the first time a piece of ours steps onto a burning tile (once a match).
   fireTile: [
     "Careful on that tile, don't stand there too long!",
@@ -147,8 +144,12 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   ],
 };
 
-/** Each cue's kind: critical cues always speak; remarks and small talk (`paced`) roll KING_SPEECH.chance. */
-type Kind = "critical" | "remark" | "paced" | "info";
+/**
+ * Each cue's kind: critical cues always speak; remarks and small talk (`paced`) roll KING_SPEECH.chance. A `lead` always
+ * speaks too, but a critical line cuts in on it (the Hidden Boss's phase change: his triumph, then his cry as he's
+ * drained, two seconds later).
+ */
+type Kind = "critical" | "lead" | "remark" | "paced" | "info";
 const KIND: Record<KingCue, Kind> = {
   intro: "critical",
   idle: "paced",
@@ -184,14 +185,12 @@ const KIND: Record<KingCue, Kind> = {
   fireTile: "critical",
   foeIntro: "critical",
   foeBlocked: "critical",
-  foePhase2: "critical",
-  foeBoardWon: "critical",
-  foeBoardLost: "critical",
-  foeVictory2: "critical",
+  foeTriumph: "lead",
+  foeDrained: "critical",
 };
 
 /** How much each kind of line matters to his voice: critical cuts in; a remark waits its turn ahead of small talk. */
-const PRIORITY: Record<Kind, Priority> = { critical: CRITICAL, remark: NORMAL, paced: LOW, info: LOW };
+const PRIORITY: Record<Kind, Priority> = { critical: CRITICAL, lead: NORMAL, remark: NORMAL, paced: LOW, info: LOW };
 
 /** His voice: one line at a time, each for its time (speech.tsx). */
 const voice = new Voice();
@@ -235,7 +234,7 @@ export function kingSay(cue: KingCue, key: string, now = Date.now(), rng: () => 
   spoken.add(key);
   if (spoken.size > 300) spoken.clear();
   const kind = KIND[cue];
-  if (kind !== "critical") {
+  if (kind !== "critical" && kind !== "lead") {
     if (now - lastAt < KING_SPEECH.quietMs) return null;
     if (kind === "remark" && moveNo - remarkAt < KING_SPEECH.remarkGapMoves) return null;
     const base = KING_SPEECH.chance[cue] ?? 0;

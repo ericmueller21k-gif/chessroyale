@@ -1,10 +1,10 @@
 // The Hidden Boss's phase 2, frame by frame in a real Boss alone battle, as an admin, on a phone (390 px) and a computer
-// (1280 px), with real taps: the phase change (?win=1: you mate him in phase 1; he gets up in a rage, leaps onto the board,
-// throws the book down, chants over its light, the split into four, the book back in his hands, the Chess960 shuffle),
-// the four boards in play (?phase=2: a few of your moves against him), a win (?win=1: your Qxf7 mates on your board, the
-// bots mate on theirs: "Victory!") and a loss (?win=1, then you resign your board: "won 3 of 4"), and his phase 2
-// ultimate on the admins' trigger. Records every painted frame (Chrome's screencast) and saves
-// stills, a GIF of each moment, and screenshots.
+// (1280 px), with real taps: the phase change (?win=1: you mate him in phase 1; he absorbs the God King, gets up in a
+// rage, leaps onto the board, throws the book down, chants over its light, the split into four with its arcs, the book
+// back in his hands, the Chess960 shuffle), the four boards in play (?phase=2: a few of your moves against him), a win
+// (?win=1: your Qxf7 mates on your board, the bots mate on theirs: "Victory!") and a loss (?win=1, then you resign
+// your board: "won 3 of 4"), and his phase 2 ultimate on the admins' trigger. Records every painted frame (Chrome's
+// screencast) and saves stills, a GIF of each moment, and screenshots.
 //   npm run frames:recluse2 -- <out-dir> [phone|desktop|both] [light|dark] [base=http://localhost:8788] [only=change]
 // Needs the app and its API running (npx wrangler dev), as frames:recluse does.
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
@@ -170,9 +170,11 @@ const change = async (ctx) => {
   await play("h5f7");
   const fall = await waitUntil((s) => s.fall, 30_000);
   const ch = await waitUntil((s) => s.kind === "phaseChange", 30_000);
-  // (PHASE_CHANGE's beats: his rage, the leap, landed, the book brandished, thrown down, the chant and its light, the
-  // cracks, the split, the book back in his hands, the leap back, "PHASE 2".)
-  for (const [ms, label] of [[700, "01-rage"], [1700, "02-leap"], [2150, "03-landed"], [2750, "04-brandish"], [3250, "05-thrown"], [4300, "06-chant"], [5500, "07-crack"], [6800, "08-split"], [7800, "09-book-back"], [8550, "10-leap-back"], [9400, "11-banner"]]) {
+  // (PHASE_CHANGE's beats: the God King triumphant, the boss's hand raised, the drain, the power landing (his look
+  // ignites), the God King gone, his rage, the leap, landed, the book brandished, thrown down, the chant and its light, the
+  // cracks and the arcs, the split, the boards growing, the book back in his hands, the leap back, "PHASE 2".)
+  const beats = [[600, "01-king"], [1950, "02-seize"], [3200, "03-drain"], [4400, "04-ignite"], [5050, "05-gone"], [5400, "06-rage"], [6100, "07-leap"], [6600, "08-landed"], [7000, "09-brandish"], [7600, "10-thrown"], [8600, "11-chant"], [9700, "12-crack-arcs"], [10450, "13-split-arcs"], [11200, "14-grow"], [12300, "15-book-back"], [13000, "16-leap-back"], [13900, "17-banner"]];
+  for (const [ms, label] of beats) {
     const wait = ch.now + ms - Date.now();
     if (wait > 0) await p.waitForTimeout(wait);
     await shot(`change-${label}`);

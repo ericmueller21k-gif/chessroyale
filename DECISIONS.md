@@ -3987,6 +3987,116 @@ it if they need to wait 5 or 10 seconds." Then, Oct 14: tell players about the d
   the boss plays Stockfish; its rule 4 now says a Solo or Boss alone battle waits for Maia, 20 s at most, and online
   nobody does (it said nobody ever waits). Numbers from `BOSS_BRAIN`.
 
+## The Hidden Boss absorbs the God King (Eric, Oct 14, 2026)
+
+Eric's idea for phase 2's story: there the Hidden Boss plays with Stockfish, which clashes with his anti-engine
+persona. So he **absorbs the God King** (the players' engine helper, whom he mocked all through phase 1) and becomes
+**half engine**, "brain and engine combined": the God King, stronger than every boss, is finally overpowered. Eric on
+the look: "if we can avoid doing any sort of changing to the sprite and just do an overlay, that would be sick"; on the
+arcs: "not like the ones we had earlier used in this game; they need to be a bit smoother looking"; on the whole: "it's
+supposed to be this epic thing" (about 15 to 20 s). Same reach as before: admins only, in Boss alone; no rule,
+protocol or stored data changed.
+
+**The sequence** (`PHASE_CHANGE` in `packages/app/src/recluse-phase2.ts`; ms from the phase change's start, which
+follows the 1.8 s fall; 14.8 s, so 16.6 s with the fall, was 10.4 s after it; not skippable, as before):
+1. **The God King triumphant** (0 to 2.1 s): in his place in the dock (BossDock's new `king`, from `absorbKing`) he
+   raises his sword (his `raise`, `raised`), his golden aura swelling behind him (CSS, `.gk-aura`), with his shout
+   (`gkHyuah`) and a short gloat in his bubble. The boss is still slumped and mumbling.
+2. **The boss seizes it** (1.7 s): still on his knees, his head snaps up glaring (the rage's first beat, moved here) and
+   he raises his open hand to the God King (`seize`; then `seizeLoop`, his arm trembling, his teeth gritted).
+3. **The drain** (2.14 to 4.29 s, `drainMs`: exactly the God King's Last Stand blows to his stagger): a golden stream
+   from the God King into the boss's hand (`AbsorbStream`, over the page: a beam of two strokes, a wide soft one and a
+   thin bright core, and 16 golden motes flowing along it, moved by transform; a glow gathering in the hand), under both
+   their bubbles. The God King is drained through his Last Stand's blows, his own frames from the first blow (red-white
+   flashes, his armor cracking at three points, his flame dimming), flickering more and more (CSS opacity) as his aura
+   shrinks; his cry in his bubble, a grunt (`gkLastGrunt2`) and the drain's whoosh (`recluseDrain`, new).
+4. **The power lands** (4.29 s, `igniteAt`): the boss's fist closes on it (`seized`, its spark `recluseSpark`, new), a
+   cold flash in his hand, and his **half-engine look ignites** (a flare of the eye, the circuit lines drawn in); his
+   line (4.41 s; NORMAL priority, so his chant cuts in on it at 7.93 s, after it has been up whole for at least 1.8 s:
+   two CRITICAL lines would have held the chant's words back to the split, and his revive line after them). The God King staggers and fades up and away in light, five motes rising (`gkLeave`); **gone** at 4.99
+   s, his last words still up beside his empty place until their time is over.
+5. **Then the reworked change goes on**, 4.43 s later than before: up in a rage (4.89 s: off his knees, the book
+   snatched, his fist), the leap onto the board (5.76 s; lands 6.44), the book brandished and thrown down (6.73), the
+   chant and its light (7.93), the cracks (9.63) and the quarters parting (10.38) and growing into four boards (10.78 to
+   11.68), the book back in his hands (11.78; the shuffle 11.93 to 12.83), the leap back (12.66; home 13.34), "PHASE 2"
+   (13.44), the clocks (14.84).
+6. **The arcs** (9.43 to 11.58 s, each gone 0.26 s later): blue arcs strike the cracks from his raised hands, about
+   every 85 to 145 ms, and two big ones from both hands at once, out along the cross, as the board cracks and as it
+   parts; a blue flash where each lands and a blue pulse on the board. One soft crackle under them (`recluseArc`, new,
+   its two snaps on the big ones).
+
+**His half-engine look** (the whole of phase 2 and the result screen after it, until a new battle): over every drawing
+of him, the bust in a phone's bar, his figure by a computer's board, his figure on the board through the rest of the
+change, the results: **his left eye (our right, the side towards the board) glows cold blue**, **faint circuit lines**
+run from beside it up to his temple and down his cheek, with three bright pads, and **now and then it all flickers**
+(twice, then steady for about five seconds). An overlay only (`EngineOverlay`, components/Recluse.tsx): a box his
+drawing's size holding one his head's size, moved onto his head every frame by a transform (`placeEngine`, from where
+the frame puts his head part: `headOf`, his shake included), so it sits on the eye in any animation of either drawing;
+four elements, and only opacity and transform animate. It ignites only as it comes (`fresh`); a screen drawn later
+shows it already on.
+
+**The God King in phase 2: gone.** His place in the dock stays, empty (`king="gone"`: the dock doesn't move), with no
+button, no charges and no words; his phase 2 lines (`KING_VS_RECLUSE.phase2`, `boardWon`, `boardLost`, `victory2` and
+their cues) are removed, phase 1's kept. Nothing needed a voice for the team: a board's result is on its own tag, and
+the boss has his line on it. This replaces #210's "a try spends its charge in phase 2 too" (Eric's own call here: no God
+King buttons in phase 2); in phase 1 a try still spends its charge.
+
+**Lines** (all PLACEHOLDERS, ours, in `characters/recluse-lines.ts`; nothing presented as his words):
+- His, as the power lands (one, by the phase change): "All game you leaned on an engine. Now see how you like it.",
+  "Mind and machine. Both mine now." ("A Beautiful Mind" is the title of the film about John Nash, so it isn't used.)
+- The God King's triumph (short: his cry cuts in about two seconds later; a new cue kind, `lead`: always said, but a
+  critical line cuts in on it): "Kneel. The crown always wins.", "Down you stay, bookworm!", "Your book is closed.
+  Kneel!". His cry as he's drained: "No! My light... what are you doing?!", "Release me! That power is mine!", "Aaagh!
+  My strength!".
+- Phase 2's chatter mocks the engine he took (`RECLUSE_LINES.engine`): every third line of his chatter, from the
+  first, in turn, the lowest priority as the collusion lines: "Fun, isn't it?", "Look how much fun we're having.",
+  "Not so nice when the engine's on my side, is it?", "Go on, call your God King. Oh, that's right.", "Every line,
+  every move. I see them all now."
+- Screen text (admins only): the dock's "The God King triumphs!", "He's draining the God King!", then "The boss rises!"
+  over "Mind and engine, one." until his chant.
+
+**My calls.**
+- **The God King where he always is**, in the dock (by the board's bottom-right corner on a computer, under the board
+  on a phone), not brought onto the board: his figure is already there, and the stream then crosses the board from him
+  to the boss (on a phone from the dock to the bar above the board). The stream leaves him sideways and low and rises
+  into the hand from below, so it never runs through either bubble; it's drawn under them.
+- **His drained look is his own Last Stand frames** (Eric: no new God King frames needed), timed so their stagger comes
+  as the power lands: the flashes and cracks read as his power being torn out. The aura, the flicker and the fade are
+  CSS over his figure. Those 59 frames are drawn ahead from the battle's start (`prewarmKing`, about 4 ms a frame of
+  work): on this machine each takes about 2 ms to draw, a new one every 30 to 50 ms through the drain, which a slowed
+  phone would feel.
+- **The boss's raised hand and fist are new frames of his** (3 short animations, 12 frames, from his existing parts:
+  kneeling, the open palm of his chant, his fist), not an overlay: the overlay rule is for the half-engine look. They
+  make the seizing read; the rage starts from his knees after them, as before.
+- **The arcs:** a midpoint-displacement path (jagged in the small, smooth in the large) drawn as curves through the
+  points' midpoints, so no sharp zigzag; a thin bright core over two soft glows (wide translucent strokes, no filter),
+  blue enough to read on the light squares; each shape redrawn every 70 ms of its 260 ms. One SVG over the board.
+- **The God King's figure in the dock is no longer a button in the phase change and phase 2** (it wasn't callable in
+  the phase change before either).
+
+**Measured** (the slow-phone perf case, `e2e/perf.spec.ts`: an iPhone 13 profile at 4x CPU throttling, `?phase=2`, the
+whole phase change, then eight seconds of four boards in play; runs of this branch and main alternating, on a quiet
+machine, load 0.7 to 1.8):
+- The phase change: this branch 9.6, 8.4 and 6.2% of frames over 20 ms (p95 33.3 to 33.4 ms, the longest 233, 167 and
+  150 ms); main 5.0, 5.9 and 5.5% (p95 33.3, the longest 233, 183 and 200). A point or two more dropped frames over a
+  change half again as long (14.8 s against 10.4), within the budget (15%, p95 under 50 ms), p95 the same, the longest
+  frame no longer. (The first run predates drawing ahead one slice at a time; with `?phase=2` the drawing ahead runs
+  during the change itself, which in a real fight it never does: it's done in phase 1, minutes earlier.)
+- Four boards in play: this branch 1.7, 1.3 and 0.6%, main 1.9, 0.6 and 0.6%: the same (the look over his figure costs
+  nothing that shows).
+- Drawing the God King's drained frames on the spot costs about 2 ms each on this machine (unthrottled), so they're drawn
+  ahead; the stream's motes move by transform only, and the arcs are one SVG of a few strokes, no filter.
+
+**Testing.** Targeted lane (animation, art, lines and the God King's presence; no rule changed): typecheck, the app's
+and the chess package's unit tests; `recluse-phase2.test.ts` (the timeline's beats, order and 15 to 20 s length, the
+figure run's steps landing on the beats, the God King's look at each moment and gone for good, his triumph giving way
+to his cry, the arcs on the cracks with their big ones, the lines, the God King silent in phase 2 through SoloMatch's
+own phase 2 moments, the chatter's engine lines), `recluse.test.ts` (the seizing frames' cues, kneeling, the hand
+inside the frame; his head found on every frame of either drawing with the engine eye on his eye's pixels; every frame
+inside its frame); e2e `recluse.spec.ts` (every beat of the absorption watched from before it can show, the arcs, the
+look on his figure on the board and where he stands; in phase 2 no God King button, figure or word), `king-attack`,
+`boss-speech`, `perf.spec.ts`'s phase 2 case. Frames: `npm run frames:recluse2 -- <dir> both light only=change`.
+
 ## The engine reader: a slot's last exact line may name another move (Oct 14, 2026)
 
 **What:** The code that reads Stockfish's output (`searchLines` in `packages/chess/src/uci.ts`, and the same function in

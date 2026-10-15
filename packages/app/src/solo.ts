@@ -3,9 +3,9 @@ import { GUARD_WORDS, MatchRunner, ShowdownScout, brainLine as brainWords, board
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, SimulView, Standing, VoteView } from "./game.ts";
-import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, Talk } from "./recluse-phase2.ts";
+import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, Talk, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
-import { playInPlace, setFigureRun } from "./components/BossCharacter.tsx";
+import { playInPlace, setEngineAt, setFigureRun } from "./components/BossCharacter.tsx";
 import { play, warmSounds } from "./sound.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
@@ -521,12 +521,13 @@ export class SoloMatch implements GameView {
   /**
    * Calling the God King. To play the move: your whole turn, no move of your own. To strike the boss: he comes
    * now if enough of the crowd has called, the clock stands still while he strikes, and then you pick as usual.
-   * Against the Hidden Boss neither comes, but the try spends its charge as if it had (Eric, Oct 14), in phase 1 on your
-   * move or in phase 2 while the boards are in play; the dock has him mock it, and your move goes on (its clock too).
+   * Against the Hidden Boss neither comes, but the try spends its charge as if it had (Eric, Oct 14), on your move in
+   * phase 1; the dock has him mock it, and your move goes on (its clock too). In phase 2 there's no God King to call: the
+   * boss absorbed him in the phase change (Eric, Oct 14), and the dock has no button for him.
    */
   callKing(strike = false) {
     if (kingHelpBlocked(this.runner?.boss)) {
-      if ((this.phase.kind === "play" || (this.phase.kind === "simul" && this.phase2Playing)) && this.runner.kingTried()) this.emit();
+      if (this.phase.kind === "play" && this.runner.kingTried()) this.emit();
       return;
     }
     if (this.phase.kind !== "play" || !this.runner.boss?.kingCharges || this.kingCalled) return;
@@ -848,10 +849,12 @@ export class SoloMatch implements GameView {
   }
 
   /**
-   * His phase change (PHASE_CHANGE, about 10.5 s; not skippable, like a boss's intro): up in a rage, his leap onto the
-   * board, the book thrown down, the chant and its light, the split, the book back in his hands, the shuffle, his leap
-   * back. Phase 2's boards are set up now (each its own Chess960 start, from the battle's seed), so the shuffle shows
-   * where they go; their clocks start as it ends. `fromFall`: after phase 1's fall, whose mumbling carries on into it.
+   * His phase change (PHASE_CHANGE, about 15 s; not skippable, like a boss's intro): he absorbs the God King (who's gone
+   * from then on: he says nothing in phase 2, and can't be called), his half-engine look igniting; up in a rage, his leap
+   * onto the board, the book thrown down, the chant and its light, the split and its arcs, the book back in his hands, the
+   * shuffle, his leap back. Phase 2's boards are set up now (each its own Chess960 start, from the battle's seed), so the
+   * shuffle shows where they go; their clocks start as it ends. `fromFall`: after phase 1's fall, whose mumbling carries
+   * on into it.
    */
   private startPhaseChange(fromFall = false) {
     if (this.timer) clearTimeout(this.timer);
@@ -886,16 +889,18 @@ export class SoloMatch implements GameView {
     this.talk = new Talk(this.rng);
     this.lastSlow = null;
     // (The slow move's sound made ahead, off the page, before play begins.)
-    warmSounds(["recluseSlow"]);
-    // Where he stands: up in a rage at once; from his leap the board draws him (his place stands empty), and once he's
-    // back he rests in phase 2's idle.
-    setFigureRun({ since: at, anims: ["rage"], loop: "idle2", before: "collapseLoop" });
+    warmSounds(["recluseSlow", "recluseDrain", "recluseSpark", "recluseArc"]);
+    // Where he stands: slumped while the God King gloats, then he seizes his power and gets up in a rage; from his leap the
+    // board draws him (his place stands empty), and once he's back he rests in phase 2's idle. His half-engine look comes on
+    // as the power lands, for the rest of the fight.
+    setFigureRun(phaseChangeRun(at));
+    setEngineAt(at + PHASE_CHANGE.igniteAt);
     this.set({ kind: "phaseChange", at });
     this.timer = setTimeout(() => this.startSimul(), PHASE_CHANGE.total);
   }
   private phase2Names = new Map<string, string>();
 
-  /** Phase 2's play: every clock starts. His line and the God King's. */
+  /** Phase 2's play: every clock starts. His line (the God King is gone: absorbed in the phase change). */
   private startSimul() {
     if (!this.phase2 || this.stopped) return;
     this.phase2Playing = true;
@@ -904,7 +909,6 @@ export class SoloMatch implements GameView {
     const lines = RECLUSE_LINES.phase2;
     // (NORMAL: his ultimate's line, if it comes this soon, cuts in.)
     bossVoice.say(lines[Math.floor(this.rng() * lines.length)]!, "recluse:phase2", NORMAL);
-    kingSay("foePhase2", "recluse:phase2");
   }
 
   private phase2Lines = { won: 0, lost: 0, slow: 0 };
@@ -942,17 +946,12 @@ export class SoloMatch implements GameView {
     const lines = RECLUSE_LINES.ult2;
     bossVoice.say(lines[Math.floor(this.rng() * lines.length)]!, `recluse:p2:ult:${at}`, CRITICAL);
   }
-  /** A board decided: his word on it, and the God King's (a draw: nothing). */
+  /** A board decided: his word on it (a draw: nothing). The board's own tag says won or lost; the God King is gone. */
   private phase2Result(winner: "crowd" | "boss" | "draw") {
     if (winner === "draw" || this.phase2?.outcome.decided) return;
     const key = `recluse:p2:${winner}:${this.phase2Lines.won + this.phase2Lines.lost}`;
-    if (winner === "boss") {
-      bossVoice.say(RECLUSE_LINES.boardWon[this.phase2Lines.lost++ % RECLUSE_LINES.boardWon.length]!, key, CRITICAL);
-      kingSay("foeBoardLost", key);
-    } else {
-      bossVoice.say(RECLUSE_LINES.boardLost[this.phase2Lines.won++ % RECLUSE_LINES.boardLost.length]!, key, CRITICAL);
-      kingSay("foeBoardWon", key);
-    }
+    if (winner === "boss") bossVoice.say(RECLUSE_LINES.boardWon[this.phase2Lines.lost++ % RECLUSE_LINES.boardWon.length]!, key, CRITICAL);
+    else bossVoice.say(RECLUSE_LINES.boardLost[this.phase2Lines.won++ % RECLUSE_LINES.boardLost.length]!, key, CRITICAL);
   }
 
   /**
@@ -965,7 +964,6 @@ export class SoloMatch implements GameView {
     if (o.beaten) {
       setFigureRun({ since: now, anims: ["spellbook2"], loop: "spellLoop2" });
       bossVoice.say(RECLUSE_LINES.beaten2[Math.floor(this.rng() * RECLUSE_LINES.beaten2.length)]!, "recluse:p2:beaten", CRITICAL);
-      kingSay("foeVictory2", "recluse:p2:beaten");
     } else {
       setFigureRun({ since: now, anims: ["laugh2"], loop: "idle2" });
       bossVoice.say(RECLUSE_LINES.victory[Math.floor(this.rng() * RECLUSE_LINES.victory.length)]!, "recluse:p2:victory", CRITICAL);
