@@ -5,7 +5,7 @@ import { PlayerName } from "../components/PlayerName.tsx";
 import { answerFriend, cancelFriendRequest, openInvites, unblockPlayer, useFriends } from "../friends.ts";
 
 /**
- * Friends (/friends; DECISIONS.md, "Friends and invites"): invites to you, friend requests, your friends (online first,
+ * Friends (/friends; docs/decisions/2026-10-15-friends-and-invites.md): invites to you, friend requests, your friends (online first,
  * each with Invite), the requests you sent, and who you've blocked. Adding a friend is from their profile (tap their
  * name anywhere); who can invite you is in Settings.
  */

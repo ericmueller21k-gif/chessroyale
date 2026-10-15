@@ -1550,7 +1550,7 @@ export const GLOBAL_CHAT = {
 } as const;
 
 /**
- * Friends and invites (DECISIONS.md, "Friends and invites"; docs/areas/accounts.md): add a friend from their profile
+ * Friends and invites (docs/decisions/2026-10-15-friends-and-invites.md; docs/areas/accounts.md): add a friend from their profile
  * (they accept or decline), invite anyone to your lobby or Squads party, block. Signed-in accounts only, where signing
  * in is set up. The server enforces every number here.
  */

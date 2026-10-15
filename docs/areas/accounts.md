@@ -31,7 +31,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   written from the code, with the decisions still to make at the top. They list every kind of personal data the game keeps, why and for how long:
   a PR that stores something new, or keeps it for a different time, changes the policy in the same PR. Linked from the
   landing page's footer, Settings and the FAQ.
-- **Friends and invites** (Oct 15; DECISIONS.md, "Friends and invites"): signed-in accounts only where signing in is
+- **Friends and invites** (Oct 15; [docs/decisions/2026-10-15-friends-and-invites.md](../decisions/2026-10-15-friends-and-invites.md)): signed-in accounts only where signing in is
   set up. Add a friend from their profile (any name opens it); they accept or decline. Invite anyone to your private
   lobby or Squads party, as their setting allows (everyone, the default; friends only; no one); an invite lasts
   `FRIENDS.inviteMinutes`. Block ends a friendship and keeps the other's requests (kept unseen), invites (refused with

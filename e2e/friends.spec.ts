@@ -2,7 +2,7 @@ import { expect, type Browser, type Page } from "@playwright/test";
 import { named, test } from "./helpers.ts";
 
 /**
- * Friends and invites (DECISIONS.md, "Friends and invites"), with two players through the real server: a request from a
+ * Friends and invites (docs/decisions/2026-10-15-friends-and-invites.md), with two players through the real server: a request from a
  * profile, accepted from the friends list; each sees the other online; the invites setting (no one, then friends);
  * an invite from the list makes a lobby and shows on the other's home as a toast, and Join puts them in it; a block
  * ends the friendship, refuses invites and keeps requests from reaching the blocker. FRIENDS_SHOTS=<dir> saves the

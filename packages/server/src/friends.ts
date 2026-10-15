@@ -2,7 +2,7 @@ import { FRIENDS, FRONT_DOOR, CAPACITY, isInviteSetting, type FriendsState, type
 import type { Sql } from "./accounts.ts";
 
 /**
- * Friends and invites in D1 (DECISIONS.md, "Friends and invites"; the tables are listed in docs/areas/accounts.md for the
+ * Friends and invites in D1 (docs/decisions/2026-10-15-friends-and-invites.md; the tables are listed in docs/areas/accounts.md for the
  * privacy page and account deletion). Friend requests are accepted or declined; an invite points at a private lobby or
  * a Squads party (their links) and expires; a block hides each from the other: requests, invites, chat (the app hides
  * a blocked account's chat lines) and the friendship. Who may add or invite whom (signed in, not banned, the game

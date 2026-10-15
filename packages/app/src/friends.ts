@@ -4,7 +4,7 @@ import { account, mustSignInToPlayOnline, onAccountChange } from "./account.ts";
 import { liveNow, onLive } from "./live.ts";
 
 /**
- * Friends and invites, app side (DECISIONS.md, "Friends and invites"): your friends list as the server keeps it
+ * Friends and invites, app side (docs/decisions/2026-10-15-friends-and-invites.md): your friends list as the server keeps it
  * (GET /api/friends), the actions (each answers with the list as it is after it), the toast for a new invite, and
  * who's blocked (the chats hide their lines). The list is fetched when your account is known, when the live line says
  * something new arrived for you (`inbox`: no extra polling), and every FRIENDS.refreshMs while a list is on screen.

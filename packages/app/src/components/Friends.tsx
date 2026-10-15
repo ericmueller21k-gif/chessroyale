@@ -25,7 +25,7 @@ import { useMedia } from "./QuickChat.tsx";
 import { PlayerName } from "./PlayerName.tsx";
 
 /**
- * Friends' pieces (DECISIONS.md, "Friends and invites"): a friend's row, the phone home's line and the computer's live
+ * Friends' pieces (docs/decisions/2026-10-15-friends-and-invites.md): a friend's row, the phone home's line and the computer's live
  * panel section (friends who are online), the new invite's toast, the "Invite friends" sheet of a lobby or party, the
  * settings, and the friend buttons on a profile. Classes start with `fr-`.
  */

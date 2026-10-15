@@ -1,6 +1,6 @@
 /**
  * Friends and invites, shared by the server and the app: who may invite you, what an invite is for and where its link
- * goes, and the friends list as GET /api/friends answers it. See DECISIONS.md, "Friends and invites".
+ * goes, and the friends list as GET /api/friends answers it. See docs/decisions/2026-10-15-friends-and-invites.md.
  */
 
 /** Who may invite you to play (Settings → Friends). Missing (an account that never chose): everyone. */

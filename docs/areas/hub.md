@@ -28,7 +28,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   once `percentileMinPlayers` have ratings), the rating chart, stats (All, Classic, Crowd), recent matches, what
   they're wearing (drawn with the real item art), their quick-chat picks. A profile others see never shows an email,
   a sign-in method or anything not on the approved list; a banned player's says "Banned".
-- **Friends** (Oct 15; DECISIONS.md, "Friends and invites"; the rules and data on [accounts.md](accounts.md)):
+- **Friends** (Oct 15; [docs/decisions/2026-10-15-friends-and-invites.md](../decisions/2026-10-15-friends-and-invites.md); the rules and data on [accounts.md](accounts.md)):
   - **Where:** a phone's home has a line above the live line ("Friends · 2 online", "N new" for requests and
     invites); a computer's live panel has a FRIENDS section above the live line (friends online, each with Invite,
     at most `FRIENDS.panelMax`, and "All friends ›"). Both open the friends list (`/friends`): invites to you (Join,
