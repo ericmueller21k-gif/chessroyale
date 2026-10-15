@@ -361,6 +361,8 @@ test("his chatter all through phase 1 (Eric, Oct 15: he went quiet after move 10
     w.__lines = [];
     let last = "";
     setInterval(() => {
+      // (Phase 1 until he's beaten: Stockfish's moves may mate him.)
+      if (w.match?.boss && !w.match.boss.result) w.__end = Date.now();
       const text = document.querySelector(".bc-bubble")?.getAttribute("aria-label") ?? "";
       if (text && text !== last) w.__lines.push({ at: Date.now(), text });
       last = text;
@@ -368,7 +370,7 @@ test("his chatter all through phase 1 (Eric, Oct 15: he went quiet after move 10
     return Date.now();
   });
   // A person's pace: a few seconds a move on the slow clock, quicker on the bullet clock; Stockfish's moves (Engine move),
-  // so the battle runs on rather than ending early. About three minutes of play, or until it's decided.
+  // so the battle runs on. About three minutes of play, or until he's beaten (then phase 1's lines only).
   const btn = page.getByRole("button", { name: "Engine move", exact: true });
   const until = Date.now() + 180_000;
   while (Date.now() < until) {
@@ -380,8 +382,8 @@ test("his chatter all through phase 1 (Eric, Oct 15: he went quiet after move 10
     await btn.click({ timeout: 5000 }).catch(() => {});
     await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
   }
-  const end = await page.evaluate(() => Date.now());
-  const lines = (await page.evaluate(() => (window as any).__lines)) as { at: number; text: string }[];
+  const end = (await page.evaluate(() => (window as any).__end)) as number;
+  const lines = ((await page.evaluate(() => (window as any).__lines)) as { at: number; text: string }[]).filter((l) => l.at <= end);
   const p1 = Object.values(RECLUSE_LINES.talk[1]).flat() as string[];
   const log = lines.map((l) => `${((l.at - t0) / 1000).toFixed(1)} s${p1.includes(l.text) ? " [chatter]" : ""}: ${l.text}`);
   console.log(`His lines over ${((end - t0) / 1000).toFixed(0)} s of phase 1 (moves: ${(await bossNow(page))?.crowdMoves}):\n${log.join("\n")}`);
