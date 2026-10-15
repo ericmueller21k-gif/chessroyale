@@ -29,6 +29,24 @@ function frameImage(side: "w" | "b", frame: Frame): ImageData {
   return img;
 }
 
+/**
+ * His frames drawn ahead, a slice each animation frame (about 4 ms of work a frame), so a run of new ones never stalls a
+ * slow phone the first time it shows (the Hidden Boss's phase change drains him through his Last Stand's blows, a new
+ * frame every few hundredths of a second). Returns a cancel.
+ */
+export function prewarmKing(side: "w" | "b", frames: readonly Frame[], done?: () => void): () => void {
+  let i = 0;
+  let raf = 0;
+  const step = () => {
+    const t0 = performance.now();
+    while (i < frames.length && performance.now() - t0 < 4) frameImage(side, frames[i++]!);
+    if (i < frames.length) raf = requestAnimationFrame(step);
+    else done?.();
+  };
+  raf = requestAnimationFrame(step);
+  return () => cancelAnimationFrame(raf);
+}
+
 /** Placing his frame: his drawing space (one board square) fills the box's height, his feet at its bottom center. */
 const BOX_STYLE = {
   "--gk-w": GOD_KING.w,
