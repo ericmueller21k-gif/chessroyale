@@ -93,7 +93,7 @@ decisions. In this order:
    what to bring to Eric.
 6. **A D1 restore drill on staging** (Time Travel), and gradual or canary deploys.
 7. **The known blockers:**
-   - gate the test switches (item (d) under the Hidden Boss's notes above);
+   - gate the test switches: done (Oct 15, #224; item (d) under the Hidden Boss's notes above);
    - the engine container's Stockfish 17.1 against the browsers' 19;
    - chat moderation (report and mute);
    - the privacy policy and terms (Eric's sign-off);
@@ -331,12 +331,11 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       - **(c) His name will change** (Eric: something like "a powerful foe"; "Hidden Boss" doesn't do him justice).
         Not decided. It's one string, his `name` in `BOSS_ROSTER` (`packages/core/src/boss.ts`): the vote's card, the
         FAQ and every screen take it from there.
-      - **(d) Before launch: the test switches (director's note, Oct 15).** The lobby-create playtest overrides
-        (`packages/server/src/index.ts`: `?weakbots`, `?format`, `?power`, `?rounds`, `?clock`, `?bossMoves`, `?keep`, …)
-        and the app's URL test switches (`overridesFromUrl` in `packages/app/src/App.tsx`: `?win`, `?phase`, `?mate`, …)
-        get gated behind an admin account or a test environment variable, or any lobby or solo game that uses one is
-        made unscored: no record, coins or rewards. Today anyone who reaches the site could make easy wins (loose bots,
-        a short game, a mate in one); harmless while Cloudflare Access lets only Eric in.
+      - **(d) The test switches: gated (built Oct 15; DECISIONS.md, "The test switches: admins and test servers
+        only").** The lobby-create playtest overrides (`?weakbots`, `?format`, `?rounds`, `?clock`, `?bossMoves`,
+        `?keep`, …), a queue's `?pool=`, a crate's forced roll and the app's address switches (`?win`, `?phase`,
+        `?mate`, `?debug`, …) work only for admins or where `TEST_SWITCHES` is on (local, e2e, staging); for anyone
+        else they're ignored, so no easy wins (docs/areas/ops.md, "Test switches").
 
 Added Oct 14, 2026 (Eric; notes only, nothing built):
 

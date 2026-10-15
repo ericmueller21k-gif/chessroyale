@@ -4956,6 +4956,78 @@ The calls:
 - **Docs:** CLAUDE.md's test lanes (the batch full run is now CI's run on each push to `main`; the full lane per PR
   is the PR's own run) and the agents' ship steps: locally only the specs you touched and `@perf`; CI runs the rest.
 
+## The test switches: admins and test servers only (Oct 15, 2026)
+
+Before launch (ROADMAP.md, the Hidden Boss's internal note (d)): anyone who reached the site could use the playtest
+shortcuts in the address and in a new lobby's request, and win easily (loose bots, one round, a mate in one, a forced
+Fischer Random crate item). Harmless while Cloudflare Access lets only Eric in; not at launch. The calls:
+
+- **Who may use them:** an admin (`ADMIN_EMAILS`, the same check as the admin buttons), or anyone where the Worker
+  variable `TEST_SWITCHES` is "1": `wrangler dev` with `--var TEST_SWITCHES:1`, the e2e server (playwright.config.ts)
+  and staging (wrangler.jsonc, for the load tests' own queues). Never production. One general variable rather than
+  one per feature: the switches are many and always wanted together. `SQUADS_TEST` and `MAIA_TEST` stay as they are
+  (already gated, and their specs depend on them). In the app, Vite's dev server allows them too (`npm run dev` and
+  the frames scripts have no server to ask); a production build asks the server (`/api/auth/config` says
+  `testSwitches`, `/api/me` says `admin`).
+- **For everyone else they're ignored, silently and safely:** the request is treated as if it had none of them (the
+  server drops them before reading the rest, `lobby-options.ts`), so a player's lobby, queue, crate and solo game are
+  exactly the ones made without them. No error, no message.
+- **The full list** is in docs/areas/ops.md, "Test switches". Beyond the brief's: a queue's own `?pool=` (one person
+  could fill a lobby with their own accounts: a ranked match or Squads' coins among friends), a crate's forced
+  `fischer`/`shiny` and the crate page's "Testing:" boxes (shown to everyone while crates are free: now hidden from
+  players), `?debug` (the match on `window`), `?nolanding`, `?boss=<id>` (skipped the boss menu) and `?wip`/`?kit`.
+- **Kept for everyone:** the creator's real choices, the ones the home screen offers: the mode, Crowd's turns and
+  augments, Classic's opening moves, a raid's boss picked from the menu, the quick pace. A boss in a Crowd or Classic
+  lobby (`?boss=` outside a raid) isn't one of them (the screen never sends it), so it's a test switch.
+- **No record, coins, rewards or fair-play data from a switched game: the gate, not "unscored".** Everything the server
+  records (online results, ranking, fair-play signals, Squads' coins and crates, crate items) comes from a lobby,
+  queue or crate whose options the server itself sets, and after the gate a player's are exactly the ones made without
+  switches. So for players such a game can't exist. Solo results come from the browser and could be forged with or
+  without switches; that's why they're worth little by design: never ranked, no coins, crates or rewards, only your
+  own stats. Marking switched games unscored as well would need a second rule and would stop the e2e from testing
+  that results are recorded (`account.spec`, `lobby-close.spec` use switches). Admins' own test games still record,
+  as before, on the profiles of those who play them (a private lobby needs 30% real players to be ranked).
+- **The admin buttons** ("Trigger ultimate (testing)", "Engine move", the brain picker, the Hidden Boss in Boss alone)
+  were already admin-only, and online the lobby checks the ultimate's trigger itself: unchanged.
+- **A rejoin from a reload** reads the switches before your account is known, so an admin's or test server's rejoined
+  online match shows its lobby's numbers without them (the lobby on the server keeps them). Cosmetic, test only;
+  waiting for the account before rejoining would slow every player's reload.
+- **Testing:** full lane (security). Unit: `packages/server/test/test-switches.test.ts` (who may; every lobby switch
+  dropped for a player, alone and together, the lobby exactly the one made without them; the creator's choices kept;
+  the switches working when allowed; `/api/auth/config`; a crate's forced roll only for an admin or `TEST_SWITCHES`)
+  and `packages/app/test/test-switches.test.ts`. e2e: `test-switches.spec.ts` (with the server's flag hidden: no
+  boss menu skipped, no match on `window`, no crate test boxes; an admin's working), and the whole suite with
+  `TEST_SWITCHES` on.
+
+## Removed: Relaxed pace and Crowd's everyone-moves choice (Oct 15, 2026)
+
+Eric asked to remove two dated player options.
+
+- **Relaxed pace** (Settings → Playing; `brc.pace` on the device). It dates from Oct 2, when Classic was the only mode.
+  Each mode now has its own tuned pace (`CROWD_SETTINGS`, `RAID_SETTINGS`, `DEFAULT_SETTINGS`), so players always play
+  their mode's pace. The toggle is gone, and the app no longer reads `brc.pace`: a device that had switched it off
+  simply plays the mode's pace. **`?pace=quick` stays as a test switch** (many e2e specs use it to run faster), gated
+  like the others since the same day: read through `testParams()` in the app and listed in `LOBBY_TEST_SWITCHES` on the
+  server, so for a player it does nothing. Its numbers moved into `QUICK_PACE` in settings.ts (one entry per mode;
+  the Crowd one was typed twice, in App.tsx and the lobby's options), replacing `PACE_SETTINGS`.
+- **Crowd's "everyone moves"** (Settings → Crowd: "50 v 50 / Everyone moves"; `brc.crowdTurns`, `?turns=all`, the
+  lobby's `turns`). Eric: "we did away with playing both sides long ago". Crowd is always team turns: `CROWD_SETTINGS`
+  says `crowdTeams: true`, `modeSettings()` no longer takes a choice, and the app and the server ignore `turns` (an
+  older app's `turns=all`, or a device that stored "all", gets team turns). **Kept for raids:** `crowdTeams: false` in
+  `RAID_SETTINGS` (everyone picks the crowd's moves against the boss) and every engine path behind it.
+  Removed because only Crowd with everyone moving used it: `CROWD_EVERYONE_KNOCKOUTS` (raids have no knockouts),
+  `finalName`'s "Final four" (it only names a Crowd's last cut; raids have no cuts; Classic's cut line has its own
+  words), the FAQ's paragraph and its line about the clock, `crowd-sim.ts`'s second run (its Oct 3 report stays as a
+  snapshot, with a note). Kept, because Classic uses them: the 2v2 final's text on `Final.tsx` and `StageBreak.tsx`.
+  Kept, because it's stored history: a profile's older matches with no team still read "Crowd · everyone moves".
+- **Tests that played Crowd with everyone moving** now play 50 v 50, keeping what they tested: the judges
+  (`packages/server/test/judges.test.ts`: a seed that puts the test's people on White, searched for, and Black's moves
+  judged in between), fair play (`fairplay-lobby.test.ts`: the same counts with the team to move, and the watching
+  team's picks not taken), a reload's seat (`resign.test.ts`: the move locks once everyone here on the team to move
+  has picked), the runner (`packages/chess/test/crowd.test.ts`: a raid is the only crowd with no teams, everyone
+  alive picking every move), e2e `judges.spec.ts` (two devices on a 50 v 50) and `crowd.spec.ts` (coordinates from
+  each team's side, and a device with the old choices stored playing 50 v 50 at the mode's pace).
+
 ## Error capture and the feedback sheet (ops, Oct 15, 2026)
 
 The director's brief for launch: nothing on a player's device reported an error, the server barely logged its own,

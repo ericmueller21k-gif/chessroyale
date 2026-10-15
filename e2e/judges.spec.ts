@@ -34,8 +34,8 @@ test("many judges: two devices in one online match each check their speed, judge
   await named(desk, "Judgy");
   await named(phone, "Phony");
 
-  // Crowd, everyone moves: both devices pick every move.
-  await desk.goto("/?debug&pace=quick&mode=crowd&turns=all&augments=0&rounds=6&clock=12");
+  // Crowd 50 v 50: each device picks on its team's turns (bots fill the other seats), and both judge every move.
+  await desk.goto("/?debug&pace=quick&mode=crowd&augments=0&rounds=6&clock=12");
   await createLobbyFromHome(desk);
   await expect(desk.getByRole("heading", { name: /^Lobby / })).toBeVisible();
   const code = (await desk.locator(".invite-code").textContent())!.trim();

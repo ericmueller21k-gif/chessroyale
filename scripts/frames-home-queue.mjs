@@ -7,7 +7,7 @@
 //   5. phone: PLAY, the full-screen queue, Cancel.
 //   npm run frames:home -- <out-dir> [base url, default http://localhost:8788]
 // Needs the Worker running with a short fill (npx wrangler dev --port 8788 --enable-containers=false
-// --var MATCH_FILL_SECONDS:8 --var ENGINE_OFF:1). Saves every painted frame (frames/<step>/f<ms>.jpg), a timeline per
+// --var MATCH_FILL_SECONDS:8 --var ENGINE_OFF:1 --var TEST_SWITCHES:1). Saves every painted frame (frames/<step>/f<ms>.jpg), a timeline per
 // step (timeline.txt), and screenshots. Flags: the side menu or the live panel missing on a frame of home or the
 // queue (computer), the seat grid moving or vanishing, the count going down, a frame much brighter or darker than both
 // neighbors (a blink), more than one jump in brightness for one theme pick, and a frame of the wrong theme while

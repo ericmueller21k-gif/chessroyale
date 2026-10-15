@@ -61,6 +61,29 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   400: [engine.md](engine.md)).
 - **Load-test counters** at `/api/ops/stats` only where `OPS_STATS` is set and the request's `x-ops-key` matches
   (local and staging, never production).
+- **Test switches** (gated Oct 15; DECISIONS.md, "The test switches: admins and test servers only"): playtest
+  shortcuts in the address that would make easy wins. They work only for an admin (`ADMIN_EMAILS`) or where the Worker
+  variable `TEST_SWITCHES` is "1" (local `wrangler dev --var TEST_SWITCHES:1`, the e2e server, staging; never
+  production), and in the app on Vite's dev server. For everyone else they're ignored, silently: the lobby, the queue,
+  the crate and the solo game are exactly the ones made without them.
+  - **The server's:** a new lobby's `rounds`, `clock`, `finalTurns`, `bossMoves`, `draw`, `power`, `format`, `speed`,
+    `weakbots`, `keep`, `pace=quick` (a test switch since Oct 15: players always play the mode's own pace), a boss's
+    fixed strength (`boss=1600`) and a boss outside a raid (`lobby-options.ts`); a queue's
+    own `pool` (`/api/play`, `/api/squads/play`, `/api/squads/party`: `testPool` in `index.ts`); a crate's forced
+    `fischer` and `shiny` (`/api/locker/open`). One check, `testSwitchesOn` (`admin.ts`).
+  - **The app's** (read only through `testParams()` in `packages/app/src/test-switches.ts`; `/api/auth/config` says
+    `testSwitches` where the server has them on, `/api/me` says `admin`): all of the above, and `debug` (the match on
+    `window`), `nolanding`, `boss=<id>` (skips the boss menu), `win`, `mate`, `phase`, `laststand`, `side`, `wip` and
+    `kit`, a crate page's `fischer` and `shiny` and its "Testing:" boxes.
+  - **Kept for everyone** (the home screen's own choices): `mode`, `augments`, `moves` (opening moves), a raid's boss
+    picked from the menu; preferences and pages (`anim`, `trail`, `soundlab`, `crates`). (`turns` is gone: Crowd is
+    always team turns since Oct 15.)
+  - **Admins only already:** "Trigger ultimate (testing)" (online the lobby checks too), "Engine move", the boss brain
+    picker (`brain`), the Hidden Boss in Boss alone. Squads' test lobbies and controls: admins or `SQUADS_TEST`.
+  - **No record from a switched game:** for a player the switches can't apply, so everything the server records
+    (results, ranking, fair-play signals, Squads' coins and crates, crate items) comes from a game made without them.
+    Solo results are posted by the browser and are never ranked and earn nothing.
+  - **A new test switch:** read it through `testParams()` (app) or behind `testSwitchesOn` (server), and list it here.
 - **Errors and player reports** (below): every device reports its errors, the server its own, players report bugs
   and send feedback and ideas, and admins read them all on `/admin/ops`.
 - **Health** (below): one snapshot of the game for an admin (`/admin/ops`) or a script (`npm run ops:report`).
@@ -179,6 +202,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 | The ops page (`/admin/ops`) | `packages/server/src/ops-admin.ts` (its page frame: `admin.ts`, `adminPage`) |
 | On a device: capture, breadcrumbs, the feedback sheet | `packages/app/src/problems.ts`, `components/Problems.tsx` (the error boundary, the feedback sheet) |
 | The build's version | `packages/app/vite.config.ts` (`__APP_VERSION__`, `dist/version.json`) |
+| Test switches: who may (server), a lobby's, the app's | `admin.ts` (`testSwitchesOn`), `lobby-options.ts`; `packages/app/src/test-switches.ts` |
 | The health view, its Access check, the report script | `packages/server/src/health.ts`, `access.ts`, `ops-admin.ts`; `scripts/ops-report.mjs` |
 | Load tests (simulated players over WebSockets and the API) | `scripts/load/` (`run.ts`, `burst.ts`, `staging.sh`) → `reports/load/` |
 | The engine server | `engine/`, `packages/server/src/engine.ts` |
@@ -189,18 +213,21 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 `CAPACITY` (queue, overload, presence, rate limits), `OPS` (error capture, the endpoint's caps and limits, bounded
 writes, retention), `LOBBY_LIFE` in settings.ts; Worker variables
 `MATCH_FILL_SECONDS`, `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`, `OPS_STATS`, `LOAD_TEST` (staging only), `SQUADS_TEST`
-(local and e2e only: anyone may use Squads' test controls), `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` (public, in
-`wrangler.jsonc`: the health view's Access check). Squads lobbies report to the live hub, so the overload limit counts
-their players (since Oct 15); the home page's line still leaves them out.
+(local and e2e only: anyone may use Squads' test controls), `TEST_SWITCHES` (local, e2e and staging only: anyone may
+use the test switches), `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` (public, in `wrangler.jsonc`: the health view's Access
+check). Squads lobbies report to the live hub, so the overload limit counts their players (since Oct 15); the home
+page's line still leaves them out.
 
 ## Tests and tools
 
-- Unit: `packages/server/test/capacity.test.ts`, `matchmaker.test.ts`, `live.test.ts`, `lobby-life.test.ts`,
-  `problems.test.ts` (validation, caps, rate limits, bounded writes, pruning, fingerprints, the guards, the ops page),
-  `health.test.ts` (Access's token, Squads on the live hub, the engine server's marks, the view and who may read it).
-- e2e: `e2e/busy.spec.ts` (servers busy), `lobby-close.spec.ts`, `problems.spec.ts` (errors reach the store, the error
-  boundary, a bug report's id and feedback by kind on `/admin/ops`, the size and rate caps). The e2e Worker's
-  `ADMIN_EMAILS` has one email per project; a test makes its account an admin with `wrangler d1 execute --local`.
+- Unit: `packages/server/test/capacity.test.ts`, `matchmaker.test.ts`, `live.test.ts`, `lobby-life.test.ts`;
+  `test-switches.test.ts` (server and app: the test switches); `problems.test.ts` (validation, caps, rate limits,
+  bounded writes, pruning, fingerprints, the guards, the ops page); `health.test.ts` (Access's token, Squads on the
+  live hub, the engine server's marks, the view and who may read it).
+- e2e: `e2e/busy.spec.ts` (servers busy), `lobby-close.spec.ts`, `test-switches.spec.ts` (a player's switches
+  ignored, an admin's working), `problems.spec.ts` (errors reach the store, the error boundary, a bug report's id and
+  feedback by kind on `/admin/ops`, the size and rate caps, the health view). The e2e Worker's `ADMIN_EMAILS` has one
+  email per project; a test makes its account an admin with `wrangler d1 execute --local`.
 - Load: see `DEPLOY.md`, "Load testing". Run wrangler from a copy you aren't editing (it reloads on every change).
 
 ## Rules for this area

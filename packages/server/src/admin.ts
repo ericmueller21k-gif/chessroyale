@@ -24,6 +24,11 @@ export interface AdminEnv extends AccountEnv {
   ADMIN_EMAILS?: string;
   /** The automated reviewer's bearer token: a Worker secret or a Secrets Store binding, like ADMIN_EMAILS. */
   FAIRPLAY_REVIEW_TOKEN?: string;
+  /**
+   * "1" (local, e2e and staging; never production): anyone may use the test switches (testSwitchesOn), as an admin
+   * may.
+   */
+  TEST_SWITCHES?: string;
 }
 
 /** A setting as a string (anything else, such as a Secrets Store binding nobody read, counts as unset). */
@@ -36,6 +41,15 @@ export function isAdmin(env: AdminEnv, user: Pick<User, "email"> | null): boolea
   if (!user?.email) return false;
   const list = text(env.ADMIN_EMAILS).split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean);
   return list.includes(user.email.toLowerCase());
+}
+
+/**
+ * Whether this person may use the test switches: playtest shortcuts that would make easy wins (a lobby's `?rounds=`,
+ * `?weakbots=1`, …: lobby-options.ts; a queue's own `?pool=`; a crate's forced Fischer or Shiny). An admin may, and
+ * anyone where TEST_SWITCHES is "1"; for everyone else they're ignored, silently (docs/areas/ops.md, "Test switches").
+ */
+export function testSwitchesOn(env: AdminEnv, user: Pick<User, "email"> | null): boolean {
+  return env.TEST_SWITCHES === "1" || isAdmin(env, user);
 }
 
 /** Constant-time comparison of the reviewer's token. */
