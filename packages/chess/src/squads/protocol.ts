@@ -37,6 +37,9 @@ import type { SquadsMode, SquadsRules, SquadsVoteId } from "./votes.ts";
  * loss, at the worst place your squad could still finish); someone who comes back to a seat they left gets an
  * "error" with `left`. (Leaving is still "leave": an app that never sends it is covered by the lobby wrapping up once
  * nobody is left.)
+ * Also in version 7 (Oct 14, 2026): who's watching. `view` (the board a screen shows full size, sent when it changes)
+ * and "viewers" (who else shows that board, when it changes). Optional both ways, so no new version: an app that never
+ * sends `view` just isn't shown watching (and is sent no "viewers"), and one that doesn't know "viewers" ignores it.
  */
 export const SQUADS_PROTOCOL = 7;
 
@@ -331,6 +334,11 @@ export type SquadsClientMessage =
   /** Everything again (the lobby, the vote, every match): after a gap, or a board whose `ply` doesn't match yours. */
   | { t: "sync" }
   /**
+   * The board this screen shows full size (`key`: the match, `board`: its number), sent only when it changes (a tap, a
+   * jump, Back, a new half) and once more after reconnecting; `key` null: no board on screen. Who's watching (Oct 14).
+   */
+  | { t: "view"; key: string | null; board?: number }
+  /**
    * Test control (admins, or anyone where SQUADS_TEST is on): "Next round". Every match still going in the earliest
    * unfinished round ends now (boards still going decided by material, a level match by time left, then a coin), and
    * the bracket moves on. In the votes: they close now.
@@ -406,6 +414,12 @@ export type SquadsServerMessage = { now: number } & (
   | { t: "placed"; squadId: number; placement: SquadsPlacement; coins: number; crates: number; recorded: boolean }
   /** Every placement is decided (by squad id). */
   | { t: "results"; placements: Record<number, SquadsPlacement> }
+  /**
+   * Who's watching (Oct 14): the people showing the board your screen shows ("r0m1/2": a match's key and the board),
+   * whenever they change (people only, never bots; you among them). `full`: you've just moved to that board, so this
+   * is in place of what you had. At most one every SQUADS_LOBBY.watching.coalesceMs.
+   */
+  | { t: "viewers"; boards: Record<string, string[]>; full?: true }
   /**
    * Bot work for this device: the bot engine's top `n` moves in each position, searched at `nodes` (topMovesAt; every
    * device the same, so two answers can be compared exactly). Answer each with "botTop".

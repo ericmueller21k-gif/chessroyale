@@ -112,6 +112,8 @@ test("a same-move token: you and your partner take back with the queen, it plays
 
 test("a block: tap Block, their queen, where it would go; the arrow keeps drawing itself with its lock until they've moved, and they don't play it", async ({ page }) => {
   test.setTimeout(240_000);
+  // (You stay on your board after your move, to watch the block through their half: Jump to my next board off.)
+  await page.addInitScript(() => localStorage.setItem("brc.squads.jumpNext", "0"));
   await testLobby(page, "relay", "mercenary");
   const s = await nextDuty(page, null);
   expect(s.duty!.role).toBe("move");

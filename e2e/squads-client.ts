@@ -25,6 +25,8 @@ export interface ClientOptions {
   nodes?: number;
   /** The session cookie (a guest account from /api/me), so results and rewards are recorded. */
   cookie?: string;
+  /** What its pawn wears (an ItemLook, as the app sends it in "hello"). */
+  look?: object;
   log?: (line: string) => void;
 }
 
@@ -87,7 +89,7 @@ export class SquadsClient {
     return new Promise((resolve, reject) => {
       const ws = open(wsUrl(this.o.base, `/api/squads/lobby/${code}/ws`), this.o.cookie);
       this.ws = ws;
-      ws.addEventListener("open", () => ws.send(JSON.stringify({ t: "hello", v: SQUADS_PROTOCOL, name: this.o.name, device: "computer", ...(party ? { party } : {}), ...(this.token ? { token: this.token } : {}) })));
+      ws.addEventListener("open", () => ws.send(JSON.stringify({ t: "hello", v: SQUADS_PROTOCOL, name: this.o.name, device: "computer", ...(party ? { party } : {}), ...(this.token ? { token: this.token } : {}), ...(this.o.look ? { look: this.o.look } : {}) })));
       ws.addEventListener("message", (e) => {
         const text = String(e.data);
         this.stats.messages++;

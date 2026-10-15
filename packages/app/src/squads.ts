@@ -246,6 +246,14 @@ export class SquadsClient {
   readonly party: string | null;
   /** The match the screen shows on its big board (whose squads' sudden death is heard). */
   focus: string | null = null;
+  /**
+   * Who's watching (Oct 14): the viewers of the board this screen shows, as the server last said ("r0m1/2" → the
+   * people showing it full size, you and its own players included: the screen leaves them out). The server sends only
+   * the board you show; a list is replaced only when it changes.
+   */
+  readonly viewers = new Map<string, readonly string[]>();
+  /** The board this screen shows full size, as told to the server ("r0m1/2"; null: none). */
+  private viewing: string | null = null;
   private ws: WebSocket | null = null;
   private offset = 0;
   private retry = 0;
@@ -267,6 +275,13 @@ export class SquadsClient {
   }
   private emit() {
     this.listeners.forEach((l) => l());
+  }
+
+  private viewerListeners = new Set<() => void>();
+  /** Who's watching changed (`viewers`): told to the pawns over the board alone, not to `subscribe`'s screens. */
+  onViewers(fn: () => void): () => void {
+    this.viewerListeners.add(fn);
+    return () => this.viewerListeners.delete(fn);
   }
 
   /** Server time → this device's. */
@@ -471,6 +486,23 @@ export class SquadsClient {
     this.send({ t: "sync" });
   }
 
+  /**
+   * The board this screen shows full size (null: none), told to the server only when it changes, and again after a
+   * reconnect (the server forgets who watches what when a socket goes).
+   */
+  view(key: string | null, board = 0) {
+    const at = key === null ? null : `${key}/${board}`;
+    if (at === this.viewing) return;
+    this.viewing = at;
+    this.sendView();
+  }
+
+  private sendView() {
+    const at = this.viewing;
+    const cut = at ? at.lastIndexOf("/") : -1;
+    this.send(at ? { t: "view", key: at.slice(0, cut), board: Number(at.slice(cut + 1)) } : { t: "view", key: null });
+  }
+
   // ---------------- Messages ----------------
 
   /**
@@ -574,6 +606,8 @@ export class SquadsClient {
         store(seatKey(this.code), msg.token);
         store(CURRENT_KEY, this.code);
         void this.reportSpeed();
+        // (A reconnect: the server dropped what this screen was watching.)
+        if (this.viewing) this.sendView();
         break;
       case "lobby":
         this.lobby = this.localLobby(msg.lobby);
@@ -733,6 +767,15 @@ export class SquadsClient {
       case "results":
         this.results = msg.placements;
         break;
+      case "viewers":
+        if (msg.full) this.viewers.clear();
+        for (const [board, ids] of Object.entries(msg.boards)) {
+          if (ids.length) this.viewers.set(board, ids);
+          else this.viewers.delete(board);
+        }
+        // (Only the pawns over the board are drawn again, never the whole screen.)
+        this.viewerListeners.forEach((l) => l());
+        return;
       case "botWork":
         for (const job of msg.jobs) this.work.push(job);
         void this.runWork();

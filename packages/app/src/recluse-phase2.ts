@@ -1,5 +1,6 @@
 import { RECLUSE_PHASE2 } from "@chessroyale/core";
-import { RECLUSE, RECLUSE_BOOK } from "./characters/recluse.ts";
+import { RECLUSE, RECLUSE_JUMP } from "./characters/recluse.ts";
+import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { animLength, cueAt } from "./characters/power-art.ts";
 import {
   legalMoves,
@@ -20,39 +21,85 @@ import {
 } from "@chessroyale/chess";
 
 /**
- * The phase change (ms from its start; components/RecluseChange.tsx draws it), about 7 s, all on one square stage: the
- * red book flies from him to the board's center and slams onto it (dust, a ring, the board jolts); crack lines run down
- * and across the middle (Sawyer's board-saw gap, once each way); the four quarters part and each grows into a whole
- * board (a 2x2 of boards); the book, lying where it fell, flips its pages while every board's pieces fly to their
- * Chess960 squares, then snaps shut and goes back to him: his revive's catch comes as it goes (he started rising before);
- * then "PHASE 2" and the clocks start.
+ * The phase change (Eric, Oct 14), ms from its start (screens/Recluse2.tsx draws it), about 10.5 s after a short fall
+ * (`fallMs`: phase 1 beaten, the board holds while he collapses and starts to mumble), all on one square stage:
+ * - where he stands, he gets up in a rage (`rage`: the book flies back into his hand);
+ * - he leaps from there onto the middle of the board (the board draws his whole figure, on a phone too), landing with a
+ *   thud and a burst of dust (the board jolts);
+ * - he brandishes the book over his head and throws it down at his feet, where it lands open;
+ * - light pours up out of it while he chants over it, arms raised, his hair lifting (phase 2's face from here), his
+ *   chant in his bubble;
+ * - the boards crack (Sawyer's board-saw gap, down and across the middle) and the quarters part, each growing into a
+ *   whole board at its corner, as the light dies;
+ * - the book snaps shut and flies up into his hands (his revive's own frames) while every board's pieces fly to their
+ *   Chess960 squares; he leaps back to his place, in phase 2's idle from then on;
+ * - "PHASE 2", and the clocks start.
+ * One book on screen throughout: his own, in his frames.
  */
 export const PHASE_CHANGE = (() => {
-  const revive = RECLUSE.anims.revive!;
-  const reviveMs = animLength(revive);
-  const catchAt = cueAt(revive, "catch") ?? reviveMs;
-  const flyMs = 650;
-  const slamAt = flyMs;
-  const slamMs = animLength(RECLUSE_BOOK.anims.slam!);
-  const crackAt = slamAt + 500;
+  const a = RECLUSE.anims;
+  const len = (n: string) => animLength(a[n]!);
+  const fallMs = 1800;
+  const rageMs = len("rage");
+  // (The board's figure takes over where he stood as the leap's crouch begins: his place is empty until he's back.)
+  const leapAt = rageMs;
+  const upAt = leapAt + RECLUSE_JUMP.upAt;
+  const landAt = leapAt + RECLUSE_JUMP.landAt;
+  const dropAt = leapAt + len("leap");
+  const thudAt = dropAt + (cueAt(a.drop!, "thud") ?? 0);
+  const chantAt = dropAt + len("drop");
+  const lightMs = 500;
+  const crackAt = chantAt + 1700;
   const partAt = crackAt + 750;
   const growAt = partAt + 400;
   const growMs = 900;
-  const flipAt = growAt + growMs + 100;
-  const shuffleAt = flipAt + 200;
+  const pickupAt = growAt + growMs + 100;
+  const catchAt = pickupAt + (cueAt(a.pickup!, "catch") ?? 0);
+  const shuffleAt = pickupAt + 150;
   const shuffleMs = 900;
-  const closeAt = shuffleAt + shuffleMs + 100;
-  const bookGoneAt = closeAt + animLength(RECLUSE_BOOK.anims.close!);
-  const reviveAt = bookGoneAt - catchAt;
-  const bannerAt = Math.max(reviveAt + reviveMs, bookGoneAt) + 100;
+  const backAt = pickupAt + len("pickup");
+  const homeAt = backAt + len("leap2");
+  const bannerAt = Math.max(homeAt, shuffleAt + shuffleMs) + 100;
   const bannerMs = 1400;
-  return { flyMs, slamAt, slamMs, crackAt, partAt, growAt, growMs, flipAt, shuffleAt, shuffleMs, closeAt, bookGoneAt, reviveAt, bannerAt, bannerMs, total: bannerAt + bannerMs };
+  return { fallMs, rageMs, leapAt, upAt, landAt, dropAt, thudAt, chantAt, lightMs, crackAt, partAt, growAt, growMs, pickupAt, catchAt, shuffleAt, shuffleMs, backAt, homeAt, bannerAt, bannerMs, total: bannerAt + bannerMs };
 })();
+
+/** Which stage of his collusion lines phase 2 has reached, by his moves so far on all the boards. */
+export function talkStage(moves: number): "early" | "middle" | "late" {
+  return moves >= RECLUSE_PHASE2.talkLateFrom ? "late" : moves >= RECLUSE_PHASE2.talkMiddleFrom ? "middle" : "early";
+}
+
+/**
+ * His collusion lines in phase 2 (RECLUSE_LINES.collusion): after every few of his moves (`talkEvery`, give or take
+ * `talkJitter`), a line of the stage the fight has reached, each stage's in turn. The lowest priority of his lines: if
+ * anything is being said (a slow-move line, his ultimate's, a board's), this one is skipped, not queued, and the next
+ * comes after the next few moves.
+ */
+export class Talk {
+  private next: number;
+  private said = { early: 0, middle: 0, late: 0 };
+  constructor(private readonly rng: () => number) {
+    this.next = this.after(0);
+  }
+  private after(n: number) {
+    const { talkEvery, talkJitter } = RECLUSE_PHASE2;
+    return n + talkEvery - talkJitter + Math.floor(this.rng() * (2 * talkJitter + 1));
+  }
+  /** After his `moves`-th move: the line he says now, or null (not due yet, or something else is being said: `busy`). */
+  lineAfter(moves: number, busy: boolean): string | null {
+    if (moves < this.next) return null;
+    this.next = this.after(moves);
+    if (busy) return null;
+    const stage = talkStage(moves);
+    const lines = RECLUSE_LINES.collusion[stage];
+    return lines[this.said[stage]++ % lines.length]!;
+  }
+}
 
 /** His ultimate where he stands (playInPlace): the spellbook opened, held, slammed shut. */
 export const PHASE2_ULT_ANIMS = ["spellbook2", "spellLoop2", "spellClose2"] as const;
-/** "5 SECONDS!" shows this long as his ultimate comes (ms). */
-export const PHASE2_ULT_BANNER_MS = 1800;
+/** "5 SECONDS!" shows this long as his ultimate comes (ms): a second longer than usual (Eric, Oct 14; FightBanner `long`). */
+export const PHASE2_ULT_BANNER_MS = 2800;
 
 /** What the bots' engine must do: play at a strength (UciEngine), or its best (the test switch, ?win=1). */
 export interface Phase2BotEngine extends Phase2Engine {
@@ -76,6 +123,8 @@ export class Phase2Game {
   private timers = new Set<ReturnType<typeof setTimeout>>();
   /** What his engine is on now (the admins' line): the board and how long his last move took. */
   lastMs: number | null = null;
+  /** His moves so far, on all the boards. */
+  bossMoves = 0;
 
   constructor(
     private readonly opts: {
@@ -90,9 +139,14 @@ export class Phase2Game {
       onChange: () => void;
       /** A board has just been decided (its result is set). */
       onResult: (b: Phase2Board) => void;
-      /** A slow move (anyone's) before his ultimate; then his ultimate as it comes. */
-      onSlow?: () => void;
+      /**
+       * A slow move (anyone's) before his ultimate: on which board, and whether it was the one that brought his ultimate;
+       * then his ultimate as it comes.
+       */
+      onSlow?: (boardId: number, ult: boolean) => void;
       onUlt?: () => void;
+      /** His move played on a board: how many he has made so far on all of them. */
+      onBossMove?: (moves: number) => void;
       onDone: () => void;
     },
   ) {
@@ -148,8 +202,13 @@ export class Phase2Game {
     if (this.stopped || next === this.state) return;
     const before = this.state;
     this.state = next;
-    if (next.ultAt !== null && before.ultAt === null) this.opts.onUlt?.();
-    else if (next.slow > before.slow) this.opts.onSlow?.();
+    const ult = next.ultAt !== null && before.ultAt === null;
+    if (next.slow > before.slow) {
+      // (One move at a time changes the state: the board whose history grew.)
+      const slowOn = next.boards.find((b, i) => b.board.history.length > before.boards[i]!.board.history.length);
+      if (slowOn) this.opts.onSlow?.(slowOn.id, ult);
+    }
+    if (ult) this.opts.onUlt?.();
     for (const b of next.boards) {
       const was = before.boards.find((x) => x.id === b.id)!;
       if (was === b) continue;
@@ -184,7 +243,11 @@ export class Phase2Game {
         this.thinking = false;
         this.lastMs = performance.now() - t0;
         if (this.stopped) return;
-        if (this.board(id)?.board.fen === fen) this.update(phase2Move(this.state, id, move, Date.now()));
+        if (this.board(id)?.board.fen === fen) {
+          const before = this.state;
+          this.update(phase2Move(this.state, id, move, Date.now()));
+          if (this.state !== before && !this.stopped) this.opts.onBossMove?.(++this.bossMoves);
+        }
         this.pump();
       });
   }

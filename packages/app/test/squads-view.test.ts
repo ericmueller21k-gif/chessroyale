@@ -32,6 +32,8 @@ import {
   canTapChip,
   chipLeftMs,
   chipsLeft,
+  studyBoard,
+  notWatchers,
   type LocalMatch,
 } from "../src/squads-view.ts";
 import { SQUADS } from "@chessroyale/core";
@@ -148,6 +150,84 @@ describe("Squads screens: YOU and NEXT", () => {
 
   it("the final: its one board, no next", () => {
     expect(myBoards(match({}, 1), "b1")).toEqual({ you: 0, next: null });
+  });
+});
+
+describe("Squads screens: jump to my next board, and who's watching (Oct 14)", () => {
+  const over = { winner: "w" as const, how: "mate" as const };
+  it("the board to study once you've moved: next turn's (Relay only)", () => {
+    const m = match();
+    // Seat 0 plays board 0 on turn 0, board 1 next; on turn 3 seat 2 is on board 1 and plays board 2 next.
+    expect(studyBoard(m, "a0")).toBe(1);
+    expect(studyBoard({ ...m, turn: 3 }, "b2")).toBe(2);
+    expect(studyBoard(m, "spectator")).toBeNull();
+    expect(studyBoard(match({}, 2), "a0")).toBeNull();
+    expect(studyBoard(match({}, 1), "a0")).toBeNull();
+  });
+
+  it("next turn's board finished (you'd scout it): the first one after it still going; none left but yours: null", () => {
+    const m = match();
+    const done = (...ids: number[]) => ({ ...m, boards: m.boards.map((b) => (ids.includes(b.id) ? { ...b, result: over } : b)) });
+    expect(studyBoard(done(1), "a0")).toBe(2);
+    expect(studyBoard(done(1, 2), "a0")).toBe(3);
+    // Only your own board is still going (and it's never the one to study): stay.
+    expect(studyBoard(done(1, 2, 3), "a0")).toBeNull();
+    // Your own board finished doesn't matter: the next one is still going.
+    expect(studyBoard(done(0), "a0")).toBe(1);
+  });
+
+  it("who's watching leaves out you and the board's own players this turn", () => {
+    const m = match();
+    // Board 1 on turn 0: seat 1 of each squad (a1, b1) plays it; you (a0) never show either.
+    expect(notWatchers(m, 1, "a0")).toEqual(["a0", "a1", "b1"]);
+    // Next turn board 1 is seat 0's; a spectator (x9) is in no match.
+    expect(notWatchers({ ...m, turn: 1 }, 1, "x9")).toEqual(["x9", "a0", "b0"]);
+    // Your own board: you're one of its players.
+    expect(notWatchers(m, 0, "a0")).toEqual(["a0", "b0"]);
+    // Pairs: the pair on the board plays it. The final: everyone in the match plays it.
+    expect(notWatchers(match({}, 2), 0, null)).toEqual(["a0", "a1", "b0", "b1"]);
+    expect(notWatchers(match({}, 1), 0, null)).toHaveLength(8);
+  });
+
+  it("the client keeps each board's viewers as the server says (a change, nobody, a full picture), and says what it shows only when that changes", () => {
+    const c = new SquadsClient("ABCDE");
+    const sent: unknown[] = [];
+    (c as any).ws = { readyState: WebSocket.OPEN, send: (t: string) => sent.push(JSON.parse(t)) };
+    const msg = (m: object) => (c as any).onMessage({ now: Date.now(), ...m });
+    // (Only the pawns over the board hear of it: the screen isn't drawn again.)
+    let screen = 0;
+    let pawns = 0;
+    c.subscribe(() => screen++);
+    c.onViewers(() => pawns++);
+    msg({ t: "viewers", boards: { "r0m0/1": ["p1", "p2"], "r0m1/0": ["p3"] }, full: true });
+    expect([screen, pawns]).toEqual([0, 1]);
+    expect([...c.viewers]).toEqual([
+      ["r0m0/1", ["p1", "p2"]],
+      ["r0m1/0", ["p3"]],
+    ]);
+    const kept = c.viewers.get("r0m1/0");
+    msg({ t: "viewers", boards: { "r0m0/1": [], "r0m0/2": ["p1"] } });
+    expect(c.viewers.has("r0m0/1")).toBe(false);
+    expect(c.viewers.get("r0m0/2")).toEqual(["p1"]);
+    // (A board that didn't change keeps its list, so the pawns over it aren't drawn again.)
+    expect(c.viewers.get("r0m1/0")).toBe(kept);
+    msg({ t: "viewers", boards: { "r1m0/0": ["p4"] }, full: true });
+    expect([...c.viewers.keys()]).toEqual(["r1m0/0"]);
+    c.view("r0m2", 3);
+    c.view("r0m2", 3);
+    c.view("r0m2", 1);
+    c.view(null);
+    c.view(null);
+    expect(sent).toEqual([
+      { t: "view", key: "r0m2", board: 3 },
+      { t: "view", key: "r0m2", board: 1 },
+      { t: "view", key: null },
+    ]);
+    // A reconnect: the server forgot; the screen says again what it shows (nothing here, so nothing).
+    c.view("r0m3", 0);
+    sent.length = 0;
+    msg({ t: "welcome", v: 7, playerId: "p1", token: "t", code: "ABCDE", test: false });
+    expect(sent.filter((x: any) => x.t === "view")).toEqual([{ t: "view", key: "r0m3", board: 0 }]);
   });
 });
 

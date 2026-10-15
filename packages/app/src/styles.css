@@ -1668,8 +1668,9 @@ p {
 }
 
 /* ---- A computer's title line: the admins' testing items (Hud.tsx), then sound, then the flag (Eric, Oct 13) ----
-   One row, on the title's line. When it's tight (900 to 1100 px) the brain's pill shrinks and ellipsizes first; the
-   title, the test button and the player's buttons keep their size. */
+   One row, on the title's line. When it's tight (900 to 1100 px) the brain's pill shrinks and ellipsizes first (its
+   whole text on hover: the title line keeps one row, so the boards below never move); the title, the test button and
+   the player's buttons keep their size. A phone's line, under the dock, wraps instead. */
 .match-tools {
   flex: 0 1 auto;
   min-width: 0;
@@ -1688,6 +1689,9 @@ p {
   padding: 2px 9px;
   border: 1px solid var(--line);
   border-radius: 999px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background: var(--surface-2);
   line-height: 16px;
 }
@@ -4251,6 +4255,84 @@ button.history-label {
 .boss-intro.leaving {
   opacity: 0;
 }
+/* (After the loading step: its card takes over from that one's, the same backdrop, so no entrance.) */
+.boss-intro.no-entrance {
+  animation: none;
+}
+
+/* ---- Solo, the loading step before a boss battle on Maia (BrainLoading.tsx): the intro card's backdrop, held still.
+   Nothing moves but the bar (a transform), and only while the download's size isn't known does it slide. ---- */
+.boss-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+  color: #fff;
+  background: radial-gradient(circle, rgba(70, 10, 40, 0.82) 0%, rgba(10, 0, 10, 0.9) 75%);
+}
+.boss-loading-icon {
+  font-size: 48px;
+  line-height: 1;
+}
+.boss-loading-icon .boss-portrait {
+  display: block;
+  width: 88px;
+}
+.boss-loading-title {
+  font-size: 20px;
+}
+.boss-loading-bar {
+  position: relative;
+  width: 200px;
+  max-width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+.boss-loading-bar > i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  border-radius: inherit;
+  background: #d4a531;
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+.boss-loading-bar.busy > i {
+  width: 35%;
+  transform: none;
+  animation: boss-loading-busy 1.4s ease-in-out infinite;
+}
+@keyframes boss-loading-busy {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+.boss-loading-note {
+  font-size: 13px;
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+.boss-loading-first {
+  max-width: 250px;
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0.8;
+}
+.boss-loading-leave {
+  margin-top: 4px;
+}
 .boss-intro-icon {
   font-size: 72px;
   animation: skull-in 700ms cubic-bezier(0.2, 1.6, 0.4, 1), boss-breathe 2.4s ease-in-out 700ms infinite;
@@ -5023,6 +5105,101 @@ button.history-label {
 @keyframes fb-lines {
   to {
     background-position: 52px 0;
+  }
+}
+/* A banner held 1 s longer (FightBanner `long`: the Hidden Boss's "5 SECONDS!", Eric, Oct 14): 2.5 s, the same entrance
+   and exit as every other banner's, the hold between them a second longer (each keyframe's time kept up to the hold's
+   end, a second added after it). Every other banner is untouched. */
+.fight-banner.long .fb-flash {
+  animation-name: fb-flash-long;
+  animation-duration: 2.5s;
+}
+.fight-banner.long .fb-band {
+  animation-name: fb-band-long;
+  animation-duration: 2.5s;
+}
+.fight-banner.long .fb-face {
+  animation-name: fb-face-long;
+  animation-duration: 2.5s;
+}
+.fight-banner.long .fb-text {
+  animation-name: fb-slam-long;
+  animation-duration: 2.5s;
+}
+.fight-banner.long .fb-sub {
+  animation-name: fb-sub-long;
+  animation-duration: 2.5s;
+}
+@keyframes fb-band-long {
+  0% {
+    translate: -110% 0;
+  }
+  8.4% {
+    translate: 0 0;
+  }
+  10.8% {
+    translate: -1.5% 0;
+  }
+  13.2%,
+  90.4% {
+    translate: 0 0;
+  }
+  100% {
+    translate: 110% 0;
+  }
+}
+@keyframes fb-slam-long {
+  0%,
+  7.2% {
+    opacity: 0;
+    scale: 2.6;
+  }
+  12% {
+    opacity: 1;
+    scale: 0.9;
+  }
+  15.6% {
+    scale: 1.06;
+  }
+  19.2%,
+  100% {
+    scale: 1;
+    opacity: 1;
+  }
+}
+@keyframes fb-face-long {
+  0%,
+  6% {
+    opacity: 0;
+    translate: -60% 0;
+  }
+  13.2%,
+  100% {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@keyframes fb-sub-long {
+  0%,
+  15.6% {
+    opacity: 0;
+  }
+  21.6%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes fb-flash-long {
+  0%,
+  10.2% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.55;
+  }
+  18%,
+  100% {
+    opacity: 0;
   }
 }
 
@@ -10803,6 +10980,42 @@ img.qicon {
 .place-results.ch-recluse .bc-bubble {
   max-width: min(220px, 50vw - 64px);
 }
+/* He adds time per move (his bullet clock's increment, Recluse.tsx's bulletPlus): one clean line across the board's
+   middle for the rest of its moment, gone as your clock starts. Only its opacity moves; exactly the squares' width
+   (--board-size: the wrap is a hair wider), its text in the board's own width (cqw) with a floor and a ceiling, so it
+   reads on a phone and a computer, light or dark. */
+.rc-plus {
+  position: absolute;
+  z-index: 7;
+  left: 0;
+  width: var(--board-size, 100%);
+  top: calc(var(--board-size, 100%) / 2);
+  transform: translateY(-50%);
+  box-sizing: border-box;
+  padding: 2.2cqw 3cqw;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-size: clamp(16px, 6.2cqw, 34px);
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: center;
+  pointer-events: none;
+  animation: rc-plus var(--rc-plus-ms, 2300ms) linear both;
+}
+@keyframes rc-plus {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
 
 /* ---------------- Boss powers (BossPowers.tsx) ---------------- */
 
@@ -11387,6 +11600,7 @@ img.qicon {
   cursor: default;
 }
 /* Testing, admins: the boss's brain at work (Boss alone, BrainDebug in BossDock.tsx). One short line. */
+/* (A phone's wraps rather than cut: a failure's reason is read whole, Oct 14. A computer's pill: see .match-tools.) */
 .brain-debug {
   margin: 4px auto 0;
   max-width: 100%;
@@ -11395,9 +11609,7 @@ img.qicon {
   font-size: 11px;
   line-height: 1.3;
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 /*
@@ -12650,6 +12862,135 @@ button.sq-tiny {
 }
 .sq-status {
   line-height: 1.2;
+}
+/* The line above the board: what's happening and, right after it, who else is watching this board (an eye and their
+   pawns; Oct 14). The pawns stand a little taller than the line and spill into the gaps around it, so the line keeps
+   its height and the board never moves as people come and go. */
+.sq-status-row {
+  justify-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  --sq-watch-h: 20px;
+}
+.sq-status-row > .sq-status {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.sq-watchers {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.sq-eye {
+  width: 15px;
+  height: auto;
+  margin-right: 1px;
+}
+.sq-watchers-pawns {
+  display: inline-flex;
+}
+.sq-watcher {
+  flex: none;
+  width: var(--sq-watch-h);
+  height: var(--sq-watch-h);
+}
+.sq-watcher + .sq-watcher {
+  margin-left: calc(var(--sq-watch-h) * -0.5);
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .sq-status-row {
+    --sq-watch-h: 26px;
+  }
+}
+/* "Jump to my next board" (Relay): a small switch, and its (i) opening a line of explanation under it. */
+.sq-jump {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  font-size: 13px;
+}
+.sq-jump-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  cursor: pointer;
+}
+.sq-jump-switch input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 36px;
+  height: 21px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--fd-seat);
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: pointer;
+  transition: background 150ms;
+}
+.sq-jump-switch input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--fd-off);
+  transition: transform 150ms;
+}
+.sq-jump-switch input[type="checkbox"]:checked {
+  background: var(--fd-gold);
+  box-shadow: none;
+}
+.sq-jump-switch input[type="checkbox"]:checked::before {
+  transform: translateX(15px);
+  background: var(--fd-gold-ink);
+}
+/* (A 36 px target around a small round "i".) */
+.sq-info {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: italic 700 12px Georgia, "Times New Roman", serif;
+  cursor: pointer;
+}
+.sq-info > span {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+  line-height: 1;
+}
+.sq-info.on {
+  color: var(--accent);
+}
+.sq-jump-info {
+  flex: 1 0 100%;
+  margin: 0 0 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
 }
 .sq-game .board-area .board-wrap {
   width: min(100%, calc(100dvh - 318px));
@@ -14099,19 +14440,97 @@ button.sq-tiny {
   transform: rotate(90deg);
 }
 .rc-crack > .fx-sprite,
-.rc-book > .fx-sprite {
+.rc-fig > .fx-sprite {
   display: block;
   width: 100%;
   height: 100%;
   image-rendering: pixelated;
 }
-/* The red book on the board (its sprite is a square across; drawn bigger here). */
-.rc-book {
+/* His whole figure on the board (from his leap in to his leap back): placed by a transform in the board's own width
+   (cqw), his feet on the point he's at (his frames draw his shadow: no filter); his place stands empty meanwhile, his
+   words still beside it. */
+.rc-fig {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 7;
+  aspect-ratio: 64 / 146;
+  pointer-events: none;
+  will-change: transform;
+}
+.rc-away .boss-char-sprite {
+  visibility: hidden;
+}
+/* His shadow on the board where he's coming down. */
+.rc-shadow {
   position: absolute;
   z-index: 6;
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
+  width: 16%;
+  height: 4%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(8, 8, 14, 0.7) 0 45%, rgba(8, 8, 14, 0) 72%);
   pointer-events: none;
+}
+/* The light pouring up out of the book as he chants: behind him, a cone of it from the book at his feet with rays in
+   it, pulsing (only its opacity and transform move: the board isn't repainted); in front, a glow on the open pages. Its
+   strength (opacity, height) comes from the timeline. */
+.rc-light {
+  position: absolute;
+  z-index: 6;
+  width: 62%;
+  height: 70%;
+  translate: -50% -100%;
+  transform-origin: 50% 100%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.rc-light::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(38% 100%, 62% 100%, 100% 0, 0 0);
+  background:
+    repeating-conic-gradient(from 155deg at 50% 100%, rgba(255, 250, 215, 0.75) 0deg 3deg, rgba(255, 250, 215, 0) 3deg 9deg),
+    radial-gradient(ellipse 30% 75% at 50% 100%, rgba(255, 255, 235, 0.95), rgba(255, 255, 235, 0) 100%),
+    linear-gradient(to top, rgba(255, 214, 90, 0.98), rgba(255, 176, 40, 0.72) 45%, rgba(255, 140, 30, 0) 100%);
+  -webkit-mask-image: linear-gradient(to top, #000 40%, transparent);
+  mask-image: linear-gradient(to top, #000 40%, transparent);
+  transform-origin: 50% 100%;
+  animation: rc-pulse 420ms ease-in-out infinite alternate;
+}
+.rc-glow {
+  position: absolute;
+  z-index: 8;
+  width: 30%;
+  height: 9%;
+  translate: -50% -50%;
+  pointer-events: none;
+  will-change: opacity;
+}
+.rc-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255, 252, 230, 0.95) 0 28%, rgba(255, 200, 70, 0.6) 52%, rgba(255, 190, 60, 0) 72%);
+  animation: rc-pulse 420ms ease-in-out infinite alternate;
+}
+@keyframes rc-pulse {
+  from {
+    opacity: 0.72;
+    transform: scaleX(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1.06);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rc-light::before,
+  .rc-glow::before {
+    animation: none;
+  }
 }
 /* A board's tag over its top-left corner: who plays it and their clock. */
 .rc-tag {
@@ -14169,15 +14588,22 @@ button.sq-tiny {
 .rc-result.lost {
   color: #ff8a8a;
 }
-/* A phone: the other three boards small above yours; tap one to watch it big. */
+/* A phone: the other three boards small above yours; tap one to watch it big. (Room above them for their row of slow
+   moves.) */
 .rc-minis {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   width: min(100%, 420px);
-  margin: 4px auto 0;
+  margin: 14px auto 0;
   padding: 0 16px;
   box-sizing: border-box;
+}
+/* Each board keeps its own layers (pieces, tags, results) to itself, so nothing on it shows through his words: his
+   bubble sits over every board, whatever their own stacking (Eric, Oct 14: a long line was cut off by the boards). */
+.rc-mini,
+.rc-stage > .rc-played {
+  isolation: isolate;
 }
 .rc-mini {
   position: relative;
@@ -14186,6 +14612,102 @@ button.sq-tiny {
   border-radius: 4px;
   background: none;
   cursor: pointer;
+}
+/* His ultimate, on a phone's small boards too: "5 s!" across each as the banner shows over yours. */
+.rc-ult .rc-mini::after {
+  content: "5 s!";
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  border-radius: 2px;
+  background: rgba(59, 7, 100, 0.55);
+  color: #fee2e2;
+  font: italic 900 22px/1 "Arial Black", "Helvetica Neue", Impact, system-ui, sans-serif;
+  text-shadow: 2px 2px 0 #1a0a00;
+  pointer-events: none;
+}
+/* The team's slow moves beside your board (SlowMarks; on a phone, the big board): ten slots, a red pixel X each, the rest
+   dim. A column by the board's right edge, in the gutter beside it (never over it), as Jefferson's candle shots stand.
+   They flash at every slow move. */
+.rc-slow {
+  position: absolute;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+.rc-slow svg {
+  display: block;
+  image-rendering: pixelated;
+}
+.rc-slow-cell {
+  fill: rgba(16, 12, 22, 0.8);
+}
+.rc-slow-empty {
+  fill: rgba(255, 255, 255, 0.22);
+}
+.rc-slow-x {
+  fill: #ff4646;
+}
+.rc-slow-label {
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rc-slow.col {
+  left: calc(var(--board-size, 100%) + 4px);
+  top: calc(var(--board-size, 100%) / 2);
+  translate: 0 -50%;
+  flex-direction: column;
+}
+.rc-slow.col svg {
+  width: min(12px, calc(var(--board-size, 100%) * 0.055));
+}
+.rc-slow.col .rc-slow-label {
+  writing-mode: vertical-rl;
+  rotate: 180deg;
+}
+.rc-slow.flash svg {
+  animation: rc-slow-flash 600ms ease-out 3;
+}
+.rc-slow.flash .rc-slow-label {
+  color: #e11d48;
+}
+/* The board the last slow move was on: a small red note over its top-right corner, for a moment. */
+.rc-slow-note {
+  position: absolute;
+  top: 3px;
+  right: calc(100% - var(--board-size, 100%) + 3px);
+  z-index: 9;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(127, 29, 29, 0.9);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.rc-mini .rc-slow-note {
+  top: 1px;
+  right: 1px;
+  padding: 0 3px;
+  font-size: 9px;
+}
+@keyframes rc-slow-flash {
+  from {
+    filter: drop-shadow(0 0 3px #ff4646);
+  }
+  to {
+    filter: none;
+  }
 }
 .rc-mini.you {
   border-color: #ffd451;

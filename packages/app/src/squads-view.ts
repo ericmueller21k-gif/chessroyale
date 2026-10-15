@@ -128,6 +128,36 @@ export function myBoards(m: Pick<NetSquadsMatch, "format" | "sides" | "turn" | "
   return { you: 0, next: null };
 }
 
+/**
+ * "Jump to my next board" (Relay; Eric, Oct 14): the board to study once you've moved, the one you play next. That's
+ * next turn's board; if it has finished (you'd sit that turn out and scout), the first board after it that's still
+ * going. Null when there's none but the one you're on, outside Relay, or when you're not in the match.
+ */
+export function studyBoard(m: Pick<NetSquadsMatch, "format" | "sides" | "turn" | "boards">, playerId: string | null): number | null {
+  const seat = seatIn(m, playerId);
+  const n = m.boards.length;
+  if (m.format !== "relay" || n < 2 || seat < 0) return null;
+  for (let k = 1; k < n; k++) {
+    const b = relayBoardOf(seat, m.turn + k, n);
+    if (!m.boards[b]?.result) return b;
+  }
+  return null;
+}
+
+/** The switch's name and its (i), in plain words (the FAQ uses the same). */
+export const JUMP_NEXT_LABEL = "Jump to my next board";
+export const JUMP_NEXT_INFO = "On: once you've moved, you go straight to the board you play next turn, to study it while you wait. Off: you stay on your board until the game moves you.";
+
+/**
+ * Who's watching a board full size (Oct 14) shows the people the server says show it, less these: you, and the
+ * board's own players (they're playing it). `m.turn` is the turn whose boards are on screen (during the show after a
+ * turn, the one just played, as the YOU marks).
+ */
+export function notWatchers(m: Pick<NetSquadsMatch, "format" | "sides" | "turn" | "boards">, board: number, me: string | null): string[] {
+  const players = m.sides.flatMap((s) => s.seats).filter((id) => myBoards(m, id)?.you === board);
+  return me && !players.includes(me) ? [me, ...players] : players;
+}
+
 /** Your duty in the half being played, your partner (Pairs) if any, and the rest of your squad on it (the final's vote). */
 export function dutyOf(m: Pick<NetSquadsMatch, "state" | "current">, playerId: string | null): { duty: NetDuty; partner: string | null; team: string[] } | null {
   if (!playerId || m.state !== "half" || !m.current) return null;

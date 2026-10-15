@@ -1,7 +1,8 @@
 // Frame-by-frame check of Squads' screens, played the way a player plays them (real taps), against a running server
 // with the test switch on (npx wrangler dev --var SQUADS_TEST:1 ...):
 //   npm run frames:squads -- <out-dir> <relay|pairs|final|block|token|menu|standings|modevote|shop|stockfish|shield|chip|clockvote|clockline> [url=http://localhost:8787] [width=390] [scheme=dark] [clock=rapid]
-// relay: your move (it must show at once and never snap back), then scouting a tiny board and back.
+// relay: your move (it must show at once and never snap back), a beat later the board you play next (Jump to my next
+// board, on by default), then scouting a tiny board and back.
 // pairs: your pick, lock in, the coin-flip reveal. final: your vote, lock in, the vote's reveal.
 // block: from the Scotch recapture, Block, their queen, f6: the arrow draws, keeps redrawing with its lock pulsing,
 // through your move and theirs, until they've moved (each frame's arrows are logged too). token: the same move as your

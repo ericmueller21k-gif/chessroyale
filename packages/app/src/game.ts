@@ -155,9 +155,11 @@ export type Phase =
   | { kind: "vote"; vote: VoteView }
   /**
    * Boss battle: the boss thinking, its move, or its strike (`until`: when the next crowd move starts). `lights`:
-   * Hollow's Lights out, at the start of his turn (the clocks stopped), before his move.
+   * Hollow's Lights out, at the start of his turn (the clocks stopped), before his move. `loading` (with `intro`): solo,
+   * the loading step before the intro, while the boss's Maia brain loads (maia-gate.ts): the intro's first frame, held;
+   * `afterLoading`: the intro that follows it.
    */
-  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; lights?: LightsView; fall?: boolean }
+  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; fall?: boolean }
   /**
    * The Hidden Boss's phase change (`at`: when it began; PHASE_CHANGE in recluse-phase2.ts): the book's slam, the board
    * split into four, his revive, the Chess960 shuffle. Then `simul`: his phase 2, four boards at once (GameView.simul).
@@ -204,8 +206,10 @@ export interface SimulView {
   /** Every board is decided (his reaction holds the boards, then the result). */
   decided: boolean;
   beaten: boolean;
-  /** Slow moves so far (his ultimate comes past RECLUSE_PHASE2.slowMovesForUlt). */
+  /** Slow moves so far, the team's (the RECLUSE_PHASE2.slowMovesForUlt-th brings his ultimate). */
   slow: number;
+  /** The last slow move: on which board (id) and when, or null. */
+  lastSlow: { board: number; at: number } | null;
   /** When his ultimate came (then every move has ultMoveSeconds, no bank), or null. */
   ultAt: number | null;
 }

@@ -50,6 +50,7 @@ import {
   type BossMoveKind,
   pigTurn,
   ShowdownScout,
+  kingHelpBlocked,
 } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
@@ -841,10 +842,11 @@ export class NetMatch implements GameView {
   /** Testing, admins: what the boss's brain did with its last move, on the device that plays the boss. */
   get brainLine(): string | null {
     if (!isAdmin() || !this.bossPlan || !this.boss) return null;
-    if (this.brainNote) return brainWords(this.brainNote);
+    // (Maia failed to load: why, for the admin reading it.)
+    if (this.brainNote) return `${brainWords(this.brainNote)}${this.maia?.status === "failed" ? ` · ${this.maia.error ?? "no reason"}` : ""}`;
     const p = this.bossPlan;
     const share = p.stockfishShare ? ` · ${Math.round(p.stockfishShare * 100)}% Stockfish` : "";
-    return `Maia ${p.rating} · ${GUARD_WORDS[p.brain]}${share} · ${this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? "failed: Stockfish" : "loading"}`;
+    return `Maia ${p.rating} · ${GUARD_WORDS[p.brain]}${share} · ${this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? `failed: Stockfish (${this.maia.error ?? "no reason"})` : "loading"}`;
   }
 
   /** Hollow's extra move (a failed Lights out), host only: a quiet move within the cap, or "" (he skips it). */
@@ -1097,7 +1099,8 @@ export class NetMatch implements GameView {
 
   kingCalled = false;
   callKing(strike = false) {
-    if (this.phase.kind !== "play" || !this.key || !this.boss?.kingCharges || this.kingCalled) return;
+    // (The Hidden Boss can't be met online: no server path takes a try against him, so nothing is sent.)
+    if (this.phase.kind !== "play" || !this.key || !this.boss?.kingCharges || this.kingCalled || kingHelpBlocked(this.boss)) return;
     if (strike) {
       // A strike isn't your turn: you still pick once he's done (the server says when he strikes).
       if (this.phase.strike?.mine) return;

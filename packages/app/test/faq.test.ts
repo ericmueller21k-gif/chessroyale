@@ -117,6 +117,16 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(own.toLowerCase()).toContain("every boss except hollow (stockfish) plays with maia");
   });
 
+  it("Maia's download and its wait, from the settings: about downloadMb, kept; Solo waits loadGateMs at most, online never", () => {
+    const on = section("boss-brain", { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, forPlayers: true, downloadMb: 35, loadGateMs: 12_000 } });
+    expect(on).toContain("Maia is a human-like engine, so a boss plays more like a person than Stockfish does.");
+    expect(on).toContain("It's a bigger download, about 35 MB, fetched once the first time you meet a boss and then kept on your device; on a slow connection, or if it can't load, the boss plays Stockfish instead.");
+    expect(on).toContain("In Solo games and Boss alone, a boss battle waits for Maia to load before it starts, 12 s at most; online, nobody waits for it.");
+    expect(on).not.toContain("Nobody ever waits for it");
+    // (Off for players, nobody downloads it: no word of it.)
+    expect(section("boss-brain", { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, forPlayers: false } })).not.toContain("bigger download");
+  });
+
   it("Maia is marked as being tested only while it's off for players", () => {
     expect(section("boss-brain")).toContain(BOSS_BRAIN.forPlayers ? "New." : "Being tested; coming soon.");
     const on = section("boss-brain", { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, forPlayers: true } });
@@ -259,6 +269,16 @@ describe("the FAQ on Squads (v2: tokens, blocks, the team vote)", () => {
     expect(changed).toContain("4 for a queen's;");
     expect(changed).toContain("Up to 2 blocks a turn");
     expect(changed).not.toContain("for castling");
+  });
+});
+
+describe("the FAQ on Squads' screens (Oct 14: jump to my next board, who's watching)", () => {
+  it("names the switch as the screen does, and says whether it starts on from the setting", () => {
+    const t = section("modes");
+    expect(t).toContain("Jump to my next board (on unless you switch it off, under the board) takes you straight to the board you play next turn");
+    expect(t).toContain("An eye and pawns over a board show who else is watching it.");
+    const off = section("modes", { ...FAQ_DEFAULTS, squadsWatching: { jumpToNext: false } });
+    expect(off).toContain("Jump to my next board (off unless you switch it on, under the board)");
   });
 });
 

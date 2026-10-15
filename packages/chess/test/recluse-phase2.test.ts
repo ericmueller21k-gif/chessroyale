@@ -204,20 +204,34 @@ describe("his phase 2 ultimate: slow moves, then a few seconds a move, a random 
     expect(st.slow).toBe(2);
   });
 
-  it("fires on the slow move after slowMovesForUlt: from then on, no slow moves count and no flag falls", () => {
+  it("fires on the team's slowMovesForUlt-th slow move (10 of 10): from then on, no slow moves count and no flag falls", () => {
+    expect(RECLUSE_PHASE2.slowMovesForUlt).toBe(10);
     let st = start([518, 1, 2, 3]);
     let at = T0;
-    for (let i = 0; i < RECLUSE_PHASE2.slowMovesForUlt; i++) ({ st, at } = round(st, 0, SLOW + 100, at));
-    expect(st.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt);
+    // (The team's: one slow move after another, around the four boards.)
+    for (let i = 0; i < RECLUSE_PHASE2.slowMovesForUlt - 1; i++) ({ st, at } = round(st, i % 4, SLOW + 100, at));
+    expect(st.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt - 1);
     expect(st.ultAt).toBeNull();
-    ({ st, at } = round(st, 0, SLOW + 100, at));
+    ({ st, at } = round(st, 1, SLOW + 100, at));
+    expect(st.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt);
     expect(st.ultAt).not.toBeNull();
     const ultAt = st.ultAt!;
-    // Every player whose move it is starts their few seconds as it comes.
-    for (const b of st.boards.slice(1)) expect(b.turnAt).toBe(ultAt);
+    // Every player whose move it is starts their few seconds as it comes (all but board 1's, whose move it was).
+    for (const b of st.boards.filter((x) => x.id !== 1)) expect(b.turnAt).toBe(ultAt);
     ({ st } = round(st, 0, SLOW + 100, at));
-    expect(st.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt + 1);
+    expect(st.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt);
     expect(phase2Flags(st, ultAt + 10 * 60_000)).toBe(st);
+  });
+
+  it("gives anyone mid-move a fresh, full ultMoveSeconds from the moment it comes, however long they'd thought (nobody paused)", () => {
+    const st0 = start([518, 1, 2, 3]);
+    // (Board 1's player has thought for 4.9 s, board 2's for a minute: both get the whole 5 s from the ultimate.)
+    const st = { ...st0, boards: st0.boards.map((b) => (b.id === 1 ? { ...b, turnAt: T0 - 4900 } : b.id === 2 ? { ...b, turnAt: T0 - 60_000 } : b)) };
+    const ult = phase2Ult(st, T0);
+    for (const b of ult.boards) expect(moveLeft(ult, b, T0)).toBe(RECLUSE_PHASE2.ultMoveSeconds * 1000);
+    expect(moveLeft(ult, ult.boards[1]!, T0 + 4000)).toBe(RECLUSE_PHASE2.ultMoveSeconds * 1000 - 4000);
+    // (Their clocks run on: nothing waits for the banner.)
+    expect(phase2Timeouts(ult, T0 + RECLUSE_PHASE2.ultMoveSeconds * 1000, () => 0).boards.every((b) => b.board.history.length === 1)).toBe(true);
   });
 
   it("then each move has ultMoveSeconds, no bank; out of them, a random legal move is played for that player (never a loss)", () => {

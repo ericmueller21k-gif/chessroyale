@@ -512,13 +512,23 @@ export const BOSS_POWERS = {
    * it's bullet with no added time per move so it's a true race against the clock but it should be bearable for a strong
    * team"). His own meter, not the rage meter: it fills from crowd turn 1 and is full as crowd turn bulletTurn begins,
    * when it comes (his line and the spellbook, no warning); nothing else fills it (no strikes, no eval). From then to the
-   * end of phase 1 everyone's clock is a bank of bulletBankSeconds: no increment, no per-move cap, nothing adds time; a
-   * bank that runs out loses the battle on time. Eric, Oct 14, after playing it: 3:00 "feels like too much", so 1:00
-   * ("1+0"), was 180 s. A player at 2 to 3 s a move gets 20 to 30 more moves out of it, and a battle is capped at
-   * bossMaxMoves (60) crowd moves. Not yet sim-tested.
+   * end of phase 1 everyone's clock is a bank of bulletBankSeconds: no per-move cap, and no increment for its first
+   * bulletPlainMoves moves (below); a bank that runs out loses the battle on time. Eric, Oct 14, after playing it: 3:00
+   * "feels like too much", so 1:00 ("1+0"), was 180 s. A battle is capped at bossMaxMoves (60) crowd moves. Not yet
+   * sim-tested.
    */
   bulletTurn: 7,
   bulletBankSeconds: 60,
+  /**
+   * Then he adds time per move (Eric, Oct 14, after playing it again: "1 min too short, needs to be 1+1 or even 1+2... a
+   * few moves, say 3, with 1+0, then he says a comment about it and suggests adding time per move"): the crowd plays the
+   * bullet clock's first bulletPlainMoves moves on the bank alone (1+0); as the next crowd turn begins he says so (his
+   * line, then "+2 s a move from now on" across the board), and from then on each move made in time adds
+   * bulletIncrementSeconds to that player's bank (1+2: the more forgiving of Eric's two, as 1:00 alone felt too short).
+   * No cap on the bank: it grows by at most this a move, over at most bossMaxMoves moves. Estimates, not sim-tested.
+   */
+  bulletPlainMoves: 3,
+  bulletIncrementSeconds: 2,
   /** The meter glows from this full (0-1) as it nears its ultimate. */
   rageGlowFrom: 0.75,
   /**
@@ -805,14 +815,15 @@ export const RECLUSE_PHASE2 = {
   bankSeconds: 120,
   /**
    * His ultimate (Eric, Oct 14): a move that takes longer than `slowMoveSeconds` (anyone's, on any board, before it
-   * comes) is a slow move: he says so (one of his lines about playing faster). Once the team's slow moves pass
-   * `slowMovesForUlt` (it fires on the next one), his ultimate: from then on every move on every board has
-   * `ultMoveSeconds`, no bank; when they run out, a random legal move is played for that player (never a loss on
-   * time). Before it, the bank above applies. Estimates, not yet sim-tested: with a 2:00 bank (about 3 s a move over a
-   * game) slow moves will be common, so it will likely come early in the fight.
+   * comes) is a slow move: he says so (one of his lines about playing faster), counted once for the team as the move
+   * is made (the X marks beside every board). The team's `slowMovesForUlt`-th slow move brings his ultimate (Eric, Oct
+   * 14, after playtesting: at 10 of 10; it was the 6th, then the 5th): from then on every move on every board has
+   * `ultMoveSeconds`, no bank, everyone's few seconds starting fresh as it comes; when they run out, a random legal
+   * move is played for that player (never a loss on time). Before it, the bank above applies. Estimates, not yet
+   * sim-tested: with a 2:00 bank (about 3 s a move over a game) slow moves will be common.
    */
   slowMoveSeconds: 5,
-  slowMovesForUlt: 5,
+  slowMovesForUlt: 10,
   ultMoveSeconds: 5,
   /** The bots on the other boards (Boss alone): Stockfish at this strength, this many nodes, within `botMoveMs`. */
   botElo: 2200,
@@ -827,6 +838,17 @@ export const RECLUSE_PHASE2 = {
   botSlowMs: [5400, 7000] as readonly [number, number],
   /** Once every board is decided: how long his reaction holds the boards before the result screen (ms). */
   endMs: 3200,
+  /**
+   * His collusion lines in phase 2 (Eric, Oct 14: the four boards against a team fit his story): one every `talkEvery`
+   * of his moves (all four boards together), give or take `talkJitter` (a random pick each time); a line comes only if
+   * no other is up (the lowest priority: skipped, never queued). Which stage by his moves so far: early, then middle
+   * from `talkMiddleFrom`, late from `talkLateFrom`. Estimates: on four boards he moves about once a second, so a line
+   * every 6 to 10 s, the middle from about half a minute in, the late after about a minute.
+   */
+  talkEvery: 8,
+  talkJitter: 2,
+  talkMiddleFrom: 24,
+  talkLateFrom: 64,
 };
 
 /** BOSS_POWERS with room for other numbers (tests, and the switch turned off). */
@@ -980,8 +1002,28 @@ export const BOSS_BRAIN = {
   strict: { maxLoss: 4, maxLogitLoss: 0.5 } as BrainGuard,
   /** Maia's answer is waited for this long at most (from the request, made alongside the top-8 search); then Stockfish. */
   timeoutMs: 1500,
-  /** The model's load gives up after this long (the boss plays Stockfish meanwhile: nothing ever waits for it). */
+  /** The model's load gives up after this long (the boss plays Stockfish meanwhile). */
   loadTimeoutMs: 60_000,
+  /**
+   * A solo boss battle on Maia waits for it, at most this long, before its intro: the loading step ("Loading the
+   * boss…", the download's bar, then "Starting…"), with this device's Stockfish paused so Maia loads alone (Eric's
+   * iPhone, Oct 14: Maia failed to load beside it). Then the battle begins whatever happened: not ready yet, the boss
+   * plays Stockfish until it is, as before. 20 s: a first download takes a few seconds on Wi-Fi and the start a second
+   * or two (Eric: "People can deal with it if they need to wait 5 or 10 seconds"); a slow connection gives up rather
+   * than keep a player waiting. Online nothing waits (other players can't wait on one device).
+   */
+  loadGateMs: 20_000,
+  /**
+   * After the loading step, this device's Stockfish must answer again within this long; if it doesn't (short of
+   * memory beside Maia), Maia is closed and Stockfish started once more: the battle needs Stockfish, not Maia.
+   */
+  stockfishBackMs: 15_000,
+  /**
+   * Maia's download, rounded, for the players' words (the loading step's note, the FAQ): its three files unpacked,
+   * the model 25.2 MB, onnxruntime's WebAssembly 14.2 MB and the worker 0.1 MB (packages/app/test/maia-gate.test.ts
+   * checks it against the files). Over the network it's less (the WebAssembly comes compressed), never more.
+   */
+  downloadMb: 40,
   /** Candidates Maia lists per move. */
   multipv: 8,
 };
@@ -1362,6 +1404,14 @@ export const SQUADS_LOBBY = {
    * arrows. It never touches scoring, bots or the server.
    */
   cheatLines: { moves: 3, nodes: 300_000 },
+  /**
+   * Who's watching a board, and jumping to your next one (Eric, Oct 14). Each screen tells the lobby which board it
+   * shows full size, only when that changes; the lobby sends everyone the viewers of the boards that changed, at most
+   * once every `coalesceMs` (so a lobby of 32 switching boards can't flood anyone). Over the board, up to `shown` pawns,
+   * then "+N". "Jump to my next board" (Relay) is `jumpToNext` on a device that hasn't set it, and moves you
+   * `jumpAfterMs` after your move (time to see your piece land: your move shows nowhere else until the half ends).
+   */
+  watching: { coalesceMs: 1000, shown: 4, jumpToNext: true, jumpAfterMs: 600 },
   /** A party (an invite code or link, up to SQUADS.partyMax): closes after this long with nobody in it. */
   partyIdleMinutes: 60,
   /** A party in line asks the matchmaker again this often while it's busy. */

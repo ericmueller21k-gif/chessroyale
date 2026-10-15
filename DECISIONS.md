@@ -3657,6 +3657,336 @@ raised.
 **So:** a red Big Boy perf run is re-run alone on a quiet machine before a PR is blamed.
 
 
+## The Hidden Boss's phase change, reworked (Eric, Oct 14, 2026)
+
+Eric, after seeing the phase change from #201: "I wanted it where the board split is a bit longer cool animation, he
+drops down to the center of the board, book in hand, angry, drops it to the ground, light beaming from it as he chants
+nonsense and then the boards crack and split like they do now." Then, the same day, what he chants: the 1962
+Candidates in Curaçao, where he said his rivals teamed up on him ("He should mumble their last names randomly, say
+things like 'they worked as a team'... just don't say Soviets obviously and Russians, their last names are ok
+though"), and through phase 2's play, lines about the team against him, escalating. Same reach as before: admins only,
+in Boss alone; no rule, protocol or stored data changed.
+
+**The sequence** (one timeline, `PHASE_CHANGE` in `packages/app/src/recluse-phase2.ts`; about 10.4 s after a 1.8 s fall,
+was 7.2 s after 4.5 s; not skippable, as before):
+1. **Beaten** (0 to 1.8 s before it): he collapses and mumbles as before, but the fall is short when phase 2 follows
+   (`PHASE_CHANGE.fallMs`; the rules' 4.5 s stays for a fall without one). His voice is cleared as he falls rather than
+   as the change begins, so his mumbling carries on until his chant cuts in.
+2. **Up in a rage** (0 to 1.3 s), where he stands, both drawings (the bust in a phone's bar, the figure by a computer's
+   board): his brows come down, his head snaps up glaring, teeth bared, he gets up and the book flies back up into his
+   hand (`rage`).
+3. **The leap** (1.3 to 2.3 s): the board draws his whole figure, on a phone too (his place stands empty meanwhile; his
+   bubble stays beside it, as for Sawyer and Wrangler). From his place (the bar's top left on a phone, beside the
+   board's bottom left on a computer) onto the middle, his shadow where he'll land; a thud (`recluseThump`), a burst
+   of dust, the board jolts (`leap`).
+4. **The book thrown down** (2.3 to 3.5 s): brandished over his head, a shout, then thrown at his feet, where it lands
+   open with a thud and dust (`drop`).
+5. **The chant** (3.5 to 7.35 s): arms raised over the open book, his mouth working, his hair lifting: phase 2's face
+   and hair from here (the light is his power coming back), so the transformation is this beat. Light pours up out of
+   the book: a cone of it behind him with rays, pulsing, and a glow on the pages (CSS only), motes rising in his frames,
+   the pages lit; a soft minor chord swelling over the stare's hum (`recluseGlow`). One chant line in his bubble.
+6. **The boards crack and split** (5.2 to 7.25 s), as before: Sawyer's board-saw gap down and across, the quarters part
+   (the board jolts again) and grow into four boards, as the light dies.
+7. **The book back** (7.35 to 8.2 s): it snaps shut and flies up into his hands (his revive's own frames: `pickup`),
+   his revive line; meanwhile every board's pieces fly to their Chess960 squares (7.5 to 8.4 s).
+8. **The leap back** (8.2 to 8.9 s) to his place, gone before he lands (`leap2`); there, phase 2's idle from then on.
+9. **"PHASE 2"** at 9.0 s; the clocks start at 10.4 s.
+
+**One book on screen**, his own, in his frames, from start to end. The flying book effect (`RECLUSE_BOOK`) isn't shown
+any more (kept as art), so the slumped frame's book and a second book on the board can't both show, as they did.
+
+**My calls.**
+- **The light in CSS, not a sprite:** two layers (`.rc-light`, `.rc-glow`) whose opacity and transform alone move;
+  the least code and no new frames to paint. The motes and lit pages are in his frames (as his spellbook's are).
+- **His size on the board:** 24% of its width, about his own 2x beside a computer's board (1.3x on a phone).
+- **One chant line a phase change**, picked from the list: each bubble stays 3.5 to 4.5 s (the one rule), so two
+  wouldn't end before his revive line. One bubble at a time throughout: the mumble, the chant, the revive line, then
+  phase 2's line.
+- **The dock's first line** "The red book!" is now "The boss rises!" (admins only). The flying book's page-flip sound is
+  gone with it.
+- **Frames** (41 new frame specs, the bust 11 of them; parts painted only when first shown, drawn ahead from his
+  battle's start: `prewarmRecluse`): `rage`, `leap`, `drop`, `chantRaise`, `chant` (an 8-frame loop), `pickup` (one
+  new frame, then the revive's), `leap2`; a raised open hand, his angry face (brows drawn down in a V, a glare, a
+  scowl, a shout), a free hand clenched, no shadow in the air. Two new synth sounds (`thump`, `glow`), made ahead in
+  the sound worker like his others.
+
+**His words** (`characters/recluse-lines.ts`; Eric's rules: his rivals' last names are fine, Petrosian, Keres, Geller,
+Tal, Korchnoi; never the words for their country or its people; nothing that says Korchnoi threw games, only the agreed
+draws and the teamwork, which historians largely accept; a test checks the first and the last):
+- **Real quotes, word for word**, from his article "The Russians Have Fixed World Chess", Sports Illustrated, Aug 20,
+  1962, read on a scan of the printed pages (p. 19's passage is also quoted word for word in Dominic Lawson, "Collusion
+  in Curaçao", Standpoint, 2012): "They worked as a team." (p. 19), "They consulted during the games." (p. 19), "They
+  agreed ahead of time to draw the games they played against each other." (p. 19), "They would openly analyze my game
+  while I was still playing it." (p. 65), "It made me mad that they thought they could get away with it." (p. 65), "I
+  will never again play in one of these tournaments." (p. 18). Of the other candidates passed along: "Well, I now know
+  better." (p. 18) is verified but reads oddly alone; "Anyone could draw his own conclusions from this sequence of
+  events" (p. 64) is about Korchnoi's games (left out by Eric's rule); "If you start out badly..." isn't in the article
+  (not used, not paraphrased).
+- **Ours** (placeholders): the mumbled name fragments ("Petrosian... Keres... Geller...", "Keres... Geller... draw...
+  draw...") and the phase 2 lines below.
+
+**His collusion lines in phase 2** (Eric, Oct 14: the four boards against a team fit his story): every `talkEvery` (8)
+of his moves on all the boards, give or take `talkJitter` (2), a line from three pools by his moves so far: early,
+suspicious muttering; from `talkMiddleFrom` (24), accusations (his games analyzed, the quick draws, the names); from
+`talkLateFrom` (64), paranoid ranting (`Talk`, `talkStage`). Each pool in turn. **The lowest priority:** skipped (not
+queued) while any line of his is up, and a new priority below LOW in the speech rules (`CHATTER`): any other line (a
+slow move's, his ultimate's, a board's) cuts in on it, so those always come first. Estimates: on four boards he moves
+about once a second, so a line every 6 to 10 s when nothing else is said, the middle from about half a minute in, the
+late after about a minute.
+
+**Phase 2's slow moves, reworked (Eric, Oct 14, after playtesting; same PR, the same files).**
+- **The ultimate at 10 of 10:** `slowMovesForUlt` is 10 (was 5, firing on the 6th). Still one shared team counter, one
+  per slow move as it's made; now the 10th brings it (`>=`, not `>`).
+- **The marks beside every board** (`SlowMarks` in `screens/Recluse2.tsx`), as Jefferson's candle shots stand beside
+  his board ("it fits the theme of the other boss"): ten slots, a red pixel X for each slow move, the rest dim, a small
+  "slow" label. A column by the right edge of each of a computer's four boards (in the gutter, never over a board) and
+  of a phone's big board; a phone's three small boards have no room beside them, so a row above each. Eric: no turtle,
+  "something basic... doesn't distract too much, but it's clear to everyone playing". The dock's "slow moves N of 5" is
+  gone (the dock keeps your clock).
+- **Each slow move:** a soft sound (`recluseSlow`: two low notes falling, D to A, quick plucks with a little of their
+  octave so a phone's speaker carries them, well under a move's loudness, made ahead in the sound worker: never a
+  buzzer), the marks of the board it was on flash red for 1.8 s with a small "slow move" note over its top-right corner
+  (my call: a note on the board says which board without numbering them, and a dock note didn't fit a phone's line),
+  and his slow-move line as before (not on the 10th: his ultimate's line then).
+- **The ultimate's banner** ("5 SECONDS!") over every board at the same moment: over the four on a computer, over yours
+  on a phone with "5 s!" across each small board. Nobody is paused; everyone whose move it is gets a fresh, full 5 s
+  from that moment (`phase2Ult` already restarted them; now tested), however long they'd thought.
+- **That banner is held 1 s longer** (`PHASE2_ULT_BANNER_MS` 2.8 s): `FightBanner`'s new `long` option, the same
+  entrance and exit with the hold a second longer (its own keyframes, 2.5 s). Every other banner keeps its timing.
+
+**His bubble over the boards in phase 2** (Eric, Oct 14: a long line, the Weaver Adams quote, was cut off and covered
+by the boards). Each board now keeps its own layers to itself (`isolation: isolate` on a phone's small boards and a
+computer's four), so his bubble sits over every board; it already wraps within the screen (at most 220 px or 60% of
+the width, moved back into view if it would run off). Measured with the longest line on a 390 px and a 360 px phone and
+at 1280 and 1024 px: nothing covers it, all of it on screen.
+
+**Measured** (the slow-phone perf case, `e2e/perf.spec.ts`, 4x CPU throttling, three runs each on this machine):
+- Before, on a quiet machine (origin/main, 3 runs): the phase change p95 33 ms, 5 to 8% of frames dropped; four
+  boards in play 2 to 3%.
+- A/B, alternating runs of main and this branch while other sessions' engine sims loaded the machine (load 6 to 11 on
+  4 cores; main failed its budget too then), six runs each: the phase change main 17, 10, 10, 16, 20, 22% dropped
+  (p95 33 to 50 ms), this branch 16, 14, 9, 15, 12, 22% (p95 33 to 67 ms); four boards in play main 14, 11, 15, 22,
+  19, 22%, this branch 15, 13, 22, 17, 18, 20%. So no worse than main under the same conditions. The light's layers
+  move only their opacity and transform, his figure carries no filter, his frames are drawn ahead from his battle's
+  start, and each board's slow marks are drawn again only when their count or flash changes. A run on a quiet machine
+  is still to do (the budget, 15% dropped and p95 under 50 ms, holds only there, as for Big Boy's check).
+
+**Testing.** Targeted lane (animation, art and lines, and one rule number: the ultimate's threshold): typecheck, the
+app's unit tests
+(`recluse-phase2.test.ts`: the timeline's beats and length, one book in every frame, the leap's shadow and dust, the
+lines' rules and quotes, the collusion stages, intervals and priority, his moves counted, the slow moves' boards and
+the 10th bringing the ultimate; `recluse.test.ts`: every new
+frame inside its frame, the cues; `recluse-boss.test.ts`: a recluse sound for every cue, the new sounds under a move's
+loudness); the rules' `packages/chess/test/recluse-phase2.test.ts` (the ultimate at 10 of 10, a fresh full 5 s for
+anyone mid-move); e2e `recluse.spec.ts` (the phase change's every beat watched from before it can show, no second
+book, his place empty only while he's on the board; ten slow moves marking every board, the note, the sound, the long
+banner at 10), `boss-character.spec.ts`, and `perf.spec.ts`'s phase 2 case. Frames:
+`npm run frames:recluse2 -- <dir> both light only=change`.
+
+## Squads: jump to my next board, and who's watching (Oct 14, 2026)
+
+**What (Eric, Oct 14):** two things for the Squads match screen. **Jump to my next board** (Relay): "a button toggle
+with an info thing; enabled it moves you instantly to the next board, waiting and watching, with it off you wait
+until forced. It should be on by default." **Who's watching** (every Squads match board): "your pawn pieces stacked
+above the board for who is spectating the board with like a spectate eye icon." Eric also decided that viewing boards
+after you've moved stays free, helping teammates included ("it is squads after all"); whether to limit viewing a
+teammate's board while they're still to move is an open question for players (ROADMAP.md, Squads).
+
+**Calls:**
+- **The switch** sits on the match screen only (Relay, in the panel after your move's panel, so it never pushes the
+  move or Block down), not in Settings: one place, in view when it matters. "Jump to my next board" with an (i) that
+  opens one line: "On: once you've moved, you go straight to the board you play next turn, to study it while you wait.
+  Off: you stay on your board until the game moves you." On by default (`SQUADS_LOBBY.watching.jumpToNext`),
+  remembered per device (`brc.squads.jumpNext` in prefs.ts, try/catch).
+- **The jump comes 600 ms after your move** (`jumpAfterMs`), not in the same frame: until the half ends your move shows
+  only on your own big board (the tiny boards show the server's position), so an instant switch would hide the piece
+  you just moved. A board you open yourself in those 600 ms wins. It comes once a half; "Back to my board" stays.
+- **The board to study** is next turn's; if that one has finished (you'd sit that turn out and scout it), the first
+  board after it that's still going, the one you'll actually play next; if none but yours, you stay. The line above
+  the board says "Watching Board 3 · your next board".
+- **Who's watching** shows people only (bots never view), never you and never the board's own players this turn: a
+  small pixel eye, then up to 4 profile pawns (`Avatar`, with their items), overlapping, then "+N"; names on hover
+  (a title), nothing on long-press. Each pawn is the watcher's color on that board (white for someone outside the
+  match). The pawns spill a little above and below the line over the board, so the line keeps its height and the
+  board doesn't move as people come and go.
+- **The protocol** gains `view` (the board a screen shows full size, sent only when it changes: a tap, the jump, Back,
+  a new half; again after a reconnect) and `viewers`, optional both ways, so `SQUADS_PROTOCOL` stays 7: an app on
+  either side of the deploy keeps playing, and one that never sends `view` simply isn't shown.
+- **Each screen hears only about the board it shows** (not every board to everyone): who's on it, when that changes,
+  and the whole list when it has just moved there; at most once a second per screen (`coalesceMs` 1000, twice the
+  brief's example: who's watching doesn't need to be quicker, and it halves the worst case on a slow phone).
+- **Only the pawns redraw** on `viewers`: the client tells them alone (`onViewers`), never the whole screen, and each
+  pawn is memoized. Views are kept in the lobby's record (a view change is one storage write, like any message).
+
+**Measured** (a local server, a full 32-seat test lobby, main first and then this change; the frames on an iPhone 13
+profile with the CPU slowed 4x):
+- **Messages, per player per minute** (3 minutes of Relay): 32 people each doing what the screen does with the jump
+  on (their board when a half asks them to move, the next board 600 ms after their move: about 6 view changes a minute
+  each): main 356 → 376 messages (+6%), 194.6 → 196.4 KB (+1%); `viewers` 19.6 a minute each. The first version
+  (every board's changes to everyone) sent 101 a minute each: telling each screen only about its own board cut it
+  five-fold. 4 people and 28 bots, each switching every 3 s: 210 → 234 (+11%), `viewers` 24.8. One client spamming 10
+  switches a second: 42 `viewers` a minute each (the cap is 60). Each view change is one write of the lobby's record,
+  as for any message.
+- **Frames, share over 20 ms** (12 s windows, two runs each; a shared machine, so a few points of noise): nobody
+  switching, the same (main 2.9-5.2%, the branch 2.8%). Three watchers each coming onto and off your board every 5 s:
+  1.1-2.1% → 4.2-5.0% on your board, 0.6% → 1.0-1.9% on your next board; every 2 s (the one-a-second cap): 1.5% →
+  4.8% and 0.4% → 2.7-3.2%. p95 stays at one refresh (16.8 ms) in every case. One change of the pawns costs a slowed
+  phone 10-15 ms (median; 40-50 ms at worst), almost all of it a dressed `Avatar` being drawn (a plain pawn: 2 ms),
+  and only when someone comes or goes; on a real board that's a few times a turn. Before the pawns redrew alone (a
+  `viewers` message redrew the whole screen) the 1-second churn cost 17-20%.
+- **Narrow phones:** at 360 px and up the line over the board stays one line with four pawns and "+2"; at 320 px the
+  longest Relay line ("Moved · Board 1 · waiting for the half to end") wraps under the widest stack and the board moves
+  14 px (as a long block banner does today).
+- **Frame by frame** (`npm run frames:squads relay`, light and dark): the piece slides once, then the board switches
+  once 600 ms later; nothing snaps back, no flash.
+
+**Player-visible text:** "Jump to my next board", its (i) line above and the (i)'s label ('What "Jump to my next
+board" does'), "Watching Board N · your next board", the pawns' hover "Watching: Pam, Quinn" (and "Watching this
+board: …" for screen readers), "+N", and the FAQ's Relay line.
+
+**Testing.** Full lane (a client-server protocol change): typecheck, the whole unit suite (new: the board to jump to,
+finished boards included; who's watching on the server: a board shown, switching, nobody, only your own board's news,
+a burst coalesced, views naming no board, disconnecting, coming back, leaving, an app that never says; the switch's
+default and storage; the FAQ line), e2e `e2e/squads-watch.spec.ts` (the jump on by default and off, remembered; a
+second player's pawn with the eye over your board, the board not moving, gone when they look away or disconnect),
+`squads-play.spec.ts` and `squads-v2.spec.ts` adapted to the jump, and the whole e2e suite.
+
+### The Hidden Boss's slow moves: once, beside your board (Eric, Oct 14, 2026)
+
+Eric, after playing it: "Why show the same slow moves 4 times each player just needs to see one on the right of their
+board since they all are the same total right?" The count is the team's, so the ten marks now show once: a column by
+the right edge of your board (on a phone, the big board, yours or the one you're watching). The small boards and the
+other three on a computer show none. The marks flash at every slow move, whoever's; the short "slow move" note still
+sits on the board it was on, so you see which board was slow.
+
+## The Hidden Boss after Eric's playtest: no strikes, a try spends its charge, one quote gone, 1+0 then 1+2 (Eric, Oct 14, 2026)
+
+Eric played phase 1 on Oct 14 and asked for four changes. Same reach as before: admins only, in Boss alone; no
+protocol or stored data changed (online can't meet him: the new event kind and rule are the shared runner's, as his
+others are).
+
+**1. He never strikes the crowd** (my call; Eric: "I'll leave you to that").
+- Every boss knocks out the crowd's worst mover every `bossKillEvery` (3) moves while more than its minimum is left,
+  and its intro says "Worst mover struck every 3 moves." Eric saw it in his fight and wasn't sure it belonged. It
+  doesn't: his real fight is a squad of four, who must all reach phase 2's four boards.
+- A per-boss rule, `BossRules.noStrikes` (his only): the runner's `bossKillDue` is never true for him (solo, the server
+  and the sims all ask it), the screens get `strikeIn` null, so his card says "Move N of M", and his intro's second
+  line is empty instead of the strikes line. Other bosses unchanged (a unit test runs a crowd of five against him and
+  against Boingo: no knockouts for him, Boingo's at moves 3 and 6, the card counting down).
+
+**2. The Weaver Adams line is gone** from `boardWon` (Eric: "it doesn't fit the rest"), with its source note. His board
+win lines are the two placeholders. Nothing else referred to it but its test (now: no Weaver Adams anywhere in his
+lines). Its research entry stays in "The Hidden Boss, phase 2" as a record.
+
+**3. The God King's help tried against him spends the charge** (Eric: "using the king's move doesn't draw down on the
+usage vs him like it should").
+- Tapping "Play move" or "Strike" is still blocked and mocked as before (the slam, his line, the God King's), and now
+  uses up that charge as if it had worked: the runner's `kingTried` (one charge a try; none left, nothing), called by
+  solo's `callKing`, which the dock now calls after the mock. The crowns go down; with none left the God King can't be
+  called, as against any boss. Phase 2 too (the same dock, the same charges).
+- **My calls:** a blocked try leaves your move yours (he played nothing; the clock runs on), and a second try in the
+  same move spends another charge (each try is a use; no new state to track). `kingMoves` and `kingStrikes` stay empty
+  (he never acted). The Last Stand isn't a player's action: unchanged, it never comes and spends nothing.
+- Online can't meet him: `NetMatch.callKing` sends nothing for him (no server path takes such a try), as before.
+
+**4. The bullet clock: 1+0 for three moves, then he adds 2 s a move** (Eric: "1 min too short, needs to be 1+1 or even
+1+2... a few moves, say 3, with 1+0, then he says a comment about it and suggests adding time per move, then a banner
+or just text on the center of the board that says time being added per move").
+- After his ultimate (the 1:00 bank, as before), the crowd plays `BOSS_POWERS.bulletPlainMoves` (3) moves at 1+0. As
+  the next crowd turn begins, his moment `bulletPlus` (a new event kind, once, from his rules' `everyTurn`): where he
+  stands he consults the book and says one grudging line (new placeholders, `RECLUSE_LINES.bulletPlus`: too fast even
+  for real chess, time per move then; one hints that the clock that adds time per move was his own idea, never as a
+  quote, and no number in the lines), then clean text across the middle of the board, "+2 s a move from now on"
+  (`.rc-plus`: a dark band, white text sized to the board, fading in and out; not a FightBanner), from 0.5 s to the
+  end of the moment (2.8 s, `RECLUSE_FX.bulletPlus`). The dock's word for the moment is "+2 s a move".
+- From then on each move made in time adds `bulletIncrementSeconds` to that player's bank. **2 s** (the director's
+  pick: Eric said 1+1 or 1+2; 1:00 felt too short, so the more forgiving one; one setting). It's the game's usual
+  increment: the runner's round settings give the bullet clock that increment (`bulletIncrement`, from the turn and
+  `ultAt`), so a move may take the bank plus 2 s, and the bank after it is the bank plus 2 s less the time taken; a move
+  not made in time empties the bank, and the battle is lost on time as before. No cap on the bank (none existed for
+  bullet): the per-move cap is set where no bank can reach it (the bullet bank plus the increment on every move a
+  battle can have), so the bank decides.
+- The dock shows the time control once it applies: "Bullet 1+2 · 0:41 left" (before it, "Bullet · 0:41 left" as now).
+- **The clock still only counts your own thinking:** his moment is a power's moment like any other (`POWER_FX`), so
+  the crowd's clock starts after it, as it starts after his move, his thinking and every reveal.
+- Settings in `packages/core/src/settings.ts` with comments; estimates, not sim-tested.
+
+**Testing.** Targeted lane (rules touched, so the whole unit suite): typecheck; unit
+`packages/chess/test/recluse.test.ts` (no strikes against him and Boingo's as before; a try spends a charge, one a try,
+none left nothing, phase 2's too, another boss's untouched; three moves at 1+0, his moment once as the fourth begins,
++2 s a move made in time, the bank growing past 1:00 uncapped, out of time still loses, the rule's numbers, the moment's
+length in the boss's turn show), `packages/app/test/recluse-boss.test.ts` (the moment's line, priority, text, dock word
+and timing; "Bullet 1+2" from the right turn; no Weaver Adams; solo's `callKing` spending a charge a try and leaving
+your move yours); e2e `recluse.spec.ts` (no strike text from the intro on; the dock's crowns 3, 2, 1 in phase 1 and 3, 2
+in phase 2; three moves at 1+0, his line, "+2 s a move from now on" only while the boss screen holds, "Bullet 1+2", the
+bank after a move exactly +2 s less the time taken), `matchmaking.spec.ts`'s Solo raid (another boss's card still says
+"Strikes in…"), `king-attack.spec.ts`, `boss-speech.spec.ts`, `resign.spec.ts`. Frames: `npm run frames:recluse --
+<dir> both light only=plus`; the dock's "Your move. Bullet 1+2 · 0:59 left" measured whole in its two lines at 320,
+360 and 390 px, and the band on the squares exactly.
+- **A test fix on the way** (`recluse.spec.ts`, phase 2's slow moves, from #208): it failed on a computer, on main too.
+  The bots' slow moves can bring his ultimate during the 5.4 s the test thinks, and then its own move can't add one; the
+  test now stops counting once the ultimate has come by the time it moves.
+
+### Maia's loading step (Eric, Oct 14, 2026)
+
+On Eric's iPhone 15 (Safari, Wi-Fi) Maia failed to load in every normal boss battle and loaded with `?win=1`, where
+almost nothing else runs; with #209 the admins' line said why: "failed: Stockfish (load failed: no available ba…",
+onnxruntime-web's "no available backend found. ERR: [wasm] …", which on iOS Safari usually means its WebAssembly memory
+couldn't be made. Eric: "We just need to add a loading bar... 'loading components' or something. People can deal with
+it if they need to wait 5 or 10 seconds." Then, Oct 14: tell players about the download, quick and simple. My calls:
+
+- **A loading step before the intro, solo only** (Boss alone, a Solo raid, the Crowd's boss battle in Solo: wherever
+  `startBrain` puts the boss on Maia). The boss screen holds the intro's first frame under a card on the board, the
+  intro card's backdrop with no entrance: the boss's portrait, **"Loading the boss…"**, a bar, under it "12 of 40 MB"
+  while the files come down with **"First time only: about 40 MB, then it's saved on this device."**, then
+  **"Starting…"** while Maia starts, and **Leave** (home; before move 1 only: in the Crowd's battle leaving is
+  resigning, which stays the top line's, with its confirm). Then the intro as before; its card takes over from the
+  step's without an entrance, so the board never shows between the two dark cards. The boss's figure rests (a
+  `loading` stage: its idle loop, no line); its entrance is the intro's.
+- **Stockfish stops, it doesn't only idle.** Each Stockfish worker on the device (the pool the app starts as it opens,
+  and the engine of its own if one was made) ends once the work already asked for is done, so its WebAssembly memory is
+  freed; anything asked for meanwhile (the intro's eval bar, a hint, the Engine move's search, the boss's move) waits in
+  its queue; fresh workers start, set up as before, when the step ends (`UciEngine.pause`, `pauseEngines`). Maia's
+  worker starts at once, but its model loads only after Stockfish's workers have ended. Stopping is simpler than
+  re-ordering the app's start (the pool is made as the app opens, for every mode) and frees the same memory. Online is
+  unchanged (other players can't wait on one device; the protocol isn't touched).
+- **One retry.** A load that fails short of memory or with no backend ("memory" or "backend" in its reason) is tried
+  once more from a fresh worker, with Stockfish still stopped; any other failure (a missing file) isn't.
+- **Never stuck.** `BOSS_BRAIN.loadGateMs`, 20 s from the step's start (download included), is the most it waits; then
+  the battle begins whatever happened: Maia not ready yet loads on and takes over once ready (Stockfish's moves until
+  then), as before the step. 20 s: on Wi-Fi a first download takes a few seconds and the start a second or two (Eric's
+  5 or 10 seconds), and a slow connection gives up rather than hold a player. If a fresh Stockfish doesn't answer within
+  `stockfishBackMs` (15 s) after the step, Maia is closed and Stockfish started once more: a battle needs Stockfish,
+  not Maia.
+- **The bar** counts the bytes the page reads (the menu's prefetch, else the step's own) against the three files'
+  sizes, written into the app by its build (live, the worker and the WebAssembly come compressed with no length the
+  page could use; a response's own length when it isn't compressed; a sliding bar when neither is known). Files the
+  service worker already keeps aren't read again (the prefetch used to read all 40 MB every time it ran), so a later
+  battle goes straight to "Starting…". The download is counted in the files' own size, 40 MB (`BOSS_BRAIN.downloadMb`,
+  checked against the files by a test), which is what's saved on the device; over the network it's about 29 MB (the
+  WebAssembly comes compressed), so "about 40 MB" never understates it.
+- **Maia's memory, in the box.** onnxruntime-web 1.30's only WebAssembly build is the threaded one (we run one thread),
+  so its memory is shared, and it asks for a 4 GiB maximum. A shared memory reserves its maximum up front, and iOS
+  Safari can refuse that much, more readily with Stockfish's memories already reserved beside it, which fits Eric's
+  `?win=1` loading and normal battles not. The box now caps it at 512 MiB while the session is made
+  (`MEMORY_MAX_PAGES` in `packages/maia-worker/src/model.ts`); the model uses about 70 MB of it (69 MB after loading
+  and after 20 moves, the same, in Node), and works the same in Chromium. A load's error now comes whole and on one
+  line (`errorText`: its kind, message and cause), and a phone's admins' line wraps instead of cutting it (a computer's
+  pill stays one line in the title line, so the boards below never move, with the whole text on hover). Verified in
+  Chromium and Node only; only Eric's iPhone can say which of the three (the cap, Stockfish stopped, the retry) did it
+  (TESTING.md, "Maia").
+- **The admins' line** says more: "loading (waited 20 s)" when the step gave up, "… (2nd try; the 1st: <reason>)" after
+  a retry, "Stockfish (Maia closed: Stockfish didn't start again beside it)" after the last resort.
+- **Measured** (Chromium, the CPU slowed 4x, a local server): the step took 3.6 s the first time (the download 2.3 s,
+  Maia's start 1.3 s) and 1.2-1.3 s after that (a quarter second looking in the cache, then "Starting…"); unslowed in
+  the e2e, 2.3-2.8 s the first time. A boss intro on a slowed phone (`perf.spec.ts`, Big Boy's snack, one run each):
+  main p95 33.4 ms, 13% of frames dropped; this branch p95 16.8 ms, 2% (twice): the intro no longer shares the phone
+  with Maia's load. The other perf cases within their usual spread.
+- **The FAQ** (Brain 2) says why Maia (a human-like engine, so a boss plays more like a person than Stockfish does),
+  that it's a bigger download, about 40 MB, fetched once and kept, and that on a slow connection or if it can't load
+  the boss plays Stockfish; its rule 4 now says a Solo or Boss alone battle waits for Maia, 20 s at most, and online
+  nobody does (it said nobody ever waits). Numbers from `BOSS_BRAIN`.
+
 ## The engine reader: a slot's last exact line may name another move (Oct 14, 2026)
 
 **What:** The code that reads Stockfish's output (`searchLines` in `packages/chess/src/uci.ts`, and the same function in
@@ -3691,4 +4021,5 @@ beyond noise; all together the crowd's score leans +0.05 ± 0.03 its way. Bosses
 
 **Testing.** Full lane (judging numbers on every device and on the server): typecheck, the whole unit suite, the whole
 e2e suite. Unit: `packages/chess/test/uci.test.ts` (recorded lines where two moves swap slots and the search stops on
-a bound; a search with no mix-up reads as before; a move that left the lines is dropped).
+a bound; a search with no move twice reads exactly as before, a single line too; with a move twice, a move that has
+left the lines is dropped).

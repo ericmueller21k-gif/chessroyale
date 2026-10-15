@@ -202,15 +202,17 @@ test("Relay (a test lobby): your move on your board shows at once, then the tiny
   const mine = legal(s.fen!).find((m) => m.length === 4)!;
   const moved = await watchFor(page, { moved: { selector: ".sq-status", text: /^Moved · Board/ }, played: { selector: ".sq-duty strong", text: /^You played / } });
   await tapMove(page, mine);
-  // At once: your move is on your board (it stays there: nothing snaps back while the half runs).
+  // At once: your move is on your board (nothing snaps back).
   await expect.poll(() => moved.seen(), { timeout: 5000 }).toEqual({ moved: true, played: true });
+  // A beat later (Jump to my next board, on by default) the big board is next turn's (e2e/squads-watch.spec.ts).
+  await expect(page.locator(".sq-tiny.on .sq-mark.next")).toHaveCount(1, { timeout: 5000 });
   // The tiny boards are tappable now: watch another board full size, then back.
   const others = page.locator("button.sq-tiny:not(.is-you)");
   await expect(others.first()).toBeVisible();
-  // The big board's coordinates sit in their own squares, either way up (the letters were a column off): on your board,
-  // then on next turn's, where your squad has the other color, so it opens the other way up.
+  // The big board's coordinates sit in their own squares, either way up (the letters were a column off): on next
+  // turn's board, then back on yours, where your squad has the other color, so it opens the other way up.
   const up = await expectCoordsInSquares(page);
-  await page.locator("button.sq-tiny:has(.sq-mark.next)").click();
+  await page.getByRole("button", { name: "Back to my board" }).click();
   await expectCoordsInSquares(page, up === "white" ? "black" : "white");
   await others.nth(3).click();
   await expect(page.locator(".sq-status")).toContainText(/^Watching Board \d|is over/);

@@ -306,6 +306,16 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   `armageddonIntroSeconds` (the last pick stands; nobody: the bots' Black), then `startArmageddon`.
 - **Spectating and leaving.** Everyone gets every match (the tiny boards). A knocked-out squad's people watch on, or
   `leave` (their socket closes) and queue again.
+- **Who's watching** (Eric, Oct 14; DECISIONS.md, "Squads: jump to my next board, and who's watching"). Each screen
+  sends `view` (the match and board it shows full size, or none) only when that changes, and again after a reconnect.
+  The lobby keeps each person's board in the record (`views`; a view naming no board here counts as none). Each screen
+  hears only about the board it shows: `viewers` with the people showing it now (people only: bots never send `view`;
+  you among them), when that changes, and whole (`full`) when it has just moved there. At once if the last round went
+  out more than `SQUADS_LOBBY.watching.coalesceMs` (1 s) ago, else when it's that old, with everything that changed
+  meanwhile (`viewsDirty`, `viewsFresh`, `viewsSentAt`, an alarm): at most one a second to anyone, however many switch.
+  Someone who disconnects or leaves drops out; back, their screen says again what it shows. Viewing stays free: anyone
+  may watch any board once they've moved (ROADMAP.md keeps the question of limiting a teammate's board open for
+  players).
 - **Placements and rewards** (unranked). When the bracket decides a squad's placement, each person on it gets a results
   row (mode "squads", placement 1, 2, 3 or 5 of 8 squads) if signed in, and `SQUADS_LOBBY.rewards` (coins into the
   wallet, crates counted in `wallets.crates` for when crates stop being free) if still playing their seat. Nothing in
@@ -349,9 +359,11 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   match in full, as you may see it: tokens, block banks, blocks in effect and placed, the token log; its mode, each
   side's free seconds, kits, Stockfish tokens and shields left, the tokens used and being used, coins this match),
   `turn`, `clocks`, `choices`, `half`, `choiceNo`, `block`, `blockNo`, `token`, `assist`, `assistNo`, `wallets`,
-  `bought`, `shopNo`, `coins`, `placed`, `results`, `botWork`, `left`, `error`, `closed`, and sends `hello`, `vote`,
-  `choose`, `lock`, `block`, `assist`, `buy`, `unbuy`, `armageddon`, `speed`, `botTop` (each line with its reply),
-  `reclaim`, `leave`, `sync`, `nextRound`. A party socket
+  `bought`, `shopNo`, `coins`, `placed`, `results`, `viewers`, `botWork`, `left`, `error`, `closed`, and sends `hello`,
+  `vote`, `choose`, `lock`, `block`, `assist`, `buy`, `unbuy`, `armageddon`, `speed`, `botTop` (each line with its
+  reply), `reclaim`, `leave`, `sync`, `view`, `nextRound`. (`view` and `viewers`, Oct 14, are optional both ways, so
+  they came without a new version: an app that never sends `view` isn't shown watching, one that doesn't know
+  `viewers` ignores it.) A party socket
   gets `welcome`, `party`, `error`, `closed` and sends `hello`, `queue`, `cancel`, `leave`.
 - **Not yet:** the live line doesn't count Squads lobbies or their players (nor does the matchmaker's overload limit);
   no quick chat in Squads lobbies.
@@ -369,7 +381,7 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
 | A headless player (tests, the full-lobby run) | `e2e/squads-client.ts`, `scripts/squads-headless.ts` |
 
 Settings: `SQUADS_LOBBY` in settings.ts (the bracket's intro, rewards, bot work, the test controls' switch and test
-fill, parties); Worker variables `MATCH_FILL_SECONDS` and `SQUADS_TEST`.
+fill, parties, `watching`: who's watching and the jump); Worker variables `MATCH_FILL_SECONDS` and `SQUADS_TEST`.
 
 Tests: `packages/server/test/resign.test.ts` ("resigning in Squads": mid-bracket, in the votes, the last one out and
 everyone away), `packages/server/test/squads-lobby.test.ts` (seats and parties, the fill, votes, the bracket, a full bot lobby
@@ -383,11 +395,15 @@ playing on to its results), `squads-mercenary-lobby.test.ts` (the Mode vote; eve
 squad, caps, putting back, closed once the match starts; the kit; catch-up; the Stockfish token and a shield through
 the server; bots' shopping; a whole Mercenary bot lobby's coins adding up), `squads-queue.test.ts` (the queue,
 parties, D1 rewards), `squads-do.test.ts` (the Durable Object: storage per match,
-restart, closing); e2e `e2e/squads.spec.ts` (a party through the real server; a test lobby at the final);
+restart, closing), `squads-watching.test.ts` (who's watching: a board shown, a switch, nobody, only your own board's news, a
+burst coalesced to one message a window, views naming no board, disconnecting, coming back, leaving, an app that never
+says); e2e `e2e/squads.spec.ts` (a party through the real server; a test lobby at the final);
 `e2e/squads-test-tools.spec.ts` (the start link and Cheat lines, and a player without them); `e2e/squads-v2.spec.ts`
 (a token burned and refunded, a block and its arrow until they've moved, Cheat lines while blocking);
 `e2e/squads-clocks.spec.ts` (the Clock vote's cards in chess form, whole at 320 px; the winner on the match's card,
-in its deadlines, and the clock line whole at 320 px); `e2e/squads-mercenary.spec.ts` (choosing Mercenary in the Mode vote, earning coins, the shop between rounds, a
+in its deadlines, and the clock line whole at 320 px); `e2e/squads-watch.spec.ts` (Jump to my next board on by
+default and switched off, remembered; a headless teammate showing your board: his pawn, dressed, and the eye over it,
+the board not moving, gone when he looks away or disconnects); `e2e/squads-mercenary.spec.ts` (choosing Mercenary in the Mode vote, earning coins, the shop between rounds, a
 Stockfish token and a shield). The full-lobby run: `npx tsx scripts/squads-headless.ts
 --url http://localhost:8787 --device` against `wrangler dev` (`--var SQUADS_TEST:1` for test lobbies).
 
@@ -419,6 +435,21 @@ door's look; every class is `sq-`.
   you've moved or locked in: one opens full size with "Back to my board"; a new half that asks something of you brings
   you back), your board full size with « » through its moves (from its own start), and under it both squads' clocks
   with the free seconds counting down between them. The timer bar over the board is your move's deadline (no ticks).
+  - **Jump to my next board** (Relay; Eric, Oct 14): a switch in the panel (after your move's panel), with an (i) that
+    says in a sentence what it does (`JUMP_NEXT_LABEL`, `JUMP_NEXT_INFO`). On (the default, `watching.jumpToNext`;
+    remembered on the device, `brc.squads.jumpNext`, `squadsJumpNext` in prefs.ts), once you've made your Relay move the
+    big board goes to the board you play next turn, `watching.jumpAfterMs` (600 ms) later so your piece lands first
+    (your move shows nowhere else until the half ends), unless you've opened another board meanwhile. Next turn's board
+    finished (you'd scout it): the first board after it still going; none but yours: you stay (`studyBoard`). The line
+    above the board says "Watching Board 3 · your next board"; "Back to my board" works as before, and the jump comes
+    once a half. Off: you stay on your board until the game moves you. Pairs and the final have no next board.
+  - **Who's watching** (Oct 14; `Watchers` in SquadsParts.tsx): right after the line above the board, a small pixel eye
+    and the profile pawns (`Avatar`, with their items) of the other people showing that board full size, overlapping,
+    up to `watching.shown` (4), then "+N"; their names on hover. Not you, not the board's own players this turn
+    (`notWatchers`). Each pawn is the watcher's color on that board (white for anyone outside the match). The pawns
+    stand a little taller than the line and spill into the gaps around it, so the board doesn't move as people come and
+    go. Static, and it listens for who's watching itself (`client.onViewers`): a `viewers` message redraws these pawns
+    and nothing else (each pawn memoized), never the whole screen; a clock tick or a move doesn't redraw them.
   - **Relay:** your move shows on your board at once and stays (no snap-back); "Moved · waiting for the half to end".
   - **Pairs:** your pick green, your partner's live in blue; lock in. Their move too: "Same move: it plays for sure,
     and uses a token"; with none left the board won't take it ("No same-move tokens left: pick a different move").
@@ -491,16 +522,17 @@ door's look; every class is `sq-`.
 
 | What | Where |
 | --- | --- |
-| The client: the lobby's and the party's sockets, local times, optimistic choices, bot work, sounds | `packages/app/src/squads.ts` |
-| What the screens work out (clocks run down, YOU/NEXT, standings, names) | `packages/app/src/squads-view.ts` |
+| The client: the lobby's and the party's sockets, local times, optimistic choices, bot work, sounds, who's watching | `packages/app/src/squads.ts` |
+| What the screens work out (clocks run down, YOU/NEXT, the board to jump to, who's watching, standings, names) | `packages/app/src/squads-view.ts` |
 | The waiting room, votes, bracket phase, knocked out, results | `packages/app/src/screens/Squads.tsx` |
 | A match: Relay, Pairs, the final's vote, reveals, staging, blocking | `packages/app/src/screens/SquadsMatch.tsx` |
 | Blocked moves' arrows, the block picker, pick tags, block points and tokens, the token breakdown | `packages/app/src/components/SquadsBlocks.tsx` |
 | The party sheet | `packages/app/src/screens/SquadsParty.tsx` |
-| Standings, clocks, tiny boards, the bracket | `packages/app/src/components/SquadsParts.tsx` |
+| Standings, clocks, tiny boards, the bracket, who's watching (the eye and pawns) | `packages/app/src/components/SquadsParts.tsx` |
 | The menu slot | `packages/app/src/screens/Home.tsx` (`MODES`, `chosenHomeMode`); routes in `App.tsx` |
 
-Tests: `packages/app/test/squads-view.test.ts`; e2e `e2e/squads-play.spec.ts` (through the real server with its bots, on
+Tests: `packages/app/test/squads-view.test.ts` (with the board to jump to, finished boards included, who's watching,
+and the client's `view`/`viewers`), `squads-jump.test.ts` (the switch on by default, remembered, no storage); e2e `e2e/squads-play.spec.ts` (through the real server with its bots, on
 a phone and a computer: Pairs, the final, a Relay half with the board's coordinates in their squares both ways up, Next
 round, the party, the sounds). Frames:
 `npm run frames:squads -- <dir> relay|pairs|final|block|token|menu|standings|clockvote|clockline http://localhost:8787` against `wrangler

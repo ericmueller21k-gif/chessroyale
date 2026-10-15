@@ -1,21 +1,23 @@
-import { RECLUSE_PHASE2, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
+import { RECLUSE_PHASE2, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, SimulView, Standing, VoteView } from "./game.ts";
-import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game } from "./recluse-phase2.ts";
+import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, Talk } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { playInPlace, setFigureRun } from "./components/BossCharacter.tsx";
+import { play, warmSounds } from "./sound.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
-import { ownEngine, warmEngineServer, withServerRecheck } from "./engine.ts";
+import { ownEngine, pauseEngines, warmEngineServer, withServerRecheck } from "./engine.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
 import { crowdMoveCues, kingSay, resetKingSpeech } from "./godKing.ts";
-import { CRITICAL, LOW, NORMAL, bossVoice } from "./speech.tsx";
+import { CHATTER, CRITICAL, LOW, NORMAL, bossVoice } from "./speech.tsx";
 import { SoloLobbyChat } from "./chat.ts";
 import { account } from "./account.ts";
 import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
 import { prefetchMaia, startMaia } from "./maia.ts";
+import { MaiaGate, type GateEnd } from "./maia-gate.ts";
 
 export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
@@ -419,27 +421,78 @@ export class SoloMatch implements GameView {
   private maia: HumanUciEngine | null = null;
   /** The admins' debug line is on. */
   private brainShown = false;
+  /** The battle's Maia brain, when it has one (the admins' line, while Maia's worker isn't started yet). */
+  private brainPlan: { brain: BossBrain; rating: number; stockfishShare?: number } | null = null;
+  /** The loading step under way, before the intro (maia-gate.ts). */
+  private gate: MaiaGate | null = null;
+  /** How the loading step ended, and why Maia's first try failed if it was tried again (the admins' line). */
+  private gateEnd: GateEnd | null = null;
+  private maiaFirstError: string | null = null;
+  /** Maia was closed because this device's Stockfish didn't answer again beside it (the admins' line). */
+  private brainDropped = false;
 
   /**
-   * Any boss battle, as it begins (Boss alone, a Solo raid, the Crowd's boss battle): the boss's brain. On the Maia
-   * brain (every boss's own, for an admin until it's on for players; in Boss alone an admin may pick another), Maia's
-   * worker starts loading now, during the intro: the boss plays Stockfish until it's ready, never waiting for it.
+   * Any boss battle, as it begins (Boss alone, a Solo raid, the Crowd's boss battle): the boss's brain, then `next` (the
+   * intro). On the Maia brain (every boss's own; in Boss alone an admin may pick another), the loading step first
+   * (DECISIONS.md, "Maia's loading step", Oct 14): this device's Stockfish paused, Maia loaded alone, at most
+   * BOSS_BRAIN.loadGateMs, with its screen (BossScreen's `loading`). Not ready by then: the boss plays Stockfish until
+   * it is, as before.
    */
-  private startBrain() {
-    if (!this.runner.state.boss || this.maia) return;
+  private startBrain(next: (afterLoading?: boolean) => void) {
+    if (!this.runner.state.boss || this.maia) return next();
     const { picked, maia } = soloBrain(this.settings.raid && !this.raidBots);
     const plan = this.runner.bossBrainPlan(picked, maia)!;
     this.brainShown = isAdmin();
-    if (plan.brain === "stockfish" || plan.rating === null) return;
-    this.maia = startMaia(BOSS_BRAIN.loadTimeoutMs);
-    if (this.maia) this.runner.humanBrain = { brain: plan.brain, rating: plan.rating, ...(plan.stockfishShare ? { stockfishShare: plan.stockfishShare } : {}), engine: this.maia };
+    if (plan.brain === "stockfish" || plan.rating === null || typeof Worker === "undefined") return next();
+    const brain = { brain: plan.brain, rating: plan.rating, ...(plan.stockfishShare ? { stockfishShare: plan.stockfishShare } : {}) };
+    this.brainPlan = brain;
+    // (Its files: already here, or under way since the boss menu; else from now, so the bar can show them coming.)
+    prefetchMaia();
+    const gate = new MaiaGate({
+      start: (after) => {
+        const engine = startMaia(BOSS_BRAIN.loadTimeoutMs, after);
+        this.maia = engine;
+        this.runner.humanBrain = engine ? { ...brain, engine } : null;
+        return engine;
+      },
+      pause: (until) => pauseEngines(until, () => this.dropBrain(), BOSS_BRAIN.stockfishBackMs),
+      gateMs: BOSS_BRAIN.loadGateMs,
+    });
+    this.gate = gate;
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, intro: true, loading: true });
+    void gate.done.then((end) => {
+      if (this.gate !== gate) return;
+      this.gate = null;
+      this.gateEnd = end;
+      this.maiaFirstError = gate.firstError;
+      if (!this.stopped) next(true);
+    });
+  }
+
+  /** The boss's intro (bossIntroTimeline), then the battle. `afterLoading`: the loading step was on screen. */
+  private bossIntro(afterLoading = false) {
+    const powers = this.runner.state.boss?.powers;
+    const introMs = bossIntroTimeline(this.runner.boards.get(this.runner.state.boards[0]!)!.history.length, !!powers?.claimed, !!powers?.snack).total;
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + introMs, intro: true, ...(afterLoading ? { afterLoading } : {}) });
+    this.timer = setTimeout(() => this.nextRound(), introMs);
   }
 
   /** Frees Maia (its model holds a few hundred MB) once the battle is over. */
   private freeBrain() {
+    this.gate?.stop();
+    this.gate = null;
     this.maia?.close();
     this.maia = null;
+    this.brainPlan = null;
     if (this.runner) this.runner.humanBrain = null;
+  }
+
+  /** This device's Stockfish didn't answer again beside Maia (short of memory): Maia goes, the battle plays on Stockfish. */
+  private dropBrain() {
+    if (!this.maia) return;
+    this.freeBrain();
+    this.brainDropped = true;
+    this.emit();
   }
 
   /** Testing, admins: what the boss's brain did with its last move ("Maia 1450 · no guard · Maia's #1 · 120 ms"). */
@@ -451,11 +504,14 @@ export class SoloMatch implements GameView {
       return `Stockfish ${RECLUSE_PHASE2.elo} · at most ${RECLUSE_PHASE2.moveMs} ms${ms !== null ? ` · last ${Math.round(ms)} ms` : ""}`;
     }
     const note = this.runner.brainNote;
-    if (note) return brainWords(note);
-    const hb = this.runner.humanBrain;
-    if (!hb) return "Stockfish";
+    // (Maia failed to load: why, for the admin reading it, e.g. "load timed out" or the worker's error.)
+    if (note) return `${brainWords(note)}${this.maia?.status === "failed" ? ` · ${this.maia.error ?? "no reason"}` : ""}`;
+    const hb = this.runner.humanBrain ?? this.brainPlan;
+    if (!hb) return this.brainDropped ? "Stockfish (Maia closed: Stockfish didn't start again beside it)" : "Stockfish";
     const share = hb.stockfishShare ? ` · ${Math.round(hb.stockfishShare * 100)}% Stockfish` : "";
-    return `Maia ${hb.rating} · ${GUARD_WORDS[hb.brain]}${share} · ${this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? "failed: Stockfish" : "loading"}`;
+    const status = this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? `failed: Stockfish (${this.maia.error ?? "no reason"})` : this.gateEnd === "timeout" ? `loading (waited ${Math.round(BOSS_BRAIN.loadGateMs / 1000)} s)` : "loading";
+    // (Ready, or failed, on a second try: why the first failed.)
+    return `Maia ${hb.rating} · ${GUARD_WORDS[hb.brain]}${share} · ${status}${this.maiaFirstError ? ` (2nd try; the 1st: ${this.maiaFirstError})` : ""}`;
   }
 
   private bossIntroDone = false;
@@ -465,11 +521,15 @@ export class SoloMatch implements GameView {
   /**
    * Calling the God King. To play the move: your whole turn, no move of your own. To strike the boss: he comes
    * now if enough of the crowd has called, the clock stands still while he strikes, and then you pick as usual.
+   * Against the Hidden Boss neither comes, but the try spends its charge as if it had (Eric, Oct 14), in phase 1 on your
+   * move or in phase 2 while the boards are in play; the dock has him mock it, and your move goes on (its clock too).
    */
   callKing(strike = false) {
+    if (kingHelpBlocked(this.runner?.boss)) {
+      if ((this.phase.kind === "play" || (this.phase.kind === "simul" && this.phase2Playing)) && this.runner.kingTried()) this.emit();
+      return;
+    }
     if (this.phase.kind !== "play" || !this.runner.boss?.kingCharges || this.kingCalled) return;
-    // (The Hidden Boss: the God King's help doesn't work against him; the dock has him mock the try, nothing spent.)
-    if (kingHelpBlocked(this.runner.boss)) return;
     if (strike) return this.callStrike();
     this.kingCalled = true;
     this.runner.kingCallers.add(HUMAN);
@@ -788,17 +848,19 @@ export class SoloMatch implements GameView {
   }
 
   /**
-   * His phase change (PHASE_CHANGE, about 7 s; not skippable, like a boss's intro): the book's slam, the split, his
-   * revive, the shuffle. Phase 2's boards are set up now (each its own Chess960 start, from the battle's seed), so the
-   * shuffle shows where they go; their clocks start as it ends.
+   * His phase change (PHASE_CHANGE, about 10.5 s; not skippable, like a boss's intro): up in a rage, his leap onto the
+   * board, the book thrown down, the chant and its light, the split, the book back in his hands, the shuffle, his leap
+   * back. Phase 2's boards are set up now (each its own Chess960 start, from the battle's seed), so the shuffle shows
+   * where they go; their clocks start as it ends. `fromFall`: after phase 1's fall, whose mumbling carries on into it.
    */
-  private startPhaseChange() {
+  private startPhaseChange(fromFall = false) {
     if (this.timer) clearTimeout(this.timer);
     this.begun = true;
     this.freeBrain();
     this.brainShown = isAdmin();
-    // (Phase 1's words are over: neither voice carries a line into the phase change.)
-    bossVoice.reset();
+    // (Phase 1's words are over: neither voice carries a line into the phase change. His were cleared as he fell, so his
+    // mumbling goes on until his chant cuts in.)
+    if (!fromFall) bossVoice.reset();
     resetKingSpeech();
     const at = Date.now();
     const seed = this.runner.state.boss?.powers?.seed ?? Math.floor(this.rng() * 2 ** 32);
@@ -816,12 +878,18 @@ export class SoloMatch implements GameView {
       rng: this.rng,
       onChange: () => this.emit(),
       onResult: (b) => this.phase2Result(b.result!.winner),
-      onSlow: () => this.phase2Slow(),
+      onSlow: (id, ult) => this.phase2Slow(id, ult),
       onUlt: () => this.phase2Ult(),
+      onBossMove: (n) => this.phase2Talk(n),
       onDone: () => this.phase2Done(),
     });
-    // He stays slumped until he starts to rise, then revives as the book comes back to him, and rests in phase 2's idle.
-    setFigureRun({ since: at + PHASE_CHANGE.reviveAt, anims: ["revive"], loop: "idle2", before: "collapseLoop" });
+    this.talk = new Talk(this.rng);
+    this.lastSlow = null;
+    // (The slow move's sound made ahead, off the page, before play begins.)
+    warmSounds(["recluseSlow"]);
+    // Where he stands: up in a rage at once; from his leap the board draws him (his place stands empty), and once he's
+    // back he rests in phase 2's idle.
+    setFigureRun({ since: at, anims: ["rage"], loop: "idle2", before: "collapseLoop" });
     this.set({ kind: "phaseChange", at });
     this.timer = setTimeout(() => this.startSimul(), PHASE_CHANGE.total);
   }
@@ -840,12 +908,32 @@ export class SoloMatch implements GameView {
   }
 
   private phase2Lines = { won: 0, lost: 0, slow: 0 };
+  private talk: Talk | null = null;
 
-  /** A slow move: his word on it, if nothing else is being said (one bubble: it waits a little, then lapses). */
-  private phase2Slow() {
+  /**
+   * His `n`-th move on the boards: now and then a line about the team against him, only if nothing else is being said
+   * (chatter: any other line of his, a slow move's, his ultimate's, a board's, cuts in on it).
+   */
+  private phase2Talk(n: number) {
+    const line = this.talk?.lineAfter(n, !!bossVoice.line());
+    if (line) bossVoice.say(line, `recluse:p2:talk:${n}`, CHATTER);
+  }
+
+  /**
+   * A slow move (the team's count, the X marks beside every board): a soft sound, and his word on it if nothing else is
+   * being said (one bubble: it waits a little, then lapses).
+   */
+  private phase2Slow(boardId: number, ult: boolean) {
+    // (Soft and low: two notes falling. The board it was on flashes its marks, and the dock names it, for a moment.)
+    play("recluseSlow");
+    this.lastSlow = { board: boardId, at: Date.now() };
+    // (The one that brings his ultimate: his ultimate's line instead.)
+    if (ult) return;
     const lines = RECLUSE_LINES.slow;
     bossVoice.say(lines[this.phase2Lines.slow++ % lines.length]!, `recluse:p2:slow:${this.phase2Lines.slow}`, LOW);
   }
+  /** The last slow move: on which board, and when (its marks flash, the dock names it). */
+  private lastSlow: { board: number; at: number } | null = null;
 
   /** His ultimate: his line, the spellbook where he stands; from now on a few seconds a move on every board. */
   private phase2Ult() {
@@ -912,6 +1000,7 @@ export class SoloMatch implements GameView {
       playing: this.phase2Playing,
       ...o,
       slow: g.state.slow,
+      lastSlow: this.lastSlow,
       ultAt: g.state.ultAt,
       boards: g.state.boards.map((b) => ({
         id: b.id,
@@ -948,22 +1037,21 @@ export class SoloMatch implements GameView {
         return this.startPhaseChange();
       }
       if (!this.bossIntroDone) {
-        // The boss arrives: it takes over from an even position of the game just played.
+        // The boss arrives: it takes over from an even position of the game just played (on Maia, its loading step
+        // first).
         this.bossIntroDone = true;
-        this.startBrain();
-        const powers = this.runner.state.boss?.powers;
-        const introMs = bossIntroTimeline(this.runner.boards.get(this.runner.state.boards[0]!)!.history.length, !!powers?.claimed, !!powers?.snack).total;
-        this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + introMs, intro: true });
-        this.timer = setTimeout(() => this.nextRound(), introMs);
-        return;
+        return this.startBrain((afterLoading) => this.bossIntro(afterLoading));
       }
       if (this.runner.stageComplete()) {
         this.runner.finishBossBattle();
         // (A boss with a fall beaten, the Hidden Boss: the board holds while he collapses and starts to mumble; then his
-        // phase change and phase 2 (Boss alone), or the result screen, where he goes on mumbling.)
-        const fallMs = this.runner.boss?.result === "crowd" ? bossRules(this.runner.boss)?.fallMs : undefined;
+        // phase change and phase 2 (Boss alone), or the result screen, where he goes on mumbling. Before his phase
+        // change the fall is short, and his words are cleared as he falls, so his mumbling carries on into it.)
+        const phase2 = this.phase2Due();
+        const fallMs = this.runner.boss?.result !== "crowd" ? undefined : phase2 ? PHASE_CHANGE.fallMs : bossRules(this.runner.boss)?.fallMs;
         if (fallMs) {
-          const next = this.phase2Due() ? () => this.startPhaseChange() : () => this.finish();
+          if (phase2) bossVoice.reset();
+          const next = phase2 ? () => this.startPhaseChange(true) : () => this.finish();
           this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + fallMs, fall: true });
           this.timer = setTimeout(next, fallMs);
           return;

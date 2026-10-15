@@ -36,6 +36,7 @@ import {
   RATING_MIN_MOVES,
   SHOP_FREE,
   SQUADS,
+  SQUADS_LOBBY,
   TIERS,
   bossBrainFor,
   bossStrength,
@@ -58,6 +59,7 @@ import {
 } from "@chessroyale/core";
 import { clockLabel, defaultClock, minutesName } from "@chessroyale/chess/squads";
 import { anchorsOf, parse, plainText, type Block } from "./markdown.ts";
+import { JUMP_NEXT_LABEL } from "../squads-view.ts";
 
 /** Everything the FAQ quotes. The defaults are the game's; tests pass changed ones. */
 export interface FaqSources {
@@ -87,6 +89,8 @@ export interface FaqSources {
   clockVote: Pick<PregameVote, "options" | "defaultOption">;
   /** Resigning and leaving: how long someone may be gone from a match and still have their seat. */
   leaving: { awayMs: number };
+  /** Squads' "Jump to my next board" (Relay): on for a device that hasn't set it. */
+  squadsWatching: { jumpToNext: boolean };
 }
 
 export const FAQ_DEFAULTS: FaqSources = {
@@ -114,6 +118,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   squads: SQUADS,
   clockVote: PREGAME_VOTES.find((v) => v.id === "speed")!,
   leaving: LEAVING,
+  squadsWatching: SQUADS_LOBBY.watching,
 };
 
 // ---------------- Numbers as words ----------------
@@ -194,7 +199,7 @@ function modes(src: FaqSources): FaqSection {
 
 - **${Q.squadCount} squads of ${Q.squadSize}** play a knockout bracket. Come alone or with a party of up to ${Q.partyMax}; bots fill any empty seats.
 - **Two modes, voted first:** **Classic** is just chess: same-move tokens in Pairs, no blocks, no coins. **Mercenary** adds coins, a team shop between rounds and items, with blocks on (see [Squads: Mercenary](#mode-mercenary)). A third mode is coming soon. Nobody voting means Classic.
-- **Round 1, Relay:** ${n(Q.boards.relay, "board")}; your squad's players move from board to board, a different one each turn.
+- **Round 1, Relay:** ${n(Q.boards.relay, "board")}; your squad's players move from board to board, a different one each turn. Once you've moved you can watch any board (tap its tiny board), and **${JUMP_NEXT_LABEL}** (${src.squadsWatching.jumpToNext ? "on unless you switch it off" : "off unless you switch it on"}, under the board) takes you straight to the board you play next turn, to study it while you wait. An eye and pawns over a board show who else is watching it.
 - **Round 2, Pairs:** ${n(Q.boards.pairs, "board")}, played in pairs that change partners: both partners pick a move, and a coin decides which is played.
 - **Same-move tokens (Pairs):** pick the same move as your partner and it's played for sure, using one of your squad's ${n(Q.tokens.perMatch, "token")} for the match (both squads' tokens show under the board). If the engine then finds it was the only good move, every other move about ${n(Math.round(Q.tokens.refundGap / Q.tokens.pawnWorth), "pawn")} worse, the token comes back a few seconds later. The engine runs on players' devices; if none can judge it, there's no refund. With no tokens left, partners must pick different moves. After the match, a breakdown lists every token used, refunded or not, and why.
 - **The final, the team vote:** one board. On your squad's move all of you pick, you see your teammates' picks as they come (the other squad doesn't), and you can copy one. The most picked move is played; a tie is settled by a coin between the tied moves.
@@ -470,13 +475,19 @@ Going from ${pct(from, 0)} to ${pct(to, 0)} is only ${num(gPoints, 1)} points, b
 ### Brain 2: Maia-3, a human-like boss {#maia-brain}
 
 ${maiaNote}
-
+${
+  M.forPlayers
+    ? `
+**Why Maia, and its download.** Maia is a human-like engine, so a boss plays more like a person than Stockfish does. It's a bigger download, about ${M.downloadMb} MB, fetched once the first time you meet a boss and then kept on your device; on a slow connection, or if it can't load, the boss plays Stockfish instead.
+`
+    : ""
+}
 **Maia-3**, by the CSSLab at the University of Toronto, learned from human games to predict the move a person of a given rating would play. Held-back Stockfish plays like a strong engine with sudden lapses; Maia plays like a person, plans and mistakes included. There's no blunder guard by default: Maia's mistakes are human ones, and a boss's edge comes from its powers. A Maia boss picks its move like this:
 
 1. Maia is asked for its likeliest moves at the boss's Maia rating ([the handover](#handover)), and draws one from its own probabilities, a little sharper than a real person (temperature ${num(M.temperature)}) and never one of the rarest (only from the likeliest moves that together make up ${pct(M.topP, 0)} of the chances).
 2. **Powers:** Maia only picks among the moves a power leaves the boss (a pie, a toy block, a saw cut, Sawyer's first pawn move). If none of its likeliest moves is allowed, the boss plays its usual Stockfish move.
 3. A **guard**, where there is one ([the bridge](#handover)), may veto that move, judged against the boss's own Stockfish search of its best moves (a move outside that search is turned down). Maia's next likeliest moves are then tried in turn (at most ${M.candidates} in all, each at least ${pct(M.minP, 0)} likely); if none passes, the boss plays Stockfish's best.
-4. If Maia hasn't loaded, fails, or takes more than ${num(M.timeoutMs / 1000)} s (an older phone, say), the boss plays its usual Stockfish move. Nobody ever waits for it.
+4. If Maia hasn't loaded, fails, or takes more than ${num(M.timeoutMs / 1000)} s for a move (an older phone, say), the boss plays its usual Stockfish move. In Solo games and Boss alone, a boss battle waits for Maia to load before it starts, ${num(M.loadGateMs / 1000)} s at most; online, nobody waits for it.
 
 A Maia boss doesn't slip on purpose: its own mistakes take the slips' place. Its special moments keep their own engine picks: the move it makes when the God King strikes it, Boingo's move for the crowd as his funhouse comes, Hollow's extra move after Lights out and Big Boy's Big Bounce.
 

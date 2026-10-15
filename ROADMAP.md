@@ -66,6 +66,10 @@ on Eric's account.
      final's staging.
    - Phase 4: e2e and polish, then playtests with real players (the sim's open questions: real think times and
      misses, and how often a final is lost on time).
+   - **Open question for players (Eric, Oct 14): limit viewing a teammate's board while they're still to move?** Once
+     you've moved you can watch any board full size, and "Jump to my next board" takes you to the one you play next,
+     where a teammate may still be thinking: squads can talk it over (on Discord, say) and help. Eric: helping is fine
+     for now, "it is squads after all", so viewing stays free; players may weigh in, and it could be restricted later.
 
 ## Later: Eric's ideas (Oct 9, 2026; not started, not queued)
 
@@ -192,6 +196,21 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       letter rather than the hammer and sickle, which is banned in some countries (e.g. Lithuania, Latvia, Ukraine).
       Eric's call.
     - **For testing until then:** he's reachable from the boss menu, playing with bots.
+    - **Rewards vs. just playing him (Eric, Oct 14; ideas only, undecided, nothing to build yet):** Eric doesn't
+      want an awesome boss that most people never get to play, but playing him mustn't take away from the quest.
+      - **Rewards only the real way:** a trophy, the Fischer Random crate and any other reward come only from
+        beating him through Squads (the red book plus a tournament win).
+      - **Ways to play him for fun, no rewards** (any or none; Eric isn't sure yet):
+        - Buying the red book once unlocks him in solo Boss alone (with bots, who will lose; that's fine).
+        - Friends: a group of four (a party, or queued together) can choose him if all four have him unlocked (or
+          a book). Needs a four-player Boss mode, which doesn't exist yet.
+        - **The Crowd (50v50) mode** (Eric: "probably a decent compromise"): when it's down to the last four
+          players, an extra vote: fight him, or the usual ending.
+      - Why it matters: if the player base stays small, Squads wins may be rare, and a few players should still
+        get a chance at him.
+      - Director's notes: the solo unlock is the cheapest. The Crowd vote and the friends' mode both need the
+        four-player online fight (his server-side brain, the four boards online) that the Squads path needs anyway.
+        Keeping rewards to the Squads path keeps fair-play review to one place.
   - **Phase 1 to phase 2 (Eric, Oct 14):**
     - **Phase 1** is one board against him. Beat him there and **he collapses**: he drops to his knees, slumps and
       mumbles nonsense to himself (lines from Eric later).
@@ -234,17 +253,19 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
     source recorded (DECISIONS.md, "The Hidden Boss, phase 1"); his hateful and political statements stay excluded.
   - **Phase 1 is built (Oct 14), for admins only, in Boss alone** (DECISIONS.md, "The Hidden Boss, phase 1"): pick
     "Hidden Boss" from the boss menu (admins see him after the rest). Maia-3 at its top rating, raw, at a fixed
-    strength; the God King's help blocked and mocked; his ultimate at turn 7, the bullet clock for the rest of the
-    battle (1:00, no added time, out of time loses; Eric, Oct 14: was 3:00); beaten, he collapses and mumbles, then phase 2. Placeholder
+    strength; the God King's help blocked and mocked (a try spends its charge); no strikes on the crowd; his ultimate at
+    turn 7, the bullet clock for the rest of the battle (1:00 with no added time for 3 moves, then he adds 2 s a move;
+    out of time loses; Eric, Oct 14: was 3:00, then 1+0); beaten, he collapses and mumbles, then phase 2. Placeholder
     lines (and five verified quotes) in one table, `characters/recluse-lines.ts`, for Eric's own.
   - **Phase 2 is built (Oct 14), for admins only, in Boss alone** (DECISIONS.md, "The Hidden Boss, phase 2"): beaten
-    in phase 1, he collapses and mumbles, then the phase change (about 7 s: the book's slam, Sawyer's crack lines, the
-    quarters growing into four boards, the Chess960 shuffle as the book's pages flip, his revive), then four boards
+    in phase 1, he collapses and mumbles, then the phase change (about 10 s, reworked Oct 14: up in a rage, he leaps
+    onto the board, throws the book down and chants over its light; Sawyer's crack lines, the quarters growing into four
+    boards; the book back in his hands, the Chess960 shuffle, his leap back), then four boards
     at once, each its own Chess960 start: you on one, bots on three. Stockfish only, at 2750, at most 0.9 s a move;
     2:00 a board, no added time, out of time loses that board; a lost board's neighbors play on; all four must be
     won ("Victory!"), else a defeat that says how many of four were won. **His phase 2 ultimate** (Eric, Oct 14):
-    each move longer than 5 s (anyone's, any board) draws a line about playing faster; on the team's 6th slow move,
-    "That's enough!" and from then on 5 s a move on every board, no bank, a random legal move played for whoever runs
+    each move longer than 5 s (anyone's, any board) draws a line about playing faster and marks a red X beside every
+    board; on the team's 10th slow move, "That's enough!" and from then on 5 s a move on every board, no bank, a random legal move played for whoever runs
     out (never a loss on time). Test switches: the admins' "Trigger ultimate (testing)", `?win=1` (a mate in one in
     both phases, the bots take theirs), `?phase=2` (straight to the phase change).
     - **Left for later:** his real name and lines (phase 2's are placeholders too); how players reach him (the red
@@ -252,7 +273,7 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       glow); the special crate and its reward; a server-side brain (the engine server's move endpoint) and fair-play
       review for real fights; online and Squads play (today the server never makes a battle with him); the
       engine-against-engine sim in Chess960 at the real clock (next step, for 2750 and the 2:00 bank); sim-tuning
-      phase 1's numbers (turn 7, 60 s); the FAQ's Chess960 words once players can meet him.
+      phase 1's numbers (turn 7, 60 s, 3 moves at 1+0, then +2 s); the FAQ's Chess960 words once players can meet him.
 
 Added Oct 14, 2026 (Eric; notes only, nothing built):
 
