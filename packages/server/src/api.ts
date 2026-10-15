@@ -5,6 +5,7 @@ import { cachedUserId, firstSighting, forgetToken, markSeen } from "./presence.t
 import { REPORT_THANKS, appeal, fairStatus, reportPlayer } from "./fairplay.ts";
 import { isAdmin, type AdminEnv } from "./admin.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
+import { accountDownload, deleteAccount } from "./account-data.ts";
 import {
   buyItem,
   cleanEmail,
@@ -234,6 +235,31 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return json(await profile(sql, await updateProfile(sql, current.id, body)));
   }
 
+  // GET /api/me/data: "Download my data" (Settings), everything kept about your account as a JSON file, the global
+  // chat's lines (the live hub's) included. See account-data.ts.
+  if (path === "/api/me/data" && request.method === "GET") {
+    const hub = env.LIVE ? await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).accountData(current.id).catch(() => null) : null;
+    const body = await accountDownload(sql, current, now, hub ? { globalChat: hub.globalChat } : {});
+    return new Response(JSON.stringify(body, null, 2), {
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-disposition": `attachment; filename="hunchess-data-${new Date(now).toISOString().slice(0, 10)}.json"`,
+      },
+    });
+  }
+  // POST /api/me/delete {confirm: "delete"}: "Delete account" (Settings, after a confirmation). Everything personal goes
+  // (account-data.ts), every session with it (signed out on every device), and the live hub forgets the account
+  // (online now, its global chat lines). The app then starts afresh as a new guest.
+  if (path === "/api/me/delete" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { confirm?: unknown };
+    if (b?.confirm !== "delete") return json({ message: "Confirm that you want to delete your account." }, 400);
+    await deleteAccount(sql, current, now);
+    if (token) forgetToken(token);
+    if (env.LIVE) await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).forgetAccount(current.id).catch(() => undefined);
+    return json({ ok: true }, 200, { "set-cookie": cookie(SESSION_COOKIE, "", 0) });
+  }
+
   // The shop. GET /api/shop: your coins, items and what's equipped. POST /api/shop/buy {item}, /api/shop/equip {item}.
   if (path === "/api/shop" && request.method === "GET") return json(await shopState(sql, current.id));
   if ((path === "/api/shop/buy" || path === "/api/shop/equip") && request.method === "POST") {
@@ -371,9 +397,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (!res.ok) return Response.redirect(`${url.origin}/?signin=failed`, 302);
     const { id_token } = (await res.json()) as { id_token?: string };
     // The token came straight from Google over TLS, so its claims can be read without checking the signature.
-    const claims = id_token ? (JSON.parse(atob(id_token.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/"))) as { sub?: string; email?: string; email_verified?: boolean; name?: string; aud?: string }) : null;
+    const claims = id_token ? (JSON.parse(atob(id_token.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/"))) as { sub?: string; email?: string; email_verified?: boolean; aud?: string }) : null;
     if (!claims?.sub || claims.aud !== env.GOOGLE_CLIENT_ID) return Response.redirect(`${url.origin}/?signin=failed`, 302);
-    const user = await signInWithIdentity(sql, current, "google", claims.sub, { email: claims.email_verified ? (claims.email ?? null) : null, name: claims.name ?? null }, now);
+    const user = await signInWithIdentity(sql, current, "google", claims.sub, { email: claims.email_verified ? (claims.email ?? null) : null }, now);
     return signInAs(user, `${url.origin}${safeNext(readCookie(request, NEXT_COOKIE))}?signin=google`);
   }
 

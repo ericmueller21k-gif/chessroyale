@@ -3,7 +3,7 @@ import { CAPACITY, FRONT_DOOR } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
 import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LobbySummary } from "./live.ts";
 import { countCall } from "./ops.ts";
-import { GlobalChat, type GlobalChatSnapshot, type GlobalPost, type GlobalSender } from "./global-chat.ts";
+import { GlobalChat, type GlobalChatSnapshot, type GlobalLine, type GlobalPost, type GlobalSender } from "./global-chat.ts";
 import type { Env } from "./index.ts";
 
 /** The one live hub (its name). */
@@ -135,6 +135,17 @@ export class LiveHub extends DurableObject<Env> {
       await this.saveChat();
     }
     return { post, chat: this.chat.snapshot(now) };
+  }
+
+  /** What the hub holds about an account, for its download: its lines in the global chat, and when it was last seen. */
+  async accountData(id: string): Promise<{ globalChat: GlobalLine[]; lastSeen: number | null }> {
+    return { globalChat: this.chat.linesOf(id), lastSeen: this.board.lastSeen(id) };
+  }
+
+  /** A deleted account (account-data.ts): no longer online, and its lines leave the global chat. */
+  async forgetAccount(id: string): Promise<void> {
+    this.board.forgetSeen(id);
+    if (this.chat.forgetAccount(id)) await this.saveChat();
   }
 
   /** A drawn icon on a line still in the chat (null for any other key). */

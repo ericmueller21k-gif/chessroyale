@@ -304,6 +304,17 @@ export function cleanEmail(email: unknown): string | null {
   return e.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : null;
 }
 
+/**
+ * A deleted account's results keep this as their account (account-data.ts): no account has it (ids are 16 random
+ * characters), so no profile shows them, while the game's own numbers stay right.
+ */
+export const DELETED_ID = "deleted";
+/** What an admin's page shows for an account that was deleted (a fair-play ban outlives it). */
+export const DELETED_NAME = "Deleted player";
+
+/** Whether an account (still) exists: a lobby saving results for someone who deleted their account mid-match skips them. */
+export const accountExists = async (sql: Sql, id: string) => !!(await sql.first("SELECT id FROM users WHERE id = ?", id));
+
 export interface User {
   id: string;
   name: string;
@@ -383,7 +394,7 @@ export async function signInWithIdentity(
   current: User | null,
   kind: "google" | "email",
   value: string,
-  extra: { email?: string | null; name?: string | null } = {},
+  extra: { email?: string | null } = {},
   now: number,
 ): Promise<User> {
   const col = kind === "google" ? "google_sub" : "email";
@@ -406,14 +417,9 @@ export async function signInWithIdentity(
     return (await getUser(sql, current.id))!;
   }
   const id = randomToken(12);
-  await sql.run(
-    `INSERT INTO users (id, name, ${col}, created_at, last_seen) VALUES (?, ?, ?, ?, ?)`,
-    id,
-    cleanName(extra.name) ?? (kind === "email" ? value.split("@")[0]!.slice(0, 16) : "Player"),
-    value,
-    now,
-    now,
-  );
+  // A new account is "Player" until its owner picks a name: never their Google name or the start of their email,
+  // which everyone would see (DECISIONS.md, "Delete my account and download my data").
+  await sql.run(`INSERT INTO users (id, name, ${col}, created_at, last_seen) VALUES (?, 'Player', ?, ?, ?)`, id, value, now, now);
   if (kind === "google") await adoptGoogleEmail(sql, id, extra.email);
   return (await getUser(sql, id))!;
 }
@@ -438,8 +444,16 @@ const MAX_ATTEMPTS = 5;
 
 export type CodeStart = { ok: true; code: string } | { ok: false; message: string };
 
-/** A fresh 6-digit sign-in code for an address (rate-limited). */
+/** Sign-in code records go an hour after their last code was sent: by then it has expired and its hour's count is spent. */
+const CODE_KEEP_MS = 3_600_000;
+let codesPurgedAt = 0;
+
+/** A fresh 6-digit sign-in code for an address (rate-limited). Old records are cleared first (at most every 10 minutes). */
 export async function startEmailCode(sql: Sql, email: string, now: number): Promise<CodeStart> {
+  if (now - codesPurgedAt > 10 * 60_000 || now < codesPurgedAt) {
+    codesPurgedAt = now;
+    await sql.run("DELETE FROM email_codes WHERE sent_at < ?", now - CODE_KEEP_MS);
+  }
   const row = await sql.first<{ sent_at: number; hour_start: number; sends_this_hour: number }>(
     "SELECT sent_at, hour_start, sends_this_hour FROM email_codes WHERE email = ?",
     email,
@@ -517,6 +531,8 @@ const flag = (b: unknown) => (b === true ? 1 : b === false ? 0 : null);
 export const cleanSan = (m: unknown) => (typeof m === "string" && /^(?:[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O(?:-O)?)[+#]?$/.test(m) ? m : null);
 
 export async function recordResult(sql: Sql, userId: string, r: MatchResult, now: number): Promise<void> {
+  // (An account deleted mid-match gets nothing new.)
+  if (!(await accountExists(sql, userId))) return;
   const rating = typeof r.rating === "number" && Number.isFinite(r.rating) ? Math.round(r.rating) : null;
   const cuts = count(r.cuts);
   const strikes = count(r.strikes);
@@ -897,7 +913,7 @@ export async function equipItem(sql: Sql, userId: string, itemId: unknown): Prom
 export async function grantReward(sql: Sql, userId: string, coins: number, crates: number): Promise<void> {
   const c = Math.max(0, Math.round(coins));
   const k = Math.max(0, Math.round(crates));
-  if (!c && !k) return;
+  if ((!c && !k) || !(await accountExists(sql, userId))) return;
   await sql.run(
     "INSERT INTO wallets (user_id, coins, crates) VALUES (?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates",
     userId,

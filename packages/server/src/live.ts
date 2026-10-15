@@ -178,6 +178,12 @@ export class LiveBoard {
   private written = new Map<string, number>();
   private lobbies = new Map<string, LobbySummary & { updatedAt: number }>();
 
+  /** A deleted account: no longer online, and nothing left to write. */
+  forgetSeen(id: string) {
+    this.seen.delete(id);
+    this.written.delete(id);
+  }
+
   markSeen(ids: readonly string[], at: number) {
     for (const id of ids) if ((this.seen.get(id) ?? 0) < at) this.seen.set(id, at);
   }

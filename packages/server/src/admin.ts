@@ -11,7 +11,7 @@
  */
 import { FAIRPLAY, crowdRate, skipReason, type FairMove, type FairSummary } from "@chessroyale/core";
 import { toSan } from "@chessroyale/chess";
-import { d1Sql, ensureSchema, userFromToken, type Sql, type User } from "./accounts.ts";
+import { DELETED_NAME, d1Sql, ensureSchema, userFromToken, type Sql, type User } from "./accounts.ts";
 import { SESSION_COOKIE, readCookie, type AccountEnv } from "./api.ts";
 import { caseOf, decide, decideAppeal, purgeEvidence, type Appeal, type Case, type CaseMailer } from "./fairplay.ts";
 import { deepCheckRun, type DeepSearch } from "./fairplay-deep.ts";
@@ -77,8 +77,10 @@ export async function openCases(sql: Sql, now: number, status: "open" | "review"
         ? "1 = 1"
         : "c.status = ?";
   const rows = await sql.all<Case & { name: string }>(
-    `SELECT c.user_id, c.status, c.reason, c.opened_at, c.updated_at, c.decided_at, c.decided_by, u.name FROM fairplay_cases c
-     JOIN users u ON u.id = c.user_id WHERE ${where} ORDER BY c.updated_at DESC LIMIT 500`,
+    // (A ban outlives a deleted account: it's listed as a deleted player.)
+    `SELECT c.user_id, c.status, c.reason, c.opened_at, c.updated_at, c.decided_at, c.decided_by, COALESCE(u.name, ?) AS name FROM fairplay_cases c
+     LEFT JOIN users u ON u.id = c.user_id WHERE ${where} ORDER BY c.updated_at DESC LIMIT 500`,
+    DELETED_NAME,
     ...(status === "open" || status === "all" ? [] : [status]),
   );
   const out: CaseRow[] = [];
@@ -172,7 +174,8 @@ function evidenceMove(m: FairMove): EvidenceMove {
 }
 
 export interface CaseDetail {
-  player: { id: string; name: string; joinedAt: number; signedIn: boolean; email: string | null; onlineMatches: number };
+  /** (joinedAt null: the account was deleted and its ban kept.) */
+  player: { id: string; name: string; joinedAt: number | null; signedIn: boolean; email: string | null; onlineMatches: number };
   case: Case | null;
   reports: { at: number; reason: string; match: string | null; reporter: { id: string; name: string; signedIn: boolean } }[];
   matches: { lobby: string | null; mode: string; playedAt: number; counted: number; perf: number | null; score: number; level: string; summary: FairSummary; moves: EvidenceMove[] | null; keepUntil: number | null }[];
@@ -184,11 +187,14 @@ export interface CaseDetail {
 
 /** Everything about one case: the player, reports, each match's signals and judged picks, the log and appeals. */
 export async function caseDetail(sql: Sql, userId: string, opts: { email: boolean; limit?: number } = { email: false }): Promise<CaseDetail | null> {
-  const u = await sql.first<{ id: string; name: string; created_at: number; email: string | null; google_sub: string | null }>(
+  const found = await sql.first<{ id: string; name: string; created_at: number; email: string | null; google_sub: string | null }>(
     "SELECT id, name, created_at, email, google_sub FROM users WHERE id = ?",
     userId,
   );
-  if (!u) return null;
+  // A deleted account whose ban outlives it (account-data.ts): its case, log and device markers, under its old id.
+  const kept = found ? null : await caseOf(sql, userId);
+  if (!found && !kept) return null;
+  const u = found ?? { id: userId, name: DELETED_NAME, created_at: null, email: null, google_sub: null };
   const online = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM results WHERE user_id = ? AND online = 1", userId))?.n ?? 0;
   const reports = await sql.all<{ at: number; reason: string; match: string | null; id: string; name: string; email: string | null; google_sub: string | null }>(
     `SELECT r.at, r.reason, r.match, u.id, u.name, u.email, u.google_sub FROM reports r JOIN users u ON u.id = r.reporter
@@ -203,8 +209,8 @@ export async function caseDetail(sql: Sql, userId: string, opts: { email: boolea
   const log = await sql.all<{ at: number; action: string; by: string; reason: string | null }>("SELECT at, action, by, reason FROM fairplay_log WHERE user_id = ? ORDER BY at DESC, id DESC LIMIT 200", userId);
   const appeals = await sql.all<Appeal>("SELECT id, user_id, at, text, status, decided_at, decided_by, reply FROM fairplay_appeals WHERE user_id = ? ORDER BY at DESC", userId);
   const sameDevice = await sql.all<{ id: string; name: string; status: string | null }>(
-    `SELECT DISTINCT u.id, u.name, c.status FROM fairplay_devices d JOIN fairplay_devices o ON o.device = d.device AND o.user_id != d.user_id
-     JOIN users u ON u.id = o.user_id LEFT JOIN fairplay_cases c ON c.user_id = u.id WHERE d.user_id = ? LIMIT 20`,
+    `SELECT DISTINCT o.user_id AS id, COALESCE(u.name, '${DELETED_NAME}') AS name, c.status FROM fairplay_devices d JOIN fairplay_devices o ON o.device = d.device AND o.user_id != d.user_id
+     LEFT JOIN users u ON u.id = o.user_id LEFT JOIN fairplay_cases c ON c.user_id = o.user_id WHERE d.user_id = ? LIMIT 20`,
     userId,
   );
   const parse = <T>(s: string | null): T | null => {
@@ -408,7 +414,7 @@ function casePage(d: CaseDetail, note: string | null): string {
   };
   return `<p><a href="/admin/fairplay">← Fair play</a></p><h1>${esc(d.player.name)}</h1>
 ${note ? `<div class="card">${esc(note)}</div>` : ""}
-<p class="muted">${esc(d.player.id)} · ${d.player.signedIn ? esc(d.player.email ?? "signed in (Google)") : "guest"} · joined ${when(d.player.joinedAt)} · ${d.player.onlineMatches} online matches</p>
+<p class="muted">${esc(d.player.id)} · ${d.player.joinedAt === null ? "the account was deleted; its ban is kept" : `${d.player.signedIn ? esc(d.player.email ?? "signed in (Google)") : "guest"} · joined ${when(d.player.joinedAt)}`} · ${d.player.onlineMatches} online matches</p>
 <div class="card">Status: <b class="${esc(c?.status ?? "")}">${esc(c?.status ?? "no case")}</b> ${c ? `· ${esc(c.reason)} · updated ${when(c.updated_at)}${c.decided_by ? ` · last decided by ${esc(c.decided_by)}` : ""}` : ""}</div>
 ${appealForm}
 <h2>Decide</h2>${decision}

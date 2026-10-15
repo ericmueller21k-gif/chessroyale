@@ -132,7 +132,8 @@ export function normalizeEmail(email: string): string {
   return `${gmail ? base.replace(/\./g, "") : base}@${gmail ? "gmail.com" : domain}`;
 }
 
-async function identityHashes(u: Pick<User, "email" | "google_sub">): Promise<[string, string][]> {
+/** An account's sign-in identities as fair play keeps them for a ban: hashed. */
+export async function identityHashes(u: Pick<User, "email" | "google_sub">): Promise<[string, string][]> {
   const out: [string, string][] = [];
   if (u.email) out.push(["email", await sha256(`email:${normalizeEmail(u.email)}`)]);
   if (u.google_sub) out.push(["google", await sha256(`google:${u.google_sub}`)]);
@@ -238,16 +239,17 @@ export async function decide(
   if (!status) return { ok: false, status: 400, message: "decision must be ban, clear, watch or review" };
   const why = typeof reason === "string" ? reason.trim().slice(0, 2000) : "";
   if (why.length < 5) return { ok: false, status: 400, message: "a written reason is required" };
+  // (A deleted account's ban outlives it: its case can still be decided, a ban lifted, with no one to email.)
   const user = await getUser(sql, userId);
-  if (!user) return { ok: false, status: 404, message: "no such player" };
   const before = await caseOf(sql, userId);
+  if (!user && !before) return { ok: false, status: 404, message: "no such player" };
   if (by === "reviewer") {
     if (before?.status === "banned") return { ok: false, status: 409, message: "banned cases and their appeals are for a person" };
     if ((await latestAppeal(sql, userId))?.status === "open") return { ok: false, status: 409, message: "this player has an open appeal: a person decides" };
   }
   await setCase(sql, userId, status, by, why, now);
   const notice = typeof opts.notice === "string" && opts.notice.trim() ? opts.notice.trim().slice(0, 1000) : null;
-  if (opts.mail && (status === "banned" || (status === "cleared" && (before?.status === "review" || before?.status === "banned")))) {
+  if (user && opts.mail && (status === "banned" || (status === "cleared" && (before?.status === "review" || before?.status === "banned")))) {
     await opts.mail(user, status === "banned" ? "banned" : "cleared", notice).catch((e: unknown) => console.log(`fair play email to ${userId}: ${String(e)}`));
   }
   return { ok: true, status };

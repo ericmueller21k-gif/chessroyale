@@ -96,7 +96,7 @@ describe("accounts", () => {
     const sql = memorySql();
     await ensureSchema(sql);
     const a = await createGuest(sql, 1000);
-    const linked = await signInWithIdentity(sql, a.user, "google", "sub-1", { email: "e@x.com", name: "Eric" }, 2000);
+    const linked = await signInWithIdentity(sql, a.user, "google", "sub-1", { email: "e@x.com" }, 2000);
     expect(linked.id).toBe(a.user.id);
     expect(linked.google_sub).toBe("sub-1");
     expect(linked.email).toBe("e@x.com");
@@ -115,8 +115,11 @@ describe("accounts", () => {
     const sql = memorySql();
     await ensureSchema(sql);
     // No guest on this device: a new account made by Google keeps the email (normalized).
-    const fresh = await signInWithIdentity(sql, null, "google", "sub-2", { email: "Admin@Example.com", name: "A" }, 1000);
+    const fresh = await signInWithIdentity(sql, null, "google", "sub-2", { email: "Admin@Example.com" }, 1000);
     expect(fresh.email).toBe("admin@example.com");
+    // Its name is "Player" until its owner picks one: never from Google or the email address.
+    expect(fresh.name).toBe("Player");
+    expect((await signInWithIdentity(sql, null, "email", "jane.doe1987@example.com", {}, 1100)).name).toBe("Player");
     // An older Google account saved without its email gets it when it signs in again.
     await sql.run("INSERT INTO users (id, name, google_sub, created_at, last_seen) VALUES ('old', 'Old', 'sub-3', 0, 0)");
     const g = await createGuest(sql, 2000);
