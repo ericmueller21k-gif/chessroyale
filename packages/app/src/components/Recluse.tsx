@@ -113,12 +113,14 @@ export function prewarmRecluse(side: "w" | "b"): void {
   warmed = side;
   const frames = (ch: typeof RECLUSE, names: readonly string[]) => names.flatMap((n) => ch.anims[n]?.frames ?? []);
   const PLACE = ["seize", "seizeLoop", "seized", "rage"];
-  prewarmSprite(RECLUSE_BUST, frames(RECLUSE_BUST, PLACE));
-  prewarmSprite(RECLUSE, frames(RECLUSE, [...PLACE, ...ON_BOARD_ANIMS]));
   // (The God King: triumphant, then his Last Stand from its blows, as the drain shows it.)
   let t = LAST_STAND.fallAt;
   const drained = GOD_KING.anims.lastStand!.frames.filter((f) => (t += f.ms) > LAST_STAND.slashAt);
-  prewarmKing(side, [...GOD_KING.anims.raise!.frames, ...GOD_KING.anims.raised!.frames, ...drained]);
+  // One after another, in the order they show (the God King's from the start, his seizing, then the board's figure),
+  // so only one slice of drawing ahead is ever at work in a frame.
+  prewarmKing(side, [...GOD_KING.anims.raise!.frames, ...GOD_KING.anims.raised!.frames, ...drained], () =>
+    prewarmSprite(RECLUSE_BUST, frames(RECLUSE_BUST, PLACE), undefined, () => prewarmSprite(RECLUSE, frames(RECLUSE, [...PLACE, ...ON_BOARD_ANIMS]))),
+  );
   warmSounds(["recluseDrain", "recluseSpark", "recluseArc"]);
 }
 

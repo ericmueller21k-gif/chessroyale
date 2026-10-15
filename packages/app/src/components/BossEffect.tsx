@@ -118,7 +118,7 @@ export function prewarm(name: EffectName, frames: readonly (readonly [string, nu
  * A character's frames drawn ahead the same way (a boss's power moment played away from his spot, which SpriteAnim
  * draws: Big Boy's bounce), in the given look. Returns a cancel.
  */
-export function prewarmSprite(ch: Character, frames: readonly Frame[], look?: string): () => void {
+export function prewarmSprite(ch: Character, frames: readonly Frame[], look?: string, done?: () => void): () => void {
   let i = 0;
   let stop = () => {};
   stop = onEachFrame(() => {
@@ -128,7 +128,11 @@ export function prewarmSprite(ch: Character, frames: readonly Frame[], look?: st
       if (f) frameImage(ch, f, look);
       i++;
     } while (i < frames.length && performance.now() - t0 < 4);
-    if (i >= frames.length) stop();
+    if (i >= frames.length) {
+      stop();
+      // (What's to be drawn ahead next, so that one slice a frame is ever at work: the Hidden Boss's.)
+      done?.();
+    }
   });
   return () => stop();
 }
