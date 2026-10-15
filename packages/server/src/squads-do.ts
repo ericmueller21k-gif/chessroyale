@@ -3,7 +3,7 @@ import { SQUADS } from "@chessroyale/core";
 import type { LobbyCloseReason, Opening } from "@chessroyale/chess";
 import type { PartyClientMessage, SquadsClientMessage } from "@chessroyale/chess/squads";
 import openings from "@chessroyale/chess/data/openings.json";
-import { SquadsCore, newSquadsRecord, squadsClosing, squadsLiveSummary, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
+import { SquadsCore, newSquadsRecord, squadsClosing, squadsLiveKey, squadsLiveSummary, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
 import { PartyCore, newPartyRecord, partyClosing, type PartyRecord } from "./squads-party.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { d1Sql, ensureSchema, grantReward, recordResult } from "./accounts.ts";
@@ -188,7 +188,7 @@ export class SquadsLobby extends DurableObject<Env> {
           // Already gone.
         }
       }
-      if (this.env.LIVE) await liveHub(this.env).forget(rec.code).catch(() => undefined);
+      if (this.env.LIVE) await liveHub(this.env).forget(squadsLiveKey(rec.code)).catch(() => undefined);
       this.record = null;
       this.matches = {};
       this.live = new LiveReporter();

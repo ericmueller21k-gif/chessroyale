@@ -219,7 +219,7 @@ describe("rate limits", () => {
     expect(rateLimited({ ip: "3.3.3.3", session: null, play: false }, t, true)).toBeNull();
   });
 
-  it("an account is a key only for a real session cookie, and a refused address uses up nothing of it", () => {
+  it("an account is a key only for a cookie shaped like a session token, and a refused address uses up nothing of it", () => {
     const L = CAPACITY.rateLimits;
     const t = 5_000_000;
     const tok = "tok-d".padEnd(43, "x");

@@ -384,13 +384,19 @@ export function newSquadsRecord(code: string, now: number, seed: number, opts: {
 }
 
 /**
+ * A Squads lobby's key on the live hub: "squads:" and its code. The hub keys lobbies by code, and Squads' codes come
+ * from the same letters as Crowd's, so a bare code could be another mode's lobby (and forgetting it would drop that one).
+ */
+export const squadsLiveKey = (code: string) => `squads:${code}`;
+
+/**
  * What a Squads lobby tells the live hub (live.ts): its phase as the live line has them, the people connected now, and
  * when it filled. Counted for the overload limit and the health view, never on the home page's public line.
  */
 export function squadsLiveSummary(r: SquadsRecord): LobbySummary {
   const phase = r.phase === "results" ? "over" : r.phase === "vote" || r.phase === "bracket" ? "playing" : "waiting";
   return {
-    code: r.code,
+    code: squadsLiveKey(r.code),
     mode: "squads",
     kind: r.auto ? "queue" : "private",
     phase,

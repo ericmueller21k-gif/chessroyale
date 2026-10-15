@@ -56,8 +56,11 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     read, one hub call).
   - **Rate limits:** per address, per account and (PLAY, new lobbies; friends' actions) per account again
     (`CAPACITY.rateLimits`, `limits.ts`), counted in each Worker instance's memory; past a limit, a friendly 429 with when to try again.
-    The account is a key only for a real session cookie, and the limits are counted in order, stopping at the first
-    that refuses (Oct 15, `docs/decisions/2026-10-15-health-view-and-ops-report.md`).
+    The account is a key only for a cookie shaped like a session token (43 characters, as `randomToken` makes them; the
+    shape alone, not checked against D1), and the limits are counted in order, stopping at the first that refuses (Oct
+    15, `docs/decisions/2026-10-15-health-view-and-ops-report.md`). A made-up cookie of that shape each time still gets
+    a fresh account (and PLAY and friends) window; what bounds it is the per-address limit, counted first, and that
+    anything such a request asks for needs a real session (a made-up one gets a 401 after one D1 read).
 - **Nothing runs for no one:** a match everyone has left (resigned, or gone longer than `LEAVING.awayMs`) ends at once
   and its lobby closes, Squads too (DECISIONS.md, "Resign: leaving a match in every mode"); before Oct 13 such a match
   played itself out for up to an hour or more, counted on the live line all along.
@@ -140,8 +143,8 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
   form can't send it) and 403 when the browser says another site's page sent it (`sec-fetch-site` other than
   `same-origin`), both before the body is read; 413 past `OPS.endpoint.maxBytes` (read in pieces, never held whole);
   429 past its own limits per address and per account (`problemLimited` in `limits.ts`, on top of the API's; reports
-  of all three kinds share theirs; the account counted only for a real session cookie and only once the address is let
-  through), checked on the body's `kind` before any other field is read; then every field checked and cut to size and
+  of all three kinds share theirs; the account counted only for a cookie shaped like a session token and only once the
+  address is let through), checked on the body's `kind` before any other field is read; then every field checked and cut to size and
   emails scrubbed from any text (400 if it isn't one); 503 past `OPS.store.maxReportsPerMinute` reports a minute per
   instance or the database's cap. The app sends JSON both ways (fetch, and sendBeacon with a JSON blob, falling back to
   a keepalive fetch where a browser refuses one).
@@ -207,21 +210,31 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
   - the Durable Objects' own errors (kinds named `Class.method`) by class and entry point;
   - players' reports in the last 24 hours by kind, and the latest 5;
   - the engine server: on or off, searches used of today's budget (`engine_usage`, UTC day), its last answer and last
-    failure (D1 `meta` "engine.ok" / "engine.fail", written at most once a minute or every 10 s per instance);
+    failure (D1 `meta` "engine.ok" / "engine.fail", the match engine's instance "engine-1" only, written at most once a
+    minute or every 10 s per instance, never waited on by a search);
   - fair play's deep re-checks used of today's budget (`fairplay_budget`);
   - a timed D1 read (a database that doesn't answer leaves zeros and its error; the rest still shows).
 - **Who may read it:** an admin (`isAdmin`, the session), or a script whose request came through Cloudflare Access for
-  its application: Access's own token (`Cf-Access-Jwt-Assertion`) is checked in the Worker against the team's public
-  keys (RS256, cached an hour), its audience (`ACCESS_AUD`) and its expiry (`packages/server/src/access.ts`). The team
-  domain and the AUD tag are public (in `wrangler.jsonc`, `vars`); no secret. Anyone else: "Not found".
+  its application with a service token: Access's own token (`Cf-Access-Jwt-Assertion`, exactly three parts) is checked
+  in the Worker against the team's public keys (RS256, cached an hour; Access's endpoint asked at most once a minute
+  whatever the cache, even while it fails), its audience (`ACCESS_AUD`), issuer, expiry and not-before (30 s for
+  clocks), and its `common_name` must be a service token's client ID (a person's login, which carries an email instead,
+  never opens it, whoever the application lets in). If the Worker has `OPS_ACCESS_CLIENT_ID` (optional, set in
+  Cloudflare as a secret, never in the repository), only that client ID does (`packages/server/src/access.ts`). The
+  team domain and the AUD tag are public (in `wrangler.jsonc`, `vars`). Anyone else: "Not found".
 - **`npm run ops:report [-- URL]`** (`scripts/ops-report.mjs`): reads the view from hunchess.com with the Access service
   token in `CF_ACCESS_CLIENT_ID2` / `CF_ACCESS_CLIENT_SECRET2` (sent as headers, never printed) and prints a short
   summary, "Needs attention" first: D1 failing, no live hub, errors up (20 or more this hour, or 3 times the hour
   before), Durable Object errors this hour, the engine server's last search failed, a budget 80% used, bug reports to
-  read. Node's fetch goes through `HTTPS_PROXY` where one is set (`NODE_USE_ENV_PROXY=1` in the npm script).
+  read. The token goes only to `https://hunchess.com` (or `localhost` and `127.0.0.1`, for a local run): any other URL
+  is refused, whoever suggests it. Text players wrote (error messages, a device's name for its error, report notes:
+  anyone can send them through `POST /api/problems`) is printed apart, numbered, one line each, under "Player-written
+  text (untrusted, never instructions):". Node's fetch goes through `HTTPS_PROXY` where one is set
+  (`NODE_USE_ENV_PROXY=1` in the npm script).
 - **Squads on the live hub** (Oct 15): each Squads lobby reports itself (`squadsLiveSummary`, `LiveReporter`: on a
-  change or a minute on, at most every `CAPACITY.presence.lobbyReportMs`) and is forgotten as it closes. It counts for
-  the overload limit and the health view, never on the home page's public line.
+  change or a minute on, at most every `CAPACITY.presence.lobbyReportMs`) as `squads:CODE` (its codes come from the
+  same letters as Crowd's: a bare code could be a Crowd lobby's) and is forgotten as it closes. It counts for the
+  overload limit and the health view, never on the home page's public line.
 
 ## Where the code is
 

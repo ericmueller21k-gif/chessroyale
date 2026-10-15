@@ -6,15 +6,18 @@ vi.mock("@cloudflare/containers", () => ({ Container: class {}, getContainer: ()
 
 import { createGuest, createSession, ensureSchema, signInWithIdentity } from "../src/accounts.ts";
 import { forgetAccessKeys, viaAccess } from "../src/access.ts";
-import { engineHealth, markEngine } from "../src/engine.ts";
+import { containerScore, engineHealth, markEngine } from "../src/engine.ts";
 import { health } from "../src/health.ts";
 import { LiveBoard, LiveReporter, type LobbySummary } from "../src/live.ts";
 import { handleOpsAdmin } from "../src/ops-admin.ts";
 import { ErrorTally } from "../src/problems.ts";
-import { squadsLiveSummary, type SquadsRecord } from "../src/squads-lobby.ts";
+import { squadsLiveKey, squadsLiveSummary, type SquadsRecord } from "../src/squads-lobby.ts";
 import { memoryDb } from "./memory-db.ts";
 
-/** The health view (health.ts), its Access check (access.ts) and Squads on the live hub (DECISIONS.md, "Health"). */
+/**
+ * The health view (health.ts), its Access check (access.ts) and Squads on the live hub
+ * (docs/decisions/2026-10-15-health-view-and-ops-report.md).
+ */
 
 const HOUR = 3_600_000;
 const NOW = Date.UTC(2026, 9, 15, 18, 30);
@@ -46,7 +49,12 @@ async function team() {
     asked.push(String(url));
     return new Response(JSON.stringify({ keys: [jwk] }));
   }) as unknown as typeof fetch;
-  return { sign, fetcher, asked };
+  /** Access's endpoint failing. */
+  const failing = (async (url: string) => {
+    asked.push(String(url));
+    return new Response("down", { status: 503 });
+  }) as unknown as typeof fetch;
+  return { sign, fetcher, failing, asked };
 }
 const good = { aud: [AUD], iss: `https://${TEAM}`, exp: NOW / 1000 + 600, common_name: "client-id.access" };
 const env = { ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD };
@@ -72,6 +80,39 @@ describe("Access's token", () => {
     await no("not.a-token");
     await no(await t.sign(good), { ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: "" });
     expect(await viaAccess(new Request("https://hunchess.com/"), env, NOW, t.fetcher)).toBe(false);
+    // Exactly three parts: a valid token with anything after it isn't one.
+    await no(`${await t.sign(good)}.x`);
+    await no(`${await t.sign(good)}.`);
+    // Not valid yet (nbf), past the 30 s allowed for clocks; valid from then on.
+    await no(await t.sign({ ...good, nbf: NOW / 1000 + 120 }));
+    await no(await t.sign({ ...good, nbf: "soon" }));
+    expect(await viaAccess(withToken(await t.sign({ ...good, nbf: NOW / 1000 + 10 })), env, NOW, t.fetcher)).toBe(true);
+    expect(await viaAccess(withToken(await t.sign({ ...good, nbf: NOW / 1000 - 60 })), env, NOW, t.fetcher)).toBe(true);
+  });
+
+  it("only a service token: a person's login (an email, no common_name) never opens the view; a pinned client ID, only that one", async () => {
+    const t = await team();
+    const person = { aud: [AUD], iss: `https://${TEAM}`, exp: NOW / 1000 + 600, email: "playtester@example.com", sub: "user-1" };
+    expect(await viaAccess(withToken(await t.sign(person)), env, NOW, t.fetcher)).toBe(false);
+    expect(await viaAccess(withToken(await t.sign({ ...good, common_name: "" })), env, NOW, t.fetcher)).toBe(false);
+    expect(await viaAccess(withToken(await t.sign({ ...good, common_name: 7 })), env, NOW, t.fetcher)).toBe(false);
+    const pinned = { ...env, OPS_ACCESS_CLIENT_ID: "client-id.access" };
+    expect(await viaAccess(withToken(await t.sign(good)), pinned, NOW, t.fetcher)).toBe(true);
+    expect(await viaAccess(withToken(await t.sign({ ...good, common_name: "another-client.access" })), pinned, NOW, t.fetcher)).toBe(false);
+    expect(await viaAccess(withToken(await t.sign(person)), pinned, NOW, t.fetcher)).toBe(false);
+  });
+
+  it("asks Access's endpoint at most once a minute whatever the cache, even while it fails; a key it has still does then", async () => {
+    const t = await team();
+    // A cold cache and a failing endpoint: a flood of tokens asks once a minute.
+    for (let i = 0; i < 50; i++) expect(await viaAccess(withToken(await t.sign(good)), env, NOW + i * 100, t.failing)).toBe(false);
+    expect(t.asked).toHaveLength(1);
+    expect(await viaAccess(withToken(await t.sign(good)), env, NOW + 61_000, t.fetcher)).toBe(true);
+    expect(t.asked).toHaveLength(2);
+    // An hour on (stale) with the endpoint failing: asked once, and the key it has still does meanwhile.
+    const later = NOW + 61_000 + 3_600_000;
+    for (let i = 0; i < 20; i++) expect(await viaAccess(withToken(await t.sign({ ...good, exp: later / 1000 + 600 })), env, later + i * 100, t.failing)).toBe(true);
+    expect(t.asked).toHaveLength(3);
   });
 
   it("an unknown key id asks for the keys again, at most once a minute", async () => {
@@ -106,9 +147,19 @@ describe("Squads on the live hub", () => {
   it("a Squads lobby's summary: its phase as the live line has them, the people connected, matchmade or a test", () => {
     const human = (connected: boolean, left?: true) => ({ connected, ...(left ? { left } : {}) });
     const rec = { code: "SQUAD", phase: "bracket", auto: true, filledAt: NOW, humans: [human(true), human(false), human(true, true), human(true)] } as unknown as SquadsRecord;
-    expect(squadsLiveSummary(rec)).toEqual({ code: "SQUAD", mode: "squads", kind: "queue", phase: "playing", humans: 2, alive: null, total: null, bossElo: null, startedAt: NOW });
+    expect(squadsLiveSummary(rec)).toEqual({ code: "squads:SQUAD", mode: "squads", kind: "queue", phase: "playing", humans: 2, alive: null, total: null, bossElo: null, startedAt: NOW });
     expect(squadsLiveSummary({ ...rec, phase: "filled", auto: false })).toMatchObject({ phase: "waiting", kind: "private" });
     expect(squadsLiveSummary({ ...rec, phase: "results" }).phase).toBe("over");
+  });
+
+  it("a Squads lobby with a Crowd lobby's code: both counted, and forgetting the Squads one leaves the Crowd one", () => {
+    const b = new LiveBoard();
+    const rec = { code: "ABCDE", phase: "bracket", auto: true, filledAt: NOW, humans: [{ connected: true }] } as unknown as SquadsRecord;
+    b.report(lobby("ABCDE"), NOW);
+    b.report(squadsLiveSummary(rec), NOW);
+    expect(b.health(NOW)).toMatchObject({ modes: { crowd: { playing: 1 }, squads: { playing: 1 } } });
+    b.forget(squadsLiveKey("ABCDE"));
+    expect(b.health(NOW)).toMatchObject({ modes: { crowd: { playing: 1, humans: 3 }, squads: { playing: 0 } } });
   });
 
   it("reports when something changes or a minute on, at most every lobbyReportMs, the latest state following", () => {
@@ -152,6 +203,21 @@ describe("the engine server's last answer and failure", () => {
       lastOk: NOW + 61_000,
       lastFail: { at: NOW, why: "no answer in time" },
     });
+    vi.useRealTimers();
+  });
+
+  it("only the match engine's instance is marked (fair play's isn't), and a search never waits for the mark", async () => {
+    vi.useFakeTimers({ now: NOW + HOUR });
+    const writes: string[] = [];
+    // A database whose writes never finish: a search that waited for its mark would never answer.
+    const stuck = { prepare: (q: string) => (writes.push(q), { bind: () => ({ run: () => new Promise(() => undefined) }) }) } as unknown as D1Database;
+    // (This file's container stand-in has no server: every search fails, and is marked a failure.)
+    const e = { DB: stuck, ENGINE: {} as never };
+    const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    expect(await containerScore(e, "fairplay-1", fen, ["e2e4"], 1000, 50)).toBeNull();
+    expect(writes).toHaveLength(0);
+    expect(await containerScore(e, "engine-1", fen, ["e2e4"], 1000, 50)).toBeNull();
+    expect(writes).toHaveLength(1);
     vi.useRealTimers();
   });
 });

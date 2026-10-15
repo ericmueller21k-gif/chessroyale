@@ -56,6 +56,8 @@ const marked = { ok: 0, fail: 0 };
 /**
  * The health view's "last success" and "last failure" (ops-admin.ts): times in D1's `meta`, written at most once a
  * minute (a success) or every 10 s (a failure) per instance, so a busy server costs a write a minute. Never throws.
+ * Only the match engine's instance ("engine-1") is marked, never waited on (`containerScore`): best effort, so a mark
+ * cut short is just an older time.
  */
 export async function markEngine(env: EngineEnv, ok: boolean, why = ""): Promise<void> {
   const now = Date.now();
@@ -84,6 +86,10 @@ export async function containerScore(env: EngineEnv, instance: string, fen: stri
     console.log(`engine server: not sent, a position Stockfish refuses (${refused}): ${fen}`);
     return null;
   }
+  // The health view's marks are the match engine's alone (fair play's instance would blur them), and never awaited.
+  const mark = (ok: boolean, why: string) => {
+    if (instance === "engine-1") void markEngine(env, ok, why);
+  };
   try {
     const stub = getContainer(env.ENGINE!, instance);
     const res = await Promise.race([
@@ -91,14 +97,14 @@ export async function containerScore(env: EngineEnv, instance: string, fen: stri
       new Promise<null>((r) => setTimeout(() => r(null), timeoutMs)),
     ]);
     if (!res || !res.ok) {
-      await markEngine(env, false, res ? `answered ${res.status}` : "no answer in time");
+      mark(false, res ? `answered ${res.status}` : "no answer in time");
       return null;
     }
     const body = (await res.json()) as { moves?: MoveScore[] };
-    await markEngine(env, Array.isArray(body.moves), "an answer without moves");
+    mark(Array.isArray(body.moves), "an answer without moves");
     return Array.isArray(body.moves) ? body.moves : null;
   } catch (e) {
-    await markEngine(env, false, String(e).slice(0, 120));
+    mark(false, String(e).slice(0, 120));
     return null;
   }
 }

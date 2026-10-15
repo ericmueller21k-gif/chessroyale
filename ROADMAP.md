@@ -107,7 +107,9 @@ decisions. In this order:
 - At launch, when Access comes off the rest of the site: keep an Access application on the health path
   (`hunchess.com/api/admin/health`) with the service-token policy, and give its AUD tag to a session for
   `ACCESS_AUD` in `wrangler.jsonc` (today's is the whole site's application). Without it, `npm run ops:report` is
-  refused, and only admins signed in can read the view.
+  refused, and only admins signed in can read the view. Optional, any time: pin the view to the one service token by
+  adding the Worker secret `OPS_ACCESS_CLIENT_ID` (its client ID) in Cloudflare (Workers, chessroyale, Settings,
+  Variables and Secrets); unset, any service token the application admits may read it.
 - Any paid service (an uptime monitor, an error service, a paging service), if we ever want one: asked first with a
   monthly price.
 - Legal sign-off: the privacy policy and terms, and the rules for crates before any real money.
