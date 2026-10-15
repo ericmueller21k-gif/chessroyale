@@ -17,7 +17,7 @@ describe("the FAQ's contents", () => {
   const anchors = faqAnchors(page);
 
   it("has every section the brief lists, in order", () => {
-    expect(page.toc.map((t) => t.id)).toEqual(["modes", "scoring", "boss-brain", "boss-powers", "god-king", "crates", "fair-play", "credits"]);
+    expect(page.toc.map((t) => t.id)).toEqual(["modes", "scoring", "boss-brain", "boss-powers", "god-king", "crates", "fair-play", "credits", "privacy"]);
   });
 
   it("every table-of-contents entry has a matching section, and every sub-entry a heading in it", () => {
@@ -158,6 +158,12 @@ describe("the FAQ's numbers come from the settings", () => {
     const credits = faqPage().sections.find((s) => s.id === "credits")!;
     expect(linksOf(credits.blocks)).toEqual(expect.arrayContaining(["/engine/maia/maia-box-source.tar.gz", "/engine/stockfish-source.tar.gz", "/engine/COPYING.txt", "/engine/maia/LICENSE.txt"]));
     expect(text()).not.toMatch(/on request/i);
+  });
+
+  it("links the privacy policy, the terms and the copyright page (as links, not bold text around them)", () => {
+    const privacy = faqPage().sections.find((s) => s.id === "privacy")!;
+    expect(linksOf(privacy.blocks)).toEqual(["/privacy", "/terms", "/copyright"]);
+    expect(plainText(privacy.blocks)).not.toContain("](");
   });
 
   it("the blunder guard, the slips and the strength example", () => {
