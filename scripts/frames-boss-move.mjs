@@ -10,9 +10,7 @@ import { Chess } from "chess.js";
 
 const [outArg = ".", bossName = "Boingo", widthArg] = process.argv.slice(2);
 const out = resolve(outArg);
-// (From the app's folder, as the other frames scripts run: its Vite config finds its files from there.)
-process.chdir("packages/app");
-const server = await createServer({ root: ".", configFile: "vite.config.ts", server: { port: 5197 }, logLevel: "error" });
+const server = await createServer({ root: "packages/app", configFile: "packages/app/vite.config.ts", server: { port: 5197 }, logLevel: "error" });
 await server.listen();
 const url = server.resolvedUrls.local[0];
 const b = await chromium.launch();
