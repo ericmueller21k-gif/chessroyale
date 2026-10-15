@@ -1,3 +1,4 @@
+import { isBlocked } from "./friends.ts";
 import { GLOBAL_CHAT, chatSay } from "@chessroyale/core";
 import { rideLive } from "./live.ts";
 
@@ -61,9 +62,9 @@ export class GlobalChatStore {
 
   constructor(private keep = GLOBAL_CHAT.keep) {}
 
-  /** The lines to show, oldest first (muted players' left out). */
+  /** The lines to show, oldest first (muted players' and blocked accounts' left out). */
   lines(): GlobalLine[] {
-    return this.muted.length ? this.list.filter((l) => !this.muted.includes(l.from)) : this.list;
+    return this.list.filter((l) => !this.muted.includes(l.from) && !isBlocked(l.from));
   }
 
   /** New lines from the server (the live line's answer, or a post's). */

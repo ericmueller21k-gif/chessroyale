@@ -1,7 +1,7 @@
 import { deleteLockerItems, equipLocker, lockerState, openCrate } from "./locker.ts";
 import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
-import { cachedUserId, firstSighting, forgetToken, markSeen } from "./presence.ts";
+import { cachedUserId, firstSighting, forgetToken, inboxOf, markSeen, rememberInbox } from "./presence.ts";
 import { REPORT_THANKS, appeal, fairStatus, reportPlayer } from "./fairplay.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
@@ -118,6 +118,9 @@ export async function accountOf(request: Request, env: AccountEnv, waitUntil?: W
   return userFromToken(sql, readCookie(request, SESSION_COOKIE), Date.now(), presenceTouch(env, waitUntil));
 }
 
+/** A time as its day only (noon UTC that day), for a profile that hides when its player is online. */
+export const dayOf = (at: number) => Math.floor(at / 86_400_000) * 86_400_000 + 43_200_000;
+
 /** The live line's numbers, shared by every request to this Worker instance for a few seconds. */
 let liveCache: { at: number; body: LiveCounts } | null = null;
 let prunedAt = 0;
@@ -157,16 +160,23 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // GET /api/live: the live line (online, matches running, in queue, the playing-now list, typical waits). Polled by
   // the front door every few seconds and by matches every 30 s, so it also marks you as online.
   if (path === "/api/live" && request.method === "GET") {
-    const touch = presenceTouch(env, waitUntil);
-    if (touch) {
+    // ?busy=1: the app is in a match (friends lists show "In a match"). `inbox`: friends' news for you (presence.ts).
+    const busy = url.searchParams.get("busy") === "1";
+    let inbox: number | undefined;
+    if (env.LIVE && waitUntil) {
       // The live hub: presence in batches (the session lookup cached), the numbers from its memory.
       const uid = await cachedUserId(sql, token, now);
       if (uid && firstSighting(uid, now)) {
         // Just arrived: the hub hears at once, and its numbers (which include you) refresh this instance's.
         // (Typed as sent: RPC's types widen the votes' [SAN, count] pairs to plain arrays.)
-        const counts = (await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).arrive(uid, now).catch(() => null)) as LiveCounts | null;
-        if (counts) liveCache = { at: now, body: counts };
-      } else if (uid) touch(uid);
+        const counts = (await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).arrive(uid, now, busy).catch(() => null)) as (LiveCounts & { inbox?: number }) | null;
+        if (counts) {
+          const { inbox: news, ...numbers } = counts;
+          if (news) rememberInbox(uid, news);
+          liveCache = { at: now, body: numbers };
+        }
+      } else if (uid) markSeen(env as Required<Pick<AccountEnv, "LIVE">>, uid, now, waitUntil, busy);
+      if (uid) inbox = inboxOf(uid);
     } else await touchSession(sql, token, now);
     if (!liveCache || now - liveCache.at > LIVE_CACHE_MS) {
       if (env.LIVE) liveCache = { at: now, body: (await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).liveCounts()) as LiveCounts };
@@ -181,7 +191,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     // ?chat=N (the home page's global chat is open): its lines after N ride along (global-chat-api.ts).
     const chatSince = url.searchParams.get("chat");
     const chat = chatSince !== null && env.LIVE ? await chatSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(chatSince), now).catch(() => null) : null;
-    return json({ ...liveCache.body, fillSeconds: Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60)), ...(chat ? { chat } : {}) });
+    return json({ ...liveCache.body, fillSeconds: Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60)), ...(chat ? { chat } : {}), ...(inbox ? { inbox } : {}) });
   }
 
   // GET /api/chat/icon/KEY: a drawn icon on a line in the global chat (anyone may read the chat).
@@ -195,8 +205,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (pm && request.method === "GET") {
     const p = await publicProfile(sql, pm[1]!, now);
     if (!p) return json({ message: "No such player." }, 404);
-    // Online now, from the live hub (D1's last_seen is written once a minute).
-    if (env.LIVE) {
+    // Hiding when you're online hides when you played too: others get each recent match's day, not its time (you get
+    // yours exact: "See your result" finds a match by it). The session from this instance's cache, usually no D1 read.
+    if (p.hidden && (await cachedUserId(sql, token, now).catch(() => null)) !== p.id) {
+      for (const r of p.recent) r.playedAt = dayOf(r.playedAt);
+    }
+    // Online now, from the live hub (D1's last_seen is written once a minute); never for someone who hides it.
+    if (env.LIVE && !p.hidden) {
       const live = await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).presence(p.id).catch(() => null);
       if (live?.lastSeen && live.lastSeen > (p.lastSeen ?? 0)) Object.assign(p, { lastSeen: live.lastSeen, online: live.online });
     }
