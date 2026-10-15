@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
+import { KING_ATTACK, LAST_STAND } from "@chessroyale/chess";
 import { BOARD_SEL, test } from "./helpers.ts";
 
 /**
@@ -12,9 +13,10 @@ import { BOARD_SEL, test } from "./helpers.ts";
  *   gold hits, none of the red slashes), and the Last Stand carries on as before (he falls; you pick again).
  * The beats are KING_ATTACK's and LAST_STAND's (packages/chess/src/boss-timing.ts).
  */
-const ATTACK_MS = 2780;
-const LASHES = 10;
-const ATTACK_AT = 5550;
+const ATTACK_MS = KING_ATTACK.ms;
+const LASHES = KING_ATTACK.lashes;
+// (6.55 s into the Last Stand: 5.55 s before its cut-in got a second longer, Oct 15.)
+const ATTACK_AT = LAST_STAND.attackAt;
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 
 /** Samples the page every animation frame from now on: what the attack shows, against its own start. */

@@ -449,18 +449,21 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     reviveLine: { selector: ".bc-bubble", text: /Not yet\. Now we play real chess\.|On your feet, all of you\. Again!/ },
     // (One book on screen: his own, in his frames; never a second one flying in.)
     book: { selector: ".rc-book" },
-    // Nothing said twice at once (Eric, Oct 15): the dock never repeats his line or the banner, the boss bar never
-    // repeats the title's "phase 2", and the subtitle never says he's beaten as he rises.
-    dockRepeat: { selector: ".boss-dock-status", text: /Mind and engine|Phase 2!|Every board must be won/ },
-    barPhase: { selector: ".boss-next", text: /Phase 2/ },
-    beaten: { selector: ".opening-name", text: /the boss is beaten|phase 2:/ },
-    clockLine: { selector: ".boss-dock-status", text: /^2:00 on your clock, no added time$/ },
   });
   await play(page, "h5f7");
   // The board holds while he falls, then (no result screen) the phase change, then phase 2's four boards.
   await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.fall), { timeout: 60_000 }).toBe(true);
   expect((await bossNow(page)).result).toBe("crowd");
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("phaseChange");
+  // Nothing said twice at once in the phase change (Eric, Oct 15): the dock never repeats his line or the banner, the
+  // boss bar never repeats the title's "phase 2", and the subtitle never says he's beaten as he rises (it did during
+  // his fall, on the boss screen, where it's true).
+  const words = await watchFor(page, {
+    dockRepeat: { selector: ".boss-dock-status", text: /Mind and engine|Phase 2!|Every board must be won/ },
+    barPhase: { selector: ".boss-next", text: /Phase 2/ },
+    beaten: { selector: ".rc-change .opening-name", text: /the boss is beaten|phase 2:/ },
+    clockLine: { selector: ".boss-dock-status", text: /^2:00 on your clock, no added time$/ },
+  });
   expect(await fall.seen()).toMatchObject({ collapse: true, dock: true });
   const at = Date.now();
   await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 }).toBe(true);
@@ -496,11 +499,8 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     leapBack: true,
     banner: true,
     book: false,
-    dockRepeat: false,
-    barPhase: false,
-    beaten: false,
-    clockLine: true,
   });
+  expect(await words.seen()).toEqual({ dockRepeat: false, barPhase: false, beaten: false, clockLine: true });
   // Phase 2's bar: how many are won, nothing the title says; its subtitle: the variant alone.
   await expect(page.locator(".boss-next")).toHaveText(/^\d of 4 won$/);
   await expect(page.locator(".opening-name")).toHaveText(/· Chess960$/);
@@ -603,8 +603,7 @@ test("phase 2's ultimate (the admins' trigger): \"5 SECONDS!\", his line and spe
   await expect(page.locator(".boss-dock-status")).not.toContainText(/slow moves \d of/);
   await expect(page.locator(".rc-slow")).toHaveCount(1);
   const ult = await watchFor(page, {
-    // (Held a second longer than other banners: FightBanner's `long`.)
-    banner: { selector: ".fight-banner.long", text: /5 SECONDS!/ },
+    banner: { selector: ".fight-banner", text: /5 SECONDS!/ },
     spell: { selector: `${figure()}[data-anim="spellbook2"]` },
     line: { selector: ".bc-bubble", text: /That's enough!|Enough thinking!/ },
   });
@@ -635,7 +634,7 @@ test("phase 2's slow moves (?phase=2): each marks a red X for the team in one co
   const seen = await watchFor(page, {
     flash: { selector: ".rc-slow.flash" },
     note: { selector: ".rc-slow-note", text: /slow move/ },
-    banner: { selector: ".fight-banner.long", text: /5 SECONDS!/ },
+    banner: { selector: ".fight-banner", text: /5 SECONDS!/ },
     minis: { selector: ".rc-ult .rc-mini" },
   });
   // Slow moves of yours (each after 5 s of thought; the bots add theirs now and then) until his ultimate comes.

@@ -4686,4 +4686,13 @@ the duplicated text on this page". All placeholders (admins and a solo Crowd fin
 - Phase 1: the title said "move 5" and his card "Move 5 of 60": the card now says "56 moves left" (a boss that never
   strikes; every other boss's card shows its strikes).
 
-**Testing.**
+**Testing.** Full lane (server timing changed: the moments, the intro, the strike's clock, the votes): typecheck, the
+whole unit suite (new `packages/app/test/banners.test.ts`: the 2.5 s keyframes and no long version, every banner
+inside its moment, Boingo's turn after his banner, the God King's and the Last Stand's beats after their cut-ins, the
+votes' 4.2 s; `last-stand.test.ts` for its second), and the whole `npm run e2e` (310: 241 passed, 59 skipped, 10
+failed). Of the 10: `recluse.spec.ts` (6) and `king-attack.spec.ts` (2) read the old `long` class and the Last
+Stand's old attack beat (now read from `LAST_STAND`), and a new check of mine looked at the fall's subtitle too; fixed
+and green alone, both projects (21 passed). `crowd-hidden.spec.ts:106` ("you reached the final": the player cut before
+the final) and `lobby-chat.spec.ts:28` (a box not there yet) on the computer passed alone. `recluse.spec.ts` now
+checks the phase change never repeats a line, the bar never says "Phase 2", the subtitle never says he's beaten, and
+the dock's clock line shows. Screenshots before and after at 390 and 1280 px: in the PR.
