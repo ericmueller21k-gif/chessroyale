@@ -2,6 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { BOARD_SEL, test, watchFor } from "./helpers.ts";
+import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
 
 /**
  * The Hidden Boss, phase 1 (admins only, in Boss alone), on a phone and a computer with real taps:
@@ -346,6 +347,58 @@ async function resignHere(page: Page, note: RegExp) {
   await expect(confirm.locator(".mm-confirm-note")).toHaveText(note);
   await confirm.getByRole("button", { name: /Resign/ }).click();
 }
+
+test("his chatter all through phase 1 (Eric, Oct 15: he went quiet after move 10): a line about every 15 s by the clock, the bullet stretch too, his moments' lines first", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
+  test.setTimeout(7 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await meetHim(page);
+  await yourMove(page);
+  // Every line of his as it first shows in his text box, with the time (the page's clock).
+  const t0 = await page.evaluate(() => {
+    const w = window as any;
+    w.__lines = [];
+    let last = "";
+    setInterval(() => {
+      // (Phase 1 until he's beaten: Stockfish's moves may mate him.)
+      if (w.match?.boss && !w.match.boss.result) w.__end = Date.now();
+      const text = document.querySelector(".bc-bubble")?.getAttribute("aria-label") ?? "";
+      if (text && text !== last) w.__lines.push({ at: Date.now(), text });
+      last = text;
+    }, 100);
+    return Date.now();
+  });
+  // A person's pace: a few seconds a move on the slow clock, quicker on the bullet clock; Stockfish's moves (Engine move),
+  // so the battle runs on. About three minutes of play, or until he's beaten (then phase 1's lines only).
+  const btn = page.getByRole("button", { name: "Engine move", exact: true });
+  const until = Date.now() + 180_000;
+  while (Date.now() < until) {
+    const ok = await yourMove(page, 30_000).then(() => true, () => false);
+    if (!ok) break;
+    const b = await bossNow(page);
+    if (b?.result) break;
+    await page.waitForTimeout(b && b.crowdMoves < 6 ? 2000 + Math.random() * 4000 : 500 + Math.random() * 1500);
+    await btn.click({ timeout: 5000 }).catch(() => {});
+    await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
+  }
+  const end = (await page.evaluate(() => (window as any).__end)) as number;
+  const lines = ((await page.evaluate(() => (window as any).__lines)) as { at: number; text: string }[]).filter((l) => l.at <= end);
+  const p1 = Object.values(RECLUSE_LINES.talk[1]).flat() as string[];
+  const log = lines.map((l) => `${((l.at - t0) / 1000).toFixed(1)} s${p1.includes(l.text) ? " [chatter]" : ""}: ${l.text}`);
+  console.log(`His lines over ${((end - t0) / 1000).toFixed(0)} s of phase 1 (moves: ${(await bossNow(page))?.crowdMoves}):\n${log.join("\n")}`);
+  test.info().annotations.push({ type: "lines", description: log.join(" | ") });
+  const chatter = lines.filter((l) => p1.includes(l.text)).map((l) => l.at);
+  const gaps = chatter.slice(1).map((t, i) => t - chatter[i]!);
+  // Steady from the start to the end of what was played: the first within an interval or so, then no long gap.
+  expect(chatter.length).toBeGreaterThanOrEqual(Math.floor((end - t0) / 20_000));
+  expect(chatter[0]! - t0).toBeLessThanOrEqual(25_000);
+  expect(Math.max(...gaps)).toBeLessThanOrEqual(30_000);
+  expect(end - chatter.at(-1)!).toBeLessThanOrEqual(30_000);
+  // His moments' lines came, and whole (none is cut short by his chatter: it never cuts in).
+  if ((await bossNow(page)).crowdMoves >= 7) expect(lines.some((l) => (RECLUSE_LINES.bullet as readonly string[]).includes(l.text))).toBe(true);
+  expect(errors).toEqual([]);
+});
 
 test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase change (he absorbs the God King, up in a rage, his leap onto the board, the book thrown down, the chant and its light, the split, the book back, the leap back, the shuffle) and four boards; all four won: Victory!", async ({ page }) => {
   test.setTimeout(5 * 60_000);

@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
 import { createLobbyFromHome, engineTop, soloFromHome, submitMove, test, watchFor } from "./helpers.ts";
+import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
 
 /**
  * The Crowd's boss final is always the Hidden Boss (Eric, Oct 14): the top 4 against him, for everyone, solo and online.
@@ -8,7 +9,7 @@ import { createLobbyFromHome, engineTop, soloFromHome, submitMove, test, watchFo
  * - Solo (you and bots): the top 4 meet him; the God King's help tried spends a charge and the move goes on; beaten
  *   (?win=1), he collapses, then his phase 2 with the other finalists on the other three boards.
  * - Online: everyone sees his intro by name, four in the battle, his bullet clock; a try at the God King spends a charge
- *   and your move goes on. (Phase 2 isn't online: phase 1 won is the victory, unit-tested in crowd-hidden-boss.test.ts.)
+ *   and your move goes on; his chatter (Oct 15), driven on this device from its own view, comes within half a minute. (Phase 2 isn't online: phase 1 won is the victory, unit-tested in crowd-hidden-boss.test.ts.)
  */
 const him = crowdFinalBoss()!;
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
@@ -120,8 +121,18 @@ test("online: a Crowd boss final meets him: his intro by name for everyone, four
   expect(await alive(page)).toBe(crowdFinalists("boss"));
   expect(await mine(page), "you reached the final").toBe(true);
   const banner = await watchFor(page, { bullet: { selector: ".fight-banner.power-cut", text: /BULLET!/ } });
+  // His chatter (recluse-talk.ts): this device drives it from its own view of the battle. When its first line shows.
+  await page.evaluate((lines) => {
+    const w = window as any;
+    w.__chatter = null;
+    const t = setInterval(() => {
+      const text = document.querySelector(".bc-bubble")?.getAttribute("aria-label");
+      if (text && lines.includes(text)) (w.__chatter = { at: Date.now(), text }), clearInterval(t);
+    }, 100);
+  }, Object.values(RECLUSE_LINES.talk[1]).flat() as string[]);
   // Your first move against him: the God King tried (a strike): he doesn't come, a charge is spent, still your move.
   await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
+  const playAt: number = await page.evaluate(() => (window as any).match.phase.startsAt);
   const charges: number = (await bossNow(page)).kingCharges;
   expect(charges).toBeGreaterThanOrEqual(1);
   await page.getByRole("button", { name: /God King: tap to summon/ }).click();
@@ -139,5 +150,10 @@ test("online: a Crowd boss final meets him: his intro by name for everyone, four
   expect((await bossNow(page)).kingCharges).toBe(charges - 1);
   await expect.poll(() => banner.seen(), { timeout: 90_000 }).toEqual({ bullet: true });
   expect((await bossNow(page)).powers.ultAt).toBe(2);
+  // His chatter came, from his first turn's clock about 15 s on (later if his mock or bullet line was up then).
+  await expect.poll(() => page.evaluate(() => (window as any).__chatter), { timeout: 45_000 }).not.toBeNull();
+  const chatter = (await page.evaluate(() => (window as any).__chatter)) as { at: number; text: string };
+  console.log(`Online, his first chatter ${((chatter.at - playAt) / 1000).toFixed(1)} s after your first move began: ${chatter.text}`);
+  expect(chatter.at - playAt).toBeLessThanOrEqual(30_000);
   expect(errors).toEqual([]);
 });

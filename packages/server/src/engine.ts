@@ -1,5 +1,5 @@
 import { Container, getContainer } from "@cloudflare/containers";
-import { recheckCloseCalls, type EngineLike, type MoveScore, type RecheckSettings } from "@chessroyale/chess";
+import { recheckCloseCalls, stockfishRefuses, type EngineLike, type MoveScore, type RecheckSettings } from "@chessroyale/chess";
 
 /**
  * The engine server: native Stockfish 17.1 (the full network) in a Cloudflare Container (engine/Dockerfile).
@@ -50,15 +50,25 @@ async function takeBudget(env: EngineEnv): Promise<boolean> {
   }
 }
 
-/** One restricted search on the engine server; null if there's no server, no budget left, or no answer in time. */
-export async function serverScoreAt(env: EngineEnv, fen: string, moves: readonly string[], nodes = SERVER_RECHECK_NODES): Promise<MoveScore[] | null> {
+/**
+ * The one way into the engine server's searches: `serverScoreAt` (every match's re-checks, the judges' verdicts, Squads'
+ * bot work, `/api/engine/score`) and fair play's deep re-check (`fairplay-engine.ts`) all search through here. A
+ * position Stockfish refuses (`stockfishRefuses`) is never sent: Stockfish ends its process on one, and the container
+ * goes down with it until it restarts, taking every lobby's re-checks along. It's "no answer" instead (null), which
+ * every caller already handles (DECISIONS.md, "The engine server never gets a position Stockfish refuses", Oct 15).
+ */
+export async function containerScore(env: EngineEnv, instance: string, fen: string, moves: readonly string[], nodes: number, timeoutMs: number): Promise<MoveScore[] | null> {
   if (!engineOn(env) || !moves.length) return null;
-  if (!(await takeBudget(env))) return null;
+  const refused = stockfishRefuses(fen);
+  if (refused) {
+    console.log(`engine server: not sent, a position Stockfish refuses (${refused}): ${fen}`);
+    return null;
+  }
   try {
-    const stub = getContainer(env.ENGINE!, "engine-1");
+    const stub = getContainer(env.ENGINE!, instance);
     const res = await Promise.race([
       stub.fetch("http://engine/score", { method: "POST", body: JSON.stringify({ fen, moves: [...new Set(moves)], nodes }) }),
-      new Promise<null>((r) => setTimeout(() => r(null), TIMEOUT_MS)),
+      new Promise<null>((r) => setTimeout(() => r(null), timeoutMs)),
     ]);
     if (!res || !res.ok) return null;
     const body = (await res.json()) as { moves?: MoveScore[] };
@@ -66,6 +76,13 @@ export async function serverScoreAt(env: EngineEnv, fen: string, moves: readonly
   } catch {
     return null;
   }
+}
+
+/** One restricted search on the engine server; null if there's no server, no budget left, or no answer in time. */
+export async function serverScoreAt(env: EngineEnv, fen: string, moves: readonly string[], nodes = SERVER_RECHECK_NODES): Promise<MoveScore[] | null> {
+  if (!engineOn(env) || !moves.length) return null;
+  if (!(await takeBudget(env))) return null;
+  return containerScore(env, "engine-1", fen, moves, nodes, TIMEOUT_MS);
 }
 
 /** Wakes the engine server (a match is starting), so the first re-check doesn't wait for it to boot. */
