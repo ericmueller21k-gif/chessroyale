@@ -33,7 +33,7 @@ const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
 }));
 
 describe("MatchRunner", () => {
-  it("plays a whole 64-bot match: one board fewer per cut, one color per stage, then the 2v2 final", async () => {
+  it("plays a whole 64-bot match: one board fewer per cut (ties at the line kept in), one color per stage, then the 2v2 final", async () => {
     const settings: Settings = { ...DEFAULT_SETTINGS, roundsPerStage: 2, firstStageRounds: 2 };
     const rng = mulberry32(1);
     const runner = new MatchRunner({
@@ -48,11 +48,18 @@ describe("MatchRunner", () => {
     let rounds = 0;
     let lastStage = -1;
     let colours = new Map<string, string | null>();
+    let tiesKept = 0;
+    let maxGroup = 0;
     while (!runner.isFinal()) {
       const groups = runner.deal();
-      // Boards are never swapped; the count follows the plan (fewer only if a game ended).
-      expect(groups.size).toBeLessThanOrEqual(plan[runner.state.stage]!.boards);
-      expect([...groups.values()].flat()).toHaveLength(runner.alive().length);
+      // Boards are never swapped; the count follows the plan (fewer only if a game ended), or is more when ties at the
+      // cut line kept more players in (the opening allowance makes many: docs/decisions/2026-10-15-opening-allowance-and-ties.md):
+      // enough boards for groupSize a board, so groups keep their size.
+      const alive = runner.alive().length;
+      expect(groups.size).toBeLessThanOrEqual(Math.max(plan[runner.state.stage]!.boards, Math.ceil(alive / settings.groupSize)));
+      if (runner.state.cutCarry) tiesKept++;
+      maxGroup = Math.max(maxGroup, ...[...groups.values()].map((g) => g.length));
+      expect([...groups.values()].flat()).toHaveLength(alive);
       if (groups.size >= 2) {
         // Everyone sits on a board where their color is to move; groups are 7-10 when boards are odd.
         for (const [id, ids] of groups) for (const pid of ids) expect(runner.player(pid).colour).toBe(runner.boards.get(id)!.fen.split(" ")[1]);
@@ -76,6 +83,11 @@ describe("MatchRunner", () => {
       if (runner.stageComplete()) runner.endStage();
     }
     expect(rounds).toBe(16);
+    // Ties at a cut line kept players in (owed by later cuts), and the groups kept their size: at most 10 (an odd
+    // number of boards makes them 7-10), never a crowded board.
+    expect(tiesKept).toBeGreaterThan(0);
+    expect(maxGroup).toBeLessThanOrEqual(10);
+    // The last cut takes exactly what's owed: the final four.
     expect(runner.alive()).toHaveLength(4);
     expect(runner.state.boards).toHaveLength(1);
     // The final: one finalist moves per turn, alternating teams.

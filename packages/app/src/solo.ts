@@ -178,7 +178,7 @@ export class SoloMatch implements GameView {
     return whiteExpected(fen, await this.runner.topMovesFor(fen));
   }
   get cutoff(): number {
-    return this.runner.alive().length - (this.settings.knockoutsPerStage[this.runner.state.stage] ?? 0);
+    return this.runner.cutoff();
   }
 
   subscribe(fn: () => void) {

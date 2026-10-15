@@ -622,9 +622,9 @@ export class LobbyCore {
     return (this.runner?.leaderboard() ?? []).map((s) => ({ ...s, ...(looks.has(s.id) ? { look: looks.get(s.id)! } : {}), ...(uid(s.id) ? { uid: uid(s.id) } : {}) }));
   }
 
+  /** How many would go through if the stage's cut came now (ties at the line go through). */
   private cutoff(): number {
-    const alive = this.runner!.alive().length;
-    return alive - (this.settings.knockoutsPerStage[this.runner!.state.stage] ?? 0);
+    return this.runner!.cutoff();
   }
 
   private aliveHumans(): Human[] {
@@ -1902,7 +1902,7 @@ export class LobbyCore {
         fenBefore: mine?.fenBefore ?? null,
         bestMove: mine?.bestMove ?? null,
         playedMove: mine?.result.playedMove ?? null,
-        picks: mine?.result.players.map((p) => ({ playerId: p.playerId, move: p.move, loss: p.loss, roundScore: p.roundScore, ...(p.usedPowerUp ? { usedPowerUp: true } : {}) })) ?? [],
+        picks: mine?.result.players.map((p) => ({ playerId: p.playerId, move: p.move, loss: p.loss, ...(p.counted !== undefined ? { counted: p.counted } : {}), ...(p.material ? { material: p.material } : {}), roundScore: p.roundScore, ...(p.usedPowerUp ? { usedPowerUp: true } : {}) })) ?? [],
         drawRule: mine?.result.drawRule ?? "random",
         ...(mine?.king !== undefined ? { king: mine.king, kingCalls: mine.kingCalls } : {}),
         ...(mine?.lastStand ? { lastStand: mine.lastStand } : {}),
@@ -2069,7 +2069,7 @@ export class LobbyCore {
     const out = new Set<string>();
     for (const side of ["w", "b"] as const) {
       const team = rows.filter((r) => r.team === side && !r.out);
-      for (const id of cutBubble(team, team.length - Math.floor(k / 2), this.settings.recheckCutPoints)) out.add(id);
+      for (const id of cutBubble(team, team.filter((r) => !r.cut).length, this.settings.recheckCutPoints)) out.add(id);
     }
     return out;
   }

@@ -400,6 +400,23 @@ export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRo
   stage === 0 ? s.firstStageRounds : s.roundsPerStage;
 
 /**
+ * The opening allowance (Eric, Oct 15, 2026; docs/decisions/2026-10-15-opening-allowance-and-ties.md): early in a game a
+ * move's loss counts for points only beyond `points`, so a sound move off the engine's line costs nothing, while poor
+ * play still costs. The move number is the game's own (the position's fullmove number: "Move 6" on the top bar), the
+ * same in every mode: the whole allowance through move `flatThrough`, then falling in a line to nothing at move
+ * `goneBy` (nothing from there on). A move that gives up at least `materialPawns` pawns of material against the
+ * engine's best move by the exchange check (it leaves something to be taken, or passes up a capture that wins
+ * material: `materialSlips` in the chess package) gets no allowance at all. Measured in reports/opening-allowance.md.
+ * The FAQ and the screens read these numbers from here.
+ */
+export const OPENING_ALLOWANCE = {
+  points: 8,
+  flatThrough: 10,
+  goneBy: 14,
+  materialPawns: 1,
+} as const;
+
+/**
  * Crowd 50 v 50 knockouts for each way to end: they leave 8 (team final), 4 (the boss final, against the Hidden Boss) or
  * 2 (duel); `crowdFinalists` says how many. The boss final's are the duel's cuts stopping at four (Eric, Oct 14: "the top
  * four always battle versus [him]"; it was the top 10 against a random boss).
