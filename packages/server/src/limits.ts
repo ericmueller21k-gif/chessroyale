@@ -1,4 +1,4 @@
-import { CAPACITY } from "@chessroyale/core";
+import { CAPACITY, OPS } from "@chessroyale/core";
 
 /**
  * Rate limits on the API (CAPACITY.rateLimits): requests per window per address, per account (its session) and, for
@@ -55,4 +55,32 @@ export function rateLimited(req: { ip: string | null; session: string | null; pl
     if (!r.ok) wait = Math.max(wait, r.retryMs);
   }
   return wait > 0 ? wait : null;
+}
+
+const P = OPS.endpoint;
+const problemLimits = {
+  errors: [new RateLimiter(P.errors.perIp.limit, P.errors.perIp.windowMs), new RateLimiter(P.errors.perUser.limit, P.errors.perUser.windowMs)],
+  report: [new RateLimiter(P.reports.perIp.limit, P.reports.perIp.windowMs), new RateLimiter(P.reports.perUser.limit, P.reports.perUser.windowMs)],
+} as const;
+
+/** A session cookie as accounts.ts makes them (randomToken: 32 bytes, base64url); anything else isn't one. */
+export const isSessionToken = (v: string | null): v is string => v !== null && /^[\w-]{43}$/.test(v);
+
+/**
+ * POST /api/problems (problems.ts): error reports and player reports, each with their own limits per address and per
+ * account (OPS.endpoint), on top of the API's. Null if this one may go ahead, else how long to wait. The address is
+ * only a key in this instance's memory, never stored. The account is counted only for a real session cookie (a made-up
+ * one each time would be a fresh key) and only once the address is let through (a refused request uses up nothing).
+ */
+export function problemLimited(kind: "errors" | "report", req: { ip: string | null; session: string | null }, now: number): number | null {
+  const [perIp, perUser] = problemLimits[kind];
+  if (req.ip) {
+    const r = perIp.hit(req.ip, now);
+    if (!r.ok) return r.retryMs;
+  }
+  if (isSessionToken(req.session)) {
+    const r = perUser.hit(req.session, now);
+    if (!r.ok) return r.retryMs;
+  }
+  return null;
 }

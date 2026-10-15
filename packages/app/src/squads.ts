@@ -23,6 +23,7 @@ import {
   type SquadsServerMessage,
 } from "@chessroyale/chess/squads";
 import { account, playerName } from "./account.ts";
+import { crumb } from "./problems.ts";
 import { enginePool, engineSpeed } from "./engine.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { play } from "./sound.ts";
@@ -386,6 +387,7 @@ export class SquadsClient {
     this.mine = { key, seq, move, lock: d.duty.role === "move" };
     m.choiceAt = { ...m.choiceAt, [this.myId]: Date.now() };
     this.send({ t: "choose", key, seq, move });
+    crumb(`move ${move}`);
     this.showChoices(m);
     this.emit();
   }
@@ -400,6 +402,7 @@ export class SquadsClient {
     const d = dutyOf(m, this.myId);
     if (!d || d.duty.board !== board || m.placed.some((b) => b.board === board && b.move === move)) return;
     this.send({ t: "block", key, seq: m.current.seq, board, move });
+    crumb(`block ${move}`);
   }
 
   /** Lock in your pick (the half ends early once everyone with a duty has). */

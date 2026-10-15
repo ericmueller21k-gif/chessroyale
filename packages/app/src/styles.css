@@ -1164,6 +1164,8 @@ p {
   position: relative;
   transition: height 0.5s ease;
 }
+/* (docs/decisions/2026-10-15-scoreboard-and-final-panel-layout.md. Opaque, the tower's own color under each row's tint: a row sliding past another covers it rather than printing
+   over it. A row that moves far fades in at its place instead: RaceTower's .jump.) */
 .tower-row {
   position: absolute;
   left: 0;
@@ -1171,11 +1173,23 @@ p {
   top: 0;
   height: calc(var(--row) - 2px);
   margin-top: 1px;
-  transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.3s;
+  transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
   border-left: 3px solid transparent;
+  background-color: #101216;
+  z-index: 1;
 }
 .tower-row:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.025);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.025));
+}
+/* (Under the sliding rows while it fades in, so a row sliding past it is never seen through it.) */
+.tower-row.jump {
+  z-index: 0;
+  animation: tower-jump 0.45s ease-out;
+}
+@keyframes tower-jump {
+  from {
+    opacity: 0;
+  }
 }
 .t-pos {
   height: 100%;
@@ -1197,12 +1211,31 @@ p {
   background: #b0703c;
   color: #fff;
 }
+/* (The name shrinks to "…", never the ✓ or 💡 beside it: the name is a button, so it gets the ellipsis itself. On
+   the whole cell, a moved player's name was cut as one block, leaving "✓ …".) */
 .t-name {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
   font-weight: 700;
   padding-left: 6px;
+}
+.t-name > * {
+  flex: none;
+}
+.t-name > .t-name-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.t-check {
+  margin-right: 4px;
+}
+.t-practice {
+  margin-left: 4px;
 }
 .t-pts {
   text-align: right;
@@ -1234,11 +1267,11 @@ p {
   font-weight: 800;
 }
 .tower-row.you {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  background-image: linear-gradient(color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--accent) 22%, transparent));
   border-left-color: var(--accent);
 }
 .tower-row.zone {
-  background: rgba(244, 160, 64, 0.1);
+  background-image: linear-gradient(rgba(244, 160, 64, 0.1), rgba(244, 160, 64, 0.1));
 }
 .tower-row.zone .t-pos {
   background: #6b4a1c;
@@ -1910,6 +1943,50 @@ p {
   min-height: 40px;
   font-size: 15px;
 }
+/* The phone's sheet: Report a bug on a row of its own, under Sound and Resign. */
+.mm-wide {
+  grid-column: 1 / -1;
+}
+/* A computer's title line with an admin's testing items has no room for one more button (they'd run over the title):
+   the report button gives way there; Settings and the phone's sheet still have it. */
+.match-tools:not(:empty) ~ .mm .mm-report {
+  display: none;
+}
+/* The error boundary's screen (components/Problems.tsx): its Reload button at its own height (.btn grows in a row). */
+.crash .btn {
+  flex: none;
+}
+/* ---- The feedback sheet (components/Problems.tsx): over any screen, a match's included ---- */
+.rp-scrim {
+  z-index: 75;
+}
+/* Its three kinds: the emoji over the words, on the field's color so the choice reads as one control. */
+.rp-kinds {
+  background: var(--fd-bg);
+}
+.rp-kinds button {
+  line-height: 1.15;
+  text-align: center;
+}
+.rp-kinds b {
+  font-size: 18px;
+  line-height: 1;
+}
+.rp-id {
+  margin: 4px 0;
+  font-size: 17px;
+  text-align: center;
+}
+.rp-id strong {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 22px;
+  letter-spacing: 2px;
+  user-select: all;
+}
+.rp-error {
+  color: var(--danger);
+  font-weight: 700;
+}
 /* A plain "Leave the match" for someone already out (the cut screen, watching, the solo play-out). */
 .leave-match {
   margin-top: 10px;
@@ -2098,7 +2175,8 @@ button.history-label {
 }
 .final-player {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
   align-items: center;
   padding: 6px 8px;
   border-radius: 8px;
@@ -2113,11 +2191,23 @@ button.history-label {
 .final-player.to-move {
   background: color-mix(in srgb, var(--good) 16%, transparent);
 }
+/* (The name shrinks to "…", never the crown before it, never into the score beside it: the name is a button, so it
+   gets the ellipsis itself; on the whole line it was cut as one block, leaving "👑 …".) */
 .final-name {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
   font-weight: 700;
+  white-space: nowrap;
+}
+.final-crown {
+  flex: none;
+  margin-right: 4px;
+}
+.final-name .player-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .final-avg {
   font-weight: 900;
@@ -3009,6 +3099,7 @@ button.history-label {
 @media (max-width: 899px) and (min-height: 520px) {
   .screen.game .poll {
     gap: 3px;
+    margin: 0 10px;
   }
   .screen.game .poll-row {
     padding: 2px 8px;
@@ -10548,7 +10639,8 @@ img.qicon {
 .qp-picked.emoji {
   display: grid;
   grid-template-columns: repeat(var(--n), minmax(0, 50px));
-  gap: 6px;
+  /* (Wider than the ✕'s overhang, 7 px with its ring, so it never sits on the next emoji.) */
+  gap: 10px;
 }
 .qp-picked.emoji .qp-chip {
   position: relative;

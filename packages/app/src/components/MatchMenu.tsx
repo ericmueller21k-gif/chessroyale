@@ -1,15 +1,18 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { isMuted, onMuteChange, setMuted, unlockAudio } from "../sound.ts";
 import { MuteButton } from "./MuteButton.tsx";
+import { openReport } from "./Problems.tsx";
 import { useMedia } from "./QuickChat.tsx";
 
 /**
  * Resigning and leaving a match, the way chess sites do it (Eric, Oct 13; DECISIONS.md, "Resign: leaving a match in
  * every mode"). In the top line of every match screen, at its right end:
  *   - a phone: a "⋯" button (where the sound button was) opening a small sheet at the foot of the screen: Sound, and
- *     Resign with its flag (Leave before move 1, or once you're out). A home for later options.
- *   - a computer (the game's two-column layout): the sound button, then the flag, at the right end of the title line
- *     over the board's column; an admin's testing items sit just before them (Hud.tsx, .match-tools; Eric, Oct 13).
+ *     Resign with its flag (Leave before move 1, or once you're out), and under them Report a bug (the feedback sheet:
+ *     Problems.tsx). A home for later options.
+ *   - a computer (the game's two-column layout): Report a bug, the sound button, then the flag, at the right end of
+ *     the title line over the board's column; an admin's testing items sit just before them (Hud.tsx, .match-tools;
+ *     Eric, Oct 13).
  * Either way, a second step that says what will happen ("Resign? You'll leave this match and it counts as a loss.")
  * with Cancel and Resign. Nothing dims or covers the board, its moves or the clock meanwhile: the phone's sheet sits
  * at the foot of the screen, the computer's beside the flag (out into the column next to the board). No undo, no draw offers (Eric: not now).
@@ -135,8 +138,8 @@ function useOpen(): [Open, (o: Open) => void] {
 }
 
 /**
- * The control at the right end of a match screen's top line: on a phone "⋯" and its sheet, on a computer the sound
- * button and the flag (in that order, the flag last). `exit` null: nothing to leave right now (only the sound switch).
+ * The control at the right end of a match screen's top line: on a phone "⋯" and its sheet, on a computer Report a bug,
+ * the sound button and the flag (in that order, the flag last). `exit` null: nothing to leave right now.
  */
 export function MatchMenu({ exit }: { exit: MatchExit | null }) {
   const computer = useMedia(COMPUTER_LAYOUT);
@@ -154,6 +157,19 @@ export function MatchMenu({ exit }: { exit: MatchExit | null }) {
   if (computer)
     return (
       <span class="mm mm-computer">
+        <button
+          type="button"
+          class="mm-flag mm-report"
+          aria-label="Report a bug"
+          title="Report a bug"
+          aria-haspopup="dialog"
+          onClick={() => {
+            setOpen(null);
+            openReport("bug");
+          }}
+        >
+          <span aria-hidden="true">🐞</span>
+        </button>
         <MuteButton />
         {exit && (
           <button
@@ -184,7 +200,8 @@ export function MatchMenu({ exit }: { exit: MatchExit | null }) {
       {open && (
         <div class="mm-scrim" onClick={() => setOpen(null)}>
           {open === "menu" ? (
-            // (One row, so it never reaches the board or its clocks; a tap anywhere else, or "⋯" again, closes it.)
+            // (Sound and Resign side by side, Report a bug under them, so it stays short at the foot of the screen;
+            // a tap anywhere else, or "⋯" again, closes it.)
             <div class={`mm-sheet${exit ? "" : " one"}`} role="dialog" aria-label="Match options" onClick={(e) => e.stopPropagation()}>
               <SoundRow />
               {exit && (
@@ -195,6 +212,19 @@ export function MatchMenu({ exit }: { exit: MatchExit | null }) {
                   <span class="mm-row-label">{exit.kind === "resign" ? "Resign" : "Leave the match"}</span>
                 </button>
               )}
+              <button
+                type="button"
+                class="mm-row mm-wide"
+                onClick={() => {
+                  setOpen(null);
+                  openReport("bug");
+                }}
+              >
+                <span class="mm-row-icon" aria-hidden="true">
+                  🐞
+                </span>
+                <span class="mm-row-label">Report a bug</span>
+              </button>
             </div>
           ) : (
             exit && <ConfirmExit exit={exit} place="sheet" onCancel={() => setOpen(null)} />
