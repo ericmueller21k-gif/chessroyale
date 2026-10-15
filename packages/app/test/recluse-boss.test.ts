@@ -190,7 +190,7 @@ describe("the God King's help tried in Boss alone: blocked, and the charge spent
     vi.unstubAllGlobals();
   });
 
-  it("each try (his strike, his move) takes a charge from the dock's count and your move goes on; none left, a try does nothing", () => {
+  it("each try (his strike, his move) takes a charge from the dock's count and your move goes on; none left, a try does nothing", async () => {
     // (A stand-in engine: its searches answer with the legal moves; the boss never gets to move here.)
     const engine = {
       topMoves: async (fen: string, n: number) => legalMoves(fen).slice(0, n).map((move) => ({ move, expected: 0.5 })),
@@ -203,7 +203,8 @@ describe("the God King's help tried in Boss alone: blocked, and the charge spent
     // (Before your move: nothing.)
     m.callKing(true);
     expect(m.boss!.kingCharges).toBe(3);
-    for (let i = 0; i < 60 && m.phase.kind !== "play"; i++) vi.advanceTimersByTime(500);
+    // (Maia's loading step first: this stand-in worker never answers, so it ends at BOSS_BRAIN.loadGateMs; then the intro.)
+    for (let i = 0; i < 120 && m.phase.kind !== "play"; i++) await vi.advanceTimersByTimeAsync(500);
     expect(m.phase.kind).toBe("play");
     expect(m.boss!.id).toBe("recluse");
     m.callKing(true);

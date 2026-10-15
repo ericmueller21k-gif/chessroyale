@@ -1198,7 +1198,8 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
     case "vote":
       return <VoteScreen match={match} vote={p.vote} menu={<MatchMenu exit={exitFor(match)} />} />;
     case "boss":
-      return <BossScreen match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} lights={p.lights} fall={p.fall} />;
+      // (The loading step, then the intro on a screen of its own: the intro's timeline starts as it mounts.)
+      return <BossScreen key={p.loading ? "boss-loading" : "boss"} match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} loading={p.loading} afterLoading={p.afterLoading} lights={p.lights} fall={p.fall} />;
     case "phaseChange":
       return <PhaseChangeScreen match={match} at={p.at} />;
     case "simul":

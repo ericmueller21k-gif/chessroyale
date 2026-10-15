@@ -1668,8 +1668,9 @@ p {
 }
 
 /* ---- A computer's title line: the admins' testing items (Hud.tsx), then sound, then the flag (Eric, Oct 13) ----
-   One row, on the title's line. When it's tight (900 to 1100 px) the brain's pill shrinks and ellipsizes first; the
-   title, the test button and the player's buttons keep their size. */
+   One row, on the title's line. When it's tight (900 to 1100 px) the brain's pill shrinks and ellipsizes first (its
+   whole text on hover: the title line keeps one row, so the boards below never move); the title, the test button and
+   the player's buttons keep their size. A phone's line, under the dock, wraps instead. */
 .match-tools {
   flex: 0 1 auto;
   min-width: 0;
@@ -1688,6 +1689,9 @@ p {
   padding: 2px 9px;
   border: 1px solid var(--line);
   border-radius: 999px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background: var(--surface-2);
   line-height: 16px;
 }
@@ -4250,6 +4254,84 @@ button.history-label {
 }
 .boss-intro.leaving {
   opacity: 0;
+}
+/* (After the loading step: its card takes over from that one's, the same backdrop, so no entrance.) */
+.boss-intro.no-entrance {
+  animation: none;
+}
+
+/* ---- Solo, the loading step before a boss battle on Maia (BrainLoading.tsx): the intro card's backdrop, held still.
+   Nothing moves but the bar (a transform), and only while the download's size isn't known does it slide. ---- */
+.boss-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+  color: #fff;
+  background: radial-gradient(circle, rgba(70, 10, 40, 0.82) 0%, rgba(10, 0, 10, 0.9) 75%);
+}
+.boss-loading-icon {
+  font-size: 48px;
+  line-height: 1;
+}
+.boss-loading-icon .boss-portrait {
+  display: block;
+  width: 88px;
+}
+.boss-loading-title {
+  font-size: 20px;
+}
+.boss-loading-bar {
+  position: relative;
+  width: 200px;
+  max-width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+.boss-loading-bar > i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  border-radius: inherit;
+  background: #d4a531;
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+.boss-loading-bar.busy > i {
+  width: 35%;
+  transform: none;
+  animation: boss-loading-busy 1.4s ease-in-out infinite;
+}
+@keyframes boss-loading-busy {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+.boss-loading-note {
+  font-size: 13px;
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+.boss-loading-first {
+  max-width: 250px;
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0.8;
+}
+.boss-loading-leave {
+  margin-top: 4px;
 }
 .boss-intro-icon {
   font-size: 72px;
@@ -11518,6 +11600,7 @@ img.qicon {
   cursor: default;
 }
 /* Testing, admins: the boss's brain at work (Boss alone, BrainDebug in BossDock.tsx). One short line. */
+/* (A phone's wraps rather than cut: a failure's reason is read whole, Oct 14. A computer's pill: see .match-tools.) */
 .brain-debug {
   margin: 4px auto 0;
   max-width: 100%;
@@ -11526,9 +11609,7 @@ img.qicon {
   font-size: 11px;
   line-height: 1.3;
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 /*

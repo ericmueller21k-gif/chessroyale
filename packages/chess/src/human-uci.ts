@@ -22,6 +22,8 @@ export class HumanUciEngine implements HumanEngineLike {
   private state: "new" | "loading" | "ready" | "failed" | "closed" = "new";
   /** Why it failed, if it did. */
   error: string | null = null;
+  /** Waiting for the load to end (loaded()). */
+  private waiting: ((ok: boolean) => void)[] = [];
 
   constructor(
     private readonly transport: UciTransport,
@@ -65,10 +67,22 @@ export class HumanUciEngine implements HumanEngineLike {
     return this.state;
   }
 
+  private setState(s: "loading" | "ready" | "failed" | "closed"): void {
+    this.state = s;
+    if (s === "loading") return;
+    for (const w of this.waiting.splice(0)) w(s === "ready");
+  }
+
+  /** Once the load has ended: true ready, false failed or closed (never before it ends; at once if it has). */
+  loaded(): Promise<boolean> {
+    if (this.state === "new" || this.state === "loading") return new Promise((resolve) => this.waiting.push(resolve));
+    return Promise.resolve(this.state === "ready");
+  }
+
   /** The handshake and the model's load (the first isready): ready, or failed with its reason (or after `timeoutMs`). */
   init(timeoutMs = 60_000): Promise<boolean> {
     if (this.state !== "new") return Promise.resolve(this.state === "ready");
-    this.state = "loading";
+    this.setState("loading");
     const work = this.serial(async () => {
       const ok = this.until((l) => l === "uciok");
       this.transport.send("uci");
@@ -83,22 +97,22 @@ export class HumanUciEngine implements HumanEngineLike {
     return new Promise<boolean>((resolve) => {
       const t = setTimeout(() => {
         if (this.state === "loading") {
-          this.state = "failed";
           this.error = "load timed out";
+          this.setState("failed");
         }
         resolve(false);
       }, timeoutMs);
       work.then(
         () => {
           clearTimeout(t);
-          if (this.state === "loading") this.state = "ready";
+          if (this.state === "loading") this.setState("ready");
           resolve(this.state === "ready");
         },
         (e: unknown) => {
           clearTimeout(t);
           if (this.state !== "closed") {
-            this.state = "failed";
             this.error = e instanceof Error ? e.message : String(e);
+            this.setState("failed");
           }
           resolve(false);
         },
@@ -133,13 +147,13 @@ export class HumanUciEngine implements HumanEngineLike {
   /** The worker broke (an error event): no more moves from it. */
   fail(reason: string): void {
     if (this.state === "closed") return;
-    this.state = "failed";
     this.error = reason;
+    this.setState("failed");
   }
 
   /** Frees the model and ends the worker (after the battle). */
   close(): void {
-    this.state = "closed";
+    this.setState("closed");
     try {
       this.transport.send("quit");
     } catch {

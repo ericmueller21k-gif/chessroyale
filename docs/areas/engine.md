@@ -58,8 +58,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     move and Big Boy's bounce keep their own Stockfish picks; a reply its power's search scored (Wrangler's to the
     showdown's duel: `BossRules.bestReply`, `bossRequest.best`) is Stockfish's best at full strength, Maia not asked;
     Maia's own mistakes replace the slips.
-  - **Never waited on:** not ready, failed, or no answer in 1.5 s (`timeoutMs`): today's move. A slow or old device
-    falls back to Stockfish this way, move by move.
+  - **Never waited on, move by move:** not ready, failed, or no answer in 1.5 s (`timeoutMs`): today's move. A slow
+    or old device falls back to Stockfish this way. Only a solo battle's start waits for it (the loading step, below).
   - **Where:** every boss battle, solo (`startBrain` in `solo.ts`, the runner's `humanBrain`) and online (the lobby
     decides the battle's plan once, `bossBrainNow`; the host is told as the intro starts, `bossBrain`, and each boss
     request carries it; the host's device plays Maia's move and the server sends that one move to everyone).
@@ -69,8 +69,28 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     it and plays Stockfish's move as host. `forPlayers` is the only gate: on, a player's device runs the same rule
     (`maiaAllowed`, `soloBrain`; online `bossBrainNow`), with no admin's pick and no debug line.
   - **Loading:** the files are fetched ahead when a battle on Maia may come (the boss menu, a Solo raid's queue, a raid
-    lobby on a device that may run it, the Crowd's vote for a boss battle); the worker starts as the battle's intro
-    begins (a prefetch under way finishes first) and ends with the battle; the service worker keeps the files.
+    lobby on a device that may run it, the Crowd's vote for a boss battle; files the service worker already keeps
+    aren't read again); the worker ends with the battle.
+  - **The loading step, solo** (DECISIONS.md, "Maia's loading step", Oct 14; Eric's iPhone failed to load Maia beside
+    the battle's Stockfish): before the intro of a solo battle on Maia (Boss alone, a Solo raid, the Crowd's boss
+    battle), the boss screen holds the intro's first frame under a card, "Loading the boss…", with the download's bar
+    (bytes of the three files, their sizes written in by the build since live the worker and the WebAssembly come
+    compressed; a sliding bar when unknown; "First time only: about 40 MB, then it's saved on this device."), then
+    "Starting…" while Maia starts (at once when its files are kept), and Leave (before move 1). Meanwhile this device's
+    **Stockfish is paused**: its workers end once the work asked for is done (their WebAssembly memory freed), work
+    asked for meanwhile waits, and fresh workers start once the step ends (`UciEngine.pause`, `pauseEngines`); Maia's
+    model loads only after they've ended. A load that fails short of memory or with no backend is tried once more
+    from a fresh worker. At most `BOSS_BRAIN.loadGateMs` (20 s) from the start; then the battle begins whatever
+    happened (not ready: Stockfish until it is, as before). If a fresh Stockfish doesn't answer within
+    `stockfishBackMs`, Maia is closed and Stockfish started again (the battle needs Stockfish, not Maia).
+    `maia-gate.ts` (`MaiaGate`), `startBrain` in `solo.ts`, `BrainLoading.tsx`.
+  - **Online, unchanged:** nothing waits; the host's device starts Maia as the intro begins (the lobby's `bossBrain`),
+    with its Stockfish running (judging, the boss's moves), and plays Stockfish's move until Maia is ready (or for the
+    battle, if it fails).
+  - **Its memory:** onnxruntime's build is the threaded one (one thread here) and its WebAssembly memory is shared, with a
+    4 GiB maximum that a shared memory reserves up front; the box caps it at 512 MiB (`MEMORY_MAX_PAGES` in its
+    `model.ts`; the model uses about 70 MB of it). Its load errors come whole, on one line (`errorText`), and a phone's
+    admins' line wraps (a computer's pill stays one line, the whole text on hover).
 - **Judging with a power.** When a boss power limits the crowd's moves, the best move is the best of the allowed ones
   (`judgeTop`, `judgeCandidates`, `allowedSearch` in `boss-powers.ts`); Jefferson's fire counts a piece left to burn as
   gone (`fireJudged`). Shared with the `god-king` lane by agreement.
@@ -97,6 +117,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 | Ratings from move losses | `packages/core/src/rating.ts`, `rating-curve.ts` |
 | The boss's brain: the rule, the text client | `packages/chess/src/boss-brain.ts`, `human-uci.ts`; `bossMoveFrom` in `runner.ts` |
 | Maia in the browser (start, prefetch, free) | `packages/app/src/maia.ts`, `boss-brain.ts` (who may run it; the admins' pick), `solo.ts` (`startBrain`), `net.ts` (`useBrain`, `hostBoss`) |
+| The loading step (solo): Stockfish paused, Maia alone | `packages/app/src/maia-gate.ts`, `components/BrainLoading.tsx`; `pauseEngines` in `engine.ts`; `UciEngine.pause` (`uci.ts`), `HumanUciEngine.loaded` |
 | The online plan | `packages/server/src/lobby.ts` (`bossBrainNow`, the `bossBrain` message, the boss request's `brain`) |
 | The Maia box (AGPL: worker, conversion, model) | `packages/maia-worker/` (README.md), built into `/engine/maia/` |
 | The engines' source archives | `packages/maia-worker/scripts/source-archive.mjs` (→ `/engine/maia/maia-box-source.tar.gz`); `packages/app/stockfish-source/` (→ `/engine/stockfish-source.tar.gz`, copied by `vite.config.ts`) |
@@ -104,7 +125,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 
 ## Settings
 
-`engineNodes`, `recheck*`, `boss*` (strength, stumble, slip, blunder guard), `BOSS_BRAIN` (Maia), `BOSS_TIERS`,
+`engineNodes`, `recheck*`, `boss*` (strength, stumble, slip, blunder guard), `BOSS_BRAIN` (Maia; its loading step:
+`loadGateMs`, `stockfishBackMs`, `downloadMb`), `BOSS_TIERS`,
 `BOSS_DIFFICULTY`, `JUDGES` in settings.ts; Worker variables `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`.
 
 ## Tests and tools
@@ -120,9 +142,14 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 - The brain: `packages/chess/test/boss-brain.test.ts` (the rating lines, the bridge, the brains' choices with made-up
   candidates, the fallbacks, the text client), `maia-bosses.test.ts` (every boss's Maia path in a battle),
   `packages/server/test/boss-powers-lobby.test.ts` ("the boss's brain online"); `packages/app/test/maia-players.test.ts`
-  (`forPlayers` on: a player's boss on Maia by the rule, solo); `packages/maia-worker/test/` (the encoder against the
-  official tokenizer, the protocol, the int8 model in onnxruntime-web, the source archive);
-  `packages/app/test/engine-source.test.ts` (Stockfish's archive); `e2e/maia.spec.ts` (also: both archives served);
+  (`forPlayers` on: a player's boss on Maia by the rule, solo); `packages/app/test/maia-gate.test.ts` (the loading
+  step: Stockfish first, the time limit, the one retry, leaving; the bar's sums; `downloadMb` against the files);
+  `packages/chess/test/uci-pause.test.ts` (`UciEngine.pause`, its revive; `HumanUciEngine.loaded`);
+  `packages/maia-worker/test/` (the encoder against the official tokenizer, the protocol and its whole error text, the
+  int8 model in onnxruntime-web and its capped memory, the source archive);
+  `packages/app/test/engine-source.test.ts` (Stockfish's archive); `e2e/maia.spec.ts` (also: both archives served; the
+  loading step: Stockfish's workers ended before Maia's load and no search in it, then the battle on Maia; a missing
+  model: the step gives up, Stockfish plays, the line says why);
   `npx tsx packages/sim/scripts/maia-calibration.ts` (`reports/maia-calibration.md`), `maia-sim.ts`
   (`reports/maia-boss.md`).
 - Sims (`packages/sim/scripts/`, write to `reports/`): `judge-accuracy.ts`, `judge-cuts.ts`, `judge-determinism.ts`,

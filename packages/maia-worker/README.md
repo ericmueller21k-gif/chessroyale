@@ -82,6 +82,11 @@ sha256 `ba14208b…62524f`), for the non-boss bots later.
 - In onnxruntime-web 1.30.0's WebAssembly, one thread: about **75–85 ms a move** on this machine's CPU (Node and
   headless Chromium alike; the first move about 200 ms), so roughly 0.2–0.35 s on a phone. Loading: about 1–2.5 s.
 - Memory with the model loaded: about 350–450 MB. The game ends the worker after each battle.
+- onnxruntime's WebAssembly memory: its build is the threaded one (run on one thread), so its memory is shared, and it
+  asks for a 4 GiB maximum, which a shared memory reserves up front: more than iOS Safari may give (Oct 14: an iPhone's
+  load failed with "no available backend found"). `src/model.ts` caps it at 512 MiB (`MEMORY_MAX_PAGES`) while the
+  session is made; the model uses about 70 MB of it (69 MB after loading and after 20 moves, measured in Node).
+- A failed load's reason comes whole, on one line (`errorText` in `src/uci.ts`).
 - Download, as served live (measured Oct 11): the model 25.2 MB as it is (Cloudflare doesn't compress `.onnx`; it
   would only shrink about 20% anyway), onnxruntime's WebAssembly 3.3 MB (brotli; 14.2 MB unpacked), the worker 40 KB
   (brotli): about 28.5 MB the first time. Fetched only for a battle that uses Maia, then kept by the service worker.

@@ -493,13 +493,19 @@ Going from ${pct(from, 0)} to ${pct(to, 0)} is only ${num(gPoints, 1)} points, b
 ### Brain 2: Maia-3, a human-like boss {#maia-brain}
 
 ${maiaNote}
-
+${
+  M.forPlayers
+    ? `
+**Why Maia, and its download.** Maia is a human-like engine, so a boss plays more like a person than Stockfish does. It's a bigger download, about ${M.downloadMb} MB, fetched once the first time you meet a boss and then kept on your device; on a slow connection, or if it can't load, the boss plays Stockfish instead.
+`
+    : ""
+}
 **Maia-3**, by the CSSLab at the University of Toronto, learned from human games to predict the move a person of a given rating would play. Held-back Stockfish plays like a strong engine with sudden lapses; Maia plays like a person, plans and mistakes included. There's no blunder guard by default: Maia's mistakes are human ones, and a boss's edge comes from its powers. A Maia boss picks its move like this:
 
 1. Maia is asked for its likeliest moves at the boss's Maia rating ([the handover](#handover)), and draws one from its own probabilities, a little sharper than a real person (temperature ${num(M.temperature)}) and never one of the rarest (only from the likeliest moves that together make up ${pct(M.topP, 0)} of the chances).
 2. **Powers:** Maia only picks among the moves a power leaves the boss (a pie, a toy block, a saw cut, Sawyer's first pawn move). If none of its likeliest moves is allowed, the boss plays its usual Stockfish move.
 3. A **guard**, where there is one ([the bridge](#handover)), may veto that move, judged against the boss's own Stockfish search of its best moves (a move outside that search is turned down). Maia's next likeliest moves are then tried in turn (at most ${M.candidates} in all, each at least ${pct(M.minP, 0)} likely); if none passes, the boss plays Stockfish's best.
-4. If Maia hasn't loaded, fails, or takes more than ${num(M.timeoutMs / 1000)} s (an older phone, say), the boss plays its usual Stockfish move. Nobody ever waits for it.
+4. If Maia hasn't loaded, fails, or takes more than ${num(M.timeoutMs / 1000)} s for a move (an older phone, say), the boss plays its usual Stockfish move. In Solo games and Boss alone, a boss battle waits for Maia to load before it starts, ${num(M.loadGateMs / 1000)} s at most; online, nobody waits for it.
 
 ${fixed ? `**${fixed.name}** has a brain of his own: Maia at its top rating, ${maiaTopRating(M)}, with no guard and none of Stockfish's moves, whatever the crowd (Stockfish only while Maia loads, or where it can't run).
 

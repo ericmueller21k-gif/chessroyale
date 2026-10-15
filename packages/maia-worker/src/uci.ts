@@ -25,6 +25,19 @@ import { policy, sample, seeded } from "./policy.ts";
 
 export const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+/**
+ * An error's whole text on one line (a line is one message): its message, with its kind when the message doesn't say
+ * it, and its cause's; nothing cut (onnxruntime's "no available backend found. ERR: [wasm] RangeError: Out of memory").
+ */
+export function errorText(e: unknown): string {
+  const one = (x: unknown): string => {
+    if (!(x instanceof Error)) return String(x);
+    const kind = x.name && x.name !== "Error" && !x.message.startsWith(x.name) ? `${x.name}: ` : "";
+    return `${kind}${x.message}${x.cause !== undefined ? ` (cause: ${one(x.cause)})` : ""}`;
+  };
+  return one(e).replace(/\s+/g, " ").trim();
+}
+
 export interface UciHost {
   send(line: string): void;
   /** Loads the model (once: the engine keeps the promise). */
@@ -87,7 +100,7 @@ export class MaiaUci {
         try {
           await this.ensureModel();
         } catch (e) {
-          this.loadError = e instanceof Error ? e.message : String(e);
+          this.loadError = errorText(e);
           this.host.send(`info string error load failed: ${this.loadError}`);
         }
         this.host.send("readyok");
