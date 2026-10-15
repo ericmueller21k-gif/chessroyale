@@ -21,7 +21,11 @@ function workerTransport(onError: (reason: string) => void): UciTransport {
     if (typeof e.data !== "string") return;
     for (const line of e.data.split("\n")) for (const l of listeners) l(line.trim());
   };
-  worker.onerror = (e) => onError(e.message || "worker error");
+  // (Handled: Maia fails, the boss plays Stockfish; the error never reaches the page as one of its own.)
+  worker.onerror = (e) => {
+    e.preventDefault();
+    onError(e.message || "worker error");
+  };
   return {
     send: (c) => worker.postMessage(c),
     onLine: (l) => listeners.push(l),

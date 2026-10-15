@@ -3986,3 +3986,52 @@ it if they need to wait 5 or 10 seconds." Then, Oct 14: tell players about the d
   that it's a bigger download, about 40 MB, fetched once and kept, and that on a slow connection or if it can't load
   the boss plays Stockfish; its rule 4 now says a Solo or Boss alone battle waits for Maia, 20 s at most, and online
   nobody does (it said nobody ever waits). Numbers from `BOSS_BRAIN`.
+
+### Engines' exits never reach the page: positions Stockfish refuses (Oct 15, 2026)
+
+Another helper saw page errors `ExitStatus: "Y"` in `e2e/sawyer.spec.ts`'s errors check (4 of 40 runs on main, 2 of
+80 on a branch from it), and asked whether #212's stopping and restarting of Stockfish's workers caused them.
+
+**What it is.** Stockfish 19 (the stockfish.js build the game runs) checks each position as it's set up. One it refuses
+("Unsupported position. WHITE has more than 8 pawns.", "King can be captured.", "Too many pieces for WHITE.", …) gets
+"info string CRITICAL ERROR: …" and an `exit()`, and in a browser worker Emscripten throws its exit, an `ExitStatus`
+(this build's minified class `Y`), uncaught; an uncaught error in a worker is reported in the page too. Reproduced in
+Chromium against the worker itself: every refused position gives exactly `ExitStatus: Y` in the page, and nothing else
+did (a worker stopped mid-search or mid-start, `quit`, `stop`, commands sent during a search, the next search sent at
+once after a `bestmove`, a position with no moves, `searchmoves` with an illegal move). So #212's pause isn't the cause:
+stopping a worker throws nothing. The engine answers on afterwards, but its last position stays set (the refused one
+isn't), so a search for a refused position answers for another one ("Sawyer, built" saw it hang in Node, where the
+exit ends the process).
+
+**Where the spec's errors came from: not found.** With every position the engine was asked about checked (a refused
+one logged with its caller) and every worker's error and complaint caught, 80 runs of the spec's tests as on main (60
+across its three, 20 more of the split's) never sent a refused position or ended a worker, and the match runner made
+none through 120 Sawyer battles (and 30 of each other boss) on a stand-in engine that checks every position it's
+handed. Reading the code found one game path that can make one, Sawyer's split beside a promoted piece (below), which
+can't come in the spec's first moves. So the cause of those page errors stays open; both nets below keep it from a
+player whatever it was.
+
+My calls:
+
+- **Positions Stockfish refuses are never sent.** `stockfishRefuses(fen)` (`packages/chess/src/uci.ts`) holds its
+  rules, measured against the build: one king a side; no pawn on the first or eighth rank; at most 8 pawns a side; no
+  more pieces than promotions could have made (beyond a queen, two rooks, two bishops and two knights, no more than the
+  pawns missing; bishops' colors don't count); the side not to move not in check; an en passant square on the sixth
+  rank with White to move, the third with Black; at most four castling rights it can read. Move counters and castling
+  rights a position can't have, it ignores. `UciEngine` checks before every search: a refused position gets no lines
+  (as a position with no moves; scoring, no scores), and a move at a strength throws, as "no move" does. Every caller
+  already handles both (the boss falls back to the first allowed move, the eval bar keeps its last value).
+- **A worker's error stays in the worker.** Stockfish's workers and Maia's handle their error event (`preventDefault`):
+  whatever ends a worker's program, nothing reaches the page as an error of its own (Stockfish's: a console warning;
+  Maia's already failed Maia, and the boss plays Stockfish).
+- **Sawyer's split counts promotions.** `splitRoom` also counts his promoted pieces: with seven pawns and a second
+  queen he has no room (an eighth pawn would make more pieces than promotions could). It's the one game path found
+  that could hand Stockfish a refused position.
+- **The spec's moves don't lose.** Its quiet fallback could walk into a quick mate, and taking every pawn of his it
+  could sometimes lost the battle before the split came (flakes on main too). Its moves now come from the engine's
+  ranking for the crowd (`engineTop`, the judge's, Sawyer's limits kept): the wanted move if it's within a tenth of
+  the best's expected score, else the best quiet move that is, else the best; while it waits for the split (now up to
+  20 crowd moves, was 14), a pawn of his taken if that's within a fifth of the best, else the best move. The first
+  move stays quiet (the knock test). The board saw's dots check is skipped when no piece has moves both across the
+  middle and not (a position now and then). A last test sends a refused position to a worker on purpose: no page
+  error, and the engine answers on.

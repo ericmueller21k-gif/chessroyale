@@ -29,6 +29,7 @@ import {
   sanLineToUci,
   splitRoom,
   splitSquare,
+  stockfishRefuses,
   trackHalves,
   triggerUltimate,
   withPiece,
@@ -147,6 +148,13 @@ describe("Sawyer's split pawn", () => {
     expect(splitRoom("rnbqkbnr/ppp1pppp/8/8/8/3q4/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "b")).toBe(false);
     expect(splitRoom(START_FEN.replace("PPPPPPPP", "PPPP1PPP"), "b")).toBe(false);
     expect(splitRoom(START_FEN.replace("PPPPPPPP", "PPPP1PPP"), "w")).toBe(true);
+    // Seven pawns and a promoted queen, the board not full: an eighth pawn would make more pieces than promotions could
+    // have (Stockfish refuses that position: stockfishRefuses), so no room; with the queen gone, room.
+    const promoted = "4k3/p1pp1ppp/8/q3p3/8/8/8/3qK3 w - - 0 1";
+    expect(splitRoom(promoted, "b")).toBe(false);
+    expect(stockfishRefuses(withPiece(promoted, "d5", { color: "b", type: "p" }))).toMatch(/promotions/);
+    expect(splitRoom(promoted.replace("3qK3", "4K3"), "b")).toBe(true);
+    expect(stockfishRefuses(withPiece(promoted.replace("3qK3", "4K3"), "d5", { color: "b", type: "p" }))).toBeNull();
   });
 
   it("Eric's call: the pawn he moved when it can split; if not, another of his that can, the most central, from the seed; none: null", () => {

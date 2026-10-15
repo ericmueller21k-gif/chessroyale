@@ -6,7 +6,7 @@
 
 import { ENGINE_MAX_ELO, ENGINE_MIN_ELO } from "@chessroyale/core";
 import { isChess960Fen } from "./chess960.ts";
-import { applyMove, gameEnd } from "./rules.ts";
+import { applyMove, gameEnd, kingAttacked } from "./rules.ts";
 
 export interface UciTransport {
   send(command: string): void;
@@ -74,6 +74,50 @@ export function parseInfo(line: string): InfoLine | null {
     ...(pv[2] ? { reply: pv[2] } : {}),
     ...(mate ? { mate: Number(mate[1]) } : {}),
   };
+}
+
+/**
+ * Why Stockfish would refuse this position, or null. Stockfish 19 checks a position as it's set up, and a refused one
+ * ends its process with an error (in a browser, its worker's exit thrown into the page: "ExitStatus", Oct 15) and
+ * leaves its last position in place, so a search would answer for the wrong position. Its rules, as measured against
+ * the build the game runs: one king a side; no pawn on the first or eighth rank; at most 8 pawns a side; no more pieces
+ * than promotions could have made (beyond a queen, two rooks, two bishops and two knights, no more than the pawns
+ * missing); the side not to move not in check; an en passant square on the sixth rank with White to move, the third
+ * with Black (any other is ignored); at most four castling rights, in letters it reads (KQkq, or files). Rights a
+ * position can't have it ignores, and the move counters it doesn't check.
+ */
+export function stockfishRefuses(fen: string): string | null {
+  const [board = "", side = "w", castling = "-", ep = "-"] = fen.split(" ");
+  if (side !== "w" && side !== "b") return "no side to move";
+  if (castling !== "-" && !/^[KQkqA-Ha-h]{1,4}$/.test(castling)) return "castling rights it can't read";
+  const ranks = board.split("/");
+  if (ranks.length !== 8) return "not eight ranks";
+  const count: Record<string, number> = {};
+  for (let r = 0; r < 8; r++) {
+    let files = 0;
+    for (const c of ranks[r]!) {
+      if (c >= "1" && c <= "8") {
+        files += Number(c);
+        continue;
+      }
+      count[c] = (count[c] ?? 0) + 1;
+      if ((c === "p" || c === "P") && (r === 0 || r === 7)) return "a pawn on the first or eighth rank";
+      files++;
+    }
+    if (files !== 8) return "a rank without eight squares";
+  }
+  for (const [color, up] of [["Black", false], ["White", true]] as const) {
+    const n = (piece: string) => count[up ? piece.toUpperCase() : piece] ?? 0;
+    if (n("k") !== 1) return `${color} hasn't one king`;
+    const pawns = n("p");
+    if (pawns > 8) return `${color} has more than 8 pawns`;
+    const promoted = Math.max(0, n("q") - 1) + Math.max(0, n("r") - 2) + Math.max(0, n("b") - 2) + Math.max(0, n("n") - 2);
+    if (promoted > 8 - pawns) return `${color} has more pieces than promotions could make`;
+  }
+  if (ep !== "-" && ep[1] !== (side === "w" ? "6" : "3")) return "an en passant square on the wrong rank";
+  // (Without its castling rights: a Chess960 position's are written by file, which chess.js doesn't read.)
+  if (kingAttacked(`${board} ${side} - - 0 1`, side === "w" ? "b" : "w")) return "the side not to move is in check";
+  return null;
 }
 
 /** Whether `p` settles within `ms` (its timer cleared either way). */
@@ -196,6 +240,8 @@ export class UciEngine {
 
   /** One fixed-budget search with a cleared hash. Returns the last score per line. */
   private async search(fen: string, multipv: number, searchMoves?: readonly string[], nodes = this.options.nodes): Promise<MoveScore[]> {
+    // (A position Stockfish refuses is never sent: no lines, as for a position with no moves.)
+    if (stockfishRefuses(fen)) return [];
     this.transport.send("ucinewgame");
     this.transport.send(`setoption name MultiPV value ${multipv}`);
     await this.ready();
@@ -222,7 +268,8 @@ export class UciEngine {
     // Sorted so the same set of moves always gives the same search, whoever asks.
     const unique = [...new Set(moves)].sort();
     return this.serial(async () => {
-      if (!unique.length) return [];
+      // (A position Stockfish refuses: no scores, rather than made-up ones for the positions after its moves.)
+      if (!unique.length || stockfishRefuses(fen)) return [];
       const found = await this.search(fen, unique.length, unique);
       const have = new Set(found.map((m) => m.move));
       for (const m of unique) if (!have.has(m)) found.push({ move: m, ...(await this.scoreAfter(fen, m)) });
@@ -290,6 +337,8 @@ export class UciEngine {
    */
   playAtElo(fen: string, elo: number, nodes = this.options.nodes, moveMs?: number): Promise<string> {
     return this.serial(async () => {
+      const refused = stockfishRefuses(fen);
+      if (refused) throw new Error(`No move in ${fen}: Stockfish refuses it (${refused})`);
       this.transport.send("ucinewgame");
       this.transport.send("setoption name MultiPV value 1");
       this.transport.send("setoption name UCI_LimitStrength value true");
