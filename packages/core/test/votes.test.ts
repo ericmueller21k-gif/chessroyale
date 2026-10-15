@@ -31,7 +31,7 @@ import {
   type Settings,
 } from "../src/index.ts";
 
-const crowd: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { crowdTeams: true }) };
+const crowd: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd") };
 const speed = PREGAME_VOTES.find((v) => v.id === "speed")!;
 /** Crowd 50 v 50's settings once each time control has won the vote (by its id: the order is the vote's business). */
 const won = (id: string): Settings => ({ ...crowd, ...speed.options.find((o) => o.id === id)!.patch });

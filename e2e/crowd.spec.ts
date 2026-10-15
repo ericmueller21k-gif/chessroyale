@@ -1,5 +1,5 @@
 import { devices, expect } from "@playwright/test";
-import { Chess } from "chess.js";
+import { CROWD_SETTINGS } from "@chessroyale/core";
 import { createLobbyFromHome, expectCoordsInSquares, named, soloFromHome, submitMove, test } from "./helpers.ts";
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
@@ -79,7 +79,7 @@ test("online, once you're out, a later cut says so (not \"You're through\") and 
   test.setTimeout(5 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   // A lobby of one (and 99 bots) where you never pick: -25 a move puts you at the bottom of your team.
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=team&rounds=1&clock=4");
+  await page.goto("/?debug&pace=quick&mode=crowd&format=team&rounds=1&clock=4");
   await createLobbyFromHome(page);
   await page.getByRole("button", { name: /Start with 1 player/ }).click();
   const cut = () => page.evaluate(() => {
@@ -151,28 +151,33 @@ test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives
   expect(places).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
 });
 
-test("the board's coordinates sit in their own squares, either way up (Crowd, everyone moves: the board turns to the side to move)", async ({ page }) => {
+test("the board's coordinates sit in their own squares, either way up (Crowd 50 v 50: your team's side at the bottom)", async ({ page }) => {
   test.setTimeout(3 * 60_000);
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=all&augments=0&clock=20");
-  await soloFromHome(page);
-  await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
+  // Your team is drawn as the match starts, about one in two each: new matches until both have come up.
   const seen = new Set<string>();
-  const stopAt = Date.now() + 2 * 60_000;
-  while (seen.size < 2 && Date.now() < stopAt) {
-    if ((await phase(page)) === "play") {
-      const fen: string = await page.evaluate(() => (window as any).match.phase.board.fen);
-      seen.add(await expectCoordsInSquares(page, fen.split(" ")[1] === "w" ? "white" : "black"));
-      // A move (any legal one: the board is what's tested), then the other side's turn.
-      const move = new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""))[0]!;
-      await page.evaluate((mv) => {
-        const m = (window as any).match;
-        if (m.phase.kind === "play") m.submit(mv);
-      }, move);
-      await expect.poll(async () => (await phase(page)) !== "play" || (await page.evaluate(() => (window as any).match.phase.board.fen)) !== fen, { timeout: 40_000 }).toBe(true);
-    }
-    await page.waitForTimeout(200);
+  for (let i = 0; i < 12 && seen.size < 2; i++) {
+    await page.goto("/?debug&mode=crowd&augments=0");
+    await soloFromHome(page);
+    await expect.poll(() => phase(page), { timeout: 30_000 }).toMatch(/play|watching/);
+    const team: string = await page.evaluate(() => (window as any).match.runner.player("you").colour);
+    seen.add(await expectCoordsInSquares(page, team === "w" ? "white" : "black"));
   }
   expect([...seen].sort()).toEqual(["black", "white"]);
+});
+
+test("a device that chose the old options (Everyone moves, Relaxed pace off) plays 50 v 50 at the mode's own pace", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("brc.crowdTurns", "all");
+    localStorage.setItem("brc.pace", "quick");
+  });
+  await page.goto("/?debug&mode=crowd&augments=0");
+  await soloFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 30_000 }).toMatch(/play|watching/);
+  const m = await page.evaluate(() => {
+    const x = (window as any).match;
+    return { teams: x.settings.crowdTeams, reveal: x.settings.revealSeconds, drawn: x.settings.drawnMoveSeconds, team: x.runner.player("you").colour };
+  });
+  expect(m).toEqual({ teams: true, reveal: CROWD_SETTINGS.revealSeconds, drawn: CROWD_SETTINGS.drawnMoveSeconds, team: expect.stringMatching(/^[wb]$/) });
 });
 
 test("the board never moves or resizes during a turn (Crowd and Classic)", async ({ page }) => {

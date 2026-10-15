@@ -4999,6 +4999,35 @@ Fischer Random crate item). Harmless while Cloudflare Access lets only Eric in; 
   boss menu skipped, no match on `window`, no crate test boxes; an admin's working), and the whole suite with
   `TEST_SWITCHES` on.
 
+## Removed: Relaxed pace and Crowd's everyone-moves choice (Oct 15, 2026)
+
+Eric asked to remove two dated player options.
+
+- **Relaxed pace** (Settings → Playing; `brc.pace` on the device). It dates from Oct 2, when Classic was the only mode.
+  Each mode now has its own tuned pace (`CROWD_SETTINGS`, `RAID_SETTINGS`, `DEFAULT_SETTINGS`), so players always play
+  their mode's pace. The toggle is gone, and the app no longer reads `brc.pace`: a device that had switched it off
+  simply plays the mode's pace. **`?pace=quick` stays as a test switch** (many e2e specs use it to run faster), gated
+  like the others since the same day: read through `testParams()` in the app and listed in `LOBBY_TEST_SWITCHES` on the
+  server, so for a player it does nothing. Its numbers moved into `QUICK_PACE` in settings.ts (one entry per mode;
+  the Crowd one was typed twice, in App.tsx and the lobby's options), replacing `PACE_SETTINGS`.
+- **Crowd's "everyone moves"** (Settings → Crowd: "50 v 50 / Everyone moves"; `brc.crowdTurns`, `?turns=all`, the
+  lobby's `turns`). Eric: "we did away with playing both sides long ago". Crowd is always team turns: `CROWD_SETTINGS`
+  says `crowdTeams: true`, `modeSettings()` no longer takes a choice, and the app and the server ignore `turns` (an
+  older app's `turns=all`, or a device that stored "all", gets team turns). **Kept for raids:** `crowdTeams: false` in
+  `RAID_SETTINGS` (everyone picks the crowd's moves against the boss) and every engine path behind it.
+  Removed because only Crowd with everyone moving used it: `CROWD_EVERYONE_KNOCKOUTS` (raids have no knockouts),
+  `finalName`'s "Final four" (it only names a Crowd's last cut; raids have no cuts; Classic's cut line has its own
+  words), the FAQ's paragraph and its line about the clock, `crowd-sim.ts`'s second run (its Oct 3 report stays as a
+  snapshot, with a note). Kept, because Classic uses them: the 2v2 final's text on `Final.tsx` and `StageBreak.tsx`.
+  Kept, because it's stored history: a profile's older matches with no team still read "Crowd · everyone moves".
+- **Tests that played Crowd with everyone moving** now play 50 v 50, keeping what they tested: the judges
+  (`packages/server/test/judges.test.ts`: a seed that puts the test's people on White, searched for, and Black's moves
+  judged in between), fair play (`fairplay-lobby.test.ts`: the same counts with the team to move, and the watching
+  team's picks not taken), a reload's seat (`resign.test.ts`: the move locks once everyone here on the team to move
+  has picked), the runner (`packages/chess/test/crowd.test.ts`: a raid is the only crowd with no teams, everyone
+  alive picking every move), e2e `judges.spec.ts` (two devices on a 50 v 50) and `crowd.spec.ts` (coordinates from
+  each team's side, and a device with the old choices stored playing 50 v 50 at the mode's pace).
+
 ## Error capture and the feedback sheet (ops, Oct 15, 2026)
 
 The director's brief for launch: nothing on a player's device reported an error, the server barely logged its own,

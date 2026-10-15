@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type MatchmakingType, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type MatchmakingType, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -74,7 +74,7 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
   // ?speed=bullet|blitz|rapid: that time control (for testing, with ?format=; old ids map over, unknown ones are Blitz).
   const speed = crowd ? (speedOption(q.get("speed"))?.patch ?? {}) : {};
   return {
-    // The mode's own rules and pace first, then pace and playtest overrides on top (only the ones that are set).
+    // The mode's own rules and pace first, then playtest overrides on top (only the ones that are set).
     // The boss raid: its own settings, and (solo) a boss a step above your rating.
     ...(raid
       ? {
@@ -87,8 +87,9 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
           // Boss alone: the difficulty chosen next to the boss picker (Easy to Hardest) on top of that strength.
           bossDifficulty: matchBoss || bossTierFromUrl() ? 0 : difficultyElo(),
         }
-      : modeSettings(mode.mode === "classic" ? "classic" : "crowd", { crowdTeams: mode.crowdTeams, augments: mode.augments })),
-    ...(quickPace() ? (crowd ? { revealSeconds: 2, drawnMoveSeconds: 1.2, stageBreakSeconds: 4 } : PACE_SETTINGS.quick) : {}),
+      : modeSettings(mode.mode === "classic" ? "classic" : "crowd", { augments: mode.augments })),
+    // Testing: ?pace=quick, a shorter reveal and less settling in.
+    ...(q.get("pace") === "quick" ? QUICK_PACE[crowd ? "crowd" : "classic"] : {}),
     ...definedOnly({
       roundsPerStage: n("rounds"),
       firstStageRounds: n("rounds"),
@@ -116,16 +117,6 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     // Testing, solo: ?boss=<id>&wip=1 meets a boss whose powers are built before its art is (placeholders show).
     ...(q.get("wip") === "1" && bossDef(bossIdFromLink(q.get("boss")))?.powers ? { bossId: bossIdFromLink(q.get("boss"))!, bossUnfinished: true } : {}),
   };
-}
-
-/** Quick pace: off by default (relaxed), set by the first screen's toggle or ?pace=quick. */
-function quickPace(): boolean {
-  if (new URLSearchParams(location.search).get("pace") === "quick") return true;
-  try {
-    return localStorage.getItem("brc.pace") === "quick";
-  } catch {
-    return false;
-  }
 }
 
 /** An invite link (/lobby/ABCDE) opens the join form with the code filled in (once we know the lobby is still open). */
@@ -612,7 +603,7 @@ export function App() {
     setError(null);
     const m = new NetMatch(code.toUpperCase(), playerName(), enginePool, queue ? false : practiceOn());
     m.settings = queue
-      ? { ...DEFAULT_SETTINGS, ...(queue === "raid" ? RAID_SETTINGS : modeSettings("crowd", { crowdTeams: true, augments: true })) }
+      ? { ...DEFAULT_SETTINGS, ...(queue === "raid" ? RAID_SETTINGS : modeSettings("crowd", { augments: true })) }
       : { ...DEFAULT_SETTINGS, ...overridesFromUrl(opts.mode) };
     // The queue shows at once (not "Connecting…"); the lobby confirms it.
     if (queue) m.auto = true;
@@ -636,7 +627,6 @@ export function App() {
       // (The test switches ride along for those allowed them; the server checks again: lobby-options.ts.)
       const params = testParams();
       params.delete("debug");
-      if (quickPace()) params.set("pace", "quick");
       const mode = { ...chosenMode(), ...(modeId ? { mode: modeId } : {}) };
       params.set("mode", mode.mode);
       if (mode.mode === "raid") {
@@ -644,7 +634,6 @@ export function App() {
         if (chosenBoss()) params.set("boss", chosenBoss());
         else if (bossTierFromUrl()) params.set("boss", String(bossTierFromUrl()));
       } else if (mode.mode === "crowd") {
-        params.set("turns", mode.crowdTeams ? "teams" : "all");
         params.set("augments", mode.augments ? "1" : "0");
       } else params.set("moves", String(chosenOpeningMoves()));
       const res = await fetch(`/api/lobby?${params}`, { method: "POST" });
