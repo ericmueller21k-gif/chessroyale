@@ -13,13 +13,19 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   process on a position it refuses (a ninth pawn, more pieces than promotions could make, the side not to move in
   check, …), and a browser worker's exit was thrown into the page. `stockfishRefuses` (`uci.ts`) holds its rules
   (checked against the real engine), and `UciEngine` never sends such a position: no lines, no scores, or "no move".
-  Every engine worker's error stays in the worker (`preventDefault` in `engine.ts`, `maia.ts`).
+  One rule more than Stockfish 19's own: a castling right without its rook and king in place (19 drops it; the engine
+  server's 17.1 crashes on it). Every engine worker's error stays in the worker (`preventDefault` in `engine.ts`,
+  `maia.ts`).
 - **The engine server never gets one either** (DECISIONS.md, "The engine server never gets a position Stockfish
   refuses", Oct 15): one would end the container's Stockfish, and every lobby's re-checks with it. Every search the
   Worker sends the container goes through `containerScore` (`packages/server/src/engine.ts`: `serverScoreAt`'s and
   fair play's), which checks first: not sent, "no answer", one log line. `/api/engine/score` answers 400 for one,
   before the day's budget; fair play's deep re-check passes one over. `engine/server.mjs` has no copy of the rules
-  (only the Worker can reach it). Open: the rules were measured against Stockfish 19, the container runs 17.1.
+  (only the Worker can reach it). Its own Stockfish (17.1) is checked against the same rules in CI (DECISIONS.md, "The
+  engine server's own Stockfish, checked in CI", Oct 15): `.github/workflows/engine-container.yml` builds the image
+  and sends it every case in `packages/chess/test/stockfish-refuses-cases.ts` through `server.mjs`; each one
+  `stockfishRefuses` lets through must be searched with the server answering on (`engine-container.test.ts`). It
+  runs when `engine/`, `uci.ts` or the check change, or by hand, in about a minute.
 - **Who scores, online: many judges.** Each board's scoring job (position, picks, bots; no names) goes to **two
   devices** drawn by the lobby, weighted by the speed each reported on joining. A device sends the engine's raw output;
   the lobby works out the board with the same code (`judge.ts`: `runJudgeJob`, `judgedBoard`). Two honest answers are
@@ -34,6 +40,10 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   class `EngineServer`, binding `ENGINE`, instance `standard-2`) at 2M nodes (`SERVER_RECHECK_NODES`). If it doesn't
   answer in time, the host re-checks on its own device. Server searches are capped per day by
   `ENGINE_DAILY_SEARCHES` (3000), counted in D1 (`engine_usage`); `ENGINE_OFF=1` turns the server off (local, e2e).
+  The reports measured the re-check with the full-network Stockfish 19 build standing in for the server; the
+  container's own 17.1 reads the same re-checks 3.2 points apart on average (`reports/container-accuracy.md`), so
+  moving it to Stockfish 19 (built from the browsers' stockfish.js source) is recommended (DECISIONS.md, "The engine
+  server's own Stockfish, checked in CI").
 - **Deep checks on players' computers** (`JUDGES.deepOnDevices`) are built and ship **off**: the browsers' lite network
   is less accurate than the server's (`reports/deep-accuracy.md`), and fairness comes first.
 - **Bosses' strength.** `bossMoveFrom` in `runner.ts` plays at a UCI_Elo set from the lobby's ratings (`bossElo`:
@@ -124,7 +134,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 | Re-checks, the boss's moves, bot picks | `packages/chess/src/runner.ts` |
 | The browser's engine pool | `packages/app/src/engine.ts` |
 | Many judges (lobby side) | `packages/server/src/judges.ts` (pure helpers), the flow in `lobby.ts` ("Many judges") |
-| The engine server | `engine/`, `packages/server/src/engine.ts` (`containerScore`: the one way in); routes `/api/engine/ping`, `/api/engine/score` |
+| The engine server | `engine/`, `packages/server/src/engine.ts` (`containerScore`: the one way in); routes `/api/engine/ping`, `/api/engine/score`; its CI check `.github/workflows/engine-container.yml` (`packages/chess/test/engine-container.test.ts`) |
+| The positions refused (rules, cases) | `stockfishRefuses` in `packages/chess/src/uci.ts`; `packages/chess/test/stockfish-refuses-cases.ts` |
 | Ratings from move losses | `packages/core/src/rating.ts`, `rating-curve.ts` |
 | The boss's brain: the rule, the text client | `packages/chess/src/boss-brain.ts`, `human-uci.ts`; `bossMoveFrom` in `runner.ts` |
 | Maia in the browser (start, prefetch, free) | `packages/app/src/maia.ts`, `boss-brain.ts` (who may run it; the admins' pick), `solo.ts` (`startBrain`), `net.ts` (`useBrain`, `hostBoss`) |
@@ -142,8 +153,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 
 ## Tests and tools
 
-- Unit: `packages/chess/test/uci.test.ts`, `stockfish-refuses.test.ts` (each rule against the real engine; never a
-  real game's position; never sent), `judge.test.ts`, `boss-guard.test.ts`, `top-cache.test.ts`, `bots.test.ts`,
+- Unit: `packages/chess/test/uci.test.ts`, `stockfish-refuses.test.ts` (each rule against the real engine, on the
+  cases in `stockfish-refuses-cases.ts`; never a real game's position, Chess960 too; never sent), `judge.test.ts`, `boss-guard.test.ts`, `top-cache.test.ts`, `bots.test.ts`,
   `packages/server/test/judges.test.ts`, `engine-server.test.ts` (a refused position never reaches the container, from
   any path; a legal one does, Chess960 too). (Engine tests run real Stockfish.)
 - e2e: `e2e/judges.spec.ts` (with containers off); `e2e/sawyer.spec.ts`'s last test (a refused position never sent;
@@ -151,8 +162,12 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 - Chess960: `packages/chess/test/chess960.test.ts` (perft against the published table, each castling rule, FEN, SAN,
   random games against chess.js), `chess960-engine.test.ts` (the commands sent, Stockfish's FEN, perft and moves
   against ours, scoring and `playAtElo` on Chess960).
-- The container: Docker locally, or live via `/api/engine/ping` and `/api/engine/score` with the Access service-token
-  headers (never print their values).
+- The container: in CI, `engine-container.yml` (the image built, its own Stockfish over HTTP on every refusal case,
+  each case's verdict in the run's summary, and one search as the game asks, 2M nodes: about 2.5 s there); Docker
+  locally (`ENGINE_IMAGE=<tag> npx vitest run packages/chess/test/engine-container.test.ts`, skipped without it); or
+  live via `/api/engine/ping` and `/api/engine/score` with the Access service-token headers (never print their
+  values). `npx tsx packages/sim/scripts/container-accuracy.ts` (Docker) sets its numbers on the re-checks against
+  the Stockfish 19 stand-in of `reports/deep-accuracy.md` (`reports/container-accuracy.md`).
 - The brain: `packages/chess/test/boss-brain.test.ts` (the rating lines, the bridge, the brains' choices with made-up
   candidates, the fallbacks, the text client), `maia-bosses.test.ts` (every boss's Maia path in a battle),
   `packages/server/test/boss-powers-lobby.test.ts` ("the boss's brain online"); `packages/app/test/maia-players.test.ts`
@@ -167,7 +182,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   `npx tsx packages/sim/scripts/maia-calibration.ts` (`reports/maia-calibration.md`), `maia-sim.ts`
   (`reports/maia-boss.md`).
 - Sims (`packages/sim/scripts/`, write to `reports/`): `judge-accuracy.ts`, `judge-cuts.ts`, `judge-determinism.ts`,
-  `many-judges.ts`, `deep-accuracy.ts`, `deep-timing.ts`, `boss-blunders.ts`, `boss-sim.ts`, `calibrate-rating.ts`.
+  `many-judges.ts`, `deep-accuracy.ts`, `container-accuracy.ts` (Docker), `deep-timing.ts`, `boss-blunders.ts`,
+  `boss-sim.ts`, `calibrate-rating.ts`.
 
 ## Rules for this area
 
@@ -175,6 +191,11 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   and then without skimping (Eric's computing priorities, `CLAUDE.md`).
 - A power that changes the position outside a move (a piece added, removed or moved) never makes one Stockfish
   refuses (`stockfishRefuses`): check it there, as Sawyer's `splitRoom` does; the engine's own check is the last line.
+  That includes castling rights: a rook or king moved or removed takes its rights with it (`withoutPiece`, Pig's
+  `fenWith`).
+- A new kind of position to refuse (or let through) goes in `stockfish-refuses-cases.ts`: `npm test` checks it against
+  the browsers' Stockfish 19, `engine-container` against the server's. A change to `engine/` (a new Stockfish, say)
+  runs that check: keep it green.
 - Every search sent to the engine server goes through `containerScore` (`packages/server/src/engine.ts`), never a
   `fetch` of its own: it's where positions Stockfish refuses stop.
 - Money is Eric's: never raise `ENGINE_DAILY_SEARCHES`, the container's size or count, or add a paid service without
