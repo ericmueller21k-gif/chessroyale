@@ -55,7 +55,7 @@ const WARN: MomentUi = {
     const when = ui?.ultimate.when ?? "Next turn";
     return (
       <div class="power-moment pm-warn">
-        {t < 1600 && banner("RAGE!", `${when}: ${ui?.ultimate.name ?? "its ultimate"}`, "rage")}
+        {t < 2600 && banner("RAGE!", `${when}: ${ui?.ultimate.name ?? "its ultimate"}`, "rage")}
         {cast("", 0)}
       </div>
     );

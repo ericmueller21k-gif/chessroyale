@@ -29,7 +29,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   screen, every game (Eric, Oct 13): the data's order, left to right, speeds slowest to fastest. From Black's side the
   board turns but the order doesn't: the zones are taken the other way round (`voteZoneFor`), and the cards never
   flip. A default is named by its option's id (`optionIndex`), never by its place. Non-voters (and `voteBotSkip` of the bots) join
-  the winner. `?speed=bullet|blitz|rapid` skips the vote for tests (old ids map over: normal → rapid, variable →
+  the winner, then the winner's banner; each result shows `voteResultSeconds` (4.2 s since Eric's Oct 15 "every banner a
+  second longer"; was 3.2). `?speed=bullet|blitz|rapid` skips the vote for tests (old ids map over: normal → rapid, variable →
   blitz; an unknown id gets Blitz).
 - **The endings.** Each leaves `crowdFinalists(format)` players (the lobby less `CROWD_KNOCKOUTS[format]`). Team final:
   `teamFinalSizes` players a side, the weakest out every `teamFinalMovesPerStep`. **The boss final** (Eric, Oct 14):

@@ -16,7 +16,7 @@ import { RECLUSE_FX } from "./bosses/recluse.ts";
  * starting position, then the game so far replayed quickly from the start, one
  * move at a time, then a fighting-game "START!" banner.
  */
-export const BOSS_INTRO = { cardMs: 2600, replayMs: 2400, minStepMs: 110, maxStepMs: 260, bannerGapMs: 250, bannerMs: 1500 } as const;
+export const BOSS_INTRO = { cardMs: 2600, replayMs: 2400, minStepMs: 110, maxStepMs: 260, bannerGapMs: 250, bannerMs: 2500 } as const;
 
 /**
  * When each part of the intro happens (ms after it starts), for a game `plies` half-moves in. `claimed`: Hollow claims
@@ -49,7 +49,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * step, `spin`: its banner, then the board turns again); the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX } as const;
+export const POWER_FX = { warn: 2700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX } as const;
 
 /** How long one power's moment holds the screen (ms). */
 export const powerFxMs = (e: { kind: keyof typeof POWER_FX; first?: boolean }): number => (POWER_FX[e.kind] ?? 0) + (POWER_FX_EXTRA[e.kind]?.(e) ?? 0);
@@ -64,7 +64,8 @@ export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX; fi
 
 /**
  * The God King acting from his spot by the board (Eric, Oct 9, 2026), ms after he starts: he raises his sword where he
- * stands (`raiseAt`), his cut-in banner plays (`cutAt`, for `cutMs`), then his bolt leaves the blade for the piece he
+ * stands (`raiseAt`), his cut-in banner plays (`cutAt`, for `cutMs`: 2.5 s, and everything after it a second later,
+ * since every banner got a second longer, Eric, Oct 15), then his bolt leaves the blade for the piece he
  * moves (`boltAt`; the move plays at `moveAt`), or a bolt and a slash land on the boss's king three times (`slashAt`).
  * He lowers his sword at `lowerAt` (a move) or `strikeLowerAt` (a strike). The reveal where he plays the move lasts
  * `moveMs` longer (solo and online); a strike stops the clock for settings.kingStrikeMs, which covers it.
@@ -72,13 +73,13 @@ export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX; fi
 export const KING_COMMAND = {
   raiseAt: 0,
   cutAt: 300,
-  cutMs: 1500,
-  boltAt: 2000,
-  moveAt: 2350,
-  lowerAt: 2900,
-  slashAt: [2050, 2500, 2950] as readonly number[],
-  strikeLowerAt: 3400,
-  moveMs: 1700,
+  cutMs: 2500,
+  boltAt: 3000,
+  moveAt: 3350,
+  lowerAt: 3900,
+  slashAt: [3050, 3500, 3950] as readonly number[],
+  strikeLowerAt: 4400,
+  moveMs: 2700,
 } as const;
 
 /**
@@ -91,12 +92,12 @@ export const KING_SUMMON = {
   appearAt: 1300,
   raiseAt: 1550,
   cutAt: 1550,
-  cutMs: 1500,
-  boltAt: 3250,
-  moveAt: 3600,
-  slashAt: [3300, 3750, 4200] as readonly number[],
-  strikeMs: 5900,
-  moveMs: 5400,
+  cutMs: 2500,
+  boltAt: 4250,
+  moveAt: 4600,
+  slashAt: [4300, 4750, 5200] as readonly number[],
+  strikeMs: 6900,
+  moveMs: 6400,
 } as const;
 
 /** How much longer the reveal lasts when the God King plays the move. */
@@ -119,7 +120,7 @@ export function lastMoveTookQueen(history: readonly string[], bases?: readonly B
  * or when G-REX's fire has just burnt (`burnt`: it plays first).
  */
 export function bossThinkMs(history: readonly string[], bases?: readonly Base[] | null, burnt = false): number {
-  return Math.max(lastMoveTookQueen(history, bases) ? 2000 : 1200, burnt ? FIRE_BURN_MS : 0);
+  return Math.max(lastMoveTookQueen(history, bases) ? 3000 : 1200, burnt ? FIRE_BURN_MS : 0);
 }
 
 /**
@@ -142,7 +143,8 @@ export function bossThinkMs(history: readonly string[], bases?: readonly Base[] 
  *    his fallen figure lies in the dock from then on, with his last words (and his leftover charges, as power-ups).
  * 7. At `endMs` the reveal ends: the crowd picks again with a fresh clock.
  *
- * Beats 1 to 7 are as they were before the warning, all `warnMs` later.
+ * Beats 1 to 7 are as they were before the warning, all `warnMs` later. Since Oct 15 (Eric: every banner a second
+ * longer) the cut-in holds 3.1 s, not 2.1, and beats 4 to 7 come a second later, so it still ends before the slide.
  */
 const LS_WARN_MS = 1300;
 const after = (ms: number) => LS_WARN_MS + ms;
@@ -160,18 +162,18 @@ export const LAST_STAND = {
   fallAt: after(1150),
   crashAt: after(1400),
   bannerAt: after(1950),
-  bannerMs: 2100,
-  slideAt: after(4150),
-  slashAt: after(4650),
+  bannerMs: 3100,
+  slideAt: after(5150),
+  slashAt: after(5650),
   slashes: 25,
   slashEveryMs: 80,
-  attackAt: after(4250),
-  crackAt: [after(5050), after(5650), after(6250)] as readonly number[],
-  staggerAt: after(6800),
-  collapseAt: after(7250),
-  fadeAt: after(7800),
+  attackAt: after(5250),
+  crackAt: [after(6050), after(6650), after(7250)] as readonly number[],
+  staggerAt: after(7800),
+  collapseAt: after(8250),
+  fadeAt: after(8800),
   fadeMs: 500,
-  endMs: after(8600),
+  endMs: after(9600),
 } as const;
 
 /** How much longer the reveal lasts when the God King makes his Last Stand. */

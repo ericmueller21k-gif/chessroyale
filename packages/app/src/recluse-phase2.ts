@@ -81,7 +81,8 @@ export const PHASE_CHANGE = (() => {
   const backAt = pickupAt + len("pickup");
   const homeAt = backAt + len("leap2");
   const bannerAt = Math.max(homeAt, shuffleAt + shuffleMs) + 100;
-  const bannerMs = 1400;
+  // ("PHASE 2": 2.4 s, every banner a second longer since Eric, Oct 15; the clocks start after it.)
+  const bannerMs = 2400;
   return {
     fallMs,
     kingAt,
@@ -219,7 +220,10 @@ export function smoothPath(pts: readonly Pt[]): string {
 
 /** His ultimate where he stands (playInPlace): the spellbook opened, held, slammed shut. */
 export const PHASE2_ULT_ANIMS = ["spellbook2", "spellLoop2", "spellClose2"] as const;
-/** "5 SECONDS!" shows this long as his ultimate comes (ms): a second longer than usual (Eric, Oct 14; FightBanner `long`). */
+/**
+ * "5 SECONDS!" shows this long as his ultimate comes (ms): the banner's whole 2.5 s. It had its extra second first (Eric,
+ * Oct 14); since Oct 15 every banner has it, so it's as long as the rest now.
+ */
 export const PHASE2_ULT_BANNER_MS = 2800;
 
 /**

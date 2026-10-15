@@ -1019,7 +1019,8 @@ export class SoloMatch implements GameView {
   get bossNote(): string | null {
     const v = this.simul;
     if (!v) return null;
-    return v.playing ? `Phase 2 · ${v.won} of ${v.of} won` : "Phase 2";
+    // (Only what the title, "BOSS · phase 2", doesn't say: nothing in the phase change, then how many are won.)
+    return v.playing ? `${v.won} of ${v.of} won` : "";
   }
 
   private nextRound() {

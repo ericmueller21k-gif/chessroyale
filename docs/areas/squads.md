@@ -255,7 +255,8 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   `partyIdleMinutes` with nobody in it.
 - **A lobby's life.** waiting (people join until the fill time, MATCH_FILL_SECONDS as for Crowd, or 32 people) →
   filled (`formSquads`: parties whole, bots in every empty seat; the full grid for FRONT_DOOR.fillShowMs) → vote (Start,
-  then Clock, on Crowd's vote machinery; bots vote) → bracket (drawn; round 1's matches after `bracketIntroSeconds`;
+  then Clock, on Crowd's vote machinery; bots vote; each result shows `voteResultSeconds`, 4.2 s since Oct 15, the
+  winner's banner a second longer) → bracket (drawn; round 1's matches after `bracketIntroSeconds`;
   each later match `roundBreakSeconds` after its second feeder ends) → results. It closes as Crowd's lobbies do
   (LOBBY_LIFE): 15 minutes after its results, 60 if it never filled, 180 with nobody connected (a bracket left to its
   bots reaches its results in under an hour).
@@ -464,8 +465,9 @@ door's look; every class is `sq-`.
     could go; as many as the points allow, then Done blocking. Every blocked move shows to everyone as an arrow from the
     piece to the square that draws like a move arrow, then keeps redrawing itself slowly and softly with a lock pulsing
     on it (`BlockArrows`, the beat kept from when it was placed), through your turn and theirs until they've moved.
-    The line above the board says it for a few seconds ("You blocked Qd8–f6 (−3)", "Knights blocked your Qd8–f6",
-    "Block lifted: it would have left no move (refunded)").
+    The line above the board says it for 3.6 s (`BANNER_MS`; 2.6 s before every banner got a second longer, Eric,
+    Oct 15) ("You blocked Qd8–f6 (−3)", "Knights blocked your Qd8–f6", "Block lifted: it would have left no move
+    (refunded)").
   - **Each squad's block points and tokens** under its clock, both squads, always (`SquadResources`).
   - **The token breakdown** after a Pairs match (`TokenBreakdown`; between matches, and on the results): every use,
     refunded or not, why, with numbers ("Qxd4: refunded, every other move lost at least 3.1 pawns").

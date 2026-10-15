@@ -256,7 +256,8 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
       </div>
       {!gone && (
         <div class="power-moment pm-lights">
-          {t < LIGHTS_OUT.dropAt && <PowerBanner boss={boss} side={boss.crowdSide} text="LIGHTS OUT!" tone="dark" />}
+          {/* (Its banner a second past his drop: every banner a second longer, Eric, Oct 15; nobody's clock runs.) */}
+          {t < LIGHTS_OUT.dropAt + 1000 && <PowerBanner boss={boss} side={boss.crowdSide} text="LIGHTS OUT!" tone="dark" />}
           {anim && (
             <span class="pm-hollow-spot" style={{ left: `${spot.left}%`, top: `${spot.top}%`, width: `${spot.width}%`, aspectRatio: `${kit.ch.w} / ${kit.ch.h}` }}>
               <BossMoment boss={boss.name} anim={(anim as { name: string }).name} since={(anim as { since: number }).since} then={(anim as { then?: string }).then} />

@@ -17,7 +17,7 @@ import { bossPowers, moveLoss, powerRoll, to, turnOf, warnThenUnleash, type Batt
  * How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). The funhouse's is its own screen,
  * after the move he plays for the crowd: he pogos on, the board turns upside down, he speaks, the move lands, he goes.
  */
-export const BOINGO_FX = { pie: 2300, funhouse: 5200, spin: 2600 } as const;
+export const BOINGO_FX = { pie: 3300, funhouse: 6200, spin: 3600 } as const;
 
 /** The legal moves of the side not to move (as if it were its turn): what a square would block for the boss. */
 function movesOfOther(fen: string): string[] {
