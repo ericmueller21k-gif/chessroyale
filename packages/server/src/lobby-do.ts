@@ -3,7 +3,7 @@ import type { ClientMessage, LobbyCloseReason, Opening, ServerMessage } from "@c
 import openings from "@chessroyale/chess/data/openings.json";
 import { LobbyCore, lobbyClosing, newLobbyRecord, type LobbyRecord, type ServerScoreRequest } from "./lobby.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
-import { ICONS, accountExists, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
+import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
 import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
@@ -147,8 +147,8 @@ export class Lobby extends DurableObject<Env> {
     const mail = caseMailer(await withSecrets(this.env));
     for (const r of [...left, ...(over ? core.humanResults() : [])]) {
       const userId = rec.accounts?.[r.playerId];
-      // (Someone who deleted their account mid-match gets nothing recorded.)
-      if (!userId || !(await accountExists(sql, userId).catch(() => true))) continue;
+      // (Someone who deleted their account mid-match gets nothing recorded: recordFairPlay and recordResult skip them.)
+      if (!userId) continue;
       // Fair play: the match's signals and the player's level first (it may put them in review)…
       const moves = core.fairMoves(r.playerId);
       if (moves.length) {

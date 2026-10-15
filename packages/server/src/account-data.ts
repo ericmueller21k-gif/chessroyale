@@ -4,35 +4,52 @@
  * docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md and docs/areas/accounts.md.
  *
  * Every store that keeps something about a player has its entry in ACCOUNT_STORES: what goes in the download, and
- * what deleting the account does to it. **A feature that stores something new about a player adds its entry here in
- * the same PR** (and its line in the privacy policy, screens/Legal.tsx); `account-data.test.ts` checks every table
- * with a player column is covered.
+ * what deleting the account does to it. Every other table is listed in NO_ACCOUNT_DATA, with why. **A PR that adds a
+ * table puts it in one or the other** (and, if it keeps anything about a player, its line in the privacy policy,
+ * screens/Legal.tsx): `account-data.test.ts` fails on a table in neither, whether it's in the schema or made anywhere
+ * else in the server's code.
  *
  * Deleting removes everything personal. What stays, and why:
- *   - results, without the player: their rows move to the account id DELETED_ID and lose their lobby code, so the
- *     game's own numbers (how often each boss wins, typical placements) stay right while nothing ties them to anyone;
- *   - a fair-play ban: the case, its log, the hashed email and Google id (fairplay_identities) and the device markers,
- *     under the deleted account's random id, so deleting an account never lifts a ban (a new account with the same
- *     identity is banned again). Everything else of fair play goes (judged moves, match summaries, appeals, reports).
- * The users row and the sessions go last, so a deletion that stops halfway can be run again from the same session.
+ *   - results, without the player: their rows move to the account id DELETED_ID, lose their lobby code, rating, best
+ *     move and eval-bar flag, and keep only the day they were played, so the game's own numbers (how often each boss
+ *     wins, typical placements) stay right while nothing ties them to anyone, or to each other;
+ *   - fair play's file on an account that's banned or in review: the case, its log, the hashed email and Google id
+ *     (fairplay_identities) and the device markers, under the deleted account's random id, so deleting never gets
+ *     around fair play (a new account with the same identity is banned again, or goes back to review). Everything
+ *     else of fair play goes (judged moves, match summaries, appeals, reports).
+ * It all happens in one batch (one transaction), so it's never half done, and anything written for the account after
+ * it (a lobby's result, a reward, fair play's record) finds no account and writes nothing.
  */
-import { DELETED_ID, type Sql, type User } from "./accounts.ts";
-import { caseOf, identityHashes, logCase } from "./fairplay.ts";
-import { deleteSocial } from "./friends.ts";
+import { DELETED_ID, stmt, type Sql, type Stmt, type User } from "./accounts.ts";
+import { caseOf, identityHashes } from "./fairplay.ts";
+import { socialDeletes } from "./friends.ts";
+
+/** What a store's erase needs to know, worked out before the batch. */
+export interface EraseContext {
+  now: number;
+  /** The account is banned or in review: fair play's file on it stays (with these hashed identities). */
+  keepFairPlay: boolean;
+  identities: [kind: string, hash: string][];
+}
 
 /** One store's part of an account: its share of the download, and what deleting the account does to it. */
 export interface AccountStore {
   /** Its key in the download. */
   name: string;
-  /** The tables it covers (the test checks every table with a player column is someone's). */
+  /** The tables it covers (the test checks every table is someone's, or in NO_ACCOUNT_DATA). */
   tables: readonly string[];
   /** The player's rows, for the download. */
   export(sql: Sql, user: User): Promise<unknown>;
-  /** Deletes the player's rows, or keeps what must stay (saying why above). */
-  erase(sql: Sql, user: User, ctx: { now: number; banned: boolean }): Promise<void>;
+  /** The statements that delete the player's rows, or keep what must stay (saying why above); run in one batch. */
+  erase(user: User, ctx: EraseContext): Stmt[];
 }
 
 const all = (sql: Sql, q: string, ...p: unknown[]) => sql.all<Record<string, unknown>>(q, ...p);
+const DAY = 86_400_000;
+
+/** A result's columns in the download (not `held`, which would say fair play is looking at the account). */
+const RESULT_COLUMNS =
+  "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar";
 
 export const ACCOUNT_STORES: AccountStore[] = [
   {
@@ -40,17 +57,22 @@ export const ACCOUNT_STORES: AccountStore[] = [
     tables: ["email_codes"],
     // The latest code sent to the account's email (never the code itself, only that one was sent).
     export: async (sql, u) => (u.email ? await sql.first("SELECT email, sent_at, expires_at, attempts FROM email_codes WHERE email = ?", u.email) : null),
-    erase: async (sql, u) => {
-      if (u.email) await sql.run("DELETE FROM email_codes WHERE email = ?", u.email);
-    },
+    erase: (u) => (u.email ? [stmt("DELETE FROM email_codes WHERE email = ?", u.email)] : []),
   },
   {
     name: "results",
     tables: ["results"],
-    export: (sql, u) => all(sql, "SELECT * FROM results WHERE user_id = ? ORDER BY played_at, id", u.id),
-    erase: async (sql, u) => {
-      await sql.run("UPDATE results SET user_id = ?, lobby = NULL WHERE user_id = ?", DELETED_ID, u.id);
-    },
+    export: (sql, u) => all(sql, `SELECT ${RESULT_COLUMNS} FROM results WHERE user_id = ? ORDER BY played_at, id`, u.id),
+    // Kept as nobody's: only the day, and nothing that could find the match (the lobby, the exact time) or tie one
+    // deleted player's rows together (the rating).
+    erase: (u) => [
+      stmt(
+        `UPDATE results SET user_id = ?, lobby = NULL, played_at = played_at - played_at % ${DAY}, rating = NULL, best_move = NULL, eval_bar = NULL
+         WHERE user_id = ?`,
+        DELETED_ID,
+        u.id,
+      ),
+    ],
   },
   {
     name: "shop",
@@ -61,30 +83,24 @@ export const ACCOUNT_STORES: AccountStore[] = [
       equipped: await all(sql, "SELECT slot, item_id FROM equipped WHERE user_id = ?", u.id),
       chatPicks: await sql.first("SELECT lines, emoji FROM chat_picks WHERE user_id = ?", u.id),
     }),
-    erase: async (sql, u) => {
-      for (const t of ["wallets", "inventory", "equipped", "chat_picks"]) await sql.run(`DELETE FROM ${t} WHERE user_id = ?`, u.id);
-    },
+    erase: (u) => ["wallets", "inventory", "equipped", "chat_picks"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, u.id)),
   },
   {
     name: "locker",
     tables: ["items", "equipped_items"],
     export: async (sql, u) => ({
-      items: await all(sql, "SELECT * FROM items WHERE user_id = ? ORDER BY created_at", u.id),
+      items: await all(sql, "SELECT id, def, color, color2, blemish, seed, crate, fischer, created_at FROM items WHERE user_id = ? ORDER BY created_at", u.id),
       equipped: await all(sql, "SELECT slot, item_id FROM equipped_items WHERE user_id = ?", u.id),
     }),
-    erase: async (sql, u) => {
-      await sql.run("DELETE FROM equipped_items WHERE user_id = ?", u.id);
-      await sql.run("DELETE FROM items WHERE user_id = ?", u.id);
-    },
+    erase: (u) => [stmt("DELETE FROM equipped_items WHERE user_id = ?", u.id), stmt("DELETE FROM items WHERE user_id = ?", u.id)],
   },
   {
-    // Reports the player made (about other players), and reports about them.
-    name: "reportsMade",
+    // Reports about players (fair play's sheet). The download has the ones the player made; deleting removes those
+    // and the ones about them.
+    name: "reports",
     tables: ["reports"],
-    export: (sql, u) => all(sql, "SELECT target, reason, match, at FROM reports WHERE reporter = ? ORDER BY at", u.id),
-    erase: async (sql, u) => {
-      await sql.run("DELETE FROM reports WHERE reporter = ? OR target = ?", u.id, u.id);
-    },
+    export: async (sql, u) => ({ made: await all(sql, "SELECT target, reason, match, at FROM reports WHERE reporter = ? ORDER BY at", u.id) }),
+    erase: (u) => [stmt("DELETE FROM reports WHERE reporter = ? OR target = ?", u.id, u.id)],
   },
   {
     // Friends, requests, blocks, invites and the caps' counts (friends.ts; docs/areas/accounts.md, "Data stored by
@@ -105,7 +121,26 @@ export const ACCOUNT_STORES: AccountStore[] = [
       };
     },
     // Both sides: their friendships, requests, blocks and invites go from everyone's lists.
-    erase: (sql, u) => deleteSocial(sql, u.id),
+    erase: (u) => socialDeletes(u.id),
+  },
+  {
+    // Error records and the feedback sheet's reports (problems.ts). A bug report carries the account (if signed in);
+    // feedback and ideas carry none, so they can't be found and expire with the rest (OPS.store.keepDays). An error
+    // record keeps the account inside its latest sample (JSON), so deleting takes the id out and leaves the count.
+    name: "problemReports",
+    tables: ["ops_reports", "ops_errors"],
+    export: async (sql, u) => ({
+      reports: await all(sql, "SELECT id, at, kind, version, note, diag FROM ops_reports WHERE account = ? ORDER BY at", u.id),
+      errors: await all(
+        sql,
+        "SELECT hour, kind, message, version, last_seen, sample FROM ops_errors WHERE json_valid(sample) AND json_extract(sample, '$.account') = ? ORDER BY hour",
+        u.id,
+      ),
+    }),
+    erase: (u) => [
+      stmt("DELETE FROM ops_reports WHERE account = ?", u.id),
+      stmt("UPDATE ops_errors SET sample = json_set(sample, '$.account', NULL) WHERE json_valid(sample) AND json_extract(sample, '$.account') = ?", u.id),
+    ],
   },
   {
     // The download has what the player already sees of fair play (banned or not, their appeals and the replies). The
@@ -117,21 +152,33 @@ export const ACCOUNT_STORES: AccountStore[] = [
       banned: (await caseOf(sql, u.id))?.status === "banned",
       appeals: await all(sql, "SELECT at, text, status, decided_at, reply FROM fairplay_appeals WHERE user_id = ? ORDER BY at", u.id),
     }),
-    erase: async (sql, u, { now, banned }) => {
-      await sql.run("DELETE FROM fairplay_matches WHERE user_id = ?", u.id);
-      await sql.run("DELETE FROM fairplay_appeals WHERE user_id = ?", u.id);
-      if (banned) {
-        // The ban outlives the account: its identities (hashed) as they are now, with its case, log and device markers.
-        for (const [kind, hash] of await identityHashes(u)) {
-          await sql.run("INSERT OR REPLACE INTO fairplay_identities (kind, hash, user_id, at) VALUES (?, ?, ?, ?)", kind, hash, u.id, now);
-        }
-        await logCase(sql, u.id, "account deleted", "player", "the player deleted their account; the ban, its hashed identities and device markers are kept", now);
-        return;
-      }
-      for (const t of ["fairplay_cases", "fairplay_log", "fairplay_identities", "fairplay_devices"]) await sql.run(`DELETE FROM ${t} WHERE user_id = ?`, u.id);
+    erase: (u, { now, keepFairPlay, identities }) => {
+      const gone = [stmt("DELETE FROM fairplay_matches WHERE user_id = ?", u.id), stmt("DELETE FROM fairplay_appeals WHERE user_id = ?", u.id)];
+      if (!keepFairPlay) return [...gone, ...["fairplay_cases", "fairplay_log", "fairplay_identities", "fairplay_devices"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, u.id))];
+      // Banned or in review: the file outlives the account, with its identities as they are now (an older deleted
+      // account's row for the same identity keeps it), so a new account made with one is caught (banCheck).
+      return [
+        ...gone,
+        ...identities.map(([kind, hash]) => stmt("INSERT OR IGNORE INTO fairplay_identities (kind, hash, user_id, at) VALUES (?, ?, ?, ?)", kind, hash, u.id, now)),
+        stmt(
+          "INSERT INTO fairplay_log (user_id, at, action, by, reason) VALUES (?, ?, 'account deleted', 'player', ?)",
+          u.id,
+          now,
+          "the player deleted their account; its case, log, hashed identities and device markers are kept",
+        ),
+      ];
     },
   },
 ];
+
+/** Tables with nothing about any player, and why (the test checks every table is here or in ACCOUNT_STORES). */
+export const NO_ACCOUNT_DATA: Record<string, string> = {
+  live_lobbies: "running lobbies for the live line: codes, modes and counts",
+  queue_waits: "how long the queue took: mode, time, players, wait",
+  fairplay_budget: "the deep re-check's searches per day",
+  engine_usage: "the engine server's searches per day (engine.ts)",
+  meta: "the schema's version",
+};
 
 /** The account itself (users) and its sessions: first in the download, last to go. */
 const ACCOUNT_TABLES = ["users", "sessions"] as const;
@@ -143,7 +190,7 @@ const readable = (v: unknown): unknown => {
   if (Array.isArray(v)) return v.map(readable);
   if (!v || typeof v !== "object") return v;
   return Object.fromEntries(
-    Object.entries(v).map(([k, x]) => [k, typeof x === "number" && /(^|_)(at|seen|until|start|since)$/.test(k) && x > 1e11 ? new Date(x).toISOString() : readable(x)]),
+    Object.entries(v).map(([k, x]) => [k, typeof x === "number" && /(^|_)(at|seen|until|start|since|hour)$/.test(k) && x > 1e11 ? new Date(x).toISOString() : readable(x)]),
   );
 };
 
@@ -163,13 +210,17 @@ export async function accountDownload(sql: Sql, user: User, now: number, extra: 
 }
 
 /**
- * Deletes an account: every store's part (ACCOUNT_STORES), then the account and its sessions, so it's signed out on
- * every device. What stays and why: this file's header. Safe to run again if it stopped halfway.
+ * Deletes an account: every store's statements, then the account and its sessions (signed out on every device), in
+ * one batch, so it's all or nothing. What stays and why: this file's header.
  */
-export async function deleteAccount(sql: Sql, user: User, now: number): Promise<{ banned: boolean }> {
-  const banned = (await caseOf(sql, user.id))?.status === "banned";
-  for (const s of ACCOUNT_STORES) await s.erase(sql, user, { now, banned });
-  await sql.run("DELETE FROM users WHERE id = ?", user.id);
-  await sql.run("DELETE FROM sessions WHERE user_id = ?", user.id);
-  return { banned };
+export async function deleteAccount(sql: Sql, user: User, now: number): Promise<{ keptFairPlay: boolean }> {
+  const status = (await caseOf(sql, user.id))?.status;
+  const keepFairPlay = status === "banned" || status === "review";
+  const ctx: EraseContext = { now, keepFairPlay, identities: keepFairPlay ? await identityHashes(user) : [] };
+  await sql.batch([
+    ...ACCOUNT_STORES.flatMap((s) => s.erase(user, ctx)),
+    stmt("DELETE FROM users WHERE id = ?", user.id),
+    stmt("DELETE FROM sessions WHERE user_id = ?", user.id),
+  ]);
+  return { keptFairPlay: keepFairPlay };
 }

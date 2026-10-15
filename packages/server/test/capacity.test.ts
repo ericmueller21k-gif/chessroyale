@@ -27,6 +27,12 @@ function memorySql(): Sql & { statements: string[] } {
       statements.push(q);
       return db.prepare(q).all(...(p as never[])) as never;
     },
+    async batch(list: readonly { sql: string; params: unknown[] }[]) {
+      for (const s of list) {
+        statements.push(s.sql);
+        db.prepare(s.sql).run(...(s.params as never[]));
+      }
+    },
   };
 }
 

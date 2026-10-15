@@ -32,15 +32,21 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   - **The download:** GET `/api/me/data` answers a JSON file of everything kept about the account (every store's rows,
     the global chat's lines from the live hub). It leaves out who has blocked them and fair play's detection records
     (on request, by email).
-  - **Deleting:** POST `/api/me/delete` `{confirm: "delete"}`, after the app's confirmation. It removes everything
-    personal in every store and signs the account out on every device. The live hub forgets it (online, global chat
-    lines). The app clears its local storage and starts afresh.
-  - **What stays:** results, moved to the shared account id `deleted` without their lobby code; and a ban, if banned
-    (case, log, hashed identities, device markers, under the old id, shown on the review page as "Deleted player").
-  - **A lobby that finishes later** records nothing for a deleted account.
-  - **Every store is one entry in `ACCOUNT_STORES`** (`account-data.ts`). A table with an account column and no entry
-    fails `account-data.test.ts`.
-- **Sign-in code records** go an hour after their code was sent. A new account is called "Player" until its owner picks
+  - **Deleting:** POST `/api/me/delete` `{confirm: "delete"}`, from the site's own origin, as JSON, after the app's
+    confirmation. It removes everything personal in every store, in one batch (one transaction), and signs the
+    account out on every device. The live hub forgets it (online, global chat lines). The app clears its local
+    storage and starts afresh.
+  - **What stays:**
+    - results, moved to the shared account id `deleted` with only their day, and without their lobby code, rating,
+      best move or eval-bar flag;
+    - fair play's file if banned or in review (case, log, hashed identities, device markers, under the old id, shown
+      on the review page as "Deleted player"). A new account with the identity is banned again, or goes to review.
+  - **A lobby or a reward that finishes later** records nothing for a deleted account: its writes say `WHERE EXISTS`
+    the account.
+  - **Every table is accounted for:** each is in a store in `ACCOUNT_STORES` (`account-data.ts`) or listed in
+    `NO_ACCOUNT_DATA`. `account-data.test.ts` fails on a table in neither, from the schema or any `CREATE TABLE` in
+    the server.
+- **Sign-in code records** go an hour after their code was sent (the Worker's 15-minute schedule, `purgeEmailCodes`). A new account is called "Player" until its owner picks
   a name (never a Google name or the start of an email).
 - **The privacy policy, terms and copyright page** (`/privacy`, `/terms`, `/copyright`, `screens/Legal.tsx`) are drafts
   written from the code, with the decisions still to make at the top. They list every kind of personal data the game keeps, why and for how long:
@@ -110,5 +116,5 @@ Worker variables and secrets (see `DEPLOY.md`): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIE
 
 - Secrets never in the repo or in output; Eric does sign-ups and purchases.
 - A profile others can see never shows an email, a sign-in method or anything not on the approved list.
-- A new table that keeps anything about an account gets its entry in `ACCOUNT_STORES` (`account-data.ts`): its part of
-  the download and what deleting does to it, and its line in the privacy policy, in the same PR.
+- A new table goes in `ACCOUNT_STORES` (`account-data.ts`: its part of the download, and what deleting does to it)
+  with its line in the privacy policy, or in `NO_ACCOUNT_DATA` with why it holds nothing about anyone, in the same PR.

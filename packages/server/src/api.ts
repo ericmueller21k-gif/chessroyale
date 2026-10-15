@@ -256,7 +256,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // GET /api/me/data: "Download my data" (Settings), everything kept about your account as a JSON file, the global
   // chat's lines (the live hub's) included. See account-data.ts.
   if (path === "/api/me/data" && request.method === "GET") {
-    const hub = env.LIVE ? await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).accountData(current.id).catch(() => null) : null;
+    const hub = env.LIVE
+      ? await liveHub(env as Required<Pick<AccountEnv, "LIVE">>)
+          .accountData(current.id)
+          .catch((e: unknown) => void console.error(`download: the live hub's part is missing (${String(e)})`))
+      : null;
     const body = await accountDownload(sql, current, now, hub ? { globalChat: hub.globalChat } : {});
     return new Response(JSON.stringify(body, null, 2), {
       headers: {
@@ -270,11 +274,18 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // (account-data.ts), every session with it (signed out on every device), and the live hub forgets the account
   // (online now, its global chat lines). The app then starts afresh as a new guest.
   if (path === "/api/me/delete" && request.method === "POST") {
+    // Only from this site's own page, as JSON (a form from anywhere else can't send it), and only confirmed.
+    if (request.headers.get("origin") !== url.origin) return json({ message: "Not from here." }, 403);
+    if (!/^application\/json\b/i.test(request.headers.get("content-type") ?? "")) return json({ message: "Send JSON." }, 415);
     const b = (await request.json().catch(() => ({}))) as { confirm?: unknown };
     if (b?.confirm !== "delete") return json({ message: "Confirm that you want to delete your account." }, 400);
     await deleteAccount(sql, current, now);
     if (token) forgetToken(token);
-    if (env.LIVE) await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).forgetAccount(current.id).catch(() => undefined);
+    if (env.LIVE) {
+      await liveHub(env as Required<Pick<AccountEnv, "LIVE">>)
+        .forgetAccount(current.id)
+        .catch((e: unknown) => console.error(`account deleted, but the live hub kept its chat lines and presence (${String(e)})`));
+    }
     return json({ ok: true }, 200, { "set-cookie": cookie(SESSION_COOKIE, "", 0) });
   }
 

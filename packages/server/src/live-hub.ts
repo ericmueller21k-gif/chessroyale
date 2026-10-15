@@ -160,9 +160,9 @@ export class LiveHub extends DurableObject<Env> {
     return { post, chat: this.chat.snapshot(now) };
   }
 
-  /** What the hub holds about an account, for its download: its lines in the global chat, and when it was last seen. */
-  async accountData(id: string): Promise<{ globalChat: GlobalLine[]; lastSeen: number | null }> {
-    return { globalChat: this.chat.linesOf(id), lastSeen: this.board.lastSeen(id) };
+  /** What the hub holds about an account, for its download: its lines in the global chat. */
+  async accountData(id: string): Promise<{ globalChat: GlobalLine[] }> {
+    return { globalChat: this.chat.linesOf(id) };
   }
 
   /** A deleted account (account-data.ts): no longer online, and its lines leave the global chat. */

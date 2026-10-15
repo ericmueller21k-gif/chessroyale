@@ -223,8 +223,9 @@ export async function caseDetail(sql: Sql, userId: string, opts: { email: boolea
   const log = await sql.all<{ at: number; action: string; by: string; reason: string | null }>("SELECT at, action, by, reason FROM fairplay_log WHERE user_id = ? ORDER BY at DESC, id DESC LIMIT 200", userId);
   const appeals = await sql.all<Appeal>("SELECT id, user_id, at, text, status, decided_at, decided_by, reply FROM fairplay_appeals WHERE user_id = ? ORDER BY at DESC", userId);
   const sameDevice = await sql.all<{ id: string; name: string; status: string | null }>(
-    `SELECT DISTINCT o.user_id AS id, COALESCE(u.name, '${DELETED_NAME}') AS name, c.status FROM fairplay_devices d JOIN fairplay_devices o ON o.device = d.device AND o.user_id != d.user_id
+    `SELECT DISTINCT o.user_id AS id, COALESCE(u.name, ?) AS name, c.status FROM fairplay_devices d JOIN fairplay_devices o ON o.device = d.device AND o.user_id != d.user_id
      LEFT JOIN users u ON u.id = o.user_id LEFT JOIN fairplay_cases c ON c.user_id = o.user_id WHERE d.user_id = ? LIMIT 20`,
+    DELETED_NAME,
     userId,
   );
   const parse = <T>(s: string | null): T | null => {
@@ -398,7 +399,7 @@ ${cases.length ? cases
     )
     .join("") : `<tr><td colspan="8" class="muted">Nothing here.</td></tr>`}</table></div>
 <h2>Recent decisions</h2><div class="card scroll"><table><tr><th>When</th><th>Player</th><th>Action</th><th>By</th><th>Reason</th></tr>
-${log.map((l) => `<tr><td>${when(l.at)}</td><td><a href="/admin/fairplay/case/${esc(l.user_id)}">${esc(l.name ?? l.user_id)}</a></td><td>${esc(l.action)}</td><td>${esc(l.by)}</td><td class="wrap">${esc(l.reason)}</td></tr>`).join("")}</table></div>`;
+${log.map((l) => `<tr><td>${when(l.at)}</td><td><a href="/admin/fairplay/case/${esc(l.user_id)}">${esc(l.name ?? DELETED_NAME)}</a></td><td>${esc(l.action)}</td><td>${esc(l.by)}</td><td class="wrap">${esc(l.reason)}</td></tr>`).join("")}</table></div>`;
 }
 
 function casePage(d: CaseDetail, note: string | null): string {

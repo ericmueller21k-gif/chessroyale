@@ -14,8 +14,8 @@ export function AccountData() {
     setError(null);
     try {
       await deleteMyAccount();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't delete your account. Try again.");
+    } catch {
+      setError("Couldn't delete your account. Try again.");
       setBusy(false);
     }
   };
@@ -36,8 +36,8 @@ export function AccountData() {
             signed out on every device, and this device's settings reset.
           </p>
           <p>
-            Your match results stay, without your name, so the game's numbers stay right. If your account is banned for fair play,
-            the ban stays: a new account with the same email or Google account is banned too.
+            Your match results stay, without your name, so the game's numbers stay right. If fair play has banned your account or
+            is looking into it, its records stay, so a new account with the same email or Google account can't get around it.
           </p>
           <p>
             <strong>This can't be undone.</strong>

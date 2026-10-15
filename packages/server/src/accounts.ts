@@ -39,7 +39,16 @@ export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
   first<T>(sql: string, ...params: unknown[]): Promise<T | null>;
   all<T>(sql: string, ...params: unknown[]): Promise<T[]>;
+  /** Runs statements as one transaction: all of them or none (D1's batch). */
+  batch(statements: readonly Stmt[]): Promise<void>;
 }
+
+/** A statement for `Sql.batch`. */
+export interface Stmt {
+  sql: string;
+  params: unknown[];
+}
+export const stmt = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
 
 /** The SQL interface over a D1 binding. */
 export function d1Sql(db: D1Database): Sql {
@@ -55,6 +64,10 @@ export function d1Sql(db: D1Database): Sql {
     async all(sql, ...params) {
       countD1(sql);
       return (await db.prepare(sql).bind(...params).all()).results as never;
+    },
+    async batch(statements) {
+      for (const s of statements) countD1(s.sql);
+      if (statements.length) await db.batch(statements.map((s) => db.prepare(s.sql).bind(...s.params)));
     },
   };
 }
@@ -344,8 +357,11 @@ export const DELETED_ID = "deleted";
 /** What an admin's page shows for an account that was deleted (a fair-play ban outlives it). */
 export const DELETED_NAME = "Deleted player";
 
-/** Whether an account (still) exists: a lobby saving results for someone who deleted their account mid-match skips them. */
-export const accountExists = async (sql: Sql, id: string) => !!(await sql.first("SELECT id FROM users WHERE id = ?", id));
+/**
+ * Writes for an account that may have been deleted since (a lobby's results, a reward) go through this in the same
+ * statement, so a deleted account gets nothing new and no extra read is made.
+ */
+const IF_ACCOUNT = "WHERE EXISTS (SELECT 1 FROM users WHERE id = ?)";
 
 export interface User {
   id: string;
@@ -477,16 +493,16 @@ const MAX_ATTEMPTS = 5;
 
 export type CodeStart = { ok: true; code: string } | { ok: false; message: string };
 
-/** Sign-in code records go an hour after their last code was sent: by then it has expired and its hour's count is spent. */
-const CODE_KEEP_MS = 3_600_000;
-let codesPurgedAt = 0;
+/**
+ * Sign-in code records go an hour after their last code was sent (by then it has expired and its hour's count is
+ * spent): the Worker's 15-minute schedule runs this (index.ts), so none stays much past the hour.
+ */
+export async function purgeEmailCodes(sql: Sql, now: number): Promise<void> {
+  await sql.run("DELETE FROM email_codes WHERE sent_at < ?", now - 3_600_000);
+}
 
-/** A fresh 6-digit sign-in code for an address (rate-limited). Old records are cleared first (at most every 10 minutes). */
+/** A fresh 6-digit sign-in code for an address (rate-limited). */
 export async function startEmailCode(sql: Sql, email: string, now: number): Promise<CodeStart> {
-  if (now - codesPurgedAt > 10 * 60_000 || now < codesPurgedAt) {
-    codesPurgedAt = now;
-    await sql.run("DELETE FROM email_codes WHERE sent_at < ?", now - CODE_KEEP_MS);
-  }
   const row = await sql.first<{ sent_at: number; hour_start: number; sends_this_hour: number }>(
     "SELECT sent_at, hour_start, sends_this_hour FROM email_codes WHERE email = ?",
     email,
@@ -564,8 +580,6 @@ const flag = (b: unknown) => (b === true ? 1 : b === false ? 0 : null);
 export const cleanSan = (m: unknown) => (typeof m === "string" && /^(?:[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O(?:-O)?)[+#]?$/.test(m) ? m : null);
 
 export async function recordResult(sql: Sql, userId: string, r: MatchResult, now: number): Promise<void> {
-  // (An account deleted mid-match gets nothing new.)
-  if (!(await accountExists(sql, userId))) return;
   const rating = typeof r.rating === "number" && Number.isFinite(r.rating) ? Math.round(r.rating) : null;
   const cuts = count(r.cuts);
   const strikes = count(r.strikes);
@@ -575,7 +589,7 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   await sql.run(
     `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
        brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}`,
     userId,
     mode,
     r.online ? 1 : 0,
@@ -600,6 +614,8 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     r.held ? 1 : 0,
     typeof r.bossId === "string" && bossDef(r.bossId) ? r.bossId : null,
     flag(r.evalBar),
+    // (An account deleted mid-match gets nothing new.)
+    userId,
   );
   // Only a ranked match moves your ranking (and not while fair play holds your results).
   if (rating !== null && ranked && !r.held) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);
@@ -949,12 +965,15 @@ export async function equipItem(sql: Sql, userId: string, itemId: unknown): Prom
 export async function grantReward(sql: Sql, userId: string, coins: number, crates: number): Promise<void> {
   const c = Math.max(0, Math.round(coins));
   const k = Math.max(0, Math.round(crates));
-  if ((!c && !k) || !(await accountExists(sql, userId))) return;
+  if (!c && !k) return;
+  // (Not for an account deleted mid-match.)
   await sql.run(
-    "INSERT INTO wallets (user_id, coins, crates) VALUES (?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates",
+    `INSERT INTO wallets (user_id, coins, crates) SELECT ?, ?, ? ${IF_ACCOUNT}
+     ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates`,
     userId,
     c,
     k,
+    userId,
   );
 }
 

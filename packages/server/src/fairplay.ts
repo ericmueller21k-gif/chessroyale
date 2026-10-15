@@ -112,7 +112,8 @@ export async function setCase(sql: Sql, userId: string, status: CaseStatus, by: 
     for (const [kind, hash] of u ? await identityHashes(u) : []) {
       await sql.run("INSERT OR REPLACE INTO fairplay_identities (kind, hash, user_id, at) VALUES (?, ?, ?, ?)", kind, hash, userId, now);
     }
-  } else if (before?.status === "banned") {
+  } else if (before?.status === "banned" || (before?.status === "review" && status !== "review")) {
+    // (A ban lifted, or a review decided: an account deleted while in review kept its identities, account-data.ts.)
     await sql.run("DELETE FROM fairplay_identities WHERE user_id = ?", userId);
   }
 }
@@ -161,10 +162,20 @@ export async function banCheck(sql: Sql, user: User | null, device: string | nul
     );
   }
   for (const [kind, hash] of await identityHashes(user)) {
-    const owner = await sql.first<{ user_id: string }>("SELECT user_id FROM fairplay_identities WHERE kind = ? AND hash = ? AND user_id != ?", kind, hash, user.id);
-    if (owner) {
-      await setCase(sql, user.id, "banned", "evasion", `signed in with the ${kind === "email" ? "email address" : "Google account"} of banned account ${owner.user_id}`, now);
+    // (A banned account's identities, or those of an account deleted while banned or in review: account-data.ts.)
+    const owner = await sql.first<{ user_id: string; status: string | null }>(
+      "SELECT i.user_id, c.status FROM fairplay_identities i LEFT JOIN fairplay_cases c ON c.user_id = i.user_id WHERE i.kind = ? AND i.hash = ? AND i.user_id != ?",
+      kind,
+      hash,
+      user.id,
+    );
+    const what = kind === "email" ? "email address" : "Google account";
+    if (owner?.status === "banned" || (owner && owner.status === null)) {
+      await setCase(sql, user.id, "banned", "evasion", `signed in with the ${what} of banned account ${owner.user_id}`, now);
       return { banned: true };
+    }
+    if (owner?.status === "review" && c?.status !== "review" && c?.status !== "cleared") {
+      await raiseCase(sql, user.id, "review", "evasion", `signed in with the ${what} of account ${owner.user_id}, deleted while in review`, now);
     }
   }
   if (device && c?.status !== "review" && c?.status !== "cleared") {
@@ -365,11 +376,14 @@ export async function recordFairPlay(
   mail?: CaseMailer,
 ): Promise<FairRecord> {
   const lv = FAIRPLAY.levels;
+  const account = await sql.first<{ rating: number | null }>("SELECT rating FROM users WHERE id = ?", userId);
+  // An account deleted mid-match (account-data.ts): nothing recorded.
+  if (!account) return { summary: matchSignals(match.moves, referenceStrength([], null)), verdict: { level: "none", reasons: [] }, acted: "none" };
   const history = await sql.all<HistoryRow>(
     "SELECT id, perf, score, counted, played_at, summary FROM fairplay_matches WHERE user_id = ? ORDER BY played_at DESC, id DESC LIMIT 20",
     userId,
   );
-  const rating = (await sql.first<{ rating: number | null }>("SELECT rating FROM users WHERE id = ?", userId))?.rating ?? null;
+  const rating = account.rating ?? null;
   const summary = matchSignals(match.moves, referenceStrength(history.slice(0, 10).map((h) => h.perf), rating));
   const c = await caseOf(sql, userId);
   const verdict = playerLevel([...levelInputs(history, c), { ...summary, at: now }], now, lv);

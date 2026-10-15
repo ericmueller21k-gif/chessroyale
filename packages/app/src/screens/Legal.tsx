@@ -129,7 +129,7 @@ function Privacy() {
         title="Sign-in codes"
         what={<p>Your email address, the code (stored only as a hash), when it was sent, and how many tries and sends it has had.</p>}
         why="to check the code, and to stop abuse (5 tries a code, 5 codes an hour)."
-        kept="an hour after the code was sent."
+        kept="about an hour after the code was sent."
       />
       <Item
         title="Matches and stats"
@@ -327,8 +327,8 @@ function Privacy() {
       <ul>
         <li>
           <strong>See it, or get a copy:</strong> Settings → Download my data gives you a file (JSON) of everything we keep about your
-          account. Fair play's detection records aren't in it, as they'd show how cheating is found: email <Mail /> for those, and
-          a person answers.
+          account, your bug reports and the error records with your account included. Fair play's detection records aren't in
+          it, as they'd show how cheating is found: email <Mail /> for those, and a person answers.
         </li>
         <li>
           <strong>Correct it:</strong> change your name and icon in your profile, or email us.
@@ -353,18 +353,22 @@ function Privacy() {
           <strong>Deleted:</strong> your account (name, icon, email or Google id, when you joined and were last seen), every
           sign-in session (you're signed out on every device), your sign-in code's record, your items, coins, crates and shop
           items, your quick-chat picks, reports you made and reports about you, fair play's records about you, your friends,
-          requests, blocks and invites (from the other players' lists too), and your lines in the global chat.
+          requests, blocks and invites (from the other players' lists too), your lines in the global chat, the bug reports you
+          sent, and your account id on error records.
         </li>
         <li>
-          <strong>Kept, without you:</strong> your match results, moved to one shared "deleted" account with their match codes
-          removed, so nothing leads back to you and the game's numbers stay right.
+          <strong>Kept, without you:</strong> your match results, moved to one shared "deleted" account, with only the day they
+          were played and without their match code, rating, best move or eval-bar setting, so nothing leads back to you and the
+          game's numbers stay right. Error records stay counted, without your account. Feedback and ideas never carry your
+          account, so they stay until they expire ({OPS.store.keepDays} days).
         </li>
         <li>
-          <strong>Kept if you're banned:</strong> the ban's record (its decisions and why), the hash of your email or Google id,
-          and the device markers, under your old account's random id, so a new account can't get around the ban. Nothing else.
+          <strong>Kept if fair play has acted on your account:</strong> if it's banned, or fair play is looking into it, its
+          record (decisions and why), the hash of your email or Google id, and the device markers stay, under your old
+          account's random id, so a new account can't get around fair play. Nothing else.
         </li>
         <li>
-          <strong>A match you're in</strong> shows your name to its players until it closes (at most{" "}
+          <strong>A match or Squads party you're in</strong> shows your name to its players until it closes (a match at most{" "}
           {LOBBY_LIFE.lobbyResultsKeepMinutes} minutes after it ends), and records nothing for you.
         </li>
         <li>

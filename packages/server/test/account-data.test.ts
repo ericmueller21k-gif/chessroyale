@@ -1,3 +1,6 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { CRATES, GLOBAL_CHAT, SHOP_ITEMS } from "@chessroyale/core";
 import {
@@ -9,6 +12,7 @@ import {
   grantReward,
   profile,
   publicProfile,
+  purgeEmailCodes,
   recordResult,
   setChatPicks,
   signInWithIdentity,
@@ -17,10 +21,10 @@ import {
   type Sql,
   type User,
 } from "../src/accounts.ts";
-import { ACCOUNT_STORES, COVERED_TABLES, accountDownload, deleteAccount } from "../src/account-data.ts";
+import { ACCOUNT_STORES, COVERED_TABLES, NO_ACCOUNT_DATA, accountDownload, deleteAccount } from "../src/account-data.ts";
 import { handleAccountApi } from "../src/api.ts";
 import { caseDetail, openCases } from "../src/admin.ts";
-import { appeal, banCheck, caseOf, decide, reportPlayer, setCase } from "../src/fairplay.ts";
+import { appeal, banCheck, caseOf, decide, recordFairPlay, reportPlayer, setCase } from "../src/fairplay.ts";
 import { answerRequest, block, sendInvite, sendRequest, setFriendSettings } from "../src/friends.ts";
 import { GlobalChat } from "../src/global-chat.ts";
 import { LiveBoard } from "../src/live.ts";
@@ -29,15 +33,25 @@ import { memoryDb } from "./memory-db.ts";
 
 /**
  * Deleting an account and downloading its data (account-data.ts; docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md):
- * every store's rows in the download, every one gone after deleting (results kept without the player, a ban kept),
- * every table that keeps an account id covered, and the API.
+ * every table accounted for, every store's rows in the download, none left after deleting (results kept without the
+ * player, fair play's file kept for a ban or a review), all in one transaction, and the API.
  */
 const T0 = 1_800_000_000_000;
+const DAY = 86_400_000;
 const DEVICE = "device-marker-0123456789";
+const SRC = join(dirname(fileURLToPath(import.meta.url)), "../src");
 const count = async (sql: Sql, q: string, ...p: unknown[]) => (await sql.first<{ n: number }>(`SELECT COUNT(*) AS n FROM ${q}`, ...p))!.n;
+const tablesOf = async (sql: Sql) => (await sql.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")).map((t) => t.name);
 
-/** Columns that hold an account id, by name, in any table (the coverage test reads every table for them). */
-const ACCOUNT_COLUMNS = ["user_id", "reporter", "target", "from_id", "to_id", "friend_id", "blocked_id", "account"];
+/** Every row of every table that mentions this id anywhere (any column, JSON inside a column too). */
+async function rowsNaming(sql: Sql, id: string, skip: readonly string[] = []) {
+  const found: string[] = [];
+  for (const t of await tablesOf(sql)) {
+    if (skip.includes(t)) continue;
+    for (const row of await sql.all<Record<string, unknown>>(`SELECT * FROM ${t}`)) if (JSON.stringify(row).includes(id)) found.push(`${t}: ${JSON.stringify(row).slice(0, 120)}`);
+  }
+  return found;
+}
 
 /** Ann (signed in by email) with something in every store; Bo and Cy, signed in, around her. */
 async function world() {
@@ -55,7 +69,7 @@ async function world() {
   // A second device, a sign-in code, results (online and solo).
   const phone = await createSession(sql, a.id, T0);
   expect((await startEmailCode(sql, "ann@example.com", T0)).ok).toBe(true);
-  await recordResult(sql, a.id, { mode: "crowd", online: true, placement: 3, players: 100, lobby: "ABCDE", ranked: true, rating: 1400 }, T0 + 1);
+  await recordResult(sql, a.id, { mode: "crowd", online: true, placement: 3, players: 100, lobby: "ABCDE", ranked: true, rating: 1400, bestMove: "Nf3", evalBar: true }, T0 + 1);
   await recordResult(sql, a.id, { mode: "boss", online: false, placement: 1, players: 20 }, T0 + 2);
   await recordResult(sql, bo.user.id, { mode: "crowd", online: true, placement: 9, players: 100, lobby: "ABCDE" }, T0 + 1);
   // The shop, the locker, coins and crates.
@@ -72,14 +86,37 @@ async function world() {
   await reportPlayer(sql, a, bo.user.id, "Cheating", "ABCDE", T0 + 5);
   await reportPlayer(sql, bo.user, a.id, "Offensive name or icon", null, T0 + 6);
   await banCheck(sql, a, DEVICE, T0 + 7);
-  // Friends: Bo is her friend, Cy has asked her, she blocked nobody yet, an invite to Bo; her settings.
+  // Friends: Bo is her friend, Cy has asked her, an invite to Bo; her settings.
   await sendRequest(sql, a.id, bo.user.id, false, T0 + 8);
   await answerRequest(sql, bo.user.id, a.id, true, T0 + 9);
   await sendRequest(sql, cy.user.id, a.id, false, T0 + 10);
   expect((await sendInvite(sql, a.id, bo.user.id, "crowd", "FGHJK", false, T0 + 11)).ok).toBe(true);
   await setFriendSettings(sql, a.id, { invites: "friends", showOnline: false });
+  // Ops: her bug report and an error record with her account in its sample; feedback (no account); Bo's error.
+  const sample = (account: string | null) => JSON.stringify({ stack: "at x", where: { screen: "home" }, trail: [], device: { ua: "Phone" }, version: "v1", account, at: T0 });
+  await sql.run("INSERT INTO ops_reports (id, at, kind, account, version, note, diag) VALUES ('BUG123', ?, 'bug', ?, 'v1', 'the board froze', ?)", T0 + 12, a.id, JSON.stringify({ account: a.id }));
+  await sql.run("INSERT INTO ops_reports (id, at, kind, account, version, note, diag) VALUES ('IDEA45', ?, 'idea', NULL, '', 'more bosses', '{}')", T0 + 12);
+  await sql.run("INSERT INTO ops_errors (fingerprint, hour, source, kind, message, version, count, first_seen, last_seen, sample) VALUES ('fp1', ?, 'client', 'error', 'boom', 'v1', 3, ?, ?, ?)", T0, T0, T0 + 13, sample(a.id));
+  await sql.run("INSERT INTO ops_errors (fingerprint, hour, source, kind, message, version, count, first_seen, last_seen, sample) VALUES ('fp2', ?, 'client', 'error', 'bang', 'v1', 1, ?, ?, ?)", T0, T0, T0, sample(bo.user.id));
   return { sql, d1, ann, bo, cy, a, phone };
 }
+
+describe("every table is accounted for", () => {
+  it("each table, in the schema or made anywhere in the server's code, is an account store's or listed as holding no account data", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const made = new Set(await tablesOf(sql));
+    // (Tables made outside the schema, such as engine_usage, by their CREATE TABLE anywhere in the server.)
+    for (const f of readdirSync(SRC).filter((x) => x.endsWith(".ts"))) {
+      for (const m of readFileSync(join(SRC, f), "utf8").matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)) made.add(m[1]!);
+    }
+    expect(made.size).toBeGreaterThan(25);
+    for (const t of made) {
+      expect(COVERED_TABLES.includes(t) || t in NO_ACCOUNT_DATA, `${t}: give it an entry in ACCOUNT_STORES, or list it in NO_ACCOUNT_DATA (account-data.ts)`).toBe(true);
+    }
+    for (const t of Object.keys(NO_ACCOUNT_DATA)) expect(COVERED_TABLES, `${t} is in both`).not.toContain(t);
+  });
+});
 
 describe("download my data", () => {
   it("has every store's rows about the account, times as dates, and nothing about anyone else", async () => {
@@ -94,23 +131,28 @@ describe("download my data", () => {
     expect(Object.keys(d.sessions[0])).toEqual(["created_at", "expires_at"]);
     expect(d.signInCode).toMatchObject({ email: "ann@example.com", attempts: 0 });
     expect(d.signInCode).not.toHaveProperty("code_hash");
+    // Results, without `held` (it would say whether fair play holds them).
     expect(d.results.map((r: { mode: string; lobby: string | null }) => [r.mode, r.lobby])).toEqual([
       ["crowd", "ABCDE"],
       ["boss", null],
     ]);
+    expect(d.results[0]).not.toHaveProperty("held");
     expect(d.shop.wallet).toEqual({ coins: 50, crates: 2 });
     expect(d.shop.items.map((i: { item_id: string }) => i.item_id)).toContain(SHOP_ITEMS.find((i) => i.slot === "chat" && !i.starter)!.id);
     expect(d.locker.items).toHaveLength(1);
-    expect(d.reportsMade).toEqual([{ target: bo.user.id, reason: "Cheating", match: "ABCDE", at: new Date(T0 + 5).toISOString() }]);
+    expect(d.reports).toEqual({ made: [{ target: bo.user.id, reason: "Cheating", match: "ABCDE", at: new Date(T0 + 5).toISOString() }] });
     expect(d.fairPlay).toEqual({ banned: false, appeals: [] });
     expect(d.friends.friends.map((f: { id: string; name: string }) => [f.id, f.name])).toEqual([[bo.user.id, "Bo"]]);
     expect(d.friends.requestsReceived.map((r: { id: string }) => r.id)).toEqual([cy.user.id]);
     expect(d.friends.requestsSent).toEqual([]);
     expect(d.friends.invitesSent).toMatchObject([{ id: bo.user.id, kind: "crowd", code: "FGHJK" }]);
     expect(d.friends.limits.length).toBeGreaterThan(0);
-    // Nothing of anyone else's but the names the app shows her: no other email, no report about her, no token.
+    // Her bug report and the error record with her account; not the anonymous idea, not Bo's error.
+    expect(d.problemReports.reports.map((r: { id: string; note: string }) => [r.id, r.note])).toEqual([["BUG123", "the board froze"]]);
+    expect(d.problemReports.errors.map((e: { message: string; hour: string }) => [e.message, e.hour])).toEqual([["boom", new Date(T0).toISOString()]]);
+    // Nothing of anyone else's but the names the app shows her: no other email, no report about her, no hash.
     const text = JSON.stringify(d);
-    for (const secret of ["bo@example.com", "cy@example.com", "Offensive name or icon", "token_hash", "code_hash", DEVICE]) expect(text).not.toContain(secret);
+    for (const secret of ["bo@example.com", "cy@example.com", "Offensive name or icon", "token_hash", "code_hash", DEVICE, "more bosses", "bang"]) expect(text).not.toContain(secret);
   });
 
   it("leaves out who has blocked the player", async () => {
@@ -124,65 +166,65 @@ describe("download my data", () => {
 });
 
 describe("delete my account", () => {
-  it("every table that keeps an account id is covered", async () => {
-    const { sql } = memoryDb();
-    await ensureSchema(sql);
-    const tables = await sql.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'");
-    const holding: string[] = [];
-    for (const { name } of tables) {
-      const cols = (await sql.all<{ name: string }>(`PRAGMA table_info(${name})`)).map((c) => c.name);
-      if (cols.some((c) => ACCOUNT_COLUMNS.includes(c)) || name === "users" || name === "email_codes") holding.push(name);
-    }
-    expect(holding.length).toBeGreaterThan(15);
-    for (const t of holding) expect(COVERED_TABLES, `${t} keeps an account id: give it an entry in ACCOUNT_STORES (account-data.ts)`).toContain(t);
-  });
-
   it("removes everything personal, everywhere, and keeps the results without the player", async () => {
     const { sql, ann, bo, cy, a, phone } = await world();
-    expect(await deleteAccount(sql, a, T0 + 40)).toEqual({ banned: false });
-    // Not a row anywhere names her: every table, every account column.
-    const tables = await sql.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'");
-    for (const { name } of tables) {
-      const cols = (await sql.all<{ name: string }>(`PRAGMA table_info(${name})`)).map((c) => c.name);
-      for (const c of [...cols.filter((x) => ACCOUNT_COLUMNS.includes(x)), ...(name === "users" ? ["id"] : [])]) {
-        expect(await count(sql, `${name} WHERE ${c} = ?`, a.id), `${name}.${c}`).toBe(0);
-      }
-    }
-    expect(await count(sql, "email_codes WHERE email = ?", "ann@example.com")).toBe(0);
+    expect(await deleteAccount(sql, a, T0 + 40)).toEqual({ keptFairPlay: false });
+    // Not a row anywhere mentions her: every table, every column, JSON inside columns too.
+    expect(await rowsNaming(sql, a.id)).toEqual([]);
+    expect(await rowsNaming(sql, "ann@example.com")).toEqual([]);
     // Signed out everywhere: both devices' sessions are gone.
     expect(await userFromToken(sql, ann.token, T0 + 41)).toBeNull();
     expect(await userFromToken(sql, phone, T0 + 41)).toBeNull();
     expect(await publicProfile(sql, a.id, T0 + 41)).toBeNull();
-    // Her results stay, as nobody's: the shared deleted id, no lobby code. Bo's are untouched.
-    expect(await sql.all("SELECT mode, placement, lobby FROM results WHERE user_id = ? ORDER BY played_at", DELETED_ID)).toEqual([
-      { mode: "crowd", placement: 3, lobby: null },
-      { mode: "boss", placement: 1, lobby: null },
+    // Her results stay as nobody's: the shared deleted id, the day only, no lobby, rating, best move or eval bar.
+    expect(await sql.all("SELECT mode, placement, players, played_at, lobby, rating, best_move, eval_bar FROM results WHERE user_id = ? ORDER BY mode", DELETED_ID)).toEqual([
+      { mode: "boss", placement: 1, players: 20, played_at: T0 - (T0 % DAY), lobby: null, rating: null, best_move: null, eval_bar: null },
+      { mode: "crowd", placement: 3, players: 100, played_at: T0 - (T0 % DAY), lobby: null, rating: null, best_move: null, eval_bar: null },
     ]);
     expect(await publicProfile(sql, DELETED_ID, T0 + 41)).toBeNull();
     expect((await profile(sql, bo.user)).stats.all.matches).toBe(1);
-    // Her friendships, requests and invites are gone from the others' lists too; Bo keeps his item and his report.
+    // Her friendships, requests and invites are gone from the others' lists too; Bo keeps his item, his error record.
     expect(await count(sql, "friends WHERE user_id = ?", bo.user.id)).toBe(0);
     expect(await count(sql, "friend_requests WHERE from_id = ?", cy.user.id)).toBe(0);
     expect(await count(sql, "items WHERE user_id = ?", bo.user.id)).toBe(1);
-    // Nothing of fair play kept for an account that wasn't banned.
+    // Her error record stays counted, without her; the anonymous idea stays.
+    expect(await sql.all("SELECT fingerprint, count FROM ops_errors ORDER BY fingerprint")).toEqual([
+      { fingerprint: "fp1", count: 3 },
+      { fingerprint: "fp2", count: 1 },
+    ]);
+    expect(await sql.all("SELECT id FROM ops_reports")).toEqual([{ id: "IDEA45" }]);
+    // Nothing of fair play kept for an account that wasn't banned or in review.
     expect(await caseOf(sql, a.id)).toBeNull();
     // Signing in with her email again makes a new, empty account.
     const g = await createGuest(sql, T0 + 50);
     const again = await signInWithIdentity(sql, g.user, "email", "ann@example.com", {}, T0 + 51);
     expect(again.id).not.toBe(a.id);
     expect((await profile(sql, again)).stats.all.matches).toBe(0);
-    // Deleting again (a deletion that stopped halfway, run once more) is harmless.
-    await deleteAccount(sql, a, T0 + 60);
-    expect(await count(sql, "results WHERE user_id = ?", DELETED_ID)).toBe(2);
   });
 
-  it("a lobby or a reward that finishes after the deletion records nothing", async () => {
+  it("is one transaction: a statement that fails leaves everything as it was", async () => {
+    const { sql, a } = await world();
+    const before = await rowsNaming(sql, a.id);
+    // (Every write goes through the batch: a plain run would throw here.)
+    const failing: Sql = {
+      ...sql,
+      run: async () => {
+        throw new Error("deleteAccount must write through one batch");
+      },
+      batch: (statements) => sql.batch([...statements, { sql: "INSERT INTO no_such_table VALUES (1)", params: [] }]),
+    };
+    await expect(deleteAccount(failing, a, T0 + 40)).rejects.toThrow();
+    expect(await rowsNaming(sql, a.id)).toEqual(before);
+    expect(await count(sql, "users WHERE id = ?", a.id)).toBe(1);
+  });
+
+  it("a match, a reward or fair play that finishes after the deletion records nothing", async () => {
     const { sql, a } = await world();
     await deleteAccount(sql, a, T0 + 40);
-    await recordResult(sql, a.id, { mode: "crowd", online: true, placement: 1, players: 100, lobby: "QWERT" }, T0 + 41);
+    await recordResult(sql, a.id, { mode: "crowd", online: true, placement: 1, players: 100, lobby: "QWERT", ranked: true, rating: 1500 }, T0 + 41);
     await grantReward(sql, a.id, 100, 1);
-    expect(await count(sql, "results WHERE user_id = ? OR lobby = 'QWERT'", a.id)).toBe(0);
-    expect(await count(sql, "wallets WHERE user_id = ?", a.id)).toBe(0);
+    expect((await recordFairPlay(sql, a.id, { lobby: "QWERT", mode: "crowd", moves: [] }, T0 + 42)).acted).toBe("none");
+    expect(await rowsNaming(sql, a.id)).toEqual([]);
   });
 
   it("a ban outlives the account: its case, log, hashed identity and device marker; an admin can still lift it", async () => {
@@ -195,17 +237,16 @@ describe("delete my account", () => {
       T0,
       T0 + 1e9,
     );
-    expect(await deleteAccount(sql, a, T0 + 40)).toEqual({ banned: true });
+    expect(await deleteAccount(sql, a, T0 + 40)).toEqual({ keptFairPlay: true });
     expect((await caseOf(sql, a.id))?.status).toBe("banned");
     expect(await count(sql, "fairplay_identities WHERE user_id = ?", a.id)).toBe(1);
     expect(await count(sql, "fairplay_devices WHERE user_id = ?", a.id)).toBe(1);
     expect(await sql.first("SELECT action, by FROM fairplay_log WHERE user_id = ? ORDER BY id DESC LIMIT 1", a.id)).toEqual({ action: "account deleted", by: "player" });
-    // Her words and the evidence go; nothing else of hers stays.
+    // Only fair play's file names her; her words and the evidence are gone.
+    expect((await rowsNaming(sql, a.id, ["fairplay_cases", "fairplay_log", "fairplay_identities", "fairplay_devices"])).length).toBe(0);
     expect(await count(sql, "fairplay_appeals WHERE user_id = ?", a.id)).toBe(0);
     expect(await count(sql, "fairplay_matches WHERE user_id = ?", a.id)).toBe(0);
-    expect(await count(sql, "users WHERE id = ?", a.id)).toBe(0);
-    // A new account with her email (as Gmail-style variants normalize, here a +tag) is banned again; a new account on
-    // her device goes to review.
+    // A new account with her email (normalized: a +tag) is banned again; a new account on her device goes to review.
     const g1 = await createGuest(sql, T0 + 50);
     const again = await signInWithIdentity(sql, g1.user, "email", "ann+new@example.com", {}, T0 + 51);
     expect((await banCheck(sql, again, null, T0 + 52)).banned).toBe(true);
@@ -218,18 +259,54 @@ describe("delete my account", () => {
     expect(detail?.player).toMatchObject({ id: a.id, name: "Deleted player", joinedAt: null, email: null });
     expect(await decide(sql, a.id, "clear", "admin:eric@example.com", "lifted after a second look", T0 + 56)).toEqual({ ok: true, status: "cleared" });
     expect(await count(sql, "fairplay_identities WHERE user_id = ?", a.id)).toBe(0);
-    // Nothing kept for an id that never had an account or a case.
-    expect((await decide(sql, "nobody-at-all", "clear", "admin:eric@example.com", "no such player", T0))).toMatchObject({ ok: false, status: 404 });
+    expect(await decide(sql, "nobody-at-all", "clear", "admin:eric@example.com", "no such player", T0)).toMatchObject({ ok: false, status: 404 });
   });
 
-  it("sign-in code records go an hour after their code was sent", async () => {
+  it("a review outlives the account too: a new account with the same email goes back to review, never told why", async () => {
+    const { sql, a } = await world();
+    await setCase(sql, a.id, "review", "detection", "engine-like moves", T0 + 20);
+    expect(await deleteAccount(sql, a, T0 + 40)).toEqual({ keptFairPlay: true });
+    expect((await caseOf(sql, a.id))?.status).toBe("review");
+    expect(await count(sql, "fairplay_identities WHERE user_id = ?", a.id)).toBe(1);
+    const g = await createGuest(sql, T0 + 50);
+    const again = await signInWithIdentity(sql, g.user, "email", "ann@example.com", {}, T0 + 51);
+    expect((await banCheck(sql, again, null, T0 + 52)).banned).toBe(false);
+    expect((await caseOf(sql, again.id))?.status).toBe("review");
+    // Asking again doesn't pile up notes.
+    const notes = await count(sql, "fairplay_log WHERE user_id = ?", again.id);
+    await banCheck(sql, again, null, T0 + 53);
+    expect(await count(sql, "fairplay_log WHERE user_id = ?", again.id)).toBe(notes);
+    // Deciding the deleted account's review (cleared) forgets its identity.
+    await decide(sql, a.id, "clear", "reviewer", "nothing in it after all", T0 + 60);
+    expect(await count(sql, "fairplay_identities WHERE user_id = ?", a.id)).toBe(0);
+  });
+
+  it("an identity shared by two deleted bans stays banned", async () => {
+    const { sql, a } = await world();
+    await setCase(sql, a.id, "banned", "admin:eric@example.com", "engine moves", T0 + 20);
+    await deleteAccount(sql, a, T0 + 40);
+    // A new account with the same email: banned by evasion; then it's deleted too.
+    const g = await createGuest(sql, T0 + 50);
+    const again = await signInWithIdentity(sql, g.user, "email", "ann@example.com", {}, T0 + 51);
+    expect((await banCheck(sql, again, null, T0 + 52)).banned).toBe(true);
+    expect(await deleteAccount(sql, again, T0 + 60)).toEqual({ keptFairPlay: true });
+    // One row for the identity (its key is the identity), a banned deleted account's; a third account is banned too.
+    const owners = await sql.all<{ user_id: string }>("SELECT user_id FROM fairplay_identities WHERE kind = 'email'");
+    expect(owners).toHaveLength(1);
+    expect([a.id, again.id]).toContain(owners[0]!.user_id);
+    expect((await caseOf(sql, owners[0]!.user_id))?.status).toBe("banned");
+    const g3 = await createGuest(sql, T0 + 70);
+    const third = await signInWithIdentity(sql, g3.user, "email", "ann@example.com", {}, T0 + 71);
+    expect((await banCheck(sql, third, null, T0 + 72)).banned).toBe(true);
+  });
+
+  it("sign-in code records go an hour after their code was sent (the Worker's schedule)", async () => {
     const { sql } = memoryDb();
     await ensureSchema(sql);
-    const t = T0 + 100 * 3_600_000;
-    await startEmailCode(sql, "old@example.com", t);
-    await startEmailCode(sql, "recent@example.com", t + 30 * 60_000);
-    await startEmailCode(sql, "new@example.com", t + 61 * 60_000);
-    expect((await sql.all<{ email: string }>("SELECT email FROM email_codes ORDER BY email")).map((r) => r.email)).toEqual(["new@example.com", "recent@example.com"]);
+    await startEmailCode(sql, "old@example.com", T0);
+    await startEmailCode(sql, "recent@example.com", T0 + 30 * 60_000);
+    await purgeEmailCodes(sql, T0 + 61 * 60_000);
+    expect((await sql.all<{ email: string }>("SELECT email FROM email_codes")).map((r) => r.email)).toEqual(["recent@example.com"]);
   });
 });
 
@@ -240,12 +317,13 @@ describe("the API: GET /api/me/data and POST /api/me/delete", () => {
     if (init.cookie) headers.set("cookie", init.cookie);
     return (await handleAccountApi(new Request(origin + path, { ...init, headers }), env as never))!;
   };
+  const json = { origin, "content-type": "application/json" };
 
-  it("downloads a file, deletes only when confirmed, signs out, and the live hub forgets the account", async () => {
+  it("downloads a file; deletes only when asked from this site, as JSON, confirmed; signs out; the live hub forgets", async () => {
     const { sql, d1, ann, a } = await world();
     const forgotten: string[] = [];
     const hub = {
-      accountData: async (id: string) => ({ globalChat: id === a.id ? [{ n: 1, at: T0, from: id, name: "Ann", rating: null, say: "gg" }] : [], lastSeen: T0 }),
+      accountData: async (id: string) => ({ globalChat: id === a.id ? [{ n: 1, at: T0, from: id, name: "Ann", rating: null, say: "gg" }] : [] }),
       forgetAccount: async (id: string) => void forgotten.push(id),
     };
     const env = { DB: d1, LIVE: { idFromName: () => "hub", get: () => hub } };
@@ -256,10 +334,14 @@ describe("the API: GET /api/me/data and POST /api/me/delete", () => {
     const body = (await file.json()) as { account: User; globalChat: { say: string }[] };
     expect(body.account.id).toBe(a.id);
     expect(body.globalChat.map((l) => l.say)).toEqual(["gg"]);
-    // Without the confirmation: nothing happens.
-    expect((await call(env, "/api/me/delete", { method: "POST", cookie, body: "{}" })).status).toBe(400);
+    const confirm = JSON.stringify({ confirm: "delete" });
+    // From another site (or no origin), as a form's text, or unconfirmed: nothing happens.
+    expect((await call(env, "/api/me/delete", { method: "POST", cookie, headers: { "content-type": "application/json" }, body: confirm })).status).toBe(403);
+    expect((await call(env, "/api/me/delete", { method: "POST", cookie, headers: { ...json, origin: "https://www.hunchess.com" }, body: confirm })).status).toBe(403);
+    expect((await call(env, "/api/me/delete", { method: "POST", cookie, headers: { origin, "content-type": "text/plain" }, body: confirm })).status).toBe(415);
+    expect((await call(env, "/api/me/delete", { method: "POST", cookie, headers: json, body: "{}" })).status).toBe(400);
     expect(await count(sql, "users WHERE id = ?", a.id)).toBe(1);
-    const done = await call(env, "/api/me/delete", { method: "POST", cookie, body: JSON.stringify({ confirm: "delete" }) });
+    const done = await call(env, "/api/me/delete", { method: "POST", cookie, headers: json, body: confirm });
     expect(done.status).toBe(200);
     expect(done.headers.getSetCookie().find((c) => c.startsWith("hc_session="))).toMatch(/^hc_session=; .*Max-Age=0/);
     expect(forgotten).toEqual([a.id]);
@@ -275,9 +357,8 @@ describe("the live hub's part", () => {
 
   it("global chat: a deleted account's lines leave it, everyone else's stay; a player's own lines for their download", () => {
     const chat = new GlobalChat({ ...GLOBAL_CHAT, bots: false });
-    const say = "l-hey";
     // (Each a gap apart, the one-message limit.)
-    for (const [i, who] of ["ann", "bo", "ann"].entries()) expect(chat.post(sender(who), say, T0 + i * GLOBAL_CHAT.gapMs).ok).toBe(true);
+    for (const [i, who] of ["ann", "bo", "ann"].entries()) expect(chat.post(sender(who), "l-hey", T0 + i * GLOBAL_CHAT.gapMs).ok).toBe(true);
     expect(chat.linesOf("ann")).toHaveLength(2);
     expect(chat.forgetAccount("ann")).toBe(true);
     expect(chat.snapshot(T0 + 3 * GLOBAL_CHAT.gapMs).lines.map((l) => l.from)).toEqual(["bo"]);
