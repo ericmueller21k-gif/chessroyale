@@ -3,6 +3,7 @@ import type { ComponentChildren } from "preact";
 import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, PREGAME_VOTES } from "@chessroyale/core";
 import { finalName } from "../game.ts";
 import { InstallCard } from "../components/InstallCard.tsx";
+import { FriendSettings } from "../components/Friends.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut } from "../account.ts";
@@ -108,7 +109,7 @@ function ThemeChoice() {
   );
 }
 
-/** Settings: the theme, sound, how you play, Crowd's options, how to play (and the FAQ), installing, your sign-in, privacy and terms. */
+/** Settings: the theme, sound, how you play, Crowd's options, chat, friends, how to play (and the FAQ), installing, your sign-in, privacy and terms. */
 export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => void; onSoundLab?: () => void; onFaq?: (section?: string) => void }) {
   const { config, profile } = useAccount();
   const [, rerender] = useState(0);
@@ -242,6 +243,8 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
           On a phone, while chat is hidden, the newest message shows for a moment under the top bar (never over the board).
         </Toggle>
       </section>
+
+      <FriendSettings />
 
       {/* (Classic is off the menu while it's redesigned, still played with ?mode=classic: its setting shows only then.) */}
       {mode.mode === "classic" && (
