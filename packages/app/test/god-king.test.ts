@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { KING_SPEECH } from "@chessroyale/core";
 import { holdMs } from "../src/speech.tsx";
+import { GOD_KING_SOUNDS, godKingSound } from "../src/characters/god-king-sounds.ts";
+import { makeBossSound } from "../src/characters/boss-sounds.ts";
+import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { KING_LINES, blunderLabel, blunderWords, bossMoveCues, capitalised, chancesWords, crowdMoveCues, kingLine, kingSay, kingTurn, lastStandLine, mateThreatened, replyWords, resetKingSpeech, setKingFallen, turnCues } from "../src/godKing.ts";
 
 describe("the God King's lines", () => {
@@ -178,5 +181,25 @@ describe("his Last Stand in plain words (the warning and the results card)", () 
     expect(replyWords(qgd, { move: "a2a3", reply: "h7h6", mateIn: 5 })).toEqual({ san: "h6", note: "mate in 5" });
     expect(replyWords(qgd, { move: "a2a3", reply: "h7h6" })).toEqual({ san: "h6", note: "" });
     expect(replyWords(qgd, { move: "a2a3" })).toBeNull();
+  });
+});
+
+describe("his sounds (synthesized: god-king-sounds.ts)", () => {
+  it("his \"can't\" (tapped with no charges left): short, soft, no louder than a piece's move, the same every time, made in the sound worker's table", () => {
+    for (const name of GOD_KING_SOUNDS) {
+      const s = godKingSound(name, 44100);
+      let peak = 0;
+      let sum = 0;
+      for (const v of s) {
+        expect(Number.isFinite(v)).toBe(true);
+        peak = Math.max(peak, Math.abs(v));
+        sum += v * v;
+      }
+      expect(s.length / 44100, name).toBeLessThan(0.35);
+      expect(peak, name).toBeLessThan(MOVE_PEAK / 2);
+      expect(10 * Math.log10(sum / s.length), name).toBeLessThan(MOVE_MEAN_DB - 2);
+      expect(s, `${name} is the same every time`).toEqual(godKingSound(name, 44100));
+      expect(makeBossSound(["godKing", name], 44100)).toBe(godKingSound(name, 44100));
+    }
   });
 });

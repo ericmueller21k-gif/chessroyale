@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { crowdFinalBoss } from "@chessroyale/core";
-import { BOARD_SEL, createLobbyFromHome, engineTop, named, soloFromHome, submitMove, test } from "./helpers.ts";
+import { BOARD_SEL, createLobbyFromHome, engineTop, named, soloFromHome, submitMove, test, watchFor } from "./helpers.ts";
 
 /** The boss final's boss (Eric, Oct 14: always the Hidden Boss), by his roster name. */
 const finalBoss = crowdFinalBoss()!;
@@ -143,9 +143,12 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   await expect(menu.locator(".boss-row")).toHaveCount(8);
   await expect(menu.getByRole("button", { name: /Random boss/ })).toBeVisible();
   await expect(menu.getByRole("button", { name: /Match the group/ })).toHaveCount(0);
+  // (The opening's name lands 1.8 s into the card, which goes at 2.6 s, after Maia's loading step of no set length:
+  // watched from before it can appear, as a poll can look either side of that window.)
+  const roulette = await watchFor(page, { landed: { selector: ".opening-roulette.landed" } });
   await menu.getByRole("button", { name: /Boingo the Clown/ }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".opening-roulette.landed")).toBeVisible({ timeout: 5_000 });
+  await expect.poll(() => roulette.seen(), { timeout: 5_000 }).toEqual({ landed: true });
   const boss = await page.evaluate(() => (window as any).match.boss);
   expect(boss.raid).toBe(true);
   expect(boss.name).toBe("Boingo the Clown");

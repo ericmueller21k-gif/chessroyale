@@ -18,13 +18,16 @@ async function boardNow(page: Page) {
   return page.evaluate((squares) => {
     const board = document.querySelector(squares)!.getBoundingClientRect();
     const row = document.querySelector(".board-row")!.getBoundingClientRect();
-    return { bars: document.querySelectorAll(".eval-bar").length, width: board.width, left: board.left - row.left, right: row.right - board.right, overflow: document.documentElement.scrollWidth - innerWidth };
+    // (The dock's row under the board: its edges the board's, bar or no bar; Eric, Oct 15.)
+    const dock = document.querySelector(".boss-dock-main")!.getBoundingClientRect();
+    return { bars: document.querySelectorAll(".eval-bar").length, width: board.width, left: board.left - row.left, right: row.right - board.right, overflow: document.documentElement.scrollWidth - innerWidth, dockOff: Math.max(Math.abs(dock.left - board.left), Math.abs(dock.right - board.right)) };
   }, BOARD_SEL.squares);
 }
 
 test("the eval bar: on by default, switched off in Settings, and the board takes its room", async ({ page }, info) => {
   const on = await boardNow(page);
   expect(on.bars).toBe(1);
+  expect(on.dockOff).toBeLessThanOrEqual(1);
 
   await page.goto("/settings");
   const toggle = page.getByRole("switch", { name: /Eval bar/ });
@@ -42,6 +45,7 @@ test("the eval bar: on by default, switched off in Settings, and the board takes
   else expect(off.width).toBeGreaterThanOrEqual(on.width - 1);
   expect(Math.abs(off.left - off.right)).toBeLessThanOrEqual(2);
   expect(off.overflow).toBeLessThanOrEqual(0);
+  expect(off.dockOff).toBeLessThanOrEqual(1);
 
   // Back on: the bar again, the board as it was.
   await page.goto("/settings");
