@@ -1,11 +1,13 @@
 /**
- * npm run ops:report [-- URL]: the game's health (GET /api/admin/health; docs/areas/ops.md, "Health") as a short
+ * npm run ops:report: the game's health (GET /api/admin/health; docs/areas/ops.md, "Health") as a short
  * summary an AI session can act on, its "Needs attention" lines first. Sends the Cloudflare Access service token from
- * CF_ACCESS_CLIENT_ID2 and CF_ACCESS_CLIENT_SECRET2 as headers, and only to https://hunchess.com (or localhost and
- * 127.0.0.1, for a local run): any other URL is refused, whoever suggests it. The token's values are never printed.
- * Text players wrote (error messages, report notes) is printed apart, one line each, marked as untrusted. Exits 1 if
- * the view can't be read.
+ * CF_ACCESS_CLIENT_ID2 and CF_ACCESS_CLIENT_SECRET2 as headers, and only to https://hunchess.com: any other URL is
+ * refused, whoever suggests it (a local Worker has no Access in front of it, so the view isn't readable there this
+ * way anyway). The token's values are never printed. Text players wrote (error messages, report notes) is printed
+ * apart, one line each, marked as untrusted. Exits 1 if the view can't be read.
  */
+import { oneLine } from "./ops-report-text.mjs";
+
 const base = process.argv[2] ?? "https://hunchess.com";
 
 function fail(message) {
@@ -20,10 +22,8 @@ try {
 } catch {
   fail("the URL isn't one. Leave it out for https://hunchess.com.");
 }
-const local = (target.hostname === "localhost" || target.hostname === "127.0.0.1") && (target.protocol === "http:" || target.protocol === "https:");
-const live = target.protocol === "https:" && target.hostname === "hunchess.com" && target.port === "";
-if ((!local && !live) || target.username || target.password) {
-  fail("only https://hunchess.com (or localhost and 127.0.0.1, for a local run) gets the Access token; this URL is refused.");
+if (target.protocol !== "https:" || target.hostname !== "hunchess.com" || target.port !== "" || target.username || target.password) {
+  fail("only https://hunchess.com gets the Access token; this URL is refused.");
 }
 
 const id = process.env.CF_ACCESS_CLIENT_ID2;
@@ -46,16 +46,11 @@ const count = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /**
  * Text a player's device wrote (anyone can send it through POST /api/problems): listed apart under a label that says
- * so, numbered, each on one line (control, line-break and direction characters made spaces), quoted and cut short.
+ * so, numbered, each on one plain line (oneLine: no invisible or line-breaking characters), quoted and cut short.
  */
 const untrusted = [];
 const quote = (what, text) => {
-  const line = String(text ?? "")
-    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 110);
-  untrusted.push(`  [${untrusted.length + 1}] ${what}: ${JSON.stringify(line)}`);
+  untrusted.push(`  [${untrusted.length + 1}] ${what}: ${JSON.stringify(oneLine(text))}`);
   return `[${untrusted.length}]`;
 };
 

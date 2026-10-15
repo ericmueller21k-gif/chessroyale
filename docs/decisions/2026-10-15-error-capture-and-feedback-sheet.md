@@ -49,7 +49,8 @@ report a bug (with a short id to share), send feedback or suggest an idea, and a
 - **The cheap checks first** (the independent review): the rate limits run on the body's `kind` before any other
   field is read or scrubbed. The account's limit counts only a cookie shaped like a session token (43 characters, as
   `randomToken` makes them; the shape alone, so the per-address limit is what bounds made-up ones) and only once the
-  address is let through, so a refused request uses up nothing. The API-wide limiter in `index.ts` keys the same way in the health PR, not here.
+  address is let through, so a refused request uses up nothing. The API-wide limiter in `index.ts` keys the same way
+  in the health PR, not here.
 - **The cron's jobs fail apart** (the independent review): deleting old rows failing (a D1 error) is logged and counted
   as a server error, and fair play's deep re-check still runs.
 - **Fingerprints** are source, kind, the message with numbers, long hex ids, hosts, queries and build hashes taken out,

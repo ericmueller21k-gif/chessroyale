@@ -31,20 +31,17 @@ const b64urlJson = (s: string): Record<string, unknown> | null => {
 /**
  * The team's signing keys by id, kept an hour. Asked for again (an hour on, or for a key id it doesn't know) at most
  * once a minute, whatever the cache holds: made-up tokens can't make the Worker ask Access's endpoint over and over,
- * even while that endpoint fails.
+ * even while that endpoint fails. One ask at a time: requests arriving while it's on its way wait for it (a real token
+ * arriving with a made-up one, on a cold instance, isn't turned away because the made-up one asked first).
  */
 let keys: { team: string; at: number; byKid: Map<string, CryptoKey> } | null = null;
 let askedAt = -Infinity;
+let asking: Promise<void> | null = null;
 
-async function signingKey(team: string, kid: string, now: number, fetcher: typeof fetch): Promise<CryptoKey | null> {
-  const known = keys?.team === team ? keys.byKid.get(kid) : undefined;
-  if (known && now - keys!.at < 3_600_000) return known;
-  // (Within the minute, a key it already has, even past the hour, still does: Access changes its keys every few weeks.)
-  if (now - askedAt < 60_000) return known ?? null;
-  askedAt = now;
+async function fetchKeys(team: string, now: number, fetcher: typeof fetch): Promise<void> {
   try {
     const res = await fetcher(`https://${team}/cdn-cgi/access/certs`);
-    if (!res.ok) return known ?? null;
+    if (!res.ok) return;
     const body = (await res.json()) as { keys?: (JsonWebKey & { kid?: string })[] };
     const byKid = new Map<string, CryptoKey>();
     for (const jwk of body.keys ?? []) {
@@ -52,16 +49,38 @@ async function signingKey(team: string, kid: string, now: number, fetcher: typeo
       byKid.set(jwk.kid, await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]));
     }
     keys = { team, at: now, byKid };
-    return byKid.get(kid) ?? null;
   } catch {
-    return known ?? null;
+    // The keys it has, if any, still do.
   }
+}
+
+/** How long a request waits for an ask already on its way (one whose request was cut short may never finish). */
+const ASK_WAIT_MS = 10_000;
+
+async function signingKey(team: string, kid: string, now: number, fetcher: typeof fetch): Promise<CryptoKey | null> {
+  const held = () => (keys?.team === team ? (keys.byKid.get(kid) ?? null) : null);
+  if (held() && now - keys!.at < 3_600_000) return held();
+  if (!asking || now - askedAt >= ASK_WAIT_MS) {
+    asking = null;
+    // (Within the minute, a key it already has, even past the hour, still does: Access changes its keys every few weeks.)
+    if (now - askedAt < 60_000) return held();
+    askedAt = now;
+    const ask: Promise<void> = fetchKeys(team, now, fetcher).finally(() => {
+      if (asking === ask) asking = null;
+    });
+    asking = ask;
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([asking, new Promise((r) => (timer = setTimeout(r, ASK_WAIT_MS)))]);
+  clearTimeout(timer);
+  return held();
 }
 
 /** Forgets the cached keys (tests). */
 export const forgetAccessKeys = () => {
   keys = null;
   askedAt = -Infinity;
+  asking = null;
 };
 
 /**
