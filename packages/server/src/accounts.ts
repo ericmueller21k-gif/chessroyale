@@ -33,6 +33,7 @@ import {
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, type LockerState } from "./locker.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA } from "./fairplay-schema.ts";
+import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, deleteSocial } from "./friends.ts";
 
 export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
@@ -164,6 +165,8 @@ const SCHEMA = [
     diag TEXT NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS ops_reports_at ON ops_reports (at)`,
+  // Friends, requests, blocks, invites and their caps (friends.ts).
+  ...FRIENDS_SCHEMA,
 ];
 
 /**
@@ -204,6 +207,8 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "wallets", column: "crates", type: "INTEGER NOT NULL DEFAULT 0" },
   // Each account's latest rating, for the percentile (filled in from the results already stored).
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
+  // Friends (Oct 15, 2026): who may invite you, hiding when you're online (friends.ts).
+  ...FRIENDS_COLUMNS,
 ];
 const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,
@@ -422,6 +427,7 @@ export async function signInWithIdentity(
       await sql.run(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, owner.id);
       await moveShop(sql, current.id, owner.id);
       await sql.run("DELETE FROM sessions WHERE user_id = ?", current.id);
+      await deleteSocial(sql, current.id);
       await sql.run("DELETE FROM users WHERE id = ?", current.id);
     }
     if (kind === "google" && !owner.email && (await adoptGoogleEmail(sql, owner.id, extra.email))) return (await getUser(sql, owner.id))!;
@@ -687,6 +693,8 @@ export interface PublicProfile {
   joinedAt: number;
   lastSeen: number | null;
   online: boolean;
+  /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null, whatever the truth. */
+  hidden?: boolean;
   rating: number | null;
   /** The rank ("Weighty"), its place on the ladder (0 = Novice), its color and a top rank's pill effect. */
   tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
@@ -776,8 +784,8 @@ export function raidStats(rows: ResultRow[]): RaidStats {
 
 /** Anyone's profile by account id (null if there's no such account). */
 export async function publicProfile(sql: Sql, userId: string, now: number): Promise<PublicProfile | null> {
-  const u = await sql.first<{ id: string; name: string; created_at: number; last_seen: number | null; rating: number | null }>(
-    "SELECT id, name, created_at, last_seen, rating FROM users WHERE id = ?",
+  const u = await sql.first<{ id: string; name: string; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null }>(
+    "SELECT id, name, created_at, last_seen, rating, hide_online FROM users WHERE id = ?",
     userId,
   );
   if (!u) return null;
@@ -804,8 +812,9 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
     name: u.name,
     look: (await lockerState(sql, u.id)).look,
     joinedAt: u.created_at,
-    lastSeen: u.last_seen,
-    online: u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,
+    lastSeen: u.hide_online ? null : u.last_seen,
+    online: !u.hide_online && u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,
+    ...(u.hide_online ? { hidden: true } : {}),
     rating: banned ? null : rating,
     tier: tier ? { label: tier.label, level: tier.level, color: tier.color, effect: tier.effect } : null,
     topPercent: banned ? null : top,

@@ -189,6 +189,7 @@ export class NetMatch implements GameView {
     teams: () => !this.boss && this.standingsList.some((s) => !!s.team),
     // (The profile's picks, from the account: they follow the player like the rest of the profile.)
     picks: () => account().profile?.shop?.chat,
+    uidOf: (id) => this.players.find((p) => p.id === id)?.uid,
   });
 
   private ws: WebSocket | null = null;

@@ -1,13 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { OPS } from "@chessroyale/core";
 
-// (The ops page reads the engine server's health; the real container needs the Workers runtime, and nothing here searches.)
-vi.mock("@cloudflare/containers", () => ({ Container: class {}, getContainer: () => null }));
+// (The Worker's module, for its cron, and the ops page's health section: the engine server's container needs the
+// Workers runtime, and nothing here searches.)
+vi.mock("@cloudflare/containers", () => ({ Container: class {}, getContainer: () => ({ fetch: async () => new Response("{}") }) }));
 
 import { createGuest, createSession, ensureSchema, signInWithIdentity, type Sql } from "../src/accounts.ts";
-import { problemLimited } from "../src/limits.ts";
+import { isSessionToken, problemLimited } from "../src/limits.ts";
 import {
   ErrorTally,
+  codeInPath,
+  errorSample,
   fingerprint,
   guardEntries,
   handleProblems,
@@ -17,11 +20,14 @@ import {
   readCapped,
   readProblem,
   reportById,
+  saveReport,
+  scrubEmails,
   topErrors,
   topFile,
   type ErrorGroup,
 } from "../src/problems.ts";
 import { handleOpsAdmin } from "../src/ops-admin.ts";
+import worker, { type Env } from "../src/index.ts";
 import { memoryDb } from "./memory-db.ts";
 
 /** Errors and player reports (problems.ts, docs/areas/ops.md "Errors and player reports"). */
@@ -59,13 +65,20 @@ const anError = (message = "TypeError: Cannot read properties of undefined (read
 });
 
 let ip = 0;
-function post(body: unknown, opts: { session?: string; raw?: string } = {}) {
+function post(body: unknown, opts: { session?: string; raw?: string; ip?: string; headers?: Record<string, string> } = {}) {
   return new Request("https://hunchess.com/api/problems", {
     method: "POST",
-    headers: { "content-type": "application/json", "cf-connecting-ip": `10.0.0.${++ip}`, ...(opts.session ? { cookie: `hc_session=${opts.session}` } : {}) },
+    headers: {
+      "content-type": "application/json",
+      "cf-connecting-ip": opts.ip ?? `10.0.0.${++ip}`,
+      ...(opts.session ? { cookie: `hc_session=${opts.session}` } : {}),
+      ...opts.headers,
+    },
     body: opts.raw ?? JSON.stringify(body),
   });
 }
+/** A session cookie's shape (randomToken: 43 characters), made from a name. */
+const tok = (name: string) => name.padEnd(43, "x");
 
 // (One clock for the whole file, only ever moving on: the module's tally remembers when it last wrote.)
 beforeAll(() => {
@@ -91,7 +104,7 @@ describe("reading a request", () => {
     expect(JSON.stringify(p)).not.toContain("dropped");
     const e = p.kind === "errors" ? p.errors[0]! : null;
     expect(e!.message).toBe("Error: mail me at [email]");
-    expect(e!.trail).toEqual(["x".repeat(80), "ok"]);
+    expect(e!.trail).toEqual(["x".repeat(60), "ok"]);
     expect(e!.where).toEqual(where);
   });
 
@@ -105,7 +118,7 @@ describe("reading a request", () => {
     if (p.kind !== "errors") throw new Error("errors expected");
     expect(p.errors).toHaveLength(OPS.endpoint.maxErrorsPerPost);
     expect(p.errors[0]!.message).toHaveLength(300);
-    expect(p.errors[0]!.stack).toHaveLength(1500);
+    expect(p.errors[0]!.stack).toHaveLength(1000);
     expect(p.errors[0]!.where).toEqual({ screen: "s".repeat(60), mode: null, boss: null, code: null });
     expect(p.diag).toEqual({ version: "unknown", device: { ua: "u".repeat(300), viewport: "", memory: null }, account: null });
   });
@@ -125,6 +138,27 @@ describe("reading a request", () => {
     for (const b of [null, "x", [], {}, { kind: "errors" }, { kind: "errors", errors: [] }, { kind: "hack" }, { kind: "report" }, { kind: "feedback", note: "   " }, { kind: "idea" }]) {
       expect(readProblem(b)).toBeNull();
     }
+  });
+
+  it("scrubbing is linear: a 20 KB field without separators, or with one \"@\", takes a few milliseconds", () => {
+    for (const long of ["a".repeat(20_000), `a@${"b".repeat(20_000)}`, `${"a".repeat(50)}@`.repeat(400)]) {
+      const t = performance.now();
+      scrubEmails(long);
+      expect(performance.now() - t, long.slice(0, 60)).toBeLessThan(20);
+    }
+    expect(scrubEmails("x.pat@example.com, (sam@ex.co) and @@lee@ex.org.")).toBe("[email], ([email]) and @@[email].");
+    const t = performance.now();
+    readProblem({ kind: "bug", note: "n".repeat(19_000), where: { screen: "s".repeat(19_000) } });
+    expect(performance.now() - t).toBeLessThan(20);
+  });
+
+  it("control characters can't hide an address from the scrub (they're dropped first; newlines kept)", () => {
+    const p = readProblem({ kind: "bug", note: "write to pat\u0000@exam\u0007ple.com\nor sam\u001f@ex.co\u007f, thanks" })!;
+    expect(p.kind === "bug" && p.note).toBe("write to [email]\nor [email], thanks");
+    // An address across the field's cut is scrubbed before the cut, not left half there.
+    const q = readProblem({ kind: "bug", note: `${"n ".repeat(248)}pat@example.com` })!;
+    expect(q.kind === "bug" && q.note).toBe(`${"n ".repeat(248)}[email]`.slice(0, 500));
+    expect(JSON.stringify(q)).not.toContain("pat");
   });
 
   it("reads a body up to the cap and no further", async () => {
@@ -159,7 +193,11 @@ function counting(sql: Sql) {
   const writes: string[] = [];
   return {
     writes,
-    sql: { ...sql, run: (q: string, ...p: unknown[]) => (writes.push(q.trim().split(/\s+/)[0]!), sql.run(q, ...p)) } as Sql,
+    sql: {
+      ...sql,
+      run: (q: string, ...p: unknown[]) => (writes.push(q.trim().split(/\s+/)[0]!), sql.run(q, ...p)),
+      first: (q: string, ...p: unknown[]) => (writes.push(q.trim().split(/\s+/)[0]!), sql.first(q, ...p)),
+    } as Sql,
   };
 }
 const group = (fp: string, patch: Partial<ErrorGroup> = {}): ErrorGroup => ({ fingerprint: fp, source: "client", kind: "error", message: `Error ${fp}`, version: "abc1234def56", sample: "{}", ...patch });
@@ -181,20 +219,80 @@ describe("bounded writes", () => {
     expect(rows).toEqual([{ count: 10_002, sample: "{}", first_seen: T0 }]);
   });
 
-  it("at most maxRowsPerFlush rows a write (the most frequent), at most maxGroups kinds in memory; the rest dropped and logged", async () => {
+  it("at most maxRowsPerFlush rows a write (the most frequent; the rest wait for the next), at most maxGroups kinds in memory (more dropped and logged)", async () => {
     const { sql } = memoryDb();
     await ensureSchema(sql);
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const t = new ErrorTally();
     for (let g = 0; g < OPS.store.maxGroups + 50; g++) for (let n = 0; n <= g % 7; n++) t.add(group(`g${g}`), T0);
+    expect(log).not.toHaveBeenCalled();
     const c = counting(sql);
     expect(await t.flush(c.sql)).toBe(OPS.store.maxRowsPerFlush);
     expect(c.writes).toHaveLength(OPS.store.maxRowsPerFlush);
     const kept = await sql.all<{ count: number }>("SELECT count FROM ops_errors");
     expect(kept.every((r) => r.count === 7)).toBe(true);
-    expect(log).toHaveBeenCalledWith(expect.objectContaining({ ops: "errors-dropped" }));
-    // Nothing left over for the next write.
+    expect(log).toHaveBeenCalledWith({ ops: "errors-dropped", count: expect.any(Number) });
+    // The rest are written at the next writes, the most frequent first, until none are left.
+    expect(t.pending).toBe(OPS.store.maxGroups - OPS.store.maxRowsPerFlush);
+    expect(await t.flush(sql)).toBe(OPS.store.maxRowsPerFlush);
+    while (t.pending) await t.flush(sql);
+    expect((await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM ops_errors"))!.n).toBe(OPS.store.maxGroups);
     expect(await t.flush(sql)).toBe(0);
+    log.mockRestore();
+  });
+
+  it("one address counts once per kind per write window: a device repeating an error can't push others out", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const t = new ErrorTally();
+    for (let i = 0; i < 1000; i++) t.add(group("loud"), T0, "10.9.9.9");
+    for (let i = 0; i < 3; i++) t.add(group("real"), T0, `10.8.8.${i}`);
+    for (let g = 0; g < OPS.store.maxRowsPerFlush; g++) for (let i = 0; i < 2; i++) t.add(group(`two${g}`), T0, `10.7.7.${i}`);
+    await t.flush(sql);
+    const rows = await sql.all<{ fingerprint: string; count: number }>("SELECT fingerprint, count FROM ops_errors ORDER BY count DESC, fingerprint");
+    expect(rows[0]).toEqual({ fingerprint: "real", count: 3 });
+    expect(rows.find((r) => r.fingerprint === "loud")?.count ?? 1).toBe(1);
+    // A new window: that address counts once more.
+    t.add(group("loud"), T0 + 1, "10.9.9.9");
+    while (t.pending) await t.flush(sql);
+    expect((await sql.first<{ count: number }>("SELECT count FROM ops_errors WHERE fingerprint = 'loud'"))!.count).toBe(2);
+  });
+
+  it("an error's row keeps a small sample: a few kilobytes at most, whatever was sent", () => {
+    // Every field at its longest, in characters that take 3 bytes each (or 2 as JSON escapes).
+    const wide = (n: number) => "€\"".repeat(n);
+    const p = readProblem({
+      kind: "errors",
+      version: "abc1234def56",
+      device: { ua: wide(500), viewport: "12345x12345@99.999", memory: 1024 },
+      account: "a".repeat(64),
+      errors: [{ kind: wide(50), message: wide(500), stack: wide(2000), where: { screen: wide(100), mode: wide(50), boss: wide(50), code: "ABCDE" }, trail: Array.from({ length: 40 }, () => wide(100)) }],
+    })!;
+    if (p.kind !== "errors") throw new Error("errors expected");
+    const sample = errorSample(p.errors[0]!, p.diag, "a".repeat(64), T0);
+    expect(JSON.parse(sample).trail).toHaveLength(OPS.store.sampleCrumbs);
+    expect(new TextEncoder().encode(sample).length).toBeLessThan(7_000);
+  });
+
+  it("the database's own cap: at most maxNewErrorsPerHour new kinds an hour (a cap line logged); stored kinds keep counting", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const t = new ErrorTally();
+    const cap = OPS.store.maxNewErrorsPerHour;
+    for (let i = 0; i < cap + 10; i += OPS.store.maxRowsPerFlush) {
+      for (let j = i; j < i + OPS.store.maxRowsPerFlush; j++) t.add(group(`kind${j}`), T0);
+      await t.flush(sql);
+    }
+    t.add(group("kind0"), T0 + 1000);
+    await t.flush(sql);
+    expect((await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM ops_errors"))!.n).toBe(cap);
+    expect((await sql.first<{ count: number }>("SELECT count FROM ops_errors WHERE fingerprint = 'kind0'"))!.count).toBe(2);
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ ops: "cap", what: "new kinds of error an hour" }));
+    // The next hour starts afresh.
+    t.add(group("later"), T0 + HOUR);
+    await t.flush(sql);
+    expect((await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM ops_errors WHERE fingerprint = 'later'"))!.n).toBe(1);
     log.mockRestore();
   });
 
@@ -213,22 +311,54 @@ describe("bounded writes", () => {
     await bg.settle();
     expect(writes).toBe(2);
   });
+
+  it("a wait its request's end cut short doesn't stop later ones", async () => {
+    const t = new ErrorTally();
+    const lost: Promise<unknown>[] = [];
+    let later = 0;
+    const now = Date.now();
+    t.schedule(now, async () => undefined, () => undefined);
+    // (This wait's timer never fires: its request ended.)
+    t.schedule(now + 1, async () => undefined, (p) => void lost.push(p));
+    const bg = background();
+    const write = async () => void later++;
+    t.schedule(now + OPS.store.flushMs, write, bg.waitUntil);
+    expect(later).toBe(1);
+    t.schedule(now + OPS.store.flushMs + 1, write, bg.waitUntil);
+    await vi.advanceTimersByTimeAsync(2 * OPS.store.flushMs);
+    await bg.settle();
+    expect(later).toBe(2);
+  });
 });
 
 describe("rate limits", () => {
   it("errors: per account, then per address; reports have their own, tighter, limits", () => {
     const now = T0;
     const L = OPS.endpoint;
-    for (let i = 0; i < L.errors.perUser.limit; i++) expect(problemLimited("errors", { ip: "9.9.9.1", session: "s-errors" }, now)).toBeNull();
-    expect(problemLimited("errors", { ip: "9.9.9.2", session: "s-errors" }, now)).toBeGreaterThan(0);
+    for (let i = 0; i < L.errors.perUser.limit; i++) expect(problemLimited("errors", { ip: "9.9.9.1", session: tok("s-errors") }, now)).toBeNull();
+    expect(problemLimited("errors", { ip: "9.9.9.2", session: tok("s-errors") }, now)).toBeGreaterThan(0);
     // Another account behind the same address goes ahead, until the address's own limit.
-    expect(problemLimited("errors", { ip: "9.9.9.1", session: "s-other" }, now)).toBeNull();
+    expect(problemLimited("errors", { ip: "9.9.9.1", session: tok("s-other") }, now)).toBeNull();
     for (let i = 0; i < L.errors.perIp.limit; i++) problemLimited("errors", { ip: "9.9.9.3", session: null }, now);
-    expect(problemLimited("errors", { ip: "9.9.9.3", session: `s-${Math.random()}` }, now)).toBeGreaterThan(0);
-    for (let i = 0; i < L.reports.perUser.limit; i++) expect(problemLimited("report", { ip: "9.9.9.4", session: "s-report" }, now)).toBeNull();
-    expect(problemLimited("report", { ip: "9.9.9.5", session: "s-report" }, now)).toBeGreaterThan(0);
+    expect(problemLimited("errors", { ip: "9.9.9.3", session: tok(`s-${Math.random()}`) }, now)).toBeGreaterThan(0);
+    for (let i = 0; i < L.reports.perUser.limit; i++) expect(problemLimited("report", { ip: "9.9.9.4", session: tok("s-report") }, now)).toBeNull();
+    expect(problemLimited("report", { ip: "9.9.9.5", session: tok("s-report") }, now)).toBeGreaterThan(0);
     // A window later, it goes ahead again.
-    expect(problemLimited("errors", { ip: "9.9.9.6", session: "s-errors" }, now + L.errors.perUser.windowMs)).toBeNull();
+    expect(problemLimited("errors", { ip: "9.9.9.6", session: tok("s-errors") }, now + L.errors.perUser.windowMs)).toBeNull();
+  });
+
+  it("an account is counted only for a real session cookie, and not when the address is already refused", () => {
+    const now = T0 + 7 * DAY;
+    const L = OPS.endpoint.reports;
+    expect(isSessionToken(tok("a"))).toBe(true);
+    for (const v of [null, "", "short", `${tok("a")}x`, tok("a").replace("x", "!")]) expect(isSessionToken(v)).toBe(false);
+    // A refused address uses up nothing of the account's limit.
+    for (let i = 0; i < L.perIp.limit; i++) problemLimited("report", { ip: "9.8.0.1", session: null }, now);
+    for (let i = 0; i < 20; i++) expect(problemLimited("report", { ip: "9.8.0.1", session: tok("s-fresh") }, now)).toBeGreaterThan(0);
+    for (let i = 0; i < L.perUser.limit; i++) expect(problemLimited("report", { ip: `9.8.1.${i}`, session: tok("s-fresh") }, now)).toBeNull();
+    expect(problemLimited("report", { ip: "9.8.2.1", session: tok("s-fresh") }, now)).toBeGreaterThan(0);
+    // A cookie that isn't a session's is no key: only the address counts.
+    for (let i = 0; i < L.perUser.limit + 3; i++) expect(problemLimited("report", { ip: `9.8.3.${i}`, session: "made-up" }, now)).toBeNull();
   });
 });
 
@@ -242,6 +372,20 @@ describe("POST /api/problems", () => {
     expect((await handleProblems(new Request("https://hunchess.com/api/problems"), { DB: d1 }, bg.waitUntil)).status).toBe(404);
   });
 
+  it("only JSON from this site's own pages: a form's post or another site's is refused before the body is read", async () => {
+    const { d1 } = memoryDb();
+    const bg = background();
+    const body = { kind: "idea", note: "cross" };
+    for (const type of ["text/plain", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x", ""]) {
+      expect((await handleProblems(post(body, { headers: { "content-type": type } }), { DB: d1 }, bg.waitUntil)).status, type).toBe(415);
+    }
+    for (const site of ["cross-site", "same-site", "none"]) {
+      expect((await handleProblems(post(body, { headers: { "sec-fetch-site": site } }), { DB: d1 }, bg.waitUntil)).status, site).toBe(403);
+    }
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect((await handleProblems(post(body, { headers: { "sec-fetch-site": "same-origin", "content-type": "application/json; charset=utf-8" } }), { DB: d1 }, bg.waitUntil)).status).toBe(200);
+  });
+
   it("errors land in D1 grouped by fingerprint, with the account only when it's this session's", async () => {
     const { sql, d1 } = memoryDb();
     await ensureSchema(sql, d1);
@@ -253,16 +397,22 @@ describe("POST /api/problems", () => {
     const res = await handleProblems(post({ kind: "errors", version: "abc1234def56", device, account: pat.id, errors: [anError(), anError("ReferenceError: nope")] }, { session: token }), env, bg.waitUntil);
     expect(res.status).toBe(200);
     // Someone else's account id, claimed: not kept.
-    await handleProblems(post({ kind: "errors", version: "abc1234def56", device, account: pat.id, errors: [anError()] }, { session: "someone-else" }), env, bg.waitUntil);
+    await handleProblems(post({ kind: "errors", version: "abc1234def56", device, account: pat.id, errors: [anError()] }, { session: tok("someone-else") }), env, bg.waitUntil);
+    // The same error twice in one request, or again from that address this window: counted once.
+    await handleProblems(post({ kind: "errors", version: "abc1234def56", device, errors: [anError("ReferenceError: nope"), anError("ReferenceError: nope")] }, { ip: "10.1.1.1" }), env, bg.waitUntil);
+    await handleProblems(post({ kind: "errors", version: "abc1234def56", device, errors: [anError("ReferenceError: nope")] }, { ip: "10.1.1.1" }), env, bg.waitUntil);
     await flushed(bg);
     const top = await topErrors(sql, Date.now());
     expect(top.map((e) => [e.message, e.day, e.week])).toEqual([
       ["TypeError: Cannot read properties of undefined (reading 'board')", 2, 2],
-      ["ReferenceError: nope", 1, 1],
+      ["ReferenceError: nope", 2, 2],
     ]);
     const sample = JSON.parse(top[0]!.sample) as { account: string | null; where: unknown; device: unknown; version: string };
-    expect(sample).toMatchObject({ account: null, where, device, version: "abc1234def56" });
-    expect(JSON.parse(top[1]!.sample).account).toBe(pat.id);
+    expect(sample).toMatchObject({ account: null, where, device, version: "abc1234def56", trail: anError().trail });
+    const patsWrite = await handleProblems(post({ kind: "errors", version: "abc1234def56", device, account: pat.id, errors: [anError("Error: pat's own")] }, { session: token }), env, bg.waitUntil);
+    expect(patsWrite.status).toBe(200);
+    await flushed(bg);
+    expect(JSON.parse((await topErrors(sql, Date.now(), 30, "pat's own"))[0]!.sample).account).toBe(pat.id);
     expect(JSON.stringify(await sql.all("SELECT * FROM ops_errors"))).not.toContain("pat@example.com");
   });
 
@@ -304,12 +454,35 @@ describe("POST /api/problems", () => {
     expect(await latestReports(sql)).toHaveLength(2);
   });
 
+  it("the database's own cap: at most maxReportsPerDay reports a day, whatever the instance (a cap line logged)", async () => {
+    const { sql, d1 } = memoryDb();
+    await ensureSchema(sql, d1);
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await vi.advanceTimersByTimeAsync(60_000);
+    const now = Date.now();
+    await sql.run(
+      "INSERT INTO ops_reports (id, at, kind, account, version, note, diag) SELECT printf('R%05d', value), ?, 'idea', NULL, '', 'x', '{}' FROM json_each(?)",
+      now - HOUR,
+      JSON.stringify(Array.from({ length: OPS.store.maxReportsPerDay }, (_, i) => i)),
+    );
+    // (The cap is in the insert itself: two instances counting at once can't both write past it.)
+    expect(await saveReport(sql, readProblem({ kind: "idea", note: "direct" }) as never, null, now)).toBeNull();
+    const res = await handleProblems(post({ kind: "idea", note: "one more" }), { DB: d1 }, background().waitUntil);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ message: "Too many reports right now. Try again in a minute." });
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ ops: "cap", what: "player reports a day" }));
+    // A day on, it takes reports again.
+    await vi.advanceTimersByTimeAsync(24 * HOUR);
+    expect((await handleProblems(post({ kind: "idea", note: "next day" }), { DB: d1 }, background().waitUntil)).status).toBe(200);
+    log.mockRestore();
+  });
+
   it("429 past an account's limit", async () => {
     const { d1 } = memoryDb();
     const bg = background();
     const statuses: number[] = [];
     for (let i = 0; i <= OPS.endpoint.errors.perUser.limit; i++) {
-      statuses.push((await handleProblems(post({ kind: "errors", errors: [anError(`Error: ${i}`)] }, { session: "s-429" }), { DB: d1 }, bg.waitUntil)).status);
+      statuses.push((await handleProblems(post({ kind: "errors", errors: [anError(`Error: ${i}`)] }, { session: tok("s-429") }), { DB: d1 }, bg.waitUntil)).status);
     }
     expect(statuses.slice(0, -1).every((s) => s === 200)).toBe(true);
     expect(statuses.at(-1)).toBe(429);
@@ -342,9 +515,45 @@ describe("the server's own errors", () => {
     await flushed(bg);
     const lines = log.mock.calls.map((c) => c[0] as { ops?: string; kind?: string; code?: string }).filter((l) => l.ops === "error");
     expect(lines).toEqual([expect.objectContaining({ kind: "Thing.alarm", route: "Thing.alarm", code: "ABCDE", version: "abc1234def56" })]);
-    const rows = await sql.all<{ source: string; kind: string; count: number; sample: string }>("SELECT source, kind, count, sample FROM ops_errors");
-    expect(rows.map((r) => [r.source, r.kind, r.count])).toEqual([["server", "Thing.alarm", 2]]);
-    expect(JSON.parse(rows[0]!.sample)).toMatchObject({ message: "Error: alarm broke", code: "ABCDE", version: "abc1234def56" });
+    const rows = await sql.all<{ source: string; kind: string; message: string; count: number; sample: string }>("SELECT source, kind, message, count, sample FROM ops_errors");
+    expect(rows.map((r) => [r.source, r.kind, r.message, r.count])).toEqual([["server", "Thing.alarm", "Error: alarm broke", 2]]);
+    expect(JSON.parse(rows[0]!.sample)).toMatchObject({ route: "Thing.alarm", code: "ABCDE", version: "abc1234def56" });
+    log.mockRestore();
+  });
+
+  it("the lobby or party code in a path: only where one goes, the whole segment", () => {
+    expect(codeInPath("/api/lobby/ABCDE/ws")).toBe("ABCDE");
+    expect(codeInPath("/api/lobby/abcde")).toBe("ABCDE");
+    expect(codeInPath("/api/squads/party/WXYZ2/join")).toBe("WXYZ2");
+    expect(codeInPath("/api/squads/lobby/K3K3K")).toBe("K3K3K");
+    for (const path of ["/api/lobby/ABCDEF", "/api/lobby/ABCD1", "/api/me/ABCDE", "/x/api/lobby/ABCDE", "/api/squads/ABCDE", "/api/lobbyABCDE/x"]) expect(codeInPath(path), path).toBeNull();
+  });
+
+  it("the cron: old rows failing to go is logged and counted, and fair play's deep check still runs", async () => {
+    const { d1 } = memoryDb();
+    const seen: string[] = [];
+    const db = new Proxy(d1, {
+      get(target, key) {
+        if (key !== "prepare") return Reflect.get(target, key);
+        return (q: string) => {
+          seen.push(q);
+          if (q.startsWith("DELETE FROM ops_errors")) throw new Error("D1_ERROR: busy");
+          return target.prepare(q);
+        };
+      },
+    });
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const pending: Promise<unknown>[] = [];
+    const ctx = { waitUntil: (p: Promise<unknown>) => void pending.push(p), passThroughOnException() {} } as unknown as ExecutionContext;
+    await worker.scheduled({} as ScheduledController, { DB: db, ASSETS, ENGINE: {} } as unknown as Env, ctx);
+    // (Each piece of background work to its end, the clock moving on while it waits for the tally's next write.)
+    while (pending.length) {
+      let done = false;
+      void pending.shift()!.finally(() => (done = true));
+      while (!done) await vi.advanceTimersByTimeAsync(1_000);
+    }
+    expect(seen.some((q) => q.includes("FROM fairplay_matches"))).toBe(true);
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ ops: "error", kind: "cron", route: "prune" }));
     log.mockRestore();
   });
 });

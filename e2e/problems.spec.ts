@@ -164,8 +164,11 @@ test("the feedback sheet: Report a bug from the match menu gives a short id that
   expect(html).toContain(`"account": "${accountId}"`);
 });
 
-test("POST /api/problems: 413 past its size cap, 429 past an account's rate, 400 for anything else; /admin/ops is Not found for players", async ({ page }) => {
+test("POST /api/problems: only JSON from this site, 413 past its size cap, 429 past an account's rate, 400 for anything else; /admin/ops is Not found for players", async ({ page }) => {
   await page.request.get("/api/me");
+  // A form's post (not JSON) and another site's page's: refused.
+  expect((await page.request.post("/api/problems", { headers: { "content-type": "text/plain" }, data: JSON.stringify({ kind: "idea", note: "x" }) })).status()).toBe(415);
+  expect((await page.request.post("/api/problems", { headers: { "sec-fetch-site": "cross-site" }, data: { kind: "idea", note: "x" } })).status()).toBe(403);
   const big = await page.request.post("/api/problems", { headers: { "content-type": "application/json" }, data: JSON.stringify({ kind: "bug", note: "x".repeat(30_000) }) });
   expect(big.status()).toBe(413);
   expect((await page.request.post("/api/problems", { data: { kind: "nope" } })).status()).toBe(400);

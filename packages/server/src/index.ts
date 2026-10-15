@@ -17,6 +17,7 @@ import { deepCheckRun } from "./fairplay-deep.ts";
 import { containerSearch } from "./fairplay-engine.ts";
 import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
+import { handleFriendsApi } from "./friends-api.ts";
 import { countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
 import { handleOpsAdmin } from "./ops-admin.ts";
@@ -56,6 +57,8 @@ export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv {
   OPS_STATS?: string;
   /** "1" on staging for load tests from one machine: the per-address rate limit is off (never in production). */
   LOAD_TEST?: string;
+  /** "1": friends and invites switched off for everyone (friends-api.ts). */
+  PAUSE_FRIENDS?: string;
 }
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
@@ -76,22 +79,23 @@ export default {
   /**
    * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), and
    * fair play's deep re-check of flagged players' moves on the engine server (cases in review at once, the rest
-   * off-peak; fairplay-deep.ts). An error is logged and counted like any other.
+   * off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(_event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
     if (!rawEnv.DB) return;
     const db = rawEnv.DB;
+    const failed = (route: string) => (e: unknown) => serverError(rawEnv, { kind: "cron", route }, e, (p) => ctx.waitUntil(p));
     ctx.waitUntil(
       (async () => {
         const sql = d1Sql(db);
         await ensureSchema(sql, db);
-        await pruneProblems(sql, Date.now());
+        await pruneProblems(sql, Date.now()).catch(failed("prune"));
         const env = await withSecrets(rawEnv);
         const search = containerSearch(env);
         if (!search) return;
         const r = await deepCheckRun(sql, search, Date.now(), { mail: caseMailer(env) });
         if (r.searches) console.log(`fair play deep re-check: ${r.searches} searches, ${r.matches} matches done`);
-      })().catch((e: unknown) => serverError(rawEnv, { kind: "cron", route: "scheduled" }, e, (p) => ctx.waitUntil(p))),
+      })().catch(failed("scheduled")),
     );
   },
 } satisfies ExportedHandler<Env>;
@@ -112,6 +116,7 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
       ip: request.headers.get("cf-connecting-ip"),
       session: readCookie(request, SESSION_COOKIE),
       play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname)),
+      friends: request.method === "POST" && url.pathname.startsWith("/api/friends/"),
     },
     t,
     rawEnv.LOAD_TEST === "1",
@@ -145,6 +150,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // Accounts: /api/me, /api/results, /api/auth/*
     const account = await handleAccountApi(request, env, fetch, waitUntil);
     if (account) return account;
+    // Friends and invites: /api/friends (friends-api.ts).
+    const friends = await handleFriendsApi(request, env, waitUntil);
+    if (friends) return friends;
     // POST /api/engine/score {fen, moves} → {moves}: the engine server's deeper look at a few moves (solo games'
     // re-checks); 503 when there's no server or today's budget is spent (the device then re-checks itself). A position
     // Stockfish refuses is a bad request, turned away before the budget (it would end the server's Stockfish: engine.ts).

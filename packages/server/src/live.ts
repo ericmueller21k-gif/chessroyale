@@ -182,9 +182,47 @@ export class LiveBoard {
   private seen = new Map<string, number>();
   private written = new Map<string, number>();
   private lobbies = new Map<string, LobbySummary & { updatedAt: number }>();
+  /** Accounts whose app last said it was in a match (friends lists show "In a match"). */
+  private busy = new Set<string>();
+  /**
+   * Something new for an account (a friend request, an invite, a request accepted), and when: passed back to the Worker
+   * instances that see it, so its next live line says so and the app fetches its friends list (presence.ts).
+   */
+  private news = new Map<string, number>();
 
-  markSeen(ids: readonly string[], at: number) {
+  /** `busy`: what these accounts' apps said about being in a match (only the live line's own request says). */
+  markSeen(ids: readonly string[], at: number, busy?: Readonly<Record<string, boolean>>) {
     for (const id of ids) if ((this.seen.get(id) ?? 0) < at) this.seen.set(id, at);
+    if (busy) {
+      for (const [id, b] of Object.entries(busy)) {
+        if (b) this.busy.add(id);
+        else this.busy.delete(id);
+      }
+    }
+  }
+
+  /** Online now, and in a match: for friends lists (at most FRIENDS.max at a time, by the caller). */
+  presenceOf(ids: readonly string[], now: number): Record<string, { online: boolean; busy: boolean }> {
+    const out: Record<string, { online: boolean; busy: boolean }> = {};
+    for (const id of ids) {
+      const online = this.isOnline(id, now);
+      out[id] = { online, busy: online && this.busy.has(id) };
+    }
+    return out;
+  }
+
+  notify(ids: readonly string[], at: number) {
+    for (const id of ids) if ((this.news.get(id) ?? 0) < at) this.news.set(id, at);
+  }
+
+  /** The news stamps among these accounts (only the ones that have any). */
+  newsFor(ids: readonly string[]): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const id of ids) {
+      const at = this.news.get(id);
+      if (at !== undefined) out[id] = at;
+    }
+    return out;
   }
 
   /** Seeds who was online from D1 (after the hub restarts): they were seen then, and that's already written. */
@@ -288,8 +326,11 @@ export class LiveBoard {
       if (now - at > 10 * 60_000 && (this.written.get(id) ?? 0) >= at) {
         this.seen.delete(id);
         this.written.delete(id);
+        this.busy.delete(id);
       }
     }
+    // (An app fetches its list within seconds of news; an hour on, the news is in any list it loads.)
+    for (const [id, at] of this.news) if (now - at > 60 * 60_000) this.news.delete(id);
     for (const [code, l] of this.lobbies) {
       if (now - l.updatedAt > 60 * 60_000) {
         this.lobbies.delete(code);

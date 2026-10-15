@@ -29,6 +29,28 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   once `percentileMinPlayers` have ratings), the rating chart, stats (All, Classic, Crowd), recent matches, what
   they're wearing (drawn with the real item art), their quick-chat picks. A profile others see never shows an email,
   a sign-in method or anything not on the approved list; a banned player's says "Banned".
+- **Friends** (Oct 15; [docs/decisions/2026-10-15-friends-and-invites.md](../decisions/2026-10-15-friends-and-invites.md); the rules and data on [accounts.md](accounts.md)):
+  - **Where:** a phone's home has a line above the live line ("Friends · 2 online", "N new" for requests and
+    invites); a computer's live panel has a FRIENDS section above the live line (friends online, each with Invite,
+    at most `FRIENDS.panelMax`, and "All friends ›"). Both open the friends list (`/friends`): invites to you (Join,
+    ✕), friend requests (Accept, Decline), your friends online first (In a match next, then the rest; Invite on each),
+    the requests you sent (Cancel) and who you've blocked (Unblock).
+  - **Someone's profile:** Add friend (or Cancel request, Accept friend, Remove friend), Invite to play, Block and
+    Report; Remove and Block ask for a second tap. Blocked: Unblock and Report only.
+  - **Inviting:** to your private lobby while it waits, or your Squads party; at the front door with neither, the
+    server is asked whether they'd take an invite, then a lobby (or, with Squads picked, a party) is made in the home
+    screen's mode and they're invited into it. Not during a match. A lobby and a party have "Invite friends" (a sheet
+    of your friends) under their link.
+  - **A new invite** shows as a toast at the top of a front-door page (never over a match or the queue) for
+    `FRIENDS.toastMs`: Join (into the lobby or party; the invite leaves your list) or ✕ (declines it).
+  - **Settings → Friends:** "Invites from" (Everyone, Friends, No one) and "Show when I'm online".
+  - **Fresh:** the list loads with your account and again when the live line's `inbox` grows (something new arrived
+    for you). While a list is on screen (the phone's line, the computer's panel, the friends list, Invite friends) and
+    you have a friend who shows when they're online, who's online in it refreshes every `FRIENDS.refreshMs`
+    (`/api/friends/online`: the cached session, one D1 read, one hub call). Who's online and in a match come from the
+    live hub (the app says "in a match" with its live line, `?busy=1`).
+  - **The toast waits** for a front-door page: an invite that arrives during a match or in the queue shows when you're
+    back (if it's still open), and its `FRIENDS.toastMs` start only once it's on screen.
 - **Light and dark:** follows the device until you pick (Settings); same layout and accents in both.
 - **Gone from Settings (Eric, Oct 15):** "Relaxed pace" (each mode plays its own pace; `?pace=quick` is a test switch)
   and Crowd's "50 v 50 / Everyone moves" choice (Crowd is always team turns). A device's old picks (`brc.pace`,
@@ -81,7 +103,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 | What | Where |
 | --- | --- |
-| Screens | `packages/app/src/screens/Home.tsx`, `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx`, `Settings.tsx`, `Lobby.tsx`, `Legal.tsx` |
+| Screens | `packages/app/src/screens/Home.tsx`, `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx`, `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
+| Friends' pieces (rows, the home line, the live panel's section, the toast, Invite friends, the settings, a profile's buttons) | `packages/app/src/components/Friends.tsx`; the list and actions `friends.ts` |
 | The computer's frame and menus | `components/FrontDoor.tsx`, `FrontMenu.tsx`, `LiveWindow.tsx`, `LiveNumber.tsx`, `MiniBoard.tsx`, `TinyBoard.tsx`, `LeaderboardSheet.tsx` |
 | Names and icons everywhere | `components/PlayerName.tsx`, `PixelIcon.tsx` (`UserIcon`), `profile-nav.ts` |
 | The live line, app side | `packages/app/src/live.ts` |
@@ -105,7 +128,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   `piece-sounds.test.ts` (the piece-sound picks: storage, fallback, files), `faq.test.ts` (the FAQ: contents against
   sections, links, every boss, numbers following the settings).
 - e2e: `e2e/front-door.spec.ts`, `landing.spec.ts`, `home-layout.spec.ts`, `live-window.spec.ts`, `profile.spec.ts`,
-  `install.spec.ts`, `crate-banner.spec.ts`, `eval-bar.spec.ts` (the switch: Settings only, the board's room, phone and
+  `install.spec.ts`, `crate-banner.spec.ts`, `friends.spec.ts` (two players: request, accept, online, the invites setting,
+  an invite joined from its toast, a block; the phone's line at 320 px), `eval-bar.spec.ts` (the switch: Settings only, the board's room, phone and
   computer), `piece-sounds.spec.ts` (pick, preview, reload, what loads, every file's start and loudness), `faq.spec.ts`
   (Settings → FAQ, a jump to a section, a link to a heading, back).
 - Frames: `npm run frames:home`, `frames:queue`.

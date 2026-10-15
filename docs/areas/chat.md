@@ -18,6 +18,9 @@ Lane: `social`.
   as "chat" items).
 - **Limits** (the server enforces, the app mirrors): `minGapMs` between messages, a burst limit, no repeating a line
   within `repeatMs`. Sounds are quieter than a move and follow the mute switch.
+- **Blocked players** (a profile's Block button, [accounts.md](accounts.md)): their lines never show, in the
+  global chat (by account) and in quick chat in a match (by their seat's account, `uidOf`): `MatchChat.hidden()` is
+  muted or blocked. Hidden in the app only, so it costs the server nothing.
 - **Bots chat** a little: a line or two at the start and end, now and then after a great move
   (`QUICK_CHAT.bot*`), never more than `botMaxPerMinute`.
 - **Lobby chat:** the same quick chat while a match fills (the queue's grid), one channel for everyone waiting; its

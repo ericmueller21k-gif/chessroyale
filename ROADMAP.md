@@ -340,7 +340,9 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
 Added Oct 14, 2026 (Eric; notes only, nothing built):
 
 - **Friends and invites** (Eric, Oct 14: "we're gonna need like a, something where you can tap on somebody and just
-  add them as a friend").
+  add them as a friend"). **Built Oct 15** (docs/decisions/2026-10-15-friends-and-invites.md): requests accepted or declined, block,
+  invites to your lobby or party for anyone your setting allows, "Show when I'm online"; the open questions below are
+  answered there.
   - **Add a friend:** tap a player, then "Add friend". No chat with friends ("in today's day and age, it's not
     necessary").
   - **Friends online:** your friends who are online, in their own list above the players online.

@@ -10,8 +10,9 @@ these weren't reviewed first. Most are a single line in `packages/core/src/setti
   in its area's file in [`docs/history/`](docs/history/). The index below lists each one, in the order it was made,
   and links to it. Code comments that cite `DECISIONS.md, "<section>"` still lead there: find the section's title
   below.
-- **New decisions go at the end of this file**, under "New decisions": one section each, with the date and the
-  reason, as before. Add to your own lane's sections rather than rewriting others'.
+- **New decisions go in [`docs/decisions/`](docs/decisions/README.md)**, one file each, named
+  `YYYY-MM-DD-short-title.md`, with the date and the reason (Oct 15, 2026: every PR appending to the end of this file
+  made every pair of open PRs conflict). The "New decisions" sections below, written up to Oct 15, stay here.
 - **When a decision changes how an area works,** update its page in `docs/areas/` in the same PR.
 - **When this file grows long again** (a month or so of new decisions), move the new sections, unchanged, to the end
   of their area's `docs/history/` file and list them in the index.
@@ -154,6 +155,8 @@ In [`docs/history/ops.md`](docs/history/ops.md). How it works today: [`docs/area
 - [Capacity: built (Oct 7, 2026)](docs/history/ops.md#capacity-built-oct-7-2026)
 
 ## New decisions
+
+Written up to Oct 15, 2026. Newer decisions: one file each in [`docs/decisions/`](docs/decisions/README.md).
 
 Add new sections here (`### Title (date)`), newest last.
 
@@ -5109,97 +5112,3 @@ over the bar's status or the line under it, the God King's never over the dock's
 increment; the phase change's two lines; on a computer, every tag above its board and no Bank column), `king-attack`,
 `crowd`, `crowd-hidden`. `npm run frames:boss` at 360 and 1280 on both builds. Screenshots before and after at 390 and
 1280 px in the PR.
-
-## Error capture and the feedback sheet (ops, Oct 15, 2026)
-
-The director's brief for launch: nothing on a player's device reported an error, the server barely logged its own,
-and the only admin page was fair play's. Built: every device reports its errors, the server records its own, players
-report a bug (with a short id to share), send feedback or suggest an idea, and admins read it all on `/admin/ops`
-(docs/areas/ops.md, "Errors and player reports"). The calls:
-
-- **One endpoint, one table per thing.** `POST /api/problems` takes `{kind: "errors"}`, or a report: `{kind: "bug" |
-  "feedback" | "idea"}` (the name `/api/report` was taken by player reports for fair play). Errors go in `ops_errors`,
-  one row per fingerprint per hour, upserted; player reports in `ops_reports`. Hourly rows give the page true "last 24
-  hours" and "7 days" counts (and next PR's "last hour") with one statement per kind per write.
-- **A count is page loads, not throws.** A device sends each kind of error once per page load, so a loop throwing a
-  thousand times a second counts once per player; that's the better measure of how many players a bug hits. The
-  server's own errors count each time (they're already rare and bounded).
-- **Bounded writes, per instance.** Counted in memory by fingerprint, written at once the first time and then at most
-  every 20 s, at most 5 rows a write (the most frequent), at most 100 kinds held; the rest dropped and logged as a
-  number. Under 30 s because the wait rides the request's `waitUntil` (as presence's batches do). Worst case a
-  storm costs 15 rows a minute per instance, far inside D1's included writes. Reports are one row each, written at
-  once for the id, capped at 20 a minute per instance on top of the per-address and per-account limits.
-- **Fingerprints** are source, kind, the message with numbers, long hex ids, hosts, queries and build hashes taken out,
-  and the top file without its hash, so a bug keeps its row across deploys and the page shows which versions it came
-  from. FNV-1a 32 bits: with a few hundred kinds, a collision is about a one-in-a-million chance.
-- **The account id only when signed in, and only its own.** The app sends it only for a signed-in player; the server
-  keeps it only if it's the session's own (the presence cache, so rarely a D1 read). Guests send none.
-- **No IP addresses, no emails, no chat.** The rate limits key on the address in memory only; emails are scrubbed from
-  every stored text (a report's note included: "[email]"); breadcrumbs are screens, moments and moves sent, never
-  anything typed. Kept 30 days, deleted by the existing 15-minute cron. The privacy page says so.
-- **The version is the commit.** `vite.config.ts` puts the commit's first 12 characters in the app
-  (`WORKERS_CI_COMMIT_SHA` in Workers Builds, else git) and writes `dist/version.json` (not precached); the Worker reads
-  that file through the assets binding for its own errors. The one cost: the bundle now changes with every commit, so
-  every deploy updates the service worker's cache (mostly 304s); most deploys changed the bundle anyway.
-- **The error boundary throws the error on once** after showing "Something went wrong" with Reload, so the console and
-  every e2e spec's page-error check still see a render error (the boundary would otherwise hide it from them). The
-  page's listener skips an error already captured, so it's reported once.
-- **The sound worker's error is handled in the worker too** (`preventDefault`, like #216's for the engines'): it was
-  already handled (sounds made in idle moments instead) but also reached the page, which would have counted it twice.
-- **Durable Objects' entry points are wrapped where the Worker exports them** (`guardEntries` in `index.ts`: a list of
-  each class's fetch, WebSocket handlers, alarm and the methods the Worker calls; errors thrown on as before). In each
-  object's own module the wrap made an import cycle (live hub, problems, API, live hub) that the unit tests' module
-  loader can't resolve. The matchmaker's batch errors, caught and logged before, now go to the store too.
-- **One feedback sheet, three kinds** (Eric's addition, Oct 15): "We'd love your feedback", then 🐞 Report a bug (the
-  diagnostics, as built first), 💬 Feedback and 💡 Suggest an idea (a note alone: no diagnostics, no account, no
-  version kept, so a note can't be tied to a device or player). Feedback and ideas need a note (nothing else is sent);
-  a bug's is optional. Every kind gets the same short id and lives in the same table with its kind; only a bug shows
-  "share this id" (the others, a thank-you), since only a bug is worth looking up by id. The match menu opens it on
-  Report a bug, Settings on Feedback; no link on the home screen (Settings is one tap away, and the front door stays
-  uncluttered). The same rate limits, all three kinds together. `/admin/ops` lists reports of one kind
-  (`?kind=idea`: the ideas as a list).
-- **The sheet is one over any screen**, beside the ban notice and drawn like it, opened from the match menu or
-  Settings. In the match menu itself the form would be redrawn with every phase (a match draws each phase's screen
-  afresh), dropping a phone's keyboard mid-sentence. On a phone it's a row under Sound and Resign (the sheet is two
-  rows now: measured at 320, 360 and 390 px, it stays below the board and the move's clock, over the lower part of the
-  dock only while open); on a computer a 🐞 button before the sound button. Where an admin's testing items
-  share that title line (boss battles, Eric only), they already fill it at 504 px (900 to 1280 px wide), and one more
-  button pushed them over the title: there the report button gives way (a CSS rule; measured the same as before), and
-  admins report from Settings or a phone.
-- **The ops page searches errors by message** (`?q=`), and among equal counts shows the newest first: what a session
-  triaging a player's report needs, and what keeps a fresh error findable in the e2e's long-lived local database.
-- **e2e admins:** no sign-in is set up in tests, so the e2e Worker's `ADMIN_EMAILS` has one email per project and a test
-  gives its account that email with `wrangler d1 execute --local` (per project, so the two projects never take each
-  other's).
-- **Testing:** the full lane (a new public endpoint, stored data, security): typecheck, the unit suite (a new
-  `problems.test.ts`), the whole e2e suite in two shards, and a new `problems.spec.ts`.
-
-## The health view and `npm run ops:report` (ops, Oct 15, 2026)
-
-Launch readiness, step 2 (ROADMAP.md): one snapshot of the game an AI session can read and act on, as JSON
-(`GET /api/admin/health`) and as the first section of `/admin/ops` (docs/areas/ops.md, "Health"). The calls:
-
-- **Squads on the live hub** (the director's pick): each Squads lobby reports itself to the hub as mode "squads"
-  (on a change or a minute on, at most every 2 s, as Crowd's lobbies do; forgotten as it closes). It counts in the
-  health view and **the overload limit now counts Squads players** (it didn't before); the home page's public line
-  (online aside: matches running, in queue, playing now, the live window) leaves Squads out, unchanged.
-- **Who may read the JSON:** an admin's session, or a request that came through Cloudflare Access for its application:
-  the Worker checks Access's own token (`Cf-Access-Jwt-Assertion`) against the team's public keys (RS256, keys cached
-  an hour, asked again for an unknown key id at most once a minute), its audience and its expiry, so the view stays
-  closed where Access isn't in front of it (the site at launch). The team domain and the application's AUD tag are
-  public (the Access login redirect names both) and sit in `wrangler.jsonc`; no new secret. Pre-launch any request
-  that passed Access may read it (only Eric and the service token can); at launch the health path needs its own Access
-  application and `ACCESS_AUD` updated (ROADMAP.md, "Only Eric can do").
-- **Errors by the clock hour:** rows are per hour, so the view says "this hour" (so far) and "the hour before" rather
-  than a rolling hour it can't count exactly; and 24 hours.
-- **The engine server's last answer and last failure** weren't kept anywhere: they're two keys in D1's `meta`, written
-  at most once a minute (an answer) or every 10 s (a failure) per instance, never in the way of a search's answer
-  (a write that fails is ignored).
-- **`npm run ops:report`** is a plain Node script (no dependencies): the service token from `CF_ACCESS_CLIENT_ID2` /
-  `CF_ACCESS_CLIENT_SECRET2` as headers, never printed; "Needs attention" first, each line saying what's wrong and where
-  to look (thresholds: 20 errors an hour or 3 times the hour before, any Durable Object error this hour, a failing
-  engine server, 80% of a budget, unread bug reports). Node's fetch only uses `HTTPS_PROXY` with
-  `NODE_USE_ENV_PROXY=1`, so the npm script sets it (harmless without a proxy).
-- **Testing:** the targeted lane plus the server specs it touches (the hub's counts, Squads' lobbies, the overload
-  limit, the live window, the ops page): typecheck, the unit suite (a new `health.test.ts`), and the e2e specs
-  `problems`, `front-door`, `live-window`, `busy`, `squads` and `squads-play`.

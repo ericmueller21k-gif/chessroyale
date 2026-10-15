@@ -1550,6 +1550,36 @@ export const GLOBAL_CHAT = {
 } as const;
 
 /**
+ * Friends and invites (docs/decisions/2026-10-15-friends-and-invites.md; docs/areas/accounts.md): add a friend from their profile
+ * (they accept or decline), invite anyone to your lobby or Squads party, block. Signed-in accounts only, where signing
+ * in is set up. The server enforces every number here.
+ */
+export const FRIENDS = {
+  /** Friends one account can have. */
+  max: 200,
+  /** Friend requests one account has waiting for an answer at once. */
+  maxPendingSent: 50,
+  /** A request nobody answered is dropped after this many days. */
+  requestDays: 30,
+  /** Friend requests one account can send in a day. */
+  requestsPerDay: 30,
+  /** Players one account can have blocked. */
+  maxBlocked: 500,
+  /** Invites one account can send in an hour. */
+  invitesPerHour: 60,
+  /** Inviting the same player again: not sooner than this. */
+  reinviteMs: 30_000,
+  /** An invite stays open this long (in the friend's list, and as a toast while it's new), then it's gone. */
+  inviteMinutes: 10,
+  /** The friends list refreshes this often while it's on screen (and at once when something new arrives for you). */
+  refreshMs: 60_000,
+  /** A new invite's toast stays this long unless it's tapped (the invite stays in the list until it expires). */
+  toastMs: 20_000,
+  /** The computer's live panel lists at most this many friends who are online. */
+  panelMax: 8,
+} as const;
+
+/**
  * Capacity (the `ops` delegate): the matchmaker's batches and admission, overload, presence and the live line's
  * write limits, and the API's rate limits. See DECISIONS.md, "Capacity: built".
  */
@@ -1603,6 +1633,8 @@ export const CAPACITY = {
     perUser: { limit: 1_200, windowMs: 60_000 },
     /** PLAY and new lobbies (a player in line asks every 3 s). */
     play: { limit: 40, windowMs: 60_000 },
+    /** Friends' actions (requests, answers, invites, blocks, settings): FRIENDS has the daily and hourly caps. */
+    friends: { limit: 30, windowMs: 60_000 },
   },
 } as const;
 
@@ -1634,15 +1666,24 @@ export const OPS = {
   store: {
     /**
      * Each Worker instance (and Durable Object instance) counts its errors in memory and writes them to D1 at most
-     * this often (the first at once), at most `maxRowsPerFlush` rows a time (the most frequent; the rest are dropped
-     * and logged as a number). Kept under 30 s: a flush waits in the request's waitUntil.
+     * this often (the first at once), at most `maxRowsPerFlush` rows a time (the most frequent; the rest wait for the
+     * next write). Kept under 30 s: a flush waits in the request's waitUntil.
      */
     flushMs: 20_000,
     maxRowsPerFlush: 5,
-    /** Different errors held in memory between writes, at most (more are dropped). */
+    /** Different errors held in memory between writes, at most (more are dropped and logged as a number). */
     maxGroups: 100,
+    /** The breadcrumbs an error's row keeps with its latest occurrence (a bug report keeps all `client.breadcrumbs`). */
+    sampleCrumbs: 10,
     /** Player reports (bugs, feedback, ideas) each instance writes a minute, at most (one row each, written at once). */
     maxReportsPerMinute: 20,
+    /**
+     * Caps for the whole database, whatever the instances (a flood from many addresses can't grow D1 without bound):
+     * new kinds of error an hour (one already stored keeps counting) and player reports a day, each in its insert.
+     * Under 0.9 GB in all over keepDays with every cap hit every hour (docs/areas/ops.md, "Small rows").
+     */
+    maxNewErrorsPerHour: 100,
+    maxReportsPerDay: 2_000,
     /** Errors and player reports are deleted after this many days (the 15-minute cron). */
     keepDays: 30,
   },

@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { FAIRPLAY, GLOBAL_CHAT, LOBBY_LIFE, OPS } from "@chessroyale/core";
+import { FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS } from "@chessroyale/core";
 
 /**
  * The privacy policy (/privacy), terms of service (/terms) and copyright page (/copyright): drafts written from what
@@ -144,8 +144,8 @@ function Privacy() {
       <Item
         title="Online now and last seen"
         what={<p>When your app last checked in. It checks in every few seconds while it's open.</p>}
-        why={'the "online" count on the home screen, and "Online now" or "last seen" on your profile.'}
-        kept="only the latest time, written over about once a minute."
+        why={'the "online" count on the home screen, "Online now" or "last seen" on your profile, and whether your friends see you online.'}
+        kept="only the latest time, written over about once a minute. Whether you're in a match is never written down: it's kept in memory while you're online."
       />
       <Item
         title="Your locker, coins and shop"
@@ -232,21 +232,23 @@ function Privacy() {
         kept={`${OPS.store.keepDays} days.`}
       />
       <Item
-        title="Friends (being built)"
+        title="Friends"
         what={
           <p>
-            Friend requests, your friends, the players you block, your settings for who may invite you and whether friends see you
-            online, game invites (they expire), and counts that limit how many requests and invites you send.
+            Your friends, friend requests waiting for an answer, the players you block, your settings for who may invite you and
+            whether others see when you're online, game invites to you, and counts that limit how many requests and invites you send.
           </p>
         }
-        why="so you can find and invite friends, and keep away from players you block."
-        kept="until you remove them or the account is deleted."
+        why="so you can add friends and invite players to your games, and keep away from players you block."
+        kept={`friends and blocks until you remove them or the account is deleted; a request until it's answered, or ${FRIENDS.requestDays} days; an invite ${FRIENDS.inviteMinutes} minutes; the counts a day.`}
       />
 
       <h2>What other players see</h2>
       <p>
-        Your profile: your name, the items you wear, when you joined, "Online now" or when you were last seen, your rating, rank and
-        "Top %", your stats and last 10 matches, and "Banned" if you are. Never your email or how you sign in. In matches and chat,
+        Your profile: your name, the items you wear, when you joined, "Online now" or when you were last seen (unless you hide it in
+        Settings), your rating, rank and "Top %", your stats and last 10 matches (only their day while you hide when you're
+        online), and "Banned" if you are. Your friends also see whether you're online or in a match, unless you hide it. Nobody
+        sees who you've blocked. Never your email or how you sign in. In matches and chat,
         players see your name, icon, look and rating, and your picks.
       </p>
 

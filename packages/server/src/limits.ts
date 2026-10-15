@@ -2,7 +2,7 @@ import { CAPACITY, OPS } from "@chessroyale/core";
 
 /**
  * Rate limits on the API (CAPACITY.rateLimits): requests per window per address, per account (its session) and, for
- * PLAY and new lobbies, per account again. Counted in each Worker instance's memory, so they stop a runaway client or
+ * PLAY and new lobbies, and for friends' actions, per account again. Counted in each Worker instance's memory, so they stop a runaway client or
  * script, not a person playing; past a limit the answer is a friendly 429 with when to try again.
  */
 export class RateLimiter {
@@ -34,24 +34,32 @@ const L = CAPACITY.rateLimits;
 const perIp = new RateLimiter(L.perIp.limit, L.perIp.windowMs);
 const perUser = new RateLimiter(L.perUser.limit, L.perUser.windowMs);
 const play = new RateLimiter(L.play.limit, L.play.windowMs);
+const friends = new RateLimiter(L.friends.limit, L.friends.windowMs);
 
 export const TOO_MANY = "Too many requests. Wait a few seconds and try again.";
 
+/** A session cookie as accounts.ts makes them (randomToken: 32 bytes, base64url); anything else isn't one. */
+export const isSessionToken = (v: string | null): v is string => v !== null && /^[\w-]{43}$/.test(v);
+
 /**
  * Whether this request may go ahead: null if so, else how long to wait. `ip` is skipped when `ipExempt` (a load test
- * from one machine; the LOAD_TEST variable on staging, never production).
+ * from one machine; the LOAD_TEST variable on staging, never production). The account is a key only for a real session
+ * cookie (a made-up one each time would be a fresh key), and the limits are counted in order, stopping at the first
+ * that refuses: a refused request uses up nothing further.
  */
-export function rateLimited(req: { ip: string | null; session: string | null; play: boolean }, now: number, ipExempt = false): number | null {
+export function rateLimited(req: { ip: string | null; session: string | null; play: boolean; friends?: boolean }, now: number, ipExempt = false): number | null {
+  const session = isSessionToken(req.session) ? req.session : null;
   const checks: [RateLimiter, string][] = [];
   if (req.ip && !ipExempt) checks.push([perIp, req.ip]);
-  if (req.session) checks.push([perUser, req.session]);
-  if (req.play) checks.push([play, req.session ?? `ip:${req.ip}`]);
-  let wait = 0;
+  if (session) checks.push([perUser, session]);
+  if (req.play) checks.push([play, session ?? `ip:${req.ip}`]);
+  // (Friends' actions: a burst limit here; the daily and hourly caps are counted in D1, friends.ts.)
+  if (req.friends) checks.push([friends, session ?? `ip:${req.ip}`]);
   for (const [l, k] of checks) {
     const r = l.hit(k, now);
-    if (!r.ok) wait = Math.max(wait, r.retryMs);
+    if (!r.ok) return r.retryMs;
   }
-  return wait > 0 ? wait : null;
+  return null;
 }
 
 const P = OPS.endpoint;
@@ -63,15 +71,18 @@ const problemLimits = {
 /**
  * POST /api/problems (problems.ts): error reports and player reports, each with their own limits per address and per
  * account (OPS.endpoint), on top of the API's. Null if this one may go ahead, else how long to wait. The address is
- * only a key in this instance's memory, never stored.
+ * only a key in this instance's memory, never stored. The account is counted only for a real session cookie (a made-up
+ * one each time would be a fresh key) and only once the address is let through (a refused request uses up nothing).
  */
 export function problemLimited(kind: "errors" | "report", req: { ip: string | null; session: string | null }, now: number): number | null {
   const [perIp, perUser] = problemLimits[kind];
-  let wait = 0;
-  for (const [l, k] of [[perIp, req.ip], [perUser, req.session]] as const) {
-    if (!k) continue;
-    const r = l.hit(k, now);
-    if (!r.ok) wait = Math.max(wait, r.retryMs);
+  if (req.ip) {
+    const r = perIp.hit(req.ip, now);
+    if (!r.ok) return r.retryMs;
   }
-  return wait > 0 ? wait : null;
+  if (isSessionToken(req.session)) {
+    const r = perUser.hit(req.session, now);
+    if (!r.ok) return r.retryMs;
+  }
+  return null;
 }

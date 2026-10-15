@@ -29,7 +29,7 @@ const started = Date.now();
 
 /** A breadcrumb: an app event (a screen or a moment, a move sent), kept with the last few. Never anything typed. */
 export function crumb(event: string) {
-  trail.push(`${((Date.now() - started) / 1000).toFixed(1)}s ${event}`.slice(0, 80));
+  trail.push(`${((Date.now() - started) / 1000).toFixed(1)}s ${event}`.slice(0, 60));
   if (trail.length > OPS.client.breadcrumbs) trail.shift();
 }
 
@@ -55,14 +55,14 @@ const recent: { kind: string; message: string }[] = [];
 const captured = new WeakSet<object>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 
-/** A stack, short and without this site's address: its first 12 lines, 1200 characters in all. */
+/** A stack, short and without this site's address: its first 12 lines, 1000 characters in all (what the server keeps). */
 const trimStack = (stack: string) =>
   stack
     .split("\n")
     .slice(0, 12)
     .map((l) => l.trim().replaceAll(location.origin, "").slice(0, 160))
     .join("\n")
-    .slice(0, 1200);
+    .slice(0, 1000);
 
 /**
  * An error to report (`kind`: error, rejection, render, worker:<name>). Each kind of error once per page load, up to
@@ -82,7 +82,7 @@ export function captureError(kind: string, error: unknown, at = "") {
   if (seen.has(key) || seen.size >= OPS.client.maxErrorsPerPage) return;
   seen.add(key);
   recent.push({ kind, message });
-  if (recent.length > 5) recent.shift();
+  if (recent.length > 3) recent.shift();
   queue.push({ kind, message, stack, where, trail: [...trail] });
   timer ??= setTimeout(() => send(false), OPS.client.batchMs);
 }
@@ -112,8 +112,20 @@ function send(hiding: boolean) {
   timer = null;
   while (queue.length) {
     const body = JSON.stringify({ kind: "errors", errors: queue.splice(0, OPS.endpoint.maxErrorsPerPost), ...diag() });
-    if (hiding && navigator.sendBeacon?.("/api/problems", new Blob([body], { type: "application/json" }))) continue;
+    if (hiding && beacon(body)) continue;
     void fetch("/api/problems", { method: "POST", headers: { "content-type": "application/json" }, body, keepalive: true }).catch(() => undefined);
+  }
+}
+
+/**
+ * sendBeacon with the body as JSON (the endpoint takes nothing else); false where the browser won't (an older one
+ * refuses a JSON blob): then a fetch with keepalive, which outlives the page too.
+ */
+function beacon(body: string): boolean {
+  try {
+    return navigator.sendBeacon?.("/api/problems", new Blob([body], { type: "application/json" })) ?? false;
+  } catch {
+    return false;
   }
 }
 
