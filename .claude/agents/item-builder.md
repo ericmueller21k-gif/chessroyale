@@ -71,9 +71,9 @@ If a request needs gameplay, engine or protocol changes, say so and stop; that's
    tolerates re-runs), and pass the field through `cleanLook`.
 8. **Record it** in `DECISIONS.md` (New decisions): the items, the odds table, and each call you made and why. Keep
    it short. Update `docs/areas/shop.md` if how crates work changed.
-9. **Ship it** per `CLAUDE.md`: run `npm run typecheck` and `npm test`. Run `npm run e2e` (slow, about 20 minutes; run it
-   in the background) when screens changed. Open the PR, wait for the `check` run to pass, merge it with a merge commit,
-   then verify it live (see `CLAUDE.md`).
+9. **Ship it** per `CLAUDE.md`: run `npm run typecheck` and `npm test`, and when screens changed, the e2e specs you
+   touched, locally (under the shared e2e lock). Open the PR, wait for the `check` run to pass and read the e2e run's
+   `result` (CI runs the whole suite on the PR), merge it with a merge commit, then verify it live (see `CLAUDE.md`).
 
 ## Reporting back
 

@@ -19,6 +19,7 @@ engine server's sections (indexed in `DECISIONS.md`, in `docs/history/ops.md` an
 | Scaling fixes: the matchmaker's throughput, database write load, live counts | `packages/server/src/matchmaker.ts` (plumbing, not the matching rules, which are `ranked`'s), `live.ts`, `accounts.ts` (write patterns), `index.ts` |
 | Rate limits, overload handling | `packages/server/src/index.ts`, `api.ts` |
 | Deploy config, monitoring, alerts | `wrangler.jsonc`, `DEPLOY.md` |
+| CI: typecheck and unit tests, the e2e suite on 5 runners (`docs/areas/ops.md`, "CI e2e") | `.github/workflows/`, `e2e/ci-shard.mjs`, `ci-timings.json`, `ci-summary.ts`, `ci-summary-merge.mjs` |
 
 Not yours:
 - game rules, screens and rating math
@@ -30,7 +31,8 @@ Not yours:
   the job; use our servers only when truly needed, and then without skimping.
 
 - **Money is Eric's.** Never raise instance counts, caps or plans, or add a paid service, without asking him with a
-  monthly estimate. Recommend billing alerts.
+  monthly estimate. Recommend billing alerts. CI uses GitHub's standard runners only (free for the public repository):
+  no paid or larger runners.
 - **Never load-test production.** Use a staging copy (its own Worker, Durable Objects and D1) and tear it down after.
   The staging deploy needs Eric's OK if it costs anything.
 - **Measure, then fix, then measure again.** Every scaling change comes with before/after numbers from the load test

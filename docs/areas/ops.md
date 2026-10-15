@@ -14,6 +14,33 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   The "Workers Builds: chessroyale" check fails instantly on PR branches (Cloudflare's preview build for non-production
   branches): only `check` (typecheck and unit tests, `.github/workflows/check.yml`) and the e2e run decide whether a PR
   is green. Merge with a merge commit, then confirm the deploy live.
+- **CI e2e** (Oct 15, DECISIONS.md "e2e on GitHub Actions for every PR"): `.github/workflows/e2e.yml` runs the whole
+  Playwright suite, both projects, on every PR to `main` and every push to `main`, on GitHub's standard runners (free:
+  the repository is public). CI runs the full e2e on every PR; local runs are for targeted checks and perf.
+  - **Layout:** 5 `shard` jobs side by side (about 17 minutes in all, 1 for setup), then `result`. Each shard runs whole
+    spec files, spread by their measured test time (`e2e/ci-shard.mjs` reads `e2e/ci-timings.json`; a new spec counts
+    as the median until the table is refreshed); inside a file the tests run in order, as locally. Each runner builds
+    the app once (`E2E_PREBUILT=1` tells Playwright's web server to start wrangler without building again) and serves
+    it with the same `wrangler dev` and test variables as locally (`playwright.config.ts`). 2 workers per runner, as
+    locally (half the runner's 4 CPUs).
+  - **Reading a run:** `result`'s summary on the run's page (each shard's reporter, `e2e/ci-summary.ts`, writes a
+    record; `e2e/ci-summary-merge.mjs` renders them): flaky tests first, then failed ones, each with its shard,
+    `file:line`, project, the line it failed on and the gist of its error; each shard's counts and time; and the
+    test time by file as a ready-made `ci-timings.json`. `result` is red if any shard is. A shard with a failed or
+    flaky test uploads its HTML report with the retries' traces (`e2e-report-shard-N`, kept 7 days;
+    `npx playwright show-report <folder>`).
+  - **Retries and traces:** `--retries 1` in CI until the flaky-test batch lands; the goal is 0, as
+    `playwright.config.ts` has it. A test that passes only on its retry is "flaky": the summary lists it first, so
+    it stays in view. Traces only on that retry (`on-first-retry`): recording every test measured about 8% slower.
+    Flakes only: "Re-run failed jobs" once; a test that fails again is real.
+  - **Left out: `@perf`** (`e2e/perf.spec.ts`, frame budgets on a 4x-slowed phone), because they measure the machine.
+    Run them locally under the e2e lock, or from Actions → e2e → Run workflow with "perf" ticked (a `perf` job, phone,
+    1 worker; its report is kept 7 days: read its numbers as a trend, not a verdict).
+  - **Caches:** npm (`setup-node`) and Playwright's Chromium (headless shell only, the browser headless runs use;
+    `~/.cache/ms-playwright`, keyed by Playwright's version).
+  - **Concurrency:** a new push to a PR cancels that PR's run still going; pushes to `main` each get their own run.
+    A run takes 6 jobs at once: the account's limit on jobs at once (20 on GitHub Free) queues the rest.
+  - **Not a required check yet;** if it becomes one, require `result` (one name, whatever the shard count).
 - **Schema at runtime:** D1 tables are made by the Worker (`CREATE TABLE IF NOT EXISTS`, then `ALTER TABLE` migrations
   that tolerate re-runs), so a deploy needs no migration step.
 - **Built for surges** (measured with simulated players on staging):
@@ -64,7 +91,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 | Load-test counters | `packages/server/src/ops.ts` |
 | Load tests (simulated players over WebSockets and the API) | `scripts/load/` (`run.ts`, `burst.ts`, `staging.sh`) → `reports/load/` |
 | The engine server | `engine/`, `packages/server/src/engine.ts` |
-| CI | `.github/workflows/check.yml` |
+| CI | `.github/workflows/check.yml` (typecheck, unit tests), `e2e.yml` (the e2e suite); `e2e/ci-shard.mjs`, `ci-timings.json`, `ci-summary.ts` |
 
 ## Settings
 
