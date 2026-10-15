@@ -37,7 +37,7 @@ export const BULLET_ANIMS = ["consult", "spellbook", "spellLoop", "spellClose"] 
 export const BULLET = (() => {
   const a = RECLUSE.anims;
   const bannerAt = animLength(a.consult!) + (cueAt(a.spellbook!, "open") ?? 0);
-  return { bannerAt, bannerMs: 1600, runMs: BULLET_ANIMS.reduce((t, n) => t + animLength(a[n]!), 0) };
+  return { bannerAt, bannerMs: 2600, runMs: BULLET_ANIMS.reduce((t, n) => t + animLength(a[n]!), 0) };
 })();
 
 /** The bullet clock is on: his ultimate has come (to the end of the battle). */

@@ -5125,7 +5125,7 @@ button.history-label {
   inset: 0;
   background: #fff;
   opacity: 0;
-  animation: fb-flash 1.5s linear both;
+  animation: fb-flash 2.5s linear both;
 }
 .fb-band {
   position: relative;
@@ -5141,7 +5141,7 @@ button.history-label {
   border-bottom: 4px solid #fff7d6;
   background: linear-gradient(90deg, #7f1d1d, #dc2626 20%, #f97316 50%, #dc2626 80%, #7f1d1d);
   box-shadow: 0 0 0 3px #1a0a00, 0 10px 30px rgba(0, 0, 0, 0.55);
-  animation: fb-band 1.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  animation: fb-band 2.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
 .fight-banner.boss .fb-band {
   background: linear-gradient(90deg, #0b0612, #3b0764 22%, #7f1d1d 50%, #3b0764 78%, #0b0612);
@@ -5166,7 +5166,7 @@ button.history-label {
   background: radial-gradient(circle, #451a03 0%, #0b0612 75%);
   box-shadow: 0 0 0 4px #fca5a5, 0 0 24px rgba(248, 113, 113, 0.9);
   transform: skewY(7deg);
-  animation: fb-face 1.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  animation: fb-face 2.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
 .fb-words {
   position: relative;
@@ -5188,7 +5188,7 @@ button.history-label {
     5px 5px 0 #1a0a00,
     0 0 24px rgba(255, 200, 80, 0.85);
   white-space: nowrap;
-  animation: fb-slam 1.5s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  animation: fb-slam 2.5s cubic-bezier(0.3, 1.4, 0.5, 1) both;
 }
 .fight-banner.boss .fb-text {
   font-size: 8.4cqw;
@@ -5206,113 +5206,13 @@ button.history-label {
   text-transform: uppercase;
   color: #fff;
   text-shadow: 2px 2px 0 #1a0a00;
-  animation: fb-sub 1.5s ease-out both;
+  animation: fb-sub 2.5s ease-out both;
 }
+/* Every banner holds about 2.5 s (Eric, Oct 15: "increase the banners for all banners by the extra second we
+   discussed"): the entrance and exit as they were at 1.5 s, the hold between them a second longer (the Hidden Boss's
+   "5 SECONDS!" had it first, Oct 14). Keyframe times are those of the old 1.5 s banner up to the hold's end, scaled to
+   2.5 s, with the second added after it. */
 @keyframes fb-band {
-  0% {
-    translate: -110% 0;
-  }
-  14% {
-    translate: 0 0;
-  }
-  18% {
-    translate: -1.5% 0;
-  }
-  22%,
-  84% {
-    translate: 0 0;
-  }
-  100% {
-    translate: 110% 0;
-  }
-}
-@keyframes fb-slam {
-  0%,
-  12% {
-    opacity: 0;
-    scale: 2.6;
-  }
-  20% {
-    opacity: 1;
-    scale: 0.9;
-  }
-  26% {
-    scale: 1.06;
-  }
-  32%,
-  84% {
-    scale: 1;
-    opacity: 1;
-  }
-  100% {
-    scale: 1;
-    opacity: 1;
-  }
-}
-@keyframes fb-face {
-  0%,
-  10% {
-    opacity: 0;
-    translate: -60% 0;
-  }
-  22%,
-  100% {
-    opacity: 1;
-    translate: 0 0;
-  }
-}
-@keyframes fb-sub {
-  0%,
-  26% {
-    opacity: 0;
-  }
-  36%,
-  100% {
-    opacity: 1;
-  }
-}
-@keyframes fb-flash {
-  0%,
-  17% {
-    opacity: 0;
-  }
-  20% {
-    opacity: 0.55;
-  }
-  30%,
-  100% {
-    opacity: 0;
-  }
-}
-@keyframes fb-lines {
-  to {
-    background-position: 52px 0;
-  }
-}
-/* A banner held 1 s longer (FightBanner `long`: the Hidden Boss's "5 SECONDS!", Eric, Oct 14): 2.5 s, the same entrance
-   and exit as every other banner's, the hold between them a second longer (each keyframe's time kept up to the hold's
-   end, a second added after it). Every other banner is untouched. */
-.fight-banner.long .fb-flash {
-  animation-name: fb-flash-long;
-  animation-duration: 2.5s;
-}
-.fight-banner.long .fb-band {
-  animation-name: fb-band-long;
-  animation-duration: 2.5s;
-}
-.fight-banner.long .fb-face {
-  animation-name: fb-face-long;
-  animation-duration: 2.5s;
-}
-.fight-banner.long .fb-text {
-  animation-name: fb-slam-long;
-  animation-duration: 2.5s;
-}
-.fight-banner.long .fb-sub {
-  animation-name: fb-sub-long;
-  animation-duration: 2.5s;
-}
-@keyframes fb-band-long {
   0% {
     translate: -110% 0;
   }
@@ -5330,7 +5230,7 @@ button.history-label {
     translate: 110% 0;
   }
 }
-@keyframes fb-slam-long {
+@keyframes fb-slam {
   0%,
   7.2% {
     opacity: 0;
@@ -5349,7 +5249,7 @@ button.history-label {
     opacity: 1;
   }
 }
-@keyframes fb-face-long {
+@keyframes fb-face {
   0%,
   6% {
     opacity: 0;
@@ -5361,7 +5261,7 @@ button.history-label {
     translate: 0 0;
   }
 }
-@keyframes fb-sub-long {
+@keyframes fb-sub {
   0%,
   15.6% {
     opacity: 0;
@@ -5371,7 +5271,7 @@ button.history-label {
     opacity: 1;
   }
 }
-@keyframes fb-flash-long {
+@keyframes fb-flash {
   0%,
   10.2% {
     opacity: 0;
@@ -5382,6 +5282,11 @@ button.history-label {
   18%,
   100% {
     opacity: 0;
+  }
+}
+@keyframes fb-lines {
+  to {
+    background-position: 52px 0;
   }
 }
 
@@ -5473,7 +5378,7 @@ button.history-label {
   flex: none;
   width: 28cqw;
   transform: skewY(7deg);
-  animation: kc-portrait 1.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  animation: kc-portrait 2.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
 .gk-portrait {
   display: block;
@@ -5498,7 +5403,7 @@ button.history-label {
   text-shadow: 2px 2px 0 #0b0b1a;
   letter-spacing: 0.06em;
   margin-bottom: 1.2cqw;
-  animation: fb-sub 1.5s ease-out both;
+  animation: fb-sub 2.5s ease-out both;
 }
 .fight-banner.king-cut .kc-text {
   font-size: 11cqw;
@@ -5517,7 +5422,7 @@ button.history-label {
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 247, 214, 0.35), transparent 70%);
   transform: skewY(7deg);
-  animation: kc-target 1.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  animation: kc-target 2.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
 .kc-target piece {
   position: absolute;
@@ -5532,11 +5437,11 @@ button.history-label {
 }
 @keyframes kc-portrait {
   0%,
-  8% {
+  4.8% {
     opacity: 0;
     translate: -70% 0;
   }
-  20%,
+  12%,
   100% {
     opacity: 1;
     translate: 0 0;
@@ -5544,15 +5449,15 @@ button.history-label {
 }
 @keyframes kc-target {
   0%,
-  22% {
+  13.2% {
     opacity: 0;
     scale: 0.4;
   }
-  32% {
+  19.2% {
     opacity: 1;
     scale: 1.15;
   }
-  38%,
+  22.8%,
   100% {
     opacity: 1;
     scale: 1;
@@ -7145,7 +7050,8 @@ button.history-label {
   border-radius: 50% 0 50% 50%;
   box-shadow: inset -1px -1px 0 #7f0f16;
 }
-/* 3. His cut-in: darker than his usual one (blood red and black, gold trim), held a little longer for the line. */
+/* 3. His cut-in: darker than his usual one (blood red and black, gold trim), held a little longer for the line (3.1 s:
+   his usual 2.5 s and 0.6 s more). */
 .fight-banner.last-stand-cut .fb-band {
   height: 38%;
   gap: 2cqw;
@@ -7161,7 +7067,7 @@ button.history-label {
 .fight-banner.last-stand-cut .fb-band,
 .fight-banner.last-stand-cut .fb-text,
 .fight-banner.last-stand-cut .kc-portrait {
-  animation-duration: 2.1s;
+  animation-duration: 3.1s;
 }
 .fight-banner.last-stand-cut .kc-portrait {
   width: 23cqw;
@@ -7185,7 +7091,7 @@ button.history-label {
   text-align: center;
   color: #fde68a;
   text-shadow: 2px 2px 0 #0b0b1a;
-  animation: fb-sub 2.1s ease-out both;
+  animation: fb-sub 3.1s ease-out both;
 }
 /* In the dock: he leaps up out of view, onto the board. */
 /* (His frames crouch, then spring up with his sword raised: the `leap` animation.) */

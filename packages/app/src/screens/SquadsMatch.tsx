@@ -1037,8 +1037,8 @@ function DutyPanel({
   );
 }
 
-/** A block banner shows this long over the board (ms). */
-const BANNER_MS = 2600;
+/** A block banner shows this long over the board (ms; 3.6 s: every banner a second longer, Eric, Oct 15). */
+const BANNER_MS = 3600;
 /** How long "+30 s" shows on a squad's clock after a Time chip (both squads). */
 const CHIP_FLASH_MS = 1800;
 

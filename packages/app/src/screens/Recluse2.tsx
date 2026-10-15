@@ -312,7 +312,8 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
       {hud}
       <div class={`board-area${jolt ? " pw-crash" : ""}`}>
         <div class="opening-name">
-          <BossHeading side="w" note={split ? "phase 2: Chess960" : "the boss is beaten"} />
+          {/* (The title says "phase 2" already, and "the boss is beaten" read wrong as he rises: Chess960 once it splits.) */}
+          <BossHeading side="w" note={split ? "Chess960" : undefined} />
         </div>
         <div class="board-row">
           {bossSide}
@@ -357,7 +358,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
               </span>
             )}
             {t >= C.arcAt && t < C.arcEnd + ARC_LIFE && <Arcs t={t} hands={CHANT_HANDS} />}
-            {t >= C.bannerAt && <FightBanner text="PHASE 2" sub="Chess960 · win all four boards" tone="boss" sound="bannerStart" />}
+            {t >= C.bannerAt && <FightBanner text="PHASE 2" sub="Win all four boards" tone="boss" sound="bannerStart" />}
           </div>
         </div>
       </div>
@@ -368,14 +369,26 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
         king={absorbKing(t, at)}
         // (No move is anyone's during the phase change: no clock.)
         clock={null}
+        // (Never what his bubble or the banner says at the same moment, Eric, Oct 15: his "Mind and machine" line had
+        // "Mind and engine, one." under it, and "PHASE 2" "win all four boards" had "Phase 2!" "Every board must be
+        // won."; as the banner shows, the clock you'll have, which nothing else on screen says yet.)
         status={
           <>
             <span class="dock-line">
               <strong>
-                {t < C.drainAt ? "The God King triumphs!" : t < C.goneAt ? "He's draining the God King!" : t < C.chantAt ? "The boss rises!" : t < C.bannerAt ? "One board becomes four…" : "Phase 2!"}
+                {t < C.drainAt
+                  ? "The God King triumphs!"
+                  : t < C.goneAt
+                    ? "He's draining the God King!"
+                    : t < C.chantAt
+                      ? "The boss rises!"
+                      : t < C.bannerAt
+                        ? "One board becomes four…"
+                        : `${clock(RECLUSE_PHASE2.bankSeconds * 1000)} on your clock, no added time`}
               </strong>
             </span>
-            <span class="dock-line muted">{t >= C.igniteAt && t < C.chantAt ? "Mind and engine, one." : t < C.bannerAt ? "" : "Every board must be won."}</span>
+            {/* (The second line kept, empty, so the box keeps its height.) */}
+            <span class="dock-line muted" />
           </>
         }
       />
@@ -493,9 +506,9 @@ export function SimulScreen({ match }: { match: GameView }) {
   const others = v.boards.filter((b) => b.id !== big.id);
   const yourTurn = v.playing && mine.toMove === "crowd";
   // His ultimate as it comes: "5 SECONDS!" over the boards.
-  // (On every board at once, held a second longer than a banner usually is; nobody waits for it: the 5 s start now.)
+  // (On every board at once; nobody waits for it: the 5 s start now.)
   const ultOn = v.ultAt !== null && now - v.ultAt < PHASE2_ULT_BANNER_MS;
-  const ultBanner = ultOn && <FightBanner text={`${RECLUSE_PHASE2.ultMoveSeconds} SECONDS!`} sub="A move every 5 s, or a random one" tone="boss" sound="bannerStart" long />;
+  const ultBanner = ultOn && <FightBanner text={`${RECLUSE_PHASE2.ultMoveSeconds} SECONDS!`} sub="A move every 5 s, or a random one" tone="boss" sound="bannerStart" />;
 
   const status = v.decided
     ? v.beaten
@@ -520,7 +533,8 @@ export function SimulScreen({ match }: { match: GameView }) {
       )}
       <div class="board-area">
         <div class="opening-name">
-          <BossHeading side="w" note={`Chess960 · ${v.won} of ${v.of} won`} />
+          {/* (How many are won: the boss bar's right side.) */}
+          <BossHeading side="w" note="Chess960" />
         </div>
         <div class="board-row">
           {bossSide}

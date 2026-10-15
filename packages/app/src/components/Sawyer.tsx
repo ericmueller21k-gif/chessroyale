@@ -270,7 +270,7 @@ const rimFilter = (rim = 0, shade = 0): string => {
 
 function splitMoment({ boss, moment, now, t, orientation, banner }: MomentProps) {
   const split = boss.powers?.split;
-  if (!split?.pawn || !split.square) return <div class="power-moment pm-split">{t < 1300 && banner("SPLIT PAWN!", "Two for one", "saw")}</div>;
+  if (!split?.pawn || !split.square) return <div class="power-moment pm-split">{t < 2300 && banner("SPLIT PAWN!", "Two for one", "saw")}</div>;
   const mine = boss.crowdSide === "w" ? "b" : "w";
   const pawn = centreOf(split.pawn, orientation);
   const half = centreOf(split.square, orientation);
@@ -305,7 +305,7 @@ function splitMoment({ boss, moment, now, t, orientation, banner }: MomentProps)
   const r2 = (n: number) => Math.round(n * 100) / 100;
   return (
     <div class="power-moment pm-split">
-      {t < 1300 && banner("SPLIT PAWN!", "Two for one", "saw")}
+      {t < 2300 && banner("SPLIT PAWN!", "Two for one", "saw")}
       <div class="hb-pieces sw-layer" aria-hidden="true" data-look={SAWYER_LOOKS.split} data-split={t < SPLIT.crackAt ? "saw" : t < settledAt ? "apart" : "settled"}>
         {at?.shadow && <Shadow at={at.shadow.at} size={at.shadow.size} />}
         {air.map((h) => (
@@ -393,7 +393,7 @@ function cutMoment({ moment, t, banner, cast }: MomentProps) {
   const [a, b] = moment.squares ?? [];
   return (
     <div class="power-moment pm-cut">
-      {t < 1500 && banner("SAW CUT!", a && b ? `No crossing ${a}–${b}` : undefined, "saw")}
+      {t < 2500 && banner("SAW CUT!", a && b ? `No crossing ${a}–${b}` : undefined, "saw")}
       {cast("cut", SAW_CUT.cutAt)}
     </div>
   );
@@ -460,7 +460,7 @@ function boardSawMoment({ boss, moment, t, banner }: MomentProps) {
           : { anim: "leap", since: moment.at + BOARD_SAW.offAt - LEAP.upAt };
   return (
     <div class="power-moment pm-boardsaw">
-      {t < 1500 && banner("BOARD SAW!", `No crossing the middle for ${BOSS_POWERS.boardSawTurns} turns`, "saw")}
+      {t < 2500 && banner("BOARD SAW!", `No crossing the middle for ${BOSS_POWERS.boardSawTurns} turns`, "saw")}
       <div class="hb-pieces sw-layer" aria-hidden="true" data-boardsaw={t < BOARD_SAW.runAt ? "rev" : t < BOARD_SAW.splitAt ? "run" : "split"}>
         {at?.shadow && <Shadow at={at.shadow.at} size={at.shadow.size} />}
         {at && <Figure boss={boss} at={at.at} flip={false} anim={anim.anim} since={anim.since} id="boardsaw" />}

@@ -13,7 +13,7 @@ import { legalMoves, pieceAt, sideToMove } from "../rules.ts";
 import { VALUE, bossPowers, from, powerRoll, to, turnOf, warnThenUnleash, type BossRules, type Side } from "./base.ts";
 
 /** How long each of her moments holds the screen (ms; POWER_FX in boss-timing.ts). */
-export const GINGER_FX = { freeze: 2300, blizzard: 3600, thaw: 2200 } as const;
+export const GINGER_FX = { freeze: 3300, blizzard: 3600, thaw: 3200 } as const;
 
 /**
  * Freeze: the piece to ice, one that matters (the most valuable and mobile of the crowd's pieces: a pick from the

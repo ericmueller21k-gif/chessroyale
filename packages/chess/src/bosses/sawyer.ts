@@ -31,7 +31,7 @@ import { VALUE, crowdHalf, from, meterFull, other, powerRoll, testSwitch, to, tu
 export const SPLIT = { hopAt: 1100, landAt: 1600, sawAt: 1650, cutAt: 1970, crackAt: 2450, settledAt: 2950, backAt: 3050, total: 3600 } as const;
 
 /** A saw cut: the banner, his `sawDown` at the board's corner, its `cut` cue as the groove opens along the edge (`openMs`). */
-export const SAW_CUT = { cutAt: 1500, openMs: 380, ms: 2300 } as const;
+export const SAW_CUT = { cutAt: 1500, openMs: 380, ms: 3300 } as const;
 
 /**
  * The board saw, beat by beat (ms into its moment, as the crowd's turn begins):

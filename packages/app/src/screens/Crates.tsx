@@ -418,8 +418,9 @@ function CrateOpening({
   const afterFirst = () => {
     if (!strips) return;
     if (result?.roll.fischer) {
+      // (Its banner's 2.5 s and a beat: every banner a second longer, Eric, Oct 15.)
       setStage("fischer");
-      setTimeout(() => setStage("spin2"), 1700);
+      setTimeout(() => setStage("spin2"), 2700);
     } else {
       setStage("unwrap");
       setTimeout(() => setStage("reveal"), 1150);
