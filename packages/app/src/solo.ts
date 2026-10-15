@@ -15,6 +15,7 @@ import { crowdMoveCues, kingSay, resetKingSpeech } from "./godKing.ts";
 import { CRITICAL, LOW, NORMAL, bossVoice } from "./speech.tsx";
 import { SoloLobbyChat } from "./chat.ts";
 import { account } from "./account.ts";
+import { crumb } from "./problems.ts";
 import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
 import { prefetchMaia, startMaia } from "./maia.ts";
 import { MaiaGate, type GateEnd } from "./maia-gate.ts";
@@ -1105,6 +1106,7 @@ export class SoloMatch implements GameView {
     const inFinal = !!this.runner.final;
     this.movedAt = now;
     this.progress.mark(HUMAN);
+    crumb(move ? `move ${move}` : "no move in time");
     if (this.live) {
       // Your pick shows straight away; the bots still thinking finish quickly (as they do on the leaderboard).
       const now = Date.now();

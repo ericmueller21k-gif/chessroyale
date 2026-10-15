@@ -5,7 +5,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 ## How it works today
 
 - **Hosting:** Cloudflare, on Eric's account (Workers Paid, $5/month, which Containers need): one Worker
-  (`chessroyale`) serves the built app and routes `/api/*` and `/admin/fairplay`; Durable Objects for each lobby
+  (`chessroyale`) serves the built app and routes `/api/*`, `/admin/fairplay` and `/admin/ops`; Durable Objects for each lobby
   (`Lobby`), the matchmaker (`Matchmaker`), the live hub (`LiveHub`), and Squads' lobbies and parties (`SquadsLobby`,
   `SquadsParty`); the engine server as a Container
   (`EngineServer`, `standard-2`, `max_instances` 2); D1 (`hunchess`) for accounts, results, the locker, fair play and
@@ -93,6 +93,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     (results, ranking, fair-play signals, Squads' coins and crates, crate items) comes from a game made without them.
     Solo results are posted by the browser and are never ranked and earn nothing.
   - **A new test switch:** read it through `testParams()` (app) or behind `testSwitchesOn` (server), and list it here.
+- **Errors and player reports** (below): every device reports its errors, the server its own, players report bugs
+  and send feedback and ideas, and admins read them all on `/admin/ops`.
 
 - **Licenses** (`LICENSES.md`, audited Oct 12, 2026): every third-party piece that reaches a player's device, from the
   build's module list and `public/`, its license and its credit. Nothing GPL, AGPL, LGPL, non-commercial or
@@ -107,6 +109,90 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   goes private; not precached by the service worker. Updating the `stockfish` package needs its source
   archive first (the build stops without one).
 
+## Errors and player reports
+
+Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-and-feedback-sheet.md`.
+
+- **On a device** (`packages/app/src/problems.ts`): the page's `error` and `unhandledrejection`, the Stockfish, Maia and
+  sound workers' error events (each handled in its worker with `preventDefault`, as #216 made the engines'), and render
+  errors through the one error boundary at the app's root (`components/Problems.tsx`: "Something went wrong" and
+  Reload instead of a blank page; the error is still thrown on once as a page error, so the console and the e2e
+  error checks see it). Each kind of error is sent once per page load, at most `OPS.client.maxErrorsPerPage`, a few
+  seconds at a time (`OPS.client.batchMs`), by sendBeacon when the page is hidden. Browser extensions' errors and
+  "Script error." are skipped.
+- **What each error carries:** the message and a trimmed stack (12 lines, 1000 characters); the build's version (the commit's first 12
+  characters, put in by `vite.config.ts` from `WORKERS_CI_COMMIT_SHA` or git; `dist/version.json` says the same for
+  the deploy); the screen (a boss battle's moment too: loading, intro, lights out, fall, the turn's power events), mode,
+  boss and lobby code; the user agent, viewport and memory class (`navigator.deviceMemory`, where there is one); the
+  last 20 breadcrumbs (screens and moments, moves sent: never chat, emails or anything typed); the account id if signed
+  in (kept only if it's the request's own session's).
+- **The feedback sheet** (Eric, Oct 15): "We'd love your feedback", with three kinds: 🐞 Report a bug (an optional
+  note, sent with the same diagnostics and the page's last 3 errors; the answer is "Report AB12CD — share this id": 6
+  characters, no look-alikes), 💬 Feedback and 💡 Suggest an idea (a note, required, sent alone: no diagnostics, no
+  account; the answer is a thank-you). One sheet over any screen (rendered beside the ban notice, so a match redrawing
+  never takes the form away). Opened on Report a bug from the match menu (a phone's "⋯" sheet; a computer's 🐞 button
+  beside the sound button, except where an admin's testing items fill that line), and on Feedback from Settings
+  (HELP).
+- **The endpoint:** `POST /api/problems` (`packages/server/src/problems.ts`), `{kind: "errors"}`, or a report:
+  `{kind: "bug" | "feedback" | "idea"}`. In order: 415 unless the body is JSON (`content-type: application/json`: a
+  form can't send it) and 403 when the browser says another site's page sent it (`sec-fetch-site` other than
+  `same-origin`), both before the body is read; 413 past `OPS.endpoint.maxBytes` (read in pieces, never held whole);
+  429 past its own limits per address and per account (`problemLimited` in `limits.ts`, on top of the API's; reports
+  of all three kinds share theirs; the account counted only for a real session cookie and only once the address is let
+  through), checked on the body's `kind` before any other field is read; then every field checked and cut to size and
+  emails scrubbed from any text (400 if it isn't one); 503 past `OPS.store.maxReportsPerMinute` reports a minute per
+  instance or the database's cap. The app sends JSON both ways (fetch, and sendBeacon with a JSON blob, falling back to
+  a keepalive fetch where a browser refuses one).
+- **The server's own errors:** the Worker's fetch (a plain 500 answer), the cron and the Durable Objects' entry points
+  (Lobby, Matchmaker, LiveHub, SquadsLobby, SquadsParty: their fetch, WebSocket handlers, alarm and every method the
+  Worker calls; `guardEntries` in `index.ts`, thrown on as before) and the matchmaker's batches: one structured log
+  line (`{ops: "error", kind, route, code, version, message, fingerprint}`, the first of each kind per write window)
+  and the same store. The deploy's version is read from the app's `version.json` through the assets binding. The
+  cron's jobs fail apart: old rows failing to go is logged and counted, and fair play's deep check still runs.
+- **Bounded writes:** errors are counted in memory per Worker instance (and Durable Object instance) by fingerprint
+  (source, kind, the message with numbers, ids and build hashes taken out, the top file without its hash) and written
+  at most every `OPS.store.flushMs` (the first at once), at most `OPS.store.maxRowsPerFlush` rows a time (the most
+  frequent; one row per kind of error per hour, upserted); the rest wait for the next write (one is set for a window
+  later); past `maxGroups` kinds in memory, new kinds are dropped and logged as a number. So writes grow with
+  instances, never with errors. Player reports are one row each, written at once (for the id).
+- **Fair counts:** a kind of error counts once per request, and once per address per write window (a set of
+  address and fingerprint pairs in memory, cleared at each write, never stored): one device sending the same error
+  over and over can't push other errors out of the rows a write takes.
+- **The database's own caps** (whatever the instances, so a flood from many addresses can't grow D1 without bound),
+  each in the insert itself (an indexed count in its `WHERE`, so instances writing at once can't pass it): at most
+  `OPS.store.maxNewErrorsPerHour` (100) new kinds of error an hour (kinds already stored keep counting) and
+  `maxReportsPerDay` (2000) reports in any 24 hours. At a cap, one `{ops: "cap"}` log line, and a report gets "Too
+  many reports right now. Try again in a minute."
+- **Small rows:** an error's row keeps its message and its latest occurrence's stack, place, last
+  `OPS.store.sampleCrumbs` (10) breadcrumbs, device, version and account; a bug's its note, place, 20 breadcrumbs (60
+  characters each), last 3 errors, device, version and account. At most about 6 KB and 7 KB, with every field full of
+  3-byte characters (under 3 KB and 3.5 KB in plain text). With every cap hit every hour for 30 days, about 440 MB of
+  each, under 0.9 GB in all (under 0.4 GB in plain text); in real use, a few megabytes.
+- **The email scrubber is linear** (it tries a match only where a run of address characters starts) and works on each
+  field with control characters dropped first (so none can split an address past it) and cut to its size (with room
+  for an address across the cut): a 20 KB field costs a few milliseconds, not a second.
+- **Stored** (D1, made at runtime with the rest of the schema): `ops_errors` (fingerprint, hour, source, kind, message,
+  version, count, first and last seen, the latest occurrence's diagnostics) and `ops_reports` (id, when, kind, a bug's
+  account id or none, a bug's version, the note, a bug's diagnostics).
+- **The ops page:** `/admin/ops` (admins only, as `/admin/fairplay`: `isAdmin`; anyone else gets "Not found"): the
+  most frequent errors of the last 7 days (the last 24 hours' first, then the newest), with their versions, first and
+  last seen, and the latest diagnostics a tap away; a search by message (`?q=`); player reports by id (`?report=ID`)
+  and the latest 50, all or of one kind (`?kind=bug|feedback|idea`: the ideas as a list), a bug's with its full
+  diagnostics.
+
+### Data and retention
+
+- **Kept:** only what's listed above: an error's message, trimmed stack, version, screen, mode, boss, lobby code, user
+  agent, viewport, memory class and breadcrumbs (screens, moments, moves sent), a report's kind and note, and the
+  account id of a signed-in player (errors and bugs). Feedback and ideas keep only their note. Counts per kind of error
+  per hour.
+- **Never kept:** IP addresses (the rate limits use them as keys in an instance's memory only), email addresses
+  (scrubbed from any text, notes and messages included), chat text, or anything a player types other than a report's
+  note.
+- **For 30 days** (`OPS.store.keepDays`): the 15-minute cron deletes older errors (by hour) and player reports
+  (`pruneProblems`).
+- The privacy policy (`/privacy`, `screens/Legal.tsx`) says the same in plain words.
+
 ## Where the code is
 
 | What | Where |
@@ -117,6 +203,10 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 | Live counts and presence | `packages/server/src/live-hub.ts`, `live.ts`, `presence.ts` |
 | Rate limits | `packages/server/src/limits.ts` |
 | Load-test counters | `packages/server/src/ops.ts` |
+| Errors and player reports: the endpoint, the bounded store, server errors, the guards | `packages/server/src/problems.ts` (guards applied in `index.ts`) |
+| The ops page (`/admin/ops`) | `packages/server/src/ops-admin.ts` (its page frame: `admin.ts`, `adminPage`) |
+| On a device: capture, breadcrumbs, the feedback sheet | `packages/app/src/problems.ts`, `components/Problems.tsx` (the error boundary, the feedback sheet) |
+| The build's version | `packages/app/vite.config.ts` (`__APP_VERSION__`, `dist/version.json`) |
 | Test switches: who may (server), a lobby's, the app's | `admin.ts` (`testSwitchesOn`), `lobby-options.ts`; `packages/app/src/test-switches.ts` |
 | Load tests (simulated players over WebSockets and the API) | `scripts/load/` (`run.ts`, `burst.ts`, `staging.sh`) → `reports/load/` |
 | The engine server | `engine/`, `packages/server/src/engine.ts` |
@@ -124,7 +214,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 
 ## Settings
 
-`CAPACITY` (queue, overload, presence, rate limits), `LOBBY_LIFE` in settings.ts; Worker variables
+`CAPACITY` (queue, overload, presence, rate limits), `OPS` (error capture, the endpoint's caps and limits, bounded
+writes, retention), `LOBBY_LIFE` in settings.ts; Worker variables
 `MATCH_FILL_SECONDS`, `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`, `OPS_STATS`, `LOAD_TEST` (staging only), `SQUADS_TEST`
 (local and e2e only: anyone may use Squads' test controls), `TEST_SWITCHES` (local, e2e and staging only: anyone may
 use the test switches). Squads lobbies aren't on the live line yet, so the
@@ -133,9 +224,14 @@ overload limit doesn't count their players.
 ## Tests and tools
 
 - Unit: `packages/server/test/capacity.test.ts`, `matchmaker.test.ts`, `live.test.ts`, `lobby-life.test.ts`;
-  `test-switches.test.ts` (server and app: the test switches).
+  `test-switches.test.ts` (server and app: the test switches); `problems.test.ts` (validation, the scrubber's speed
+  and its control-character bypass, caps, cross-site refusals, rate limits and their keys, bounded writes, fair
+  counts, row sizes, pruning, fingerprints, lobby codes in paths, the guards, the cron's jobs failing apart, the ops
+  page).
 - e2e: `e2e/busy.spec.ts` (servers busy), `lobby-close.spec.ts`, `test-switches.spec.ts` (a player's switches
-  ignored, an admin's working).
+  ignored, an admin's working), `problems.spec.ts` (errors reach the store, the error boundary, a bug report's id and
+  feedback by kind on `/admin/ops`, the size and rate caps). The e2e Worker's `ADMIN_EMAILS` has one email per
+  project; a test makes its account an admin with `wrangler d1 execute --local`.
 - Load: see `DEPLOY.md`, "Load testing". Run wrangler from a copy you aren't editing (it reloads on every change).
 
 ## Rules for this area

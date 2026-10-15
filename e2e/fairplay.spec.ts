@@ -91,7 +91,7 @@ test("the reviewer's API lists a reported player's case with its evidence", asyn
   const target = await myId(other);
   // A report from the profile page (no match): a watch case for a person to read.
   await page.goto(`/profile/${target}`);
-  await page.getByRole("button", { name: "Report" }).click();
+  await page.getByRole("button", { name: "Report", exact: true }).click();
   await page.getByRole("button", { name: "Offensive name or icon", exact: true }).click();
   await expect(page.getByText("Thanks, we'll look into it.")).toBeVisible();
   const list = (await (await page.request.get("/api/admin/fairplay/cases?status=watch", { headers: REVIEW })).json()) as { cases: { userId: string; reports: number; status: string }[] };

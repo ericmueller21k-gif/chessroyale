@@ -71,6 +71,41 @@ on Eric's account.
      where a teammate may still be thinking: squads can talk it over (on Discord, say) and help. Eric: helping is fine
      for now, "it is squads after all", so viewing stays free; players may weigh in, and it could be restricted later.
 
+## Launch readiness (the director's plan, Oct 15, 2026)
+
+At launch, AI sessions run the game day to day; Eric relays player reports and approves money, account and legal
+decisions. In this order:
+
+1. **Error capture and the feedback sheet.** Done (the ops lane): every device reports its errors, the server its own
+   (the Worker, the cron, every Durable Object's entry points); players report a bug (with diagnostics and a short id to
+   share), send feedback or suggest an idea; `/admin/ops` lists the top errors and the reports by kind. Bounded D1 writes, kept 30 days, no IP addresses or emails
+   (docs/areas/ops.md, "Errors and player reports").
+2. **A health report and `npm run ops:report`:** an admin-only health view (the deployed version, live players and
+   lobbies, errors in the last hour and day, reports, the engine server's and fair play's budgets, a D1 check, Durable
+   Object errors) and a script that prints a short summary from hunchess.com an AI session can act on.
+3. **Alerts:** a cron self-check that emails Eric on spikes (errors, failures, budgets), reusing fair play's mailer
+   (`fairplay-mail.ts`), plus a daily scheduled AI triage session that reads the report and the new player reports.
+4. **Kill switches and rollback:** per mode, per boss and for the shop, plus a maintenance banner, through Worker
+   runtime variables (no deploy needed), and a tested one-command rollback to the previous deploy.
+5. **`RUNBOOK.md` for AI sessions:** what to check each day, what each alert means, the switches and the rollback, and
+   what to bring to Eric.
+6. **A D1 restore drill on staging** (Time Travel), and gradual or canary deploys.
+7. **The known blockers:**
+   - gate the test switches: done (Oct 15, #224; item (d) under the Hidden Boss's notes above);
+   - the engine container's Stockfish 17.1 against the browsers' 19;
+   - chat moderation (report and mute);
+   - the privacy policy and terms (Eric's sign-off);
+   - loot-box rules before any real-money crates.
+
+**Only Eric can do:**
+
+- Cloudflare billing and usage alerts (Billing → budget alerts; the suggested $20/month, and D1 and Workers Logs
+  usage notifications).
+- A read-only monitoring token for the AI sessions (Cloudflare API: Account Analytics and Workers Observability read).
+- Any paid service (an uptime monitor, an error service, a paging service), if we ever want one: asked first with a
+  monthly price.
+- Legal sign-off: the privacy policy and terms, and the rules for crates before any real money.
+
 ## Later: Eric's ideas (Oct 9, 2026; not started, not queued)
 
 Eric: "too big a change for now". Recorded so they aren't lost; nothing gets built until he says so.

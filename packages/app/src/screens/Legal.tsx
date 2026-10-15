@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE } from "@chessroyale/core";
+import { FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS } from "@chessroyale/core";
 
 /**
  * The privacy policy (/privacy), terms of service (/terms) and copyright page (/copyright): drafts written from what
@@ -218,17 +218,18 @@ function Privacy() {
         kept="the device facts only while the match runs."
       />
       <Item
-        title={'Error reports and "Report a problem" (being built)'}
+        title="Error reports and feedback"
         what={
           <p>
-            What went wrong (the error and where in the app), the app's version, the screen, mode and boss, the match code, device
-            facts (your browser and system as its user agent gives them, your screen size and a rough memory class), the last 20 or
-            so things the app did (never chat or anything you typed), your account id if you're signed in, and for "Report a
-            problem", the note you choose to write. Never your IP address.
+            When something goes wrong: what went wrong (the error and where in the app), the app's version, the screen, mode and
+            boss, the match code, device facts (your browser and system as its user agent gives them, your screen size and a rough
+            memory class), the last 20 or so things the app did (screens, moments and the moves you sent; never chat or anything you
+            typed), and your account id if you're signed in. A bug you report sends the same with the note you choose to write;
+            feedback and ideas are just your note. Never your IP address, and any email address in a note is removed.
           </p>
         }
-        why="to find and fix bugs."
-        kept={<Blank>set when error reports ship</Blank>}
+        why="to find and fix bugs, and to hear what you think."
+        kept={`${OPS.store.keepDays} days.`}
       />
       <Item
         title="Friends"
