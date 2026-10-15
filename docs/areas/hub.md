@@ -54,12 +54,31 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - **Gone from Settings (Eric, Oct 15):** "Relaxed pace" (each mode plays its own pace; `?pace=quick` is a test switch)
   and Crowd's "50 v 50 / Everyone moves" choice (Crowd is always team turns). A device's old picks (`brc.pace`,
   `brc.crowdTurns`) are no longer read.
-- **The eval bar's switch** (Settings → Playing, "Eval bar"; Eric, Oct 10): on by default. Off, no bar on any board
-  (every mode: the play, reveal, vote, final and boss screens all use `EvalBar`, which draws nothing) and the board
-  takes its room, centered, on a phone and a computer. Only in Settings, never on a board screen. Kept on the device
-  (`prefs.ts`: `evalBarOn`, `brc.evalBar`; accounts keep no preferences). The value is still worked out (the God
-  King's word on how it's going reads it). Each result records it (`results.eval_bar`: 1 on, 0 off, NULL from older
-  apps), from solo's post and the online `hello`, to see later who turns it off and how they play.
+- **Settings, in order** (the overhaul, Eric, Oct 15: "smoothness, quickness, with some variety offered";
+  [docs/decisions/2026-10-15-settings-overhaul.md](../decisions/2026-10-15-settings-overhaul.md)): THEME · SOUND
+  (sound on or off, Move, Capture and Reveal sound) · BOARD (Animations, Motion trail) · QUICK CHAT · FRIENDS · HOW TO
+  PLAY · ACCOUNT · PRIVACY AND TERMS · **TESTING**, shown only to admins (`profile.admin`, ADMIN_EMAILS). Gone the same
+  day: the pre-game votes' switch (always on; `?augments=0` is a test switch), Classic's
+  opening moves stepper (Classic plays its default), the sound lab (`?soundlab`: its choice is the Reveal sound).
+- **Board** (Animations: picks as ghost pieces, or just names; Motion trail: each pick flies to its square): wherever
+  picks show, Crowd and raids (`CrowdGhosts`) and Classic's and Squads' reveals (`ShadeMoves`: without the trail the
+  see-through pieces appear on their squares, without animations only the names, which then carry the reel). Kept on
+  the device (`brc.crowdAnim`, `brc.crowdTrail`, the same keys as before); `useBoardAnimations` and `useMotionTrail` in
+  `hooks.ts`.
+- **Testing (admins): practice mode and the eval bar** (Eric, Oct 15: "The engine moves and eval settings will be
+  phased to an admin only menu for testers"). Both count only where the test switches do (`prefs.ts`: `practiceOn`,
+  `evalBarOn` read `testSwitchesAllowed()`: an admin, a server with TEST_SWITCHES on, Vite's dev server). For players
+  practice is off and there's no eval bar, whatever the device stored (`brc.practice`, `brc.evalBar`). Online the lobby
+  checks too: a `hello`'s practice counts only from an admin's socket or where TEST_SWITCHES is "1" (`lobby-do.ts`).
+- **The eval bar** (testers; its switch since Oct 10, testers only since Oct 15): on by default. Off, no bar on any
+  board (every mode: the play, reveal, vote, final and boss screens all use `EvalBar`, which draws nothing) and the
+  board takes its room, centered, on a phone and a computer. Only in Settings, never on a board screen. Kept on the
+  device (`brc.evalBar`; accounts keep no preferences). The value is still worked out (the God King's word on how it's
+  going reads it). Each result records it (`results.eval_bar`: 1 on, 0 off, NULL from older apps), from solo's post and
+  the online `hello`: every player's reads 0 since Oct 15.
+- **The Reveal sound** (Settings → Sound, Oct 15; was the sound lab): the roulette's voice as the crowd's move is
+  chosen (`REEL_VOICES` in `sound.ts`, `brc.reelVoice`): Steel pan (the default), Kalimba, Marimba, Glockenspiel, Music
+  box, 8-bit blip. Picking plays a whole roulette (`previewReel`), as ▶ does without picking.
 - **Piece sounds** (Settings → Sound; Eric, Oct 11; all wood, Oct 12; the classics back as the defaults, Oct 12): a
   **Move sound** and a **Capture sound** picker, chosen separately, each option a radio (picking plays it) with its own
   ▶. Nine each, every one wood (Eric: "slightly different wooden sounds, not chips or clicks"). Moves: Classic knock
@@ -124,13 +143,15 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 - Unit: `packages/server/test/accounts.test.ts`, `live.test.ts`, `packages/core/test/profile.test.ts`,
   `packages/app/test/theme.test.ts`, `under-board.test.ts`, `king-attack.test.ts` (the eval bar's setting),
-  `piece-sounds.test.ts` (the piece-sound picks: storage, fallback, files), `faq.test.ts` (the FAQ: contents against
-  sections, links, every boss, numbers following the settings).
+  `piece-sounds.test.ts` (the piece-sound picks: storage, fallback, files), `testers.test.ts` (practice mode and the
+  eval bar: testers only), `faq.test.ts` (the FAQ: contents against sections, links, every boss, numbers following the
+  settings); `packages/server/test/lobby-do-practice.test.ts` (online practice: testers only).
 - e2e: `e2e/front-door.spec.ts`, `landing.spec.ts`, `home-layout.spec.ts`, `live-window.spec.ts`, `profile.spec.ts`,
-  `install.spec.ts`, `crate-banner.spec.ts`, `friends.spec.ts` (two players: request, accept, online, the invites setting,
-  an invite joined from its toast, a block; the phone's line at 320 px), `eval-bar.spec.ts` (the switch: Settings only, the board's room, phone and
-  computer), `piece-sounds.spec.ts` (pick, preview, reload, what loads, every file's start and loudness), `faq.spec.ts`
-  (Settings → FAQ, a jump to a section, a link to a heading, back).
+  `install.spec.ts`, `crate-banner.spec.ts`, `friends.spec.ts` (two players: request, accept, online, the invites
+  setting, an invite joined from its toast, a block; the phone's line at 320 px), `eval-bar.spec.ts` (testers: the
+  switch in Settings only, the board's room, phone and computer; players: no bar, no switch), `piece-sounds.spec.ts`
+  (pick, preview, reload, what loads, every file's start and loudness; the Reveal sound), `faq.spec.ts` (Settings →
+  FAQ, a jump to a section, a link to a heading, back).
 - Frames: `npm run frames:home`, `frames:queue`.
 - Real-phone check by Eric: `TESTING.md`.
 

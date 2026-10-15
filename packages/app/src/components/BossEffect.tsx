@@ -157,6 +157,22 @@ export interface SpriteAnimProps {
   onFrame?: (frame: Frame) => void;
 }
 
+/** A frame of a sprite's animation as shown (spriteFrameAt): which animation, which frame, and its run's tag. */
+export type Shown = { anim: string; frame: number; tag: string };
+
+/**
+ * The frames whose sounds are due now `s` shows, `prev` having shown last (null: the first drawn): `s`, after any passed
+ * over since in the same run, or in the one-shot `anim` before its loop took over. A slow frame on a busy phone jumps
+ * past a short one (Wrangler's 60 ms "tug"), and its sound would never play. Their sounds come a moment late instead.
+ */
+export function framesSince(ch: Character, anim: string, prev: Shown | null, s: Shown): Shown[] {
+  const out: Shown[] = [];
+  if (prev && prev.tag === s.tag) for (let i = prev.frame + 1; i < s.frame; i++) out.push({ anim: s.anim, frame: i, tag: s.tag });
+  else if (prev && prev.anim === anim && s.anim !== anim) for (let i = prev.frame + 1; i < ch.anims[anim]!.frames.length; i++) out.push({ anim, frame: i, tag: prev.tag });
+  out.push(s);
+  return out;
+}
+
 export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class: cls = "", style, look, onFrame }: SpriteAnimProps) {
   const cv = useRef<HTMLCanvasElement>(null);
   // Drawn before the paint (no empty first frame), then on every animation frame that changes the picture.
@@ -164,6 +180,9 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
     const g = cv.current?.getContext("2d");
     if (!g) return;
     let last = "";
+    // The run and frame drawn last: a frame skipped since (a slow frame on a busy phone jumps past a 60 ms one) still
+    // plays its sound, a moment late rather than never (framesSince).
+    let prev: Shown | null = null;
     const draw = () => {
       const s = spriteFrameAt(ch, anim, then, Date.now(), since);
       const shown = `${s.anim}:${s.frame}`;
@@ -176,12 +195,16 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
         g.putImageData(frameImage(ch, frame, look), 0, 0);
         onFrame?.(frame);
         cv.current?.setAttribute("data-frame", shown);
-        const sound = frame.cue ? sounds[frame.cue] : undefined;
-        const tag = `${ch.id}:${id}:${s.tag}:${s.frame}`;
-        if (sound && !played.has(tag)) {
-          played.add(tag);
-          play(sound);
+        for (const f of framesSince(ch, anim, prev, s)) {
+          const fr = ch.anims[f.anim]!.frames[f.frame]!;
+          const sound = fr.cue ? sounds[fr.cue] : undefined;
+          const tag = `${ch.id}:${id}:${f.tag}:${f.frame}`;
+          if (sound && !played.has(tag)) {
+            played.add(tag);
+            play(sound);
+          }
         }
+        prev = s;
       }
     };
     draw();

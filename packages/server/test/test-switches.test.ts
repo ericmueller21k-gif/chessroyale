@@ -27,15 +27,15 @@ describe("who may use them", () => {
 });
 
 describe("a new lobby's options", () => {
-  const all = `rounds=1&clock=5&finalTurns=2&bossMoves=3&draw=weighted&power=candle&format=boss&speed=bullet&weakbots=1&keep=5&pace=quick`;
+  const all = `rounds=1&clock=5&finalTurns=2&bossMoves=3&draw=weighted&power=candle&format=boss&speed=bullet&weakbots=1&keep=5&pace=quick&augments=0`;
 
   it("for a player, every test switch is dropped: the lobby is exactly the one made without them", () => {
-    for (const base of ["mode=crowd", "mode=crowd&augments=0", "mode=classic&moves=4", `mode=raid&boss=${playable}`]) {
+    for (const base of ["mode=crowd", "mode=classic", `mode=raid&boss=${playable}`]) {
       expect(lobbyOptions(q(`${base}&${all}`), false)).toEqual(lobbyOptions(q(base), false));
       expect(lobbyOptions(q(`${base}&${all}`), false).keepMs).toBeUndefined();
     }
     // Each one alone, too.
-    for (const k of LOBBY_TEST_SWITCHES) expect(lobbyOptions(q(`mode=crowd&${k}=${k === "draw" ? "weighted" : k === "format" ? "boss" : k === "pace" ? "quick" : 1}`), false)).toEqual(lobbyOptions(q("mode=crowd"), false));
+    for (const k of LOBBY_TEST_SWITCHES) expect(lobbyOptions(q(`mode=crowd&${k}=${k === "draw" ? "weighted" : k === "format" ? "boss" : k === "pace" ? "quick" : k === "augments" ? 0 : 1}`), false)).toEqual(lobbyOptions(q("mode=crowd"), false));
     // A boss's fixed strength, and a boss in a mode that isn't a raid.
     const raid = lobbyOptions(q(`mode=raid&boss=${BOSS_TIERS[0]}`), false).overrides;
     expect(raid.bossFixedElo).toBeUndefined();
@@ -43,13 +43,15 @@ describe("a new lobby's options", () => {
     expect(lobbyOptions(q(`mode=crowd&boss=${playable}`), false)).toEqual(lobbyOptions(q("mode=crowd"), false));
   });
 
-  it("for a player, the creator's own choices stay: the mode, Crowd's augments, the opening moves, the raid's boss", () => {
-    const crowd = lobbyOptions(q(`mode=crowd&augments=0&${all}`), false).overrides;
+  it("for a player, the creator's own choices stay: the mode, the raid's boss", () => {
+    const crowd = lobbyOptions(q(`mode=crowd&${all}`), false).overrides;
     expect(crowd.mode).toBe("crowd");
-    expect(crowd.augments).toBe(false);
-    // The mode's own pace (pace=quick is a test switch since Oct 15).
+    // The pre-game votes always (augments=0 is a test switch since Oct 15), at the mode's own pace (pace=quick too).
+    expect(crowd.augments).toBe(true);
     expect(crowd.revealSeconds).toBe(CROWD_SETTINGS.revealSeconds);
-    expect(lobbyOptions(q(`mode=classic&moves=4&${all}`), false).overrides.openingMoves).toBe(4);
+    // Classic's opening moves are its own (an older app's moves= is ignored, for everyone, since Oct 15).
+    expect(lobbyOptions(q("mode=classic&moves=4"), false)).toEqual(lobbyOptions(q("mode=classic"), false));
+    expect(lobbyOptions(q("mode=classic&moves=4"), true).overrides.openingMoves).toBeUndefined();
     const raid = lobbyOptions(q(`mode=raid&boss=${playable}&${all}`), false).overrides;
     expect(raid.raid).toBe(true);
     expect(raid.bossId).toBe(playable);
@@ -73,10 +75,12 @@ describe("a new lobby's options", () => {
     expect(lobbyOptions(q(`mode=crowd&boss=${playable}`), true).overrides.bossId).toBe(playable);
     expect(lobbyOptions(q("mode=crowd&pace=quick"), true).overrides).toMatchObject(QUICK_PACE.crowd);
     expect(lobbyOptions(q("mode=classic&pace=quick"), true).overrides).toMatchObject(QUICK_PACE.classic);
+    expect(lobbyOptions(q("mode=crowd&augments=0"), true).overrides.augments).toBe(false);
   });
 
   it("asks who's asking only when a query has a test switch", () => {
-    expect(asksTestSwitches(q("mode=crowd&augments=0"))).toBe(false);
+    expect(asksTestSwitches(q("mode=crowd"))).toBe(false);
+    expect(asksTestSwitches(q("mode=crowd&augments=0"))).toBe(true);
     expect(asksTestSwitches(q("mode=crowd&pace=quick"))).toBe(true);
     expect(asksTestSwitches(q("mode=classic&moves=3"))).toBe(false);
     expect(asksTestSwitches(q(`mode=raid&boss=${playable}`))).toBe(false);
