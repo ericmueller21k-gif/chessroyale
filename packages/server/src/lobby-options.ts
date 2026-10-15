@@ -1,17 +1,16 @@
-import { BOSS_TIERS, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, QUICK_PACE, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { BOSS_TIERS, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, QUICK_PACE, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { LobbyRecord } from "./lobby.ts";
 
 /**
  * A new lobby's settings, from POST /api/lobby's query (index.ts). Two kinds of options:
- *   - the creator's choices, which anyone may make (the home screen's): the mode (`mode=classic|crowd|raid`), Crowd's
- *     augments (`augments=0|1`), Classic's opening moves (`moves=0-10`) and the raid's boss (`boss=<id>`, a playable
- *     one);
+ *   - the creator's choices, which anyone may make (the home screen's): the mode (`mode=classic|crowd|raid`) and the
+ *     raid's boss (`boss=<id>`, a playable one);
  *   - test switches (playtests and the e2e; docs/areas/ops.md, "Test switches"): the keys in LOBBY_TEST_SWITCHES, a
  *     boss's fixed strength (`boss=1600`, one of the tiers) and a boss for any mode but a raid. Only where `test` (an
  *     admin, or TEST_SWITCHES on: testSwitchesOn in admin.ts); for anyone else they're dropped, silently, so the lobby
  *     is exactly the one made without them.
  */
-export const LOBBY_TEST_SWITCHES = ["rounds", "clock", "finalTurns", "bossMoves", "draw", "power", "format", "speed", "weakbots", "keep", "pace"] as const;
+export const LOBBY_TEST_SWITCHES = ["rounds", "clock", "finalTurns", "bossMoves", "draw", "power", "format", "speed", "weakbots", "keep", "pace", "augments"] as const;
 
 /** `?boss=` is the creator's pick only in a raid, as a boss's id: a fixed strength (a tier), or a boss in another mode, is a test's. */
 const testBoss = (q: URLSearchParams) => q.has("boss") && (q.get("mode") !== "raid" || BOSS_TIERS.includes(Number(q.get("boss"))));
@@ -38,6 +37,7 @@ export function lobbyOptions(query: URLSearchParams, test: boolean): { overrides
   const raid = q.get("mode") === "raid";
   const mode = raid || q.get("mode") === "crowd" ? "crowd" : "classic";
   const overrides = {
+    // ?augments=0: no pre-game votes, a team final at the default clock (for testing; players always vote).
     ...(raid ? RAID_SETTINGS : modeSettings(mode, { augments: q.get("augments") !== "0" })),
     // ?pace=quick: a shorter reveal and less settling in (for testing).
     ...(q.get("pace") === "quick" ? QUICK_PACE[mode] : {}),
@@ -61,8 +61,6 @@ export function lobbyOptions(query: URLSearchParams, test: boolean): { overrides
       finalMaxTurns: n("finalTurns"),
       bossMaxMoves: n("bossMoves"),
       drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
-      // Opening moves per side on each board (0-10), chosen by the lobby's creator.
-      openingMoves: mode === "classic" && q.has("moves") ? Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(Number(q.get("moves")) || 0))) : undefined,
     }),
     // ?format=team|boss|duel: skip the pre-game votes and play that ending (for testing).
     ...(() => {

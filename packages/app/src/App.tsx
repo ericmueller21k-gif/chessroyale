@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
 import { type MatchmakingType, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
-import { bossInUrl, bossTierFromUrl, chosenBoss, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
+import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
@@ -23,7 +23,6 @@ import { PlayScreen } from "./screens/Play.tsx";
 import { PhaseChangeScreen, SimulScreen } from "./screens/Recluse2.tsx";
 import { ResultsScreen } from "./screens/Results.tsx";
 import { RevealScreen } from "./screens/Reveal.tsx";
-import { SoundLab } from "./screens/SoundLab.tsx";
 import { PlayerProfileScreen } from "./screens/PlayerProfile.tsx";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
@@ -31,7 +30,9 @@ import { ShopScreen } from "./screens/Shop.tsx";
 import { account, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult } from "./account.ts";
 import { isAdmin } from "./boss-brain.ts";
 import { difficultyElo } from "./boss-difficulty.ts";
-import { startLive } from "./live.ts";
+import { setLiveBusy, startLive } from "./live.ts";
+import { setInviteHost } from "./friends.ts";
+import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
@@ -51,6 +52,7 @@ import { SquadsQueue, SquadsScreen, squadsWaiting } from "./screens/Squads.tsx";
 import { PartySheet } from "./screens/SquadsParty.tsx";
 import { measureSound } from "./sound.ts";
 import { testParams } from "./test-switches.ts";
+import { evalBarOn, practiceOn } from "./prefs.ts";
 
 /**
  * A match's settings: the mode and the choices made on the home screen, plus playtest overrides from the URL, e.g.
@@ -62,9 +64,9 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
   const q = testParams();
   const n = (k: string) => (q.has(k) ? Number(q.get(k)) : undefined);
   const draw = q.get("draw") as DrawRule | null;
-  const mode = { ...chosenMode(), ...(modeId ? { mode: modeId } : {}) };
-  const raid = mode.mode === "raid";
-  const crowd = mode.mode === "crowd" || raid;
+  const mode = modeId ?? chosenMode();
+  const raid = mode === "raid";
+  const crowd = mode === "crowd" || raid;
   // Testing, admins: Boss alone (a raid alone, the boss picked) may meet a boss hidden from players (the Hidden Boss).
   const hidden = raid && !matchBoss && isAdmin();
   // ?format=team|boss|duel: skip the pre-game votes and play that ending (for testing).
@@ -86,7 +88,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
           // Boss alone: the difficulty chosen next to the boss picker (Easy to Hardest) on top of that strength.
           bossDifficulty: matchBoss || bossTierFromUrl() ? 0 : difficultyElo(),
         }
-      : modeSettings(mode.mode === "classic" ? "classic" : "crowd", { augments: mode.augments })),
+      : // Testing: ?augments=0, no pre-game votes (a team final at the default clock).
+        modeSettings(mode === "classic" ? "classic" : "crowd", { augments: q.get("augments") !== "0" })),
     // Testing: ?pace=quick, a shorter reveal and less settling in.
     ...(q.get("pace") === "quick" ? QUICK_PACE[crowd ? "crowd" : "classic"] : {}),
     ...definedOnly({
@@ -96,8 +99,6 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
       finalMaxTurns: n("finalTurns"),
       bossMaxMoves: n("bossMoves"),
       drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
-      // (Crowd always starts from move 0: its own openingMoves stays.)
-      openingMoves: crowd ? undefined : chosenOpeningMoves(),
     }),
     ...forced,
     ...speed,
@@ -204,7 +205,6 @@ export function App() {
   const savedResult = useRef<AnyMatch | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [soundLab, setSoundLab] = useState(() => new URLSearchParams(location.search).has("soundlab"));
   // A profile from the address: /profile is yours, /profile/ID someone's.
   useState(() => {
     const m = location.pathname.match(/^\/profile(?:\/([A-Za-z0-9_-]{1,64}))?\/?$/);
@@ -215,6 +215,8 @@ export function App() {
   const [showSettings, setShowSettings] = useState(() => location.pathname === "/settings");
   /** The FAQ ("How HunChess works"), opened from Settings; back goes to Settings. */
   const [showFaq, setShowFaq] = useState(() => location.pathname === "/faq");
+  /** Your friends list (/friends: screens/Friends.tsx). */
+  const [showFriends, setShowFriends] = useState(() => location.pathname === "/friends");
   /** The computer's side menu: open the home screen's boss menu or Play with friends. */
   const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(null);
   const [legal, setLegal] = useState<LegalPage | null>(() => legalPageOf(location.pathname));
@@ -309,6 +311,7 @@ export function App() {
       bestMove: bestMoveOf(match.moves),
       ...feats,
       ...(resigned && feats?.strikes !== null && feats?.strikes !== undefined ? { survived: false } : {}),
+      evalBar: evalBarOn(),
     });
   });
   const [, rerender] = useReducer((n: number, _: unknown) => n + 1, 0);
@@ -550,14 +553,6 @@ export function App() {
     if (testParams().has("debug")) (window as unknown as { match: GameView }).match = m;
   };
 
-  const practiceOn = () => {
-    try {
-      return localStorage.getItem("brc.practice") === "1";
-    } catch {
-      return false;
-    }
-  };
-
   /**
    * Against bots in your browser, in the mode given or the one picked. Solo (`fill`): the queue screen fills with your
    * bots first, and a raid has 49 of them in the crowd with a boss matched to you. Boss alone: you against the boss
@@ -617,22 +612,22 @@ export function App() {
       // (The test switches ride along for those allowed them; the server checks again: lobby-options.ts.)
       const params = testParams();
       params.delete("debug");
-      const mode = { ...chosenMode(), ...(modeId ? { mode: modeId } : {}) };
-      params.set("mode", mode.mode);
-      if (mode.mode === "raid") {
+      const mode = modeId ?? chosenMode();
+      params.set("mode", mode);
+      if (mode === "raid") {
         // (The server sets up the raid: the boss picked, else one a step above the group.)
         if (chosenBoss()) params.set("boss", chosenBoss());
         else if (bossTierFromUrl()) params.set("boss", String(bossTierFromUrl()));
-      } else if (mode.mode === "crowd") {
-        params.set("augments", mode.augments ? "1" : "0");
-      } else params.set("moves", String(chosenOpeningMoves()));
+      }
       const res = await fetch(`/api/lobby?${params}`, { method: "POST" });
       const body = (await res.json()) as { code?: string; message?: string; banned?: boolean };
       if (body.banned) return showBanNotice();
       if (!body.code) throw new Error(body.message ?? "Couldn't create a lobby.");
-      joinLobby(body.code, { mode: mode.mode });
+      joinLobby(body.code, { mode });
+      return body.code;
     } catch (e) {
       setError((e as Error).message);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -778,6 +773,7 @@ export function App() {
     setShowSettings(false);
     setShowFaq(false);
     setShowShop(false);
+    setShowFriends(false);
     if (location.pathname !== "/") history.replaceState(null, "", "/");
   };
   const nav: FrontNav = {
@@ -805,8 +801,52 @@ export function App() {
       goHome();
       setShowSettings(true);
     },
+    friendsList: () => {
+      goHome();
+      setShowFriends(true);
+      history.replaceState(null, "", "/friends");
+    },
     signIn: () => chooseGuest(false),
   };
+  // Friends (friends.ts): what an invite can point at (a private lobby still waiting, your party), making one at the
+  // front door in the home screen's mode, and joining someone's. Set every render, so it sees this render's state.
+  setInviteHost({
+    target: () => {
+      if (match instanceof NetMatch && !match.auto && match.phase.kind === "lobby" && !match.gone)
+        return { kind: match.settings.raid ? "raid" : match.settings.mode === "crowd" ? "crowd" : "classic", code: match.code };
+      return party ? { kind: "squads", code: party.code } : null;
+    },
+    canCreate: () => !match && !squads,
+    create: async () => {
+      const mode = chosenHomeMode();
+      goHome();
+      if (mode !== "squads") {
+        const code = await createLobby(mode);
+        return code ? { kind: mode, code } : null;
+      }
+      const r = await createParty();
+      if ("banned" in r) {
+        showBanNotice();
+        return null;
+      }
+      if ("error" in r) throw new Error(r.error);
+      void joinParty(r.code);
+      return { kind: "squads", code: r.code };
+    },
+    join: (kind, code) => {
+      goHome();
+      if (kind === "squads") return void joinParty(code);
+      // (An invite can outlive its lobby's start: ask first, so a stale one never costs you your party.)
+      void lobbyStatus(code).then((s) => {
+        // (No answer, offline: carry on as if it's open, as lobbyStatus's other callers do.)
+        if (s && (!s.open || s.phase !== "waiting")) return setSquadsNote("That lobby has started or closed.");
+        if (party) closeParty();
+        joinLobby(code);
+      });
+    },
+  });
+  // In a match (not its lobby or results): the live line says so, for friends' lists.
+  setLiveBusy((!!match && !["loading", "lobby", "results"].includes(match.phase.kind)) || (!!squads && !squadsWaiting(squads.lobby)));
 
   /**
    * The side menu while you're in the queue (it stays on a computer): Play is where you are, and your profile opens over
@@ -818,7 +858,7 @@ export function App() {
     home: () => undefined,
     profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
     ...Object.fromEntries(
-      (["bossAlone", "friends", "shop", "settings"] as const).map((k) => [
+      (["bossAlone", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
         k,
         () => {
           if (match) leave();
@@ -868,7 +908,6 @@ export function App() {
       </>
     );
   }
-  if (!match && soundLab) return <SoundLab onBack={() => setSoundLab(false)} />;
   if (!match && legal) {
     return (
       <LegalScreen page={legal} onBack={() => leaveLegal(() => setLegal(null))} />
@@ -895,7 +934,6 @@ export function App() {
             setShowSettings(false);
             if (location.pathname === "/settings") history.replaceState(null, "", "/");
           }}
-          onSoundLab={() => setSoundLab(true)}
           onFaq={() => {
             setShowFaq(true);
             history.replaceState(null, "", "/faq");
@@ -920,6 +958,23 @@ export function App() {
           onShop={() => {
             closeProfile();
             setShowShop("chat");
+          }}
+        />
+      </FrontFrame>
+    );
+  }
+  if (!match && showFriends) {
+    return (
+      <FrontFrame page="friends" nav={nav}>
+        <FriendsScreen
+          onBack={() => {
+            setShowFriends(false);
+            if (location.pathname === "/friends") history.replaceState(null, "", "/");
+          }}
+          onSettings={() => {
+            setShowFriends(false);
+            setShowSettings(true);
+            history.replaceState(null, "", "/settings");
           }}
         />
       </FrontFrame>
@@ -1005,6 +1060,7 @@ export function App() {
         onJoinLobby={(code) => joinLobby(code, { typed: code !== inviteCode })}
         onSquads={() => void squadsPlay()}
         onParty={openParty}
+        onFriends={nav.friendsList}
         onSignIn={() => chooseGuest(false)}
         onProfile={() => openProfile({ you: true, name: account().profile?.user.name ?? "" })}
         onShop={() => setShowShop("shop")}

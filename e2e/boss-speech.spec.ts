@@ -1,5 +1,4 @@
 import { expect, type Page } from "@playwright/test";
-import { Chess } from "chess.js";
 import { SPEECH } from "@chessroyale/core";
 import { engineTop, test } from "./helpers.ts";
 
@@ -24,8 +23,10 @@ const BOSSES = [
   { id: "grex", name: "Jefferson", banner: "SPARKLER!" },
   { id: "hollow", name: "Hollow", banner: "DARKNESS!" },
   { id: "bigboy", name: "Big Boy", banner: "TOY BLOCK!" },
-  // (Sawyer's split needs room for another pawn of his: you take one of his pawns whenever you can.)
-  { id: "sawyer", name: "Sawyer", banner: "SPLIT PAWN!", takePawns: true },
+  // (Sawyer's saw cut, his passive on turn 3 of every battle (BOSS_POWERS.sawFirst). Not his split pawn: it waits for
+  // room for another pawn of his and then his next pawn move, both up to his brain, so no crowd play brings it on
+  // time; grabbing his pawns to make room blundered into the God King's Last Stand, whose leap rightly hides his words.)
+  { id: "sawyer", name: "Sawyer", banner: "SAW CUT!" },
 ] as const;
 
 type Segment = { text: string; ok: boolean; why: string; from: number; to: number; before: number };
@@ -85,20 +86,14 @@ async function watchSpeech(page: Page) {
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 
-/** Waits for your move, then plays the engine's best allowed move (or, `takePawns`, a capture of a boss's pawn first). */
-async function playBest(page: Page, takePawns = false) {
+/**
+ * Waits for your move, then plays the engine's best allowed move: never a blunder, so the God King's Last Stand (his leap
+ * hides his words, as it should) never cuts into a line being timed.
+ */
+async function playBest(page: Page) {
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   await page.waitForTimeout(300);
-  const take = takePawns
-    ? await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: ((window as any).match.boss?.powers?.allowed ?? null) as string[] | null }))
-    : null;
-  const capture = take
-    ? new Chess(take.fen)
-        .moves({ verbose: true })
-        .filter((m) => m.captured === "p" && !m.promotion && (!take.allowed || take.allowed.includes(m.from + m.to)))
-        .sort((a, b) => "pnbrqk".indexOf(a.piece) - "pnbrqk".indexOf(b.piece))[0]
-    : undefined;
-  const { top } = capture ? { top: [{ move: capture.from + capture.to }] } : await engineTop(page);
+  const { top } = await engineTop(page);
   const move = top[0]?.move ?? null;
   await page.evaluate((mv) => {
     const m = (window as any).match;
@@ -125,16 +120,15 @@ const gapsIn = (s: Speech, from: number, to: number) => s.gaps.filter(([at]) => 
 
 for (const boss of BOSSES) {
   test(`${boss.name}'s line for its ${boss.banner} stays in its text box, whole and in view, for its full time; so does the God King's`, async ({ page }) => {
-    test.setTimeout(("takePawns" in boss ? 7 : 4) * 60_000);
+    test.setTimeout(4 * 60_000);
     const speech = await watchSpeech(page);
     await page.goto(`/?debug&clock=60&boss=${boss.id}`);
     await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
     await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
-    // Best moves until the moment comes (Ginger, Boingo, Jefferson and Big Boy as your second turn begins, Sawyer's split
-    // once there's room for it; Hollow after his first move).
-    const takePawns = "takePawns" in boss && boss.takePawns;
-    for (let i = 0; i < (takePawns ? 12 : 4) && !(await speech()).banners[boss.banner]; i++) {
-      await playBest(page, takePawns);
+    // Best moves until the moment comes (Ginger, Boingo, Jefferson and Big Boy as your second turn begins, Sawyer's saw
+    // cut as your third does; Hollow after his first move).
+    for (let i = 0; i < 4 && !(await speech()).banners[boss.banner]; i++) {
+      await playBest(page);
       await expect.poll(async () => !!(await speech()).banners[boss.banner] || (await phase(page)) === "play", { timeout: 60_000 }).toBe(true);
     }
     const bannerAt = (await speech()).banners[boss.banner]!;

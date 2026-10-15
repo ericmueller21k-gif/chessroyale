@@ -265,12 +265,12 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain(`${((50 / 110) * 100).toFixed(1)}%`);
   });
 
-  it("the clock vote's time controls, the default, and the clock without the vote", () => {
+  it("the clock vote's time controls, the default, and a raid's clock", () => {
     const t = section("modes");
     expect(t).toContain("Rapid 10+5 (10 minutes, +5 s a move, at most 20 s on a move), Blitz 5+3 (5 minutes, +3 s a move, at most 15 s on a move) or Bullet 3+2 (3 minutes, +2 s a move, at most 10 s on a move)");
     expect(t).toContain("Nobody voting means Blitz 5+3.");
     expect(t).toContain("as on a chess clock");
-    expect(t).toContain("Pre-game votes off) it's 10 minutes, +5 s a move, at most 20 s on a move; a boss raid is 10 minutes, +5 s a move, at most 20 s on a move.");
+    expect(t).toContain("A boss raid is 10 minutes, +5 s a move, at most 20 s on a move.");
     expect(t).not.toMatch(/Variable|Normal \(/);
     // Changed time controls (and a changed default) change the words.
     const V = FAQ_DEFAULTS.clockVote;

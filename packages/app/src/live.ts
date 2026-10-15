@@ -34,6 +34,8 @@ export interface LiveCounts {
   waits: { crowd: number | null; boss: number | null };
   /** Seconds a matchmade lobby waits before bots fill it. */
   fillSeconds?: number;
+  /** Friends' news for you (when something last arrived): it grows, and friends.ts fetches the friends list. */
+  inbox?: number;
 }
 
 let current: LiveCounts | null = null;
@@ -52,6 +54,16 @@ export interface LiveRider {
   take(body: unknown): void;
 }
 let rider: LiveRider | null = null;
+/** This app is in a match (App says): the request says so, and friends lists show "In a match". */
+let busy = false;
+export function setLiveBusy(on: boolean) {
+  busy = on;
+}
+/** Hears every answer (friends.ts reads `inbox`). */
+export function onLive(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
 /** A rider joined while a request was out: ask again as soon as it's back. */
 let again = false;
 
@@ -71,7 +83,9 @@ async function poll() {
   try {
     if (typeof document === "undefined" || document.visibilityState !== "hidden") {
       const r = rider;
-      const res = await fetch(`/api/live${r ? `?${r.query()}` : ""}`, { credentials: "same-origin" });
+      const q = new URLSearchParams(r ? r.query() : "");
+      if (busy) q.set("busy", "1");
+      const res = await fetch(`/api/live${q.size ? `?${q}` : ""}`, { credentials: "same-origin" });
       if (res.ok) {
         const body = (await res.json()) as LiveCounts;
         current = body;

@@ -4,6 +4,7 @@ import { account } from "../account.ts";
 import { useLive, type PlayingNow } from "../live.ts";
 import { AccountBar, DressedPawn, GearIcon, LiveLine, Logo } from "./FrontDoor.tsx";
 import { GlobalChat } from "./GlobalChat.tsx";
+import { FriendsPanel, InviteToast } from "./Friends.tsx";
 
 /** Where the computer's side menu can take you. */
 export interface FrontNav {
@@ -13,11 +14,13 @@ export interface FrontNav {
   shop: () => void;
   profile: () => void;
   settings: () => void;
+  /** Your friends list (the live panel's Friends section, the phone home's line). */
+  friendsList: () => void;
   /** Sign in (the global chat's guests). */
   signIn?: () => void;
 }
 
-export type FrontPage = "home" | "queue" | "profile" | "settings" | "shop" | "lobby";
+export type FrontPage = "home" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends";
 
 const Icon = ({ d, children }: { d?: string; children?: ComponentChildren }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -93,13 +96,17 @@ function matchLine(m: PlayingNow, now: number): { title: string; sub: string } {
   return { title, sub: [left, min === null ? null : min < 1 ? "just started" : `${min} min in`].filter(Boolean).join(" · ") };
 }
 
-/** The computer's right column: your coins and pawn at the top right, the live line, and the matches being played now. */
-export function RightPanel({ onProfile, chat, onSignIn }: { onProfile: () => void; chat?: boolean; onSignIn?: () => void }) {
+/**
+ * The computer's right column: your coins and pawn at the top right, your friends who are online (above the players
+ * online, Eric's order), the live line, and the matches being played now.
+ */
+export function RightPanel({ onProfile, onFriends, chat, onSignIn }: { onProfile: () => void; onFriends: () => void; chat?: boolean; onSignIn?: () => void }) {
   const live = useLive();
   const now = Date.now();
   return (
     <aside class="fd-right" aria-label="Live">
       <AccountBar onProfile={onProfile} />
+      <FriendsPanel onOpen={onFriends} />
       <LiveLine live={live} stacked />
       <section class="fd-section">
         <h2 class="fd-label">PLAYING NOW</h2>
@@ -135,7 +142,9 @@ export function FrontFrame({ children, page, nav }: { children: ComponentChildre
     <div class={`fd-root${nav ? " framed" : ""}${page ? ` fd-on-${page}` : ""}`}>
       {nav && <SideMenu page={page} nav={nav} />}
       <main class="fd-center">{children}</main>
-      {nav && <RightPanel onProfile={nav.profile} chat={page === "home"} onSignIn={nav.signIn} />}
+      {nav && <RightPanel onProfile={nav.profile} onFriends={nav.friendsList} chat={page === "home"} onSignIn={nav.signIn} />}
+      {/* A new invite: front-door pages only (never over a match, nor in the queue). */}
+      {nav && page !== "queue" && <InviteToast />}
     </div>
   );
 }

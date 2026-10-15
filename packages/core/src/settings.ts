@@ -1567,6 +1567,36 @@ export const GLOBAL_CHAT = {
 } as const;
 
 /**
+ * Friends and invites (docs/decisions/2026-10-15-friends-and-invites.md; docs/areas/accounts.md): add a friend from their profile
+ * (they accept or decline), invite anyone to your lobby or Squads party, block. Signed-in accounts only, where signing
+ * in is set up. The server enforces every number here.
+ */
+export const FRIENDS = {
+  /** Friends one account can have. */
+  max: 200,
+  /** Friend requests one account has waiting for an answer at once. */
+  maxPendingSent: 50,
+  /** A request nobody answered is dropped after this many days. */
+  requestDays: 30,
+  /** Friend requests one account can send in a day. */
+  requestsPerDay: 30,
+  /** Players one account can have blocked. */
+  maxBlocked: 500,
+  /** Invites one account can send in an hour. */
+  invitesPerHour: 60,
+  /** Inviting the same player again: not sooner than this. */
+  reinviteMs: 30_000,
+  /** An invite stays open this long (in the friend's list, and as a toast while it's new), then it's gone. */
+  inviteMinutes: 10,
+  /** The friends list refreshes this often while it's on screen (and at once when something new arrives for you). */
+  refreshMs: 60_000,
+  /** A new invite's toast stays this long unless it's tapped (the invite stays in the list until it expires). */
+  toastMs: 20_000,
+  /** The computer's live panel lists at most this many friends who are online. */
+  panelMax: 8,
+} as const;
+
+/**
  * Capacity (the `ops` delegate): the matchmaker's batches and admission, overload, presence and the live line's
  * write limits, and the API's rate limits. See DECISIONS.md, "Capacity: built".
  */
@@ -1620,6 +1650,8 @@ export const CAPACITY = {
     perUser: { limit: 1_200, windowMs: 60_000 },
     /** PLAY and new lobbies (a player in line asks every 3 s). */
     play: { limit: 40, windowMs: 60_000 },
+    /** Friends' actions (requests, answers, invites, blocks, settings): FRIENDS has the daily and hourly caps. */
+    friends: { limit: 30, windowMs: 60_000 },
   },
 } as const;
 

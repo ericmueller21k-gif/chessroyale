@@ -50,8 +50,13 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **The live line:** the live hub keeps who's online and which lobbies run in memory; Worker instances pass on who
     they've seen in batches (`presence.ts`, at most every `CAPACITY.presence.flushMs`), lobbies report changes at most
     every 2 s, each Worker caches `/api/live` for 3 s, and D1 gets `users.last_seen` once a minute per account.
-  - **Rate limits:** per address, per account and (PLAY, new lobbies) per account again (`CAPACITY.rateLimits`,
-    `limits.ts`), counted in each Worker instance's memory; past a limit, a friendly 429 with when to try again.
+    Friends ride on it (Oct 15): a batch also says who's in a match (the live line's `?busy=1`), and the hub answers
+    with friends' news for anyone in it, which their next `/api/live` passes on as `inbox`; a friends list is one hub
+    call (`presenceOf`). No new D1 writes per request. One new request: while a friends list is on screen, for a
+    player with a friend who shows when they're online, `/api/friends/online` once a minute (cached session, one D1
+    read, one hub call).
+  - **Rate limits:** per address, per account and (PLAY, new lobbies; friends' actions) per account again
+    (`CAPACITY.rateLimits`, `limits.ts`), counted in each Worker instance's memory; past a limit, a friendly 429 with when to try again.
 - **Nothing runs for no one:** a match everyone has left (resigned, or gone longer than `LEAVING.awayMs`) ends at once
   and its lobby closes, Squads too (DECISIONS.md, "Resign: leaving a match in every mode"); before Oct 13 such a match
   played itself out for up to an hour or more, counted on the live line all along.
@@ -68,17 +73,20 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   production), and in the app on Vite's dev server. For everyone else they're ignored, silently: the lobby, the queue,
   the crate and the solo game are exactly the ones made without them.
   - **The server's:** a new lobby's `rounds`, `clock`, `finalTurns`, `bossMoves`, `draw`, `power`, `format`, `speed`,
-    `weakbots`, `keep`, `pace=quick` (a test switch since Oct 15: players always play the mode's own pace), a boss's
-    fixed strength (`boss=1600`) and a boss outside a raid (`lobby-options.ts`); a queue's
+    `weakbots`, `keep`, `pace=quick` (a test switch since Oct 15: players always play the mode's own pace), `augments=0`
+    (no pre-game votes; a test switch since Oct 15: players always vote), a boss's fixed strength (`boss=1600`) and a boss outside a raid (`lobby-options.ts`); a queue's
     own `pool` (`/api/play`, `/api/squads/play`, `/api/squads/party`: `testPool` in `index.ts`); a crate's forced
     `fischer` and `shiny` (`/api/locker/open`). One check, `testSwitchesOn` (`admin.ts`).
   - **The app's** (read only through `testParams()` in `packages/app/src/test-switches.ts`; `/api/auth/config` says
     `testSwitches` where the server has them on, `/api/me` says `admin`): all of the above, and `debug` (the match on
     `window`), `nolanding`, `boss=<id>` (skips the boss menu), `win`, `mate`, `phase`, `laststand`, `side`, `wip` and
     `kit`, a crate page's `fischer` and `shiny` and its "Testing:" boxes.
-  - **Kept for everyone** (the home screen's own choices): `mode`, `augments`, `moves` (opening moves), a raid's boss
-    picked from the menu; preferences and pages (`anim`, `trail`, `soundlab`, `crates`). (`turns` is gone: Crowd is
-    always team turns since Oct 15.)
+  - **Kept for everyone** (the home screen's own choices): `mode` and a raid's boss picked from the menu; preferences
+    and pages (`anim`, `trail`, `crates`). Gone on Oct 15: `turns` (Crowd is always team turns), `moves` (Classic plays
+    its default opening moves) and `soundlab` (its choice is Settings' Reveal sound).
+  - **Testers' options** (Settings → Testing, admins): practice mode and the eval bar count only where the switches do
+    (`practiceOn` and `evalBarOn` in `prefs.ts`); online the lobby takes a `hello`'s practice only from an admin's
+    socket or where TEST_SWITCHES is "1" (`lobby-do.ts`; `lobby-do-practice.test.ts`).
   - **Admins only already:** "Trigger ultimate (testing)" (online the lobby checks too), "Engine move", the boss brain
     picker (`brain`), the Hidden Boss in Boss alone. Squads' test lobbies and controls: admins or `SQUADS_TEST`.
   - **No record from a switched game:** for a player the switches can't apply, so everything the server records
