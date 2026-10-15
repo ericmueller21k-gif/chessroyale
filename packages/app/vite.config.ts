@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -75,7 +76,7 @@ function serviceWorker(): Plugin {
         // (Not the live window's bot replays: only a computer's home fetches them, so phones never download them. Nor
         // the Maia box: about 40 MB, fetched only for a battle that uses it, then kept in its own cache: MAIA below.
         // Nor the engines' source archives: for whoever downloads them, never for the game.)
-        .filter((f) => f !== "/sw.js" && !f.endsWith(".webmanifest") && !f.endsWith(".txt") && !f.endsWith(".tar.gz") && !f.startsWith("/replays/") && !f.startsWith("/engine/maia/"))
+        .filter((f) => f !== "/sw.js" && f !== "/version.json" && !f.endsWith(".webmanifest") && !f.endsWith(".txt") && !f.endsWith(".tar.gz") && !f.startsWith("/replays/") && !f.startsWith("/engine/maia/"))
         // Hosts redirect /index.html to /, and a cached redirect can't answer a page load.
         .map((f) => (f === "/index.html" ? "/" : f))
         .sort();
@@ -96,6 +97,39 @@ function serviceWorker(): Plugin {
 }
 
 /**
+ * This build's commit (Workers Builds gives it as WORKERS_CI_COMMIT_SHA; a local build asks git): the app reports its
+ * first 12 characters with every error (src/problems.ts), and dist/version.json tells the Worker and the ops tools
+ * which commit is deployed. "dev" when neither knows.
+ */
+const COMMIT = (() => {
+  let sha = process.env.WORKERS_CI_COMMIT_SHA ?? "";
+  if (!sha) {
+    try {
+      sha = execSync("git rev-parse HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+    } catch {
+      // No git here.
+    }
+  }
+  return /^[0-9a-f]{40}$/.test(sha) ? sha : null;
+})();
+const VERSION = COMMIT?.slice(0, 12) ?? "dev";
+
+/** Writes dist/version.json: the version, the commit and when it was built (not precached: see serviceWorker). */
+function versionFile(): Plugin {
+  let outDir = "dist";
+  return {
+    name: "brc-version",
+    apply: "build",
+    configResolved(config) {
+      outDir = config.build.outDir;
+    },
+    closeBundle() {
+      writeFileSync(join(outDir, "version.json"), JSON.stringify({ version: VERSION, commit: COMMIT, built: new Date().toISOString() }) + "\n");
+    },
+  };
+}
+
+/**
  * The Maia box's files' sizes (unpacked), for its loading bar (src/maia.ts): live, the worker and the WebAssembly come
  * compressed, with no length the bar could use. Empty when the box isn't built.
  */
@@ -106,8 +140,8 @@ function maiaFileBytes(): Record<string, number> {
 }
 
 export default defineConfig({
-  define: { __MAIA_FILE_BYTES__: JSON.stringify(maiaFileBytes()) },
-  plugins: [stockfish(), maiaBox(), preact(), serviceWorker()],
+  define: { __MAIA_FILE_BYTES__: JSON.stringify(maiaFileBytes()), __APP_VERSION__: JSON.stringify(VERSION) },
+  plugins: [stockfish(), maiaBox(), preact(), serviceWorker(), versionFile()],
   server: { host: true },
   build: { target: "es2020", chunkSizeWarningLimit: 1000 },
 });

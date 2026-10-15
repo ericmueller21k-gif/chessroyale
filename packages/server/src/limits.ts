@@ -1,4 +1,4 @@
-import { CAPACITY } from "@chessroyale/core";
+import { CAPACITY, OPS } from "@chessroyale/core";
 
 /**
  * Rate limits on the API (CAPACITY.rateLimits): requests per window per address, per account (its session) and, for
@@ -48,6 +48,28 @@ export function rateLimited(req: { ip: string | null; session: string | null; pl
   if (req.play) checks.push([play, req.session ?? `ip:${req.ip}`]);
   let wait = 0;
   for (const [l, k] of checks) {
+    const r = l.hit(k, now);
+    if (!r.ok) wait = Math.max(wait, r.retryMs);
+  }
+  return wait > 0 ? wait : null;
+}
+
+const P = OPS.endpoint;
+const problemLimits = {
+  errors: [new RateLimiter(P.errors.perIp.limit, P.errors.perIp.windowMs), new RateLimiter(P.errors.perUser.limit, P.errors.perUser.windowMs)],
+  report: [new RateLimiter(P.reports.perIp.limit, P.reports.perIp.windowMs), new RateLimiter(P.reports.perUser.limit, P.reports.perUser.windowMs)],
+} as const;
+
+/**
+ * POST /api/problems (problems.ts): error reports and player reports, each with their own limits per address and per
+ * account (OPS.endpoint), on top of the API's. Null if this one may go ahead, else how long to wait. The address is
+ * only a key in this instance's memory, never stored.
+ */
+export function problemLimited(kind: "errors" | "report", req: { ip: string | null; session: string | null }, now: number): number | null {
+  const [perIp, perUser] = problemLimits[kind];
+  let wait = 0;
+  for (const [l, k] of [[perIp, req.ip], [perUser, req.session]] as const) {
+    if (!k) continue;
     const r = l.hit(k, now);
     if (!r.ok) wait = Math.max(wait, r.retryMs);
   }

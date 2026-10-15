@@ -5,7 +5,7 @@ export function LegalScreen({ page, onBack }: { page: "privacy" | "terms"; onBac
   return (
     <div class="screen legal">
       <h1>{page === "privacy" ? "Privacy policy" : "Terms of use"}</h1>
-      <p class="muted small">Last updated October 8, 2026</p>
+      <p class="muted small">Last updated October 15, 2026</p>
       {page === "privacy" ? (
         <>
           <h2>What we keep</h2>
@@ -27,6 +27,12 @@ export function LegalScreen({ page, onBack }: { page: "privacy" | "terms"; onBac
               the same device is looked at by a person. It isn't used for anything else, and clearing your cookies removes it.
             </li>
             <li>If your account is banned: an appeal you send, and our reply. We email you about a ban, or when a review clears you.</li>
+            <li>
+              If something goes wrong in the game: the error, the game's version, the screen, mode and match you were in, the last few
+              things that happened in the game (screens, moments and the moves you sent; never chat or anything you type), your
+              browser, screen size and device memory, and your account ID if you're signed in. A bug you report sends the same with
+              your note; feedback and ideas are just your note. We keep these for 30 days, and never with your IP address or email.
+            </li>
           </ul>
           <h2>What we don't do</h2>
           <p>No ads, no ad tracking, no selling or sharing your information. Your email is only for signing in.</p>

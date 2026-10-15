@@ -137,6 +137,33 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS reports_reporter ON reports (reporter, at)`,
   // Fair play: cases and their log (fairplay.ts).
   ...FAIRPLAY_SCHEMA,
+  // Errors (the app's and the server's), one row per kind of error per hour, and the feedback sheet's reports: bugs,
+  // feedback and ideas (problems.ts).
+  // Nothing personal beyond a signed-in account's id: no IP addresses, emails or chat (docs/areas/ops.md).
+  `CREATE TABLE IF NOT EXISTS ops_errors (
+    fingerprint TEXT NOT NULL,
+    hour INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    message TEXT NOT NULL,
+    version TEXT NOT NULL,
+    count INTEGER NOT NULL,
+    first_seen INTEGER NOT NULL,
+    last_seen INTEGER NOT NULL,
+    sample TEXT NOT NULL,
+    PRIMARY KEY (fingerprint, hour)
+  )`,
+  `CREATE INDEX IF NOT EXISTS ops_errors_hour ON ops_errors (hour)`,
+  `CREATE TABLE IF NOT EXISTS ops_reports (
+    id TEXT PRIMARY KEY,
+    at INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    account TEXT,
+    version TEXT NOT NULL,
+    note TEXT NOT NULL,
+    diag TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS ops_reports_at ON ops_reports (at)`,
 ];
 
 /**

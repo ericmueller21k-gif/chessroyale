@@ -4,6 +4,7 @@ import type { LobbyRecord } from "./lobby.ts";
 import { openLobbyCode } from "./codes.ts";
 import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
+import { serverError } from "./problems.ts";
 import { FILL_IN_ORDER, QueueCore, type MatchRules, type Ticket } from "./queue.ts";
 
 export { queueName } from "./queue.ts";
@@ -100,7 +101,7 @@ export class Matchmaker extends DurableObject<Env> {
     let held = false;
     this.forming = this.form()
       .then((h) => void (held = h))
-      .catch((e) => console.log(`matchmaker: ${String(e)}`))
+      .catch((e: unknown) => serverError(this.env, { kind: "Matchmaker.form", route: "Matchmaker.form" }, e, (p) => this.ctx.waitUntil(p)))
       .finally(() => {
         this.forming = null;
         if (!this.q.waiting) return;

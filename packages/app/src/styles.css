@@ -1906,6 +1906,50 @@ p {
   min-height: 40px;
   font-size: 15px;
 }
+/* The phone's sheet: Report a bug on a row of its own, under Sound and Resign. */
+.mm-wide {
+  grid-column: 1 / -1;
+}
+/* A computer's title line with an admin's testing items has no room for one more button (they'd run over the title):
+   the report button gives way there; Settings and the phone's sheet still have it. */
+.match-tools:not(:empty) ~ .mm .mm-report {
+  display: none;
+}
+/* The error boundary's screen (components/Problems.tsx): its Reload button at its own height (.btn grows in a row). */
+.crash .btn {
+  flex: none;
+}
+/* ---- The feedback sheet (components/Problems.tsx): over any screen, a match's included ---- */
+.rp-scrim {
+  z-index: 75;
+}
+/* Its three kinds: the emoji over the words, on the field's color so the choice reads as one control. */
+.rp-kinds {
+  background: var(--fd-bg);
+}
+.rp-kinds button {
+  line-height: 1.15;
+  text-align: center;
+}
+.rp-kinds b {
+  font-size: 18px;
+  line-height: 1;
+}
+.rp-id {
+  margin: 4px 0;
+  font-size: 17px;
+  text-align: center;
+}
+.rp-id strong {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 22px;
+  letter-spacing: 2px;
+  user-select: all;
+}
+.rp-error {
+  color: var(--danger);
+  font-weight: 700;
+}
 /* A plain "Leave the match" for someone already out (the cut screen, watching, the solo play-out). */
 .leave-match {
   margin-top: 10px;

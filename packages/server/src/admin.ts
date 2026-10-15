@@ -316,7 +316,7 @@ export async function handleAdmin(
   const cm = url.pathname.match(/^\/admin\/fairplay\/case\/([A-Za-z0-9_-]{1,64})$/);
   if (cm) {
     const d = await caseDetail(sql, cm[1]!, { email: true });
-    return d ? html(casePage(d, url.searchParams.get("note"))) : notFound();
+    return d ? adminPage("Fair play", casePage(d, url.searchParams.get("note"))) : notFound();
   }
   if (url.pathname === "/admin/fairplay") {
     const status = url.searchParams.get("status") ?? "open";
@@ -328,7 +328,7 @@ export async function handleAdmin(
       `SELECT l.user_id, l.at, l.action, l.by, l.reason, u.name FROM fairplay_log l LEFT JOIN users u ON u.id = l.user_id
        WHERE l.by != 'detection' AND l.by != 'reports' ORDER BY l.at DESC, l.id DESC LIMIT 40`,
     );
-    return html(listPage(cases, appeals, log, status, by));
+    return adminPage("Fair play", listPage(cases, appeals, log, status, by));
   }
   return notFound();
 }
@@ -340,12 +340,13 @@ export function policy() {
 
 // ---------------- HTML ----------------
 
-const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-const when = (t: number | null | undefined) => (t ? new Date(t).toISOString().slice(0, 16).replace("T", " ") : "");
-const html = (body: string) =>
+export const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+export const when = (t: number | null | undefined) => (t ? new Date(t).toISOString().slice(0, 16).replace("T", " ") : "");
+/** An admin page (fair play's, ops'): server-rendered, light and dark, never framed or indexed. */
+export const adminPage = (title: string, body: string) =>
   new Response(
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
-<title>Fair play · HunChess</title><style>
+<title>${esc(title)} · HunChess</title><style>
 :root{color-scheme:light dark;--bg:#fafaf7;--fg:#1d1d1b;--muted:#6b6b66;--line:#ddd9cf;--card:#fff;--gold:#b8860b;--bad:#b3261e;--ok:#1e7b34}
 @media (prefers-color-scheme:dark){:root{--bg:#141412;--fg:#ecebe6;--muted:#a3a29b;--line:#34332e;--card:#1d1d1a;--gold:#e0b44c;--bad:#f2867d;--ok:#7fd18f}}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif}main{max-width:1100px;margin:0 auto;padding:16px}
@@ -356,7 +357,7 @@ td.wrap{white-space:normal;min-width:180px}.pill{display:inline-block;border-rad
 .review,.banned{color:var(--bad)}.cleared{color:var(--ok)}.hard{font-weight:700}.skip{color:var(--muted)}
 form.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}input[type=text],textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);flex:1 1 260px}
 button{font:inherit;min-height:40px;padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}button.ban{border-color:var(--bad);color:var(--bad)}button.clear{border-color:var(--ok);color:var(--ok)}
-nav a{margin-right:12px}
+nav a{margin-right:12px}pre{white-space:pre-wrap;word-break:break-word;font-size:12px;margin:6px 0 0}details summary{cursor:pointer}
 </style></head><body><main>${body}</main></body></html>`,
     { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY" } },
   );

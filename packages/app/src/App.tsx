@@ -50,6 +50,7 @@ import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, fo
 import { SquadsQueue, SquadsScreen, squadsWaiting } from "./screens/Squads.tsx";
 import { PartySheet } from "./screens/SquadsParty.tsx";
 import { measureSound } from "./sound.ts";
+import { noteWhere } from "./problems.ts";
 
 /**
  * Playtest overrides from the URL, e.g. ?rounds=4&clock=15&draw=weighted (handy for quick tests). `matchBoss`: a raid's
@@ -204,6 +205,15 @@ const storedGuest = () => {
 };
 
 type AnyMatch = GameView & { dispose(): void };
+
+/** What's on screen, for error reports (problems.ts): a match's phase (a boss battle's moment too), else the page. */
+function screenOf(match: AnyMatch | null, page: string): string {
+  if (!match) return page;
+  const p = match.phase;
+  if (p.kind !== "boss") return p.kind;
+  const moment = p.loading ? "loading" : p.intro ? "intro" : p.lights ? "lights out" : p.fall ? "fall" : (p.boss.powers?.events ?? []).map((e) => e.kind).join(" ");
+  return moment ? `boss ${moment}` : "boss";
+}
 
 export function App() {
   const [match, setMatch] = useState<AnyMatch | null>(null);
@@ -766,6 +776,18 @@ export function App() {
   useEffect(() => {
     if (match instanceof NetMatch && match.exited) leave();
   });
+  // Where the app is, for error reports and bug reports (problems.ts): the screen, mode, boss and lobby code.
+  useEffect(() =>
+    noteWhere({
+      screen: screenOf(
+        match,
+        squads ? `squads ${squads.lobby?.phase ?? "joining"}` : inLine ? "queue" : showSettings ? "settings" : showFaq ? "faq" : showShop || legal || (profileOpen ? "profile" : "home"),
+      ),
+      mode: match ? `${match instanceof NetMatch ? "online" : "solo"} ${match.settings.raid ? "raid" : match.settings.mode}` : squads ? "online squads" : null,
+      boss: match?.boss?.id ?? null,
+      code: match instanceof NetMatch ? match.code : (squads?.code ?? party?.code ?? null),
+    }),
+  );
 
   const leave = () => {
     // On purpose: opening the app again doesn't bring you back to this match.
