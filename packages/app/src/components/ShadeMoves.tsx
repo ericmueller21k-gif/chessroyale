@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState } from "preact/hooks";
 import { pieceAt } from "@chessroyale/chess";
 import { BoardTurn, viewSquare, type QuarterTurn } from "../board-view.ts";
+import { useBoardAnimations, useMotionTrail } from "../hooks.ts";
 
 const NAMES: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
 
@@ -23,7 +24,8 @@ function at(real: string, orientation: "white" | "black", turn: QuarterTurn = 0)
 /**
  * Everyone's pick at once: a see-through copy of each moved piece slides to its
  * square, with the players' names stacked above where it lands. Sits over the
- * board (inside its wrapper) and lets taps through.
+ * board (inside its wrapper) and lets taps through. Settings → Board: without the
+ * motion trail the copies appear on their squares; without animations, just the names.
  */
 export function ShadeMoves({
   fen,
@@ -41,14 +43,18 @@ export function ShadeMoves({
   chosen?: string | null;
 }) {
   const turn = useContext(BoardTurn);
-  const [landed, setLanded] = useState(false);
+  const animate = useBoardAnimations();
+  const trail = useMotionTrail();
+  const [slid, setSlid] = useState(false);
+  const landed = slid || !(animate && trail);
   useEffect(() => {
-    const t = setTimeout(() => setLanded(true), 60);
+    const t = setTimeout(() => setSlid(true), 60);
     return () => clearTimeout(t);
   }, [fen]);
   return (
     <div class="hb-pieces shade-layer" aria-hidden="true">
-      {moves.map((m) => {
+      {animate &&
+        moves.map((m) => {
         const piece = pieceAt(fen, m.move.slice(0, 2));
         if (!piece) return null;
         const from = at(m.move.slice(0, 2), orientation, turn);
@@ -70,7 +76,7 @@ export function ShadeMoves({
           return (
             <div
               key={`tag${m.move}`}
-              class={`shade-tag${m.you ? " you" : ""}${chosen && chosen !== m.move ? " not-chosen" : ""}`}
+              class={`shade-tag${m.you ? " you" : ""}${!animate && highlight === m.move ? " reel-on" : ""}${chosen && chosen !== m.move ? " not-chosen" : ""}`}
               style={{ left: `${to.left + 6.25}%`, top: `${to.top}%` }}
             >
               {m.names.map((n) => (

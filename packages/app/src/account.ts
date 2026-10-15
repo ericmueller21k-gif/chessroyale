@@ -1,6 +1,5 @@
 import type { ChatPicks, ShopState } from "@chessroyale/core";
 import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankEffect } from "@chessroyale/core";
-import { evalBarOn } from "./prefs.ts";
 
 /**
  * Your account, as the screens see it: a guest account made the first time
@@ -193,11 +192,12 @@ export async function recordSoloResult(r: {
   survived?: boolean | null;
   lastStand?: boolean | null;
   bossElo?: number | null;
+  /** Whether the eval bar was on (testers only since Oct 15), so we can see later who played without it. */
+  evalBar: boolean;
 }): Promise<void> {
   if (!state.profile) return;
   try {
-    // (With the eval bar's setting at the time, so we can see later who plays without it.)
-    await api("/api/results", { method: "POST", body: JSON.stringify({ ...r, evalBar: evalBarOn() }) });
+    await api("/api/results", { method: "POST", body: JSON.stringify(r) });
     set({ profile: await api<Profile>("/api/me") });
   } catch {
     // Not important enough to bother the player.
