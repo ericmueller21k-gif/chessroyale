@@ -50,7 +50,7 @@ test("Settings: download my data, then delete the account (asked first); it's go
   const chunks: Buffer[] = [];
   for await (const c of (await download.createReadStream())!) chunks.push(c as Buffer);
   const file = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  expect(Object.keys(file)).toEqual(expect.arrayContaining(["exportedAt", "about", "account", "sessions", "results", "shop", "locker", "reportsMade", "friends", "fairPlay"]));
+  expect(Object.keys(file)).toEqual(expect.arrayContaining(["exportedAt", "about", "account", "sessions", "results", "shop", "locker", "reports", "friends", "problemReports", "fairPlay"]));
   expect(file.account).toMatchObject({ id, name: "Delia" });
   expect(file.results.map((r: { placement: number }) => r.placement)).toEqual([7]);
   expect(file.locker.items).toHaveLength(1);
