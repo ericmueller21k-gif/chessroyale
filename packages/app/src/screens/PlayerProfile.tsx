@@ -469,7 +469,7 @@ export function PlayerProfileScreen({
           )}
           {onSettings && (
             <button type="button" class="fd-row-link" onClick={onSettings}>
-              Settings: sound, Crowd options, how to play, your sign-in ›
+              Settings: sound, the board, quick chat, how to play, your sign-in ›
             </button>
           )}
         </>

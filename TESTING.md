@@ -20,7 +20,7 @@ turns, and the best average move quality wins. A solo match is about 25 minutes 
 `?rounds=1&pace=quick` for a very fast run-through that still reaches the final).
 
 **Also new in recent versions** (worth a look while you play):
-- Tick **Practice mode** on the first screen if you want unlimited power-ups (the engine's top 3 moves with arrows).
+- Switch on **Practice mode** in Settings → Testing (admins) if you want unlimited power-ups (the engine's top 3 moves with arrows).
 - The strip above the board shows your position and how far you are above or below the elimination line; tap it
   for the full leaderboard. On a computer the leaderboard sits on the left all the time.
 - You keep one color per stage. When you land on a board, the last few moves you missed replay before you move.

@@ -1,9 +1,11 @@
 import { expect, type Page } from "@playwright/test";
-import { BOARD_SEL, test } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, switchesOff, test } from "./helpers.ts";
 
 /**
  * The eval bar's switch (Eric, Oct 10): on by default, in Settings only (never on a board screen); off, no bar on any
- * board and the board takes its room, centered, on a phone and a computer; remembered on the device.
+ * board and the board takes its room, centered, on a phone and a computer; remembered on the device. Since Oct 15 it's
+ * for testers only (an admin, or a test server like this one), its switch in Settings → Testing (admins); players never
+ * see the bar.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 
@@ -24,7 +26,8 @@ async function boardNow(page: Page) {
   }, BOARD_SEL.squares);
 }
 
-test("the eval bar: on by default, switched off in Settings, and the board takes its room", async ({ page }, info) => {
+test("the eval bar (testers): on by default, switched off in Settings → Testing, and the board takes its room", async ({ page }, info) => {
+  await asAdmin(page);
   const on = await boardNow(page);
   expect(on.bars).toBe(1);
   expect(on.dockOff).toBeLessThanOrEqual(1);
@@ -53,4 +56,23 @@ test("the eval bar: on by default, switched off in Settings, and the board takes
   const again = await boardNow(page);
   expect(again.bars).toBe(1);
   expect(Math.abs(again.width - on.width)).toBeLessThanOrEqual(1);
+});
+
+test("players never see the eval bar: no bar on the board and no switch, even on a device that had it on", async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  // A player (this server has TEST_SWITCHES on: the app is told otherwise, as hunchess.com tells a player).
+  await switchesOff(page);
+  await page.addInitScript(() => localStorage.setItem("brc.evalBar", "1"));
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page.getByRole("switch", { name: /Eval bar/ })).toHaveCount(0);
+  // Boss alone, the boss picked from the menu: the board, and no bar beside it.
+  await page.goto("/");
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await page.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /Boingo/ }).click();
+  await expect(page.locator(".board-row")).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator(BOARD_SEL.squares)).toBeVisible();
+  await page.waitForTimeout(1000);
+  await expect(page.locator(".eval-bar")).toHaveCount(0);
 });

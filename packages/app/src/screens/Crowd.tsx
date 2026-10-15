@@ -16,34 +16,19 @@ import { KING_COMMAND, KING_SUMMON, LAST_STAND, LAST_STAND_MS } from "@chessroya
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
 import { BossHeading } from "./Play.tsx";
-import { crowdAnimations, crowdTrail, onPrefsChange } from "../prefs.ts";
 import { bossAlone, elimination, finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { GavelPiece } from "../components/Gavel.tsx";
 import { Avatar } from "../components/Items.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { pawnLook } from "../looks.ts";
-import { seenKey } from "../hooks.ts";
+import { seenKey, useBoardAnimations, useMotionTrail } from "../hooks.ts";
 import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
 import { exitMatch } from "../match-exit.ts";
 import { ordinal } from "./StageBreak.tsx";
 
 const sideName = (s: "w" | "b") => (s === "w" ? "White" : "Black");
-
-/** The device's Crowd animation setting, kept in sync if it changes. */
-export function useCrowdAnimations(): boolean {
-  const [on, setOn] = useState(crowdAnimations());
-  useEffect(() => onPrefsChange(() => setOn(crowdAnimations())), []);
-  return on;
-}
-
-/** The device's motion trail setting (Crowd, with animations on), kept in sync if it changes. */
-export function useCrowdTrail(): boolean {
-  const [on, setOn] = useState(crowdTrail());
-  useEffect(() => onPrefsChange(() => setOn(crowdTrail())), []);
-  return on;
-}
 
 /** Picks as ghost pieces with names, ranked by the leaderboard. */
 export function ghostPicks(match: GameView, picks: readonly { playerId: string; move: string | null }[]): GhostPick[] {
@@ -58,8 +43,8 @@ export function ghostPicks(match: GameView, picks: readonly { playerId: string; 
 const seenLive = { fen: "", ids: new Set<string>() };
 
 export function LiveGhosts({ match, fen, orientation }: { match: GameView; fen: string; orientation: "white" | "black" }) {
-  const animate = useCrowdAnimations();
-  const trail = useCrowdTrail();
+  const animate = useBoardAnimations();
+  const trail = useMotionTrail();
   const now = useFrameNow();
   // Picks made before you could see them catch up in a quick wave from this moment; later ones arrive live.
   const [since] = useState(Date.now());
@@ -148,8 +133,8 @@ export function WatchScreen({
 export function CrowdReveal({ match, mine, board, until }: { match: GameView; mine: GroupReveal; board: BoardView; until: number }) {
   const [start] = useState(Date.now());
   const now = useFrameNow();
-  const animate = useCrowdAnimations();
-  const trail = useCrowdTrail();
+  const animate = useBoardAnimations();
+  const trail = useMotionTrail();
   // Boss battle: the God King's Last Stand on this move (it plays out after the move lands, in its own extra time).
   const stand = match.boss && mine.lastStand ? mine.lastStand : null;
   const total = Math.max(2500, until - start - (stand ? LAST_STAND_MS : 0));

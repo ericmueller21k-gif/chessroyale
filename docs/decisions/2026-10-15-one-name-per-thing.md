@@ -25,11 +25,10 @@ From the slop audit (V3, V8, V11–V15, V19–V21, V23).
 - **The results table** names what was played: "Boss battle" (a raid, Boss alone), the Crowd's knockouts as one row
   (a stage there is a move or two), then its ending ("Team final", "Boss final", "Duel"), and Classic's stages, then
   its "Final" (`lossRows`, unit-tested). It used to label any match's ending "Duel".
-- **Settings' how-to block is gone.** It was a second, hand-kept copy of the FAQ's rules, already wrong ("Ten bosses";
-  the votes-off line said "Normal speed (20 s a move)", which was gone since Oct 13). Its place is two links into the FAQ:
-  how each mode works (`/faq#faq-modes`) and the whole FAQ. The votes-off line is now built from the settings and the
-  vote's own name for that clock ("Rapid 10+5"). Classic's opening-moves setting shows only when Classic is the
-  chosen mode (`?mode=classic`), since Classic is off the menu.
+- **Settings' how-to block is gone.** It was a second, hand-kept copy of the FAQ's rules, already wrong ("Ten bosses",
+  for 7 bosses over 10 tiers). Its place is two links into the FAQ: how each mode works (`/faq#faq-modes`) and the whole
+  FAQ. (The votes-off line and Classic's stepper, also stale, went with their controls in #236, the Settings
+  overhaul.) The FAQ names a raid's clock as the vote does: "A boss raid is Rapid 10+5."
 - **Numbers from settings:** Home's matchmaking lines take the server's fill time ("bots at 8 s" on the test server,
   60 s live) and the lobby sizes. Before, they had "60", "a minute", "50", "100", "49" and "99" typed in. The landing
   page's numbers come from the settings too, and its "boss battle against Stockfish" is now the boss final against the
