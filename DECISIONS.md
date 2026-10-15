@@ -4096,3 +4096,40 @@ inside the frame; his head found on every frame of either drawing with the engin
 inside its frame); e2e `recluse.spec.ts` (every beat of the absorption watched from before it can show, the arcs, the
 look on his figure on the board and where he stands; in phase 2 no God King button, figure or word), `king-attack`,
 `boss-speech`, `perf.spec.ts`'s phase 2 case. Frames: `npm run frames:recluse2 -- <dir> both light only=change`.
+
+## The engine reader: a slot's last exact line may name another move (Oct 14, 2026)
+
+**What:** The code that reads Stockfish's output (`searchLines` in `packages/chess/src/uci.ts`, and the same function in
+`engine/server.mjs`) reads each MultiPV slot's last exact line, as before, unless that lists a move twice. Then it lists
+each move once, with the numbers of that move's own latest exact line; the moves listed are the ones in the last line
+printed for each slot (bound lines included), in the slots' order. Eric approved the fix ("Engine fix is a go").
+
+**Why:** Stockfish re-sorts its lines as it goes deeper, and a search that runs out of nodes partway through a line
+prints that slot as a bound. The slot's last exact line was then from the depth before, and it often named the move
+that had since moved to another slot. One move came out twice (with an out-of-date number) and another not at all.
+Measured: about 19% of the judge's top-8 searches (lite build, 250k nodes, 800 searches), 6.7% of device re-checks
+(700k, 3 moves), 5 to 6% of the engine server's re-checks (native 17.1, 400k and 2M, 4 moves), 2.2% at 20k nodes with 2
+moves. Players felt it as silent misgrading: a duplicated move's out-of-date number (5 points or more off in about
+1.75% of top-8 searches, up to about 35), a board's best move missing from the top 8 (about 0.5%), and a re-check
+quietly ignored when the best move was the one left out. The castling move in the first report was a coincidence.
+
+**Only broken searches change:** a search with no move twice reads exactly as before, by construction (checked on the
+raw output of 1,000 saved searches: lite top 8 at 250k, single lines at 250k, re-checks at 700k, the server's at 2M).
+A first version also re-read a search whose last line was a bound naming another move (about 2 single-line searches in
+100), with that move and an older number; it was narrowed so those keep their old reading.
+
+**Kept as safety nets:** `scoreMoves`' fallback for a move left out (`scoreAfter`) and Squads' `cleanTop` (keeps a
+move's first line if it is listed twice).
+
+**Rollout:** during a deploy, a device on the old code and one on the new can disagree on an affected search; the
+lobby then asks a third judge and the engine server, as for any disagreement. Fine before launch.
+
+**Before and after** (`reports/engine-reader.md`): the judge's accuracy doesn't change beyond noise (judge-accuracy's
+positions re-scored with the fix: today's scorer's error −0.035 ± 0.022 points a pick). The boss's own Stockfish move
+changes in 7 of 1,200 positions (+0.03 points a move). In paired raids (about 24 games a boss, each code), no boss moves
+beyond noise; all together the crowd's score leans +0.05 ± 0.03 its way. Bosses keep their tuning.
+
+**Testing.** Full lane (judging numbers on every device and on the server): typecheck, the whole unit suite, the whole
+e2e suite. Unit: `packages/chess/test/uci.test.ts` (recorded lines where two moves swap slots and the search stops on
+a bound; a search with no move twice reads exactly as before, a single line too; with a move twice, a move that has
+left the lines is dropped).
