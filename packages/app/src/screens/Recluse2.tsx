@@ -39,6 +39,13 @@ import { useStillKey } from "../hooks.ts";
 const QUARTER_BOARD = [1, 2, 0, 3] as const;
 /** Each board's share of the square once split (the rest is the cross between them). */
 const CELL = 0.48;
+/**
+ * A computer's four boards (played where the phase change leaves them): a little smaller, each with a row above it for
+ * its tag (who plays it and their clock), so no tag covers a board's back rank (Chess960's back rank is random). `cell`:
+ * a board's share of the square; `tag`: the row above each, in % of the square. The cross between the rows is what's left
+ * (1.8%), between the columns 11%. Written on the stage for styles.css (.rc-desk .rc-played).
+ */
+export const DESK = { cell: 0.445, tag: 4.6 } as const;
 
 const ease = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
@@ -48,20 +55,22 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
  * growing into a whole board at its corner (its clip opening to the full board as it shrinks toward its corner; the board
  * itself keeps its size: only a transform, which it measures without).
  */
-function quarterStyle(q: number, t: number): Record<string, string> {
+function quarterStyle(q: number, t: number, desk: boolean): Record<string, string> {
   const C = PHASE_CHANGE;
   const right = q % 2 === 1;
   const bottom = q >= 2;
   const part = ease((t - C.partAt) / (C.growAt - C.partAt));
   const grow = ease((t - C.growAt) / C.growMs);
   const gap = (1 - grow) * part * 3;
-  const scale = 1 - (1 - CELL) * grow;
+  const scale = 1 - (1 - (desk ? DESK.cell : CELL)) * grow;
+  // (A computer's top boards end a tag's row down from the square's top: DESK.)
+  const down = desk && !bottom ? DESK.tag * grow : 0;
   const half = 50 * (1 - grow);
   const clip = `inset(${bottom ? half : 0}% ${right ? 0 : half}% ${bottom ? 0 : half}% ${right ? half : 0}%)`;
   return {
     clipPath: clip,
     transformOrigin: `${right ? "100%" : "0"} ${bottom ? "100%" : "0"}`,
-    transform: `translate(${right ? gap : -gap}%, ${bottom ? gap : -gap}%) scale(${scale})`,
+    transform: `translate(${right ? gap : -gap}%, ${bottom ? gap : down - gap}%) scale(${scale})`,
   };
 }
 
@@ -325,7 +334,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
             {/* (The four boards from the start, each clipped to its quarter: together they are the whole board until they
                 part, so the split mounts nothing new on a slow phone.) */}
             {QUARTER_BOARD.map((id, q) => (
-              <div key={q} class={`rc-cell rc-split rc-q${q}`} style={quarterStyle(q, t)}>
+              <div key={q} class={`rc-cell rc-split rc-q${q}`} style={quarterStyle(q, t, computer)}>
                 <Board fen={shuffled ? v.boards[id]!.fen : v.from} orientation="white" silent />
               </div>
             ))}
@@ -371,7 +380,8 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
         clock={null}
         // (Never what his bubble or the banner says at the same moment, Eric, Oct 15: his "Mind and machine" line had
         // "Mind and engine, one." under it, and "PHASE 2" "win all four boards" had "Phase 2!" "Every board must be
-        // won."; as the banner shows, the clock you'll have, which nothing else on screen says yet.)
+        // won."; as the banner shows, the clock you'll have, which nothing else on screen says yet: on two lines, so
+        // a phone shows it whole.)
         status={
           <>
             <span class="dock-line">
@@ -384,11 +394,11 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
                       ? "The boss rises!"
                       : t < C.bannerAt
                         ? "One board becomes four…"
-                        : `${clock(RECLUSE_PHASE2.bankSeconds * 1000)} on your clock, no added time`}
+                        : `${clock(RECLUSE_PHASE2.bankSeconds * 1000)} on your clock`}
               </strong>
             </span>
-            {/* (The second line kept, empty, so the box keeps its height.) */}
-            <span class="dock-line muted" />
+            {/* (The second line kept, empty until then, so the box keeps its height.) */}
+            <span class="dock-line muted">{t >= C.bannerAt ? "No added time." : ""}</span>
           </>
         }
       />
@@ -410,9 +420,9 @@ const RESULT_WORD = (b: SimulBoardView) => {
 };
 
 /**
- * A board's tag: who plays it and their clock. Over a computer's four boards, at each one's corner; a phone's small
- * boards, just above each (their clock only: the board's button says whose it is), off their pieces (Eric, Oct 15). A
- * phone's big board: none on yours (your clock is the dock's), the player's name on one you're watching.
+ * A board's tag: who plays it and their clock. A computer's four boards: in the row above each (DESK), off its back rank;
+ * a phone's small boards, just above each (their clock only: the board's button says whose it is), off their pieces
+ * (Eric, Oct 15). A phone's big board: none on yours (your clock is the dock's), the player's name on one you're watching.
  */
 function Tag({ b, v, now, small, big }: { b: SimulBoardView; v: SimulView; now: number; small?: boolean; big?: boolean }) {
   if (big) return b.you ? null : <span class="rc-tag">{b.name}</span>;
@@ -508,19 +518,22 @@ export function SimulScreen({ match }: { match: GameView }) {
   // His ultimate as it comes: "5 SECONDS!" over the boards.
   // (On every board at once; nobody waits for it: the 5 s start now.)
   const ultOn = v.ultAt !== null && now - v.ultAt < PHASE2_ULT_BANNER_MS;
-  const ultBanner = ultOn && <FightBanner text={`${RECLUSE_PHASE2.ultMoveSeconds} SECONDS!`} sub="A move every 5 s, or a random one" tone="boss" sound="bannerStart" />;
+  // (Its name alone: what it means, "5 s a move, or a random one", is the dock's.)
+  const ultBanner = ultOn && <FightBanner text={`${RECLUSE_PHASE2.ultMoveSeconds} SECONDS!`} tone="boss" sound="bannerStart" />;
 
+  // (How many are won: the boss bar's right side.)
   const status = v.decided
     ? v.beaten
       ? "All four boards won!"
-      : `${v.won} of ${v.of} won: the boss wins`
+      : "The boss wins."
     : mine.result
       ? `Your board: ${RESULT_WORD(mine).toLowerCase()}. The others play on.`
       : yourTurn
         ? "Your move"
         : "The boss is thinking…";
   return (
-    <div class={`screen game boss-screen rc-simul ${computer ? "rc-desk" : "rc-phone"}${ultOn ? " rc-ult" : ""}`}>
+    // (The small boards' "5 s!" as his ultimate comes, from the setting: styles.css, .rc-ult .rc-mini.)
+    <div class={`screen game boss-screen rc-simul ${computer ? "rc-desk" : "rc-phone"}${ultOn ? " rc-ult" : ""}`} style={{ "--rc-ult-note": `"${RECLUSE_PHASE2.ultMoveSeconds} s!"` }}>
       {hud}
       {!computer && (
         <div class="rc-minis" role="list" aria-label="The other boards">
@@ -540,7 +553,7 @@ export function SimulScreen({ match }: { match: GameView }) {
           {bossSide}
           <div class="eval-bar rc-evalgap" aria-hidden="true" />
           {computer ? (
-            <div class="board-wrap rc-stage">
+            <div class="board-wrap rc-stage" style={{ "--rc-cell": `${DESK.cell * 100}%`, "--rc-tagrow": `${DESK.tag}%` }}>
               {QUARTER_BOARD.map((id, q) => (
                 <div key={q} class={`rc-cell rc-q${q} rc-played`}>
                   <SimulBoard match={match} v={v} b={v.boards[id]!} now={now} marks={v.boards[id]!.you} />

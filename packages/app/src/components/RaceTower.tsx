@@ -24,6 +24,7 @@ export function RaceTower({
   done,
   cutLabel = "Cut line",
   floats,
+  bank = true,
 }: {
   standings: readonly Standing[];
   cutoff: number;
@@ -42,6 +43,11 @@ export function RaceTower({
    * when it went to everyone.
    */
   floats?: ReadonlyMap<string, ChatFloat>;
+  /**
+   * The time bank column (off in the Hidden Boss's phase 2, from his phase change: each player's time is their board's
+   * own clock then, on its tag, and the bank would show a clock nobody plays on).
+   */
+  bank?: boolean;
 }) {
   const ROW = mini ? 22 : 30;
   const alive = standings.filter((s) => !s.out);
@@ -86,7 +92,7 @@ export function RaceTower({
   const away = floats ? [...floats].filter(([id]) => !shown.has(id)).map(([, f]) => f).slice(-3) : [];
 
   return (
-    <div class={`tower${compact ? " tower-compact" : ""}${mini ? " tower-mini" : ""}`} style={{ "--row": `${ROW}px` }}>
+    <div class={`tower${compact ? " tower-compact" : ""}${mini ? " tower-mini" : ""}${bank ? "" : " tower-nobank"}`} style={{ "--row": `${ROW}px` }}>
       <div class="tower-head">
         <span>Pos</span>
         <span>Player</span>

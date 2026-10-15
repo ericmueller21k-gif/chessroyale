@@ -269,10 +269,9 @@ export function PlayScreen({
               </span>
             ) : waiting ? (
               <span>
+                {/* (How many have picked: the line above the board says it.) */}
                 <Dots /> <strong>{picked ? "Move in." : note?.out ? "Out of tries." : "Time's up."}</strong>{" "}
-                <span class="muted">
-                  Waiting · {doneCount}/{alive.length}
-                </span>
+                {alive.length > 1 && <span class="muted">Waiting for the others</span>}
               </span>
             ) : intro ? (
               <span class="muted">Get ready…</span>
@@ -284,9 +283,10 @@ export function PlayScreen({
                 </span>
               </span>
             ) : duelTurn(match.boss) ? (
-              // Wrangler's showdown: the rule the player must play by, whole, for the whole turn.
+              // Wrangler's showdown: the rule the player must play by, whole, for the whole turn. (Not the power's
+              // name: its banners said it.)
               <span class="duel-note">
-                <strong>Showdown!</strong> <span class="muted">Take one of his {duelCount(match.boss) === 2 ? "two" : "three"}.</span>
+                <strong>Take one of his {duelCount(match.boss) === 2 ? "two" : "three"} duels.</strong>
               </span>
             ) : (
               <span>
@@ -327,11 +327,7 @@ export function PlayScreen({
             <span>
               <strong>{picked ? "Move in." : "Time's up."}</strong> Waiting for other players
             </span>
-            {alive.length > 0 && (
-              <span class="waiting-count">
-                {doneCount}/{alive.length}
-              </span>
-            )}
+            {/* (How many have picked: the line above the board says it, "16/50 picked".) */}
           </div>
         ) : (
           <>

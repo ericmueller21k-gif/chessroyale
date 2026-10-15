@@ -13,7 +13,7 @@ export function LeaderboardSheet({ match, onClose }: { match: GameView; onClose:
             ✕
           </button>
         </div>
-        <RaceTower standings={view.standings} cutoff={view.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} />
+        <RaceTower standings={view.standings} cutoff={view.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} bank={!match.simul} />
       </div>
     </div>
   );

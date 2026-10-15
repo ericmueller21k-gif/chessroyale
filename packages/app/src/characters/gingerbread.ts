@@ -772,9 +772,9 @@ export const GINGER_LINES: Partial<Record<import("./boss-beats.ts").Beat, readon
   defeat: ["I… crumble…", "Oh, snap…", "Back to the oven…"],
   victory: ["Snap! I win!", "Sweet, sweet victory!", "Iced you all! Ha!"],
   strike: ["Snap! You're done!", "Crumbled!"],
-  power: ["Freeze!", "Chill out!", "Stay frosty!", "On ice you go!", "Cold feet?"],
+  power: ["Chill out!", "Stay frosty!", "On ice you go!", "Cold feet?"],
   ultimateWarn: ["A storm is brewing…", "Feel that chill?", "Wrap up warm…", "The frost is coming…"],
-  ultimate: ["BLIZZARD!", "Let it snow!", "Freeze, all of you!", "Snow day! Ha!"],
+  ultimate: ["Let it snow!", "Freeze, all of you!", "Snow day! Ha!"],
   ultimateHit: ["Melting? Already?!", "Hmph. Don't get comfy.", "My lovely ice!", "Drip, drip… bah!"],
 };
 export const GINGER_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {

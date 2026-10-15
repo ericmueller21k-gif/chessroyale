@@ -60,8 +60,12 @@ export interface MomentUi {
   order: number;
   /** Which of the kit's moments it is. */
   kit: KitMoment;
-  /** The dock's word for it ("Freeze!"): the boss's own words are in its text box (speech.tsx). */
-  dock: string;
+  /**
+   * What it means for you, in the dock, only where no banner says it (a moment without a banner, or whose banner has no
+   * line under its name). Left out: the dock keeps the turn's own line (the boss's move). Never the power's name: the
+   * banner names it, and the boss's bubble is his character (DECISIONS.md, "Nothing said twice").
+   */
+  dock?: (m: Pick<Moment, "kind" | "squares" | "fizzled">) => string | null;
   /** When what it puts on a square appears there (ms, wall clock); undefined: it puts nothing on that square. */
   appearAt?: (m: Moment, square: string, orientation: "white" | "black") => number | undefined;
   /** It plays on a screen of its own (the funhouse, his extra move, the Big Bounce) when this says so. */

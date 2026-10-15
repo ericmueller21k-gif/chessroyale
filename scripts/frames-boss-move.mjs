@@ -1,5 +1,5 @@
 // Frame-by-frame check of one move in a solo boss raid, the way a player makes it (two taps on the board).
-//   npm run frames:boss -- <out-dir> [boss name, default "Boingo"]
+//   npm run frames:boss -- <out-dir> [boss name, default "Boingo"] [width: a phone under 800 px, else a computer; default an iPhone 13]
 // Starts the app's dev server, picks a boss, taps a knight or bishop move, then saves a PNG every time the board's
 // pieces or the phase change for 12 s, and prints a timeline (ms, phase, piece count, frame). Read the frames: a piece
 // that jumps back, flickers or moves twice shows up as an extra frame. See .claude/LESSONS.md.
@@ -8,7 +8,7 @@ import { chromium, devices } from "@playwright/test";
 import { createServer } from "vite";
 import { Chess } from "chess.js";
 
-const [outArg = ".", bossName = "Boingo"] = process.argv.slice(2);
+const [outArg = ".", bossName = "Boingo", widthArg] = process.argv.slice(2);
 const out = resolve(outArg);
 // (From the app's folder, as the other frames scripts run: its Vite config finds its files from there.)
 process.chdir("packages/app");
@@ -16,7 +16,8 @@ const server = await createServer({ root: ".", configFile: "vite.config.ts", ser
 await server.listen();
 const url = server.resolvedUrls.local[0];
 const b = await chromium.launch();
-const p = await b.newPage({ ...devices["iPhone 13"] });
+const w = Number(widthArg);
+const p = await b.newPage(w ? { viewport: { width: w, height: w < 800 ? 760 : 800 }, deviceScaleFactor: w < 800 ? 2 : 1, isMobile: w < 800, hasTouch: w < 800 } : { ...devices["iPhone 13"] });
 p.on("pageerror", (e) => console.log("pageerror", e.message));
 await p.goto(url + "?debug&clock=30&nolanding");
 await p.getByRole("button", { name: "Boss alone" }).click();
