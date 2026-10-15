@@ -145,7 +145,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   serving the boards in turn (`phase2Next`: yours first). Each player's bank `bankSeconds` (120 s), no increment; he
   has no clock. Yours is the dock's clock, at the box's right (Oct 15). Each board's tag (`Tag`): on a computer, the
   player's name and clock at each board's corner; on a phone, each small board's clock just above it, off its pieces,
-  and the big board none when it's yours (the player's name on one you watch). A board ends by mate, a draw, time (`phase2Flags`) or resigning (`phase2Resign`); the others play on;
+  and the big board none when it's yours (the player's name on one you watch). A board ends by mate, a draw, time
+  (`phase2Flags`) or resigning (`phase2Resign`); the others play on;
   the battle ends when every board is decided, won only with all four won (`phase2Outcome`). Then his reaction
   (`RECLUSE_PHASE2.endMs`: beaten, the spellbook's glow as a placeholder for his transformation; he won, his laugh) and
   the result (`results.simul`: "won N of 4"). No power-ups, no items, no God King (absorbed). Engine move (admins)
