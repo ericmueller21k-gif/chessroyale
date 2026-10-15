@@ -838,16 +838,30 @@ function credits(src: FaqSources): FaqSection {
 - **Stockfish**, the chess engine behind the judge, the bosses and the bots: free software under the GPL-3.0 ([stockfishchess.org](https://stockfishchess.org), [source](https://github.com/official-stockfish/Stockfish), this build: [stockfish.js](https://github.com/nmrugg/stockfish.js) 19, [its source](/engine/stockfish-source.tar.gz), [license](/engine/COPYING.txt)). It runs as a separate program in your browser.
 - **Maia-3**, the human-like model ${src.brain.forPlayers ? "behind [the bosses](#maia-brain)" : "[being tested](#maia-brain) for bosses"}: by the CSSLab, University of Toronto, under the AGPL-3.0 ([Maia-3](https://github.com/CSSLab/maia3)). It runs as its own separate program in your browser; our Maia box's [source code](/engine/maia/maia-box-source.tar.gz) is free to download ([notice](/engine/maia/NOTICE.txt), [license](/engine/maia/LICENSE.txt)).
 - **The chess pieces**: drawn by Colin M.L. Burnett, from [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces), under the BSD license ([license](/licenses/pieces.txt)).
-- **Classic piece sounds** and their variations: [PyChess](https://github.com/pychess/pychess/tree/master/sounds) (GPL-3.0). The variations are made from PyChess's sounds by our own script ([license](/engine/COPYING.txt), [how each was made](/sounds/SOURCES.md)). Like the engines, they're separate files the game plays, not part of its code.
+- **Classic piece sounds** and their variations: [PyChess](https://github.com/pychess/pychess/tree/master/sounds) (GPL-3.0). The variations are made from PyChess's sounds by our own script ([license](/engine/COPYING.txt), [how each was made](/sounds/SOURCES.md), [their source](/sounds/pychess-sounds-source.tar.gz)). Like the engines, they're separate files the game plays, not part of its code.
 - **The app** is built with Preact (MIT) and chess.js (BSD), in the Archivo, Archivo Black and Press Start 2P fonts (SIL Open Font License) ([licenses](/licenses/third-party.txt)). Its other sounds are free of rights (CC0) or the game's own.
 - The same credits are at the foot of Settings.
 `,
   };
 }
 
+function privacyAndTerms(): FaqSection {
+  return {
+    id: "privacy",
+    title: "Privacy and terms",
+    body: `
+- [Privacy policy](/privacy): what we keep about you, why, for how long, and how to see or delete it.
+- [Terms of service](/terms): the rules for accounts, fair play, chat, names and icons, and virtual items.
+- [Copyright](/copyright): how to report a name or icon that copies your work.
+
+> Both are drafts until they're reviewed.
+`,
+  };
+}
+
 /** The FAQ's sections, in order, built from `src` (the game's settings unless a test says otherwise). */
 export function faqSections(src: FaqSources = FAQ_DEFAULTS): FaqSection[] {
-  return [modes(src), scoring(src), bossBrain(src), bossPowers(src), godKing(src), crates(src), fairPlay(), credits(src)];
+  return [modes(src), scoring(src), bossBrain(src), bossPowers(src), godKing(src), crates(src), fairPlay(), credits(src), privacyAndTerms()];
 }
 
 /** The line under the title. */
