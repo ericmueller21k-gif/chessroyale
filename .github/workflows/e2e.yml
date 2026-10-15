@@ -1,0 +1,156 @@
+# The whole Playwright e2e suite (both projects, phone and desktop) on every pull request to main and every push to
+# main, on 5 runners at once (about 17 minutes). Each shard runs whole spec files, spread by their measured time
+# (e2e/ci-shard.mjs, e2e/ci-timings.json). The `result` job puts one summary on the run's page (flaky tests first, then
+# failed ones, each with its shard and error; e2e/ci-summary.ts, ci-summary-merge.mjs) and is red if any shard is.
+#
+# Retries: 1 here until the flaky-test batch lands (the goal is 0, as playwright.config.ts has it). A test that passes
+# on the retry is "flaky": listed at the top of the summary, never hidden. Traces only on that retry (recording every
+# test costs about 8% more time). A shard with a failed or flaky test uploads its HTML report with those traces
+# (artifact `e2e-report-shard-N`, kept 7 days).
+#
+# Left out here: the @perf specs (e2e/perf.spec.ts), whose frame budgets depend on the machine's speed. Run them
+# locally, or from Actions → e2e → Run workflow with "perf" ticked (instead of the suite).
+#
+# Not a required check yet: Eric decides once it has proven itself over a few PRs (then require `result`). Docs:
+# CLAUDE.md "Test lanes" and docs/areas/ops.md.
+name: e2e
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      perf:
+        description: "Run the @perf specs (frame budgets, slowed phone) instead of the suite"
+        type: boolean
+        default: false
+
+# A new push to a pull request cancels its run still going; every push to main gets its own run.
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  # The app is built in its own step, so Playwright's web server only starts wrangler (playwright.config.ts).
+  E2E_PREBUILT: "1"
+  PLAYWRIGHT_HTML_OPEN: never
+  WRANGLER_SEND_METRICS: "false"
+  # (Keep in step with the matrix below.)
+  SHARDS: 5
+
+jobs:
+  shard:
+    if: ${{ !inputs.perf }}
+    name: shard ${{ matrix.shard }} of 5
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
+    env:
+      E2E_SHARD_LABEL: Shard ${{ matrix.shard }} of 5
+      E2E_SUMMARY_FILE: ${{ github.workspace }}/e2e-summary/shard-${{ matrix.shard }}.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Playwright version
+        id: pw
+        run: echo "version=$(node -p 'require("@playwright/test/package.json").version')" >> "$GITHUB_OUTPUT"
+      - name: Cache the Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-shell
+      # (The download is skipped when the cache has it; the system libraries are installed either way.)
+      - name: Install Chromium
+        run: npx playwright install --with-deps --only-shell chromium
+      - name: Build the app
+        run: npm run build
+      - name: Run shard ${{ matrix.shard }} of 5
+        run: |
+          files=$(node e2e/ci-shard.mjs ${{ matrix.shard }} "$SHARDS")
+          echo "Files: $files"
+          npx playwright test $files --grep-invert @perf --forbid-only --retries 1 --trace on-first-retry \
+            --reporter=list,github,html,./e2e/ci-summary.ts
+      - name: Keep the summary
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-summary-${{ matrix.shard }}
+          path: e2e-summary/
+          retention-days: 1
+          if-no-files-found: ignore
+          overwrite: true
+      # (On a failure, or when a test only passed on its retry: e2e/ci-summary.ts leaves shard-N.flaky.)
+      - name: Keep the report
+        if: ${{ failure() || hashFiles('e2e-summary/*.flaky') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report-shard-${{ matrix.shard }}
+          path: playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+          overwrite: true
+
+  result:
+    if: ${{ !cancelled() && !inputs.perf }}
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: e2e
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: e2e-summary-*
+          path: e2e-summary
+          merge-multiple: true
+      - name: Summary
+        run: node e2e/ci-summary-merge.mjs "$SHARDS" e2e-summary >> "$GITHUB_STEP_SUMMARY"
+      - name: Every shard green
+        if: ${{ needs.shard.result != 'success' }}
+        run: exit 1
+
+  perf:
+    if: ${{ inputs.perf }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Playwright version
+        id: pw
+        run: echo "version=$(node -p 'require("@playwright/test/package.json").version')" >> "$GITHUB_OUTPUT"
+      - name: Cache the Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-shell
+      - name: Install Chromium
+        run: npx playwright install --with-deps --only-shell chromium
+      - name: Build the app
+        run: npm run build
+      # One worker, so the specs don't share the runner's CPU with each other. A runner is neither Eric's phone nor the
+      # local machine: read the numbers as a trend, not a verdict.
+      - name: Run the perf specs
+        run: npx playwright test --grep @perf --project phone --workers 1 --forbid-only --reporter=list,github,html
+      - name: Keep the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-perf-report
+          path: playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
