@@ -4896,3 +4896,20 @@ only in the repository. It's now served as the engines' source is, so it holds w
   (`sounds-source.test.ts`) fails when `piece-sounds.py` changes and the archive wasn't made again, and checks the link
   is in Settings, the FAQ, `/licenses/third-party.txt` and `sounds/SOURCES.md`.
 - Not precached by the service worker (the build leaves out every `.tar.gz`), like the engines' archives.
+
+## One clock format; the dev tools run from the repo root (Oct 15, 2026)
+
+- **Every clock on screen is `clockShown`** (`packages/app/src/clock-text.ts`): m:ss in whole seconds rounded up, the
+  dock's rounding (.claude/LESSONS.md, "A countdown that seemed to fire early"). The scoreboard's Bank, the board's
+  clock and the HUD rounded down, so at the same moment they could show a second less than the dock. Its copies are
+  gone (RaceTower's `clockText`, Recluse2's and the queue's `clock`); Squads' `bankText` is `clockShown` with
+  `tenths`, unchanged: a chess clock's style, rounded down throughout ("3:05", then "9.4" under ten seconds), since
+  rounding up there would jump from "0:11" to "9.9" as the bank crosses ten seconds. The queue's "waiting 1:05" counts up, and rounding up there is a second ahead at most; one
+  formatter is worth more than that second.
+- **`vite.config.ts` finds its files from its own folder** (`APP`), not the folder Vite started in. From the repo root,
+  `npm run preview:items`, `frames:flash`, `frames:vote` and `node scripts/preview-god-king.mjs` failed with
+  "Stockfish 19.0.0 has no source archive"; the other frames scripts worked around it with
+  `process.chdir("packages/app")`. Those workarounds are gone: the scripts pass `root: "packages/app"` and the config's
+  path. `perf-boss.mjs`'s `PERF_DIST` is now read from the folder you run it in (the repo root).
+- **Testing:** light lane plus the clock specs: typecheck, the unit suite, `boss-dock`, `squads-clocks`, `crowd`,
+  `recluse` and `votes` (its bank check now rounds up), and each changed script run once from the repo root.

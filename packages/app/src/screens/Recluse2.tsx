@@ -25,6 +25,7 @@ import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
 import { BossHeading } from "./Play.tsx";
 import { useStillKey } from "../hooks.ts";
+import { clockShown } from "../clock-text.ts";
 
 /**
  * The Hidden Boss's phase change and his phase 2 (rules: packages/chess/src/bosses/recluse-phase2.ts; the driver:
@@ -384,7 +385,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
                       ? "The boss rises!"
                       : t < C.bannerAt
                         ? "One board becomes four…"
-                        : `${clock(RECLUSE_PHASE2.bankSeconds * 1000)} on your clock, no added time`}
+                        : `${clockShown(RECLUSE_PHASE2.bankSeconds * 1000)} on your clock, no added time`}
               </strong>
             </span>
             {/* (The second line kept, empty, so the box keeps its height.) */}
@@ -395,12 +396,6 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
     </div>
   );
 }
-
-/** m:ss. */
-const clock = (ms: number) => {
-  const s = Math.ceil(ms / 1000);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
 
 const RESULT_WORD = (b: SimulBoardView) => {
   const r = b.result!;
@@ -423,7 +418,7 @@ function Tag({ b, v, now, small, big }: { b: SimulBoardView; v: SimulView; now: 
   return (
     <span class={`rc-tag${b.you ? " you" : ""}${running ? " running" : ""}${low ? " low" : ""}`}>
       {!small && <span class="rc-tag-name">{b.name} </span>}
-      <span class="rc-tag-clock">{clock(left)}</span>
+      <span class="rc-tag-clock">{clockShown(left)}</span>
     </span>
   );
 }

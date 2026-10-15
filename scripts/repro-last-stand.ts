@@ -28,8 +28,7 @@ function hangsQueen(fen: string, move: string): boolean {
   return attackers.length > 0 && (attackers.some((a) => after.get(a as Square)!.type !== "q") || !after.isAttacked(to, piece.color));
 }
 
-process.chdir("packages/app");
-const server = await createServer({ root: ".", configFile: "vite.config.ts", server: { port: 5193, strictPort: false }, logLevel: "error" });
+const server = await createServer({ root: "packages/app", configFile: "packages/app/vite.config.ts", server: { port: 5193, strictPort: false }, logLevel: "error" });
 await server.listen();
 const url = server.resolvedUrls!.local[0]!;
 const browser = await chromium.launch();
