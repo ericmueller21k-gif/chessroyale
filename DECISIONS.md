@@ -3674,7 +3674,7 @@ moves. Players felt it as silent misgrading: a duplicated move's out-of-date num
 quietly ignored when the best move was the one left out. The castling move in the first report was a coincidence.
 
 **Only broken searches change:** a search with no move twice reads exactly as before, by construction (checked on the
-raw output of 1,300 saved searches: lite top 8 at 250k, single lines at 250k, re-checks at 700k, the server's at 2M).
+raw output of 1,000 saved searches: lite top 8 at 250k, single lines at 250k, re-checks at 700k, the server's at 2M).
 A first version also re-read a search whose last line was a bound naming another move (about 2 single-line searches in
 100), with that move and an older number; it was narrowed so those keep their old reading.
 
@@ -3683,6 +3683,11 @@ move's first line if it is listed twice).
 
 **Rollout:** during a deploy, a device on the old code and one on the new can disagree on an affected search; the
 lobby then asks a third judge and the engine server, as for any disagreement. Fine before launch.
+
+**Before and after** (`reports/engine-reader.md`): the judge's accuracy doesn't change beyond noise (judge-accuracy's
+positions re-scored with the fix: today's scorer's error −0.035 ± 0.022 points a pick). The boss's own Stockfish move
+changes in 7 of 1,200 positions (+0.03 points a move). In paired raids (about 24 games a boss, each code), no boss moves
+beyond noise; all together the crowd's score leans +0.05 ± 0.03 its way. Bosses keep their tuning.
 
 **Testing.** Full lane (judging numbers on every device and on the server): typecheck, the whole unit suite, the whole
 e2e suite. Unit: `packages/chess/test/uci.test.ts` (recorded lines where two moves swap slots and the search stops on
