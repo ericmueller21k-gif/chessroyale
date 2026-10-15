@@ -562,7 +562,7 @@ export function CrowdCut({
   }, []);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
   const aliveAfter = standings.filter((s) => !s.out).length - knockedOut.length;
-  // The last cut: what comes next (team final, boss battle, duel, or the final four).
+  // The last cut: what comes next (team final, boss battle or duel).
   const final = stage >= match.settings.knockoutsPerStage.length - 1;
   const next = finalName(match.settings);
   const s = match.settings;

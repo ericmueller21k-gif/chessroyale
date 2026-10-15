@@ -69,10 +69,14 @@ test("settings: the old home's options live here and stick", async ({ page }) =>
   const practice = page.getByRole("switch", { name: /Practice mode/ });
   await expect(practice).not.toBeChecked();
   await practice.click();
-  await page.getByRole("radio", { name: /Everyone moves/ }).click();
+  const votes = page.getByRole("switch", { name: /Pre-game votes/ });
+  await expect(votes).toBeChecked();
+  await votes.click();
   await page.reload();
   await expect(page.getByRole("switch", { name: /Practice mode/ })).toBeChecked();
-  await expect(page.getByRole("radio", { name: /Everyone moves/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("switch", { name: /Pre-game votes/ })).not.toBeChecked();
+  // Gone since Oct 15: Relaxed pace (each mode has its own) and Crowd's everyone-moves choice (always 50 v 50).
+  await expect(page.getByText(/Relaxed pace|Everyone moves/)).toHaveCount(0);
   await page.getByRole("button", { name: "Back" }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
 });

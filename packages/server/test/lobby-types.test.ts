@@ -4,7 +4,7 @@ import { setup } from "./lobby-fixture.ts";
 
 /** Matchmaking types in a lobby (Default, Bots off), and which matches count for ranking. Solo is the browser's. */
 
-const crowd = (): Partial<Settings> => ({ ...modeSettings("crowd", { crowdTeams: true, augments: false }), finalFormat: "team" });
+const crowd = (): Partial<Settings> => ({ ...modeSettings("crowd", { augments: false }), finalFormat: "team" });
 const join = (L: ReturnType<typeof setup>, n: number, from = 0) => {
   for (let i = 0; i < n; i++) expect(L.core.connect(undefined, `P${from + i}`, "phone", false, 1500).ok).toBe(true);
 };

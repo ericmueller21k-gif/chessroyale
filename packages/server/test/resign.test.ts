@@ -36,7 +36,7 @@ type Msg = ServerMessage;
  * the Durable Object runs it: every use of `core` is a fresh LobbyCore from the stored record (its match runner
  * restored from its snapshot), never one kept in memory between events.
  */
-function setup(settings: Partial<Settings> = {}) {
+function setup(settings: Partial<Settings> = {}, seed = 7) {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
   const closed: string[] = [];
@@ -45,7 +45,7 @@ function setup(settings: Partial<Settings> = {}) {
     send: (id: string, msg: object) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as Msg]),
     close: (id: string) => void closed.push(id),
   };
-  const rng = mulberry32(7);
+  const rng = mulberry32(seed);
   const base = { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...settings };
   let record = newLobbyRecord("ABCDE", now);
   let kept: LobbyCore | null = null;
@@ -107,7 +107,7 @@ const join = (L: Lobby, n: number, first = 1) => {
 };
 /** A matchmade (Default) Crowd 50 v 50 with `n` people and bots in the other seats, run on to move 1. */
 function crowd(n: number, extra: Partial<Settings> = {}) {
-  const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }), ...extra });
+  const L = setup({ ...modeSettings("crowd", { augments: false }), ...extra });
   L.core.setAuto(L.now + 60_000);
   join(L, n);
   L.advance(60_000);
@@ -157,7 +157,7 @@ describe("resigning online: Crowd 50 v 50 and raids", () => {
   });
 
   it("before move 1 (the votes) it's just Leave: nothing recorded, their vote goes with them, a bot sits in", () => {
-    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }) });
+    const L = setup({ ...modeSettings("crowd", { augments: true }) });
     L.core.setAuto(L.now + 60_000);
     join(L, 2);
     L.advance(60_000);
@@ -177,7 +177,7 @@ describe("resigning online: Crowd 50 v 50 and raids", () => {
   });
 
   it("Cancel on the queue screen once its seats have filled (an older app's \"leave\") is leaving the match: a bot sits in", () => {
-    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }) });
+    const L = setup({ ...modeSettings("crowd", { augments: true }) });
     L.core.setAuto(L.now + 60_000);
     join(L, 2);
     L.advance(60_000);
@@ -272,21 +272,30 @@ describe("resigning online: Crowd 50 v 50 and raids", () => {
     expect(L.core.connect(token, "P2", "phone")).toMatchObject({ ok: false, ended: true, left: { how: "away" } });
   });
 
-  it("someone away doesn't hold the move up: it locks once everyone here has moved (with nobody here, it waits for the clock)", () => {
-    // Everyone moves (no teams): both people pick every move. (No cut for a while: p2's misses mustn't put him out.)
-    const L = setup({ ...modeSettings("crowd", { crowdTeams: false, augments: false }), firstStageRounds: 10, roundsPerStage: 10 });
-    L.core.setAuto(L.now + 60_000);
-    join(L, 2);
-    L.advance(60_000);
-    L.until(() => L.core.record.phase === "play");
+  it("someone away doesn't hold the move up: it locks once everyone here on the team to move has moved (with nobody here, it waits for the clock)", () => {
+    // Both people on White, so both pick every White move: a lobby seed that does it, searched for. (No cut for a
+    // while: p2's misses mustn't put him out.)
+    const start = (seed: number) => {
+      const L = setup({ ...modeSettings("crowd", { augments: false }), firstStageRounds: 10, roundsPerStage: 10 }, seed);
+      L.core.setAuto(L.now + 60_000);
+      join(L, 2);
+      L.advance(60_000);
+      L.until(() => L.core.record.phase === "play");
+      return L;
+    };
+    const both = (L: Lobby) => L.runner().state.players.filter((p) => !p.isBot).every((p) => p.colour === "w");
+    let seed = 1;
+    let L = start(seed);
+    while (!both(L) && seed < 200) L = start(++seed);
+    expect(both(L)).toBe(true);
     L.core.disconnect("p2");
     const r = L.last("p1", "round")!;
     L.core.message("p1", { t: "pick", key: r.key, move: legalMoves(r.board!.fen)[0]! });
     expect(L.core.record.phase).toBe("scoring");
-    // Next move: p2 back and p1 picks: the move waits for p2.
+    // White's next move (Black's bots move between): p2 back and p1 picks: the move waits for p2.
     const token = L.core.record.humans.find((h) => h.id === "p2")!.token;
     L.core.connect(token, "P2", "phone");
-    L.until(() => L.core.record.phase === "play" && L.last("p1", "round")!.key !== r.key);
+    L.until(() => L.core.record.phase === "play" && L.last("p1", "round")!.key !== r.key && !L.last("p1", "round")!.watching);
     const r2 = L.last("p1", "round")!;
     L.core.message("p1", { t: "pick", key: r2.key, move: legalMoves(r2.board!.fen)[0]! });
     expect(L.core.record.phase).toBe("play");
@@ -344,7 +353,7 @@ describe("resigning online: Crowd 50 v 50 and raids", () => {
   });
 
   it("a private lobby nobody started closes when its last person presses Leave (its code stops working); while anyone's there, the idle rule", () => {
-    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }) });
+    const L = setup({ ...modeSettings("crowd", { augments: false }) });
     join(L, 2);
     L.core.message("p1", { t: "leave" });
     expect(lobbyClosing(L.core.record, true)!.reason).toBe("idle");
@@ -352,7 +361,7 @@ describe("resigning online: Crowd 50 v 50 and raids", () => {
     L.core.message("p2", { t: "leave" });
     expect(lobbyClosing(L.core.record, false)).toEqual({ at: L.now, reason: "idle" });
     // (A resign from the waiting room is the same Leave, and says so.)
-    const M = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }) });
+    const M = setup({ ...modeSettings("crowd", { augments: false }) });
     join(M, 1);
     M.core.message("p1", { t: "resign" });
     expect(M.last("p1", "resigned")).toEqual(expect.objectContaining({ how: "early", result: null }));

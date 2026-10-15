@@ -39,7 +39,7 @@ async function capture() {
     frames.push({ file, t });
   }
 }
-await page.goto(`${BASE}/?debug&mode=crowd&turns=teams&augments=0&clock=10&nolanding`);
+await page.goto(`${BASE}/?debug&mode=crowd&augments=0&clock=10&nolanding`);
 await page.getByLabel("Your name").fill("Hunter");
 const capturing$ = capture();
 await page.getByRole("button", { name: /Play solo vs 99 bots/ }).click();

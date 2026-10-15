@@ -6,14 +6,14 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 ## How it works today
 
 - **A mode is a preset over one engine.** `modeSettings()` and `CROWD_SETTINGS` / `RAID_SETTINGS` in settings.ts
-  patch `DEFAULT_SETTINGS`. Three modes are played:
+  patch `DEFAULT_SETTINGS`. Two are played on these screens:
   - **Crowd 50 v 50** (the main mode): 100 players, one board, two teams of 50, each playing one side all game. Every
-    player picks a move each turn; the **most popular** pick is played (`drawRuleByStage: ["popular"]`). Bots fill
-    empty seats (see [matchmaking.md](matchmaking.md)).
-  - **Crowd "everyone moves"** (`crowdTeams: false`): everyone picks for whichever side is to move; a 2v2 final of the
-    last four.
-  - **Boss raid** (`RAID_SETTINGS`): up to 50 people (no bots online) pick the crowd's moves together against a boss,
-    from a named opening 5 moves in. Solo's "Boss alone" is a raid with a crowd of one. See [bosses.md](bosses.md).
+    player picks a move on their team's turns; the **most popular** pick is played (`drawRuleByStage: ["popular"]`).
+    Bots fill empty seats (see [matchmaking.md](matchmaking.md)). Always team turns (`crowdTeams` in
+    `CROWD_SETTINGS`): the "everyone moves" choice went on Oct 15, 2026 (DECISIONS.md).
+  - **Boss raid** (`RAID_SETTINGS`, `crowdTeams: false`): up to 50 people (no bots online) pick the crowd's moves
+    together against a boss, from a named opening 5 moves in. Solo's "Boss alone" is a raid with a crowd of one. See
+    [bosses.md](bosses.md).
 - **Scoring.** Every pick is scored by how much expected score it gives away against the best move (1 point = 0.01 of
   expected score), from the judge's numbers. A miss scores `missedMoveScore`. Scores carry over all game in Crowd. A
   **brilliant** move is one that separated the field (among enough pickers); a pick made after a power-up's hints
@@ -84,7 +84,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   takes what you think beyond the increment out of the bank; a quicker move banks the rest, as on a chess clock (the
   bank isn't capped at its start). An empty bank still leaves the increment. The clock vote sets all three; the match is
   made with the default bank, so the vote's patch resets every bank before move 1 (`startBanks`, from
-  `MatchRunner.patchSettings`). Without the vote (votes off, everyone moves, raids) it's Rapid 10+5, 20 s a move. Only
+  `MatchRunner.patchSettings`). Without the vote (votes off, raids) it's Rapid 10+5, 20 s a move. Only
   your own team's moves run your clock. The board's clock shows this move's seconds and your bank, draining live from
   bank + increment as you think; the scoreboard's BANK updates after each move. Online, each `round` message carries
   the move's cap (`moveClock`) and the increment (`increment`), so a reloaded app has them. The finals (team final,
@@ -132,8 +132,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 
 ## Settings
 
-`OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `CROWD_EVERYONE_KNOCKOUTS`, `PACE_SETTINGS`
-(relaxed/quick; tests use quick), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
+`OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
+(the `?pace=quick` test switch, per mode; players always play the mode's own pace), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
 `moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
 time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
 

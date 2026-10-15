@@ -8325,7 +8325,7 @@ a.fd-row-link {
 }
 .fd-seg {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   background: var(--fd-panel);
   border-radius: 12px;
@@ -8345,14 +8345,6 @@ a.fd-row-link {
   justify-content: center;
   gap: 2px;
   cursor: pointer;
-}
-.fd-seg.three {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.fd-seg button span {
-  font-size: 11px;
-  font-weight: 400;
-  opacity: 0.8;
 }
 .fd-seg button.on {
   background: var(--fd-gold);

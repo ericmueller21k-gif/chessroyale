@@ -30,7 +30,7 @@ const phase = () => p.evaluate(() => window.match?.phase.kind ?? "none").catch((
 // Solo 50 v 50 with the votes on; until you're on the side asked for (a fresh match each try).
 let side = null;
 for (let attempt = 0; attempt < 12; attempt++) {
-  await p.goto(url + "?debug&nolanding&mode=crowd&turns=teams&augments=1&pace=quick");
+  await p.goto(url + "?debug&nolanding&mode=crowd&augments=1&pace=quick");
   // Matchmaking: Solo, then PLAY (the seats fill with bots, then the match).
   await p.getByRole("radio", { name: /^Solo/ }).click();
   await p.getByRole("button", { name: "PLAY", exact: true }).click();
