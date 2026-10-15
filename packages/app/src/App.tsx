@@ -10,6 +10,7 @@ import { enginePool } from "./engine.ts";
 import { cutLabel, elimination, isCrowd, roundLive, towerView, type GameView } from "./game.ts";
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
 import { exitFor, exitMatch, onExitMatch } from "./match-exit.ts";
+import { useRecluseTalk } from "./recluse-talk.ts";
 import { MatchMenu } from "./components/MatchMenu.tsx";
 import type { LeftHow } from "@chessroyale/chess";
 import { SoloMatch } from "./solo.ts";
@@ -322,6 +323,8 @@ export function App() {
   /** A computer (the front door's frame): the queue fills in place, with the lobby's chat beside it. */
   const computer = useMedia("(min-width: 1024px)");
 
+  // The Hidden Boss's chatter, all through his fight, whatever screen shows it.
+  useRecluseTalk(match);
   useEffect(() => {
     if (!match) return;
     const off = match.subscribe(() => rerender(undefined));

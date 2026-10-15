@@ -810,6 +810,28 @@ export const HOLLOW_LIGHTS: { readonly colours: readonly { readonly name: string
  * an admin's Boss alone (you on one board, bots on the other three) and a solo Crowd's boss final (the other finalists on
  * the other three; Oct 14). Not online yet: there phase 1 won is the crowd's victory.
  */
+/**
+ * The Hidden Boss's chatter (Eric, Oct 15: "he stopped saying voice lines after like 10 moves... he should be slowly,
+ * as the game goes on, saying those lines about being teamed up on and getting more upset"): one line about every
+ * `everyMs` of play, give or take `jitterMs`, in phase 1 (the whole of it, the bullet stretch too) and in phase 2 (while
+ * any board is in play); `recluse-talk.ts`. By the clock, not by moves: moves come at very different speeds (a slow
+ * think early in phase 1, a second each in its bullet stretch, one board left late in phase 2), and phase 2's old
+ * every-8-of-his-moves went quiet for minutes once boards ended. A line is said only when no other line of his is up
+ * and, in phase 1, on your own move (never over his moments, whose lines come first); due but blocked, it's tried again
+ * `retryMs` later instead of waiting a whole interval. Stages by play time so far (`middleFromMs`, `lateFromMs`, per
+ * phase): suspicious muttering, then accusations, then angry ranting. 15 s: a line, read and gone (about 5 to 8 s),
+ * then a quiet spell about as long, so he keeps talking without drowning out his moments or the God King.
+ * Phase 1 (about 3 to 6 minutes: six slow moves, then the bullet stretch): the middle from 1:15, the late from 3:00.
+ * Phase 2 (about 2 to 5 minutes): the middle from 0:45, the late from 1:45. Estimates, to tune after playtests.
+ */
+export const RECLUSE_TALK = {
+  everyMs: 15_000,
+  jitterMs: 3_000,
+  retryMs: 1_500,
+  1: { middleFromMs: 75_000, lateFromMs: 180_000 },
+  2: { middleFromMs: 45_000, lateFromMs: 105_000 },
+} as const;
+
 export const RECLUSE_PHASE2 = {
   /** How many boards (all of them must be won to beat him). */
   boards: 4,
@@ -861,17 +883,6 @@ export const RECLUSE_PHASE2 = {
   botSlowMs: [5400, 7000] as readonly [number, number],
   /** Once every board is decided: how long his reaction holds the boards before the result screen (ms). */
   endMs: 3200,
-  /**
-   * His collusion lines in phase 2 (Eric, Oct 14: the four boards against a team fit his story): one every `talkEvery`
-   * of his moves (all four boards together), give or take `talkJitter` (a random pick each time); a line comes only if
-   * no other is up (the lowest priority: skipped, never queued). Which stage by his moves so far: early, then middle
-   * from `talkMiddleFrom`, late from `talkLateFrom`. Estimates: on four boards he moves about once a second, so a line
-   * every 6 to 10 s, the middle from about half a minute in, the late after about a minute.
-   */
-  talkEvery: 8,
-  talkJitter: 2,
-  talkMiddleFrom: 24,
-  talkLateFrom: 64,
 };
 
 /** BOSS_POWERS with room for other numbers (tests, and the switch turned off). */

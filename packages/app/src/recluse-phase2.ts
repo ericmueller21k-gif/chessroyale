@@ -1,6 +1,5 @@
 import { RECLUSE_PHASE2 } from "@chessroyale/core";
 import { RECLUSE, RECLUSE_JUMP } from "./characters/recluse.ts";
-import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { animLength, cueAt } from "./characters/power-art.ts";
 import {
   LAST_STAND,
@@ -216,42 +215,6 @@ export function smoothPath(pts: readonly Pt[]): string {
   }
   const last = pts[pts.length - 1]!;
   return `${d} L${f(last[0])} ${f(last[1])}`;
-}
-
-/** Which stage of his collusion lines phase 2 has reached, by his moves so far on all the boards. */
-export function talkStage(moves: number): "early" | "middle" | "late" {
-  return moves >= RECLUSE_PHASE2.talkLateFrom ? "late" : moves >= RECLUSE_PHASE2.talkMiddleFrom ? "middle" : "early";
-}
-
-/**
- * His chatter in phase 2: after every few of his moves (`talkEvery`, give or take `talkJitter`), a line. Every third,
- * from the first, mocks the engine he took from the God King (RECLUSE_LINES.engine, in turn); the rest are his collusion
- * lines (RECLUSE_LINES.collusion), of the stage the fight has reached, each stage's in turn. The lowest priority of his
- * lines: if anything is being said (a slow-move line, his ultimate's, a board's), this one is skipped, not queued, and the
- * next comes after the next few moves.
- */
-export class Talk {
-  private next: number;
-  private said = { early: 0, middle: 0, late: 0 };
-  private lines = 0;
-  private engine = 0;
-  constructor(private readonly rng: () => number) {
-    this.next = this.after(0);
-  }
-  private after(n: number) {
-    const { talkEvery, talkJitter } = RECLUSE_PHASE2;
-    return n + talkEvery - talkJitter + Math.floor(this.rng() * (2 * talkJitter + 1));
-  }
-  /** After his `moves`-th move: the line he says now, or null (not due yet, or something else is being said: `busy`). */
-  lineAfter(moves: number, busy: boolean): string | null {
-    if (moves < this.next) return null;
-    this.next = this.after(moves);
-    if (busy) return null;
-    if (this.lines++ % 3 === 0) return RECLUSE_LINES.engine[this.engine++ % RECLUSE_LINES.engine.length]!;
-    const stage = talkStage(moves);
-    const lines = RECLUSE_LINES.collusion[stage];
-    return lines[this.said[stage]++ % lines.length]!;
-  }
 }
 
 /** His ultimate where he stands (playInPlace): the spellbook opened, held, slammed shut. */

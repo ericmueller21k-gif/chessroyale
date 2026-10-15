@@ -4379,3 +4379,79 @@ My calls:
 Tests: `packages/server/test/engine-server.test.ts` (a refused position never reaches the container stub, from the
 endpoint (400, the budget untouched), `serverScoreAt` (one line logged) or fair play's search; a legal one does,
 Chess960 included); `fairplay-deep.test.ts`'s last test (passed over, the match done).
+
+## The Hidden Boss keeps talking: his chatter in both phases, by the clock (Eric, Oct 15, 2026)
+
+Eric, after playing him on his iPhone: "he stopped saying voice lines after like 10 moves. He should be slowly, as the
+game goes on, saying... those lines about like being teamed up on and like getting more upset." That was phase 1. Same
+reach as before: admins only, in Boss alone; no rule, protocol or stored data changed.
+
+**The cause.**
+- **Phase 1 had no chatter at all.** His lines there were his entrance, the bullet clock's line (turn 7), the "time per
+  move" line (turn 10), the God King's help mocked, and `rattled` (behind on material, now and then). After turn 10 he
+  had nothing left to say: Eric's "after like 10 moves". The collusion lines were built for phase 2 only.
+- **Phase 2's would have gone quiet the same way:** a line every 8 (±2) of his moves, the stage by his move count,
+  assuming he moves about once a second on four boards. He moves only when a player does, so with one board left at
+  10 to 20 s a move that's a line every 1 to 3 minutes; and a line due while any other was up was skipped and the next
+  pushed a whole 8 moves on. (`bossVoice.line()` is up exactly as long as the line shows, typing, reading and fade: not
+  a cause.)
+
+**The fix: one mechanism for both phases, by the clock** (`packages/app/src/recluse-talk.ts`; `RECLUSE_TALK` in
+settings.ts).
+- **A line about every 15 s of play** (`everyMs` 15 s, give or take `jitterMs` 3 s): in phase 1 from his first "play"
+  turn to the end (the 1+0 and 1+2 bullet stretch too), in phase 2 while any board is in play. Moves come at very
+  different speeds (a slow think early in phase 1, a second each in its bullet stretch, one board left late in phase 2),
+  so the clock is the one measure that keeps a steady pace. 15 s (the director's figure, kept): a line, read and gone in
+  about 5 to 8 s, then a quiet spell about as long, so he keeps talking without drowning out his moments or the God
+  King (whose voice is his own).
+- **When he may talk** (`talkWhen`): phase 1, on the crowd's move once its clock runs, or while he thinks over his own;
+  never over his intro, a power's moment (the bullet clock's and "time per move" come before your clock starts) or his
+  fall. Phase 2, while a board is in play.
+- **Never in the way:** the lowest priority, as before (`CHATTER`): said only when no other line of his is up, and any
+  other line cuts in on it. Due but blocked (another line up), it's tried again `retryMs` (1.5 s) later, not a whole
+  interval on; due outside a moment he may talk, it waits for the next one.
+- **Stages by play time so far** (`talkStage`): suspicious muttering, accusations, angry ranting. Phase 1 (about 3 to 6
+  minutes: six slow moves, then the bullet stretch): the middle from 1:15, the late from 3:00. Phase 2 (about 2 to 5
+  minutes): from 0:45 and 1:45. My call: play time over another measure of the fight (material, moves): the simplest,
+  the same in both phases, and his temper rising with the clock reads right.
+- **No repeats:** each stage's lines in a shuffled order, none again until all have been said (then a fresh order, never
+  starting with the line just said). In phase 2 every third line, from the first, still mocks the engine he took, in turn.
+- **One driver** (`useRecluseTalk`, called once from `App.tsx`): a look every 0.5 s while his fight is on screen, whatever
+  screen shows it. It reads only the match's view (its phase, his boss view, phase 2's boards), so the Crowd final's
+  online phase 1 against him (#213) gets the same chatter with no change, each device driving its own from its own view
+  (its own shuffle and timing), as every voice already lives on its device; `crowd-hidden.spec.ts`'s online test sees it.
+  Only those fighting him hear it: a player knocked out before his final (who watches it) doesn't (my call: his
+  muttering is at the team in front of him). Phase 2's old move counter (`Talk`, `talkEvery`,
+  `talkJitter`, `talkMiddleFrom`, `talkLateFrom`) is gone; `Phase2Game.onBossMove` stays (counted, unused by chatter).
+
+**Lines** (`RECLUSE_LINES.talk[1]` and `talk[2]`, replacing `collusion`). Phase 1 is you with the God King (an engine at
+your side) against him, or the team in the Crowd final; lines about four boards or each other's boards stay phase 2's.
+- **Moved to phase 1** (as they were, never altered): the placeholder "Who told you that move?" (it fits a lone player
+  with the God King) and three of his own words from Sports Illustrated: "They consulted during the games.", "They would
+  openly analyze my game while I was still playing it." (middle), "It made me mad that they thought they could get away
+  with it." (late). Each QUOTE now sits in one phase only, so a fight never says one twice in its chatter. Phase 2 keeps
+  "They agreed ahead of time to draw the games they played against each other.", "They worked as a team." and "I will
+  never again play in one of these tournaments.".
+- **New, PLACEHOLDERS** (ours, not his words), phase 1: early "That came quickly. Too quickly.", "Is someone whispering to
+  you?", "You keep looking over at him. Why?", "I know an engine move when I see one."; middle "He's feeding you moves.
+  Don't think I can't see it.", "You and your golden friend, picking my games apart together.", "Two against one.
+  Curaçao all over again.", "A king in armor whispering moves. Is that chess?", "You two have been talking about my games. I know it." (seven:
+  the middle runs 1:45, about seven lines; a played run said all six it had, then one again); late "Petrosian did this. Keres did this.
+  Now you!", "Teamwork! Always teamwork against me!", "Analyze it together, then! It won't save you!", "Geller, Keres,
+  Petrosian... and now a king in armor!", "Enough whispering! Play your own moves!", "A whole team against me, as
+  always!". Phase 2's late stage, which a long phase 2 ran through: "Whispering across the boards again! I hear you!",
+  "Every board, the same plan! Who wrote it?".
+- Eric's rules hold (a test checks the first and the last): last names only, never the words for their country or its
+  people, nothing about Korchnoi's games.
+
+**Measured.** Unit `packages/app/test/recluse-talk.test.ts` simulates long fights with real move timing, the driver's
+looks every 0.5 s and the other lines said into the same voice: phase 1 to move 60 (six moves at 5 to 25 s, his turns,
+the bullet clock's CRITICAL line, three moves at 1 to 3 s, the "time per move" line, then 1 to 4 s a move, his reactions
+now and then; 400 to 450 s), five seeds: 23 to 28 lines, a mean gap of 15.6 to 16.9 s, the longest 18 to 27.5 s (where
+his bullet line was up when one came due: his own words first), never quiet (no line of his up) more than 18.5 s. Phase
+2 down to one board, a move every 10 to 20 s for ten minutes, slow-move and board lines now and then: 39 lines, mean gap
+15.2 to 15.5 s, the longest 18 to 21 s, never quiet more than 17 s (the old counter: one every 60 to 200 s there). E2e
+`recluse.spec.ts` logs his lines over about three minutes of a played phase 1 (a phone, Stockfish's moves at a person's
+pace, 34 moves): his entrance at 0.1 s; chatter at 14.0, 30.0, 44.0, 63.5, 77.0, 90.5, 103.5, 121.0, 134.0, 149.5 and
+167.5 s; the bullet clock's line at 37.3 s and "time per move" at 55.3 s, each whole, the chatter around them (gaps 13
+to 19.5 s).
