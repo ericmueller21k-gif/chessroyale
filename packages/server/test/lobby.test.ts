@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, FRONT_DOOR, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, FRONT_DOOR, crowdFinalists, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
 import { LAST_STAND_MS, applyMove, bossIntroTimeline, legalMoves, sanLineToUci, toSan, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -544,7 +544,7 @@ describe("lobby: Crowd mode", () => {
     expect([1, 2, 5, 6, 7].map((m) => clocks.get(m))).toEqual([10, 10, 10, 15, 15]);
   });
 
-  it("boss battle online: the host plays the boss's moves, the boss strikes every 3 crowd moves, results carry the outcome", () => {
+  it("the boss final online (always the Hidden Boss): the host plays his moves, he never strikes, results carry the outcome", () => {
     const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }), finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0, bossMaxMoves: 7 });
     // (Ann has switched the eval bar off; Bo's app is from before the setting: it doesn't say.)
     L.core.connect(undefined, "Ann", "computer", false, null, undefined, undefined, null, false);
@@ -585,7 +585,8 @@ describe("lobby: Crowd mode", () => {
     }
     expect(L.core.record.phase).toBe("results");
     expect(bossMoves).toBeGreaterThan(0);
-    expect(strikes).toBe(2);
+    expect(L.core.save().runner!.state.boss!.id).toBe("recluse");
+    expect(strikes).toBe(0);
     const res = L.last("p1", "results")!;
     expect(["crowd", "boss", "draw"]).toContain(res.bossResult);
     expect(Object.keys(res.placements)).toHaveLength(100);
@@ -599,14 +600,17 @@ describe("lobby: Crowd mode", () => {
     for (const r of mine) {
       expect(r.cuts).toBeGreaterThan(0);
       expect(r.cuts).toBeLessThanOrEqual(stages);
-      expect(r.cutsSurvived).toBe(r.cuts === stages && r.placement <= 10 ? stages : r.cuts! - 1);
+      // (The top 4 fought him: crowdFinalists.)
+      const fought = r.placement <= crowdFinalists("boss");
+      expect(r.cutsSurvived).toBe(r.cuts === stages && fought ? stages : r.cuts! - 1);
       expect(r.brilliant).toBeGreaterThanOrEqual(0);
       expect(r.bestMove).toMatch(/^(?:[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O(?:-O)?)[+#]?$/);
       expect(r.bossElo).toBeNull();
-      if (r.placement <= 10) {
-        expect(r.strikes).toBeGreaterThanOrEqual(r.strikesSurvived!);
-        expect(r.survived).not.toBeNull();
-        expect(r.lastStand).not.toBeNull();
+      if (fought) {
+        expect(r.strikes).toBe(0);
+        expect(r.strikesSurvived).toBe(0);
+        expect(r.survived).toBe(true);
+        expect(r.lastStand).toBe(false);
       } else expect(r.strikes).toBeNull();
     }
   });

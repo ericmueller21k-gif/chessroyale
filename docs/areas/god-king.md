@@ -6,7 +6,9 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 
 - **Who he is.** The crowd's champion in every boss battle (the raid, the Crowd's boss final, solo's "Boss alone"). He
   stands in the dock under the board (a computer: by the board's bottom-right corner, mirroring the boss by its
-  bottom-left, his words and menu opening outwards; Eric, Oct 11), talks now and then, and can be called to act. He is
+  bottom-left, his words and menu opening outwards; Eric, Oct 11; a phone: on a line of his own under the dock's row, in
+  its middle, his words and menu opening above the row, or beside the row where the screen's column has room right of
+  the board; Eric, Oct 15: see [bosses.md](bosses.md), "The dock under the board"), talks now and then, and can be called to act. He is
   secondary to the chess: big moments are rare and short, and there is no instruction text on screen.
 - **Charges.** He has up to `kingChargesMax` (3) charges. Power-ups convert to charges (`kingPowerUpsPerCharge`).
   Tapping him opens his command menu: **play this move** (he plays the best move for the crowd, with his bolt) or
@@ -16,6 +18,9 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   `boss-powers.ts`, from `callStrike` in the runner). Bots in the crowd follow him (`kingBotLoss`, `kingBotFollow`).
 - **His word after Ginger's blizzard** names what the storm left free: the queen's lines, the king's
   (`blizzardKing`), or another piece's (`blizzardOne`), from the moves allowed.
+- **No charges left** (Eric, Oct 15): a tap on him gets his soft "can't" (two quick, muffled low notes falling,
+  synthesized: `characters/god-king-sounds.ts`, made ahead in the sound worker's table as the bosses' are, `kingCant`)
+  and a tiny shake, dimmed a moment (`.gk-unit.nope`, 0.4 s); nothing else (no menu, nothing spent).
 - **The clock stands still** while he acts, for everyone, solo and online: a move lengthens the reveal by
   `KING_COMMAND.moveMs`, a strike stops every deadline for `kingStrikeMs`. Nothing he does costs anyone time.
 - **His Last Stand.** Always armed, once per game. If the crowd's played move gives away at least the bar (in points
@@ -41,7 +46,10 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   help won't take hold (`mockKingHelp` in `components/Recluse.tsx`). Each try spends its charge as if it had worked
   (Eric, Oct 14: "using the king's move doesn't draw down on the usage vs him like it should"; the runner's
   `kingTried`, solo's `callKing`, in phase 1): the crowns go down one a try, and with none left he can't be called,
-  as against any boss. Your move goes on (he played nothing); the Last Stand, which nobody calls, spends nothing. In
+  as against any boss. Online (the Crowd's boss final, Oct 14) the same: `NetMatch.callKing` sends the try and shows
+  the crown gone at once, the lobby spends it (`kingTried`; never a turn, a strike or a tally); the mock plays on the
+  device that tried, and the others see the crown gone with the move's reveal. Your move goes on (he played nothing);
+  the Last Stand, which nobody calls, spends nothing. In
   this fight he opens with his own line as "START!" comes ("I sense a tremendous power within this foe.", Eric's;
   `foeIntro`, said by the boss screen's intro), and his
   lines about calling him (the nudge, "spent", "A charge might turn it") are left out (`turnCues`' `noHelp`). His
@@ -52,7 +60,8 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   power into a raised hand: his Last Stand's blows flash and crack him (his own frames), he flickers and cries out
   (`foeDrained`); and as it lands he fades up and away in light. No new frames of his: the aura, the flicker and the fade
   are CSS over his figure (`.gk-aura`, `.gk-unit.gk-drained`, `.gk-fading`). From then on he's gone: his place in the
-  dock stays, empty (`king="gone"`), nothing to tap, and he says nothing in phase 2 (his phase 2 lines are gone).
+  dock stays, empty (`king="gone"`), nothing to tap, and he says nothing in phase 2 (his phase 2 lines are gone). (On a
+  phone, where his place is a line under the dock's row, that line closes up instead: the row above doesn't move.)
 - **His lines** come from cues (a new danger to your queen or king, a mate threat, a queen taken, his own acts, a boss
   power…). Critical cues always speak; everything else is paced by `KING_SPEECH` (about 5 to 10 lines a game). Each
   line then follows the speech rule every speaker shares (`speech.tsx`, `SPEECH`; Oct 10): it types out and stays
@@ -89,7 +98,7 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 | The dock and his command menu | `packages/app/src/components/BossDock.tsx` |
 | His lines | `packages/app/src/godKing.ts` (against the Hidden Boss: `characters/recluse-lines.ts`) |
 | The boss screens | `packages/app/src/screens/Boss.tsx`, the boss parts of `Crowd.tsx` and `Play.tsx` |
-| Sounds | `packages/app/public/sounds/god-king/`, `public/sounds/banner/` (CC0, credited in `CREDITS.md`), `src/sound.ts` |
+| Sounds | `packages/app/public/sounds/god-king/`, `public/sounds/banner/` (CC0, credited in `CREDITS.md`), `src/sound.ts`; synthesized (his "can't"): `src/characters/god-king-sounds.ts` |
 
 ## Settings
 
@@ -99,11 +108,15 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 
 ## Tests and tools
 
+- His "can't" (no charges left): unit `packages/app/test/god-king.test.ts` (under a move's loudness, the same every
+  time, in the sound worker's table); e2e `e2e/recluse.spec.ts` (the sound and the shake, no menu).
 - Against the Hidden Boss: unit `packages/chess/test/recluse.test.ts` (blocked; a try spends its charge, the Last Stand
   nothing), `packages/app/test/recluse-boss.test.ts` (the mocks, his cues, solo's `callKing` spending),
   `packages/app/test/recluse-phase2.test.ts` (absorbed: his look at each moment of the phase change, gone for good, his
-  triumph giving way to his cry, silent in phase 2); e2e `e2e/recluse.spec.ts` (the dock's count drops in phase 1; the
-  absorption's beats; no button, no figure and no word from him in phase 2).
+  triumph giving way to his cry, silent in phase 2), `packages/server/test/crowd-hidden-boss.test.ts` (online: a try is
+  never a turn or a strike, and spends a charge); e2e `e2e/recluse.spec.ts` (the dock's count drops in phase 1; the
+  absorption's beats; no button, no figure and no word from him in phase 2), `e2e/crowd-hidden.spec.ts` (the Crowd's
+  final, solo and online).
 - Unit: `packages/chess/test/last-stand.test.ts`, `packages/app/test/god-king.test.ts`,
   `packages/app/test/god-king-sprite.test.ts`, `packages/server/test/lobby.test.ts`.
 - e2e: `e2e/formats.spec.ts` (the boss final), `e2e/boss-powers.spec.ts`.

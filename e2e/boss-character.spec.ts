@@ -20,9 +20,9 @@ test("Boingo the Clown: a raid boss as a character, across the board from the Go
   await expect(page.locator(phone ? ".boss-char.place-side" : ".boss-char.place-bar")).toBeHidden();
 
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
-  // He never takes a tap and never covers the board: on a phone he's in the boss bar above it, the God King in the dock
-  // under it on the right; on a computer he's by its bottom-left corner and the God King mirrors him by its bottom-right
-  // (Eric, Oct 11), the status box under the board at its width.
+  // He never takes a tap and never covers the board: on a phone he's in the boss bar above it, the God King on a line of
+  // his own under the dock's row, in its middle (Eric, Oct 15); on a computer he's by its bottom-left corner and the God
+  // King mirrors him by its bottom-right (Eric, Oct 11), the status box under the board at its width.
   const char = visibleChar(page);
   expect(await char.evaluate((e) => getComputedStyle(e).pointerEvents)).toBe("none");
   expect(await char.locator("canvas").evaluate((e) => getComputedStyle(e).pointerEvents)).toBe("none");
@@ -31,9 +31,10 @@ test("Boingo the Clown: a raid boss as a character, across the board from the Go
   const king = (await page.locator(".gk-unit").first().boundingBox())!;
   if (phone) {
     expect(box.y + box.height).toBeLessThanOrEqual(board.y);
-    expect(king.y).toBeGreaterThanOrEqual(board.y + board.height - 1);
     expect(box.x + box.width / 2).toBeLessThan(board.x + board.width / 2);
-    expect(king.x + king.width / 2).toBeGreaterThan(board.x + board.width / 2);
+    const row = (await page.locator(".boss-dock-main").boundingBox())!;
+    expect(king.y).toBeGreaterThanOrEqual(row.y + row.height);
+    expect(Math.abs(king.x + king.width / 2 - (board.x + board.width / 2))).toBeLessThanOrEqual(1);
   } else {
     expect(box.x + box.width).toBeLessThanOrEqual(board.x);
     expect(box.y + box.height).toBeGreaterThan(board.y + board.height / 2);

@@ -188,4 +188,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 
 ## Explaining the game
 
+- **A countdown that seemed to fire early** (Oct 15, [story](../docs/history/lessons.md#a-countdown-that-seemed-to-fire-early-oct-15-2026)):
+  - A clock the player plays against is on screen all the time, in one place, readable at a glance, in the same
+    rounding as any countdown over the board (the dock's `DockClock`): never only inside a line that changes.
+  - Before hunting a "fired early" bug, work out the player's own time on the path they really played (bank,
+    increment, pace), check it against what they last saw, and test that path.
+
 - **The FAQ follows the rules** (Oct 11): a PR that changes a rule, a number's meaning or a boss updates its words in `packages/app/src/faq/content.ts` in the same PR; numbers there come from the settings objects, never typed in.

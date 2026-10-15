@@ -4183,6 +4183,158 @@ My calls:
   middle and not (a position now and then). A last test sends a refused position to a worker on purpose: no page
   error, and the engine answers on.
 
+## The boss dock after Eric's Hidden Boss playtest: the board's width, your clock, the God King's "can't" (Eric, Oct 15, 2026)
+
+Eric played the Hidden Boss on his iPhone 15 (Oct 14-15) and reported four things about the box under the board.
+
+- **The lone big number wasn't the countdown misfiring.** Eric: "just the big one popped up for a second, and I
+  definitely had more time", around moves 12 to 15, while spamming Engine move; his screenshot of the same battle shows
+  "Bullet 1+2 · 0:20 left" at move 20. Every turn's deadline is the bank plus the increment, set as the turn starts, and
+  the big 3-2-1 and the dock's time both read it. A unit test spams Engine move at every moment through the bullet's
+  1+0 and 1+2 moves and checks, every 50 ms, that the count only shows in the bank's own last 3 s
+  (`packages/app/test/boss-clock.test.ts`). Five browser runs found nothing either, spamming real Engine move taps with
+  instant and slow answers, a 4x and 6x slowed CPU, the test switch and the natural turn-7 bullet, and an observer on
+  every `.cc-num` inserted. What fits all of it: the bullet's first three moves are 1+0 (60 s, nothing added). Think
+  through them and you reach the first 1+2 turn with about 0 s, so that turn starts with what's left plus 2 s, inside the
+  count. Its first frame shows one big number ("3" for 2.0 to 3.0 s, rounded up) and no build-up. It's gone a moment
+  later when an instant Engine move goes in. Each instant move after that banks about 1.9 s, which takes about 0 s to
+  about 0:20 by move 20, his screenshot. The countdown was right. Nothing told him his time was that low: the dock's
+  "· 0:02 left" was small and muted, came after the words, was gone between moves, and was rounded down while the big
+  number is rounded up, so the two read one apart. So the fix is the clock (below), and the countdown's logic stays as
+  it is. The same test plays that path: 19.7 s on each 1+0 move, then a 2.9 s turn whose first frame shows a lone "3"
+  and whose dock clock reads "0:03". Found on the way: Engine move waits for the judge's full search (the power-up
+  hints'), and on a slowed phone that took 3 to 9 s of the bank a move. Fine for an admins' tool; a spammer under 1+2 can
+  still run out.
+- **Your clock, always there** (`DockClock` in `BossDock.tsx`): bold at the status box's right, on every boss battle's
+  screens (every boss, raids, the Crowd's boss final, the Hidden Boss's phase 2, where it's your board's clock). It runs
+  on your move and turns red in its last 10 s (`TICK_FROM_SECONDS`, when the ticks start). Once your move is in, it holds
+  where it stopped, dimmed, through the boss's turn, its moments and the reveal, whichever screen shows it: one store per
+  match, written as it runs. It reads m:ss in whole seconds rounded up, as the big 3-2-1 counts, so its 0:01 is the big
+  "1". Under the bullet clock's increment, a move starts with the 2 s added (the runner gives a move the bank plus the
+  increment), so as your move begins the number goes up by 2, a green "+2" rising over it for 1.6 s
+  (`DOCK_PLUS_MS`). The words on the left drop the time ("Your move. Bullet 1+2"; phase 2's "Your clock m:ss" line is
+  gone, its ultimate's line says "5 s a move, or a random one"). On a phone in phase 2, the big board's tag no
+  longer repeats your clock over its corner, where it covered the a8 piece (Eric: "It's not in the right spot"). It's
+  gone on your board and shows only the player's name on a board you watch. The small boards' clocks sit just above
+  each board, off its pieces. A computer's four boards keep their name-and-clock tags. Light: the clock re-renders itself a few times a second;
+  the screen around it doesn't. None during Lights out (its prompt takes the box, as it takes the arrows' room), the
+  phase change, or before your first move of the battle.
+- **The row is exactly the board's width, under its edges, on every screen.** BossDock measures the board as drawn
+  (`.hb-container`, a whole number of device pixels) before the first paint and whenever it or the dock changes size,
+  and places the row by it (`--dk-left`, `--dk-w`). One rule for every variant (the eval bar's offset, the scoreboard
+  minimized, a short phone, phase 2's big board or its four), rather than a copy of each board-size formula. Copies
+  would drift. On a phone the row had run from the screen's left edge to the God King, 24 px left of the board and
+  40 px short of its right edge.
+- **The God King on a phone: on a line of his own under the row, in its middle**, so the box has the board's whole
+  width. His words and his menu open above the row (over the board's bottom edge, as they did beside it), never over the
+  box. Absorbed by the Hidden Boss (phase 2), his empty place takes no line there (the row above doesn't move). **Where
+  he goes is decided by the room there is, not the device** (Eric: "decide by available width"): beside the
+  row when the screen's column has 66 px right of the board (his 58 px and a gap), under it otherwise. Side by side
+  squeezes the box as soon as the board fills the column, and on a phone or tablet held upright it always does (the
+  column is at most 560 px, so 768 px gives the same column as a big phone). That leaves him beside the row only on a phone
+  on its side, whose board is held back by the height. A 768 px breakpoint was tried first: the screen's column clips
+  anything outside it (the phone layout locks the screen with `overflow: hidden`), so he was cut off at 768. A computer
+  (900 px wide and 600 tall) keeps him by the board's bottom-right corner as before, the row the board's width there too
+  (it already was, within 2 px). Measured in `e2e/boss-dock.spec.ts` at 320, 390, 768, 844 × 390, 1024 and 1280 px:
+  the row's edges within 1 px of the board's.
+- **The words' room on a phone.** With the row the board's width and the clock in it, the « » are 32 px (were 40) and
+  the margins a little less up to 420 px, the clock 17 px (15 px under 360). That gives the words what they had beside the
+  God King, within a few pixels (320 px: 113 against 114; 360: 147 against 154; 390: 176 against 184). The Last Stand's
+  short verdict ("Chances 55% → 12%") now shows up to 379 px (was 359), so its long one never loses its end at 360. On a
+  phone, "Bullet 1+2" keeps together on its line.
+- **Tapping the God King with no charges left** (with the Hidden Boss, your tries spend them): his soft "can't", two
+  quick, muffled low notes falling, under a move's loudness, synthesized in the sound worker's table as the bosses' are
+  (`characters/god-king-sounds.ts`, the `godKing` module in `boss-sounds.ts`, `kingCant`). Plus a tiny shake, dimmed a
+  moment (0.4 s). Nothing else: no menu, nothing spent. His button now takes the tap when he has no charges (it said
+  nothing before), labelled "God King: no charges left".
+
+## The Crowd's boss final: always the Hidden Boss, the top 4 (Eric, Oct 14, 2026)
+
+Eric: "that mode is always just versus [him], like the top four always battle versus [him]… instead of saying boss raid
+it'll say hidden boss… That'll incentivize people to also want to pick that mode… you're always playing with three
+other randoms." His name will change later; not now ("Hidden Boss" everywhere), but it comes from one place.
+
+**The vote's option** (`bossFinalOption` in `packages/core/src/votes.ts`).
+- Label: his roster name ("Hidden Boss"); icon: his (📕); blurb: "Top 4 team up against him" (the count from
+  `crowdFinalists("boss")`). My call on "against him" rather than "against the Hidden Boss": the label right above
+  names him, the winner's banner shows label and blurb side by side (his name twice), and a sentence without his name
+  can't break when he's renamed ("against the A powerful foe").
+- Its id ("boss"), its place (the middle) and the default (Team final) stay: options never move (Eric, Oct 13).
+- With no `crowdFinal` boss in the roster, the card and the final fall back to "Boss battle" 👹 against a random playable
+  boss, as before.
+
+**Top 4** (`CROWD_KNOCKOUTS.boss`): the duel's cuts stopping at four, `[16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2]`
+(13 cuts; the battle starts after move 22, was 20 for the top 10). My call: the same tail as the duel (8, then 6, then
+4, one from each team a cut) rather than a single cut from 8 to 4. Every cut is the same number from each team, so the
+four are two of each; in the battle they're one crowd.
+
+**The rule: he's the Crowd's final for everyone, hidden everywhere else.** `BossDef.crowdFinal` on his roster line and
+`crowdFinalBoss()` (`boss.ts`). The runner's `startBoss` meets him whatever boss was picked or met last (`bossId`,
+`bossAvoid` don't apply there any more). He stays `adminOnly`: never random, never in a raid, never in a player's boss
+menu, never from a lobby creator's `?boss=`. Tests: `boss.test.ts`, `recluse.test.ts`, `crowd.test.ts`,
+`crowd-hidden-boss.test.ts`.
+
+**One edit to rename him.** His `name` in `BOSS_ROSTER`. Screens find a boss's kit by the name they show, so a renamed
+boss would have lost its kit: `bossKit` now falls back to the roster's `kit` for that name (`kitName` in
+`characters/kits.ts`). The vote's card, the FAQ, the result lines and the menus already take his name from the roster.
+
+**Online, phase 1** (the lobby runs his rules through the shared runner, as solo does). Piece by piece:
+- **His brain:** decided as the battle begins (`bossBrainNow` → his fixed brain, Maia at its top, 2500, raw), told to
+  the host, whose device plays his moves; his moves are asked at his fixed 2650 (Stockfish's while Maia loads, or if it
+  can't run). The roadmap wants his moves from our engine server for "this fight": that's the Squads path, with its
+  reward and fair-play review. This path has no reward, so the host's device (Eric's computing priorities: players'
+  devices first); his server-side brain comes with phase 2 online.
+- **No help:** the God King's move, strike and Last Stand never come online either (the runner's rules). A try
+  (`NetMatch.callKing`, the existing "king" message) is never a turn, a strike or a tally on the server: it spends a
+  charge (`kingTried`, #210's rule) and the move goes on. On main before this PR a "play move" call would have taken the
+  caller's turn: nobody could meet him online then. The mock (the slam, his line, the God King's) plays on the device
+  that tried; the others see the crown gone with the move's reveal. My call: no new message to show everyone the mock.
+- **No strikes, the bullet clock and its increment (1+0, then +2 s), a loss on time:** runner rules, so the lobby's
+  deadlines (`allowedMsFor`), banks and end follow. New: the results carry `timeout` (he won on time), read in the same
+  event the battle ends (`bossTimedOut` stays off the stored state).
+- **His lines and moments:** from the shared boss view, the same on every screen, as for every boss.
+- **His collapse:** beaten, the lobby holds the board `RECLUSE_FALL_MS` (4.5 s) with a boss message marked `fall`, then
+  sends the results; resigning meanwhile is "already out" (everyone is placed).
+- **Protocol:** two optional fields, `fall` (boss message) and `timeout` (results). Nothing removed or renamed. An older
+  app shows the fall as the board with the result in it, and the result without "on time".
+- **Phase 2 is not online** (four boards online, his server-side Stockfish, its fair-play hooks: a separate, bigger
+  build). Online, a phase 1 win ends the battle as the crowd's victory, as before phase 2 existed.
+
+**Solo Crowd (you and bots): phase 2 runs** as in Boss alone, when you were one of the four (`phase2Follows`): you on
+board 0, the other three finalists (their names) on the others (`phase2Mates`; fresh bots only if fewer than three
+remain). The result screen keeps your place in the crowd ("2nd of 100") with "You beat Hidden Boss on all 4 boards!" or
+"Hidden Boss won. You won N of 4 boards…". Out before the final, the battle plays out without you (no phase 2).
+
+**No rewards from this path** (rewards only via Squads, ROADMAP.md). Nothing special is recorded: the final records
+what any boss final records (your place, the cuts, the boss reached and survived).
+
+**Also, on the way:**
+- The battle's intro said "Ten of you vs the boss.": now "Four of you vs the boss." (from the count).
+- The result's "A win on your record." went to places 1 to 10: now to those who fought (a raid's crowd not struck down,
+  the Crowd's top 4), as the server's record already did.
+- Online the vote's result now patches the app's settings as it does the server's, so the last cut names the right
+  ending and the leaderboard's cut line follows the boss final's 13 cuts (a reload mid-match falls back to the queue's
+  settings, as before).
+- `?win=1` also works in a solo Crowd's boss final (a mate in one), to see him beaten there. New test switch
+  `?weakbots=1` (solo, and a lobby you create; `WEAK_BOT_SKILL`): every bot plays loosely, so a test playing the
+  engine's best move surely reaches the top 4. With the usual bots it didn't (8th in the first run): the strongest bots
+  play the engine's move as often as a perfect player, and only two of each team get through.
+- Settings' "How to play": "a boss battle (top 10 against a boss)" is now "(top 4 against Hidden Boss)", its counts from
+  the settings. The FAQ: the endings name him; his own block (met only in the Crowd's final, no God King help, no
+  strikes, the bullet clock, phase 2 solo, online a phase 1 win); his fixed strength and brain; the God King's section;
+  "Still to come" no longer lists him among bosses without art.
+- A player who met him in the Crowd records him as their last boss; the next random boss avoids him, which avoids
+  nobody (he isn't in the draw). Not worth a rule.
+
+**Player-visible text:** the card ("Hidden Boss", 📕, "Top 4 team up against him"), "Four of you vs the boss.",
+Settings' "a boss battle (top 4 against Hidden Boss)", the FAQ lines above; the results' "A win on your record." for
+raid survivors placed below 10th.
+
+**Testing.** Full lane (the server and what it sends): typecheck; the whole unit suite; e2e `crowd-hidden.spec.ts` (new:
+the card on a phone and a computer; solo through phase 2 with the finalists; online: his intro, four in the battle, a
+God King try, his bullet clock), `formats.spec.ts`, `votes.spec.ts`, `crowd.spec.ts`, `recluse.spec.ts`, `maia.spec.ts`,
+then the whole suite.
+
 ### The engine server never gets a position Stockfish refuses (Oct 15, 2026)
 
 #216 kept the positions Stockfish refuses from players' devices. The engine server (native Stockfish in a Cloudflare

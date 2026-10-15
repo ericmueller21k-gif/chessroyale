@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
+import { crowdFinalBoss } from "@chessroyale/core";
 import { BOARD_SEL, createLobbyFromHome, soloFromHome, test } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
@@ -100,7 +101,7 @@ test("the vote board: your pawn is solid, drag it into a zone, the count goes up
   const before = Number(await page.locator(".vote-zone-count").nth(1).textContent());
   await drag(page, start, await centre(page, ".vote-zone", 1), touch);
   await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(1);
-  await expect(page.locator(".vote-card.on")).toContainText("Boss battle");
+  await expect(page.locator(".vote-card.on")).toContainText(crowdFinalBoss()!.name);
   await expect(page.locator(".vote-zone.mine")).toHaveCount(1);
   await expect.poll(async () => Number(await page.locator(".vote-zone-count").nth(1).textContent())).toBeGreaterThan(before);
   // The tally bubbles up: a count that goes up pops.

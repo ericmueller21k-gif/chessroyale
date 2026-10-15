@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2 } from "@chessroyale/core";
 import { LAST_STAND, legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
-import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, Talk, absorbKing, arcPoints, phaseChangeRun, smoothPath, talkStage } from "../src/recluse-phase2.ts";
+import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, Talk, absorbKing, arcPoints, phase2Follows, phase2Mates, phaseChangeRun, smoothPath, talkStage } from "../src/recluse-phase2.ts";
 import { ON_BOARD_ANIMS, RECLUSE, RECLUSE_BUST } from "../src/characters/recluse.ts";
 import { CHATTER, CRITICAL, LOW, NORMAL, Voice, bossVoice, typeMs } from "../src/speech.tsx";
 import { SoloMatch } from "../src/solo.ts";
@@ -11,6 +11,32 @@ import { animLength } from "../src/characters/power-art.ts";
 
 // The Hidden Boss's phase 2 on this device (recluse-phase2.ts): the phase change's beats, and the four boards driven
 // with pretend engines and a pretend clock. Its rules: packages/chess/test/recluse-phase2.test.ts.
+
+describe("when phase 2 follows, and who plays it beside you", () => {
+  const won = { bossId: "recluse", result: "crowd" };
+  it("after phase 1 won against him: alone (Boss alone) and in a solo Crowd's boss final (Oct 14); never a Solo raid, another boss, or a loss", () => {
+    expect(phase2Follows({ ...won, raid: true, raidBots: false, crowdFinal: false })).toBe(true);
+    expect(phase2Follows({ ...won, raid: false, raidBots: false, crowdFinal: true })).toBe(true);
+    expect(phase2Follows({ ...won, raid: true, raidBots: true, crowdFinal: false })).toBe(false);
+    expect(phase2Follows({ ...won, raid: false, raidBots: false, crowdFinal: false })).toBe(false);
+    for (const result of ["boss", "draw", null]) expect(phase2Follows({ ...won, result, raid: false, raidBots: false, crowdFinal: true })).toBe(false);
+    expect(phase2Follows({ ...won, bossId: "clown", raid: false, raidBots: false, crowdFinal: true })).toBe(false);
+  });
+
+  it("the other boards: the finalists who fought beside you, then fresh bots for any left (Boss alone: all fresh), one a board", () => {
+    const fresh = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `bot${i}`, name: `Fresh ${i}` }));
+    const boards = RECLUSE_PHASE2.boards;
+    const finalists = [{ id: "bot7", name: "Ann" }, { id: "bot0", name: "Bo" }, { id: "bot3", name: "Cy" }];
+    expect(phase2Mates(finalists, boards, fresh)).toEqual(finalists);
+    expect(phase2Mates([], boards, fresh)).toEqual(fresh(boards - 1));
+    expect(phase2Mates([...finalists, { id: "bot9", name: "Di" }], boards, fresh)).toEqual(finalists);
+    // One short (somebody struck): a fresh bot, under an id of its own.
+    const two = phase2Mates(finalists.slice(0, 2), boards, fresh);
+    expect(two).toHaveLength(boards - 1);
+    expect(new Set(two.map((b) => b.id)).size).toBe(boards - 1);
+    expect(two.slice(0, 2)).toEqual(finalists.slice(0, 2));
+  });
+});
 
 describe("the phase change", () => {
   it("is 15 to 20 s with its short fall (Eric: \"this epic thing\"), its beats in order: the God King's absorption, rage, leap, the book thrown down, the chant, the split, the book back, the leap back", () => {

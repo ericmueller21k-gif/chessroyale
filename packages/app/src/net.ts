@@ -622,8 +622,12 @@ export class NetMatch implements GameView {
       case "vote": {
         this.standingsList = m.standings;
         const v = m.vote;
-        // (The crowd voted for a boss battle at the end: Maia's files ahead, on a device that may play it.)
-        if (v.result !== null && PREGAME_VOTES[v.index]?.options[v.result]?.patch.finalFormat === "boss") this.maiaAhead();
+        // The vote's result sets the rest of the match, as on the server (how it ends: what the last cut leads to, the
+        // leaderboard's cut line; the clock). The crowd voted for the boss final: Maia's files ahead, on a device that may
+        // play him with it.
+        const won = v.result !== null ? PREGAME_VOTES[v.index]?.options[v.result] : undefined;
+        if (won) this.settings = { ...this.settings, ...won.patch };
+        if (won?.patch.finalFormat === "boss") this.maiaAhead();
         this.voteState = { ...v, startsAt: this.local(v.startsAt), until: this.local(v.until), votes: v.votes.map((x) => ({ ...x, at: this.local(x.at) })), ...(v.nextAt ? { nextAt: this.local(v.nextAt) } : {}) };
         // Keep your own vote if the server's copy hasn't caught up yet.
         if (this.myVoteLocal && this.myVoteLocal.key === v.key && !this.voteState.votes.some((x) => x.playerId === this.myId)) {
@@ -647,7 +651,8 @@ export class NetMatch implements GameView {
         this.standingsList = m.standings;
         this.currentBoard = m.boss.board;
         this.lights = null;
-        return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro });
+        // (`fall`: beaten, the Hidden Boss collapses on the board until the results come.)
+        return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro, ...(m.fall ? { fall: true } : {}) });
       case "darkTry": {
         if (m.key !== this.key || this.phase.kind !== "play") return;
         if (m.ok) {
@@ -715,7 +720,16 @@ export class NetMatch implements GameView {
 
   private showResults(m: Extract<ServerMessage, { t: "results" }>) {
     const placement = (this.myId && m.placements[this.myId]) || this.placement || this.totalPlayers;
-    this.setPhase({ kind: "results", placement, winner: m.winner, youWon: placement === 1, gameWinner: m.gameWinner, ...(m.bossResult ? { bossResult: m.bossResult } : {}) });
+    this.setPhase({
+      kind: "results",
+      placement,
+      winner: m.winner,
+      youWon: placement === 1,
+      gameWinner: m.gameWinner,
+      ...(m.bossResult ? { bossResult: m.bossResult } : {}),
+      // (The Hidden Boss's bullet clock ran out: he won on time.)
+      ...(m.timeout ? { timeout: true } : {}),
+    });
   }
 
   private onReveal(m: Extract<ServerMessage, { t: "reveal" }>) {
@@ -1099,8 +1113,15 @@ export class NetMatch implements GameView {
 
   kingCalled = false;
   callKing(strike = false) {
-    // (The Hidden Boss can't be met online: no server path takes a try against him, so nothing is sent.)
-    if (this.phase.kind !== "play" || !this.key || !this.boss?.kingCharges || this.kingCalled || kingHelpBlocked(this.boss)) return;
+    if (this.phase.kind !== "play" || !this.key || !this.boss?.kingCharges || this.kingCalled) return;
+    if (kingHelpBlocked(this.boss)) {
+      // The Hidden Boss (the Crowd's boss final): the God King doesn't come, but the try spends a charge as if he had
+      // (Eric, Oct 14), as solo's does: the server spends it; it's gone here at once, and the next boss view says what
+      // the server holds. Your move goes on, its clock too; the dock has him mock it.
+      this.send({ t: "king", key: this.key, ...(strike ? { strike: true } : {}) });
+      this.boss = { ...this.boss, kingCharges: this.boss.kingCharges - 1 };
+      return this.emit();
+    }
     if (strike) {
       // A strike isn't your turn: you still pick once he's done (the server says when he strikes).
       if (this.phase.strike?.mine) return;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_DIFFICULTY, ENGINE_MAX_ELO, BOSS_ROSTER, bossDef, bossIdFromLink, bossStrength, bossThreat, chooseBoss, isPlayable, playableBosses, type BossDef } from "../src/index.ts";
+import { BOSS_DIFFICULTY, ENGINE_MAX_ELO, BOSS_ROSTER, bossDef, bossIdFromLink, bossStrength, bossThreat, chooseBoss, crowdFinalBoss, isPlayable, playableBosses, type BossDef } from "../src/index.ts";
 
 describe("the boss template: who can be met", () => {
   it("only a boss with a complete character and its powers is playable", () => {
@@ -20,6 +20,18 @@ describe("the boss template: who can be met", () => {
     expect(BOSS_ROSTER.find((b) => b.id === "grex")).toMatchObject({ name: "Jefferson", kit: "Jefferson", powers: { passive: "sparkler", ultimate: "candle" } });
     expect(BOSS_ROSTER.find((b) => b.id === "gingerbread")!.powers).toEqual({ passive: "freeze", ultimate: "blizzard" });
     expect(BOSS_ROSTER.find((b) => b.id === "clown")!.powers).toEqual({ passive: "pie", ultimate: "funhouse" });
+  });
+
+  it("the Crowd's boss final meets the roster's crowdFinal boss (the Hidden Boss, hidden from players elsewhere), if it has its character and powers; none marked: none (a random playable one)", () => {
+    const base: BossDef = { id: "x", name: "X", icon: "x", kit: "X", offset: 0, powers: { passive: "freeze", ultimate: "blizzard" } };
+    const hidden: BossDef = { ...base, id: "h", name: "H", adminOnly: true, crowdFinal: true };
+    expect(crowdFinalBoss([base, hidden])).toBe(hidden);
+    expect(crowdFinalBoss([base])).toBeNull();
+    expect(crowdFinalBoss([base, { ...hidden, kit: null }])).toBeNull();
+    expect(crowdFinalBoss([base, { ...hidden, powers: null }])).toBeNull();
+    // Today: the Hidden Boss, by his roster name and icon (one place: renaming him is one edit).
+    expect(crowdFinalBoss()).toMatchObject({ id: "recluse", name: "Hidden Boss", icon: "📕" });
+    expect(isPlayable(crowdFinalBoss())).toBe(false);
   });
 
   it("Jefferson was G-REX (Eric, Oct 10): his id stays grex, and a test link's ?boss=jefferson meets him too", () => {
