@@ -21,7 +21,6 @@ import {
   BRILLIANT,
   CRATES,
   CRATES_FREE,
-  CROWD_EVERYONE_KNOCKOUTS,
   CROWD_KNOCKOUTS,
   CROWD_SETTINGS,
   DEFAULT_SETTINGS,
@@ -72,7 +71,6 @@ export interface FaqSources {
   crowd: Settings;
   raid: Settings;
   crowdKnockouts: Readonly<Record<FinalFormat, readonly number[]>>;
-  everyoneKnockouts: readonly number[];
   powers: BossPowerSettings;
   brain: BossBrainSettings;
   difficulty: readonly { id: string; label: string; elo: number }[];
@@ -105,7 +103,6 @@ export const FAQ_DEFAULTS: FaqSources = {
   crowd: { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS },
   raid: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS },
   crowdKnockouts: CROWD_KNOCKOUTS,
-  everyoneKnockouts: CROWD_EVERYONE_KNOCKOUTS,
   powers: BOSS_POWERS,
   brain: BOSS_BRAIN,
   difficulty: BOSS_DIFFICULTY,
@@ -192,9 +189,8 @@ function modes(src: FaqSources): FaqSection {
 - Each turn, everyone on the side to move picks a move before the clock runs out, and the **most popular pick is played** (a tie is settled at random).
 - Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(C.firstStageRounds / 2, "move")}; after that, the lowest scorers are cut after every move, the same number from each team. Scores carry over all game.
 - **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss battle (the top ${left(src.crowdKnockouts.boss)} team up against ${finalFoe}) or a duel (the best of each side, 1v1). Then on the clock.
-- **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. Without the vote (Everyone moves, or Pre-game votes off) it's ${timeControl(C)}; a boss raid is ${timeControl(R)}.
+- **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. Without the vote (Pre-game votes off) it's ${timeControl(C)}; a boss raid is ${timeControl(R)}.
 - **${n(C.powerUpsAtStart, "power-up")}** each: a power-up shows the engine's top 3 moves for that turn.
-- **Everyone moves** (Settings, Crowd) is the other way to play: everyone picks for whichever side is to move, down to a 2v2 final of the last ${left(src.everyoneKnockouts)}. It's for solo games and lobbies you create; PLAY is always 50 v 50.
 - Matchmaking: **Default** fills empty seats with bots after a short wait, **Bots off** waits for real players, and **Solo** is you and bots, at once.
 
 ### Boss raid and Boss alone {#mode-boss}
@@ -838,16 +834,30 @@ function credits(src: FaqSources): FaqSection {
 - **Stockfish**, the chess engine behind the judge, the bosses and the bots: free software under the GPL-3.0 ([stockfishchess.org](https://stockfishchess.org), [source](https://github.com/official-stockfish/Stockfish), this build: [stockfish.js](https://github.com/nmrugg/stockfish.js) 19, [its source](/engine/stockfish-source.tar.gz), [license](/engine/COPYING.txt)). It runs as a separate program in your browser.
 - **Maia-3**, the human-like model ${src.brain.forPlayers ? "behind [the bosses](#maia-brain)" : "[being tested](#maia-brain) for bosses"}: by the CSSLab, University of Toronto, under the AGPL-3.0 ([Maia-3](https://github.com/CSSLab/maia3)). It runs as its own separate program in your browser; our Maia box's [source code](/engine/maia/maia-box-source.tar.gz) is free to download ([notice](/engine/maia/NOTICE.txt), [license](/engine/maia/LICENSE.txt)).
 - **The chess pieces**: drawn by Colin M.L. Burnett, from [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces), under the BSD license ([license](/licenses/pieces.txt)).
-- **Classic piece sounds** and their variations: [PyChess](https://github.com/pychess/pychess/tree/master/sounds) (GPL-3.0). The variations are made from PyChess's sounds by our own script ([license](/engine/COPYING.txt), [how each was made](/sounds/SOURCES.md)). Like the engines, they're separate files the game plays, not part of its code.
+- **Classic piece sounds** and their variations: [PyChess](https://github.com/pychess/pychess/tree/master/sounds) (GPL-3.0). The variations are made from PyChess's sounds by our own script ([license](/engine/COPYING.txt), [how each was made](/sounds/SOURCES.md), [their source](/sounds/pychess-sounds-source.tar.gz)). Like the engines, they're separate files the game plays, not part of its code.
 - **The app** is built with Preact (MIT) and chess.js (BSD), in the Archivo, Archivo Black and Press Start 2P fonts (SIL Open Font License) ([licenses](/licenses/third-party.txt)). Its other sounds are free of rights (CC0) or the game's own.
 - The same credits are at the foot of Settings.
 `,
   };
 }
 
+function privacyAndTerms(): FaqSection {
+  return {
+    id: "privacy",
+    title: "Privacy and terms",
+    body: `
+- [Privacy policy](/privacy): what we keep about you, why, for how long, and how to see or delete it.
+- [Terms of service](/terms): the rules for accounts, fair play, chat, names and icons, and virtual items.
+- [Copyright](/copyright): how to report a name or icon that copies your work.
+
+> Both are drafts until they're reviewed.
+`,
+  };
+}
+
 /** The FAQ's sections, in order, built from `src` (the game's settings unless a test says otherwise). */
 export function faqSections(src: FaqSources = FAQ_DEFAULTS): FaqSection[] {
-  return [modes(src), scoring(src), bossBrain(src), bossPowers(src), godKing(src), crates(src), fairPlay(), credits(src)];
+  return [modes(src), scoring(src), bossBrain(src), bossPowers(src), godKing(src), crates(src), fairPlay(), credits(src), privacyAndTerms()];
 }
 
 /** The line under the title. */

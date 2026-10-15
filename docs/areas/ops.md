@@ -14,6 +14,33 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   The "Workers Builds: chessroyale" check fails instantly on PR branches (Cloudflare's preview build for non-production
   branches): only `check` (typecheck and unit tests, `.github/workflows/check.yml`) and the e2e run decide whether a PR
   is green. Merge with a merge commit, then confirm the deploy live.
+- **CI e2e** (Oct 15, DECISIONS.md "e2e on GitHub Actions for every PR"): `.github/workflows/e2e.yml` runs the whole
+  Playwright suite, both projects, on every PR to `main` and every push to `main`, on GitHub's standard runners (free:
+  the repository is public). CI runs the full e2e on every PR; local runs are for targeted checks and perf.
+  - **Layout:** 5 `shard` jobs side by side (about 17 minutes in all, 1 for setup), then `result`. Each shard runs whole
+    spec files, spread by their measured test time (`e2e/ci-shard.mjs` reads `e2e/ci-timings.json`; a new spec counts
+    as the median until the table is refreshed); inside a file the tests run in order, as locally. Each runner builds
+    the app once (`E2E_PREBUILT=1` tells Playwright's web server to start wrangler without building again) and serves
+    it with the same `wrangler dev` and test variables as locally (`playwright.config.ts`). 2 workers per runner, as
+    locally (half the runner's 4 CPUs).
+  - **Reading a run:** `result`'s summary on the run's page (each shard's reporter, `e2e/ci-summary.ts`, writes a
+    record; `e2e/ci-summary-merge.mjs` renders them): flaky tests first, then failed ones, each with its shard,
+    `file:line`, project, the line it failed on and the gist of its error; each shard's counts and time; and the
+    test time by file as a ready-made `ci-timings.json`. `result` is red if any shard is. A shard with a failed or
+    flaky test uploads its HTML report with the retries' traces (`e2e-report-shard-N`, kept 7 days;
+    `npx playwright show-report <folder>`).
+  - **Retries and traces:** `--retries 1` in CI until the flaky-test batch lands; the goal is 0, as
+    `playwright.config.ts` has it. A test that passes only on its retry is "flaky": the summary lists it first, so
+    it stays in view. Traces only on that retry (`on-first-retry`): recording every test measured about 8% slower.
+    Flakes only: "Re-run failed jobs" once; a test that fails again is real.
+  - **Left out: `@perf`** (`e2e/perf.spec.ts`, frame budgets on a 4x-slowed phone), because they measure the machine.
+    Run them locally under the e2e lock, or from Actions → e2e → Run workflow with "perf" ticked (a `perf` job, phone,
+    1 worker; its report is kept 7 days: read its numbers as a trend, not a verdict).
+  - **Caches:** npm (`setup-node`) and Playwright's Chromium (headless shell only, the browser headless runs use;
+    `~/.cache/ms-playwright`, keyed by Playwright's version).
+  - **Concurrency:** a new push to a PR cancels that PR's run still going; pushes to `main` each get their own run.
+    A run takes 6 jobs at once: the account's limit on jobs at once (20 on GitHub Free) queues the rest.
+  - **Not a required check yet;** if it becomes one, require `result` (one name, whatever the shard count).
 - **Schema at runtime:** D1 tables are made by the Worker (`CREATE TABLE IF NOT EXISTS`, then `ALTER TABLE` migrations
   that tolerate re-runs), so a deploy needs no migration step.
 - **Built for surges** (measured with simulated players on staging):
@@ -23,8 +50,13 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **The live line:** the live hub keeps who's online and which lobbies run in memory; Worker instances pass on who
     they've seen in batches (`presence.ts`, at most every `CAPACITY.presence.flushMs`), lobbies report changes at most
     every 2 s, each Worker caches `/api/live` for 3 s, and D1 gets `users.last_seen` once a minute per account.
-  - **Rate limits:** per address, per account and (PLAY, new lobbies) per account again (`CAPACITY.rateLimits`,
-    `limits.ts`), counted in each Worker instance's memory; past a limit, a friendly 429 with when to try again.
+    Friends ride on it (Oct 15): a batch also says who's in a match (the live line's `?busy=1`), and the hub answers
+    with friends' news for anyone in it, which their next `/api/live` passes on as `inbox`; a friends list is one hub
+    call (`presenceOf`). No new D1 writes per request. One new request: while a friends list is on screen, for a
+    player with a friend who shows when they're online, `/api/friends/online` once a minute (cached session, one D1
+    read, one hub call).
+  - **Rate limits:** per address, per account and (PLAY, new lobbies; friends' actions) per account again
+    (`CAPACITY.rateLimits`, `limits.ts`), counted in each Worker instance's memory; past a limit, a friendly 429 with when to try again.
 - **Nothing runs for no one:** a match everyone has left (resigned, or gone longer than `LEAVING.awayMs`) ends at once
   and its lobby closes, Squads too (DECISIONS.md, "Resign: leaving a match in every mode"); before Oct 13 such a match
   played itself out for up to an hour or more, counted on the live line all along.
@@ -35,6 +67,29 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   400: [engine.md](engine.md)).
 - **Load-test counters** at `/api/ops/stats` only where `OPS_STATS` is set and the request's `x-ops-key` matches
   (local and staging, never production).
+- **Test switches** (gated Oct 15; DECISIONS.md, "The test switches: admins and test servers only"): playtest
+  shortcuts in the address that would make easy wins. They work only for an admin (`ADMIN_EMAILS`) or where the Worker
+  variable `TEST_SWITCHES` is "1" (local `wrangler dev --var TEST_SWITCHES:1`, the e2e server, staging; never
+  production), and in the app on Vite's dev server. For everyone else they're ignored, silently: the lobby, the queue,
+  the crate and the solo game are exactly the ones made without them.
+  - **The server's:** a new lobby's `rounds`, `clock`, `finalTurns`, `bossMoves`, `draw`, `power`, `format`, `speed`,
+    `weakbots`, `keep`, `pace=quick` (a test switch since Oct 15: players always play the mode's own pace), a boss's
+    fixed strength (`boss=1600`) and a boss outside a raid (`lobby-options.ts`); a queue's
+    own `pool` (`/api/play`, `/api/squads/play`, `/api/squads/party`: `testPool` in `index.ts`); a crate's forced
+    `fischer` and `shiny` (`/api/locker/open`). One check, `testSwitchesOn` (`admin.ts`).
+  - **The app's** (read only through `testParams()` in `packages/app/src/test-switches.ts`; `/api/auth/config` says
+    `testSwitches` where the server has them on, `/api/me` says `admin`): all of the above, and `debug` (the match on
+    `window`), `nolanding`, `boss=<id>` (skips the boss menu), `win`, `mate`, `phase`, `laststand`, `side`, `wip` and
+    `kit`, a crate page's `fischer` and `shiny` and its "Testing:" boxes.
+  - **Kept for everyone** (the home screen's own choices): `mode`, `augments`, `moves` (opening moves), a raid's boss
+    picked from the menu; preferences and pages (`anim`, `trail`, `soundlab`, `crates`). (`turns` is gone: Crowd is
+    always team turns since Oct 15.)
+  - **Admins only already:** "Trigger ultimate (testing)" (online the lobby checks too), "Engine move", the boss brain
+    picker (`brain`), the Hidden Boss in Boss alone. Squads' test lobbies and controls: admins or `SQUADS_TEST`.
+  - **No record from a switched game:** for a player the switches can't apply, so everything the server records
+    (results, ranking, fair-play signals, Squads' coins and crates, crate items) comes from a game made without them.
+    Solo results are posted by the browser and are never ranked and earn nothing.
+  - **A new test switch:** read it through `testParams()` (app) or behind `testSwitchesOn` (server), and list it here.
 
 - **Licenses** (`LICENSES.md`, audited Oct 12, 2026): every third-party piece that reaches a player's device, from the
   build's module list and `public/`, its license and its credit. Nothing GPL, AGPL, LGPL, non-commercial or
@@ -43,8 +98,10 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   the FAQ.
 - **The engines' source, served by the site** (Oct 14, DECISIONS.md "The Maia box's source on the site"): the Maia
   box's (AGPL-3.0) at `/engine/maia/maia-box-source.tar.gz`, written by its build; Stockfish's (GPL-3.0) at
-  `/engine/stockfish-source.tar.gz`, from `packages/app/stockfish-source/`. Static files, so they stay public when the
-  repository goes private; not precached by the service worker. Updating the `stockfish` package needs its source
+  `/engine/stockfish-source.tar.gz`, from `packages/app/stockfish-source/`. The PyChess sounds' (GPL-3.0, Oct 15) at
+  `/sounds/pychess-sounds-source.tar.gz`, written by `scripts/sounds-source.py` (run it after changing
+  `scripts/piece-sounds.py`; `sounds-source.test.ts` checks). Static files, so they stay public when the repository
+  goes private; not precached by the service worker. Updating the `stockfish` package needs its source
   archive first (the build stops without one).
 
 ## Where the code is
@@ -57,21 +114,25 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 | Live counts and presence | `packages/server/src/live-hub.ts`, `live.ts`, `presence.ts` |
 | Rate limits | `packages/server/src/limits.ts` |
 | Load-test counters | `packages/server/src/ops.ts` |
+| Test switches: who may (server), a lobby's, the app's | `admin.ts` (`testSwitchesOn`), `lobby-options.ts`; `packages/app/src/test-switches.ts` |
 | Load tests (simulated players over WebSockets and the API) | `scripts/load/` (`run.ts`, `burst.ts`, `staging.sh`) → `reports/load/` |
 | The engine server | `engine/`, `packages/server/src/engine.ts` |
-| CI | `.github/workflows/check.yml` |
+| CI | `.github/workflows/check.yml` (typecheck, unit tests), `e2e.yml` (the e2e suite); `e2e/ci-shard.mjs`, `ci-timings.json`, `ci-summary.ts` |
 
 ## Settings
 
 `CAPACITY` (queue, overload, presence, rate limits), `LOBBY_LIFE` in settings.ts; Worker variables
 `MATCH_FILL_SECONDS`, `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`, `OPS_STATS`, `LOAD_TEST` (staging only), `SQUADS_TEST`
-(local and e2e only: anyone may use Squads' test controls). Squads lobbies aren't on the live line yet, so the
+(local and e2e only: anyone may use Squads' test controls), `TEST_SWITCHES` (local, e2e and staging only: anyone may
+use the test switches). Squads lobbies aren't on the live line yet, so the
 overload limit doesn't count their players.
 
 ## Tests and tools
 
-- Unit: `packages/server/test/capacity.test.ts`, `matchmaker.test.ts`, `live.test.ts`, `lobby-life.test.ts`.
-- e2e: `e2e/busy.spec.ts` (servers busy), `lobby-close.spec.ts`.
+- Unit: `packages/server/test/capacity.test.ts`, `matchmaker.test.ts`, `live.test.ts`, `lobby-life.test.ts`;
+  `test-switches.test.ts` (server and app: the test switches).
+- e2e: `e2e/busy.spec.ts` (servers busy), `lobby-close.spec.ts`, `test-switches.spec.ts` (a player's switches
+  ignored, an admin's working).
 - Load: see `DEPLOY.md`, "Load testing". Run wrangler from a copy you aren't editing (it reloads on every change).
 
 ## Rules for this area

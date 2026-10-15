@@ -49,7 +49,7 @@ async function playToResults(page: Page, seen: Set<string>, minutes: number) {
 test("pre-game votes: the cards vote too; the winners set the ending and the clock", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
-  await page.goto("/?debug&mode=crowd&turns=teams&augments=1");
+  await page.goto("/?debug&mode=crowd&augments=1");
   await soloFromHome(page);
   await expect(page.locator(".vote-screen")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("heading", { name: "How does it end?" })).toBeVisible();
@@ -90,7 +90,7 @@ test("pre-game votes: the cards vote too; the winners set the ending and the clo
 test("team final: the top 8 play 4v4, the weakest on each side go out, everyone is placed", async ({ page }) => {
   test.setTimeout(10 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=team&rounds=1&clock=20&finalTurns=30");
+  await page.goto("/?debug&pace=quick&mode=crowd&format=team&rounds=1&clock=20&finalTurns=30");
   await soloFromHome(page);
   const seen = new Set<string>();
   await playToResults(page, seen, 9);
@@ -107,7 +107,7 @@ test("team final: the top 8 play 4v4, the weakest on each side go out, everyone 
 test("boss battle (solo): always the Hidden Boss; he replies, never strikes, the God King never comes, and the result shows", async ({ page }) => {
   test.setTimeout(10 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=1&clock=20&bossMoves=7");
+  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=1&clock=20&bossMoves=7");
   await soloFromHome(page);
   const seen = new Set<string>();
   await playToResults(page, seen, 9);
@@ -307,7 +307,7 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
 test("boss battle (online): always the Hidden Boss, the host's browser plays him", async ({ page }) => {
   test.setTimeout(12 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough");
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=1&clock=15&bossMoves=6");
+  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=1&clock=15&bossMoves=6");
   await createLobbyFromHome(page);
   await page.getByRole("button", { name: /Start with 1 player/ }).click();
   const seen = new Set<string>();

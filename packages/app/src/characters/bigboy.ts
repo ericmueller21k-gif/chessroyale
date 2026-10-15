@@ -851,7 +851,7 @@ export const BIGBOY_LINES: Partial<Record<import("./boss-beats.ts").Beat, readon
   victory: ["Big boy win!", "Yay! All mine!", "Again! Again!"],
   strike: ["Bonk!", "Time out!", "Bad! Bonk!"],
   power: ["Catch!", "Blocky!", "My toy!", "Stack it!"],
-  ultimateWarn: ["Big boy mad!", "Gonna bounce…", "Waaaah!"],
+  ultimateWarn: ["Big boy mad!", "Waaaah!"],
   ultimate: ["Big boy BOUNCE!", "Boing boing!", "Bouncy bouncy!"],
 };
 export const BIGBOY_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {

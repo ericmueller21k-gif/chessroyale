@@ -25,6 +25,7 @@ import {
 } from "@chessroyale/chess/squads";
 import { toSan, type MoveScore } from "@chessroyale/chess";
 import type { Arrow } from "./board/types.ts";
+import { clockShown } from "./clock-text.ts";
 
 /**
  * What Squads' screens work out from the lobby as the server sends it (docs/areas/squads.md, "The screens"): pure, so
@@ -84,12 +85,7 @@ export function points(x: number): string {
 export const LOW_BANK_MS = 30_000;
 
 /** "3:05" (m:ss); under ten seconds "9.4". */
-export function bankText(ms: number): string {
-  const v = Math.max(0, ms);
-  if (v < 10_000) return (Math.floor(v / 100) / 10).toFixed(1);
-  const s = Math.floor(v / 1000);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
+export const bankText = (ms: number): string => clockShown(ms, { tenths: true });
 
 export function squadOf(lobby: NetSquadsLobby | null, playerId: string | null): NetSquad | null {
   if (!lobby || !playerId) return null;

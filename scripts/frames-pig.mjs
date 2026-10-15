@@ -18,8 +18,7 @@ const power = process.argv.find((a) => a.startsWith("power="))?.slice(6) ?? "sho
 const [out = "pig-frames", which = "both", scheme = "light"] = args;
 const outDir = resolve(out);
 mkdirSync(outDir, { recursive: true });
-process.chdir("packages/app");
-const server = await createServer({ root: ".", configFile: "vite.config.ts", server: { port: 5198, strictPort: false }, logLevel: "error" });
+const server = await createServer({ root: "packages/app", configFile: "packages/app/vite.config.ts", server: { port: 5198, strictPort: false }, logLevel: "error" });
 await server.listen();
 const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch();

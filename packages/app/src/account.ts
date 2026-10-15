@@ -27,13 +27,16 @@ export interface Profile {
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss?: ModeStats };
   rating: number | null;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
-  /** An admin (ADMIN_EMAILS, as for the fair-play review): sees the boss battle's test trigger. */
+  /** An admin (ADMIN_EMAILS, as for the fair-play review): sees the boss battle's test trigger, may use the test switches. */
   admin?: boolean;
 }
 
 export interface AccountState {
-  /** Sign-in options the server has set up (null until known; accounts false = no accounts here). */
-  config: { accounts: boolean; google: boolean; email: boolean; onlineNeedsSignIn?: boolean } | null;
+  /**
+   * Sign-in options the server has set up (null until known; accounts false = no accounts here). `testSwitches`: the
+   * server has TEST_SWITCHES on (local, e2e, staging), so the address's test switches work for everyone (test-switches.ts).
+   */
+  config: { accounts: boolean; google: boolean; email: boolean; onlineNeedsSignIn?: boolean; testSwitches?: boolean } | null;
   profile: Profile | null;
 }
 
@@ -109,7 +112,10 @@ export interface Locker {
   keys: number | null;
 }
 
-/** Opens a crate on the server. `force`: the test switches (?fischer=1, ?shiny=1), honored only while testing. */
+/**
+ * Opens a crate on the server. `force`: the test switches (?fischer=1, ?shiny=1), honored only for those allowed them
+ * (test-switches.ts; the server checks too) and while crates are free.
+ */
 export async function openCrate(crate: string, force: { fischer?: boolean; shiny?: boolean } = {}): Promise<{ roll: CrateRoll; item: ItemInstance }> {
   const r = await api<{ roll: CrateRoll; item: ItemInstance; locker: Locker }>("/api/locker/open", { method: "POST", body: JSON.stringify({ crate, ...force }) });
   if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
@@ -199,6 +205,8 @@ export interface PublicProfile {
   joinedAt: number;
   lastSeen: number | null;
   online: boolean;
+  /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null. */
+  hidden?: boolean;
   rating: number | null;
   tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
   topPercent: number | null;

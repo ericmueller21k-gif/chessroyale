@@ -58,7 +58,7 @@ const file: ReplayFile = !fresh && existsSync(OUT) ? JSON.parse(readFileSync(OUT
 const library = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8")) as Opening[];
 const engines = await Promise.all(Array.from({ length: 4 }, () => createNodeEngine({ nodes: NODES, hashMb: 16 })));
 // Average to loose bots (skill temperatures 2-32 points; the full range starts at 0.25), as in a lobby's 50 v 50.
-const settings: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { crowdTeams: true }), engineNodes: NODES, botSkillRange: [2, 32] };
+const settings: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd"), engineNodes: NODES, botSkillRange: [2, 32] };
 
 for (let k = 0; k < count; k++) {
   const seed = 7000 + file.replays.length;

@@ -1,7 +1,7 @@
 // Frame-by-frame check of the queue's pops (see .claude/LESSONS.md): people's pawns popping into their seats,
 // several at once (staggered), then the bots' cascade when the fill time runs out.
 //   npm run frames:queue -- <out-dir> [base url, default http://localhost:8788]
-// Needs the Worker running (npx wrangler dev --port 8788 --var MATCH_FILL_SECONDS:20 ...). Animations are slowed
+// Needs the Worker running (npx wrangler dev --port 8788 --var MATCH_FILL_SECONDS:20 --var TEST_SWITCHES:1 ...). Animations are slowed
 // 10× so each 0.35 s pop spans many frames. Saves a PNG of the grid every ~100 ms (35 ms of animation time each), a
 // timeline of every seat's scale per frame (timeline.txt: look for a scale past 1 that settles back to 1, and for
 // any seat that pops twice), and a strip of the first pop (strip.png, with ImageMagick).

@@ -1,7 +1,7 @@
 // Frame-by-frame check of moves made with quick chat on (see .claude/LESSONS.md): an online 50 v 50 on a phone-sized
 // screen, chat in the space under the board, while another player's lines keep arriving (feed, bubble, emoji floats).
 //   npm run frames:chat -- <out-dir> [moves=2] [scheme=dark|light] [layout=split|chat|board] [base url]
-// Needs the Worker running (npx wrangler dev --port 8788 --enable-containers=false --var MATCH_FILL_SECONDS:8 ...).
+// Needs the Worker running (npx wrangler dev --port 8788 --enable-containers=false --var MATCH_FILL_SECONDS:8 --var TEST_SWITCHES:1 ...).
 // layout: what the phone shows under the board (split: scoreboard and chat side by side; chat: chat full width;
 // board: the scoreboard full width, so new lines come as the bubble).
 // Writes f<ms>.jpg for every painted frame and timeline.txt, and prints: phase changes, every change of the pieces

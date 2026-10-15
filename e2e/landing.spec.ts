@@ -26,7 +26,9 @@ test("landing: demo loop, sign-in, guests play bots only, FAQ and legal pages, i
   // Legal pages.
   await page.getByRole("link", { name: "Privacy" }).click();
   await expect(page.getByRole("heading", { name: "Privacy policy" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "DRAFT — not yet reviewed" })).toBeVisible();
   await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByRole("heading", { name: "Sign in to play online" })).toBeVisible();
   // A guest gets solo play against bots; online asks you to sign in. Crowd is the default mode.
   await page.getByRole("button", { name: "Play vs 99 bots as a guest" }).click();
   await expect(page.getByRole("radio", { name: /Crowd/ })).toHaveAttribute("aria-checked", "true");

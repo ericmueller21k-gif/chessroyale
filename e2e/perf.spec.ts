@@ -8,6 +8,10 @@ import { counts, frameStats, instrument } from "./perf-probe.js";
  * smooth late in a long game. Real moves first, measuring after each (DOM, animations, rAF callbacks per frame,
  * timers: none may grow); then the board's game made 120 plies long (a real game) and the frames measured while the
  * board sits and while a piece is dragged, then through the boss's turn. The whole match: `npm run perf:boss`.
+ *
+ * Every test here is tagged `@perf`: a frame budget depends on the machine's speed, so CI's e2e leaves them out
+ * (`--grep-invert @perf`). Run them locally under the e2e lock, or from the e2e workflow's manual run (Actions → e2e →
+ * Run workflow, "perf").
  */
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
@@ -35,7 +39,7 @@ function longGame(plies: number): { history: string[]; fen: string } {
   }
 }
 
-test("a long boss battle on a slow phone: nothing grows, and late frames stay within budget", async ({ page }) => {
+test("a long boss battle on a slow phone: nothing grows, and late frames stay within budget", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);
   await page.addInitScript(instrument);
@@ -125,7 +129,7 @@ test("a long boss battle on a slow phone: nothing grows, and late frames stay wi
   }
 });
 
-test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays within budget", async ({ page }) => {
+test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays within budget", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);
   await page.addInitScript(instrument);
@@ -230,7 +234,7 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
   }
 });
 
-test("Big Boy on a slow phone: his snack, his toy block and the whole Big Bounce stay within budget, the first time they show", async ({ page }) => {
+test("Big Boy on a slow phone: his snack, his toy block and the whole Big Bounce stay within budget, the first time they show", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);
   await page.addInitScript(instrument);
@@ -269,7 +273,7 @@ test("Big Boy on a slow phone: his snack, his toy block and the whole Big Bounce
   }
 });
 
-test("Sawyer on a slow phone: the split, the board saw and his first saw cut stay within budget, the first time they show", async ({ page }) => {
+test("Sawyer on a slow phone: the split, the board saw and his first saw cut stay within budget, the first time they show", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);
   await page.addInitScript(instrument);
@@ -311,7 +315,7 @@ test("Sawyer on a slow phone: the split, the board saw and his first saw cut sta
   }
 });
 
-test("the Hidden Boss's phase 2 on a slow phone: the phase change and four boards in play stay within budget", async ({ page }) => {
+test("the Hidden Boss's phase 2 on a slow phone: the phase change and four boards in play stay within budget", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);
   await page.addInitScript(instrument);

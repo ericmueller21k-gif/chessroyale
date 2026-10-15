@@ -45,7 +45,7 @@ function crowdFinal(patch: Partial<Settings> = {}, seed = 7) {
     mulberry32(seed),
     {
       ...DEFAULT_SETTINGS,
-      ...modeSettings("crowd", { crowdTeams: true, augments: false }),
+      ...modeSettings("crowd", { augments: false }),
       finalFormat: "boss",
       knockoutsPerStage: CROWD_KNOCKOUTS.boss,
       // (Two rounds a stage: with one, the team that hasn't moved yet is all tied at the first cut.)

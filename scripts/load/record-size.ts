@@ -13,7 +13,7 @@ const people = Number(process.argv[2] ?? 100);
 const seconds = Number(process.argv[3] ?? 240);
 let now = 1_000_000;
 const inbox = new Map<string, ServerMessage[]>();
-const overrides = modeSettings("crowd", { crowdTeams: true, augments: true });
+const overrides = modeSettings("crowd", { augments: true });
 const rec = newLobbyRecord("ABCDE", now, overrides);
 const io = { now: () => now, send: (id: string, msg: unknown) => inbox.set(id, [...(inbox.get(id) ?? []).slice(-20), msg as ServerMessage]), icon: () => undefined };
 let core = new LobbyCore(rec, io, openings as unknown as Opening[], mulberry32(3));

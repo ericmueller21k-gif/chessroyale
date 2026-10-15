@@ -3,7 +3,7 @@
 // animation frame logs where the sheet or confirm is against the board and the line above it (the move's count and
 // clock): nothing may cover them, and the board mustn't move. Flags frames that blink (a jump in brightness).
 //   npm run frames:resign -- <out-dir> [phone|desktop|both] [dark|light|both] [boss|crowd] [base-url]
-// The base URL is a running Worker (npx wrangler dev, http://localhost:8787 by default): the built app.
+// The base URL is a running Worker (npx wrangler dev --var TEST_SWITCHES:1, http://localhost:8787 by default): the built app.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { chromium, devices } from "@playwright/test";
 import sharp from "sharp";

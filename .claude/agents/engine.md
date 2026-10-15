@@ -67,7 +67,7 @@ changes beyond the engine's own messages, write up the proposal and stop; that's
   add a paid service, without asking him. Give the monthly cost estimate with any proposal. Today it's Workers Paid
   ($5/mo) plus container time; the hybrid costs well under 1¢ per match.
 - **Measure before and after.** Any change to the judge or a boss comes with numbers from a sim script, a before/after
-  table, in `reports/` and summarized in `DECISIONS.md` (New decisions). Never a vibe. Keep `docs/areas/engine.md`
+  table, in `reports/` and summarized in a new file in `docs/decisions/`. Never a vibe. Keep `docs/areas/engine.md`
   true.
 - **Fairness first.** The judge must give the same score for the same move whoever hosts, and on any device, within
   the measured noise. Brilliant-move credit never comes from a power-up move.
@@ -75,7 +75,9 @@ changes beyond the engine's own messages, write up the proposal and stop; that's
   slow.
 - **Testing:**
   - Run `npm test` and `npm run typecheck`.
-  - Run `npm run e2e` (about 20 minutes, in the background) for anything gameplay touches.
+  - For anything gameplay touches: locally, the e2e specs you touched (under the shared e2e lock), and the `@perf`
+    specs if it could slow a phone (`npx playwright test --grep @perf --project phone`: CI leaves them out). CI
+    runs the whole e2e suite on the PR (`.github/workflows/e2e.yml`): read its `result` before merging.
   - e2e runs with containers off. Test the container itself with Docker locally, or live via `/api/engine/ping`
     and `/api/engine/score`, with the Access service-token headers described in `CLAUDE.md`. Never print their values.
 - **Shipping:** per `CLAUDE.md`: PR, wait for `check`, merge with a merge commit, verify live.

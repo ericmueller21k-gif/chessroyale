@@ -71,8 +71,10 @@ Adding a boss: follow the checklist in `docs/areas/bosses.md` ("Adding a boss").
   - Unit tests for the rules: when it triggers, when it must not, once per game, scores unaffected.
   - A lobby test for the online path.
   - An e2e case that plays through it.
-  - Run `npm test`, `npm run typecheck` and `npm run e2e` (about 20 minutes, in the background) before merging.
-- **Record it** in `DECISIONS.md` (New decisions), a section for your feature: what you built, timings, any call you
+  - Run `npm test`, `npm run typecheck` and, locally, the e2e specs you touched (under the shared e2e lock); for
+    animation and timing work, the `@perf` specs too (`npx playwright test --grep @perf --project phone`: CI leaves
+    them out). CI runs the whole e2e suite on the PR (`.github/workflows/e2e.yml`): read its `result` before merging.
+- **Record it** in a new file in `docs/decisions/`, a section for your feature: what you built, timings, any call you
   made and why. Keep `docs/areas/god-king.md` and `bosses.md` true.
 - **Ship it** per `CLAUDE.md`: PR, wait for `check`, merge with a merge commit, verify live.
 

@@ -316,10 +316,16 @@ export class Lobby extends DurableObject<Env> {
   }
 
   /** Whether the lobby is open, and where its match is (null: no such lobby, or it has closed). */
-  async status(): Promise<{ phase: "waiting" | "playing" | "over" } | null> {
+  /** Whether it's open and where it's at; `matchmade` (PLAY's queue, not a code's lobby) and `mode` for friends' invites. */
+  async status(): Promise<{ phase: "waiting" | "playing" | "over"; matchmade: boolean; mode: "crowd" | "raid" | "classic" } | null> {
     if (!this.record || (await this.closeIfDue())) return null;
     const r = this.record;
-    return { phase: r.phase === "results" ? "over" : r.phase === "lobby" && !r.auto?.filledAt ? "waiting" : "playing" };
+    const o = r.overrides ?? {};
+    return {
+      phase: r.phase === "results" ? "over" : r.phase === "lobby" && !r.auto?.filledAt ? "waiting" : "playing",
+      matchmade: !!r.auto,
+      mode: o.raid ? "raid" : o.mode === "crowd" ? "crowd" : "classic",
+    };
   }
 
   /**

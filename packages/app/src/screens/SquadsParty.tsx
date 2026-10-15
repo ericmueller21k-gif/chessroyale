@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { SQUADS } from "@chessroyale/core";
 import { FdButton } from "../components/FrontDoor.tsx";
 import type { PartyClient } from "../squads.ts";
+import { InviteFriends } from "../components/Friends.tsx";
 
 /**
  * Squads' party (docs/areas/squads.md, "The screens"): make one (a code and an invite link, /squads/party/CODE), or
@@ -85,6 +86,7 @@ export function PartySheet({
                 {copied ? "Copied" : "Copy link"}
               </FdButton>
             </div>
+            <InviteFriends />
             <ul class="sq-party-members" aria-label="Members">
               {p?.members.map((m) => (
                 <li key={m.id} class={`${m.connected ? "" : "away"}${m.id === party.memberId ? " you" : ""}`}>
