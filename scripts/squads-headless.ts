@@ -15,7 +15,7 @@
  *                             sit idle and a bot takes each seat after its third miss (a full bot lobby)
  *   --device                  each person's client answers bot work with Node's Stockfish, as a phone or computer would
  *   --nodes N                 the device engine's nodes for bot work (default: what each job asks, SQUADS_LOBBY.botWork.nodes)
- *   --pool NAME               the queue's pool (default: a fresh one, so runs never meet)
+ *   --pool NAME               the queue's pool (default: a fresh one, so runs never meet; needs TEST_SWITCHES=1)
  *   --out FILE                also write the report (Markdown) there
  *   --timeout S               give up after this long (default 7200: a bot lobby can run over an hour)
  */

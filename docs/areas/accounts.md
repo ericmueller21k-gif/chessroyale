@@ -24,7 +24,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   coins into `wallets.coins`, crates counted in `wallets.crates` (for when crates stop being free), both carried over
   when a guest signs in (`grantReward`).
 - **Admins** are the emails in `ADMIN_EMAILS` (a Worker variable or secret, never in the repo): the fair-play review
-  page and the boss battle's "Trigger ultimate (testing)" button.
+  page, the boss battle's "Trigger ultimate (testing)" button, and the test switches in the address (`?debug`,
+  `?rounds=`, …; [ops.md](ops.md), "Test switches").
 - **Bans** (from [fairplay.md](fairplay.md)) stop online play; solo stays open.
 - **The privacy policy, terms and copyright page** (`/privacy`, `/terms`, `/copyright`, `screens/Legal.tsx`) are drafts
   written from the code, with the decisions still to make at the top. They list every kind of personal data the game keeps, why and for how long:

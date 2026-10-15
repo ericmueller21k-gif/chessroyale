@@ -3,7 +3,7 @@ import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, inboxOf, markSeen, rememberInbox } from "./presence.ts";
 import { REPORT_THANKS, appeal, fairStatus, reportPlayer } from "./fairplay.ts";
-import { isAdmin, type AdminEnv } from "./admin.ts";
+import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
 import {
   buyItem,
@@ -144,7 +144,10 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
   const email = !!env.RESEND_API_KEY;
-  if (path === "/api/auth/config") return json({ accounts: !!env.DB, google, email, onlineNeedsSignIn: !!env.DB && signInRequired(env) });
+  // (`testSwitches`: TEST_SWITCHES is on here, so the app honors its test switches for everyone: local, e2e, staging.)
+  if (path === "/api/auth/config") {
+    return json({ accounts: !!env.DB, google, email, onlineNeedsSignIn: !!env.DB && signInRequired(env), ...((env as AdminEnv).TEST_SWITCHES === "1" ? { testSwitches: true } : {}) });
+  }
   if (!env.DB) return json({ message: "Accounts aren't set up yet." }, 503);
   const sql: Sql = d1Sql(env.DB);
   await ensureSchema(sql, env.DB);
@@ -255,13 +258,14 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return json(await setChatPicks(sql, current.id, b && typeof b === "object" ? b : {}));
   }
 
-  // The locker. GET /api/locker; POST /api/locker/open {crate, fischer?, shiny?} (the test switches work only while
-  // crates are free); POST /api/locker/equip {slot, item} (item null empties the slot); POST /api/locker/delete
+  // The locker. GET /api/locker; POST /api/locker/open {crate, fischer?, shiny?} (the test switches: admins, or
+  // TEST_SWITCHES, and only while crates are free); POST /api/locker/equip {slot, item} (item null empties the slot); POST /api/locker/delete
   // {items} (deletes your crate items for good).
   if (path === "/api/locker" && request.method === "GET") return json(await lockerState(sql, current.id));
   if (path === "/api/locker/open" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { crate?: unknown; fischer?: unknown; shiny?: unknown };
-    const r = await openCrate(sql, current.id, b.crate, { fischer: b.fischer === true, shiny: b.shiny === true }, now);
+    const force = testSwitchesOn(env as AdminEnv, current) ? { fischer: b.fischer === true, shiny: b.shiny === true } : {};
+    const r = await openCrate(sql, current.id, b.crate, force, now);
     return r.ok ? json(r) : json({ message: r.message }, 400);
   }
   if (path === "/api/locker/equip" && request.method === "POST") {

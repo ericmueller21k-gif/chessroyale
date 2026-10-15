@@ -1,7 +1,7 @@
 /**
  * Records the landing page's demo loop: a solo 50 v 50 Crowd match on a phone
  * screen, played by a bot-like "you" that picks the engine's move after a few
- * seconds. Needs the app served at BASE (default: `npx wrangler dev --port 8788`
+ * seconds. Needs the app served at BASE (default: `npx wrangler dev --port 8788 --var TEST_SWITCHES:1`
  * after `npm run build`). Captures sharp frames (2x) as back-to-back
  * screenshots into reports/demo/frames/, plus reports/demo/frames.txt for
  * ffmpeg; then cut and encode with scripts/encode-demo.sh.
