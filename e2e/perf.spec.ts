@@ -12,6 +12,9 @@ import { counts, frameStats, instrument } from "./perf-probe.js";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 
+/** Some frames, for the log: the 95th percentile, the dropped ones (over 20 ms) and the longest. */
+const f = (s: { n: number; p95: number; slow: number; max: number }) => `p95 ${s.p95} ms, ${Math.round(s.slow * 100)}% dropped (${Math.round(s.slow * s.n)} of ${s.n} over 20 ms), longest ${s.max} ms`;
+
 /** A legal game of `plies` moves that isn't over, White to move (the crowd's side), from a fixed seed. */
 function longGame(plies: number): { history: string[]; fen: string } {
   for (let seed = 1; ; seed++) {
@@ -106,7 +109,6 @@ test("a long boss battle on a slow phone: nothing grows, and late frames stay wi
 
   const report = { early, after: samples.map((s) => ({ dom: s.dom, anims: s.anims, raf: s.rafPerFrame, timers: s.timeouts + s.intervals, idle: s.idle })), late, drag, turn };
   await test.info().attach("perf", { body: JSON.stringify(report, null, 1), contentType: "application/json" });
-  const f = (s: { p95: number; slow: number }) => `p95 ${s.p95} ms, ${Math.round(s.slow * 100)}% dropped`;
   console.log(`late (120 plies): idle ${f(late.idle)}; drag ${f(drag)}; boss turn ${f(turn)}; DOM ${early.dom} → ${late.dom}, rAF/frame ${early.rafPerFrame} → ${late.rafPerFrame}`);
   // Nothing grows with the moves (a little slack for a banner or a bubble at the moment of counting).
   for (const s of [...samples, late]) {
@@ -140,7 +142,7 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
   };
   // Through the sparkler and the candle: the launch itself measured (he slams the candle down and fires 24 shots that
   // fan out, each whistling; the first wave's shadows appear as he jumps off).
-  let launch: { p95: number; slow: number } | null = null;
+  let launch: { n: number; p95: number; slow: number; max: number } | null = null;
   let draws = 0;
   for (let i = 0; i < 3; i++) {
     await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
@@ -161,7 +163,7 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
       draws = await page.evaluate(() => ((window as any).__launchBoard?.hbDraws ?? 0) - (window as any).__launchDraws);
     }
   }
-  console.log(`G-REX's Roman candle launch (slowed phone): p95 ${launch!.p95} ms, ${Math.round(launch!.slow * 100)}% dropped, the board drawn ${draws} times`);
+  console.log(`G-REX's Roman candle launch (slowed phone): ${f(launch!)}, the board drawn ${draws} times`);
   // The screen draws every frame while the candle plays over the board; the board's pieces only when they change
   // (docs/areas/board.md): a few times at most, not once a frame (Oct 14: it was every frame).
   expect(draws, "the board's pieces drawn during the launch").toBeLessThan(10);
@@ -219,7 +221,6 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
   await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);
   const turn = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((f) => f[0]));
-  const f = (s: { p95: number; slow: number }) => `p95 ${s.p95} ms, ${Math.round(s.slow * 100)}% dropped`;
   console.log(`G-REX, 9 fire tiles and shadows, 120 plies: idle ${f(idle)}; drag ${f(drag)}; boss turn ${f(turn)}; DOM ${early.dom} → ${late.dom}, anims ${early.anims} → ${late.anims}`);
   // The tiles' own elements and animations only (a few each), nothing per redraw.
   expect(late.dom, "DOM elements").toBeLessThanOrEqual(early.dom + 40 + squares.length * 6);
@@ -261,7 +262,6 @@ test("Big Boy on a slow phone: his snack, his toy block and the whole Big Bounce
   const bounce = await through(() => phase(page).then((p) => p === "play"));
   const powers = await page.evaluate(() => (window as any).match.boss.powers);
   expect(powers.bounce).toBeTruthy();
-  const f = (s: { p95: number; slow: number }) => `p95 ${s.p95} ms, ${Math.round(s.slow * 100)}% dropped`;
   console.log(`Big Boy (slowed phone): snack ${f(snack)}; block and warning ${f(block)}; bounce (${powers.bounce.moves.length} moved) ${f(bounce)}`);
   for (const [what, s] of [["snack", snack], ["block", block], ["bounce", bounce]] as const) {
     expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);
@@ -304,7 +304,6 @@ test("Sawyer on a slow phone: the split, the board saw and his first saw cut sta
   expect(powers.split).toBeTruthy();
   expect(powers.boardSaw).toBeTruthy();
   expect(powers.cut).toBeTruthy();
-  const f = (s: { p95: number; slow: number }) => `p95 ${s.p95} ms, ${Math.round(s.slow * 100)}% dropped`;
   console.log(`Sawyer (slowed phone): split ${f(split)}; board saw ${f(saw)}; cut ${f(cut)}`);
   for (const [what, s] of [["split", split], ["board saw", saw], ["cut", cut]] as const) {
     expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);
@@ -343,7 +342,7 @@ test("the Hidden Boss's phase 2 on a slow phone: the phase change and four board
   await page.waitForTimeout(8000);
   const play = frameStats((await page.evaluate(() => (window as any).__perf.frames.splice(0))).map((f: [number, number]) => f[0]));
   const moves = await page.evaluate(() => (window as any).match.simul.boards.reduce((n: number, b: { history: string[] }) => n + b.history.length, 0));
-  console.log(`phase 2 on a 4x-slowed phone: the phase change ${JSON.stringify(change)}; four boards in play ${JSON.stringify(play)}, ${moves} moves`);
+  console.log(`phase 2 on a 4x-slowed phone: the phase change ${f(change)}; four boards in play ${f(play)}, ${moves} moves`);
   expect(moves, "moves played on the bots' boards meanwhile").toBeGreaterThan(4);
   for (const [what, s] of [["the phase change", change], ["four boards in play", play]] as const) {
     expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);

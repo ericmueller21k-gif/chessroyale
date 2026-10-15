@@ -192,8 +192,8 @@ const KIND: Record<KingCue, Kind> = {
 /** How much each kind of line matters to his voice: critical cuts in; a remark waits its turn ahead of small talk. */
 const PRIORITY: Record<Kind, Priority> = { critical: CRITICAL, lead: NORMAL, remark: NORMAL, paced: LOW, info: LOW };
 
-/** His voice: one line at a time, each for its time (speech.tsx). */
-const voice = new Voice();
+/** His voice: one line at a time, each for its time (speech.tsx); his bubble in the dock draws from it (useVoice). */
+export const kingVoice = new Voice();
 let lastAt = 0;
 let quietMoves = 0;
 /** Crowd moves so far, and the move of the last remark. */
@@ -245,7 +245,7 @@ export function kingSay(cue: KingCue, key: string, now = Date.now(), rng: () => 
   const options = lines.length > 1 ? lines.filter((l) => l !== lastLine.get(cue)) : lines;
   const text = options[Math.floor(rng() * options.length)]!;
   lastLine.set(cue, text);
-  voice.say(text, key, PRIORITY[kind], now);
+  kingVoice.say(text, key, PRIORITY[kind], now);
   lastAt = now;
   quietMoves = 0;
   if (kind === "remark") remarkAt = moveNo;
@@ -258,12 +258,12 @@ export function kingSay(cue: KingCue, key: string, now = Date.now(), rng: () => 
  * so a screen change carries on where the bubble was instead of starting over.
  */
 export function kingLine(now = Date.now()): Spoken | null {
-  return voice.line(now);
+  return kingVoice.line(now);
 }
 
 /** For tests: forget everything said. */
 export function resetKingSpeech() {
-  voice.reset();
+  kingVoice.reset();
   fallen = false;
   lastAt = 0;
   quietMoves = 0;

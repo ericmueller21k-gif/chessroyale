@@ -11,7 +11,7 @@ import { prewarmGrex } from "./Grex.tsx";
 import { prewarmSawyer } from "./Sawyer.tsx";
 import { prewarmPig } from "./Pig.tsx";
 import { EngineOverlay, placeEngine, prewarmRecluse } from "./Recluse.tsx";
-import { CRITICAL, LOW, NORMAL, SpeechBox, bossVoice, holdMs, useVoice, type Priority } from "../speech.tsx";
+import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 import { lightsId, syncLights } from "../characters/lights.ts";
 
@@ -314,7 +314,6 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     const timers = fallAt.map(({ text, at }, i) => setTimeout(() => bossVoice.say(text, `${boss.id}:${boss.startMove}:fall:${i}`, NORMAL), Math.max(0, at - Date.now())));
     return () => timers.forEach(clearTimeout);
   }, [fallAt]);
-  const { line, now } = useVoice(bossVoice);
   if (!kit || !beat) return null;
   const { ch } = kit;
   return (
@@ -322,7 +321,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
       {kit.engine && <EngineOverlay ch={ch} elRef={eng} />}
       {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). */}
-      {line && <SpeechBox key={line.key} class="bc-bubble" text={line.text} at={line.at} until={line.until} now={now} fits={1} />}
+      <VoiceBubble voice={bossVoice} class="bc-bubble" />
     </div>
   );
 }

@@ -24,6 +24,7 @@ import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE2_ULT_BANNER_MS, PHASE_CHANGE, 
 import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
 import { BossHeading } from "./Play.tsx";
+import { useStillKey } from "../hooks.ts";
 
 /**
  * The Hidden Boss's phase change and his phase 2 (rules: packages/chess/src/bosses/recluse-phase2.ts; the driver:
@@ -278,6 +279,10 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   useLayoutEffect(() => {
     if (revived) bossVoice.say(RECLUSE_LINES.revive[at % RECLUSE_LINES.revive.length]!, `recluse:revive:${at}`, CRITICAL);
   }, [revived]);
+  // (The header and the boss's place don't move with the frame: drawn as the match changes, useStillKey.)
+  const still = useStillKey(match, now);
+  const hud = useMemo(() => <Hud match={match} />, [match, still]);
+  const bossSide = useMemo(() => <BossSide match={match} />, [match, still]);
   if (!v) return null;
   const split = t >= C.partAt;
   const shuffled = t >= C.shuffleAt;
@@ -304,13 +309,13 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   const cracking = t >= C.crackAt && t < C.growAt;
   return (
     <div class={`screen game boss-screen rc-change${away ? " rc-away" : ""}`}>
-      <Hud match={match} />
+      {hud}
       <div class={`board-area${jolt ? " pw-crash" : ""}`}>
         <div class="opening-name">
           <BossHeading side="w" note={split ? "phase 2: Chess960" : "the boss is beaten"} />
         </div>
         <div class="board-row">
-          <BossSide match={match} />
+          {bossSide}
           <div class="eval-bar rc-evalgap" aria-hidden="true" />
           <div
             class="board-wrap rc-stage"
@@ -478,6 +483,10 @@ export function SimulScreen({ match }: { match: GameView }) {
   const now = useFrameNow();
   const computer = useMedia(COMPUTER_LAYOUT);
   const [watch, setWatch] = useState(0);
+  // (The header and the boss's place don't move with the frame: drawn as the match changes, useStillKey.)
+  const still = useStillKey(match, now);
+  const hud = useMemo(() => <Hud match={match} />, [match, still]);
+  const bossSide = useMemo(() => <BossSide match={match} />, [match, still]);
   if (!v) return null;
   const mine = v.boards[0]!;
   const big = v.boards.find((b) => b.id === watch) ?? mine;
@@ -499,7 +508,7 @@ export function SimulScreen({ match }: { match: GameView }) {
         : "The boss is thinking…";
   return (
     <div class={`screen game boss-screen rc-simul ${computer ? "rc-desk" : "rc-phone"}${ultOn ? " rc-ult" : ""}`}>
-      <Hud match={match} />
+      {hud}
       {!computer && (
         <div class="rc-minis" role="list" aria-label="The other boards">
           {others.map((b) => (
@@ -514,7 +523,7 @@ export function SimulScreen({ match }: { match: GameView }) {
           <BossHeading side="w" note={`Chess960 · ${v.won} of ${v.of} won`} />
         </div>
         <div class="board-row">
-          <BossSide match={match} />
+          {bossSide}
           <div class="eval-bar rc-evalgap" aria-hidden="true" />
           {computer ? (
             <div class="board-wrap rc-stage">

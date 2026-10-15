@@ -4455,3 +4455,173 @@ his bullet line was up when one came due: his own words first), never quiet (no 
 pace, 34 moves): his entrance at 0.1 s; chatter at 14.0, 30.0, 44.0, 63.5, 77.0, 90.5, 103.5, 121.0, 134.0, 149.5 and
 167.5 s; the bullet clock's line at 37.3 s and "time per move" at 55.3 s, each whole, the chatter around them (gaps 13
 to 19.5 s).
+
+## The boss screen draws only what changed (Oct 15, 2026)
+
+Eric approved it (Oct 15): the boss screens redrew too much every frame, so each frame now redraws only what changed.
+His rule for it: easier code and less lag over all else, fewer bug risks. This is the follow-up held back in "The boss
+screen's lag: the boss view free to read" and "Big Boy's perf check near its budget".
+
+**What was drawn every frame, and why.** Measured with a render counter in a diagnostic build (every component's
+renders and their time, by what was on screen) through a solo Boss alone battle against each boss with its ultimate
+brought early, on a phone slowed 4x:
+- The boss screen (`BossScreen`) keeps a clock that ticks every frame (`useFrameNow` at its top). Its effects need it:
+  the board's position through a bounce, a split or a lasso, the moments over the board, the jolts and turns, the
+  dock's words as each moment comes. But everything the screen drew was drawn with it, 50 to 60 times a second for the
+  boss's whole turn (the intro, thinking, his move and its moments): the header and the boss bar (`Hud`), the boss by
+  the board (`BossSide`), the dock (`BossDock`), and the scoreboard or chat under it (`UnderBoard`). Those took two
+  thirds of the screen's render work each frame.
+- The God King in the dock (`GodKingUnit`) had a frame clock of its own, always running: drawn twice a frame on the
+  boss screen (his clock and the dock's), and 60 times a second on your move's screen, which draws 5 times a second.
+- A phone draws the boss's figure in two places (the bar and by the board, one hidden by CSS): each was drawn with the
+  screen, 110 to 120 times a second together.
+- The Hidden Boss's phase change and phase 2 (`Recluse2.tsx`) did the same with their header and figure.
+- The first attempt (Oct 14) stopped at parts that only stayed right because they were drawn every frame: Hollow's bulb
+  strip relights at a time it reads while drawing, the admins' brain line reads a note the engine writes without
+  telling the screen, the chat's "Next in N s" counts down only as it's drawn. Two more turned up on the way: a solo
+  boss's state can change between the match's own changes (its ultimate readied while it thinks: the rage meter), and
+  the speech boxes' own refresh (`useVoice`) asked for its next frame from an effect, so it drew every other frame and
+  could miss a line said just before it listened. The figure's redraw every frame had hidden both.
+
+**The fix.** No new library: Preact's `useMemo` of an element (Preact leaves an element it's handed again alone, as the
+board's drawing layer has since #185) and `memo` (already in Squads).
+- `useStillKey` (`hooks.ts`) is when the parts that don't move with the clock are drawn: whenever the match changes (its
+  `subscribe`), whenever the boss's state changes (its view is new then), and every 200 ms (`STILL_MS`), as often as
+  your move's screen draws them, so what they read as they're drawn (the brain line, the chat's wait) keeps up exactly
+  as it does there. The boss screen keeps the header, the boss by the board and the chat as elements memoized on it.
+- The dock is memoized on the same key plus the values its words read from the clock: the moment, the burn line, the
+  claim and snack windows, the funhouse's move, "Your move in N". During Lights out it's drawn every frame (the prompt
+  counts down). A new word read from the clock goes in that list (the rule is in docs/areas/bosses.md).
+- `GodKingUnit` is `memo`'d (the dock keeps its callbacks and its power-up object the same while they hold the same)
+  and draws every frame only while he commands from his spot or shakes his "can't". His figure animates on its own
+  canvas loop, as before.
+- `VoiceBubble` (`speech.tsx`): a speaker's words in their box, keeping themselves current. It listens to the voice
+  from before the paint (a line said just before it listened shows too), and draws every frame while a line types and
+  fades (`useFrameNow`). The boss's figure and the God King use it, so neither is drawn again for its words.
+- Hollow's bulb strip (`BossBarExtra`) draws itself every frame through his turn, so it relights as his darkness lands,
+  to the frame.
+- The phase change and phase 2 keep the header and the boss's place on `useStillKey`. Their docks still draw every
+  frame: their words and phase 2's clocks change with the clock, and the dock's clock and the boards' clocks tick
+  together only if they draw together. About 0.7 ms a frame of a slowed phone's (diagnostic build), left for the risk.
+- Not changed: the board and what's drawn over it (memoized inside since #185), the eval bar (cheap), your move's screen
+  (it draws 5 times a second; only the God King's own clock there is gone), and the reveal (raids and the Last Stand:
+  it draws every frame too, a candidate for the same key, not measured here).
+- On the way: `npm run frames:boss` failed to start (its Vite server ran from the repo's root, where the app's config
+  can't find the Stockfish source archive); it now runs from the app's folder like the other frames scripts.
+
+**Renders** (the diagnostic build, the phone slowed 4x; renders a second, main → this branch; the boss screen's render
+work a frame in ms, inclusive, comparable between the builds, not the shipped build's numbers):
+
+| Moment | screen's render work a frame, ms | header (Hud) | dock | God King | chat / scoreboard | boss figure (2 places) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Big Boy's intro | 3.78 → 1.31 | 57 → 5 | 57 → 6 | 114 → 0 | 57 → 5 | 115 → 10 |
+| Big Boy's snack | 4.39 → 1.43 | 60 → 5 | 60 → 7 | 120 → 0 | 60 → 5 | 120 → 11 |
+| Big Boy's bounce | 4.81 → 2.32 | 58 → 5 | 58 → 6 | 117 → 0 | 58 → 5 | 117 → 10 |
+| Jefferson's Roman candle | 4.59 → 1.93 | 55 → 5 | 55 → 5 | 111 → 0 | 55 → 5 | 111 → 10 |
+| Ginger's blizzard | 3.65 → 1.56 | 57 → 5 | 57 → 6 | 114 → 0 | 57 → 5 | 114 → 11 |
+| Ginger's thaw | 4.33 → 2 | 60 → 6 | 60 → 6 | 119 → 0 | 60 → 6 | 119 → 11 |
+| Boingo's funhouse | 3.89 → 1.79 | 59 → 5 | 59 → 6 | 118 → 0 | 59 → 5 | 119 → 10 |
+| Sawyer's board saw | 3.6 → 1.6 | 60 → 5 | 60 → 6 | 119 → 0 | 60 → 5 | 119 → 10 |
+| Hollow's Lights out | 4.9 → 2.37 | 58 → 4 | 58 → 60 | 116 → 0 | 58 → 4 | 116 → 9 |
+| Hollow's dark | 3.56 → 2.06 | 55 → 5 | 55 → 6 | 109 → 0 | 55 → 5 | 109 → 11 |
+| Wrangler's lasso drag | 3.55 → 1.83 | 59 → 5 | 59 → 6 | 117 → 0 | 59 → 5 | 117 → 11 |
+| Wrangler's Showdown | 3.71 → 2.19 | 56 → 5 | 56 → 6 | 112 → 0 | 56 → 5 | 112 → 10 |
+| The boss thinking (Jefferson) | 4.07 → 1.73 | 47 → 6 | 47 → 6 | 92 → 0 | 47 → 6 | 93 → 12 |
+| The Hidden Boss's phase change | 3.52 → 2.49 | 51 → 5 | 51 → 52 | 101 → 13 | 0 → 0 | 101 → 10 |
+| The Hidden Boss's phase 2 | 3.74 → 2.32 | 58 → 7 | 58 → 60 | 115 → 0 | 0 → 0 | 117 → 13 |
+| Your move (Play, Big Boy) | 0.62 → 0.66 | 6 → 6 | 6 → 6 | 59 → 1 | 6 → 6 | 12 → 12 |
+
+**Nothing stale, frame by frame.** A check (a scratch tool, not committed) plays each boss's battle with the page's clock
+paused and stepped 48 ms at a time; at each step it takes the screen's markup as that frame drew it, then has the match
+redraw everything at the same instant and takes it again. A difference is a part drawn from something out of date.
+Every boss's screens (Big Boy, Jefferson, Ginger, Boingo, Sawyer, Hollow with Lights out, Wrangler's drag and Showdown),
+and the Hidden Boss's phase change and phase 2: about 4,700 steps on each build. The only difference on this branch
+that main doesn't also show: the rage meter's `transition: none` stays up to 200 ms after its drain has finished. Its
+width is the same either way, so there's nothing to see. The rest show on both builds: a line said in an effect that
+the redraw runs early, and a speech box a letter apart at a typing boundary. `npm run frames:boss` (a plain move,
+tapped, against Boingo, Big Boy, Hollow and Wrangler): the same frames on both builds, nothing moving twice or jumping.
+
+**Measured** on the phone slowed 4x, main (e05a85c) and this branch one right after the other, two pairs per case (the order
+swapped in the second), each pair started on a quiet machine (the 1-minute load average 1.7 to 2.5 on 4 cores,
+logged before each). Each cell: pair 1, pair 2. `perf.spec.ts` (main's build and this branch's served by turns on
+8788, the same spec against both):
+
+| Case | frames over 20 ms, of all (main → branch) | p95 frame, ms | longest frame, ms |
+| --- | --- | --- | --- |
+| Ginger, 120 plies: idle | 0/91, 0/91 → 0/91, 0/90 | 16.7, 16.7 → 16.7, 16.8 | 17, 17 → 17, 17 |
+| Ginger, 120 plies: drag | 2/121, 3/121 → 1/123, 2/120 | 16.8, 16.8 → 16.7, 16.8 | 33, 50 → 33, 50 |
+| Ginger, 120 plies: the boss's turn | 5/159, 5/108 → 3/103, 5/168 | 16.8, 16.8 → 16.8, 16.8 | 233, 167 → 150, 133 |
+| Jefferson's Roman candle launch | 6/348, 10/345 → 13/333, 3/349 | 16.8, 16.8 → 16.8, 16.8 | 100, 50 → 150, 117 |
+| Jefferson, 9 fire tiles: idle | 2/88, 1/89 → 2/86, 0/91 | 16.8, 16.8 → 16.8, 16.7 | 50, 33 → 83, 17 |
+| Jefferson, 9 fire tiles: drag | 3/119, 5/117 → 3/121, 4/119 | 16.8, 16.8 → 16.8, 16.8 | 33, 67 → 50, 67 |
+| Jefferson, 9 fire tiles: the boss's turn | 20/277, 19/274 → 12/337, 24/308 | 33.3, 33.3 → 16.8, 33.3 | 117, 133 → 133, 233 |
+| Big Boy's intro and snack | 7/465, 6/470 → 4/469, 6/459 | 16.8, 16.8 → 16.8, 16.8 | 183, 133 → 100, 183 |
+| Big Boy's toy block and warning | 10/455, 6/454 → 8/455, 14/449 | 16.8, 16.8 → 16.8, 16.8 | 117, 150 → 83, 117 |
+| Big Boy's bounce | 11/694, 11/688 → 9/696, 11/691 | 16.8, 16.8 → 16.8, 16.8 | 233, 250 → 233, 217 |
+| Sawyer's split | 7/398, 7/263 → 8/452, 8/389 | 16.8, 16.8 → 16.8, 16.8 | 100, 283 → 217, 133 |
+| Sawyer's board saw | 7/523, 8/575 → 9/637, 6/469 | 16.8, 16.8 → 16.8, 16.8 | 83, 117 → 100, 83 |
+| Sawyer's first cut | 4/230, 8/276 → 7/279, 6/410 | 16.8, 16.8 → 16.8, 16.8 | 100, 133 → 117, 50 |
+| The Hidden Boss's phase change | 65/796, 103/669 → 68/798, 72/780 | 33.3, 50 → 33.3, 33.4 | 200, 233 → 200, 183 |
+| The Hidden Boss's phase 2 (four boards) | 4/482, 12/468 → 5/479, 9/477 | 16.8, 16.8 → 16.8, 16.8 | 33, 133 → 50, 33 |
+
+Each effect in a solo Boss alone battle with its ultimate brought early (the shipped, minified build; frames from
+`requestAnimationFrame`, the main thread's CPU from a trace):
+
+| Effect | frames over 20 ms, of all (main → branch) | p95 frame, ms | longest frame, ms | main thread's CPU a frame, mean ms |
+| --- | --- | --- | --- | --- |
+| Big Boy's intro (his card, the replay, START!) | 7/234, 6/234 → 6/225, 5/234 | 16.8, 16.8 → 16.8, 16.8 | 100.1, 133.4 → 233.3, 150 | 8.71, 8.54 → 7.86, 6.88 |
+| Big Boy's snack | 0/195, 0/195 → 2/194, 0/195 | 16.8, 16.8 → 16.8, 16.7 | 16.8, 16.8 → 33.3, 16.8 | 8.44, 8.78 → 7.66, 6.49 |
+| Big Boy's toy block | 3/133, 4/130 → 3/132, 3/133 | 16.8, 16.7 → 16.8, 16.8 | 66.6, 83.3 → 83.3, 66.6 | 11.22, 11.72 → 10.94, 8.88 |
+| Big Boy's bounce | 17/352, 11/360 → 8/362, 6/364 | 16.8, 16.8 → 16.8, 16.8 | 83.3, 50.1 → 66.7, 66.7 | 13.58, 12.18 → 10.43, 8.98 |
+| Jefferson's sparkler | 9/118, 5/128 → 5/131, 5/131 | 33.3, 16.8 → 16.8, 16.8 | 100.1, 100 → 66.6, 83.3 | 14.99, 13.28 → 10.57, 11.66 |
+| Jefferson's Roman candle | 69/335, 8/416 → 6/417, 6/410 | 49.9, 16.7 → 16.8, 16.8 | 83.3, 49.9 → 66.7, 116.6 | 17.88, 11.83 → 10.33, 10.59 |
+| Ginger's freeze | 23/108, 2/135 → 2/134, 4/132 | 33.4, 16.8 → 16.7, 16.8 | 133.3, 50.1 → 50, 66.8 | 17.62, 10.73 → 10.02, 9.18 |
+| Ginger's blizzard | 44/160, 10/204 → 6/209, 7/208 | 33.5, 16.8 → 16.8, 16.8 | 83.3, 50 → 33.4, 33.4 | 19.55, 12.17 → 9.57, 9.69 |
+| Ginger's thaw | 21/242, 5/256 → 6/256, 6/255 | 33.3, 16.8 → 16.8, 16.8 | 50, 50.1 → 33.4, 50 | 14.53, 10.43 → 8.15, 9.14 |
+| Boingo's pie | 13/669, 12/671 → 12/671, 12/672 | 16.8, 16.8 → 16.8, 16.8 | 99.9, 66.7 → 66.7, 66.7 | 10.86, 10.64 → 8.75, 7.97 |
+| Boingo's funhouse | 11/300, 6/305 → 3/309, 3/308 | 16.8, 16.7 → 16.8, 16.8 | 50, 166.7 → 50, 50 | 11.23, 9.85 → 7.55, 6.79 |
+| Sawyer's board saw | 3/337, 5/334 → 5/332, 3/338 | 16.7, 16.7 → 16.8, 16.8 | 50, 50 → 66.7, 33.4 | 10.95, 10.59 → 9.13, 7.63 |
+| Sawyer's first cut | 7/130, 4/132 → 1/136, 1/136 | 33.3, 16.8 → 16.8, 16.7 | 33.4, 49.9 → 50, 33.4 | 12.59, 11.18 → 8.28, 8.45 |
+| Hollow's dark | 10/227, 16/383 → 26/364, 10/226 | 16.8, 16.8 → 33.3, 16.8 | 66.7, 50 → 99.9, 66.7 | 12.77, 12.01 → 13.2, 10.87 |
+| Hollow's Lights out (its rounds) | 84/1358, 42/1398 → 146/1280, 24/1421 | 33.3, 16.8 → 33.4, 16.8 | 116.7, 116.7 → 133.4, 116.7 | 13.68, 11.4 → 15.52, 9.34 |
+| Hollow's extra move | 10/119, 5/125 → 2/127, 1/129 | 33.3, 16.8 → 16.7, 16.7 | 300, 233.3 → 300.1, 233.3 | 16.45, 13.35 → 13.17, 10.51 |
+| Wrangler's long pull | 3/202, 6/200 → 2/202, 2/205 | 16.8, 16.8 → 16.7, 16.7 | 100, 100 → 100, 66.7 | 12.2, 13.39 → 8.98, 8.66 |
+| Wrangler's lasso drag | 7/411, 17/384 → 1/208, 13/391 | 16.8, 16.8 → 16.7, 16.8 | 33.4, 133.4 → 33.3, 116.7 | 10.63, 12.78 → 8.29, 10.09 |
+| Wrangler's Showdown | 7/352, 14/341 → 7/352, 7/351 | 16.8, 16.8 → 16.8, 16.8 | 33.4, 66.6 → 33.4, 50 | 11.78, 13.18 → 10.09, 10.24 |
+| The rage warning (all) | 40/459, 17/490 → 16/485, 9/493 | 26.4, 20 → 20, 16.8 | 66.7, 50.1 → 83.3, 83.4 | 14.55, 12.61 → 11.85, 10.28 |
+| The boss thinking (all) | 153/2639, 118/2585 → 108/2593, 92/2535 | 26.6, 20.9 → 19.1, 16.8 | 300, 266.7 → 433.3, 416.6 | 12.27, 11.61 → 9.84, 9.26 |
+| The boss's move (all, without its moments) | 87/1628, 61/1253 → 71/1386, 56/1519 | 24.2, 27.9 → 25.1, 22 | 149.9, 116.7 → 233.4, 116.7 | 12.55, 11.4 → 10, 8.67 |
+
+What it says. The main thread's work a frame is down on every boss screen (Hollow's below): 1 to 3 ms of 9 to 14 for most
+moments, more where main's frame was heaviest (Ginger's blizzard 19.6 and 12.2 → 9.6 and 9.7, Jefferson's candle
+17.9 and 11.8 → 10.3 and 10.6, Big Boy's bounce 13.6 and 12.2 → 10.4 and 9.0, the boss thinking 12.3 and 11.6 →
+9.8 and 9.3). On main most moments already held 16.8 ms at the 95th percentile on the slowed phone (since #185, #196,
+#203 and #212), so that column mostly stays put; what moves is the frames over 20 ms in the heavier moments (the
+bounce, the candle, the blizzard and thaw, the funhouse, the first cut, the warning, the boss thinking) and the moments
+main had at 33 ms in a pair (the sparkler, the freeze, the first cut, the warning, Hollow's extra move), at 16.8 now.
+The longest frames are single long tasks (a sound, a new frame drawn the first time, an engine's answer) that land in
+one run and not the next, on both builds. `perf.spec.ts` passed all five on this branch in both pairs; main failed its
+phase change's budget in pair 2 (p95 50 ms, 15% of frames over 20 ms; this branch 33.4 ms, 9%). Big Boy's intro and
+snack: 1 to 1.5% of frames over 20 ms on both, where it sat at 8 to 16% before Maia's loading step.
+
+Hollow: pair 1's branch run was slow throughout, its play screen too (13.1 → 16.4 ms CPU a frame, a screen this
+change hardly touches): the machine, not the build. Two more pairs for him (3: main first; 4: the branch first): his
+dark 21/215, 18/215 → 17/210, 14/221 frames over 20 ms, CPU 15.4, 14.9 → 12.6, 13.2 ms; Lights out's rounds 75/1358,
+45/1399 → 46/1400, 45/1397, CPU 13.0, 10.8 → 11.8, 11.6. So his dark is down in pairs 2 to 4, and Lights out within
+the noise: its frame is the night over the board, its prompt and the dock, drawn every frame on both builds (the render
+counter shows the still parts gone there too, 4.3 → 2.5 ms of render work a frame in the diagnostic build). The Hidden
+Boss's phase change stays at about 33 ms at the 95th percentile on both: its frame is the four boards' quarter
+transforms, the light and the arcs (the browser's style and paint more than the screen's scripts), and its dock still
+draws every frame. Skipped: more there would be a rewrite of a scripted moment for little.
+
+**Player-visible change:** none intended. The speech boxes now type out at every frame on your move's screen too (they
+drew every other frame there).
+
+**Testing.** Targeted lane (the boss screens, the dock, the God King, speech): typecheck; the whole unit suite (120
+files, 1,604 tests); e2e `boss-character`, `boss-dock`, `boss-powers` (Ginger, Boingo, Jefferson), `boss-speech`, `recluse`
+(with the merged chatter), `grex`, `hollow`, `bigboy`, `sawyer`, `pig` (Wrangler and his showdown), `king-attack`,
+`resign`, `formats`, `crowd-hidden`, `eval-bar`, `maia` (the loading step on the boss screen): 106 passed, 27 skipped
+(one-project tests), 1 failed: `sawyer.spec.ts:97` on the phone, "the split came" (the crowd's game didn't reach
+Sawyer's split within its moves: the runner's state, not the screen; the spec's own note says the crowd now and then
+loses before it). Alone, once: passed (1.1 min). `perf.spec.ts` as above (it now logs each stretch's dropped frames
+and longest frame). `npm run frames:boss` on both builds, as above.

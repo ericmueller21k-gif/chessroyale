@@ -18,8 +18,9 @@
  * from its BossUi, the boss character for its reactions); its words show in its text box beside it, on every screen.
  */
 import type { ComponentChildren, JSX } from "preact";
-import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { SPEECH } from "@chessroyale/core";
+import { useFrameNow } from "./components/Countdown.tsx";
 
 /** How much a line matters: only a critical line cuts in on another (and any line on chatter); the rest wait their turn. */
 export const CHATTER = -1;
@@ -124,19 +125,31 @@ export const bossVoice = new Voice();
 
 /**
  * The line a voice has up, kept current: the box redraws every frame while a line is up (it types and fades), and
- * as soon as one is said; otherwise it rests.
+ * as soon as one is said; otherwise it rests. It keeps itself current, whatever draws the screen around it (a boss
+ * screen draws its header and the boss's figure only now and then: useStillKey).
  */
 export function useVoice(voice: Voice): { line: Spoken | null; now: number } {
   const [, bump] = useState(0);
-  useEffect(() => voice.subscribe(() => bump((n) => n + 1)), [voice]);
   const now = Date.now();
   const line = voice.line(now);
-  useEffect(() => {
-    if (!line) return;
-    const raf = requestAnimationFrame(() => bump((n) => n + 1));
-    return () => cancelAnimationFrame(raf);
-  });
+  const shown = line?.key ?? null;
+  // (Before the paint; and a line said before this listened, in the same drawing, is drawn too.)
+  useLayoutEffect(() => {
+    const off = voice.subscribe(() => bump((n) => n + 1));
+    if ((voice.line()?.key ?? null) !== shown) bump((n) => n + 1);
+    return off;
+  }, [voice]);
+  useFrameNow(!!line);
   return { line, now };
+}
+
+/**
+ * A voice's line in its box (SpeechBox), keeping itself current (useVoice): the figure it stands by isn't drawn again
+ * for it. `hidden`: not shown just now (it's still looked at, so its lines keep their time and their turns).
+ */
+export function VoiceBubble({ voice, class: cls, hidden = false }: { voice: Voice; class: string; hidden?: boolean }) {
+  const { line, now } = useVoice(voice);
+  return line && !hidden ? <SpeechBox key={line.key} class={cls} text={line.text} at={line.at} until={line.until} now={now} fits={1} /> : null;
 }
 
 /** Says a line into a voice once, as it's first drawn (a moment's line from inside its screen); draws nothing. */

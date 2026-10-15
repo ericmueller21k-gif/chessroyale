@@ -17,6 +17,7 @@ import { PIG_UI } from "./Pig.tsx";
 import { RECLUSE_UI } from "./Recluse.tsx";
 import { PowerBanner, kitLine, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
+import { useFrameNow } from "./Countdown.tsx";
 
 /**
  * Boss powers on screen: what every player sees, from the battle's shared state (NetBoss.powers), so online everyone
@@ -136,9 +137,15 @@ export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), 
   );
 }
 
-/** The boss's own piece by the boss bar's rage meter (Hollow's bulbs), from the boss screen's moments ending at `until`. */
+/**
+ * The boss's own piece by the boss bar's rage meter (Hollow's bulbs), from the boss screen's moments ending at `until`.
+ * Through the boss's turn on its screen it draws itself every frame (the strip relights as his darkness lands): the
+ * header around it draws only now and then (useStillKey).
+ */
 export function BossBarExtra({ boss, until = 0 }: { boss: BossView; until?: number }) {
-  return bossUi(boss)?.bar?.({ boss, moments: () => momentsOf(boss, until) }) ?? null;
+  const bar = bossUi(boss)?.bar;
+  useFrameNow(!!bar && !!until);
+  return bar?.({ boss, moments: () => momentsOf(boss, until) }) ?? null;
 }
 
 // ---------------- The moments ----------------
