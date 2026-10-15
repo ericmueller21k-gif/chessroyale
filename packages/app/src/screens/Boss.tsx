@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
 import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, PowerBoard, PowerMoment, RageMeter, funhouseView, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
-import { SnackTime, bounceFen, bounceJolt, snackLine, snackPawnShown } from "../components/BigBoy.tsx";
+import { SnackTime, bounceFen, bounceJolt, snackPawnShown } from "../components/BigBoy.tsx";
 import { boardSawJolt, splitFen, splitStill } from "../components/Sawyer.tsx";
 import { SHOWDOWN_KING_AT, pigBoard } from "../components/Pig.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
@@ -18,7 +18,7 @@ import { EvalBar } from "../components/EvalBar.tsx";
 import { UnderBoard } from "../components/QuickChat.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import type { BossView, GameView, LightsView } from "../game.ts";
-import { LightsDock, LightsOutLayer } from "../components/LightsOut.tsx";
+import { LightsDock, LightsOutLayer, lightsStatus } from "../components/LightsOut.tsx";
 import { seenKey, useStillKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
@@ -26,7 +26,7 @@ import { BossCharacter, BossFace, BossSide, hasCharacter, resetBeats } from "../
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { BossHeading } from "./Play.tsx";
 import { ordinal } from "./StageBreak.tsx";
-import { CRITICAL, bossVoice } from "../speech.tsx";
+import { CRITICAL, VoiceBubble, bossVoice } from "../speech.tsx";
 import { kingBlocked } from "../components/Recluse.tsx";
 import { BrainLoading } from "../components/BrainLoading.tsx";
 import { crowdFinalists } from "@chessroyale/core";
@@ -99,6 +99,10 @@ export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
           {match?.bossNote == null && <RageMeter boss={boss} />}
           {match?.bossNote == null && <BossBarExtra boss={boss} until={match?.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0} />}
         </span>
+        {/* (His words, a phone's: in his name's room, from the bar's bottom up over the title line, never over the
+            status at the right ("58 moves left", "2 of 4 won") or the line and the board under the bar. A computer's
+            are by his figure beside the board.) */}
+        {char && <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble" />}
       </span>
       <span class="boss-next">
         {match?.bossNote != null
@@ -316,29 +320,33 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const under = useMemo(() => <UnderBoard match={match} />, [match, still]);
   // The dock's words change with the match and with these, read from the clock (a new word read from the clock goes in
   // this list): it's drawn again when one of them changes, not every frame (Lights out's prompt, every frame).
-  const claiming = claimed && t >= tl.claimAt && t < tl.bannerAt;
   const snacking = !!snack && t >= tl.claimAt + SNACK.grabAt && t < tl.bannerAt;
+  const momentLine = moment ? dockLine(moment) : null;
+  // (Lights out, before its first round, as the night falls: the dock as on every other screen, your clock held, what
+  // it means for you; its rounds take the whole box, with the crowd's meter: LightsDock.)
+  const lightsStart = !!lights && lightsStatus(lights, match.settings.lateGraceMs, now).key === "start";
   const dock = useMemo(
     () => (
       <BossDock
         match={match}
         side={boss.crowdSide}
         cues={kingCues}
-        wide={!!lights}
+        wide={!!lights && !lightsStart}
         status={
-          lights ? (
+          lights && !lightsStart ? (
             // (Lights out: the round's prompt, whole, for the whole round, and the crowd's meter.)
             <LightsDock lights={lights} graceMs={match.settings.lateGraceMs} now={now} />
           ) : (
           <>
             <span class="dock-line">
-              {claiming ? (
-                <>
-                  {boss.icon} <strong>{claimLine(boss)}</strong>
-                </>
+              {/* (Nothing his bubble or a banner says at the same moment: Hollow's claim and Big Boy's snack line are
+                  his bubble's; the dock says what the snack means for you. A power's moment: its banner names it, so
+                  the dock keeps the turn's own line, unless the moment has words of its own for you, dockLine.) */}
+              {lightsStart ? (
+                <strong>Remember where his pieces are.</strong>
               ) : snacking ? (
                 <>
-                  {boss.icon} <strong>{snackLine(boss)}</strong>
+                  {boss.icon} <strong>You start a pawn down.</strong>
                 </>
               ) : intro ? (
                 <strong>{boss.raid ? "All of you vs the boss." : finalistsLine()}</strong>
@@ -352,9 +360,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 <>
                   {boss.icon} Plays <strong>your</strong> move{funPlayed ? <>: <strong>{funMove.san}</strong></> : "…"}
                 </>
-              ) : moment ? (
+              ) : momentLine ? (
                 <>
-                  {boss.icon} <strong>{dockLine(moment)}</strong>
+                  {boss.icon} <strong>{momentLine}</strong>
                 </>
               ) : victim ? (
                 <strong class="bad">
@@ -375,7 +383,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
               ) : null}
             </span>
             <span class="dock-line muted">
-              {intro
+              {lightsStart
+                ? "Clocks stopped."
+                : intro
                 ? // (A boss that never strikes, the Hidden Boss: nothing about strikes.)
                   bossRules(boss)?.noStrikes
                   ? ""
@@ -399,7 +409,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         }
       />
     ),
-    [match, still, kingCues, lights, lights ? now : 0, claiming, snacking, funPlayed, moment, burnLine, left],
+    [match, still, kingCues, lights, lights ? now : 0, snacking, funPlayed, momentLine, burnLine, left],
   );
   return (
     <div class={`screen game boss-screen${victim ? " striking" : ""}`}>

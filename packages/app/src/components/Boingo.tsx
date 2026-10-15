@@ -79,7 +79,7 @@ export function funhouseLine(m: Pick<Moment, "key" | "pick">): string {
   return FUNHOUSE_LINES[(m.pick ?? hash(m.key)) % FUNHOUSE_LINES.length]!;
 }
 /** His line as the board turns again (round to a side, or back the right way up). */
-export const SPIN_LINES = ["Wheee! Round we go!", "Spin the board!", "Dizzy yet? Honk!", "Hold on tight! Hee hee!"];
+export const SPIN_LINES = ["Wheee! Round we go!", "Dizzy yet? Honk!", "Hold on tight! Hee hee!"];
 
 function pieMoment({ moment, t, orientation, banner, cast }: MomentProps) {
   return (
@@ -119,13 +119,12 @@ export const BOINGO_UI = {
   id: "clown",
   ultimate: { name: "the Funhouse" },
   moments: {
-    pie: { order: 0, kit: "power", dock: "Pie!", appearAt: (m, square) => (m.square === square ? m.at + PIE.landAt : undefined), view: pieMoment },
+    pie: { order: 0, kit: "power", appearAt: (m, square) => (m.square === square ? m.at + PIE.landAt : undefined), view: pieMoment },
     // The funhouse has a screen of its own, after the move he plays for the crowd: the board turns upside down and the
     // move lands. Then each later step turns it again as a crowd turn begins.
     funhouse: {
       order: 3,
       kit: "ultimate",
-      dock: "Funhouse!",
       line: (_kit, m) => funhouseLine(m),
       lineAt: FUNHOUSE.lineAt,
       own: (boss) => !!boss.powers?.funhouse?.move && boss.powers.funhouse.turn === boss.crowdMoves && boss.powers.events.some((e) => e.kind === "funhouse"),
@@ -134,7 +133,6 @@ export const BOINGO_UI = {
     spin: {
       order: 3,
       kit: "ultimate",
-      dock: "Spin!",
       line: (_kit, m) => SPIN_LINES[hash(m.key) % SPIN_LINES.length]!,
       lineAt: SPIN.lineAt,
       view: spinMoment,
