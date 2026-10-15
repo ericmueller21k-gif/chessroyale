@@ -16,6 +16,7 @@ import { bigBoySound, type BigBoySound } from "./characters/bigboy-sounds.ts";
 import { sawyerSound, type SawyerSound } from "./characters/sawyer-sounds.ts";
 import { pigSound, type PigSound } from "./characters/pig-sounds.ts";
 import { recluseSound, type RecluseSound } from "./characters/recluse-sounds.ts";
+import { godKingSound } from "./characters/god-king-sounds.ts";
 import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
 import { soundCache } from "./characters/synth.ts";
 import { CASTLE_SOUND, MOVE_SOUNDS, CAPTURE_SOUNDS, defaultPieceSound, onPieceSoundChange, pieceSound, pieceSoundOption, type PieceSoundKind } from "./piece-sounds.ts";
@@ -234,6 +235,8 @@ const bigBoy = (name: BigBoySound) => (t: number) => buffer(bigBoySound(name, ct
 const sawyer = (name: SawyerSound) => (t: number) => buffer(sawyerSound(name, ctx!.sampleRate), t);
 const pig = (name: PigSound) => (t: number) => buffer(pigSound(name, ctx!.sampleRate), t);
 const recluse = (name: RecluseSound) => (t: number) => buffer(recluseSound(name, ctx!.sampleRate), t);
+/** The God King tapped with no charges left: his soft "can't" (god-king-sounds.ts). */
+const kingCant = (t: number) => buffer(godKingSound("cant", ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
 function grexWhistle(t: number) {
   const w = whistlePick(Math.random(), Math.random(), Math.random());
@@ -566,6 +569,7 @@ export type SoundName =
   | "recluseDrain"
   | "recluseSpark"
   | "recluseArc"
+  | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
   | "sqSting";
@@ -699,6 +703,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   recluseDrain: recluse("drain"),
   recluseSpark: recluse("spark"),
   recluseArc: recluse("arc"),
+  kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
   // Every board's move landing after a round: a quick ripple of soft knocks (the picked move sound), one per board.
@@ -787,6 +792,7 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   recluseDrain: [["recluse", "drain"]],
   recluseSpark: [["recluse", "spark"]],
   recluseArc: [["recluse", "arc"]],
+  kingCant: [["godKing", "cant"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */
 let worker: Worker | null | undefined;

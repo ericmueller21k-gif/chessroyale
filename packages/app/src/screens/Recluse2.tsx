@@ -361,6 +361,8 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
         match={match}
         side="w"
         king={absorbKing(t, at)}
+        // (No move is anyone's during the phase change: no clock.)
+        clock={null}
         status={
           <>
             <span class="dock-line">
@@ -389,15 +391,19 @@ const RESULT_WORD = (b: SimulBoardView) => {
   return r.winner === "crowd" ? "Won" : `Lost${how}`;
 };
 
-/** A board's tag over its corner: who plays it and their clock (or its result). */
-function Tag({ b, v, now, small }: { b: SimulBoardView; v: SimulView; now: number; small?: boolean }) {
+/**
+ * A board's tag: who plays it and their clock. Over a computer's four boards, at each one's corner; a phone's small
+ * boards, just above each (their clock only: the board's button says whose it is), off their pieces (Eric, Oct 15). A
+ * phone's big board: none on yours (your clock is the dock's), the player's name on one you're watching.
+ */
+function Tag({ b, v, now, small, big }: { b: SimulBoardView; v: SimulView; now: number; small?: boolean; big?: boolean }) {
+  if (big) return b.you ? null : <span class="rc-tag">{b.name}</span>;
   // (His ultimate: the move's own few seconds, not the bank.)
   const left = moveLeft(v, b, now);
   const running = v.playing && b.toMove === "crowd";
   const low = running && left < (v.ultAt !== null ? 2_000 : 15_000);
   return (
     <span class={`rc-tag${b.you ? " you" : ""}${running ? " running" : ""}${low ? " low" : ""}`}>
-      {/* (A phone's small boards: the clock only; the board's button says whose it is.) */}
       {!small && <span class="rc-tag-name">{b.name} </span>}
       <span class="rc-tag-clock">{clock(left)}</span>
     </span>
@@ -442,8 +448,11 @@ function SlowMarks({ n, flash }: { n: number; flash: boolean }) {
   );
 }
 
-/** One phase 2 board: yours takes moves on your turn. `marks`: the team's slow moves beside it (one board shows them). */
-function SimulBoard({ match, v, b, now, small, marks: withMarks, children }: { match: GameView; v: SimulView; b: SimulBoardView; now: number; small?: boolean; marks?: boolean; children?: ComponentChildren }) {
+/**
+ * One phase 2 board: yours takes moves on your turn. `marks`: the team's slow moves beside it (one board shows them).
+ * `big`: a phone's big board.
+ */
+function SimulBoard({ match, v, b, now, small, big, marks: withMarks, children }: { match: GameView; v: SimulView; b: SimulBoardView; now: number; small?: boolean; big?: boolean; marks?: boolean; children?: ComponentChildren }) {
   const mine = b.you && v.playing && b.toMove === "crowd";
   const recent = !!v.lastSlow && now - v.lastSlow.at < SLOW_NOTE_MS;
   // (The note marks the board the slow move was on; the marks flash at any slow move.)
@@ -453,7 +462,7 @@ function SimulBoard({ match, v, b, now, small, marks: withMarks, children }: { m
   const marks = useMemo(() => <SlowMarks n={n} flash={recent} />, [n, recent]);
   return (
     <Board fen={b.fen} orientation="white" lastMove={b.lastMove} interactive={mine} onMove={(m) => match.simulMove?.(b.id, m)} small={small} silent={!b.you}>
-      <Tag b={b} v={v} now={now} small={small} />
+      <Tag b={b} v={v} now={now} small={small} big={big} />
       <Outcome b={b} />
       {v.playing && withMarks && marks}
       {/* (Which board the last slow move was on: a small note over its top-right corner, for a moment.) */}
@@ -517,7 +526,7 @@ export function SimulScreen({ match }: { match: GameView }) {
               {ultBanner}
             </div>
           ) : (
-            <SimulBoard key={big.id} match={match} v={v} b={big} now={now} marks>
+            <SimulBoard key={big.id} match={match} v={v} b={big} now={now} big marks>
               {ultBanner}
             </SimulBoard>
           )}
@@ -527,6 +536,9 @@ export function SimulScreen({ match }: { match: GameView }) {
         match={match}
         side="w"
         king="gone"
+        // Your board's clock at the box's right: its bank (from his ultimate, the few seconds a move) running on your move,
+        // holding while he answers; none once your board is decided or before the clocks start.
+        clock={mine.result || !v.playing ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + (v.ultAt !== null ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : mine.bankMs) } : undefined}
         status={
           <>
             <span class="dock-line">
@@ -540,11 +552,11 @@ export function SimulScreen({ match }: { match: GameView }) {
               ) : mine.result ? (
                 ""
               ) : v.ultAt !== null ? (
-                // (His ultimate: a few seconds a move, then a random one is played for you.)
-                `${RECLUSE_PHASE2.ultMoveSeconds} s a move · ${yourTurn ? `${(moveLeft(v, mine, now) / 1000).toFixed(1)} s left` : "then a random move"}`
+                // (His ultimate: a few seconds a move, then a random one is played for you; the seconds are your clock.)
+                `${RECLUSE_PHASE2.ultMoveSeconds} s a move, or a random one`
               ) : (
-                // (The slow moves themselves: the marks beside every board.)
-                `Your clock ${clock(moveLeft(v, mine, now))}`
+                // (The slow moves themselves: the marks beside every board; your time: the clock at the box's right.)
+                ""
               )}
             </span>
           </>
