@@ -15,6 +15,7 @@ import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { LiveWindow } from "../components/LiveWindow.tsx";
 import { LIVE_WINDOW_MEDIA } from "../bot-replays.ts";
+import { FriendsLine } from "../components/Friends.tsx";
 import { testParams } from "../test-switches.ts";
 
 const MODE_KEY = "brc.mode";
@@ -414,6 +415,7 @@ export function HomeScreen({
   onJoinLobby,
   onSquads,
   onParty,
+  onFriends,
   onProfile,
   onShop,
   onSignIn,
@@ -444,6 +446,8 @@ export function HomeScreen({
   onSquads: () => void;
   /** Squads' party: make one, or join by code. */
   onParty: () => void;
+  /** Your friends list. */
+  onFriends: () => void;
   onProfile: () => void;
   onShop: () => void;
   onSignIn: () => void;
@@ -611,6 +615,8 @@ export function HomeScreen({
           <AccountBar onProfile={onProfile} />
         </div>
       </header>
+      {/* (A phone's: friends above the players online. A computer has them in its live panel.) */}
+      <FriendsLine onOpen={onFriends} />
       <LiveLine live={live} />
       {notice && <Notice notice={notice} />}
       <div class="fd-home-main">

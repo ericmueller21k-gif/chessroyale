@@ -2,7 +2,8 @@
 
 Eric: "do what you think is best", with the goal "smoothness, quickness, with some variety offered". Settings now
 reads, in order: THEME · SOUND (sound on or off, Move, Capture and Reveal sound) · BOARD (Animations, Motion trail) ·
-QUICK CHAT · HOW TO PLAY · ACCOUNT · PRIVACY AND TERMS · TESTING (admins only). The credits stay at the foot.
+QUICK CHAT · FRIENDS (new the same day, where friends put it) · HOW TO PLAY · ACCOUNT · PRIVACY AND TERMS · TESTING
+(admins only). The credits stay at the foot.
 
 - **Testing, for admins only** (`profile.admin`, the same ADMIN_EMAILS check as the other admin buttons). Eric: "The
   engine moves and eval settings will be phased to an admin only menu for testers." It holds:

@@ -6,6 +6,7 @@ import { ItemArt } from "../components/Items.tsx";
 import { IconEditor, UserIcon } from "../components/PixelIcon.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { QuickChatPicks } from "../components/ChatPicks.tsx";
+import { ProfileFriendActions } from "../components/Friends.tsx";
 import { account, fetchProfile, onAccountChange, reportPlayer, updateProfile, type PublicProfile } from "../account.ts";
 import type { ProfileTarget } from "../profile-nav.ts";
 import { ordinal } from "./StageBreak.tsx";
@@ -14,6 +15,7 @@ const nth = (n: number) => `${n}${ordinal(n)}`;
 
 /** "Online now", or when they were last seen. */
 function seenLine(p: PublicProfile, now = Date.now()): string {
+  if (p.hidden) return "Online status hidden";
   if (p.online) return "Online now";
   if (!p.lastSeen) return "Offline";
   const min = Math.round((now - p.lastSeen) / 60_000);
@@ -329,7 +331,7 @@ function ReportSheet({ p, match, onClose }: { p: PublicProfile; match?: string; 
 
 /**
  * A profile (docs/mockups/front-door/Profile.dc.html): one structure for everyone. Yours adds Edit name & icon,
- * Open locker and settings; someone else's adds Report (and Add friend, later). Nothing private is ever shown:
+ * Open locker and settings; someone else's adds Add friend, Invite to play, Block and Report. Nothing private is ever shown:
  * the server's public profile has no email, sign-in method or icon in it.
  */
 export function PlayerProfileScreen({
@@ -472,12 +474,7 @@ export function PlayerProfileScreen({
           )}
         </>
       ) : (
-        <div class="fd-actions">
-          <FdButton disabled>Add friend (later)</FdButton>
-          <FdButton danger onClick={() => setSheet("report")}>
-            Report
-          </FdButton>
-        </div>
+        <ProfileFriendActions uid={p.id} name={p.name} onReport={() => setSheet("report")} />
       )}
       </div>
       {sheet === "edit" && <EditSheet onClose={() => setSheet(null)} />}

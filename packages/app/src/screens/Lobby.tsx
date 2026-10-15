@@ -2,6 +2,7 @@ import type { NetMatch } from "../net.ts";
 import { QueueScreen } from "./Queue.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { LobbyChat } from "../components/LobbyChat.tsx";
+import { InviteFriends } from "../components/Friends.tsx";
 
 export function LobbyScreen({ match, onLeave, onLetBotsFill }: { match: NetMatch; onLeave: () => void; onLetBotsFill?: () => void }) {
   // Matchmade (PLAY): the queue, not a lobby.
@@ -24,6 +25,7 @@ export function LobbyScreen({ match, onLeave, onLetBotsFill }: { match: NetMatch
         <button type="button" class="btn btn-secondary btn-wide" onClick={share}>
           Share invite link
         </button>
+        <InviteFriends />
       </div>
       <h2 class="muted small">
         Players ({humans.length} of {match.settings.lobbySize}){match.settings.raid ? "" : " · empty seats fill with bots"}

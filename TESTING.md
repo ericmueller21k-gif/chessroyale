@@ -84,3 +84,20 @@ On your phone, with the ringer switch on:
    at once, about as loud as the others, none harsh or clipped through the phone's speaker.
 2. Pick one of each (picking plays it too), then play a few moves in **Boss alone**: your picks should sound for
    every move and capture. Tell me which ones you like, and any to drop or replace.
+
+## Friends and invites (Oct 15, about 10 minutes)
+
+Two signed-in accounts: your phone and your computer (or a friend's phone), each signed in with a different Google
+account or email.
+
+1. **Add a friend.** On the computer, open the other account's profile (tap its name in a lobby, or open its profile
+   link) and tap **Add friend**. Within about 10 seconds the phone's home shows **Friends · … 1 new** above the live
+   line: tap it, then **Accept**.
+2. **Online.** The computer's right column lists the phone under **FRIENDS** as **Online**. Start a match on the phone:
+   within a minute it reads **In a match**.
+3. **Invite.** With the phone back on its home screen, tap **Invite** beside it on the computer. The computer goes into
+   a new lobby; the phone shows **… invited you to a Crowd lobby** at the top with **Join**. Tap Join: the phone is in
+   the lobby.
+4. **The setting.** On the phone, **Settings → Friends → Invites from: No one**. An invite from the computer now says
+   "This player isn't taking invites right now."
+5. Tell me whether the invite at the top is easy to see and to dismiss on the iPhone (it sits under the notch).
