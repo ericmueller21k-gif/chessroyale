@@ -152,7 +152,7 @@ function lassoMoment({ boss, moment, now, t, orientation, banner }: MomentProps)
   const pull = moment.kind === "pull";
   const title = pull ? "LONG PULL!" : "LASSO!";
   const sub = pull ? "Three squares in one move" : moment.ult ? "No showdown this time: a tug instead" : l ? `Your ${PIECE_WORD[l.type] ?? "piece"}, dragged a square` : undefined;
-  if (!l) return <div class={`power-moment pm-${moment.kind}`}>{t < 1300 && banner(title, sub, "western")}</div>;
+  if (!l) return <div class={`power-moment pm-${moment.kind}`}>{t < 2300 && banner(title, sub, "western")}</div>;
   const from = centreOf(l.from, orientation);
   const to = centreOf(l.to, orientation);
   const stand = lassoStand(from, to);
@@ -171,7 +171,7 @@ function lassoMoment({ boss, moment, now, t, orientation, banner }: MomentProps)
   const shown = t >= B.hopAt - PIG_LEAP.upAt && t < B.backAt + FLIGHT + 120;
   return (
     <div class={`power-moment pm-${moment.kind}`}>
-      {t < 1300 && banner(title, sub, "western")}
+      {t < 2300 && banner(title, sub, "western")}
       <div class="hb-pieces pg-layer" aria-hidden="true" data-lasso={`${l.from}${l.to}`} data-stage={t < s0 ? "rope" : sliding ? "tug" : "done"}>
         {at.shadow && <Shadow at={at.shadow.at} size={at.shadow.size} />}
         {sliding && <AirPiece code={pieceCode(l.color, l.type)} at={lerp(from, to, u)} square={u < 0.5 ? l.from : l.to} />}
@@ -235,7 +235,7 @@ function showdownMoment({ boss, moment, now, t, orientation, banner }: MomentPro
   const drawing = t >= SHOWDOWN.drawAt;
   return (
     <div class="power-moment pm-showdown">
-      {t < 1300 && banner("SHOWDOWN!", `${pairs.length === 2 ? "Two" : "Three"} duels: you must take one`, "western")}
+      {t < 2300 && banner("SHOWDOWN!", `${pairs.length === 2 ? "Two" : "Three"} duels: you must take one`, "western")}
       {drawing && banner("DRAW!", "Pick your duel", "western draw")}
       <SoundAt id={`${moment.key}:draw`} at={moment.at + SHOWDOWN.drawAt} now={now} sound="pigDraw" />
       {pairs.map((_, k) => (

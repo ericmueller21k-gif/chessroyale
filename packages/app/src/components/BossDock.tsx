@@ -317,7 +317,7 @@ export function UltimateTest({ match }: { match: GameView }) {
       </button>
     );
   }
-  if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result || match.bossNote) return null;
+  if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result || match.bossNote != null) return null;
   // (Hollow's Lights out: the full meter has it on its way until the test has begun.)
   const lights = p.ultimate === "lightsout";
   const underWay = p.ultAt !== null && (!lights || (p.lightsAt != null && p.lightsAt >= p.ultAt));

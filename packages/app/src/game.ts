@@ -297,7 +297,10 @@ export interface GameView {
   readonly simul?: SimulView | null;
   /** Your move on your phase 2 board. */
   simulMove?(boardId: number, move: string): void;
-  /** A word in the boss bar instead of the move count (the Hidden Boss's phase 2: "Phase 2 · 1 of 4 won"). */
+  /**
+   * A word in the boss bar instead of the move count while the Hidden Boss's phase 2 is on ("1 of 4 won"; "" in its
+   * phase change); null (or absent) otherwise, so test it against null, not for truth.
+   */
   readonly bossNote?: string | null;
   /** Testing, admins in Boss alone (solo only; online has none): the "Engine move" button shows. */
   readonly engineMoveShown?: boolean;

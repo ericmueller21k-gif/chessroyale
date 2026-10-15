@@ -106,7 +106,7 @@ function darkMoment({ boss, moment, now, t, orientation, kit, banner }: MomentPr
   const fromPt = hollowCastFrom(kit);
   return (
     <div class="power-moment pm-dark">
-      {t < 1250 && banner("DARKNESS!", moment.square ? `Dark on ${moment.square}` : undefined, "dark")}
+      {t < 2250 && banner("DARKNESS!", moment.square ? `Dark on ${moment.square}` : undefined, "dark")}
       {cast && now >= castSince && (
         <span class="pm-caster pm-hollow" style={{ aspectRatio: `${kit!.ch.w} / ${kit!.ch.h}` }}>
           {/* (His bulbs out as he casts: the last went out with his move.) */}
@@ -120,7 +120,7 @@ function darkMoment({ boss, moment, now, t, orientation, kit, banner }: MomentPr
 }
 
 // Hollow moves twice (the crowd's find rate in Lights out was under lightsOutHold): his banner as it lands.
-const extraMoment = ({ boss, t, banner }: MomentProps) => <div class="power-moment pm-extra">{t < 1800 && banner("TWICE!", `${boss.name.replace(/^The /, "")} moves again`, "dark")}</div>;
+const extraMoment = ({ boss, t, banner }: MomentProps) => <div class="power-moment pm-extra">{t < 2800 && banner("TWICE!", `${boss.name.replace(/^The /, "")} moves again`, "dark")}</div>;
 
 export const HOLLOW_UI = {
   id: "hollow",

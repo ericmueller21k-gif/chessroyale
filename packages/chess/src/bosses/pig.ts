@@ -50,7 +50,7 @@ export const DRAG = PULL;
  * line-up one at a time (`pairs`, each sliding for `yankMs`); "DRAW!" with a quick-draw sting (`drawAt`); then the
  * crowd picks its duel.
  */
-export const SHOWDOWN = { dropAt: 900, landAt: 1400, throwAt: 2400, cornerAt: 2900, pairs: [3000, 3500, 4000] as readonly number[], yankMs: 420, drawAt: 4600, total: 6000 } as const;
+export const SHOWDOWN = { dropAt: 900, landAt: 1400, throwAt: 2400, cornerAt: 2900, pairs: [3000, 3500, 4000] as readonly number[], yankMs: 420, drawAt: 4600, total: 7000 } as const;
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). */
 export const PIG_FX = { pull: PULL.total, drag: DRAG.total, showdown: SHOWDOWN.total } as const;
 

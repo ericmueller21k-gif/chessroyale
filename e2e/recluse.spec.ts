@@ -111,7 +111,8 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes,
   const strikes = await watchFor(page, {
     card: { selector: ".boss-next", text: /Strikes/ },
     dock: { selector: ".boss-dock-status", text: /struck/i },
-    moves: { selector: ".boss-next", text: /^Move \d+ of \d+$/ },
+    // (The title says which move it is: the card, the moves left; Eric, Oct 15.)
+    moves: { selector: ".boss-next", text: /^\d+ moves? left$/ },
   });
   // His intro: the stare (his figure where it stands on this screen). The God King's opening line in this fight is his
   // own, as "START!" comes (checked at the end: it may wait for his line to type out), never one of his usual ones.
@@ -282,7 +283,7 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes,
   expect(await phase(page)).toBe("play");
   expect((await bossNow(page)).kingCharges).toBe(0);
   expect(await strikes.seen()).toEqual({ card: false, dock: false, moves: true });
-  await expect(page.locator(".boss-next")).toHaveText(/^Move \d+ of \d+$/);
+  await expect(page.locator(".boss-next")).toHaveText(/^\d+ moves? left$/);
   expect(await kingIntro.seen()).toEqual({ foe: true, usual: false });
   expect(errors).toEqual([]);
 });
@@ -448,6 +449,12 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     reviveLine: { selector: ".bc-bubble", text: /Not yet\. Now we play real chess\.|On your feet, all of you\. Again!/ },
     // (One book on screen: his own, in his frames; never a second one flying in.)
     book: { selector: ".rc-book" },
+    // Nothing said twice at once (Eric, Oct 15): the dock never repeats his line or the banner, the boss bar never
+    // repeats the title's "phase 2", and the subtitle never says he's beaten as he rises.
+    dockRepeat: { selector: ".boss-dock-status", text: /Mind and engine|Phase 2!|Every board must be won/ },
+    barPhase: { selector: ".boss-next", text: /Phase 2/ },
+    beaten: { selector: ".opening-name", text: /the boss is beaten|phase 2:/ },
+    clockLine: { selector: ".boss-dock-status", text: /^2:00 on your clock, no added time$/ },
   });
   await play(page, "h5f7");
   // The board holds while he falls, then (no result screen) the phase change, then phase 2's four boards.
@@ -489,7 +496,14 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     leapBack: true,
     banner: true,
     book: false,
+    dockRepeat: false,
+    barPhase: false,
+    beaten: false,
+    clockLine: true,
   });
+  // Phase 2's bar: how many are won, nothing the title says; its subtitle: the variant alone.
+  await expect(page.locator(".boss-next")).toHaveText(/^\d of 4 won$/);
+  await expect(page.locator(".opening-name")).toHaveText(/· Chess960$/);
   // Phase 2: the God King gone (nothing to tap), the boss's look on where he stands.
   await expect(page.locator(".gk-unit.gone")).toHaveCount(1);
   await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(0);

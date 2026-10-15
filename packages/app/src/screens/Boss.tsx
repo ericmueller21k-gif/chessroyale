@@ -96,12 +96,12 @@ export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
             </i>
           ))}
           {/* (The Hidden Boss's phase 2 has no meter: his bullet clock is phase 1's.) */}
-          {!match?.bossNote && <RageMeter boss={boss} />}
-          {!match?.bossNote && <BossBarExtra boss={boss} until={match?.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0} />}
+          {match?.bossNote == null && <RageMeter boss={boss} />}
+          {match?.bossNote == null && <BossBarExtra boss={boss} until={match?.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0} />}
         </span>
       </span>
       <span class="boss-next">
-        {match?.bossNote
+        {match?.bossNote != null
           ? match.bossNote
           : boss.result
           ? boss.result === "crowd"
@@ -113,11 +113,18 @@ export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
             ? boss.strikeIn <= 1
               ? "Strikes after this move"
               : `Strikes in ${boss.strikeIn} moves`
-            : `Move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)} of ${boss.maxMoves}`}
+            : // (A boss that never strikes, the Hidden Boss: the moves left, since the title says which move it is.)
+              movesLeft(boss)}
       </span>
     </div>
   );
 }
+
+/** The crowd's moves left before the battle is judged, this one included: "12 moves left". */
+const movesLeft = (boss: BossView) => {
+  const n = Math.max(0, boss.maxMoves - boss.crowdMoves);
+  return `${n} ${n === 1 ? "move" : "moves"} left`;
+};
 
 /** Hollow's line as he claims the dark side (the same for everyone). */
 const claimLine = (boss: BossView) => {

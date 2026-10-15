@@ -286,7 +286,8 @@ export const DEFAULT_SETTINGS: Settings = {
   cutClockVote: false,
   finalFormat: "team",
   voteSeconds: 8,
-  voteResultSeconds: 3.2,
+  // (4.2 s: the winner's banner a second longer, as every banner since Eric, Oct 15; was 3.2.)
+  voteResultSeconds: 4.2,
   voteBotSkip: 0.1,
   voteYouScale: 1.12,
   teamFinalSizes: [4, 3, 2],
@@ -306,7 +307,8 @@ export const DEFAULT_SETTINGS: Settings = {
   bossDifficulty: 0,
   bossUnfinished: false,
   kingStrikeLoss: [5, 15],
-  kingStrikeMs: 3700,
+  // (4.7 s: his cut-in a second longer, and his slashes after it, Oct 15; was 3.7 s. The move clock stands still.)
+  kingStrikeMs: 4700,
   kingOnBoard: false,
   kingPowerUpsPerCharge: 10,
   kingChargesMax: 3,
@@ -2056,7 +2058,8 @@ export const SQUADS: SquadsSettings = {
   partyMax: 4,
   boards: { relay: 4, pairs: 2, final: 1 },
   voteSeconds: 8,
-  voteResultSeconds: 3.2,
+  // (4.2 s: the winner's banner a second longer, as every banner since Eric, Oct 15; was 3.2.)
+  voteResultSeconds: 4.2,
   voteBotSkip: 0.1,
   // Eric, Oct 10: one team clock per squad for the whole tournament; Oct 13: three chess time controls, Bullet, Blitz
   // and Rapid, each with an increment that banks and its own cap on a move. Tuned by reports/squads-sim.md

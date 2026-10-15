@@ -4625,3 +4625,65 @@ files, 1,604 tests); e2e `boss-character`, `boss-dock`, `boss-powers` (Ginger, B
 Sawyer's split within its moves: the runner's state, not the screen; the spec's own note says the crowd now and then
 loses before it). Alone, once: passed (1.1 min). `perf.spec.ts` as above (it now logs each stretch's dropped frames
 and longest frame). `npm run frames:boss` on both builds, as above.
+
+## Every banner a second longer; nothing said twice on the Hidden Boss's screens (Eric, Oct 15, 2026)
+
+Two changes from Eric after playing on his iPhone. Online play and stored data are unchanged apart from timing the
+server shares with the app (below); no protocol change.
+
+**1. Every banner a second longer.** Eric: "Let's increase the banners for all banners by the extra second we
+discussed" (the second the Hidden Boss's "5 SECONDS!" got on Oct 14).
+- **The banner itself:** the fighting-game banner (`FightBanner`, the powers' `PowerBanner`, the God King's cut-in)
+  is 2.5 s, was 1.5 s: the entrance and exit as before, the hold a second longer. Today's `long` keyframes are now the
+  only ones and `FightBanner`'s `long` option is gone (my call: the simplest, one set of keyframes). The Last Stand's
+  cut-in: 3.1 s, was 2.1 s. "5 SECONDS!" keeps its 2.8 s (`PHASE2_ULT_BANNER_MS`): it had the second already. (A slip
+  found on the way: Jefferson's Roman candle banner has the tone `long` for its smaller text, so since Oct 14 it played
+  the long keyframes and was cut off at 1.5 s, mid-hold; with one set of keyframes it plays whole.)
+- **Each window a banner is shown for, a second longer:** every power's banner (`t < …`), Ginger's thaw
+  (`THAW.bannerMs` 2500), the Hidden Boss's BULLET! (`BULLET.bannerMs` 2600), "START!" (`BOSS_INTRO.bannerMs` 2500),
+  the God King's cut-in (`KING_COMMAND.cutMs`, `KING_SUMMON.cutMs` 2500), the Last Stand's (`LAST_STAND.bannerMs`
+  3100), "PHASE 2" (`PHASE_CHANGE.bannerMs` 2400), Lights out's (to `dropAt` + 1 s), FISCHER RANDOM! (the crate's stage
+  2.7 s), Squads' block line over the board (`BANNER_MS` 3600), and the votes' result banner (`voteResultSeconds` 4.2,
+  Crowd and Squads: the winner's banner shows until the next vote, so its phase is a second longer; my call that it's
+  a banner in Eric's sense, as the code and the area pages call it).
+- **A moment the banner would outlive grows a second** (so its banner is never cut off; `POWER_FX`, shared by the
+  server and the solo game): the rage warning 1700 → 2700, Ginger's freeze 2300 → 3300 and thaw 2200 → 3200, Boingo's
+  pie 2300 → 3300, Jefferson's sparkler 2300 → 3300, Hollow's extra move 2200 → 3200, Big Boy's toy block 2300 → 3300,
+  Sawyer's saw cut 2300 → 3300, Wrangler's showdown 6000 → 7000 ("DRAW!" runs to its end); "START!" makes the intro a
+  second longer; QUEEN SLAIN! plays while the boss thinks, so the least he thinks after you take his queen is 3 s, was
+  2 s (`bossThinkMs`); "PHASE 2" makes the phase change a second longer (15.8 s after the fall).
+- **A moment that holds its banner already keeps its length** (the director's rule): the blizzard, the candle, the
+  dark, the Big Bounce, the split, the lasso, the board saw, Lights out, BULLET!, QUEEN DOWN! (inside the boss's 3.1 s
+  move). There the banner's last second now lies over the beat after it (the Big Bounce's leap, the pie's and block's
+  throw, the split's hop, Lights out's drop...), as some already overlapped a little.
+- **Except where what follows can't run under it:** Boingo's board turns with everything on it, so a banner over the
+  turn would turn too: the funhouse's beats after its banner come a second later (`FUNHOUSE` clownAt 2300, lineAt 3700,
+  moveAt 4500, exitAt 5500; its moment 5200 → 6200) and each later spin's (`SPIN` 2300; 2600 → 3600). The God King's
+  bolt and slashes come after his cut-in, and the Last Stand's slide after its cut-in (both kept by tests): their
+  later beats come a second later too (`KING_COMMAND` boltAt 3000, moveAt 3350, lowerAt 3900, slashAt 3050-3950,
+  strikeLowerAt 4400, `moveMs` 1700 → 2700; `KING_SUMMON` likewise, off; `LAST_STAND` slideAt to endMs a second later,
+  `LAST_STAND_MS` 9900 → 10900), and the strike's still clock `kingStrikeMs` 3700 → 4700.
+- **Clocks:** nobody loses time. Every moment above comes before the crowd's clock starts (solo and online: the same
+  shared numbers); a God King's move or Last Stand lengthens the reveal by its own `kingMoveMs` / `LAST_STAND_MS`; his
+  strike stops the clock for `kingStrikeMs`; phase 2's clocks start after the phase change's total; "5 SECONDS!" is as it
+  was (nobody waits: the fresh 5 s start with it); Squads' block line and the vote banner never touched a clock.
+- **Not banners, not changed:** Classic's "Round start" / "Round end" (the round's countdown, its rules), Squads' match
+  card and the waiting lines (shown while their phase lasts), the bullet increment's "+2 s a move" (`.rc-plus`, its
+  moment's own text).
+
+**2. Nothing said twice at once on the Hidden Boss's screens.** Eric's screenshot, mid phase change, "also look at
+the duplicated text on this page". All placeholders (admins and a solo Crowd final see them); no quote touched.
+- The dock under "The boss rises!" said "Mind and engine, one." as his bubble said "Mind and machine. Both mine now.":
+  the sub-line is gone. As "PHASE 2" "Chess960 · win all four boards" showed, the dock said "Phase 2!" "Every board
+  must be won.": the banner's line is now "Win all four boards" (the subtitle says Chess960) and the dock says what
+  nothing else does yet, "2:00 on your clock, no added time" (from `RECLUSE_PHASE2.bankSeconds`). The God King's
+  "triumphs" and "draining" lines narrate, never repeat, his bubbles: kept.
+- The boss bar's right side repeated the title's "phase 2": nothing in the phase change, "N of 4 won" in phase 2 (was
+  "Phase 2", "Phase 2 · N of 4 won"). `bossNote` is `""` in the phase change, so its checks test it against null.
+- The subtitle said "the boss is beaten" as he rose: nothing after "you play White" until the split, then "Chess960"
+  (was "phase 2: Chess960", the title's word again); in phase 2 "Chess960" (was "Chess960 · N of 4 won", the bar's
+  count again).
+- Phase 1: the title said "move 5" and his card "Move 5 of 60": the card now says "56 moves left" (a boss that never
+  strikes; every other boss's card shows its strikes).
+
+**Testing.**
