@@ -376,8 +376,8 @@ function Terms() {
       <h2>Fair play</h2>
       <ul>
         <li>
-          No engines, bots, other devices or anyone else's help picking your moves in online matches. Practice mode's power-ups are
-          allowed: you're marked, and practice never counts toward your ranking.
+          No engines, bots, other devices or anyone else's help picking your moves in online matches. Our testers' practice mode is
+          allowed: it's marked, and practice never counts toward a ranking.
         </li>
         <li>No second accounts to get around a ban, and no arranging results with other players.</li>
         <li>Don't exploit bugs. Report them.</li>

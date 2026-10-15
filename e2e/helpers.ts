@@ -245,3 +245,26 @@ export async function expectCoordsInSquares(page: Page, orientation?: "white" | 
     .toBe("in their squares");
   return last.orientation!;
 }
+
+/** The server's config as production's says it: TEST_SWITCHES off. */
+export async function switchesOff(page: Page) {
+  await page.route("**/api/auth/config", async (route) => {
+    const res = await route.fetch();
+    const { testSwitches: _, ...body } = (await res.json()) as Record<string, unknown>;
+    await route.fulfill({ response: res, json: body });
+  });
+}
+
+/** Your profile says you're an admin (as /api/me does for an email in ADMIN_EMAILS). */
+export async function asAdmin(page: Page) {
+  await page.route("**/api/me*", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    try {
+      const res = await route.fetch();
+      const body = await res.json().catch(() => null);
+      await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
+    } catch {
+      // The page is gone: nothing to answer.
+    }
+  });
+}

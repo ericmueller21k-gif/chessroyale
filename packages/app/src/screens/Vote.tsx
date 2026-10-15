@@ -24,7 +24,7 @@ import type { GameView, VoteView } from "../game.ts";
 import { pawnLook } from "../looks.ts";
 import { underBoardView } from "../prefs.ts";
 import { play } from "../sound.ts";
-import { useCrowdAnimations } from "./Crowd.tsx";
+import { useBoardAnimations } from "../hooks.ts";
 
 /** No pieces while the votes run: only everyone's pawns. */
 const EMPTY_FEN = "8/8/8/8/8/8/8/8 w - - 0 1";
@@ -132,7 +132,7 @@ export function VoteScreen({
   menu?: ComponentChildren;
 }) {
   const now = useFrameNow();
-  const animate = useCrowdAnimations();
+  const animate = useBoardAnimations();
   const side = match.standings().find((s) => s.isYou)?.team ?? "w";
   const orientation: Orientation = side === "w" ? "white" : "black";
   // Option to zone and back, for this screen: the options run left to right whichever side you're on (voteZoneFor).
