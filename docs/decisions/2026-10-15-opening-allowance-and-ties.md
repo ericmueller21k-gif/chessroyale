@@ -122,10 +122,10 @@ poor, and not punish players not playing precise engine lines or slight variatio
 - **Classic's grouping:** with players kept in by ties, the next stage keeps enough boards for them
   (`ceil(survivors / groupSize)`, never fewer than the plan's), so groups stay at their size (7-10 with an odd number of
   boards, as before) and never crowd a board; the boards still go one at a time, finished games first.
-- **The screens' words hold with fewer out:** the cut says the real numbers ("5 out · 87 left", or "Nobody out, ties go
-  through"); Classic's break lists who went out; "Why was I cut?" says "below the last player through" with the real
-  gap, "level with" only at the last cut (with why), and "less than 0.1 points below" when the shown scores round the
-  same.
+- **The screens' words hold with fewer out:** the cut says the real numbers ("5 out · 87 left", or "Nobody out · 92
+  left" over "Everyone at the cut line was tied, and ties go through"); Classic's break lists who went out; "Why was I
+  cut?" says "below the last player through" with the real gap, "level with" only at the last cut (with why), and
+  "less than 0.1 points below" when the shown scores round the same.
 
 ## Sims
 
