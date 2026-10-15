@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { GameView, Standing } from "../game.ts";
-import { clockText } from "./RaceTower.tsx";
+import { clockShown } from "../clock-text.ts";
 
 /** Seconds left on your move at which the small clock turns red. */
 export const URGENT_SECONDS = 5;
@@ -46,7 +46,7 @@ export function BoardClock({ match, you, turn }: { match: GameView; you: Standin
   const urgent = secs !== null && runs && !turn!.done && secs <= URGENT_SECONDS;
   const low = bank !== null && bank < LOW_BANK_MS;
   if (secs === null && bank === null) return null;
-  const label = [secs !== null ? `${secs} s left on this move` : null, bank !== null ? `${clockText(bank)} left in your bank` : null].filter(Boolean).join(", ");
+  const label = [secs !== null ? `${secs} s left on this move` : null, bank !== null ? `${clockShown(bank)} left in your bank` : null].filter(Boolean).join(", ");
   return (
     <div class={`board-clock${urgent ? " urgent" : ""}${turn && !runs ? " theirs" : ""}${turn?.done ? " done" : ""}`} title={label} aria-label={label}>
       {secs !== null && (
@@ -56,7 +56,7 @@ export function BoardClock({ match, you, turn }: { match: GameView; you: Standin
         </span>
       )}
       {bank !== null && (
-        <span class={`bc-bank${low ? " low" : ""}`}>{clockText(bank)}</span>
+        <span class={`bc-bank${low ? " low" : ""}`}>{clockShown(bank)}</span>
       )}
     </div>
   );

@@ -228,9 +228,9 @@ test("time's up: whoever didn't vote (you, and a few bots) walks to the winner, 
   expect(await page.evaluate(() => (window as any).match.myVote)).toBe(atEnd.result);
 });
 
-/** The bank as the board's clock writes it (RaceTower's clockText). */
+/** The bank as the board's clock writes it (clock-text.ts's clockShown: whole seconds rounded up). */
 const clockText = (ms: number) => {
-  const sec = Math.max(0, Math.floor(ms / 1000));
+  const sec = Math.ceil(Math.max(0, ms) / 1000);
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 };
 

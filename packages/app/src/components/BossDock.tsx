@@ -14,6 +14,7 @@ import { COMPUTER_LAYOUT } from "./MatchMenu.tsx";
 import { Bolt } from "./PowerUpButton.tsx";
 import { useMedia } from "./QuickChat.tsx";
 import { VoiceBubble } from "../speech.tsx";
+import { clockShown } from "../clock-text.ts";
 import { bulletIncrementOn, kingBlocked, mockKingHelp } from "./Recluse.tsx";
 
 /**
@@ -242,11 +243,6 @@ export type DockClockRun = { startsAt: number; deadline: number; frozen?: { at: 
 export const clockLeft = (run: DockClockRun, now: number): number =>
   Math.max(0, run.deadline - (run.frozen && now >= run.frozen.at && now < run.frozen.until ? run.frozen.until : Math.max(now, run.startsAt)));
 
-/** m:ss, in whole seconds rounded up, as the big 3-2-1 counts (its "1" is the dock's 0:01). */
-export const clockShown = (ms: number): string => {
-  const s = Math.ceil(ms / 1000);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
 
 /** Where each match's dock clock stopped: it holds there between your moves, whichever screen shows it. */
 const held = new WeakMap<object, { run: DockClockRun | null; ms: number | null }>();
