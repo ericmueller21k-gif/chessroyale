@@ -120,6 +120,36 @@ export function stockfishRefuses(fen: string): string | null {
   return null;
 }
 
+/**
+ * Each line of a search, from its output: each slot's last exact line, as always, unless that lists a move twice.
+ * Stockfish re-sorts its lines as it deepens, and a search cut off mid-line prints that slot as a bound (skipped), so
+ * the slot's last exact line can be from an earlier depth, naming a move that has since moved to another slot: one
+ * move came out twice and another not at all (about 1 search in 5 of the judge's top 8 at 250k nodes). Then each move
+ * is listed once, with the numbers of its own latest exact line, and the moves are the ones in the last line printed
+ * for each slot (bound lines included), in the slots' order. A search with no move twice reads exactly as before.
+ */
+export function searchLines(lines: readonly string[]): InfoLine[] {
+  const exactSlots = new Map<number, InfoLine>();
+  const lastSlots = new Map<number, string>();
+  const exact = new Map<string, InfoLine>();
+  const bound = new Map<string, InfoLine>();
+  for (const l of lines) {
+    const info = parseInfo(l);
+    const any = info ?? parseInfo(l.replace(/ (?:lower|upper)bound/, ""));
+    if (!any) continue;
+    lastSlots.set(any.multipv, any.move);
+    if (info) {
+      exactSlots.set(info.multipv, info);
+      exact.set(info.move, info);
+    } else bound.set(any.move, any);
+  }
+  const bySlot = <T,>(slots: Map<number, T>) => [...slots].sort((a, b) => a[0] - b[0]).map(([, v]) => v);
+  const plain = bySlot(exactSlots);
+  if (new Set(plain.map((m) => m.move)).size === plain.length) return plain;
+  const listed = new Set(lastSlots.values());
+  return [...new Set([...plain.map((m) => m.move), ...bySlot(lastSlots)])].filter((m) => listed.has(m)).map((m) => exact.get(m) ?? bound.get(m)!);
+}
+
 /** Whether `p` settles within `ms` (its timer cleared either way). */
 function settlesWithin(p: Promise<unknown>, ms: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -238,7 +268,7 @@ export class UciEngine {
     this.transport.send(`position fen ${fen}`);
   }
 
-  /** One fixed-budget search with a cleared hash. Returns the last score per line. */
+  /** One fixed-budget search with a cleared hash. Returns each line's latest score (searchLines). */
   private async search(fen: string, multipv: number, searchMoves?: readonly string[], nodes = this.options.nodes): Promise<MoveScore[]> {
     // (A position Stockfish refuses is never sent: no lines, as for a position with no moves.)
     if (stockfishRefuses(fen)) return [];
@@ -250,13 +280,7 @@ export class UciEngine {
     this.transport.send(
       `go nodes ${nodes}` + (searchMoves?.length ? ` searchmoves ${searchMoves.join(" ")}` : ""),
     );
-    const lines = await done;
-    const last = new Map<number, InfoLine>();
-    for (const l of lines) {
-      const info = parseInfo(l);
-      if (info) last.set(info.multipv, info);
-    }
-    return [...last.values()].sort((a, b) => a.multipv - b.multipv).map(({ multipv: _, ...score }) => score);
+    return searchLines(await done).map(({ multipv: _, ...score }) => score);
   }
 
   /**
