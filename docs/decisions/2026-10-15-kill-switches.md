@@ -7,7 +7,7 @@ switches and the maintenance banner". The calls:
 
 - **Worker runtime variables, one per switch** (CLAUDE.md: admin settings go in the Worker's runtime variables):
   `PAUSE_CLASSIC`, `PAUSE_CROWD`, `PAUSE_RAID`, `PAUSE_SQUADS`, `PAUSE_SOLO`, `PAUSE_SHOP`, `PAUSE_FRIENDS` and
-  `PAUSE_BOSS_<ID>` (e.g. `PAUSE_BOSS_PIG`); "1" rests that part, deleting it brings it back. One variable each
+  `PAUSE_BOSS_<ID>` (by the boss's roster id, e.g. `PAUSE_BOSS_PIG` for Wrangler); "1" rests that part, deleting it brings it back. One variable each
   rather than a list in one variable: each shows by name in the dashboard, and a typo in one can't switch off another.
   "true", "yes", "on" or a JSON `true` count too (a kill switch shouldn't fail on how it was typed); anything else
   is on. `MAINTENANCE_BANNER` is the banner's message (at most 200 characters).
