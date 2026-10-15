@@ -1611,6 +1611,10 @@ p {
 .shade-tag.you span:first-child {
   background: #2f6fe4;
 }
+/* Animations off (Settings → Board): no see-through pieces, so the names carry the reel. */
+.shade-tag.reel-on span {
+  background: #1f9d5c;
+}
 .round-over {
   position: absolute;
   left: 50%;
@@ -2790,49 +2794,6 @@ button.history-label {
   color: var(--danger);
 }
 
-/* ---- Opening moves stepper on the first screen ---- */
-
-.stepper-field {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  color: var(--muted);
-}
-.stepper-field strong {
-  color: var(--text);
-}
-.stepper {
-  flex: none;
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
-  overflow: hidden;
-}
-.stepper button {
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: none;
-  color: var(--text);
-  font-size: 20px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.stepper button:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-.stepper output {
-  min-width: 28px;
-  text-align: center;
-  font-size: 18px;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-}
-
 /* After a round: the tiny boards light up one after another as every move lands. */
 .strip-slot.wave .tiny-board {
   animation: strip-wave 0.6s ease-out both;
@@ -2852,8 +2813,6 @@ button.history-label {
   }
 }
 
-/* ---- Sound lab ---- */
-
 .link-btn {
   align-self: center;
   border: none;
@@ -2864,56 +2823,6 @@ button.history-label {
   font-weight: 700;
   cursor: pointer;
 }
-.lab-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-.lab-list li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  border-radius: 12px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-}
-.lab-list li.chosen {
-  border-color: var(--accent);
-}
-.lab-play {
-  width: 40px;
-  height: 40px;
-  border: none;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-text);
-  font-size: 15px;
-  cursor: pointer;
-}
-.lab-name {
-  flex: 1;
-  font-weight: 700;
-}
-.lab-use {
-  height: 34px;
-  padding: 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-.lab-use:disabled {
-  color: var(--accent);
-  border-color: var(--accent);
-  cursor: default;
-}
-
 /* ---- Mode picker (first screen) ---- */
 
 .mode-pick {
@@ -8421,27 +8330,7 @@ a.fd-row-link {
   color: var(--fd-gold-ink);
   font-weight: 800;
 }
-.fd-stepper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-}
-.fd-stepper button {
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--fd-panel-2);
-  color: var(--fd-text);
-  font-size: 20px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.fd-stepper button:disabled {
-  opacity: 0.4;
-}
-/* Settings → Sound: the Move sound and Capture sound pickers (each option a radio, with its own ▶). */
+/* Settings → Sound: the Move, Capture and Reveal sound pickers (each option a radio, with its own ▶). */
 .ps-picker {
   display: flex;
   flex-direction: column;
@@ -8513,12 +8402,6 @@ a.fd-row-link {
 .ps-play:active,
 .ps-choice:active {
   filter: brightness(1.15);
-}
-.fd-stepper output {
-  min-width: 24px;
-  text-align: center;
-  font-weight: 800;
-  font-size: 17px;
 }
 .fd-rules {
   background: var(--fd-panel);

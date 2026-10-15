@@ -394,13 +394,13 @@ function bubblePop(at: number, level: number) {
 }
 
 /**
- * Voices for the reveal's "selecting move" roulette, to audition in the sound
- * lab (?soundlab). Each plays one note; the roulette climbs a major arpeggio
- * from `base` (C, E, G, C), and the winner is three of the same note.
+ * Voices for the reveal's "selecting move" roulette (Settings → Sound, "Reveal sound"). Each plays one note; the
+ * roulette climbs a major arpeggio from `base` (C, E, G, C), and the winner is three of the same note.
  */
 export const REEL_VOICES = {
   pan: {
-    label: "Steel pan (warm, default)",
+    label: "Steel pan",
+    blurb: "Warm (the default)",
     base: 523.25, // C5
     note: (t: number, f: number, l = 1) => {
       strike(t, f, [[1, 1, 0.5], [2, 0.45, 0.32], [3, 0.18, 0.18], [4.02, 0.08, 0.1]], 0.16 * l, { glide: 0.012 });
@@ -408,27 +408,32 @@ export const REEL_VOICES = {
     },
   },
   kalimba: {
-    label: "Kalimba (soft pluck)",
+    label: "Kalimba",
+    blurb: "A soft pluck",
     base: 523.25,
     note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.45], [5.4, 0.12, 0.05], [2, 0.12, 0.2]], 0.17 * l),
   },
   marimba: {
-    label: "Marimba (wooden)",
+    label: "Marimba",
+    blurb: "Wooden",
     base: 523.25,
     note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.38], [4, 0.14, 0.07], [10, 0.03, 0.02]], 0.18 * l),
   },
   glock: {
-    label: "Glockenspiel (bright bell)",
+    label: "Glockenspiel",
+    blurb: "A bright bell",
     base: 1046.5, // C6
     note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.6], [2.76, 0.3, 0.25], [5.4, 0.12, 0.1]], 0.1 * l),
   },
   musicbox: {
-    label: "Music box (tinkly)",
+    label: "Music box",
+    blurb: "Tinkly",
     base: 1046.5,
     note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.8], [3, 0.15, 0.3], [4.2, 0.05, 0.08]], 0.09 * l),
   },
   chip: {
     label: "8-bit blip",
+    blurb: "Like an old video game",
     base: 1046.5,
     note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.07], [2, 0.8, 0.05]], 0.05 * l, { type: "square" }),
   },
@@ -451,6 +456,22 @@ export function setReelVoice(v: ReelVoice) {
   } catch {
     // Not important.
   }
+}
+
+/** A whole roulette in a voice, to hear it in Settings: the slowing steps, then the winner's three tones. */
+export function previewReel(voice: ReelVoice) {
+  unlockAudio();
+  // About 1.9 s over 11 steps, each a little longer than the last, as the reveal's reel slows.
+  const raw = Array.from({ length: 11 }, (_, i) => Math.pow(1.22, i));
+  const scale = 1900 / raw.reduce((a, b) => a + b, 0);
+  let at = 0;
+  let last = 0;
+  for (const d of raw) {
+    last = at;
+    setTimeout(() => play("reel", voice), at);
+    at += d * scale;
+  }
+  setTimeout(() => play("select", voice), last + 450);
 }
 
 const ARPEGGIO = [1, 1.26, 1.5, 2]; // C E G C
@@ -862,7 +883,7 @@ export function warmSounds(names: readonly SoundName[]): void {
   }
 }
 
-/** Plays a sound; `voice` previews a roulette voice without choosing it (the sound lab). */
+/** Plays a sound; `voice` previews a roulette voice without choosing it (Settings → Sound, "Reveal sound"). */
 export function play(name: SoundName, voice?: ReelVoice) {
   // Tests read this log (set window.__soundLog = [] to start one).
   (globalThis as { __soundLog?: string[] }).__soundLog?.push(`${name}:${ctx?.state ?? "none"}${muted ? ":muted" : ""}`);

@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { gameEnd, sideToMove } from "@chessroyale/chess";
 import { enginePool } from "../engine.ts";
 import { evalBarOn, onPrefsChange } from "../prefs.ts";
+import { onAccountChange } from "../account.ts";
 
 /**
  * What the bar last showed, and every position's value so far. A screen change
@@ -26,9 +27,10 @@ const remember = (fen: string, w: number) => {
  * King's Last Stand plunges the bar to the crowd's chances after a blunder that
  * never stands on the board, and lets it go back as the piece slides back.
  *
- * A player can switch the bar off in Settings (prefs.ts, `evalBarOn`): then nothing shows and the board takes its room
- * (every screen's CSS narrows the board only for `.eval-bar ~ .board-wrap`). The value is still worked out, so what
- * reads it (`knownEval`: the God King's word on how it's going) is the same either way.
+ * For testers only since Oct 15 (prefs.ts, `evalBarOn`: an admin or a test server, and switched off in Settings →
+ * Testing): for players nothing shows and the board takes its room (every screen's CSS narrows the board only for
+ * `.eval-bar ~ .board-wrap`). The value is still worked out, so what reads it (`knownEval`: the God King's word on how
+ * it's going) is the same either way.
  */
 export function EvalBar({
   fen,
@@ -43,7 +45,16 @@ export function EvalBar({
 }) {
   const [white, setWhite] = useState<number | null>(() => known.get(fen) ?? lastShown);
   const [on, setOn] = useState(evalBarOn);
-  useEffect(() => onPrefsChange(() => setOn(evalBarOn())), []);
+  useEffect(() => {
+    // (Who's a tester is known once the account loads.)
+    const update = () => setOn(evalBarOn());
+    const offPrefs = onPrefsChange(update);
+    const offAccount = onAccountChange(update);
+    return () => {
+      offPrefs();
+      offAccount();
+    };
+  }, []);
 
   useEffect(() => {
     let live = true;
