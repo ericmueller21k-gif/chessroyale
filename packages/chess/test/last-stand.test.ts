@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, lastStandBar, lastStandDue, mulberry32, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, RAID_SETTINGS, countedOf, lastStandBar, lastStandDue, mulberry32, type Settings } from "@chessroyale/core";
 import { LAST_STAND, LAST_STAND_MS, MatchRunner, blunderCost, fenAfter, lastStandHits, legalMoves, sanLineToUci, toSan, type EngineLike, type Opening, type UciEngine } from "../src/index.ts";
 import { createNodeEngine } from "../src/node.ts";
 
@@ -115,9 +115,10 @@ describe("the God King's Last Stand: the rule", () => {
     expect(runner.boss!.kingCharges).toBe(0);
     expect(runner.boss!.lastStand).toEqual({ atMove: 1, move: BLUNDER, loss: 47, bar: 35, charges: 3, fen: before, bestMove: b.bestMove, before: 0.55, after: 0.08 });
     expect(runner.bossView()!.barred).toBe(BLUNDER);
-    // The scores stand: the loss is on your record.
-    expect(runner.player("h0").finalLosses).toEqual([47]);
+    // The scores stand: the raw loss is on your record (ratings), and the boss's strikes weigh it as it counted (after
+    // the opening allowance: a raid starts at move 6; docs/decisions/2026-10-15-opening-allowance-and-ties.md).
     expect(runner.player("h0").lossesByStage.flat()).toEqual([47]);
+    expect(runner.player("h0").finalLosses).toEqual([countedOf(b.result.players[0]!)]);
     // The re-pick: an ordinary scored round, with the blunder off the table.
     runner.deal();
     const again = await runner.score(pick("d2d3"));
@@ -270,8 +271,11 @@ describe("the God King's Last Stand: the rule", () => {
     const engine = judge({ bestExpected: 0.55, blunder: "d2d4", blunderExpected: 0.08 });
     const ids = ["h0", "h1", "h2", "h3", "h4"];
     const runner = new MatchRunner({ settings, rng: mulberry32(9), engines: [engine], library: [opening(RUY)], entrants: ids.map((id) => ({ id, name: id, isBot: false })) });
-    // The boss has just struck, after crowd move 3.
+    // The boss has just struck, after crowd move 3. (Late in the game, past the opening allowance, so every point the
+    // picks below give away counts: the board's move number is 20.)
     runner.state = { ...runner.state, boss: { ...runner.state.boss!, minSurvivors: 1, crowdMoves: 3, sinceKill: 0 } };
+    const late = runner.boards.get(0)!;
+    runner.boards.set(0, { ...late, fen: late.fen.replace(/\d+$/, "20") });
     runner.deal();
     const picks = (blunderers: string[], blunder: string, others: string) =>
       new Map(ids.map((id) => [id, { move: blunderers.includes(id) ? blunder : others, thinkMs: 1000 }]));
@@ -280,13 +284,14 @@ describe("the God King's Last Stand: the rule", () => {
     expect(runner.state.boss).toMatchObject({ crowdMoves: 3, sinceKill: 0 });
     expect(runner.bossView()!.strikeIn).toBe(settings.bossKillEvery);
     // The re-pick (crowd move 4), then moves 5 and 6: the three play the best, the other two a little worse (2 to 7
-    // points a move). The strike comes after move 6, as it would have without him.
+    // points a move); h1 plays the worse move once too, so one of the three is clearly the worst (a tie waits). The
+    // strike comes after move 6, as it would have without him.
     const due: number[] = [];
     for (let i = 0; i < 3; i++) {
       while (runner.bossToMove()) await runner.playBoss();
       runner.deal();
       const top = await engine.topMoves(runner.boards.get(0)!.fen, 2);
-      await runner.score(picks(["h0", "h1", "h2"], top[0]!.move, top[1]!.move));
+      await runner.score(picks(i === 1 ? ["h0", "h2"] : ["h0", "h1", "h2"], top[0]!.move, top[1]!.move));
       if (runner.bossKillDue()) due.push(runner.state.boss!.crowdMoves);
     }
     expect(due).toEqual([6]);

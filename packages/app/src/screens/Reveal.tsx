@@ -5,7 +5,7 @@ import { Board } from "../components/Board.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { UnderBoard } from "../components/QuickChat.tsx";
 import { ShadeMoves, SquareRing, type ShadeMove } from "../components/ShadeMoves.tsx";
-import { type BoardView, type GameView, type GroupReveal } from "../game.ts";
+import { allowanceNote, type BoardView, type GameView, type GroupReveal } from "../game.ts";
 import { seenKey } from "../hooks.ts";
 import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
@@ -140,6 +140,7 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
         <div class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>
           {fmt(me.roundScore)}
           <span class="round-score-label">{me.move ? "this round" : "missed move"}</span>
+          {allowanceNote(me) && <span class="allowance-line">{allowanceNote(me)}</span>}
         </div>
         <ul class="picks">
           {mine.result.players

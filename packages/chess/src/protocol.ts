@@ -1,7 +1,7 @@
 import type { BossBrain, BounceResult, BurnEvent, LassoDrag, LightsOutTarget, LongPull, PowerEvent, PowerId, SawCut, ShowdownResult, SplitPawn } from "@chessroyale/core";
 import type { Base } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
-import type { Augment, DrawRule } from "@chessroyale/core";
+import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
 import type { LastStandRound } from "./runner.ts";
 import type { JudgeJob, JudgeReport, JudgeRules } from "./judge.ts";
 import type { MoveScore } from "./uci.ts";
@@ -71,6 +71,8 @@ export interface NetStanding {
   isBot: boolean;
   /** Knocked out (then `placement` is set). */
   out: boolean;
+  /** Still in, but the stage's cut would take them if it came now (ties at the line go through). */
+  cut?: boolean;
   placement: number | null;
   /** Crowd 50 v 50: the player's team (the side they play all match). */
   team?: "w" | "b" | null;
@@ -83,7 +85,12 @@ export interface NetStanding {
 export interface NetPick {
   playerId: string;
   move: string | null;
+  /** Raw loss against the best move (null: a miss). */
   loss: number | null;
+  /** The loss as it counted for points, when the opening allowance took something off (see PlayerRoundResult). */
+  counted?: number;
+  /** The opening allowance applied on this move but not to this pick: it gave up material (see PlayerRoundResult). */
+  material?: MaterialSlip;
   roundScore: number;
   /** Used a power-up this round (so the pick can't count as brilliant). */
   usedPowerUp?: boolean;
