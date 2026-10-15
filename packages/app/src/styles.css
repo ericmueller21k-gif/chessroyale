@@ -933,11 +933,12 @@ p {
     height: 300px;
   }
   /* Quick chat sits under the panel beside the board (the vote results, the waiting banner, the power-up picks). The
-     panel keeps one height in every phase of a turn (room for five vote rows, yours and the result line), so the
-     chat under it stays put instead of jumping down at each reveal and back up at each move (Eric, Oct 9). */
+     panel keeps one height in every phase of a turn (room for five vote rows, yours, the result line and the opening
+     allowance's line under it), so the chat under it stays put instead of jumping down at each reveal and back up at
+     each move (Eric, Oct 9). */
   .screen.game:has(> .under-board) > .play-footer,
   .screen.game:has(> .under-board) > .poll {
-    min-height: 236px;
+    min-height: 262px;
     align-content: start;
   }
 }
@@ -2993,6 +2994,16 @@ button.history-label {
 }
 .poll-result .round-score {
   font-size: 26px;
+}
+/* The opening allowance on your pick ("1.2 forgiven · opening"): its own line, never wrapped. */
+.allowance-line {
+  flex-basis: 100%;
+  display: block;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--muted);
+  white-space: nowrap;
 }
 .crowd-cut {
   justify-content: center;
@@ -7296,15 +7307,18 @@ button.history-label {
   font-size: 12px;
   font-weight: 600;
 }
-.dock-line.blunder-words .narrow-only {
+.dock-line.blunder-words .narrow-only,
+.dock-line.allowance-words .narrow-only {
   display: none;
 }
 /* (Up to 379 px: the dock's row is the board's width, its clock at the right; Oct 15.) */
 @media (max-width: 379px) {
-  .dock-line.blunder-words .wide-only {
+  .dock-line.blunder-words .wide-only,
+  .dock-line.allowance-words .wide-only {
     display: none;
   }
-  .dock-line.blunder-words .narrow-only {
+  .dock-line.blunder-words .narrow-only,
+  .dock-line.allowance-words .narrow-only {
     display: inline;
   }
 }

@@ -66,8 +66,10 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
   const boss = match.boss;
   const me = alive[alive.findIndex((x) => x.isYou)];
   const knockouts = cutoff > 0 && cutoff < alive.length;
-  // The score on the cut line: the last player who'd go through.
-  const cutScore = knockouts ? alive[cutoff - 1]!.points : null;
+  // The score on the cut line: the last player who'd go through. While nobody would go (ties at the line go through), the
+  // line is the last place, and the pill stays, so the top bar keeps its layout through the stage.
+  const cutStage = !match.final && !boss && (match.settings.knockoutsPerStage[match.stage] ?? 0) > 0;
+  const cutScore = cutoff > 0 && (knockouts || cutStage) && alive.length ? alive[Math.min(cutoff, alive.length) - 1]!.points : null;
   const inZone = knockouts && rank > cutoff;
   // Crowd: the move number on the board, and turns left until the cut.
   const crowd = isCrowd(match);

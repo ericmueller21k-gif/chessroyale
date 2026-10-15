@@ -72,10 +72,20 @@ async function start(page: Page, query: string) {
   await expect(page.getByRole("heading", { name: "Today's openings" })).toBeVisible();
 }
 
-test("strong play survives every stage, plays the 2v2 final, and sees results", async ({ page }) => {
+test("strong play is never cut on a tie, the 2v2 final is played (with your turns when you're in it), and results show", async ({ page }) => {
+  // Before Oct 15 a tie at a cut went to less thinking time, and this test's player (the engine's best, found ahead)
+  // always won those ties, so it always reached the final. Now everyone tied with the last player through goes through,
+  // and only the last cut breaks a tie (docs/decisions/2026-10-15-opening-allowance-and-ties.md). With one round a stage
+  // (rounds=1) a stage's score is one round against one board's group, so whole groups tie exactly, and what the ties
+  // leave over is owed by the later cuts: reaching the final then turns on the luck of the groups (measured headless:
+  // rarely at one round a stage; at Classic's own 8 and 5 rounds a stage, every time). So this asserts the rule itself: you're never cut
+  // while tied with, or above, the last player through, except at the last cut; the final is played; if you're in it,
+  // you get turns.
   test.setTimeout(240_000);
   await start(page, "rounds=1&clock=20&pace=quick");
   let finalTurns = 0;
+  // Every alive player's exact stage score just before each cut, and whether it was the last cut before the final.
+  let before: { scores: Record<string, number>; last: boolean } | null = null;
   for (let i = 0; i < 3000; i++) {
     const p = await phase(page);
     if (p === "results") break;
@@ -86,13 +96,29 @@ test("strong play survives every stage, plays the 2v2 final, and sees results", 
       await clickMove(page, await bestMove(page));
       await expect.poll(() => phase(page)).not.toBe("play");
     } else if (p === "reveal") {
-      // (One round a stage: every reveal ends one.)
+      // (One round a stage: every reveal ends one.) The exact scores the cut is about to go by.
+      before = await page.evaluate(() => {
+        const m = (window as any).match;
+        const st = m.runner.state;
+        if (st.final) return null;
+        const scores = Object.fromEntries(st.players.filter((x: any) => x.alive).map((x: any) => [x.id, x.stageScore]));
+        return { scores, last: st.stage >= m.settings.knockoutsPerStage.length - 1 };
+      });
       await searchBoards(page);
       await tapThroughReveal(page);
     } else if (p === "stageBreak") {
       await expect(page.locator(".tower-row").first()).toBeVisible();
-      // Strong play wins exact ties at a cut by thinking less, as a strong player does; bots think 3 s or more. So
-      // the test has its next moves found now, not on the player's clock (on a busy machine that took up to 10 s).
+      const brk = await page.evaluate(() => {
+        const ph = (window as any).match.phase;
+        return { youOut: ph.youOut as boolean, out: ph.knockedOut.map((x: any) => x.id) as string[] };
+      });
+      if (brk.youOut && before) {
+        // Out: strictly below everyone who went through (to the last bit), unless this was the last cut.
+        const through = Object.keys(before.scores).filter((id) => !brk.out.includes(id));
+        const line = Math.min(...through.map((id) => before!.scores[id]!));
+        if (!before.last) expect(before.scores.you!, "cut while tied with or above the last player through").toBeLessThanOrEqual(line - 1e-9);
+      }
+      // The test's next moves are found now, not on the player's clock (on a busy machine that took up to 10 s).
       await searchBoards(page, true);
       await page.getByRole("button", { name: /Next stage|See how it ends/ }).click();
     } else if (p === "final") {
@@ -107,8 +133,14 @@ test("strong play survives every stage, plays the 2v2 final, and sees results", 
   }
   await expect(page.getByRole("button", { name: "Play again" })).toBeVisible();
   await expect(page.locator(".results h1")).toContainText(/of 64/);
-  // Strong play reaches the final and gets turns in it.
-  expect(finalTurns).toBeGreaterThan(0);
+  // The 2v2 final was played (four finalists, placed 1st to 4th); if you were in it, you got turns.
+  const final = await page.evaluate(() => {
+    const st = (window as any).match.runner.state;
+    return { order: (st.final?.order ?? []) as string[], places: st.players.filter((p: any) => (st.final?.order ?? []).includes(p.id)).map((p: any) => p.placement).sort() };
+  });
+  expect(final.order).toHaveLength(4);
+  expect(final.places).toEqual([1, 2, 3, 4]);
+  if (final.order.includes("you")) expect(finalTurns).toBeGreaterThan(0);
 });
 
 test("missing every move gets you knocked out; the match plays out and shows results", async ({ page }) => {
