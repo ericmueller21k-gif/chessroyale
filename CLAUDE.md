@@ -3,7 +3,7 @@
 ## Follow the spec
 
 `buildspec.md` is the brief. Read it before doing anything, and follow it. Where it's ambiguous, make the call and
-record it in `DECISIONS.md`.
+record it in a new file in `docs/decisions/`.
 
 ## Language
 
@@ -16,14 +16,16 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
   chat, the shop, the engine, fair play, ops): how it works today, where the code is, its settings, its tests and
   the lessons that apply. Read your area's page before changing anything in it; `docs/areas/README.md` lists them.
 - **`DECISIONS.md`**: why things are the way they are. It indexes every decision up to Oct 10, 2026 (now word for word
-  in `docs/history/<area>.md`), and new decisions go at its end, one section each, with the date and the reason.
+  in `docs/history/<area>.md`) and keeps the sections added up to Oct 15.
+- **`docs/decisions/`**: every newer decision, one file each (`YYYY-MM-DD-short-title.md`), with the date and the
+  reason. Never append to `DECISIONS.md`: one shared end made every pair of open PRs conflict (Oct 15, 2026).
 - A PR that changes how an area works updates its page in `docs/areas/` in the same PR.
 
 ## How Eric likes to work (carried over from Word Trap)
 
-- Keep Eric's involvement minimal. Make judgment calls yourself and record each one, with the reason, in
-  `DECISIONS.md`. Stop and ask Eric only for things only Eric can do: accounts or anything that costs money, testing on
-  his real phone or computer, or reversing a rule he set.
+- Keep Eric's involvement minimal. Make judgment calls yourself and record each one, with the reason, in its own
+  file in `docs/decisions/`. Stop and ask Eric only for things only Eric can do: accounts or anything that costs
+  money, testing on his real phone or computer, or reversing a rule he set.
 - Don't stop for review between milestones (Eric, Oct 2, 2026, overriding the spec's "stop after each milestone"):
   commit, push and keep going. Opening and merging your own PRs into `main` is fine; `main` auto-deploys.
 - Hosting: Cloudflare (Workers + Durable Objects, deployed from GitHub) on Eric's account, same as Word Trap. Eric is
@@ -136,8 +138,8 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
 - `ops`: capacity, load tests, scaling choke points, monitoring, rate limits, graceful overload, running costs.
 - `fairplay`: reports, cheat detection (signals from each match's judged moves, the suspicion score), flags, bans,
   the review page (`/admin/fairplay`) and appeals, and the cheater simulations that tune them.
-- Lanes keep sessions out of each other's files. Run one delegate per lane at a time. In `DECISIONS.md`'s "New
-  decisions", add your own sections rather than rewriting others'. Each lane keeps its area pages in `docs/areas/`
+- Lanes keep sessions out of each other's files. Run one delegate per lane at a time. Each decision is its own file in
+  `docs/decisions/`: add your own files rather than rewriting others'. Each lane keeps its area pages in `docs/areas/`
   true.
 
 ## Progress

@@ -25,5 +25,5 @@ Rules for every area: `CLAUDE.md` and `.claude/LESSONS.md`. Every tunable is in 
 ## Keeping a page true
 
 - A PR that changes how an area works updates its page in the same PR: what it does, files, settings, tests.
-- Keep a page short and current. The reasons go in `DECISIONS.md` ("New decisions"), not here.
+- Keep a page short and current. The reasons go in `docs/decisions/` (one file each), not here.
 - A lesson that applies to one area goes on its page as well as in `.claude/LESSONS.md`.

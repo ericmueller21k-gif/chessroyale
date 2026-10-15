@@ -67,7 +67,7 @@ If you need one of those changed, say what and why, and stop.
   for each event-to-animation rule, and an e2e case once a boss is on screen. Run `npm test` and `npm run typecheck`,
   and locally only the e2e specs you touched (under the shared e2e lock). CI runs the whole e2e suite on the PR
   (`.github/workflows/e2e.yml`): read its `result` before merging anything that changes a screen.
-- **Record it** in `DECISIONS.md` (New decisions): what you built and any call you made, with the reason. Keep
+- **Record it** in a new file in `docs/decisions/`: what you built and any call you made, with the reason. Keep
   `docs/areas/bosses.md` true.
 - **Ship it** per `CLAUDE.md`: PR, wait for `check`, merge with a merge commit.
 

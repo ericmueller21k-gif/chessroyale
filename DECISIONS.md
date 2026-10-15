@@ -10,8 +10,9 @@ these weren't reviewed first. Most are a single line in `packages/core/src/setti
   in its area's file in [`docs/history/`](docs/history/). The index below lists each one, in the order it was made,
   and links to it. Code comments that cite `DECISIONS.md, "<section>"` still lead there: find the section's title
   below.
-- **New decisions go at the end of this file**, under "New decisions": one section each, with the date and the
-  reason, as before. Add to your own lane's sections rather than rewriting others'.
+- **New decisions go in [`docs/decisions/`](docs/decisions/README.md)**, one file each, named
+  `YYYY-MM-DD-short-title.md`, with the date and the reason (Oct 15, 2026: every PR appending to the end of this file
+  made every pair of open PRs conflict). The "New decisions" sections below, written up to Oct 15, stay here.
 - **When a decision changes how an area works,** update its page in `docs/areas/` in the same PR.
 - **When this file grows long again** (a month or so of new decisions), move the new sections, unchanged, to the end
   of their area's `docs/history/` file and list them in the index.
@@ -154,6 +155,8 @@ In [`docs/history/ops.md`](docs/history/ops.md). How it works today: [`docs/area
 - [Capacity: built (Oct 7, 2026)](docs/history/ops.md#capacity-built-oct-7-2026)
 
 ## New decisions
+
+Written up to Oct 15, 2026. Newer decisions: one file each in [`docs/decisions/`](docs/decisions/README.md).
 
 Add new sections here (`### Title (date)`), newest last.
 
