@@ -60,8 +60,8 @@ function Draft() {
           representatives, and the UK Online Safety Act's short risk assessments (a lawyer).
         </li>
         <li>
-          <strong>How long fair-play records are kept:</strong> today with no end date while the account exists, and a ban's
-          record, with its hashed email or Google id, even after the account is deleted (Eric, a lawyer).
+          <strong>How long fair-play records are kept:</strong> today with no end date while the account exists, and the record
+          of a ban or an open review, with its hashed email or Google id, even after the account is deleted (Eric, a lawyer).
         </li>
       </ol>
     </section>
@@ -203,8 +203,8 @@ function Privacy() {
         kept={
           <>
             judged moves for {FAIRPLAY.evidenceDaysUnflagged} days, or {FAIRPLAY.evidenceDays} days if you were reported or flagged,
-            and longer only while a review of your account is open. The rest until you delete your account, except a ban, which
-            stays (below).
+            and longer only while a review of your account is open. The rest until you delete your account, unless fair play has
+            acted on it (below).
           </>
         }
       />
