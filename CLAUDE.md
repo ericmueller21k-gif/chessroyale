@@ -36,7 +36,8 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
   mode.
 - Keep every tunable in one settings file (`packages/core/src/settings.ts`).
 - Game modes (Oct 3, 2026): **Classic** (64 players, 8 boards, players rotate) and **Crowd** (100 players, one board,
-  most popular move played; 50 v 50 or everyone moves; augment votes). A mode is a preset over the same engine:
+  most popular move played; always 50 v 50 by team turns since Oct 15; pre-game votes always on). A boss raid is
+  the one mode where everyone picks every move (`crowdTeams: false`). A mode is a preset over the same engine:
   `modeSettings()` / `CROWD_SETTINGS` in settings.ts. The pre-modes Classic is commit `bd726b5` on main.
 - Next phase (accounts, profiles, matchmaking, ranked, coins/icons/emotes): see `ROADMAP.md` for the order and what
   needs Eric.

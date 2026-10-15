@@ -103,7 +103,7 @@ poor, and not punish players not playing precise engine lines or slight variatio
   endings keep their sizes (the team final's 8, the boss final's 4, the duel's 2, Classic's final four). First built as
   "the next cut takes it all": the sims showed the owed places piling into the cut after move 14, the first move the
   allowance no longer covers (12 out instead of 8), where the field arrives nearly tied and one small loss decides
-  (the strongest bot went out over a single 3.4-point move). The director chose to spread it (Oct 15): Eric's bar is
+  (the 24th strongest of 100 bots went out over a single 3.4-point move). The director chose to spread it (Oct 15): Eric's bar is
   that a player who goes out thinks "yeah, I messed up".
 - **The last cut before a fixed-size ending** (`isLastCut`) takes exactly what's owed. An exact tie at its line goes to
   less **raw** loss over the match (`rawLossTotal`: every raw loss, a miss counting `finalMissLoss`), then less
@@ -156,6 +156,13 @@ raw, or a miss; "slight variations" are picks among the engine's top 8.
   above them).
 - **What's owed, spread over the cuts still to come**, keeps every cut near its planned size; the move-14 cut takes 8.2
   (it took 12.2 when the next cut owed it all). The last cut takes what's left (6.8 instead of 4).
+- **The move-14 cut is still the allowance's first real test**, whatever its size: most of those it takes (82%; 87%
+  when the next cut owed it all, 73% with the allowance alone) gave nothing away that counted before move 11, so a
+  few small losses at moves 11-14 decide it (their median, counted: 4.2 points; 2.4 when it took 12). Bots from the
+  strongest quarter it took, over the 12 matches: 5 before, 10 at the next cut, 8 spread (the strongest bot: once
+  before, never after). In match 7001 the 24th strongest still goes out there, 1.3 below the line over one 3.4-point
+  move at move 14 (its "Why you went out" is in the PR). That's the allowance doing what it says: forgiving the
+  opening's small losses moves the first separation to where the allowance ends.
 
 **Which part does what** (the director asked, Oct 15). The same seeds with only part of the change: `ties-only` (the
 allowance's points 0), `allowance-only` (every cut exact, ties broken as at the last cut), `after-next-cut` (both, the
