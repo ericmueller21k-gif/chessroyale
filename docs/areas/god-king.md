@@ -40,14 +40,22 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   still opens; picking "Play move" or "Strike" has the boss slam his book shut and mock it, and the God King says his
   help won't take hold (`mockKingHelp` in `components/Recluse.tsx`). Each try spends its charge as if it had worked
   (Eric, Oct 14: "using the king's move doesn't draw down on the usage vs him like it should"; the runner's
-  `kingTried`, solo's `callKing`, in phase 1 and 2): the crowns go down one a try, and with none left he can't be called,
+  `kingTried`, solo's `callKing`, in phase 1): the crowns go down one a try, and with none left he can't be called,
   as against any boss. Online (the Crowd's boss final, Oct 14) the same: `NetMatch.callKing` sends the try and shows
   the crown gone at once, the lobby spends it (`kingTried`; never a turn, a strike or a tally); the mock plays on the
-  device that tried, and the others see the crown gone with the move's reveal. Your move goes on (he played nothing); the Last Stand, which nobody calls, spends nothing. In
+  device that tried, and the others see the crown gone with the move's reveal. Your move goes on (he played nothing);
+  the Last Stand, which nobody calls, spends nothing. In
   this fight he opens with his own line as "START!" comes ("I sense a tremendous power within this foe.", Eric's;
   `foeIntro`, said by the boss screen's intro), and his
   lines about calling him (the nudge, "spent", "A charge might turn it") are left out (`turnCues`' `noHelp`). His
   lines for this fight are in the Hidden Boss's table, `characters/recluse-lines.ts`.
+- **The Hidden Boss absorbs him** (Eric, Oct 14; DECISIONS.md, "The Hidden Boss absorbs the God King"): his phase
+  change opens with it. In his place in the dock (BossDock's `king`) he raises his sword over the beaten boss, his aura
+  swelling, and gloats (`foeTriumph`, a `lead` cue: always said, but a critical line cuts in); then the boss drains his
+  power into a raised hand: his Last Stand's blows flash and crack him (his own frames), he flickers and cries out
+  (`foeDrained`); and as it lands he fades up and away in light. No new frames of his: the aura, the flicker and the fade
+  are CSS over his figure (`.gk-aura`, `.gk-unit.gk-drained`, `.gk-fading`). From then on he's gone: his place in the
+  dock stays, empty (`king="gone"`), nothing to tap, and he says nothing in phase 2 (his phase 2 lines are gone).
 - **His lines** come from cues (a new danger to your queen or king, a mate threat, a queen taken, his own acts, a boss
   power…). Critical cues always speak; everything else is paced by `KING_SPEECH` (about 5 to 10 lines a game). Each
   line then follows the speech rule every speaker shares (`speech.tsx`, `SPEECH`; Oct 10): it types out and stays
@@ -96,9 +104,11 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 
 - Against the Hidden Boss: unit `packages/chess/test/recluse.test.ts` (blocked; a try spends its charge, the Last Stand
   nothing), `packages/app/test/recluse-boss.test.ts` (the mocks, his cues, solo's `callKing` spending),
-  `packages/server/test/crowd-hidden-boss.test.ts` (online: a try is never a turn or a strike, and spends a charge); e2e
-  `e2e/recluse.spec.ts` (the dock's count drops, phase 1 and 2), `e2e/crowd-hidden.spec.ts` (the Crowd's final, solo
-  and online).
+  `packages/app/test/recluse-phase2.test.ts` (absorbed: his look at each moment of the phase change, gone for good, his
+  triumph giving way to his cry, silent in phase 2), `packages/server/test/crowd-hidden-boss.test.ts` (online: a try is
+  never a turn or a strike, and spends a charge); e2e `e2e/recluse.spec.ts` (the dock's count drops in phase 1; the
+  absorption's beats; no button, no figure and no word from him in phase 2), `e2e/crowd-hidden.spec.ts` (the Crowd's
+  final, solo and online).
 - Unit: `packages/chess/test/last-stand.test.ts`, `packages/app/test/god-king.test.ts`,
   `packages/app/test/god-king-sprite.test.ts`, `packages/server/test/lobby.test.ts`.
 - e2e: `e2e/formats.spec.ts` (the boss final), `e2e/boss-powers.spec.ts`.

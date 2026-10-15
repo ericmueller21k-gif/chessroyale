@@ -75,6 +75,11 @@ export interface BossKit extends BeatLines {
   lookOf?: (boss: BossView) => string | undefined;
   /** Its attack on a king (the God King's Last Stand, its mate), if it has one: see KingAttackKit. */
   kingAttack?: KingAttackKit;
+  /**
+   * A half-engine look that comes on over its drawing (the Hidden Boss, from his phase change: components/Recluse.tsx's
+   * EngineOverlay, placed on his head frame by frame; BossCharacter's `setEngineAt`). An overlay, never its frames.
+   */
+  engine?: boolean;
 }
 
 export const BOSS_KITS: Record<string, BossKit> = {
@@ -304,7 +309,10 @@ export const BOSS_KITS: Record<string, BossKit> = {
       book: "recluseShut",
       rise: "recluseRustle",
       catch: "recluseShut",
-      // (The phase change: up in a rage, the leap onto the board, the book thrown down, the chant's light.)
+      // (The phase change: his hand raised to the God King, his fist closing on his power as the engine in him ignites,
+      // up in a rage, the leap onto the board, the book thrown down, the chant's light.)
+      reach: "recluseRustle",
+      grab: "recluseSpark",
       snatch: "recluseRustle",
       jump: "recluseRustle",
       land: "recluseThump",
@@ -319,6 +327,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
     portrait: { ...RECLUSE_PORTRAIT, anim: "idle", frame: 0 },
     // (The bust is 50 px wide: the wider box on a phone, as Sawyer's and Wrangler's.)
     wide: true,
+    // (Phase 2: one eye glowing cold blue, faint circuit lines down that side of his face: the God King's power, absorbed.)
+    engine: true,
   },
 };
 

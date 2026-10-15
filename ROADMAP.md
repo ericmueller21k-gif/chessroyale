@@ -259,9 +259,11 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
     out of time loses; Eric, Oct 14: was 3:00, then 1+0); beaten, he collapses and mumbles, then phase 2. Placeholder
     lines (and five verified quotes) in one table, `characters/recluse-lines.ts`, for Eric's own.
   - **Phase 2 is built (Oct 14), for admins only, in Boss alone** (DECISIONS.md, "The Hidden Boss, phase 2"): beaten
-    in phase 1, he collapses and mumbles, then the phase change (about 10 s, reworked Oct 14: up in a rage, he leaps
-    onto the board, throws the book down and chants over its light; Sawyer's crack lines, the quarters growing into four
-    boards; the book back in his hands, the Chess960 shuffle, his leap back), then four boards
+    in phase 1, he collapses and mumbles, then the phase change (about 15 s, reworked Oct 14: he absorbs the God King,
+    who stood over him, draining his golden power into a raised hand, and becomes half engine (one eye cold blue,
+    circuit lines: an overlay, all of phase 2; the God King is gone from then on); up in a rage, he leaps onto the board,
+    throws the book down and chants over its light; Sawyer's crack lines with blue arcs striking them, the quarters
+    growing into four boards; the book back in his hands, the Chess960 shuffle, his leap back), then four boards
     at once, each its own Chess960 start: you on one, bots on three. Stockfish only, at 2750, at most 0.9 s a move;
     2:00 a board, no added time, out of time loses that board; a lost board's neighbors play on; all four must be
     won ("Victory!"), else a defeat that says how many of four were won. **His phase 2 ultimate** (Eric, Oct 14):
