@@ -3,12 +3,12 @@ import { allPausable, bossesOff, pausedLine, pauseVariable, type Pausable } from
 /**
  * The kill switches and the maintenance banner, read from the Worker's runtime variables (docs/areas/ops.md, "Kill
  * switches"; the parts and their lines: pauses.ts in core). Everything reads them through here.
- *   - `PAUSE_<NAME>` = "1" (or true, yes, on) rests that part: PAUSE_CLASSIC, PAUSE_CROWD, PAUSE_RAID, PAUSE_SQUADS,
+ *   - `PAUSE_<NAME>` = "1" (or true, yes, on; a JSON true or 1) rests that part: PAUSE_CLASSIC, PAUSE_CROWD, PAUSE_RAID, PAUSE_SQUADS,
  *     PAUSE_SOLO, PAUSE_SHOP, PAUSE_FRIENDS, PAUSE_BOSS_<ID> (e.g. PAUSE_BOSS_PIG). Unset, "0" or anything else: on.
  *   - `MAINTENANCE_BANNER`: a short message at the top of every screen while it's set (at most 200 characters).
- * Read at most once a minute per Worker instance (CACHE_MS). Changing a variable in the dashboard deploys a new version
- * of the Worker, whose instances start with nothing cached, so in practice a change applies within seconds of that
- * deploy; the cache matters only if the switches ever move to storage (KV, D1).
+ * Read at most once a minute (CACHE_MS) for each Worker instance's environment object. Changing a variable in the
+ * dashboard deploys a new version of the Worker, whose instances start with nothing cached, so in practice a change
+ * applies within seconds of that deploy; the cache matters only if the switches ever move to storage (KV, D1).
  */
 export interface KillSwitchEnv {
   MAINTENANCE_BANNER?: string;
@@ -24,9 +24,10 @@ export interface SwitchStatus {
 
 export const CACHE_MS = 60_000;
 const BANNER_MAX = 200;
-let cache: { at: number; status: SwitchStatus } | null = null;
+const cache = new WeakMap<object, { at: number; status: SwitchStatus }>();
 
-const on = (v: unknown) => typeof v === "string" && /^(1|true|yes|on)$/i.test(v.trim());
+// (A dashboard "Text" variable is a string; a JSON one may be true or 1.)
+const on = (v: unknown) => v === true || v === 1 || (typeof v === "string" && /^(1|true|yes|on)$/i.test(v.trim()));
 
 function read(env: object): SwitchStatus {
   const vars = env as Record<string, unknown>;
@@ -36,8 +37,11 @@ function read(env: object): SwitchStatus {
 
 /** The switches as this Worker instance last read them (again once CACHE_MS has passed). */
 export function switchStatus(env: object, now = Date.now()): SwitchStatus {
-  if (!cache || now - cache.at >= CACHE_MS) cache = { at: now, status: read(env) };
-  return cache.status;
+  const hit = cache.get(env);
+  if (hit && now - hit.at < CACHE_MS) return hit.status;
+  const status = read(env);
+  cache.set(env, { at: now, status });
+  return status;
 }
 
 /** Whether this part is resting. */
@@ -49,8 +53,3 @@ export const pausedBosses = (env: object, now?: number): string[] => bossesOff(s
 /** The server's answer to something new while its part is resting: 503, the friendly line, and which part. */
 export const pausedResponse = (what: Pausable): Response =>
   new Response(JSON.stringify({ message: pausedLine(what), paused: what }), { status: 503, headers: { "content-type": "application/json", "cache-control": "no-store" } });
-
-/** Forgets what was read (tests). */
-export function clearSwitchCache(): void {
-  cache = null;
-}

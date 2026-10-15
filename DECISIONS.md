@@ -10,8 +10,9 @@ these weren't reviewed first. Most are a single line in `packages/core/src/setti
   in its area's file in [`docs/history/`](docs/history/). The index below lists each one, in the order it was made,
   and links to it. Code comments that cite `DECISIONS.md, "<section>"` still lead there: find the section's title
   below.
-- **New decisions go at the end of this file**, under "New decisions": one section each, with the date and the
-  reason, as before. Add to your own lane's sections rather than rewriting others'.
+- **New decisions go in [`docs/decisions/`](docs/decisions/README.md)**, one file each, named
+  `YYYY-MM-DD-short-title.md`, with the date and the reason (Oct 15, 2026: every PR appending to the end of this file
+  made every pair of open PRs conflict). The "New decisions" sections below, written up to Oct 15, stay here.
 - **When a decision changes how an area works,** update its page in `docs/areas/` in the same PR.
 - **When this file grows long again** (a month or so of new decisions), move the new sections, unchanged, to the end
   of their area's `docs/history/` file and list them in the index.
@@ -154,6 +155,8 @@ In [`docs/history/ops.md`](docs/history/ops.md). How it works today: [`docs/area
 - [Capacity: built (Oct 7, 2026)](docs/history/ops.md#capacity-built-oct-7-2026)
 
 ## New decisions
+
+Written up to Oct 15, 2026. Newer decisions: one file each in [`docs/decisions/`](docs/decisions/README.md).
 
 Add new sections here (`### Title (date)`), newest last.
 
@@ -4374,7 +4377,8 @@ My calls:
   position no game reaches, so refusing them costs nothing. But a position 17.1 trips on and 19 merely ignores isn't
   covered. One to check: castling rights with no rook on that side, which 19 ignores and an older Stockfish's FEN
   reader may not handle. To close it before launch, either measure the container's binary against the same cases
-  (Docker, locally) or move the container to Stockfish 19 so the measured rules are its rules.
+  (Docker, locally) or move the container to Stockfish 19 so the measured rules are its rules. (Closed the same day:
+  "The engine server's own Stockfish, checked in CI", below. 17.1 did crash on those castling rights.)
 
 Tests: `packages/server/test/engine-server.test.ts` (a refused position never reaches the container stub, from the
 endpoint (400, the budget untouched), `serverScoreAt` (one line logged) or fair play's search; a legal one does,
@@ -4730,3 +4734,381 @@ Eric opened crates on his iPhone and asked for three fixes. The calls:
 - **Testing:** light/targeted lane (art and CSS): typecheck, the unit suite (a new `gift-tube.test.ts`: the stripes
   tile the tube with no gaps or overlaps, and blotches match the purity on each painted set; `crates.test.ts`: the
   second color is stable, never the first, follows the odds, and stacks), and the crate e2e specs.
+
+## The engine server's own Stockfish, checked in CI (Oct 15, 2026)
+
+Closes the open item of "The engine server never gets a position Stockfish refuses": `stockfishRefuses` was measured
+against Stockfish 19 (the browsers' build), while the container runs native Stockfish 17.1, which nobody had measured.
+These sessions can't run Docker or the downloaded binary, so the measuring runs on GitHub's machines.
+
+**The check** (`.github/workflows/engine-container.yml`, `packages/chess/test/engine-container.test.ts`). It builds the
+image from `engine/Dockerfile`, starts it, and sends `server.mjs`'s `/score` every case in
+`packages/chess/test/stockfish-refuses-cases.ts` (the refusal test's table, moved there so both tests share it: 49
+positions), as the Worker would: the case's legal moves, the king's first so castling is among them, at most 8, at
+200k nodes. A case `stockfishRefuses` lets through must come back searched (only moves it asked for, scores from 0 to
+1), and the server must then answer a search of the start. A case it turns away is only reported: searched,
+turned away by `server.mjs`'s own check (400), or the container down, and how. Then one search as the game asks for
+it: an Italian middlegame, 4 moves, 2M nodes, about 2.5 s on GitHub's runner against the Worker's 12 s. The run's
+summary lists every case's outcome. It runs on a PR that touches `engine/`, `packages/chess/src/uci.ts`, the case
+table, the check or the workflow, and by hand (Actions > engine-container > Run workflow). Never on other PRs or on
+main. About 1 minute a run (the image builds in about 10 s, so there's no build cache: it would save nothing).
+
+**What 17.1 does with the cases** (the first run, with the rules as they were):
+
+- **Four positions `stockfishRefuses` let through crashed it** (SIGSEGV, the container down): castling rights with no
+  rook where 17.1 looks for one. "K" or "Q" with no rook (`4k3/8/8/8/8/8/8/4K3 w K - 0 1`), Black's "kq" with no rooks,
+  "K" with White's only rook on h2. 17.1's FEN reader walks from the corner along the board looking for the rook and,
+  finding none, reads and writes past the board's end (its `position.cpp`; Stockfish 18 reads castling the same way).
+  Stockfish's development code after 18, which stockfish.js 19 is built from, drops a right without its rook
+  between the corner and the king. Three more were read wrongly without a crash: "K" with only an a1 rook (17.1 makes
+  it queen-side castling), "KQ" with the king on e2 (it castles from e2), "H" with no rook on h1 (it castles with an
+  empty square).
+- Of what Stockfish 19 refuses, 17.1 crashed on two (no black king; the side not to move in check) and searched the
+  rest as if nothing were wrong (nine pawns, a pawn on the eighth rank, two white kings, …). `server.mjs`'s pattern
+  turns the malformed ones away. None reach it.
+
+My calls:
+
+- **Refuse them, for both engines.** `stockfishRefuses` now also refuses a castling right that doesn't hold as
+  Stockfish 19 reads it (`castlingRightHolds`): K or Q needs a rook of that color between that corner and the king; a
+  file's letter (Chess960), that color's rook on that file; either way the king on files b to g of its back rank. 19
+  drops such a right and 17.1 crashes on it or misreads it, so with these refused, both engines read every right the
+  same way. Refusing costs nothing, because no game makes such a position. chess.js keeps a right only while that king
+  and rook haven't moved and the rook hasn't been taken. The powers that move or remove pieces drop the rights with
+  them (`withoutPiece`, Pig's `fenWith`, Big Boy's bounce). Our Chess960 rules can't even read a right without its
+  rook (they throw). A new test plays 20 random Chess960 games beside the 20 normal ones: nothing refused. The second
+  run: every case let through searched, the server answering on.
+- **Also closed: gaps against Stockfish 19 itself**, found reading its source. A piece letter it can't read, no side
+  to move, an en passant square that isn't a square, and move counters over 32767 (the fifty-move count) or 100000
+  (the move number) are refused by 19, and `stockfishRefuses` let them through. None reaches an engine: our FENs come
+  from chess.js and our own rules, and `server.mjs`'s pattern stops all but the counters. Each is a case now.
+- **The table holds two verdicts:** `refused` (what `stockfishRefuses` says, checked in `npm test`) and, where it
+  differs, `sf19` (what Stockfish 19 does: `npm test` checks it against the real engine, and checks that everything
+  19 refuses is refused). The container's verdict comes from the CI check.
+- **`server.mjs` logs how Stockfish ended**, `stockfish exited (SIGSEGV)`. It used to log the exit code alone, which
+  is null for a crash. That helps the container's logs and the check.
+
+**17.1 or Stockfish 19 in the container: my recommendation is Stockfish 19, in its own PR.** This PR doesn't switch.
+
+- **Calibration, measured** (`packages/sim/scripts/container-accuracy.ts`, `reports/container-accuracy.md`). The
+  container's own 17.1 ran the 267 close-call re-checks of `reports/deep-accuracy.md` (one search, 2M nodes, as the
+  game asks), where the full-network Stockfish 19 build had stood in for it. On the same re-checks the two engines are
+  3.2 points apart on average (median 1.9; 20 picks 10+ apart). 17.1 calls a re-checked pick 0.8 points better on
+  average. Against the referee (Stockfish 19 full, each move alone), 17.1 is off by a mean of 6.2 points against the
+  stand-in's 4.8 (10+ off: 43 picks against 26). In the cut replays (`judge-cuts.ts`, now with a row for it), the
+  re-check with the server's own numbers cuts a player really in the top quarter 0.64% of the time, against the
+  stand-in's 0.37%. That's about what two players' computers give (0.63%), the option that was turned down for not
+  being fair enough. The referee leans toward its own build, so this doesn't show 17.1 is wrong. But the judge was tuned
+  on Stockfish 19's numbers (`reports/judge-accuracy.md`, `deep-accuracy.md`, the devices' lite build), and a
+  re-check's numbers replace the devices' numbers for some picks and not others. One engine family for every number on
+  a board is the fair setup.
+- **"Stockfish 19" isn't an official release.** Stockfish's latest release is 18 (native binaries up to `sf_18`, no
+  `sf_19`), and 18 reads castling as 17.1 does. The browsers' build is stockfish.js 19.0.0, made from Stockfish's
+  development code after 18 (version string "19", one network: `nn-1a298aa575a0` for the full build). Its source,
+  the archive the site already serves, builds natively (`make build ARCH=x86-64-avx2`). Built that way, the container
+  would run the stand-in itself: the same code and network, so the reports' "engine server" numbers would become its
+  real numbers, and its refusals would be the measured ones. An official 19, when it ships, will probably carry a later
+  network (Stockfish's master has already moved on to another).
+- **Image and build time.** Today: a prebuilt 80 MB release tar, built in about 10 s. The 19 build compiles from
+  source in a two-stage image: a minute or two more on every build that touches `engine/`. It also needs the network,
+  about 95 MB, which `net.sh` downloads from Stockfish's test server, so pin it by its hash (its name) or keep a
+  copy. The final image is about the same size (the binary carries its network).
+- **Licenses: no difference.** The container's Stockfish runs on Cloudflare and is never handed to a player, who gets
+  numbers over HTTP, so the GPL asks nothing of us for it, whichever version runs. `LICENSES.md` lists what reaches a
+  player's device and doesn't list it, rightly. Built from the stockfish.js source, its source would be the archive
+  the site already serves.
+- **Safety no longer decides it.** Both engines are covered by the same rules now, and this check runs on any new
+  binary before it ships. When the container moves, its CI run shows 19's verdict on every case.
+
+**Testing:** typecheck; the unit suite (`stockfish-refuses.test.ts` against the real Stockfish 19, with the new cases
+and the Chess960 games; `engine-server.test.ts`, `fairplay-deep.test.ts` unchanged); the new CI check green on the PR.
+No app or Worker code changed (`server.mjs` only logs differently), so no e2e.
+
+### Privacy policy and terms: drafts from the code (Oct 15, 2026)
+
+The director asked for launch-ready drafts, written from what the code does, with the legal research's decisions
+folded in (its plan, section 4.5). `/privacy` and `/terms` existed since Oct 8 as a few lines each; they're rewritten,
+and `/copyright` is new (`packages/app/src/screens/Legal.tsx`). The calls:
+
+- **Marked as drafts on every page:** "DRAFT — not yet reviewed" at the top, then the decisions only Eric or a lawyer
+  can make: who runs HunChess (the controller: a person or company, and a postal address), the contact address
+  (privacy@hunchess.com must reach an inbox), the minimum age, governing law (Eric's state; courts or arbitration),
+  a DMCA agent ($6 at the US Copyright Office, renewed every 3 years), real-money purchases, the EU/UK points (legal
+  bases and transfer wording, EU and UK representatives, the UK Online Safety Act's short assessments), and how long
+  fair-play records are kept. Placeholders are in bold [brackets]. `main` deploys to Eric only (Zero Trust), so
+  showing the list costs nothing before launch.
+- **The inventory, one block per kind of data, each with what, why and how long:** the account, sessions, sign-in
+  codes, matches and stats, online now and last seen, the locker and wallet, chat, fair play (judged moves, match
+  summaries, reports, cases, appeals, the device marker, banned identities' hashes), scoring on players' devices (the
+  judge), and three stores still being built, marked "(being built)" as the FAQ marks unfinished things: error reports
+  and "Report a problem" (ops; device facts and breadcrumbs, the optional note, never an IP), chat moderation's
+  reports, bans and mutes, and friends (requests, friends, blocks, invite and online settings, invites, the counts
+  that limit them). Their retention reads "[set when … ships]" until their code sets one. Then what other players see,
+  the legal reasons for EU and UK players (running the game: what you asked for; fair play, security and bug fixing:
+  legitimate interest, which you can object to), cookies and local storage, who else handles data (Cloudflare,
+  Google, Resend: checked in the code, nobody else gets anything), the US transfer, children, rights (access, a copy,
+  correction, deletion, objection, restriction, a complaint to a regulator; 30 days), changes and contact.
+- **Cookies: essential only, so no banner.** Checked in the code: `hc_session` (sign-in), `hc_device` (fair play's
+  device marker), `hc_oauth` and `hc_next` (10 minutes during Google sign-in), all first-party; no analytics, ads or
+  third-party scripts (fonts are self-hosted). Adding analytics later means revisiting this.
+- **Minimum age, proposed and not built:** 13, or the local minimum if higher; a neutral birth month and year asked
+  before signing in, choosing a name or drawing an icon; under 13, guest play only with a default name. It reads as
+  "[Proposed, for Eric to decide]" on both pages. The policy says the game is for a general audience, not directed to
+  children under 13, and that a child's information is deleted when we learn of it. The gate is a separate task.
+- **Names and drawn icons:** no personal information, nothing offensive, no one else's marks or art, no
+  impersonation; players own their drawings and give us a license to show them; we can rename or reset; reported
+  through the report sheet's existing reason (read from `FAIRPLAY.reports.reasons`).
+- **Copyright (DMCA):** `/copyright` has the agent's placeholders, what a notice and a counter-notice need (17 U.S.C.
+  §512(c)(3) and (g)(3), in plain words), what we do, and the repeat-infringer policy; the terms point to it.
+- **Virtual items:** cosmetic, no cash value, no selling or trading, a license and not ownership, gone with the
+  account, odds in the FAQ and rolled on the server, earned or free today (ROADMAP item 7), testing-period items may be
+  reset at launch; purchases would need the terms first. **Not affiliated** with FIDE, Chess.com, Lichess or any real
+  person or organization; the characters are fictional.
+- **Numbers come from settings.ts where they live there** (fair play's evidence days, global chat's kept lines and
+  age, a lobby's results minutes), so a tuned setting changes the page with it, as the FAQ does. The cookie lifetimes
+  and the code limits are the server's constants (`api.ts`, `accounts.ts`), typed in.
+- **Honest about what's true today,** even where it's not ideal: sign-in code records are kept one per address with no
+  end date, fair-play records with no end date, and a brand-new account made at sign-in takes its name from Google or
+  the email's local part. The account-deletion PR (next) changes the first and last; the decisions list carries the
+  second.
+- **Reached from** the landing page's footer (now with Copyright), Settings (a new "Privacy and terms" section, always
+  shown) and the FAQ (a short last section). All plain links, so Back on a legal page is the browser's back to the page
+  that linked it, and home when it was opened any other way (`leaveLegal`). The FAQ's links to the game's own pages
+  open in the same tab (files and other sites still open a new one).
+- **The landing FAQ's email answer** said "Sign-in only"; fair-play notices go to that address too, so it now says so.
+- **LICENSES.md said the game's source "isn't published".** The GitHub repository is public with no license file, so
+  it now says that: all rights reserved, no license granted; Eric decides later whether it goes private.
+- **Testing:** light lane (copy, CSS, links, a static file): typecheck, the unit suite (`faq.test.ts`: the new
+  section's three links; `sounds-source.test.ts`, below), and the specs for the screens touched: `landing.spec.ts`,
+  `faq.spec.ts`, and a new `legal.spec.ts` (each page's draft notice and decisions, every data block says why and how
+  long, no sideways scroll at a phone's width, the copyright page's agent, and Back from Settings, the FAQ, the other
+  legal pages and a direct open).
+
+### The PyChess sounds' source on the site (Oct 15, 2026)
+
+The legal research found one gap in the licenses: the PyChess knocks (GPL-3.0) and our six variations of them ship as
+separate files, which is sound, but the GPL asks for their corresponding source, the preferred form for changing
+them: PyChess's original WAVs (public at PyChess) and `scripts/piece-sounds.py`, which made the variations and lived
+only in the repository. It's now served as the engines' source is, so it holds when the repository goes private:
+
+- **`/sounds/pychess-sounds-source.tar.gz`** (56 KB): PyChess's `mov2.wav`, `capture2.wav` and `castle.wav` from the
+  commit the variations were made from (their hashes in its README), `scripts/piece-sounds.py`, the classic mp3s the
+  script levels against, the GPL text, and the command. Running that command from the archive makes the six
+  variations again **byte for byte** (checked). It mirrors the repository's layout, so the script runs unchanged.
+- **Written by `scripts/sounds-source.py`**, the same bytes on any machine (fixed times, owners and order). A unit test
+  (`sounds-source.test.ts`) fails when `piece-sounds.py` changes and the archive wasn't made again, and checks the link
+  is in Settings, the FAQ, `/licenses/third-party.txt` and `sounds/SOURCES.md`.
+- Not precached by the service worker (the build leaves out every `.tar.gz`), like the engines' archives.
+
+## One clock format; the dev tools run from the repo root (Oct 15, 2026)
+
+- **Every clock on screen is `clockShown`** (`packages/app/src/clock-text.ts`): m:ss in whole seconds rounded up, the
+  dock's rounding (.claude/LESSONS.md, "A countdown that seemed to fire early"). The scoreboard's Bank, the board's
+  clock and the HUD rounded down, so at the same moment they could show a second less than the dock. Its copies are
+  gone (RaceTower's `clockText`, Recluse2's and the queue's `clock`); Squads' `bankText` is `clockShown` with
+  `tenths`, unchanged: a chess clock's style, rounded down throughout ("3:05", then "9.4" under ten seconds), since
+  rounding up there would jump from "0:11" to "9.9" as the bank crosses ten seconds. The queue's "waiting 1:05" counts up, and rounding up there is a second ahead at most; one
+  formatter is worth more than that second.
+- **`vite.config.ts` finds its files from its own folder** (`APP`), not the folder Vite started in. From the repo root,
+  `npm run preview:items`, `frames:flash`, `frames:vote` and `node scripts/preview-god-king.mjs` failed with
+  "Stockfish 19.0.0 has no source archive"; the other frames scripts worked around it with
+  `process.chdir("packages/app")`. Those workarounds are gone: the scripts pass `root: "packages/app"` and the config's
+  path. `perf-boss.mjs`'s `PERF_DIST` is now read from the folder you run it in (the repo root).
+- **Testing:** light lane plus the clock specs: typecheck, the unit suite, `boss-dock`, `squads-clocks`, `crowd`,
+  `recluse` and `votes` (its bank check now rounds up), and each changed script run once from the repo root.
+
+## e2e on GitHub Actions for every PR (Oct 15, 2026)
+
+Eric approved running the Playwright suite on GitHub Actions for every PR. The repository is public, so standard
+runners are free. Seven helpers queuing for one local e2e machine was the bottleneck. CI runs the full e2e on every
+PR; local runs are for targeted checks and perf (CLAUDE.md "Test lanes"; how it works: docs/areas/ops.md, "CI e2e").
+The calls:
+
+- **One workflow, `e2e.yml`, on every PR to `main` and every push to `main`:** both projects, 5 `shard` jobs side by
+  side, then a `result` job that is red if any shard is. Not a required check yet: the director decides once it has
+  proven itself over a few PRs. If it becomes one, require `result` (one name, whatever the shard count).
+- **5 shards, whole files spread by measured time** (`e2e/ci-shard.mjs`, `e2e/ci-timings.json`), not Playwright's
+  `--shard`. Playwright splits by test count in file order. In the first CI run (4 shards) that put formats (11
+  minutes on the phone alone), crowd and crowd-hidden in one shard: 21 minutes against 15-18 for the others. From
+  that run's per-file times, any number of count-based shards still left that shard at 21 minutes. Balanced by file:
+  4 shards would take about 18.4 minutes of tests, 5 about 15, 6 about 13.4. 5 keeps a run inside 15-20 minutes
+  with setup (about a minute: npm ci, the cached browser, the build) with fewer jobs at once. Inside a file the tests
+  still run in order on one worker, as locally (no `fullyParallel`, which would change how tests run). A new spec
+  counts as the table's median until the table is refreshed from a run's summary.
+- **Retries: 1 until the flaky-test batch lands; the goal is 0** (the director, Oct 15). `playwright.config.ts` sets
+  none, and stays so for local runs. A test that passes only on its retry is "flaky": `result`'s summary lists those
+  first, with their shard and first error, so they stay in view rather than hidden. Flaky in CI so far:
+  `boss-dock.spec.ts:96` and `boss-powers.spec.ts:384` (both desktop: the match had already ended when the test
+  expected a move); the batch also covers Sawyer's split, `crowd.spec.ts:178`, `lobby-chat.spec.ts:28` and
+  `crowd-hidden.spec.ts:106`.
+- **Traces only on the retry** (`on-first-retry`). Measured in the first run, with the same shards run both ways:
+  retain-on-failure (recording every test) made each shard 6-10% slower (1.3-1.6 minutes). On the retry it costs
+  nothing for a passing test, and a flaky or failing test comes with its trace. A shard with a failed or flaky test
+  uploads its HTML report with those traces (kept 7 days); nothing is uploaded for a clean shard.
+- **Left out: the `@perf` specs** (`e2e/perf.spec.ts`, 5 frame-budget tests on a 4x-slowed phone, now tagged
+  `@perf`), because they measure the machine as much as the code, and 2 workers share a runner's CPU. They run
+  locally, or by hand: Actions → e2e → Run workflow, "perf" ticked (one runner, 1 worker; they passed there in 3.4
+  minutes on the first try). Nothing else is left out.
+- **The build is a step of its own** (`E2E_PREBUILT=1` tells Playwright's web server to start wrangler without
+  building again): one build per runner, its time and errors shown on their own. The server is the same
+  `wrangler dev` with the same test variables as locally.
+- **Caches:** npm (setup-node) and Playwright's Chromium (headless shell only, which headless runs use; keyed by
+  Playwright's version). Workers: Playwright's default, half the runner's 4 CPUs (2), as locally.
+- **Concurrency:** a new push to a PR cancels its older run; every push to `main` gets its own run (none skipped).
+  A run takes 6 jobs at once; the account's limit on jobs at once (20 on GitHub Free) queues the rest.
+- **Docs:** CLAUDE.md's test lanes (the batch full run is now CI's run on each push to `main`; the full lane per PR
+  is the PR's own run) and the agents' ship steps: locally only the specs you touched and `@perf`; CI runs the rest.
+
+## The test switches: admins and test servers only (Oct 15, 2026)
+
+Before launch (ROADMAP.md, the Hidden Boss's internal note (d)): anyone who reached the site could use the playtest
+shortcuts in the address and in a new lobby's request, and win easily (loose bots, one round, a mate in one, a forced
+Fischer Random crate item). Harmless while Cloudflare Access lets only Eric in; not at launch. The calls:
+
+- **Who may use them:** an admin (`ADMIN_EMAILS`, the same check as the admin buttons), or anyone where the Worker
+  variable `TEST_SWITCHES` is "1": `wrangler dev` with `--var TEST_SWITCHES:1`, the e2e server (playwright.config.ts)
+  and staging (wrangler.jsonc, for the load tests' own queues). Never production. One general variable rather than
+  one per feature: the switches are many and always wanted together. `SQUADS_TEST` and `MAIA_TEST` stay as they are
+  (already gated, and their specs depend on them). In the app, Vite's dev server allows them too (`npm run dev` and
+  the frames scripts have no server to ask); a production build asks the server (`/api/auth/config` says
+  `testSwitches`, `/api/me` says `admin`).
+- **For everyone else they're ignored, silently and safely:** the request is treated as if it had none of them (the
+  server drops them before reading the rest, `lobby-options.ts`), so a player's lobby, queue, crate and solo game are
+  exactly the ones made without them. No error, no message.
+- **The full list** is in docs/areas/ops.md, "Test switches". Beyond the brief's: a queue's own `?pool=` (one person
+  could fill a lobby with their own accounts: a ranked match or Squads' coins among friends), a crate's forced
+  `fischer`/`shiny` and the crate page's "Testing:" boxes (shown to everyone while crates are free: now hidden from
+  players), `?debug` (the match on `window`), `?nolanding`, `?boss=<id>` (skipped the boss menu) and `?wip`/`?kit`.
+- **Kept for everyone:** the creator's real choices, the ones the home screen offers: the mode, Crowd's turns and
+  augments, Classic's opening moves, a raid's boss picked from the menu, the quick pace. A boss in a Crowd or Classic
+  lobby (`?boss=` outside a raid) isn't one of them (the screen never sends it), so it's a test switch.
+- **No record, coins, rewards or fair-play data from a switched game: the gate, not "unscored".** Everything the server
+  records (online results, ranking, fair-play signals, Squads' coins and crates, crate items) comes from a lobby,
+  queue or crate whose options the server itself sets, and after the gate a player's are exactly the ones made without
+  switches. So for players such a game can't exist. Solo results come from the browser and could be forged with or
+  without switches; that's why they're worth little by design: never ranked, no coins, crates or rewards, only your
+  own stats. Marking switched games unscored as well would need a second rule and would stop the e2e from testing
+  that results are recorded (`account.spec`, `lobby-close.spec` use switches). Admins' own test games still record,
+  as before, on the profiles of those who play them (a private lobby needs 30% real players to be ranked).
+- **The admin buttons** ("Trigger ultimate (testing)", "Engine move", the brain picker, the Hidden Boss in Boss alone)
+  were already admin-only, and online the lobby checks the ultimate's trigger itself: unchanged.
+- **A rejoin from a reload** reads the switches before your account is known, so an admin's or test server's rejoined
+  online match shows its lobby's numbers without them (the lobby on the server keeps them). Cosmetic, test only;
+  waiting for the account before rejoining would slow every player's reload.
+- **Testing:** full lane (security). Unit: `packages/server/test/test-switches.test.ts` (who may; every lobby switch
+  dropped for a player, alone and together, the lobby exactly the one made without them; the creator's choices kept;
+  the switches working when allowed; `/api/auth/config`; a crate's forced roll only for an admin or `TEST_SWITCHES`)
+  and `packages/app/test/test-switches.test.ts`. e2e: `test-switches.spec.ts` (with the server's flag hidden: no
+  boss menu skipped, no match on `window`, no crate test boxes; an admin's working), and the whole suite with
+  `TEST_SWITCHES` on.
+
+## Removed: Relaxed pace and Crowd's everyone-moves choice (Oct 15, 2026)
+
+Eric asked to remove two dated player options.
+
+- **Relaxed pace** (Settings → Playing; `brc.pace` on the device). It dates from Oct 2, when Classic was the only mode.
+  Each mode now has its own tuned pace (`CROWD_SETTINGS`, `RAID_SETTINGS`, `DEFAULT_SETTINGS`), so players always play
+  their mode's pace. The toggle is gone, and the app no longer reads `brc.pace`: a device that had switched it off
+  simply plays the mode's pace. **`?pace=quick` stays as a test switch** (many e2e specs use it to run faster), gated
+  like the others since the same day: read through `testParams()` in the app and listed in `LOBBY_TEST_SWITCHES` on the
+  server, so for a player it does nothing. Its numbers moved into `QUICK_PACE` in settings.ts (one entry per mode;
+  the Crowd one was typed twice, in App.tsx and the lobby's options), replacing `PACE_SETTINGS`.
+- **Crowd's "everyone moves"** (Settings → Crowd: "50 v 50 / Everyone moves"; `brc.crowdTurns`, `?turns=all`, the
+  lobby's `turns`). Eric: "we did away with playing both sides long ago". Crowd is always team turns: `CROWD_SETTINGS`
+  says `crowdTeams: true`, `modeSettings()` no longer takes a choice, and the app and the server ignore `turns` (an
+  older app's `turns=all`, or a device that stored "all", gets team turns). **Kept for raids:** `crowdTeams: false` in
+  `RAID_SETTINGS` (everyone picks the crowd's moves against the boss) and every engine path behind it.
+  Removed because only Crowd with everyone moving used it: `CROWD_EVERYONE_KNOCKOUTS` (raids have no knockouts),
+  `finalName`'s "Final four" (it only names a Crowd's last cut; raids have no cuts; Classic's cut line has its own
+  words), the FAQ's paragraph and its line about the clock, `crowd-sim.ts`'s second run (its Oct 3 report stays as a
+  snapshot, with a note). Kept, because Classic uses them: the 2v2 final's text on `Final.tsx` and `StageBreak.tsx`.
+  Kept, because it's stored history: a profile's older matches with no team still read "Crowd · everyone moves".
+- **Tests that played Crowd with everyone moving** now play 50 v 50, keeping what they tested: the judges
+  (`packages/server/test/judges.test.ts`: a seed that puts the test's people on White, searched for, and Black's moves
+  judged in between), fair play (`fairplay-lobby.test.ts`: the same counts with the team to move, and the watching
+  team's picks not taken), a reload's seat (`resign.test.ts`: the move locks once everyone here on the team to move
+  has picked), the runner (`packages/chess/test/crowd.test.ts`: a raid is the only crowd with no teams, everyone
+  alive picking every move), e2e `judges.spec.ts` (two devices on a 50 v 50) and `crowd.spec.ts` (coordinates from
+  each team's side, and a device with the old choices stored playing 50 v 50 at the mode's pace).
+
+## Nothing said twice, nothing over the board: the boss screens (Oct 15, 2026)
+
+From the slop audit (Oct 15: V1, V2, V4, V5, V7, V10, V24, V25, the Crowd's pick count, and `ult2`'s seconds). No rule,
+timing, protocol or stored data changes: words, where the speech boxes sit, and phase 2's layout on a computer.
+
+**The rule for a power's words: the banner names it, the dock explains it, the bubble is character.**
+- **The banner** names the power, with its line saying what it does to you, as before.
+- **The dock** says what it means for you, or just your clock: through a power's moment it keeps the turn's own line
+  ("🍪 Boss plays Nf6"), as it showed just before, so nothing in it changes as the banner comes. A moment says its own
+  words there only where no banner says them (`MomentUi.dock`, a function now, optional): the Big Bounce (its banner is
+  its name alone): "Your pieces land on new squares."; the fireballs (no banner): "Fire on e4 and f5", or "Fire on 3
+  squares" for more, one line on a phone ("Your king is fireproof." when they all fizzle on him); Jefferson's fireproof
+  laugh (no banner): "Fire burns only your pieces.". Before, every moment had a word that repeated its banner ("🍪
+  Freeze!" under FREEZE!).
+- **The boss's bubble** says a character line, never the power's name. Gone from the rotations (agents' lines, not
+  Eric's): Ginger's "Freeze!" and "BLIZZARD!", Jefferson's "ROMAN CANDLE!", Big Boy's "Gonna bounce…" (under RAGE!'s
+  "the Big Bounce"), Wrangler's "The long pull!" and "Pick yer duel, varmints." (with DRAW!), Boingo's "Spin the board!".
+  **Eric's own lines stay** (his rule over ours): Big Boy's "Big boy BOUNCE!" still shows under BIG BOUNCE! now and
+  then, and Sawyer's "Two for one!" stays; SPLIT PAWN!'s line under it, which said the same, is now "He gets a second
+  pawn".
+- **The same rule elsewhere:** Hollow's claim and Big Boy's snack line were in the dock and the bubble at once: the
+  bubble's only now (the snack's dock: "You start a pawn down."). Wrangler's DRAW! is its name alone ("Pick your duel"
+  was under it, with the God King's "Pick the duel that wins!"), and your move's dock says "Take one of his three duels."
+  (was "Showdown! Take one of his three."). The Hidden Boss's "+2 s a move from now on" is the board's alone (the dock had
+  "📕 +2 s a move"). His phase 2 "5 SECONDS!" is its name alone (its line said what the dock says); his `ult2` lines
+  never name the seconds (placeholders, reworded: "That's enough! No more thinking, all of you!", "Enough thinking! Move,
+  or I move for you!"): my call over reading the number from the setting into the line, since the banner already says it
+  from `RECLUSE_PHASE2.ultMoveSeconds` (as `bulletPlus`'s number is the board's). The phone's small boards' "5 s!" comes
+  from the setting too. Phase 2's end: "The boss wins." (was "N of 4 won: the boss wins" beside the bar's "N of 4 won").
+- **How many have picked** is the line above the board's ("16/50 picked"): the Crowd's waiting box no longer repeats it
+  ("Move in. Waiting for other players"), nor a boss raid's dock ("Move in. Waiting for the others", was "Waiting · 3/4").
+  Crowd's watch screen keeps its count: nothing else there says it.
+
+**Nothing over the board or the bar's status (phones).**
+- **The God King's words beside him** (V1): on his own line under the dock, to his right (the room to the row's right
+  edge, 8 px text), never over the board or the box. His bubble had opened above the row, over ranks 1 and 2, also while
+  you chose a move (Wrangler's duel). A long line runs down past his line, over the test buttons or the scoreboard
+  under the dock, which nobody needs mid-line; below him would run off a short phone's screen. His menu still opens
+  above the row (you open it). A phone on its side keeps him beside the row with his words above him.
+- **The God King's words go with him** once the Hidden Boss absorbs him (V24): his "Aaagh! My strength!" stayed up from
+  an empty place under "The boss rises!".
+- **The boss's words in the boss bar** (V5): in his name's room (BossBar renders the box, `.bc-bar-bubble`), from just
+  above the bar's bottom edge upwards over the title line, never over the status at the bar's right ("58 moves left"
+  read "es left", "2 of 4 won" read "4 won") or the line and the board under the bar. The box is at least the name's
+  room high, so a short line covers his name and skulls whole, as the old box did, never half of them; nothing is
+  hidden (a first try hid them while he spoke, and CI's `boss-powers` caught the rage meter hidden). A computer's stay
+  by his figure.
+- **The corner casts are as designed** (the director's call, Oct 15): the boss steps up to the board's top-left corner
+  for a moment (the casters, Wrangler's lasso and showdown, Hollow's dark and Lights out, Big Boy's snack), over the
+  subtitle and a8, while the board isn't playable; the audit took them for the bar's figure. Nothing players must read
+  mid-moment is in the subtitle then (it says "BOSS BATTLE · you play White · the boss's move").
+
+**Hollow's Lights out, before its first round** (V25): the dock as on every other screen, your clock held, "Remember
+where his pieces are." over "Clocks stopped." (was "Lights out! Clocks stopped." alone, left at the top of the whole
+box, the banner's words again). Its rounds keep the whole box for their prompt and the crowd's meter.
+
+**A dock line wraps, never cut** (found with V10): the boss screen's first line was one line with an ellipsis, so at
+360 px "The boss is thinking…" read "The boss is think…" (on main too). It now wraps to two lines; the box holds two of
+them and the muted line under them.
+
+**The Hidden Boss's phase 2.**
+- **The dock's first line** (V10): "2:00 on your clock" over "No added time." (one line was cut to "2:00 on your clock,
+  no adde…" at 360 px).
+- **A computer's tags above the boards** (V4): each board's name and clock in a row of its own above it, off its back
+  rank (they covered a8 to d8 on every board, yours too, and Chess960's back rank is random). The four boards are a
+  little smaller for it (`DESK`: 44.5% of the square each, a 4.6% row above each, 1.8% between the rows, 11% between the
+  columns, where the slow moves stand), and the phase change ends them exactly there (its quarters' last scale and
+  offset), so nothing jumps into phase 2. The tag's text is in the board's own width (at most 12 px), so it fits the row
+  at any size; the "slow move" note sits at the row's right.
+- **No Bank column** (V7): from the phase change on, the scoreboard hides it (`RaceTower`'s `bank`): every player's time
+  is their board's clock then (on its tag), and the bank showed phase 1's 10:00. The m:ss formatters are the clock
+  batch's.
+
+**Testing.** Targeted lane: typecheck, the unit suite (new `nothing-twice.test.ts`: the dock's words per moment, no
+power's name in a boss's power lines, Eric's lines kept, `ult2` without seconds, `DESK`'s geometry;
+`recluse-boss.test.ts` updated), and e2e `boss-speech` (now also: neither speech box over the board, the boss's never
+over the bar's status or the line under it, the God King's never over the dock's box, every frame), `boss-dock`,
+`boss-powers`, `bigboy`, `hollow`, `sawyer`, `pig` (the duel prompt's new words), `recluse` (the dock never says the
+increment; the phase change's two lines; on a computer, every tag above its board and no Bank column), `king-attack`,
+`crowd`, `crowd-hidden`. `npm run frames:boss` at 360 and 1280 on both builds. Screenshots before and after at 390 and
+1280 px in the PR.

@@ -30,7 +30,10 @@ export type FinalFormat = "team" | "boss" | "duel";
 
 export interface Settings {
   mode: GameMode;
-  /** Crowd: two teams, 50 v 50, each playing one side all game (false: everyone picks for whichever side is to move). */
+  /**
+   * Crowd: two teams, 50 v 50, each playing one side all game. False only in a boss raid (RAID_SETTINGS): everyone
+   * picks the crowd's moves against the boss.
+   */
   crowdTeams: boolean;
   /** Crowd 50 v 50: before the game, everyone votes on how it ends and how fast it is (see votes.ts). */
   augments: boolean;
@@ -278,11 +281,13 @@ export function moveClockAt(s: Pick<Settings, "moveClockSeconds" | "moveClockSte
   return seconds;
 }
 
-/** "Relaxed" is the default; "quick" shortens the reveal and the settling-in time on a new board. */
-export type Pace = "relaxed" | "quick";
-export const PACE_SETTINGS: Record<Pace, Partial<Settings>> = {
-  relaxed: {},
-  quick: { revealSeconds: 3, drawnMoveSeconds: 2.5, boardIntroSeconds: 2 },
+/**
+ * The test switch `?pace=quick` (the e2e and playtests, test-switches.ts): a shorter reveal and less settling in, on top
+ * of the mode's own pace. Players always play the mode's own pace (the Relaxed pace toggle went on Oct 15, 2026).
+ */
+export const QUICK_PACE: Record<GameMode, Partial<Settings>> = {
+  classic: { revealSeconds: 3, drawnMoveSeconds: 2.5, boardIntroSeconds: 2 },
+  crowd: { revealSeconds: 2, drawnMoveSeconds: 1.2, stageBreakSeconds: 4 },
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -401,13 +406,6 @@ export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRo
   stage === 0 ? s.firstStageRounds : s.roundsPerStage;
 
 /**
- * Crowd mode: 100 players on one board from the starting position, the most
- * popular pick always played. No cuts for the first 10 moves (20 plies), then
- * a cut after every move (2 plies) down to the final four, who play the 2v2.
- * Scores carry over all game (a stage is only one move long). 3 power-ups,
- * none earned.
- */
-/**
  * Crowd 50 v 50 knockouts for each way to end: they leave 8 (team final), 4 (the boss final, against the Hidden Boss) or
  * 2 (duel); `crowdFinalists` says how many. The boss final's are the duel's cuts stopping at four (Eric, Oct 14: "the top
  * four always battle versus [him]"; it was the top 10 against a random boss).
@@ -417,11 +415,17 @@ export const CROWD_KNOCKOUTS: Record<FinalFormat, readonly number[]> = {
   boss: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2],
   duel: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2, 2],
 };
-/** Crowd "everyone moves": down to 4 for the 2v2 final. */
-export const CROWD_EVERYONE_KNOCKOUTS: readonly number[] = [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2];
 
+/**
+ * Crowd mode: 100 players, 50 v 50, on one board from the starting position; each team picks its side's moves and the
+ * most popular pick is played. No cuts for the first 10 moves (20 plies), then a cut after every move (2 plies, half
+ * from each team) down to the ending the pre-game vote picked (CROWD_KNOCKOUTS). Scores carry over all game (a stage
+ * is only one move long). 3 power-ups, none earned.
+ */
 export const CROWD_SETTINGS: Partial<Settings> = {
   mode: "crowd",
+  // Always team turns (Crowd's "everyone moves" went on Oct 15, 2026); only a raid sets it false.
+  crowdTeams: true,
   lobbySize: 100,
   groupSize: 100,
   knockoutsPerStage: CROWD_KNOCKOUTS.team,
@@ -435,7 +439,7 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   powerUpsPerStage: 0,
   openingMoves: 0,
   // With DEFAULT_SETTINGS' 10-minute bank and +5 s: Rapid 10+5, the clock whenever there's no clock vote (votes off,
-  // everyone moves, raids). The vote's options are in votes.ts.
+  // raids). The vote's options are in votes.ts.
   moveClockSeconds: 20,
   boardIntroSeconds: 0,
   // One board from the starting position: no opening grid to show.
@@ -1084,15 +1088,9 @@ export function definedOnly<T extends object>(o: T): Partial<T> {
 }
 
 /** Settings for a mode (Classic is the default). */
-export function modeSettings(mode: GameMode, opts: { crowdTeams?: boolean; augments?: boolean } = {}): Partial<Settings> {
+export function modeSettings(mode: GameMode, opts: { augments?: boolean } = {}): Partial<Settings> {
   if (mode !== "crowd") return {};
-  return {
-    ...CROWD_SETTINGS,
-    ...(opts.crowdTeams !== undefined ? { crowdTeams: opts.crowdTeams } : {}),
-    ...(opts.augments !== undefined ? { augments: opts.augments } : {}),
-    // Everyone moves keeps the 2v2 final of the last four.
-    ...(opts.crowdTeams === false ? { knockoutsPerStage: CROWD_EVERYONE_KNOCKOUTS } : {}),
-  };
+  return { ...CROWD_SETTINGS, ...(opts.augments !== undefined ? { augments: opts.augments } : {}) };
 }
 
 export type Augment = "more" | "same" | "less";
@@ -1558,6 +1556,36 @@ export const GLOBAL_CHAT = {
 } as const;
 
 /**
+ * Friends and invites (docs/decisions/2026-10-15-friends-and-invites.md; docs/areas/accounts.md): add a friend from their profile
+ * (they accept or decline), invite anyone to your lobby or Squads party, block. Signed-in accounts only, where signing
+ * in is set up. The server enforces every number here.
+ */
+export const FRIENDS = {
+  /** Friends one account can have. */
+  max: 200,
+  /** Friend requests one account has waiting for an answer at once. */
+  maxPendingSent: 50,
+  /** A request nobody answered is dropped after this many days. */
+  requestDays: 30,
+  /** Friend requests one account can send in a day. */
+  requestsPerDay: 30,
+  /** Players one account can have blocked. */
+  maxBlocked: 500,
+  /** Invites one account can send in an hour. */
+  invitesPerHour: 60,
+  /** Inviting the same player again: not sooner than this. */
+  reinviteMs: 30_000,
+  /** An invite stays open this long (in the friend's list, and as a toast while it's new), then it's gone. */
+  inviteMinutes: 10,
+  /** The friends list refreshes this often while it's on screen (and at once when something new arrives for you). */
+  refreshMs: 60_000,
+  /** A new invite's toast stays this long unless it's tapped (the invite stays in the list until it expires). */
+  toastMs: 20_000,
+  /** The computer's live panel lists at most this many friends who are online. */
+  panelMax: 8,
+} as const;
+
+/**
  * Capacity (the `ops` delegate): the matchmaker's batches and admission, overload, presence and the live line's
  * write limits, and the API's rate limits. See DECISIONS.md, "Capacity: built".
  */
@@ -1611,6 +1639,8 @@ export const CAPACITY = {
     perUser: { limit: 1_200, windowMs: 60_000 },
     /** PLAY and new lobbies (a player in line asks every 3 s). */
     play: { limit: 40, windowMs: 60_000 },
+    /** Friends' actions (requests, answers, invites, blocks, settings): FRIENDS has the daily and hourly caps. */
+    friends: { limit: 30, windowMs: 60_000 },
   },
 } as const;
 

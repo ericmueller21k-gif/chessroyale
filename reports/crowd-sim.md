@@ -1,5 +1,7 @@
 # Crowd mode: bot simulation (Oct 3, 2026)
 
+(A snapshot from Oct 3. Everyone moves was removed on Oct 15, 2026, so the script now runs 50 v 50 only.)
+
 `npx tsx packages/sim/scripts/crowd-sim.ts 10`: 10 matches of 100 bots per turn mode, real engine at 100k nodes,
 default Crowd settings (no cuts for 20 plies, then a cut every 2 plies down to 4, 2v2 final of 5 moves each).
 

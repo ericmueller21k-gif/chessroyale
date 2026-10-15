@@ -104,11 +104,11 @@ export const GINGER_UI = {
   id: "gingerbread",
   ultimate: { name: "the Blizzard" },
   moments: {
-    freeze: { order: 0, kit: "power", dock: "Freeze!", appearAt: (m, square) => (m.square === square ? m.at + FREEZE.iceAt : undefined), view: freezeMoment },
+    freeze: { order: 0, kit: "power", appearAt: (m, square) => (m.square === square ? m.at + FREEZE.iceAt : undefined), view: freezeMoment },
     // The blizzard's sweep crosses the board left to right; each piece ices over as it passes.
-    blizzard: { order: 2, kit: "ultimate", dock: "Blizzard!", appearAt: (m, square, orientation) => m.at + BLIZZARD.sweepAt + (squareXY(square, orientation).x / 800) * BLIZZARD.sweepMs, view: blizzardMoment },
+    blizzard: { order: 2, kit: "ultimate", appearAt: (m, square, orientation) => m.at + BLIZZARD.sweepAt + (squareXY(square, orientation).x / 800) * BLIZZARD.sweepMs, view: blizzardMoment },
     // Each later turn of it: the pieces freed thaw (and she grumbles as their ice melts).
-    thaw: { order: 2, kit: "ultimateHit", dock: "Thaw!", lineAt: THAW.meltAt, view: thawMoment },
+    thaw: { order: 2, kit: "ultimateHit", lineAt: THAW.meltAt, view: thawMoment },
   },
   // Ice over iced pieces (the characters' iceOverlay: it forms, then shimmers while it lasts; due to thaw next turn, it
   // cracks and thins to dripping, nearly clear ice; as it thaws, it melts away): one block the shape of the square,

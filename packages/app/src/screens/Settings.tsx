@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, RAID_SETTINGS as R, BOSS_TIERS, PREGAME_VOTES, crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
+import { FriendSettings } from "../components/Friends.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut } from "../account.ts";
@@ -25,10 +26,10 @@ function Toggle({ title, checked, disabled, onChange, children }: { title: strin
   );
 }
 
-function stored(key: string, fallback: boolean, on = "1"): boolean {
+function stored(key: string, fallback: boolean): boolean {
   try {
     const v = localStorage.getItem(key);
-    return v === null ? fallback : v === on;
+    return v === null ? fallback : v === "1";
   } catch {
     return fallback;
   }
@@ -151,7 +152,7 @@ const THEMES: { id: ThemePref; label: string }[] = [
 function ThemeChoice() {
   const { pref } = useTheme();
   return (
-    <div class="fd-seg three" role="radiogroup" aria-label="Theme">
+    <div class="fd-seg" role="radiogroup" aria-label="Theme">
       {THEMES.map((t) => (
         <button type="button" role="radio" key={t.id} aria-checked={pref === t.id} class={pref === t.id ? "on" : ""} onClick={() => setThemePref(t.id)}>
           {t.label}
@@ -161,13 +162,12 @@ function ThemeChoice() {
   );
 }
 
-/** Settings: the theme, sound, how you play, Crowd's options, how to play (and the FAQ), installing, and your sign-in. */
+/** Settings: the theme, sound, how you play, Crowd's options, chat, friends, how to play (and the FAQ), installing, your sign-in, privacy and terms. */
 export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => void; onSoundLab?: () => void; onFaq?: () => void }) {
   const { config, profile } = useAccount();
   const [, rerender] = useState(0);
   useEffect(() => onMuteChange(() => rerender((n) => n + 1)), []);
   const [practice, setPractice] = useState(() => stored("brc.practice", false));
-  const [relaxed, setRelaxed] = useState(() => stored("brc.pace", true, "relaxed"));
   const [evalBar, setEvalBar] = useState(evalBarOn);
   const [mode, setMode] = useState(chosenMode);
   const [anim, setAnim] = useState(crowdAnimations);
@@ -233,16 +233,6 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
           Unlimited power-ups (the engine's top 3 moves, any time). You're marked 💡 on the leaderboard.
         </Toggle>
         <Toggle
-          title="Relaxed pace"
-          checked={relaxed}
-          onChange={(on) => {
-            setRelaxed(on);
-            store("brc.pace", on ? "relaxed" : "quick");
-          }}
-        >
-          A few seconds to settle on each new board and to watch the chosen move. Off: quick games (solo, and lobbies you create).
-        </Toggle>
-        <Toggle
           title="Eval bar"
           checked={evalBar}
           onChange={(on) => {
@@ -256,17 +246,6 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
 
       <section class="fd-section">
         <h2 class="fd-label">CROWD</h2>
-        <div class="fd-seg" role="radiogroup" aria-label="Turns">
-          <button type="button" role="radio" aria-checked={mode.crowdTeams} class={mode.crowdTeams ? "on" : ""} onClick={() => changeMode({ crowdTeams: true })}>
-            50 v 50
-            <span>You play one side</span>
-          </button>
-          <button type="button" role="radio" aria-checked={!mode.crowdTeams} class={!mode.crowdTeams ? "on" : ""} onClick={() => changeMode({ crowdTeams: false })}>
-            Everyone moves
-            <span>You pick every turn</span>
-          </button>
-        </div>
-        <p class="fd-note">For solo games and lobbies you create. PLAY's queue is always 50 v 50.</p>
         <Toggle
           title="Animations"
           checked={anim}
@@ -317,6 +296,8 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
           On a phone, while chat is hidden, the newest message shows for a moment under the top bar (never over the board).
         </Toggle>
       </section>
+
+      <FriendSettings />
 
       <section class="fd-section">
         <h2 class="fd-label">CLASSIC</h2>
@@ -399,6 +380,19 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
         </section>
       )}
 
+      <section class="fd-section">
+        <h2 class="fd-label">PRIVACY AND TERMS</h2>
+        <a class="fd-row-link" href="/privacy">
+          Privacy policy: what we keep about you, and why ›
+        </a>
+        <a class="fd-row-link" href="/terms">
+          Terms of service ›
+        </a>
+        <a class="fd-row-link" href="/copyright">
+          Copyright: report a name or icon that copies your work ›
+        </a>
+      </section>
+
       <p class="fd-note maia-credit">
         Bosses and bots use <a href="https://stockfishchess.org">Stockfish</a> (GPL-3.0,{" "}
         <a href="https://github.com/official-stockfish/Stockfish">source</a>, <a href="https://github.com/nmrugg/stockfish.js">this build</a> and{" "}
@@ -414,7 +408,7 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
       <p class="fd-note sounds-credit">
         Classic piece sounds and their variations: <a href="https://github.com/pychess/pychess/tree/master/sounds">PyChess</a> (GPL-3.0). The
         variations are made from PyChess's sounds by our own script (<a href="/engine/COPYING.txt">license</a>,{" "}
-        <a href="/sounds/SOURCES.md">how each was made</a>).
+        <a href="/sounds/SOURCES.md">how each was made</a>, <a href="/sounds/pychess-sounds-source.tar.gz" download>their source</a>).
       </p>
       <p class="fd-note licences-credit">
         Built with Preact (MIT) and chess.js (BSD), in the Archivo and Press Start 2P fonts (SIL Open Font License):{" "}

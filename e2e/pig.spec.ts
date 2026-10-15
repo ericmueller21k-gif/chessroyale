@@ -285,7 +285,7 @@ test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle
     yank: { selector: '.pg-layer[data-showdown="yank"] .pg-ropes .pg-rope' },
     draw: { selector: ".fight-banner.power-cut", text: /DRAW!/ },
     duels: { selector: ".pg-duels[data-duels] .pg-duel" },
-    dock: { selector: ".duel-note", text: /Showdown!\s*Take one of his (three|two)\./ },
+    dock: { selector: ".duel-note", text: /^Take one of his (three|two) duels\.$/ },
   });
   await page.evaluate(() => ((window as any).__soundLog = []));
   await play(page, "e2e4");

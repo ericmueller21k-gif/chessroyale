@@ -49,7 +49,6 @@ const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null =>
 const WARN: MomentUi = {
   order: 1,
   kit: "ultimateWarn",
-  dock: "Rage!",
   view: ({ boss, t, banner, cast }: MomentProps) => {
     const ui = bossUi(boss);
     const when = ui?.ultimate.when ?? "Next turn";
@@ -156,9 +155,12 @@ export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | 
   return ui.line ? ui.line(kit, m) : kitLine(kit, ui.kit, m.key);
 }
 
-/** The dock's word for a power's moment ("Freeze!"); the boss's own words are in its text box. */
-export function dockLine(m: Pick<Moment, "kind">): string {
-  return MOMENT_UI[m.kind].dock;
+/**
+ * What a power's moment means for you, for the dock, where no banner says it; null otherwise (the dock keeps the turn's
+ * own line). The banner names the power; the boss's bubble is his character.
+ */
+export function dockLine(m: Pick<Moment, "kind" | "squares" | "fizzled">): string | null {
+  return MOMENT_UI[m.kind].dock?.(m) ?? null;
 }
 
 /** When the boss says a moment's line (ms into it). */

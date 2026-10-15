@@ -2,12 +2,9 @@ import type { Standing } from "../game.ts";
 import type { ChatFloat } from "../chat.ts";
 import { PlayerName } from "./PlayerName.tsx";
 import { LiveNumber } from "./LiveNumber.tsx";
+import { clockShown } from "../clock-text.ts";
 
 const pts = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
-export const clockText = (ms: number) => {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
 
 /**
  * The live leaderboard, styled like a racing timing tower. Rows slide to their
@@ -24,6 +21,7 @@ export function RaceTower({
   done,
   cutLabel = "Cut line",
   floats,
+  bank = true,
 }: {
   standings: readonly Standing[];
   cutoff: number;
@@ -42,6 +40,11 @@ export function RaceTower({
    * when it went to everyone.
    */
   floats?: ReadonlyMap<string, ChatFloat>;
+  /**
+   * The time bank column (off in the Hidden Boss's phase 2, from his phase change: each player's time is their board's
+   * own clock then, on its tag, and the bank would show a clock nobody plays on).
+   */
+  bank?: boolean;
 }) {
   const ROW = mini ? 22 : 30;
   const alive = standings.filter((s) => !s.out);
@@ -86,7 +89,7 @@ export function RaceTower({
   const away = floats ? [...floats].filter(([id]) => !shown.has(id)).map(([, f]) => f).slice(-3) : [];
 
   return (
-    <div class={`tower${compact ? " tower-compact" : ""}${mini ? " tower-mini" : ""}`} style={{ "--row": `${ROW}px` }}>
+    <div class={`tower${compact ? " tower-compact" : ""}${mini ? " tower-mini" : ""}${bank ? "" : " tower-nobank"}`} style={{ "--row": `${ROW}px` }}>
       <div class="tower-head">
         <span>Pos</span>
         <span>Player</span>
@@ -127,7 +130,7 @@ export function RaceTower({
               <span class="t-pts">{r.out ? "out" : <LiveNumber value={r.points} format={pts} />}</span>
               <span class="t-avg">{r.out ? "" : pts(r.avg)}</span>
               <span class={`t-elo${r.rating !== null && r.rating === topRating ? " top" : ""}`}>{r.rating ?? "—"}</span>
-              <span class="t-bank">{r.out ? "" : clockText(r.bankMs)}</span>
+              <span class="t-bank">{r.out ? "" : clockShown(r.bankMs)}</span>
               <span class="t-pu">{r.out ? "" : r.practice ? "∞" : r.powerUps}</span>
               {floats?.get(r.id) && (
                 <span key={floats.get(r.id)!.key} class="t-float" aria-hidden="true">

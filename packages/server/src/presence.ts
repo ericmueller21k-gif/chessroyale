@@ -13,6 +13,8 @@ import type { Env } from "./index.ts";
 type Waiter = (p: Promise<unknown>) => void;
 
 const pending = new Map<string, number>();
+/** What the live line's own requests said about being in a match since the last batch (friends lists show it). */
+const busyPending = new Map<string, boolean>();
 let flushedAt = 0;
 let flushTimer = false;
 
@@ -25,13 +27,25 @@ function flush(env: Pick<Env, "LIVE">, now: number): Promise<unknown> {
   if (!pending.size) return Promise.resolve();
   const ids = [...pending.keys()];
   const at = Math.max(...pending.values());
+  const busy = busyPending.size ? Object.fromEntries(busyPending) : undefined;
   pending.clear();
-  return liveHub(env).seen(ids, at).catch(() => undefined);
+  busyPending.clear();
+  // (The hub answers with friends' news for any of them: their next live line from this instance says so.)
+  return liveHub(env)
+    .seen(ids, at, busy)
+    .then((news) => {
+      for (const [id, t] of Object.entries(news ?? {})) rememberInbox(id, t);
+    })
+    .catch(() => undefined);
 }
 
-/** An account was heard from now. Passed on at once if the last batch went long enough ago, else with the next. */
-export function markSeen(env: Pick<Env, "LIVE">, userId: string, now: number, waitUntil: Waiter) {
+/**
+ * An account was heard from now. Passed on at once if the last batch went long enough ago, else with the next. `busy`:
+ * the live line's request says whether its app is in a match (other requests leave it as it was).
+ */
+export function markSeen(env: Pick<Env, "LIVE">, userId: string, now: number, waitUntil: Waiter, busy?: boolean) {
   pending.set(userId, now);
+  if (busy !== undefined) busyPending.set(userId, busy);
   const since = now - flushedAt;
   if (since >= CAPACITY.presence.flushMs || pending.size >= 500) {
     waitUntil(flush(env, now));
@@ -80,3 +94,15 @@ export function firstSighting(userId: string, now: number): boolean {
 export function forgetToken(token: string) {
   tokens.delete(token);
 }
+
+const inbox = new Map<string, number>();
+/**
+ * Friends' news for an account, as the live hub last told this instance (a time: something new arrived for them then).
+ * The live line passes it on; the app fetches its friends list when it grows. Another instance may know a newer one.
+ */
+export function rememberInbox(userId: string, at: number) {
+  if ((inbox.get(userId) ?? 0) >= at) return;
+  if (inbox.size >= TOKEN_CACHE_MAX) inbox.delete(inbox.keys().next().value!);
+  inbox.set(userId, at);
+}
+export const inboxOf = (userId: string) => inbox.get(userId);

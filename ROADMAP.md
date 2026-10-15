@@ -290,17 +290,18 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       - **(c) His name will change** (Eric: something like "a powerful foe"; "Hidden Boss" doesn't do him justice).
         Not decided. It's one string, his `name` in `BOSS_ROSTER` (`packages/core/src/boss.ts`): the vote's card, the
         FAQ and every screen take it from there.
-      - **(d) Before launch: the test switches (director's note, Oct 15).** The lobby-create playtest overrides
-        (`packages/server/src/index.ts`: `?weakbots`, `?format`, `?power`, `?rounds`, `?clock`, `?bossMoves`, `?keep`, …)
-        and the app's URL test switches (`overridesFromUrl` in `packages/app/src/App.tsx`: `?win`, `?phase`, `?mate`, …)
-        get gated behind an admin account or a test environment variable, or any lobby or solo game that uses one is
-        made unscored: no record, coins or rewards. Today anyone who reaches the site could make easy wins (loose bots,
-        a short game, a mate in one); harmless while Cloudflare Access lets only Eric in.
+      - **(d) The test switches: gated (built Oct 15; DECISIONS.md, "The test switches: admins and test servers
+        only").** The lobby-create playtest overrides (`?weakbots`, `?format`, `?rounds`, `?clock`, `?bossMoves`,
+        `?keep`, …), a queue's `?pool=`, a crate's forced roll and the app's address switches (`?win`, `?phase`,
+        `?mate`, `?debug`, …) work only for admins or where `TEST_SWITCHES` is on (local, e2e, staging); for anyone
+        else they're ignored, so no easy wins (docs/areas/ops.md, "Test switches").
 
 Added Oct 14, 2026 (Eric; notes only, nothing built):
 
 - **Friends and invites** (Eric, Oct 14: "we're gonna need like a, something where you can tap on somebody and just
-  add them as a friend").
+  add them as a friend"). **Built Oct 15** (docs/decisions/2026-10-15-friends-and-invites.md): requests accepted or declined, block,
+  invites to your lobby or party for anyone your setting allows, "Show when I'm online"; the open questions below are
+  answered there.
   - **Add a friend:** tap a player, then "Add friend". No chat with friends ("in today's day and age, it's not
     necessary").
   - **Friends online:** your friends who are online, in their own list above the players online.
@@ -322,7 +323,11 @@ Added Oct 14, 2026 (Eric; notes only, nothing built):
   real-phone check (`TESTING.md`, "Maia").
 - **privacy@hunchess.com:** forward it to yourself with Cloudflare Email Routing (free), or name another address.
 - **Workers Paid ($5 a month):** only when real traffic outgrows the free limits.
-- **Privacy policy and terms:** drafted at /privacy and /terms; Eric to read them over.
+- **Privacy policy, terms and copyright page:** drafts at /privacy, /terms and /copyright, written from the code (Oct
+  15). Each lists the decisions that are yours or a lawyer's: who runs HunChess (a person or company, a postal
+  address), the contact address, the minimum age (13 proposed, with a neutral birth month and year question; not
+  built), governing law, a DMCA agent ($6 at the US Copyright Office), real-money purchases, the EU/UK points, and how
+  long fair-play records are kept.
 - **Real-phone testing** of matchmaking with friends.
 - **Art:** simple icons and emotes can be drawn in code; polished custom art would mean an artist or a paid pack.
 - **At launch (Eric, Oct 13-14):**

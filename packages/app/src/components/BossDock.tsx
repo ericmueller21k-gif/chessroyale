@@ -14,6 +14,7 @@ import { COMPUTER_LAYOUT } from "./MatchMenu.tsx";
 import { Bolt } from "./PowerUpButton.tsx";
 import { useMedia } from "./QuickChat.tsx";
 import { VoiceBubble } from "../speech.tsx";
+import { clockShown } from "../clock-text.ts";
 import { bulletIncrementOn, kingBlocked, mockKingHelp } from "./Recluse.tsx";
 
 /**
@@ -84,8 +85,8 @@ export function BossDock({
   powerUp?: { enabled: boolean; inUse: boolean };
   /**
    * What he shows instead of standing by, never to be called (the Hidden Boss's phase change: triumphant, drained, fading
-   * as the boss absorbs him), or "gone": absorbed, his place empty for the rest of the fight (phase 2), but for his last
-   * words while they last.
+   * as the boss absorbs him), or "gone": absorbed, his place empty for the rest of the fight (phase 2), his words gone
+   * with him (a bubble from an empty place read as a slip).
    */
   king?: KingShow;
   /**
@@ -242,11 +243,6 @@ export type DockClockRun = { startsAt: number; deadline: number; frozen?: { at: 
 export const clockLeft = (run: DockClockRun, now: number): number =>
   Math.max(0, run.deadline - (run.frozen && now >= run.frozen.at && now < run.frozen.until ? run.frozen.until : Math.max(now, run.startsAt)));
 
-/** m:ss, in whole seconds rounded up, as the big 3-2-1 counts (its "1" is the dock's 0:01). */
-export const clockShown = (ms: number): string => {
-  const s = Math.ceil(ms / 1000);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
 
 /** Where each match's dock clock stopped: it holds there between your moves, whichever screen shows it. */
 const held = new WeakMap<object, { run: DockClockRun | null; ms: number | null }>();
@@ -421,11 +417,11 @@ const GodKingUnit = memo(function GodKingUnit({
   const leapAt = useMemo(() => (leaping ? Date.now() : 0), [leaping]);
   if (show) {
     // (The Hidden Boss absorbs him: his aura behind him, his figure as the phase change says, motes as he fades; his place
-    // kept, empty once he's gone, so the dock doesn't move. His words stay up their time, his figure gone or not.)
+    // kept, empty once he's gone, so the dock doesn't move. Gone, his words go with him: no bubble from an empty place.)
     const gone = show === "gone";
     return (
       <div class={`gk-unit ${gone ? "gone" : show.class}`}>
-        <VoiceBubble voice={kingVoice} class="gk-bubble" />
+        <VoiceBubble voice={kingVoice} class="gk-bubble" hidden={gone} />
         <span class="gk-unit-btn" role={gone ? undefined : "img"} aria-label={gone ? undefined : "The God King"} aria-hidden={gone ? "true" : undefined}>
           {!gone && (
             <>
