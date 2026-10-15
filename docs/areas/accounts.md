@@ -26,6 +26,10 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 - **Admins** are the emails in `ADMIN_EMAILS` (a Worker variable or secret, never in the repo): the fair-play review
   page and the boss battle's "Trigger ultimate (testing)" button.
 - **Bans** (from [fairplay.md](fairplay.md)) stop online play; solo stays open.
+- **The privacy policy, terms and copyright page** (`/privacy`, `/terms`, `/copyright`, `screens/Legal.tsx`) are drafts
+  written from the code, with the decisions still to make at the top. They list every kind of personal data the game keeps, why and for how long:
+  a PR that stores something new, or keeps it for a different time, changes the policy in the same PR. Linked from the
+  landing page's footer, Settings and the FAQ.
 - **Friends and invites** (Oct 15; DECISIONS.md, "Friends and invites"): signed-in accounts only where signing in is
   set up. Add a friend from their profile (any name opens it); they accept or decline. Invite anyone to your private
   lobby or Squads party, as their setting allows (everyone, the default; friends only; no one); an invite lasts
@@ -36,8 +40,9 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 
 ## Data stored by friends (for the privacy page and account deletion)
 
-Every row is about two accounts; `deleteSocial(sql, userId)` (`friends.ts`) deletes an account's rows on both sides
-(account deletion calls it; so does a guest's merge into the account it signs in to).
+Every row is about two accounts; `deleteSocial(sql, userId)` (`friends.ts`) deletes an account's rows on both sides.
+A guest's merge into the account it signs in to calls it; account deletion, when it's built, must too. The privacy
+policy's "Friends" entry (`screens/Legal.tsx`) says the same in plain words.
 
 | Table / column | What | Kept |
 | --- | --- | --- |
@@ -59,6 +64,7 @@ stay in the live hub's memory (never written).
 | Accounts, sessions, identities, profiles, results (D1, behind a tiny SQL interface) | `packages/server/src/accounts.ts` |
 | The account API (`/api/me`, `/api/auth/*`, `/api/profile/*`, `/api/results`, …) | `packages/server/src/api.ts`, routed from `index.ts` |
 | App side: your account, signing in | `packages/app/src/account.ts`, `components/SignIn.tsx` |
+| The privacy policy, terms and copyright page | `packages/app/src/screens/Legal.tsx` |
 | Fair play's tables (made with the rest of the schema) | `packages/server/src/fairplay-schema.ts` |
 | Friends: requests, blocks, invites, settings, caps (D1); the API (`/api/friends`, its kill switch) | `packages/server/src/friends.ts`, `friends-api.ts`; shared types `packages/core/src/friends.ts` |
 | App side: the friends list, actions, the invite toast, who's blocked | `packages/app/src/friends.ts`; screens on [hub.md](hub.md) |
@@ -75,8 +81,9 @@ Worker variables and secrets (see `DEPLOY.md`): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIE
   blocks, invites and the settings, the caps, expiry, hidden status, `deleteSocial`, the API and its kill switch, the
   live board's news and "in a match"); `packages/app/test/friends.test.ts` (the list, the toast, hiding blocked chat,
   inviting from the front door).
-- e2e: `e2e/account.spec.ts`, `profile.spec.ts`, `friends.spec.ts` (two players: request, accept, online, the invites
-  setting, an invite joined from its toast, a block).
+- e2e: `e2e/account.spec.ts`, `profile.spec.ts`, `legal.spec.ts` (the privacy policy, terms and copyright page),
+  `friends.spec.ts` (two players: request, accept, online, the invites setting, an invite joined from its toast, a
+  block).
 
 ## Rules for this area
 

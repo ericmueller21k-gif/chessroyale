@@ -324,7 +324,11 @@ Added Oct 14, 2026 (Eric; notes only, nothing built):
   real-phone check (`TESTING.md`, "Maia").
 - **privacy@hunchess.com:** forward it to yourself with Cloudflare Email Routing (free), or name another address.
 - **Workers Paid ($5 a month):** only when real traffic outgrows the free limits.
-- **Privacy policy and terms:** drafted at /privacy and /terms; Eric to read them over.
+- **Privacy policy, terms and copyright page:** drafts at /privacy, /terms and /copyright, written from the code (Oct
+  15). Each lists the decisions that are yours or a lawyer's: who runs HunChess (a person or company, a postal
+  address), the contact address, the minimum age (13 proposed, with a neutral birth month and year question; not
+  built), governing law, a DMCA agent ($6 at the US Copyright Office), real-money purchases, the EU/UK points, and how
+  long fair-play records are kept.
 - **Real-phone testing** of matchmaking with friends.
 - **Art:** simple icons and emotes can be drawn in code; polished custom art would mean an artist or a paid pack.
 - **At launch (Eric, Oct 13-14):**
