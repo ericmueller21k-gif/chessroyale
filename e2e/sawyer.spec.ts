@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { SAWYER_LOOKS } from "@chessroyale/core";
-import { BOARD_SEL, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, engineTop, test, watchFor } from "./helpers.ts";
 
 /**
  * Sawyer, the raccoon with a saw, played alone on a phone and a computer with real taps: his first move a pawn's and
@@ -39,13 +39,25 @@ async function play(page: Page, move: string) {
   }
   await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
 }
-/** An allowed move once it's your move (his cuts' limits), preferring `want`; a quiet one otherwise. */
-async function allowedMove(page: Page, want: string[] = []): Promise<string> {
+/** The crowd's moves now, ranked as the judge ranks them (his cuts' limits kept), best first; its quiet moves; its pawn takes. */
+async function ranked(page: Page) {
   await yourMove(page);
-  const { fen, allowed } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: (window as any).match.boss?.powers?.allowed as string[] | null }));
-  const legal = allowed ?? new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
-  const quiet = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion).map((m) => m.from + m.to);
-  return want.find((m) => legal.includes(m)) ?? legal.filter((m) => quiet.includes(m)).sort()[0] ?? legal.sort()[0]!;
+  const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
+  const top = (await engineTop(page)).top as { move: string; expected: number }[];
+  const moves = new Chess(fen).moves({ verbose: true }).filter((m) => !m.promotion);
+  return { top, quiet: moves.filter((m) => !m.captured).map((m) => m.from + m.to), takes: moves.filter((m) => m.captured === "p").map((m) => m.from + m.to) };
+}
+/**
+ * An allowed move once it's your move that doesn't lose (within a tenth of the best's expected score: such a move never
+ * walks into a quick mate, which ended the battle early now and then, Oct 15): `want`'s first, else the best quiet one,
+ * else the best. `quiet`: a quiet move whatever (the knock test).
+ */
+async function allowedMove(page: Page, want: string[] = [], opts: { quiet?: boolean } = {}): Promise<string> {
+  const { top, quiet } = await ranked(page);
+  const fine = top.filter((m) => m.expected >= top[0]!.expected - 0.1).map((m) => m.move);
+  const pick = want.find((m) => fine.includes(m)) ?? fine.find((m) => quiet.includes(m));
+  if (pick) return pick;
+  return opts.quiet ? (top.map((m) => m.move).find((m) => quiet.includes(m)) ?? quiet[0]!) : fine[0]!;
 }
 const file = (sq: string) => sq.charCodeAt(0) - 97;
 const crossesMiddle = (m: string) => file(m.slice(0, 2)) <= 3 !== file(m.slice(2, 4)) <= 3;
@@ -72,15 +84,14 @@ const morph = SAWYER_LOOKS.split === "morph";
 const inAir = morph ? "piece.sw-mini:not(.saw-half-l):not(.saw-half-r) + piece.sw-mini:not(.saw-half-l):not(.saw-half-r)" : "piece.sw-half";
 const pairLook = morph ? (SAWYER_LOOKS.settle === "small" ? "small" : null) : "halves";
 
-/** A move that takes one of his pawns, if one may (so his split gets its room: the engine plays no ninth pawn). */
-async function takeHisPawn(page: Page): Promise<string | null> {
-  await yourMove(page);
-  const { fen, allowed, side } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: (window as any).match.boss?.powers?.allowed as string[] | null, side: (window as any).match.boss.crowdSide as string }));
-  const his = side === "w" ? "b" : "w";
-  const take = new Chess(fen).moves({ verbose: true }).filter((m) => m.captured === "p" && m.color !== his && !m.promotion && (!allowed || allowed.includes(m.from + m.to)));
-  // (The cheapest piece takes it.)
-  const order = "pnbrqk";
-  return take.sort((a, b) => order.indexOf(a.piece) - order.indexOf(b.piece))[0] ? take[0]!.from + take[0]!.to : null;
+/**
+ * Until the split comes: a move that takes one of his pawns (so his split gets its room: the engine plays no ninth pawn)
+ * if one costs little (within a fifth of the best's expected score: never a piece for it), else the engine's best. A
+ * crowd that took any pawn it could, or drifted on the quiet moves, now and then lost before the split (Oct 15).
+ */
+async function roomMove(page: Page): Promise<string> {
+  const { top, takes } = await ranked(page);
+  return top.find((m) => takes.includes(m.move) && m.expected >= top[0]!.expected - 0.2)?.move ?? top[0]!.move;
 }
 
 test("Sawyer: his first move a pawn's, then the split (two small whole pawns that grow; or halves) once there's room; your move's knock; his saw cuts", async ({ page }) => {
@@ -106,7 +117,7 @@ test("Sawyer: his first move a pawn's, then the split (two small whole pawns tha
     line: { selector: ".bc-bubble", text: /Two for one!|Half off!|Double trouble!/ },
   });
   // (A quiet move: its knock is the plain move's.)
-  await play(page, await allowedMove(page, ["g1f3", "b1c3", "g8f6", "b8c6", "h2h3", "h7h6"]));
+  await play(page, await allowedMove(page, ["g1f3", "b1c3", "g8f6", "b8c6", "h2h3", "h7h6"], { quiet: true }));
   await expect.poll(async () => (await soundsHeard(page)).map((s) => s.split(":")[0]), { timeout: 10_000 }).toContain("move");
   expect((await soundsHeard(page))[0]!.split(":")[0]).toBe("move");
   await yourMove(page);
@@ -117,9 +128,9 @@ test("Sawyer: his first move a pawn's, then the split (two small whole pawns tha
   expect(mid.get(first.board.history.at(-1).slice(0, 2) as never)).toMatchObject({ type: "p", color: mine });
 
   // Until the split comes (at once, or after his first pawn move once one of his pawns is gone): take his pawns when
-  // you can. Any saw cut on the way: nothing crosses it, and its groove is on its edge.
+  // that costs little (roomMove). Any saw cut on the way: nothing crosses it, and its groove is on its edge.
   let cuts = 0;
-  for (let i = 0; i < 14 && !(await powers(page))?.split?.square; i++) {
+  for (let i = 0; i < 20 && !(await powers(page))?.split?.square; i++) {
     const p = await powers(page);
     if (p.cut && !cuts) {
       cuts++;
@@ -136,7 +147,7 @@ test("Sawyer: his first move a pawn's, then the split (two small whole pawns tha
       apart: { selector: `.sw-layer[data-split="apart"] ${inAir}` },
       line: { selector: ".bc-bubble", text: /Two for one!|Half off!|Double trouble!/ },
     });
-    await play(page, (await takeHisPawn(page)) ?? (await allowedMove(page, ["h2h3", "a2a3", "h7h6", "a7a6"])));
+    await play(page, await roomMove(page));
     await yourMove(page);
   }
   const boss = await page.evaluate(() => (window as any).match.boss);
@@ -199,12 +210,14 @@ test("Sawyer's board saw (?power=boardsaw): he saws up the middle, the board spl
   const fen3 = await page.evaluate(() => (window as any).match.phase.board.fen as string);
   expect(p3.allowed?.length).toBeGreaterThan(0);
   for (const m of p3.allowed) expect(crossesMiddle(m)).toBe(false);
+  // (A piece with moves both across and not: its dots stay on its half. Now and then the position has none.)
   const across = new Chess(fen3).moves({ verbose: true }).find((m) => crossesMiddle(m.from + m.to) && p3.allowed.some((a: string) => a.startsWith(m.from)));
-  expect(across, "a piece with a move across the middle").toBeTruthy();
-  await tap(page, across!.from);
-  await expect(page.locator(`${BOARD_SEL.square}.move-dest`).first()).toBeVisible();
-  for (const sq of await dotSquares(page)) expect(file(sq) <= 3, `${across!.from} → ${sq}`).toBe(file(across!.from) <= 3);
-  await tap(page, across!.from);
+  if (across) {
+    await tap(page, across.from);
+    await expect(page.locator(`${BOARD_SEL.square}.move-dest`).first()).toBeVisible();
+    for (const sq of await dotSquares(page)) expect(file(sq) <= 3, `${across.from} → ${sq}`).toBe(file(across.from) <= 3);
+    await tap(page, across.from);
+  }
   // The cut due on the 3rd turn waited for the saw: it comes on the 4th.
   expect(p3.cut ?? null).toBeNull();
   const cutSeen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /SAW CUT!/ }, caster: { selector: ".pm-cut .pm-caster" } });
@@ -280,3 +293,44 @@ test("Sawyer: the board saw from the admins' trigger, a cut taped over and heali
   expect(allowed.some(crossesMiddle)).toBe(new Chess(fen).moves({ verbose: true }).some((m) => crossesMiddle(m.from + m.to)));
   expect(errors).toEqual([]);
 });
+
+/**
+ * Here because it showed here (Oct 15: "ExitStatus" page errors now and then in this spec's errors check): Stockfish 19
+ * ends its process on a position it refuses, and in a browser that exit was thrown into the page. The game's engine
+ * never sends such a position (stockfishRefuses), and a worker's error, whatever its cause, stays in the worker.
+ */
+test("Stockfish: a position it refuses is never sent, and a worker's exit never reaches the page as an error; the engine answers on", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
+  test.setTimeout(3 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/?debug&clock=60&boss=sawyer&laststand=0");
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await yourMove(page);
+  const NINE_PAWNS = "4k3/8/8/8/8/P7/PPPPPPPP/4K3 w - - 0 1";
+  const ask = (fen: string | null) =>
+    page.evaluate((fen) => {
+      const m = (window as any).match;
+      (window as any).__answer = null;
+      void m.engines[0].topMoves(fen ?? m.phase.board.fen, 1).then((t: unknown) => ((window as any).__answer = t));
+    }, fen);
+  const answer = () => page.evaluate(() => (window as any).__answer);
+  // The game's engine doesn't send it: no lines, as for a position with no moves.
+  await ask(NINE_PAWNS);
+  await expect.poll(answer, { timeout: 30_000 }).toEqual([]);
+  // Sent to its worker anyway (around the engine's check, in its turn), Stockfish refuses it and ends its process: its
+  // error stays in the worker.
+  await page.evaluate((fen) => {
+    const e = (window as any).match.engines[0];
+    void e.serial(async () => {
+      e.transport.send(`position fen ${fen}`);
+      e.transport.send("isready");
+      await new Promise((r) => setTimeout(r, 1500));
+    });
+  }, NINE_PAWNS);
+  // The engine answers on, for the position on the board.
+  await ask(null);
+  await expect.poll(async () => ((await answer()) as unknown[] | null)?.length ?? 0, { timeout: 30_000 }).toBe(1);
+  expect(errors).toEqual([]);
+});
+

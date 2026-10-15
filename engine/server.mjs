@@ -48,6 +48,32 @@ function parseInfo(line) {
   if (!wdl || !pv) return null;
   return { multipv: mpv ? Number(mpv[1]) : 1, move: pv[1], expected: expectedFromWdl(Number(wdl[1]), Number(wdl[2]), Number(wdl[3])) };
 }
+// Each line's move and score, as searchLines in packages/chess/src/uci.ts (keep the two the same): each slot's last
+// exact line, as always, unless that lists a move twice; then each move once, with its own latest exact line's score.
+function searchLines(lines) {
+  const exactSlots = new Map();
+  const lastSlots = new Map();
+  const exact = new Map();
+  const bound = new Map();
+  for (const l of lines) {
+    const info = parseInfo(l);
+    const any = info ?? parseInfo(l.replace(/ (?:lower|upper)bound/, ""));
+    if (!any) continue;
+    lastSlots.set(any.multipv, any.move);
+    if (info) {
+      exactSlots.set(info.multipv, info);
+      exact.set(info.move, info);
+    } else bound.set(any.move, any);
+  }
+  const bySlot = (slots) => [...slots].sort((a, b) => a[0] - b[0]).map(([, v]) => v);
+  const plain = bySlot(exactSlots);
+  const pick = (m) => ({ move: m.move, expected: m.expected });
+  if (new Set(plain.map((m) => m.move)).size === plain.length) return plain.map(pick);
+  const listed = new Set(lastSlots.values());
+  return [...new Set([...plain.map((m) => m.move), ...bySlot(lastSlots)])]
+    .filter((m) => listed.has(m))
+    .map((m) => pick(exact.get(m) ?? bound.get(m)));
+}
 
 let queue = Promise.resolve();
 const serial = (fn) => {
@@ -78,12 +104,7 @@ function score(fen, moves, nodes) {
     send(`position fen ${fen}`);
     const done = until((l) => l.startsWith("bestmove"));
     send(`go nodes ${nodes} searchmoves ${moves.join(" ")}`);
-    const last = new Map();
-    for (const l of await done) {
-      const info = parseInfo(l);
-      if (info) last.set(info.multipv, info);
-    }
-    return [...last.values()].sort((a, b) => a.multipv - b.multipv).map(({ move, expected }) => ({ move, expected }));
+    return searchLines(await done);
   });
 }
 

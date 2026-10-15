@@ -57,20 +57,18 @@ const square = (f: number, r: number) => `${"abcdefgh"[f]}${r}`;
 export const firstMoveDue = (p: Pick<BossPowerState, "split"> | null | undefined): boolean => !!p && !p.split;
 
 /**
- * There's room on the board for another pawn of `side`'s: fewer than 8 of them, and fewer than 32 pieces in all. The
- * engine (Stockfish, for his moves, the judge, the eval bar and the bots) refuses any position with a ninth pawn a side
- * or a 33rd piece, so the split waits for room (DECISIONS.md, "Sawyer, built").
+ * There's room on the board for another pawn of `side`'s: fewer than 8 of them, fewer than 32 pieces in all, and no
+ * more pieces than promotions could have made with one pawn fewer missing (beyond a queen, two rooks, two bishops and
+ * two knights). The engine (Stockfish, for his moves, the judge, the eval bar and the bots) refuses any other position
+ * (stockfishRefuses), so the split waits for room (DECISIONS.md, "Sawyer, built"; the promotions, Oct 15).
  */
 export function splitRoom(fen: string, side: Side): boolean {
   const board = fen.split(" ")[0]!;
-  const pawn = side === "w" ? "P" : "p";
-  let pawns = 0;
-  let pieces = 0;
-  for (const c of board) {
-    if (c === pawn) pawns++;
-    if ((c >= "a" && c <= "z") || (c >= "A" && c <= "Z")) pieces++;
-  }
-  return pawns < 8 && pieces < 32;
+  const count = (c: string) => [...board].filter((x) => x === (side === "w" ? c.toUpperCase() : c)).length;
+  const pawns = count("p");
+  const pieces = [...board].filter((c) => (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")).length;
+  const promoted = Math.max(0, count("q") - 1) + Math.max(0, count("r") - 2) + Math.max(0, count("b") - 2) + Math.max(0, count("n") - 2);
+  return pawns < 8 && pieces < 32 && promoted <= 8 - (pawns + 1);
 }
 
 /**

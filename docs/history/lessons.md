@@ -713,3 +713,48 @@ every one of 21 battles on a phone's budget.
   Test that a later round sees new candidates.
 - A power that fires only when a search finds something is measured in real battles (a sim through the match runner,
   on a phone's budget) before it ships: how often it fires, and how long after it may. A fixed position doesn't show it.
+
+## A move scored twice, another not at all (Oct 14, 2026)
+
+**What was seen:** while building the Chess960 rules, a helper asked the engine server (run locally at 20k nodes) to
+score two moves, one of them castling, and got the same move back twice, the castling move missing.
+
+**The cause:** our reader of Stockfish's output kept the last exact line for each MultiPV slot and skipped bound lines.
+Stockfish re-sorts its lines as it deepens, and a search cut off partway through a line prints that slot as a bound, so
+the slot's last exact line came from the depth before and could name the move that now sat in the other slot. It
+happened in about one in five of the judge's top-8 searches. It had been seen twice before and patched where it
+showed: `scoreMoves` re-scored a missing move another way (milestone 1), and Squads' `cleanTop` kept a duplicated
+move's first line. Neither covered re-checks, the engine server or the top-8 search, and nobody asked why.
+
+**The fix:** `searchLines` reads each slot's last exact line as before, unless that lists a move twice; then each move
+once, with its own latest exact line, the moves from the last line printed for each slot (bound lines included). A
+search with no move twice reads exactly as before.
+
+**The rule:**
+- When an engine's answer looks impossible (a move twice, a move missing), find out why before patching around it, and
+  measure how often it happens across many positions: a fallback where it showed hides it everywhere else.
+- Read Stockfish's MultiPV output by move, not by slot: a slot's last exact line may name another move.
+
+## A countdown that seemed to fire early (Oct 15, 2026)
+
+**What Eric saw:** against the Hidden Boss, under his bullet clock (1+2), "just the big one popped up for a second",
+the 3-2-1's big number alone, "and I definitely had more time because I would have seen the 3-2-1 whole countdown".
+He was spamming Engine move and played on: at move 20 the dock said "Bullet 1+2 · 0:20 left".
+
+**The cause:** no misfire. The bullet clock's first three moves add nothing (60 s, 1+0). Think through them and the
+first 1+2 turn starts with about 0 s plus the 2 s, inside the countdown, so its first frame shows one big number with
+no build-up. Then the instant Engine move takes it away. Each instant move after that banks about 1.9 s, which is
+where his 0:20 at move 20 came from. Nothing on screen had said his time was that low. It was small, muted, after the
+words, gone between moves, and rounded down ("0:02 left") while the big number is rounded up ("3"). A unit test
+spamming Engine move at every moment of the bullet clock, and five browser runs (instant and slow answers, a slowed CPU,
+every `.cc-num` watched), never showed the count with time in the bank.
+
+**The fix:** your clock always in the dock, bold at the status box's right, holding between your moves, red in its last
+10 s, in the same rounding as the big 3-2-1, with a "+2" as the increment lands (`DockClock`). The countdown's logic
+didn't change. `packages/app/test/boss-clock.test.ts` plays Eric's path.
+
+**The rule:**
+- A clock the player plays against is on screen all the time, in one place, readable at a glance, in the same rounding
+  as any countdown drawn over the board. Never only inside a line of text that changes with the moment.
+- Before hunting a "fired early" bug, work out the player's own time on the path they really played (the bank, the
+  increment, how fast they moved) and check it against what they saw last; then test that path.
