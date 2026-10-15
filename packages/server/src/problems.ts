@@ -65,12 +65,22 @@ export type Problem = { kind: "errors"; diag: Diag; errors: DeviceError[] } | Re
 
 // ---------------- Reading a request ----------------
 
-const EMAIL = /[^\s@<>()"',;:]+@[^\s@<>()"',;:]+\.[a-z]{2,}/gi;
+/**
+ * An email address. Linear: a match is tried only where a run of address characters starts (the lookbehind), never
+ * from inside one, and no quantifier is nested, so a long run without an "@" costs one pass, not one per character.
+ */
+const EMAIL = /(?<![^\s@<>()"',;:])[^\s@<>()"',;:]+@[^\s@<>()"',;:]+\.[a-z]{2,}/gi;
+/** Every email address in a text, as "[email]". */
+export const scrubEmails = (s: string) => s.replace(EMAIL, "[email]");
 const VERSION = /^([0-9a-f]{7,40}|dev)$/;
-/** Text as stored: a string, emails scrubbed, control characters (other than newlines) dropped, cut to `max`. */
+/**
+ * Text as stored: a string, emails scrubbed, control characters (other than newlines) dropped, cut to `max`. Cut first
+ * (with room for an address that crosses the cut), so the scrub's work is bounded by the field, never the request.
+ */
 const text = (v: unknown, max: number) =>
   typeof v === "string"
     ? v
+        .slice(0, max + 254)
         .replace(EMAIL, "[email]")
         .replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, "")
         .slice(0, max)
@@ -195,8 +205,13 @@ interface Counted extends ErrorGroup {
   last: number;
 }
 
+/**
+ * One kind of error's count for its hour: added to its row, or a new row while the hour has fewer than
+ * OPS.store.maxNewErrorsPerHour (the database's own cap: a flood of made-up errors can't grow it without bound).
+ */
 const UPSERT = `INSERT INTO ops_errors (fingerprint, hour, source, kind, message, version, count, first_seen, last_seen, sample)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
+  WHERE EXISTS (SELECT 1 FROM ops_errors WHERE fingerprint = ?1 AND hour = ?2) OR (SELECT COUNT(*) FROM ops_errors WHERE hour = ?2) < ?11
   ON CONFLICT (fingerprint, hour) DO UPDATE SET count = count + excluded.count, last_seen = MAX(last_seen, excluded.last_seen),
   version = excluded.version, sample = excluded.sample`;
 
@@ -236,7 +251,12 @@ export class ErrorTally {
     this.dropped = 0;
     if (dropped) console.error({ ops: "errors-dropped", count: dropped });
     for (const g of rows) {
-      await sql.run(UPSERT, g.fingerprint, Math.floor(g.last / HOUR) * HOUR, g.source, g.kind, g.message, g.version, g.count, g.first, g.last, g.sample);
+      await sql.run(UPSERT, g.fingerprint, Math.floor(g.last / HOUR) * HOUR, g.source, g.kind, g.message, g.version, g.count, g.first, g.last, g.sample, OPS.store.maxNewErrorsPerHour);
+    }
+    // (A full hour keeps counting what it has; new kinds wait for the next. Said once a write, for the health view.)
+    const hour = rows.length ? Math.floor(rows[0]!.last / HOUR) * HOUR : 0;
+    if (rows.length && ((await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM ops_errors WHERE hour = ?", hour))?.n ?? 0) >= OPS.store.maxNewErrorsPerHour) {
+      console.error({ ops: "cap", what: "new kinds of error this hour", cap: OPS.store.maxNewErrorsPerHour });
     }
     return rows.length;
   }
@@ -437,7 +457,15 @@ export async function handleProblems(request: Request, env: ProblemsEnv, waitUnt
     }
     return json({ ok: true });
   }
-  if (!reportsWritten.hit("all", now).ok) return json({ message: "Too many reports right now. Try again in a minute." }, 503);
+  // This instance's cap, then the database's own, whatever the instances (one indexed count; requests counted at once
+  // may overshoot it by about one burst, which is fine for a bound on storage).
+  const busy = () => json({ message: "Too many reports right now. Try again in a minute." }, 503);
+  if (!reportsWritten.hit("all", now).ok) return busy();
+  const today = await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM ops_reports WHERE at > ?", now - DAY);
+  if ((today?.n ?? 0) >= OPS.store.maxReportsPerDay) {
+    console.error({ ops: "cap", what: "player reports a day", cap: OPS.store.maxReportsPerDay });
+    return busy();
+  }
   return json({ id: await saveReport(sql, p, account, now) });
 }
 

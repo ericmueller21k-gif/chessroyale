@@ -140,6 +140,13 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   frequent; one row per kind of error per hour, upserted); past `maxGroups` kinds in memory or the rows a write takes,
   they're dropped and logged as a number. So writes grow with instances, never with errors. Player reports are one row
   each, written at once (for the id).
+- **The database's own caps** (whatever the instances, so a flood from many addresses can't grow D1 without bound):
+  at most `OPS.store.maxNewErrorsPerHour` (100) new kinds of error an hour (one conditional upsert; kinds already stored
+  keep counting) and `maxReportsPerDay` (2000) reports a day (one indexed count before the insert; requests counted at
+  once can overshoot it by about a burst). At a cap, one `{ops: "cap"}` log line, and a report gets "Too many reports
+  right now. Try again in a minute." At most about 300 MB of errors and 240 MB of reports over the 30 days.
+- **The email scrubber is linear** (it tries a match only where a run of address characters starts) and works on each
+  field cut to its size first: a 20 KB field costs a few milliseconds, not a second.
 - **Stored** (D1, made at runtime with the rest of the schema): `ops_errors` (fingerprint, hour, source, kind, message,
   version, count, first and last seen, the latest occurrence's diagnostics) and `ops_reports` (id, when, kind, a bug's
   account id or none, a bug's version, the note, a bug's diagnostics).

@@ -5047,6 +5047,16 @@ report a bug (with a short id to share), send feedback or suggest an idea, and a
   number. Under 30 s because the wait rides the request's `waitUntil` (as presence's batches do). Worst case a
   storm costs 15 rows a minute per instance, far inside D1's included writes. Reports are one row each, written at
   once for the id, capped at 20 a minute per instance on top of the per-address and per-account limits.
+- **The database's own caps** (my review, approved): every other cap is per instance, so a flood of made-up errors or
+  reports from many addresses could grow D1 without bound. So: at most 100 new kinds of error an hour (a conditional
+  upsert: a kind already stored keeps counting) and 2000 reports a day (an indexed count before the insert; requests
+  counted at the same moment can overshoot it by about one burst, fine for a bound on storage). At a cap, one
+  `{ops: "cap"}` log line (for the health view), and a report gets the usual "Too many reports right now. Try again in a
+  minute." Worst case over the 30 days: about 300 MB of errors and 240 MB of reports, against D1's 10 GB.
+- **The email scrubber is linear and bounded:** it ran before each field was cut to size, and a 20 KB field without
+  separators took 0.8 s of CPU (measured). Now each field is cut first (with room for an address across the cut), and
+  the pattern only tries a match where a run of address characters starts, with no nested quantifier: a few
+  milliseconds at any length (a unit test holds it under 20 ms).
 - **Fingerprints** are source, kind, the message with numbers, long hex ids, hosts, queries and build hashes taken out,
   and the top file without its hash, so a bug keeps its row across deploys and the page shows which versions it came
   from. FNV-1a 32 bits: with a few hundred kinds, a collision is about a one-in-a-million chance.

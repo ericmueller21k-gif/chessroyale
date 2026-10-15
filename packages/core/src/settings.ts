@@ -1643,6 +1643,13 @@ export const OPS = {
     maxGroups: 100,
     /** Player reports (bugs, feedback, ideas) each instance writes a minute, at most (one row each, written at once). */
     maxReportsPerMinute: 20,
+    /**
+     * Caps for the whole database, whatever the instances (a flood from many addresses can't grow D1 without bound):
+     * new kinds of error an hour (one already stored keeps counting) and player reports a day. At most about 300 MB
+     * of errors and 240 MB of reports over keepDays.
+     */
+    maxNewErrorsPerHour: 100,
+    maxReportsPerDay: 2_000,
     /** Errors and player reports are deleted after this many days (the 15-minute cron). */
     keepDays: 30,
   },

@@ -13,6 +13,7 @@ import {
   readCapped,
   readProblem,
   reportById,
+  scrubEmails,
   topErrors,
   topFile,
   type ErrorGroup,
@@ -123,6 +124,18 @@ describe("reading a request", () => {
     }
   });
 
+  it("scrubbing is linear: a 20 KB field without separators, or with one \"@\", takes a few milliseconds", () => {
+    for (const long of ["a".repeat(20_000), `a@${"b".repeat(20_000)}`, `${"a".repeat(50)}@`.repeat(400)]) {
+      const t = performance.now();
+      scrubEmails(long);
+      expect(performance.now() - t, long.slice(0, 60)).toBeLessThan(20);
+    }
+    expect(scrubEmails("x.pat@example.com, (sam@ex.co) and @@lee@ex.org.")).toBe("[email], ([email]) and @@[email].");
+    const t = performance.now();
+    readProblem({ kind: "bug", note: "n".repeat(19_000), where: { screen: "s".repeat(19_000) } });
+    expect(performance.now() - t).toBeLessThan(20);
+  });
+
   it("reads a body up to the cap and no further", async () => {
     const small = new Request("https://x/", { method: "POST", body: "hello" });
     expect(await readCapped(small, 10)).toBe("hello");
@@ -191,6 +204,28 @@ describe("bounded writes", () => {
     expect(log).toHaveBeenCalledWith(expect.objectContaining({ ops: "errors-dropped" }));
     // Nothing left over for the next write.
     expect(await t.flush(sql)).toBe(0);
+    log.mockRestore();
+  });
+
+  it("the database's own cap: at most maxNewErrorsPerHour new kinds an hour (a cap line logged); stored kinds keep counting", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const t = new ErrorTally();
+    const cap = OPS.store.maxNewErrorsPerHour;
+    for (let i = 0; i < cap + 10; i += OPS.store.maxRowsPerFlush) {
+      for (let j = i; j < i + OPS.store.maxRowsPerFlush; j++) t.add(group(`kind${j}`), T0);
+      await t.flush(sql);
+    }
+    t.add(group("kind0"), T0 + 1000);
+    await t.flush(sql);
+    expect((await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM ops_errors"))!.n).toBe(cap);
+    expect((await sql.first<{ count: number }>("SELECT count FROM ops_errors WHERE fingerprint = 'kind0'"))!.count).toBe(2);
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ ops: "cap" }));
+    // The next hour starts afresh.
+    t.add(group("later"), T0 + HOUR);
+    await t.flush(sql);
+    expect((await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM ops_errors WHERE fingerprint = 'later'"))!.n).toBe(1);
     log.mockRestore();
   });
 
@@ -298,6 +333,27 @@ describe("POST /api/problems", () => {
     expect(ids.every((id) => /^[A-HJKMNP-Z2-9]{6}$/.test(id))).toBe(true);
     expect((await latestReports(sql, 30, "idea")).map((r) => r.note)).toEqual(["idea: more bosses"]);
     expect(await latestReports(sql)).toHaveLength(2);
+  });
+
+  it("the database's own cap: at most maxReportsPerDay reports a day, whatever the instance (a cap line logged)", async () => {
+    const { sql, d1 } = memoryDb();
+    await ensureSchema(sql, d1);
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await vi.advanceTimersByTimeAsync(60_000);
+    const now = Date.now();
+    await sql.run(
+      "INSERT INTO ops_reports (id, at, kind, account, version, note, diag) SELECT printf('R%05d', value), ?, 'idea', NULL, '', 'x', '{}' FROM json_each(?)",
+      now - HOUR,
+      JSON.stringify(Array.from({ length: OPS.store.maxReportsPerDay }, (_, i) => i)),
+    );
+    const res = await handleProblems(post({ kind: "idea", note: "one more" }), { DB: d1 }, background().waitUntil);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ message: "Too many reports right now. Try again in a minute." });
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ ops: "cap", what: "player reports a day" }));
+    // A day on, it takes reports again.
+    await vi.advanceTimersByTimeAsync(24 * HOUR);
+    expect((await handleProblems(post({ kind: "idea", note: "next day" }), { DB: d1 }, background().waitUntil)).status).toBe(200);
+    log.mockRestore();
   });
 
   it("429 past an account's limit", async () => {
