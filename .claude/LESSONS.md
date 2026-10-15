@@ -138,6 +138,12 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   sees new ones); a power that fires only when a search finds something is measured in real battles, on a phone's
   budget, before it ships (`showdown-sim.ts`).
 
+- **A move scored twice, another not at all** (Oct 14, [story](../docs/history/lessons.md#a-move-scored-twice-another-not-at-all-oct-14-2026)):
+  a slot's last exact line in Stockfish's MultiPV output may name another move: read through `searchLines`, never by
+  slot alone.
+  When an engine's answer looks impossible, find out why and measure how often across many positions before adding a
+  fallback where it showed.
+
 ## Servers: everything ends
 
 - **A lobby that never closed** (Oct 7, [story](../docs/history/lessons.md#a-lobby-that-never-closed-oct-7-2026)):

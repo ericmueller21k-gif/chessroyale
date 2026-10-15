@@ -9,6 +9,11 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   with the highest score, not the first line). `packages/chess/src/uci.ts` (`UciEngine`) speaks UCI; the same code runs
   in Node (tests, sims: `src/node.ts`) and in the browser (a Web Worker pool, Stockfish 19 lite WASM:
   `packages/app/src/engine.ts`). The browser engine is deterministic (`reports/judge-determinism.md`).
+- **Positions Stockfish refuses** (DECISIONS.md, "Engines' exits never reach the page", Oct 15): Stockfish 19 ends its
+  process on a position it refuses (a ninth pawn, more pieces than promotions could make, the side not to move in
+  check, …), and a browser worker's exit was thrown into the page. `stockfishRefuses` (`uci.ts`) holds its rules
+  (checked against the real engine), and `UciEngine` never sends such a position: no lines, no scores, or "no move".
+  Every engine worker's error stays in the worker (`preventDefault` in `engine.ts`, `maia.ts`).
 - **Who scores, online: many judges.** Each board's scoring job (position, picks, bots; no names) goes to **two
   devices** drawn by the lobby, weighted by the speed each reported on joining. A device sends the engine's raw output;
   the lobby works out the board with the same code (`judge.ts`: `runJudgeJob`, `judgedBoard`). Two honest answers are
@@ -131,9 +136,11 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 
 ## Tests and tools
 
-- Unit: `packages/chess/test/uci.test.ts`, `judge.test.ts`, `boss-guard.test.ts`, `top-cache.test.ts`, `bots.test.ts`,
+- Unit: `packages/chess/test/uci.test.ts`, `stockfish-refuses.test.ts` (each rule against the real engine; never a
+  real game's position; never sent), `judge.test.ts`, `boss-guard.test.ts`, `top-cache.test.ts`, `bots.test.ts`,
   `packages/server/test/judges.test.ts`. (Engine tests run real Stockfish.)
-- e2e: `e2e/judges.spec.ts` (with containers off).
+- e2e: `e2e/judges.spec.ts` (with containers off); `e2e/sawyer.spec.ts`'s last test (a refused position never sent;
+  a worker's exit kept off the page, the engine answering on).
 - Chess960: `packages/chess/test/chess960.test.ts` (perft against the published table, each castling rule, FEN, SAN,
   random games against chess.js), `chess960-engine.test.ts` (the commands sent, Stockfish's FEN, perft and moves
   against ours, scoring and `playAtElo` on Chess960).
@@ -159,11 +166,16 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 
 - Never compromise the game; use players' devices wherever they can do the job; the servers only when truly needed,
   and then without skimping (Eric's computing priorities, `CLAUDE.md`).
+- A power that changes the position outside a move (a piece added, removed or moved) never makes one Stockfish
+  refuses (`stockfishRefuses`): check it there, as Sawyer's `splitRoom` does; the engine's own check is the last line.
 - Money is Eric's: never raise `ENGINE_DAILY_SEARCHES`, the container's size or count, or add a paid service without
   asking, with a monthly estimate.
 - Measure before and after: a judge or boss change comes with a sim's before/after table in `reports/`.
 - Never break the fallback: every server path degrades to the host's own engine.
 - "The engine's best move" is the line with the highest score, not the first line.
+- Stockfish's output goes through `searchLines` (`uci.ts`, the same in `engine/server.mjs`; keep the two the same): a
+  slot's last exact line may name another move, so a move listed twice is read again by move (DECISIONS.md, "The
+  engine reader", Oct 14).
 - The FAQ explains the judge, the re-check and the boss's brain and strength to players (`packages/app/src/faq/content.ts`):
   a change to how they work changes its words in the same PR.
 - The Maia box stays a separate program: nothing in the game imports it, and nothing in it imports the game; only
