@@ -22,7 +22,7 @@ If a request needs gameplay, engine or protocol changes, say so and stop; that's
 | Server rolls and storage (D1 `items`, `equipped_items`) | `packages/server/src/locker.ts` |
 | Shop cosmetics: pawn hats, God King looks (bought in the shop, worn from the locker) | `packages/core/src/shop.ts`, `packages/app/src/components/Cosmetics.tsx` |
 | Tests | `packages/core/test/crates.test.ts`, `packages/server/test/accounts.test.ts` |
-| The record of every call made | `docs/history/shop-and-crates.md` ("Crates: Winter Crate · Series 1"); new calls in `DECISIONS.md` (New decisions) |
+| The record of every call made | `docs/history/shop-and-crates.md` ("Crates: Winter Crate · Series 1"); new calls in `docs/decisions/` (one file each) |
 
 ## Adding a crate item: the checklist
 
@@ -69,7 +69,7 @@ If a request needs gameplay, engine or protocol changes, say so and stop; that's
 7. **Test it.** Update the odds assertions in `crates.test.ts` and add a test for anything new (a new roll, a new field).
    A new stored field needs a column: add an `ALTER TABLE` to `LOCKER_MIGRATIONS` in `locker.ts` (it runs once and
    tolerates re-runs), and pass the field through `cleanLook`.
-8. **Record it** in `DECISIONS.md` (New decisions): the items, the odds table, and each call you made and why. Keep
+8. **Record it** in a new file in `docs/decisions/`: the items, the odds table, and each call you made and why. Keep
    it short. Update `docs/areas/shop.md` if how crates work changed.
 9. **Ship it** per `CLAUDE.md`: run `npm run typecheck` and `npm test`, and when screens changed, the e2e specs you
    touched, locally (under the shared e2e lock). Open the PR, wait for the `check` run to pass and read the e2e run's

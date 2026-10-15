@@ -67,7 +67,7 @@ changes beyond the engine's own messages, write up the proposal and stop; that's
   add a paid service, without asking him. Give the monthly cost estimate with any proposal. Today it's Workers Paid
   ($5/mo) plus container time; the hybrid costs well under 1¢ per match.
 - **Measure before and after.** Any change to the judge or a boss comes with numbers from a sim script, a before/after
-  table, in `reports/` and summarized in `DECISIONS.md` (New decisions). Never a vibe. Keep `docs/areas/engine.md`
+  table, in `reports/` and summarized in a new file in `docs/decisions/`. Never a vibe. Keep `docs/areas/engine.md`
   true.
 - **Fairness first.** The judge must give the same score for the same move whoever hosts, and on any device, within
   the measured noise. Brilliant-move credit never comes from a power-up move.

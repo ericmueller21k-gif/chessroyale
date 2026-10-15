@@ -46,7 +46,7 @@ Not yours:
   - An e2e case in a 50 v 50 match on phone and desktop.
   - Run `npm test`, `npm run typecheck` and, locally, the e2e specs you touched (under the shared e2e lock).
     CI runs the whole e2e suite on the PR (`.github/workflows/e2e.yml`): read its `result` before merging.
-- **Record it** in `DECISIONS.md` (New decisions) and keep `docs/areas/chat.md` true, and **ship it** per `CLAUDE.md`.
+- **Record it** in a new file in `docs/decisions/` and keep `docs/areas/chat.md` true, and **ship it** per `CLAUDE.md`.
 
 ## Reporting back
 
