@@ -4138,7 +4138,8 @@ Eric played the Hidden Boss on his iPhone 15 (Oct 14-15) and reported four thing
   40 px short of its right edge.
 - **The God King on a phone: on a line of his own under the row, in its middle**, so the box has the board's whole
   width. His words and his menu open above the row (over the board's bottom edge, as they did beside it), never over the
-  box. **Where he goes is decided by the room there is, not the device** (Eric: "decide by available width"): beside the
+  box. Absorbed by the Hidden Boss (phase 2), his empty place takes no line there (the row above doesn't move). **Where
+  he goes is decided by the room there is, not the device** (Eric: "decide by available width"): beside the
   row when the screen's column has 66 px right of the board (his 58 px and a gap), under it otherwise. Side by side
   squeezes the box as soon as the board fills the column, and on a phone or tablet held upright it always does (the
   column is at most 560 px, so 768 px gives the same column as a big phone). That leaves him beside the row only on a phone
