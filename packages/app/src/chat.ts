@@ -1,3 +1,4 @@
+import { isBlocked } from "./friends.ts";
 import {
   QUICK_CHAT,
   botChatLines,
@@ -45,6 +46,8 @@ export interface ChatHost {
   teams: () => boolean;
   /** The lines and emoji this player picked in their profile (their account's; missing: the defaults). */
   picks: () => StoredChatPicks | null | undefined;
+  /** A player's account (their seat's uid), for what's kept by account: who you've blocked (friends.ts). */
+  uidOf?: (playerId: string) => string | undefined;
 }
 
 /**
@@ -180,6 +183,11 @@ export class MatchChat {
     return this.muted.has(id);
   }
 
+  /** A sender whose lines don't show: muted for this match, or an account you've blocked (friends.ts). */
+  hidden(from: string): boolean {
+    return this.muted.has(from) || isBlocked(this.host.uidOf?.(from));
+  }
+
   mutedIds(): string[] {
     return [...this.muted];
   }
@@ -208,7 +216,7 @@ export class MatchChat {
 
   /** The feed: the last lines this player can see (shown now, not muted). */
   lines(now = Date.now()): ChatLine[] {
-    return this.list.filter((l) => l.at <= now && !this.muted.has(l.from)).slice(-QUICK_CHAT.feedSize);
+    return this.list.filter((l) => l.at <= now && !this.hidden(l.from)).slice(-QUICK_CHAT.feedSize);
   }
 
   /** Lines that arrived while no chat was on screen (not your own). */
@@ -287,7 +295,7 @@ export class MatchChat {
   private arrived(l: ChatLine) {
     const me = this.host.me();
     if (this.visible) this.markSeen();
-    if (l.from !== me && l.to === "team" && !chatOff() && !this.muted.has(l.from) && Date.now() - this.lastTick > QUICK_CHAT.tickGapMs) {
+    if (l.from !== me && l.to === "team" && !chatOff() && !this.hidden(l.from) && Date.now() - this.lastTick > QUICK_CHAT.tickGapMs) {
       this.lastTick = Date.now();
       play("chat");
     }

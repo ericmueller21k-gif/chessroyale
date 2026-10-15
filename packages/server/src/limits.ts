@@ -2,7 +2,7 @@ import { CAPACITY, OPS } from "@chessroyale/core";
 
 /**
  * Rate limits on the API (CAPACITY.rateLimits): requests per window per address, per account (its session) and, for
- * PLAY and new lobbies, per account again. Counted in each Worker instance's memory, so they stop a runaway client or
+ * PLAY and new lobbies, and for friends' actions, per account again. Counted in each Worker instance's memory, so they stop a runaway client or
  * script, not a person playing; past a limit the answer is a friendly 429 with when to try again.
  */
 export class RateLimiter {
@@ -34,6 +34,7 @@ const L = CAPACITY.rateLimits;
 const perIp = new RateLimiter(L.perIp.limit, L.perIp.windowMs);
 const perUser = new RateLimiter(L.perUser.limit, L.perUser.windowMs);
 const play = new RateLimiter(L.play.limit, L.play.windowMs);
+const friends = new RateLimiter(L.friends.limit, L.friends.windowMs);
 
 export const TOO_MANY = "Too many requests. Wait a few seconds and try again.";
 
@@ -41,11 +42,13 @@ export const TOO_MANY = "Too many requests. Wait a few seconds and try again.";
  * Whether this request may go ahead: null if so, else how long to wait. `ip` is skipped when `ipExempt` (a load test
  * from one machine; the LOAD_TEST variable on staging, never production).
  */
-export function rateLimited(req: { ip: string | null; session: string | null; play: boolean }, now: number, ipExempt = false): number | null {
+export function rateLimited(req: { ip: string | null; session: string | null; play: boolean; friends?: boolean }, now: number, ipExempt = false): number | null {
   const checks: [RateLimiter, string][] = [];
   if (req.ip && !ipExempt) checks.push([perIp, req.ip]);
   if (req.session) checks.push([perUser, req.session]);
   if (req.play) checks.push([play, req.session ?? `ip:${req.ip}`]);
+  // (Friends' actions: a burst limit here; the daily and hourly caps are counted in D1, friends.ts.)
+  if (req.friends) checks.push([friends, req.session ?? `ip:${req.ip}`]);
   let wait = 0;
   for (const [l, k] of checks) {
     const r = l.hit(k, now);

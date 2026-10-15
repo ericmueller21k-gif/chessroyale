@@ -10,6 +10,9 @@ import { engineTop, test } from "./helpers.ts";
  * plus 35 ms a character once typed, at most 4.5 s: SPEECH in settings.ts, read here, so the numbers can change
  * without this test), through the end of the boss's turn and into yours.
  * The God King's opening line is held to the same rule. Every frame is watched, from before the page loads.
+ * Neither box is ever over the board's squares, and the boss's never over the boss bar's status or the line under the
+ * bar, nor the God King's over the dock's box (Oct 15: his had covered ranks 1 and 2 while you chose a move): a frame
+ * where one is counts as not on screen.
  */
 
 /** How long a line must stay fully on screen: typed, then readable (its fade after that isn't counted). */
@@ -36,15 +39,25 @@ type Speech = { boss: Segment[]; king: Segment[]; banners: Record<string, number
 async function watchSpeech(page: Page) {
   await page.addInitScript(() => {
     const out: Speech = ((window as unknown as { __speech: Speech }).__speech = { boss: [], king: [], banners: {}, gaps: [] });
-    const look = (selector: string): { text: string; ok: boolean; why: string } => {
+    /** The first of `selectors` on screen that the box covers (by more than a pixel each way), if any. */
+    const covers = (r: DOMRect, selectors: string[]) =>
+      selectors.find((s) =>
+        [...document.querySelectorAll<HTMLElement>(s)].some((o) => {
+          const b = o.getBoundingClientRect();
+          return b.width > 0 && Math.min(r.right, b.right) - Math.max(r.left, b.left) > 1 && Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top) > 1;
+        }),
+      );
+    const look = (selector: string, keepOff: string[]): { text: string; ok: boolean; why: string } => {
       for (const el of document.querySelectorAll<HTMLElement>(selector)) {
         const r = el.getBoundingClientRect();
         if (r.width === 0 || r.height === 0) continue;
         const text = el.getAttribute("aria-label") ?? "";
+        const over = covers(r, keepOff);
         const why =
           getComputedStyle(el).visibility !== "visible" ? "hidden"
           : r.top < 0 || r.left < 0 || r.right > innerWidth || r.bottom > innerHeight ? `off screen ${[r.left, r.top, r.right, r.bottom].map(Math.round)}`
           : el.classList.contains("leaving") ? "fading"
+          : over ? `over ${over}`
           : "";
         return { text, ok: !why, why };
       }
@@ -59,8 +72,8 @@ async function watchSpeech(page: Page) {
     const frame = () => {
       const now = Date.now();
       if (prev && now - prev > 150) out.gaps.push([prev, now - prev]);
-      track(out.boss, look(".bc-bubble"), now);
-      track(out.king, look(".gk-bubble"), now);
+      track(out.boss, look(".bc-bubble", [".board-row .hb-container", ".boss-next", ".board-area > .opening-name"]), now);
+      track(out.king, look(".gk-bubble", [".board-row .hb-container", ".boss-dock-status"]), now);
       for (const b of document.querySelectorAll(".fight-banner.power-cut .kc-text")) out.banners[b.textContent ?? ""] ??= now;
       prev = now;
       requestAnimationFrame(frame);

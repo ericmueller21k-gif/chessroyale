@@ -10,8 +10,9 @@ these weren't reviewed first. Most are a single line in `packages/core/src/setti
   in its area's file in [`docs/history/`](docs/history/). The index below lists each one, in the order it was made,
   and links to it. Code comments that cite `DECISIONS.md, "<section>"` still lead there: find the section's title
   below.
-- **New decisions go at the end of this file**, under "New decisions": one section each, with the date and the
-  reason, as before. Add to your own lane's sections rather than rewriting others'.
+- **New decisions go in [`docs/decisions/`](docs/decisions/README.md)**, one file each, named
+  `YYYY-MM-DD-short-title.md`, with the date and the reason (Oct 15, 2026: every PR appending to the end of this file
+  made every pair of open PRs conflict). The "New decisions" sections below, written up to Oct 15, stay here.
 - **When a decision changes how an area works,** update its page in `docs/areas/` in the same PR.
 - **When this file grows long again** (a month or so of new decisions), move the new sections, unchanged, to the end
   of their area's `docs/history/` file and list them in the index.
@@ -154,6 +155,8 @@ In [`docs/history/ops.md`](docs/history/ops.md). How it works today: [`docs/area
 - [Capacity: built (Oct 7, 2026)](docs/history/ops.md#capacity-built-oct-7-2026)
 
 ## New decisions
+
+Written up to Oct 15, 2026. Newer decisions: one file each in [`docs/decisions/`](docs/decisions/README.md).
 
 Add new sections here (`### Title (date)`), newest last.
 
@@ -5028,76 +5031,84 @@ Eric asked to remove two dated player options.
   alive picking every move), e2e `judges.spec.ts` (two devices on a 50 v 50) and `crowd.spec.ts` (coordinates from
   each team's side, and a device with the old choices stored playing 50 v 50 at the mode's pace).
 
-## Error capture and the feedback sheet (ops, Oct 15, 2026)
+## Nothing said twice, nothing over the board: the boss screens (Oct 15, 2026)
 
-The director's brief for launch: nothing on a player's device reported an error, the server barely logged its own,
-and the only admin page was fair play's. Built: every device reports its errors, the server records its own, players
-report a bug (with a short id to share), send feedback or suggest an idea, and admins read it all on `/admin/ops`
-(docs/areas/ops.md, "Errors and player reports"). The calls:
+From the slop audit (Oct 15: V1, V2, V4, V5, V7, V10, V24, V25, the Crowd's pick count, and `ult2`'s seconds). No rule,
+timing, protocol or stored data changes: words, where the speech boxes sit, and phase 2's layout on a computer.
 
-- **One endpoint, one table per thing.** `POST /api/problems` takes `{kind: "errors"}`, or a report: `{kind: "bug" |
-  "feedback" | "idea"}` (the name `/api/report` was taken by player reports for fair play). Errors go in `ops_errors`,
-  one row per fingerprint per hour, upserted; player reports in `ops_reports`. Hourly rows give the page true "last 24
-  hours" and "7 days" counts (and next PR's "last hour") with one statement per kind per write.
-- **A count is page loads, not throws.** A device sends each kind of error once per page load, so a loop throwing a
-  thousand times a second counts once per player; that's the better measure of how many players a bug hits. The
-  server's own errors count each time (they're already rare and bounded).
-- **Bounded writes, per instance.** Counted in memory by fingerprint, written at once the first time and then at most
-  every 20 s, at most 5 rows a write (the most frequent), at most 100 kinds held; the rest dropped and logged as a
-  number. Under 30 s because the wait rides the request's `waitUntil` (as presence's batches do). Worst case a
-  storm costs 15 rows a minute per instance, far inside D1's included writes. Reports are one row each, written at
-  once for the id, capped at 20 a minute per instance on top of the per-address and per-account limits.
-- **The database's own caps** (my review, approved): every other cap is per instance, so a flood of made-up errors or
-  reports from many addresses could grow D1 without bound. So: at most 100 new kinds of error an hour (a conditional
-  upsert: a kind already stored keeps counting) and 2000 reports a day (an indexed count before the insert; requests
-  counted at the same moment can overshoot it by about one burst, fine for a bound on storage). At a cap, one
-  `{ops: "cap"}` log line (for the health view), and a report gets the usual "Too many reports right now. Try again in a
-  minute." Worst case over the 30 days: about 300 MB of errors and 240 MB of reports, against D1's 10 GB.
-- **The email scrubber is linear and bounded:** it ran before each field was cut to size, and a 20 KB field without
-  separators took 0.8 s of CPU (measured). Now each field is cut first (with room for an address across the cut), and
-  the pattern only tries a match where a run of address characters starts, with no nested quantifier: a few
-  milliseconds at any length (a unit test holds it under 20 ms).
-- **Fingerprints** are source, kind, the message with numbers, long hex ids, hosts, queries and build hashes taken out,
-  and the top file without its hash, so a bug keeps its row across deploys and the page shows which versions it came
-  from. FNV-1a 32 bits: with a few hundred kinds, a collision is about a one-in-a-million chance.
-- **The account id only when signed in, and only its own.** The app sends it only for a signed-in player; the server
-  keeps it only if it's the session's own (the presence cache, so rarely a D1 read). Guests send none.
-- **No IP addresses, no emails, no chat.** The rate limits key on the address in memory only; emails are scrubbed from
-  every stored text (a report's note included: "[email]"); breadcrumbs are screens, moments and moves sent, never
-  anything typed. Kept 30 days, deleted by the existing 15-minute cron. The privacy page says so.
-- **The version is the commit.** `vite.config.ts` puts the commit's first 12 characters in the app
-  (`WORKERS_CI_COMMIT_SHA` in Workers Builds, else git) and writes `dist/version.json` (not precached); the Worker reads
-  that file through the assets binding for its own errors. The one cost: the bundle now changes with every commit, so
-  every deploy updates the service worker's cache (mostly 304s); most deploys changed the bundle anyway.
-- **The error boundary throws the error on once** after showing "Something went wrong" with Reload, so the console and
-  every e2e spec's page-error check still see a render error (the boundary would otherwise hide it from them). The
-  page's listener skips an error already captured, so it's reported once.
-- **The sound worker's error is handled in the worker too** (`preventDefault`, like #216's for the engines'): it was
-  already handled (sounds made in idle moments instead) but also reached the page, which would have counted it twice.
-- **Durable Objects' entry points are wrapped where the Worker exports them** (`guardEntries` in `index.ts`: a list of
-  each class's fetch, WebSocket handlers, alarm and the methods the Worker calls; errors thrown on as before). In each
-  object's own module the wrap made an import cycle (live hub, problems, API, live hub) that the unit tests' module
-  loader can't resolve. The matchmaker's batch errors, caught and logged before, now go to the store too.
-- **One feedback sheet, three kinds** (Eric's addition, Oct 15): "We'd love your feedback", then 🐞 Report a bug (the
-  diagnostics, as built first), 💬 Feedback and 💡 Suggest an idea (a note alone: no diagnostics, no account, no
-  version kept, so a note can't be tied to a device or player). Feedback and ideas need a note (nothing else is sent);
-  a bug's is optional. Every kind gets the same short id and lives in the same table with its kind; only a bug shows
-  "share this id" (the others, a thank-you), since only a bug is worth looking up by id. The match menu opens it on
-  Report a bug, Settings on Feedback; no link on the home screen (Settings is one tap away, and the front door stays
-  uncluttered). The same rate limits, all three kinds together. `/admin/ops` lists reports of one kind
-  (`?kind=idea`: the ideas as a list).
-- **The sheet is one over any screen**, beside the ban notice and drawn like it, opened from the match menu or
-  Settings. In the match menu itself the form would be redrawn with every phase (a match draws each phase's screen
-  afresh), dropping a phone's keyboard mid-sentence. On a phone it's a row under Sound and Resign (the sheet is two
-  rows now: measured at 320, 360 and 390 px, it stays below the board and the move's clock, over the lower part of the
-  dock only while open); on a computer a 🐞 button before the sound button. Where an admin's testing items
-  share that title line (boss battles, Eric only), they already fill it at 504 px (900 to 1280 px wide), and one more
-  button pushed them over the title: there the report button gives way (a CSS rule; measured the same as before), and
-  admins report from Settings or a phone.
-- **The ops page searches errors by message** (`?q=`), and among equal counts shows the newest first: what a session
-  triaging a player's report needs, and what keeps a fresh error findable in the e2e's long-lived local database.
-- **e2e admins:** no sign-in is set up in tests, so the e2e Worker's `ADMIN_EMAILS` has one email per project and a test
-  gives its account that email with `wrangler d1 execute --local` (per project, so the two projects never take each
-  other's).
-- **Testing:** the full lane (a new public endpoint, stored data, security): typecheck, the unit suite (a new
-  `problems.test.ts`), the whole e2e suite in two shards, and a new `problems.spec.ts`.
+**The rule for a power's words: the banner names it, the dock explains it, the bubble is character.**
+- **The banner** names the power, with its line saying what it does to you, as before.
+- **The dock** says what it means for you, or just your clock: through a power's moment it keeps the turn's own line
+  ("🍪 Boss plays Nf6"), as it showed just before, so nothing in it changes as the banner comes. A moment says its own
+  words there only where no banner says them (`MomentUi.dock`, a function now, optional): the Big Bounce (its banner is
+  its name alone): "Your pieces land on new squares."; the fireballs (no banner): "Fire on e4 and f5", or "Fire on 3
+  squares" for more, one line on a phone ("Your king is fireproof." when they all fizzle on him); Jefferson's fireproof
+  laugh (no banner): "Fire burns only your pieces.". Before, every moment had a word that repeated its banner ("🍪
+  Freeze!" under FREEZE!).
+- **The boss's bubble** says a character line, never the power's name. Gone from the rotations (agents' lines, not
+  Eric's): Ginger's "Freeze!" and "BLIZZARD!", Jefferson's "ROMAN CANDLE!", Big Boy's "Gonna bounce…" (under RAGE!'s
+  "the Big Bounce"), Wrangler's "The long pull!" and "Pick yer duel, varmints." (with DRAW!), Boingo's "Spin the board!".
+  **Eric's own lines stay** (his rule over ours): Big Boy's "Big boy BOUNCE!" still shows under BIG BOUNCE! now and
+  then, and Sawyer's "Two for one!" stays; SPLIT PAWN!'s line under it, which said the same, is now "He gets a second
+  pawn".
+- **The same rule elsewhere:** Hollow's claim and Big Boy's snack line were in the dock and the bubble at once: the
+  bubble's only now (the snack's dock: "You start a pawn down."). Wrangler's DRAW! is its name alone ("Pick your duel"
+  was under it, with the God King's "Pick the duel that wins!"), and your move's dock says "Take one of his three duels."
+  (was "Showdown! Take one of his three."). The Hidden Boss's "+2 s a move from now on" is the board's alone (the dock had
+  "📕 +2 s a move"). His phase 2 "5 SECONDS!" is its name alone (its line said what the dock says); his `ult2` lines
+  never name the seconds (placeholders, reworded: "That's enough! No more thinking, all of you!", "Enough thinking! Move,
+  or I move for you!"): my call over reading the number from the setting into the line, since the banner already says it
+  from `RECLUSE_PHASE2.ultMoveSeconds` (as `bulletPlus`'s number is the board's). The phone's small boards' "5 s!" comes
+  from the setting too. Phase 2's end: "The boss wins." (was "N of 4 won: the boss wins" beside the bar's "N of 4 won").
+- **How many have picked** is the line above the board's ("16/50 picked"): the Crowd's waiting box no longer repeats it
+  ("Move in. Waiting for other players"), nor a boss raid's dock ("Move in. Waiting for the others", was "Waiting · 3/4").
+  Crowd's watch screen keeps its count: nothing else there says it.
+
+**Nothing over the board or the bar's status (phones).**
+- **The God King's words beside him** (V1): on his own line under the dock, to his right (the room to the row's right
+  edge, 8 px text), never over the board or the box. His bubble had opened above the row, over ranks 1 and 2, also while
+  you chose a move (Wrangler's duel). A long line runs down past his line, over the test buttons or the scoreboard
+  under the dock, which nobody needs mid-line; below him would run off a short phone's screen. His menu still opens
+  above the row (you open it). A phone on its side keeps him beside the row with his words above him.
+- **The God King's words go with him** once the Hidden Boss absorbs him (V24): his "Aaagh! My strength!" stayed up from
+  an empty place under "The boss rises!".
+- **The boss's words in the boss bar** (V5): in his name's room (BossBar renders the box, `.bc-bar-bubble`), from just
+  above the bar's bottom edge upwards over the title line, never over the status at the bar's right ("58 moves left"
+  read "es left", "2 of 4 won" read "4 won") or the line and the board under the bar. The box is at least the name's
+  room high, so a short line covers his name and skulls whole, as the old box did, never half of them; nothing is
+  hidden (a first try hid them while he spoke, and CI's `boss-powers` caught the rage meter hidden). A computer's stay
+  by his figure.
+- **The corner casts are as designed** (the director's call, Oct 15): the boss steps up to the board's top-left corner
+  for a moment (the casters, Wrangler's lasso and showdown, Hollow's dark and Lights out, Big Boy's snack), over the
+  subtitle and a8, while the board isn't playable; the audit took them for the bar's figure. Nothing players must read
+  mid-moment is in the subtitle then (it says "BOSS BATTLE · you play White · the boss's move").
+
+**Hollow's Lights out, before its first round** (V25): the dock as on every other screen, your clock held, "Remember
+where his pieces are." over "Clocks stopped." (was "Lights out! Clocks stopped." alone, left at the top of the whole
+box, the banner's words again). Its rounds keep the whole box for their prompt and the crowd's meter.
+
+**A dock line wraps, never cut** (found with V10): the boss screen's first line was one line with an ellipsis, so at
+360 px "The boss is thinking…" read "The boss is think…" (on main too). It now wraps to two lines; the box holds two of
+them and the muted line under them.
+
+**The Hidden Boss's phase 2.**
+- **The dock's first line** (V10): "2:00 on your clock" over "No added time." (one line was cut to "2:00 on your clock,
+  no adde…" at 360 px).
+- **A computer's tags above the boards** (V4): each board's name and clock in a row of its own above it, off its back
+  rank (they covered a8 to d8 on every board, yours too, and Chess960's back rank is random). The four boards are a
+  little smaller for it (`DESK`: 44.5% of the square each, a 4.6% row above each, 1.8% between the rows, 11% between the
+  columns, where the slow moves stand), and the phase change ends them exactly there (its quarters' last scale and
+  offset), so nothing jumps into phase 2. The tag's text is in the board's own width (at most 12 px), so it fits the row
+  at any size; the "slow move" note sits at the row's right.
+- **No Bank column** (V7): from the phase change on, the scoreboard hides it (`RaceTower`'s `bank`): every player's time
+  is their board's clock then (on its tag), and the bank showed phase 1's 10:00. The m:ss formatters are the clock
+  batch's.
+
+**Testing.** Targeted lane: typecheck, the unit suite (new `nothing-twice.test.ts`: the dock's words per moment, no
+power's name in a boss's power lines, Eric's lines kept, `ult2` without seconds, `DESK`'s geometry;
+`recluse-boss.test.ts` updated), and e2e `boss-speech` (now also: neither speech box over the board, the boss's never
+over the bar's status or the line under it, the God King's never over the dock's box, every frame), `boss-dock`,
+`boss-powers`, `bigboy`, `hollow`, `sawyer`, `pig` (the duel prompt's new words), `recluse` (the dock never says the
+increment; the phase change's two lines; on a computer, every tag above its board and no Bank column), `king-attack`,
+`crowd`, `crowd-hidden`. `npm run frames:boss` at 360 and 1280 on both builds. Screenshots before and after at 390 and
+1280 px in the PR.
