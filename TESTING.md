@@ -16,8 +16,8 @@ that a real iPhone runs the chess engine fast enough, so that's the main thing t
 
 **New: 64 players and a 2v2 final.** 8 boards with 8 players each; each cut removes the bottom 8 and the most
 lopsided board, down to 4 players on the last board. Then a 2v2 final: seeds 1 & 4 against 2 & 3, teammates take
-turns, and the best average move quality wins. A solo match is about 25 minutes at the relaxed pace
-(`?rounds=1&pace=quick` for a very fast run-through that still reaches the final).
+turns, and the best average move quality wins. A solo match is about 25 minutes (as an admin, add
+`?rounds=1&pace=quick` for a very fast run-through that still reaches the final).
 
 **Also new in recent versions** (worth a look while you play):
 - Tick **Practice mode** on the first screen if you want unlimited power-ups (the engine's top 3 moves with arrows).

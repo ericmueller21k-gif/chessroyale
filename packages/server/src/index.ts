@@ -151,7 +151,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
       const raid = url.searchParams.get("mode") === "raid";
       const type = url.searchParams.get("type") === "botsoff" ? "botsoff" : "default";
-      const overrides = raid ? RAID_SETTINGS : modeSettings("crowd", { crowdTeams: true, augments: true });
+      const overrides = raid ? RAID_SETTINGS : modeSettings("crowd", { augments: true });
       // ?pool=NAME: a queue of its own (a test switch: tests run several queues at once without meeting). Split by
       // region when that's on (queue.ts). ?ticket=ID: a player in line asking again (they keep their place).
       const region = regionOf(request.cf as { continent?: unknown } | undefined);

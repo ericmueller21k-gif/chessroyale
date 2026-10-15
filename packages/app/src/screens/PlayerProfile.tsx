@@ -193,6 +193,7 @@ function Recent({ p, mark }: { p: PublicProfile; mark?: number }) {
         const boss = r.mode === "boss";
         const place = boss ? (r.won === true ? "Won" : r.won === false ? "Lost" : r.survived === false ? "Out" : r.survived === true ? "Draw" : nth(r.placement)) : nth(r.placement);
         const gold = boss ? r.won === true : r.placement === 1;
+        // (A Crowd match with no team: everyone moves, a choice until Oct 15, 2026. Older records keep saying so.)
         const mode =
           r.mode === "crowd"
             ? `Crowd · ${r.team ? "50 v 50" : "everyone moves"}`
@@ -468,7 +469,7 @@ export function PlayerProfileScreen({
           )}
           {onSettings && (
             <button type="button" class="fd-row-link" onClick={onSettings}>
-              Settings: sound, pace, Crowd options, how to play, your sign-in ›
+              Settings: sound, Crowd options, how to play, your sign-in ›
             </button>
           )}
         </>

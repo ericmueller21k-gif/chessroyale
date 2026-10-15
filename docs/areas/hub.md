@@ -51,6 +51,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   - **The toast waits** for a front-door page: an invite that arrives during a match or in the queue shows when you're
     back (if it's still open), and its `FRIENDS.toastMs` start only once it's on screen.
 - **Light and dark:** follows the device until you pick (Settings); same layout and accents in both.
+- **Gone from Settings (Eric, Oct 15):** "Relaxed pace" (each mode plays its own pace; `?pace=quick` is a test switch)
+  and Crowd's "50 v 50 / Everyone moves" choice (Crowd is always team turns). A device's old picks (`brc.pace`,
+  `brc.crowdTurns`) are no longer read.
 - **The eval bar's switch** (Settings → Playing, "Eval bar"; Eric, Oct 10): on by default. Off, no bar on any board
   (every mode: the play, reveal, vote, final and boss screens all use `EvalBar`, which draws nothing) and the board
   takes its room, centered, on a phone and a computer. Only in Settings, never on a board screen. Kept on the device

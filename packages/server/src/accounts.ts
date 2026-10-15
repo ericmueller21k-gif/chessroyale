@@ -686,7 +686,7 @@ export interface PublicProfile {
     online: boolean;
     placement: number;
     players: number;
-    /** Crowd: the side played (50 v 50), or null (everyone moves). */
+    /** Crowd: the side played (50 v 50), or null (everyone moves, a choice until Oct 15, 2026). */
     team: "w" | "b" | null;
     won: boolean | null;
     /** A boss battle: still standing at the end. */

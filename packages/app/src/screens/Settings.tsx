@@ -26,10 +26,10 @@ function Toggle({ title, checked, disabled, onChange, children }: { title: strin
   );
 }
 
-function stored(key: string, fallback: boolean, on = "1"): boolean {
+function stored(key: string, fallback: boolean): boolean {
   try {
     const v = localStorage.getItem(key);
-    return v === null ? fallback : v === on;
+    return v === null ? fallback : v === "1";
   } catch {
     return fallback;
   }
@@ -152,7 +152,7 @@ const THEMES: { id: ThemePref; label: string }[] = [
 function ThemeChoice() {
   const { pref } = useTheme();
   return (
-    <div class="fd-seg three" role="radiogroup" aria-label="Theme">
+    <div class="fd-seg" role="radiogroup" aria-label="Theme">
       {THEMES.map((t) => (
         <button type="button" role="radio" key={t.id} aria-checked={pref === t.id} class={pref === t.id ? "on" : ""} onClick={() => setThemePref(t.id)}>
           {t.label}
@@ -168,7 +168,6 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
   const [, rerender] = useState(0);
   useEffect(() => onMuteChange(() => rerender((n) => n + 1)), []);
   const [practice, setPractice] = useState(() => stored("brc.practice", false));
-  const [relaxed, setRelaxed] = useState(() => stored("brc.pace", true, "relaxed"));
   const [evalBar, setEvalBar] = useState(evalBarOn);
   const [mode, setMode] = useState(chosenMode);
   const [anim, setAnim] = useState(crowdAnimations);
@@ -234,16 +233,6 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
           Unlimited power-ups (the engine's top 3 moves, any time). You're marked 💡 on the leaderboard.
         </Toggle>
         <Toggle
-          title="Relaxed pace"
-          checked={relaxed}
-          onChange={(on) => {
-            setRelaxed(on);
-            store("brc.pace", on ? "relaxed" : "quick");
-          }}
-        >
-          A few seconds to settle on each new board and to watch the chosen move. Off: quick games (solo, and lobbies you create).
-        </Toggle>
-        <Toggle
           title="Eval bar"
           checked={evalBar}
           onChange={(on) => {
@@ -257,17 +246,6 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
 
       <section class="fd-section">
         <h2 class="fd-label">CROWD</h2>
-        <div class="fd-seg" role="radiogroup" aria-label="Turns">
-          <button type="button" role="radio" aria-checked={mode.crowdTeams} class={mode.crowdTeams ? "on" : ""} onClick={() => changeMode({ crowdTeams: true })}>
-            50 v 50
-            <span>You play one side</span>
-          </button>
-          <button type="button" role="radio" aria-checked={!mode.crowdTeams} class={!mode.crowdTeams ? "on" : ""} onClick={() => changeMode({ crowdTeams: false })}>
-            Everyone moves
-            <span>You pick every turn</span>
-          </button>
-        </div>
-        <p class="fd-note">For solo games and lobbies you create. PLAY's queue is always 50 v 50.</p>
         <Toggle
           title="Animations"
           checked={anim}

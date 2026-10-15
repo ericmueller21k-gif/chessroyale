@@ -18,7 +18,7 @@ const b = await chromium.launch();
 const ctx = await b.newContext({ ...devices["iPhone 13"], colorScheme: scheme });
 const p = await ctx.newPage();
 p.on("pageerror", (e) => console.log("pageerror", e.message));
-const modeQuery = mode === "boss" ? "" : mode === "crowd" ? "&mode=crowd&turns=teams&augments=0" : "&mode=classic";
+const modeQuery = mode === "boss" ? "" : mode === "crowd" ? "&mode=crowd&augments=0" : "&mode=classic";
 await p.goto(url + `?debug&clock=30&nolanding${modeQuery}${extra ? "&" + extra : ""}`);
 if (mode === "boss") {
   await p.getByRole("button", { name: "Boss alone" }).click();
