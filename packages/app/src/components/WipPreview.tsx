@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { cueAt, animLength, darkItem, lightsOutSmashes, lightsOutSpot, nightItems, nightWarmList, type NightState, type SquareItem } from "../characters/power-art.ts";
 import { HOLLOW_CAST_FROM, bulbsLook, findLine } from "../characters/hollow.ts";
 import { wipKit, wipLook } from "../characters/kits.ts";
+import { testParams } from "../test-switches.ts";
 import { pickLine } from "../characters/boss-beats.ts";
 import { BoardEffects, BossEffect, BossMoment, prewarm } from "./BossEffect.tsx";
 
@@ -24,7 +25,7 @@ type Moment = (typeof MOMENTS)[number];
 
 export function wipPower(): Moment | null {
   try {
-    const q = new URLSearchParams(location.search);
+    const q = testParams();
     const p = q.get("power");
     return q.get("wip") === "1" && wipKit()?.ch.id === "hollow" && MOMENTS.includes(p as Moment) ? (p as Moment) : null;
   } catch {

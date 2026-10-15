@@ -20,7 +20,8 @@ import { counts, frameStats, instrument, longStats } from "../e2e/perf-probe.js"
 
 const [out = "perf-out", mode = "gingerbread", which = "both", movesArg = "25", power = ""] = process.argv.slice(2);
 const MOVES = Number(movesArg) || 25;
-// online: a Ginger raid on a running local server (npx wrangler dev --port 8788 ..., after npm run build).
+// online: a Ginger raid on a running local server (npx wrangler dev --port 8788 --var TEST_SWITCHES:1 ..., after
+// npm run build).
 const ONLINE = process.env.PERF_URL ?? "http://localhost:8788/";
 const outDir = resolve(out);
 mkdirSync(outDir, { recursive: true });
@@ -123,6 +124,9 @@ async function run(kind, name, context, throttle) {
       : kind === "online"
         ? `mode=raid&boss=gingerbread${power ? `&power=${power}` : ""}&clock=60`
         : `boss=${kind}${power ? `&power=${power}` : ""}&clock=60`;
+  // (The production build allows the address's test switches only where the server says so: no server here, so
+  // its answer is given. Online, the local server's TEST_SWITCHES does it: see its command above.)
+  if (kind !== "online") await p.route("**/api/auth/config", (r) => r.fulfill({ json: { accounts: false, google: false, email: false, testSwitches: true } }));
   await p.goto(`${kind === "online" ? ONLINE : url}?debug&nolanding&${q}`);
   if (kind === "crowd") {
     await p.getByRole("radio", { name: /^Solo/ }).click();

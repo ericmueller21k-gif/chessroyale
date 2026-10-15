@@ -20,6 +20,7 @@ import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
 import { lashItem, type SquareItem } from "./power-art.ts";
+import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
  * A boss's attack on a king (Eric, Oct 10: Hollow first): played on the board beside the God King in his Last Stand
@@ -332,8 +333,11 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
 };
 
-/** Test links only (?wip=1&kit=<name>): a kit drawn before its boss is playable, shown in every boss's place. */
-const WIP_KIT = (() => {
+/**
+ * Test links only (?wip=1&kit=<name>, a test switch: test-switches.ts): a kit drawn before its boss is playable, shown
+ * in every boss's place. (The address is read once; whether you may use it, each time.)
+ */
+const WIP_KIT_ASKED = (() => {
   try {
     const q = new URLSearchParams(globalThis.location?.search ?? "");
     return q.get("wip") === "1" ? q.get("kit") : null;
@@ -341,9 +345,12 @@ const WIP_KIT = (() => {
     return null;
   }
 })();
+const wipKitName = () => (WIP_KIT_ASKED && testSwitchesAllowed() ? WIP_KIT_ASKED : null);
 /** The kit a test link shows in every boss's place, if any (by its name, spaces optional: `kit=BigBoy`). */
-export const wipKit = (): BossKit | null =>
-  WIP_KIT ? (BOSS_KITS[WIP_KIT] ?? Object.entries(BOSS_KITS).find(([k]) => k.replace(/\s/g, "") === WIP_KIT.replace(/\s/g, ""))?.[1] ?? null) : null;
+export const wipKit = (): BossKit | null => {
+  const name = wipKitName();
+  return name ? (BOSS_KITS[name] ?? Object.entries(BOSS_KITS).find(([k]) => k.replace(/\s/g, "") === name.replace(/\s/g, ""))?.[1] ?? null) : null;
+};
 /**
  * For a test link's preview of a moment (components/WipPreview.tsx): a look to show instead of the kit's own (his bulbs
  * counting down before the power rules exist).
@@ -356,4 +363,4 @@ export const wipLook: { now: (() => string | undefined) | null } = { now: null }
  * whose name Eric will change) is one edit, his `name` in BOSS_ROSTER.
  */
 export const kitName = (name: string, roster: readonly BossDef[] = BOSS_ROSTER): string => (BOSS_KITS[name] ? name : (roster.find((b) => b.name === name)?.kit ?? name));
-export const bossKit = (name: string | undefined | null): BossKit | null => (name ? ((WIP_KIT && !name.startsWith("original:") ? wipKit() : null) ?? BOSS_KITS[kitName(name)] ?? null) : null);
+export const bossKit = (name: string | undefined | null): BossKit | null => (name ? ((WIP_KIT_ASKED && !name.startsWith("original:") ? wipKit() : null) ?? BOSS_KITS[kitName(name)] ?? null) : null);

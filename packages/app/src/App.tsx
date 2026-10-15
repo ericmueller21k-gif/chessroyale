@@ -50,13 +50,16 @@ import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, fo
 import { SquadsQueue, SquadsScreen, squadsWaiting } from "./screens/Squads.tsx";
 import { PartySheet } from "./screens/SquadsParty.tsx";
 import { measureSound } from "./sound.ts";
+import { testParams } from "./test-switches.ts";
 
 /**
- * Playtest overrides from the URL, e.g. ?rounds=4&clock=15&draw=weighted (handy for quick tests). `matchBoss`: a raid's
- * boss is matched to you (a Solo raid, like an online one), not the one last picked from the boss menu (Boss alone).
+ * A match's settings: the mode and the choices made on the home screen, plus playtest overrides from the URL, e.g.
+ * ?rounds=4&clock=15&draw=weighted (test switches: only for those allowed them, test-switches.ts; else ignored).
+ * `matchBoss`: a raid's boss is matched to you (a Solo raid, like an online one), not the one last picked from the boss
+ * menu (Boss alone).
  */
 function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Settings> {
-  const q = new URLSearchParams(location.search);
+  const q = testParams();
   const n = (k: string) => (q.has(k) ? Number(q.get(k)) : undefined);
   const draw = q.get("draw") as DrawRule | null;
   const mode = { ...chosenMode(), ...(modeId ? { mode: modeId } : {}) };
@@ -431,8 +434,10 @@ export function App() {
     else void lobbyStatus(m.code, 3000).then((s) => go(s?.result ?? null));
   });
 
-  const debug = new URLSearchParams(location.search).has("debug");
-  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, __measureSound: measureSound });
+  // ?debug (a test switch): the match and the Squads clients on `window`, for tests and the console. (Each render, so
+  // they're there once your account says you may, and a match joined before that, from a link, is too.)
+  const debug = testParams().has("debug");
+  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, __measureSound: measureSound, ...(match ? { match } : {}) });
 
   // ---------------- Squads ----------------
 
@@ -553,7 +558,7 @@ export function App() {
     resetBoardsStrip();
     elimination.current = null;
     setMatch(m);
-    if (debug) (window as unknown as { match: GameView }).match = m;
+    if (testParams().has("debug")) (window as unknown as { match: GameView }).match = m;
   };
 
   const practiceOn = () => {
@@ -620,7 +625,8 @@ export function App() {
   const createLobby = async (modeId?: ModeChoiceId) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams(location.search);
+      // (The test switches ride along for those allowed them; the server checks again: lobby-options.ts.)
+      const params = testParams();
       params.delete("debug");
       if (quickPace()) params.set("pace", "quick");
       const mode = { ...chosenMode(), ...(modeId ? { mode: modeId } : {}) };
@@ -663,8 +669,8 @@ export function App() {
       const q = new URLSearchParams();
       if (mode === "raid") q.set("mode", "raid");
       if (type === "botsoff") q.set("type", "botsoff");
-      // (?pool=NAME: a queue of its own, for tests.)
-      const pool = new URLSearchParams(location.search).get("pool");
+      // (?pool=NAME: a queue of its own, a test switch.)
+      const pool = testParams().get("pool");
       if (pool) q.set("pool", pool);
       // (Already in line: from "let bots fill" when the servers were busy.)
       if (ticket) q.set("ticket", ticket);
@@ -721,7 +727,7 @@ export function App() {
     const from = match;
     const q = new URLSearchParams({ type: "default", from: from.code });
     if (from.settings.raid) q.set("mode", "raid");
-    const pool = new URLSearchParams(location.search).get("pool");
+    const pool = testParams().get("pool");
     if (pool) q.set("pool", pool);
     try {
       const res = await fetch(`/api/play?${q}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ seat: from.seat }) });
@@ -838,7 +844,8 @@ export function App() {
   };
 
   // (Before any page below, the home screen's frame needs these.)
-  const noLanding = new URLSearchParams(location.search).has("nolanding");
+  // ?nolanding (a test switch): straight to home, without the landing page.
+  const noLanding = testParams().has("nolanding");
   const inviteCode = invite === "open" ? linkCode : undefined;
   const notice = ended ? (ended.why === "idle" ? "That lobby has closed." : ended.why === "left" ? leftNote(ended.how) : "That match has ended.") : (squadsNote ?? undefined);
   // Squads: the lobby you're in (the waiting room is the home screen's queue, as for Crowd).
