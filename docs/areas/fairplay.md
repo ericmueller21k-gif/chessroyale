@@ -24,7 +24,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 - **Reports** never ban anyone: they raise a player's review priority and record their moves.
 - **A ban needs the deep re-check:** a flagged player's counted moves searched again on the engine server (its own
   instance, `fairplay-1`, its own daily budget, from the Worker's schedule: cases in review at once, the rest
-  off-peak). The judges' quick numbers can open a review, never a ban.
+  off-peak). The judges' quick numbers can open a review, never a ban. A move in a position Stockfish refuses is
+  passed over (the engine server never gets one: [engine.md](engine.md)), so it can't stop the queue.
 - **The review page** `/admin/fairplay` (admins only, `ADMIN_EMAILS`) and the reviewer's API `/api/admin/fairplay/*`
   (a bearer token, `FAIRPLAY_REVIEW_TOKEN`). Every decision goes in the case's log with who and why; the automated
   reviewer never decides appeals nor changes a ban.

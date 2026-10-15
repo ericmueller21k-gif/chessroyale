@@ -30,7 +30,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   played itself out for up to an hour or more, counted on the live line all along.
 - **Costs and guards:** engine server re-checks capped by `ENGINE_DAILY_SEARCHES` (3000 a day, D1 `engine_usage`);
   fair play's deep re-checks by `FAIRPLAY.deep.dailySearches` (D1 `fairplay_budget`) on their own instance; the
-  deep re-check's cron runs every 15 minutes (`triggers.crons`). Suggested budget alert: $20/month.
+  deep re-check's cron runs every 15 minutes (`triggers.crons`). Suggested budget alert: $20/month. The engine server
+  never gets a position Stockfish refuses, which would take it down (`containerScore`; `/api/engine/score` answers
+  400: [engine.md](engine.md)).
 - **Load-test counters** at `/api/ops/stats` only where `OPS_STATS` is set and the request's `x-ops-key` matches
   (local and staging, never production).
 
