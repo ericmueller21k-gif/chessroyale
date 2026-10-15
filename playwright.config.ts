@@ -9,7 +9,7 @@ export default defineConfig({
     // The real Worker and Durable Objects, run locally by wrangler, serving the built app.
     // (Without the engine server container, so the phones' own re-checks are what's tested; see DEPLOY.md.)
     // E2E_PREBUILT=1: the app is already built (CI builds it in its own step), so start wrangler at once.
-    command: (process.env.E2E_PREBUILT ? "" : "npm run build && ") + "npx wrangler dev --port 8788 --enable-containers=false --var MATCH_FILL_SECONDS:8 --var ENGINE_OFF:1 --var SQUADS_TEST:1 --var MAIA_TEST:1 --var FAIRPLAY_REVIEW_TOKEN:e2e-review-token-0123456789",
+    command: (process.env.E2E_PREBUILT ? "" : "npm run build && ") + "npx wrangler dev --port 8788 --enable-containers=false --var MATCH_FILL_SECONDS:8 --var ENGINE_OFF:1 --var SQUADS_TEST:1 --var MAIA_TEST:1 --var TEST_SWITCHES:1 --var FAIRPLAY_REVIEW_TOKEN:e2e-review-token-0123456789",
     url: "http://localhost:8788",
     reuseExistingServer: true,
     timeout: 120_000,

@@ -38,6 +38,7 @@ import { FightBanner } from "../components/FightBanner.tsx";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play, unlockAudio } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
+import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 
 const tierIndex = (def: string) => TIERS.findIndex((t) => t.id === itemDef(def)?.tier);
 const colorIndex = (c: string) => ITEM_COLORS.findIndex((x) => x.id === c);
@@ -139,9 +140,12 @@ export function CratesPanel() {
 }
 
 function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen; onBack: () => void }) {
-  const q = new URLSearchParams(location.search);
-  const [forceFischer, setForceFischer] = useState(q.get("fischer") === "1");
-  const [forceShiny, setForceShiny] = useState(q.get("shiny") === "1");
+  // Test switches (test-switches.ts; the server checks too): ?fischer=1, ?shiny=1 force the roll, until changed with
+  // the boxes below. (Read on every render: whether you may is known once your account is.)
+  const [fischerSet, setForceFischer] = useState<boolean | null>(null);
+  const [shinySet, setForceShiny] = useState<boolean | null>(null);
+  const forceFischer = testSwitchesAllowed() && (fischerSet ?? testParams().get("fischer") === "1");
+  const forceShiny = testSwitchesAllowed() && (shinySet ?? testParams().get("shiny") === "1");
   const [opening, setOpening] = useState(!!resume);
   const look = CRATE_LOOKS[crate.look];
   // Commonest first; Legendary and Mythic (Fischer Random) last.
@@ -239,7 +243,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           ))}
         </div>
       </details>
-      {CRATES_FREE && (
+      {CRATES_FREE && testSwitchesAllowed() && (
         <div class="test-switches">
           <span class="muted small">Testing:</span>
           <label class="check small">

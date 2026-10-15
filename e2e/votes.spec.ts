@@ -54,7 +54,7 @@ async function drag(page: Page, from: { x: number; y: number }, to: { x: number;
 test("the vote board: your pawn is solid, drag it into a zone, the count goes up; the second vote starts from home; the game begins with the pieces", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   const touch = test.info().project.name === "phone";
-  await page.goto("/?debug&mode=crowd&turns=teams&augments=1");
+  await page.goto("/?debug&mode=crowd&augments=1");
   await soloFromHome(page);
   await expect(page.locator(".vote-screen")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("heading", { name: "How does it end?" })).toBeVisible();
@@ -176,7 +176,7 @@ test("the vote board: your pawn is solid, drag it into a zone, the count goes up
 test("time's up: whoever didn't vote (you, and a few bots) walks to the winner, then the banner names it", async ({ page }) => {
   test.setTimeout(2 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
-  await page.goto("/?debug&mode=crowd&turns=teams&augments=1");
+  await page.goto("/?debug&mode=crowd&augments=1");
   await soloFromHome(page);
   await expect(page.locator(".vote-screen")).toBeVisible({ timeout: 30_000 });
   // 8 seconds to vote (settings.voteSeconds), on screen as the timer bar's whole length.
@@ -265,7 +265,7 @@ test("a time control (Bullet 3+2): a 3:00 bank, +2 s each move kept when the mov
   test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   // (No votes: the ending and the time control from the address.)
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=team&speed=bullet");
+  await page.goto("/?debug&pace=quick&mode=crowd&format=team&speed=bullet");
   await soloFromHome(page);
   await waitForYourMove(page);
   const first = await yourMove(page);
@@ -295,7 +295,7 @@ test("online, the time control's increment comes with each move (an app that sta
   test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   // A lobby of one and 99 bots, on Bullet 3+2 (no votes: from the address).
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=team&speed=bullet");
+  await page.goto("/?debug&pace=quick&mode=crowd&format=team&speed=bullet");
   await createLobbyFromHome(page);
   await expect.poll(() => page.evaluate(() => !!(window as any).match?.code), { timeout: 30_000 }).toBe(true);
   // Joined from PLAY, the app only knows the Crowd's usual clock (Rapid's +5 s) until the server says otherwise.

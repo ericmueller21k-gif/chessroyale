@@ -39,19 +39,15 @@ async function playKnockouts(settings: Settings, seed: number) {
     expect(groups.size).toBe(1);
     const [[boardId, ids]] = [...groups] as [[number, string[]]];
     const side = runner.boards.get(boardId)!.fen.split(" ")[1];
-    if (settings.crowdTeams) {
-      // Only the team whose side is to move picks.
-      expect(ids.every((id) => runner.player(id).colour === side)).toBe(true);
-      expect(ids.length).toBe(runner.alive().length / 2);
-    } else {
-      expect(ids.length).toBe(runner.alive().length);
-    }
+    // Only the team whose side is to move picks.
+    expect(ids.every((id) => runner.player(id).colour === side)).toBe(true);
+    expect(ids.length).toBe(runner.alive().length / 2);
     await runner.score(new Map());
     plies++;
     if (runner.stageComplete()) {
       runner.endStage();
       sizes.push(runner.alive().length);
-      if (settings.crowdTeams && !runner.boss) {
+      if (!runner.boss) {
         // Teams stay even all the way down.
         const w = runner.alive().filter((p) => p.colour === "w").length;
         expect(w * 2).toBe(runner.alive().length);
@@ -65,7 +61,7 @@ describe("Crowd mode", () => {
   const base: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd") };
 
   it("50 v 50 team final: down to 8, then 4v4 alternating, 3v3, 2v2 to the end", async () => {
-    const settings: Settings = { ...base, crowdTeams: true, finalMaxTurns: 70 };
+    const settings: Settings = { ...base, finalMaxTurns: 70 };
     const { runner, sizes, plies } = await playKnockouts(settings, 1);
     expect(sizes).toEqual([84, 70, 58, 48, 40, 32, 26, 20, 16, 12, 8]);
     expect(plies).toBe(20 + 2 * 10);
@@ -104,7 +100,7 @@ describe("Crowd mode", () => {
   });
 
   it("leaving (LEAVING): a seat handed to a bot keeps its team, score and turns in the final under a new id; one that goes out takes the last place still open, and every place is still given once", async () => {
-    const settings: Settings = { ...base, crowdTeams: true, finalMaxTurns: 30 };
+    const settings: Settings = { ...base, finalMaxTurns: 30 };
     const runner = new MatchRunner({
       settings,
       rng: mulberry32(3),
@@ -152,7 +148,7 @@ describe("Crowd mode", () => {
   });
 
   it("50 v 50 duel: the best of each side play 1v1; the game's winner places first", async () => {
-    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "duel", knockoutsPerStage: CROWD_KNOCKOUTS.duel, finalMaxTurns: 40 };
+    const settings: Settings = { ...base, finalFormat: "duel", knockoutsPerStage: CROWD_KNOCKOUTS.duel, finalMaxTurns: 40 };
     const { runner, sizes } = await playKnockouts(settings, 3);
     expect(sizes.at(-1)).toBe(2);
     const f = runner.final!;
@@ -172,7 +168,7 @@ describe("Crowd mode", () => {
 
   it("50 v 50 boss final: always the Hidden Boss (whatever boss was picked), the top 4 against him, from the starting position, at his fixed strength and brain", async () => {
     // (A boss picked or met last makes no difference: Eric, Oct 14, "that mode is always just versus [him]".)
-    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20, bossId: "bigboy", bossAvoid: "recluse" };
+    const settings: Settings = { ...base, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20, bossId: "bigboy", bossAvoid: "recluse" };
     const { runner, sizes, plies } = await playKnockouts(settings, 4);
     expect(crowdFinalists("boss")).toBe(4);
     expect(sizes.at(-1)).toBe(4);
@@ -199,7 +195,7 @@ describe("Crowd mode", () => {
   });
 
   it("50 v 50 boss final: the four play the battle out against him; the God King's help never comes, nobody is struck, and everyone is placed", async () => {
-    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 9 };
+    const settings: Settings = { ...base, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 9 };
     const { runner } = await playKnockouts(settings, 4);
     const boss = runner.boss!;
     expect(boss.id).toBe("recluse");
@@ -328,16 +324,30 @@ describe("Crowd mode", () => {
     expect(bossInfo(3190).name).toBe("The Engine Eternal");
   });
 
-  it("everyone moves: all alive pick every ply, cut by overall standings", async () => {
-    const settings: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { crowdTeams: false }) };
-    const { runner, sizes } = await playKnockouts(settings, 2);
-    expect(sizes.at(-1)).toBe(4);
-    expect(runner.final!.order).toHaveLength(4);
-    expect(runner.leaderboard()[0]!.team).toBeNull();
+  it("Crowd is always 50 v 50; only a raid has no teams: everyone alive picks every crowd move, nobody on a side", async () => {
+    // (Crowd's "everyone moves" went on Oct 15, 2026: whatever an older caller asks for, a Crowd match has teams.)
+    expect(base.crowdTeams).toBe(true);
+    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "grex", lastStandFrom: 999 } as Settings;
+    const lib: Opening[] = [{ ...library[0]!, moves: sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1"]), expected: { 10: 0.52 } }];
+    const runner = new MatchRunner({
+      settings,
+      rng: mulberry32(2),
+      engines: [fake],
+      library: lib,
+      entrants: Array.from({ length: 6 }, (_, i) => ({ id: `h${i}`, name: `H${i}`, isBot: false })),
+    });
+    for (let move = 0; move < 3; move++) {
+      if (runner.bossToMove()) await runner.playBoss();
+      const groups = runner.deal();
+      expect([...groups.values()]).toEqual([runner.alive().map((p) => p.id)]);
+      await runner.score(new Map(runner.alive().map((p) => [p.id, { move: legalMoves(runner.boards.get(0)!.fen)[0]!, thinkMs: 1000 }])));
+      if (runner.bossKillDue()) runner.bossKill();
+    }
+    expect(runner.leaderboard().every((row) => row.team === null)).toBe(true);
   });
 
   it("bot picks decided at the start of a round are the ones scored", async () => {
-    const settings: Settings = { ...base, crowdTeams: true };
+    const settings: Settings = { ...base };
     const runner = new MatchRunner({
       settings,
       rng: mulberry32(5),
@@ -355,7 +365,7 @@ describe("Crowd mode", () => {
   });
 
   it("the clock vote's time control: every bank starts at its bank (only before move 1), every move's cap is its own, bots think within it", async () => {
-    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 4 };
+    const settings: Settings = { ...base, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 4 };
     const runner = new MatchRunner({
       settings,
       rng: mulberry32(11),
@@ -406,7 +416,7 @@ describe("Crowd mode", () => {
       { fromMove: 16, seconds: 25 },
       { fromMove: 21, seconds: 30 },
     ];
-    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 4, moveClockSteps: rising };
+    const settings: Settings = { ...base, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 4, moveClockSteps: rising };
     const runner = new MatchRunner({
       settings,
       rng: mulberry32(11),

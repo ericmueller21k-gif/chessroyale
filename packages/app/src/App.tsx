@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type MatchmakingType, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type MatchmakingType, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -50,13 +50,16 @@ import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, fo
 import { SquadsQueue, SquadsScreen, squadsWaiting } from "./screens/Squads.tsx";
 import { PartySheet } from "./screens/SquadsParty.tsx";
 import { measureSound } from "./sound.ts";
+import { testParams } from "./test-switches.ts";
 
 /**
- * Playtest overrides from the URL, e.g. ?rounds=4&clock=15&draw=weighted (handy for quick tests). `matchBoss`: a raid's
- * boss is matched to you (a Solo raid, like an online one), not the one last picked from the boss menu (Boss alone).
+ * A match's settings: the mode and the choices made on the home screen, plus playtest overrides from the URL, e.g.
+ * ?rounds=4&clock=15&draw=weighted (test switches: only for those allowed them, test-switches.ts; else ignored).
+ * `matchBoss`: a raid's boss is matched to you (a Solo raid, like an online one), not the one last picked from the boss
+ * menu (Boss alone).
  */
 function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Settings> {
-  const q = new URLSearchParams(location.search);
+  const q = testParams();
   const n = (k: string) => (q.has(k) ? Number(q.get(k)) : undefined);
   const draw = q.get("draw") as DrawRule | null;
   const mode = { ...chosenMode(), ...(modeId ? { mode: modeId } : {}) };
@@ -70,7 +73,7 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
   // ?speed=bullet|blitz|rapid: that time control (for testing, with ?format=; old ids map over, unknown ones are Blitz).
   const speed = crowd ? (speedOption(q.get("speed"))?.patch ?? {}) : {};
   return {
-    // The mode's own rules and pace first, then pace and playtest overrides on top (only the ones that are set).
+    // The mode's own rules and pace first, then playtest overrides on top (only the ones that are set).
     // The boss raid: its own settings, and (solo) a boss a step above your rating.
     ...(raid
       ? {
@@ -83,8 +86,9 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
           // Boss alone: the difficulty chosen next to the boss picker (Easy to Hardest) on top of that strength.
           bossDifficulty: matchBoss || bossTierFromUrl() ? 0 : difficultyElo(),
         }
-      : modeSettings(mode.mode === "classic" ? "classic" : "crowd", { crowdTeams: mode.crowdTeams, augments: mode.augments })),
-    ...(quickPace() ? (crowd ? { revealSeconds: 2, drawnMoveSeconds: 1.2, stageBreakSeconds: 4 } : PACE_SETTINGS.quick) : {}),
+      : modeSettings(mode.mode === "classic" ? "classic" : "crowd", { augments: mode.augments })),
+    // Testing: ?pace=quick, a shorter reveal and less settling in.
+    ...(q.get("pace") === "quick" ? QUICK_PACE[crowd ? "crowd" : "classic"] : {}),
     ...definedOnly({
       roundsPerStage: n("rounds"),
       firstStageRounds: n("rounds"),
@@ -112,16 +116,6 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     // Testing, solo: ?boss=<id>&wip=1 meets a boss whose powers are built before its art is (placeholders show).
     ...(q.get("wip") === "1" && bossDef(bossIdFromLink(q.get("boss")))?.powers ? { bossId: bossIdFromLink(q.get("boss"))!, bossUnfinished: true } : {}),
   };
-}
-
-/** Quick pace: off by default (relaxed), set by the first screen's toggle or ?pace=quick. */
-function quickPace(): boolean {
-  if (new URLSearchParams(location.search).get("pace") === "quick") return true;
-  try {
-    return localStorage.getItem("brc.pace") === "quick";
-  } catch {
-    return false;
-  }
 }
 
 /** An invite link (/lobby/ABCDE) opens the join form with the code filled in (once we know the lobby is still open). */
@@ -429,8 +423,10 @@ export function App() {
     else void lobbyStatus(m.code, 3000).then((s) => go(s?.result ?? null));
   });
 
-  const debug = new URLSearchParams(location.search).has("debug");
-  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, __measureSound: measureSound });
+  // ?debug (a test switch): the match and the Squads clients on `window`, for tests and the console. (Each render, so
+  // they're there once your account says you may, and a match joined before that, from a link, is too.)
+  const debug = testParams().has("debug");
+  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, __measureSound: measureSound, ...(match ? { match } : {}) });
 
   // ---------------- Squads ----------------
 
@@ -551,7 +547,7 @@ export function App() {
     resetBoardsStrip();
     elimination.current = null;
     setMatch(m);
-    if (debug) (window as unknown as { match: GameView }).match = m;
+    if (testParams().has("debug")) (window as unknown as { match: GameView }).match = m;
   };
 
   const practiceOn = () => {
@@ -597,7 +593,7 @@ export function App() {
     setError(null);
     const m = new NetMatch(code.toUpperCase(), playerName(), enginePool, queue ? false : practiceOn());
     m.settings = queue
-      ? { ...DEFAULT_SETTINGS, ...(queue === "raid" ? RAID_SETTINGS : modeSettings("crowd", { crowdTeams: true, augments: true })) }
+      ? { ...DEFAULT_SETTINGS, ...(queue === "raid" ? RAID_SETTINGS : modeSettings("crowd", { augments: true })) }
       : { ...DEFAULT_SETTINGS, ...overridesFromUrl(opts.mode) };
     // The queue shows at once (not "Connecting…"); the lobby confirms it.
     if (queue) m.auto = true;
@@ -618,9 +614,9 @@ export function App() {
   const createLobby = async (modeId?: ModeChoiceId) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams(location.search);
+      // (The test switches ride along for those allowed them; the server checks again: lobby-options.ts.)
+      const params = testParams();
       params.delete("debug");
-      if (quickPace()) params.set("pace", "quick");
       const mode = { ...chosenMode(), ...(modeId ? { mode: modeId } : {}) };
       params.set("mode", mode.mode);
       if (mode.mode === "raid") {
@@ -628,7 +624,6 @@ export function App() {
         if (chosenBoss()) params.set("boss", chosenBoss());
         else if (bossTierFromUrl()) params.set("boss", String(bossTierFromUrl()));
       } else if (mode.mode === "crowd") {
-        params.set("turns", mode.crowdTeams ? "teams" : "all");
         params.set("augments", mode.augments ? "1" : "0");
       } else params.set("moves", String(chosenOpeningMoves()));
       const res = await fetch(`/api/lobby?${params}`, { method: "POST" });
@@ -661,8 +656,8 @@ export function App() {
       const q = new URLSearchParams();
       if (mode === "raid") q.set("mode", "raid");
       if (type === "botsoff") q.set("type", "botsoff");
-      // (?pool=NAME: a queue of its own, for tests.)
-      const pool = new URLSearchParams(location.search).get("pool");
+      // (?pool=NAME: a queue of its own, a test switch.)
+      const pool = testParams().get("pool");
       if (pool) q.set("pool", pool);
       // (Already in line: from "let bots fill" when the servers were busy.)
       if (ticket) q.set("ticket", ticket);
@@ -719,7 +714,7 @@ export function App() {
     const from = match;
     const q = new URLSearchParams({ type: "default", from: from.code });
     if (from.settings.raid) q.set("mode", "raid");
-    const pool = new URLSearchParams(location.search).get("pool");
+    const pool = testParams().get("pool");
     if (pool) q.set("pool", pool);
     try {
       const res = await fetch(`/api/play?${q}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ seat: from.seat }) });
@@ -836,7 +831,8 @@ export function App() {
   };
 
   // (Before any page below, the home screen's frame needs these.)
-  const noLanding = new URLSearchParams(location.search).has("nolanding");
+  // ?nolanding (a test switch): straight to home, without the landing page.
+  const noLanding = testParams().has("nolanding");
   const inviteCode = invite === "open" ? linkCode : undefined;
   const notice = ended ? (ended.why === "idle" ? "That lobby has closed." : ended.why === "left" ? leftNote(ended.how) : "That match has ended.") : (squadsNote ?? undefined);
   // Squads: the lobby you're in (the waiting room is the home screen's queue, as for Crowd).
