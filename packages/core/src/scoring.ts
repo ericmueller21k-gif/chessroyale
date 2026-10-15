@@ -1,11 +1,20 @@
 import type { Rng } from "./rng.ts";
-import { DEFAULT_SETTINGS, type DrawRule, type Settings } from "./settings.ts";
+import { DEFAULT_SETTINGS, OPENING_ALLOWANCE, type DrawRule, type Settings } from "./settings.ts";
 
 /**
  * Scoring from buildspec.md. Expected scores are from the mover's side, 0 to 1
  * (win chance plus half the draw chance). Loss is measured in points, where
  * 1 point = 0.01 of expected score.
  */
+
+/** How a pick gave up material against the best move (the opening allowance's fallback): see PlayerRoundResult.material. */
+export type MaterialSlip = "missed" | "gave";
+
+/** The opening allowance for one picked move: points off its loss, or none because it gave up material. */
+export interface Allowance {
+  points: number;
+  material?: MaterialSlip;
+}
 
 /** One player's pick in a group: a move (UCI) or null for a miss. */
 export interface Pick {
@@ -24,8 +33,18 @@ export interface GroupEvaluation {
 export interface PlayerRoundResult {
   playerId: string;
   move: string | null;
-  /** Points given away versus the best move; null for a miss. */
+  /** Points given away versus the best move (raw: the board's draw, brilliance, fair play and ratings use it); null for a miss. */
   loss: number | null;
+  /**
+   * The loss that counts for points: the raw loss less the opening allowance (never below 0). Set only when the
+   * allowance took something off; otherwise it's the raw loss.
+   */
+  counted?: number;
+  /**
+   * The opening allowance applied on this move but not to this pick: it gave up material against the best move ("gave":
+   * it left something to be taken; "missed": it passed up a capture that won material). Its whole loss counts.
+   */
+  material?: MaterialSlip;
   roundScore: number;
   /** Called the King (boss battle) instead of picking: no score either way, and not a miss. */
   abstained?: boolean;
@@ -35,7 +54,7 @@ export interface PlayerRoundResult {
 
 export interface GroupResult {
   players: PlayerRoundResult[];
-  /** Average loss over the players who picked (null if nobody did). */
+  /** Average counted loss over the players who picked (null if nobody did): what each round score is measured from. */
   averageLoss: number | null;
   /** The move played on the board. */
   playedMove: string;
@@ -103,24 +122,44 @@ export function drawMove(
   return among(moves);
 }
 
+/** The opening allowance on move number `move` (the position's fullmove number): see OPENING_ALLOWANCE. */
+export function openingAllowance(move: number, a: { points: number; flatThrough: number; goneBy: number } = OPENING_ALLOWANCE): number {
+  if (move <= a.flatThrough) return a.points;
+  if (move >= a.goneBy) return 0;
+  return (a.points * (a.goneBy - move)) / (a.goneBy - a.flatThrough);
+}
+
+/** The loss a result counts for points: `counted` when the opening allowance took something off, else the raw loss. */
+export const countedOf = (p: { loss: number | null; counted?: number }) => p.counted ?? p.loss;
+
+/**
+ * Scores a group's picks. `allowance` gives the opening allowance for each picked move: points taken off its loss before
+ * it counts for points, or none because it gave up material (the runner's: OPENING_ALLOWANCE on the game's move number,
+ * and the exchange check). Left out: none. The board's draw, and every raw `loss`, are before it.
+ */
 export function scoreGroup(
   picks: readonly Pick[],
   evaluation: GroupEvaluation,
   rng: Rng,
   settings: Settings = DEFAULT_SETTINGS,
   rule: DrawRule = "random",
+  allowance?: (move: string) => Allowance,
 ): GroupResult {
   const picked = picks.filter((p) => p.move !== null);
   const losses = moveLosses(
     evaluation,
     picked.map((p) => p.move!),
   );
-  const averageLoss = picked.length ? picked.reduce((s, p) => s + losses[p.move!]!, 0) / picked.length : null;
-  const players = picks.map((p) =>
-    p.move === null
-      ? { playerId: p.playerId, move: null, loss: null, roundScore: settings.missedMoveScore }
-      : { playerId: p.playerId, move: p.move, loss: losses[p.move]!, roundScore: averageLoss! - losses[p.move]! },
-  );
+  const off = new Map(picked.map((p) => [p.move!, allowance?.(p.move!) ?? { points: 0 }]));
+  const counted = (m: string) => Math.max(0, losses[m]! - off.get(m)!.points);
+  const averageLoss = picked.length ? picked.reduce((s, p) => s + counted(p.move!), 0) / picked.length : null;
+  const players = picks.map((p): PlayerRoundResult => {
+    if (p.move === null) return { playerId: p.playerId, move: null, loss: null, roundScore: settings.missedMoveScore };
+    const loss = losses[p.move]!;
+    const c = counted(p.move);
+    const material = off.get(p.move)!.material;
+    return { playerId: p.playerId, move: p.move, loss, ...(c !== loss ? { counted: c } : {}), ...(material ? { material } : {}), roundScore: averageLoss! - c };
+  });
   const playedMove = picked.length
     ? drawMove(
         picked.map((p) => p.move!),
