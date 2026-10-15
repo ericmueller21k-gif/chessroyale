@@ -171,7 +171,7 @@ export const CRATES: readonly CrateDef[] = [
   {
     id: "beta-001",
     name: "Beta Crate · Series 001",
-    blurb: "Secret agents, pirates, ninjas, the old shop's hats and a smile",
+    blurb: "Secret agents, pirates, ninjas, classic hats and a smile",
     look: "beta",
     // Eric (Oct 11): the same odds as Winter.
     strip: [

@@ -392,7 +392,7 @@ function bounceMoment({ boss, moment, now, t, orientation, banner }: MomentProps
 export const BIGBOY_UI = {
   id: "bigboy",
   // (His Big Bounce comes at the start of his turn, after your move.)
-  ultimate: { name: "the Big Bounce", when: "After your move" },
+  ultimate: { name: "the big bounce", when: "After your move" },
   moments: {
     block: { order: 0, kit: "power", dock: "Toy block!", appearAt: (m, square) => (m.square === square ? m.at + BLOCK.landAt : undefined), view: blockMoment },
     // The Big Bounce, at the start of his turn before his move: its own screen.

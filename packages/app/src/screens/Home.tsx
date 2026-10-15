@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, adminPlayable, bossDef, bossIdFromLink, bossStrength, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
+import { BOSS_TIERS, adminPlayable, bossDef, bossIdFromLink, bossStrength, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, SQUADS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { chosenDifficulty, difficultyElo, rememberDifficulty } from "../boss-difficulty.ts";
 import { powersLine } from "../power-words.ts";
@@ -258,14 +258,18 @@ export function BossMenu({
 /** The home screen's mode: one of the solo/lobby modes, or Squads (online only, its own queue and parties). */
 export type HomeMode = ModeChoiceId | "squads";
 
+/** The seats of a Crowd match and a boss raid, from their settings. */
+const CROWD_SIZE = CROWD_SETTINGS.lobbySize ?? S.lobbySize;
+const RAID_SIZE = RAID_SETTINGS.lobbySize ?? S.lobbySize;
+
 /**
  * The mode picker's three choices (Squads took Classic's place, Eric, Oct 10: Classic is still played with ?mode=classic
  * while it's reworked).
  */
 const MODES: { id: HomeMode; label: string; sub: string }[] = [
   { id: "crowd", label: "Crowd", sub: "50 v 50" },
-  { id: "squads", label: "Squads", sub: "8 squads of 4" },
-  { id: "raid", label: "Boss raid", sub: "up to 50" },
+  { id: "squads", label: "Squads", sub: `${SQUADS.squadCount} squads of ${SQUADS.squadSize}` },
+  { id: "raid", label: "Boss raid", sub: `up to ${RAID_SIZE}` },
 ];
 
 /** The mode the home screen shows picked: Squads if this device last picked it (and the address names no mode). */
@@ -357,25 +361,25 @@ function FriendsSheet({
   );
 }
 
-/** The Matchmaking choices: a word or two under each (the ⓘ says more). */
-const TYPES: { id: MatchmakingType; label: string; sub: string }[] = [
-  { id: "default", label: "Default", sub: "bots at 60 s" },
+/** The Matchmaking choices: a word or two under each (the ⓘ says more). `fill`: the server's wait before bots fill (s). */
+const types = (fill: number): { id: MatchmakingType; label: string; sub: string }[] => [
+  { id: "default", label: "Default", sub: `bots at ${fill} s` },
   { id: "botsoff", label: "Bots off", sub: "people only" },
   { id: "solo", label: "Solo", sub: "you + bots" },
 ];
 
 /** What each way of being matched does, for the ⓘ. */
-function TypesInfo({ raid }: { raid: boolean }) {
+function TypesInfo({ raid, fill }: { raid: boolean; fill: number }) {
   // (The real players a match needs to count: 30 of a 50 v 50's 100, 15 of a raid's 50.)
-  const crowdMin = rankedMinHumans(CROWD_SETTINGS.lobbySize ?? 100);
-  const raidMin = rankedMinHumans(RAID_SETTINGS.lobbySize ?? 50);
+  const crowdMin = rankedMinHumans(CROWD_SIZE);
+  const raidMin = rankedMinHumans(RAID_SIZE);
   return (
     <div class="fd-types-info" id="fd-types-info">
       <p>
-        <strong>Default</strong> adds bots after 60 seconds to keep the wait short.
+        <strong>Default</strong> adds bots after {fill} s to keep the wait short.
       </p>
       <p>
-        <strong>Bots off</strong> plays real people only: it waits until the {raid ? `raid has 50 (or ${MATCHMAKING.raidBotsOffMinPlayers} after a minute)` : "lobby is full"}.
+        <strong>Bots off</strong> plays real people only: it waits until the {raid ? `raid has ${RAID_SIZE} (or ${MATCHMAKING.raidBotsOffMinPlayers} after ${fill} s)` : "lobby is full"}.
       </p>
       <p>
         <strong>Solo</strong> is you and bots, starting at once.
@@ -533,7 +537,7 @@ export function HomeScreen({
   };
   const fill = live?.fillSeconds ?? 60;
   const wait = mode === "raid" ? live?.waits.boss : mode === "squads" ? null : live?.waits.crowd;
-  const bots = mode === "raid" ? 49 : mode === "classic" ? S.lobbySize - 1 : 99;
+  const bots = (mode === "raid" ? RAID_SIZE : mode === "classic" ? S.lobbySize : CROWD_SIZE) - 1;
   // The line under PLAY: what PLAY does, for this mode and way of being matched.
   const soloLine = mode === "raid" ? `You and ${bots} bots against a boss` : `Solo vs ${bots} bots`;
   const hint =
@@ -546,7 +550,7 @@ export function HomeScreen({
           </button>
         </>
       ) : (
-        `Solo queue: you join a squad of 4 · bots fill any empty seat after ${fill} s`
+        `Solo queue: you join a squad of ${SQUADS.squadSize} · bots fill any empty seat after ${fill} s`
       )
     ) : mode === "classic" && type !== "solo" ? (
       "Classic is being reworked"
@@ -560,7 +564,7 @@ export function HomeScreen({
     ) : type === "solo" ? (
       `${soloLine} · starts at once${mode === "classic" ? " · online Classic is coming" : ""}`
     ) : type === "botsoff" ? (
-      mode === "raid" ? `People only: starts at 50, or ${MATCHMAKING.raidBotsOffMinPlayers} after a minute` : "People only: starts when 100 have joined"
+      mode === "raid" ? `People only: starts at ${RAID_SIZE}, or ${MATCHMAKING.raidBotsOffMinPlayers} after ${fill} s` : `People only: starts when ${CROWD_SIZE} have joined`
     ) : mode === "raid" ? (
       `Join a raid; bots fill the crowd after ${fill} s`
     ) : wait ? (
@@ -665,13 +669,13 @@ export function HomeScreen({
           {squads ? (
             <button type="button" class="fd-btn sq-party-btn" onClick={onParty}>
               Party
-              <span>Play with up to 3 friends in one squad · create one or join by code</span>
+              <span>Play with up to {SQUADS.partyMax - 1} friends in one squad · create one or join by code</span>
             </button>
           ) : (
             <>
             <div class="fd-types-row">
               <div class="fd-modes fd-types" role="radiogroup" aria-label="Matchmaking">
-                {TYPES.map((t) => {
+                {types(fill).map((t) => {
                   const off = soloOnly && t.id !== "solo";
                   return (
                     <button
@@ -702,10 +706,10 @@ export function HomeScreen({
                 i
               </button>
             </div>
-            {info && <TypesInfo raid={mode === "raid"} />}
+            {info && <TypesInfo raid={mode === "raid"} fill={fill} />}
             {type === "botsoff" && (
               <p class="fd-warn" role="note">
-                <span aria-hidden="true">⚠</span> No bots can mean a much longer wait: the match starts only when {mode === "raid" ? "the raid has enough people" : "100 people have joined"}. You can switch to Default from the queue.
+                <span aria-hidden="true">⚠</span> No bots can mean a much longer wait: the match starts only when {mode === "raid" ? "the raid has enough people" : `${CROWD_SIZE} people have joined`}. You can switch to Default from the queue.
               </p>
             )}
             </>

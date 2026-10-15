@@ -314,7 +314,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
       <div class={`board-area${jolt ? " pw-crash" : ""}`}>
         <div class="opening-name">
           {/* (The title says "phase 2" already, and "the boss is beaten" read wrong as he rises: Chess960 once it splits.) */}
-          <BossHeading side="w" note={split ? "Chess960" : undefined} />
+          <BossHeading side="w" final={!match.settings.raid} note={split ? "Chess960" : undefined} />
         </div>
         <div class="board-row">
           {bossSide}
@@ -529,7 +529,7 @@ export function SimulScreen({ match }: { match: GameView }) {
       <div class="board-area">
         <div class="opening-name">
           {/* (How many are won: the boss bar's right side.) */}
-          <BossHeading side="w" note="Chess960" />
+          <BossHeading side="w" final={!match.settings.raid} note="Chess960" />
         </div>
         <div class="board-row">
           {bossSide}

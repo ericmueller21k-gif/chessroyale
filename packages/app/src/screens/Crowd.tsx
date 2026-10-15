@@ -17,7 +17,7 @@ import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
 import { BossHeading } from "./Play.tsx";
 import { crowdAnimations, crowdTrail, onPrefsChange } from "../prefs.ts";
-import { elimination, finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
+import { bossAlone, elimination, finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { GavelPiece } from "../components/Gavel.tsx";
 import { Avatar } from "../components/Items.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
@@ -301,7 +301,11 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
       <div class={`board-area${stand && ts >= LAST_STAND.crashAt && ts < LAST_STAND.crashAt + 450 ? " ls-shake" : ""}`}>
         <div class="opening-name">
           {match.boss ? (
-            <BossHeading side={sideToMove(fen)} note={mine.king ? "the God King's move" : stand && played ? (ts < LAST_STAND.freezeAt ? "a blunder" : "the God King's Last Stand") : `${voters} ${voters === 1 ? "vote" : "votes"}`} />
+            <BossHeading
+              side={sideToMove(fen)}
+              final={!match.settings.raid}
+              note={mine.king ? "the God King's move" : stand && played ? (ts < LAST_STAND.freezeAt ? "a blunder" : "the God King's Last Stand") : bossAlone(match) ? undefined : `${voters} ${voters === 1 ? "vote" : "votes"}`}
+            />
           ) : (
             <>
               <strong>{sideName(sideToMove(fen))}</strong> · {voters} {voters === 1 ? "vote" : "votes"}
@@ -465,7 +469,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
             <>
               <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore)}</span>
               <span class="muted small">
-                {me.move ? `you picked ${toSan(fen, me.move)}` : "no move from you"} · best was {toSan(fen, mine.bestMove)}
+                {me.move && me.move === mine.bestMove ? `you found the best move, ${toSan(fen, me.move)}` : `${me.move ? `you picked ${toSan(fen, me.move)}` : "no move from you"} · best was ${toSan(fen, mine.bestMove)}`}
               </span>
             </>
           ) : (
@@ -560,7 +564,7 @@ export function CrowdCut({
   }, []);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
   const aliveAfter = standings.filter((s) => !s.out).length - knockedOut.length;
-  // The last cut: what comes next (team final, boss battle or duel).
+  // The last cut: what comes next (team final, boss final or duel).
   const final = stage >= match.settings.knockoutsPerStage.length - 1;
   const next = finalName(match.settings);
   const s = match.settings;
@@ -619,7 +623,7 @@ export function CrowdCut({
               : outBefore
                 ? `You went out earlier, in ${match.placement}${ordinal(match.placement ?? 0)} place.`
                 : final
-                ? next === "Boss battle"
+                ? next === "Boss final"
                   ? "You face the boss!"
                   : next === "Duel"
                     ? "You're in the duel!"

@@ -520,7 +520,7 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   await simulPlay(page, "h5f7");
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
   await expect(page.locator(".results h1")).toHaveText("Victory!");
-  await expect(page.locator(".team-result")).toContainText("You beat Hidden Boss on all 4 boards!");
+  await expect(page.locator(".team-result")).toContainText("You beat the Hidden Boss on all 4 boards!");
   // His defeat in phase 2 (a placeholder for his transformation: the spellbook's glow, his hair in the wind).
   await expect(page.locator(".boss-char.place-results")).toHaveAttribute("data-anim", /spellbook2|spellLoop2/, { timeout: 10_000 });
   expect(await change.seen()).toMatchObject({ idle2: true, reviveLine: true });
@@ -585,7 +585,7 @@ test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defea
   await expect.poll(async () => (await simulNow(page))?.boards[0].result?.how ?? null, { timeout: 10_000 }).toBe("resign");
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
   await expect(page.locator(".results h1")).toHaveText("Defeated");
-  await expect(page.locator(".team-result")).toContainText("Hidden Boss won. You won 3 of 4 boards: all 4 must be won.");
+  await expect(page.locator(".team-result")).toContainText("The Hidden Boss won. You won 3 of 4 boards: all 4 must be won.");
   await expect(page.locator(".boss-char.place-results")).toHaveAttribute("data-anim", /laugh2|idle2/, { timeout: 10_000 });
   expect(errors).toEqual([]);
 });

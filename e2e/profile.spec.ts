@@ -58,7 +58,7 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   await expect(tiles.filter({ hasText: "cuts survived" })).toContainText("100%");
   await page.getByRole("tab", { name: "Boss raid" }).click();
   await expect(tiles.filter({ hasText: "raids" })).toContainText("0");
-  await expect(page.getByText("BOSSES BEATEN · 0 / 10")).toBeVisible();
+  await expect(page.getByText("BOSS TIERS BEATEN · 0 / 10")).toBeVisible();
   await expect(page.locator(".fd-match")).toContainText("Best move Nxe5");
   // Rename.
   await page.getByRole("button", { name: "Edit name & icon" }).click();

@@ -128,7 +128,9 @@ describe("the FAQ's numbers come from the settings", () => {
   });
 
   it("Maia is marked as being tested only while it's off for players", () => {
-    expect(section("boss-brain")).toContain(BOSS_BRAIN.forPlayers ? "New." : "Being tested; coming soon.");
+    expect(section("boss-brain")).toContain(BOSS_BRAIN.forPlayers ? "plays with Maia" : "Being tested; coming soon.");
+    // (No developer's notes in the player's FAQ: "New." went, Oct 15.)
+    expect(section("boss-brain")).not.toContain("New.");
     const on = section("boss-brain", { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, forPlayers: true } });
     expect(on).not.toContain("Being tested");
     const off = section("boss-brain", { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, forPlayers: false } });
@@ -199,7 +201,8 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(t).toContain("again and again");
     expect(t).toContain(`${BOSS_POWERS.rageStrike} each time the God King strikes the boss`);
     expect(t).toContain(`Ginger ×${BOSS_POWERS.rageSpeed.gingerbread}`);
-    expect(t).toContain("not yet tested with bots");
+    expect(t).toContain("These rates are estimates, and may be tuned as real battles come in.");
+    expect(t).not.toContain("not yet tested");
     expect(t).toContain("two ultimates never overlap");
     expect(t).toContain("only one of your pieces may move, picked at random");
     // Ginger's blizzard (Oct 12): its turns, the count free on its second, the thaw; numbers from the settings.
@@ -249,7 +252,8 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(t).toContain("Rapid 10+5 (10 minutes, +5 s a move, at most 20 s on a move), Blitz 5+3 (5 minutes, +3 s a move, at most 15 s on a move) or Bullet 3+2 (3 minutes, +2 s a move, at most 10 s on a move)");
     expect(t).toContain("Nobody voting means Blitz 5+3.");
     expect(t).toContain("as on a chess clock");
-    expect(t).toContain("Pre-game votes off) it's 10 minutes, +5 s a move, at most 20 s on a move; a boss raid is 10 minutes, +5 s a move, at most 20 s on a move.");
+    // (The clock without the vote by its name, once: the raid's is the same.)
+    expect(t).toContain("Pre-game votes off) it's Rapid 10+5, as in a boss raid.");
     expect(t).not.toMatch(/Variable|Normal \(/);
     // Changed time controls (and a changed default) change the words.
     const V = FAQ_DEFAULTS.clockVote;
@@ -264,14 +268,15 @@ describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Bos
   const him = crowdFinalBoss()!;
   it("names him (the roster's name) and the number who face him (the knockouts), never typed", () => {
     const t = section("modes");
-    expect(t).toContain(`a boss battle (the top ${crowdFinalists("boss")} team up against ${him.name})`);
-    expect(t).toContain(`The Crowd's boss battle is always ${him.name}, for the last ${crowdFinalists("boss")} of a 50 v 50.`);
+    // (The Crowd's ending is the boss final; "the Hidden Boss" with its article in a sentence.)
+    expect(t).toContain(`a boss final (the top ${crowdFinalists("boss")} team up against the ${him.name})`);
+    expect(t).toContain(`The Crowd's boss final is always the ${him.name}, for the last ${crowdFinalists("boss")} of a 50 v 50.`);
     // No strikes in the Crowd's final: the strike line is the raid's only.
     expect(t).toContain("until half the raid is left.");
     // Other knockouts, another name: the words follow.
-    const renamed = BOSS_ROSTER.map((b) => (b.id === him.id ? { ...b, name: "A Powerful Foe" } : b));
+    const renamed = BOSS_ROSTER.map(({ the: _, ...b }) => (b.id === him.id ? { ...b, name: "A Powerful Foe" } : b));
     const moved = section("modes", { ...FAQ_DEFAULTS, roster: renamed, crowdKnockouts: { ...CROWD_KNOCKOUTS, boss: CROWD_KNOCKOUTS.team } });
-    expect(moved).toContain("a boss battle (the top 8 team up against A Powerful Foe)");
+    expect(moved).toContain("a boss final (the top 8 team up against A Powerful Foe)");
     expect(moved).not.toContain(him.name);
   });
 
@@ -294,9 +299,9 @@ describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Bos
 
   it("his strength and brain are fixed (the Crowd's battle no longer follows the finalists' ratings); the God King can't help against him", () => {
     const t = section("boss-brain");
-    expect(t).toContain(`The Crowd's boss battle is always ${him.name}, whose strength is fixed at ${fixedLevel()}`);
+    expect(t).toContain(`The Crowd's boss final is always the ${him.name}, whose strength is fixed at ${fixedLevel()}`);
     expect(t).toContain(`Maia at its top rating, ${maiaTopRating()}, with no guard`);
-    expect(section("god-king")).toContain(`His help doesn't work against ${him.name}, the Crowd's boss`);
+    expect(section("god-king")).toContain(`His help doesn't work against the ${him.name}, the Crowd's boss`);
   });
 });
 

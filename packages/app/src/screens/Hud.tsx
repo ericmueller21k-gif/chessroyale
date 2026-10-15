@@ -7,7 +7,7 @@ import { useMedia } from "../components/QuickChat.tsx";
 import { exitFor } from "../match-exit.ts";
 import { clockShown } from "../clock-text.ts";
 import { BoardsStrip } from "../components/TinyBoard.tsx";
-import { isCrowd, myBoardId, towerView, type GameView } from "../game.ts";
+import { bossAlone, isCrowd, myBoardId, towerView, type GameView } from "../game.ts";
 import { roundsInStage } from "@chessroyale/core";
 import { BossBar } from "./Boss.tsx";
 
@@ -109,7 +109,8 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
               </>
             )}
           </span>
-          {rank > 0 && (
+          {/* (Boss alone: no place to show in a crowd of one.) */}
+          {rank > 0 && !bossAlone(match) && (
             <span class={`hud-rank ${inZone ? "danger" : ""}`}>
               P<LiveNumber value={rank} format={(x) => String(Math.round(x))} goodWhenDown />
               <span class="muted">/{match.final ? match.final.order.length : alive.length}</span>

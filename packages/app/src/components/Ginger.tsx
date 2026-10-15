@@ -102,7 +102,7 @@ export function prewarmGinger(): void {
 
 export const GINGER_UI = {
   id: "gingerbread",
-  ultimate: { name: "the Blizzard" },
+  ultimate: { name: "the blizzard" },
   moments: {
     freeze: { order: 0, kit: "power", dock: "Freeze!", appearAt: (m, square) => (m.square === square ? m.at + FREEZE.iceAt : undefined), view: freezeMoment },
     // The blizzard's sweep crosses the board left to right; each piece ices over as it passes.

@@ -76,11 +76,12 @@ export function MiniTower({
   };
 
   return (
-    <section class={`mini-tower${open ? "" : " closed"}${narrow ? " narrow" : ""}`} aria-label="Leaderboard">
+    // (Alone against a boss: your own row, no more; the panel holds just that, not a crowd's worth of empty space.)
+    <section class={`mini-tower${open ? "" : " closed"}${narrow ? " narrow" : ""}${standings.length === 1 ? " one" : ""}`} aria-label="Leaderboard">
       <div class="mini-tower-head">
         <button type="button" class="mini-tower-title" onClick={() => setSheet(true)}>
           {view.teamLabel ?? "Leaderboard"}
-          {!narrow && <span class="muted"> · tap for all {alive.length}</span>}
+          {!narrow && alive.length > 1 && <span class="muted"> · tap for all {alive.length}</span>}
         </button>
         {head}
         {openProp === undefined && (

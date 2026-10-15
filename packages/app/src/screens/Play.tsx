@@ -191,7 +191,7 @@ export function PlayScreen({
           {match.final ? (
             <FinalTurnLabel match={match} side={side} />
           ) : match.boss ? (
-            <BossHeading side={side} note={alone && waiting ? "the boss is thinking" : `${doneCount}/${alive.length} picked`} />
+            <BossHeading side={side} final={!match.settings.raid} note={alone ? (waiting ? "the boss is thinking" : undefined) : `${doneCount}/${alive.length} picked`} />
           ) : match.settings.mode === "crowd" ? (
             <>
               {/* (On a phone, dropped while the lit "▲" note is in the line, to leave room for the clock at the board's
@@ -355,11 +355,14 @@ export function PlayScreen({
   );
 }
 
-/** Boss battle: the line above the board, the same on every screen of it. */
-export function BossHeading({ side, note }: { side: "w" | "b"; note?: string }) {
+/**
+ * Boss battle: the line above the board, the same on every screen of it. `final`: the Crowd's boss final (a raid or
+ * Boss alone is a boss battle).
+ */
+export function BossHeading({ side, note, final = false }: { side: "w" | "b"; note?: string; final?: boolean }) {
   return (
     <>
-      <strong>BOSS BATTLE</strong> · you play {side === "w" ? "White" : "Black"}
+      <strong>{final ? "BOSS FINAL" : "BOSS BATTLE"}</strong> · you play {side === "w" ? "White" : "Black"}
       {note ? <> · {note}</> : null}
     </>
   );

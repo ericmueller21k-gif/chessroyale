@@ -896,9 +896,9 @@ export function App() {
             if (location.pathname === "/settings") history.replaceState(null, "", "/");
           }}
           onSoundLab={() => setSoundLab(true)}
-          onFaq={() => {
+          onFaq={(section) => {
             setShowFaq(true);
-            history.replaceState(null, "", "/faq");
+            history.replaceState(null, "", section ? `/faq#faq-${section}` : "/faq");
           }}
         />
       </FrontFrame>

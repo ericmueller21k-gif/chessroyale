@@ -29,7 +29,7 @@ import { ordinal } from "./StageBreak.tsx";
 import { CRITICAL, bossVoice } from "../speech.tsx";
 import { kingBlocked } from "../components/Recluse.tsx";
 import { BrainLoading } from "../components/BrainLoading.tsx";
-import { crowdFinalists } from "@chessroyale/core";
+import { bossInText, crowdFinalists } from "@chessroyale/core";
 
 /** The Crowd's boss final as it starts: how many face the boss (crowdFinalists: the top 4), as a word. */
 const NUMBER_WORDS = ["None", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
@@ -341,7 +341,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                   {boss.icon} <strong>{snackLine(boss)}</strong>
                 </>
               ) : intro ? (
-                <strong>{boss.raid ? "All of you vs the boss." : finalistsLine()}</strong>
+                <strong>{boss.raid ? (alone ? "You vs the boss." : "All of you vs the boss.") : finalistsLine()}</strong>
               ) : fall ? (
                 // (Beaten, the Hidden Boss collapses and mumbles before the result.)
                 <>
@@ -406,7 +406,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
       {hud}
       <div class={`board-area${slam ? " pw-slam" : ""}${jolt === "crash" ? " pw-crash" : jolt === "bump" ? " pw-bump" : ""}`}>
         <div class="opening-name">
-          <BossHeading side={boss.crowdSide} note={fall ? "the boss is beaten" : lights ? "lights out" : thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
+          <BossHeading side={boss.crowdSide} final={!boss.raid} note={fall ? "the boss is beaten" : lights ? "lights out" : thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
         </div>
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           {bossSide}
@@ -424,8 +424,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" />}
             {/* (The queen banners are silent for now: Eric, Oct 11, the gasp sounded wrong. Its file is kept, unused:
                 queenGasp in sound.ts, public/sounds/banner/queen-gasp.mp3.) */}
-            {slewQueen && <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} />}
-            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} />}
+            {slewQueen && <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${bossInText(boss.name)}'s queen`} />}
+            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${bossInText(boss.name, true)} takes your queen`} />}
             {loading && <BrainLoading match={match} boss={boss} />}
             {showCard && (
               // (After the loading step, whose card it takes over from: no entrance, so the board doesn't blink between.)

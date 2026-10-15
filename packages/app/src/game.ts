@@ -339,6 +339,12 @@ export interface GameView {
   resign(): void;
 }
 
+/**
+ * Boss alone: you against a boss, nobody else (a raid of one). Its screens speak to you, never to a crowd: no pick
+ * count, no place in a crowd of one, no crowd table.
+ */
+export const bossAlone = (m: Pick<GameView, "settings" | "totalPlayers">) => !!m.settings.raid && m.totalPlayers === 1;
+
 /** Crowd 50 v 50: your team (the side you play all match), if you have one. */
 export function myTeam(m: Pick<GameView, "standings">): "w" | "b" | null {
   return m.standings().find((s) => s.isYou)?.team ?? null;
@@ -348,10 +354,10 @@ export function myTeam(m: Pick<GameView, "standings">): "w" | "b" | null {
  * The leaderboard as you should see it: in Crowd 50 v 50 each team has its own
  * cut (half the knockouts each), so it shows your team with your team's cut line.
  */
-export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" | "stage"> & { boss?: BossView | null }): { standings: Standing[]; cutoff: number; teamLabel: string | null } {
+export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" | "stage" | "totalPlayers"> & { boss?: BossView | null }): { standings: Standing[]; cutoff: number; teamLabel: string | null } {
   const all = m.standings();
-  // Boss battle: one crowd, no cut line (the boss strikes instead).
-  if (m.boss) return { standings: all, cutoff: all.filter((s) => !s.out).length, teamLabel: "The crowd" };
+  // Boss battle: one crowd, no cut line (the boss strikes instead). Boss alone: just you, your own row.
+  if (m.boss) return { standings: all, cutoff: all.filter((s) => !s.out).length, teamLabel: bossAlone(m) ? "You" : "The crowd" };
   const team = all.find((s) => s.isYou)?.team ?? null;
   if (!team) return { standings: all, cutoff: m.cutoff, teamLabel: null };
   const mine = all.filter((s) => s.team === team);
@@ -362,9 +368,32 @@ export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" 
 
 export const isCrowd = (m: Pick<GameView, "settings">) => m.settings.mode === "crowd";
 
-/** What a Crowd match's last cut leads to, by name: the team final, the boss battle or the duel. */
+/** What a Crowd match's last cut leads to, by name: the team final, the boss final or the duel. */
 export function finalName(s: Pick<Settings, "finalFormat">): string {
-  return s.finalFormat === "boss" ? "Boss battle" : s.finalFormat === "duel" ? "Duel" : "Team final";
+  return s.finalFormat === "boss" ? "Boss final" : s.finalFormat === "duel" ? "Duel" : "Team final";
+}
+
+/**
+ * The results table's rows: your average loss per move in each part of the match, named for what was played. Classic:
+ * each stage, then "Final". Crowd: the knockouts as one row (a stage there is a move or two), then its ending (team
+ * final, boss final or duel). A raid or Boss alone: the boss battle.
+ */
+export function lossRows(match: Pick<GameView, "settings" | "lossesByStage">): { label: string; avg: number }[] {
+  const s = match.settings;
+  const stages = s.knockoutsPerStage.length;
+  const avg = (l: readonly number[]) => l.reduce((a, b) => a + b, 0) / l.length;
+  const parts: { label: string; losses: number[] }[] = [];
+  const add = (label: string, l: readonly number[]) => {
+    const last = parts.at(-1);
+    if (last?.label === label) last.losses.push(...l);
+    else parts.push({ label, losses: [...l] });
+  };
+  match.lossesByStage.forEach((l, i) => {
+    if (s.raid) add("Boss battle", l);
+    else if (i >= stages) add(s.mode === "crowd" ? finalName(s) : "Final", l);
+    else add(s.mode === "crowd" ? "Knockouts" : `Stage ${i + 1}`, l);
+  });
+  return parts.filter((p) => p.losses.length).map((p) => ({ label: p.label, avg: avg(p.losses) }));
 }
 
 /** The board you're on this turn (highlighted in the strip), if any. */

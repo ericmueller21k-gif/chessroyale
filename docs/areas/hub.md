@@ -57,7 +57,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - **The first tap of a visit** doesn't wait for sound (Oct 12): the audio graph is made while the page is idle
   (`prepareAudio`), so a tap only switches it on; the samples start loading after that tap's frame.
 - **The FAQ, "How HunChess works"** (Eric, Oct 11): Settings → HOW TO PLAY → "📖 FAQ · How it works" (`/faq`; back
-  goes to Settings). A long page for the curious: a table of contents with tap-to-jump links, then the modes, how
+  goes to Settings), or "📖 How each mode works" (`/faq#faq-modes`). Settings keeps no rules of its own: the FAQ is
+  the one copy (Oct 15). A long page for the curious: a table of contents with tap-to-jump links, then the modes, how
   moves are scored (with the math and a worked example), how a boss decides its moves (its strength, Stockfish and
   Maia, the handover between them, what a rating gap means), boss powers and the rage meter (one block per boss), the
   God King and his Last Stand, leaving or resigning (the modes' last entry), crates and items, fair play (high level

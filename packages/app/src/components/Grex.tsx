@@ -277,7 +277,7 @@ function fireproofMoment({ boss, moment, t, orientation }: MomentProps) {
 
 export const GREX_UI = {
   id: "grex",
-  ultimate: { name: "the Roman Candle" },
+  ultimate: { name: "the Roman candle" },
   moments: {
     spark: { order: 0, kit: "power", dock: "Sparkler!", appearAt: (m, square) => (m.square === square ? m.at + SPARK.landAt : undefined), view: sparkMoment },
     // (A fireball's landing ends on the tile's first stage: the tile carries on from there.)
