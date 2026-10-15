@@ -60,6 +60,8 @@ export interface PlayerState {
    * Missing (a match started before the allowance), the raw ones count.
    */
   countedLossSum?: number;
+  /** The raw losses summed (kept as moves come, so ranking never re-adds a long match; missing: from lossesByStage). */
+  rawLossSum?: number;
   lastBoard: number | null;
   lastGroupmates: string[];
   /** Stage in which the player was knocked out (null while alive). */
@@ -388,6 +390,7 @@ export function applyRound(
       misses: (p.misses ?? 0) + (o.loss === null && !o.abstained ? 1 : 0),
       lossesByStage,
       countedLossSum: countedSum(p) + (counted ?? 0),
+      rawLossSum: rawSum(p) + (o.loss ?? 0),
       lastBoard: board,
       lastGroupmates: board === null ? [] : groups.get(board)!.filter((id) => id !== p.id),
     };
@@ -401,15 +404,18 @@ export function applyRound(
   };
 }
 
+/** The match's raw losses, summed. */
+const rawSum = (p: Pick<PlayerState, "lossesByStage" | "rawLossSum">) => p.rawLossSum ?? p.lossesByStage.reduce((s, l) => s + l.reduce((a, x) => a + x, 0), 0);
+
 /** The match's losses as they count for points, summed (the raw ones for a match started before the opening allowance). */
-const countedSum = (p: Pick<PlayerState, "lossesByStage" | "countedLossSum">) => p.countedLossSum ?? p.lossesByStage.flat().reduce((s, x) => s + x, 0);
+const countedSum = (p: Pick<PlayerState, "lossesByStage" | "countedLossSum" | "rawLossSum">) => p.countedLossSum ?? rawSum(p);
 
 /**
  * A player's average counted loss per move over the whole match (the opening allowance taken off), a missed move
  * counting as finalMissLoss (lower is better; Infinity before any move). It's the steady measure the late game ranks
  * by, so one blunder (or one brilliant move) can't decide alone.
  */
-export function matchLoss(p: Pick<PlayerState, "lossesByStage" | "misses" | "countedLossSum">, settings: Settings = DEFAULT_SETTINGS): number {
+export function matchLoss(p: Pick<PlayerState, "lossesByStage" | "misses" | "countedLossSum" | "rawLossSum">, settings: Settings = DEFAULT_SETTINGS): number {
   const misses = p.misses ?? 0;
   const n = p.lossesByStage.reduce((s, l) => s + l.length, 0) + misses;
   return n ? (countedSum(p) + misses * settings.finalMissLoss) / n : Infinity;
@@ -419,8 +425,8 @@ export function matchLoss(p: Pick<PlayerState, "lossesByStage" | "misses" | "cou
  * Everything a player gave away over the match before the opening allowance: every raw loss, a miss counting as
  * finalMissLoss. The last cut before a fixed-size ending breaks an exact tie with it (fewer first).
  */
-export function rawLossTotal(p: Pick<PlayerState, "lossesByStage" | "misses">, settings: Settings = DEFAULT_SETTINGS): number {
-  return p.lossesByStage.reduce((s, l) => s + l.reduce((a, x) => a + x, 0), 0) + (p.misses ?? 0) * settings.finalMissLoss;
+export function rawLossTotal(p: Pick<PlayerState, "lossesByStage" | "misses" | "rawLossSum">, settings: Settings = DEFAULT_SETTINGS): number {
+  return rawSum(p) + (p.misses ?? 0) * settings.finalMissLoss;
 }
 
 /** Converts a scored group into per-player outcomes, given each player's thinking time. */
