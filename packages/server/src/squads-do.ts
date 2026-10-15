@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { SQUADS } from "@chessroyale/core";
+import { SQUADS, pausedLine } from "@chessroyale/core";
 import type { LobbyCloseReason, Opening } from "@chessroyale/chess";
 import type { PartyClientMessage, SquadsClientMessage } from "@chessroyale/chess/squads";
 import openings from "@chessroyale/chess/data/openings.json";
@@ -11,6 +11,7 @@ import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { isAdmin } from "./admin.ts";
 import { serverScoreAt } from "./engine.ts";
 import { countCall } from "./ops.ts";
+import { isPaused } from "./kill-switches.ts";
 import type { Env } from "./index.ts";
 
 const library = openings as unknown as Opening[];
@@ -442,8 +443,13 @@ export class SquadsParty extends DurableObject<Env> {
     this.asking = true;
     try {
       await this.persist(asking);
-      const mm = this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName(this.record.queueName));
-      const answer = await mm.next({}, this.record.fillMs, { squads: true }, want.ticket, { size: want.size, pass: want.pass }).catch(() => null);
+      // Squads resting (a kill switch): the party waits in line with its line, asking again each minute, and goes in
+      // once it's back.
+      const answer = isPaused(this.env, "squads")
+        ? { busy: true as const, ticket: want.ticket ?? "", position: 0, waitSeconds: 60, retryMs: 60_000, message: pausedLine("squads") }
+        : await this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName(this.record.queueName))
+            .next({}, this.record.fillMs, { squads: true }, want.ticket, { size: want.size, pass: want.pass })
+            .catch(() => null);
       if (!this.record) return;
       const core = this.core();
       core.answered(want.pass, answer);

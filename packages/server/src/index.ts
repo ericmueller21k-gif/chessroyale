@@ -18,6 +18,7 @@ import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
 import { countRoute, opsStats, routeOf } from "./ops.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
+import { isPaused, pausedBosses, pausedResponse, switchStatus, type KillSwitchEnv } from "./kill-switches.ts";
 
 export { Lobby } from "./lobby-do.ts";
 export { SquadsLobby, SquadsParty } from "./squads-do.ts";
@@ -25,7 +26,7 @@ export { Matchmaker } from "./matchmaker.ts";
 export { EngineServer } from "./engine.ts";
 export { LiveHub } from "./live-hub.ts";
 
-export interface Env extends AccountEnv, EngineEnv, AdminEnv {
+export interface Env extends AccountEnv, EngineEnv, AdminEnv, KillSwitchEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
   /** Squads: one object per lobby, and one per party (squads-do.ts). */
   SQUADS: DurableObjectNamespace<SquadsLobby>;
@@ -107,6 +108,8 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUntil): Promise<Response> {
+  // GET /api/status → { paused, banner }: the kill switches that are off and the maintenance banner (kill-switches.ts).
+  if (url.pathname === "/api/status" && request.method === "GET") return json(switchStatus(rawEnv));
   {
     // (The sign-in secrets may live in the Secrets Store: read them as strings.)
     const env = await withSecrets(rawEnv);
@@ -138,12 +141,15 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // &from=CODE with { seat }: Bots off → Default, keeping your wait: you leave that lobby and bots fill a minute after
     // you first joined it at the latest. 409 if that lobby has started meanwhile (stay in it).
     if (url.pathname === "/api/play" && request.method === "POST") {
+      const raid = url.searchParams.get("mode") === "raid";
+      // (A mode resting, a kill switch: no new matches. The bosses resting are never met.)
+      if (isPaused(rawEnv, raid ? "raid" : "crowd")) return pausedResponse(raid ? "raid" : "crowd");
       const refused = await mayPlay(request, env, waitUntil);
       if (refused) return refused;
       const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
-      const raid = url.searchParams.get("mode") === "raid";
       const type = url.searchParams.get("type") === "botsoff" ? "botsoff" : "default";
-      const overrides = raid ? RAID_SETTINGS : modeSettings("crowd", { crowdTeams: true, augments: true });
+      const off = pausedBosses(rawEnv);
+      const overrides = { ...(raid ? RAID_SETTINGS : modeSettings("crowd", { crowdTeams: true, augments: true })), ...(off.length ? { bossesOff: off } : {}) };
       // ?pool=NAME: a queue of its own (tests run several queues at once without meeting). Split by region when
       // that's on (queue.ts). ?ticket=ID: a player in line asking again (they keep their place).
       const region = regionOf(request.cf as { continent?: unknown } | undefined);
@@ -168,6 +174,11 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     }
     // POST /api/lobby → { code }
     if (url.pathname === "/api/lobby" && request.method === "POST") {
+      // (A mode resting, or the boss picked, a kill switch: no new lobby. The bosses resting are never met.)
+      const part = url.searchParams.get("mode") === "raid" ? "raid" : url.searchParams.get("mode") === "crowd" ? "crowd" : "classic";
+      const picked = bossIdFromLink(url.searchParams.get("boss"));
+      if (isPaused(rawEnv, part)) return pausedResponse(part);
+      if (picked && isPaused(rawEnv, `boss:${picked}`)) return pausedResponse(`boss:${picked}`);
       const refused = await mayPlay(request, env, waitUntil);
       if (refused) return refused;
       // Playtest overrides, e.g. POST /api/lobby?rounds=2&clock=15
@@ -216,7 +227,8 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       };
       // ?keep=SECONDS: its results stay up this long (5 s up to the usual 15 minutes), for tests.
       const keep = url.searchParams.has("keep") ? Math.max(5, Math.min(LOBBY_LIFE.lobbyResultsKeepMinutes * 60, Number(url.searchParams.get("keep")) || 0)) * 1000 : undefined;
-      const plain = JSON.parse(JSON.stringify(overrides));
+      const off = pausedBosses(rawEnv);
+      const plain = JSON.parse(JSON.stringify(off.length ? { ...overrides, bossesOff: off } : overrides));
       const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, plain, undefined, keep)) !== false);
       return code ? json({ code }) : json({ message: "Couldn't create a lobby. Try again." }, 500);
     }
@@ -264,6 +276,8 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
   const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
   const region = regionOf(request.cf as { continent?: unknown } | undefined);
   const queue = queueName("squads", "default", url.searchParams.get("pool"), region);
+  // (Squads resting, a kill switch: no new queue or party. Its test lobbies, admins only, still open.)
+  if ((url.pathname === "/api/squads/play" || url.pathname === "/api/squads/party") && request.method === "POST" && isPaused(env, "squads")) return pausedResponse("squads");
   if (url.pathname === "/api/squads/play" && request.method === "POST") {
     const refused = await mayPlay(request, env, waitUntil);
     if (refused) return refused;
