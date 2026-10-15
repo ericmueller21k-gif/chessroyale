@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2 } from "@chessroyale/core";
 import { LAST_STAND, legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
-import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, Talk, absorbKing, arcPoints, phaseChangeRun, smoothPath, talkStage } from "../src/recluse-phase2.ts";
+import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, absorbKing, arcPoints, phaseChangeRun, smoothPath } from "../src/recluse-phase2.ts";
 import { ON_BOARD_ANIMS, RECLUSE, RECLUSE_BUST } from "../src/characters/recluse.ts";
-import { CHATTER, CRITICAL, LOW, NORMAL, Voice, bossVoice, typeMs } from "../src/speech.tsx";
+import { CRITICAL, NORMAL, Voice, bossVoice, typeMs } from "../src/speech.tsx";
 import { SoloMatch } from "../src/solo.ts";
 import { KING_LINES, kingLine, kingSay, resetKingSpeech } from "../src/godKing.ts";
 import { KING_VS_RECLUSE, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
@@ -115,7 +115,7 @@ describe("the phase change", () => {
 describe("his phase 2 lines", () => {
   it("has a line for each moment; the God King's last are his triumph and his cry as he's drained (none in phase 2)", () => {
     for (const k of ["absorb", "engine", "revive", "phase2", "boardWon", "boardLost", "beaten2", "chant"] as const) expect(RECLUSE_LINES[k].length, k).toBeGreaterThan(0);
-    for (const k of ["early", "middle", "late"] as const) expect(RECLUSE_LINES.collusion[k].length, k).toBeGreaterThan(0);
+    for (const p of [1, 2] as const) for (const k of ["early", "middle", "late"] as const) expect(RECLUSE_LINES.talk[p][k].length, `${p} ${k}`).toBeGreaterThan(0);
     expect(Object.keys(KING_VS_RECLUSE).sort()).toEqual(["blocked", "drained", "intro", "triumph"]);
     expect(Object.keys(KING_LINES).filter((c) => c.startsWith("foe")).sort()).toEqual(["foeBlocked", "foeDrained", "foeIntro", "foeTriumph"]);
     // (Placeholders, ours: "Mind and machine", never the film's title.)
@@ -155,64 +155,16 @@ describe("his phase 2 lines", () => {
     expect(RECLUSE_LINES.chant.some((l) => /Petrosian/.test(l) && /Keres/.test(l) && /Geller/.test(l))).toBe(true);
     // (Verified on the printed pages of his Sports Illustrated article, Aug 20, 1962: never altered.)
     expect(RECLUSE_LINES.chant).toContain("They worked as a team.");
-    expect(RECLUSE_LINES.collusion.middle).toEqual(expect.arrayContaining(["They consulted during the games.", "They would openly analyze my game while I was still playing it.", "They agreed ahead of time to draw the games they played against each other."]));
-    expect(RECLUSE_LINES.collusion.late).toEqual(expect.arrayContaining(["They worked as a team.", "It made me mad that they thought they could get away with it.", "I will never again play in one of these tournaments."]));
+    // (Each in one phase's chatter only, so a fight never says one twice there.)
+    const { 1: p1, 2: p2 } = RECLUSE_LINES.talk;
+    expect(p1.middle).toEqual(expect.arrayContaining(["They consulted during the games.", "They would openly analyze my game while I was still playing it."]));
+    expect(p1.late).toContain("It made me mad that they thought they could get away with it.");
+    expect(p2.middle).toContain("They agreed ahead of time to draw the games they played against each other.");
+    expect(p2.late).toEqual(expect.arrayContaining(["They worked as a team.", "I will never again play in one of these tournaments."]));
+    const one = all(p1);
+    for (const line of all(p2)) expect(one, line).not.toContain(line);
     // (Korchnoi only among the names, never with a word about a game he played.)
     for (const line of all(RECLUSE_LINES).filter((l) => /Korchnoi/.test(l))) expect(line.replace(/[.\s]/g, "")).toMatch(/^(Petrosian|Keres|Geller|Tal|Korchnoi)+$/);
-  });
-});
-
-describe("his collusion lines in phase 2", () => {
-  it("picks the stage by his moves so far: early, middle from talkMiddleFrom, late from talkLateFrom", () => {
-    const { talkMiddleFrom: mid, talkLateFrom: late } = RECLUSE_PHASE2;
-    expect(talkStage(0)).toBe("early");
-    expect(talkStage(mid - 1)).toBe("early");
-    expect(talkStage(mid)).toBe("middle");
-    expect(talkStage(late - 1)).toBe("middle");
-    expect(talkStage(late)).toBe("late");
-    expect(talkStage(10_000)).toBe("late");
-  });
-
-  it("speaks every talkEvery of his moves, give or take talkJitter, each stage's lines in turn", () => {
-    const { talkEvery, talkJitter } = RECLUSE_PHASE2;
-    for (const r of [0, 0.5, 0.999]) {
-      const talk = new Talk(() => r);
-      const at: number[] = [];
-      const said: string[] = [];
-      for (let n = 1; n <= 200; n++) {
-        const line = talk.lineAfter(n, false);
-        if (line) at.push(n), said.push(line);
-      }
-      const gaps = at.slice(1).map((n, i) => n - at[i]!);
-      expect(at[0]!).toBeGreaterThanOrEqual(talkEvery - talkJitter);
-      for (const g of gaps) expect(g).toBeGreaterThanOrEqual(talkEvery - talkJitter), expect(g).toBeLessThanOrEqual(talkEvery + talkJitter);
-      // Every third line, from the first, mocks the engine he took (in turn); the rest are his stage's pool, in turn.
-      said.forEach((l, i) => (i % 3 === 0 ? expect(l).toBe(RECLUSE_LINES.engine[(i / 3) % RECLUSE_LINES.engine.length]) : expect(RECLUSE_LINES.collusion[talkStage(at[i]!)]).toContain(l)));
-      const pool = RECLUSE_LINES.collusion.early;
-      const early = said.filter((_, i) => i % 3 !== 0 && talkStage(at[i]!) === "early");
-      expect(early).toEqual(early.map((_, i) => pool[i % pool.length]));
-    }
-  });
-
-  it("is the lowest priority: skipped (not queued) while anything is being said; anything he says cuts in on it", () => {
-    const talk = new Talk(() => 0.5);
-    const due = RECLUSE_PHASE2.talkEvery;
-    // A line is up (a slow move's): this one is skipped, and the next comes a few moves later.
-    expect(talk.lineAfter(due, true)).toBeNull();
-    expect(talk.lineAfter(due + 1, false)).toBeNull();
-    expect(talk.lineAfter(due * 2, false)).not.toBeNull();
-    // In the voice: chatter is cut by any other line of his (a slow move's is LOW), and never cuts one in turn.
-    const voice = new Voice();
-    voice.say("Who told you that move?", "talk", CHATTER, 1000);
-    voice.say("Still thinking? Move!", "slow", LOW, 1500);
-    expect(voice.line(1500)?.text).toBe("Still thinking? Move!");
-    voice.say("Who told you that move?", "talk2", CHATTER, 1600);
-    expect(voice.line(1700)?.text).toBe("Still thinking? Move!");
-    // (Chatter said over chatter waits its turn, as any other line.)
-    const v2 = new Voice();
-    v2.say("A", "a", CHATTER, 0);
-    v2.say("B", "b", CHATTER, 10);
-    expect(v2.line(20)?.text).toBe("A");
   });
 });
 
@@ -281,7 +233,7 @@ describe("phase 2's four boards on this device", () => {
     for (const b of g.state.boards) expect(b.board.history.length).toBeGreaterThanOrEqual(2);
     expect(e.asked.length).toBeGreaterThanOrEqual(4);
     for (const a of e.asked) expect(a).toMatchObject({ elo: RECLUSE_PHASE2.elo, nodes: RECLUSE_PHASE2.nodes, moveMs: RECLUSE_PHASE2.moveMs });
-    // (Each of his moves counted, on all the boards together: what his collusion lines go by.)
+    // (Each of his moves counted, on all the boards together.)
     const his = g.state.boards.reduce((n, b) => n + Math.floor(b.board.history.length / 2), 0);
     expect(moved).toEqual(Array.from({ length: his }, (_, i) => i + 1));
     expect(g.bossMoves).toBe(his);

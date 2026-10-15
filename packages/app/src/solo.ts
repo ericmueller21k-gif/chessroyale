@@ -3,7 +3,7 @@ import { GUARD_WORDS, MatchRunner, ShowdownScout, brainLine as brainWords, board
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, SimulView, Standing, VoteView } from "./game.ts";
-import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, Talk, phaseChangeRun } from "./recluse-phase2.ts";
+import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { playInPlace, setEngineAt, setFigureRun } from "./components/BossCharacter.tsx";
 import { play, warmSounds } from "./sound.ts";
@@ -12,7 +12,7 @@ import { RoundProgress } from "./progress.ts";
 import { ownEngine, pauseEngines, warmEngineServer, withServerRecheck } from "./engine.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
 import { crowdMoveCues, kingSay, resetKingSpeech } from "./godKing.ts";
-import { CHATTER, CRITICAL, LOW, NORMAL, bossVoice } from "./speech.tsx";
+import { CRITICAL, LOW, NORMAL, bossVoice } from "./speech.tsx";
 import { SoloLobbyChat } from "./chat.ts";
 import { account } from "./account.ts";
 import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
@@ -883,10 +883,8 @@ export class SoloMatch implements GameView {
       onResult: (b) => this.phase2Result(b.result!.winner),
       onSlow: (id, ult) => this.phase2Slow(id, ult),
       onUlt: () => this.phase2Ult(),
-      onBossMove: (n) => this.phase2Talk(n),
       onDone: () => this.phase2Done(),
     });
-    this.talk = new Talk(this.rng);
     this.lastSlow = null;
     // (The slow move's sound made ahead, off the page, before play begins.)
     warmSounds(["recluseSlow", "recluseDrain", "recluseSpark", "recluseArc"]);
@@ -912,16 +910,6 @@ export class SoloMatch implements GameView {
   }
 
   private phase2Lines = { won: 0, lost: 0, slow: 0 };
-  private talk: Talk | null = null;
-
-  /**
-   * His `n`-th move on the boards: now and then a line about the team against him, only if nothing else is being said
-   * (chatter: any other line of his, a slow move's, his ultimate's, a board's, cuts in on it).
-   */
-  private phase2Talk(n: number) {
-    const line = this.talk?.lineAfter(n, !!bossVoice.line());
-    if (line) bossVoice.say(line, `recluse:p2:talk:${n}`, CHATTER);
-  }
 
   /**
    * A slow move (the team's count, the X marks beside every board): a soft sound, and his word on it if nothing else is

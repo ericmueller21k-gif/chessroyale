@@ -9,7 +9,7 @@
  *   None is presented as his words, none is a near-copy of a real quote; nothing political, nothing about any nation,
  *   nothing hateful.
  *
- * The phase change's chant and phase 2's collusion lines (Eric, Oct 14) are about the 1962 Candidates in Curaçao, where he
+ * The phase change's chant and his chatter (`talk`; Eric, Oct 14 and 15) are about the 1962 Candidates in Curaçao, where he
  * said his rivals worked as a team against him (the quick draws they agreed among themselves, his games analyzed
  * together): mumbled fragments with his rivals' last names (ours), and his own words from his article on it, verified
  * against the printed page. Eric's rules for them: the last names are fine (Petrosian, Keres, Geller, Tal, Korchnoi),
@@ -88,38 +88,69 @@ export const RECLUSE_LINES = {
   /** A slow move (more than slowMoveSeconds, anyone's), before his ultimate: one, in turn (placeholders). */
   slow: ["Still thinking? Move!", "You think too hard. Play!", "The clock is ticking. So am I.", "Stop staring. Make a move!", "Faster! This isn't correspondence chess."],
   /**
-   * Phase 2, against a team on four boards: his games analyzed by the others, collusion and teamwork against him, every
-   * few of his moves (RECLUSE_PHASE2.talkEvery), in three stages as the fight goes on (talkMiddleFrom, talkLateFrom):
-   * suspicious muttering, then accusations, then paranoid ranting. Each stage in turn. The lowest priority: skipped while
-   * any other line is up. Ours (placeholders), and his own words marked QUOTE.
+   * His chatter (recluse-talk.ts; Eric, Oct 14 and 15): about every 15 s of play (RECLUSE_TALK), all through phase 1 and
+   * phase 2, about the team against him (his games analyzed, collusion, Curaçao), in three stages as the fight goes on:
+   * suspicious muttering, then accusations, then angry ranting. Each stage's lines in a shuffled order, none again until
+   * all have been said. The lowest priority: said only when no other line is up, and any other line cuts in on it.
+   * Phase 1 is you with the God King (an engine at your side) against him; phase 2, four boards against him (lines
+   * about the boards are phase 2's only). Ours (PLACEHOLDERS), and his own words marked QUOTE, each in one phase only.
    */
-  collusion: {
-    early: ["I see you looking at each other's boards...", "Why is everyone so quiet over there?", "Four boards, and you all move together. Hm.", "Who told you that move?"],
-    middle: [
-      // QUOTE: "The Russians Have Fixed World Chess", Sports Illustrated, Aug 20, 1962, p. 19 (scan of the printed page).
-      "They consulted during the games.",
-      "You're analyzing my games together. I can see it.",
-      // QUOTE: the same article, p. 65 (scan of the printed page).
-      "They would openly analyze my game while I was still playing it.",
-      "Petrosian, Keres, Geller... quick draws, every time. I remember.",
-      // QUOTE: the same article, p. 19 (scan of the printed page; also word for word in Lawson, Standpoint, 2012).
-      "They agreed ahead of time to draw the games they played against each other.",
-    ],
-    late: [
-      // QUOTE: the same article, p. 19 (as in the chant).
-      "They worked as a team.",
-      "One team, one brain, all of you against me!",
-      // QUOTE: the same article, p. 65 (scan of the printed page).
-      "It made me mad that they thought they could get away with it.",
-      "Petrosian... Keres... Geller... and now all of you!",
-      // QUOTE: the same article, p. 18 (scan of the printed page).
-      "I will never again play in one of these tournaments.",
-      "Draw, draw, draw... and every board against me!",
-    ],
+  talk: {
+    1: {
+      // PLACEHOLDERS, new for phase 1 (Oct 15), but the one moved from phase 2.
+      early: [
+        "Who told you that move?",
+        "That came quickly. Too quickly.",
+        "Is someone whispering to you?",
+        "You keep looking over at him. Why?",
+        "I know an engine move when I see one.",
+      ],
+      middle: [
+        // QUOTE: "The Russians Have Fixed World Chess", Sports Illustrated, Aug 20, 1962, p. 19 (scan of the printed page).
+        "They consulted during the games.",
+        "He's feeding you moves. Don't think I can't see it.",
+        // QUOTE: the same article, p. 65 (scan of the printed page).
+        "They would openly analyze my game while I was still playing it.",
+        "You and your golden friend, picking my games apart together.",
+        "Two against one. Curaçao all over again.",
+        "A king in armor whispering moves. Is that chess?",
+      ],
+      late: [
+        // QUOTE: the same article, p. 65 (scan of the printed page).
+        "It made me mad that they thought they could get away with it.",
+        "Petrosian did this. Keres did this. Now you!",
+        "Teamwork! Always teamwork against me!",
+        "Analyze it together, then! It won't save you!",
+        "Geller, Keres, Petrosian... and now a king in armor!",
+        "Enough whispering! Play your own moves!",
+        "A whole team against me, as always!",
+      ],
+    },
+    2: {
+      early: ["I see you looking at each other's boards...", "Why is everyone so quiet over there?", "Four boards, and you all move together. Hm."],
+      middle: [
+        "You're analyzing my games together. I can see it.",
+        "Petrosian, Keres, Geller... quick draws, every time. I remember.",
+        // QUOTE: the same article, p. 19 (scan of the printed page; also word for word in Lawson, Standpoint, 2012).
+        "They agreed ahead of time to draw the games they played against each other.",
+      ],
+      late: [
+        // QUOTE: the same article, p. 19 (as in the chant).
+        "They worked as a team.",
+        "One team, one brain, all of you against me!",
+        "Petrosian... Keres... Geller... and now all of you!",
+        // QUOTE: the same article, p. 18 (scan of the printed page).
+        "I will never again play in one of these tournaments.",
+        "Draw, draw, draw... and every board against me!",
+        // PLACEHOLDERS, new (Oct 15): a long phase 2 ran through the rest.
+        "Whispering across the boards again! I hear you!",
+        "Every board, the same plan! Who wrote it?",
+      ],
+    },
   },
   /**
    * Phase 2's chatter mocks the engine he took from the God King: every third line of his chatter, from the first, in
-   * turn (`Talk`; the lowest priority, as the collusion lines). Placeholders, ours.
+   * turn (`Chatter`; the lowest priority, as the rest of his chatter). Placeholders, ours.
    */
   engine: [
     "Fun, isn't it?",
