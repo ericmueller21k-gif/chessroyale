@@ -19,18 +19,15 @@ import { testParams } from "../test-switches.ts";
 
 export const OPENING_KEY = "brc.openingMoves";
 const MODE_KEY = "brc.mode";
-const TURNS_KEY = "brc.crowdTurns";
 const AUGMENTS_KEY = "brc.augments";
 
 export interface ModeChoice {
   /** Classic, Crowd (50 v 50) or the boss raid. */
   mode: ModeChoiceId;
-  /** Crowd: 50 v 50 teams (true) or everyone moves (false). */
-  crowdTeams: boolean;
   augments: boolean;
 }
 
-/** The mode for solo games and lobbies you create: ?mode=crowd&turns=all&augments=0, else this device's choice. */
+/** The mode for solo games and lobbies you create: ?mode=crowd&augments=0, else this device's choice. */
 export function chosenMode(): ModeChoice {
   const q = new URLSearchParams(location.search);
   const get = (k: string) => {
@@ -45,7 +42,6 @@ export function chosenMode(): ModeChoice {
   const mode = picked === "classic" ? "classic" : picked === "raid" ? "raid" : "crowd";
   return {
     mode,
-    crowdTeams: (q.get("turns") ?? get(TURNS_KEY)) !== "all",
     augments: (q.get("augments") ?? get(AUGMENTS_KEY)) !== "0",
   };
 }
@@ -53,7 +49,6 @@ export function chosenMode(): ModeChoice {
 export function saveMode(c: ModeChoice) {
   try {
     localStorage.setItem(MODE_KEY, c.mode);
-    localStorage.setItem(TURNS_KEY, c.crowdTeams ? "teams" : "all");
     localStorage.setItem(AUGMENTS_KEY, c.augments ? "1" : "0");
   } catch {
     // Not important.

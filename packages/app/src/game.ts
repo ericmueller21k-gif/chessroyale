@@ -362,9 +362,8 @@ export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" 
 
 export const isCrowd = (m: Pick<GameView, "settings">) => m.settings.mode === "crowd";
 
-/** What the last cut leads to, by name: the team final, the boss battle, the duel (or the final four). */
-export function finalName(s: Pick<Settings, "mode" | "crowdTeams" | "finalFormat">): string {
-  if (s.mode !== "crowd" || !s.crowdTeams) return "Final four";
+/** What a Crowd match's last cut leads to, by name: the team final, the boss battle or the duel. */
+export function finalName(s: Pick<Settings, "finalFormat">): string {
   return s.finalFormat === "boss" ? "Boss battle" : s.finalFormat === "duel" ? "Duel" : "Team final";
 }
 

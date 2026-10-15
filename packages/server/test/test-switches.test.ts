@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_ROSTER, BOSS_TIERS, CRATES_FREE, WEAK_BOT_SKILL, isPlayable } from "@chessroyale/core";
+import { BOSS_ROSTER, BOSS_TIERS, CRATES_FREE, CROWD_SETTINGS, QUICK_PACE, WEAK_BOT_SKILL, isPlayable } from "@chessroyale/core";
 import { createGuest, createSession, ensureSchema, signInWithIdentity } from "../src/accounts.ts";
 import { testSwitchesOn } from "../src/admin.ts";
 import { handleAccountApi } from "../src/api.ts";
@@ -27,15 +27,15 @@ describe("who may use them", () => {
 });
 
 describe("a new lobby's options", () => {
-  const all = `rounds=1&clock=5&finalTurns=2&bossMoves=3&draw=weighted&power=candle&format=boss&speed=bullet&weakbots=1&keep=5`;
+  const all = `rounds=1&clock=5&finalTurns=2&bossMoves=3&draw=weighted&power=candle&format=boss&speed=bullet&weakbots=1&keep=5&pace=quick`;
 
   it("for a player, every test switch is dropped: the lobby is exactly the one made without them", () => {
-    for (const base of ["mode=crowd", "mode=crowd&turns=all&augments=0", "mode=classic&moves=4", `mode=raid&boss=${playable}`, "mode=crowd&pace=quick"]) {
+    for (const base of ["mode=crowd", "mode=crowd&augments=0", "mode=classic&moves=4", `mode=raid&boss=${playable}`]) {
       expect(lobbyOptions(q(`${base}&${all}`), false)).toEqual(lobbyOptions(q(base), false));
       expect(lobbyOptions(q(`${base}&${all}`), false).keepMs).toBeUndefined();
     }
     // Each one alone, too.
-    for (const k of LOBBY_TEST_SWITCHES) expect(lobbyOptions(q(`mode=crowd&${k}=${k === "draw" ? "weighted" : k === "format" ? "boss" : 1}`), false)).toEqual(lobbyOptions(q("mode=crowd"), false));
+    for (const k of LOBBY_TEST_SWITCHES) expect(lobbyOptions(q(`mode=crowd&${k}=${k === "draw" ? "weighted" : k === "format" ? "boss" : k === "pace" ? "quick" : 1}`), false)).toEqual(lobbyOptions(q("mode=crowd"), false));
     // A boss's fixed strength, and a boss in a mode that isn't a raid.
     const raid = lobbyOptions(q(`mode=raid&boss=${BOSS_TIERS[0]}`), false).overrides;
     expect(raid.bossFixedElo).toBeUndefined();
@@ -43,17 +43,26 @@ describe("a new lobby's options", () => {
     expect(lobbyOptions(q(`mode=crowd&boss=${playable}`), false)).toEqual(lobbyOptions(q("mode=crowd"), false));
   });
 
-  it("for a player, the creator's own choices stay: the mode, Crowd's turns and augments, the opening moves, the raid's boss, the pace", () => {
-    const crowd = lobbyOptions(q(`mode=crowd&turns=all&augments=0&${all}`), false).overrides;
+  it("for a player, the creator's own choices stay: the mode, Crowd's augments, the opening moves, the raid's boss", () => {
+    const crowd = lobbyOptions(q(`mode=crowd&augments=0&${all}`), false).overrides;
     expect(crowd.mode).toBe("crowd");
-    expect(crowd.crowdTeams).toBe(false);
     expect(crowd.augments).toBe(false);
+    // The mode's own pace (pace=quick is a test switch since Oct 15).
+    expect(crowd.revealSeconds).toBe(CROWD_SETTINGS.revealSeconds);
     expect(lobbyOptions(q(`mode=classic&moves=4&${all}`), false).overrides.openingMoves).toBe(4);
     const raid = lobbyOptions(q(`mode=raid&boss=${playable}&${all}`), false).overrides;
     expect(raid.raid).toBe(true);
     expect(raid.bossId).toBe(playable);
     expect(raid.bossPicked).toBe(playable);
-    expect(lobbyOptions(q("mode=crowd&pace=quick"), false).overrides.revealSeconds).toBe(2);
+  });
+
+  it("an older app's Crowd choices are ignored: everyone moves (turns=all) is team turns, Relaxed pace off is the mode's pace", () => {
+    const old = lobbyOptions(q("mode=crowd&turns=all&augments=1&pace=quick"), false);
+    expect(old).toEqual(lobbyOptions(q("mode=crowd&augments=1"), false));
+    expect(old.overrides.crowdTeams).toBe(true);
+    expect(old.overrides.knockoutsPerStage).toEqual(CROWD_SETTINGS.knockoutsPerStage);
+    // Even where the test switches work, turns=all is gone.
+    expect(lobbyOptions(q("mode=crowd&turns=all"), true).overrides.crowdTeams).toBe(true);
   });
 
   it("for those allowed, the switches work", () => {
@@ -62,10 +71,13 @@ describe("a new lobby's options", () => {
     expect(o.keepMs).toBe(5000);
     expect(lobbyOptions(q(`mode=raid&boss=${BOSS_TIERS[0]}`), true).overrides).toMatchObject({ bossFixedElo: BOSS_TIERS[0], bossFixed: BOSS_TIERS[0] });
     expect(lobbyOptions(q(`mode=crowd&boss=${playable}`), true).overrides.bossId).toBe(playable);
+    expect(lobbyOptions(q("mode=crowd&pace=quick"), true).overrides).toMatchObject(QUICK_PACE.crowd);
+    expect(lobbyOptions(q("mode=classic&pace=quick"), true).overrides).toMatchObject(QUICK_PACE.classic);
   });
 
   it("asks who's asking only when a query has a test switch", () => {
-    expect(asksTestSwitches(q("mode=crowd&turns=all&augments=0&pace=quick"))).toBe(false);
+    expect(asksTestSwitches(q("mode=crowd&augments=0"))).toBe(false);
+    expect(asksTestSwitches(q("mode=crowd&pace=quick"))).toBe(true);
     expect(asksTestSwitches(q("mode=classic&moves=3"))).toBe(false);
     expect(asksTestSwitches(q(`mode=raid&boss=${playable}`))).toBe(false);
     expect(asksTestSwitches(q(`mode=raid&boss=${BOSS_TIERS[0]}`))).toBe(true);

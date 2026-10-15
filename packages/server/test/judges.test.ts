@@ -49,21 +49,23 @@ function setup(opts: { judges?: Partial<JudgeConfig>; server?: boolean; settings
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
   const serverAsks: ServerScoreRequest[] = [];
-  const core = new LobbyCore(
-    newLobbyRecord("JUDGE", now),
-    {
-      now: () => now,
-      send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as Msg]),
-      judges: { ...JUDGES, ...opts.judges },
-      judgeRng: mulberry32(3),
-      serverEngine: !!opts.server,
-      serverScore: (req) => void serverAsks.push(req),
-    },
-    library,
-    mulberry32(7),
-    // Crowd, everyone moves: one board, every person picks every move.
-    { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { crowdTeams: false, augments: false }), roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...opts.settings },
-  );
+  const make = (seed: number) =>
+    new LobbyCore(
+      newLobbyRecord("JUDGE", now),
+      {
+        now: () => now,
+        send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as Msg]),
+        judges: { ...JUDGES, ...opts.judges },
+        judgeRng: mulberry32(3),
+        serverEngine: !!opts.server,
+        serverScore: (req) => void serverAsks.push(req),
+      },
+      library,
+      mulberry32(seed),
+      // Crowd 50 v 50: one board; the team to move picks (bots fill the seats), and every device judges.
+      { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { augments: false }), roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...opts.settings },
+    );
+  let core = make(7);
   const take = (id: string, t: Msg["t"]) => {
     const all = inbox.get(id) ?? [];
     inbox.set(id, all.filter((m) => m.t !== t));
@@ -101,15 +103,52 @@ function setup(opts: { judges?: Partial<JudgeConfig>; server?: boolean; settings
   const serve = (down = false) => {
     for (const req of serverAsks.splice(0)) core.serverScored(req.id, down ? null : deep(req.fen, req.moves));
   };
-  /** n people join (each reporting its speed unless `old`), the match starts, the first round begins. */
+  /**
+   * n people join (each reporting its speed unless `old`), the match starts, the first round begins. The tests want
+   * every person picking in the same rounds, so the lobby's seed is one that puts them all on White (the first to
+   * move): searched for here, a new lobby each try.
+   */
   const begin = (n: number, nps: number[] = [], old: number[] = [], computers: number[] = [0]) => {
-    for (let i = 0; i < n; i++) {
-      core.connect(undefined, `P${i + 1}`, computers.includes(i) ? "computer" : "phone");
-      if (!old.includes(i)) core.message(`p${i + 1}`, { t: "speed", nps: nps[i] ?? 400_000 });
+    for (let seed = 1; ; seed++) {
+      core = make(seed);
+      inbox.clear();
+      serverAsks.length = 0;
+      for (let i = 0; i < n; i++) {
+        core.connect(undefined, `P${i + 1}`, computers.includes(i) ? "computer" : "phone");
+        if (!old.includes(i)) core.message(`p${i + 1}`, { t: "speed", nps: nps[i] ?? 400_000 });
+      }
+      core.message("p1", { t: "start" });
+      for (let i = 0; i < 40 && core.record.phase !== "play"; i++) advance(1000);
+      expect(core.record.phase).toBe("play");
+      if (core.save().runner!.state.players.every((p) => p.isBot || p.colour === "w")) return;
+      expect(seed, `no lobby seed up to ${seed} puts all ${n} people on White`).toBeLessThan(2000);
     }
-    core.message("p1", { t: "start" });
-    for (let i = 0; i < 40 && core.record.phase !== "play"; i++) advance(1000);
-    expect(core.record.phase).toBe("play");
+  };
+  /**
+   * On to the people's next turn (White's; false if the match ends first). Black's moves are the bots' (the people
+   * watch): the devices judge those too, honestly, or the host scores them.
+   */
+  const nextTurn = async () => {
+    const key = core.record.round?.key;
+    for (let i = 0; i < 400 && core.record.phase !== "results"; i++) {
+      const fen = core.record.phase === "play" && core.record.round?.key !== key ? last("p1", "round")?.board?.fen : undefined;
+      if (fen && fen.split(" ")[1] === "w") return true;
+      for (const id of core.record.humans.map((h) => h.id)) await answer(id);
+      serve();
+      const host = core.record.hostId;
+      const req = host ? last(host, "scoreRequest") : undefined;
+      if (host && req && core.record.scoreRequest?.key === req.key) {
+        const boards = req.jobs.map((j) => {
+          const exp = Object.fromEntries(legalMoves(j.fen).map((m) => [m, truth(j.fen, m)]));
+          const best = Object.keys(exp).reduce((a, b) => (exp[b]! > exp[a]! ? b : a));
+          return { boardId: j.boardId, bestMove: best, bestExpected: exp[best]!, expectedAfter: exp, botPicks: Object.fromEntries(j.bots.map((b) => [b.id, best])), botThinkMs: {} };
+        });
+        core.message(host, { t: "scores", key: req.key, boards });
+      }
+      advance(500);
+    }
+    expect(core.record.phase).toBe("results");
+    return false;
   };
   /** Everyone picks: the first legal move unless told otherwise. */
   const pickAll = (n: number, moves: Record<string, string> = {}) => {
@@ -121,7 +160,7 @@ function setup(opts: { judges?: Partial<JudgeConfig>; server?: boolean; settings
     }
   };
   const judgesOf = () => Object.values(core.record.judges?.tasks ?? {})[0]?.judges ?? [];
-  return { core, take, last, advance, answer, answerSplit, serve, begin, pickAll, judgesOf, serverAsks, inbox, get now() { return now; } };
+  return { get core() { return core; }, take, last, advance, answer, answerSplit, serve, begin, nextTurn, pickAll, judgesOf, serverAsks, inbox, get now() { return now; } };
 }
 
 describe("many judges: the lobby", () => {
@@ -176,11 +215,8 @@ describe("many judges: the lobby", () => {
     const L = setup({ server: true, settings: { firstStageRounds: 12 } });
     L.begin(3, [1_000_000, 900_000, 800_000]);
     let rounds = 0;
-    for (let i = 0; i < 400 && rounds < 8 && L.core.record.judges!.devices.p1!.strikes < 2 && L.core.record.phase !== "results"; i++) {
-      if (L.core.record.phase !== "play") {
-        L.advance(500);
-        continue;
-      }
+    for (let i = 0; i < 8 && L.core.record.judges!.devices.p1!.strikes < 2; i++) {
+      if (i > 0 && !(await L.nextTurn())) break;
       const r = L.last("p1", "round")!;
       if (!r.board) break; // p1 is out
       const fen = r.board.fen;
@@ -243,7 +279,8 @@ describe("many judges: the lobby", () => {
   });
 
   it("a late judge: the first answer is used after the grace time; the late answer is still compared, and a judge that never answers brings a spot check now and then", async () => {
-    const L = setup({ server: true, judges: { spotCheckShare: 1, graceMs: 300, graceFactor: 0.5 } });
+    // (No cut for a while: the people's first picks mustn't put them out before their next turn.)
+    const L = setup({ server: true, judges: { spotCheckShare: 1, graceMs: 300, graceFactor: 0.5 }, settings: { firstStageRounds: 20 } });
     L.begin(4);
     L.pickAll(4);
     const [first, late] = L.judgesOf() as [string, string];
@@ -261,8 +298,8 @@ describe("many judges: the lobby", () => {
     expect(await L.answer(late)).toBe(1);
     expect(L.core.record.judges!.stats.lateAgreed).toBe(1);
     expect(L.core.record.phase).toBe("reveal");
-    // Next round: the late judge drops out without answering: a spot check (share 1 here) on the one answer used.
-    for (let i = 0; i < 60 && L.core.record.phase !== "play"; i++) L.advance(500);
+    // The people's next turn: the late judge drops out without answering: a spot check (share 1 here) on the one answer used.
+    await L.nextTurn();
     L.pickAll(4);
     const [f2, l2] = L.judgesOf() as [string, string];
     L.advance(1000);
@@ -311,9 +348,9 @@ describe("many judges: the lobby", () => {
     expect(L.core.record.judges!.stats.agreed).toBe(1);
     // Benched devices: the host's work goes to someone else.
     for (const id of ["p1", "p2"]) L.core.record.judges!.devices[id]!.strikes = 2;
-    for (let i = 0; i < 60 && L.core.record.phase !== "play"; i++) L.advance(500);
+    await L.nextTurn();
     L.pickAll(3);
-    expect(L.last("p3", "scoreRequest")).toBeTruthy();
+    expect(L.last("p3", "scoreRequest")!.key).toBe(L.core.record.scoreRequest!.key);
   });
 
   it("a judge that drops before answering is replaced; one whose answer doesn't hold together is struck and replaced", async () => {

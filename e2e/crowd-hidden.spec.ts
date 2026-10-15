@@ -31,7 +31,7 @@ async function knockouts(page: Page, minutes: number, until: (p: Page) => Promis
 
 test("the vote: the boss final's card is his (his name and icon, the top 4), between Team final and Duel, and fits its card", async ({ page }) => {
   test.setTimeout(2 * 60_000);
-  await page.goto("/?debug&mode=crowd&turns=teams&augments=1");
+  await page.goto("/?debug&mode=crowd&augments=1");
   await soloFromHome(page);
   await expect(page.getByRole("heading", { name: "How does it end?" })).toBeVisible({ timeout: 30_000 });
   const cards = page.locator(".vote-card");
@@ -57,7 +57,7 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   page.on("pageerror", (e) => errors.push(e.message));
   // (Two rounds a stage: with one, the team that hasn't moved yet is a coin flip at the first cut. Loose bots, ?weakbots=1:
   // the strongest bots play the engine's best as often as you do, and only two of each team reach the final.)
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=2&clock=30&win=1&weakbots=1");
+  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=2&clock=30&win=1&weakbots=1");
   await soloFromHome(page);
   await knockouts(page, 8);
   // (The battle is set up at the last cut; its intro comes after the cut's screen. Its line counts the finalists.)
@@ -108,7 +108,7 @@ test("online: a Crowd boss final meets him: his intro by name for everyone, four
   test.skip(test.info().project.name !== "desktop", "one run is enough: a computer");
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=2&clock=30&bossMoves=8&power=bullet&weakbots=1");
+  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=2&clock=30&bossMoves=8&power=bullet&weakbots=1");
   await createLobbyFromHome(page);
   await page.getByRole("button", { name: /Start with 1 player/ }).click();
   await knockouts(page, 9);
