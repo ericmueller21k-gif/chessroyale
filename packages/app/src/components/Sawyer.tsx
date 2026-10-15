@@ -270,7 +270,7 @@ const rimFilter = (rim = 0, shade = 0): string => {
 
 function splitMoment({ boss, moment, now, t, orientation, banner }: MomentProps) {
   const split = boss.powers?.split;
-  if (!split?.pawn || !split.square) return <div class="power-moment pm-split">{t < 2300 && banner("SPLIT PAWN!", "Two for one", "saw")}</div>;
+  if (!split?.pawn || !split.square) return <div class="power-moment pm-split">{t < 2300 && banner("SPLIT PAWN!", "He gets a second pawn", "saw")}</div>;
   const mine = boss.crowdSide === "w" ? "b" : "w";
   const pawn = centreOf(split.pawn, orientation);
   const half = centreOf(split.square, orientation);
@@ -305,7 +305,7 @@ function splitMoment({ boss, moment, now, t, orientation, banner }: MomentProps)
   const r2 = (n: number) => Math.round(n * 100) / 100;
   return (
     <div class="power-moment pm-split">
-      {t < 2300 && banner("SPLIT PAWN!", "Two for one", "saw")}
+      {t < 2300 && banner("SPLIT PAWN!", "He gets a second pawn", "saw")}
       <div class="hb-pieces sw-layer" aria-hidden="true" data-look={SAWYER_LOOKS.split} data-split={t < SPLIT.crackAt ? "saw" : t < settledAt ? "apart" : "settled"}>
         {at?.shadow && <Shadow at={at.shadow.at} size={at.shadow.size} />}
         {air.map((h) => (
@@ -502,9 +502,9 @@ export const SAWYER_UI = {
   id: "sawyer",
   ultimate: { name: "the board saw" },
   moments: {
-    split: { order: 0, kit: "power", dock: "Split pawn!", line: splitLine, view: splitMoment },
-    cut: { order: 0, kit: "power", dock: "Saw cut!", appearAt: (m, square) => (m.squares?.includes(square) ? m.at + SAW_CUT.cutAt : undefined), view: cutMoment },
-    boardsaw: { order: 2, kit: "ultimate", dock: "Board saw!", view: boardSawMoment },
+    split: { order: 0, kit: "power", line: splitLine, view: splitMoment },
+    cut: { order: 0, kit: "power", appearAt: (m, square) => (m.squares?.includes(square) ? m.at + SAW_CUT.cutAt : undefined), view: cutMoment },
+    boardsaw: { order: 2, kit: "ultimate", view: boardSawMoment },
   },
   // Under the pieces: the cut's groove and tape, the gap down the middle. Over them: his split pawns drawn as halves or
   // small (once they've landed; as ordinary pawns with the morph's "grow"), and markers for tests and readers.

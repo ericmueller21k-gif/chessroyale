@@ -901,7 +901,7 @@ export const PIG: Character = {
  */
 export const PIG_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
   entrance: ["Howdy, varmints.", "Saddle up!", "Yee-haw!"],
-  pull: ["The long pull!", "Giddy-up, pawn!", "Yank!"],
+  pull: ["Giddy-up, pawn!", "Yank!"],
   move: ["Giddy-up.", "Easy now.", "Mosey on."],
   capture: ["Roped!", "Hog-tied!", "Got 'im!"],
   check: ["Reach for the sky!", "Hands up!", "Corralled!"],
@@ -915,7 +915,7 @@ export const PIG_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly 
   power: ["Git over here!", "C'mere, little doggie.", "Yoink!"],
   tug: ["Fine. Just a tug, then.", "Yoink, anyhow.", "A tug'll do."],
   ready: ["I've got you in my sights."],
-  ultimate: ["This board ain't big enough for the six of us.", "It's high noon!", "Pick yer duel, varmints."],
+  ultimate: ["This board ain't big enough for the six of us.", "It's high noon!"],
 };
 export const PIG_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
   entrance: 1,
