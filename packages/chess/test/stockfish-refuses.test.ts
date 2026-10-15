@@ -1,43 +1,15 @@
 import { Chess } from "chess.js";
 import { describe, expect, it } from "vitest";
-import { START_FEN, UciEngine, stockfishRefuses, type UciTransport } from "../src/index.ts";
+import { START_FEN, UciEngine, applyMove960, chess960Fen, legalMoves960, stockfishRefuses, type UciTransport } from "../src/index.ts";
 import { nodeTransport } from "../src/node.ts";
+import { CASES } from "./stockfish-refuses-cases.ts";
 
 /**
  * Positions Stockfish refuses (Oct 15): Stockfish 19 checks a position as it's set up, and a refused one ends its process
  * with an error (in a browser, its worker's "ExitStatus" thrown into the page) and leaves its last position in place.
- * `stockfishRefuses` says which it refuses, so they're never sent; checked here against the real engine.
+ * `stockfishRefuses` says which it refuses, so they're never sent; checked here against the real engine. The cases are
+ * shared with the engine server's check (`stockfish-refuses-cases.ts`).
  */
-const CASES: Record<string, { fen: string; refused: boolean }> = {
-  start: { fen: START_FEN, refused: false },
-  ninePawns: { fen: "4k3/8/8/8/8/P7/PPPPPPPP/4K3 w - - 0 1", refused: true },
-  nineBlackPawns: { fen: "4k3/pppppppp/p7/8/8/8/8/4K3 b - - 0 1", refused: true },
-  thirtyThreePieces: { fen: "rnbqkbnr/pppppppp/8/8/8/P7/PPPPPPPP/RNBQKBNR w KQkq - 0 1", refused: true },
-  pawnOnEighth: { fen: "P3k3/8/8/8/8/8/8/4K3 w - - 0 1", refused: true },
-  pawnOnFirst: { fen: "4k3/8/8/8/8/8/8/p3K3 b - - 0 1", refused: true },
-  noBlackKing: { fen: "8/8/8/8/8/8/8/4K3 w - - 0 1", refused: true },
-  twoWhiteKings: { fen: "4k3/8/8/8/8/8/8/3KK3 w - - 0 1", refused: true },
-  sideNotToMoveInCheck: { fen: "4k3/4Q3/8/8/8/8/8/4K3 w - - 0 1", refused: true },
-  sideToMoveInDoubleCheck: { fen: "4k3/8/8/8/8/8/8/1r2K2r w - - 0 1", refused: false },
-  tooManyQueens: { fen: "4k3/8/8/8/8/8/QQQQQQQQ/QQ2K3 w - - 0 1", refused: true },
-  nineKnightsNoPawns: { fen: "4k3/8/8/8/8/8/NNNNNNNN/N3K3 w - - 0 1", refused: false },
-  extraKnightEightPawns: { fen: "4k3/8/8/8/8/N7/PPPPPPPP/RNBQKBNR w - - 0 1", refused: true },
-  extraKnightSevenPawns: { fen: "4k3/8/8/8/8/N7/PPPPPPP1/RNBQKBNR w - - 0 1", refused: false },
-  threeRooksEightPawns: { fen: "4k3/8/8/8/8/8/PPPPPPPP/RR2K2R w - - 0 1", refused: true },
-  twoQueensSevenPawns: { fen: "4k3/8/8/8/8/8/PPPPPPP1/QQ2K3 w - - 0 1", refused: false },
-  twoSameColorBishops: { fen: "4k3/8/8/8/8/8/PPPPPPPP/1B1BK3 w - - 0 1", refused: false },
-  epWrongRankWhite: { fen: "4k3/8/8/8/8/8/8/4K3 w - e3 0 1", refused: true },
-  epWrongRankBlack: { fen: "4k3/8/8/8/8/8/8/4K3 b - e6 0 1", refused: true },
-  epNoCapturer: { fen: "4k3/8/8/4p3/8/8/8/4K3 w - e6 0 1", refused: false },
-  epNoPawnInFront: { fen: "4k3/8/8/8/8/8/8/4K3 w - e6 0 1", refused: false },
-  epLegal: { fen: "4k3/8/8/3Pp3/8/8/8/4K3 w - e6 0 1", refused: false },
-  castlingWithoutRook: { fen: "4k3/8/8/8/8/8/8/4K3 w K - 0 1", refused: false },
-  fiveCastlingRights: { fen: "r3k2r/8/8/8/8/8/8/R3K2R w KQkqK - 0 1", refused: true },
-  unreadableCastling: { fen: "r3k2r/8/8/8/8/8/8/R3K2R w Kx - 0 1", refused: true },
-  bigCounters: { fen: "4k3/8/8/8/8/8/8/4K3 w - - 1000 900", refused: false },
-  chess960: { fen: "bqnb1rkr/pp3ppp/3ppn2/2p5/5P2/P2P4/NPP1P1PP/BQ1BNRKR w HFhf - 2 9", refused: false },
-};
-
 /** What the real engine says to `fen`: refused ("CRITICAL ERROR"), or not. A refused one ends its process. */
 async function refusedByStockfish(fen: string): Promise<boolean> {
   const t = nodeTransport();
@@ -61,15 +33,16 @@ async function refusedByStockfish(fen: string): Promise<boolean> {
 }
 
 describe("stockfishRefuses: the positions Stockfish refuses", () => {
-  it("names a reason for exactly the positions the real engine refuses", async () => {
+  it("names a reason for every position the real engine refuses, and only for the cases it should", async () => {
     const wrong: string[] = [];
     for (const [name, c] of Object.entries(CASES)) {
-      const ours = !!stockfishRefuses(c.fen);
-      expect(ours, name).toBe(c.refused);
-      if ((await refusedByStockfish(c.fen)) !== c.refused) wrong.push(name);
+      expect(!!stockfishRefuses(c.fen), name).toBe(c.refused);
+      // (Everything Stockfish 19 refuses is refused; beyond that, only what the engine server's Stockfish misreads.)
+      if (c.sf19) expect(c.refused, name).toBe(true);
+      if ((await refusedByStockfish(c.fen)) !== (c.sf19 ?? c.refused)) wrong.push(name);
     }
     expect(wrong, "cases where the real engine disagrees").toEqual([]);
-  }, 120_000);
+  }, 180_000);
 
   it("refuses no position of a real game (random games, both sides to move, en passant squares included)", () => {
     let n = 0;
@@ -81,6 +54,23 @@ describe("stockfishRefuses: the positions Stockfish refuses", () => {
         s = (Math.imul(s ^ (s >>> 15), 2246822507) + 0x6d2b79f5) >>> 0;
         c.move(moves[s % moves.length]!);
         expect(stockfishRefuses(c.fen()), c.fen()).toBeNull();
+        n++;
+      }
+    }
+    expect(n).toBeGreaterThan(1000);
+  });
+
+  it("refuses no position of a real Chess960 game (its castling rights by file included)", () => {
+    let n = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      let s = seed;
+      const next = () => (s = (Math.imul(s ^ (s >>> 15), 2246822507) + 0x6d2b79f5) >>> 0);
+      let fen = chess960Fen(next() % 960);
+      for (let ply = 0; ply < 120; ply++) {
+        expect(stockfishRefuses(fen), fen).toBeNull();
+        const moves = legalMoves960(fen);
+        if (!moves.length) break;
+        fen = applyMove960(fen, moves[next() % moves.length]!);
         n++;
       }
     }

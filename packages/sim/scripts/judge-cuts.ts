@@ -24,6 +24,8 @@ type Row = {
   /** The re-check as the game runs it (deep-accuracy.ts): the lite build at 2M nodes (a computer), the full network at 2M (the server). */
   liteDeep?: Record<string, number>;
   fullDeep?: Record<string, number>;
+  /** The same re-check by the engine server's own binary, native Stockfish 17.1 (container-accuracy.ts). */
+  serverDeep?: Record<string, number>;
 };
 const rows: Row[] = readdirSync(dir).filter((f) => f.endsWith(".jsonl")).flatMap((f) => readFileSync(dir + f, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)));
 try {
@@ -31,6 +33,12 @@ try {
   for (const r of rows) Object.assign(r, { liteDeep: deep.get(r.fen)?.liteDeep, fullDeep: deep.get(r.fen)?.fullDeep });
 } catch {
   // No deep-accuracy run yet.
+}
+try {
+  const server = new Map(readFileSync(root + "reports/container-accuracy.jsonl", "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l) as Row).map((d) => [d.fen, d.serverDeep]));
+  for (const r of rows) r.serverDeep = server.get(r.fen);
+} catch {
+  // No container-accuracy run yet.
 }
 
 const N = 100;
@@ -45,7 +53,7 @@ const band = (o: Record<string, number>, b: number) => Object.fromEntries(Object
 const recheck = (r: Row, k: "lite" | "lite1m", at: number, by: "ref" | "lite1m" | "full" = "ref") =>
   Object.fromEntries(r.picks.map((m) => [m, r[k][m]! >= at ? r[by][m]! : r[k][m]!]));
 /** The judge "lite" with its picks losing between `range` points searched again by `by` (where it has a number). */
-const recheckIn = (r: Row, [lo, hi]: [number, number], by: "ref" | "lite1m" | "liteDeep" | "fullDeep") =>
+const recheckIn = (r: Row, [lo, hi]: [number, number], by: "ref" | "lite1m" | "liteDeep" | "fullDeep" | "serverDeep") =>
   Object.fromEntries(r.picks.map((m) => [m, r.lite[m]! >= lo && r.lite[m]! <= hi && r[by]?.[m] !== undefined ? r[by]![m]! : r.lite[m]!]));
 const JUDGES: [string, (r: Row) => Record<string, number>][] = [
   ["Referee (truth)", (r) => r.ref],
@@ -64,6 +72,7 @@ const JUDGES: [string, (r: Row) => Record<string, number>][] = [
   ["Online: re-check 5-60 on computers (lite 1M)", (r) => recheckIn(r, [5, 60], "lite1m")],
   ["As the game runs it: re-check 5-60, full network 2M (the engine server)", (r) => recheckIn(r, [5, 60], "fullDeep")],
   ["As the game runs it: re-check 5-60, lite 2M (two computers)", (r) => recheckIn(r, [5, 60], "liteDeep")],
+  ["As deployed: re-check 5-60, native Stockfish 17.1 2M (the engine server's own binary)", (r) => recheckIn(r, [5, 60], "serverDeep")],
 ];
 
 function match(seed: number) {
