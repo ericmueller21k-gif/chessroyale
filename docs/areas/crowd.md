@@ -32,8 +32,9 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   (`finalLosses`), `matchLoss` (`countedLossSum`) and final placements; **raw** losses stay for the board's draw,
   brilliance, ratings and fair play (`lossesByStage`), and a miss costs as before. Bots unchanged. The reveal says it
   in one line (`allowanceNote` in `game.ts`): "−2.4 → 0 · opening", "−4.1 · gave up material", "−4.1 · missed a
-  capture" (Crowd under the poll, Classic under the round score, a boss battle in the dock's "You:" line); the
-  breakdown says what counted. Squads isn't scored per move: untouched.
+  capture" (Crowd under the poll, Classic under the round score, a boss battle as the dock's second line, shortened
+  under 380 px: "−9.6 → −1.6", "−4.1 · all counts"); the breakdown says what counted, and the group's average as it
+  counted. Squads isn't scored per move: untouched.
 - **The cut.** After each stage (`firstStageRounds`, then `roundsPerStage`) the lowest scorers are knocked out
   (`knockoutsPerStage`; in 50 v 50 the same number from each team). **Ties at the line go through** (`cutPlan` in
   `match.ts`): everyone tied exactly (`sameScore`) with the last player through stays in; nobody goes out on thinking

@@ -68,12 +68,13 @@ export interface MoveRecord {
  * ("−2.4 → 0 · opening"), or why it didn't cover the pick ("−4.1 · gave up material", "−4.1 · missed a capture").
  * Null when it made no difference (no loss, or no allowance on this move).
  */
-export function allowanceNote(p: { loss: number | null; counted?: number; material?: MaterialSlip }): string | null {
+export function allowanceNote(p: { loss: number | null; counted?: number; material?: MaterialSlip }, short = false): string | null {
   if (p.loss === null || p.loss < 0.05) return null;
   const pts = (x: number) => (x < 0.05 ? "0" : `−${x.toFixed(1)}`);
-  if (p.material) return `${pts(p.loss)} · ${p.material === "missed" ? "missed a capture" : "gave up material"}`;
+  // (Short, for the boss dock on the narrowest phones, whose line holds about 18 characters.)
+  if (p.material) return `${pts(p.loss)} · ${short ? "all counts" : p.material === "missed" ? "missed a capture" : "gave up material"}`;
   if (p.counted === undefined) return null;
-  return `${pts(p.loss)} → ${pts(p.counted)} · opening`;
+  return short && p.counted >= 0.05 ? `${pts(p.loss)} → ${pts(p.counted)}` : `${pts(p.loss)} → ${pts(p.counted)} · opening`;
 }
 
 /** Your move from a reveal, with what the elimination breakdown needs (null if you weren't picking). */

@@ -159,6 +159,7 @@ function summary(beforeLabel: string, afterLabel: string) {
     const add = (k: string, v: string) => (rows[k] ??= []).push(v);
     for (const [, ms] of sides) {
       let cut = 0, cutPoor = 0, cutNeg = 0, surv = 0, survTop8 = 0, survPoor = 0, tiedThrough = 0, cuts = 0, out = 0;
+      let clean = 0, cleanThrough = 0, poorAll = 0, poorCut = 0;
       const cutSkill: number[] = [];
       for (const m of ms) {
         const c = m.cuts[cutNo];
@@ -184,6 +185,17 @@ function summary(beforeLabel: string, afterLabel: string) {
           if (c.scores[id]! < -1e-9) cutNeg++;
           cutSkill.push(m.skills[id]!);
         }
+        for (const id of Object.keys(c.scores)) {
+          // Only the engine's top 8, and nothing poor (a sound move off the line is still one of them).
+          if (!offTop.has(id) && !poor.has(id)) {
+            clean++;
+            if (!outs.has(id)) cleanThrough++;
+          }
+          if (poor.has(id)) {
+            poorAll++;
+            if (outs.has(id)) poorCut++;
+          }
+        }
         const through = Object.keys(c.scores).filter((id) => !outs.has(id));
         for (const id of through) {
           surv++;
@@ -193,10 +205,12 @@ function summary(beforeLabel: string, afterLabel: string) {
         tiedThrough += cutLines(m)[cutNo]!.kept;
       }
       add("Players cut (per match)", (out / Math.max(1, cuts)).toFixed(1));
+      add("**Of those who played only top-8 moves (nothing poor), went through**", pctOf(cleanThrough, clean));
+      add("**Of those who had played poorly, cut**", pctOf(poorCut, poorAll));
       add("Cut players who played poorly (a material error, a loss of 20+ or a miss)", pctOf(cutPoor, cut));
       add("Cut players with a negative score", pctOf(cutNeg, cut));
       add("Cut players' bot temperature (median; higher is looser)", cutSkill.length ? cutSkill.sort((a, b) => a - b)[Math.floor(cutSkill.length / 2)]!.toFixed(1) : "–");
-      add("Survivors who played only top-8 moves, still in", pctOf(survTop8, surv));
+      add("Survivors who played only top-8 moves", pctOf(survTop8, surv));
       add("Survivors who had played poorly", pctOf(survPoor, surv));
       add("Kept in by a tie at the line, owed by the next cut (per match)", (tiedThrough / Math.max(1, cuts)).toFixed(1));
     }

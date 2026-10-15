@@ -401,7 +401,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                   </>
                 )}
               </span>
-              <span class="dock-line muted">
+              <span class={`dock-line muted${me && allowanceNote(me) ? " allowance-words" : ""}`}>
                 {!me
                   ? `You watched · best ${toSan(fen, mine.bestMove)}`
                   : !me.move
@@ -410,8 +410,16 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                         ? `${mine.kingCalls} of ${picks.length} called him · no score`
                         : "You called him · no score"
                       : "No move from you."
-                    : // (The opening allowance on your pick, when it made a difference: the line is short, so the note alone.)
-                      (allowanceNote(me) ?? `You: ${toSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore)}) · best ${toSan(fen, mine.bestMove)}`)}
+                    : allowanceNote(me) ? (
+                      // The opening allowance on your pick, when it made a difference: the note alone (the line is short;
+                      // shorter still on the narrowest phones).
+                      <>
+                        <span class="wide-only">{allowanceNote(me)}</span>
+                        <span class="narrow-only">{allowanceNote(me, true)}</span>
+                      </>
+                    ) : (
+                      `You: ${toSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore)}) · best ${toSan(fen, mine.bestMove)}`
+                    )}
               </span>
             </>
             )

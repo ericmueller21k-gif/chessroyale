@@ -5113,7 +5113,9 @@ poor, and not punish players not playing precise engine lines or slight variatio
   same-move token's refund (and Mercenary's brilliant move), never a loss that counts for points.
 - **Players see it.** The reveal says it in one line (`allowanceNote`), tested at 320 px: "−2.4 → 0 · opening" (or
   "−9.6 → −1.6 · opening"), "−4.1 · gave up material", "−4.1 · missed a capture". Crowd: its own line under the poll's
-  result; Classic: under the round score; a boss battle: in the dock's "You:" line instead of the round score. "Why was
+  result; Classic: under the round score; a boss battle: the dock's second line is the note alone (it holds about 18
+  characters on a 320 px phone, where it shortens to "−9.6 → −1.6" and "−4.1 · all counts"; measured at 320, 390 and
+  1280 with the widest losses: nothing spills). "Why was
   I cut?" says what counted for each move. The FAQ's "The opening allowance" says both rules in two sentences, and its
   Crowd section says ties go through. Nothing in Settings: its How to play is becoming links to the FAQ (#232).
 
@@ -5149,7 +5151,37 @@ poor, and not punish players not playing precise engine lines or slight variatio
 
 ### Sims
 
-SIM_TABLE_PLACEHOLDER
+`packages/sim/scripts/allowance-sim.ts` (`reports/allowance-sim.md`): 12 Crowd 50 v 50 matches of 100 bots before
+the change (`main` at 144eb80) and 12 after, the same seeds (identical up to the first cut), the judge's strength
+(250k nodes), team final. "Poor" is a pick that gave up a pawn or more by the exchange check, lost 20 points or more
+raw, or a miss; "slight variations" are picks among the engine's top 8.
+
+| | before | after |
+| --- | ---: | ---: |
+| Cut 1 (after move 10): of those who played only top-8 moves, went through | 96% | 99% |
+| Cut 1: cut players who had played poorly | 83% | 91% |
+| Cut 1: cut players with a negative score | 100% | 97% |
+| Cut 1: players out (mean) | 16.0 | 15.1 |
+| Cut 2 (after move 11): of those who played only top-8 moves, went through | 92% | 97% |
+| Cut 2: cut players who had played poorly | 66% | 86% |
+| Cut 2: players out (mean) | 14.0 | 12.2 |
+| Cuts with an exact tie at a team's line | 8% | 67% |
+| Most owed at once (mean of each match's largest) | 0 | 9.3 |
+| Out at each cut (mean) | 16 · 14 · 12 · 10 · 8 · 8 · 6 · 6 · 4 · 4 · 4 | 15.1 · 12.2 · 10.2 · 8.3 · 12.2 · 7.8 · 6.3 · 4.6 · 5.3 · 3.8 · 6.5 |
+| The ending's size (every match) | 8 | 8 |
+| Plies per match (mean) | 160.3 | 158.8 |
+| Placement against bot skill (Spearman) | 0.763 | 0.634 |
+
+- **Both halves of Eric's goal move the right way:** fewer players who only played the engine's top moves go out (4%
+  to 1% at the first cut, 8% to 3% at the second), and more of those who do go out played poorly (83% to 91%, 66% to
+  86%). Only 3% of the first cut's players had a score of 0 or more (they were the lowest of a team whose rest was tied
+  above them).
+- **What it costs:** exact ties are common (two players with the same counted losses every move tie to the bit), so
+  most cuts keep someone in, and the owed players go when the allowance runs out: the 5th cut (move 14) takes 12
+  rather than 8. The endings keep their sizes, and a match is as long as before.
+- **Placement tracks the bots' skill less (0.763 to 0.634).** A bot's skill shows the same in every move, the opening
+  included, so forgiving the opening's small losses takes real signal away from bots; for people the opening's
+  precision is the memorized lines Eric doesn't want to decide a match. ARMS_PLACEHOLDER
 
 ### Testing
 

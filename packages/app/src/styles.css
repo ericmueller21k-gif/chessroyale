@@ -7270,15 +7270,18 @@ button.history-label {
   font-size: 12px;
   font-weight: 600;
 }
-.dock-line.blunder-words .narrow-only {
+.dock-line.blunder-words .narrow-only,
+.dock-line.allowance-words .narrow-only {
   display: none;
 }
 /* (Up to 379 px: the dock's row is the board's width, its clock at the right; Oct 15.) */
 @media (max-width: 379px) {
-  .dock-line.blunder-words .wide-only {
+  .dock-line.blunder-words .wide-only,
+  .dock-line.allowance-words .wide-only {
     display: none;
   }
-  .dock-line.blunder-words .narrow-only {
+  .dock-line.blunder-words .narrow-only,
+  .dock-line.allowance-words .narrow-only {
     display: inline;
   }
 }
