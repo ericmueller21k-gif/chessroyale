@@ -590,6 +590,8 @@ export interface ReclusePose {
   fist?: boolean;
   /** Both hands raised open, palms to us (the chant; the book lies on the ground). */
   palms?: boolean;
+  /** His free hand alone raised open, palm to us (reaching for the God King's power); the other as it is. */
+  reach?: boolean;
   /** Off the ground (a leap): no shadow under his feet (the board draws one where he'll land). */
   air?: boolean;
 }
@@ -642,7 +644,7 @@ export function recluseLayers(p: ReclusePose, bust = false): Layer[] {
     layers.push(book, at(fore.name, fore.at[0], fore.at[1]), at("clutch", wrR[0] - 2, wrR[1] - 3));
   } else layers.push(book, at("fist:a", wrR[0] - 3, wrR[1] - 3));
   if (onBook) layers.push(at(`fist:${p.grip ?? "a"}`, wrL[0] - 3, wrL[1] - 3));
-  else if (p.palms) layers.push(palm(wrL, false));
+  else if (p.palms || p.reach) layers.push(palm(wrL, false));
   else if (p.fist) layers.push(at("fist:a", wrL[0] - 3, wrL[1] - 1));
   else layers.push(at(`hand:${p.grip === "b" ? "flex" : "rest"}`, wrL[0] - 4, wrL[1] - 1));
   return layers;
@@ -903,21 +905,45 @@ const REVIVE: Spec[] = [
   { ms: 130, p: { phase: 2, wind: 2 } },
 ];
 
-// ---- The phase change (Eric, Oct 14): beaten, he gets up in a rage, leaps onto the middle of the board, throws the book
-// down at his feet, and chants over it as light pours out of it (his hair lifting: phase 2 begins); the boards crack and
-// split; the book flies back up into his hands and he leaps back to his place. The board draws him (Recluse2.tsx);
-// only `rage` plays where he stands, so it alone is in the bust too.
+// ---- The phase change (Eric, Oct 14): beaten, still on his knees he seizes the God King's power (his raised hand, then
+// his fist; the half-engine look is an overlay, components/Recluse.tsx, not his frames), gets up in a rage, leaps onto
+// the middle of the board, throws the book down at his feet, and chants over it as light pours out of it (his hair
+// lifting: phase 2 begins); the boards crack and split; the book flies back up into his hands and he leaps back to his
+// place. The board draws him (Recluse2.tsx); only the seizing and `rage` play where he stands, so they alone are in the
+// bust too.
 
 const ANGRY: Partial<Face> = { eyes: "glare", brows: "fury", mouth: "scowl" };
+/** His free arm raised beside his head, the hand open to us (he reaches for the God King's power), kneeling. */
+const REACH: Partial<Hold> = { ...SLUMP, elbowL: [63, 39], wristL: [65, 29] };
 /**
- * Up in a rage (one-shot, from `collapseLoop`; his place, both drawings): his brows come down, his head snaps up
- * glaring at us, teeth gritted, shaking (cue `rise`); he gets up, and the book flies up off the ground (cue `snatch`)
- * into his hand, clutched at his side again (cue `catch`); he stands trembling, his free hand a fist.
+ * He seizes the God King's power (one-shot, from `collapseLoop`; his place, both drawings; Eric, Oct 14): his brows come
+ * down and his head snaps up glaring at us (cue `rise`), and still on his knees he raises his free hand, open, towards
+ * the God King (cue `reach`). Then `seizeLoop` while the power streams into it, and `seized` as it lands.
  */
-const RAGE: Spec[] = [
+const SEIZE: Spec[] = [
   { ms: 160, p: { stance: "kneel", dip: 6, face: { eyes: "down", brows: "hard", mouth: "tight" }, hold: SLUMP } },
   { ms: 180, p: { stance: "kneel", dip: 3, shake: 1, face: ANGRY, hold: SLUMP }, extra: { cue: "rise" } },
-  { ms: 120, p: { stance: "kneel", dip: 3, shake: -1, face: ANGRY, hold: SLUMP } },
+  { ms: 100, p: { stance: "kneel", dip: 3, shake: -1, face: ANGRY, reach: true, hold: { ...SLUMP, elbowL: [62, 47], wristL: [64, 41] } } },
+  { ms: 140, p: { stance: "kneel", dip: 2, face: { ...ANGRY, mouth: "grit" }, reach: true, hold: REACH }, extra: { cue: "reach" } },
+];
+/** The power streaming into his raised hand (loop, 0.48 s): his arm trembling, his teeth gritted, glaring. */
+const SEIZE_LOOP: Spec[] = Array.from({ length: 4 }, (_, i) => ({
+  ms: 120,
+  p: { stance: "kneel", dip: 2, shake: i % 2 ? -1 : 1, face: { ...ANGRY, mouth: i === 2 ? "shout" : "grit" }, reach: true, hold: { ...REACH, wristL: [65 + (i % 2 ? 0.5 : -0.5), 29 - (i === 1 ? 1 : 0)] } },
+}));
+/** The power lands (one-shot): his raised hand clenches into a fist (cue `grab`), and he holds it there, trembling. */
+const SEIZED: Spec[] = [
+  { ms: 110, p: { stance: "kneel", dip: 2, headDy: -1, face: { ...ANGRY, mouth: "shout" }, fist: true, hold: { ...REACH, wristL: [64, 31] } }, extra: { cue: "grab", shake: [0, 1] } },
+  { ms: 160, p: { stance: "kneel", dip: 2, shake: 1, face: ANGRY, fist: true, hold: { ...REACH, wristL: [64, 31] } } },
+  { ms: 160, p: { stance: "kneel", dip: 2, shake: -1, face: ANGRY, fist: true, hold: { ...REACH, wristL: [64, 31] } } },
+  { ms: 170, p: { stance: "kneel", dip: 2, shake: 1, face: ANGRY, fist: true, hold: { ...REACH, wristL: [64, 31] } } },
+];
+/**
+ * Up in a rage (one-shot, after `seized`; his place, both drawings): he gets up off his knees, and the book flies up off
+ * the ground (cue `snatch`) into his hand, clutched at his side again (cue `catch`); he stands trembling, his free hand
+ * a fist.
+ */
+const RAGE: Spec[] = [
   { ms: 110, p: { stance: "low", dip: 2, face: ANGRY, hold: { ...SLUMP, elbowR: [32, 58], wristR: [35, 77], elbowL: [61, 58], wristL: [57, 78] } } },
   { ms: 80, p: { stance: "bend", dip: 1, face: ANGRY, hold: flyBack("spin45", [38, 112]) }, extra: { cue: "snatch" } },
   { ms: 70, p: { stance: "rise", face: ANGRY, hold: flyBack("spin135", [31, 96]) } },
@@ -1043,7 +1069,11 @@ const anims = (bust: boolean): Record<string, Anim> => ({
   spellLoop2: { loop: true, frames: build(SPELL_LOOP, bust, 2) },
   spellClose2: { loop: false, frames: build(SPELL_CLOSE(2), bust, 2) },
   slam2: { loop: false, frames: build(SLAM(2), bust, 2) },
-  // The phase change: up in a rage where he stands; the rest only on the board, as the whole figure.
+  // The phase change: he seizes the God King's power and gets up in a rage where he stands; the rest only on the board,
+  // as the whole figure.
+  seize: { loop: false, frames: build(SEIZE, bust) },
+  seizeLoop: { loop: true, frames: build(SEIZE_LOOP, bust) },
+  seized: { loop: false, frames: build(SEIZED, bust) },
   rage: { loop: false, frames: build(RAGE, bust) },
   ...(bust
     ? {}
@@ -1104,3 +1134,27 @@ export const RECLUSE_BUST: Character = {
 
 /** The part of him a portrait shows (his face and hair), in the full figure's frame pixels. */
 export const RECLUSE_PORTRAIT = { x: OX + HEAD_AT[0] - 2, y: OY - 1, w: 29, h: 36 } as const;
+
+/**
+ * Where his head sits on a frame: its part's top-left pixel, in that frame's pixels (the frame's shake included). The
+ * half-engine overlay of phase 2 (components/Recluse.tsx) is placed by it, frame by frame, on either drawing.
+ */
+const heads = new WeakMap<Frame, readonly [number, number] | null>();
+export function headOf(frame: Frame): readonly [number, number] | null {
+  let at = heads.get(frame);
+  if (at === undefined) {
+    const l = frame.layers.find((x) => x.part.startsWith("head:"));
+    at = l ? [l.x + (frame.shake?.[0] ?? 0), l.y + (frame.shake?.[1] ?? 0)] : null;
+    heads.set(frame, at);
+  }
+  return at;
+}
+/** A head part's size (its own pixels: 25 x 35, the rows for the hair in the wind on top). */
+export const HEAD_SIZE = [25, LIFT + HEAD_BASE.length] as const;
+/** His engine eye in the head part's pixels: the middle of his left eye's iris (our right, the side towards the board). */
+export const ENGINE_EYE = [16, 18] as const;
+/** His raised open hand's middle on a frame (frame pixels), when he holds one up (`reach`): where the God King's power goes. */
+export function palmOf(frame: Frame): readonly [number, number] | null {
+  const l = frame.layers.find((x) => x.part === "hand:palm" && !x.flipX);
+  return l ? [l.x + PALM[0]!.length / 2 + (frame.shake?.[0] ?? 0), l.y + PALM.length / 2 + (frame.shake?.[1] ?? 0)] : null;
+}

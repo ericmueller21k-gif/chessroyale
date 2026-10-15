@@ -3,6 +3,7 @@ import { RECLUSE, RECLUSE_JUMP } from "./characters/recluse.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { animLength, cueAt } from "./characters/power-art.ts";
 import {
+  LAST_STAND,
   legalMoves,
   phase2BossMove,
   phase2Flags,
@@ -21,16 +22,23 @@ import {
 } from "@chessroyale/chess";
 
 /**
- * The phase change (Eric, Oct 14), ms from its start (screens/Recluse2.tsx draws it), about 10.5 s after a short fall
+ * The phase change (Eric, Oct 14), ms from its start (screens/Recluse2.tsx draws it), about 15 s after a short fall
  * (`fallMs`: phase 1 beaten, the board holds while he collapses and starts to mumble), all on one square stage:
- * - where he stands, he gets up in a rage (`rage`: the book flies back into his hand);
+ * - **the God King's absorption** (Eric, Oct 14: he plays with an engine now, so he takes the God King's): the God King
+ *   stands over him in his place, his sword raised and his aura swelling, and gloats (`kingAt`); still on his knees, the
+ *   boss's head snaps up and he raises his hand to the God King (`seizeAt`); the God King's golden power streams out of
+ *   him into that hand while he flickers and cracks (`drainAt`: his Last Stand's blows, its flashes and cracks, are his
+ *   frames); as it lands the boss's fist closes, his half-engine look ignites and he says so (`igniteAt`), and the God
+ *   King fades away (`goneAt`: absorbed; he is gone for the rest of the fight);
+ * - he gets up in a rage where he stands (`rage`: the book flies back into his hand);
  * - he leaps from there onto the middle of the board (the board draws his whole figure, on a phone too), landing with a
  *   thud and a burst of dust (the board jolts);
  * - he brandishes the book over his head and throws it down at his feet, where it lands open;
  * - light pours up out of it while he chants over it, arms raised, his hair lifting (phase 2's face from here), his
  *   chant in his bubble;
  * - the boards crack (Sawyer's board-saw gap, down and across the middle) and the quarters part, each growing into a
- *   whole board at its corner, as the light dies;
+ *   whole board at its corner, as the light dies; blue arcs strike the board from his hands meanwhile (`arcAt` to
+ *   `arcEnd`: the engine's power splits it);
  * - the book snaps shut and flies up into his hands (his revive's own frames) while every board's pieces fly to their
  *   Chess960 squares; he leaps back to his place, in phase 2's idle from then on;
  * - "PHASE 2", and the clocks start.
@@ -40,9 +48,20 @@ export const PHASE_CHANGE = (() => {
   const a = RECLUSE.anims;
   const len = (n: string) => animLength(a[n]!);
   const fallMs = 1800;
+  // The absorption. (His drain lasts the God King's Last Stand blows to his stagger: its flashes and cracks, his frames.)
+  const kingAt = 0;
+  const seizeAt = 1700;
+  const drainAt = seizeAt + (cueAt(a.seize!, "reach") ?? 0);
+  const drainMs = LAST_STAND.staggerAt - LAST_STAND.slashAt;
+  const igniteAt = drainAt + drainMs;
+  // (His word on it, a moment after: his chant cuts in on it.)
+  const absorbLineAt = igniteAt + 120;
+  const fadeMs = 700;
+  const goneAt = igniteAt + fadeMs;
+  const riseAt = igniteAt + len("seized");
   const rageMs = len("rage");
   // (The board's figure takes over where he stood as the leap's crouch begins: his place is empty until he's back.)
-  const leapAt = rageMs;
+  const leapAt = riseAt + rageMs;
   const upAt = leapAt + RECLUSE_JUMP.upAt;
   const landAt = leapAt + RECLUSE_JUMP.landAt;
   const dropAt = leapAt + len("leap");
@@ -53,6 +72,9 @@ export const PHASE_CHANGE = (() => {
   const partAt = crackAt + 750;
   const growAt = partAt + 400;
   const growMs = 900;
+  // (The arcs start just before the crack and stop as the boards settle.)
+  const arcAt = crackAt - 200;
+  const arcEnd = growAt + growMs - 100;
   const pickupAt = growAt + growMs + 100;
   const catchAt = pickupAt + (cueAt(a.pickup!, "catch") ?? 0);
   const shuffleAt = pickupAt + 150;
@@ -61,8 +83,140 @@ export const PHASE_CHANGE = (() => {
   const homeAt = backAt + len("leap2");
   const bannerAt = Math.max(homeAt, shuffleAt + shuffleMs) + 100;
   const bannerMs = 1400;
-  return { fallMs, rageMs, leapAt, upAt, landAt, dropAt, thudAt, chantAt, lightMs, crackAt, partAt, growAt, growMs, pickupAt, catchAt, shuffleAt, shuffleMs, backAt, homeAt, bannerAt, bannerMs, total: bannerAt + bannerMs };
+  return {
+    fallMs,
+    kingAt,
+    seizeAt,
+    drainAt,
+    drainMs,
+    igniteAt,
+    absorbLineAt,
+    fadeMs,
+    goneAt,
+    riseAt,
+    rageMs,
+    leapAt,
+    upAt,
+    landAt,
+    dropAt,
+    thudAt,
+    chantAt,
+    lightMs,
+    crackAt,
+    partAt,
+    growAt,
+    growMs,
+    arcAt,
+    arcEnd,
+    pickupAt,
+    catchAt,
+    shuffleAt,
+    shuffleMs,
+    backAt,
+    homeAt,
+    bannerAt,
+    bannerMs,
+    total: bannerAt + bannerMs,
+  };
 })();
+
+/**
+ * His figure where he stands through the phase change (BossCharacter's figure run, from `at`, the change's start): slumped
+ * and mumbling, then he seizes the God King's power, his hand held up while it streams in, his fist as it lands, up in a
+ * rage; from his leap the board draws him, and once he's back he rests in phase 2's idle.
+ */
+export function phaseChangeRun(at: number) {
+  const C = PHASE_CHANGE;
+  const seize = animLength(RECLUSE.anims.seize!);
+  return { since: at + C.seizeAt, anims: ["seize", { anim: "seizeLoop", ms: C.igniteAt - C.seizeAt - seize }, "seized", "rage"], loop: "idle2", before: "collapseLoop" } as const;
+}
+
+/** What the God King shows in his place at `t` ms into the phase change, or "gone" (absorbed: from then on, phase 2 too). */
+export type AbsorbKing = { anim: "raise" | "lastStand"; since: number; then?: "raised"; class: "gk-triumph" | "gk-drained" | "gk-fading" } | "gone";
+export function absorbKing(t: number, at: number): AbsorbKing {
+  const C = PHASE_CHANGE;
+  // Triumphant: his sword raised (his aura swelling). Drained: his Last Stand's blows, its flashes and cracks, timed so
+  // its stagger comes as the power lands; then he fades as he staggers.
+  if (t < C.drainAt) return { anim: "raise", since: at + C.kingAt, then: "raised", class: "gk-triumph" };
+  if (t >= C.goneAt) return "gone";
+  return { anim: "lastStand", since: at + C.igniteAt - (LAST_STAND.staggerAt - LAST_STAND.fallAt), class: t < C.igniteAt ? "gk-drained" : "gk-fading" };
+}
+
+/**
+ * The arcs that strike the board as it splits (Eric, Oct 14: smooth, thin bright cores with a soft glow): when each
+ * strikes (ms into the phase change), from which of his raised hands (0: our left), where on the cracks it lands (% of
+ * the board), its shape's seed, and whether it's one of the two big ones (both hands at once, as the board cracks and
+ * as it parts). The same every time.
+ */
+export interface ArcStrike {
+  at: number;
+  hand: 0 | 1;
+  to: readonly [number, number];
+  seed: number;
+  big: boolean;
+}
+/** How long an arc shows (ms), and how often its shape is drawn again while it does. */
+export const ARC_LIFE = 260;
+export const ARC_REDRAW = 70;
+export const ARC_STRIKES: readonly ArcStrike[] = (() => {
+  const C = PHASE_CHANGE;
+  let s = 0x2f6b9e1;
+  const rnd = () => ((s = (Math.imul(s ^ (s >>> 15), 2246822507) + 0x6d2b79f5) >>> 0) / 2 ** 32);
+  const out: ArcStrike[] = [];
+  // A point on the cracks, on his hand's side: down the middle (above him or below), or out along the cross.
+  const target = (hand: 0 | 1): [number, number] => {
+    const r = rnd();
+    const side = hand === 0 ? -1 : 1;
+    if (r < 0.3) return [50, 4 + rnd() * 26];
+    if (r < 0.55) return [50, 72 + rnd() * 24];
+    return [50 + side * (12 + rnd() * 38), 50];
+  };
+  for (let t = C.arcAt, i = 0; t < C.arcEnd - ARC_LIFE / 2; t += 85 + rnd() * 60, i++) {
+    const hand = (i % 2) as 0 | 1;
+    out.push({ at: Math.round(t), hand, to: target(hand), seed: 1 + Math.floor(rnd() * 1e6), big: false });
+  }
+  for (const at of [C.crackAt, C.partAt])
+    for (const hand of [0, 1] as const) out.push({ at, hand, to: hand === 0 ? [4, 50] : [96, 50], seed: 1 + Math.floor(rnd() * 1e6), big: true });
+  return out.sort((x, y) => x.at - y.at);
+})();
+
+type Pt = readonly [number, number];
+/**
+ * An arc's points from `a` to `b`: midpoint displacement (each segment's middle pushed off the line, less at each level),
+ * so it's jagged in the small and smooth in the large; `seed` picks its shape.
+ */
+export function arcPoints(a: Pt, b: Pt, seed: number, depth = 4, rough = 0.16): Pt[] {
+  let s = seed >>> 0 || 1;
+  const rnd = () => ((s = (Math.imul(s ^ (s >>> 15), 2246822507) + 0x6d2b79f5) >>> 0) / 2 ** 32) * 2 - 1;
+  let pts: Pt[] = [a, b];
+  let amp = Math.hypot(b[0] - a[0], b[1] - a[1]) * rough;
+  for (let d = 0; d < depth; d++) {
+    const next: Pt[] = [pts[0]!];
+    for (let i = 1; i < pts.length; i++) {
+      const p = pts[i - 1]!;
+      const q = pts[i]!;
+      const len = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+      const o = rnd() * amp;
+      next.push([(p[0] + q[0]) / 2 + (-(q[1] - p[1]) / len) * o, (p[1] + q[1]) / 2 + ((q[0] - p[0]) / len) * o], q);
+    }
+    pts = next;
+    amp *= 0.55;
+  }
+  return pts;
+}
+/** A smooth path through points (curves through the midpoints, the points their control points): no sharp zigzags. */
+export function smoothPath(pts: readonly Pt[]): string {
+  const f = (v: number) => Math.round(v * 100) / 100;
+  if (pts.length < 3) return pts.map((p, i) => `${i ? "L" : "M"}${f(p[0])} ${f(p[1])}`).join(" ");
+  let d = `M${f(pts[0]![0])} ${f(pts[0]![1])}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p = pts[i]!;
+    const n = pts[i + 1]!;
+    d += ` Q${f(p[0])} ${f(p[1])} ${f((p[0] + n[0]) / 2)} ${f((p[1] + n[1]) / 2)}`;
+  }
+  const last = pts[pts.length - 1]!;
+  return `${d} L${f(last[0])} ${f(last[1])}`;
+}
 
 /** Which stage of his collusion lines phase 2 has reached, by his moves so far on all the boards. */
 export function talkStage(moves: number): "early" | "middle" | "late" {
@@ -70,14 +224,17 @@ export function talkStage(moves: number): "early" | "middle" | "late" {
 }
 
 /**
- * His collusion lines in phase 2 (RECLUSE_LINES.collusion): after every few of his moves (`talkEvery`, give or take
- * `talkJitter`), a line of the stage the fight has reached, each stage's in turn. The lowest priority of his lines: if
- * anything is being said (a slow-move line, his ultimate's, a board's), this one is skipped, not queued, and the next
- * comes after the next few moves.
+ * His chatter in phase 2: after every few of his moves (`talkEvery`, give or take `talkJitter`), a line. Every third,
+ * from the first, mocks the engine he took from the God King (RECLUSE_LINES.engine, in turn); the rest are his collusion
+ * lines (RECLUSE_LINES.collusion), of the stage the fight has reached, each stage's in turn. The lowest priority of his
+ * lines: if anything is being said (a slow-move line, his ultimate's, a board's), this one is skipped, not queued, and the
+ * next comes after the next few moves.
  */
 export class Talk {
   private next: number;
   private said = { early: 0, middle: 0, late: 0 };
+  private lines = 0;
+  private engine = 0;
   constructor(private readonly rng: () => number) {
     this.next = this.after(0);
   }
@@ -90,6 +247,7 @@ export class Talk {
     if (moves < this.next) return null;
     this.next = this.after(moves);
     if (busy) return null;
+    if (this.lines++ % 3 === 0) return RECLUSE_LINES.engine[this.engine++ % RECLUSE_LINES.engine.length]!;
     const stage = talkStage(moves);
     const lines = RECLUSE_LINES.collusion[stage];
     return lines[this.said[stage]++ % lines.length]!;

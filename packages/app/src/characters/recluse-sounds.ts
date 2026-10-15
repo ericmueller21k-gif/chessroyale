@@ -2,13 +2,15 @@
  * The Hidden Boss's sounds, synthesized (no files, no licenses): the red book's pages fluttering as it opens, the book
  * slammed shut (a dull thump with a slap of paper), a soft rustle of cloth as he moves it or himself, his laugh as breath
  * through the nose (no real voice: a few huffs), a low swell under his stare, and for his phase change a thump as he
- * lands on the board and the light pouring out of the book (a soft chord swelling over the hum), and phase 2's slow move
- * (two soft notes falling). Each is a pure function of the sample rate (its noise is seeded), so a test can measure
+ * lands on the board and the light pouring out of the book (a soft chord swelling over the hum), the God King's power
+ * drained into him (a rising whoosh under a golden shimmer gliding down), the engine in him igniting (a few sparks and a
+ * cold tone rising) and the arcs that split the board (a soft crackle, never a buzz), and phase 2's slow move (two soft
+ * notes falling). Each is a pure function of the sample rate (its noise is seeded), so a test can measure
  * it: every one stays quieter than a piece's move (peak and loudness). Made ahead in the sound worker (warmSounds).
  */
-import { bandpass, lowpass, noise, osc, render, sine, soft, type Voice, soundCache } from "./synth.ts";
+import { bandpass, lowpass, noise, osc, render, rng, saw, sine, soft, type Voice, soundCache } from "./synth.ts";
 
-export type RecluseSound = "flip" | "shut" | "rustle" | "huff" | "hum" | "thump" | "glow" | "slow";
+export type RecluseSound = "flip" | "shut" | "rustle" | "huff" | "hum" | "thump" | "glow" | "slow" | "drain" | "spark" | "arc";
 
 /** Noise with its highs rolled off: paper, never a hiss. */
 const paper = (rate: number, cut: number, seed: number): Voice => lowpass(rate, cut, noise(seed));
@@ -89,10 +91,62 @@ const SOUNDS: Record<RecluseSound, (rate: number) => Float32Array> = {
     const pluck = (age: number, decay: number) => (age < 0 ? 0 : Math.min(1, age / 0.01) * Math.exp(-age / decay));
     return render(rate, 0.42, (t) => pluck(t, 0.06) * d(t) + pluck(t - 0.13, 0.09) * a(t));
   },
+  // The God King's power drained into him (the phase change, 2.15 s, as long as the drain): a whoosh rising through
+  // the band (noise, its center climbing) and swelling, under a golden shimmer (two tones a fifth apart) gliding down and
+  // fading, its tremolo quickening: his power leaving him.
+  drain: (rate) => {
+    const dur = 2.15;
+    const air = bandpass(rate, (t) => 380 + 2100 * (t / dur) ** 1.4, 1.3, lowpass(rate, 7000, noise(631)));
+    const g1 = osc(rate, (t) => 880 * 2 ** (-t / dur), sine);
+    const g2 = osc(rate, (t) => 1320 * 2 ** (-t / dur), sine);
+    return render(rate, dur, (t) => {
+      const swell = Math.min(1, t / 0.25) * (t / dur) ** 1.2 * Math.min(1, (dur - t) / 0.12);
+      const gold = Math.min(1, t / 0.15) * (1 - t / dur) ** 0.8 * (0.7 + 0.3 * Math.sin(2 * Math.PI * (6 + 8 * t / dur) * t));
+      return 2.6 * swell * air(t) + gold * (g1(t) + 0.6 * g2(t));
+    });
+  },
+  // The engine in him igniting as the power lands (0.6 s): three quick soft sparks, and a cold tone sweeping up and
+  // dying away (its octave over it, faint).
+  spark: (rate) => {
+    const fizz = bandpass(rate, () => 3600, 1.4, lowpass(rate, 6500, noise(641)));
+    const tone = osc(rate, (t) => 320 + 1100 * (1 - Math.exp(-t / 0.08)), sine);
+    const high = osc(rate, (t) => 640 + 2200 * (1 - Math.exp(-t / 0.08)), sine);
+    const at = [0, 0.045, 0.11];
+    return render(rate, 0.6, (t) => {
+      let snap = 0;
+      for (const a of at) {
+        const age = t - a;
+        if (age >= 0 && age < 0.03) snap = Math.max(snap, Math.exp(-age / 0.006));
+      }
+      const env = Math.min(1, t / 0.01) * Math.exp(-t / 0.18);
+      return 3 * snap * fizz(t) + env * (tone(t) + 0.25 * high(t));
+    });
+  },
+  // The arcs striking the board as it splits (2.3 s, from just before the crack): soft crackling (short ticks of noise
+  // in a high band, rolled off above, some louder), two bigger snaps where the big arcs strike (the crack at 0.2 s, the
+  // quarters parting at 0.95 s: PHASE_CHANGE, a test checks), and a faint electric hum under it.
+  arc: (rate) => {
+    const dur = 2.3;
+    const r = rng(653);
+    const ticks: { at: number; len: number; amp: number }[] = [];
+    for (let t = 0.01; t < dur - 0.15; t += 0.012 + r() * 0.05) ticks.push({ at: t, len: 0.002 + r() * 0.005, amp: 0.35 + r() * 0.65 });
+    for (const at of [0.2, 0.95]) for (let i = 0; i < 4; i++) ticks.push({ at: at + i * 0.018, len: 0.006, amp: 1.6 - i * 0.25 });
+    const crackle = bandpass(rate, () => 3000, 1.1, lowpass(rate, 6000, noise(659)));
+    const buzz = lowpass(rate, 380, osc(rate, () => 118, saw));
+    return render(rate, dur, (t) => {
+      let env = 0;
+      for (const k of ticks) {
+        const age = t - k.at;
+        if (age >= 0 && age < k.len * 3) env = Math.max(env, k.amp * Math.exp(-age / k.len));
+      }
+      const fade = Math.min(1, t / 0.1) * Math.min(1, (dur - t) / 0.4);
+      return 3.2 * env * crackle(t) + fade * 0.35 * (0.6 + 0.4 * Math.sin(2 * Math.PI * 7 * t)) * buzz(t);
+    });
+  },
 };
 
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
-const LEVEL: Record<RecluseSound, number> = { flip: 0.11, shut: 0.26, rustle: 0.18, huff: 0.1, hum: 0.09, thump: 0.24, glow: 0.05, slow: 0.12 };
+const LEVEL: Record<RecluseSound, number> = { flip: 0.11, shut: 0.26, rustle: 0.18, huff: 0.1, hum: 0.09, thump: 0.24, glow: 0.05, slow: 0.12, drain: 0.07, spark: 0.13, arc: 0.15 };
 
 const cache = soundCache("recluse");
 /** The samples for one of his sounds at a sample rate (made once, then reused). */
