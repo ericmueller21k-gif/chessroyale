@@ -538,3 +538,46 @@ export function perft960(fen: string, depth: number): number {
   };
   return count(readFen(fen), depth);
 }
+
+// ---------------- A quick material search (no engine) ----------------
+
+const MATERIAL: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+/** Material for `c` (pawn 1 ... queen 9) less the other side's. */
+function materialOf(board: readonly string[], c: Color): number {
+  let total = 0;
+  for (const p of board) if (p) total += colorOf(p) === c ? MATERIAL[p.toLowerCase()]! : -MATERIAL[p.toLowerCase()]!;
+  return total;
+}
+
+/**
+ * The moves that keep the most material two moves deep, in UCI as legalMoves960 writes them (castling as the king
+ * taking its own rook): each move scored by the reply that hurts most. A mate in one scores above any material, a reply
+ * that mates below any, a position with no reply a draw (0, as even). (A stalemate after a quiet reply isn't looked for:
+ * it's rare, and only the side far behind gets it.) The Hidden Boss's last resort in phase 2, when no device can play
+ * his move (recluse-phase2.ts, phase2FallbackMove). Any position, normal or Chess960; empty with no legal move.
+ */
+export function materialBest960(fen: string): string[] {
+  const pos = readFen(fen);
+  const me = pos.turn;
+  const MATE = 1000;
+  let best = -Infinity;
+  let picks: Move[] = [];
+  for (const m of legal(pos)) {
+    const after = make(pos, m);
+    const replies = legal(after);
+    let worst = Infinity;
+    if (!replies.length) worst = inCheckPos(after) ? MATE : 0;
+    for (const r of replies) {
+      const next = make(after, r);
+      const v = inCheckPos(next) && !legal(next).length ? -MATE : materialOf(next.board, me);
+      if (v < worst) worst = v;
+      // (Already worse than the best so far: it can't win or tie.)
+      if (worst < best) break;
+    }
+    if (worst > best) {
+      best = worst;
+      picks = [m];
+    } else if (worst === best) picks.push(m);
+  }
+  return picks.map(uciOf);
+}

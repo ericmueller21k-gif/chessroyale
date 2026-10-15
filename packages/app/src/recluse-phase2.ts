@@ -3,14 +3,18 @@ import { RECLUSE, RECLUSE_JUMP } from "./characters/recluse.ts";
 import { animLength, cueAt } from "./characters/power-art.ts";
 import {
   LAST_STAND,
-  legalMoves,
+  PHASE2_CHANGE_MS,
+  PHASE2_FALL_MS,
   phase2BossMove,
-  phase2Flags,
+  phase2BotThink,
+  phase2Changes,
+  phase2FallbackMove,
   phase2Move,
   phase2Next,
   phase2Outcome,
+  phase2Queue,
   phase2Resign,
-  phase2Timeouts,
+  phase2Tick,
   phase2ToMove,
   phase2Ult,
   startPhase2,
@@ -46,7 +50,8 @@ import {
 export const PHASE_CHANGE = (() => {
   const a = RECLUSE.anims;
   const len = (n: string) => animLength(a[n]!);
-  const fallMs = 1800;
+  // (The lobby server times them online without his frames: PHASE2_FALL_MS and PHASE2_CHANGE_MS, checked against these.)
+  const fallMs = PHASE2_FALL_MS;
   // The absorption. (His drain lasts the God King's Last Stand blows to his stagger: its flashes and cracks, his frames.)
   const kingAt = 0;
   const seizeAt = 1700;
@@ -305,10 +310,7 @@ export class Phase2Game {
     this.state = startPhase2({ players: this.opts.players, numbers: this.opts.numbers, now: Date.now(), win: this.opts.win });
     for (const b of this.state.boards) if (b.player !== this.opts.human) this.botTurn(b.id);
     // (Before his ultimate a bank that runs out loses the board; after it, a move out of time is played at random.)
-    this.tick = setInterval(() => {
-      const now = Date.now();
-      this.update(phase2Timeouts(phase2Flags(this.state, now), now, this.opts.rng ?? Math.random));
-    }, 200);
+    this.tick = setInterval(() => this.update(phase2Tick(this.state, Date.now(), this.opts.rng ?? Math.random)), 200);
     this.opts.onChange();
   }
 
@@ -349,30 +351,22 @@ export class Phase2Game {
     if (this.stopped || next === this.state) return;
     const before = this.state;
     this.state = next;
-    const ult = next.ultAt !== null && before.ultAt === null;
-    if (next.slow > before.slow) {
-      // (One move at a time changes the state: the board whose history grew.)
-      const slowOn = next.boards.find((b, i) => b.board.history.length > before.boards[i]!.board.history.length);
-      if (slowOn) this.opts.onSlow?.(slowOn.id, ult);
-    }
-    if (ult) this.opts.onUlt?.();
-    for (const b of next.boards) {
-      const was = before.boards.find((x) => x.id === b.id)!;
-      if (was === b) continue;
-      if (b.result && !was.result) this.opts.onResult(b);
-      const who = phase2ToMove(b);
-      if (who === "boss" && !this.waiting.includes(b.id)) this.waiting.push(b.id);
-      if (who === "crowd" && b.player !== this.opts.human && b.board.history.length !== was.board.history.length) this.botTurn(b.id);
-    }
+    // (What the change brought: the same reading the lobby server makes of it online.)
+    const c = phase2Changes(before, next);
+    if (c.slow) this.opts.onSlow?.(c.slow.board, c.slow.ult);
+    if (c.ult) this.opts.onUlt?.();
+    for (const id of c.results) this.opts.onResult(this.board(id)!);
+    this.waiting = phase2Queue(this.waiting, next, c);
+    for (const id of c.crowdTurns) if (this.board(id)!.player !== this.opts.human) this.botTurn(id);
     this.pump();
     this.opts.onChange();
-    if (phase2Outcome(next).decided) {
+    if (c.done) {
       this.stop();
       this.opts.onDone();
     }
   }
 
-  /** His next move, one board at a time on his one engine. No answer from it: the first legal move (never a stall). */
+  /** His next move, one board at a time on his one engine. No answer from it: the last resort's move (never a stall). */
   private pump() {
     if (this.thinking || this.stopped) return;
     const id = phase2Next(this.state, this.waiting, this.opts.human);
@@ -385,7 +379,7 @@ export class Phase2Game {
     this.thinking = true;
     const t0 = performance.now();
     void phase2BossMove(this.opts.boss, fen)
-      .catch(() => legalMoves(fen)[0]!)
+      .catch(() => phase2FallbackMove(fen, this.opts.rng)!)
       .then((move) => {
         this.thinking = false;
         this.lastMs = performance.now() - t0;
@@ -403,23 +397,19 @@ export class Phase2Game {
   private botTurn(id: number) {
     const fen = this.board(id)!.board.fen;
     const rng = this.opts.rng ?? Math.random;
-    // (Now and then a slow one before his ultimate, so his count comes from the bots too.)
-    const slow = this.state.ultAt === null && !this.opts.win && rng() < RECLUSE_PHASE2.botSlowChance;
-    const [lo, hi] = slow ? RECLUSE_PHASE2.botSlowMs : RECLUSE_PHASE2.botMoveMs;
-    const think = lo + rng() * (hi - lo);
+    const { thinkMs, searchMs } = phase2BotThink(rng, { ultCome: this.state.ultAt !== null, win: this.opts.win });
     const engine = this.opts.bots;
     const search = this.opts.win
-      ? engine.topMoves(fen, 1).then((t) => t[0]?.move ?? legalMoves(fen)[0]!)
-      : // (A slow one only waits longer: its search keeps the usual budget, so a shared engine isn't held up.)
-        engine.playAtElo(fen, RECLUSE_PHASE2.botElo, RECLUSE_PHASE2.botNodes, Math.min(think, RECLUSE_PHASE2.botMoveMs[1]));
+      ? engine.topMoves(fen, 1).then((t) => t[0]?.move ?? phase2FallbackMove(fen, rng)!)
+      : engine.playAtElo(fen, RECLUSE_PHASE2.botElo, RECLUSE_PHASE2.botNodes, searchMs);
     const wait = new Promise<void>((r) => {
       const t = setTimeout(() => {
         this.timers.delete(t);
         r();
-      }, this.opts.win ? 300 : think);
+      }, thinkMs);
       this.timers.add(t);
     });
-    void Promise.all([search.catch(() => legalMoves(fen)[0]!), wait]).then(([move]) => {
+    void Promise.all([search.catch(() => phase2FallbackMove(fen, rng)!), wait]).then(([move]) => {
       if (this.stopped || this.board(id)?.board.fen !== fen) return;
       this.update(phase2Move(this.state, id, move, Date.now()));
     });

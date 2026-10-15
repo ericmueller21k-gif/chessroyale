@@ -99,6 +99,13 @@ export interface Settings {
    * so Qxf7 mates the boss at once (to see a boss beaten: the Hidden Boss's collapse).
    */
   bossWinTest?: boolean;
+  /**
+   * Test switch (?phase2=1, a lobby you create): the Hidden Boss's phase 2 follows phase 1 online even while
+   * RECLUSE_PHASE2.online is off.
+   */
+  phase2Online?: boolean;
+  /** Test switch (?slow=N, a lobby you create): his phase 2 ultimate comes on the team's Nth slow move (else RECLUSE_PHASE2's). */
+  phase2SlowForUlt?: number;
   /** Boss battle: the King's strike makes the boss's next move one that loses this many points (from its top moves). */
   kingStrikeLoss: readonly [number, number];
   /**
@@ -837,6 +844,17 @@ export const RECLUSE_TALK = {
 export const RECLUSE_PHASE2 = {
   /** How many boards (all of them must be won to beat him). */
   boards: 4,
+  /**
+   * Online (the Crowd's boss final): phase 2 follows phase 1 won, as solo's does (DECISIONS.md, "The Hidden Boss's
+   * phase 2 online"). Off: phase 1 won is the crowd's victory online (a lobby's ?phase2=1 turns it on for tests).
+   */
+  online: false,
+  /**
+   * Online: how long the lobby waits for a device's move (his on a board, or a bot finalist's) before it asks the next
+   * device (ms); with none left, the last resort plays it (phase2FallbackMove). His search is at most `moveMs`, a bot's at
+   * most `botMoveMs`' top, so this covers the round trip and a phone waking its engine.
+   */
+  hostWaitMs: 6000,
   /**
    * His strength (Stockfish's UCI_Elo, its own engine-calibrated scale, not a FIDE rating). Eric, Oct 14: about 2750 to
    * start ("at that very fast pace 2750 may be sufficient"; the roadmap's earlier figure was 3000). A starting value, to

@@ -388,6 +388,47 @@ export interface NetChatLine {
   lobby?: true;
 }
 
+/**
+ * The Hidden Boss's phase 2 online (the Crowd's boss final, phase 1 won; the lobby's side:
+ * packages/server/src/bosses/recluse-phase2.ts), the same for everyone, players and watchers: the phase change, then his
+ * four boards at once. Times are server times.
+ */
+export interface NetPhase2 {
+  /**
+   * "change": the phase change, from `at` (PHASE2_CHANGE_MS); "play": the clocks run, from `at`; "end": every board is
+   * decided, his reaction holds them until `until`, then the results.
+   */
+  stage: "change" | "play" | "end";
+  at: number;
+  until?: number;
+  /** The position the phase change splits (phase 1's last). */
+  from: string;
+  boards: NetPhase2Board[];
+  /** Slow moves so far (the team's), the last one (its board, when), and when his ultimate came (null: not yet). */
+  slow: number;
+  lastSlow: { board: number; at: number } | null;
+  ultAt: number | null;
+}
+
+/** One of his phase 2 boards (packages/chess/src/bosses/recluse-phase2.ts, Phase2Board). */
+export interface NetPhase2Board {
+  id: number;
+  /** Who plays it for the team (a person's id, or a bot's), and their name. */
+  player: string;
+  name: string;
+  /** Its Chess960 start (the standard numbering; -1: the test switch's position). */
+  number: number;
+  fen: string;
+  lastMove: string | null;
+  history: string[];
+  bases?: Base[];
+  /** The player's bank (ms) as of `turnAt`, when their turn began (their clock running; null: it isn't), whose move it is. */
+  bankMs: number;
+  turnAt: number | null;
+  toMove: "crowd" | "boss" | null;
+  result: { winner: "crowd" | "boss" | "draw"; how: "mate" | "time" | "resign" | "stalemate" | "draw" } | null;
+}
+
 /** Why the server dropped a chat line (the app mirrors the limits, so this is rare). */
 export type ChatRefusal = "unknown" | "locked" | "team" | "gap" | "burst" | "repeat" | "closed" | "off";
 
@@ -448,7 +489,16 @@ export type ClientMessage =
    */
   | { t: "darkTry"; key: string; move: string; away?: number }
   /** Hollow's Lights out: this player taps a square in round `round` (0-based). */
-  | { t: "lightsTap"; key: string; round: number; square: string };
+  | { t: "lightsTap"; key: string; round: number; square: string }
+  /**
+   * The Hidden Boss's phase 2: your move on your board (`ply`: the moves on it before yours, so a move meant for a
+   * position that has gone, after a move played for you out of time, is dropped).
+   */
+  | { t: "p2Move"; board: number; ply: number; move: string }
+  /** Phase 2, a device asked for a move (p2Request): its move for that key. */
+  | { t: "p2Answer"; key: string; move: string }
+  /** Phase 2: you resign your board (it's lost; the others play on, and you watch them). */
+  | { t: "p2Resign" };
 
 /** Why a lobby closed (see LOBBY_LIFE in settings.ts). */
 export type LobbyCloseReason = "ended" | "idle" | "abandoned";
@@ -630,9 +680,18 @@ export type ServerMessage = { now: number } & (
   /**
    * Boss battle: the boss's move or strike (`until`: when the next crowd move starts). `fall`: beaten, a boss with a fall
    * (the Hidden Boss, BossRules.fallMs) collapses on the board until `until`, then the results come (an older app shows
-   * the board with the result in it meanwhile).
+   * the board with the result in it meanwhile); with `phase2`, his phase change follows instead (the short fall,
+   * PHASE2_FALL_MS), then phase 2 ("phase2").
    */
-  | { t: "boss"; boss: NetBoss; standings: NetStanding[]; until: number; thinking?: boolean; intro?: boolean; fall?: boolean }
+  | { t: "boss"; boss: NetBoss; standings: NetStanding[]; until: number; thinking?: boolean; intro?: boolean; fall?: boolean; phase2?: true }
+  /** The Hidden Boss's phase 2 (NetPhase2), as it changes: to everyone in the lobby. */
+  | { t: "phase2"; p2: NetPhase2 }
+  /**
+   * Phase 2, to a device that plays moves for the lobby (the host): a move on a board with this device's engine, his
+   * (Stockfish at `elo`, within `nodes` and `moveMs`) or a bot's on a finalist's board (`bot`, at the bots' strength;
+   * `best`: the test switch's, the engine's best). Answer with p2Answer and the key.
+   */
+  | { t: "p2Request"; key: string; board: number; fen: string; elo: number; nodes: number; moveMs: number; bot?: true; best?: true }
   /**
    * Hollow's dark, to the player who tried: `ok` the attempt was legal and is their pick (`move`, as played); else it
    * cost darkTryCost (`tries` wrong so far this turn) and they pick again, or (`out`) their turn is over, as a miss.
@@ -710,5 +769,7 @@ export type ServerMessage = { now: number } & (
       timeout?: boolean;
       /** It counted for ranking (real players filled at least RANKING.rankedMinHumanShare of the seats). Missing: an older server. */
       ranked?: boolean;
+      /** The Hidden Boss's phase 2 was played: boards won of all (all must be won; `bossResult` is phase 2's). */
+      simul?: { won: number; of: number };
     }
 );

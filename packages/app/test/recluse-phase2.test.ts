@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2 } from "@chessroyale/core";
-import { LAST_STAND, legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
+import { LAST_STAND, PHASE2_CHANGE_MS, PHASE2_FALL_MS, legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
 import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, absorbKing, arcPoints, phase2Follows, phase2Mates, phaseChangeRun, smoothPath } from "../src/recluse-phase2.ts";
 import { ON_BOARD_ANIMS, RECLUSE, RECLUSE_BUST } from "../src/characters/recluse.ts";
 import { CRITICAL, NORMAL, Voice, bossVoice, typeMs } from "../src/speech.tsx";
@@ -39,6 +39,11 @@ describe("when phase 2 follows, and who plays it beside you", () => {
 });
 
 describe("the phase change", () => {
+  it("is as long as the lobby server times it online (PHASE2_FALL_MS, PHASE2_CHANGE_MS): the clocks start together everywhere", () => {
+    expect(PHASE_CHANGE.fallMs).toBe(PHASE2_FALL_MS);
+    expect(PHASE_CHANGE.total).toBe(PHASE2_CHANGE_MS);
+  });
+
   it("is 15 to 20 s with its short fall (Eric: \"this epic thing\"), its beats in order: the God King's absorption, rage, leap, the book thrown down, the chant, the split, the book back, the leap back", () => {
     const C = PHASE_CHANGE;
     expect(C.fallMs).toBeGreaterThanOrEqual(1500);

@@ -14,7 +14,7 @@
  */
 import { RECLUSE_PHASE2, mulberry32 } from "@chessroyale/core";
 import { BOSS_OPENING, boardEnd, playOnBoard, type BoardState } from "../boards.ts";
-import { chess960Fen } from "../chess960.ts";
+import { chess960Fen, materialBest960 } from "../chess960.ts";
 import { legalMoves, sideToMove } from "../rules.ts";
 import { powerRoll } from "./base.ts";
 
@@ -243,4 +243,111 @@ export function phase2Next(st: Phase2State, waiting: readonly number[], human: s
     return !!b && phase2ToMove(b) === "boss";
   });
   return ready.find((id) => st.boards.find((b) => b.id === id)!.player === human) ?? ready[0] ?? null;
+}
+
+// ---------------- The driver's shared pieces (solo's Phase2Game and the lobby server's phase 2) ----------------
+
+/**
+ * His fall before the phase change and the phase change itself (ms), for the lobby server, which can't measure his frames:
+ * the app works both out from them (packages/app/src/recluse-phase2.ts, PHASE_CHANGE), and a test there checks these
+ * match. The clocks start once the change is over.
+ */
+export const PHASE2_FALL_MS = 1800;
+export const PHASE2_CHANGE_MS = 15_840;
+
+/** Every clock checked at `now`: before his ultimate a bank run out loses its board; after it, a move out of time is played at random. */
+export function phase2Tick(st: Phase2State, now: number, rng: () => number, s: UltSettings = RECLUSE_PHASE2): Phase2State {
+  return phase2Timeouts(phase2Flags(st, now), now, rng, s);
+}
+
+/**
+ * When the next clock runs out (ms; null: no player's clock is running): the earliest bank to empty before his
+ * ultimate, the earliest few seconds to end after it. phase2Tick at that time (or later) catches it.
+ */
+export function phase2Due(st: Phase2State, s: Pick<UltSettings, "ultMoveSeconds"> = RECLUSE_PHASE2): number | null {
+  let at: number | null = null;
+  for (const b of st.boards) {
+    if (phase2ToMove(b) !== "crowd" || b.turnAt === null) continue;
+    const t = st.ultAt !== null ? b.turnAt + s.ultMoveSeconds * 1000 : b.turnAt + b.bankMs;
+    at = at === null ? t : Math.min(at, t);
+  }
+  return at;
+}
+
+/** What one change of the state brought (one move, a clock, a resign, his ultimate), for whatever drives it to act on. */
+export interface Phase2Changes {
+  /** Boards just decided. */
+  results: number[];
+  /** A slow move just made: on which board, and whether it was the one that brought his ultimate. */
+  slow: { board: number; ult: boolean } | null;
+  /** His ultimate just came. */
+  ult: boolean;
+  /** Boards that have just come to his move (each joins his queue once). */
+  bossTurns: number[];
+  /** Boards where a move was just played and it's the player's move now (a bot's turn to think). */
+  crowdTurns: number[];
+  /** Every board is decided now, and wasn't before. */
+  done: boolean;
+}
+
+/** What changed from `before` to `next` (boards compared by identity: the rules replace only what they touch). */
+export function phase2Changes(before: Phase2State, next: Phase2State): Phase2Changes {
+  const out: Phase2Changes = { results: [], slow: null, ult: next.ultAt !== null && before.ultAt === null, bossTurns: [], crowdTurns: [], done: false };
+  if (next === before) return out;
+  if (next.slow > before.slow) {
+    // (One move at a time changes the count: the board whose history grew.)
+    const on = next.boards.find((b, i) => b.board.history.length > (before.boards[i]?.board.history.length ?? 0));
+    if (on) out.slow = { board: on.id, ult: out.ult };
+  }
+  for (const b of next.boards) {
+    const was = before.boards.find((x) => x.id === b.id);
+    if (!was || was === b) continue;
+    if (b.result && !was.result) out.results.push(b.id);
+    const who = phase2ToMove(b);
+    if (who === "boss" && phase2ToMove(was) !== "boss") out.bossTurns.push(b.id);
+    if (who === "crowd" && b.board.history.length !== was.board.history.length) out.crowdTurns.push(b.id);
+  }
+  out.done = phase2Outcome(next).decided && !phase2Outcome(before).decided;
+  return out;
+}
+
+/**
+ * His queue after a change: boards that came to his move join the end (in the order they came), boards no longer
+ * waiting for him (moved, decided) leave it. `phase2Next` picks from it.
+ */
+export function phase2Queue(waiting: readonly number[], st: Phase2State, changes?: Pick<Phase2Changes, "bossTurns">): number[] {
+  const out = [...waiting, ...(changes?.bossTurns ?? []).filter((id) => !waiting.includes(id))];
+  return out.filter((id) => {
+    const b = st.boards.find((x) => x.id === id);
+    return !!b && phase2ToMove(b) === "boss";
+  });
+}
+
+/**
+ * A bot's thinking for its move (its own clock running): a bullet player's while (`botMoveMs`), now and then longer
+ * before his ultimate (`botSlowChance`, `botSlowMs`: a slow move, so his count comes from the bots too), a moment with
+ * the test switch (`win`). `searchMs`: its search's budget (a slow one only waits longer: a shared engine isn't held up).
+ */
+export function phase2BotThink(rng: () => number, o: { ultCome: boolean; win?: boolean }, s: Pick<Phase2Settings, "botSlowChance" | "botSlowMs" | "botMoveMs"> = RECLUSE_PHASE2): { thinkMs: number; searchMs: number } {
+  const slow = !o.ultCome && !o.win && rng() < s.botSlowChance;
+  const [lo, hi] = slow ? s.botSlowMs : s.botMoveMs;
+  const think = lo + rng() * (hi - lo);
+  return { thinkMs: o.win ? 300 : think, searchMs: Math.min(think, s.botMoveMs[1]) };
+}
+
+/**
+ * The last resort, when no device can play a move (DECISIONS.md, "The Hidden Boss's phase 2 online"): a quick search
+ * of material two moves deep, no engine. A mate in one is taken; otherwise the move that keeps the most material against
+ * the reply that hurts most (a mate against it counts as the worst; a stalemate as even), ties picked at random. It never
+ * hangs a piece to a capture or walks into a mate in one, and takes what's left loose, so it doesn't give a board away
+ * as a random move would; it's far weaker than his brain, so it doesn't make him stronger either. Null: no legal move.
+ */
+export function phase2FallbackMove(fen: string, rng: () => number = Math.random): string | null {
+  const legal = legalMoves(fen);
+  if (!legal.length) return null;
+  // (The search writes castling as the king taking its rook, as the rules do for a Chess960 board; anything the rules
+  // wouldn't take is dropped, and with nothing left any legal move goes.)
+  const best = materialBest960(fen).filter((m) => legal.includes(m));
+  const from = best.length ? best : legal;
+  return from[Math.min(from.length - 1, Math.floor(rng() * from.length))]!;
 }

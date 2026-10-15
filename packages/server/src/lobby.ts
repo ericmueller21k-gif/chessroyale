@@ -1,5 +1,5 @@
 import { hollowLobby } from "./bosses/hollow.ts";
-import type { BossLobby } from "./bosses/base.ts";
+import { liveBoardOf, phase2Follows, phase2Lobby, phase2Message, phase2Result, type Phase2Lobby, type Phase2Record } from "./bosses/recluse-phase2.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
 import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
@@ -83,6 +83,14 @@ export interface LobbyIO {
   settled?(jobs: { id: string; boardId: number; how: JudgeHow; judges: string[]; board: JudgedBoard }[]): void;
   /** Someone has left the match (resigned): close their sockets. */
   close?(playerId: string): void;
+  /**
+   * The Hidden Boss's phase 2: his move from the engine server (option (b) in DECISIONS.md, "The Hidden Boss's phase 2
+   * online"; not wired yet). False or missing: not now (off, out of budget, nothing free), so a device plays it. The
+   * answer comes back through phase2ServerMoved(key, move), null if the server couldn't make it.
+   */
+  serverMove?(req: { key: string; fen: string; elo: number; nodes: number; moveMs: number }): boolean;
+  /** A kill switch is on (kill-switches.ts): what it pauses doesn't start. */
+  paused?(name: string): boolean;
 }
 
 /** A deep search the lobby asks of the engine server (a verdict, a re-check of close calls, a spot check). */
@@ -197,7 +205,8 @@ export type Timer =
   | "autoStart"
   | "autoGo"
   | "judgeTick"
-  | "lights";
+  | "lights"
+  | "phase2";
 
 /**
  * A running match's board, for the home page's live window (Crowd and boss raids; the live hub keeps it): the
@@ -214,7 +223,7 @@ export interface LiveMatchBoard {
 export interface LobbyRecord {
   code: string;
   createdAt: number;
-  phase: "lobby" | "opening" | "vote" | "play" | "scoring" | "reveal" | "stageBreak" | "final" | "boss" | "results";
+  phase: "lobby" | "opening" | "vote" | "play" | "scoring" | "reveal" | "stageBreak" | "final" | "boss" | "phase2" | "results";
   humans: Human[];
   hostId: string | null;
   runner: RunnerSnapshot | null;
@@ -358,6 +367,8 @@ export interface LobbyRecord {
   emptiedAt?: number;
   /** The match ended early because everyone had left it (it closes at once). */
   wrapped?: true;
+  /** The Hidden Boss's phase 2 (bosses/recluse-phase2.ts), from his fall after phase 1 to the results. */
+  p2?: Phase2Record;
 }
 
 export interface JudgesRecord {
@@ -489,7 +500,7 @@ export class LobbyCore {
   }
 
   /** What a boss's lobby code (bosses/<boss>.ts) may use of this lobby. */
-  private get bossLobby(): BossLobby {
+  private get bossLobby(): Phase2Lobby {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const lobby = this;
     return {
@@ -514,6 +525,14 @@ export class LobbyCore {
       roundHumans: () => lobby.roundHumans(),
       roundDone: () => lobby.roundDone(),
       lock: () => lobby.lock(),
+      rng: () => lobby.rng(),
+      broadcast: (msg, remember) => lobby.broadcast(msg, remember),
+      hostNow: () => lobby.hostNow(),
+      pickHost: (exclude) => lobby.pickHost(exclude),
+      bossFall: (until) => lobby.broadcast(lobby.bossMessage(until, { fall: true, phase2: true })),
+      finishMatch: () => lobby.finishMatch(),
+      ...(lobby.io.serverMove ? { serverMove: (req: Parameters<NonNullable<LobbyIO["serverMove"]>>[0]) => lobby.io.serverMove!(req) } : {}),
+      paused: (name) => !!lobby.io.paused?.(name),
     };
   }
 
@@ -633,8 +652,8 @@ export class LobbyCore {
   }
 
   /** The host scores rounds; prefer a connected computer. */
-  private pickHost(exclude?: string): string | null {
-    const all = this.r.humans.filter((h) => h.connected && h.id !== exclude);
+  private pickHost(exclude?: string | readonly string[]): string | null {
+    const all = this.r.humans.filter((h) => h.connected && (typeof exclude === "string" ? h.id !== exclude : !exclude?.includes(h.id)));
     // (Not a device benched for wrong scores, while there's anyone else.)
     const trusted = all.filter((h) => !this.benched(h.id));
     const candidates = trusted.length ? trusted : all;
@@ -679,7 +698,7 @@ export class LobbyCore {
       if (!this.r.hostId || !this.human(this.r.hostId)?.connected) this.r.hostId = existing.id;
       this.send(existing.id, { t: "welcome", playerId: existing.id, token: existing.token, code: this.r.code }, false);
       this.broadcast(this.lobbyMessage(existing.id), false);
-      const last = this.r.last[existing.id];
+      const last = this.lastFor(existing.id);
       if (last) this.send(existing.id, last, false);
       this.resendHostWork();
       this.resendJudgeWork(existing.id);
@@ -725,13 +744,18 @@ export class LobbyCore {
     return { ok: true as const, playerId: id };
   }
 
+  /** The phase message someone (re)joining gets: their last one, or (the Hidden Boss's phase 2) where it stands now. */
+  private lastFor(playerId: string): Outgoing | undefined {
+    return phase2Message(this.r) ?? this.r.last[playerId];
+  }
+
   /** Sends a (re)connected player everything they need: welcome, lobby, the current phase, any host work. */
   resendTo(playerId: string) {
     const h = this.human(playerId);
     if (!h) return;
     this.io.send(playerId, { t: "welcome", playerId, token: h.token, code: this.r.code });
     this.io.send(playerId, this.lobbyMessage("all"));
-    const last = this.r.last[playerId];
+    const last = this.lastFor(playerId);
     if (last) this.io.send(playerId, last);
     if (playerId === this.r.hostId) this.resendHostWork();
     this.resendJudgeWork(playerId);
@@ -803,7 +827,7 @@ export class LobbyCore {
     const at = this.r.humans.flatMap((h) => {
       if (h.connected || h.goneAt === undefined) return [];
       const t = h.goneAt + LEAVING.awayMs;
-      const inPlay = this.runner!.state.players.find((p) => p.id === h.id)?.alive !== false;
+      const inPlay = this.runner!.state.players.find((p) => p.id === h.id)?.alive !== false || liveBoardOf(this.r, h.id) !== null;
       return t > now || inPlay ? [t] : [];
     });
     return at.length ? Math.min(...at) : null;
@@ -827,7 +851,7 @@ export class LobbyCore {
   }
 
   /** A bot takes this seat from now on (a new id, and a bot's name nobody in the match has). */
-  private giveSeat(id: string) {
+  private giveSeat(id: string): { id: string; name: string; skill: number } {
     const runner = this.runner!;
     const taken = new Set(runner.state.players.map((p) => p.name));
     const n = BOT_NAMES.length;
@@ -841,6 +865,7 @@ export class LobbyCore {
     const bot = { id: `rb${++this.r.counter}`, name: name || `Bot ${this.r.counter}`, skill: LEAVING.botSkill };
     runner.handOver(id, bot);
     this.r.bots.push(bot);
+    return bot;
   }
 
   /** A person's result as they leave mid-match: out in `placement`, a loss (their team, or the crowd against a boss). */
@@ -925,6 +950,11 @@ export class LobbyCore {
       result = this.resultOf(h, p, placement);
       if (this.botTakes(id)) this.giveSeat(id);
       else this.r.placements[id] = runner.retire(id);
+    } else if (liveBoardOf(this.r, id) !== null) {
+      // The Hidden Boss's phase 2, their board in play: a loss for them, and a bot plays the board on for the team.
+      how = why;
+      result = { ...this.resultOf(h, p, p.placement ?? runner.state.players.length), teamWon: false };
+      phase2Lobby.handOver(this.bossLobby, id, this.giveSeat(id));
     } else how = "out";
     this.r.humans = this.r.humans.filter((x) => x.id !== id);
     delete this.r.last[id];
@@ -975,7 +1005,7 @@ export class LobbyCore {
     for (const h of [...this.r.humans]) {
       if (this.present(h, now)) continue;
       const p = this.runner!.state.players.find((x) => x.id === h.id);
-      if (!p || p.alive) this.leaveMatch(h, "away");
+      if (!p || p.alive || liveBoardOf(this.r, h.id) !== null) this.leaveMatch(h, "away");
     }
   }
 
@@ -1020,6 +1050,7 @@ export class LobbyCore {
       this.io.send(host, { t: "scoreRequest", ...this.r.scoreRequest });
     }
     if (this.r.phase === "boss" && this.r.bossKey) this.sendBossRequest(host);
+    if (this.r.phase === "phase2") return phase2Lobby.hostWork(this.bossLobby, host);
     // (A new host, or the host back after a reload: the battle's brain, so it loads Maia now.)
     if (this.r.bossBrain && this.r.bossIntroDone && this.r.phase !== "results") this.io.send(host, { t: "bossBrain", brain: this.r.bossBrain });
   }
@@ -1031,7 +1062,8 @@ export class LobbyCore {
    */
   ultimateTrigger(playerId: string, admin: boolean): boolean {
     if (!admin || !BOSS_POWERS.ultimateTestButton || !this.human(playerId) || !this.runner?.boss || this.r.phase === "results") return false;
-    const ok = this.runner.triggerUltimate();
+    // (The Hidden Boss's phase 2: his phase 2 ultimate now.)
+    const ok = this.r.phase === "phase2" ? phase2Lobby.ult(this.bossLobby) : this.runner.triggerUltimate();
     if (ok) console.log(`test trigger: ${playerId} brings the ultimate in ${this.r.code}`);
     return ok;
   }
@@ -1108,6 +1140,12 @@ export class LobbyCore {
         return hollowLobby.darkTry(this.bossLobby, playerId, msg.key, msg.move, msg.away);
       case "lightsTap":
         return hollowLobby.lightsTap(this.bossLobby, playerId, msg.key, msg.round, msg.square);
+      case "p2Move":
+        return phase2Lobby.move(this.bossLobby, playerId, msg.board, msg.ply, msg.move);
+      case "p2Answer":
+        return phase2Lobby.answer(this.bossLobby, playerId, msg.key, msg.move);
+      case "p2Resign":
+        return phase2Lobby.resign(this.bossLobby, playerId);
       case "hello":
       // (The test trigger goes through ultimateTrigger, from the Durable Object, which knows who's an admin.)
       case "ultimate":
@@ -1239,7 +1277,14 @@ export class LobbyCore {
         return this.judgeTick();
       case "lights":
         return hollowLobby.lightsStep(this.bossLobby);
+      case "phase2":
+        return phase2Lobby.alarm(this.bossLobby);
     }
+  }
+
+  /** The Hidden Boss's phase 2: the engine server's move for a key it was asked (LobbyIO.serverMove), null if it couldn't. */
+  phase2ServerMoved(key: string, move: string | null) {
+    phase2Lobby.serverMoved(this.bossLobby, key, move);
   }
 
   /**
@@ -1330,8 +1375,8 @@ export class LobbyCore {
 
   // ---------------- Boss battle ----------------
 
-  private bossMessage(until: number, opts: { thinking?: boolean; justKilled?: string | null; fall?: boolean } = {}): Outgoing {
-    return { t: "boss", boss: this.runner!.bossView(opts.justKilled ?? null)!, standings: this.standings(), until, ...(opts.thinking ? { thinking: true } : {}), ...(opts.fall ? { fall: true } : {}) };
+  private bossMessage(until: number, opts: { thinking?: boolean; justKilled?: string | null; fall?: boolean; phase2?: boolean } = {}): Outgoing {
+    return { t: "boss", boss: this.runner!.bossView(opts.justKilled ?? null)!, standings: this.standings(), until, ...(opts.thinking ? { thinking: true } : {}), ...(opts.fall ? { fall: true } : {}), ...(opts.phase2 ? { phase2: true as const } : {}) };
   }
 
   /** The boss's turn: everyone sees it thinking while the host's engine plays its move. */
@@ -1537,10 +1582,14 @@ export class LobbyCore {
         return this.setTimer("nextRound", until);
       }
       if (runner.stageComplete()) {
+        // (Who fought it: the finalists, best first once placed. The Hidden Boss's phase 2 puts them on its boards.)
+        const fought = runner.alive().map((p) => p.id);
         runner.finishBossBattle();
+        const finalists = fought.map((id) => runner.player(id)).sort((a, b) => (a.placement ?? 99) - (b.placement ?? 99));
+        if (phase2Follows(this.bossLobby, finalists.length)) return phase2Lobby.begin(this.bossLobby, finalists.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })));
         // Beaten, a boss with a fall (the Hidden Boss, BossRules.fallMs): the board holds while he collapses and mumbles,
-        // as solo's does, then the results (this again, the match over). Online he has no phase 2 yet: phase 1 won is the
-        // crowd's victory.
+        // as solo's does, then the results (this again, the match over). Where his phase 2 doesn't follow online (it's
+        // off, or paused), phase 1 won is the crowd's victory.
         const fallMs = runner.boss.result === "crowd" ? bossRules(runner.boss)?.fallMs : undefined;
         if (fallMs) {
           this.r.phase = "boss";
@@ -2765,6 +2814,7 @@ export class LobbyCore {
     const st = this.standings();
     const winner = this.settings.mode === "crowd" ? runner.gameWinner() : null;
     const boss = runner.boss;
+    const p2 = phase2Result(this.r);
     const stages = this.settings.knockoutsPerStage.length;
     // Everyone still here, and anyone who left once they were out (their place stood; recorded now, with everyone's).
     const people: { id: string; practice?: boolean; evalBar?: boolean }[] = [...this.r.humans, ...(this.r.left ?? []).filter((l) => l.deferred)];
@@ -2777,7 +2827,9 @@ export class LobbyCore {
       const p = runner.player(h.id);
       const reachedBoss = p.outInStage === null || p.outInStage >= stages;
       const survived = !!boss && reachedBoss && !boss.kills.some((k) => k.id === h.id);
-      const teamWon = boss?.result ? (survived && boss.result !== "draw" ? boss.result === "crowd" : null) : team && winner ? team === winner : null;
+      // (The Hidden Boss's phase 2 was played: it decides the battle; all four boards must be won.)
+      const bossWon = p2 ? (p2.beaten ? "crowd" : "boss") : boss?.result;
+      const teamWon = boss?.result ? (survived && bossWon !== "draw" ? bossWon === "crowd" : null) : team && winner ? team === winner : null;
       const f = this.r.feats?.[h.id];
       return [
         {
@@ -2848,6 +2900,7 @@ export class LobbyCore {
 
   private finishMatch() {
     const runner = this.runner!;
+    const p2 = phase2Result(this.r);
     for (const p of runner.state.players) this.r.placements[p.id] = p.placement!;
     this.r.phase = "results";
     this.r.timer = null;
@@ -2861,6 +2914,8 @@ export class LobbyCore {
       standings: this.standings(),
       ...(this.settings.mode === "crowd" ? { gameWinner: runner.gameWinner() } : {}),
       ...(runner.boss?.result ? { bossResult: runner.boss.result } : {}),
+      // (The Hidden Boss's phase 2 was played: its result is the battle's.)
+      ...(p2 ? { bossResult: p2.beaten ? ("crowd" as const) : ("boss" as const), simul: { won: p2.won, of: p2.of } } : {}),
       // (The Hidden Boss's bullet clock ran out: he won on time. Read in the same event as the battle ended.)
       ...(runner.bossTimedOut ? { timeout: true } : {}),
       // Whether it counted for ranking (the results say so in words).

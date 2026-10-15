@@ -1,5 +1,5 @@
 import { stockfishRefuses } from "@chessroyale/chess";
-import { BOSS_TIERS, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { BOSS_TIERS, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, CROWD_SETTINGS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
 import type { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
@@ -213,6 +213,18 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
         ...(mode === "crowd" ? (speedOption(url.searchParams.get("speed"))?.patch ?? {}) : {}),
         // ?weakbots=1: every bot plays loosely (for testing: a strong player surely survives the cuts).
         ...(url.searchParams.get("weakbots") === "1" ? { botSkillRange: WEAK_BOT_SKILL } : {}),
+        // The Hidden Boss's phase 2 online (for testing): ?phase2=1 has it follow phase 1 while it's off for everyone;
+        // ?slow=N brings his phase 2 ultimate on the team's Nth slow move; ?win=1 starts phase 1 (and phase 2's boards)
+        // from a mate in one, as solo's does; ?cuts=48,48 is a Crowd's knockouts (even numbers, leaving at least 2), to
+        // reach the final in a few rounds.
+        ...(url.searchParams.get("phase2") === "1" ? { phase2Online: true } : {}),
+        ...(n("slow") ? { phase2SlowForUlt: Math.min(20, n("slow")!) } : {}),
+        ...(url.searchParams.get("win") === "1" ? { bossWinTest: true } : {}),
+        ...(() => {
+          const cuts = (url.searchParams.get("cuts") ?? "").split(",").filter(Boolean).map(Number);
+          const ok = mode === "crowd" && cuts.length > 0 && cuts.length <= 20 && cuts.every((c) => Number.isInteger(c) && c >= 0 && c % 2 === 0);
+          return ok && cuts.reduce((a, b) => a + b, 0) <= (CROWD_SETTINGS.lobbySize ?? 100) - 2 ? { knockoutsPerStage: cuts } : {};
+        })(),
       };
       // ?keep=SECONDS: its results stay up this long (5 s up to the usual 15 minutes), for tests.
       const keep = url.searchParams.has("keep") ? Math.max(5, Math.min(LOBBY_LIFE.lobbyResultsKeepMinutes * 60, Number(url.searchParams.get("keep")) || 0)) * 1000 : undefined;

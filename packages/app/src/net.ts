@@ -48,11 +48,13 @@ import {
   type NetBoss,
   type BossAsks,
   type BossMoveKind,
+  type NetPhase2,
   pigTurn,
   ShowdownScout,
   kingHelpBlocked,
 } from "@chessroyale/chess";
-import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
+import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, SimulView, Standing, VoteView } from "./game.ts";
+import { localPhase2, phase2HostMove, phase2MoveFor, simulFromNet, stillPending, type Phase2Pending } from "./net-phase2.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { account } from "./account.ts";
 import { evalBarOn } from "./prefs.ts";
@@ -238,6 +240,15 @@ export class NetMatch implements GameView {
   get exit(): ExitKind | null {
     const k = this.phase.kind;
     if (this.closed || this.resigning || k === "results" || k === "loading" || (k === "lobby" && !this.started)) return null;
+    // (The Hidden Boss's phase change plays through; in phase 2, resigning is your board's (you watch the rest), and
+    // with none in play, leaving goes home while the battle goes on. Nothing once every board is decided.)
+    if (k === "phaseChange") return null;
+    if (k === "simul") {
+      const v = this.simul;
+      if (!v || v.decided) return null;
+      const mine = v.boards.find((b) => b.you);
+      return mine && !mine.result && v.playing ? "resign" : "leave";
+    }
     if (!this.begun) return "leave";
     const me = this.standingsList.find((s) => s.id === this.myId);
     return me && !me.out ? "resign" : "leave";
@@ -262,6 +273,8 @@ export class NetMatch implements GameView {
   resign() {
     const exit = this.exit;
     if (!exit) return;
+    // (Phase 2: your board is lost, and you stay to watch the others.)
+    if (this.phase.kind === "simul" && exit === "resign") return this.send({ t: "p2Resign" });
     this.send({ t: "resign" });
     if (this.exitHome) {
       forgetSeat(this.code);
@@ -697,6 +710,10 @@ export class NetMatch implements GameView {
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
         return void this.useBrain(m.brain);
+      case "phase2":
+        return this.onPhase2(m.p2);
+      case "p2Request":
+        return void this.hostPhase2(m);
       case "chat":
         return this.chat.onLine(m.line);
       case "chatLog":
@@ -729,7 +746,74 @@ export class NetMatch implements GameView {
       ...(m.bossResult ? { bossResult: m.bossResult } : {}),
       // (The Hidden Boss's bullet clock ran out: he won on time.)
       ...(m.timeout ? { timeout: true } : {}),
+      // (His phase 2 was played: how many of its boards were won.)
+      ...(m.simul ? { simul: m.simul } : {}),
     });
+  }
+
+  // ---------------- The Hidden Boss's phase 2 (the lobby runs it; net-phase2.ts) ----------------
+
+  /** Phase 2 as the lobby last sent it (times made local), and your move sent and not yet back. */
+  private p2: NetPhase2 | null = null;
+  private p2Pending: Phase2Pending | null = null;
+  private simulCache: { p2: NetPhase2; pending: Phase2Pending | null; me: string | null; view: SimulView } | null = null;
+
+  private onPhase2(p: NetPhase2) {
+    this.begun = true;
+    this.p2 = localPhase2(p, (t) => this.local(t));
+    if (!stillPending(this.p2, this.p2Pending)) this.p2Pending = null;
+    const kind = p.stage === "change" ? "phaseChange" : "simul";
+    // (The same phase while it lasts: the screens keep their state; only the boards change.)
+    if (this.phase.kind !== kind) return this.setPhase({ kind, at: this.p2.at });
+    this.emit();
+  }
+
+  /** Phase 2's boards (the screens read this every frame: built again only when something changed). */
+  get simul(): SimulView | null {
+    const p = this.p2;
+    if (!p || (this.phase.kind !== "phaseChange" && this.phase.kind !== "simul")) return null;
+    const c = this.simulCache;
+    if (c && c.p2 === p && c.pending === this.p2Pending && c.me === this.myId) return c.view;
+    const view = simulFromNet(p, this.myId, this.p2Pending);
+    this.simulCache = { p2: p, pending: this.p2Pending, me: this.myId, view };
+    return view;
+  }
+
+  /** Your move on your board (ignored unless it's yours to make and legal): shown at once, sent to the lobby. */
+  simulMove(boardId: number, move: string) {
+    const p = this.p2;
+    if (this.phase.kind !== "simul" || !p) return;
+    const m = phase2MoveFor(p, this.myId, boardId, move, Date.now());
+    if (!m) return;
+    this.p2Pending = m.pending;
+    this.send(m.send);
+    this.emit();
+  }
+
+  /** In the boss bar during phase 2: how many boards are won ("" in the phase change); null otherwise. */
+  get bossNote(): string | null {
+    const v = this.simul;
+    if (!v) return null;
+    return v.playing ? `${v.won} of ${v.of} won` : "";
+  }
+
+  /** Moves asked of this device as the host, being worked on (each key once). */
+  private p2Asked = new Set<string>();
+
+  /** The host: a move the lobby asked for (his, or a bot finalist's), from this device's engines. */
+  private async hostPhase2(q: Extract<ServerMessage, { t: "p2Request" }>) {
+    if (this.p2Asked.has(q.key)) return;
+    this.p2Asked.add(q.key);
+    // (His phase 1 brain isn't needed again: Maia goes.)
+    this.freeBrain();
+    try {
+      const move = await phase2HostMove(await this.engines(), q);
+      if (!this.closed) this.send({ t: "p2Answer", key: q.key, move });
+    } catch {
+      // No engine here: the lobby asks the next device, or plays its last resort.
+    } finally {
+      this.p2Asked.delete(q.key);
+    }
   }
 
   private onReveal(m: Extract<ServerMessage, { t: "reveal" }>) {
