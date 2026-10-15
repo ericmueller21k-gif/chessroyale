@@ -90,6 +90,33 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     (results, ranking, fair-play signals, Squads' coins and crates, crate items) comes from a game made without them.
     Solo results are posted by the browser and are never ranked and earn nothing.
   - **A new test switch:** read it through `testParams()` (app) or behind `testSwitchesOn` (server), and list it here.
+- **Kill switches** (Oct 15; docs/decisions/2026-10-15-kill-switches.md): Worker runtime variables that rest one part
+  of the game, set in the dashboard (how: `DEPLOY.md`, "Kill switches and the maintenance banner"). `PAUSE_<NAME>` =
+  "1" rests it, deleting it brings it back: `PAUSE_CLASSIC`, `PAUSE_CROWD`, `PAUSE_RAID`, `PAUSE_SQUADS`,
+  `PAUSE_SOLO` (Solo and Boss alone), `PAUSE_SHOP` (buying and crates; the locker stays), `PAUSE_FRIENDS`,
+  `PAUSE_BOSS_<ID>` (one boss, e.g. `PAUSE_BOSS_PIG`).
+  - **While resting:** the app disables the way in with the part's line ("Squads is resting for a bit. Back soon.";
+    `pausedLine`, core's `pauses.ts`), and the server refuses anything new for it with the same line (503,
+    `{ message, paused }`). Matches already running finish normally, and lobbies already made still start and take
+    joins by code. A Squads party in line waits with the line and goes in once it's back. Admins' Squads test lobbies
+    stay open. A boss resting is never met, at random or picked; the Crowd's boss final meets another while his is
+    resting (`rosterWithout`, `bossesOff` in a lobby's or solo game's settings).
+  - **One module reads them** (`kill-switches.ts`, cached 60 s per Worker instance); the app asks `GET /api/status`
+    (`{ paused, banner }`) at start, every minute and when it comes back on screen (`packages/app/src/status.ts`).
+  - **How fast:** changing a variable deploys a new version of the Worker, so it applies within seconds of that deploy
+    (new instances read it at once). Like any deploy, players in a match reconnect for a moment.
+- **The maintenance banner** (`MAINTENANCE_BANNER`, at most 200 characters): a slim band over the top of every
+  screen while it's set (`components/MaintenanceBanner.tsx`); ✕ hides it on that device until the message changes.
+- **Rolling back** (`npm run rollback`, `scripts/rollback.mjs`; needs `CLOUDFLARE_API_TOKEN`, never printed):
+  - With no arguments, it lists the Worker's latest 10 versions, newest first, the live one marked.
+  - `npm run rollback -- previous` (or a version's id) goes back to the one before the live one, through
+    `wrangler rollback`. `--dry-run` shows what it would do. In a terminal it asks first; elsewhere it needs `--yes`.
+    `--env staging` works on the staging Worker.
+  - **A rollback lasts until the next deploy from `main`:** revert or fix the bad change on `main` before anything
+    else merges.
+  - **A version carries its own variables:** rolling back to a version from before a `PAUSE_` or banner change undoes
+    that change too. Check the switches after a rollback.
+  - The database's schema only grows (columns are added, never removed), so an older version still runs on it.
 
 - **Licenses** (`LICENSES.md`, audited Oct 12, 2026): every third-party piece that reaches a player's device, from the
   build's module list and `public/`, its license and its credit. Nothing GPL, AGPL, LGPL, non-commercial or
@@ -115,6 +142,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 | Rate limits | `packages/server/src/limits.ts` |
 | Load-test counters | `packages/server/src/ops.ts` |
 | Test switches: who may (server), a lobby's, the app's | `admin.ts` (`testSwitchesOn`), `lobby-options.ts`; `packages/app/src/test-switches.ts` |
+| Kill switches, the banner | `packages/core/src/pauses.ts` (the parts, their lines), `packages/server/src/kill-switches.ts`; `packages/app/src/status.ts`, `components/MaintenanceBanner.tsx` |
+| Rollback | `scripts/rollback.mjs` (`npm run rollback`) |
 | Load tests (simulated players over WebSockets and the API) | `scripts/load/` (`run.ts`, `burst.ts`, `staging.sh`) → `reports/load/` |
 | The engine server | `engine/`, `packages/server/src/engine.ts` |
 | CI | `.github/workflows/check.yml` (typecheck, unit tests), `e2e.yml` (the e2e suite); `e2e/ci-shard.mjs`, `ci-timings.json`, `ci-summary.ts` |
@@ -124,15 +153,16 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 `CAPACITY` (queue, overload, presence, rate limits), `LOBBY_LIFE` in settings.ts; Worker variables
 `MATCH_FILL_SECONDS`, `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`, `OPS_STATS`, `LOAD_TEST` (staging only), `SQUADS_TEST`
 (local and e2e only: anyone may use Squads' test controls), `TEST_SWITCHES` (local, e2e and staging only: anyone may
-use the test switches). Squads lobbies aren't on the live line yet, so the
-overload limit doesn't count their players.
+use the test switches), the kill switches `PAUSE_<NAME>` and `MAINTENANCE_BANNER` (above). Squads lobbies aren't on
+the live line yet, so the overload limit doesn't count their players.
 
 ## Tests and tools
 
 - Unit: `packages/server/test/capacity.test.ts`, `matchmaker.test.ts`, `live.test.ts`, `lobby-life.test.ts`;
   `test-switches.test.ts` (server and app: the test switches).
+- Unit: `kill-switches.test.ts` (the switches, the cache, each refusal, a resting boss never met).
 - e2e: `e2e/busy.spec.ts` (servers busy), `lobby-close.spec.ts`, `test-switches.spec.ts` (a player's switches
-  ignored, an admin's working).
+  ignored, an admin's working), `kill-switches.spec.ts` (its own server on port 8789: Squads resting, the banner).
 - Load: see `DEPLOY.md`, "Load testing". Run wrangler from a copy you aren't editing (it reloads on every change).
 
 ## Rules for this area

@@ -1,4 +1,4 @@
-import { isGameCode, isInviteKind, type InviteKind } from "@chessroyale/core";
+import { isGameCode, isInviteKind, pausedLine, type InviteKind } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, accountOf, isSignedIn, readCookie, signInRequired, type AccountEnv, type WaitUntil } from "./api.ts";
 import { cachedUserId } from "./presence.ts";
@@ -37,7 +37,8 @@ export function friendsOn(env: object): boolean {
   return !isPaused(env, "friends");
 }
 
-export const FRIENDS_OFF = "Friends are switched off for now. Try again later.";
+/** The kill switch's line, as every part's (pauses.ts). */
+export const FRIENDS_OFF = pausedLine("friends");
 export const SIGN_IN_FOR_FRIENDS = "Sign in to add friends and send invites.";
 const GAME_GONE = "That lobby or party has started or closed.";
 

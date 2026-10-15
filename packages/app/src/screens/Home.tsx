@@ -523,7 +523,8 @@ export function HomeScreen({
   const [friends, setFriends] = useState(!!joinCode);
   // Boss raid: pick the boss first, for a raid alone or one you create (skipped with ?boss=N).
   const [bossMenu, setBossMenu] = useState<null | "solo" | "raid">(null);
-  const bossAlone = () => (bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
+  // (Not while Solo and Boss alone rest: the side menu's Boss alone lands here too, and the line says why.)
+  const bossAlone = () => (rest("solo") ? undefined : bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
   const pickBoss = (id: string) => {
     rememberBossPick(id);
     const forRaid = bossMenu === "raid";

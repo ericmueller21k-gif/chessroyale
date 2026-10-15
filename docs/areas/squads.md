@@ -18,6 +18,9 @@ move.
 
 ## How it works today
 
+- **Its kill switch** (`PAUSE_SQUADS`, [ops.md](ops.md) "Kill switches"): no new queue or party (503 with "Squads is
+  resting for a bit. Back soon."); a party already in line waits with that line and goes in once it's back; lobbies
+  already running finish; admins' test lobbies stay open.
 - **Pure rules in `packages/chess/src/squads/`**, imported as `@chessroyale/chess/squads`. They live in the chess
   package because they need chess.js (legal moves, mate in one) and the opening library; `core` stays chess-free.
   **No engine in the rules but one**: a same-move token's refund weighs the judge's top moves, given to the rules as
