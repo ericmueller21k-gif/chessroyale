@@ -1,0 +1,34 @@
+# The engine server's container (engine/Dockerfile): built, then its own Stockfish checked through its real HTTP
+# interface (engine/server.mjs) on every case in packages/chess/test/stockfish-refuses-cases.ts, plus one search as the
+# game asks for it (packages/chess/test/engine-container.test.ts). A position stockfishRefuses lets through must never
+# take the container down. Runs only when the container, the refusal rules or this check change, or by hand (Actions >
+# engine-container > Run workflow): about a minute.
+name: engine-container
+on:
+  pull_request:
+    paths:
+      - engine/**
+      - packages/chess/src/uci.ts
+      - packages/chess/test/stockfish-refuses-cases.ts
+      - packages/chess/test/engine-container.test.ts
+      - .github/workflows/engine-container.yml
+  workflow_dispatch:
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: |
+          docker build -t hunchess-engine:check engine
+          echo "The image: $(docker image inspect -f '{{.Size}}' hunchess-engine:check | numfmt --to=si)B" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check its Stockfish over HTTP
+        run: npx vitest run packages/chess/test/engine-container.test.ts
+        env:
+          ENGINE_IMAGE: hunchess-engine:check

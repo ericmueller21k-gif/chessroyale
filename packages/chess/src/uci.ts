@@ -77,34 +77,60 @@ export function parseInfo(line: string): InfoLine | null {
 }
 
 /**
- * Why Stockfish would refuse this position, or null. Stockfish 19 checks a position as it's set up, and a refused one
- * ends its process with an error (in a browser, its worker's exit thrown into the page: "ExitStatus", Oct 15) and
- * leaves its last position in place, so a search would answer for the wrong position. Its rules, as measured against
- * the build the game runs: one king a side; no pawn on the first or eighth rank; at most 8 pawns a side; no more pieces
+ * Whether a castling right holds as Stockfish 19 reads it, on that side's back rank (files a to h): K or Q, a rook of
+ * that color between that corner and its king; a file's letter (Chess960), that color's rook on that file; either way
+ * the king on files b to g. Stockfish 19 drops a right that doesn't hold; the engine server's Stockfish 17.1 looks for
+ * its rook past the board's edge (DECISIONS.md, "The engine server's own Stockfish, checked in CI", Oct 15).
+ */
+function castlingRightHolds(backRank: readonly string[], letter: string): boolean {
+  const [king, rook] = letter <= "Z" ? ["K", "R"] : ["k", "r"];
+  const up = letter.toUpperCase();
+  if (up === "K" || up === "Q") {
+    let rookSeen = false;
+    for (const f of up === "K" ? [7, 6, 5, 4, 3, 2, 1] : [0, 1, 2, 3, 4, 5, 6]) {
+      if (backRank[f] === king) return rookSeen;
+      if (backRank[f] === rook) rookSeen = true;
+    }
+    return false;
+  }
+  return backRank[up.charCodeAt(0) - 65] === rook && backRank.slice(1, 7).includes(king);
+}
+
+/**
+ * Why Stockfish would refuse this position, or null: no engine is ever sent one. Stockfish 19 checks a position as it's
+ * set up, and a refused one ends its process with an error (in a browser, its worker's exit thrown into the page:
+ * "ExitStatus", Oct 15) and leaves its last position in place, so a search would answer for the wrong position. Its
+ * rules, as measured against the build the game runs: pieces it reads (KQRBNP, either case) on eight ranks of eight
+ * squares; a side to move; one king a side; no pawn on the first or eighth rank; at most 8 pawns a side; no more pieces
  * than promotions could have made (beyond a queen, two rooks, two bishops and two knights, no more than the pawns
  * missing); the side not to move not in check; an en passant square on the sixth rank with White to move, the third
- * with Black (any other is ignored); at most four castling rights, in letters it reads (KQkq, or files). Rights a
- * position can't have it ignores, and the move counters it doesn't check.
+ * with Black (any other square there is ignored); at most four castling rights, in letters it reads (KQkq, or files);
+ * move counters up to 32767 (the fifty-move count) and 100000 (the move number). One more, for the engine server's
+ * Stockfish 17.1 (which checks nothing): every castling right holds (`castlingRightHolds`), where 19 merely drops one
+ * that doesn't. No game reaches any of these.
  */
 export function stockfishRefuses(fen: string): string | null {
-  const [board = "", side = "w", castling = "-", ep = "-"] = fen.split(" ");
+  const [board = "", side, castling = "-", ep = "-", half, full] = fen.split(" ");
   if (side !== "w" && side !== "b") return "no side to move";
   if (castling !== "-" && !/^[KQkqA-Ha-h]{1,4}$/.test(castling)) return "castling rights it can't read";
   const ranks = board.split("/");
   if (ranks.length !== 8) return "not eight ranks";
   const count: Record<string, number> = {};
+  const rows: string[][] = [];
   for (let r = 0; r < 8; r++) {
-    let files = 0;
+    const row: string[] = [];
     for (const c of ranks[r]!) {
       if (c >= "1" && c <= "8") {
-        files += Number(c);
+        row.push(...Array<string>(Number(c)).fill(""));
         continue;
       }
+      if (!"KQRBNPkqrbnp".includes(c)) return "a piece it can't read";
       count[c] = (count[c] ?? 0) + 1;
       if ((c === "p" || c === "P") && (r === 0 || r === 7)) return "a pawn on the first or eighth rank";
-      files++;
+      row.push(c);
     }
-    if (files !== 8) return "a rank without eight squares";
+    if (row.length !== 8) return "a rank without eight squares";
+    rows.push(row);
   }
   for (const [color, up] of [["Black", false], ["White", true]] as const) {
     const n = (piece: string) => count[up ? piece.toUpperCase() : piece] ?? 0;
@@ -114,7 +140,12 @@ export function stockfishRefuses(fen: string): string | null {
     const promoted = Math.max(0, n("q") - 1) + Math.max(0, n("r") - 2) + Math.max(0, n("b") - 2) + Math.max(0, n("n") - 2);
     if (promoted > 8 - pawns) return `${color} has more pieces than promotions could make`;
   }
-  if (ep !== "-" && ep[1] !== (side === "w" ? "6" : "3")) return "an en passant square on the wrong rank";
+  for (const letter of castling === "-" ? "" : castling) {
+    if (!castlingRightHolds(rows[letter <= "Z" ? 7 : 0]!, letter)) return `a castling right without its rook and king in place (${letter})`;
+  }
+  if (ep !== "-" && !(/^[a-h]/.test(ep) && ep[1] === (side === "w" ? "6" : "3"))) return "an en passant square it can't read, or on the wrong rank";
+  if (Number(half) < 0 || Number(half) > 32767) return "a fifty-move count out of range";
+  if (Number(full) < 0 || Number(full) > 100000) return "a move number out of range";
   // (Without its castling rights: a Chess960 position's are written by file, which chess.js doesn't read.)
   if (kingAttacked(`${board} ${side} - - 0 1`, side === "w" ? "b" : "w")) return "the side not to move is in check";
   return null;
