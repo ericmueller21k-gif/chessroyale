@@ -90,6 +90,7 @@ describe("the server refuses new matches for a part that's resting", () => {
       [{ PAUSE_SQUADS: "1" }, "/api/squads/play", "squads"],
       [{ PAUSE_SQUADS: "1" }, "/api/squads/party", "squads"],
     ];
+    // (A refusal, not an error: the Worker's error capture, problems.ts, would answer 500 "Something went wrong".)
     for (const [env, path, part] of cases) {
       const r = await call(env, "POST", path);
       expect(r.status, path).toBe(503);

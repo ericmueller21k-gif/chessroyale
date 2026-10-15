@@ -264,7 +264,7 @@ test("computer: in the queue, your profile opens over it; another menu item leav
   // Your profile: over the queue, which carries on underneath.
   await menu.getByRole("button", { name: "Profile" }).click();
   await expect(page.locator(".fd-overlay").getByRole("heading", { name: "Wanderer" })).toBeVisible();
-  await page.locator(".fd-overlay").getByRole("button", { name: "Back" }).click();
+  await page.locator(".fd-overlay").getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.locator(".fd-seats")).toBeVisible();
   expect(await page.evaluate(() => (window as any).match?.phase.kind)).toMatch(/loading|lobby/);
   // Settings: out of the queue, then Settings.

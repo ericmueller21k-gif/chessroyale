@@ -1,5 +1,6 @@
 import { UciEngine, type EngineLike, type MoveScore, type UciTransport } from "@chessroyale/chess";
 import { DEFAULT_SETTINGS, JUDGES } from "@chessroyale/core";
+import { captureWorkerError } from "./problems.ts";
 
 const ENGINE_JS = "/engine/stockfish-19-lite-single.js";
 const ENGINE_WASM = "/engine/stockfish-19-lite-single.wasm";
@@ -17,11 +18,12 @@ function workerTransport(): UciTransport {
       for (const line of e.data.split("\n")) for (const l of listeners) l(line.trim());
     };
     // An error in the worker (Stockfish ending its process: its exit is thrown as an "ExitStatus") stays in the worker:
-    // handled here, it never reaches the page as an error of its own (Oct 15). The engine answers on afterwards;
-    // positions it would refuse aren't sent at all (stockfishRefuses).
+    // handled here, it never reaches the page as an error of its own (Oct 15), and is reported (problems.ts). The
+    // engine answers on afterwards; positions it would refuse aren't sent at all (stockfishRefuses).
     w.onerror = (e) => {
       e.preventDefault();
       console.warn(`Stockfish worker: ${e.message || "error"}`);
+      captureWorkerError("stockfish", e);
     };
     return w;
   };
