@@ -5,7 +5,7 @@ import { BrainDebug, EngineMove, UltimateTest } from "../components/BossDock.tsx
 import { COMPUTER_LAYOUT, MatchMenu } from "../components/MatchMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { exitFor } from "../match-exit.ts";
-import { clockText } from "../components/RaceTower.tsx";
+import { clockShown } from "../clock-text.ts";
 import { BoardsStrip } from "../components/TinyBoard.tsx";
 import { isCrowd, myBoardId, towerView, type GameView } from "../game.ts";
 import { roundsInStage } from "@chessroyale/core";
@@ -31,7 +31,7 @@ function BankTime({ match }: { match: GameView }) {
     : me.bankMs;
   return (
     <span class={`hud-bank${bank < 60_000 ? " low" : ""}`} title="Your total time left (bank): +5 s every move, at most 30 s per move">
-      {clockText(bank)}
+      {clockShown(bank)}
     </span>
   );
 }
