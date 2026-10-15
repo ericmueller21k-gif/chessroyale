@@ -119,7 +119,9 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
     <div class="screen game" onClick={() => played && match.skipReveal()}>
       <Hud match={match} stripFrozen={!played} />
       <div class="board-area">
-        <div class="opening-name">{board.openingName}</div>
+        <div class="opening-name">
+          <span class="opening-title" title={board.openingName}>{board.openingName}</span>
+        </div>
         {/* Same row as the play screen (eval bar + board), so the board never moves or resizes between phases. */}
         <div class="board-row">
         <EvalBar fen={played ? applyMove(fen, mine.result.playedMove) : fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />

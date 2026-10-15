@@ -362,6 +362,15 @@ p {
   text-align: center;
 }
 
+/* An opening's name (Classic) stays on one line, cut with "…" when it's long: a name that wrapped pushed the board down
+   a line on a phone when the next round put you on its board (docs/decisions/2026-10-15-flaky-e2e-batch.md). */
+.opening-title {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .board-wrap {
   position: relative;
   width: 100%;

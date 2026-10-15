@@ -17,8 +17,11 @@ test("home: the live line comes from the server, the mode picker changes the lin
   expect(before.online).toBeGreaterThanOrEqual(1);
   // (Other tests' players come and go, so the number itself can move between two looks.)
   await expect(line).toContainText(/[1-9]\d* online/);
-  // Someone else waiting in the queue shows up in the count within a few seconds.
+  // Someone else waiting in the queue shows up in the count within a few seconds. (Bots off, so they stay in it: with
+  // bots they'd be in a match by the fill time, 8 s here, and the line, asked every 5 s, could miss the count between
+  // two looks: docs/decisions/2026-10-15-flaky-e2e-batch.md.)
   const other = await (await browser.newContext()).newPage();
+  await other.addInitScript(() => localStorage.setItem("brc.matchmaking", "botsoff"));
   await other.goto(`/?pool=home-${test.info().project.name}`);
   await other.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(async () => (await live(page)).queue, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);

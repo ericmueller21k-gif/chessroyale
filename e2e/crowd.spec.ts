@@ -1,8 +1,14 @@
+import { readFileSync } from "node:fs";
 import { devices, expect } from "@playwright/test";
 import { CROWD_SETTINGS } from "@chessroyale/core";
 import { createLobbyFromHome, expectCoordsInSquares, named, soloFromHome, submitMove, test } from "./helpers.ts";
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
+
+/** The longest name in the opening library (a Classic board's name, at any of its plies). */
+const LONGEST_OPENING = (JSON.parse(readFileSync(new URL("../packages/chess/data/openings.json", import.meta.url), "utf8")) as { names: Record<string, string> }[])
+  .flatMap((o) => Object.values(o.names))
+  .reduce((a, b) => (b.length > a.length ? b : a), "");
 
 test("narrow phones: the top bar's numbers stay clear of the options button, and the cut lists whole rows of names", async ({ browser }) => {
   test.setTimeout(5 * 60_000);
@@ -189,15 +195,17 @@ test("the board never moves or resizes during a turn (Crowd and Classic)", async
     const rects = new Map<string, Set<string>>();
     const stopAt = Date.now() + 25_000;
     while (Date.now() < stopAt) {
-      const [kind, rect] = await page.evaluate(async () => {
+      const [kind, rect] = await page.evaluate(() => {
         const m = (window as any).match;
         const k = m.phase.kind;
         if (k === "play" && !(window as any).__sub && Date.now() > m.phase.startsAt + 1000) {
           (window as any).__sub = 1;
-          const top = await m.runner.topMovesFor(m.phase.board.fen);
-          // (Played after this evaluate has answered: see submitMove.)
-          setTimeout(() => m.phase.kind === "play" && m.submit(top[0].move));
-          setTimeout(() => ((window as any).__sub = 0), 500);
+          // (The search isn't awaited in this evaluate: .claude/LESSONS.md, "A navigation that never happened".)
+          const fen = m.phase.board.fen;
+          void m.runner.topMovesFor(fen).then((top: { move: string }[]) => {
+            if (m.phase.kind === "play" && m.phase.board.fen === fen) m.submit(top[0]!.move);
+            setTimeout(() => ((window as any).__sub = 0), 500);
+          });
         }
         const r = document.querySelector(".board-wrap .board")?.getBoundingClientRect();
         return [k, r ? `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}` : "none"];
@@ -212,5 +220,32 @@ test("the board never moves or resizes during a turn (Crowd and Classic)", async
     const summary = [...rects].map(([r, k]) => `${r} (${[...k].join("/")})`);
     expect(summary, `${mode}: board positions seen`).toHaveLength(1);
     expect([...rects.values()][0]!.size).toBeGreaterThanOrEqual(3);
+    if (mode !== "classic") continue;
+    // Classic's line above the board is the board's opening name, and the next round can put you on any board: the
+    // library's longest name stays on one line and leaves the board where it was (a long one used to wrap and push it
+    // down a line on a phone: docs/decisions/2026-10-15-flaky-e2e-batch.md).
+    const at = [...rects.keys()][0]!;
+    let seen = null as { text: string; height: number; line: number; rect: string } | null;
+    for (let i = 0; i < 5 && seen?.text !== LONGEST_OPENING; i++) {
+      await expect
+        .poll(async () => {
+          const k = await phase(page);
+          if (k === "stageBreak") await page.evaluate(() => (window as any).match.continueFromBreak());
+          return k;
+        }, { timeout: 60_000 })
+        .toBe("play");
+      seen = await page.evaluate(async (name) => {
+        const m = (window as any).match;
+        m.phase = { ...m.phase, board: { ...m.phase.board, openingName: name } };
+        m.emit();
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const line = document.querySelector<HTMLElement>(".board-area .opening-name")!;
+        const r = document.querySelector(".board-wrap .board")!.getBoundingClientRect();
+        return { text: line.textContent ?? "", height: line.getBoundingClientRect().height, line: parseFloat(getComputedStyle(line).lineHeight), rect: `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}` };
+      }, LONGEST_OPENING);
+    }
+    expect(seen!.text).toBe(LONGEST_OPENING);
+    expect(seen!.height).toBeLessThanOrEqual(seen!.line + 0.5);
+    expect(seen!.rect).toBe(at);
   }
 });

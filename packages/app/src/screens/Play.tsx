@@ -209,7 +209,7 @@ export function PlayScreen({
               </span>
             </>
           ) : (
-            board.openingName
+            <span class="opening-title" title={board.openingName}>{board.openingName}</span>
           )}
         </div>
         <div class="board-row">

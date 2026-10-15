@@ -147,8 +147,9 @@ test("a block: tap Block, their queen, where it would go; the arrow keeps drawin
   await tapSquare(page, "d1");
   await tapSquare(page, "d4");
   await expect.poll(async () => (await seen(page)).mine).toBe("d1d4");
-  // Their half: the arrow stays up while they choose; then they've moved, not Qf6, and it's gone.
-  await expect.poll(async () => page.evaluate((k) => (window as any).squads.matches.get(k).blocks.map((b: any) => b.move), s.key), { timeout: 60_000 }).toEqual(["d8f6"]);
+  // Their half: the arrow stays up while they choose; then they've moved, not Qf6, and it's gone. (Your board's blocks:
+  // the match's list has every board's, and a bot on another board may block a move too, even Qf6.)
+  await expect.poll(async () => page.evaluate(([k, b]) => (window as any).squads.matches.get(k).blocks.filter((x: any) => x.board === b).map((x: any) => x.move), [s.key, board] as const), { timeout: 60_000 }).toEqual(["d8f6"]);
   await expect(arrow).toHaveCount(1);
   await expect.poll(async () => page.evaluate(([k, b]) => (window as any).squads.matches.get(k).boards[b].moves.length, [s.key, board] as const), { timeout: 90_000 }).toBeGreaterThanOrEqual(2);
   const moves = await page.evaluate(([k, b]) => (window as any).squads.matches.get(k).boards[b].moves, [s.key, board] as const);

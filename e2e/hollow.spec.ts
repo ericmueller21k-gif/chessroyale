@@ -304,6 +304,18 @@ test("Hollow online: the server judges an attempt into the dark (-5, only for yo
   test.skip(test.info().project.name !== "desktop", "one run is enough");
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  // What this device, the host, answers when the server asks for his extra move (a "bossMove" for an "x-" key).
+  let extraAnswer: string | null = null;
+  page.on("websocket", (ws) =>
+    ws.on("framesent", (f) => {
+      try {
+        const m = JSON.parse(String(f.payload));
+        if (m.t === "bossMove" && String(m.key).startsWith("x-")) extraAnswer = m.move;
+      } catch {
+        // (Not JSON: not ours.)
+      }
+    }),
+  );
   await page.goto("/?debug&pace=quick&mode=raid&boss=hollow&power=lightsout&bossMoves=6&clock=40");
   await createLobbyFromHome(page);
   await page.getByRole("button", { name: /^Start with 1 player$/ }).click();
@@ -341,10 +353,21 @@ test("Hollow online: the server judges an attempt into the dark (-5, only for yo
   // -5 for the wrong attempt, -50 for the five pieces not found.
   expect(await myPoints(page)).toBe(-55);
   expect((await powers(page)).lightsAt).toBe(2);
-  // 1 of 6 is under the line: after his move, the host's engine played his extra one, before your turn.
+  // 1 of 6 is under the line: after his move, the server asked the host's engine for his extra one, before your turn,
+  // and played what it answered. The engine finds one in most positions, but not in all: with no quiet move within
+  // the cap he skips it (extraMoveFrom; after 1.e4 e5 2.d4 Nf6, for one). His replies are his brain's, so the position
+  // isn't the test's to choose: the outcome must be the host's answer (docs/decisions/2026-10-15-flaky-e2e-batch.md).
+  // (The solo test above checks a played one, after 1.e4.)
+  expect(extraAnswer, "the host answered the extra move's request").not.toBeNull();
   const end = await page.evaluate(() => (window as any).match.boss);
-  expect(end.powers.lightsExtra).toBe("played");
-  expect(end.board.history.length).toBe(5);
+  if (extraAnswer) {
+    expect(end.powers.lightsExtra).toBe("played");
+    expect(end.board.history.length).toBe(5);
+    expect(end.board.history[4]).toBe(extraAnswer);
+  } else {
+    expect(end.powers.lightsExtra).toBe("skipped");
+    expect(end.board.history.length).toBe(4);
+  }
   expect(new Chess(end.board.fen).turn()).toBe("w");
   expect(errors).toEqual([]);
 });
