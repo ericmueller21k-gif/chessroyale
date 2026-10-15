@@ -161,12 +161,11 @@ export const RECLUSE_UI = {
   id: "recluse",
   ultimate: { name: "Bullet" },
   moments: {
-    bullet: { order: 2, kit: "ultimate" as KitMoment, dock: "Bullet!", view: bulletMoment },
+    bullet: { order: 2, kit: "ultimate" as KitMoment, view: bulletMoment },
     // (His line, one of RECLUSE_LINES.bulletPlus by the battle, said as it begins; it cuts in, as his ultimate's does.)
     bulletPlus: {
       order: 3,
       kit: "ultimate" as KitMoment,
-      dock: `+${BOSS_POWERS.bulletIncrementSeconds} s a move`,
       line: (_kit, m) => RECLUSE_LINES.bulletPlus[hash(m.key) % RECLUSE_LINES.bulletPlus.length]!,
       view: bulletPlusMoment,
     },

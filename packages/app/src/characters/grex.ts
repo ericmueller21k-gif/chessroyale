@@ -1160,7 +1160,7 @@ export const GREX_LINES: Partial<Record<Beat, readonly string[]>> = {
   power: ["Catch!", "Hot potato!", "Light it up!", "Heads up!", "Spark it!"],
   powerHit: ["Toasty!", "Ashes to ashes!", "Poof! Crispy!", "Smells like victory!"],
   ultimateWarn: ["Got a big one for you…", "Wanna see a trick?", "Lighting the fuse…", "Big bang coming…"],
-  ultimate: ["ROMAN CANDLE!", "Fireworks time!", "Ooh! Aah! Ha!", "Look up! Way up!"],
+  ultimate: ["Fireworks time!", "Ooh! Aah! Ha!", "Look up! Way up!"],
   ultimateHit: ["Incoming!", "It's raining fire!", "Hot rain! Ha!", "Here they come!"],
 };
 export const GREX_CHANCE: Partial<Record<Beat, number>> = {

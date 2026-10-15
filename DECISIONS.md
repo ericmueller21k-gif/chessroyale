@@ -10,8 +10,9 @@ these weren't reviewed first. Most are a single line in `packages/core/src/setti
   in its area's file in [`docs/history/`](docs/history/). The index below lists each one, in the order it was made,
   and links to it. Code comments that cite `DECISIONS.md, "<section>"` still lead there: find the section's title
   below.
-- **New decisions go at the end of this file**, under "New decisions": one section each, with the date and the
-  reason, as before. Add to your own lane's sections rather than rewriting others'.
+- **New decisions go in [`docs/decisions/`](docs/decisions/README.md)**, one file each, named
+  `YYYY-MM-DD-short-title.md`, with the date and the reason (Oct 15, 2026: every PR appending to the end of this file
+  made every pair of open PRs conflict). The "New decisions" sections below, written up to Oct 15, stay here.
 - **When a decision changes how an area works,** update its page in `docs/areas/` in the same PR.
 - **When this file grows long again** (a month or so of new decisions), move the new sections, unchanged, to the end
   of their area's `docs/history/` file and list them in the index.
@@ -154,6 +155,8 @@ In [`docs/history/ops.md`](docs/history/ops.md). How it works today: [`docs/area
 - [Capacity: built (Oct 7, 2026)](docs/history/ops.md#capacity-built-oct-7-2026)
 
 ## New decisions
+
+Written up to Oct 15, 2026. Newer decisions: one file each in [`docs/decisions/`](docs/decisions/README.md).
 
 Add new sections here (`### Title (date)`), newest last.
 
@@ -5027,3 +5030,85 @@ Eric asked to remove two dated player options.
   has picked), the runner (`packages/chess/test/crowd.test.ts`: a raid is the only crowd with no teams, everyone
   alive picking every move), e2e `judges.spec.ts` (two devices on a 50 v 50) and `crowd.spec.ts` (coordinates from
   each team's side, and a device with the old choices stored playing 50 v 50 at the mode's pace).
+
+## Nothing said twice, nothing over the board: the boss screens (Oct 15, 2026)
+
+From the slop audit (Oct 15: V1, V2, V4, V5, V7, V10, V24, V25, the Crowd's pick count, and `ult2`'s seconds). No rule,
+timing, protocol or stored data changes: words, where the speech boxes sit, and phase 2's layout on a computer.
+
+**The rule for a power's words: the banner names it, the dock explains it, the bubble is character.**
+- **The banner** names the power, with its line saying what it does to you, as before.
+- **The dock** says what it means for you, or just your clock: through a power's moment it keeps the turn's own line
+  ("🍪 Boss plays Nf6"), as it showed just before, so nothing in it changes as the banner comes. A moment says its own
+  words there only where no banner says them (`MomentUi.dock`, a function now, optional): the Big Bounce (its banner is
+  its name alone): "Your pieces land on new squares."; the fireballs (no banner): "Fire on e4 and f5", or "Fire on 3
+  squares" for more, one line on a phone ("Your king is fireproof." when they all fizzle on him); Jefferson's fireproof
+  laugh (no banner): "Fire burns only your pieces.". Before, every moment had a word that repeated its banner ("🍪
+  Freeze!" under FREEZE!).
+- **The boss's bubble** says a character line, never the power's name. Gone from the rotations (agents' lines, not
+  Eric's): Ginger's "Freeze!" and "BLIZZARD!", Jefferson's "ROMAN CANDLE!", Big Boy's "Gonna bounce…" (under RAGE!'s
+  "the Big Bounce"), Wrangler's "The long pull!" and "Pick yer duel, varmints." (with DRAW!), Boingo's "Spin the board!".
+  **Eric's own lines stay** (his rule over ours): Big Boy's "Big boy BOUNCE!" still shows under BIG BOUNCE! now and
+  then, and Sawyer's "Two for one!" stays; SPLIT PAWN!'s line under it, which said the same, is now "He gets a second
+  pawn".
+- **The same rule elsewhere:** Hollow's claim and Big Boy's snack line were in the dock and the bubble at once: the
+  bubble's only now (the snack's dock: "You start a pawn down."). Wrangler's DRAW! is its name alone ("Pick your duel"
+  was under it, with the God King's "Pick the duel that wins!"), and your move's dock says "Take one of his three duels."
+  (was "Showdown! Take one of his three."). The Hidden Boss's "+2 s a move from now on" is the board's alone (the dock had
+  "📕 +2 s a move"). His phase 2 "5 SECONDS!" is its name alone (its line said what the dock says); his `ult2` lines
+  never name the seconds (placeholders, reworded: "That's enough! No more thinking, all of you!", "Enough thinking! Move,
+  or I move for you!"): my call over reading the number from the setting into the line, since the banner already says it
+  from `RECLUSE_PHASE2.ultMoveSeconds` (as `bulletPlus`'s number is the board's). The phone's small boards' "5 s!" comes
+  from the setting too. Phase 2's end: "The boss wins." (was "N of 4 won: the boss wins" beside the bar's "N of 4 won").
+- **How many have picked** is the line above the board's ("16/50 picked"): the Crowd's waiting box no longer repeats it
+  ("Move in. Waiting for other players"), nor a boss raid's dock ("Move in. Waiting for the others", was "Waiting · 3/4").
+  Crowd's watch screen keeps its count: nothing else there says it.
+
+**Nothing over the board or the bar's status (phones).**
+- **The God King's words beside him** (V1): on his own line under the dock, to his right (the room to the row's right
+  edge, 8 px text), never over the board or the box. His bubble had opened above the row, over ranks 1 and 2, also while
+  you chose a move (Wrangler's duel). A long line runs down past his line, over the test buttons or the scoreboard
+  under the dock, which nobody needs mid-line; below him would run off a short phone's screen. His menu still opens
+  above the row (you open it). A phone on its side keeps him beside the row with his words above him.
+- **The God King's words go with him** once the Hidden Boss absorbs him (V24): his "Aaagh! My strength!" stayed up from
+  an empty place under "The boss rises!".
+- **The boss's words in the boss bar** (V5): in his name's room (BossBar renders the box, `.bc-bar-bubble`), from just
+  above the bar's bottom edge upwards over the title line, never over the status at the bar's right ("58 moves left"
+  read "es left", "2 of 4 won" read "4 won") or the line and the board under the bar. The box is at least the name's
+  room high, so a short line covers his name and skulls whole, as the old box did, never half of them; nothing is
+  hidden (a first try hid them while he spoke, and CI's `boss-powers` caught the rage meter hidden). A computer's stay
+  by his figure.
+- **The corner casts are as designed** (the director's call, Oct 15): the boss steps up to the board's top-left corner
+  for a moment (the casters, Wrangler's lasso and showdown, Hollow's dark and Lights out, Big Boy's snack), over the
+  subtitle and a8, while the board isn't playable; the audit took them for the bar's figure. Nothing players must read
+  mid-moment is in the subtitle then (it says "BOSS BATTLE · you play White · the boss's move").
+
+**Hollow's Lights out, before its first round** (V25): the dock as on every other screen, your clock held, "Remember
+where his pieces are." over "Clocks stopped." (was "Lights out! Clocks stopped." alone, left at the top of the whole
+box, the banner's words again). Its rounds keep the whole box for their prompt and the crowd's meter.
+
+**A dock line wraps, never cut** (found with V10): the boss screen's first line was one line with an ellipsis, so at
+360 px "The boss is thinking…" read "The boss is think…" (on main too). It now wraps to two lines; the box holds two of
+them and the muted line under them.
+
+**The Hidden Boss's phase 2.**
+- **The dock's first line** (V10): "2:00 on your clock" over "No added time." (one line was cut to "2:00 on your clock,
+  no adde…" at 360 px).
+- **A computer's tags above the boards** (V4): each board's name and clock in a row of its own above it, off its back
+  rank (they covered a8 to d8 on every board, yours too, and Chess960's back rank is random). The four boards are a
+  little smaller for it (`DESK`: 44.5% of the square each, a 4.6% row above each, 1.8% between the rows, 11% between the
+  columns, where the slow moves stand), and the phase change ends them exactly there (its quarters' last scale and
+  offset), so nothing jumps into phase 2. The tag's text is in the board's own width (at most 12 px), so it fits the row
+  at any size; the "slow move" note sits at the row's right.
+- **No Bank column** (V7): from the phase change on, the scoreboard hides it (`RaceTower`'s `bank`): every player's time
+  is their board's clock then (on its tag), and the bank showed phase 1's 10:00. The m:ss formatters are the clock
+  batch's.
+
+**Testing.** Targeted lane: typecheck, the unit suite (new `nothing-twice.test.ts`: the dock's words per moment, no
+power's name in a boss's power lines, Eric's lines kept, `ult2` without seconds, `DESK`'s geometry;
+`recluse-boss.test.ts` updated), and e2e `boss-speech` (now also: neither speech box over the board, the boss's never
+over the bar's status or the line under it, the God King's never over the dock's box, every frame), `boss-dock`,
+`boss-powers`, `bigboy`, `hollow`, `sawyer`, `pig` (the duel prompt's new words), `recluse` (the dock never says the
+increment; the phase change's two lines; on a computer, every tag above its board and no Bank column), `king-attack`,
+`crowd`, `crowd-hidden`. `npm run frames:boss` at 360 and 1280 on both builds. Screenshots before and after at 390 and
+1280 px in the PR.
