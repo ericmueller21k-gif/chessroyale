@@ -437,7 +437,10 @@ export class Lobby extends DurableObject<Env> {
         return;
       }
       const before = this.record.humans.length;
-      const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice, msg.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1");
+      // Practice mode (unlimited power-ups) is for testers only (an admin, or a test server: Eric, Oct 15). A player's
+      // request is ignored, so nobody plays a ranked or fair-played match with the engine's moves on tap.
+      const practice = !!msg.practice && (this.env.TEST_SWITCHES === "1" || !!attached?.admin);
+      const result = core.connect(msg.token, msg.name, msg.device, practice, msg.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1");
       // A new player took a seat: one held for the players on their way is theirs (the oldest).
       if (result.ok && this.record.humans.length > before) this.reservations.shift();
       if (!result.ok) {

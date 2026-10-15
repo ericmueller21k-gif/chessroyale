@@ -1,11 +1,15 @@
 import { SQUADS_LOBBY } from "@chessroyale/core";
+import { testSwitchesAllowed } from "./test-switches.ts";
 
 /** Small per-device preferences. */
 
 const ANIM_KEY = "brc.crowdAnim";
 const listeners = new Set<() => void>();
 
-/** Crowd: animate every pick as a ghost piece (on) or just show name tags and move only the chosen piece (off). */
+/**
+ * Settings → Board, "Animations": every pick as a ghost piece on its square (on), or just name tags and only the chosen
+ * piece moves (off). Wherever picks show: Crowd, raids, Classic's and Squads' reveals.
+ */
 export function crowdAnimations(): boolean {
   const q = new URLSearchParams(location.search).get("anim");
   if (q !== null) return q !== "0";
@@ -58,8 +62,9 @@ export function setSquadsJumpNext(on: boolean) {
 const TRAIL_KEY = "brc.crowdTrail";
 
 /**
- * Crowd, with animations on: the motion trail. Every new pick flies from its piece's square to where it lands
- * (with a short trail), then hands over to the one fixed ghost on that square. Off: picks just pop in place.
+ * Settings → Board, "Motion trail" (with animations on): every new pick flies from its piece's square to where it lands
+ * (in Crowd and raids with a short trail), then hands over to the one fixed ghost on that square. Off: picks just pop
+ * in place.
  */
 export function crowdTrail(): boolean {
   const q = new URLSearchParams(location.search).get("trail");
@@ -81,12 +86,20 @@ export function setCrowdTrail(on: boolean) {
 }
 
 const EVAL_BAR_KEY = "brc.evalBar";
+const PRACTICE_KEY = "brc.practice";
+
+/*
+ * The testers' options (Settings → Testing, shown to admins; Eric, Oct 15: "The engine moves and eval settings will be
+ * phased to an admin only menu for testers"). They count only where the test switches do (an admin, a test server, the
+ * dev server: test-switches.ts). For players the eval bar is off and practice mode is off, whatever a device stored.
+ */
 
 /**
- * The eval bar (the engine's winning chances, left of the board): on unless switched off in Settings (remembered on
- * the device). Every screen that shows it reads this; off, the board takes its room.
+ * The eval bar (the engine's winning chances, left of the board): for testers, on unless switched off in Settings →
+ * Testing (remembered on the device). Every screen that shows it reads this; off, the board takes its room.
  */
 export function evalBarOn(): boolean {
+  if (!testSwitchesAllowed()) return false;
   try {
     return localStorage.getItem(EVAL_BAR_KEY) !== "0";
   } catch {
@@ -99,6 +112,25 @@ export function setEvalBarOn(on: boolean) {
     localStorage.setItem(EVAL_BAR_KEY, on ? "1" : "0");
   } catch {
     // Not important: it lasts until a reload.
+  }
+  listeners.forEach((l) => l());
+}
+
+/** Practice mode (unlimited power-ups, the engine's top 3 at any time): for testers, off unless switched on. */
+export function practiceOn(): boolean {
+  if (!testSwitchesAllowed()) return false;
+  try {
+    return localStorage.getItem(PRACTICE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setPracticeOn(on: boolean) {
+  try {
+    localStorage.setItem(PRACTICE_KEY, on ? "1" : "0");
+  } catch {
+    // Not important.
   }
   listeners.forEach((l) => l());
 }
