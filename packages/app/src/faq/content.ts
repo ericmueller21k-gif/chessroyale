@@ -21,7 +21,6 @@ import {
   BRILLIANT,
   CRATES,
   CRATES_FREE,
-  CROWD_EVERYONE_KNOCKOUTS,
   CROWD_KNOCKOUTS,
   CROWD_SETTINGS,
   DEFAULT_SETTINGS,
@@ -72,7 +71,6 @@ export interface FaqSources {
   crowd: Settings;
   raid: Settings;
   crowdKnockouts: Readonly<Record<FinalFormat, readonly number[]>>;
-  everyoneKnockouts: readonly number[];
   powers: BossPowerSettings;
   brain: BossBrainSettings;
   difficulty: readonly { id: string; label: string; elo: number }[];
@@ -105,7 +103,6 @@ export const FAQ_DEFAULTS: FaqSources = {
   crowd: { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS },
   raid: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS },
   crowdKnockouts: CROWD_KNOCKOUTS,
-  everyoneKnockouts: CROWD_EVERYONE_KNOCKOUTS,
   powers: BOSS_POWERS,
   brain: BOSS_BRAIN,
   difficulty: BOSS_DIFFICULTY,
@@ -192,9 +189,8 @@ function modes(src: FaqSources): FaqSection {
 - Each turn, everyone on the side to move picks a move before the clock runs out, and the **most popular pick is played** (a tie is settled at random).
 - Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(C.firstStageRounds / 2, "move")}; after that, the lowest scorers are cut after every move, the same number from each team. Scores carry over all game.
 - **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss battle (the top ${left(src.crowdKnockouts.boss)} team up against ${finalFoe}) or a duel (the best of each side, 1v1). Then on the clock.
-- **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. Without the vote (Everyone moves, or Pre-game votes off) it's ${timeControl(C)}; a boss raid is ${timeControl(R)}.
+- **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. Without the vote (Pre-game votes off) it's ${timeControl(C)}; a boss raid is ${timeControl(R)}.
 - **${n(C.powerUpsAtStart, "power-up")}** each: a power-up shows the engine's top 3 moves for that turn.
-- **Everyone moves** (Settings, Crowd) is the other way to play: everyone picks for whichever side is to move, down to a 2v2 final of the last ${left(src.everyoneKnockouts)}. It's for solo games and lobbies you create; PLAY is always 50 v 50.
 - Matchmaking: **Default** fills empty seats with bots after a short wait, **Bots off** waits for real players, and **Solo** is you and bots, at once.
 
 ### Boss raid and Boss alone {#mode-boss}

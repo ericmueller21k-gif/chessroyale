@@ -7,7 +7,7 @@ import { SoloMatch } from "../src/solo.ts";
  * A Solo raid has bots in its crowd; Boss alone is you against the boss.
  */
 
-const crowd: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { crowdTeams: true, augments: true }) };
+const crowd: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { augments: true }) };
 
 describe("Solo's fill", () => {
   beforeEach(() => {

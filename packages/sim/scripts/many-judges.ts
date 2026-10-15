@@ -197,7 +197,7 @@ function lie(kind: Kind, job: JudgeJob, r: JudgeReport, ownPick: string | undefi
 async function playMatch(sc: Scenario, seed: number, mode: Mode, honest: Honest, lazyEngine: UciEngine, server: UciEngine, lazyCheck: UciEngine): Promise<{ rounds: RoundRow[]; match: MatchRow }> {
   const rng = mulberry32(seed * 7919);
   let now = 1_000_000;
-  const settings: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { crowdTeams: true, augments: false }) };
+  const settings: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { augments: false }) };
   type Ev = { at: number; seq: number; fn: () => Promise<void> | void };
   const queue: Ev[] = [];
   let seq = 0;
