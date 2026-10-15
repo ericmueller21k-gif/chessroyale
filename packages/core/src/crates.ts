@@ -1,4 +1,4 @@
-import type { Rng } from "./rng.ts";
+import { mulberry32, type Rng } from "./rng.ts";
 
 /**
  * Crates: cosmetic items in stacked layers of rarity. Every drop rolls three things independently:
@@ -47,6 +47,25 @@ export const ITEM_COLORS: readonly { id: string; name: string; hex: string; hex2
 ];
 
 export const itemColor = (id: string) => ITEM_COLORS.find((c) => c.id === id) ?? ITEM_COLORS[0]!;
+
+/**
+ * Items whose second color isn't stored but drawn from the item's own seed: the Gift-Wrap Tube's second stripe color
+ * (Eric, Oct 15, 2026: white and two random colors). Every tube, old or new, keeps one look on every device, and no
+ * stored data changes.
+ */
+const SEEDED_SECOND_COLOR: ReadonlySet<string> = new Set(["gift-tube"]);
+
+/**
+ * An item's second color: the stored one (two-color items), the one its seed gives (the tube: by the usual color
+ * odds, never its first color), or none.
+ */
+export function secondColor(it: { def: string; color: string; color2?: string | null; seed: number }): string | undefined {
+  if (it.color2) return it.color2;
+  if (!SEEDED_SECOND_COLOR.has(it.def)) return undefined;
+  const first = itemColor(it.color).id;
+  // (Its own stream, apart from the blotches' (seeded by the same number), so the two don't line up.)
+  return pick(mulberry32((it.seed ^ 0x5eed2c01) >>> 0), ITEM_COLORS.filter((c) => c.id !== first)).id;
+}
 
 export interface ItemDef {
   id: string;
@@ -279,14 +298,14 @@ export interface ItemInstance {
 }
 
 /**
- * The locker's stacks: copies of the same item in the same color (both colors, for two-color items) shown as one,
- * the purest on top (Eric, Oct 8). `items` are purest first, so `items[0]` is the top.
+ * The locker's stacks: copies of the same item in the same color (both colors, for two-color items and the tube)
+ * shown as one, the purest on top (Eric, Oct 8). `items` are purest first, so `items[0]` is the top.
  */
 export interface ItemStack {
   key: string;
   items: ItemInstance[];
 }
-export const stackKey = (it: Pick<ItemInstance, "def" | "color" | "color2">) => `${it.def}|${it.color}|${it.color2 ?? ""}`;
+export const stackKey = (it: Pick<ItemInstance, "def" | "color" | "color2" | "seed">) => `${it.def}|${it.color}|${secondColor(it) ?? ""}`;
 export function stackItems(items: readonly ItemInstance[]): ItemStack[] {
   const stacks = new Map<string, ItemInstance[]>();
   for (const it of items) {

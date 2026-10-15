@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useRef } from "preact/hooks";
-import { behindPiece, isShiny, itemColor, mulberry32, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { behindPiece, isShiny, itemColor, mulberry32, secondColor, type ItemLook, type ItemSlot } from "@chessroyale/core";
 
 /**
  * Crate items, drawn. Every item is drawn once, on a pawn's 100 × 100 square (head centered at 50, 20), with its
@@ -324,17 +324,51 @@ function Snowman({ p, side }: { p: Paint; side: "w" | "b" }) {
   );
 }
 
-function GiftTube({ p }: { p: Paint }) {
-  const stripes = [];
-  for (let y = -10; y < 110; y += 12) {
-    stripes.push(<path key={`a${y}`} d={`M60 ${y} l40 18 v5 l-40 -18 Z`} fill="#fff" opacity="0.9" />);
-    stripes.push(<path key={`b${y}`} d={`M60 ${y + 6} l40 18 v3 l-40 -18 Z`} fill={lighten(p.hex, 0.45)} />);
+/**
+ * The Gift-Wrap Tube (a weapon): a slim roll of wrapping paper, three candy stripes repeating its whole length (Eric,
+ * Oct 15: no end caps, thinner and a little longer). One stripe is always white; the other two take the item's color
+ * and its second color, which the item's seed gives (`secondColor`). Drawn upright here, tilted in its group.
+ */
+export const TUBE = { x0: 78, x1: 86, top: 16, bottom: 100 };
+/** The tube's stripes, [white, first color, second color]: bands `BAND` tall that climb `RISE` across the tube. */
+export const TUBE_STRIPES = (() => {
+  const BAND = 4.6;
+  const RISE = 6;
+  const out: string[][] = [[], [], []];
+  /** One edge of a band, cut where it leaves the tube's top or bottom (Sutherland-Hodgman, two horizontal lines). */
+  const cut = (poly: number[][], y: number, keepBelow: boolean) => {
+    const inside = (q: number[]) => (keepBelow ? q[1]! >= y : q[1]! <= y);
+    const res: number[][] = [];
+    poly.forEach((a, i) => {
+      const b = poly[(i + 1) % poly.length]!;
+      if (inside(a)) res.push(a);
+      if (inside(a) !== inside(b)) res.push([a[0]! + ((b[0]! - a[0]!) * (y - a[1]!)) / (b[1]! - a[1]!), y]);
+    });
+    return res;
+  };
+  let k = 0;
+  for (let y = TUBE.top - BAND; y < TUBE.bottom + RISE; y += BAND, k++) {
+    const band = [
+      [TUBE.x0, y],
+      [TUBE.x1, y - RISE],
+      [TUBE.x1, y - RISE + BAND],
+      [TUBE.x0, y + BAND],
+    ];
+    const poly = cut(cut(band, TUBE.top, true), TUBE.bottom, false);
+    if (poly.length >= 3) out[k % 3]!.push(`M${poly.map((q) => q.map((n) => +n.toFixed(2)).join(" ")).join(" L")} Z`);
   }
+  return out;
+})();
+function GiftTube({ p, p2 }: { p: Paint; p2: Paint }) {
+  const [white, first, second] = TUBE_STRIPES;
   return (
-    <g transform="rotate(16 82 60)">
-      <Region p={p} name="tube" d={["M76 28 Q76 25 79 25 L85 25 Q88 25 88 28 L88 90 Q88 93 85 93 L79 93 Q76 93 76 90 Z"]} over={stripes} />
-      <rect x="74.5" y="22" width="15" height="6" rx="2" fill="#d4a017" {...LINE} {...lw(2.4)} />
-      <rect x="74.5" y="90" width="15" height="6" rx="2" fill="#d4a017" {...LINE} {...lw(2.4)} />
+    <g transform="rotate(16 82 58)">
+      {white!.map((d) => (
+        <path key={d} d={d} fill="#fbfbf8" />
+      ))}
+      <Region p={p} name="stripes" d={first!} outline={false} />
+      <Region p={p2} name="stripes2" d={second!} outline={false} />
+      <rect x={TUBE.x0} y={TUBE.top} width={TUBE.x1 - TUBE.x0} height={TUBE.bottom - TUBE.top} rx="1.2" fill="none" {...LINE} {...lw(2.4)} />
     </g>
   );
 }
@@ -682,17 +716,20 @@ function DarkShades({ p }: { p: Paint }) {
   );
 }
 
-/** A smiley face (Beta, a one-off): a flat round dot smiley over the whole head, in its color; dark dot eyes and smile. */
+/**
+ * A smiley face (Beta, a one-off): a flat round dot smiley over the whole head, in its color; dark dot eyes and smile.
+ * A third bigger than first drawn (Eric, Oct 15), around the same middle (50, 29), lines and all.
+ */
 function SmileyFace({ p }: { p: Paint }) {
   const n = parseInt(p.hex.slice(1), 16);
   const dark = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 < 0.25;
   const ink = dark ? "#f8fafc" : "#1d1d1f";
   return (
     <g>
-      <Region p={p} name="face" d={["M39.5 29 a10.5 10.5 0 1 0 21 0 a10.5 10.5 0 1 0 -21 0 Z"]} line={2.4} />
-      <ellipse cx="46.3" cy="25.8" rx="1.35" ry="2" fill={ink} />
-      <ellipse cx="53.7" cy="25.8" rx="1.35" ry="2" fill={ink} />
-      <path d="M44 30.6 Q50 37 56 30.6" fill="none" stroke={ink} stroke-linecap="round" {...lw(1.9)} />
+      <Region p={p} name="face" d={["M36 29 a14 14 0 1 0 28 0 a14 14 0 1 0 -28 0 Z"]} line={3.2} />
+      <ellipse cx="45.08" cy="24.74" rx="1.8" ry="2.66" fill={ink} />
+      <ellipse cx="54.92" cy="24.74" rx="1.8" ry="2.66" fill={ink} />
+      <path d="M42.02 31.13 Q50 39.64 57.98 31.13" fill="none" stroke={ink} stroke-linecap="round" {...lw(2.5)} />
     </g>
   );
 }
@@ -1241,7 +1278,7 @@ const ITEM_ART: Record<string, (p: { p: Paint; p2: Paint; side: "w" | "b" }) => 
 
 /** The shine's box where an item is drawn in its own coordinates (the tube is drawn tilted, in a group). */
 const SHINE_BOX: Record<string, [number, number, number, number]> = {
-  "gift-tube": [74, 22, 16, 76],
+  "gift-tube": [78, 16, 8, 84],
   "candy-cane": [56, 14, 32, 84],
   "tommy-gun": [-2, -7, 85, 23],
   briefcase: [62, 57, 32, 32],
@@ -1260,7 +1297,7 @@ const FRAMES: Record<string, [number, number, number, number]> = {
   antlers: [26, -4, 48, 22],
   "santa-beard": [36, 18, 28, 28],
   snowman: [16, 6, 68, 88],
-  "gift-tube": [62, 18, 40, 82],
+  "gift-tube": [65, 15, 34, 86],
   "fire-ice-crown": [30, -6, 40, 34],
   present: [31, 1, 38, 41],
   "candy-cane": [60, 12, 38, 88],
@@ -1277,7 +1314,7 @@ const FRAMES: Record<string, [number, number, number, number]> = {
   "little-crown": [33, 2, 34, 25],
   eyepatch: [39, 21, 23, 15],
   "dark-shades": [36, 24, 28, 11],
-  "smiley-face": [38, 17, 24, 24],
+  "smiley-face": [34, 13, 32, 32],
   "suit-and-tie": [20, 15, 60, 76],
   "tommy-gun": [60, 12, 40, 84],
   "fake-mustache": [37, 27, 26, 11],
@@ -1374,7 +1411,7 @@ const anchorsFor = (skin?: string) => (skin && SKIN_ANCHORS[skin]) || PAWN_ANCHO
 export function ItemLayer({ def, finish, side = "w" }: { def: string; finish: Finish; side?: "w" | "b" }) {
   const p = usePaint(finish, def);
   // The second color (two-color items): the same blemish, its own blotches.
-  const p2 = usePaint({ color: finish.color2 ?? finish.color, blemish: finish.blemish, seed: finish.seed + 101 }, def);
+  const p2 = usePaint({ color: secondColor({ def, ...finish }) ?? finish.color, blemish: finish.blemish, seed: finish.seed + 101 }, def);
   const Art = ITEM_ART[def];
   if (!Art) return null;
   return (
