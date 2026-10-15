@@ -199,6 +199,8 @@ export interface PublicProfile {
   joinedAt: number;
   lastSeen: number | null;
   online: boolean;
+  /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null. */
+  hidden?: boolean;
   rating: number | null;
   tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
   topPercent: number | null;

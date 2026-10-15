@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, RAID_SETTINGS as R, BOSS_TIERS, PREGAME_VOTES, crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
+import { FriendSettings } from "../components/Friends.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut } from "../account.ts";
@@ -161,7 +162,7 @@ function ThemeChoice() {
   );
 }
 
-/** Settings: the theme, sound, how you play, Crowd's options, how to play (and the FAQ), installing, and your sign-in. */
+/** Settings: the theme, sound, how you play, Crowd's options, chat, friends, how to play (and the FAQ), installing, and your sign-in. */
 export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => void; onSoundLab?: () => void; onFaq?: () => void }) {
   const { config, profile } = useAccount();
   const [, rerender] = useState(0);
@@ -317,6 +318,8 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
           On a phone, while chat is hidden, the newest message shows for a moment under the top bar (never over the board).
         </Toggle>
       </section>
+
+      <FriendSettings />
 
       <section class="fd-section">
         <h2 class="fd-label">CLASSIC</h2>

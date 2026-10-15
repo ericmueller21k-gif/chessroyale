@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
 import { type MatchmakingType, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
-import { bossInUrl, bossTierFromUrl, chosenBoss, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
+import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
@@ -31,7 +31,9 @@ import { ShopScreen } from "./screens/Shop.tsx";
 import { account, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult } from "./account.ts";
 import { isAdmin } from "./boss-brain.ts";
 import { difficultyElo } from "./boss-difficulty.ts";
-import { startLive } from "./live.ts";
+import { setLiveBusy, startLive } from "./live.ts";
+import { setInviteHost } from "./friends.ts";
+import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
@@ -221,6 +223,8 @@ export function App() {
   const [showSettings, setShowSettings] = useState(() => location.pathname === "/settings");
   /** The FAQ ("How HunChess works"), opened from Settings; back goes to Settings. */
   const [showFaq, setShowFaq] = useState(() => location.pathname === "/faq");
+  /** Your friends list (/friends: screens/Friends.tsx). */
+  const [showFriends, setShowFriends] = useState(() => location.pathname === "/friends");
   /** The computer's side menu: open the home screen's boss menu or Play with friends. */
   const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(null);
   const [legal, setLegal] = useState<"privacy" | "terms" | null>(() =>
@@ -638,8 +642,10 @@ export function App() {
       if (body.banned) return showBanNotice();
       if (!body.code) throw new Error(body.message ?? "Couldn't create a lobby.");
       joinLobby(body.code, { mode: mode.mode });
+      return body.code;
     } catch (e) {
       setError((e as Error).message);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -785,6 +791,7 @@ export function App() {
     setShowSettings(false);
     setShowFaq(false);
     setShowShop(false);
+    setShowFriends(false);
     if (location.pathname !== "/") history.replaceState(null, "", "/");
   };
   const nav: FrontNav = {
@@ -812,8 +819,47 @@ export function App() {
       goHome();
       setShowSettings(true);
     },
+    friendsList: () => {
+      goHome();
+      setShowFriends(true);
+      history.replaceState(null, "", "/friends");
+    },
     signIn: () => chooseGuest(false),
   };
+  // Friends (friends.ts): what an invite can point at (a private lobby still waiting, your party), making one at the
+  // front door in the home screen's mode, and joining someone's. Set every render, so it sees this render's state.
+  setInviteHost({
+    target: () => {
+      if (match instanceof NetMatch && !match.auto && match.phase.kind === "lobby" && !match.gone)
+        return { kind: match.settings.raid ? "raid" : match.settings.mode === "crowd" ? "crowd" : "classic", code: match.code };
+      return party ? { kind: "squads", code: party.code } : null;
+    },
+    canCreate: () => !match && !squads,
+    create: async () => {
+      const mode = chosenHomeMode();
+      goHome();
+      if (mode !== "squads") {
+        const code = await createLobby(mode);
+        return code ? { kind: mode, code } : null;
+      }
+      const r = await createParty();
+      if ("banned" in r) {
+        showBanNotice();
+        return null;
+      }
+      if ("error" in r) throw new Error(r.error);
+      void joinParty(r.code);
+      return { kind: "squads", code: r.code };
+    },
+    join: (kind, code) => {
+      goHome();
+      if (kind === "squads") return void joinParty(code);
+      if (party) closeParty();
+      joinLobby(code);
+    },
+  });
+  // In a match (not its lobby or results): the live line says so, for friends' lists.
+  setLiveBusy((!!match && !["loading", "lobby", "results"].includes(match.phase.kind)) || (!!squads && !squadsWaiting(squads.lobby)));
 
   /**
    * The side menu while you're in the queue (it stays on a computer): Play is where you are, and your profile opens over
@@ -825,7 +871,7 @@ export function App() {
     home: () => undefined,
     profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
     ...Object.fromEntries(
-      (["bossAlone", "friends", "shop", "settings"] as const).map((k) => [
+      (["bossAlone", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
         k,
         () => {
           if (match) leave();
@@ -937,6 +983,23 @@ export function App() {
       </FrontFrame>
     );
   }
+  if (!match && showFriends) {
+    return (
+      <FrontFrame page="friends" nav={nav}>
+        <FriendsScreen
+          onBack={() => {
+            setShowFriends(false);
+            if (location.pathname === "/friends") history.replaceState(null, "", "/");
+          }}
+          onSettings={() => {
+            setShowFriends(false);
+            setShowSettings(true);
+            history.replaceState(null, "", "/settings");
+          }}
+        />
+      </FrontFrame>
+    );
+  }
   if (!match && showShop) {
     return (
       <FrontFrame page="shop" nav={nav}>
@@ -1017,6 +1080,7 @@ export function App() {
         onJoinLobby={(code) => joinLobby(code, { typed: code !== inviteCode })}
         onSquads={() => void squadsPlay()}
         onParty={openParty}
+        onFriends={nav.friendsList}
         onSignIn={() => chooseGuest(false)}
         onProfile={() => openProfile({ you: true, name: account().profile?.user.name ?? "" })}
         onShop={() => setShowShop("shop")}

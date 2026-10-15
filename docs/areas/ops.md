@@ -23,8 +23,11 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **The live line:** the live hub keeps who's online and which lobbies run in memory; Worker instances pass on who
     they've seen in batches (`presence.ts`, at most every `CAPACITY.presence.flushMs`), lobbies report changes at most
     every 2 s, each Worker caches `/api/live` for 3 s, and D1 gets `users.last_seen` once a minute per account.
-  - **Rate limits:** per address, per account and (PLAY, new lobbies) per account again (`CAPACITY.rateLimits`,
-    `limits.ts`), counted in each Worker instance's memory; past a limit, a friendly 429 with when to try again.
+    Friends ride on it (Oct 15): a batch also says who's in a match (the live line's `?busy=1`), and the hub answers
+    with friends' news for anyone in it, which their next `/api/live` passes on as `inbox`; a friends list is one hub
+    call (`presenceOf`). No new D1 writes per request, no new poll.
+  - **Rate limits:** per address, per account and (PLAY, new lobbies; friends' actions) per account again
+    (`CAPACITY.rateLimits`, `limits.ts`), counted in each Worker instance's memory; past a limit, a friendly 429 with when to try again.
 - **Nothing runs for no one:** a match everyone has left (resigned, or gone longer than `LEAVING.awayMs`) ends at once
   and its lobby closes, Squads too (DECISIONS.md, "Resign: leaving a match in every mode"); before Oct 13 such a match
   played itself out for up to an hour or more, counted on the live line all along.

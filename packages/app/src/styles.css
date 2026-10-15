@@ -9326,6 +9326,7 @@ button.fd-seat {
     min-height: 100dvh;
   }
   .fd-root.framed .fd-home > .fd-top,
+  .fd-root.framed .fd-home > .fr-line,
   .fd-root.framed .fd-home > .fd-live {
     display: none;
   }
@@ -15207,4 +15208,166 @@ button.sq-tiny {
   font: inherit;
   text-decoration: underline;
   cursor: pointer;
+}
+
+/*
+ * -- Friends and invites (components/Friends.tsx, screens/Friends.tsx; DECISIONS.md, "Friends and invites") --
+ * A friend's row (dot, name, status, buttons), the phone home's line above the live line, the computer's live panel
+ * section, the new invite's toast, and the badge. Every class starts with fr-.
+ */
+.fr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 14px;
+  background: var(--fd-panel);
+}
+.fr-row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+.fr-row-text .fr-name {
+  font-weight: 800;
+  max-width: 100%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.fr-status {
+  font-size: 12.5px;
+  color: var(--fd-muted);
+}
+.fr-row-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fr-row-actions .fd-btn.small {
+  padding: 0 12px;
+}
+.fr-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--fd-green);
+}
+.fr-dot.busy {
+  background: var(--fd-gold);
+}
+.fr-dot.off {
+  background: var(--fd-dim);
+}
+.fr-dot.hidden {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--fd-dim);
+}
+.fr-badge {
+  flex: none;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font: 800 12px/1.4 Archivo, system-ui, sans-serif;
+  white-space: nowrap;
+}
+/* The phone home's line, above the live line. */
+.fr-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--fd-panel);
+  color: var(--fd-text);
+  font: 600 14px Archivo, system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.fr-icon {
+  flex: none;
+  color: var(--fd-gold-text);
+}
+.fr-line-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fr-line-text span {
+  color: var(--fd-sub);
+  font-weight: 500;
+}
+.fr-chevron {
+  flex: none;
+  color: var(--fd-muted);
+  font-size: 20px;
+  line-height: 1;
+}
+/* The computer's live panel: friends online, above the live line. */
+.fr-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fr-panel-head .fr-all {
+  margin-left: auto;
+  font-size: 13px;
+}
+.fr-panel .fr-row {
+  min-height: 52px;
+  padding: 4px 6px 4px 12px;
+}
+/* A new invite, at the top of a front-door page (never over a match). */
+.fr-toast {
+  position: fixed;
+  z-index: 65;
+  top: calc(env(safe-area-inset-top) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 16px;
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--fd-line);
+}
+.fr-toast-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.3;
+}
+.fr-toast-x {
+  flex: none;
+  background: var(--fd-panel);
+}
+.fr-invite-friends {
+  width: 100%;
+}
+.fr-setting-head {
+  padding: 2px 2px 0;
+}
+.fr-note {
+  text-align: center;
 }

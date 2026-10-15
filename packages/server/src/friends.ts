@@ -194,15 +194,8 @@ export async function unblock(sql: Sql, meId: string, otherId: string): Promise<
  * setting doesn't allow you, gets nothing, and you're told they aren't taking invites.
  */
 export async function sendInvite(sql: Sql, meId: string, toId: string, kind: InviteKind, code: string, needSignIn: boolean, now: number): Promise<Done> {
-  if (toId === meId) return fail(FRIEND_TEXT.self);
-  const t = await target(sql, toId);
-  if (!t) return fail(FRIEND_TEXT.noPlayer, 404);
-  if (needSignIn && !signedIn(t)) return fail(FRIEND_TEXT.guestInvite);
-  if (await isBlocking(sql, meId, toId)) return fail(FRIEND_TEXT.unblockFirst);
-  const setting: InviteSetting = isInviteSetting(t.allow_invites) ? t.allow_invites : "everyone";
-  if (setting === "none" || (await isBlocking(sql, toId, meId)) || (setting === "friends" && !(await areFriends(sql, meId, toId)))) return fail(FRIEND_TEXT.notTaking, 403);
-  const last = await sql.first<{ at: number }>("SELECT at FROM invites WHERE from_id = ? AND to_id = ?", meId, toId);
-  if (last && now - last.at < FRIENDS.reinviteMs) return fail(FRIEND_TEXT.reinvite, 429);
+  const may = await mayInvite(sql, meId, toId, needSignIn, now);
+  if (!may.ok) return may;
   if (!(await spend(sql, meId, "invite", FRIENDS.invitesPerHour, 3_600_000, now))) return fail(FRIEND_TEXT.invitesHour, 429);
   await sql.run(
     `INSERT INTO invites (from_id, to_id, kind, code, at, expires_at) VALUES (?, ?, ?, ?, ?, ?)
@@ -215,6 +208,23 @@ export async function sendInvite(sql: Sql, meId: string, toId: string, kind: Inv
     now + FRIENDS.inviteMinutes * 60_000,
   );
   return { ok: true, notify: [toId] };
+}
+
+/**
+ * Whether `meId` may invite `toId` now (everything but the hourly cap): asked first when inviting means making a lobby
+ * or party, so a refusal doesn't leave you in an empty one.
+ */
+export async function mayInvite(sql: Sql, meId: string, toId: string, needSignIn: boolean, now: number): Promise<Done> {
+  if (toId === meId) return fail(FRIEND_TEXT.self);
+  const t = await target(sql, toId);
+  if (!t) return fail(FRIEND_TEXT.noPlayer, 404);
+  if (needSignIn && !signedIn(t)) return fail(FRIEND_TEXT.guestInvite);
+  if (await isBlocking(sql, meId, toId)) return fail(FRIEND_TEXT.unblockFirst);
+  const setting: InviteSetting = isInviteSetting(t.allow_invites) ? t.allow_invites : "everyone";
+  if (setting === "none" || (await isBlocking(sql, toId, meId)) || (setting === "friends" && !(await areFriends(sql, meId, toId)))) return fail(FRIEND_TEXT.notTaking, 403);
+  const last = await sql.first<{ at: number }>("SELECT at FROM invites WHERE from_id = ? AND to_id = ?", meId, toId);
+  if (last && now - last.at < FRIENDS.reinviteMs) return fail(FRIEND_TEXT.reinvite, 429);
+  return { ok: true };
 }
 
 /** An invite to you, dismissed (or used: joining takes it off your list). */

@@ -285,11 +285,15 @@ describe("the friends API", () => {
     // Invites: a kind and a code, else a bad request.
     expect((await call(env, a.token, "/api/friends/invite", { id: b.id, kind: "chess", code: "ABCDE" })).status).toBe(400);
     expect((await call(env, a.token, "/api/friends/invite", { id: b.id, kind: "crowd", code: "abc" })).status).toBe(400);
+    // {check: true}: whether they'd take one, with nothing stored or counted.
+    expect((await call(env, a.token, "/api/friends/invite", { id: b.id, check: true })).status).toBe(200);
+    expect((await call(env, b.token, "/api/friends")).body.state.invites).toEqual([]);
     expect((await call(env, a.token, "/api/friends/invite", { id: b.id, kind: "crowd", code: "ABCDE" })).status).toBe(200);
     expect((await call(env, b.token, "/api/friends")).body.state.invites.map((i: { code: string }) => i.code)).toEqual(["ABCDE"]);
     const set = await call(env, b.token, "/api/friends/settings", { invites: "none", showOnline: false });
     expect(set.body.state.settings).toEqual({ invites: "none", showOnline: false });
     expect((await call(env, a.token, "/api/friends/invite", { id: b.id, kind: "crowd", code: "ABCDE" })).body.message).toBe(FRIEND_TEXT.notTaking);
+    expect((await call(env, a.token, "/api/friends/invite", { id: b.id, check: true })).status).toBe(403);
     // Signing in set up: a guest gets { signIn } and can't act.
     const signedUp = { DB: d1, RESEND_API_KEY: "re_test" };
     expect((await call(signedUp, a.token, "/api/friends")).body).toEqual({ signIn: true });

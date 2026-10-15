@@ -8,6 +8,7 @@ import {
   cancelRequest,
   dismissInvite,
   friendsState,
+  mayInvite,
   removeFriend,
   sendInvite,
   sendRequest,
@@ -48,7 +49,8 @@ const isId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_
  * GET /api/friends → { state } | { off } | { signIn }: your friends list (FriendsState, core/friends.ts).
  * POST /api/friends/ACTION with JSON, each answering with the list as it is after it (or { message } and a status):
  *   request {id} · answer {id, accept} · cancel {id} · remove {id} · block {id} · unblock {id}
- *   invite {id, kind, code}: to your private lobby (kind: its mode) or Squads party ("squads"), still open
+ *   invite {id, kind, code}: to your private lobby (kind: its mode) or Squads party ("squads"), still open;
+ *     invite {id, check: true}: only whether they'd take one (asked before making a lobby or party for it)
  *   dismiss {id}: an invite to you (by who sent it) · settings {invites?, showOnline?}
  * Signed-in accounts only where signing in is set up; requests and invites not while banned. Rate limits: a burst
  * limit per account (limits.ts, CAPACITY.rateLimits.friends) and the daily and hourly caps (friends.ts, FRIENDS).
@@ -108,8 +110,13 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
       break;
     case "invite": {
       const { kind, code } = body;
-      if (!isInviteKind(kind) || !isGameCode(code)) return json({ message: "Bad request" }, 400);
       if (await banned()) return json({ message: BANNED_MESSAGE, banned: true }, 403);
+      // {check: true}: only whether they'd take it (before making a lobby or party to invite them into).
+      if (body.check === true) {
+        done = await mayInvite(sql, me.id, id, needSignIn, now);
+        break;
+      }
+      if (!isInviteKind(kind) || !isGameCode(code)) return json({ message: "Bad request" }, 400);
       // Only to a lobby still waiting for players, or a party still open (who's in it isn't checked: a code is
       // already an invite anyone can share).
       if (!(await gameOpen(env, kind === "squads", code))) return json({ message: GAME_GONE }, 409);
