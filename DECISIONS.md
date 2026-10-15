@@ -4127,7 +4127,10 @@ Eric played the Hidden Boss on his iPhone 15 (Oct 14-15) and reported four thing
   "1". Under the bullet clock's increment, a move starts with the 2 s added (the runner gives a move the bank plus the
   increment), so as your move begins the number goes up by 2, a green "+2" rising over it for 1.6 s
   (`DOCK_PLUS_MS`). The words on the left drop the time ("Your move. Bullet 1+2"; phase 2's "Your clock m:ss" line is
-  gone, its ultimate's line says "5 s a move, or a random one"). Light: the clock re-renders itself a few times a second;
+  gone, its ultimate's line says "5 s a move, or a random one"). On a phone in phase 2, the big board's tag no
+  longer repeats your clock over its corner, where it covered the a8 piece (Eric: "It's not in the right spot"). It's
+  gone on your board and shows only the player's name on a board you watch. The small boards' clocks sit just above
+  each board, off its pieces. A computer's four boards keep their name-and-clock tags. Light: the clock re-renders itself a few times a second;
   the screen around it doesn't. None during Lights out (its prompt takes the box, as it takes the arrows' room), the
   phase change, or before your first move of the battle.
 - **The row is exactly the board's width, under its edges, on every screen.** BossDock measures the board as drawn

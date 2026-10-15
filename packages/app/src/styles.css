@@ -15126,10 +15126,13 @@ button.sq-tiny {
 .rc-tag.low .rc-tag-clock {
   color: #ff7a7a;
 }
+/* A phone's small boards: the clock just above each, off its pieces (Eric, Oct 15), in the room over the row. */
 .rc-mini .rc-tag {
-  top: 1px;
-  left: 1px;
-  padding: 0 3px;
+  top: auto;
+  bottom: calc(100% + 3px);
+  left: 50%;
+  translate: -50% 0;
+  padding: 0 4px;
   font-size: 10px;
 }
 /* A decided board: its result across its middle. */
