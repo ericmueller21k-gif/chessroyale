@@ -10,6 +10,7 @@ import { openProfile } from "../profile-nav.ts";
 import { pawnLook } from "../looks.ts";
 import { LobbyChat } from "../components/LobbyChat.tsx";
 import type { MatchChat } from "../chat.ts";
+import { clockShown } from "../clock-text.ts";
 
 /**
  * What the queue screen shows: an online queue (NetMatch: Default or Bots off) or Solo filling with its bots
@@ -130,9 +131,6 @@ function useNow(ms = 250) {
 /** Your own seat, drawn from the tap on PLAY (before the server has said who you are). */
 const SELF = "\u0000you";
 
-/** "1:05": how long you've been waiting. */
-const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
-
 /**
  * The queue (docs/mockups/front-door/Queue.dc.html): "38 / 100", a bar, the seconds left, and a seat for everyone.
  * Each person's dressed pawn pops into the next seat as they join, yours first and ringed in gold. When time's up,
@@ -183,7 +181,7 @@ export function QueueScreen({
     : type === "solo"
       ? "Solo · your bots are taking their seats"
       : type === "botsoff"
-        ? `No bots · waiting ${clock(now - since.current)} for ${raid ? `50 (or ${MATCHMAKING.raidBotsOffMinPlayers} after a minute)` : `all ${size}`}`
+        ? `No bots · waiting ${clockShown(now - since.current)} for ${raid ? `50 (or ${MATCHMAKING.raidBotsOffMinPlayers} after a minute)` : `all ${size}`}`
         : `Finding players · ${left ?? "…"} s, then bots fill the rest`;
   // Whether it will count for your ranking, in words: Solo never does; online, once the bots are in.
   const unranked =

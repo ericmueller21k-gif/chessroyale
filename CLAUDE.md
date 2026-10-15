@@ -50,9 +50,18 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
   3. **Use our servers when they're truly needed:** too few capable devices, devices disagreeing, or a check that
      must be beyond any player's reach. Never skimp on the server when it's needed; never use it when a device would
      do.
-- Never merge red: every PR runs the typecheck and unit tests on GitHub (`.github/workflows/check.yml`); wait for it
-  to pass, and run the e2e lane below yourself before merging anything that changes gameplay or screens.
+- Never merge red: every PR runs the typecheck and unit tests on GitHub (`.github/workflows/check.yml`) and the whole
+  e2e suite (`.github/workflows/e2e.yml`); wait for `check` to pass and read the e2e run's result before merging
+  anything that changes gameplay or screens.
 - **Test lanes** (Eric, Oct 13: "why are we going through so many checks for changing numbers?"):
+  - **CI runs the full e2e on every PR; local runs are for targeted checks and perf** (Oct 15). The `e2e` workflow
+    runs the whole suite, both projects, on every PR to `main` and every push to `main`: 5 runners, about 17 minutes
+    (docs/areas/ops.md). CI retries a failed test once until the flaky-test batch lands (the goal is no retries);
+    its `result` job lists flaky tests (passed only on the retry) first, then failed ones, each with its shard,
+    `file:line`, project and error. Not a required check yet (the director decides when). Flakes only: "Re-run
+    failed jobs" once; a test that fails again is real. Locally, run just the specs you're working on, and the
+    `@perf` specs (frame budgets, which CI leaves out: `npx playwright test --grep @perf --project phone`), under the
+    shared e2e lock. The lanes below say which specs a change must have passed; CI runs them all on the PR anyway.
   - **Light lane** (numbers or data in settings or vote data, copy, CSS-only, docs): `check`, plus the e2e specs for
     the screens touched, plus the live check after the deploy. No sims: estimate instead.
   - **Targeted lane** (pre-launch default for logic: rules, the board, shared components, screens, boss powers):
@@ -60,12 +69,13 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
     Eric, Oct 14: "if an agent is confident in its code we can reduce token usage and testing to a minimum". What a
     change touches decides its lane, never how confident its author is: the misses (the resign confirm over the
     board, Wrangler's showdown never firing, Oct 13-14) were all confident code.
-  - **Batch full run:** the director runs the whole `npm run e2e` on `main` after a batch of targeted-lane merges, at
-    least once a day and before Eric playtests a big feature. A red spec: re-run it alone once; if it's real, find
-    the PR that caused it and fix it forward (or revert) before the next batch.
-  - **Full lane per PR** (the whole `npm run e2e` before merging) stays for the riskiest: stored data (D1 schema,
-    migrations), money, odds and wallets, sign-in and security, the client-server protocol, and anything the
-    director marks.
+  - **Batch full run:** CI's run on each push to `main` is the full run (until Oct 15 the director ran `npm run e2e`
+    locally); the director checks those runs after a batch of targeted-lane merges, at least once a day and before
+    Eric playtests a big feature. A red spec: re-run it once; if it's real, find the PR that caused it and fix it
+    forward (or revert) before the next batch.
+  - **Full lane per PR** (the whole suite green before merging: the PR's own e2e run) stays for the riskiest: stored
+    data (D1 schema, migrations), money, odds and wallets, sign-in and security, the client-server protocol, and
+    anything the director marks.
   - When unsure, the targeted lane, and say so in the PR: the director decides.
   - **Pre-launch only.** `main` deploys to Eric alone (Zero Trust), so a slip costs a playtest, not players. At
     launch every logic change goes back to the full lane per PR.
@@ -164,7 +174,9 @@ npm test                                       # vitest (engine tests run real S
 npm run typecheck
 npm run dev                                    # app dev server (solo only; no API)
 npx wrangler dev                               # app + API + Durable Objects at http://localhost:8787
-npm run e2e                                    # Playwright: solo, multiplayer, install (multiplayer takes ~5 min)
+npm run e2e                                    # Playwright, the whole suite (CI runs it on every PR)
+npx playwright test e2e/solo.spec.ts           # one spec (locally: under the shared e2e lock)
+npx playwright test --grep @perf --project phone   # the perf specs (frame budgets; CI leaves them out)
 npm run simulate                               # bot simulation -> reports/playtest.md (about 1–2 hours)
 npm run sim:squads                             # Squads bot simulation -> reports/squads-sim.md (about 15 min)
 npx tsx packages/sim/scripts/calibrate-rating.ts   # refit the engine-rating curve (~20 min)
