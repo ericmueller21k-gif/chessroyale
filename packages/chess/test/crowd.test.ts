@@ -277,15 +277,22 @@ describe("Crowd mode", () => {
     expect(k.boards[0]!.result.players.every((p) => p.abstained && p.roundScore === 0)).toBe(true);
     expect(runner.alive().every((p) => (p.misses ?? 0) === 0)).toBe(true);
     expect(runner.boss!.kingCharges).toBe(1);
+    // From here h5 misses every move, h4 every other and h3 every third; the rest play on. The boss strikes the worst
+    // since its last strike; a tie for the worst would wait (docs/decisions/2026-10-15-opening-allowance-and-ties.md).
+    const struck: string[] = [];
     while (!runner.stageComplete()) {
       if (runner.bossToMove()) {
         await runner.playBoss();
         continue;
       }
       runner.deal();
-      await runner.score(new Map([...runner.alive()].map((p) => [p.id, { move: null, thinkMs: 1000 }])));
-      if (runner.bossKillDue()) runner.bossKill();
+      const turn = runner.boss!.crowdMoves;
+      const fen = runner.boards.get(0)!.fen;
+      const misses = (id: string) => id === "h5" || (id === "h4" && turn % 2 === 0) || (id === "h3" && turn % 3 === 0);
+      await runner.score(new Map([...runner.alive()].map((p) => [p.id, { move: misses(p.id) ? null : legalMoves(fen)[0]!, thinkMs: 1000 }])));
+      if (runner.bossKillDue()) struck.push(runner.bossKill()!);
     }
+    expect([...struck].sort()).toEqual(["h3", "h4", "h5"]);
     expect(runner.alive().length).toBe(3);
     runner.finishBossBattle();
     expect(runner.state.players.map((p) => p.placement).sort()).toEqual([1, 2, 3, 4, 5, 6]);

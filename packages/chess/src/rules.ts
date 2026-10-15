@@ -1,3 +1,4 @@
+import type { MaterialSlip } from "@chessroyale/core";
 import { Chess, type Square } from "chess.js";
 import { applyMove960, gameEnd960, isChess960Fen, legalMoves960, replay960, toSan960 } from "./chess960.ts";
 
@@ -212,6 +213,171 @@ export function blunderCost(fen: string, move: string, reply?: string | null, ma
   }
   if (mateIn && mateIn > 0) return { kind: "mate", in: mateIn };
   return { kind: "chances" };
+}
+
+// ---------------- The exchange check (the opening allowance's material fallback) ----------------
+//
+// Its own small board, not chess.js: chess.js builds a SAN and two FENs for every move it lists, which made one check
+// cost about 10 ms; this one costs a few hundredths of that, run on every pick the opening allowance covers. It only
+// asks what attacks a square, so a pinned piece still counts as a recapture and a check isn't answered first: simple on
+// purpose, and it fails safe both ways (docs/decisions/2026-10-15-opening-allowance-and-ties.md).
+
+/** Piece values for the exchange check (a king captures only onto a square the other side doesn't attack). */
+const EXCHANGE_VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
+
+/** A board for the exchange check: 64 squares, a1 = 0, b1 = 1 ... h8 = 63; a piece letter (White's upper case) or "". */
+type XBoard = string[];
+
+const sqIndex = (s: string) => s.charCodeAt(0) - 97 + 8 * (s.charCodeAt(1) - 49);
+const isWhite = (p: string) => p !== "" && p === p.toUpperCase();
+const kind = (p: string) => p.toLowerCase();
+
+function xBoard(fen: string): XBoard {
+  const b: XBoard = new Array<string>(64).fill("");
+  const rows = fen.split(" ")[0]!.split("/");
+  rows.forEach((row, r) => {
+    let f = 0;
+    for (const c of row) {
+      if (c >= "1" && c <= "8") f += Number(c);
+      else b[f++ + 8 * (7 - r)] = c;
+    }
+  });
+  return b;
+}
+
+const KNIGHT = [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]] as const;
+const KING = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]] as const;
+const DIAGONALS = [[1, 1], [1, -1], [-1, 1], [-1, -1]] as const;
+const LINES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+
+/** The squares of `white`'s pieces that attack square `t` (the side to move doesn't matter, nor pins). */
+function attackersOf(b: XBoard, t: number, white: boolean): number[] {
+  const out: number[] = [];
+  const tf = t % 8;
+  const tr = (t - tf) / 8;
+  const at = (f: number, r: number) => (f >= 0 && f < 8 && r >= 0 && r < 8 ? f + 8 * r : -1);
+  const mine = (s: number, k: string) => s >= 0 && b[s] !== "" && isWhite(b[s]!) === white && kind(b[s]!) === k;
+  // A pawn attacks one rank forward, diagonally: White's from below the square, Black's from above.
+  const pr = white ? tr - 1 : tr + 1;
+  for (const df of [-1, 1]) if (mine(at(tf + df, pr), "p")) out.push(at(tf + df, pr));
+  for (const [df, dr] of KNIGHT) if (mine(at(tf + df, tr + dr), "n")) out.push(at(tf + df, tr + dr));
+  for (const [df, dr] of KING) if (mine(at(tf + df, tr + dr), "k")) out.push(at(tf + df, tr + dr));
+  for (const [dirs, kinds] of [
+    [DIAGONALS, "bq"],
+    [LINES, "rq"],
+  ] as const) {
+    for (const [df, dr] of dirs) {
+      for (let f = tf + df, r = tr + dr; at(f, r) >= 0; f += df, r += dr) {
+        const s = at(f, r);
+        if (b[s] === "") continue;
+        if (isWhite(b[s]!) === white && kinds.includes(kind(b[s]!))) out.push(s);
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * What `white` wins capturing on square `t`, the cheapest piece first, each side free to stop (0 or more). A pawn
+ * reaching the last rank becomes a queen. A king captures only when the other side doesn't attack the square.
+ */
+function exchangeOn(b: XBoard, t: number, white: boolean): number {
+  const victim = b[t]!;
+  if (victim === "") return 0;
+  const from = attackersOf(b, t, white).reduce((a, s) => (a < 0 || EXCHANGE_VALUE[kind(b[s]!)]! < EXCHANGE_VALUE[kind(b[a]!)]! ? s : a), -1);
+  if (from < 0) return 0;
+  const piece = b[from]!;
+  if (kind(piece) === "k" && attackersOf(b, t, !white).length) return 0;
+  const promotes = kind(piece) === "p" && (t >= 56 || t < 8);
+  b[from] = "";
+  b[t] = promotes ? (white ? "Q" : "q") : piece;
+  const back = exchangeOn(b, t, !white);
+  b[t] = victim;
+  b[from] = piece;
+  return Math.max(0, EXCHANGE_VALUE[kind(victim)]! + (promotes ? 8 : 0) - back);
+}
+
+/**
+ * The material a move nets by a static exchange check: what it takes (a promotion counting its gain too), less the
+ * most the opponent can then win by one capture and the exchange on that square (en passant included). Pawn 1, knight
+ * and bishop 3, rook 5, queen 9. Simple on purpose: it sees a piece left hanging and a capture passed up, not a fork or
+ * a pin, and a check is answered only by taking the piece giving it. Null when it can't say (no piece of the side to
+ * move on the move's square, a Chess960 castling). Pure: the same answer on every device.
+ */
+export function exchangeNet(fen: string, move: string): number | null {
+  const b = xBoard(fen);
+  const fields = fen.split(" ");
+  const white = fields[1] !== "b";
+  const from = sqIndex(move.slice(0, 2));
+  const to = sqIndex(move.slice(2, 4));
+  const piece = b[from];
+  if (move.length < 4 || from < 0 || from > 63 || to < 0 || to > 63 || !piece || isWhite(piece) !== white) return null;
+  if (b[to] !== "" && isWhite(b[to]!) === white) return null;
+  let gain = b[to] ? EXCHANGE_VALUE[kind(b[to]!)]! : 0;
+  // En passant: a pawn moving diagonally onto the empty en passant square takes the pawn beside it.
+  const ep = fields[3] && fields[3] !== "-" ? sqIndex(fields[3]) : -1;
+  if (kind(piece) === "p" && to === ep && b[to] === "" && from % 8 !== to % 8) {
+    b[white ? to - 8 : to + 8] = "";
+    gain += 1;
+  }
+  // Castling: the rook comes across too.
+  if (kind(piece) === "k" && Math.abs(to - from) === 2) {
+    const [rf, rt] = to > from ? [from + 3, from + 1] : [from - 4, from - 1];
+    b[rt] = b[rf]!;
+    b[rf] = "";
+  }
+  const promo = move[4];
+  if (promo) gain += EXCHANGE_VALUE[promo]! - 1;
+  b[from] = "";
+  b[to] = promo ? (white ? promo.toUpperCase() : promo) : piece;
+  // The opponent's best capture now: on any of the mover's pieces, or only on a piece giving check when there is one
+  // (a check has to be answered first; a mate leaves no capture at all).
+  const king = b.findIndex((p) => p === (white ? "k" : "K"));
+  const checkers = king < 0 ? [] : attackersOf(b, king, white);
+  let back = 0;
+  for (let s = 0; s < 64; s++) {
+    if (b[s] === "" || isWhite(b[s]!) !== white || kind(b[s]!) === "k" || (checkers.length && !checkers.includes(s))) continue;
+    back = Math.max(back, exchangeOn(b, s, !white));
+  }
+  // A pawn pushed two squares past an enemy pawn can be taken en passant.
+  if (kind(piece) === "p" && Math.abs(to - from) === 16 && !checkers.length) {
+    const passed = (from + to) / 2;
+    for (const s of attackersOf(b, passed, !white)) {
+      if (kind(b[s]!) !== "p") continue;
+      const taker = b[s]!;
+      b[s] = "";
+      b[to] = "";
+      b[passed] = taker;
+      back = Math.max(back, 1 - exchangeOn(b, passed, white));
+      b[passed] = "";
+      b[to] = piece;
+      b[s] = taker;
+    }
+  }
+  return gain - back;
+}
+
+/**
+ * Picks that give up at least `threshold` pawns of material against the engine's best move by the exchange check
+ * (exchangeNet), and how: "missed" when the best move is a capture that wins material and the pick loses none of its
+ * own; else "gave". The opening allowance doesn't cover them (OPENING_ALLOWANCE.materialPawns). A move the check can't
+ * read is never one.
+ */
+export function materialSlips(fen: string, best: string, moves: readonly string[], threshold: number): Map<string, MaterialSlip> {
+  const out = new Map<string, MaterialSlip>();
+  const bestNet = exchangeNet(fen, best);
+  if (bestNet === null) return out;
+  // (The best move takes something: a piece on its square, or a pawn en passant.)
+  const target = xBoard(fen)[sqIndex(best.slice(2, 4))];
+  const bestTakes = !!target || (best.slice(2, 4) === fen.split(" ")[3] && /^[pP]$/.test(xBoard(fen)[sqIndex(best.slice(0, 2))] ?? ""));
+  for (const m of new Set(moves)) {
+    if (m === best) continue;
+    const net = exchangeNet(fen, m);
+    if (net === null || bestNet - net < threshold) continue;
+    out.set(m, bestTakes && bestNet >= threshold && net >= 0 ? "missed" : "gave");
+  }
+  return out;
 }
 
 // ---------------- Positions that change outside the moves (G-REX's fire) ----------------

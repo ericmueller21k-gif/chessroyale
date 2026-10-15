@@ -204,7 +204,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
           {elim ? "Why you went out" : "Your game, move by move"}
         </button>
       )}
-      {review && <Breakdown moves={match.moves} you={elim?.you} line={elim?.line} placement={elim ? placement : null} onClose={() => setReview(false)} />}
+      {review && <Breakdown moves={match.moves} you={elim?.you} line={elim?.line} placement={elim ? placement : null} lastCut={elim?.lastCut} onClose={() => setReview(false)} />}
       {avgMs > 0 && <p class="muted small">Scoring took {Math.round(avgMs)} ms per round on this device.</p>}
       <div class="actions">
         <button type="button" class="btn btn-secondary" onClick={onHome}>

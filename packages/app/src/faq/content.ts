@@ -27,6 +27,7 @@ import {
   ENGINE_MIN_ELO,
   ITEM_COLORS,
   LEAVING,
+  OPENING_ALLOWANCE,
   PREGAME_VOTES,
   PRIOR_RATING,
   PURITY_BANDS,
@@ -97,6 +98,8 @@ export interface FaqSources {
   squadsWatching: { jumpToNext: boolean };
   /** The Hidden Boss's second phase (the Crowd's boss final, solo): its boards, clock and ultimate. */
   phase2: typeof RECLUSE_PHASE2;
+  /** The opening allowance: points off each early move's loss, through which move, gone by which, the material bar. */
+  allowance: { points: number; flatThrough: number; goneBy: number; materialPawns: number };
 }
 
 export const FAQ_DEFAULTS: FaqSources = {
@@ -125,6 +128,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   leaving: LEAVING,
   squadsWatching: SQUADS_LOBBY.watching,
   phase2: RECLUSE_PHASE2,
+  allowance: OPENING_ALLOWANCE,
 };
 
 // ---------------- Numbers as words ----------------
@@ -194,6 +198,7 @@ function modes(src: FaqSources): FaqSection {
 - **${C.lobbySize} players, one game of chess**, from the first move. Two teams of ${team}: your team plays White or Black all game.
 - Each turn, everyone on the side to move picks a move before the clock runs out, and the **most popular pick is played** (a tie is settled at random).
 - Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(C.firstStageRounds / 2, "move")}; after that, the lowest scorers are cut after every move, the same number from each team. Scores carry over all game.
+- **A tie at the cut line goes through:** everyone tied exactly with the last player through stays in, and the cuts still to come take the extra, a little at each. Only the last cut before the ending breaks a tie, so the ending has its size: fewer points given away before the [opening allowance](#opening-allowance) go through, then less thinking time.
 - **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss final (the top ${left(src.crowdKnockouts.boss)} team up against ${finalFoe}) or a duel (the best of each side, 1v1). Then on the clock.
 - **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. A boss raid is ${namedClock(R)}.
 - **${n(C.powerUpsAtStart, "power-up")}** each: a power-up shows the engine's top 3 moves for that turn.
@@ -202,7 +207,7 @@ function modes(src: FaqSources): FaqSection {
 ### Boss raid and Boss alone {#mode-boss}
 
 - **Boss raid:** up to ${R.lobbySize} players pick the crowd's moves together against a [boss](#boss-brain); the most popular pick is played. Most bosses start from a named opening, ${n(R.openingMoves, "move")} in. An online raid is people only; a Solo raid fills the other seats with bots.
-- **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} it knocks out the player who gave away the most points since its last strike (a missed move counts as ${n(S.finalMissLoss, "point")}), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}.
+- **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} it knocks out the player who gave away the most points since its last strike (after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
 - **The God King** fights on your side, with ${n(S.kingChargesMax, "charge")} ([more on him](#god-king)).
 - The battle ends in checkmate or a draw, or after ${n(S.bossMaxMoves, "crowd move")}, when the engine judges the position.
 - **Boss alone:** just you against a boss you choose from the boss menu, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move.
@@ -285,6 +290,14 @@ ${item("Shield", "shield", "cancels the next block against your squad that would
 `;
 }
 
+/**
+ * The opening allowance in two sentences (Eric, Oct 15: cut players should think "yeah, I messed up"): what it forgives
+ * and what it never does, with the reveal's own words. Every number from OPENING_ALLOWANCE.
+ */
+export function openingAllowanceWords(A: FaqSources["allowance"]): string {
+  return `Through move ${A.flatThrough}, the first ${n(A.points, "point")} a move gives away don't count (less each move after that, and none from move ${A.goneBy}), so a sound move off the engine's line costs nothing early on: the reveal shows it as "1.2 forgiven · opening". A move that gives up ${A.materialPawns === 1 ? "a pawn" : n(A.materialPawns, "pawn")} or more by a simple exchange check, by leaving something to be taken or by missing a capture, gets no allowance, so all of it counts ("no allowance · gave up material", "no allowance · missed a capture").`;
+}
+
 function scoring(src: FaqSources): FaqSection {
   const S = src.settings;
   const B = src.brilliant;
@@ -328,7 +341,11 @@ A loss is never below zero: if your move scores above the engine's own choice, y
 
 $ round score = the group's average loss − your loss
 
-Positive means you beat your group. A missed move scores ${num(S.missedMoveScore)} and is left out of the average. In Crowd your round scores add up all game, and every cut goes by the total.
+Positive means you beat your group (early in a game, every loss here is after the [opening allowance](#opening-allowance)). A missed move scores ${num(S.missedMoveScore)} and is left out of the average. In Crowd your round scores add up all game, and every cut goes by the total.
+
+### The opening allowance {#opening-allowance}
+
+${openingAllowanceWords(src.allowance)}
 
 ### A worked example {#worked-example}
 
