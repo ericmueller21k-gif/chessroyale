@@ -4730,3 +4730,20 @@ Eric opened crates on his iPhone and asked for three fixes. The calls:
 - **Testing:** light/targeted lane (art and CSS): typecheck, the unit suite (a new `gift-tube.test.ts`: the stripes
   tile the tube with no gaps or overlaps, and blotches match the purity on each painted set; `crates.test.ts`: the
   second color is stable, never the first, follows the odds, and stacks), and the crate e2e specs.
+
+## One clock format; the dev tools run from the repo root (Oct 15, 2026)
+
+- **Every clock on screen is `clockShown`** (`packages/app/src/clock-text.ts`): m:ss in whole seconds rounded up, the
+  dock's rounding (.claude/LESSONS.md, "A countdown that seemed to fire early"). The scoreboard's Bank, the board's
+  clock and the HUD rounded down, so at the same moment they could show a second less than the dock. Its copies are
+  gone (RaceTower's `clockText`, Recluse2's and the queue's `clock`); Squads' `bankText` is `clockShown` with
+  `tenths` (under ten seconds "9.4", still rounded down, as before). Over ten seconds a Squads bank now rounds up too
+  (3:05.4 reads "3:06"). The queue's "waiting 1:05" counts up, and rounding up there is a second ahead at most; one
+  formatter is worth more than that second.
+- **`vite.config.ts` finds its files from its own folder** (`APP`), not the folder Vite started in. From the repo root,
+  `npm run preview:items`, `frames:flash`, `frames:vote` and `node scripts/preview-god-king.mjs` failed with
+  "Stockfish 19.0.0 has no source archive"; the other frames scripts worked around it with
+  `process.chdir("packages/app")`. Those workarounds are gone: the scripts pass `root: "packages/app"` and the config's
+  path. `perf-boss.mjs`'s `PERF_DIST` is now read from the folder you run it in (the repo root).
+- **Testing:** light lane plus the clock specs: typecheck, the unit suite, `boss-dock`, `squads-clocks`, `crowd`,
+  `recluse` and `votes` (its bank check now rounds up), and each changed script run once from the repo root.

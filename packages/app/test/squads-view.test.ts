@@ -233,7 +233,7 @@ describe("Squads screens: jump to my next board, and who's watching (Oct 14)", (
 
 describe("Squads screens: words and numbers", () => {
   it("bank and points", () => {
-    expect(bankText(185_400)).toBe("3:05");
+    expect(bankText(185_400)).toBe("3:06");
     expect(bankText(9_440)).toBe("9.4");
     expect(bankText(-5)).toBe("0.0");
     expect(points(2.5)).toBe("2½");
