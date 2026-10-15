@@ -4951,6 +4951,10 @@ timing, protocol or stored data changes: words, where the speech boxes sit, and 
 where his pieces are." over "Clocks stopped." (was "Lights out! Clocks stopped." alone, left at the top of the whole
 box, the banner's words again). Its rounds keep the whole box for their prompt and the crowd's meter.
 
+**A dock line wraps, never cut** (found with V10): the boss screen's first line was one line with an ellipsis, so at
+360 px "The boss is thinking…" read "The boss is think…" (on main too). It now wraps to two lines; the box holds two of
+them and the muted line under them.
+
 **The Hidden Boss's phase 2.**
 - **The dock's first line** (V10): "2:00 on your clock" over "No added time." (one line was cut to "2:00 on your clock,
   no adde…" at 360 px).

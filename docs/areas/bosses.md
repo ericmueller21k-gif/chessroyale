@@ -300,7 +300,8 @@ build): online, phase 1 won is the crowd's victory):
   the boss's turn, the reveal and the moments, whichever screen shows it; under the bullet clock's increment a "+2"
   rises over it as each move begins. None during Lights out's rounds (their prompt and meter take the box: before the
   first round, as the night falls, the dock keeps its layout and your held clock, "Remember where his pieces are." over
-  "Clocks stopped."), the phase change, or before your first move. The words never carry the time, nor how many have
+  "Clocks stopped."), the phase change, or before your first move. Its first line wraps to two rather than being cut
+  (the box holds two and the muted line under them). The words never carry the time, nor how many have
   picked (the line above the board says it). On a phone the God King stands on a line of his own under the row, in its
   middle, his menu opening above the row and his words beside him to his right, on his line (a long line runs down past
   it), never over the board or the box; beside the row only where the screen's column has 66 px right of the board
