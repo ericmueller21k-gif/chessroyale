@@ -563,6 +563,9 @@ export type SoundName =
   | "recluseThump"
   | "recluseGlow"
   | "recluseSlow"
+  | "recluseDrain"
+  | "recluseSpark"
+  | "recluseArc"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
   | "sqSting";
@@ -693,6 +696,9 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   recluseThump: recluse("thump"),
   recluseGlow: recluse("glow"),
   recluseSlow: recluse("slow"),
+  recluseDrain: recluse("drain"),
+  recluseSpark: recluse("spark"),
+  recluseArc: recluse("arc"),
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
   // Every board's move landing after a round: a quick ripple of soft knocks (the picked move sound), one per board.
@@ -778,6 +784,9 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   recluseThump: [["recluse", "thump"]],
   recluseGlow: [["recluse", "glow"]],
   recluseSlow: [["recluse", "slow"]],
+  recluseDrain: [["recluse", "drain"]],
+  recluseSpark: [["recluse", "spark"]],
+  recluseArc: [["recluse", "arc"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */
 let worker: Worker | null | undefined;

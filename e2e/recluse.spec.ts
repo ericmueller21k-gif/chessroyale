@@ -13,8 +13,9 @@ import { BOARD_SEL, test, watchFor } from "./helpers.ts";
  * - his ultimate on the admins' trigger: the book consulted, opened like a spell book, slammed shut, "BULLET!", then the
  *   bullet clock (the whole bullet bank on the move, the dock's time left, no increment for 3 moves); then he adds time
  *   per move (his line, "+2 s a move from now on" across the board, "Bullet 1+2" in the dock, +2 s a move made in time);
- * - beaten (?win=1: you mate in one): he collapses and mumbles on the board, then (Boss alone) his phase change and
- *   phase 2's four boards.
+ * - beaten (?win=1: you mate in one): he collapses and mumbles on the board, then (Boss alone) his phase change (it
+ *   opens with the God King's absorption: triumphant, drained into the boss's raised hand, gone; the boss's half-engine
+ *   look ignites) and phase 2's four boards, with no God King.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const bossNow = (p: Page) => p.evaluate(() => (window as any).match?.boss ?? null);
@@ -314,7 +315,7 @@ async function resignHere(page: Page, note: RegExp) {
   await confirm.getByRole("button", { name: /Resign/ }).click();
 }
 
-test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase change (up in a rage, his leap onto the board, the book thrown down, the chant and its light, the split, the book back, the leap back, the shuffle) and four boards; all four won: Victory!", async ({ page }) => {
+test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase change (he absorbs the God King, up in a rage, his leap onto the board, the book thrown down, the chant and its light, the split, the book back, the leap back, the shuffle) and four boards; all four won: Victory!", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -326,7 +327,25 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     mumble: { selector: ".bc-bubble", text: /the book said|Morphy, I think everyone agrees|Sixty-four squares/ },
   });
   const change = await watchFor(page, {
+    // The God King's absorption: triumphant in his place (his line), the boss's head up and his hand raised, the stream
+    // between them, the God King drained (his cry), the power landing (the boss's look ignites, his line), the God King
+    // fading and gone.
+    triumph: { selector: ".gk-unit.gk-triumph .god-king" },
+    triumphLine: { selector: ".gk-bubble", text: /Kneel\. The crown always wins\.|Down you stay, bookworm!|Your book is closed\. Kneel!/ },
+    seize: { selector: `${figure()}[data-anim="seize"]` },
+    reach: { selector: `${figure()}[data-anim="seizeLoop"]` },
+    stream: { selector: ".rc-absorb .rc-mote" },
+    drained: { selector: ".gk-unit.gk-drained .god-king[data-anim='lastStand']" },
+    cry: { selector: ".gk-bubble", text: /what are you doing\?!|That power is mine!|My strength!/ },
+    seized: { selector: `${figure()}[data-anim="seized"]` },
+    ignite: { selector: `${figure()} .bc-engine.on.fresh` },
+    absorbLine: { selector: ".bc-bubble", text: /All game you leaned on an engine\. Now see how you like it\.|Mind and machine\. Both mine now\./ },
+    fading: { selector: ".gk-unit.gk-fading" },
+    gone: { selector: ".gk-unit.gone" },
     rage: { selector: `${figure()}[data-anim="rage"]` },
+    // (His look over his whole figure on the board too, and the arcs that split it.)
+    figEngine: { selector: ".rc-fig .bc-engine.on" },
+    arcs: { selector: ".rc-arcs .rc-arc-core" },
     // (From the leap to his return the board draws his whole figure, a phone too, and his place stands empty.)
     away: { selector: ".rc-away" },
     leap: { selector: '.rc-fig[data-anim="leap"] canvas' },
@@ -353,10 +372,43 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   expect(await fall.seen()).toMatchObject({ collapse: true, dock: true });
   const at = Date.now();
   await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 }).toBe(true);
-  // (About 10.5 s: PHASE_CHANGE.total.)
-  expect(Date.now() - at).toBeLessThan(14_000);
+  // (About 15 s: PHASE_CHANGE.total.)
+  expect(Date.now() - at).toBeLessThan(20_000);
   expect(await phase(page)).toBe("simul");
-  expect(await change.seen()).toMatchObject({ rage: true, away: true, leap: true, shadow: true, drop: true, chant: true, light: true, chantLine: true, crack: true, split: true, pickup: true, leapBack: true, banner: true, book: false });
+  expect(await change.seen()).toMatchObject({
+    triumph: true,
+    triumphLine: true,
+    seize: true,
+    reach: true,
+    stream: true,
+    drained: true,
+    cry: true,
+    seized: true,
+    ignite: true,
+    absorbLine: true,
+    fading: true,
+    gone: true,
+    rage: true,
+    figEngine: true,
+    arcs: true,
+    away: true,
+    leap: true,
+    shadow: true,
+    drop: true,
+    chant: true,
+    light: true,
+    chantLine: true,
+    crack: true,
+    split: true,
+    pickup: true,
+    leapBack: true,
+    banner: true,
+    book: false,
+  });
+  // Phase 2: the God King gone (nothing to tap), the boss's look on where he stands.
+  await expect(page.locator(".gk-unit.gone")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(0);
+  await expect(page.locator(`${figure()} .bc-engine.on`)).toHaveCSS("visibility", "visible");
   // (Back in his place, seen again.)
   await expect(page.locator(".rc-away")).toHaveCount(0);
   const v = await simulNow(page);
@@ -376,13 +428,29 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   expect(errors).toEqual([]);
 });
 
-test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 2750 answers your move; Engine move on your board; the God King's help mocked", async ({ page }) => {
+test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 2750 answers your move; Engine move on your board; no God King (absorbed), the boss's half-engine look on", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await meetHim(page, "phase=2");
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("phaseChange");
   await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 }).toBe(true);
+  // The God King is gone (the boss absorbed him in the phase change): his place in the dock empty, nothing to tap, and
+  // not a word from him all through phase 2.
+  const king = await watchFor(page, { bubble: { selector: ".gk-bubble" }, figure: { selector: ".boss-dock .god-king" } });
+  await expect(page.locator(".gk-unit.gone")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(0);
+  await expect(page.locator(".gk-command")).toHaveCount(0);
+  // His look: one eye cold blue, the circuit lines, over his figure where it stands (on screen, on his head).
+  const eng = page.locator(`${figure()} .bc-engine.on`);
+  await expect(eng).toHaveCount(1);
+  await expect(eng).toHaveCSS("visibility", "visible");
+  const eye = (await eng.locator(".rc-eng-eye").boundingBox())!;
+  const fig = (await page.locator(`${figure()} .boss-char-sprite`).boundingBox())!;
+  expect(eye.x).toBeGreaterThan(fig.x);
+  expect(eye.x + eye.width).toBeLessThan(fig.x + fig.width);
+  expect(eye.y).toBeGreaterThan(fig.y);
+  expect(eye.y + eye.height / 2).toBeLessThan(fig.y + fig.height * 0.6);
   const v = await simulNow(page);
   expect(new Set(v.boards.map((b: { number: number }) => b.number)).size).toBe(4);
   expect(new Set(v.boards.map((b: { fen: string }) => b.fen)).size).toBe(4);
@@ -401,19 +469,10 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
   await expect(btn).toBeEnabled({ timeout: 30_000 });
   await btn.click();
   await expect.poll(async () => (await simulNow(page)).boards[0].history.length, { timeout: 30_000 }).toBeGreaterThanOrEqual(3);
-  // The God King's help tried: blocked, he slams the book (phase 2's slam), and the God King says it won't take hold.
-  const mock = await watchFor(page, {
-    slam: { selector: `${figure()}[data-anim="slam2"]` },
-    king: { selector: ".gk-bubble", text: /won't take hold|shrugs off my strength|can't reach him/ },
-  });
-  await expect(page.locator(".gk-unit-charges")).toHaveAttribute("aria-label", "3 charges left");
-  await page.getByRole("button", { name: /God King: tap to summon/ }).click();
-  await page.getByRole("menuitem", { name: /Strike/ }).click();
-  await expect.poll(() => mock.seen(), { timeout: 10_000 }).toEqual({ slam: true, king: true });
-  // (The charge is spent all the same.)
-  await expect(page.locator(".gk-unit-charges")).toHaveAttribute("aria-label", "2 charges left");
   // The bots play their boards meanwhile.
   await expect.poll(async () => (await simulNow(page)).boards.slice(1).every((b: { history: string[] }) => b.history.length >= 2), { timeout: 30_000 }).toBe(true);
+  expect(await king.seen()).toEqual({ bubble: false, figure: false });
+  await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

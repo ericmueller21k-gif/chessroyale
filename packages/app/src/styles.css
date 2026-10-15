@@ -11125,7 +11125,8 @@ img.qicon {
   pointer-events: none;
   filter: drop-shadow(0 0.8cqw 0 rgba(0, 0, 0, 0.3));
 }
-.screen:has(.power-moment:not(.pm-stay)) .boss-char-sprite {
+.screen:has(.power-moment:not(.pm-stay)) .boss-char-sprite,
+.screen:has(.power-moment:not(.pm-stay)) .boss-char > .bc-engine.on {
   visibility: hidden;
 }
 /* Boingo's funhouse: he drops onto the middle of the board (his animation), and bounces off at the end. */
@@ -12488,7 +12489,8 @@ img.qicon {
   pointer-events: none;
 }
 /* While he's on the board, his figure in his corner hides (his words stay). */
-.screen:has(.king-attack.on) .boss-char-sprite {
+.screen:has(.king-attack.on) .boss-char-sprite,
+.screen:has(.king-attack.on) .boss-char > .bc-engine.on {
   visibility: hidden;
 }
 
@@ -14458,7 +14460,8 @@ button.sq-tiny {
   pointer-events: none;
   will-change: transform;
 }
-.rc-away .boss-char-sprite {
+.rc-away .boss-char-sprite,
+.rc-away .boss-char > .bc-engine.on {
   visibility: hidden;
 }
 /* His shadow on the board where he's coming down. */
@@ -14529,6 +14532,389 @@ button.sq-tiny {
 @media (prefers-reduced-motion: reduce) {
   .rc-light::before,
   .rc-glow::before {
+    animation: none;
+  }
+}
+
+/* ---- The God King's absorption (the phase change's start; Eric, Oct 14): in his place he stands triumphant, his
+   golden aura swelling; drained, the aura shrinks and he flickers (his Last Stand's blows flash and crack him: his own
+   frames); then he fades up and away in a burst of light and motes. Opacity and transform only. His place is kept once
+   he's gone (phase 2), empty, so the dock never moves. */
+.gk-aura {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  width: 150%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 244, 196, 0.85) 0 16%, rgba(255, 208, 92, 0.5) 38%, rgba(242, 193, 78, 0) 70%);
+  opacity: 0;
+  pointer-events: none;
+}
+.gk-unit.gk-triumph .gk-aura {
+  animation:
+    gk-aura-in 500ms ease-out both,
+    gk-aura-pulse 800ms 500ms ease-in-out infinite alternate;
+}
+.gk-unit.gk-drained .gk-aura {
+  opacity: 1;
+  animation: gk-aura-out 2150ms ease-in both;
+}
+.gk-unit.gk-fading .gk-aura {
+  animation: gk-aura-flash 650ms ease-out both;
+}
+.gk-unit.gk-drained .god-king.absorbed {
+  animation: gk-flicker 2150ms linear both;
+}
+.gk-unit.gk-fading .god-king.absorbed {
+  animation: gk-dissolve 700ms steps(7, end) both;
+}
+.gk-unit.gk-fading .gk-unit-charges {
+  opacity: 0;
+  transition: opacity 300ms ease-in;
+}
+.gk-unit.gone .gk-unit-btn,
+.gk-unit.gone .gk-unit-charges {
+  visibility: hidden;
+}
+.gk-motes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.gk-motes > i {
+  position: absolute;
+  left: 50%;
+  top: 60%;
+  width: 12%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fffbe0 0 30%, rgba(255, 210, 90, 0.8) 55%, rgba(255, 210, 90, 0) 75%);
+  opacity: 0;
+}
+.gk-unit.gk-fading .gk-motes > i {
+  animation: gk-mote 700ms ease-out both;
+}
+.gk-motes > i:nth-child(1) {
+  --mx: -34%;
+  animation-delay: 0ms;
+}
+.gk-motes > i:nth-child(2) {
+  --mx: 22%;
+  animation-delay: 60ms;
+}
+.gk-motes > i:nth-child(3) {
+  --mx: -8%;
+  animation-delay: 120ms;
+}
+.gk-motes > i:nth-child(4) {
+  --mx: 40%;
+  animation-delay: 180ms;
+}
+.gk-motes > i:nth-child(5) {
+  --mx: -46%;
+  animation-delay: 240ms;
+}
+@keyframes gk-aura-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes gk-aura-pulse {
+  from {
+    scale: 0.92;
+  }
+  to {
+    scale: 1.08;
+  }
+}
+@keyframes gk-aura-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0.15;
+    transform: scale(0.3);
+  }
+}
+@keyframes gk-aura-flash {
+  from {
+    opacity: 0.95;
+    transform: scale(0.3);
+  }
+  35% {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+/* (Flickering more and more as his power leaves him.) */
+@keyframes gk-flicker {
+  0%, 18%, 21%, 36%, 39%, 52%, 55%, 64%, 67%, 74%, 77%, 83%, 86%, 91%, 94%, 97% {
+    opacity: 1;
+  }
+  19.5% {
+    opacity: 0.7;
+  }
+  37.5% {
+    opacity: 0.55;
+  }
+  53.5% {
+    opacity: 0.5;
+  }
+  65.5% {
+    opacity: 0.4;
+  }
+  75.5% {
+    opacity: 0.35;
+  }
+  84.5% {
+    opacity: 0.3;
+  }
+  92.5% {
+    opacity: 0.25;
+  }
+  98.5%, 100% {
+    opacity: 0.6;
+  }
+}
+@keyframes gk-dissolve {
+  from {
+    opacity: 0.6;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10%) scale(1.06, 1.12);
+  }
+}
+@keyframes gk-mote {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 0);
+  }
+  20% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--mx)), -260%);
+  }
+}
+
+/* The stream from the God King into the boss's raised hand (AbsorbStream): over the page, in its pixels, under the
+   speech bubbles. The beam's two strokes (no filter: a wide soft one and a thin bright core), golden motes moved by
+   transform, the glow gathering in his hand and the cold flash as it lands. */
+.rc-absorb {
+  position: fixed;
+  inset: 0;
+  z-index: 11;
+  pointer-events: none;
+  overflow: hidden;
+}
+.rc-absorb-beam {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  will-change: opacity;
+}
+.rc-beam-glow,
+.rc-beam-core {
+  fill: none;
+  stroke-linecap: round;
+}
+.rc-beam-glow {
+  stroke: rgba(255, 205, 80, 0.3);
+}
+.rc-beam-core {
+  stroke: rgba(255, 246, 200, 0.85);
+}
+.rc-mote,
+.rc-gather,
+.rc-landflash {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  will-change: transform, opacity;
+}
+.rc-mote {
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  background: radial-gradient(circle, #fffbe2 0 28%, rgba(255, 206, 84, 0.85) 50%, rgba(255, 196, 60, 0) 72%);
+}
+.rc-gather {
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  background: radial-gradient(circle, rgba(255, 250, 220, 0.9) 0 18%, rgba(255, 205, 80, 0.55) 42%, rgba(255, 196, 60, 0) 70%);
+}
+.rc-landflash {
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  background: radial-gradient(circle, rgba(240, 252, 255, 1) 0 16%, rgba(130, 210, 255, 0.75) 38%, rgba(70, 150, 255, 0) 70%);
+}
+
+/* His half-engine look in phase 2 (EngineOverlay, Recluse.tsx): over his drawing, the same box as its canvas, one box the
+   size of his head moved onto it each frame (a transform). One eye glowing cold blue, faint circuit lines down that side
+   of his face, a flicker now and then; it ignites as it comes (`fresh`). Opacity and transform only. */
+.boss-char > .bc-engine {
+  position: absolute;
+  left: calc(50% - var(--bc-fx) * var(--bc-scale) * 1px);
+  bottom: calc((var(--bc-fy) - var(--bc-h)) * var(--bc-scale) * 1px);
+  width: calc(var(--bc-w) * var(--bc-scale) * 1px);
+  height: calc(var(--bc-h) * var(--bc-scale) * 1px);
+}
+.rc-fig > .bc-engine {
+  position: absolute;
+  inset: 0;
+}
+.bc-engine {
+  pointer-events: none;
+  visibility: hidden;
+}
+.bc-engine.on {
+  visibility: visible;
+}
+.rc-eng-head {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(100% * 25 / var(--rc-w));
+  height: calc(100% * 35 / var(--rc-h));
+  will-change: transform;
+}
+.bc-engine.on > .rc-eng-head {
+  animation: rc-eng-flicker 5.3s 1.2s linear infinite;
+}
+.rc-eng-circuit {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  opacity: 0.5;
+}
+.rc-eng-trace {
+  fill: #66ccff;
+}
+.rc-eng-pad {
+  fill: #dff6ff;
+}
+.bc-engine.fresh .rc-eng-circuit {
+  animation: rc-eng-draw 650ms steps(4, end) both;
+}
+.rc-eng-eye {
+  position: absolute;
+  width: calc(100% * 8 / 25);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #f4fdff 0 12%, #9ee6ff 21%, rgba(80, 176, 255, 0.6) 36%, rgba(60, 140, 255, 0) 70%);
+}
+.bc-engine.on .rc-eng-eye {
+  animation: rc-eng-pulse 1.7s ease-in-out infinite alternate;
+}
+.bc-engine.on.fresh .rc-eng-eye {
+  animation:
+    rc-eng-ignite 700ms ease-out both,
+    rc-eng-pulse 1.7s 700ms ease-in-out infinite alternate;
+}
+@keyframes rc-eng-ignite {
+  from {
+    opacity: 0;
+    scale: 5;
+  }
+  30% {
+    opacity: 1;
+    scale: 2.4;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+@keyframes rc-eng-pulse {
+  from {
+    scale: 0.9;
+  }
+  to {
+    scale: 1.1;
+  }
+}
+@keyframes rc-eng-draw {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.5;
+  }
+}
+/* (Now and then: a blink of the whole look, twice, then steady for seconds.) */
+@keyframes rc-eng-flicker {
+  0%, 86%, 88%, 90.5%, 92%, 100% {
+    opacity: 1;
+  }
+  87% {
+    opacity: 0.3;
+  }
+  91% {
+    opacity: 0.55;
+  }
+}
+
+/* The arcs splitting the board (Arcs, Recluse2.tsx): over the board and his figure, in its own 0-100 square. Each a thin
+   bright core in two soft glows (wide strokes, no filter); a blue flash where it lands; the board's blue pulse. */
+.rc-arcs {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.rc-arcs path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* (Blue enough to read on the board's light squares as well as its dark ones.) */
+.rc-arc-glow2 {
+  stroke: rgba(30, 100, 255, 0.28);
+}
+.rc-arc-glow {
+  stroke: rgba(70, 160, 255, 0.8);
+}
+.rc-arc-core {
+  stroke: #f4faff;
+}
+.rc-arc-hit {
+  fill: rgba(70, 150, 255, 0.45);
+}
+.rc-zap {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(60, 140, 255, 0.38), rgba(40, 110, 255, 0.16) 50%, rgba(40, 110, 255, 0) 78%);
+  will-change: opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bc-engine.on > .rc-eng-head,
+  .bc-engine.on .rc-eng-eye {
     animation: none;
   }
 }
