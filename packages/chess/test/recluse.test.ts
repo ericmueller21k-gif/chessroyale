@@ -417,7 +417,11 @@ describe("the God King's help doesn't work against him (his passive); a try spen
 });
 
 describe("he never strikes the crowd (Oct 14: his fight is a squad's, who must all reach phase 2)", () => {
-  /** A crowd of five against a boss (a raid, people only), every one picking the same move, `turns` crowd moves. */
+  /**
+   * A crowd of five against a boss (a raid, people only), `turns` crowd moves: every one picking the same move, but h4
+   * misses every move and h3 every other, so the worst since each strike is clear (a tie for the worst waits:
+   * DECISIONS.md, "Opening grace and ties survive the cut").
+   */
   async function crowdOf5(bossId: string, turns: number) {
     const ids = ["h0", "h1", "h2", "h3", "h4"];
     const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1400, bossId, bossHidden: true } as Settings;
@@ -432,7 +436,9 @@ describe("he never strikes the crowd (Oct 14: his fight is a squad's, who must a
       strikeIn.push(r.bossView()!.strikeIn);
       r.deal();
       const move = crowdMove(r);
-      await r.score(new Map(ids.map((id) => [id, { move, thinkMs: 1000 }])));
+      const turn = r.boss!.crowdMoves;
+      const misses = (id: string) => id === "h4" || (id === "h3" && turn % 2 === 0);
+      await r.score(new Map(ids.map((id) => [id, { move: misses(id) ? null : move, thinkMs: 1000 }])));
       if (r.bossKillDue()) {
         due.push(r.boss!.crowdMoves);
         r.bossKill();

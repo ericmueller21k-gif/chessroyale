@@ -1,5 +1,5 @@
 import { toSan, type BoardRound, type Base, type BoardSlot, type LivePick, type NetBoss, type NetFinal, type NetLightsOut, type NetStanding, type NetVote } from "@chessroyale/chess";
-import { brilliance } from "@chessroyale/core";
+import { brilliance, type MaterialSlip } from "@chessroyale/core";
 import { roundsInStage, type Augment, type Settings } from "@chessroyale/core";
 import type { MatchChat } from "./chat.ts";
 
@@ -46,6 +46,9 @@ export interface MoveRecord {
   move: string | null;
   san: string;
   loss: number | null;
+  /** The loss as it counted for points, when the opening allowance took something off; or why it didn't (material). */
+  counted?: number;
+  material?: MaterialSlip;
   roundScore: number;
   /** The engine's best move (after the re-check), and how many of those who picked found it (within 1.5 points). */
   bestMove?: string;
@@ -56,6 +59,19 @@ export interface MoveRecord {
   /** Your pick separated the field (a brilliant move, made without a power-up). */
   brilliant?: boolean;
   usedPowerUp?: boolean;
+}
+
+/**
+ * The opening allowance on a pick, in a few words for the reveal (one line, even at 320 px): what it took off
+ * ("−2.4 → 0 · opening"), or why it didn't cover the pick ("−4.1 · gave up material", "−4.1 · missed a capture").
+ * Null when it made no difference (no loss, or no allowance on this move).
+ */
+export function allowanceNote(p: { loss: number | null; counted?: number; material?: MaterialSlip }): string | null {
+  if (p.loss === null || p.loss < 0.05) return null;
+  const pts = (x: number) => (x < 0.05 ? "0" : `−${x.toFixed(1)}`);
+  if (p.material) return `${pts(p.loss)} · ${p.material === "missed" ? "missed a capture" : "gave up material"}`;
+  if (p.counted === undefined) return null;
+  return `${pts(p.loss)} → ${pts(p.counted)} · opening`;
 }
 
 /** Your move from a reveal, with what the elimination breakdown needs (null if you weren't picking). */
@@ -72,6 +88,8 @@ export function moveRecordFrom(stage: number, round: number, mine: GroupReveal, 
     move: me.move,
     san: me.move ? toSan(mine.fenBefore, me.move) : "—",
     loss: me.loss,
+    ...(me.counted !== undefined ? { counted: me.counted } : {}),
+    ...(me.material ? { material: me.material } : {}),
     roundScore: me.roundScore,
     bestMove: mine.bestMove,
     found: picked.filter((p) => p.loss! <= 1.5).length,
@@ -86,7 +104,7 @@ export function moveRecordFrom(stage: number, round: number, mine: GroupReveal, 
  * Your last elimination (Crowd): your score and the cut line's when you went out, for the breakdown on the
  * cut screen and the results.
  */
-export const elimination: { current: { stage: number; you: number; line: number; placement: number | null; out: number; left: number } | null } = { current: null };
+export const elimination: { current: { stage: number; you: number; line: number; placement: number | null; out: number; left: number; lastCut?: boolean } | null } = { current: null };
 
 /** The 2v2 final as the screens see it (same shape the server sends, with the board as a view). */
 export type FinalView = Omit<NetFinal, "board"> & { board: BoardView };
@@ -257,7 +275,7 @@ export interface GameView {
   readonly done: ReadonlySet<string>;
   /** Moves already seen on each board (key "id:generation"), to replay only what you missed. */
   readonly seen: Map<string, number>;
-  /** Players ranked at or below this many go out at the end of the stage. */
+  /** How many of those still in would go through if the stage's cut came now (ties at the line go through). */
   readonly cutoff: number;
   nameOf(id: string): string;
   isYou(id: string): boolean;
@@ -346,7 +364,8 @@ export function myTeam(m: Pick<GameView, "standings">): "w" | "b" | null {
 
 /**
  * The leaderboard as you should see it: in Crowd 50 v 50 each team has its own
- * cut (half the knockouts each), so it shows your team with your team's cut line.
+ * cut (half the knockouts each), so it shows your team with your team's cut line
+ * (where the cut would fall now: the rows it would take are marked `cut`; ties at the line go through).
  */
 export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" | "stage"> & { boss?: BossView | null }): { standings: Standing[]; cutoff: number; teamLabel: string | null } {
   const all = m.standings();
@@ -355,9 +374,8 @@ export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" 
   const team = all.find((s) => s.isYou)?.team ?? null;
   if (!team) return { standings: all, cutoff: m.cutoff, teamLabel: null };
   const mine = all.filter((s) => s.team === team);
-  const alive = mine.filter((s) => !s.out).length;
-  const k = m.settings.knockoutsPerStage[m.stage] ?? 0;
-  return { standings: mine, cutoff: alive - Math.floor(k / 2), teamLabel: team === "w" ? "White team" : "Black team" };
+  const alive = mine.filter((s) => !s.out);
+  return { standings: mine, cutoff: alive.filter((s) => !s.cut).length, teamLabel: team === "w" ? "White team" : "Black team" };
 }
 
 export const isCrowd = (m: Pick<GameView, "settings">) => m.settings.mode === "crowd";

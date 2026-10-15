@@ -17,7 +17,7 @@ import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
 import { BossHeading } from "./Play.tsx";
 import { crowdAnimations, crowdTrail, onPrefsChange } from "../prefs.ts";
-import { elimination, finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
+import { allowanceNote, elimination, finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { GavelPiece } from "../components/Gavel.tsx";
 import { Avatar } from "../components/Items.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
@@ -410,7 +410,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                         ? `${mine.kingCalls} of ${picks.length} called him · no score`
                         : "You called him · no score"
                       : "No move from you."
-                    : `You: ${toSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore)}) · best ${toSan(fen, mine.bestMove)}`}
+                    : `You: ${toSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${allowanceNote(me) ?? fmt(me.roundScore)}) · best ${toSan(fen, mine.bestMove)}`}
               </span>
             </>
             )
@@ -467,6 +467,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
               <span class="muted small">
                 {me.move ? `you picked ${toSan(fen, me.move)}` : "no move from you"} · best was {toSan(fen, mine.bestMove)}
               </span>
+              {/* The opening allowance on your pick: what it took off, or why it didn't (one line). */}
+              {allowanceNote(me) && <span class="allowance-line">{allowanceNote(me)}</span>}
             </>
           ) : (
             <span class="muted small">Your team watched this one · best was {toSan(fen, mine.bestMove)}</span>
@@ -586,14 +588,15 @@ export function CrowdCut({
   const through = standings.filter((p) => !p.out && !cutNow.has(p.id));
   const line = through.length ? Math.min(...through.map((p) => p.points)) : 0;
   useEffect(() => {
-    if (youOut && me) elimination.current = { stage, you: me.points, line, placement: match.placement, out: knockedOut.length, left: aliveAfter };
+    if (youOut && me) elimination.current = { stage, you: me.points, line, placement: match.placement, out: knockedOut.length, left: aliveAfter, lastCut: final };
   }, [stage]);
   return (
     <div class={`screen crowd-cut judge${slammed ? " slammed" : ""}`} onClick={() => !match.serverPaced && !augments && !why && match.continueFromBreak()}>
       <div class="cut-head">
         <span class="cut-badge">CUT</span>
         <span>
-          {knockedOut.length} out · {aliveAfter} left{final ? ` · the ${next.toLowerCase()} is next` : ""}
+          {/* (Real numbers: ties at the line go through, so a cut can take fewer than usual, or nobody.) */}
+          {knockedOut.length ? `${knockedOut.length} out` : "Nobody out, ties go through"} · {aliveAfter} left{final ? ` · the ${next.toLowerCase()} is next` : ""}
         </span>
       </div>
       <div class="judge-stage">
@@ -658,7 +661,7 @@ export function CrowdCut({
       )}
       {why && (
         <div onClick={(e) => e.stopPropagation()}>
-          <Breakdown moves={match.moves} you={me?.points} line={line} placement={match.placement} onClose={() => setWhy(false)} />
+          <Breakdown moves={match.moves} you={me?.points} line={line} placement={match.placement} lastCut={final} onClose={() => setWhy(false)} />
         </div>
       )}
       {augments && !youOut && !outBefore && (

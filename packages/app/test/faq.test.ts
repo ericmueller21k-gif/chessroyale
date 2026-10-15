@@ -230,6 +230,27 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain("among at least 7 pickers");
   });
 
+  it("the opening allowance: its numbers from the settings, and both of the reveal's notes", () => {
+    const t = section("scoring");
+    expect(t).toContain("Through move 10, the first 8 points a move gives away don't count (less each move after that, and none from move 14)");
+    expect(t).toContain("−2.4 → 0 · opening");
+    expect(t).toContain("−4.1 · gave up material");
+    expect(t).toContain("−4.1 · missed a capture");
+    expect(t).toContain("gives up a pawn or more");
+    const moved = section("scoring", { ...FAQ_DEFAULTS, allowance: { points: 5, flatThrough: 8, goneBy: 12, materialPawns: 2 } });
+    expect(moved).toContain("Through move 8, the first 5 points a move gives away don't count (less each move after that, and none from move 12)");
+    expect(moved).toContain("gives up 2 pawns or more");
+    // Never "free moves" or a "full grace": an allowance off each loss.
+    expect(text()).not.toMatch(/free moves?|full grace/i);
+  });
+
+  it("ties at the cut line go through; the boss's tied strike waits", () => {
+    const modes = section("modes");
+    expect(modes).toContain("everyone tied exactly with the last player through stays in, and the next cut takes the extra");
+    expect(modes).toContain("Only the last cut before the ending breaks a tie");
+    expect(modes).toContain("If two are still tied for the worst, nobody is struck");
+  });
+
   it("the worked example is scored by the game's own scoring", () => {
     const t = section("scoring");
     expect(t).toMatch(/A\s+0\.62\s+0\s+\+10/);

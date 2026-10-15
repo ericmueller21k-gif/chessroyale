@@ -1,6 +1,6 @@
 import { devices, expect } from "@playwright/test";
 import { Chess } from "chess.js";
-import { createLobbyFromHome, expectCoordsInSquares, named, soloFromHome, submitMove, test } from "./helpers.ts";
+import { createLobbyFromHome, engineTop, expectCoordsInSquares, named, soloFromHome, submitMove, test } from "./helpers.ts";
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -44,7 +44,7 @@ test("narrow phones: the top bar's numbers stay clear of the options button, and
     expect(bar.spill, `${device}: ${bar.text}`).toBeLessThanOrEqual(0);
     expect(bar.clear, `${device}: the cut pill runs under the options button`).toBeGreaterThanOrEqual(0);
     expect(bar.labelCut, `${device}: "Move 34 · cut in 2" is cut short`).toBe(false);
-    // Play to the first cut (16 go out) and hold it there.
+    // Play to the first cut (up to 16 go out: ties at the line go through) and hold it there.
     await expect
       .poll(
         async () => {
@@ -66,12 +66,59 @@ test("narrow phones: the top bar's numbers stay clear of the options button, and
       const chips = [...box.children].map((c) => ({ bottom: c.getBoundingClientRect().bottom, text: (c as HTMLElement).innerText, struck: getComputedStyle(c).textDecorationLine }));
       return { bottom: b.bottom, chips };
     });
-    // Every name shown is whole (no row cut in half), struck through, and "+N" counts the rest of the 16.
+    // Every name shown is whole (no row cut in half), struck through, and "+N" counts the rest of those out.
+    const out: number = await page.evaluate(() => (window as any).match.phase.knockedOut.length);
+    await expect(page.locator(".crowd-cut .cut-head")).toContainText(`${out} out`);
     for (const c of list.chips) expect(c.bottom, `${device}: "${c.text}" is cut off`).toBeLessThanOrEqual(list.bottom + 0.5);
     const more = list.chips.at(-1)!;
-    expect(more.text).toBe(`+${16 - (list.chips.length - 1)}`);
+    expect(more.text).toBe(`+${out - (list.chips.length - 1)}`);
     for (const c of list.chips.slice(0, -1)) expect(c.struck).toBe("line-through");
     expect(list.chips.length).toBeGreaterThanOrEqual(5);
+  }
+});
+
+test("the opening allowance on the reveal: a sound move off the engine's line counts 0, said in one line at 320 px", async ({ browser }) => {
+  test.setTimeout(3 * 60_000);
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  // The narrowest phone we support (320 px).
+  const page = await (await browser.newContext({ ...devices["iPhone SE"], browserName: undefined } as any)).newPage();
+  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=team&rounds=2&clock=40&augments=0");
+  await soloFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+  // A move in the engine's top 8 that gives away a little (0.5 to 6 points): under the allowance, so it counts 0.
+  const { fen, top } = await engineTop(page);
+  const best = (top[0] as any).expected as number;
+  const sound = top.find((m: any) => (best - m.expected) * 100 >= 0.5 && (best - m.expected) * 100 <= 6);
+  test.skip(!sound, "no top move in the band in this position");
+  await submitMove(page, sound!.move, fen);
+  await expect.poll(() => phase(page), { timeout: 60_000, intervals: [50] }).toBe("reveal");
+  // Hold the reveal (solo moves on by a timer).
+  await page.evaluate(() => clearTimeout((window as any).match.timer));
+  const line = page.locator(".poll-result .allowance-line");
+  await expect(line).toHaveText(/^−\d+\.\d → 0 · opening$/);
+  const oneLine = () =>
+    line.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { text: (el as HTMLElement).innerText, spill: el.scrollWidth - el.clientWidth, height: r.height, lineHeight: parseFloat(getComputedStyle(el).lineHeight), right: r.right, left: r.left, width: innerWidth };
+    });
+  const forgiven = await oneLine();
+  expect(forgiven.spill).toBeLessThanOrEqual(0);
+  expect(forgiven.height).toBeLessThan(forgiven.lineHeight * 1.5);
+  // The widest notes a move can get (a loss of 100, refused the allowance for material): still one line, on screen.
+  for (const [material, words] of [["missed", "missed a capture"], ["gave", "gave up material"]] as const) {
+    await page.evaluate((mat) => {
+      const m = (window as any).match;
+      const me = m.phase.mine.result.players.find((p: any) => m.isYou(p.playerId));
+      Object.assign(me, { loss: 100, material: mat });
+      delete me.counted;
+      m.emit();
+    }, material);
+    await expect(line).toHaveText(`−100.0 · ${words}`);
+    const wide = await oneLine();
+    expect(wide.spill, wide.text).toBeLessThanOrEqual(0);
+    expect(wide.height, wide.text).toBeLessThan(wide.lineHeight * 1.5);
+    expect(wide.left, wide.text).toBeGreaterThanOrEqual(0);
+    expect(wide.right, wide.text).toBeLessThanOrEqual(wide.width);
   }
 });
 

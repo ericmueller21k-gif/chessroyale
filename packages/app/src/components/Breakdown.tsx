@@ -12,7 +12,22 @@ const moveNo = (fen: string) => Number(fen.split(" ")[5] ?? 1);
  * most (what you played, the best move, how many found it), and every move. Tap a move to see the position
  * with your move (red) and the best (green). Close calls were re-checked with a deeper search before the cut.
  */
-export function Breakdown({ moves, you, line, placement, onClose }: { moves: readonly MoveRecord[]; you?: number; line?: number; placement?: number | null; onClose: () => void }) {
+export function Breakdown({
+  moves,
+  you,
+  line,
+  placement,
+  lastCut,
+  onClose,
+}: {
+  moves: readonly MoveRecord[];
+  you?: number;
+  line?: number;
+  placement?: number | null;
+  /** You went out at the last cut before the ending, where a tie is broken (not kept in). */
+  lastCut?: boolean;
+  onClose: () => void;
+}) {
   const played = moves.filter((m) => m.bestMove);
   const costly = [...played].filter((m) => m.roundScore < 0).sort((a, b) => a.roundScore - b.roundScore).slice(0, 3);
   const brilliant = played.filter((m) => m.brilliant);
@@ -29,7 +44,17 @@ export function Breakdown({ moves, you, line, placement, onClose }: { moves: rea
       {short !== null && (
         <div class="breakdown-line">
           <p>
-            {placement ? `${placement}${ordinal(placement)} place. ` : ""}You finished <strong>{Math.abs(short).toFixed(1)} points</strong> {short > 0 ? "below" : "level with"} the last player through.
+            {placement ? `${placement}${ordinal(placement)} place. ` : ""}
+            {short >= 0.05 ? (
+              <>
+                You finished <strong>{short.toFixed(1)} points</strong> below the last player through.
+              </>
+            ) : lastCut ? (
+              // (A tie at any other cut goes through: only the last cut before the ending breaks one.)
+              "You finished level with the last player through. At the last cut a tie goes to fewer points given away before the opening allowance, then to less thinking time."
+            ) : (
+              "You finished less than 0.1 points below the last player through."
+            )}
           </p>
           <div class="line-scores">
             <span class="line-score you">You {fmt(you!)}</span>
@@ -60,6 +85,13 @@ export function Breakdown({ moves, you, line, placement, onClose }: { moves: rea
       <p class="muted small">Scores compare your move with everyone who picked that turn. Close calls are re-checked with a deeper search before every cut.</p>
     </div>
   );
+}
+
+/** The opening allowance on a move, after its loss: what counted, or why all of it did. */
+function allowanceWords(m: MoveRecord): string {
+  if (m.material) return m.material === "missed" ? "; it missed a capture, so all of it counted" : "; it gave up material, so all of it counted";
+  if (m.counted === undefined) return "";
+  return m.counted < 0.05 ? "; none of it counted: the opening allowance" : `; ${m.counted.toFixed(1)} counted after the opening allowance`;
 }
 
 function MoveRow({ m, open, onOpen }: { m: MoveRecord; open: boolean; onOpen: () => void }) {
@@ -93,7 +125,7 @@ function MoveRow({ m, open, onOpen }: { m: MoveRecord; open: boolean; onOpen: ()
           />
           </div>
           <p class="small">
-            {m.move ? `You played ${m.san}${m.loss !== null ? ` (${m.loss.toFixed(1)} points from the best)` : ""}.` : "You didn't move in time."}{" "}
+            {m.move ? `You played ${m.san}${m.loss !== null ? ` (${m.loss.toFixed(1)} points from the best${allowanceWords(m)})` : ""}.` : "You didn't move in time."}{" "}
             {same ? "That was the best move." : `Best was ${best}.`} Everyone's average loss: {m.avgLoss?.toFixed(1) ?? "?"}.
           </p>
         </div>

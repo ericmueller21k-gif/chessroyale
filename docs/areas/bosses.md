@@ -22,6 +22,12 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   Hidden Boss) is the only boss it meets, for everyone, whatever was picked or met last (the runner's `startBoss`); with
   none marked it would be a random playable boss again. His name is one string in the roster (Eric will rename him): the
   vote's card, the FAQ and every screen take it from there. Details: [crowd.md](crowd.md), "The endings".
+- **The strike** (`bossKillDue`, `strikeVictim`, `bossKill` in `match.ts`): every `bossKillEvery` crowd moves the boss
+  knocks out the player with the most **counted** points lost since its last strike (the opening allowance taken off:
+  a raid starts at move 6, so its first moves are covered; [crowd.md](crowd.md)), a tie going against the weaker
+  player over the match (`matchLoss`), down to `minSurvivors` (half a raid). Still tied on both (everyone sound in the
+  opening, say): nobody is struck, and the strike is due again after the next crowd move (`strikeIn` stays at "Strikes
+  after this move"; never two at once). DECISIONS.md, "Opening grace and ties survive the cut".
 - **Strength:** a rating on Stockfish's scale from the crowd's ratings (people only; Eric, Oct 12), the raid's tiers or
   solo's difficulty, plus the boss's offset. Stockfish plays it at that UCI_Elo with the blunder guard (see
   [engine.md](engine.md)).

@@ -2986,6 +2986,16 @@ button.history-label {
 .poll-result .round-score {
   font-size: 26px;
 }
+/* The opening allowance on your pick ("−2.4 → 0 · opening"): its own line, never wrapped. */
+.allowance-line {
+  flex-basis: 100%;
+  display: block;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .crowd-cut {
   justify-content: center;
   text-align: center;

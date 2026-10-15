@@ -18,9 +18,35 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   expected score), from the judge's numbers. A miss scores `missedMoveScore`. Scores carry over all game in Crowd. A
   **brilliant** move is one that separated the field (among enough pickers); a pick made after a power-up's hints
   can't be brilliant.
+- **The opening allowance** (Eric, Oct 15; DECISIONS.md, "Opening grace and ties survive the cut";
+  `OPENING_ALLOWANCE`, `reports/opening-allowance.md`). A pick's **counted loss** is its raw loss less
+  `openingAllowance(n)`: `points` (8) through move `flatThrough` (10), then in a line to nothing at `goneBy` (14). `n`
+  is the game's own move number (the position's fullmove number), the same in every mode: Crowd from move 1, a raid
+  from move 6, Classic's boards from move 5 (and a replaced board's again), the Crowd's boss final from move 1 of its
+  fresh board. **The material fallback:** a pick that gives up `materialPawns` (1) or more against the engine's best
+  move by the exchange check (`exchangeNet`, `materialSlips` in `packages/chess/src/rules.ts`: its own small board,
+  one capture and the exchange on its square, about 0.15 ms a move) gets no allowance (`material`: "gave" or
+  "missed"). The runner works it out in `resolveBoard` (`allowanceFor`: only while the allowance applies, only the
+  distinct picks), after the bosses' rules have adjusted the numbers (`judgeEvaluation`), and hands `scoreGroup` each
+  pick's allowance. Counted losses make the round scores (and the group average), standings, cuts, the boss's strikes
+  (`finalLosses`), `matchLoss` (`countedLossSum`) and final placements; **raw** losses stay for the board's draw,
+  brilliance, ratings and fair play (`lossesByStage`), and a miss costs as before. Bots unchanged. The reveal says it
+  in one line (`allowanceNote` in `game.ts`): "−2.4 → 0 · opening", "−4.1 · gave up material", "−4.1 · missed a
+  capture" (Crowd under the poll, Classic under the round score, a boss battle in the dock's "You:" line); the
+  breakdown says what counted. Squads isn't scored per move: untouched.
 - **The cut.** After each stage (`firstStageRounds`, then `roundsPerStage`) the lowest scorers are knocked out
-  (`knockoutsPerStage`; in 50 v 50 the same number from each team). The cut is a judgment: every player's pawn in a
-  10 × 10 grid, the gavel, the verdict, "Why was I cut?" (the elimination breakdown). `stageBreakSeconds` 10.
+  (`knockoutsPerStage`; in 50 v 50 the same number from each team). **Ties at the line go through** (`cutPlan` in
+  `match.ts`): everyone tied exactly (`sameScore`) with the last player through stays in; nobody goes out on thinking
+  time or a coin flip. What that leaves over is owed by the next cut (`cutCarry`, per team in 50 v 50), so the endings
+  keep their sizes. **The last cut before a fixed-size ending** (`isLastCut`) takes exactly what's owed: an exact tie
+  there goes to less raw loss over the match (`rawLossTotal`, a miss counting `finalMissLoss`), then less thinking time
+  (over the match in Crowd, the stage in Classic), then a coin. `standings()` orders by the same keys, so a cut is always
+  the bottom of the list. The team final's steps break a tie the same way. Classic keeps enough boards for its
+  survivors (`ceil(survivors / groupSize)`, never fewer than the plan's). Every screen draws the line from the runner:
+  `cutoff()` (how many would go through now) and each standing's `cut` flag (a team's line in 50 v 50, `towerView`).
+  The cut is a judgment: every player's pawn in a 10 × 10 grid, the gavel, the verdict ("N out · M left", or "Nobody
+  out, ties go through"), "Why was I cut?" (the elimination breakdown: "level with the last player through" only at the
+  last cut, with why). `stageBreakSeconds` 10.
 - **Pre-game votes (50 v 50, `augments`).** Before move 1 everyone votes by dragging their pawn into one of three zones
   on an empty board (or tapping a card): how it ends (**team final**, **the Hidden Boss** (the boss final), **duel**), then "How fast?", a
   chess time control (**Rapid 10+5**, **Blitz 5+3**, **Bullet 3+2**; Blitz when nobody votes). The options and what
@@ -92,7 +118,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 | What | Where |
 | --- | --- |
 | Stages, grouping, the cut, retirement, bot picks (pure) | `packages/core/src/match.ts` |
-| Scoring, brilliant moves | `packages/core/src/scoring.ts` |
+| Scoring, the opening allowance, brilliant moves | `packages/core/src/scoring.ts`; the exchange check `packages/chess/src/rules.ts` (`exchangeNet`, `materialSlips`) |
+| The cut: ties, what's owed, the last cut's tie-break | `packages/core/src/match.ts` (`cutPlan`, `standings`, `endStage`) |
 | Pre-game votes | `packages/core/src/votes.ts`; screen `packages/app/src/screens/Vote.tsx` |
 | The match runner (rounds, judging, the boss battle) | `packages/chess/src/runner.ts` |
 | Boards and their positions (bases, replays) | `packages/chess/src/boards.ts`, `rules.ts` (`fenAtPly`) |
@@ -105,13 +132,20 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 
 ## Settings
 
-`LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `CROWD_EVERYONE_KNOCKOUTS`, `PACE_SETTINGS`
+`OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `CROWD_EVERYONE_KNOCKOUTS`, `PACE_SETTINGS`
 (relaxed/quick; tests use quick), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
 `moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
 time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
 
 ## Tests and tools
 
+- The opening allowance and ties: unit `packages/core/test/opening-allowance.test.ts` (the taper, counted against raw,
+  brilliance on raw), `cut-ties.test.ts` (ties go through, what's owed carries, the endings' sizes, the last cut's
+  tie-break, 50 v 50's teams, the boss's tied strike, the team final's steps), `packages/chess/test/exchange.test.ts`
+  (the exchange check: hanging, a missed capture, a gambit, en passant, promotion, a capture with check; two judges
+  agree), `runner.test.ts` (Classic's boards with ties kept in), `packages/app/test/faq.test.ts`. Sims:
+  `packages/sim/scripts/opening-allowance.ts` (the calibration, `reports/opening-allowance.md`) and
+  `allowance-sim.ts` (before/after Crowd matches, `reports/allowance-sim.md`).
 - Unit: `packages/core/test/match.test.ts`, `scoring.test.ts`, `votes.test.ts`, `brilliance.test.ts`,
   `packages/chess/test/crowd.test.ts`, `runner.test.ts`, `replay-cache.test.ts`, `long-match.test.ts`. The clock vote:
   `votes.test.ts` (each time control, the bank math, the calibration), `crowd.test.ts` (the runner) and

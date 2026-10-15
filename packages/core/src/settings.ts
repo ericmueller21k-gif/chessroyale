@@ -395,6 +395,23 @@ export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRo
   stage === 0 ? s.firstStageRounds : s.roundsPerStage;
 
 /**
+ * The opening allowance (Eric, Oct 15, 2026; DECISIONS.md, "Opening grace and ties survive the cut"): early in a game a
+ * move's loss counts for points only beyond `points`, so a sound move off the engine's line costs nothing, while poor
+ * play still costs. The move number is the game's own (the position's fullmove number: "Move 6" on the top bar), the
+ * same in every mode: the whole allowance through move `flatThrough`, then falling in a line to nothing at move
+ * `goneBy` (nothing from there on). A move that gives up at least `materialPawns` pawns of material against the
+ * engine's best move by the exchange check (it leaves something to be taken, or passes up a capture that wins
+ * material: `materialSlips` in the chess package) gets no allowance at all. Measured in reports/opening-allowance.md.
+ * The FAQ and the screens read these numbers from here.
+ */
+export const OPENING_ALLOWANCE = {
+  points: 8,
+  flatThrough: 10,
+  goneBy: 14,
+  materialPawns: 1,
+} as const;
+
+/**
  * Crowd mode: 100 players on one board from the starting position, the most
  * popular pick always played. No cuts for the first 10 moves (20 plies), then
  * a cut after every move (2 plies) down to the final four, who play the 2v2.
