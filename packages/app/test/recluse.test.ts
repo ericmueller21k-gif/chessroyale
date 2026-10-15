@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BOSS_ROSTER } from "@chessroyale/core";
 import { CHARACTERS } from "../src/characters/index.ts";
 import { EFFECT_SPRITES } from "../src/characters/effects.ts";
-import { BOSS_KITS } from "../src/characters/kits.ts";
+import { BOSS_KITS, bossKit, kitName } from "../src/characters/kits.ts";
 import { ENGINE_EYE, HEAD_SIZE, RECLUSE, RECLUSE_BOOK, RECLUSE_BUST, headOf, palmOf } from "../src/characters/recluse.ts";
 import { frameKeys, renderFrame, type Character } from "../src/characters/sprite.ts";
 
@@ -12,6 +12,18 @@ import { frameKeys, renderFrame, type Character } from "../src/characters/sprite
 // are made here for all three.
 const top = (keys: (string | null)[][]) => keys.findIndex((r) => r.some(Boolean));
 const ALL: readonly Character[] = [RECLUSE, RECLUSE_BUST, RECLUSE_BOOK];
+
+describe("his name is one edit (Eric, Oct 14: he'll be renamed)", () => {
+  it("renamed in the roster, he keeps his kit: screens find it by the name they show", () => {
+    const renamed = BOSS_ROSTER.map((b) => (b.id === "recluse" ? { ...b, name: "A Powerful Foe" } : b));
+    expect(kitName("A Powerful Foe", renamed)).toBe("Hidden Boss");
+    expect(BOSS_KITS[kitName("A Powerful Foe", renamed)]).toMatchObject({ ch: RECLUSE });
+    // Today's names are kits' own names; an unknown name stays as it is (no kit).
+    expect(kitName("Hidden Boss")).toBe("Hidden Boss");
+    expect(kitName("Jefferson")).toBe("Jefferson");
+    expect(bossKit("Nobody")).toBeNull();
+  });
+});
 
 describe("the Hidden Boss's art", () => {
   it("is his kit's drawing (the bust in a phone's bar), one roster entry hidden from players; his book isn't on the board yet", () => {

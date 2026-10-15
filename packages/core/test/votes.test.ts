@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  CROWD_KNOCKOUTS,
   CROWD_SETTINGS,
   DEFAULT_SETTINGS,
+  crowdFinalBoss,
+  crowdFinalists,
   PREGAME_VOTES,
   VOTE_SPOT_MARGIN,
   allowedMs,
@@ -53,6 +56,35 @@ describe("every vote's options keep one fixed order (Eric, Oct 13: \"should neve
       // Its own inverse: a zone gives back the option it holds.
       for (const option of [0, 1, 2]) expect(voteZoneFor(voteZoneFor(option, viewer), viewer)).toBe(option);
     }
+  });
+});
+
+describe("how it ends: the boss final is the Hidden Boss's (Eric, Oct 14)", () => {
+  const format = PREGAME_VOTES.find((v) => v.id === "format")!;
+  const boss = format.options.find((o) => o.id === "boss")!;
+
+  it("its card is the boss it always meets, named and drawn as the roster has him, and how many face him (the top 4), from the settings", () => {
+    const him = crowdFinalBoss()!;
+    expect(boss.label).toBe(him.name);
+    expect(boss.label).toBe("Hidden Boss");
+    expect(boss.icon).toBe(him.icon);
+    expect(boss.blurb).toBe(`Top ${crowdFinalists("boss")} team up against him`);
+    expect(boss.blurb).toBe("Top 4 team up against him");
+    // Its place and the default stay (Team final; Eric, Oct 13: options never move).
+    expect(format.options.indexOf(boss)).toBe(1);
+    expect(format.options[format.defaultOption]!.id).toBe("team");
+  });
+
+  it("winning it sets the boss final and its knockouts, which leave the top 4 (the duel's cuts, stopping at four)", () => {
+    expect(boss.patch).toEqual({ finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss });
+    expect(CROWD_KNOCKOUTS.boss).toEqual(CROWD_KNOCKOUTS.duel.slice(0, -1));
+    expect(crowdFinalists("boss")).toBe(4);
+    expect(crowdFinalists("team")).toBe(8);
+    expect(crowdFinalists("duel")).toBe(2);
+    // The same number from each team at every cut.
+    for (const k of CROWD_KNOCKOUTS.boss) expect(k % 2).toBe(0);
+    // A count from other knockouts, or another lobby.
+    expect(crowdFinalists("boss", { ...CROWD_KNOCKOUTS, boss: [90] }, 100)).toBe(10);
   });
 });
 

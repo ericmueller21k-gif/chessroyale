@@ -80,16 +80,19 @@ export class Chatter {
 }
 
 /**
- * Whether he may talk now, and in which phase (null: not his fight, or not now). Phase 1: on the crowd's move, once its
- * clock runs, and while he thinks over his own (so never over his intro, his moments or his fall), until he's beaten. Phase 2: while any board is in play;
+ * Whether he may talk now, and in which phase (null: not his fight, or not now). Only to those fighting him: never to a
+ * player out of the match (online, the Crowd final's spectators). Phase 1: on your move, once its clock runs, and while
+ * he thinks over his own (so never over his intro, his moments or his fall), until he's beaten. Phase 2: while any board is in play;
  * `startAt` is when its clocks started.
  */
-export function talkWhen(view: Pick<GameView, "boss" | "phase" | "simul">, now: number): { phase: TalkPhase; startAt?: number } | null {
+export function talkWhen(view: Pick<GameView, "boss" | "phase" | "simul" | "standings">, now: number): { phase: TalkPhase; startAt?: number } | null {
   if (view.boss?.id !== "recluse") return null;
+  // (Only for those fighting him: a player knocked out before his final watches it without his muttering.)
+  if (view.standings().some((s) => s.isYou && s.out)) return null;
   const p = view.phase;
   if (p.kind === "simul") return view.simul?.playing && !view.simul.decided ? { phase: 2, startAt: p.at } : null;
   if (view.boss.result) return null;
-  if ((p.kind === "play" || p.kind === "watching") && now >= p.startsAt) return { phase: 1 };
+  if (p.kind === "play" && now >= p.startsAt) return { phase: 1 };
   // (Or while he thinks over his move: his moments come after it.)
   if (p.kind === "boss" && p.thinking && !p.intro && !p.lights && !p.fall) return { phase: 1 };
   return null;

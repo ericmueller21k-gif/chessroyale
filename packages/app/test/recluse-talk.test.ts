@@ -176,9 +176,9 @@ describe("his chatter", () => {
     expect(voice.line(2000 + holdMs(RECLUSE_LINES.bullet[0]) - 1)?.text).toBe(RECLUSE_LINES.bullet[0]);
   });
 
-  it("talks in phase 1 on the crowd's move once its clock runs, until he's beaten; in phase 2 while a board is in play; never for another boss", () => {
+  it("talks in phase 1 on your move once its clock runs or while he thinks, until he's beaten; in phase 2 while a board is in play; never to a player who's out, nor for another boss", () => {
     const boss = { id: "recluse" } as GameView["boss"];
-    const v = (phase: unknown, b = boss, simul: unknown = null) => ({ boss: b, phase, simul }) as Pick<GameView, "boss" | "phase" | "simul">;
+    const v = (phase: unknown, b = boss, simul: unknown = null, out = false) => ({ boss: b, phase, simul, standings: () => [{ isYou: false, out: true }, { isYou: true, out }] }) as unknown as Pick<GameView, "boss" | "phase" | "simul" | "standings">;
     expect(talkWhen(v({ kind: "play", startsAt: 100 }), 100)).toEqual({ phase: 1 });
     expect(talkWhen(v({ kind: "play", startsAt: 100 }), 99)).toBeNull();
     expect(talkWhen(v({ kind: "boss", until: 0 }), 100)).toBeNull();
@@ -190,6 +190,10 @@ describe("his chatter", () => {
     expect(talkWhen(v({ kind: "simul", at: 50 }, boss, { playing: true, decided: false }), 100)).toEqual({ phase: 2, startAt: 50 });
     expect(talkWhen(v({ kind: "simul", at: 50 }, boss, { playing: true, decided: true }), 100)).toBeNull();
     expect(talkWhen(v({ kind: "results" }), 100)).toBeNull();
+    // (A player knocked out before his final, online: watching, not fighting him.)
+    expect(talkWhen(v({ kind: "play", startsAt: 0 }, boss, null, true), 100)).toBeNull();
+    expect(talkWhen(v({ kind: "boss", until: 0, thinking: true }, boss, null, true), 100)).toBeNull();
+    expect(talkWhen(v({ kind: "spectating", boards: [] }), 100)).toBeNull();
   });
 
   it("lines: no country or its people; each stage enough for a long fight before any repeats", () => {

@@ -23,7 +23,7 @@ export type ModeChoiceId = GameMode | "raid";
 /**
  * How a Crowd 50 v 50 match ends (chosen by the pre-game vote):
  * - team: the top 8 play on, 4v4 with teammates taking turns, shrinking to 3v3 and then 2v2, which plays to the end
- * - boss: the top 10 team up on a fresh board against a boss (BOSS_BRAIN: Maia or Stockfish), which strikes down the weakest every few moves
+ * - boss: the top 4 team up on a fresh board against the Hidden Boss (Eric, Oct 14: always him, `crowdFinalBoss` in boss.ts)
  * - duel: the best player on each side plays 1v1 to the end
  */
 export type FinalFormat = "team" | "boss" | "duel";
@@ -90,7 +90,8 @@ export interface Settings {
   bossUnfinished: boolean;
   /**
    * Testing, admins only, Boss alone: `bossId` may be a boss hidden from players (BossDef.adminOnly: the Hidden Boss,
-   * Eric, Oct 14: "for testing available in boss mode with bots for now"). Off everywhere else, so he's never met there.
+   * Eric, Oct 14: "for testing available in boss mode with bots for now"). Off everywhere else. (The Crowd's boss final
+   * meets him for everyone without it: `crowdFinalBoss` in boss.ts.)
    */
   bossHidden?: boolean;
   /**
@@ -369,6 +370,12 @@ export const DEFAULT_SETTINGS: Settings = {
   finalMissLoss: 25,
 };
 
+/**
+ * Test switch ?weakbots=1 (solo, and a lobby you create): every bot at least this loose (`botSkillRange`), so a test
+ * playing the engine's best move is sure to survive the cuts (to the Crowd's top 4, say). Never for players.
+ */
+export const WEAK_BOT_SKILL: readonly [number, number] = [8, 32];
+
 /** `count` bot skills spread evenly on a log scale across `botSkillRange`, strongest first. */
 export function botSkillSpread(count: number, settings: Settings = DEFAULT_SETTINGS): number[] {
   const [lo, hi] = settings.botSkillRange;
@@ -392,10 +399,14 @@ export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRo
  * Scores carry over all game (a stage is only one move long). 3 power-ups,
  * none earned.
  */
-/** Crowd 50 v 50 knockouts for each way to end: they leave 8 (team final), 10 (boss battle) or 2 (duel). */
+/**
+ * Crowd 50 v 50 knockouts for each way to end: they leave 8 (team final), 4 (the boss final, against the Hidden Boss) or
+ * 2 (duel); `crowdFinalists` says how many. The boss final's are the duel's cuts stopping at four (Eric, Oct 14: "the top
+ * four always battle versus [him]"; it was the top 10 against a random boss).
+ */
 export const CROWD_KNOCKOUTS: Record<FinalFormat, readonly number[]> = {
   team: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4],
-  boss: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 2],
+  boss: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2],
   duel: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2, 2],
 };
 /** Crowd "everyone moves": down to 4 for the 2v2 final. */
@@ -428,6 +439,14 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   stageBreakSeconds: 10,
   botThinkSeconds: [2, 14],
 };
+
+/**
+ * How many play a Crowd 50 v 50's ending (`format`): the lobby less every knockout (the team final 8, the boss final 4,
+ * the duel 2). The vote's cards, the FAQ and the screens take the number from here, never typed.
+ */
+export function crowdFinalists(format: FinalFormat, knockouts: Readonly<Record<FinalFormat, readonly number[]>> = CROWD_KNOCKOUTS, lobbySize = CROWD_SETTINGS.lobbySize ?? DEFAULT_SETTINGS.lobbySize): number {
+  return lobbySize - knockouts[format].reduce((a, b) => a + b, 0);
+}
 
 /**
  * Boss raid: everyone (up to 50, no bots) picks the crowd's moves together
@@ -787,8 +806,9 @@ export const HOLLOW_LIGHTS: { readonly colours: readonly { readonly name: string
 
 /**
  * The Hidden Boss's phase 2 (Eric, Oct 14; DECISIONS.md, "The Hidden Boss, phase 2"): four boards of Chess960 at once,
- * each from its own start position, against Stockfish (never Maia: it can't play Chess960). Today an admin's fight in
- * Boss alone, on this device: you on one board, bots on the other three.
+ * each from its own start position, against Stockfish (never Maia: it can't play Chess960). Solo only, on this device:
+ * an admin's Boss alone (you on one board, bots on the other three) and a solo Crowd's boss final (the other finalists on
+ * the other three; Oct 14). Not online yet: there phase 1 won is the crowd's victory.
  */
 /**
  * The Hidden Boss's chatter (Eric, Oct 15: "he stopped saying voice lines after like 10 moves... he should be slowly,
@@ -847,7 +867,10 @@ export const RECLUSE_PHASE2 = {
   slowMoveSeconds: 5,
   slowMovesForUlt: 10,
   ultMoveSeconds: 5,
-  /** The bots on the other boards (Boss alone): Stockfish at this strength, this many nodes, within `botMoveMs`. */
+  /**
+   * The bots on the other boards (Boss alone's, or a solo Crowd's finalists beside you): Stockfish at this strength, this
+   * many nodes, within `botMoveMs`.
+   */
   botElo: 2200,
   botNodes: 100_000,
   /** A bot's thinking per move (ms, its own clock running): a random time in this range, as a bullet player's. */
