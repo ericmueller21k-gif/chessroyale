@@ -1,6 +1,6 @@
 import { Fragment } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, FAIRPLAY, SLOT_NAMES, bossInfo, isShiny, itemColor, itemDef, purity, tierInfo, type ItemLook } from "@chessroyale/core";
+import { BOSS_TIERS, FAIRPLAY, SLOT_NAMES, bossInfo, isShiny, itemColor, itemDef, purity, secondColor, tierInfo, type ItemLook } from "@chessroyale/core";
 import { BackButton, DressedPawn, FdButton, GearIcon, RankPill, WORN_ORDER } from "../components/FrontDoor.tsx";
 import { ItemArt } from "../components/Items.tsx";
 import { IconEditor, UserIcon } from "../components/PixelIcon.tsx";
@@ -49,7 +49,8 @@ function Wearing({ look, own }: { look: ItemLook; own: boolean }) {
       {!rows.length && <p class="fd-note">{own ? "Nothing yet. Open a crate in the shop, then wear it from your locker." : "Nothing yet."}</p>}
       {rows.map(({ slot, it, d }) => {
         const c = itemColor(it.color);
-        const c2 = it.color2 ? itemColor(it.color2) : null;
+        const second = secondColor(it);
+        const c2 = second ? itemColor(second) : null;
         const tier = tierInfo(d.tier);
         return (
           <div key={slot} class="fd-item">

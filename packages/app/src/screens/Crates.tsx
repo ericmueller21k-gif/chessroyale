@@ -20,6 +20,7 @@ import {
   itemDef,
   purity,
   rollBlemish,
+  secondColor,
   stackItems,
   tierInfo,
   wornFromLocker,
@@ -44,8 +45,13 @@ const pct = (x: number) => (x >= 0.01 ? `${(x * 100).toFixed(x >= 0.1 ? 0 : 1)}%
 
 /** An item's one-line finish: "Emerald · Purity 91.5%". */
 /** Its color name (both, for a two-color item). */
-export const colorName = (it: { color: string; color2?: string | null }) => itemColor(it.color).name + (it.color2 ? ` & ${itemColor(it.color2).name}` : "");
-export const finishLine = (it: { color: string; color2?: string | null; blemish: number }) => `${colorName(it)} · Purity ${purity(it.blemish).toFixed(1)}%`;
+type Colored = { def: string; color: string; color2?: string | null; seed: number };
+/** An item's color, or both (two-color items, and the tube's second stripe color, which its seed gives). */
+export const colorName = (it: Colored) => {
+  const c2 = secondColor(it);
+  return itemColor(it.color).name + (c2 ? ` & ${itemColor(c2).name}` : "");
+};
+export const finishLine = (it: Colored & { blemish: number }) => `${colorName(it)} · Purity ${purity(it.blemish).toFixed(1)}%`;
 
 // ---------------- Crates ----------------
 

@@ -19,7 +19,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
      Winter's presents, Beta's supply boxes), which opens to one of that tier's items evenly, or on **Fischer Random**
      (Legendary and Mythic items only, by tier: Legendary 80, Mythic 20, shared evenly). Both crates: 40/26/18/14/2.
      A tier with no items is left off the strip, and a test keeps every live crate's tiers filled;
-  2. **its color** (red and yellow common, Pearl the rarest; some items roll a second color);
+  2. **its color** (red and yellow common, Pearl the rarest; some items roll a second color, and the Gift-Wrap Tube's
+     second stripe color comes from its seed instead, `secondColor`, so it's never stored);
   3. **its purity**: 100% minus a blemish of 0–100% (blotches over that share of its color); shiny at 90%+.
   Crates are opened on the server, so nobody can make themselves a Pearl crown. `CRATES_FREE` is on while testing.
 - **Items** have a slot (head, face, skin, weapon), are drawn on the pawn's 100 × 100 square, and fit by anchors
@@ -52,8 +53,10 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 ## Tests and tools
 
 - Unit: `packages/core/test/crates.test.ts`, `bot-looks.test.ts`, `packages/server/test/accounts.test.ts`,
-  `packages/app/test/blotches.test.ts`, `icon-pixels.test.ts`.
+  `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`, `icon-pixels.test.ts`.
 - e2e: `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts`.
+- The Fischer Random banner (`.fischer-stage` in styles.css): its band slants but the words stay level, so its padding
+  must clear the words' ends (about 0.06 of their width); `crate-banner.spec.ts` measures that every frame.
 - The fitting sheet: `npm run preview:items -- <scratch>/sheet.png items=<id>[,<id>]` (read the PNG; keep it out of
   the repo). `sheet=1` gives a short sheet to show a batch (cards, both pawns, `colors=`, `outfits=a+b;c`). `scale=1` or `scale=2`
   renders at that display scale, to look for stray pixels.

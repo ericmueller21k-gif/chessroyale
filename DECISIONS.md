@@ -4696,3 +4696,37 @@ and green alone, both projects (21 passed). `crowd-hidden.spec.ts:106` ("you rea
 the final) and `lobby-chat.spec.ts:28` (a box not there yet) on the computer passed alone. `recluse.spec.ts` now
 checks the phase change never repeats a line, the bar never says "Phase 2", the subtitle never says he's beaten, and
 the dock's clock line shows. Screenshots before and after at 390 and 1280 px: in the PR.
+
+### Crate art fixes: the Fischer Random banner, the Gift-Wrap Tube, a bigger Smiley Face (Eric, Oct 15, 2026)
+
+Eric opened crates on his iPhone and asked for three fixes. The calls:
+
+- **Fischer Random's banner cut off "a bit" (iPhone).** Not its width: the band slants 7° while the words stay level,
+  so the left end of "FISCHER RANDOM!" rises toward the band's top edge (and its right end drops toward the bottom
+  edge) by about 0.06 of the words' width. The band's padding was smaller than that, so the band's top edge cut the
+  tops of "FISCHER" in every font (measured 7 px over at 320-430 px in headless Chrome; the iPhone has the same
+  geometry). A smaller
+  text wouldn't help (the rise shrinks with the text), so the band is a little taller instead: its padding goes from
+  0.32/0.38 to 0.9/0.7 of the text size, the same banner otherwise. The words now stay 4.5-8 px inside the band at
+  320-430 px, 2.6 px or more in the widest fallback fonts tried (DejaVu Serif, and letter-spacing forced to
+  0.1em). On a computer the stage grows to 36% of its width (was 2/7) so the taller band's slanted ends stay inside it.
+  `crate-banner.spec.ts` now also measures every settled frame against the band's slanted edges (2 px or more inside),
+  at 320, 390 and 430 px.
+- **The Gift-Wrap Tube:** no gold end caps; thinner (8 wide, was 12) and a little longer (84 long, was 74 with its
+  caps); three diagonal stripes repeating its whole length, like a roll of wrapping paper: white, the item's color
+  and a second color. Each painted stripe set gets the usual blemish (blotches over exactly that share of it, measured
+  in a test), shine and finish; white stays white, like other fixed parts.
+- **The tube's second color comes from its seed, not storage** (`secondColor` in `crates.ts`): the item's seed picks
+  one by the usual color odds, never its first color. Every tube already owned gets one stable look on every device,
+  with nothing stored changed (no migration, Eric's inventory kept). A stored second color (two-color items) is always
+  used as before. Pearl can turn up as a second color (0.5%); next to white it reads as a faint lilac stripe, which
+  suits the rarest color.
+- **It's named and stacked by both colors**, as two-color items are: the reveal, locker and profile say "Cobalt &
+  Yellow", and the locker stacks tubes only with the same two colors (otherwise two different-looking tubes would show
+  as one). That's the one wording change.
+- **The Smiley Face is a third bigger** (radius 10.5 to 14, eyes, smile and lines with it), around the same middle,
+  which is its anchor at the piece's eyes, so it stays centered on every head, skin and screen. Its card frame grows
+  with it.
+- **Testing:** light/targeted lane (art and CSS): typecheck, the unit suite (a new `gift-tube.test.ts`: the stripes
+  tile the tube with no gaps or overlaps, and blotches match the purity on each painted set; `crates.test.ts`: the
+  second color is stable, never the first, follows the odds, and stacks), and the crate e2e specs.

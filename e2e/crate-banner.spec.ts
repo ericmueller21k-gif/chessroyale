@@ -36,8 +36,8 @@ test("crates: choose either crate; each shows its own boxes, spins them and open
 /**
  * The crate opening's "FISCHER RANDOM!" banner fits its words at every width (DECISIONS.md, "The computer's play
  * column, your icon, no sun"): on a computer it was cut off at both ends and top and bottom. Measured every animation
- * frame while it's up: the face and the words within the stage's width, the words within the band, the band within the
- * stage; and the words big enough to read.
+ * frame while it's up: the face and the words within the stage's width, the words within the band (its slanted edges
+ * too), the band within the stage; and the words big enough to read.
  */
 test("crates: the Fischer Random banner fits its words, phone and computer, with readable text", async ({ page }) => {
   test.setTimeout(3 * 60_000);
@@ -54,7 +54,22 @@ test("crates: the Fischer Random banner fits its words, phone and computer, with
       if (stage && band && words && text && sub && face) {
         const cs = getComputedStyle(band);
         const inner = band.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+        // The band slants 7° while the words stay level: how far each line's box stays inside the band's slanted
+        // edges (its top-left corner under the top edge, its bottom-right above the bottom edge), once the slam has
+        // settled (scale 1). Negative: cut off, as the tops of "FISCHER" were on an iPhone (Oct 15).
+        const b = band.getBoundingClientRect();
+        const tan = Math.tan((7 * Math.PI) / 180);
+        const cx = (b.left + b.right) / 2;
+        const cy = (b.top + b.bottom) / 2;
+        const clear = (e: HTMLElement) => {
+          const t = e.getBoundingClientRect();
+          const top = cy - band.offsetHeight / 2 + parseFloat(cs.borderTopWidth) - tan * (t.left - cx);
+          const bottom = cy + band.offsetHeight / 2 - parseFloat(cs.borderBottomWidth) - tan * (t.right - cx);
+          return Math.min(t.top - top, bottom - t.bottom);
+        };
+        const settled = ["1", "none"].includes(getComputedStyle(text).scale);
         log.push({
+          clear: settled ? Math.min(clear(text), clear(sub)) : Infinity,
           // (The share of the stage's width the face and the words take.)
           wide: (face.offsetWidth + parseFloat(cs.columnGap) + Math.max(text.scrollWidth, sub.scrollWidth)) / stage.clientWidth,
           tall: words.offsetHeight - inner,
@@ -68,7 +83,7 @@ test("crates: the Fischer Random banner fits its words, phone and computer, with
     };
     requestAnimationFrame(tick);
   });
-  const widths = test.info().project.name === "desktop" ? [1024, 1280, 1920] : [320, 390];
+  const widths = test.info().project.name === "desktop" ? [1024, 1280, 1920] : [320, 390, 430];
   for (const width of widths) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto("/shop?crates&fischer=1");
@@ -88,6 +103,9 @@ test("crates: the Fischer Random banner fits its words, phone and computer, with
     expect(worst("tall"), `${width}: taller than the band by`).toBeLessThanOrEqual(1);
     expect(worst("face"), `${width}: the face taller than the band by`).toBeLessThanOrEqual(0);
     expect(worst("band"), `${width}: the band taller than the stage by`).toBeLessThanOrEqual(0);
+    // (Settled frames were measured, and the words stay 2 px or more inside the slanted band in all of them.)
+    expect(log.filter((r) => r.clear !== Infinity).length, `${width}: settled frames`).toBeGreaterThan(10);
+    expect(least("clear"), `${width}: words inside the slanted band by`).toBeGreaterThanOrEqual(2);
     expect(least("text"), `${width}: text px`).toBeGreaterThanOrEqual(18);
     expect(least("sub"), `${width}: line px`).toBeGreaterThanOrEqual(11);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);

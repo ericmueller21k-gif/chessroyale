@@ -18,6 +18,7 @@ import {
   presentItems,
   purity,
   rollBlemish,
+  secondColor,
   rollCrate,
   stackItems,
   type CrateDef,
@@ -303,6 +304,30 @@ describe("crates", () => {
       it("g", "present", "red", 50, "emerald"),
     ]);
     expect(stacks.map((s) => s.items.map((i) => i.id))).toEqual([["b", "a", "f"], ["c"], ["d", "g"], ["e"]]);
+  });
+
+  it("the gift tube's second stripe color comes from its seed: stable, never its first color, by the color odds", () => {
+    const tube = (color: string, seed: number) => ({ def: "gift-tube", color, seed });
+    const counts = new Map<string, number>();
+    for (let seed = 0; seed < 20000; seed++) {
+      const c2 = secondColor(tube("red", seed * 104729 + 7))!;
+      expect(c2).toBe(secondColor(tube("red", seed * 104729 + 7)));
+      expect(c2).not.toBe("red");
+      counts.set(c2, (counts.get(c2) ?? 0) + 1);
+    }
+    // Every other color turns up, by its odds among the colors that aren't the first (yellow 30 of 70).
+    expect([...counts.keys()].sort()).toEqual(ITEM_COLORS.map((c) => c.id).filter((c) => c !== "red").sort());
+    expect(counts.get("yellow")! / 20000).toBeCloseTo(30 / 70, 1);
+    // A different first color can give a different second; a stored second color (two-color items) is kept; other
+    // one-color items have none.
+    for (const c of ITEM_COLORS) expect(secondColor(tube(c.id, 123))).not.toBe(c.id);
+    expect(secondColor({ def: "present", color: "red", color2: "emerald", seed: 5 })).toBe("emerald");
+    expect(secondColor({ def: "santa-beard", color: "red", seed: 5 })).toBeUndefined();
+    // So the locker stacks tubes by both colors.
+    const a = tube("red", 1);
+    const b = [2, 3, 4, 5, 6, 7, 8].map((s) => tube("red", s)).find((t) => secondColor(t) !== secondColor(a))!;
+    const items = [a, b, { ...a, seed: a.seed }].map((t, i) => ({ ...t, id: String(i), blemish: i }));
+    expect(stackItems(items).map((s) => s.items.map((i) => i.id))).toEqual([["0", "2"], ["1"]]);
   });
 
   it("a look from elsewhere keeps only valid slots", () => {

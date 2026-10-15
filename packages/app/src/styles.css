@@ -6621,21 +6621,27 @@ button.history-label {
  * face and the gaps, so the face and the words take about 80% of the stage's width in the widest font we've measured,
  * capped on a wide screen. The band grows to fit them, and the stage grows with its width so the slanted band stays
  * inside it. The line under it never goes below 11 px.
+ * The band slants (7°) but the words stay level, so their left end rises toward the band's top edge and their right
+ * end drops toward its bottom, by about 0.06 of the words' width: about 0.7 of --fs for "FISCHER RANDOM!" in the widest
+ * font. The band's padding clears that with room to spare (it cut the tops of "FISCHER" on an iPhone, Oct 15).
  */
 .fischer-stage {
   --fs: min(6.4cqw, 52px);
   position: relative;
   min-height: 210px;
 }
-/* (Its height: 2/7 of its width, at least 210 px. Padding, not aspect-ratio, which in the grid would set a width.) */
+/*
+ * (Its height: 36% of its width, at least 210 px, so the slanted band's ends stay inside it on a computer. Padding,
+ * not aspect-ratio, which in the grid would set a width.)
+ */
 .fischer-stage::before {
   content: "";
   display: block;
-  padding-top: 28.6%;
+  padding-top: 36%;
 }
 .fischer-stage .fight-banner .fb-band {
   height: auto;
-  padding: calc(var(--fs) * 0.32) 0 calc(var(--fs) * 0.38);
+  padding: calc(var(--fs) * 0.9) 0 calc(var(--fs) * 0.7);
   gap: calc(var(--fs) * 0.4);
 }
 .fischer-stage .fight-banner .fb-face {
