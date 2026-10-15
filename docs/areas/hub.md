@@ -58,7 +58,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   moves are scored (with the math and a worked example), how a boss decides its moves (its strength, Stockfish and
   Maia, the handover between them, what a rating gap means), boss powers and the rage meter (one block per boss), the
   God King and his Last Stand, leaving or resigning (the modes' last entry), crates and items, fair play (high level
-  only) and credits. Its words are in
+  only), credits, and links to the privacy policy and terms (the game's own pages open in the same tab, so their Back
+  returns to the FAQ). Its words are in
   `packages/app/src/faq/content.ts`, one entry per section in a small Markdown-like format (`faq/markdown.ts`), drawn
   by `screens/Faq.tsx`. **Every number comes from the settings objects** (`FaqSources`), never typed in.
   - **When a rule changes, its words in the FAQ change in the same PR** (a new boss: its block in `BOSS_BLOCKS`; a

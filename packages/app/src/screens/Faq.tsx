@@ -34,6 +34,9 @@ function Link({ href, children }: { href: string; children: ComponentChildren })
       </a>
     );
   }
+  // The game's own pages (the privacy policy, the terms) open here, and their Back comes back to the FAQ; files and
+  // other sites open in a new tab.
+  if (/^\/[a-z-]+$/.test(href)) return <a href={href}>{children}</a>;
   return (
     <a href={href} target="_blank" rel="noopener noreferrer">
       {children}
