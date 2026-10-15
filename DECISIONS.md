@@ -4903,8 +4903,8 @@ only in the repository. It's now served as the engines' source is, so it holds w
   dock's rounding (.claude/LESSONS.md, "A countdown that seemed to fire early"). The scoreboard's Bank, the board's
   clock and the HUD rounded down, so at the same moment they could show a second less than the dock. Its copies are
   gone (RaceTower's `clockText`, Recluse2's and the queue's `clock`); Squads' `bankText` is `clockShown` with
-  `tenths` (under ten seconds "9.4", still rounded down, as before). Over ten seconds a Squads bank now rounds up too
-  (3:05.4 reads "3:06"). The queue's "waiting 1:05" counts up, and rounding up there is a second ahead at most; one
+  `tenths`, unchanged: a chess clock's style, rounded down throughout ("3:05", then "9.4" under ten seconds), since
+  rounding up there would jump from "0:11" to "9.9" as the bank crosses ten seconds. The queue's "waiting 1:05" counts up, and rounding up there is a second ahead at most; one
   formatter is worth more than that second.
 - **`vite.config.ts` finds its files from its own folder** (`APP`), not the folder Vite started in. From the repo root,
   `npm run preview:items`, `frames:flash`, `frames:vote` and `node scripts/preview-god-king.mjs` failed with
