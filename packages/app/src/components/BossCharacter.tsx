@@ -73,8 +73,6 @@ const engine: { at: number | null } = { at: null };
 export function setEngineAt(at: number | null) {
   engine.at = at;
 }
-/** When his half-engine look came on (null: it hasn't). */
-export const engineAt = (): number | null => engine.at;
 /** The loop the figure rests in now, when a figure run is set (phase 2's `idle2`), else null. */
 export const figureLoop = (): string | null => figure.run?.loop ?? null;
 /** What a figure run shows at `now`, or null: none is set. */
