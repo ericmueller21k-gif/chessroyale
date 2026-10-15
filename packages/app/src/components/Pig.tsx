@@ -375,7 +375,7 @@ export const PIG_UI = {
   id: "pig",
   ultimate: { name: "SHOWDOWN!" },
   moments: {
-    pull: { order: 0, kit: "power" as KitMoment, dock: "Long pull!", line: lineOf("pull"), view: lassoMoment },
+    pull: { order: 0, kit: "power" as KitMoment, dock: "Long Pull!", line: lineOf("pull"), view: lassoMoment },
     drag: { order: 0, kit: "power" as KitMoment, dock: "Lasso!", line: (kit, m) => (m.ult ? lineOf("tug") : lineOf("power"))(kit, m), view: lassoMoment },
     showdown: { order: 2, kit: "ultimate" as KitMoment, dock: "Showdown!", view: showdownMoment },
   },

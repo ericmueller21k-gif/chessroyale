@@ -406,7 +406,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
       {hud}
       <div class={`board-area${slam ? " pw-slam" : ""}${jolt === "crash" ? " pw-crash" : jolt === "bump" ? " pw-bump" : ""}`}>
         <div class="opening-name">
-          <BossHeading side={boss.crowdSide} final={!boss.raid} note={fall ? "the boss is beaten" : lights ? "lights out" : thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
+          <BossHeading side={boss.crowdSide} final={!boss.raid} note={fall ? "the boss is beaten" : lights ? "Lights Out" : thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
         </div>
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           {bossSide}

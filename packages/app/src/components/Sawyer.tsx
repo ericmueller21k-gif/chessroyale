@@ -500,11 +500,11 @@ const splitLine = (kit: ReturnType<typeof bossKit>, m: Pick<Moment, "key">): str
 /** Sawyer's powers on screen. His rules: packages/chess/src/bosses/sawyer.ts. */
 export const SAWYER_UI = {
   id: "sawyer",
-  ultimate: { name: "the board saw" },
+  ultimate: { name: "the Board Saw" },
   moments: {
-    split: { order: 0, kit: "power", dock: "Split pawn!", line: splitLine, view: splitMoment },
-    cut: { order: 0, kit: "power", dock: "Saw cut!", appearAt: (m, square) => (m.squares?.includes(square) ? m.at + SAW_CUT.cutAt : undefined), view: cutMoment },
-    boardsaw: { order: 2, kit: "ultimate", dock: "Board saw!", view: boardSawMoment },
+    split: { order: 0, kit: "power", dock: "Split Pawn!", line: splitLine, view: splitMoment },
+    cut: { order: 0, kit: "power", dock: "Saw Cut!", appearAt: (m, square) => (m.squares?.includes(square) ? m.at + SAW_CUT.cutAt : undefined), view: cutMoment },
+    boardsaw: { order: 2, kit: "ultimate", dock: "Board Saw!", view: boardSawMoment },
   },
   // Under the pieces: the cut's groove and tape, the gap down the middle. Over them: his split pawns drawn as halves or
   // small (once they've landed; as ordinary pawns with the morph's "grow"), and markers for tests and readers.

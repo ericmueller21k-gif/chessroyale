@@ -5041,11 +5041,13 @@ From the slop audit (V3, V8, V11–V15, V19–V21, V23).
   Boss!", "the Hidden Boss mocks it"); his card, bar and headings say "Hidden Boss". That's `the: true` on his roster
   entry, and `bossInText` (core `boss.ts`) adds the word. If Eric gives him a real name, dropping the flag is the whole
   change.
-- **Power names** are written like ordinary words: lower case inside a sentence ("Next turn: the blizzard", "the Roman
-  candle", "Big Boy's big bounce"), a capital only where the name starts a label or a heading ("**Big bounce**
-  (ultimate)" in the FAQ). Banners shout in capitals. Wrangler's SHOWDOWN! stays his shout. The boss menu's power words
-  already followed this rule. The dock's own power words (e.g. "Big Bounce!") belong to the boss-screens batch, which
-  is rewriting the dock's lines (audit V2).
+- **Power names are proper names, in Title Case everywhere** (the director, Oct 15): Freeze, Blizzard, Pie, Funhouse,
+  Sparkler, Roman Candle, The Dark, Lights Out, Toy Blocks, Big Bounce, Split Pawn, Saw Cuts, Board Saw, Long Pull,
+  Lasso Drag, Showdown, No Help, Bullet. That goes for sentences ("Big Boy's Big Bounce"), the rage warning ("Next turn:
+  the Blizzard", with the article in lower case), the FAQ, the dock ("Toy Block!", "Split Pawn!") and the boss menu's
+  power words, which say what a passive does in lower case and name the power ("freezes a piece · Blizzard"). Banners
+  shout in capitals, as before. Generic words stay lower case ("his ultimate", "a power", "a toy block" as the thing on
+  the board). The bosses' own lines are speech and are left as written.
 - **Ranking:** "Unranked: solo games don't count for ranking", in the queue and on the results alike.
 - **Boss alone** (`bossAlone` in `game.ts`: a raid with one player) speaks to you: "You vs the boss.", "You beat …!",
   no "0/1 picked" or "1 vote", no "P1/1", no "most dangerous players" list of one. The scoreboard is just your own row

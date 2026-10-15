@@ -124,7 +124,7 @@ const extraMoment = ({ boss, t, banner }: MomentProps) => <div class="power-mome
 
 export const HOLLOW_UI = {
   id: "hollow",
-  ultimate: { name: "lights out" },
+  ultimate: { name: "Lights Out" },
   moments: {
     dark: {
       order: 0,

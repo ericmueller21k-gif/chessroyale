@@ -211,7 +211,7 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(t).toContain("On its third, the ice is gone and every piece moves again.");
     expect(t).toContain("The pieces that thaw next turn show cracked, dripping ice the turn before.");
     expect(t).toContain("in check, one that can get you out of it");
-    expect(t).toContain(`the blizzard's ${BOSS_POWERS.blizzardTurns} turns`);
+    expect(t).toContain(`the Blizzard's ${BOSS_POWERS.blizzardTurns} turns`);
     const longer = section("boss-powers", { ...FAQ_DEFAULTS, powers: { ...BOSS_POWERS, blizzardTurns: 4, blizzardFree: [[1, 1], [3, 3], [5, 7]] } });
     expect(longer).toContain("it lasts 4 turns.");
     expect(longer).toContain("On its second, 3 may move in all");

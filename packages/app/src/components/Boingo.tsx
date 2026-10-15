@@ -117,7 +117,7 @@ function spinMoment({ boss, t, banner }: MomentProps) {
 
 export const BOINGO_UI = {
   id: "clown",
-  ultimate: { name: "the funhouse" },
+  ultimate: { name: "the Funhouse" },
   moments: {
     pie: { order: 0, kit: "power", dock: "Pie!", appearAt: (m, square) => (m.square === square ? m.at + PIE.landAt : undefined), view: pieMoment },
     // The funhouse has a screen of its own, after the move he plays for the crowd: the board turns upside down and the
