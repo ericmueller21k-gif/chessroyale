@@ -17,6 +17,7 @@ import { sawyerSound, type SawyerSound } from "./characters/sawyer-sounds.ts";
 import { pigSound, type PigSound } from "./characters/pig-sounds.ts";
 import { recluseSound, type RecluseSound } from "./characters/recluse-sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
+import { captureWorkerError } from "./problems.ts";
 import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
 import { soundCache } from "./characters/synth.ts";
 import { CASTLE_SOUND, MOVE_SOUNDS, CAPTURE_SOUNDS, defaultPieceSound, onPieceSoundChange, pieceSound, pieceSoundOption, type PieceSoundKind } from "./piece-sounds.ts";
@@ -830,7 +831,11 @@ function soundWorker(): Worker | null {
       pending.delete(JSON.stringify([sound, rate]));
       if (data && !cached(sound, rate)) soundCache(sound[0]).set(`${sound[1]}@${rate}`, data);
     };
-    worker.onerror = () => {
+    // (Handled: its sounds are made in idle moments instead. Like the engines' workers', its error stays here, never
+    // a page error of its own, and is reported once: problems.ts.)
+    worker.onerror = (e) => {
+      e.preventDefault();
+      captureWorkerError("sound", e);
       worker?.terminate();
       worker = null;
       const left = [...pending].map((k) => JSON.parse(k) as [BossSound, number]);

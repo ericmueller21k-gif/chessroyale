@@ -70,7 +70,7 @@ test("settings: the sections in order, the board's choices stick, and Testing (p
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   // (Friends and Account show once accounts are on, Friends right after Quick chat; the order is the same either way.)
   const labels = async () => (await page.locator(".fd-settings .fd-label").allTextContents()).filter((l) => l !== "ACCOUNT" && l !== "FRIENDS");
-  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "QUICK CHAT", "HOW TO PLAY", "PRIVACY AND TERMS"]);
+  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS"]);
   // Gone (Eric, Oct 15): practice mode and the eval bar for players, the pre-game votes' and Classic's opening moves'
   // switches, the sound lab (its choice is the Reveal sound picker).
   await expect(page.getByRole("switch", { name: /Practice mode|Eval bar|Pre-game votes/ })).toHaveCount(0);
@@ -88,14 +88,14 @@ test("settings: the sections in order, the board's choices stick, and Testing (p
   // An admin: Testing, last, with practice mode (off until switched; it sticks) and the eval bar (on).
   await asAdmin(page);
   await page.reload();
-  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "QUICK CHAT", "HOW TO PLAY", "PRIVACY AND TERMS", "TESTING"]);
+  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS", "TESTING"]);
   const practice = page.getByRole("switch", { name: /Practice mode/ });
   await expect(practice).not.toBeChecked();
   await expect(page.getByRole("switch", { name: /Eval bar/ })).toBeChecked();
   await practice.click();
   await page.reload();
   await expect(page.getByRole("switch", { name: /Practice mode/ })).toBeChecked();
-  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
 });
 
