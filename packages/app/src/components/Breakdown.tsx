@@ -126,7 +126,8 @@ function MoveRow({ m, open, onOpen }: { m: MoveRecord; open: boolean; onOpen: ()
           </div>
           <p class="small">
             {m.move ? `You played ${m.san}${m.loss !== null ? ` (${m.loss.toFixed(1)} points from the best${allowanceWords(m)})` : ""}.` : "You didn't move in time."}{" "}
-            {same ? "That was the best move." : `Best was ${best}.`} Everyone's average loss: {m.avgLoss?.toFixed(1) ?? "?"}.
+            {same ? "That was the best move." : `Best was ${best}.`} Everyone's average loss:{" "}
+            {m.avgRaw !== undefined ? `${m.avgRaw.toFixed(1)} (${m.avgLoss?.toFixed(1) ?? "?"} after the opening allowance)` : (m.avgLoss?.toFixed(1) ?? "?")}.
           </p>
         </div>
       )}

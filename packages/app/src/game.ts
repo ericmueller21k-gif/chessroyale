@@ -54,8 +54,10 @@ export interface MoveRecord {
   bestMove?: string;
   found?: number;
   pickers?: number;
-  /** Everyone's average loss that turn. */
+  /** Everyone's average loss that turn, as it counted for points (the round score is measured from it). */
   avgLoss?: number | null;
+  /** The same before the opening allowance, when that differs. */
+  avgRaw?: number;
   /** Your pick separated the field (a brilliant move, made without a power-up). */
   brilliant?: boolean;
   usedPowerUp?: boolean;
@@ -94,7 +96,8 @@ export function moveRecordFrom(stage: number, round: number, mine: GroupReveal, 
     bestMove: mine.bestMove,
     found: picked.filter((p) => p.loss! <= 1.5).length,
     pickers: picked.length,
-    avgLoss: picked.length ? picked.reduce((s, p) => s + p.loss!, 0) / picked.length : null,
+    avgLoss: picked.length ? picked.reduce((s, p) => s + (p.counted ?? p.loss!), 0) / picked.length : null,
+    ...(picked.some((p) => p.counted !== undefined) ? { avgRaw: picked.reduce((s, p) => s + p.loss!, 0) / picked.length } : {}),
     brilliant: !!bril?.players.includes(me.playerId),
     usedPowerUp: !!me.usedPowerUp,
   };

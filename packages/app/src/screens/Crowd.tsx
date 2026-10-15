@@ -410,7 +410,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                         ? `${mine.kingCalls} of ${picks.length} called him · no score`
                         : "You called him · no score"
                       : "No move from you."
-                    : `You: ${toSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${allowanceNote(me) ?? fmt(me.roundScore)}) · best ${toSan(fen, mine.bestMove)}`}
+                    : // (The opening allowance on your pick, when it made a difference: the line is short, so the note alone.)
+                      (allowanceNote(me) ?? `You: ${toSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore)}) · best ${toSan(fen, mine.bestMove)}`)}
               </span>
             </>
             )
@@ -596,7 +597,7 @@ export function CrowdCut({
         <span class="cut-badge">CUT</span>
         <span>
           {/* (Real numbers: ties at the line go through, so a cut can take fewer than usual, or nobody.) */}
-          {knockedOut.length ? `${knockedOut.length} out` : "Nobody out, ties go through"} · {aliveAfter} left{final ? ` · the ${next.toLowerCase()} is next` : ""}
+          {knockedOut.length ? `${knockedOut.length} out` : "Nobody out"} · {aliveAfter} left{final ? ` · the ${next.toLowerCase()} is next` : ""}
         </span>
       </div>
       <div class="judge-stage">
@@ -641,7 +642,7 @@ export function CrowdCut({
               Why was I cut?
             </button>
           )}
-          <CutNames knockedOut={knockedOut} />
+          {knockedOut.length ? <CutNames knockedOut={knockedOut} /> : <p class="muted small">Everyone at the cut line was tied, and ties go through.</p>}
           {/* Out, you stay here until the results: quick chat with your team (online). */}
           {(youOut || me?.out) && <ChatSection match={match} />}
           {/* Or go: your place stands (online, home; solo, your result now). */}

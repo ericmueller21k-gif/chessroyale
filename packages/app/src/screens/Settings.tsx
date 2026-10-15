@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, OPENING_ALLOWANCE as A, RAID_SETTINGS as R, BOSS_TIERS, PREGAME_VOTES, crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
+import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, RAID_SETTINGS as R, BOSS_TIERS, PREGAME_VOTES, crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
@@ -63,12 +63,8 @@ export function HowToPlay() {
           picked with you.
         </li>
         <li>
-          <strong>An opening allowance.</strong> Through move {A.flatThrough} the first {A.points} points a move gives away don't count (none from
-          move {A.goneBy}), unless it gives up material or misses a capture.
-        </li>
-        <li>
           <strong>No cuts for the first {(C.firstStageRounds ?? 20) / 2} moves.</strong> Then after every move the lowest scorers go out (the
-          same number from each team); anyone tied with the last player through stays in.
+          same number from each team).
         </li>
         <li>
           <strong>⚡ {C.powerUpsAtStart} power-ups</strong> show the engine's top 3 moves. That's all you get, so pick your moments.

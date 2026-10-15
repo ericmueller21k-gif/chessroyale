@@ -5114,8 +5114,8 @@ poor, and not punish players not playing precise engine lines or slight variatio
 - **Players see it.** The reveal says it in one line (`allowanceNote`), tested at 320 px: "−2.4 → 0 · opening" (or
   "−9.6 → −1.6 · opening"), "−4.1 · gave up material", "−4.1 · missed a capture". Crowd: its own line under the poll's
   result; Classic: under the round score; a boss battle: in the dock's "You:" line instead of the round score. "Why was
-  I cut?" says what counted for each move. The FAQ's "The opening allowance" says both rules in two sentences; How to
-  play (Settings) has one line.
+  I cut?" says what counted for each move. The FAQ's "The opening allowance" says both rules in two sentences, and its
+  Crowd section says ties go through. Nothing in Settings: its How to play is becoming links to the FAQ (#232).
 
 ### Part 2: ties at the cut line survive
 

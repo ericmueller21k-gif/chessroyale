@@ -19,6 +19,7 @@
  *
  *   npx tsx packages/sim/scripts/opening-allowance.ts run <games> <seed> [engines=3]
  *   npx tsx packages/sim/scripts/opening-allowance.ts summary      -> reports/opening-allowance.md
+ * (The data behind the report is committed gzipped: reports/opening-allowance/seed1.jsonl.gz.)
  */
 import { mulberry32, shuffle, type Rng } from "@chessroyale/core";
 import { START_FEN, applyMove, exchangeNet, fenAfter, gameEnd, legalMoves, type Opening } from "@chessroyale/chess";
@@ -26,6 +27,7 @@ import { createNodeEngine } from "@chessroyale/chess/node";
 import { Chess } from "chess.js";
 import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { gunzipSync } from "node:zlib";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const out = root + "reports/opening-allowance/";
@@ -156,9 +158,10 @@ const pct = (xs: number[], p: number) => {
 const f1 = (x: number) => (Number.isNaN(x) ? "–" : x.toFixed(1));
 
 function summary() {
+  // (The committed data is gzipped: seedN.jsonl.gz; a fresh run writes seedN.jsonl.)
   const rows: Row[] = readdirSync(out)
-    .filter((f) => f.endsWith(".jsonl"))
-    .flatMap((f) => readFileSync(out + f, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as Row));
+    .filter((f) => f.endsWith(".jsonl") || (f.endsWith(".jsonl.gz") && !readdirSync(out).includes(f.slice(0, -3))))
+    .flatMap((f) => (f.endsWith(".gz") ? gunzipSync(readFileSync(out + f)).toString("utf8") : readFileSync(out + f, "utf8")).split("\n").filter(Boolean).map((l) => JSON.parse(l) as Row));
   // Sorted by the exchange check the game ships (rows written by an earlier version of it are re-checked).
   const bestOf = new Map(rows.filter((r) => r.rank === 1).map((r) => [r.fen, r.pick]));
   const memo = new Map<string, { bestNet: number; bestIsCapture: boolean }>();

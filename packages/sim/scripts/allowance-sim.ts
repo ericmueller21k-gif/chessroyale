@@ -16,7 +16,8 @@ import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, botSkillSpread, modeSettings, mulber
 import * as chess from "@chessroyale/chess";
 import { MatchRunner, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
@@ -125,8 +126,9 @@ function materialError(r: RoundRec, move: string): boolean {
 }
 
 function summary(beforeLabel: string, afterLabel: string) {
+  // (The committed data is gzipped: <label>.jsonl.gz; a fresh run writes <label>.jsonl.)
   const load = (label: string) =>
-    readFileSync(`${dir}${label}.jsonl`, "utf8")
+    (existsSync(`${dir}${label}.jsonl`) ? readFileSync(`${dir}${label}.jsonl`, "utf8") : gunzipSync(readFileSync(`${dir}${label}.jsonl.gz`)).toString("utf8"))
       .split("\n")
       .filter(Boolean)
       .map((l) => JSON.parse(l) as MatchRec);
@@ -196,7 +198,7 @@ function summary(beforeLabel: string, afterLabel: string) {
       add("Cut players' bot temperature (median; higher is looser)", cutSkill.length ? cutSkill.sort((a, b) => a - b)[Math.floor(cutSkill.length / 2)]!.toFixed(1) : "–");
       add("Survivors who played only top-8 moves, still in", pctOf(survTop8, surv));
       add("Survivors who had played poorly", pctOf(survPoor, surv));
-      add("Tied at the line and through (per match)", (tiedThrough / Math.max(1, cuts)).toFixed(1));
+      add("Kept in by a tie at the line, owed by the next cut (per match)", (tiedThrough / Math.max(1, cuts)).toFixed(1));
     }
     for (const [k, v] of Object.entries(rows)) lines.push(`| ${k} | ${v.join(" | ")} |`);
     lines.push("");
@@ -212,7 +214,8 @@ function summary(beforeLabel: string, afterLabel: string) {
     addW("Plies per match (mean)", mean(ms.map((m) => m.plies)).toFixed(1));
     addW("Cuts with fewer out than the plan (share)", pctOf(ms.flatMap((m) => m.cuts.filter((c, i) => c.out.length < CROWD_KNOCKOUTS.team[i]!)).length, ms.flatMap((m) => m.cuts).length));
     addW("Cuts with an exact tie at a team's line (share)", pctOf(ms.flatMap((m) => cutLines(m).filter((l) => l.tie)).length, ms.flatMap((m) => m.cuts).length));
-    addW("Players kept in by a tie at the line (per match)", mean(ms.map((m) => cutLines(m).reduce((s, l) => s + l.kept, 0))).toFixed(1));
+    addW("Owed to the next cut after each cut (mean: kept in by ties, not yet taken)", CROWD_KNOCKOUTS.team.map((_, i) => mean(ms.flatMap((m) => (cutLines(m)[i] ? [cutLines(m)[i]!.kept] : []))).toFixed(1)).join(" · "));
+    addW("Most owed at once (mean of each match's largest)", mean(ms.map((m) => Math.max(0, ...cutLines(m).map((l) => l.kept)))).toFixed(1));
     const outs = CROWD_KNOCKOUTS.team.map((_, i) => mean(ms.flatMap((m) => (m.cuts[i] ? [m.cuts[i]!.out.length] : []))).toFixed(1));
     addW("Out at each cut (mean)", outs.join(" · "));
     addW("Finalists (every match)", [...new Set(ms.map((m) => m.finalists.length))].join(", "));
