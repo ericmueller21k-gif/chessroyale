@@ -1,9 +1,10 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
+import { memo } from "preact/compat";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { account } from "../account.ts";
 import type { GameView, StrikeState } from "../game.ts";
-import { kingLine, kingSay, setKingFallen, type KingCue } from "../godKing.ts";
+import { kingSay, kingVoice, setKingFallen, type KingCue } from "../godKing.ts";
 import { play, warmSounds } from "../sound.ts";
 import { TICK_FROM_SECONDS, useFrameNow } from "./Countdown.tsx";
 import { GodKingFallen, GodKingSprite, kingCommandAct } from "./GodKing.tsx";
@@ -12,7 +13,7 @@ import { Chevrons, type useHistoryView } from "./HistoryNav.tsx";
 import { COMPUTER_LAYOUT } from "./MatchMenu.tsx";
 import { Bolt } from "./PowerUpButton.tsx";
 import { useMedia } from "./QuickChat.tsx";
-import { SpeechBox } from "../speech.tsx";
+import { VoiceBubble } from "../speech.tsx";
 import { bulletIncrementOn, kingBlocked, mockKingHelp } from "./Recluse.tsx";
 
 /**
@@ -100,8 +101,18 @@ export function BossDock({
   const held = match.practice ? Infinity : (match.standings().find((s) => s.isYou)?.powerUps ?? 0);
   const inUse = !!powerUp?.inUse;
   const left = inUse ? Math.max(0, held - 1) : held;
-  const power = fallen && (left > 0 || inUse) ? { left, inUse, enabled: !!powerUp?.enabled && !inUse && left > 0 } : null;
+  const enabled = !!powerUp?.enabled && !inUse && left > 0;
   const [menu, setMenu] = useState(false);
+  // (His unit is drawn again only when what it shows changes: the same values, the same objects and callbacks.)
+  const power = useMemo(() => (fallen && (left > 0 || inUse) ? { left, inUse, enabled } : null), [fallen, left, inUse, enabled]);
+  const onPower = useCallback(() => {
+    play("menuSelect");
+    match.usePowerUp();
+  }, [match]);
+  const onTap = useCallback(() => {
+    play(menu ? "menuClose" : "menuOpen");
+    setMenu(!menu);
+  }, [menu]);
   // (A computer has the admins' testing items in the title line instead: Hud.tsx, .match-tools.)
   const computer = useMedia(COMPUTER_LAYOUT);
   const view = nav?.view;
@@ -159,10 +170,7 @@ export function BossDock({
         command={command}
         fallen={fallen}
         power={power}
-        onPower={() => {
-          play("menuSelect");
-          match.usePowerUp();
-        }}
+        onPower={onPower}
         menu={
           menu && ready ? (
             <CommandMenu
@@ -179,10 +187,7 @@ export function BossDock({
             />
           ) : null
         }
-        onTap={() => {
-          play(menu ? "menuClose" : "menuOpen");
-          setMenu(!menu);
-        }}
+        onTap={onTap}
       />
     </div>
     {!computer && <UltimateTest match={match} />}
@@ -373,8 +378,11 @@ export type KingShow = { anim: GodKingAnim; since: number; then?: GodKingAnim; c
 /** How long his "can't" shake and dimming last (ms; styles.css, .gk-unit.nope). */
 const NOPE_MS = 400;
 
-/** The God King standing by: breathing, his sword swaying, his charges at his feet; his words in a bubble above. */
-function GodKingUnit({
+/**
+ * The God King standing by: breathing, his sword swaying, his charges at his feet; his words in a bubble above. Drawn
+ * again when what it shows changes (memo), not with the screen around it (a boss screen draws every frame).
+ */
+const GodKingUnit = memo(function GodKingUnit({
   show,
   side,
   charges,
@@ -401,9 +409,12 @@ function GodKingUnit({
   menu: ComponentChildren;
   onTap: () => void;
 }) {
-  const now = useFrameNow();
-  const line = kingLine(now);
+  // He draws again every frame only while a command or his "can't" plays. Otherwise he rests: his figure animates
+  // itself (GodKingSprite), his words keep themselves current (VoiceBubble).
+  const now = Date.now();
   const [nopeAt, setNopeAt] = useState(0);
+  const nope = nopeAt > 0 && now - nopeAt < NOPE_MS;
+  useFrameNow(!!command || nope);
   // Commanding from his spot: his sword raised, then his bolt or his slashes (in step with KingCommand on the board).
   const act = command ? kingCommandAct(command.mode, command.startAt, now) : undefined;
   // His leap (his Last Stand) plays from when it starts.
@@ -414,7 +425,7 @@ function GodKingUnit({
     const gone = show === "gone";
     return (
       <div class={`gk-unit ${gone ? "gone" : show.class}`}>
-        {line && <SpeechBox key={line.key} class="gk-bubble" text={line.text} at={line.at} until={line.until} now={now} fits={1} />}
+        <VoiceBubble voice={kingVoice} class="gk-bubble" />
         <span class="gk-unit-btn" role={gone ? undefined : "img"} aria-label={gone ? undefined : "The God King"} aria-hidden={gone ? "true" : undefined}>
           {!gone && (
             <>
@@ -440,7 +451,7 @@ function GodKingUnit({
     const count = power ? (power.left === Infinity ? "∞" : String(power.left)) : "";
     return (
       <div class={`gk-unit fallen${power ? " has-power" : ""}`}>
-        {line && <SpeechBox key={line.key} class="gk-bubble" text={line.text} at={line.at} until={line.until} now={now} fits={1} />}
+        <VoiceBubble voice={kingVoice} class="gk-bubble" />
         {power && (
           <button
             type="button"
@@ -466,10 +477,10 @@ function GodKingUnit({
   }
   // No charges left (Eric, Oct 15): a tap gets his soft "can't" and a tiny shake, dimmed a moment; nothing else.
   const spent = charges <= 0 && !away && !leaping && !act;
-  const nope = nopeAt > 0 && now - nopeAt < NOPE_MS;
   return (
     <div class={`gk-unit${ready ? " ready" : ""}${away ? " away" : ""}${leaping ? " leaping" : ""}${act ? " acting" : ""}${charges <= 0 ? " spent" : ""}${menu ? " open" : ""}${nope ? " nope" : ""}`}>
-      {menu ?? (line && !away && !leaping && <SpeechBox key={line.key} class="gk-bubble" text={line.text} at={line.at} until={line.until} now={now} fits={1} />)}
+      {menu}
+      <VoiceBubble voice={kingVoice} class="gk-bubble" hidden={!!menu || away || leaping} />
       <button
         type="button"
         class="gk-unit-btn"
@@ -494,7 +505,7 @@ function GodKingUnit({
       </span>
     </div>
   );
-}
+});
 
 /**
  * His commands, in a little window above his head like an old Final Fantasy

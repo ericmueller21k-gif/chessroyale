@@ -19,7 +19,7 @@ import { UnderBoard } from "../components/QuickChat.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import type { BossView, GameView, LightsView } from "../game.ts";
 import { LightsDock, LightsOutLayer } from "../components/LightsOut.tsx";
-import { seenKey } from "../hooks.ts";
+import { seenKey, useStillKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossCharacter, BossFace, BossSide, hasCharacter, resetBeats } from "../components/BossCharacter.tsx";
@@ -301,66 +301,18 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const burnLine = burnt.length && now < burnAt + BURN.ms ? (burning.length ? `${burnNames.charAt(0).toUpperCase()}${burnNames.slice(1)} burnt!` : fizzled ? "Your king is fireproof." : null) : null;
   // G-REX slams the Roman candle down on the board: it jolts.
   const slam = moment?.kind === "candle" && now >= moment.at + CANDLE.slamAt && now < moment.at + CANDLE.slamAt + CANDLE.slamMs;
-  return (
-    <div class={`screen game boss-screen${victim ? " striking" : ""}`}>
-      <Hud match={match} />
-      <div class={`board-area${slam ? " pw-slam" : ""}${jolt === "crash" ? " pw-crash" : jolt === "bump" ? " pw-bump" : ""}`}>
-        <div class="opening-name">
-          <BossHeading side={boss.crowdSide} note={fall ? "the boss is beaten" : lights ? "lights out" : thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
-        </div>
-        <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
-          <BossSide match={match} />
-          <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? lastShown} animate={!bounceShown && !splitStill(split, now) && !pig?.still}>
-            {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={boardFen} />}
-            {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}
-            {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}
-            {!thinking && !victim && !alone && !funhouse && !bounce && !pig && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={orientation} />}
-            <PowerMoment boss={boss} moment={moment} now={now} orientation={orientation} side={boss.crowdSide} />
-            {mateKing && <KingAttack boss={boss} square={mateKing} orientation={orientation} startAt={attackAt} now={now} seed={`mate:${boss.board.fen}`} king={boss.crowdSide} />}
-            <FireBurn burnt={burnt} since={burnAt} now={now} orientation={orientation} />
-            {claimed && t >= tl.claimAt && t < tl.bannerAt && <ClaimDark boss={boss} since={mountedAt + tl.claimAt} now={now} />}
-            {snack && t >= tl.claimAt && t < tl.bannerAt && <SnackTime boss={boss} since={snackAt} now={now} orientation={orientation} />}
-            {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" />}
-            {/* (The queen banners are silent for now: Eric, Oct 11, the gasp sounded wrong. Its file is kept, unused:
-                queenGasp in sound.ts, public/sounds/banner/queen-gasp.mp3.) */}
-            {slewQueen && <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} />}
-            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} />}
-            {loading && <BrainLoading match={match} boss={boss} />}
-            {showCard && (
-              // (After the loading step, whose card it takes over from: no entrance, so the board doesn't blink between.)
-              <div class={`boss-intro${afterLoading ? " no-entrance" : ""}${t > tl.replayAt - 350 ? " leaving" : ""}`} role="alert">
-                <span class="boss-intro-icon" aria-hidden="true">
-                  <BossFace boss={boss} />
-                </span>
-                <span class="boss-strike-text">A boss appears</span>
-                <strong class="boss-intro-name">{boss.name}</strong>
-                {boss.raid && boss.openingName && <OpeningRoulette name={boss.openingName} />}
-                <span class="boss-intro-note">
-                  {boss.raid && !boss.openingName
-                    ? `A fresh game from the starting position. You play ${boss.crowdSide === "w" ? "White" : "Black"}.`
-                    : boss.raid
-                    ? `It challenges you from this opening, ${boss.startMove - 1} moves in. You play ${boss.crowdSide === "w" ? "White" : "Black"}.`
-                    : boss.startMove > 1
-                    ? `It takes over your game from move ${boss.startMove}, where it was roughly even. The crowd plays White.`
-                    : "A fresh game. The crowd plays White."}
-                </span>
-              </div>
-            )}
-            {victim && (
-              <div class="boss-strike" role="alert">
-                <span class="boss-strike-skull" aria-hidden="true">
-                  💀
-                </span>
-                <span class="boss-strike-text">
-                  {boss.icon} {boss.name} struck down
-                </span>
-                <strong class="boss-strike-name">{name(victim)}</strong>
-              </div>
-            )}
-          </Board>
-        </div>
-      </div>
+  // The screen draws every frame for its effects; the parts that don't move with them (the header, the boss by the
+  // board, the chat) only as the match changes and five times a second, as on your move's screen (useStillKey).
+  const still = useStillKey(match, now);
+  const hud = useMemo(() => <Hud match={match} />, [match, still]);
+  const bossSide = useMemo(() => <BossSide match={match} />, [match, still]);
+  const under = useMemo(() => <UnderBoard match={match} />, [match, still]);
+  // The dock's words change with the match and with these, read from the clock (a new word read from the clock goes in
+  // this list): it's drawn again when one of them changes, not every frame (Lights out's prompt, every frame).
+  const claiming = claimed && t >= tl.claimAt && t < tl.bannerAt;
+  const snacking = !!snack && t >= tl.claimAt + SNACK.grabAt && t < tl.bannerAt;
+  const dock = useMemo(
+    () => (
       <BossDock
         match={match}
         side={boss.crowdSide}
@@ -373,11 +325,11 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
           ) : (
           <>
             <span class="dock-line">
-              {claimed && t >= tl.claimAt && t < tl.bannerAt ? (
+              {claiming ? (
                 <>
                   {boss.icon} <strong>{claimLine(boss)}</strong>
                 </>
-              ) : snack && t >= tl.claimAt + SNACK.grabAt && t < tl.bannerAt ? (
+              ) : snacking ? (
                 <>
                   {boss.icon} <strong>{snackLine(boss)}</strong>
                 </>
@@ -439,7 +391,71 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
           )
         }
       />
-      <UnderBoard match={match} />
+    ),
+    [match, still, kingCues, lights, lights ? now : 0, claiming, snacking, funPlayed, moment, burnLine, left],
+  );
+  return (
+    <div class={`screen game boss-screen${victim ? " striking" : ""}`}>
+      {hud}
+      <div class={`board-area${slam ? " pw-slam" : ""}${jolt === "crash" ? " pw-crash" : jolt === "bump" ? " pw-bump" : ""}`}>
+        <div class="opening-name">
+          <BossHeading side={boss.crowdSide} note={fall ? "the boss is beaten" : lights ? "lights out" : thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
+        </div>
+        <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
+          {bossSide}
+          <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
+          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? lastShown} animate={!bounceShown && !splitStill(split, now) && !pig?.still}>
+            {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={boardFen} />}
+            {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}
+            {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}
+            {!thinking && !victim && !alone && !funhouse && !bounce && !pig && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={orientation} />}
+            <PowerMoment boss={boss} moment={moment} now={now} orientation={orientation} side={boss.crowdSide} />
+            {mateKing && <KingAttack boss={boss} square={mateKing} orientation={orientation} startAt={attackAt} now={now} seed={`mate:${boss.board.fen}`} king={boss.crowdSide} />}
+            <FireBurn burnt={burnt} since={burnAt} now={now} orientation={orientation} />
+            {claimed && t >= tl.claimAt && t < tl.bannerAt && <ClaimDark boss={boss} since={mountedAt + tl.claimAt} now={now} />}
+            {snack && t >= tl.claimAt && t < tl.bannerAt && <SnackTime boss={boss} since={snackAt} now={now} orientation={orientation} />}
+            {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" />}
+            {/* (The queen banners are silent for now: Eric, Oct 11, the gasp sounded wrong. Its file is kept, unused:
+                queenGasp in sound.ts, public/sounds/banner/queen-gasp.mp3.) */}
+            {slewQueen && <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} />}
+            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} />}
+            {loading && <BrainLoading match={match} boss={boss} />}
+            {showCard && (
+              // (After the loading step, whose card it takes over from: no entrance, so the board doesn't blink between.)
+              <div class={`boss-intro${afterLoading ? " no-entrance" : ""}${t > tl.replayAt - 350 ? " leaving" : ""}`} role="alert">
+                <span class="boss-intro-icon" aria-hidden="true">
+                  <BossFace boss={boss} />
+                </span>
+                <span class="boss-strike-text">A boss appears</span>
+                <strong class="boss-intro-name">{boss.name}</strong>
+                {boss.raid && boss.openingName && <OpeningRoulette name={boss.openingName} />}
+                <span class="boss-intro-note">
+                  {boss.raid && !boss.openingName
+                    ? `A fresh game from the starting position. You play ${boss.crowdSide === "w" ? "White" : "Black"}.`
+                    : boss.raid
+                    ? `It challenges you from this opening, ${boss.startMove - 1} moves in. You play ${boss.crowdSide === "w" ? "White" : "Black"}.`
+                    : boss.startMove > 1
+                    ? `It takes over your game from move ${boss.startMove}, where it was roughly even. The crowd plays White.`
+                    : "A fresh game. The crowd plays White."}
+                </span>
+              </div>
+            )}
+            {victim && (
+              <div class="boss-strike" role="alert">
+                <span class="boss-strike-skull" aria-hidden="true">
+                  💀
+                </span>
+                <span class="boss-strike-text">
+                  {boss.icon} {boss.name} struck down
+                </span>
+                <strong class="boss-strike-name">{name(victim)}</strong>
+              </div>
+            )}
+          </Board>
+        </div>
+      </div>
+      {dock}
+      {under}
     </div>
   );
 }

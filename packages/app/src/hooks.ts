@@ -1,10 +1,30 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useReducer, useRef, useState } from "preact/hooks";
 import { START_FEN, applyMove, baseAt } from "@chessroyale/chess";
 import type { BoardView, GameView } from "./game.ts";
 
 const MAX_REPLAY = 5;
 
 export const seenKey = (b: Pick<BoardView, "id" | "generation">) => `${b.id}:${b.generation}`;
+
+/** How often a screen that draws every frame draws its still parts (ms): as often as your move's screen draws (Play). */
+export const STILL_MS = 200;
+
+/**
+ * For a screen that draws every frame (a boss's effects), when its still parts are drawn: the header, the boss by the
+ * board, the chat, the dock. A key that changes whenever the match does, whenever the boss's state does (in solo it can
+ * change between the match's changes, e.g. as its ultimate is readied: the boss's view is new then) and every STILL_MS
+ * (what they read as they're drawn, such as the admins' brain line or the chat's wait, keeps up as on your move's
+ * screen), never every frame. Use it as the dependency of a useMemo that makes the part's element: the same element,
+ * and Preact leaves it alone.
+ */
+export function useStillKey(match: GameView, now: number): string {
+  const [changes, changed] = useReducer((n: number, _: unknown) => n + 1, 0);
+  useEffect(() => match.subscribe(() => changed(undefined)), [match]);
+  const boss = useRef<{ board: unknown; n: number }>({ board: null, n: 0 });
+  const board = match.boss?.board ?? null;
+  if (board !== boss.current.board) boss.current = { board, n: boss.current.n + 1 };
+  return `${changes}:${boss.current.n}:${Math.floor(now / STILL_MS)}`;
+}
 
 /**
  * Replays the moves played on a board since this player last saw it (up to
