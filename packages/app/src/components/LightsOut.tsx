@@ -93,7 +93,8 @@ export function lightsStatus(lights: LightsView, graceMs: number, now: number): 
     const text = v === "failed" ? "He moves twice!" : v === "held" ? "The light holds." : "The lights are back.";
     return { prompt: text, short: text, note: n ? `Missed ${n}: −${n * cost}` : "You found every piece.", meter: true, key: "back" };
   }
-  if (b.round < 0) return { prompt: "Lights Out!", short: "Lights Out!", note: "Clocks stopped.", meter: false, key: "start" };
+  // (Before the first round the boss screen's dock keeps its usual layout and says this itself: Boss.tsx.)
+  if (b.round < 0) return { prompt: "Remember where his pieces are.", short: "Remember his pieces.", note: "Clocks stopped.", meter: false, key: "start" };
   const r = lights.rounds[b.round]!;
   const mine = lights.mine[b.round] ?? { found: [], wrong: [] };
   const targets = r.targets ?? r.pieces;

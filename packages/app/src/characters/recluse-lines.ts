@@ -160,8 +160,12 @@ export const RECLUSE_LINES = {
     "Go on, call your God King. Oh, that's right.",
     "Every line, every move. I see them all now.",
   ],
-  /** His phase 2 ultimate as it comes: a few seconds a move from now on (placeholders). */
-  ult2: ["That's enough! Five seconds a move, all of you!", "Enough thinking! Five seconds, or I move for you!"],
+  /**
+   * His phase 2 ultimate as it comes: a few seconds a move from now on (placeholders). Never the seconds: the banner
+   * names it from the setting (RECLUSE_PHASE2.ultMoveSeconds) and the dock says what it means, as `bulletPlus`'s number
+   * is the board's.
+   */
+  ult2: ["That's enough! No more thinking, all of you!", "Enough thinking! Move, or I move for you!"],
   /** Beaten on all four boards (placeholders; his "super saiyan" transformation comes later). */
   beaten2: ["Impossible... all four...", "Four boards... and not one book among them..."],
 } as const;

@@ -320,8 +320,9 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}`} data-anim={beat.anim} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1] }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
       {kit.engine && <EngineOverlay ch={ch} elRef={eng} />}
-      {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). */}
-      <VoiceBubble voice={bossVoice} class="bc-bubble" />
+      {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). In the
+          boss bar, the bar holds them instead, in its name's room (BossBar): never over its status or the board. */}
+      {place !== "bar" && <VoiceBubble voice={bossVoice} class="bc-bubble" />}
     </div>
   );
 }

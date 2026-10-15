@@ -236,7 +236,8 @@ function showdownMoment({ boss, moment, now, t, orientation, banner }: MomentPro
   return (
     <div class="power-moment pm-showdown">
       {t < 2300 && banner("SHOWDOWN!", `${pairs.length === 2 ? "Two" : "Three"} duels: you must take one`, "western")}
-      {drawing && banner("DRAW!", "Pick your duel", "western draw")}
+      {/* (Its name alone: what to do is the dock's on your move, and the God King says it his way as it comes.) */}
+      {drawing && banner("DRAW!", undefined, "western draw")}
       <SoundAt id={`${moment.key}:draw`} at={moment.at + SHOWDOWN.drawAt} now={now} sound="pigDraw" />
       {pairs.map((_, k) => (
         <SoundAt key={k} id={`${moment.key}:yank${k}`} at={moment.at + yankOf(k).t0} now={now} sound="pigYank" />
@@ -375,9 +376,9 @@ export const PIG_UI = {
   id: "pig",
   ultimate: { name: "SHOWDOWN!" },
   moments: {
-    pull: { order: 0, kit: "power" as KitMoment, dock: "Long Pull!", line: lineOf("pull"), view: lassoMoment },
-    drag: { order: 0, kit: "power" as KitMoment, dock: "Lasso!", line: (kit, m) => (m.ult ? lineOf("tug") : lineOf("power"))(kit, m), view: lassoMoment },
-    showdown: { order: 2, kit: "ultimate" as KitMoment, dock: "Showdown!", view: showdownMoment },
+    pull: { order: 0, kit: "power" as KitMoment, line: lineOf("pull"), view: lassoMoment },
+    drag: { order: 0, kit: "power" as KitMoment, line: (kit, m) => (m.ult ? lineOf("tug") : lineOf("power"))(kit, m), view: lassoMoment },
+    showdown: { order: 2, kit: "ultimate" as KitMoment, view: showdownMoment },
   },
   // Over the pieces, on the crowd's duel turn (and from "DRAW!" in the showdown's moment): the three duels glowing.
   board: ({ p, orientation, moments, now }) => {
