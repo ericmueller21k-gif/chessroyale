@@ -156,6 +156,24 @@ export async function signOut(): Promise<void> {
   set({ profile: await api<Profile>("/api/auth/logout", { method: "POST" }) });
 }
 
+/** "Download my data" (Settings): everything the server keeps about your account, as a JSON file. */
+export const ACCOUNT_DATA_URL = "/api/me/data";
+
+/**
+ * Deletes your account for good (Settings → Delete account, after its confirmation): the server deletes everything
+ * personal and signs you out on every device. Then this device forgets you too (everything the app keeps in its
+ * storage, settings included) and the app starts afresh, as a new visitor. Throws the server's message on failure.
+ */
+export async function deleteMyAccount(): Promise<void> {
+  await api("/api/me/delete", { method: "POST", body: JSON.stringify({ confirm: "delete" }) });
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith("brc.") || k.startsWith("hunchess-")) localStorage.removeItem(k);
+  } catch {
+    // No storage to clear.
+  }
+  location.replace("/");
+}
+
 /** A solo match's result, onto your profile (online matches are saved by the server). */
 export async function recordSoloResult(r: {
   mode: "classic" | "crowd" | "boss";

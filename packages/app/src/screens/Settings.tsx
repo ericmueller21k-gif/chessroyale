@@ -4,6 +4,7 @@ import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, RAID_SET
 import { InstallCard } from "../components/InstallCard.tsx";
 import { FriendSettings } from "../components/Friends.tsx";
 import { SignIn } from "../components/SignIn.tsx";
+import { AccountData } from "../components/AccountData.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut } from "../account.ts";
 import { chatBubbles, chatOff, crowdAnimations, crowdTrail, evalBarOn, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail, setEvalBarOn } from "../prefs.ts";
@@ -377,6 +378,7 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
           ) : (
             <p class="fd-note">You're a guest on this device.</p>
           )}
+          <AccountData />
         </section>
       )}
 

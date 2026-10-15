@@ -60,7 +60,8 @@ function Draft() {
           representatives, and the UK Online Safety Act's short risk assessments (a lawyer).
         </li>
         <li>
-          <strong>How long fair-play records are kept:</strong> today with no end date (Eric, a lawyer).
+          <strong>How long fair-play records are kept:</strong> today with no end date while the account exists, and a ban's
+          record, with its hashed email or Google id, even after the account is deleted (Eric, a lawyer).
         </li>
       </ol>
     </section>
@@ -98,6 +99,7 @@ function Privacy() {
         <li>Guests play solo against bots without signing in: no email, no Google account.</li>
         <li>Your email is for signing in and for fair-play notices. Never newsletters.</li>
         <li>Everything is stored by Cloudflare, which hosts the game.</li>
+        <li>Download your data or delete your account any time, in Settings.</li>
       </ul>
 
       <h2>What we keep, why, and for how long</h2>
@@ -112,8 +114,8 @@ function Privacy() {
         why="to run your account and keep your profile on every device you sign in on."
         kept={
           <>
-            until the account is deleted. If signing in makes a brand-new account, its name starts as the name on your Google account
-            or the part of your email before the @. Change it any time in your profile.
+            until you delete your account. A new account is called "Player" until you pick a name: we never take one from your
+            Google account or your email.
           </>
         }
       />
@@ -127,7 +129,7 @@ function Privacy() {
         title="Sign-in codes"
         what={<p>Your email address, the code (stored only as a hash), when it was sent, and how many tries and sends it has had.</p>}
         why="to check the code, and to stop abuse (5 tries a code, 5 codes an hour)."
-        kept="one record per address, replaced by each new code."
+        kept="an hour after the code was sent."
       />
       <Item
         title="Matches and stats"
@@ -139,7 +141,7 @@ function Privacy() {
           </p>
         }
         why="your profile, stats, rating and rank, and balancing the game (for example, how often each boss wins)."
-        kept="until the account is deleted."
+        kept="with your account. If you delete it, your results stay without anything that leads back to you (below)."
       />
       <Item
         title="Online now and last seen"
@@ -201,7 +203,8 @@ function Privacy() {
         kept={
           <>
             judged moves for {FAIRPLAY.evidenceDaysUnflagged} days, or {FAIRPLAY.evidenceDays} days if you were reported or flagged,
-            and longer only while a review of your account is open. Everything else here until the account is deleted.
+            and longer only while a review of your account is open. The rest until you delete your account, except a ban, which
+            stays (below).
           </>
         }
       />
@@ -322,13 +325,15 @@ function Privacy() {
       <h2>Your rights</h2>
       <ul>
         <li>
-          <strong>See it, or get a copy</strong> in a common format: email <Mail />.
+          <strong>See it, or get a copy:</strong> Settings → Download my data gives you a file (JSON) of everything we keep about your
+          account. Fair play's detection records aren't in it, as they'd show how cheating is found: email <Mail /> for those, and
+          a person answers.
         </li>
         <li>
           <strong>Correct it:</strong> change your name and icon in your profile, or email us.
         </li>
         <li>
-          <strong>Delete it:</strong> email <Mail />.
+          <strong>Delete it:</strong> Settings → Delete account (below), or email <Mail />.
         </li>
         <li>
           <strong>Object or restrict:</strong> ask us to stop or limit a use of your data, such as one based on our legitimate
@@ -339,6 +344,32 @@ function Privacy() {
         </li>
       </ul>
       <p>We answer within 30 days.</p>
+
+      <h2>Deleting your account</h2>
+      <p>Settings → Delete account, after a confirmation. It can't be undone.</p>
+      <ul>
+        <li>
+          <strong>Deleted:</strong> your account (name, icon, email or Google id, when you joined and were last seen), every
+          sign-in session (you're signed out on every device), your sign-in code's record, your items, coins, crates and shop
+          items, your quick-chat picks, reports you made and reports about you, fair play's records about you, your friends,
+          requests, blocks and invites (from the other players' lists too), and your lines in the global chat.
+        </li>
+        <li>
+          <strong>Kept, without you:</strong> your match results, moved to one shared "deleted" account with their match codes
+          removed, so nothing leads back to you and the game's numbers stay right.
+        </li>
+        <li>
+          <strong>Kept if you're banned:</strong> the ban's record (its decisions and why), the hash of your email or Google id,
+          and the device markers, under your old account's random id, so a new account can't get around the ban. Nothing else.
+        </li>
+        <li>
+          <strong>A match you're in</strong> shows your name to its players until it closes (at most{" "}
+          {LOBBY_LIFE.lobbyResultsKeepMinutes} minutes after it ends), and records nothing for you.
+        </li>
+        <li>
+          <strong>This device</strong> forgets you too: the app clears its settings and choices.
+        </li>
+      </ul>
 
       <h2>Changes</h2>
       <p>We'll update this page and its date. For a big change, we'll tell you in the game first.</p>
@@ -370,7 +401,7 @@ function Terms() {
       <ul>
         <li>You can play solo as a guest. Online play needs you to sign in, with Google or a code we email you.</li>
         <li>Keep your sign-in to yourself. You're responsible for what's played on your account.</li>
-        <li>You can stop playing at any time, and ask us to delete your account.</li>
+        <li>You can stop playing at any time, and delete your account in Settings.</li>
       </ul>
 
       <h2>Fair play</h2>

@@ -424,7 +424,7 @@ export async function signInWithIdentity(
   }
   const id = randomToken(12);
   // A new account is "Player" until its owner picks a name: never their Google name or the start of their email,
-  // which everyone would see (DECISIONS.md, "Delete my account and download my data").
+  // which everyone would see (docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md).
   await sql.run(`INSERT INTO users (id, name, ${col}, created_at, last_seen) VALUES (?, 'Player', ?, ?, ?)`, id, value, now, now);
   if (kind === "google") await adoptGoogleEmail(sql, id, extra.email);
   return (await getUser(sql, id))!;

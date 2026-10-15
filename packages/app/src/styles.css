@@ -8349,6 +8349,29 @@ a.fd-row-link {
   align-items: center;
   text-decoration: none;
 }
+/* Settings → ACCOUNT: deleting your account, and its confirmation (components/AccountData.tsx). */
+.fd-row-link.fd-row-danger {
+  color: var(--fd-danger);
+}
+.fd-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--fd-danger-line);
+}
+.fd-delete p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.fd-delete-error {
+  color: var(--fd-danger);
+}
+.fd-delete-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
 .fd-seg {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
