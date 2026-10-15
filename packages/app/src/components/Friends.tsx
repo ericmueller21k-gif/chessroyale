@@ -16,6 +16,7 @@ import {
   relationTo,
   removeFriend,
   saveFriendSettings,
+  toastOnScreen,
   unblockPlayer,
   useFriends,
 } from "../friends.ts";
@@ -164,8 +165,13 @@ const minutesLeft = (inv: InviteEntry, now = Date.now()) => `${Math.max(1, Math.
 /** A new invite, for a moment at the top of a front-door page (never over a match): Join or Dismiss. */
 export function InviteToast() {
   useFriends();
-  const inv = inviteToast();
-  if (!inv || inv.expiresAt <= Date.now()) return null;
+  const toast = inviteToast();
+  const inv = toast && toast.expiresAt > Date.now() ? toast : null;
+  // (On screen now: it counts as shown, and goes after FRIENDS.toastMs. Waiting for this page, it hadn't.)
+  useEffect(() => {
+    if (inv) toastOnScreen(inv);
+  }, [inv?.from, inv?.at]);
+  if (!inv) return null;
   return (
     <div class="fr-toast" role="status" aria-label={`${inv.name} invited you`}>
       <span class="fr-toast-text">

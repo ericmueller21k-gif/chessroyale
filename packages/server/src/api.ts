@@ -118,6 +118,9 @@ export async function accountOf(request: Request, env: AccountEnv, waitUntil?: W
   return userFromToken(sql, readCookie(request, SESSION_COOKIE), Date.now(), presenceTouch(env, waitUntil));
 }
 
+/** A time as its day only (noon UTC that day), for a profile that hides when its player is online. */
+export const dayOf = (at: number) => Math.floor(at / 86_400_000) * 86_400_000 + 43_200_000;
+
 /** The live line's numbers, shared by every request to this Worker instance for a few seconds. */
 let liveCache: { at: number; body: LiveCounts } | null = null;
 let prunedAt = 0;
@@ -202,6 +205,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (pm && request.method === "GET") {
     const p = await publicProfile(sql, pm[1]!, now);
     if (!p) return json({ message: "No such player." }, 404);
+    // Hiding when you're online hides when you played too: others get each recent match's day, not its time (you get
+    // yours exact: "See your result" finds a match by it). The session from this instance's cache, usually no D1 read.
+    if (p.hidden && (await cachedUserId(sql, token, now).catch(() => null)) !== p.id) {
+      for (const r of p.recent) r.playedAt = dayOf(r.playedAt);
+    }
     // Online now, from the live hub (D1's last_seen is written once a minute); never for someone who hides it.
     if (env.LIVE && !p.hidden) {
       const live = await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).presence(p.id).catch(() => null);

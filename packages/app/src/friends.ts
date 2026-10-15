@@ -44,6 +44,11 @@ export function relationTo(uid: string): Relation {
 
 // ---------------- The new invite's toast ----------------
 
+/**
+ * The invite the toast shows: the newest open one not shown yet. It waits for a page that can show it (a front-door
+ * page: never over a match or the queue), and only once it's on screen does it count as shown and go after
+ * FRIENDS.toastMs (InviteToast calls `toastOnScreen`). It stays in the list until it expires either way.
+ */
 let toast: InviteEntry | null = null;
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 /** Invites already shown as a toast (this visit). */
@@ -51,7 +56,18 @@ const toasted = new Set<string>();
 const inviteKey = (i: InviteEntry) => `${i.from}:${i.at}`;
 
 export const inviteToast = () => toast;
+
+/** The toast is on screen showing `inv`: it counts as shown (with any older open invite), and goes in FRIENDS.toastMs. */
+export function toastOnScreen(inv: InviteEntry) {
+  if (toasted.has(inviteKey(inv))) return;
+  for (const i of openInvites()) if (i.at <= inv.at) toasted.add(inviteKey(i));
+  toasted.add(inviteKey(inv));
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, FRIENDS.toastMs);
+}
+
 export function hideToast() {
+  if (toast) toasted.add(inviteKey(toast));
   toast = null;
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = null;
@@ -62,14 +78,12 @@ function apply(next: FriendsState) {
   state = next;
   status = "on";
   blockedIds = new Set(next.blocked.map((b) => b.id));
-  // The newest invite not shown yet becomes the toast (the rest wait in the list).
-  const fresh = openInvites().filter((i) => !toasted.has(inviteKey(i)));
-  for (const i of fresh) toasted.add(inviteKey(i));
-  if (toast && !next.invites.some((i) => inviteKey(i) === inviteKey(toast!))) toast = null;
-  if (fresh[0]) {
-    toast = fresh[0];
+  // The newest open invite not shown yet (the rest wait in the list); the one on screen stays while it's open.
+  const showing = toast && toastTimer && openInvites().some((i) => inviteKey(i) === inviteKey(toast!));
+  if (!showing) {
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(hideToast, FRIENDS.toastMs);
+    toastTimer = null;
+    toast = openInvites().find((i) => !toasted.has(inviteKey(i))) ?? null;
   }
   emit();
 }
@@ -118,7 +132,8 @@ export async function loadFriends(): Promise<void> {
 
 /** Who's online among your friends, into the list (its refresh while it's on screen: lighter than the whole list). */
 async function refreshOnline(): Promise<void> {
-  if (!state || inFlight) return;
+  // (Nobody to ask about: no friends, or all of them hide it.)
+  if (!state || inFlight || !state.friends.some((f) => !f.hidden)) return;
   try {
     const res = await fetch("/api/friends/online", { credentials: "same-origin" });
     const body = res.ok ? ((await res.json()) as { online?: Record<string, { online: boolean; busy: boolean }> }) : null;

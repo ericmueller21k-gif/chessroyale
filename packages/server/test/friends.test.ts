@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FRIENDS } from "@chessroyale/core";
-import { createGuest, ensureSchema, publicProfile, signInWithIdentity, type Sql } from "../src/accounts.ts";
+import { createGuest, d1Sql, ensureSchema, publicProfile, recordResult, signInWithIdentity, type Sql } from "../src/accounts.ts";
+import { dayOf, handleAccountApi } from "../src/api.ts";
 import {
   FRIEND_TEXT,
   answerRequest,
@@ -102,6 +103,37 @@ describe("friend requests", () => {
     await s2.run(`INSERT INTO friends (user_id, friend_id, since) VALUES ${fill}`, ...Array(FRIENDS.max).fill(two[1]));
     expect(await sendRequest(s2, two[0]!, two[1]!, false, T0)).toEqual({ ok: true, notify: [two[1]] });
     expect(await answerRequest(s2, two[1]!, two[0]!, true, T0)).toMatchObject({ ok: false, message: FRIEND_TEXT.maxFriends });
+  });
+});
+
+describe("at the same moment", () => {
+  it("the caps hold for requests and invites sent all at once; the same request twice at once is one", async () => {
+    const names = Array.from({ length: FRIENDS.invitesPerHour + 10 }, (_, i) => `P${i}`);
+    const { sql, ids } = await world(names);
+    const [me, ...rest] = ids as [string, ...string[]];
+    const sent = await Promise.all(rest.slice(0, FRIENDS.requestsPerDay + 10).map((id) => sendRequest(sql, me, id, false, T0)));
+    expect(sent.filter((r) => r.ok).length).toBe(FRIENDS.requestsPerDay);
+    expect(sent.filter((r) => !r.ok && r.message === FRIEND_TEXT.requestsToday).length).toBe(10);
+    const invited = await Promise.all(rest.map((id) => sendInvite(sql, me, id, "crowd", "LOBBY", false, T0)));
+    expect(invited.filter((r) => r.ok).length).toBe(FRIENDS.invitesPerHour);
+    // Two identical requests at once: both answered as sent, one stored.
+    const [a, b] = rest as [string, string];
+    const twice = await Promise.all([sendRequest(sql, a, b, false, T0), sendRequest(sql, a, b, false, T0)]);
+    expect(twice.every((r) => r.ok)).toBe(true);
+    expect(await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM friend_requests WHERE from_id = ? AND to_id = ?", a, b)).toEqual({ n: 1 });
+  });
+
+  it("a block at the same moment as an accept wins, whichever starts first", async () => {
+    for (const blockFirst of [true, false]) {
+      const { sql, ids } = await world();
+      const [a, b] = ids as [string, string];
+      await sendRequest(sql, b, a, false, T0);
+      const accept = () => answerRequest(sql, a, b, true, T0 + 1);
+      const blockIt = () => block(sql, b, a, T0 + 1);
+      await Promise.all(blockFirst ? [blockIt(), accept()] : [accept(), blockIt()]);
+      expect(await rows(sql, "friends")).toBe(0);
+      expect(await rows(sql, "blocks")).toBe(1);
+    }
   });
 });
 
@@ -207,6 +239,23 @@ describe("online status", () => {
     await setFriendSettings(sql, c, { showOnline: true });
     expect(await publicProfile(sql, c, T0)).toMatchObject({ online: true, lastSeen: T0 });
     expect((await publicProfile(sql, c, T0))?.hidden).toBeUndefined();
+  });
+
+  it("hidden: others see the day of each recent match, not its time; you see yours exact", async () => {
+    const { d1, users } = await world();
+    const [c, other] = users as [{ id: string; token: string }, { id: string; token: string }];
+    const env = { DB: d1 };
+    const sql = d1Sql(d1);
+    const played = T0 + 5 * 3_600_000 + 1234;
+    await recordResult(sql, c.id, { mode: "crowd", online: false, placement: 3, players: 100 }, played);
+    await setFriendSettings(sql, c.id, { showOnline: false });
+    const view = async (token: string) => {
+      const res = (await handleAccountApi(new Request(`https://hunchess.com/api/profile/${c.id}`, { headers: { cookie: `hc_session=${token}` } }), env as never))!;
+      return ((await res.json()) as { recent: { playedAt: number }[] }).recent[0]!.playedAt;
+    };
+    expect(await view(other.token)).toBe(dayOf(played));
+    expect(dayOf(played) % 86_400_000).toBe(43_200_000);
+    expect(await view(c.token)).toBe(played);
   });
 
   it("the live board: who's in a match, and friends' news for the instances that see them", () => {
@@ -318,14 +367,23 @@ describe("the friends API", () => {
     const hub = { notify: async (ids: string[]) => void notified.push(ids), presenceOf: async () => ({}), seen: async () => ({}) };
     const LIVE = { idFromName: () => "hub", get: () => hub };
     const open = new Set(["OPENS"]);
-    const LOBBIES = { idFromName: (c: string) => c, get: (c: string) => ({ status: async () => (open.has(c) ? { phase: "waiting" } : c === "PLAYS" ? { phase: "playing" } : null) }) };
+    const LOBBIES = {
+      idFromName: (c: string) => c,
+      get: (c: string) => ({
+        status: async () =>
+          open.has(c) ? { phase: "waiting", matchmade: false, mode: "raid" } : c === "PLAYS" ? { phase: "playing", matchmade: false, mode: "crowd" } : c === "QUEUE" ? { phase: "waiting", matchmade: true, mode: "crowd" } : null,
+      }),
+    };
     const PARTIES = { idFromName: (c: string) => c, get: (c: string) => ({ status: async () => (c === "PARTY" ? { members: 1, state: "open" } : null) }) };
     const env = { DB: d1, LIVE, LOBBIES, PARTIES };
     await call(env, a.token, "/api/friends/request", { id: b.id });
     expect(notified).toEqual([[b.id]]);
-    for (const code of ["GONE2", "PLAYS"]) expect((await call(env, a.token, "/api/friends/invite", { id: b.id, kind: "crowd", code })).status).toBe(409);
+    // Gone, started, or PLAY's queue (not a lobby of yours to invite into): refused.
+    for (const code of ["GONE2", "PLAYS", "QUEUE"]) expect((await call(env, a.token, "/api/friends/invite", { id: b.id, kind: "crowd", code })).status).toBe(409);
     expect((await call(env, a.token, "/api/friends/invite", { id: b.id, kind: "squads", code: "NOPE2" })).status).toBe(409);
     expect((await call(env, a.token, "/api/friends/invite", { id: b.id, kind: "crowd", code: "OPENS" })).status).toBe(200);
+    // What it's for comes from the lobby (a raid), not from what the app said.
+    expect((await call(env, b.token, "/api/friends")).body.state.invites.map((i: { kind: string }) => i.kind)).toEqual(["raid"]);
     expect((await call(env, b.token, "/api/friends/invite", { id: a.id, kind: "squads", code: "PARTY" })).status).toBe(200);
     expect(notified).toEqual([[b.id], [b.id], [a.id]]);
   });

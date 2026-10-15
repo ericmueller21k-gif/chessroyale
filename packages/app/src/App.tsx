@@ -858,8 +858,13 @@ export function App() {
     join: (kind, code) => {
       goHome();
       if (kind === "squads") return void joinParty(code);
-      if (party) closeParty();
-      joinLobby(code);
+      // (An invite can outlive its lobby's start: ask first, so a stale one never costs you your party.)
+      void lobbyStatus(code).then((s) => {
+        // (No answer, offline: carry on as if it's open, as lobbyStatus's other callers do.)
+        if (s && (!s.open || s.phase !== "waiting")) return setSquadsNote("That lobby has started or closed.");
+        if (party) closeParty();
+        joinLobby(code);
+      });
     },
   });
   // In a match (not its lobby or results): the live line says so, for friends' lists.

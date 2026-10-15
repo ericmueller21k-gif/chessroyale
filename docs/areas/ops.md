@@ -52,7 +52,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     every 2 s, each Worker caches `/api/live` for 3 s, and D1 gets `users.last_seen` once a minute per account.
     Friends ride on it (Oct 15): a batch also says who's in a match (the live line's `?busy=1`), and the hub answers
     with friends' news for anyone in it, which their next `/api/live` passes on as `inbox`; a friends list is one hub
-    call (`presenceOf`). No new D1 writes per request, no new poll.
+    call (`presenceOf`). No new D1 writes per request. One new request: while a friends list is on screen, for a
+    player with a friend who shows when they're online, `/api/friends/online` once a minute (cached session, one D1
+    read, one hub call).
   - **Rate limits:** per address, per account and (PLAY, new lobbies; friends' actions) per account again
     (`CAPACITY.rateLimits`, `limits.ts`), counted in each Worker instance's memory; past a limit, a friendly 429 with when to try again.
 - **Nothing runs for no one:** a match everyone has left (resigned, or gone longer than `LEAVING.awayMs`) ends at once

@@ -5019,13 +5019,16 @@ friends see you online, rate limits and stored data that account deletion covers
   No one. A refusal always reads "This player isn't taking invites right now.", whether it's their setting or a block.
 - **"Show when I'm online" hides it from everyone**, friends and profiles alike: profiles already showed "Online now"
   and "Last seen" to anyone, so a friends-only switch would have hidden nothing. Off, the profile says "Online status
-  hidden" and friends' lists show no dot.
+  hidden", friends' lists show no dot, and others get only the day of each recent match, not its time (the profile
+  shows days anyway; you still get yours exact, which "See your result" needs).
 - **An invite reuses the existing links:** your private lobby while it's still waiting (its mode: Crowd, raid or
   Classic) or your Squads party; Join is joining that lobby or party. At the front door with neither, "Invite" first
   asks the server whether they'd take it (`{check: true}`, so a refusal never leaves you in an empty lobby), then makes
   a lobby (with Squads picked, a party) in the home screen's mode and invites them into it. Not into a matchmade
-  queue, and not during a match (there's no game of yours to join). The server checks the lobby is still waiting (or
-  the party open), not that you're in it: a code is already an invite anyone can share.
+  queue (the server refuses one), and not during a match (there's no game of yours to join). The server checks the
+  lobby is still waiting (or the party open), not that you're in it: a code is already an invite anyone can share.
+  What an invite says it's for (a Crowd lobby, a raid) comes from the lobby itself, never from the app. Joining a
+  lobby's invite asks whether it's still waiting first, so a stale one never makes you leave your party.
 - **An invite lasts 10 minutes** (`FRIENDS.inviteMinutes`), one per pair (a new one replaces it; again only after
   `reinviteMs`, 30 s). Joining takes it off your list; ✕ declines it.
 - **Invited while in a match** (Eric's open question): it waits in your list, and shows as a toast when you're back on a
@@ -5035,13 +5038,17 @@ friends see you online, rate limits and stored data that account deletion covers
   online". A computer's live panel gets a FRIENDS section right above its live line; a phone's home a one-line
   "Friends · N online" button above its live line (always there for anyone who can have friends, so nothing pops in
   late). Both open the full list at `/friends`. No new side-menu item: the panel is on every front-door page.
-- **No extra polling or writes.** Something new for you (a request, an invite, an accepted request) is a note in the
-  live hub's memory; the presence batch each Worker instance already sends gets it back for the accounts in the batch,
-  and your next `/api/live` says `inbox: <time>`. The app fetches its list only when that grows; while a list is on
-  screen, only who's online in it refreshes, every `FRIENDS.refreshMs` (60 s; one D1 read and one hub call, not the
-  whole list's six reads). A hub restart reloads the last hour's notes from D1. Who's online is the hub's memory too (one call per list, however long); "in a match" is the app's own word
-  on its live-line request (`?busy=1`), so it covers every mode, Squads included, at no cost. (A wrong "in a match" from
-  a modified app harms nobody: it's only shown to friends.)
+- **What it costs to run.** No D1 write per request, and the news needs no poll of its own: something new for you (a
+  request, an invite, an accepted request) is a note in the live hub's memory; the presence batch each Worker instance
+  already sends gets it back for the accounts in the batch, and your next `/api/live` says `inbox: <time>`. The app
+  fetches its whole list (six D1 reads and one hub call) when that grows, when your account loads and after each
+  action. The one new recurring request: while a friends list is on screen (the phone home's line, the computer's
+  live panel, the list, Invite friends) and you have a friend who shows when they're online, `GET /api/friends/online`
+  once every `FRIENDS.refreshMs` (60 s): the session from the Worker instance's cache (usually no D1 read), one D1 read
+  of your friends and one hub call. With no such friend it isn't made. A hub restart reloads the last hour's notes from
+  D1. Who's online is the hub's memory (one call per list, however long); "in a match" is the app's own word on its
+  live-line request (`?busy=1`), so it covers every mode, Squads included, at no cost. (A wrong "in a match" from a
+  modified app harms nobody: it's only shown to friends.)
 - **Block** ends the friendship and deletes requests and invites between you. From then on their requests are kept
   but never shown to you (they see "sent", as with anyone who doesn't answer, so a block can't be found out), their
   invites are refused with the same words as a setting, and their chat lines are hidden in your app: the global chat by
@@ -5052,7 +5059,12 @@ friends see you online, rate limits and stored data that account deletion covers
 - **Limits:** a burst limit per account on friends' actions (`CAPACITY.rateLimits.friends`, 30 a minute, `limits.ts`,
   in each Worker's memory) for runaway scripts; the real caps in D1, since an account's requests land on many Worker
   instances: 30 requests a day, 60 invites an hour (`friend_limits`), at most 50 requests waiting at once, 200 friends,
-  500 blocked. Unanswered requests go after 30 days.
+  500 blocked. Unanswered requests go after 30 days. A cap is counted in one statement that only counts while under it
+  (no row back: refused), so requests sent all at once can't slip past it (a review found 40 at once all accepted when
+  it read then wrote). The 50-waiting check reads before it writes, so a burst can pass it by about one wave, which the
+  daily cap bounds.
+- **A block at the same moment as an accept wins:** the block row goes in first, and making friends is one statement
+  that never runs past a block either way.
 - **Kill switch:** `PAUSE_FRIENDS` ("1", true, yes or on) switches it off for everyone (the API answers `{off}` and the
   app hides friends). It's the gates' naming (`PAUSE_<NAME>`); once their `kill-switches.ts` is on main,
   `friendsOn(env)` becomes `!isPaused(env, "friends")`.

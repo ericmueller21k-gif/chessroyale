@@ -96,21 +96,26 @@ const signedIn = (t: Pick<Target, "email" | "google_sub">) => !!(t.email || t.go
 
 /**
  * Counts one action against a cap (`limit` per `windowMs`, per account): false when the cap is reached (nothing
- * counted). Kept in D1 because a Worker instance's memory sees only its own share of an account's requests.
+ * counted). Kept in D1 because a Worker instance's memory sees only its own share of an account's requests. One
+ * statement that counts only while under the cap (no row back: refused), so requests at once can't all slip through.
  */
 async function spend(sql: Sql, userId: string, kind: "request" | "invite", limit: number, windowMs: number, now: number): Promise<boolean> {
-  const row = await sql.first<{ window_start: number; n: number }>("SELECT window_start, n FROM friend_limits WHERE user_id = ? AND kind = ?", userId, kind);
-  const fresh = !row || now - row.window_start >= windowMs;
-  if (!fresh && row.n >= limit) return false;
-  await sql.run(
-    `INSERT INTO friend_limits (user_id, kind, window_start, n) VALUES (?, ?, ?, ?)
-     ON CONFLICT (user_id, kind) DO UPDATE SET window_start = excluded.window_start, n = excluded.n`,
+  const row = await sql.first<{ n: number }>(
+    `INSERT INTO friend_limits (user_id, kind, window_start, n) VALUES (?, ?, ?, 1)
+     ON CONFLICT (user_id, kind) DO UPDATE SET
+       n = CASE WHEN excluded.window_start - friend_limits.window_start >= ? THEN 1 ELSE friend_limits.n + 1 END,
+       window_start = CASE WHEN excluded.window_start - friend_limits.window_start >= ? THEN excluded.window_start ELSE friend_limits.window_start END
+     WHERE friend_limits.n < ? OR excluded.window_start - friend_limits.window_start >= ?
+     RETURNING n`,
     userId,
     kind,
-    fresh ? now : row.window_start,
-    fresh ? 1 : row.n + 1,
+    now,
+    windowMs,
+    windowMs,
+    limit,
+    windowMs,
   );
-  return true;
+  return !!row;
 }
 
 /**
@@ -131,7 +136,8 @@ export async function sendRequest(sql: Sql, meId: string, toId: string, needSign
   if ((await friendCount(sql, meId)) >= FRIENDS.max) return fail(FRIEND_TEXT.maxFriends);
   if ((await countOf(sql, "SELECT COUNT(*) AS n FROM friend_requests WHERE from_id = ?", meId)) >= FRIENDS.maxPendingSent) return fail(FRIEND_TEXT.maxPending);
   if (!(await spend(sql, meId, "request", FRIENDS.requestsPerDay, 86_400_000, now))) return fail(FRIEND_TEXT.requestsToday, 429);
-  await sql.run("INSERT INTO friend_requests (from_id, to_id, at) VALUES (?, ?, ?)", meId, toId, now);
+  // (OR IGNORE: the same request twice at once is one request.)
+  await sql.run("INSERT OR IGNORE INTO friend_requests (from_id, to_id, at) VALUES (?, ?, ?)", meId, toId, now);
   return { ok: true, notify: blockedByThem ? [] : [toId] };
 }
 
@@ -139,8 +145,23 @@ export async function sendRequest(sql: Sql, meId: string, toId: string, needSign
 async function befriend(sql: Sql, meId: string, fromId: string, now: number): Promise<Done> {
   if ((await friendCount(sql, meId)) >= FRIENDS.max) return fail(FRIEND_TEXT.maxFriends);
   if ((await friendCount(sql, fromId)) >= FRIENDS.max) return fail(FRIEND_TEXT.theirMax);
-  await sql.run("INSERT OR IGNORE INTO friends (user_id, friend_id, since) VALUES (?, ?, ?), (?, ?, ?)", meId, fromId, now, fromId, meId, now);
+  // (One statement, and never past a block either way: a block made at the same moment wins.)
+  await sql.run(
+    `INSERT OR IGNORE INTO friends (user_id, friend_id, since)
+     SELECT a, b, ? FROM (SELECT ? AS a, ? AS b UNION ALL SELECT ?, ?)
+     WHERE NOT EXISTS (SELECT 1 FROM blocks WHERE (user_id = ? AND blocked_id = ?) OR (user_id = ? AND blocked_id = ?))`,
+    now,
+    meId,
+    fromId,
+    fromId,
+    meId,
+    meId,
+    fromId,
+    fromId,
+    meId,
+  );
   await sql.run("DELETE FROM friend_requests WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)", meId, fromId, fromId, meId);
+  if (!(await areFriends(sql, meId, fromId))) return fail(FRIEND_TEXT.noRequest, 404);
   // (Their list changes: a new friend. No toast for it, only a fresh list.)
   return { ok: true, notify: [fromId] };
 }
@@ -176,10 +197,11 @@ export async function block(sql: Sql, meId: string, otherId: string, now: number
   if (!(await target(sql, otherId))) return fail(FRIEND_TEXT.noPlayer, 404);
   if (await isBlocking(sql, meId, otherId)) return { ok: true };
   if ((await countOf(sql, "SELECT COUNT(*) AS n FROM blocks WHERE user_id = ?", meId)) >= FRIENDS.maxBlocked) return fail(FRIEND_TEXT.maxBlocked);
+  // (The block first: an accept at the same moment then can't make them friends again, befriend.)
+  await sql.run("INSERT OR IGNORE INTO blocks (user_id, blocked_id, at) VALUES (?, ?, ?)", meId, otherId, now);
   await removeFriend(sql, meId, otherId);
   await sql.run("DELETE FROM friend_requests WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)", meId, otherId, otherId, meId);
   await sql.run("DELETE FROM invites WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)", meId, otherId, otherId, meId);
-  await sql.run("INSERT OR IGNORE INTO blocks (user_id, blocked_id, at) VALUES (?, ?, ?)", meId, otherId, now);
   return { ok: true };
 }
 
@@ -260,7 +282,7 @@ export async function friendsState(sql: Sql, meId: string, now: number, presence
   const requests = await sql.all<{ id: string; name: string; at: number }>(
     `SELECT u.id, u.name, r.at FROM friend_requests r JOIN users u ON u.id = r.from_id
      WHERE r.to_id = ? AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.user_id = r.to_id AND b.blocked_id = r.from_id)
-     ORDER BY r.at DESC`,
+     ORDER BY r.at DESC LIMIT 100`,
     meId,
   );
   const sent = await sql.all<{ id: string; name: string; at: number }>(
@@ -270,7 +292,7 @@ export async function friendsState(sql: Sql, meId: string, now: number, presence
   const invites = await sql.all<{ from_id: string; name: string; kind: InviteKind; code: string; at: number; expires_at: number }>(
     `SELECT i.from_id, u.name, i.kind, i.code, i.at, i.expires_at FROM invites i JOIN users u ON u.id = i.from_id
      WHERE i.to_id = ? AND i.expires_at > ? AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.user_id = i.to_id AND b.blocked_id = i.from_id)
-     ORDER BY i.at DESC`,
+     ORDER BY i.at DESC LIMIT 50`,
     meId,
     now,
   );

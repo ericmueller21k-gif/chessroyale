@@ -1,6 +1,7 @@
-import { isGameCode, isInviteKind } from "@chessroyale/core";
+import { isGameCode, isInviteKind, type InviteKind } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
-import { DEVICE_COOKIE, accountOf, isSignedIn, readCookie, signInRequired, type AccountEnv, type WaitUntil } from "./api.ts";
+import { DEVICE_COOKIE, SESSION_COOKIE, accountOf, isSignedIn, readCookie, signInRequired, type AccountEnv, type WaitUntil } from "./api.ts";
+import { cachedUserId } from "./presence.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import {
   answerRequest,
@@ -48,7 +49,7 @@ const isId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_
 
 /**
  * GET /api/friends → { state } | { off } | { signIn }: your friends list (FriendsState, core/friends.ts).
- * GET /api/friends/online → { online: { [id]: { online, busy } } }: only who's online (the list's refresh on screen).
+ * GET /api/friends/online → { online: { [id]: { online, busy } } }: only who's online (a list's refresh on screen).
  * POST /api/friends/ACTION with JSON, each answering with the list as it is after it (or { message } and a status):
  *   request {id} · answer {id, accept} · cancel {id} · remove {id} · block {id} · unblock {id}
  *   invite {id, kind, code}: to your private lobby (kind: its mode) or Squads party ("squads"), still open;
@@ -67,15 +68,21 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
   if (!friendsOn(env)) return get ? json({ off: true }) : json({ message: FRIENDS_OFF }, 503);
   const sql = d1Sql(env.DB);
   await ensureSchema(sql, env.DB);
+  const now = Date.now();
+  const hub = env.LIVE ? liveHub(env as Required<Pick<AccountEnv, "LIVE">>) : null;
+  const presenceOf: PresenceOf | undefined = hub ? (ids) => hub.presenceOf(ids) : undefined;
+  // Who's online among your friends (a list on screen, once a minute): the session from this instance's cache (no D1
+  // read, usually), one D1 read for the list, one hub call. (A guest has no friends, so it needs no sign-in check.)
+  if (request.method === "GET" && path === "/api/friends/online") {
+    const uid = await cachedUserId(sql, readCookie(request, SESSION_COOKIE), now);
+    return uid ? json({ online: await friendsOnline(sql, uid, now, presenceOf) }) : json({ message: "No account on this device yet." }, 401);
+  }
   const me = await accountOf(request, env, waitUntil);
   if (!me) return json({ message: "No account on this device yet." }, 401);
   const needSignIn = signInRequired(env);
   if (needSignIn && !isSignedIn(me)) return get ? json({ signIn: true }) : json({ message: SIGN_IN_FOR_FRIENDS }, 401);
-  const now = Date.now();
-  const hub = env.LIVE ? liveHub(env as Required<Pick<AccountEnv, "LIVE">>) : null;
-  const presenceOf: PresenceOf | undefined = hub ? (ids) => hub.presenceOf(ids) : undefined;
   const answer = async () => json({ state: await friendsState(sql, me.id, now, presenceOf) });
-  if (get) return path === "/api/friends/online" ? json({ online: await friendsOnline(sql, me.id, now, presenceOf) }) : answer();
+  if (get) return answer();
 
   const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   const action = path.slice("/api/friends/".length);
@@ -119,10 +126,11 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
         break;
       }
       if (!isInviteKind(kind) || !isGameCode(code)) return json({ message: "Bad request" }, 400);
-      // Only to a lobby still waiting for players, or a party still open (who's in it isn't checked: a code is
-      // already an invite anyone can share).
-      if (!(await gameOpen(env, kind === "squads", code))) return json({ message: GAME_GONE }, 409);
-      done = await sendInvite(sql, me.id, id, kind, code, needSignIn, now);
+      // Only to a private lobby still waiting for players, or a party still open (who's in it isn't checked: a code is
+      // already an invite anyone can share). What it's for comes from the lobby itself, never the app.
+      const target = await inviteTarget(env, kind, code);
+      if (!target) return json({ message: GAME_GONE }, 409);
+      done = await sendInvite(sql, me.id, id, target, code, needSignIn, now);
       break;
     }
     default:
@@ -134,10 +142,13 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
   return answer();
 }
 
-/** A private lobby still waiting for players, or a Squads party still open (true without the bindings: unit tests). */
-async function gameOpen(env: FriendsEnv, party: boolean, code: string): Promise<boolean> {
-  if (party) return env.PARTIES ? !!(await env.PARTIES.get(env.PARTIES.idFromName(code)).status().catch(() => null)) : true;
-  if (!env.LOBBIES) return true;
+/**
+ * What an invite is for: "squads" for a Squads party still open; for a lobby, its own mode, if it's a private lobby
+ * (not PLAY's queue) still waiting for players. Null: not open to an invite. (Without the bindings, unit tests: as asked.)
+ */
+async function inviteTarget(env: FriendsEnv, asked: InviteKind, code: string): Promise<InviteKind | null> {
+  if (asked === "squads") return !env.PARTIES || (await env.PARTIES.get(env.PARTIES.idFromName(code)).status().catch(() => null)) ? "squads" : null;
+  if (!env.LOBBIES) return asked;
   const s = await env.LOBBIES.get(env.LOBBIES.idFromName(code)).status().catch(() => null);
-  return s?.phase === "waiting";
+  return s && s.phase === "waiting" && !s.matchmade ? s.mode : null;
 }

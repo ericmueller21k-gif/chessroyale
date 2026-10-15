@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { FRIENDS, type FriendsState } from "@chessroyale/core";
 import type { NetChatLine } from "@chessroyale/chess";
 import { loadAccount } from "../src/account.ts";
-import { friendsBadge, friendsStatus, hideToast, inviteMode, invitePlayer, inviteToast, isBlocked, joinInvite, loadFriends, openInvites, relationTo, setInviteHost } from "../src/friends.ts";
+import { friendsBadge, friendsStatus, hideToast, inviteMode, invitePlayer, inviteToast, isBlocked, joinInvite, loadFriends, openInvites, relationTo, setInviteHost, toastOnScreen } from "../src/friends.ts";
 import { GlobalChatStore } from "../src/global-chat.ts";
 import { MatchChat } from "../src/chat.ts";
 
@@ -51,6 +51,17 @@ describe("friends in the app", () => {
     friends = { ...friends, invites: [{ ...friends.invites[0]!, at: NOW }, ...friends.invites] };
     await loadFriends();
     expect(inviteToast()?.at).toBe(NOW);
+    // It waits for a page that can show it (in a match or the queue none can): no clock runs until it's on screen...
+    vi.useFakeTimers();
+    vi.advanceTimersByTime(3 * FRIENDS.toastMs);
+    expect(inviteToast()?.at).toBe(NOW);
+    // ...then it goes after FRIENDS.toastMs.
+    toastOnScreen(inviteToast()!);
+    vi.advanceTimersByTime(FRIENDS.toastMs - 1);
+    expect(inviteToast()?.at).toBe(NOW);
+    vi.advanceTimersByTime(1);
+    expect(inviteToast()).toBeNull();
+    vi.useRealTimers();
   });
 
   it("hides a blocked account's lines: the global chat by account, quick chat in a match by the seat's account", () => {

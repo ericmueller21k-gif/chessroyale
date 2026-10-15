@@ -43,11 +43,13 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   - **A new invite** shows as a toast at the top of a front-door page (never over a match or the queue) for
     `FRIENDS.toastMs`: Join (into the lobby or party; the invite leaves your list) or ✕ (declines it).
   - **Settings → Friends:** "Invites from" (Everyone, Friends, No one) and "Show when I'm online".
-  - **Fresh without polling:** the list loads with your account and again when the live line's `inbox` grows
-    (something new arrived for you); while a list is on screen (the phone's line, the computer's panel, the friends
-    list, Invite friends) who's online in it refreshes every `FRIENDS.refreshMs` (`/api/friends/online`: one D1 read,
-    one hub call). Who's online and in a match come from the live hub (the app says "in a match" with its live line,
-    `?busy=1`).
+  - **Fresh:** the list loads with your account and again when the live line's `inbox` grows (something new arrived
+    for you). While a list is on screen (the phone's line, the computer's panel, the friends list, Invite friends) and
+    you have a friend who shows when they're online, who's online in it refreshes every `FRIENDS.refreshMs`
+    (`/api/friends/online`: the cached session, one D1 read, one hub call). Who's online and in a match come from the
+    live hub (the app says "in a match" with its live line, `?busy=1`).
+  - **The toast waits** for a front-door page: an invite that arrives during a match or in the queue shows when you're
+    back (if it's still open), and its `FRIENDS.toastMs` start only once it's on screen.
 - **Light and dark:** follows the device until you pick (Settings); same layout and accents in both.
 - **The eval bar's switch** (Settings → Playing, "Eval bar"; Eric, Oct 10): on by default. Off, no bar on any board
   (every mode: the play, reveal, vote, final and boss screens all use `EvalBar`, which draws nothing) and the board

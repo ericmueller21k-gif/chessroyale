@@ -36,7 +36,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   lobby or Squads party, as their setting allows (everyone, the default; friends only; no one); an invite lasts
   `FRIENDS.inviteMinutes`. Block ends a friendship and keeps the other's requests (kept unseen), invites (refused with
   the same words as a setting) and chat lines (hidden in the app) away. "Show when I'm online" off hides online and
-  last seen on your profile and in friends' lists, for everyone. Not while banned (requests and invites). Switched off
+  last seen on your profile and in friends' lists, for everyone, and others get only the day of your recent matches. Not while banned (requests and invites). Switched off
   for everyone by the Worker variable `PAUSE_FRIENDS` ("1"). The screens are on [hub.md](hub.md).
 
 ## Data stored by friends (for the privacy page and account deletion)
