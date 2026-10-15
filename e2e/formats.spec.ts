@@ -1,5 +1,9 @@
 import { expect, type Page } from "@playwright/test";
-import { BOARD_SEL, createLobbyFromHome, named, soloFromHome, submitMove, test, watchFor } from "./helpers.ts";
+import { crowdFinalBoss } from "@chessroyale/core";
+import { BOARD_SEL, createLobbyFromHome, engineTop, named, soloFromHome, submitMove, test, watchFor } from "./helpers.ts";
+
+/** The boss final's boss (Eric, Oct 14: always the Hidden Boss), by his roster name. */
+const finalBoss = crowdFinalBoss()!;
 
 /** page.evaluate that shrugs off a dropped execution context (seen under heavy load while the page carries on). */
 async function safely<T>(f: () => Promise<T>, fallback: T): Promise<T> {
@@ -20,26 +24,24 @@ async function playToResults(page: Page, seen: Set<string>, minutes: number) {
     seen.add(p);
     if (p === "results") return;
     if (p === "play") {
-      await safely(() => page.evaluate(async () => {
-        const m = (window as any).match;
-        if (m.phase.kind !== "play") return;
-        // Boss battle: call the King every move (he plays when more than half the crowd calls).
-        if (m.boss) m.callKing();
-        const fen = m.phase.board.fen;
-        const engines = m.runner ? null : await m.engines?.();
-        const top = await Promise.race([
-          m.runner ? m.runner.topMovesFor(fen) : engines[0].topMoves(fen, 1),
-          new Promise((r) => setTimeout(() => r(null), 12000)),
-        ]);
-        const fallback = m.runner ? [...(m.runner.planned?.values() ?? [])][0] : null;
-        const move = top ? (top as any)[0].move : fallback;
-        if (m.phase.kind === "play" && move) m.submit(move);
-      }), undefined);
+      // Boss battle: call the King every move (he plays when more than half the crowd calls; against the Hidden Boss he
+      // never comes, and each try spends a charge).
+      await safely(() => page.evaluate(() => (window as any).match.phase.kind === "play" && (window as any).match.boss && (window as any).match.callKing()), undefined);
+      // The engine's move, searched in the page and polled for (engineTop: no evaluate held open over a search), or a
+      // planned bot pick if the engine is slow.
+      const pick = await engineTop(page, "judged", 12_000).catch(() => null);
+      const fallback = await safely(() => page.evaluate(() => {
+        const r = (window as any).match.runner;
+        return (r ? [...(r.planned?.values() ?? [])][0] : null) as string | null;
+      }), null);
+      await safely(() => submitMove(page, pick?.top[0]?.move ?? fallback, pick?.fen), undefined);
     }
     if (p === "boss") {
       const k = await safely(() => page.evaluate(() => ((window as any).match.phase.boss?.justKilled ? "bossKill" : (window as any).match.phase.thinking ? "bossThinking" : "bossMove")), "none");
       seen.add(k);
     }
+    // (The Hidden Boss's phase 2, after the Crowd's final won solo: resign your board, then leave; the result comes.)
+    if (p === "simul") await safely(() => page.evaluate(() => ((window as any).match.resign(), (window as any).match.resign())), undefined);
     await page.waitForTimeout(250);
   }
 }
@@ -52,10 +54,10 @@ test("pre-game votes: the cards vote too; the winners set the ending and the clo
   await expect(page.locator(".vote-screen")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("heading", { name: "How does it end?" })).toBeVisible();
   await expect(page.locator(".vote-zone")).toHaveCount(3);
-  // Vote 1: tap the middle card (Boss battle). (Dragging your pawn is in votes.spec.ts.)
-  await page.getByRole("radio", { name: /Boss battle/ }).click();
+  // Vote 1: tap the middle card (the boss final: the Hidden Boss). (Dragging your pawn is in votes.spec.ts.)
+  await page.getByRole("radio", { name: new RegExp(finalBoss.name) }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(1);
-  await expect(page.locator(".vote-card.on")).toContainText("Boss battle");
+  await expect(page.locator(".vote-card.on")).toContainText(finalBoss.name);
   // Your pawn walks into that zone.
   await expect(page.locator(".vote-me.in")).toBeVisible();
   // Votes come in live; then the result.
@@ -102,7 +104,7 @@ test("team final: the top 8 play 4v4, the weakest on each side go out, everyone 
   if (seen.has("final")) await expect(page.locator(".team-result")).toBeVisible();
 });
 
-test("boss battle (solo): the boss replies, strikes every 3 moves, and the result shows", async ({ page }) => {
+test("boss battle (solo): always the Hidden Boss; he replies, never strikes, the God King never comes, and the result shows", async ({ page }) => {
   test.setTimeout(10 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=1&clock=20&bossMoves=7");
@@ -111,8 +113,9 @@ test("boss battle (solo): the boss replies, strikes every 3 moves, and the resul
   await playToResults(page, seen, 9);
   expect(await phase(page)).toBe("results");
   const boss = await page.evaluate(() => (window as any).match.runner.state.boss);
+  expect(boss.id).toBe(finalBoss.id);
   expect(["crowd", "boss", "draw"]).toContain(boss.result);
-  expect(boss.kills.length).toBe(2);
+  expect(boss.kills).toEqual([]);
   expect(boss.kingCharges).toBeGreaterThanOrEqual(0);
   const reached = await page.evaluate(() => {
     const m = (window as any).match;
@@ -120,9 +123,10 @@ test("boss battle (solo): the boss replies, strikes every 3 moves, and the resul
     return me.outInStage === null || me.outInStage >= m.settings.knockoutsPerStage.length;
   });
   if (reached) {
-    for (const k of ["boss", "bossThinking", "bossMove", "bossKill"]) expect(seen.has(k)).toBe(true);
-    // You called the King every move; the bots back you most of the time, so he played at least once.
-    expect(boss.kingMoves.length).toBeGreaterThan(0);
+    for (const k of ["boss", "bossThinking", "bossMove"]) expect(seen.has(k)).toBe(true);
+    expect(seen.has("bossKill")).toBe(false);
+    // You called the King every move: against him he never comes (each try spent a charge).
+    expect(boss.kingMoves).toEqual([]);
   }
   await expect(page.locator(".team-result")).toBeVisible();
 });
@@ -300,7 +304,7 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   await expect(page.locator(`.ls-card .mini ${BOARD_SEL.arrowLine}`).first()).toBeAttached();
 });
 
-test("boss battle (online): the host's browser plays the boss", async ({ page }) => {
+test("boss battle (online): always the Hidden Boss, the host's browser plays him", async ({ page }) => {
   test.setTimeout(12 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough");
   await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=1&clock=15&bossMoves=6");
@@ -311,6 +315,7 @@ test("boss battle (online): the host's browser plays the boss", async ({ page })
   expect(await phase(page)).toBe("results");
   expect(seen.has("bossThinking") || seen.has("bossMove") || seen.has("spectating")).toBe(true);
   expect(["crowd", "boss", "draw"]).toContain(await page.evaluate(() => (window as any).match.phase.bossResult));
+  expect(await page.evaluate(() => (window as any).match.boss?.id)).toBe(finalBoss.id);
 });
 
 test("Play now: players land in the same lobby, the count climbs, bots fill it and the votes begin", async ({ browser }) => {

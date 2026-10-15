@@ -5,6 +5,7 @@
  * (`?wip=1&kit=<name>`: its kit in every boss's place): a boss becomes playable once it has both a character and its
  * powers (the power rules add it to boss.ts).
  */
+import { BOSS_ROSTER, type BossDef } from "@chessroyale/core";
 import type { SoundName } from "../sound.ts";
 import type { Beat, BeatLines, Loop } from "./boss-beats.ts";
 import { BIGBOY, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT } from "./bigboy.ts";
@@ -349,4 +350,10 @@ export const wipKit = (): BossKit | null =>
  */
 export const wipLook: { now: (() => string | undefined) | null } = { now: null };
 
-export const bossKit = (name: string | undefined | null): BossKit | null => (name ? ((WIP_KIT && !name.startsWith("original:") ? wipKit() : null) ?? BOSS_KITS[name] ?? null) : null);
+/**
+ * A boss's kit by the name its screens have (the boss view's `name`): the kit of that name, or else the kit the roster
+ * gives the boss of that name (BossDef.kit). So a boss renamed in the roster keeps its kit: renaming one (the Hidden Boss,
+ * whose name Eric will change) is one edit, his `name` in BOSS_ROSTER.
+ */
+export const kitName = (name: string, roster: readonly BossDef[] = BOSS_ROSTER): string => (BOSS_KITS[name] ? name : (roster.find((b) => b.name === name)?.kit ?? name));
+export const bossKit = (name: string | undefined | null): BossKit | null => (name ? ((WIP_KIT && !name.startsWith("original:") ? wipKit() : null) ?? BOSS_KITS[kitName(name)] ?? null) : null);

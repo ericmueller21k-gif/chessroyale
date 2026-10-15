@@ -205,7 +205,8 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
         - Friends: a group of four (a party, or queued together) can choose him if all four have him unlocked (or
           a book). Needs a four-player Boss mode, which doesn't exist yet.
         - **The Crowd (50v50) mode** (Eric: "probably a decent compromise"): when it's down to the last four
-          players, an extra vote: fight him, or the usual ending.
+          players, an extra vote: fight him, or the usual ending. **Decided and built Oct 14** (below, "Internal
+          notes"): the vote's boss final is always him, the top 4 against him.
       - Why it matters: if the player base stays small, Squads wins may be rare, and a few players should still
         get a chance at him.
       - Director's notes: the solo unlock is the cheapest. The Crowd vote and the friends' mode both need the
@@ -273,9 +274,22 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
     - **Left for later:** his real name and lines (phase 2's are placeholders too); how players reach him (the red
       book Mercenary item and the Squads win); his "super saiyan" transformation (a placeholder today: the spellbook's
       glow); the special crate and its reward; a server-side brain (the engine server's move endpoint) and fair-play
-      review for real fights; online and Squads play (today the server never makes a battle with him); the
-      engine-against-engine sim in Chess960 at the real clock (next step, for 2750 and the 2:00 bank); sim-tuning
-      phase 1's numbers (turn 7, 60 s, 3 moves at 1+0, then +2 s); the FAQ's Chess960 words once players can meet him.
+      review for real fights; phase 2 online and Squads play (phase 1 is online since Oct 14: the Crowd's boss final);
+      the engine-against-engine sim in Chess960 at the real clock (next step, for 2750 and the 2:00 bank); sim-tuning
+      phase 1's numbers (turn 7, 60 s, 3 moves at 1+0, then +2 s).
+    - **Internal notes (Eric, Oct 14: "just add it to the internal side"; don't ask him again):**
+      - **(a) The reward still to build:** beating him (the real way, the Squads path) gives a **one-time award per
+        account, recorded on the account** (so it's never given twice), and the end screen tells the player to **check
+        their inventory for a special item**. The item itself comes later (the Fischer Random crate above). Nothing of it
+        is built: today no path gives a reward for beating him, the Crowd's included.
+      - **(b) The Crowd's boss final is now always him (built Oct 14; DECISIONS.md, "The Crowd's boss final: always the
+        Hidden Boss, the top 4"):** the vote's option says his name (from the roster), the top 4 face him, solo and
+        online, no reward. Online it's his phase 1 only: his brain on the host's device, a phase 1 win is the crowd's
+        victory. Solo (you and bots), his phase 2 follows with the other finalists. **Still to come: phase 2 online**
+        (four boards online, his Stockfish on our engine server, its fair-play hooks: a separate, bigger build).
+      - **(c) His name will change** (Eric: something like "a powerful foe"; "Hidden Boss" doesn't do him justice).
+        Not decided. It's one string, his `name` in `BOSS_ROSTER` (`packages/core/src/boss.ts`): the vote's card, the
+        FAQ and every screen take it from there.
 
 Added Oct 14, 2026 (Eric; notes only, nothing built):
 

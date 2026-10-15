@@ -16,7 +16,8 @@ import { figureLoop, playInPlace } from "./BossCharacter.tsx";
 import { hash, type BossUi, type KitMoment, type MomentProps } from "./PowerParts.tsx";
 
 /**
- * The Hidden Boss on screen (his rules: packages/chess/src/bosses/recluse.ts; admins only, in Boss alone):
+ * The Hidden Boss on screen (his rules: packages/chess/src/bosses/recluse.ts; an admin's Boss alone, and the Crowd's boss
+ * final for everyone, solo and online):
  * - **The bullet clock** (his ultimate, no warning): where he stands (his bust in a phone's boss bar, his whole figure by
  *   the board on a computer) he consults the red book, then opens it like a spell book, its pages glowing and turning,
  *   his hair in the wind, laughing; holds the spell; slams it shut. His line as it begins; "BULLET!" as the book falls
@@ -24,8 +25,9 @@ import { hash, type BossUi, type KitMoment, type MomentProps } from "./PowerPart
  * - **He adds time per move** (Eric, Oct 14), a few moves into it (`bulletPlus`): his line as he consults the book, then
  *   "+2 s a move from now on" across the board's middle until your clock starts; the dock's "Bullet 1+2" from then on.
  * - **The God King's help blocked** (his passive): tapping the God King's move or strike, the help doesn't come but the
- *   charge is spent as if it had (SoloMatch.callKing); he slams the book shut and mocks it, and the God King says his
- *   help won't take hold.
+ *   charge is spent as if it had (SoloMatch.callKing; online NetMatch.callKing, the lobby spending it); he slams the book
+ *   shut and mocks it, and the God King says his help won't take hold (on the device that tried: the others see the
+ *   charge gone).
  * All of it where he stands (playInPlace): he never steps onto the board.
  */
 

@@ -63,6 +63,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   by `screens/Faq.tsx`. **Every number comes from the settings objects** (`FaqSources`), never typed in.
   - **When a rule changes, its words in the FAQ change in the same PR** (a new boss: its block in `BOSS_BLOCKS`; a
     test fails without one). Something built but off for players is marked "Being tested"; a plan, "Planned".
+  - **The Crowd's boss final's boss** (the Hidden Boss, Oct 14) isn't "playable" (he's hidden from players elsewhere),
+    so his block isn't in `BOSS_BLOCKS`: `crowdFinalBlock` writes it after the rest, and the endings, his strength and
+    brain and the God King's section name him from the roster (`crowdFinalBoss`), the counts from `crowdFinalists`.
+    "Still to come" lists only bosses without their art and powers.
   - **Only how the game works for a player:** never how the app talks to the server (messages, routes, who computes
     what), limits, secrets, admin or test controls, or how cheating is detected (a test checks for the obvious words).
 - **The look:** dark ground `#14161b`, panels `#1b1e25` / `#232731`, gold `#f2c14e`, green `#4ade80` for online;

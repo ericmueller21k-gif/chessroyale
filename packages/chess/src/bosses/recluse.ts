@@ -1,7 +1,8 @@
 /**
- * The Hidden Boss (BOSS_ROSTER "recluse"; working id, Eric names him later), phase 1: his rules. Hidden from players: only
- * an admin meets him, in Boss alone (BossDef.adminOnly). His brain is fixed (BOSS_BRAIN.fixed: Maia at its top rating,
- * raw), and so is his strength.
+ * The Hidden Boss (BOSS_ROSTER "recluse"; working id, Eric names him later), phase 1: his rules. Hidden from players
+ * (BossDef.adminOnly: an admin meets him in Boss alone) except in the Crowd's boss final, which is always him, solo and
+ * online (BossDef.crowdFinal; Eric, Oct 14). His brain is fixed (BOSS_BRAIN.fixed: Maia at its top rating, raw), and so
+ * is his strength. Everything here runs in the shared match runner, so the lobby server runs it as solo does.
  *
  * - His passive, "nohelp": the God King's help doesn't work against him (Eric, Oct 14): his strike, his move and his
  *   Last Stand never come (`blocksKing`). A try at his move or strike spends its charge all the same (the runner's
@@ -28,8 +29,9 @@ import { bossPowers, testSwitch, type Battle, type BossRules } from "./base.ts";
 export const RECLUSE_FX = { bullet: 4600, bulletPlus: 2800 } as const;
 
 /**
- * Beaten (Boss alone): how long his collapse (1.07 s) and his first mumbled line hold the board before the result screen,
- * where he goes on mumbling. Solo only: online he can't be met (BossDef.adminOnly).
+ * Beaten: how long his collapse (1.07 s) and his first mumbled line hold the board before the result screen, where he
+ * goes on mumbling: solo, and online (the lobby's `fall`, the Crowd's boss final). Before his phase change (solo) the
+ * fall is shorter (the app's PHASE_CHANGE.fallMs).
  */
 export const RECLUSE_FALL_MS = 4500;
 

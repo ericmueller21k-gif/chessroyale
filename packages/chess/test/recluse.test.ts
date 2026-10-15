@@ -11,6 +11,7 @@ import {
   bossDef,
   bossStrength,
   chooseBoss,
+  crowdFinalBoss,
   hiddenBosses,
   isPlayable,
   maiaRatingFor,
@@ -81,11 +82,11 @@ async function untilTurn(r: MatchRunner, turn: number, thinkMs = 1000) {
   if (r.bossToMove()) await r.playBoss();
 }
 
-describe("who meets him: hidden from players, an admin's Boss alone only", () => {
+describe("who meets him: hidden from players, an admin's Boss alone, and the Crowd's boss final for everyone", () => {
   const def = bossDef("recluse")!;
 
   it("is one roster entry, 'Hidden Boss', with his kit and powers, hidden from players", () => {
-    expect(def).toMatchObject({ name: "Hidden Boss", kit: "Hidden Boss", powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true });
+    expect(def).toMatchObject({ name: "Hidden Boss", kit: "Hidden Boss", powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true });
     expect(BOSS_ROSTER.filter((b) => b.adminOnly).map((b) => b.id)).toEqual(["recluse"]);
     expect(isPlayable(def)).toBe(false);
     expect(adminPlayable(def)).toBe(true);
@@ -128,9 +129,18 @@ describe("who meets him: hidden from players, an admin's Boss alone only", () =>
     expect(white.boards.get(0)!.history).toHaveLength(1);
   });
 
-  it("in the match: Boss alone for an admin (bossHidden) meets him; without it (a player, a raid, the Crowd's final), never", () => {
+  it("in the match: Boss alone for an admin (bossHidden) meets him; without it (a player, a raid), never", () => {
     expect(alone().boss!.id).toBe("recluse");
     for (const extra of [{ bossHidden: false }, { bossHidden: undefined }] as Partial<Settings>[]) expect(alone(extra).boss!.id).not.toBe("recluse");
+  });
+
+  it("the one exception (Eric, Oct 14): the Crowd's boss final is always him, for everyone (crowdFinalBoss); still never playable, picked or listed anywhere else", () => {
+    expect(crowdFinalBoss()).toBe(def);
+    expect(BOSS_ROSTER.filter((b) => b.crowdFinal).map((b) => b.id)).toEqual(["recluse"]);
+    // (Still hidden from players everywhere else: the rule above is untouched.)
+    expect(isPlayable(def)).toBe(false);
+    for (const [admin, raid] of [[false, false], [false, true]] as const) expect(menuBosses({ admin, raid }).map((b) => b.id)).not.toContain("recluse");
+    // The match runner's Crowd final meets him: crowd.test.ts ("50 v 50 boss final"); the lobby's: crowd-hidden-boss.test.ts.
   });
 });
 

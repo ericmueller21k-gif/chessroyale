@@ -3,7 +3,7 @@ import { GUARD_WORDS, MatchRunner, ShowdownScout, brainLine as brainWords, board
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, SimulView, Standing, VoteView } from "./game.ts";
-import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, Talk, phaseChangeRun } from "./recluse-phase2.ts";
+import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, Talk, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { playInPlace, setEngineAt, setFigureRun } from "./components/BossCharacter.tsx";
 import { play, warmSounds } from "./sound.ts";
@@ -843,9 +843,13 @@ export class SoloMatch implements GameView {
   private phase2From = "";
   private simulCache: { state: unknown; playing: boolean; view: SimulView } | null = null;
 
-  /** Phase 1 won against the Hidden Boss, alone (Boss alone): his phase 2 follows. */
+  /**
+   * Phase 1 won against the Hidden Boss: his phase 2 follows, alone (Boss alone) or in a solo Crowd's boss final you
+   * fought in (Oct 14: the bots who reached it with you take the other boards). Never a Solo raid (49 bots, no boards for
+   * them). (Out before the final, you never get here: the battle plays out without you.)
+   */
   private phase2Due(): boolean {
-    return this.runner.boss?.id === "recluse" && this.runner.boss.result === "crowd" && !!this.settings.raid && !this.raidBots && RECLUSE_PHASE2.boards > 0;
+    return phase2Follows({ bossId: this.runner.boss?.id, result: this.runner.boss?.result, raid: !!this.settings.raid, raidBots: this.raidBots, crowdFinal: !this.settings.raid && this.settings.mode === "crowd" });
   }
 
   /**
@@ -855,8 +859,9 @@ export class SoloMatch implements GameView {
    * shuffle, his leap back. Phase 2's boards are set up now (each its own Chess960 start, from the battle's seed), so the
    * shuffle shows where they go; their clocks start as it ends. `fromFall`: after phase 1's fall, whose mumbling carries
    * on into it.
+   * `mates`: who fought phase 1 beside you (a solo Crowd's finalists), on the other boards; fresh bots for the rest.
    */
-  private startPhaseChange(fromFall = false) {
+  private startPhaseChange(fromFall = false, mates: readonly { id: string; name: string }[] = []) {
     if (this.timer) clearTimeout(this.timer);
     this.begun = true;
     this.freeBrain();
@@ -868,7 +873,7 @@ export class SoloMatch implements GameView {
     const at = Date.now();
     const seed = this.runner.state.boss?.powers?.seed ?? Math.floor(this.rng() * 2 ** 32);
     this.phase2From = this.runner.boards.get(this.runner.state.boards[0]!)!.fen;
-    const bots = botRoster(this.rng, RECLUSE_PHASE2.boards - 1, this.settings);
+    const bots = phase2Mates(mates, RECLUSE_PHASE2.boards, (n) => botRoster(this.rng, n, this.settings));
     this.phase2Names = new Map(bots.map((b) => [b.id, b.name]));
     const engines = this.engines;
     this.phase2 = new Phase2Game({
@@ -973,11 +978,15 @@ export class SoloMatch implements GameView {
     this.timer = setTimeout(() => this.finishPhase2(), RECLUSE_PHASE2.endMs);
   }
 
-  /** The result: Victory only with every board won; else a defeat that says how many of the four were won. */
+  /**
+   * The result: Victory only with every board won; else a defeat that says how many of the four were won. Your place
+   * is the match's (alone, first of one; a solo Crowd's, your place in the crowd, from phase 1's end).
+   */
   private finishPhase2() {
     const o = this.phase2?.outcome ?? { won: 0, of: RECLUSE_PHASE2.boards, beaten: false };
     this.halt();
-    this.phase = { kind: "results", placement: 1, winner: "", youWon: o.beaten, bossResult: o.beaten ? "crowd" : "boss", simul: { won: o.won, of: o.of } };
+    const top = this.runner.state.players.find((p) => p.placement === 1);
+    this.phase = { kind: "results", placement: this.you.placement ?? 1, winner: top?.name ?? "", youWon: o.beaten, bossResult: o.beaten ? "crowd" : "boss", simul: { won: o.won, of: o.of } };
     this.emit();
   }
 
@@ -1032,7 +1041,7 @@ export class SoloMatch implements GameView {
       // (Testing, ?phase=2: the Hidden Boss's phase 2 at once, from the phase change.)
       if (!this.bossIntroDone && this.phase2Jump && this.runner.state.boss?.id === "recluse") {
         this.bossIntroDone = true;
-        return this.startPhaseChange();
+        return this.startPhaseChange(false, this.runner.alive().filter((p) => p.id !== HUMAN));
       }
       if (!this.bossIntroDone) {
         // The boss arrives: it takes over from an even position of the game just played (on Maia, its loading step
@@ -1041,15 +1050,17 @@ export class SoloMatch implements GameView {
         return this.startBrain((afterLoading) => this.bossIntro(afterLoading));
       }
       if (this.runner.stageComplete()) {
+        // (Who fought it beside you: a solo Crowd's finalists, phase 2's other players if it follows.)
+        const mates = this.runner.alive().filter((p) => p.id !== HUMAN);
         this.runner.finishBossBattle();
         // (A boss with a fall beaten, the Hidden Boss: the board holds while he collapses and starts to mumble; then his
-        // phase change and phase 2 (Boss alone), or the result screen, where he goes on mumbling. Before his phase
-        // change the fall is short, and his words are cleared as he falls, so his mumbling carries on into it.)
+        // phase change and phase 2 (Boss alone, a solo Crowd's final), or the result screen, where he goes on mumbling.
+        // Before his phase change the fall is short, and his words are cleared as he falls, so his mumbling carries on.)
         const phase2 = this.phase2Due();
         const fallMs = this.runner.boss?.result !== "crowd" ? undefined : phase2 ? PHASE_CHANGE.fallMs : bossRules(this.runner.boss)?.fallMs;
         if (fallMs) {
           if (phase2) bossVoice.reset();
-          const next = phase2 ? () => this.startPhaseChange(true) : () => this.finish();
+          const next = phase2 ? () => this.startPhaseChange(true, mates) : () => this.finish();
           this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + fallMs, fall: true });
           this.timer = setTimeout(next, fallMs);
           return;

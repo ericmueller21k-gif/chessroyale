@@ -2,10 +2,12 @@ import { PRIOR_RATING } from "./rating.ts";
 import { BOSS_BRAIN, type BossBrain, type BossBrainSettings, type Settings } from "./settings.ts";
 
 /**
- * Boss battle: the last 10 team up against Stockfish. The boss's strength comes
+ * Boss battle: the Crowd's finalists team up against a boss. Its strength comes
  * from the crowd's own ratings, weighted toward the best players (it should
  * feel like a real fight to them, and like a wall to the weakest), plus an
  * offset because a crowd voting together plays better than its average member.
+ * (A boss with a fixed strength, the Hidden Boss, who is always the Crowd's boss
+ * since Oct 14, ignores it: bossStrength.)
  */
 export function bossElo(ratings: readonly (number | null)[], s: Pick<Settings, "bossEloOffset" | "bossEloRange">): number {
   const rs = ratings.map((r) => r ?? PRIOR_RATING).sort((a, b) => b - a);
@@ -95,17 +97,22 @@ export interface BossDef {
   /** Its passive and its ultimate; null until they're built. */
   powers: { passive: PowerId; ultimate: PowerId } | null;
   /**
-   * Hidden from players (the Hidden Boss, Eric, Oct 14: "for testing available in boss mode with bots for now"): only an
-   * admin meets it, in Boss alone, picked from the boss menu (`adminPlayable`). Never chosen at random, never in a raid
-   * or the Crowd's boss final, never in a player's list (the FAQ, the menu).
+   * Hidden from players (the Hidden Boss, Eric, Oct 14: "for testing available in boss mode with bots for now"): an
+   * admin meets it in Boss alone, picked from the boss menu (`adminPlayable`). Never chosen at random, never in a raid,
+   * never in a player's boss menu. The one exception is `crowdFinal`.
    */
   adminOnly?: true;
+  /**
+   * The Crowd's boss final always meets this boss, for everyone (Eric, Oct 14: "that mode is always just versus [him],
+   * like the top four always battle versus [him]"): `crowdFinalBoss`. Hidden from players everywhere else if `adminOnly`.
+   */
+  crowdFinal?: true;
 }
 
 /**
  * Every boss, complete or not. Only a playable one (isPlayable: a complete character and powers) is ever chosen,
- * in every boss mode: the raid, the Crowd's boss final and solo's boss menu. The rest are placeholders waiting for
- * their art and powers.
+ * in every boss mode: the raid and solo's boss menu; the Crowd's boss final meets the `crowdFinal` one (crowdFinalBoss).
+ * The rest are placeholders waiting for their art and powers.
  */
 export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "gingerbread", name: "Ginger", icon: "🍪", kit: "Ginger", offset: -100, powers: { passive: "freeze", ultimate: "blizzard" } },
@@ -123,10 +130,11 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // engine's measure (more if it picks the wrong duel), so he plays as far under the lobby's strength as Big Boy and
   // Sawyer (DECISIONS.md: "Wrangler, built": the estimate).
   { id: "pig", name: "Wrangler", icon: "🤠", kit: "Wrangler", offset: -250, powers: { passive: "drag", ultimate: "showdown" } },
-  // The Hidden Boss (working id "recluse"; Eric names him later), phase 1: hidden from players (admins, Boss alone only).
-  // His strength is fixed whatever the player's rating (BOSS_BRAIN.fixed: Maia at its top), so his offset is unused. The
-  // God King's help doesn't work against him ("nohelp"), and his ultimate turns the clock into bullet ("bullet").
-  { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true },
+  // The Hidden Boss (working id "recluse"; Eric names him later: his name is this one string, wherever it shows). Hidden
+  // from players (admins, Boss alone) except in the Crowd's boss final, which is always him (Eric, Oct 14). His strength
+  // is fixed whatever the player's rating (BOSS_BRAIN.fixed: Maia at its top), so his offset is unused. The God King's
+  // help doesn't work against him ("nohelp"), and his ultimate turns the clock into bullet ("bullet").
+  { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
   { id: "knight", name: "The Black Knight", icon: "🐴", kit: null, offset: 0, powers: null },
@@ -149,6 +157,13 @@ export const hiddenBosses = (roster: readonly BossDef[] = BOSS_ROSTER): BossDef[
  * (the Hidden Boss, for testing).
  */
 export const menuBosses = (opts: { admin: boolean; raid: boolean }, roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] => [...playableBosses(roster), ...(opts.admin && !opts.raid ? hiddenBosses(roster) : [])];
+
+/**
+ * The boss the Crowd's boss final always meets (Eric, Oct 14: the Hidden Boss, the top 4 against him): the roster's
+ * `crowdFinal` boss with its character and powers, for everyone, though he's hidden from players everywhere else. Null
+ * (none marked): the final meets a random playable boss, as raids do.
+ */
+export const crowdFinalBoss = (roster: readonly BossDef[] = BOSS_ROSTER): BossDef | null => roster.find((b) => b.crowdFinal && adminPlayable(b)) ?? null;
 
 /** The bosses that can be met, in roster order. */
 export function playableBosses(roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] {
