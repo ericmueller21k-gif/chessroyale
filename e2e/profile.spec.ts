@@ -103,7 +103,9 @@ test("home → queue → match, then tap a name for that player's profile (phone
   const sheet = desk.locator(".fd-overlay");
   await expect(sheet.getByRole("heading", { name: "Phoney" })).toBeVisible();
   await expect(sheet.getByRole("button", { name: "Report" })).toBeVisible();
-  await expect(sheet.getByRole("button", { name: "Add friend (later)" })).toBeDisabled();
+  await expect(sheet.getByRole("button", { name: "Add friend" })).toBeEnabled();
+  // (Mid-match there's no game of yours to invite them to: no Invite to play.)
+  await expect(sheet.getByRole("button", { name: "Invite to play" })).toHaveCount(0);
   await expect(sheet.getByRole("button", { name: "Edit name & icon" })).toHaveCount(0);
   await expect(sheet).not.toContainText(/@|Google|email/i);
   await sheet.getByRole("button", { name: "Back" }).click();

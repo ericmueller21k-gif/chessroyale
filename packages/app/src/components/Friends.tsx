@@ -20,6 +20,7 @@ import {
   useFriends,
 } from "../friends.ts";
 import { FdButton } from "./FrontDoor.tsx";
+import { useMedia } from "./QuickChat.tsx";
 import { PlayerName } from "./PlayerName.tsx";
 
 /**
@@ -28,7 +29,7 @@ import { PlayerName } from "./PlayerName.tsx";
  * settings, and the friend buttons on a profile. Classes start with `fr-`.
  */
 
-/** "Online", "In a match", "Offline", or nothing for a friend who hides it. */
+/** "Online", "In a match", "Offline", or "Online status hidden" for a friend who hides it. */
 export function friendStatus(f: FriendEntry): string {
   if (f.hidden) return "Online status hidden";
   return f.busy ? "In a match" : f.online ? "Online" : "Offline";
@@ -38,8 +39,8 @@ function Dot({ f }: { f: FriendEntry }) {
   return <span class={`fr-dot${f.hidden ? " hidden" : f.busy ? " busy" : f.online ? "" : " off"}`} aria-hidden="true" />;
 }
 
-/** "Invite": to your game (or a new one at the front door); "Invited" for a moment after. Errors go to `onNote`. */
-export function InviteButton({ uid, onNote, label = "Invite", small = true }: { uid: string; onNote: (text: string) => void; label?: string; small?: boolean }) {
+/** "Invite": to your game (or a new one at the front door); "Invited" for a moment after. What happened goes to `onNote`. */
+export function InviteButton({ uid, onNote, label = "Invite", small = true }: { uid: string; onNote: (text: string, error?: boolean) => void; label?: string; small?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>();
@@ -57,7 +58,7 @@ export function InviteButton({ uid, onNote, label = "Invite", small = true }: { 
             onNote(`Invited. The invite lasts ${FRIENDS.inviteMinutes} minutes.`);
             timer.current = setTimeout(() => setDone(false), FRIENDS.reinviteMs);
           })
-          .catch((e: Error) => onNote(e.message))
+          .catch((e: Error) => onNote(e.message, true))
           .finally(() => setBusy(false));
       }}
     >
@@ -94,7 +95,9 @@ export function FriendsBadge({ n }: { n: number }) {
  * list. Shown for anyone who can have friends, so it never pops in late; a computer has the live panel's section.
  */
 export function FriendsLine({ onOpen }: { onOpen: () => void }) {
-  const { state, status } = useFriends();
+  // (Its count of who's online refreshes while it's on screen; a computer's live panel does that instead.)
+  const phone = !useMedia("(min-width: 1024px)");
+  const { state, status } = useFriends(phone);
   if (status === "off" || status === "signIn") return null;
   const online = state?.friends.filter((f) => f.online).length ?? 0;
   const n = friendsBadge();
@@ -125,9 +128,11 @@ export const FriendsIcon = () => (
 
 /** The computer's live panel: friends who are online (with Invite), above the players online. */
 export function FriendsPanel({ onOpen }: { onOpen: () => void }) {
-  const { state, status } = useFriends(true);
+  // (The live panel is a computer's: a phone never draws or refreshes it.)
+  const computer = useMedia("(min-width: 1024px)");
+  const { state, status } = useFriends(computer);
   const [note, setNote] = useState<string | null>(null);
-  if (status === "off" || status === "signIn") return null;
+  if (!computer || status === "off" || status === "signIn") return null;
   const online = state?.friends.filter((f) => f.online) ?? [];
   return (
     <section class="fd-section fr-panel" aria-labelledby="fr-panel-label">

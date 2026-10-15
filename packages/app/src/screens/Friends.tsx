@@ -11,9 +11,10 @@ import { answerFriend, cancelFriendRequest, openInvites, unblockPlayer, useFrien
  */
 export function FriendsScreen({ onBack, onSettings }: { onBack: () => void; onSettings: () => void }) {
   const { state, status } = useFriends(true);
-  const [note, setNote] = useState<string | null>(null);
+  const [note, setNoteState] = useState<{ text: string; error: boolean } | null>(null);
+  const setNote = (text: string, error = true) => setNoteState({ text, error });
   const run = (p: Promise<unknown>) => {
-    setNote(null);
+    setNoteState(null);
     p.catch((e: Error) => setNote(e.message));
   };
   const invites = openInvites();
@@ -28,8 +29,8 @@ export function FriendsScreen({ onBack, onSettings }: { onBack: () => void; onSe
       {status === "off" && <p class="fd-sub">Friends are switched off for now. Try again later.</p>}
       {status === "unknown" && <p class="fd-sub">Loading…</p>}
       {note && (
-        <p class="fd-error" role="alert">
-          {note}
+        <p class={note.error ? "fd-error" : "fd-note fr-note"} role={note.error ? "alert" : "status"}>
+          {note.text}
         </p>
       )}
       {state && status === "on" && (

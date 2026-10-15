@@ -7,6 +7,7 @@ import {
   block,
   cancelRequest,
   dismissInvite,
+  friendsOnline,
   friendsState,
   mayInvite,
   removeFriend,
@@ -47,6 +48,7 @@ const isId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_
 
 /**
  * GET /api/friends → { state } | { off } | { signIn }: your friends list (FriendsState, core/friends.ts).
+ * GET /api/friends/online → { online: { [id]: { online, busy } } }: only who's online (the list's refresh on screen).
  * POST /api/friends/ACTION with JSON, each answering with the list as it is after it (or { message } and a status):
  *   request {id} · answer {id, accept} · cancel {id} · remove {id} · block {id} · unblock {id}
  *   invite {id, kind, code}: to your private lobby (kind: its mode) or Squads party ("squads"), still open;
@@ -59,7 +61,7 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
   const url = new URL(request.url);
   const path = url.pathname;
   if (path !== "/api/friends" && !path.startsWith("/api/friends/")) return null;
-  const get = request.method === "GET" && path === "/api/friends";
+  const get = request.method === "GET" && (path === "/api/friends" || path === "/api/friends/online");
   if (!get && request.method !== "POST") return json({ message: "Not found" }, 404);
   if (!env.DB) return json({ message: "Accounts aren't set up yet." }, 503);
   if (!friendsOn(env)) return get ? json({ off: true }) : json({ message: FRIENDS_OFF }, 503);
@@ -73,7 +75,7 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
   const hub = env.LIVE ? liveHub(env as Required<Pick<AccountEnv, "LIVE">>) : null;
   const presenceOf: PresenceOf | undefined = hub ? (ids) => hub.presenceOf(ids) : undefined;
   const answer = async () => json({ state: await friendsState(sql, me.id, now, presenceOf) });
-  if (get) return answer();
+  if (get) return path === "/api/friends/online" ? json({ online: await friendsOnline(sql, me.id, now, presenceOf) }) : answer();
 
   const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   const action = path.slice("/api/friends/".length);

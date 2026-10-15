@@ -116,6 +116,26 @@ export async function loadFriends(): Promise<void> {
   }
 }
 
+/** Who's online among your friends, into the list (its refresh while it's on screen: lighter than the whole list). */
+async function refreshOnline(): Promise<void> {
+  if (!state || inFlight) return;
+  try {
+    const res = await fetch("/api/friends/online", { credentials: "same-origin" });
+    const body = res.ok ? ((await res.json()) as { online?: Record<string, { online: boolean; busy: boolean }> }) : null;
+    if (!body?.online || !state) return;
+    const live = body.online;
+    const friends = state.friends.map((f) => ({ ...f, ...(live[f.id] ?? { online: false, busy: false }) }));
+    const rank = (f: { online: boolean; busy: boolean }) => (f.online ? (f.busy ? 1 : 0) : 2);
+    // (The server's order: online, then in a match, then the rest, each by name.)
+    friends.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+    state = { ...state, friends };
+    loadedAt = Date.now();
+    emit();
+  } catch {
+    // Offline: as it was.
+  }
+}
+
 /** A new account on this device (or signed in or out): a fresh list. */
 function syncAccount() {
   const { config, profile } = account();
@@ -225,8 +245,8 @@ let watchers = 0;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
 /**
- * The friends list for a screen: rerenders on every change. `watch`: the list is on screen, so it refreshes every
- * FRIENDS.refreshMs (while the tab is visible) for who's online.
+ * The friends list for a screen: rerenders on every change. `watch`: the list is on screen, so who's online in it
+ * refreshes every FRIENDS.refreshMs while the tab is visible (anything else new comes with the live line's `inbox`).
  */
 export function useFriends(watch = false): { state: FriendsState | null; status: FriendsStatus } {
   const [, set] = useState(0);
@@ -236,9 +256,9 @@ export function useFriends(watch = false): { state: FriendsState | null; status:
     if (watch) {
       watchers++;
       // (The computer's live panel mounts with every front-door page: a list fresher than 15 s will do.)
-      if (status === "on" && Date.now() - loadedAt > 15_000) void loadFriends();
+      if (status === "on" && Date.now() - loadedAt > 15_000) void refreshOnline();
       refreshTimer ??= setInterval(() => {
-        if (watchers > 0 && document.visibilityState !== "hidden" && status === "on") void loadFriends();
+        if (watchers > 0 && document.visibilityState !== "hidden" && status === "on") void refreshOnline();
       }, FRIENDS.refreshMs);
     }
     return () => {

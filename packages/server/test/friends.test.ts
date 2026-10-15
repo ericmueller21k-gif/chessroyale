@@ -280,6 +280,8 @@ describe("the friends API", () => {
     expect(sent.body.state.sent.map((r: { id: string }) => r.id)).toEqual([b.id]);
     expect((await call(env, b.token, "/api/friends/answer", { id: a.id, accept: true })).body.state.friends.map((f: { id: string }) => f.id)).toEqual([a.id]);
     expect((await call(env, b.token, "/api/friends/answer", { id: a.id, accept: true })).status).toBe(404);
+    // Only who's online (the refresh while a list is on screen): Ann was just seen.
+    expect((await call(env, b.token, "/api/friends/online")).body).toEqual({ online: { [a.id]: { online: true, busy: false } } });
     expect((await call(env, a.token, "/api/friends/request", { id: "../x" })).status).toBe(400);
     expect((await call(env, a.token, "/api/friends/nonsense", { id: b.id })).status).toBe(404);
     // Invites: a kind and a code, else a bad request.

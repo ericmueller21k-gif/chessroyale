@@ -249,19 +249,13 @@ export type PresenceOf = (ids: string[]) => Promise<Record<string, { online: boo
  */
 export async function friendsState(sql: Sql, meId: string, now: number, presenceOf?: PresenceOf): Promise<FriendsState> {
   const me = await sql.first<{ allow_invites: string | null; hide_online: number | null }>("SELECT allow_invites, hide_online FROM users WHERE id = ?", meId);
-  const rows = await sql.all<{ id: string; name: string; since: number; last_seen: number | null; hide_online: number | null }>(
+  const rows = await sql.all<FriendRow & { name: string; since: number }>(
     "SELECT u.id, u.name, f.since, u.last_seen, u.hide_online FROM friends f JOIN users u ON u.id = f.friend_id WHERE f.user_id = ?",
     meId,
   );
-  const shown = rows.filter((r) => !r.hide_online).map((r) => r.id);
-  const live = shown.length && presenceOf ? await presenceOf(shown).catch(() => null) : null;
-  // (Without the live hub: D1's last_seen, which a request touches every 15 s there.)
-  const fallback = (r: (typeof rows)[number]) => ({ online: r.last_seen !== null && now - r.last_seen < FRONT_DOOR.onlineWindowMs + CAPACITY.presence.lastSeenWriteMs, busy: false });
+  const live = await presenceRows(rows, now, presenceOf);
   const friends = rows
-    .map((r) => {
-      const p = r.hide_online ? { online: false, busy: false } : (live?.[r.id] ?? (live ? { online: false, busy: false } : fallback(r)));
-      return { id: r.id, name: r.name, since: r.since, online: p.online, busy: p.online && p.busy, hidden: !!r.hide_online };
-    })
+    .map((r) => ({ id: r.id, name: r.name, since: r.since, ...live[r.id]!, hidden: !!r.hide_online }))
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
   const requests = await sql.all<{ id: string; name: string; at: number }>(
     `SELECT u.id, u.name, r.at FROM friend_requests r JOIN users u ON u.id = r.from_id
@@ -292,6 +286,33 @@ export async function friendsState(sql: Sql, meId: string, now: number, presence
 }
 
 const rank = (f: { online: boolean; busy: boolean }) => (f.online ? (f.busy ? 1 : 0) : 2);
+
+interface FriendRow {
+  id: string;
+  last_seen: number | null;
+  hide_online: number | null;
+}
+
+/** Online and in a match for each friend: the live hub's (one call), nothing for one who hides it. */
+async function presenceRows(rows: FriendRow[], now: number, presenceOf?: PresenceOf): Promise<Record<string, { online: boolean; busy: boolean }>> {
+  const shown = rows.filter((r) => !r.hide_online).map((r) => r.id);
+  const live = shown.length && presenceOf ? await presenceOf(shown).catch(() => null) : null;
+  const out: Record<string, { online: boolean; busy: boolean }> = {};
+  for (const r of rows) {
+    // (Without the live hub: D1's last_seen, which a request touches every 15 s there.)
+    const p = r.hide_online
+      ? { online: false, busy: false }
+      : (live?.[r.id] ?? { online: !live && r.last_seen !== null && now - r.last_seen < FRONT_DOOR.onlineWindowMs + CAPACITY.presence.lastSeenWriteMs, busy: false });
+    out[r.id] = { online: p.online, busy: p.online && p.busy };
+  }
+  return out;
+}
+
+/** Just who's online among your friends (the list's refresh while it's on screen): one D1 read and one hub call. */
+export async function friendsOnline(sql: Sql, meId: string, now: number, presenceOf?: PresenceOf): Promise<Record<string, { online: boolean; busy: boolean }>> {
+  const rows = await sql.all<FriendRow>("SELECT u.id, u.last_seen, u.hide_online FROM friends f JOIN users u ON u.id = f.friend_id WHERE f.user_id = ?", meId);
+  return presenceRows(rows, now, presenceOf);
+}
 
 /** Accounts with something new in the last hour (open invites, recent requests): the live hub's start, after a restart. */
 export async function recentNews(sql: Sql, now: number): Promise<{ id: string; at: number }[]> {

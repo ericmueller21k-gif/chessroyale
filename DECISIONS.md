@@ -4769,9 +4769,9 @@ friends see you online, rate limits and stored data that account deletion covers
   late). Both open the full list at `/friends`. No new side-menu item: the panel is on every front-door page.
 - **No extra polling or writes.** Something new for you (a request, an invite, an accepted request) is a note in the
   live hub's memory; the presence batch each Worker instance already sends gets it back for the accounts in the batch,
-  and your next `/api/live` says `inbox: <time>`. The app fetches its list only when that grows, when the list is
-  opened, and every `FRIENDS.refreshMs` (60 s) while a list is on screen. A hub restart reloads the last hour's notes
-  from D1. Who's online is the hub's memory too (one call per list, however long); "in a match" is the app's own word
+  and your next `/api/live` says `inbox: <time>`. The app fetches its list only when that grows; while a list is on
+  screen, only who's online in it refreshes, every `FRIENDS.refreshMs` (60 s; one D1 read and one hub call, not the
+  whole list's six reads). A hub restart reloads the last hour's notes from D1. Who's online is the hub's memory too (one call per list, however long); "in a match" is the app's own word
   on its live-line request (`?busy=1`), so it covers every mode, Squads included, at no cost. (A wrong "in a match" from
   a modified app harms nobody: it's only shown to friends.)
 - **Block** ends the friendship and deletes requests and invites between you. From then on their requests are kept

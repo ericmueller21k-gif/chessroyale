@@ -6,7 +6,7 @@ import { named, test } from "./helpers.ts";
  * profile, accepted from the friends list; each sees the other online; the invites setting (no one, then friends);
  * an invite from the list makes a lobby and shows on the other's home as a toast, and Join puts them in it; a block
  * ends the friendship, refuses invites and keeps requests from reaching the blocker. FRIENDS_SHOTS=<dir> saves the
- * screenshots Eric reviews (the list, a request, the invite toast, the settings).
+ * screenshots Eric reviews (a profile's buttons, the list, a request, the invite toast, the settings).
  */
 
 const isComputer = () => test.info().project.name === "desktop";
@@ -45,23 +45,28 @@ test("two players: a request accepted, online in each other's list, the invites 
   await ann.page.getByRole("button", { name: "Add friend" }).click();
   await expect(ann.page.locator(".fr-note")).toHaveText("Request sent.");
   await expect(ann.page.getByRole("button", { name: "Cancel request" })).toBeVisible();
+  await ann.page.locator(".fr-note").scrollIntoViewIfNeeded();
+  await shot(ann.page, "profile");
+  await ann.page.emulateMedia({ colorScheme: "dark" });
+  await shot(ann.page, "profile-dark");
+  await ann.page.emulateMedia({ colorScheme: "light" });
 
   // Bo, on his home: "1 new" within seconds; his list has the request; he accepts.
   await expect(bo.page.locator(isComputer() ? ".fr-panel .fr-badge" : ".fr-line .fr-badge")).toHaveText("1 new", NEWS);
   await openFriends(bo.page);
-  const request = bo.page.locator(".fr-row", { hasText: "Ann Friend" });
+  const request = bo.page.locator(".fr-page .fr-row", { hasText: "Ann Friend" });
   await expect(request).toContainText("wants to be friends");
   await shot(bo.page, "request");
   await request.getByRole("button", { name: "Accept" }).click();
   await expect(bo.page.locator("#fr-requests")).toHaveCount(0);
-  await expect(bo.page.locator(".fr-row", { hasText: "Ann Friend" })).toContainText("Online");
+  await expect(bo.page.locator(".fr-page .fr-row", { hasText: "Ann Friend" })).toContainText("Online");
 
   // Ann sees Bo online: in the live panel on a computer, on the line above the live line on a phone.
   await ann.page.goto("/?nolanding");
   if (isComputer()) await expect(ann.page.locator(".fr-panel .fr-row", { hasText: "Bo Friend" })).toContainText("Online", NEWS);
   else await expect(ann.page.locator(".fr-line")).toContainText("Friends · 1 online", NEWS);
   await openFriends(ann.page);
-  const boRow = ann.page.locator(".fr-row", { hasText: "Bo Friend" });
+  const boRow = ann.page.locator(".fr-page .fr-row", { hasText: "Bo Friend" });
   await expect(boRow).toContainText("Online");
   await shot(ann.page, "list");
 
@@ -113,7 +118,7 @@ test("two players: a request accepted, online in each other's list, the invites 
   await ann.page.getByRole("button", { name: "Add friend" }).click();
   await expect(ann.page.locator(".fr-note")).toHaveText("Request sent.");
   await bo.page.goto("/friends?nolanding");
-  await expect(bo.page.locator(".fr-row", { hasText: "Ann Friend" })).toContainText("Unblock");
+  await expect(bo.page.locator(".fr-page .fr-row", { hasText: "Ann Friend" })).toContainText("Unblock");
   await expect(bo.page.locator("#fr-requests")).toHaveCount(0);
   await expect(bo.page.locator("#fr-friends")).toHaveText("FRIENDS · 0");
 });
