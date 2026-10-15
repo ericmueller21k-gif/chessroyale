@@ -54,6 +54,8 @@ export const PHASE_CHANGE = (() => {
   const drainAt = seizeAt + (cueAt(a.seize!, "reach") ?? 0);
   const drainMs = LAST_STAND.staggerAt - LAST_STAND.slashAt;
   const igniteAt = drainAt + drainMs;
+  // (His word on it, a moment after: his chant cuts in on it.)
+  const absorbLineAt = igniteAt + 120;
   const fadeMs = 700;
   const goneAt = igniteAt + fadeMs;
   const riseAt = igniteAt + len("seized");
@@ -88,6 +90,7 @@ export const PHASE_CHANGE = (() => {
     drainAt,
     drainMs,
     igniteAt,
+    absorbLineAt,
     fadeMs,
     goneAt,
     riseAt,

@@ -4012,7 +4012,8 @@ follows the 1.8 s fall; 14.8 s, so 16.6 s with the fall, was 10.4 s after it; no
    shrinks; his cry in his bubble, a grunt (`gkLastGrunt2`) and the drain's whoosh (`recluseDrain`, new).
 4. **The power lands** (4.29 s, `igniteAt`): the boss's fist closes on it (`seized`, its spark `recluseSpark`, new), a
    cold flash in his hand, and his **half-engine look ignites** (a flare of the eye, the circuit lines drawn in); his
-   line (4.41 s). The God King staggers and fades up and away in light, five motes rising (`gkLeave`); **gone** at 4.99
+   line (4.41 s; NORMAL priority, so his chant cuts in on it at 7.93 s, after it has been up whole for at least 1.8 s:
+   two CRITICAL lines would have held the chant's words back to the split, and his revive line after them). The God King staggers and fades up and away in light, five motes rising (`gkLeave`); **gone** at 4.99
    s, his last words still up beside his empty place until their time is over.
 5. **Then the reworked change goes on**, 4.43 s later than before: up in a rage (4.89 s: off his knees, the book
    snatched, his fist), the leap onto the board (5.76 s; lands 6.44), the book brandished and thrown down (6.73), the

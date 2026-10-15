@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2 } from "@chessroyale/co
 import { LAST_STAND, legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
 import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, Talk, absorbKing, arcPoints, phaseChangeRun, smoothPath, talkStage } from "../src/recluse-phase2.ts";
 import { ON_BOARD_ANIMS, RECLUSE, RECLUSE_BUST } from "../src/characters/recluse.ts";
-import { CHATTER, LOW, Voice, bossVoice } from "../src/speech.tsx";
+import { CHATTER, CRITICAL, LOW, NORMAL, Voice, bossVoice, typeMs } from "../src/speech.tsx";
 import { SoloMatch } from "../src/solo.ts";
 import { KING_LINES, kingLine, kingSay, resetKingSpeech } from "../src/godKing.ts";
 import { KING_VS_RECLUSE, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
@@ -122,6 +122,20 @@ describe("his phase 2 lines", () => {
     expect(RECLUSE_LINES.absorb).toContain("Mind and machine. Both mine now.");
     for (const line of [...RECLUSE_LINES.absorb, ...RECLUSE_LINES.engine]) expect(line).not.toMatch(/beautiful mind/i);
     expect(RECLUSE_LINES.engine).toEqual(expect.arrayContaining(["Fun, isn't it?", "Look how much fun we're having.", "Not so nice when the engine's on my side, is it?"]));
+  });
+
+  it("the boss's word as the power lands stays up until his chant cuts in on it, whole for a while first", () => {
+    const C = PHASE_CHANGE;
+    expect(C.absorbLineAt).toBeGreaterThanOrEqual(C.igniteAt);
+    for (const line of RECLUSE_LINES.absorb) {
+      const v = new Voice();
+      v.say(line, "absorb", NORMAL, C.absorbLineAt);
+      expect(v.line(C.chantAt - 1)?.text).toBe(line);
+      v.say(RECLUSE_LINES.chant[0], "chant", CRITICAL, C.chantAt);
+      expect(v.line(C.chantAt)?.text).toBe(RECLUSE_LINES.chant[0]);
+      // (Typed out, and on screen whole for at least a second and a half before the chant.)
+      expect(C.chantAt - C.absorbLineAt - typeMs(line), line).toBeGreaterThanOrEqual(1500);
+    }
   });
 
   it("the God King's triumph gives way to his cry as he's drained (two seconds on), each in his own voice", () => {

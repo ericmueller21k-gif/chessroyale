@@ -21,7 +21,7 @@ import { useMedia } from "../components/QuickChat.tsx";
 import type { GameView, SimulBoardView, SimulView } from "../game.ts";
 import type { ComponentChildren } from "preact";
 import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE2_ULT_BANNER_MS, PHASE_CHANGE, absorbKing, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
-import { CRITICAL, bossVoice } from "../speech.tsx";
+import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
 import { BossHeading } from "./Play.tsx";
 
@@ -262,7 +262,8 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
     kingSay("foeDrained", `recluse:drained:${at}`);
   });
   cue(t >= C.igniteAt + 80, "leave", () => play("gkLeave"));
-  cue(t >= C.igniteAt + 120, "absorb", () => bossVoice.say(RECLUSE_LINES.absorb[at % RECLUSE_LINES.absorb.length]!, `recluse:absorb:${at}`, CRITICAL));
+  // (NORMAL: his chant, three and a half seconds on, cuts in on it, so the chant's words come as he chants.)
+  cue(t >= C.absorbLineAt, "absorb", () => bossVoice.say(RECLUSE_LINES.absorb[at % RECLUSE_LINES.absorb.length]!, `recluse:absorb:${at}`, NORMAL));
   cue(t >= C.arcAt, "arcs", () => play("recluseArc"));
   // His look over his figure on the board, placed on his head frame by frame.
   const figEngine = useRef<HTMLSpanElement>(null);
