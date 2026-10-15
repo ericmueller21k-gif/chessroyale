@@ -3,12 +3,16 @@
 // Starts the app's dev server, picks a boss, taps a knight or bishop move, then saves a PNG every time the board's
 // pieces or the phase change for 12 s, and prints a timeline (ms, phase, piece count, frame). Read the frames: a piece
 // that jumps back, flickers or moves twice shows up as an extra frame. See .claude/LESSONS.md.
+import { resolve } from "node:path";
 import { chromium, devices } from "@playwright/test";
 import { createServer } from "vite";
 import { Chess } from "chess.js";
 
-const [out = ".", bossName = "Boingo"] = process.argv.slice(2);
-const server = await createServer({ root: "packages/app", configFile: "packages/app/vite.config.ts", server: { port: 5197 }, logLevel: "error" });
+const [outArg = ".", bossName = "Boingo"] = process.argv.slice(2);
+const out = resolve(outArg);
+// (From the app's folder, as the other frames scripts run: its Vite config finds its files from there.)
+process.chdir("packages/app");
+const server = await createServer({ root: ".", configFile: "vite.config.ts", server: { port: 5197 }, logLevel: "error" });
 await server.listen();
 const url = server.resolvedUrls.local[0];
 const b = await chromium.launch();

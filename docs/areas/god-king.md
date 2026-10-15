@@ -21,6 +21,10 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 - **No charges left** (Eric, Oct 15): a tap on him gets his soft "can't" (two quick, muffled low notes falling,
   synthesized: `characters/god-king-sounds.ts`, made ahead in the sound worker's table as the bosses' are, `kingCant`)
   and a tiny shake, dimmed a moment (`.gk-unit.nope`, 0.4 s); nothing else (no menu, nothing spent).
+- **Drawn when he changes** (Oct 15; DECISIONS.md, "The boss screen draws only what changed"): his unit in the dock
+  (`GodKingUnit`) is memoized, and draws again every frame only while he commands from his spot or shakes his "can't";
+  his figure animates on its own canvas loop, his words in their own box (`VoiceBubble` on `kingVoice`), so a screen
+  drawn every frame doesn't draw him with it.
 - **The clock stands still** while he acts, for everyone, solo and online: a move lengthens the reveal by
   `KING_COMMAND.moveMs`, a strike stops every deadline for `kingStrikeMs`. Nothing he does costs anyone time.
 - **His Last Stand.** Always armed, once per game. If the crowd's played move gives away at least the bar (in points

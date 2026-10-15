@@ -241,7 +241,8 @@ build): online, phase 1 won is the crowd's victory):
   claim, the battle's end) cuts in on another; the rest wait their turn, highest first, and lapse after 5 s of waiting.
   A move that brings a power's moment says nothing of its own (the moment's line is the boss's word that turn). The
   dock says the moment's word ("Freeze!"). Lights out's round prompt keeps its own box above the board for the whole
-  round (and the dock).
+  round (and the dock). Each speaker's box keeps itself current (`VoiceBubble`: it listens to its voice and draws
+  every frame while a line types and fades), so nothing around it has to be drawn again for it.
 - **Same for everyone online:** what a boss does and says on screen comes only from the shared match state
   (`boss-beats.ts`): one-shot animations play once per moment from when the device first saw it, loops run by the
   clock, lines are picked by a hash of the moment. No new protocol for a boss's looks (Hollow's `lights`, a field of
@@ -269,6 +270,18 @@ build): online, phase 1 won is the crowd's victory):
   column beside the board starts after the God King. The eval bar draws behind them both. A phone is unchanged.
   From 900 to 1099 px the boss is drawn at 1× by the eval bar, so he's whole in the window; the board makes room only
   if it must (`--bs-reach`, `--bs-need` in styles.css; Oct 14). From 1100 px he's 2× (2 screen px a sprite px).
+- **What a boss screen draws each frame** (Oct 15; DECISIONS.md, "The boss screen draws only what changed"): the boss
+  screen (`Boss.tsx`) and the Hidden Boss's phase change and phase 2 (`Recluse2.tsx`) keep a clock that ticks every
+  frame for what moves with it: the board and everything drawn over it (moments, effects, banners, Lights out), the
+  eval bar, the board's jolts and turns. The rest are elements made once and kept (`useMemo`), so Preact leaves them
+  alone until their key changes: the header with the boss bar, the boss by the board and the chat or scoreboard under
+  it, on `useStillKey` (`hooks.ts`: the match changing, the boss's state changing, and every 200 ms, as often as your
+  move's screen draws, for what they read as they're drawn); the dock on the same key plus the few clock-read values
+  its words use (the moment, the burn line, the claim and snack windows, the funhouse's move, "Your move in N"; every
+  frame during Lights out, whose prompt counts down). The phase change and phase 2 keep the header and the boss's place
+  the same way; their docks draw every frame. What draws itself every frame inside them does it on its own
+  clock: Hollow's bulb strip through his turn (`BossBarExtra`), the speakers' words (`VoiceBubble`), the God King
+  while he commands or says "can't"; their figures animate on their own canvases' loops as before.
 - **The bars at the back, the ice on its square, the queen banners silent** (Eric, Oct 11): the move clock's bars above
   and below the board draw behind everything (squares' overlays, the boss, his effects and words, the God King), as the
   eval bar does. Ginger's ice is one block the square's shape on every square, whatever the piece, placed on
@@ -315,10 +328,10 @@ Each boss lives in its own files, one per layer, on a shared base. The shared fi
 | The host's engine work | `packages/app/src/net.ts` (`hostBoss` and its kin; Wrangler's `pigTurn` and scout) | |
 | Art and sounds | `characters/index.ts` (`CHARACTERS`), `characters/kits.ts` (`BOSS_KITS`: animations per moment, lines, portrait; optional `bar` (a phone's bar's own drawing), `loops` (a loop by another name), `fall` (lines said in turn once beaten), `lineOf` (a line from the battle)), `characters/power-art.ts` (each power's moments and effects) | `characters/<boss>.ts`, `<boss>-sounds.ts` (`gingerbread`, `clown`, `grex`, `hollow`, `bigboy`, `sawyer`, `pig`, `recluse`; his lines in one table, `recluse-lines.ts`) |
 | Board effect sprites | `characters/effects.ts` (`EFFECT_SPRITES`), `characters/effects/common.ts` | `characters/effects/<boss>.ts`: `ginger.ts`, `boingo.ts`, `grex.ts`, `hollow.ts`, `bigboy.ts`, `sawyer.ts` |
-| Speech: every line's time and turn, the text box | `packages/app/src/speech.tsx` (`Voice`, `bossVoice`, `SpeechBox`, `holdMs`); power moments' lines said in `BossPowers.tsx` (`useMomentSpeech`), reactions in `BossCharacter.tsx` | a moment's `line`, `lineAt` and `priority` in its `BossUi` (only when the kit's lines aren't the whole story) |
+| Speech: every line's time and turn, the text box | `packages/app/src/speech.tsx` (`Voice`, `bossVoice`, `SpeechBox`, `VoiceBubble`, `holdMs`); power moments' lines said in `BossPowers.tsx` (`useMomentSpeech`), reactions in `BossCharacter.tsx` | a moment's `line`, `lineAt` and `priority` in its `BossUi` (only when the kit's lines aren't the whole story) |
 | Powers on screen: moments, banners, the board layer, the rage meter | `components/BossPowers.tsx` (`momentsOf`, `PowerMoment`, `PowerBoard`, `BossBarExtra`, `dockLine`, the warning), `components/PowerParts.tsx` (`BossUi`, `Moment`, `Flight`, `PowerBanner`), `components/BossEffect.tsx`; `playInPlace` (`BossCharacter.tsx`: a run of a boss's own animations where it stands, over its beat) | `components/Ginger.tsx`, `Boingo.tsx`, `Grex.tsx`, `Hollow.tsx` (+ `LightsOut.tsx`), `BigBoy.tsx`, `Sawyer.tsx`, `Pig.tsx`, `Recluse.tsx` |
 | The boss's brain (Maia-3 or Stockfish) | `bossBrainFor` (core `boss.ts`), `packages/chess/src/boss-brain.ts`, `human-uci.ts`, `bossMoveFrom` and `bossBrainPlan` (`runner.ts`); online the lobby's `bossBrainNow` and the host's `hostBoss` (`net.ts`); solo `startBrain` (`solo.ts`); `packages/app/src/maia.ts`, `boss-brain.ts`, `components/BossBrain.tsx` (the picker), `BrainDebug` (`BossDock.tsx`); the Maia box `packages/maia-worker/` | none (every boss: `BOSS_BRAIN.brain`; an exception would go in `BOSS_BRAIN.byBoss`) |
-| The boss screen | `packages/app/src/screens/Boss.tsx` (still names a few bosses: see below; Sawyer's split hides the new half until the crack, and his board saw jolts the board; Wrangler's lasso and showdown keep pieces where they were until they're hauled: `pigBoard`); `screens/Play.tsx` (Wrangler's duel prompt in the dock) | |
+| The boss screen | `packages/app/src/screens/Boss.tsx` (still names a few bosses: see below; Sawyer's split hides the new half until the crack, and his board saw jolts the board; Wrangler's lasso and showdown keep pieces where they were until they're hauled: `pigBoard`; what it draws each frame and what it keeps: `useStillKey` in `hooks.ts`); `screens/Play.tsx` (Wrangler's duel prompt in the dock) | |
 | The boss menu's power words | `packages/app/src/power-words.ts` (`Record<PowerId, …>`) | |
 | A boss's attack on a king (the Last Stand, its mate) | `components/KingAttack.tsx`, `KING_ATTACK`, `KING_ATTACKERS`, `bossTurnShowMs` (`boss-timing.ts`), `KingAttackKit` (`kits.ts`), `LastStand.tsx`, `screens/Boss.tsx` | its kit's `kingAttack` (Hollow: `HOLLOW_ATTACK` in `hollow.ts`, `lashHit` in `effects/hollow.ts`, `hollowLash`) |
 
@@ -474,6 +487,10 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 - Measure a new effect's first showing on a slowed phone; draw many new frames ahead, a slice a frame; make a boss's
   sounds before their cue; nothing a boss needs only in its battle is made when the app loads.
 - Nothing read while rendering may grow with the match; run `npm run perf:boss` late in the match.
+- A boss screen draws every frame only what moves with its clock (the board and what's over it). Something new that
+  changes with time inside the header, the boss's figure, the chat or the dock draws itself (its own `useFrameNow`,
+  a timer, or a CSS animation), or, for the dock's words, joins the dock's list of clock-read values in `Boss.tsx`;
+  otherwise it waits up to 200 ms for the next `useStillKey` tick.
 - Tables keyed by a closed set (powers, events) are typed by it (`Record<PowerId, …>`).
 - Text a player must read to play (Lights out's prompt) stays on screen as long as it applies, outside the speech box.
 - A boss's words go into its voice (`speech.tsx`), never into a box a screen or a moment owns: a line lives as long as
