@@ -278,7 +278,7 @@ describe("Crowd mode", () => {
     expect(runner.alive().every((p) => (p.misses ?? 0) === 0)).toBe(true);
     expect(runner.boss!.kingCharges).toBe(1);
     // From here h5 misses every move, h4 every other and h3 every third; the rest play on. The boss strikes the worst
-    // since its last strike; a tie for the worst would wait (DECISIONS.md, "Opening grace and ties survive the cut").
+    // since its last strike; a tie for the worst would wait (docs/decisions/2026-10-15-opening-allowance-and-ties.md).
     const struck: string[] = [];
     while (!runner.stageComplete()) {
       if (runner.bossToMove()) {

@@ -1,6 +1,6 @@
 /**
- * The opening allowance and ties at the cut, in real Crowd 50 v 50 matches of 100 bots (DECISIONS.md, "Opening grace
- * and ties survive the cut", Oct 15, 2026). Records every round (position, best move, each pick's raw and counted loss,
+ * The opening allowance and ties at the cut, in real Crowd 50 v 50 matches of 100 bots
+ * (docs/decisions/2026-10-15-opening-allowance-and-ties.md). Records every round (position, best move, each pick's raw and counted loss,
  * the engine's top 8) and every cut (who went out, who stayed, the scores), so the same file can be written by the
  * code before the change and after it and compared.
  *

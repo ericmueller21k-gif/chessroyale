@@ -400,7 +400,7 @@ export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRo
   stage === 0 ? s.firstStageRounds : s.roundsPerStage;
 
 /**
- * The opening allowance (Eric, Oct 15, 2026; DECISIONS.md, "Opening grace and ties survive the cut"): early in a game a
+ * The opening allowance (Eric, Oct 15, 2026; docs/decisions/2026-10-15-opening-allowance-and-ties.md): early in a game a
  * move's loss counts for points only beyond `points`, so a sound move off the engine's line costs nothing, while poor
  * play still costs. The move number is the game's own (the position's fullmove number: "Move 6" on the top bar), the
  * same in every mode: the whole allowance through move `flatThrough`, then falling in a line to nothing at move

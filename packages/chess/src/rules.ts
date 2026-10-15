@@ -220,7 +220,7 @@ export function blunderCost(fen: string, move: string, reply?: string | null, ma
 // Its own small board, not chess.js: chess.js builds a SAN and two FENs for every move it lists, which made one check
 // cost about 10 ms; this one costs a few hundredths of that, run on every pick the opening allowance covers. It only
 // asks what attacks a square, so a pinned piece still counts as a recapture and a check isn't answered first: simple on
-// purpose, and it fails safe both ways (DECISIONS.md, "Opening grace and ties survive the cut").
+// purpose, and it fails safe both ways (docs/decisions/2026-10-15-opening-allowance-and-ties.md).
 
 /** Piece values for the exchange check (a king captures only onto a square the other side doesn't attack). */
 const EXCHANGE_VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };

@@ -197,7 +197,7 @@ describe("resigning online: Crowd 50 v 50 and raids", () => {
     L.core.message("p1", { t: "start" });
     L.until(() => L.core.record.phase === "play");
     // p1 and p3 pick, p2 misses: the boss strikes the worst down. (Two who both missed would be tied, and a tie for the
-    // worst waits: DECISIONS.md, "Opening grace and ties survive the cut".)
+    // worst waits: docs/decisions/2026-10-15-opening-allowance-and-ties.md.)
     const r = L.last("p1", "round")!;
     for (const id of ["p1", "p3"]) L.core.message(id, { t: "pick", key: r.key, move: (r.boss?.powers?.allowed ?? legalMoves(r.board!.fen))[0]! });
     L.until(() => (L.runner().state.boss?.kills.length ?? 0) === 1);

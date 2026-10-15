@@ -1,4 +1,4 @@
-// The opening allowance and the cut, frame by frame (DECISIONS.md, "Opening grace and ties survive the cut"): a solo
+// The opening allowance and the cut, frame by frame (docs/decisions/2026-10-15-opening-allowance-and-ties.md): a solo
 // Crowd 50 v 50 with a cut after every move. Move 1: a sound move off the engine's line ("−2.4 → 0 · opening" on the
 // reveal), then the first cut (ties go through). Move 2: a move that leaves a piece to be taken ("· gave up material"),
 // then the cut, and "Why was I cut?" if it takes you.

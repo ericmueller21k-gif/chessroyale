@@ -18,7 +18,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   expected score), from the judge's numbers. A miss scores `missedMoveScore`. Scores carry over all game in Crowd. A
   **brilliant** move is one that separated the field (among enough pickers); a pick made after a power-up's hints
   can't be brilliant.
-- **The opening allowance** (Eric, Oct 15; DECISIONS.md, "Opening grace and ties survive the cut";
+- **The opening allowance** (Eric, Oct 15; docs/decisions/2026-10-15-opening-allowance-and-ties.md;
   `OPENING_ALLOWANCE`, `reports/opening-allowance.md`). A pick's **counted loss** is its raw loss less
   `openingAllowance(n)`: `points` (8) through move `flatThrough` (10), then in a line to nothing at `goneBy` (14). `n`
   is the game's own move number (the position's fullmove number), the same in every mode: Crowd from move 1, a raid

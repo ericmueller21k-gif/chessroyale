@@ -14,7 +14,7 @@ import {
   type GroupEvaluation,
 } from "../src/index.ts";
 
-// DECISIONS.md, "Opening grace and ties survive the cut" (Oct 15, 2026).
+// docs/decisions/2026-10-15-opening-allowance-and-ties.md (Oct 15, 2026).
 const A = OPENING_ALLOWANCE;
 
 describe("the opening allowance's taper", () => {

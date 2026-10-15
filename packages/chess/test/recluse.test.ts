@@ -420,7 +420,7 @@ describe("he never strikes the crowd (Oct 14: his fight is a squad's, who must a
   /**
    * A crowd of five against a boss (a raid, people only), `turns` crowd moves: every one picking the same move, but h4
    * misses every move and h3 every other, so the worst since each strike is clear (a tie for the worst waits:
-   * DECISIONS.md, "Opening grace and ties survive the cut").
+   * docs/decisions/2026-10-15-opening-allowance-and-ties.md).
    */
   async function crowdOf5(bossId: string, turns: number) {
     const ids = ["h0", "h1", "h2", "h3", "h4"];

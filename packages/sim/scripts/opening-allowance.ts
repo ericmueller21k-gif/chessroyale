@@ -1,5 +1,5 @@
 /**
- * The opening allowance's calibration (DECISIONS.md, "Opening grace and ties survive the cut", Oct 15, 2026): what
+ * The opening allowance's calibration (docs/decisions/2026-10-15-opening-allowance-and-ties.md): what
  * moves cost in the first 14 moves, by kind, at the strength the game scores with (the lite build at 250k nodes, the
  * judge's top-8 search plus a search over the other picks: `analyse`, as the runner's scoreBoard does).
  *

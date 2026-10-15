@@ -53,8 +53,8 @@ describe("MatchRunner", () => {
     while (!runner.isFinal()) {
       const groups = runner.deal();
       // Boards are never swapped; the count follows the plan (fewer only if a game ended), or is more when ties at the
-      // cut line kept more players in (the opening allowance makes many: DECISIONS.md, "Opening grace and ties survive
-      // the cut"): enough boards for groupSize a board, so groups keep their size.
+      // cut line kept more players in (the opening allowance makes many: docs/decisions/2026-10-15-opening-allowance-and-ties.md):
+      // enough boards for groupSize a board, so groups keep their size.
       const alive = runner.alive().length;
       expect(groups.size).toBeLessThanOrEqual(Math.max(plan[runner.state.stage]!.boards, Math.ceil(alive / settings.groupSize)));
       if (runner.state.cutCarry) tiesKept++;

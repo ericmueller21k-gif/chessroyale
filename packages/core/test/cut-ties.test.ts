@@ -19,7 +19,7 @@ import {
   type Settings,
 } from "../src/index.ts";
 
-// DECISIONS.md, "Opening grace and ties survive the cut" (Oct 15, 2026): at a cut everyone tied exactly with the last
+// docs/decisions/2026-10-15-opening-allowance-and-ties.md (Oct 15, 2026): at a cut everyone tied exactly with the last
 // player through goes through; what that leaves over is owed by the next cut; the last cut before a fixed-size ending
 // breaks an exact tie by less raw loss over the match, then less thinking time.
 

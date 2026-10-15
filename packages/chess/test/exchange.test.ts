@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, OPENING_ALLOWANCE, mulberry32, openingAllowance } from "@chessroyale/core";
 import { MatchRunner, exchangeNet, legalMoves, materialSlips, moveNumber, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
 
-// The exchange check: the opening allowance's material fallback (DECISIONS.md, "Opening grace and ties survive the cut").
+// The exchange check: the opening allowance's material fallback (docs/decisions/2026-10-15-opening-allowance-and-ties.md).
 
 describe("the exchange check", () => {
   it("sees a piece left hanging", () => {

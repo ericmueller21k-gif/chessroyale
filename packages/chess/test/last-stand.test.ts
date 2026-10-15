@@ -116,7 +116,7 @@ describe("the God King's Last Stand: the rule", () => {
     expect(runner.boss!.lastStand).toEqual({ atMove: 1, move: BLUNDER, loss: 47, bar: 35, charges: 3, fen: before, bestMove: b.bestMove, before: 0.55, after: 0.08 });
     expect(runner.bossView()!.barred).toBe(BLUNDER);
     // The scores stand: the raw loss is on your record (ratings), and the boss's strikes weigh it as it counted (after
-    // the opening allowance: a raid starts at move 6; DECISIONS.md, "Opening grace and ties survive the cut").
+    // the opening allowance: a raid starts at move 6; docs/decisions/2026-10-15-opening-allowance-and-ties.md).
     expect(runner.player("h0").lossesByStage.flat()).toEqual([47]);
     expect(runner.player("h0").finalLosses).toEqual([countedOf(b.result.players[0]!)]);
     // The re-pick: an ordinary scored round, with the blunder off the table.

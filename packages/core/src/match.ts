@@ -710,8 +710,8 @@ const recentLoss = (p: Pick<PlayerState, "finalLosses">, k: number) => p.finalLo
 /**
  * Who the boss would strike now: the player with the worst moves since its last strike (most counted points lost over
  * those moves, the opening allowance taken off), a tie going against the weaker player over the match (matchLoss).
- * Null when two or more are tied exactly on both: nobody is struck on a coin flip (DECISIONS.md, "Opening grace and ties
- * survive the cut").
+ * Null when two or more are tied exactly on both: nobody is struck on a coin flip
+ * (docs/decisions/2026-10-15-opening-allowance-and-ties.md).
  */
 export function strikeVictim(state: MatchState, settings: Settings = DEFAULT_SETTINGS): string | null {
   const boss = state.boss;
