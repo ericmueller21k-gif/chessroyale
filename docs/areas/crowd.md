@@ -58,7 +58,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   takes what you think beyond the increment out of the bank; a quicker move banks the rest, as on a chess clock (the
   bank isn't capped at its start). An empty bank still leaves the increment. The clock vote sets all three; the match is
   made with the default bank, so the vote's patch resets every bank before move 1 (`startBanks`, from
-  `MatchRunner.patchSettings`). Without the vote (votes off, raids) it's Rapid 10+5, 20 s a move. Only
+  `MatchRunner.patchSettings`). Without the vote (raids, or the `?augments=0` test switch) it's Rapid 10+5, 20 s a move. Only
   your own team's moves run your clock. The board's clock shows this move's seconds and your bank, draining live from
   bank + increment as you think; the scoreboard's BANK updates after each move. Online, each `round` message carries
   the move's cap (`moveClock`) and the increment (`increment`), so a reloaded app has them. The finals (team final,
@@ -66,7 +66,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   50 v 50: three chess time controls".
 - **Power-ups:** 3 at the start in Crowd (`powerUpsAtStart`); one shows the engine's top 3 moves for that turn.
 - **On screen:** every pick appears live on the board as a ghost with a name pill (one name per square, "+N"), live
-  tallies, an optional motion trail, the eval bar (unless switched off in Settings: [hub.md](hub.md)), the scoreboard
+  tallies, an optional motion trail (Settings → Board), the eval bar (testers only: [hub.md](hub.md)), the scoreboard
   and chat under the board. A crowd of one keeps its
   move on the board (no ghost, no snap-back). The board never moves between screens.
 - **Resigning and leaving** (Eric, Oct 13; `LEAVING`; DECISIONS.md, "Resign: leaving a match in every mode"). The

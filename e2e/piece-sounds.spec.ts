@@ -3,10 +3,11 @@ import { test } from "./helpers.ts";
 import { CAPTURE_SOUNDS, CASTLE_SOUND, MOVE_SOUNDS } from "../packages/app/src/piece-sounds.ts";
 
 /**
- * Settings → Sound: the Move sound and Capture sound pickers (Eric, Oct 11; all wood, Oct 12). The classic knocks
- * (PyChess's) by default, then their variations and the other wood; ▶ plays one without picking it (loading only that
- * file); a pick is kept on the device; the first tap (as a game starts) loads only the picked sounds; every option's
- * file decodes in the browser, starts on its hit and is as loud as the classic; and the classics are credited.
+ * Settings → Sound: the Move sound and Capture sound pickers (Eric, Oct 11; all wood, Oct 12), and the Reveal sound
+ * beside them (Oct 15). The classic knocks (PyChess's) by default, then their variations and the other wood; ▶ plays
+ * one without picking it (loading only that file); a pick is kept on the device; the first tap (as a game starts)
+ * loads only the picked sounds; every option's file decodes in the browser, starts on its hit and is as loud as the
+ * classic; and the classics are credited.
  */
 test.use({ serviceWorkers: "block" }); // (the service worker would precache every file, hiding what the app loads)
 
@@ -161,4 +162,24 @@ test("piece sounds: every option decodes, starts on its hit and is as loud as th
     // As loud as the classic, within a decibel (the classic's variations within half a decibel: they measure 0.1 off).
     expect(Math.abs(m.loud - r.loud), path).toBeLessThan(path.includes("-classic-") ? 0.5 : 1);
   }
+});
+
+test("the reveal sound (Settings → Sound, beside the piece sounds): the steel pan until you pick; ▶ plays a whole roulette without picking; a pick is kept", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  await page.addInitScript(() => ((window as any).__soundLog = []));
+  await page.goto("/settings");
+  const reveal = page.getByRole("radiogroup", { name: "Reveal sound" });
+  expect(await reveal.getByRole("radio").locator("strong").allTextContents()).toEqual(["Steel pan", "Kalimba", "Marimba", "Glockenspiel", "Music box", "8-bit blip"]);
+  await expect(reveal.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Steel pan/);
+  // ▶: the roulette's slowing steps, then the winner's tones; nothing picked.
+  await page.getByRole("button", { name: "Play Kalimba" }).click();
+  const log = () => page.evaluate(() => (window as any).__soundLog as string[]);
+  await expect.poll(async () => (await log()).filter((x) => x.startsWith("select:")).length, { timeout: 5000 }).toBe(1);
+  expect((await log()).filter((x) => x.startsWith("reel:"))).toHaveLength(11);
+  await expect(reveal.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Steel pan/);
+  // A pick (it plays too), kept on the device.
+  await reveal.getByRole("radio", { name: /^Marimba/ }).click();
+  await page.reload();
+  await expect(page.getByRole("radiogroup", { name: "Reveal sound" }).getByRole("radio", { checked: true })).toHaveAccessibleName(/^Marimba/);
+  expect(await page.evaluate(() => localStorage.getItem("brc.reelVoice"))).toBe("marimba");
 });

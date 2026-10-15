@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, adminPlayable, bossDef, bossIdFromLink, bossStrength, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, pausedLine, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
+import { BOSS_TIERS, adminPlayable, bossDef, bossIdFromLink, bossStrength, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, pausedLine, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { chosenDifficulty, difficultyElo, rememberDifficulty } from "../boss-difficulty.ts";
 import { powersLine } from "../power-words.ts";
@@ -19,56 +19,26 @@ import { FriendsLine } from "../components/Friends.tsx";
 import { testParams } from "../test-switches.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 
-export const OPENING_KEY = "brc.openingMoves";
 const MODE_KEY = "brc.mode";
-const AUGMENTS_KEY = "brc.augments";
 
-export interface ModeChoice {
-  /** Classic, Crowd (50 v 50) or the boss raid. */
-  mode: ModeChoiceId;
-  augments: boolean;
-}
-
-/** The mode for solo games and lobbies you create: ?mode=crowd&augments=0, else this device's choice. */
-export function chosenMode(): ModeChoice {
-  const q = new URLSearchParams(location.search);
-  const get = (k: string) => {
-    try {
-      return localStorage.getItem(k);
-    } catch {
-      return null;
-    }
-  };
-  // Crowd (50 v 50) is the main mode: Classic or the boss raid only when chosen.
-  const picked = q.get("mode") ?? get(MODE_KEY);
-  const mode = picked === "classic" ? "classic" : picked === "raid" ? "raid" : "crowd";
-  return {
-    mode,
-    augments: (q.get("augments") ?? get(AUGMENTS_KEY)) !== "0",
-  };
-}
-
-export function saveMode(c: ModeChoice) {
+/** The mode (Classic, Crowd 50 v 50 or the boss raid) for solo games and lobbies you create: ?mode=, else this device's choice. */
+export function chosenMode(): ModeChoiceId {
+  let picked = new URLSearchParams(location.search).get("mode");
   try {
-    localStorage.setItem(MODE_KEY, c.mode);
-    localStorage.setItem(AUGMENTS_KEY, c.augments ? "1" : "0");
-  } catch {
-    // Not important.
-  }
-}
-
-/** Opening moves per side for solo games and lobbies you create: ?moves=N, else this device's choice, else the default. */
-export function chosenOpeningMoves(): number {
-  const clamp = (n: number) => Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(n)));
-  const q = new URLSearchParams(location.search).get("moves");
-  if (q !== null && Number.isFinite(Number(q))) return clamp(Number(q));
-  try {
-    const v = localStorage.getItem(OPENING_KEY);
-    if (v !== null && Number.isFinite(Number(v))) return clamp(Number(v));
+    picked ??= localStorage.getItem(MODE_KEY);
   } catch {
     // No storage.
   }
-  return S.openingMoves;
+  // Crowd (50 v 50) is the main mode: Classic or the boss raid only when chosen.
+  return picked === "classic" ? "classic" : picked === "raid" ? "raid" : "crowd";
+}
+
+function saveMode(mode: ModeChoiceId) {
+  try {
+    localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    // Not important.
+  }
 }
 
 const MATCHMAKING_KEY = "brc.matchmaking";
@@ -274,13 +244,13 @@ const MODES: { id: HomeMode; label: string; sub: string }[] = [
 
 /** The mode the home screen shows picked: Squads if this device last picked it (and the address names no mode). */
 export function chosenHomeMode(): HomeMode {
-  if (new URLSearchParams(location.search).has("mode")) return new URLSearchParams(location.search).get("mode") === "squads" ? "squads" : chosenMode().mode;
+  if (new URLSearchParams(location.search).has("mode")) return new URLSearchParams(location.search).get("mode") === "squads" ? "squads" : chosenMode();
   try {
     if (localStorage.getItem(MODE_KEY) === "squads") return "squads";
   } catch {
     // No storage.
   }
-  return chosenMode().mode;
+  return chosenMode();
 }
 
 /**
@@ -508,7 +478,7 @@ export function HomeScreen({
       } catch {
         // Not important.
       }
-    } else saveMode({ ...chosenMode(), mode: m });
+    } else saveMode(m);
   };
   // How you're matched. Guests (online needs signing in) can only play Solo; Classic online is coming (Solo works).
   const [picked, setPicked] = useState<MatchmakingType>(chosenMatchmaking);

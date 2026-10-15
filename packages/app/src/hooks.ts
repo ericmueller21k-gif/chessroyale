@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
 import { START_FEN, applyMove, baseAt } from "@chessroyale/chess";
 import type { BoardView, GameView } from "./game.ts";
+import { crowdAnimations, crowdTrail, onPrefsChange } from "./prefs.ts";
 
 const MAX_REPLAY = 5;
 
@@ -80,4 +81,18 @@ export function useReplay(
   const fromStart = frames[0]?.fen === START_FEN && frames.length > 1;
   if (!frames.length || step >= frames.length - 1) return { fen: board.fen, lastMove: board.lastMove, replaying: false, fromStart };
   return { ...frames[step]!, replaying: true, fromStart };
+}
+
+/** Settings → Board, "Animations" (picks as ghost pieces), kept in sync if it changes. */
+export function useBoardAnimations(): boolean {
+  const [on, setOn] = useState(crowdAnimations());
+  useEffect(() => onPrefsChange(() => setOn(crowdAnimations())), []);
+  return on;
+}
+
+/** Settings → Board, "Motion trail" (picks fly to their squares, with animations on), kept in sync if it changes. */
+export function useMotionTrail(): boolean {
+  const [on, setOn] = useState(crowdTrail());
+  useEffect(() => onPrefsChange(() => setOn(crowdTrail())), []);
+  return on;
 }

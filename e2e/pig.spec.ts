@@ -198,7 +198,10 @@ test("Wrangler's long pull as his first move, then a lasso drag (?power=drag)", 
   test.setTimeout(6 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/?debug&clock=60&boss=pig&power=drag&laststand=0");
+  // (His brain on Stockfish, an admin's test brain, at his strength: on Maia at 600 he fell apart against the engine's
+  // best moves, and a game more than DRAG_DECIDED pawns one way has no drag, so none came within the turns now and then.)
+  await asAdmin(page);
+  await page.goto("/?debug&clock=60&boss=pig&power=drag&laststand=0&brain=stockfish");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   const boss = await bossNow(page);
@@ -215,6 +218,7 @@ test("Wrangler's long pull as his first move, then a lasso drag (?power=drag)", 
   await page.evaluate(() => ((window as any).__soundLog = []));
   await play(page, "e2e4");
   await yourMove(page);
+  expect(await page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/^Stockfish/);
   const b1 = await bossNow(page);
   expect(b1.powers.pull).toEqual({ turn: 2, from: "d7", via: "d5", to: "d4" });
   // His move is the double step (in the record), and the pawn stands on d4 with d7 and d5 empty.
@@ -235,14 +239,17 @@ test("Wrangler's long pull as his first move, then a lasso drag (?power=drag)", 
   const dragSeen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /LASSO!/ }, layer: { selector: ".pg-layer[data-lasso] .pg-piece" } });
   let drag: any = null;
   let before = 0;
+  // (Each turn's eval bar and brain, for the message if no drag came: a game past DRAG_DECIDED has none.)
+  const turns: string[] = [];
   for (let i = 0; i < 6 && !drag; i++) {
     before = (await bossNow(page)).board.history.length;
     await play(page, await goodMove(page));
     await yourMove(page);
     const b = await bossNow(page);
+    turns.push(`t${b.powers.turn} ${(await page.locator(".eval-label").first().textContent()) ?? "?"} ${await page.evaluate(() => (window as any).match.brainLine ?? "")}`);
     if (b.powers.drag && b.powers.drag.turn === b.powers.turn) drag = b;
   }
-  expect(drag, "a drag within 6 turns").not.toBeNull();
+  expect(drag, `a drag within 6 turns (${turns.join("; ")})`).not.toBeNull();
   const d = drag.powers.drag;
   // One square, up, down or sideways; never the king (nor a bishop); onto an empty square.
   const df = Math.abs(d.from.charCodeAt(0) - d.to.charCodeAt(0));

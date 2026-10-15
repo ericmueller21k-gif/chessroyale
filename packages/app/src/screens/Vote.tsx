@@ -26,7 +26,7 @@ import type { GameView, VoteView } from "../game.ts";
 import { pawnLook } from "../looks.ts";
 import { underBoardView } from "../prefs.ts";
 import { play } from "../sound.ts";
-import { useCrowdAnimations } from "./Crowd.tsx";
+import { useBoardAnimations } from "../hooks.ts";
 import { pausedBosses, useServerStatus } from "../status.ts";
 
 /** No pieces while the votes run: only everyone's pawns. */
@@ -143,7 +143,7 @@ export function VoteScreen({
       ? { ...given, options: given.options.map((o) => (o.id === "boss" ? { ...bossFinalOption(rosterWithout(off)), ...(o.disabled ? { disabled: true } : {}) } : o)) }
       : given;
   const now = useFrameNow();
-  const animate = useCrowdAnimations();
+  const animate = useBoardAnimations();
   const side = match.standings().find((s) => s.isYou)?.team ?? "w";
   const orientation: Orientation = side === "w" ? "white" : "black";
   // Option to zone and back, for this screen: the options run left to right whichever side you're on (voteZoneFor).
