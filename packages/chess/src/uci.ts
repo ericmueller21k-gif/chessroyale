@@ -12,6 +12,11 @@ export interface UciTransport {
   send(command: string): void;
   onLine(listener: (line: string) => void): void;
   close(): void;
+  /**
+   * Ends the engine's process now; a fresh one starts with the next command (a browser's Web Worker: its WebAssembly
+   * memory is freed meanwhile). Optional: a transport without it can't be paused (UciEngine.pause only holds its work).
+   */
+  restart?(): void;
 }
 
 export interface EngineOptions {
@@ -71,6 +76,18 @@ export function parseInfo(line: string): InfoLine | null {
   };
 }
 
+/** Whether `p` settles within `ms` (its timer cleared either way). */
+function settlesWithin(p: Promise<unknown>, ms: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => resolve(false), ms);
+    const done = () => {
+      clearTimeout(t);
+      resolve(true);
+    };
+    p.then(done, done);
+  });
+}
+
 /** The speed check's position: a quiet Italian middlegame. */
 const SPEED_FEN = "r1bq1rk1/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 4 6";
 
@@ -111,14 +128,48 @@ export class UciEngine {
   }
 
   async init(): Promise<void> {
-    return this.serial(async () => {
-      const ok = this.until((l) => l === "uciok");
-      this.transport.send("uci");
-      await ok;
-      this.transport.send("setoption name UCI_ShowWDL value true");
-      this.transport.send(`setoption name Hash value ${this.options.hashMb}`);
-      this.transport.send("setoption name Threads value 1");
-      await this.ready();
+    return this.serial(() => this.handshake());
+  }
+
+  /** The engine's start: UCI, its options, ready. */
+  private async handshake(): Promise<void> {
+    const ok = this.until((l) => l === "uciok");
+    this.transport.send("uci");
+    await ok;
+    this.transport.send("setoption name UCI_ShowWDL value true");
+    this.transport.send(`setoption name Hash value ${this.options.hashMb}`);
+    this.transport.send("setoption name Threads value 1");
+    await this.ready();
+  }
+
+  /**
+   * Ends the engine's process until `until` settles, then starts a fresh one, set up as before (a browser: its worker
+   * ends and its WebAssembly memory is freed, so another engine can load alone: Maia on a phone). Work already asked
+   * for finishes first; work asked for meanwhile waits for the fresh engine, so nothing searches in between. Resolves
+   * once the old process has ended. If the fresh one hasn't answered within `reviveMs` (say, short of memory beside
+   * what loaded meanwhile), `revive` is called (to free some) and it's started once more. A transport that can't
+   * restart: the work only waits.
+   */
+  pause(until: Promise<unknown>, revive?: () => void, reviveMs = 15_000): Promise<void> {
+    return new Promise<void>((ended) => {
+      void this.serial(async () => {
+        const restart = this.transport.restart?.bind(this.transport);
+        restart?.();
+        // (A fresh Stockfish starts with UCI_Chess960 off.)
+        this.chess960 = false;
+        ended();
+        await until.then(
+          () => undefined,
+          () => undefined,
+        );
+        if (!restart) return;
+        if (await settlesWithin(this.handshake(), reviveMs)) return;
+        // (The stuck start's own steps may still go on once the new process answers: the same options again, and
+        // one more readyok, which only lets someone's wait for one end early. Harmless.)
+        revive?.();
+        restart();
+        await this.handshake();
+      });
     });
   }
 

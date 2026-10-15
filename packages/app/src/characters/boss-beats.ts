@@ -56,7 +56,7 @@ export type Beat =
 export type Loop = "idle" | "thinking" | "smug" | "rattled" | "defeat" | "victory" | "ready";
 
 /** Where the battle is: the boss's entrance, the crowd's move, the boss thinking, its move, its strike, the end. */
-export type Stage = "intro" | "crowd" | "thinking" | "bossMove" | "strike" | "over";
+export type Stage = "loading" | "intro" | "crowd" | "thinking" | "bossMove" | "strike" | "over";
 
 export interface BeatState {
   stage: Stage;
@@ -145,6 +145,8 @@ export function bossBeat(cfg: BeatLines, s: BeatState): BeatResult {
     const r = s.result ?? "draw";
     return r === "crowd" ? out("defeat", "defeat", "over:crowd") : r === "boss" ? out("victory", "victory", "over:boss") : out("smug", "idle", "over:draw", false);
   }
+  // (Its brain loading, before the intro: at rest, no line.)
+  if (s.stage === "loading") return out("idle", "idle", "loading", false);
   if (s.stage === "intro") return out("entrance", "idle", `intro:${ply}`);
   if (s.stage === "strike") return out("strike", now, `strike:${ply}:${s.victim ?? ""}`);
   if (s.stage === "thinking") {

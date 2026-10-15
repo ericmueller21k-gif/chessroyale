@@ -165,7 +165,8 @@ const BEAT_PRIORITY: Partial<Record<Beat, Priority>> = { entrance: NORMAL, ready
 /** Where the battle is, from the screen's phase. */
 export function bossStage(phase: Phase, boss: BossView): Stage {
   if (boss.result || phase.kind === "results") return "over";
-  if (phase.kind === "boss") return phase.intro ? "intro" : boss.justKilled ? "strike" : phase.thinking || phase.lights ? "thinking" : "bossMove";
+  // (The loading step before the intro: the boss at rest, saying nothing; its entrance is the intro's.)
+  if (phase.kind === "boss") return phase.loading ? "loading" : phase.intro ? "intro" : boss.justKilled ? "strike" : phase.thinking || phase.lights ? "thinking" : "bossMove";
   return "crowd";
 }
 

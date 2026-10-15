@@ -3926,3 +3926,63 @@ bank after a move exactly +2 s less the time taken), `matchmaking.spec.ts`'s Sol
 - **A test fix on the way** (`recluse.spec.ts`, phase 2's slow moves, from #208): it failed on a computer, on main too.
   The bots' slow moves can bring his ultimate during the 5.4 s the test thinks, and then its own move can't add one; the
   test now stops counting once the ultimate has come by the time it moves.
+
+### Maia's loading step (Eric, Oct 14, 2026)
+
+On Eric's iPhone 15 (Safari, Wi-Fi) Maia failed to load in every normal boss battle and loaded with `?win=1`, where
+almost nothing else runs; with #209 the admins' line said why: "failed: Stockfish (load failed: no available ba…",
+onnxruntime-web's "no available backend found. ERR: [wasm] …", which on iOS Safari usually means its WebAssembly memory
+couldn't be made. Eric: "We just need to add a loading bar... 'loading components' or something. People can deal with
+it if they need to wait 5 or 10 seconds." Then, Oct 14: tell players about the download, quick and simple. My calls:
+
+- **A loading step before the intro, solo only** (Boss alone, a Solo raid, the Crowd's boss battle in Solo: wherever
+  `startBrain` puts the boss on Maia). The boss screen holds the intro's first frame under a card on the board, the
+  intro card's backdrop with no entrance: the boss's portrait, **"Loading the boss…"**, a bar, under it "12 of 40 MB"
+  while the files come down with **"First time only: about 40 MB, then it's saved on this device."**, then
+  **"Starting…"** while Maia starts, and **Leave** (home; before move 1 only: in the Crowd's battle leaving is
+  resigning, which stays the top line's, with its confirm). Then the intro as before; its card takes over from the
+  step's without an entrance, so the board never shows between the two dark cards. The boss's figure rests (a
+  `loading` stage: its idle loop, no line); its entrance is the intro's.
+- **Stockfish stops, it doesn't only idle.** Each Stockfish worker on the device (the pool the app starts as it opens,
+  and the engine of its own if one was made) ends once the work already asked for is done, so its WebAssembly memory is
+  freed; anything asked for meanwhile (the intro's eval bar, a hint, the Engine move's search, the boss's move) waits in
+  its queue; fresh workers start, set up as before, when the step ends (`UciEngine.pause`, `pauseEngines`). Maia's
+  worker starts at once, but its model loads only after Stockfish's workers have ended. Stopping is simpler than
+  re-ordering the app's start (the pool is made as the app opens, for every mode) and frees the same memory. Online is
+  unchanged (other players can't wait on one device; the protocol isn't touched).
+- **One retry.** A load that fails short of memory or with no backend ("memory" or "backend" in its reason) is tried
+  once more from a fresh worker, with Stockfish still stopped; any other failure (a missing file) isn't.
+- **Never stuck.** `BOSS_BRAIN.loadGateMs`, 20 s from the step's start (download included), is the most it waits; then
+  the battle begins whatever happened: Maia not ready yet loads on and takes over once ready (Stockfish's moves until
+  then), as before the step. 20 s: on Wi-Fi a first download takes a few seconds and the start a second or two (Eric's
+  5 or 10 seconds), and a slow connection gives up rather than hold a player. If a fresh Stockfish doesn't answer within
+  `stockfishBackMs` (15 s) after the step, Maia is closed and Stockfish started once more: a battle needs Stockfish,
+  not Maia.
+- **The bar** counts the bytes the page reads (the menu's prefetch, else the step's own) against the three files'
+  sizes, written into the app by its build (live, the worker and the WebAssembly come compressed with no length the
+  page could use; a response's own length when it isn't compressed; a sliding bar when neither is known). Files the
+  service worker already keeps aren't read again (the prefetch used to read all 40 MB every time it ran), so a later
+  battle goes straight to "Starting…". The download is counted in the files' own size, 40 MB (`BOSS_BRAIN.downloadMb`,
+  checked against the files by a test), which is what's saved on the device; over the network it's about 29 MB (the
+  WebAssembly comes compressed), so "about 40 MB" never understates it.
+- **Maia's memory, in the box.** onnxruntime-web 1.30's only WebAssembly build is the threaded one (we run one thread),
+  so its memory is shared, and it asks for a 4 GiB maximum. A shared memory reserves its maximum up front, and iOS
+  Safari can refuse that much, more readily with Stockfish's memories already reserved beside it, which fits Eric's
+  `?win=1` loading and normal battles not. The box now caps it at 512 MiB while the session is made
+  (`MEMORY_MAX_PAGES` in `packages/maia-worker/src/model.ts`); the model uses about 70 MB of it (69 MB after loading
+  and after 20 moves, the same, in Node), and works the same in Chromium. A load's error now comes whole and on one
+  line (`errorText`: its kind, message and cause), and a phone's admins' line wraps instead of cutting it (a computer's
+  pill stays one line in the title line, so the boards below never move, with the whole text on hover). Verified in
+  Chromium and Node only; only Eric's iPhone can say which of the three (the cap, Stockfish stopped, the retry) did it
+  (TESTING.md, "Maia").
+- **The admins' line** says more: "loading (waited 20 s)" when the step gave up, "… (2nd try; the 1st: <reason>)" after
+  a retry, "Stockfish (Maia closed: Stockfish didn't start again beside it)" after the last resort.
+- **Measured** (Chromium, the CPU slowed 4x, a local server): the step took 3.6 s the first time (the download 2.3 s,
+  Maia's start 1.3 s) and 1.2-1.3 s after that (a quarter second looking in the cache, then "Starting…"); unslowed in
+  the e2e, 2.3-2.8 s the first time. A boss intro on a slowed phone (`perf.spec.ts`, Big Boy's snack, one run each):
+  main p95 33.4 ms, 13% of frames dropped; this branch p95 16.8 ms, 2% (twice): the intro no longer shares the phone
+  with Maia's load. The other perf cases within their usual spread.
+- **The FAQ** (Brain 2) says why Maia (a human-like engine, so a boss plays more like a person than Stockfish does),
+  that it's a bigger download, about 40 MB, fetched once and kept, and that on a slow connection or if it can't load
+  the boss plays Stockfish; its rule 4 now says a Solo or Boss alone battle waits for Maia, 20 s at most, and online
+  nobody does (it said nobody ever waits). Numbers from `BOSS_BRAIN`.
