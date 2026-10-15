@@ -117,12 +117,18 @@ export function FinalScreen({ match, final }: { match: GameView; final: FinalVie
             <div key={t} class={`final-team side-${sides[t]}`}>
               <div class="final-team-head">
                 <span class={`side-chip ${sides[t]}`} aria-hidden="true" />
-                Team {t + 1} · {sides[t] === "w" ? "White" : "Black"}
+                {/* (A duel is one player a side: the side's color, not "Team 1".) */}
+                {match.settings.finalFormat === "duel" ? "" : `Team ${t + 1} · `}
+                {sides[t] === "w" ? "White" : "Black"}
               </div>
               {team.map((id) => (
                 <div key={id} class={`final-player${match.isYou(id) ? " you" : ""}${final.mover === id ? " to-move" : ""}`}>
                   <span class="final-name">
-                    {leader === id && <span title="Lowest average loss so far">👑 </span>}
+                    {leader === id && (
+                      <span class="final-crown" title="Lowest average loss so far">
+                        👑
+                      </span>
+                    )}
                     <Name match={match} id={id} />
                   </span>
                   <span class="final-avg" title={whole ? "Average loss per move over the whole match (lower is better)" : "Average loss per move in the final (lower is better)"}>
