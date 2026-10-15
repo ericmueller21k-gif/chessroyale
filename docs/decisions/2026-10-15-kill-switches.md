@@ -34,6 +34,9 @@ switches and the maintenance banner". The calls:
     `!isPaused(env, "friends")`, as agreed with the friends lane). Its words join the others': "Friends are resting
     for a bit. Back soon." (was "Friends are switched off for now. Try again later.").
   - **Solo and Boss alone** also can't be started from a results screen's "again" or the computer's side menu.
+- **A refusal is an answer, not an error:** the 503 with the line is returned, never thrown, so the Worker's error
+  capture (`problems.ts`, which wraps every request) never counts it. `GET /api/status` is an ordinary route under the
+  same capture.
 - **The way in is disabled with a short line, not hidden,** so a player knows it's coming back: "Squads is resting
   for a bit. Back soon." The line goes where the mode's line already is: under PLAY, on the Party button, in Play with
   friends, and under the buttons for Boss alone. The server's refusal carries the same line (pauses.ts in core), so an
