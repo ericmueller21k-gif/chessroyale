@@ -4896,9 +4896,9 @@ button.history-label {
 .dock-line:empty {
   display: none;
 }
-/* With nothing under it, the first line has the box's two lines: it wraps rather than being cut ("The boss is
-   think…" at 360 px). */
-.dk-text > .dock-line:first-child:has(+ .dock-line:empty) {
+/* The first line wraps to two rather than being cut ("The boss is think…" at 360 px): the box holds two of its lines and
+   the muted one under them. */
+.dk-text > .dock-line:first-child {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
