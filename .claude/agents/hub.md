@@ -51,7 +51,7 @@ If you need one of those changed, say what and why, and stop.
   - e2e tests for the home → queue → match path, and opening a profile by tapping a name, on phone and desktop.
   - Run `npm test`, `npm run typecheck` and, locally, the e2e specs you touched (under the shared e2e lock).
     CI runs the whole e2e suite on the PR (`.github/workflows/e2e.yml`): read its `result` before merging.
-- **Record it** in `DECISIONS.md` (New decisions) and keep your area pages true, and **ship it** per `CLAUDE.md`: PR, wait for `check`, merge with a merge commit,
+- **Record it** in a new file in `docs/decisions/` and keep your area pages true, and **ship it** per `CLAUDE.md`: PR, wait for `check`, merge with a merge commit,
   verify live.
 
 ## Reporting back

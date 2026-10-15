@@ -138,8 +138,11 @@ build): online, phase 1 won is the crowd's victory):
   on the Hidden Boss's screens"): the subtitle adds nothing before the split (the title says "phase 2"), then
   "Chess960"; the boss bar's right side is empty (in phase 2, "N of 4 won": `bossNote`, `""` in the phase change, null
   outside phase 2, so it's tested against null); the dock never says what his or the God King's bubble or the banner
-  says: no sub-line under "The boss rises!", and as "PHASE 2" "Win all four boards" shows, "2:00 on your clock, no
-  added time".
+  says: no sub-line under "The boss rises!", and as "PHASE 2" "Win all four boards" shows, "2:00 on your clock" over
+  "No added time." (two lines: one was cut off at 360 px). The God King's bubble goes with him once he's absorbed
+  (`king="gone"`: none from an empty place). Phase 2's end: "The boss wins." (the bar says how many were won) or "All
+  four boards won!". "5 SECONDS!" is its name alone; the dock says "5 s a move, or a random one", and his `ult2` lines
+  never name the seconds (placeholders; the number is a setting).
 - **His half-engine look** (Eric, Oct 14: "if we can avoid doing any sort of changing to the sprite and just do an
   overlay, that would be sick"): from the absorption to the end of the battle (the result screen too), over every
   drawing of him (the bust, his figure by the board, his figure on the board, the results): his left eye (our right)
@@ -157,8 +160,11 @@ build): online, phase 1 won is the crowd's victory):
   Stockfish only (`phase2Brain`, `phase2BossMove`: `RECLUSE_PHASE2.elo` 2750, `nodes`, `moveMs` 900 a move), one engine
   serving the boards in turn (`phase2Next`: yours first). Each player's bank `bankSeconds` (120 s), no increment; he
   has no clock. Yours is the dock's clock, at the box's right (Oct 15). Each board's tag (`Tag`): on a computer, the
-  player's name and clock at each board's corner; on a phone, each small board's clock just above it, off its pieces,
-  and the big board none when it's yours (the player's name on one you watch). A board ends by mate, a draw, time
+  player's name and clock in a row of its own above each board, off its back rank (the four boards a little smaller for
+  it, `DESK` in `Recluse2.tsx`: 44.5% of the square each, a 4.6% row above; the phase change ends them there too; the
+  "slow move" note at the row's right); on a phone, each small board's clock just above it, off its pieces,
+  and the big board none when it's yours (the player's name on one you watch). The scoreboard has no Bank column from
+  the phase change on (`RaceTower`'s `bank`): each clock is its board's. A board ends by mate, a draw, time
   (`phase2Flags`) or resigning (`phase2Resign`); the others play on;
   the battle ends when every board is decided, won only with all four won (`phase2Outcome`). Then his reaction
   (`RECLUSE_PHASE2.endMs`: beaten, the spellbook's glow as a placeholder for his transformation; he won, his laugh) and
@@ -258,10 +264,23 @@ build): online, phase 1 won is the crowd's victory):
   line about 2.5 s, a long one about 4 s; Eric, later on Oct 10: "a few seconds… not that long"), whatever the screen
   does next. One line at a time: only a critical line (an ultimate's, Hollow's first cover of the dark, his
   claim, the battle's end) cuts in on another; the rest wait their turn, highest first, and lapse after 5 s of waiting.
-  A move that brings a power's moment says nothing of its own (the moment's line is the boss's word that turn). The
-  dock says the moment's word ("Freeze!"). Lights out's round prompt keeps its own box above the board for the whole
-  round (and the dock). Each speaker's box keeps itself current (`VoiceBubble`: it listens to its voice and draws
-  every frame while a line types and fades), so nothing around it has to be drawn again for it.
+  A move that brings a power's moment says nothing of its own (the moment's line is the boss's word that turn). Lights
+  out's round prompt keeps its own box above the board for the whole round (and the dock). Each speaker's box keeps
+  itself current (`VoiceBubble`: it listens to its voice and draws every frame while a line types and fades), so
+  nothing around it has to be drawn again for it. On a phone the boss's box is in the boss bar's name column (BossBar,
+  `.bc-bar-bubble`), from just above the bar's bottom edge upwards, never over the bar's status at its right or the line
+  and board under the bar.
+- **Nothing said twice during a power** (Oct 15; DECISIONS.md, "Nothing said twice"): **the banner names the power**
+  (with its line saying what it does to you, as before); **the dock says what it means for you, or just your clock**:
+  through a moment it keeps the turn's own line ("Boss plays Nf6"), unless the moment has words of its own where no
+  banner says it (`MomentUi.dock`: the Big Bounce, "Your pieces land on new squares."; the fireballs, "Fire on e4 and f5" or "Fire on 3 squares";
+  the fireproof laugh, "Fire burns only your pieces."); **the boss's bubble is a character line, never the power's
+  name** (Eric's own lines stay: Big Boy's "Big boy BOUNCE!", Sawyer's "Two for one!", whose banner now says "He gets a
+  second pawn"). Hollow's claim and Big Boy's snack lines are the bubble's only (the snack's dock: "You start a pawn
+  down."); Wrangler's "DRAW!" is its name alone and your move's dock says "Take one of his three duels."; the Hidden
+  Boss's "+2 s a move from now on" is the board's alone. The corner casts (the boss steps up to the board's top-left
+  corner, over the subtitle and a8, while the board isn't playable) are as designed. Test:
+  `packages/app/test/nothing-twice.test.ts`.
 - **Same for everyone online:** what a boss does and says on screen comes only from the shared match state
   (`boss-beats.ts`): one-shot animations play once per moment from when the device first saw it, loops run by the
   clock, lines are picked by a hash of the moment. No new protocol for a boss's looks (Hollow's `lights`, a field of
@@ -279,11 +298,15 @@ build): online, phase 1 won is the crowd's victory):
   In the box, the words centered and, at its right, **your clock** (`DockClock`): bold, m:ss rounded up as the big 3-2-1
   counts; running on your move, red in its last 10 s; once your move is in, it holds where it stopped, dimmed, through
   the boss's turn, the reveal and the moments, whichever screen shows it; under the bullet clock's increment a "+2"
-  rises over it as each move begins. None during Lights out, the phase change, or before your first move. The words
-  never carry the time. On a phone the God King stands on a line of his own under the row, in its middle, his words and
-  menu opening above the row; beside it only where the screen's column has 66 px right of the board
-  (`KING_BESIDE_PX`: a phone on its side). Tests: `e2e/boss-dock.spec.ts` (the edges within 1 px at six sizes, the
-  clock in every frame of three moves), `packages/app/test/boss-clock.test.ts`.
+  rises over it as each move begins. None during Lights out's rounds (their prompt and meter take the box: before the
+  first round, as the night falls, the dock keeps its layout and your held clock, "Remember where his pieces are." over
+  "Clocks stopped."), the phase change, or before your first move. Its first line wraps to two rather than being cut
+  (the box holds two and the muted line under them). The words never carry the time, nor how many have
+  picked (the line above the board says it). On a phone the God King stands on a line of his own under the row, in its
+  middle, his menu opening above the row and his words beside him to his right, on his line (a long line runs down past
+  it), never over the board or the box; beside the row only where the screen's column has 66 px right of the board
+  (`KING_BESIDE_PX`: a phone on its side, his words above him as before). Tests: `e2e/boss-dock.spec.ts` (the edges
+  within 1 px at six sizes, the clock in every frame of three moves), `packages/app/test/boss-clock.test.ts`.
 - **The boss screen on a computer** (Eric, Oct 11): the boss by the board's bottom-left corner, the God King by its
   bottom-right, mirroring him (feet level, as far from the board); the status box under the board at its width; the
   column beside the board starts after the God King. The eval bar draws behind them both. A phone is unchanged.
@@ -296,8 +319,8 @@ build): online, phase 1 won is the crowd's victory):
   alone until their key changes: the header with the boss bar, the boss by the board and the chat or scoreboard under
   it, on `useStillKey` (`hooks.ts`: the match changing, the boss's state changing, and every 200 ms, as often as your
   move's screen draws, for what they read as they're drawn); the dock on the same key plus the few clock-read values
-  its words use (the moment, the burn line, the claim and snack windows, the funhouse's move, "Your move in N"; every
-  frame during Lights out, whose prompt counts down). The phase change and phase 2 keep the header and the boss's place
+  its words use (the moment's dock words, the burn line, the snack window, the funhouse's move, "Your move in N";
+  every frame during Lights out, whose prompt counts down). The phase change and phase 2 keep the header and the boss's place
   the same way; their docks draw every frame. What draws itself every frame inside them does it on its own
   clock: Hollow's bulb strip through his turn (`BossBarExtra`), the speakers' words (`VoiceBubble`), the God King
   while he commands or says "can't"; their figures animate on their own canvases' loops as before.
@@ -385,7 +408,7 @@ A boss's rules are a `BossRules` object; every hook sees only its own boss's bat
 | `opening` | `fromStart`, `crowdWhite`, `setUp` before move 1 | Hollow, Big Boy (the snack), Sawyer (his cuts from turn 3) |
 | `view(p)` | Its fields for the screens (`NetBossPowers`) | Hollow, Big Boy, Sawyer, Wrangler (his meter `ready`, the `scout` cue) |
 
-A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` word, `appearAt`, `own` screen, `line`, `lineAt`, `priority`, `view`), its ultimate's name for the warning, an optional `bar` piece by the rage meter and its `board` layer. A moment's line is said for it (its kit's line for the moment, as the moment begins, an ultimate's critical): a view never draws a boss's words itself. While a moment plays the boss's figure leaves its spot (it steps up to cast), unless the view's root has `pm-stay` (a moment it doesn't cast in: Ginger's thaw).
+A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` words where no banner says what it means, `appearAt`, `own` screen, `line`, `lineAt`, `priority`, `view`), its ultimate's name for the warning, an optional `bar` piece by the rage meter and its `board` layer. A moment's line is said for it (its kit's line for the moment, as the moment begins, an ultimate's critical): a view never draws a boss's words itself. While a moment plays the boss's figure leaves its spot (it steps up to cast), unless the view's root has `pm-stay` (a moment it doesn't cast in: Ginger's thaw).
 
 ### Adding a boss
 
