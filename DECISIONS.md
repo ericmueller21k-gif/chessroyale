@@ -4074,8 +4074,18 @@ King buttons in phase 2); in phase 1 a try still spends its charge.
 - **The God King's figure in the dock is no longer a button in the phase change and phase 2** (it wasn't callable in
   the phase change before either).
 
-**Measured** (see the PR for the numbers): the slow-phone perf case (`e2e/perf.spec.ts`, the phase change and four
-boards in play, 4x CPU throttling), A/B against main.
+**Measured** (the slow-phone perf case, `e2e/perf.spec.ts`: an iPhone 13 profile at 4x CPU throttling, `?phase=2`, the
+whole phase change, then eight seconds of four boards in play; runs of this branch and main alternating, on a quiet
+machine, load 0.7 to 1.8):
+- The phase change: this branch 9.6, 8.4 and 6.2% of frames over 20 ms (p95 33.3 to 33.4 ms, the longest 233, 167 and
+  150 ms); main 5.0, 5.9 and 5.5% (p95 33.3, the longest 233, 183 and 200). A point or two more dropped frames over a
+  change half again as long (14.8 s against 10.4), within the budget (15%, p95 under 50 ms), p95 the same, the longest
+  frame no longer. (The first run predates drawing ahead one slice at a time; with `?phase=2` the drawing ahead runs
+  during the change itself, which in a real fight it never does: it's done in phase 1, minutes earlier.)
+- Four boards in play: this branch 1.7, 1.3 and 0.6%, main 1.9, 0.6 and 0.6%: the same (the look over his figure costs
+  nothing that shows).
+- Drawing the God King's drained frames on the spot costs about 2 ms each on this machine (unthrottled), so they're drawn
+  ahead; the stream's motes move by transform only, and the arcs are one SVG of a few strokes, no filter.
 
 **Testing.** Targeted lane (animation, art, lines and the God King's presence; no rule changed): typecheck, the app's
 and the chess package's unit tests; `recluse-phase2.test.ts` (the timeline's beats, order and 15 to 20 s length, the
