@@ -4374,7 +4374,8 @@ My calls:
   position no game reaches, so refusing them costs nothing. But a position 17.1 trips on and 19 merely ignores isn't
   covered. One to check: castling rights with no rook on that side, which 19 ignores and an older Stockfish's FEN
   reader may not handle. To close it before launch, either measure the container's binary against the same cases
-  (Docker, locally) or move the container to Stockfish 19 so the measured rules are its rules.
+  (Docker, locally) or move the container to Stockfish 19 so the measured rules are its rules. (Closed the same day:
+  "The engine server's own Stockfish, checked in CI", below. 17.1 did crash on those castling rights.)
 
 Tests: `packages/server/test/engine-server.test.ts` (a refused position never reaches the container stub, from the
 endpoint (400, the budget untouched), `serverScoreAt` (one line logged) or fair play's search; a legal one does,
@@ -4730,3 +4731,92 @@ Eric opened crates on his iPhone and asked for three fixes. The calls:
 - **Testing:** light/targeted lane (art and CSS): typecheck, the unit suite (a new `gift-tube.test.ts`: the stripes
   tile the tube with no gaps or overlaps, and blotches match the purity on each painted set; `crates.test.ts`: the
   second color is stable, never the first, follows the odds, and stacks), and the crate e2e specs.
+
+## The engine server's own Stockfish, checked in CI (Oct 15, 2026)
+
+Closes the open item of "The engine server never gets a position Stockfish refuses": `stockfishRefuses` was measured
+against Stockfish 19 (the browsers' build), while the container runs native Stockfish 17.1, which nobody had measured.
+These sessions can't run Docker or the downloaded binary, so the measuring runs on GitHub's machines.
+
+**The check** (`.github/workflows/engine-container.yml`, `packages/chess/test/engine-container.test.ts`). It builds the
+image from `engine/Dockerfile`, starts it, and sends `server.mjs`'s `/score` every case in
+`packages/chess/test/stockfish-refuses-cases.ts` (the refusal test's table, moved there so both tests share it: 49
+positions), as the Worker would: the case's legal moves, the king's first so castling is among them, at most 8, at
+200k nodes. A case `stockfishRefuses` lets through must come back searched (only moves it asked for, scores from 0 to
+1), and the server must then answer a search of the start. A case it turns away is only reported: searched,
+turned away by `server.mjs`'s own check (400), or the container down, and how. Then one search as the game asks for
+it: an Italian middlegame, 4 moves, 2M nodes, about 2.5 s on GitHub's runner against the Worker's 12 s. The run's
+summary lists every case's outcome. It runs on a PR that touches `engine/`, `packages/chess/src/uci.ts`, the case
+table, the check or the workflow, and by hand (Actions > engine-container > Run workflow). Never on other PRs or on
+main. About 1 minute a run (the image builds in about 10 s, so there's no build cache: it would save nothing).
+
+**What 17.1 does with the cases** (the first run, with the rules as they were):
+
+- **Four positions `stockfishRefuses` let through crashed it** (SIGSEGV, the container down): castling rights with no
+  rook where 17.1 looks for one. "K" or "Q" with no rook (`4k3/8/8/8/8/8/8/4K3 w K - 0 1`), Black's "kq" with no rooks,
+  "K" with White's only rook on h2. 17.1's FEN reader walks from the corner along the board looking for the rook and,
+  finding none, reads and writes past the board's end (its `position.cpp`; Stockfish 18 reads castling the same way).
+  Stockfish's development code after 18, which stockfish.js 19 is built from, drops a right without its rook
+  between the corner and the king. Three more were read wrongly without a crash: "K" with only an a1 rook (17.1 makes
+  it queen-side castling), "KQ" with the king on e2 (it castles from e2), "H" with no rook on h1 (it castles with an
+  empty square).
+- Of what Stockfish 19 refuses, 17.1 crashed on two (no black king; the side not to move in check) and searched the
+  rest as if nothing were wrong (nine pawns, a pawn on the eighth rank, two white kings, …). `server.mjs`'s pattern
+  turns the malformed ones away. None reach it.
+
+My calls:
+
+- **Refuse them, for both engines.** `stockfishRefuses` now also refuses a castling right that doesn't hold as
+  Stockfish 19 reads it (`castlingRightHolds`): K or Q needs a rook of that color between that corner and the king; a
+  file's letter (Chess960), that color's rook on that file; either way the king on files b to g of its back rank. 19
+  drops such a right and 17.1 crashes on it or misreads it, so with these refused, both engines read every right the
+  same way. Refusing costs nothing, because no game makes such a position. chess.js keeps a right only while that king
+  and rook haven't moved and the rook hasn't been taken. The powers that move or remove pieces drop the rights with
+  them (`withoutPiece`, Pig's `fenWith`, Big Boy's bounce). Our Chess960 rules can't even read a right without its
+  rook (they throw). A new test plays 20 random Chess960 games beside the 20 normal ones: nothing refused. The second
+  run: every case let through searched, the server answering on.
+- **Also closed: gaps against Stockfish 19 itself**, found reading its source. A piece letter it can't read, no side
+  to move, an en passant square that isn't a square, and move counters over 32767 (the fifty-move count) or 100000
+  (the move number) are refused by 19, and `stockfishRefuses` let them through. None reaches an engine: our FENs come
+  from chess.js and our own rules, and `server.mjs`'s pattern stops all but the counters. Each is a case now.
+- **The table holds two verdicts:** `refused` (what `stockfishRefuses` says, checked in `npm test`) and, where it
+  differs, `sf19` (what Stockfish 19 does: `npm test` checks it against the real engine, and checks that everything
+  19 refuses is refused). The container's verdict comes from the CI check.
+- **`server.mjs` logs how Stockfish ended**, `stockfish exited (SIGSEGV)`. It used to log the exit code alone, which
+  is null for a crash. That helps the container's logs and the check.
+
+**17.1 or Stockfish 19 in the container: my recommendation is Stockfish 19, in its own PR.** This PR doesn't switch.
+
+- **Calibration, measured** (`packages/sim/scripts/container-accuracy.ts`, `reports/container-accuracy.md`). The
+  container's own 17.1 ran the 267 close-call re-checks of `reports/deep-accuracy.md` (one search, 2M nodes, as the
+  game asks), where the full-network Stockfish 19 build had stood in for it. On the same re-checks the two engines are
+  3.2 points apart on average (median 1.9; 20 picks 10+ apart). 17.1 calls a re-checked pick 0.8 points better on
+  average. Against the referee (Stockfish 19 full, each move alone), 17.1 is off by a mean of 6.2 points against the
+  stand-in's 4.8 (10+ off: 43 picks against 26). In the cut replays (`judge-cuts.ts`, now with a row for it), the
+  re-check with the server's own numbers cuts a player really in the top quarter 0.64% of the time, against the
+  stand-in's 0.37%. That's about what two players' computers give (0.63%), the option that was turned down for not
+  being fair enough. The referee leans toward its own build, so this doesn't show 17.1 is wrong. But the judge was tuned
+  on Stockfish 19's numbers (`reports/judge-accuracy.md`, `deep-accuracy.md`, the devices' lite build), and a
+  re-check's numbers replace the devices' numbers for some picks and not others. One engine family for every number on
+  a board is the fair setup.
+- **"Stockfish 19" isn't an official release.** Stockfish's latest release is 18 (native binaries up to `sf_18`, no
+  `sf_19`), and 18 reads castling as 17.1 does. The browsers' build is stockfish.js 19.0.0, made from Stockfish's
+  development code after 18 (version string "19", one network: `nn-1a298aa575a0` for the full build). Its source,
+  the archive the site already serves, builds natively (`make build ARCH=x86-64-avx2`). Built that way, the container
+  would run the stand-in itself: the same code and network, so the reports' "engine server" numbers would become its
+  real numbers, and its refusals would be the measured ones. An official 19, when it ships, will probably carry a later
+  network (Stockfish's master has already moved on to another).
+- **Image and build time.** Today: a prebuilt 80 MB release tar, built in about 10 s. The 19 build compiles from
+  source in a two-stage image: a minute or two more on every build that touches `engine/`. It also needs the network,
+  about 95 MB, which `net.sh` downloads from Stockfish's test server, so pin it by its hash (its name) or keep a
+  copy. The final image is about the same size (the binary carries its network).
+- **Licenses: no difference.** The container's Stockfish runs on Cloudflare and is never handed to a player, who gets
+  numbers over HTTP, so the GPL asks nothing of us for it, whichever version runs. `LICENSES.md` lists what reaches a
+  player's device and doesn't list it, rightly. Built from the stockfish.js source, its source would be the archive
+  the site already serves.
+- **Safety no longer decides it.** Both engines are covered by the same rules now, and this check runs on any new
+  binary before it ships. When the container moves, its CI run shows 19's verdict on every case.
+
+**Testing:** typecheck; the unit suite (`stockfish-refuses.test.ts` against the real Stockfish 19, with the new cases
+and the Chess960 games; `engine-server.test.ts`, `fairplay-deep.test.ts` unchanged); the new CI check green on the PR.
+No app or Worker code changed (`server.mjs` only logs differently), so no e2e.
