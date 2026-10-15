@@ -188,7 +188,7 @@ function evidenceMove(m: FairMove): EvidenceMove {
 }
 
 export interface CaseDetail {
-  /** (joinedAt null: the account was deleted and its ban kept.) */
+  /** (joinedAt null: the account was deleted and its fair-play file kept.) */
   player: { id: string; name: string; joinedAt: number | null; signedIn: boolean; email: string | null; onlineMatches: number };
   case: Case | null;
   reports: { at: number; reason: string; match: string | null; reporter: { id: string; name: string; signedIn: boolean } }[];
@@ -205,7 +205,8 @@ export async function caseDetail(sql: Sql, userId: string, opts: { email: boolea
     "SELECT id, name, created_at, email, google_sub FROM users WHERE id = ?",
     userId,
   );
-  // A deleted account whose ban outlives it (account-data.ts): its case, log and device markers, under its old id.
+  // A deleted account whose fair-play file outlives it (banned or in review; account-data.ts): its case, log and
+  // device markers, under its old id.
   const kept = found ? null : await caseOf(sql, userId);
   if (!found && !kept) return null;
   const u = found ?? { id: userId, name: DELETED_NAME, created_at: null, email: null, google_sub: null };
@@ -430,7 +431,7 @@ function casePage(d: CaseDetail, note: string | null): string {
   };
   return `<p><a href="/admin/fairplay">← Fair play</a></p><h1>${esc(d.player.name)}</h1>
 ${note ? `<div class="card">${esc(note)}</div>` : ""}
-<p class="muted">${esc(d.player.id)} · ${d.player.joinedAt === null ? "the account was deleted; its ban is kept" : `${d.player.signedIn ? esc(d.player.email ?? "signed in (Google)") : "guest"} · joined ${when(d.player.joinedAt)}`} · ${d.player.onlineMatches} online matches</p>
+<p class="muted">${esc(d.player.id)} · ${d.player.joinedAt === null ? "the account was deleted; its fair-play file is kept" : `${d.player.signedIn ? esc(d.player.email ?? "signed in (Google)") : "guest"} · joined ${when(d.player.joinedAt)}`} · ${d.player.onlineMatches} online matches</p>
 <div class="card">Status: <b class="${esc(c?.status ?? "")}">${esc(c?.status ?? "no case")}</b> ${c ? `· ${esc(c.reason)} · updated ${when(c.updated_at)}${c.decided_by ? ` · last decided by ${esc(c.decided_by)}` : ""}` : ""}</div>
 ${appealForm}
 <h2>Decide</h2>${decision}

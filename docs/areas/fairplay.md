@@ -25,8 +25,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 - **Deleting an account never gets around fair play** (`account-data.ts`; [accounts.md](accounts.md)). A banned or
   in-review account's case, log, hashed identities and device markers stay under its old id; its judged moves, match
   summaries and appeals go. A new account with one of its identities is banned again, or goes to review (`banCheck`).
-  The review page shows it as "Deleted player", and it can still be decided: lifting a ban, or deciding a review any
-  way but a ban, forgets its identities. An account fair play hasn't acted on leaves nothing in fair play's tables.
+  The review page shows it as "Deleted player", and a person can still decide it (the automated reviewer can't: 409).
+  Lifting a ban, or deciding a review any way but a ban, forgets its identities. An account fair play hasn't acted on leaves nothing in fair play's tables.
 - **A ban needs the deep re-check:** a flagged player's counted moves searched again on the engine server (its own
   instance, `fairplay-1`, its own daily budget, from the Worker's schedule: cases in review at once, the rest
   off-peak). The judges' quick numbers can open a review, never a ban. A move in a position Stockfish refuses is

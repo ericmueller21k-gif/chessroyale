@@ -354,7 +354,7 @@ export function cleanEmail(email: unknown): string | null {
  * characters), so no profile shows them, while the game's own numbers stay right.
  */
 export const DELETED_ID = "deleted";
-/** What an admin's page shows for an account that was deleted (a fair-play ban outlives it). */
+/** What an admin's page shows for an account that was deleted (its fair-play file can outlive it). */
 export const DELETED_NAME = "Deleted player";
 
 /**

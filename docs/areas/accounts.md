@@ -37,15 +37,16 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
     account out on every device. The live hub forgets it (online, global chat lines). The app clears its local
     storage and starts afresh.
   - **What stays:**
-    - results, moved to the shared account id `deleted` with only their day, and without their lobby code, rating,
-      best move or eval-bar flag;
+    - results, written again under the shared account id `deleted` with new ids, only their day, and without their
+      lobby code, rating, best move or eval-bar flag;
     - fair play's file if banned or in review (case, log, hashed identities, device markers, under the old id, shown
       on the review page as "Deleted player"). A new account with the identity is banned again, or goes to review.
   - **A lobby or a reward that finishes later** records nothing for a deleted account: its writes say `WHERE EXISTS`
     the account.
   - **Every table is accounted for:** each is in a store in `ACCOUNT_STORES` (`account-data.ts`) or listed in
     `NO_ACCOUNT_DATA`. `account-data.test.ts` fails on a table in neither, from the schema or any `CREATE TABLE` in
-    the server.
+    the server. It also pins every table's columns (`SCHEMA_COLUMNS`), so any schema change means checking the two
+    lists first.
 - **Sign-in code records** go an hour after their code was sent (the Worker's 15-minute schedule, `purgeEmailCodes`). A new account is called "Player" until its owner picks
   a name (never a Google name or the start of an email).
 - **The privacy policy, terms and copyright page** (`/privacy`, `/terms`, `/copyright`, `screens/Legal.tsx`) are drafts

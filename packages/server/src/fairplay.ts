@@ -256,6 +256,8 @@ export async function decide(
   if (!user && !before) return { ok: false, status: 404, message: "no such player" };
   if (by === "reviewer") {
     if (before?.status === "banned") return { ok: false, status: 409, message: "banned cases and their appeals are for a person" };
+    // (A deleted account's kept case has no evidence left to weigh: account-data.ts.)
+    if (!user) return { ok: false, status: 409, message: "the account was deleted; its case is for a person" };
     if ((await latestAppeal(sql, userId))?.status === "open") return { ok: false, status: 409, message: "this player has an open appeal: a person decides" };
   }
   await setCase(sql, userId, status, by, why, now);

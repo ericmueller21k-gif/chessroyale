@@ -10,15 +10,18 @@
  * else in the server's code.
  *
  * Deleting removes everything personal. What stays, and why:
- *   - results, without the player: their rows move to the account id DELETED_ID, lose their lobby code, rating, best
- *     move and eval-bar flag, and keep only the day they were played, so the game's own numbers (how often each boss
- *     wins, typical placements) stay right while nothing ties them to anyone, or to each other;
+ *   - results, without the player: their rows are written again under the account id DELETED_ID with new ids (the old
+ *     ones sat next to the same match's other rows), without their lobby code, rating, best move and eval-bar flag, and
+ *     with only the day they were played, so the game's own numbers (how often each boss wins, typical placements)
+ *     stay right while nothing ties them to anyone;
  *   - fair play's file on an account that's banned or in review: the case, its log, the hashed email and Google id
  *     (fairplay_identities) and the device markers, under the deleted account's random id, so deleting never gets
  *     around fair play (a new account with the same identity is banned again, or goes back to review). Everything
  *     else of fair play goes (judged moves, match summaries, appeals, reports).
- * It all happens in one batch (one transaction), so it's never half done, and anything written for the account after
- * it (a lobby's result, a reward, fair play's record) finds no account and writes nothing.
+ * It all happens in one batch (one transaction), so it's never half done. After it, a lobby's results, a reward and
+ * fair play's recording find no account and write nothing; a few other actions in flight at that very moment (a
+ * report, a friend action, a shop or locker write) can still leave a row that points at nothing (the decision file's
+ * known gaps).
  */
 import { DELETED_ID, stmt, type Sql, type Stmt, type User } from "./accounts.ts";
 import { caseOf, identityHashes } from "./fairplay.ts";
@@ -50,6 +53,8 @@ const DAY = 86_400_000;
 /** A result's columns in the download (not `held`, which would say fair play is looking at the account). */
 const RESULT_COLUMNS =
   "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar";
+/** A kept result's columns (every column but its id and account: a test pins the table's columns, so a new one is seen). */
+const KEPT_RESULT = "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, held, eval_bar";
 
 export const ACCOUNT_STORES: AccountStore[] = [
   {
@@ -63,15 +68,19 @@ export const ACCOUNT_STORES: AccountStore[] = [
     name: "results",
     tables: ["results"],
     export: (sql, u) => all(sql, `SELECT ${RESULT_COLUMNS} FROM results WHERE user_id = ? ORDER BY played_at, id`, u.id),
-    // Kept as nobody's: only the day, and nothing that could find the match (the lobby, the exact time) or tie one
-    // deleted player's rows together (the rating).
+    // Kept as nobody's, written again with new ids (an old id sits between its match's other rows, which keep the
+    // lobby and the time), in no order: only the day, and nothing that could find the match (the lobby, the exact time)
+    // or the player (the rating).
     erase: (u) => [
       stmt(
-        `UPDATE results SET user_id = ?, lobby = NULL, played_at = played_at - played_at % ${DAY}, rating = NULL, best_move = NULL, eval_bar = NULL
-         WHERE user_id = ?`,
+        `INSERT INTO results (user_id, ${KEPT_RESULT})
+         SELECT ?, mode, online, placement, players, team, team_won, avg_score, NULL, played_at - played_at % ${DAY}, brilliant, NULL,
+           cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, NULL, ranked, held, NULL
+         FROM results WHERE user_id = ? ORDER BY random()`,
         DELETED_ID,
         u.id,
       ),
+      stmt("DELETE FROM results WHERE user_id = ?", u.id),
     ],
   },
   {

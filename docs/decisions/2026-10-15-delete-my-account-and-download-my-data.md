@@ -13,9 +13,17 @@ match's end.
 statements that delete it. `NO_ACCOUNT_DATA` lists every other table with why it holds nothing about anyone:
 `live_lobbies`, `queue_waits`, `fairplay_budget`, `engine_usage`, `meta`.
 
-**The test is an allow-list.** It collects every table in the schema, plus every `CREATE TABLE` anywhere in the
-server's code (`engine_usage` is made outside the schema), and fails on any table in neither list. A new table can't
-slip past by naming its account column differently, or by keeping an id inside JSON.
+**The guard is two tests:**
+- **An allow-list.** It collects every table in the schema, plus every `CREATE TABLE` anywhere in the server's code,
+  in any folder and any case (`engine_usage` is made outside the schema). It fails on any table in neither list.
+- **Every table's columns, pinned.** `SCHEMA_COLUMNS` in the test lists each one. Any schema change, a new table or a
+  new column from a `COLUMNS` migration, fails it until someone checks the change against the two lists (and, for
+  `results`, the kept columns) and updates it.
+
+This makes forgetting unlikely, not impossible. A store's erase can still be wrong. The no-row-mentions-the-account
+test catches that only for columns `world()` fills. The Durable Objects' own SQLite storage is outside the guard:
+lobbies, Squads lobbies and parties hold account ids only while a match or party runs, and the live hub holds the
+global chat (covered by `forgetAccount`).
 
 The first version only looked for account columns by name. It would have missed `ops_errors` (#227), whose `sample`
 JSON holds the account id.
@@ -38,13 +46,20 @@ JSON holds the account id.
   (their drawn icons go with them).
 
 **Kept, and why:**
-- **Results, without the player.** The rows move to the account id `deleted` (`DELETED_ID`), shared by every
-  deleted account. They lose their lobby code, rating, best move and eval-bar flag, and `played_at` is rounded down to
-  the start of its UTC day. So:
+- **Results, without the player.** The rows are written again under the account id `deleted` (`DELETED_ID`), shared
+  by every deleted account, with new ids, in random order, and the old rows are deleted. They lose their lobby code,
+  rating, best move and eval-bar flag, and `played_at` is rounded down to the start of its UTC day. So:
   - the game's own numbers (how often each boss wins, typical placements) stay right;
-  - nothing ties a row to a person, to the match it came from, or to the same person's other rows;
+  - nothing ties a row to a person or to the match it came from;
+  - one player's rows still sit together as one block of new ids, so they can be told to be one deleted player's,
+    but not whose.
+
+  Why each step:
+  - a lobby saves its players one after another, so an old id sat between rows of the same match, which keep their
+    lobby code and exact time;
   - with the exact time, mode and size, a row could have been matched against the others from its lobby (written
-    within milliseconds), and the rating could have chained one player's rows together.
+    within milliseconds);
+  - the rating could have chained one player's rows together.
 
   Nothing in the code aggregates results across players today. Boss win rates will read `boss_id`, `boss_elo` and
   `team_won`, which stay.
@@ -56,8 +71,9 @@ JSON holds the account id.
   - a new account on a banned account's device goes to review, as before.
 
   The id is the account's own random one, not a hash of it: with the account gone, it points at nothing. The review
-  page lists such a case as "Deleted player", and an admin (or the automated reviewer, for a review) can still decide
-  it. Lifting a ban, or deciding a review any way but a ban, forgets the identities. The download never says whether
+  page lists such a case as "Deleted player", and a person can still decide it. The automated reviewer can't (409,
+  as with banned cases): a deleted account's case has no evidence left to weigh, and a "clear" or "watch" would
+  forget its identities. Lifting a ban, or deciding a review any way but a ban, forgets the identities. The download never says whether
   the account is in review: results are exported without `held`, and the policy and the confirmation speak of fair
   play "looking into" an account in general terms only.
 - **A match or a Squads party being played** keeps the player's name on its screens until it closes (a match at most
@@ -72,8 +88,10 @@ before. They then run as one batch, `Sql.batch`: D1's `batch()`, a transaction; 
 database. So:
 - a deletion never stops halfway: no orphan session, no half-deleted account;
 - a write that lands just before it is deleted with the rest;
-- a write after it finds no account: a result, a reward, a fair-play record, a report about the player
-  (`reportPlayer` checks the target), a block or a friend request (friends checks the target).
+- after it, a lobby's results, a reward and fair play's recording find no account and write nothing (they check in the
+  same statement, or at the read they already make).
+
+A few other actions that checked the account a moment before the batch can still write just after it (below).
 
 **On the device,** the app forgets everything it keeps (`brc.*` and `hunchess-*` in local storage, settings
 included) and starts afresh, as a new visitor. The response clears the session cookie. The fair-play device marker
@@ -138,6 +156,18 @@ with or without the SameSite=Lax cookie.
   - A key with the account in it would close this. It's fair play's schema, so it's left to that lane.
 - **An error counted in memory** before the deletion (ops' per-instance batching) can still be written with the
   account's id after it. It expires with the rest (`OPS.store.keepDays`, 30 days). Accepted.
+- **A bug report from the player's other device, just after deleting.** The problems endpoint (#227) takes the
+  account from `cachedUserId`. That cache lasts up to 10 minutes per Worker instance, and `forgetToken` clears only
+  the instance that ran the deletion. A bug report sent from another device in that window is stored with the
+  deleted id, and expires in 30 days. Accepted.
+- **Check-then-write windows.** An action that checked the account just before the batch, and writes just after it,
+  can leave a row that points at nothing:
+  - fair play's later insert and `actOn`, for a match finishing at that very moment;
+  - a report and its `raiseCase`;
+  - a friend action;
+  - a shop or locker write mid-request.
+
+  Such a row holds only the random id. No sweep for them (no cron); they're rare and point at nothing.
 - **Follow-up, not this PR:** a guest signing in to an existing account (`signInWithIdentity`) deletes the guest's
   account row but leaves its reports and fair-play rows under the guest's id. They point at nothing; they should move
   to the account or go with the guest.
@@ -152,19 +182,21 @@ with or without the SameSite=Lax cookie.
 **Full lane** (stored data, sign-in, privacy). GitHub's e2e run is the gate.
 
 **Unit:** `packages/server/test/account-data.test.ts`:
+- every table's columns are as pinned;
 - every table, in the schema or created anywhere in the server, is in a store or `NO_ACCOUNT_DATA`;
 - the download has every store's rows, readable (results without `held`; the ops rows with the account), with nothing
   of anyone else's, and leaves out who has blocked the player;
 - deleting leaves no row anywhere that mentions the account or its email, in any column or inside JSON. It signs out
-  both devices, keeps the results as nobody's (the day only, no lobby, rating, best move or eval bar), removes the
+  both devices, keeps the results as nobody's under new ids after every older row (the day only, no lobby, rating,
+  best move or eval bar), removes the
   friendships from the other side, and keeps error counts and anonymous ideas;
 - signing in again with the same email makes a new, empty account;
 - a statement that fails rolls the whole deletion back, and every write goes through the batch;
 - a result, a reward or a fair-play record after the deletion records nothing;
 - a ban is kept (case, log, identity, device marker), catches a new account by email and by device, and an admin can
   list it and lift it;
-- a review is kept: a new account with the same email goes to review, without piling up notes, and deciding it frees
-  the identity;
+- a review is kept: a new account with the same email goes to review, without piling up notes. The automated
+  reviewer can't decide it (409), and a person clearing it frees the identity;
 - an identity shared by two deleted bans stays banned;
 - sign-in code records go after an hour (the schedule's purge);
 - the API:

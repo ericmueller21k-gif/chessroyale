@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -101,14 +101,63 @@ async function world() {
   return { sql, d1, ann, bo, cy, a, phone };
 }
 
+/**
+ * Every table's columns, pinned. A schema change (a new table or column, from SCHEMA or a COLUMNS migration) fails
+ * here until someone checks it against ACCOUNT_STORES and NO_ACCOUNT_DATA (account-data.ts), and for `results`, the
+ * kept columns (KEPT_RESULT), then updates this list.
+ */
+const SCHEMA_COLUMNS: Record<string, string> = {
+  blocks: "user_id blocked_id at",
+  chat_picks: "user_id lines emoji",
+  email_codes: "email code_hash expires_at attempts sent_at hour_start sends_this_hour",
+  equipped: "user_id slot item_id",
+  equipped_items: "user_id slot item_id",
+  fairplay_appeals: "id user_id at text status decided_at decided_by reply",
+  fairplay_budget: "day searches",
+  fairplay_cases: "user_id status reason opened_at updated_at decided_at decided_by",
+  fairplay_devices: "device user_id first_seen last_seen",
+  fairplay_identities: "kind hash user_id at",
+  fairplay_log: "id user_id at action by reason",
+  fairplay_matches: "id user_id lobby mode played_at counted perf score level summary moves keep_until deep_queued deep_done",
+  friend_limits: "user_id kind window_start n",
+  friend_requests: "from_id to_id at",
+  friends: "user_id friend_id since",
+  inventory: "user_id item_id acquired_at",
+  invites: "from_id to_id kind code at expires_at",
+  items: "id user_id def color blemish seed crate fischer created_at color2",
+  live_lobbies: "code mode kind phase humans alive total boss_elo started_at updated_at",
+  meta: "key value",
+  ops_errors: "fingerprint hour source kind message version count first_seen last_seen sample",
+  ops_reports: "id at kind account version note diag",
+  queue_waits: "id mode at players wait_ms",
+  reports: "id reporter target reason at match",
+  results:
+    "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar",
+  sessions: "token_hash user_id created_at expires_at",
+  users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online",
+  wallets: "user_id coins crates",
+};
+
+/** The server's source files, every folder. */
+const sources = (dir: string): string[] =>
+  readdirSync(dir).flatMap((f) => (statSync(join(dir, f)).isDirectory() ? sources(join(dir, f)) : f.endsWith(".ts") ? [join(dir, f)] : []));
+
 describe("every table is accounted for", () => {
+  it("every table's columns are as pinned: a schema change means checking account-data.ts, then this list", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const now: Record<string, string> = {};
+    for (const t of (await tablesOf(sql)).sort()) now[t] = (await sql.all<{ name: string }>(`PRAGMA table_info(${t})`)).map((c) => c.name).join(" ");
+    expect(now, "the schema changed: check ACCOUNT_STORES and NO_ACCOUNT_DATA (account-data.ts), then update SCHEMA_COLUMNS").toEqual(SCHEMA_COLUMNS);
+  });
+
   it("each table, in the schema or made anywhere in the server's code, is an account store's or listed as holding no account data", async () => {
     const { sql } = memoryDb();
     await ensureSchema(sql);
     const made = new Set(await tablesOf(sql));
-    // (Tables made outside the schema, such as engine_usage, by their CREATE TABLE anywhere in the server.)
-    for (const f of readdirSync(SRC).filter((x) => x.endsWith(".ts"))) {
-      for (const m of readFileSync(join(SRC, f), "utf8").matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)) made.add(m[1]!);
+    // (Tables made outside the schema, such as engine_usage, by their CREATE TABLE anywhere in the server, any folder.)
+    for (const f of sources(SRC)) {
+      for (const m of readFileSync(f, "utf8").matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?["`]?(\w+)/gi)) made.add(m[1]!);
     }
     expect(made.size).toBeGreaterThan(25);
     for (const t of made) {
@@ -168,6 +217,9 @@ describe("download my data", () => {
 describe("delete my account", () => {
   it("removes everything personal, everywhere, and keeps the results without the player", async () => {
     const { sql, ann, bo, cy, a, phone } = await world();
+    const oldIds = (await sql.all<{ id: number }>("SELECT id FROM results WHERE user_id = ?", a.id)).map((r) => r.id);
+    const maxIdBefore = (await sql.first<{ m: number }>("SELECT MAX(id) AS m FROM results"))!.m;
+    expect(oldIds).toHaveLength(2);
     expect(await deleteAccount(sql, a, T0 + 40)).toEqual({ keptFairPlay: false });
     // Not a row anywhere mentions her: every table, every column, JSON inside columns too.
     expect(await rowsNaming(sql, a.id)).toEqual([]);
@@ -176,7 +228,12 @@ describe("delete my account", () => {
     expect(await userFromToken(sql, ann.token, T0 + 41)).toBeNull();
     expect(await userFromToken(sql, phone, T0 + 41)).toBeNull();
     expect(await publicProfile(sql, a.id, T0 + 41)).toBeNull();
-    // Her results stay as nobody's: the shared deleted id, the day only, no lobby, rating, best move or eval bar.
+    // Her results stay as nobody's, under new ids after every row that was there (her old ids sat beside Bo's row from
+    // the same match): the shared deleted id, the day only, no lobby, rating, best move or eval bar.
+    const kept = await sql.all<{ id: number }>("SELECT id FROM results WHERE user_id = ?", DELETED_ID);
+    expect(kept).toHaveLength(2);
+    for (const { id } of kept) expect(id).toBeGreaterThan(maxIdBefore);
+    expect(await count(sql, "results WHERE id IN (" + oldIds.join(",") + ")")).toBe(0);
     expect(await sql.all("SELECT mode, placement, players, played_at, lobby, rating, best_move, eval_bar FROM results WHERE user_id = ? ORDER BY mode", DELETED_ID)).toEqual([
       { mode: "boss", placement: 1, players: 20, played_at: T0 - (T0 % DAY), lobby: null, rating: null, best_move: null, eval_bar: null },
       { mode: "crowd", placement: 3, players: 100, played_at: T0 - (T0 % DAY), lobby: null, rating: null, best_move: null, eval_bar: null },
@@ -276,8 +333,10 @@ describe("delete my account", () => {
     const notes = await count(sql, "fairplay_log WHERE user_id = ?", again.id);
     await banCheck(sql, again, null, T0 + 53);
     expect(await count(sql, "fairplay_log WHERE user_id = ?", again.id)).toBe(notes);
-    // Deciding the deleted account's review (cleared) forgets its identity.
-    await decide(sql, a.id, "clear", "reviewer", "nothing in it after all", T0 + 60);
+    // The automated reviewer can't decide it (no evidence is left to weigh); a person clearing it forgets its identity.
+    expect(await decide(sql, a.id, "clear", "reviewer", "nothing in it after all", T0 + 60)).toMatchObject({ ok: false, status: 409 });
+    expect(await count(sql, "fairplay_identities WHERE user_id = ?", a.id)).toBe(1);
+    expect(await decide(sql, a.id, "clear", "admin:eric@example.com", "nothing in it after all", T0 + 61)).toEqual({ ok: true, status: "cleared" });
     expect(await count(sql, "fairplay_identities WHERE user_id = ?", a.id)).toBe(0);
   });
 
