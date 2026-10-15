@@ -50,20 +50,31 @@ Signed in with your admin account (players never see any of this):
 3. The Party sheet's **TEST LOBBY** row has **Start** too (the same as the link).
 4. Tell me what breaks, especially blocks: what you blocked, what the reveal showed, and whether it felt right.
 
-## Maia: every boss human-like (Oct 12, about 15 minutes)
+## Maia: every boss human-like (Oct 12; the loading step, Oct 14; about 15 minutes)
 
-Signed in with your admin account, on your phone (players still meet Stockfish; only admins meet Maia for now):
+On your iPhone (Safari), signed in with your admin account; on Wi-Fi first, then once on cellular if you can. These
+checks can't be made here (no Safari, no iPhone in the test lab): the tests run Chromium, where Maia always loads.
 
-1. Tap **Boss alone**. Under the difficulty there's **BRAIN · TEST**. Leave it on **Default (Maia, no guard)**: every
-   boss now plays with Maia, set to be clearly favored (your call, Oct 12: a boss is a challenge), then the bridge
-   (light guard, strict guard, a growing share of Stockfish moves), then Stockfish from 2800. Or pick Stockfish / Maia with no, light, full or strict guard to compare. Pick any boss.
-2. The first time, Maia downloads (about 29 MB, kept afterwards) while the boss's intro plays. Under the God King's
-   dock a small line shows what the brain did with each move: "🧠 Maia 1640 · no guard · Maia's #1 · 210 ms".
-   "Stockfish (Maia loading)" means Maia wasn't ready yet and Stockfish moved instead.
-3. Try a **Solo raid** too (the same line shows), and, if you like, a private raid online with only you in it (your
-   phone plays the boss's moves with Maia; a raid with anyone else in it stays Stockfish until it's on for players).
-4. Tell me: do the bosses feel like people? Too easy, too hard, at your usual difficulty? And the ms on the line
-   (under about 500 ms is fine).
+1. Tap **Boss alone** and pick any boss (BRAIN · TEST on **Default**). Before the intro, the board goes dark under a
+   card: **"Loading the boss…"** with a bar. The first time on a device (or after clearing the site's data) the bar
+   fills ("12 of 40 MB") with **"First time only: about 40 MB, then it's saved on this device."** under it, then
+   **"Starting…"**. From then on only "Starting…", for a second or two. Then the intro as before. **Leave** on the
+   card goes home.
+2. Under the God King's dock, the admins' line (it now wraps, so a long reason shows whole). At the intro it should
+   read **"🧠 Maia 2500 · no guard · ready"** (your number may differ). If it says anything else, send me all of it:
+   - "failed: Stockfish (load failed: …)": Maia couldn't load; the boss plays Stockfish.
+   - "ready (2nd try; the 1st: …)": the first try failed and the second worked.
+   - "loading (waited 20 s)": it wasn't ready in 20 s, so the battle began anyway (Maia takes over once ready).
+   - "Stockfish (Maia closed: Stockfish didn't start again beside it)": the phone was short of memory for both.
+3. Roughly how long the card stayed, the first time and later.
+4. Play a few moves: the line shows "Maia's #1 · 210 ms" for Maia's moves (under about 500 ms is fine).
+5. A **Solo raid** and a Solo **Crowd** match that ends in a boss battle: the same card before the boss arrives.
+6. Online (a raid you host): no card (nobody waits for one device). Your phone loads Maia while the intro plays and
+   Stockfish moves until it's ready, as before; the line says "loading", then "ready" or why it failed.
+
+What changed for the failure you saw ("load failed: no available ba…"): Maia's WebAssembly memory limit went from 4 GB
+to 512 MB (iOS Safari may refuse to set aside 4 GB), this device's Stockfish now stops while Maia loads and starts
+again after, and a load that fails short of memory is tried once more. Your line tells which helped.
 
 ## Piece sounds (Oct 11, about 3 minutes)
 

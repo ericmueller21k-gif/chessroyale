@@ -1002,8 +1002,28 @@ export const BOSS_BRAIN = {
   strict: { maxLoss: 4, maxLogitLoss: 0.5 } as BrainGuard,
   /** Maia's answer is waited for this long at most (from the request, made alongside the top-8 search); then Stockfish. */
   timeoutMs: 1500,
-  /** The model's load gives up after this long (the boss plays Stockfish meanwhile: nothing ever waits for it). */
+  /** The model's load gives up after this long (the boss plays Stockfish meanwhile). */
   loadTimeoutMs: 60_000,
+  /**
+   * A solo boss battle on Maia waits for it, at most this long, before its intro: the loading step ("Loading the
+   * boss…", the download's bar, then "Starting…"), with this device's Stockfish paused so Maia loads alone (Eric's
+   * iPhone, Oct 14: Maia failed to load beside it). Then the battle begins whatever happened: not ready yet, the boss
+   * plays Stockfish until it is, as before. 20 s: a first download takes a few seconds on Wi-Fi and the start a second
+   * or two (Eric: "People can deal with it if they need to wait 5 or 10 seconds"); a slow connection gives up rather
+   * than keep a player waiting. Online nothing waits (other players can't wait on one device).
+   */
+  loadGateMs: 20_000,
+  /**
+   * After the loading step, this device's Stockfish must answer again within this long; if it doesn't (short of
+   * memory beside Maia), Maia is closed and Stockfish started once more: the battle needs Stockfish, not Maia.
+   */
+  stockfishBackMs: 15_000,
+  /**
+   * Maia's download, rounded, for the players' words (the loading step's note, the FAQ): its three files unpacked,
+   * the model 25.2 MB, onnxruntime's WebAssembly 14.2 MB and the worker 0.1 MB (packages/app/test/maia-gate.test.ts
+   * checks it against the files). Over the network it's less (the WebAssembly comes compressed), never more.
+   */
+  downloadMb: 40,
   /** Candidates Maia lists per move. */
   multipv: 8,
 };

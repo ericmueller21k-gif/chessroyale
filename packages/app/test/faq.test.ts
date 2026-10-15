@@ -117,6 +117,16 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(own.toLowerCase()).toContain("every boss except hollow (stockfish) plays with maia");
   });
 
+  it("Maia's download and its wait, from the settings: about downloadMb, kept; Solo waits loadGateMs at most, online never", () => {
+    const on = section("boss-brain", { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, forPlayers: true, downloadMb: 35, loadGateMs: 12_000 } });
+    expect(on).toContain("Maia is a human-like engine, so a boss plays more like a person than Stockfish does.");
+    expect(on).toContain("It's a bigger download, about 35 MB, fetched once the first time you meet a boss and then kept on your device; on a slow connection, or if it can't load, the boss plays Stockfish instead.");
+    expect(on).toContain("In Solo games and Boss alone, a boss battle waits for Maia to load before it starts, 12 s at most; online, nobody waits for it.");
+    expect(on).not.toContain("Nobody ever waits for it");
+    // (Off for players, nobody downloads it: no word of it.)
+    expect(section("boss-brain", { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, forPlayers: false } })).not.toContain("bigger download");
+  });
+
   it("Maia is marked as being tested only while it's off for players", () => {
     expect(section("boss-brain")).toContain(BOSS_BRAIN.forPlayers ? "New." : "Being tested; coming soon.");
     const on = section("boss-brain", { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, forPlayers: true } });
