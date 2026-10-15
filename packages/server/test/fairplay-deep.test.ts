@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { stockfishRefuses } from "@chessroyale/chess";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
 import { createGuest, ensureSchema, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
 import { caseOf, recordFairPlay, setCase, type CaseMailer } from "../src/fairplay.ts";
@@ -159,5 +160,26 @@ describe("the deep re-check", () => {
     expect((await sql.first<{ deep_done: number | null }>("SELECT deep_done FROM fairplay_matches"))!.deep_done ?? 0).toBe(0);
     const { search } = fakeSearch();
     expect((await deepCheckRun(sql, search, QUIET + 1, { perRun: 100 })).matches).toBe(1);
+  });
+
+  it("a position Stockfish refuses is passed over, not waited on: the match is still done", async () => {
+    // (The engine server never gets one, so it would never answer: engine.ts, containerScore. No game makes one.)
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const p = await player(sql, "Pat");
+    const ninePawns = "4k3/8/8/8/8/P7/PPPPPPPP/4K3 w - - 0 1";
+    expect(stockfishRefuses(ninePawns)).not.toBeNull();
+    const moves = engineMatch(12).map((m, i) => (i === 3 ? { ...m, fen: ninePawns } : m));
+    await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves }, QUIET - HOUR);
+    const fens: string[] = [];
+    const search: DeepSearch = async (fen, ms) => {
+      fens.push(fen);
+      return stockfishRefuses(fen) ? null : ms.map((m) => ({ move: m, expected: m === "a1a2" ? 0.55 : 0.5 }));
+    };
+    const r = await deepCheckRun(sql, search, QUIET, { perRun: 100 });
+    expect(fens).toHaveLength(11);
+    expect(fens).not.toContain(ninePawns);
+    expect(r.matches).toBe(1);
+    expect((await sql.first<{ deep_done: number | null }>("SELECT deep_done FROM fairplay_matches"))!.deep_done).toBe(1);
   });
 });
