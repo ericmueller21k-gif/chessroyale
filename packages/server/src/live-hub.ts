@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { CAPACITY, FRONT_DOOR } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
-import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LobbySummary } from "./live.ts";
+import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LiveHealth, type LobbySummary } from "./live.ts";
 import { countCall } from "./ops.ts";
 import { GlobalChat, type GlobalChatSnapshot, type GlobalPost, type GlobalSender } from "./global-chat.ts";
 import type { Env } from "./index.ts";
@@ -106,6 +106,11 @@ export class LiveHub extends DurableObject<Env> {
   /** People in lobbies now (the overload limit). */
   async players(): Promise<number> {
     return this.board.players(Date.now());
+  }
+
+  /** The health view's live numbers (ops-admin.ts): who's online, people in lobbies, each mode's lobbies. */
+  async health(): Promise<LiveHealth> {
+    return this.board.health(Date.now());
   }
 
   /** For a profile: online now, and the latest time seen (fresher than D1's, which is written once a minute). */

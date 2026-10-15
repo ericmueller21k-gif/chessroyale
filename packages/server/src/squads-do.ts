@@ -3,7 +3,7 @@ import { SQUADS } from "@chessroyale/core";
 import type { LobbyCloseReason, Opening } from "@chessroyale/chess";
 import type { PartyClientMessage, SquadsClientMessage } from "@chessroyale/chess/squads";
 import openings from "@chessroyale/chess/data/openings.json";
-import { SquadsCore, newSquadsRecord, squadsClosing, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
+import { SquadsCore, newSquadsRecord, squadsClosing, squadsLiveSummary, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
 import { PartyCore, newPartyRecord, partyClosing, type PartyRecord } from "./squads-party.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { d1Sql, ensureSchema, grantReward, recordResult } from "./accounts.ts";
@@ -11,6 +11,8 @@ import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { isAdmin } from "./admin.ts";
 import { serverScoreAt } from "./engine.ts";
 import { countCall } from "./ops.ts";
+import { LiveReporter } from "./live.ts";
+import { liveHub } from "./live-hub.ts";
 import type { Env } from "./index.ts";
 
 const library = openings as unknown as Opening[];
@@ -48,6 +50,8 @@ export class SquadsLobby extends DurableObject<Env> {
   private record: SquadsRecord | null = null;
   private matches: Record<string, LiveMatch> = {};
   private serverQueue: SquadsServerRequest[] = [];
+  /** When this lobby last told the live hub about itself (live.ts). */
+  private live = new LiveReporter();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -112,6 +116,26 @@ export class SquadsLobby extends DurableObject<Env> {
     else await this.ctx.storage.deleteAlarm();
     if (rewards.length) this.ctx.waitUntil(this.writeRewards(record.code, rewards));
     for (const req of this.serverQueue.splice(0)) this.ctx.waitUntil(this.serve(req));
+    // The live hub hears about it in the background (it never holds up the match).
+    void this.reportLive().catch(() => undefined);
+  }
+
+  /**
+   * Tells the live hub about this lobby when its phase or the people connected change (or a minute on), at most every
+   * CAPACITY.presence.lobbyReportMs: Squads counts for the overload limit and the health view, not the home page's line.
+   */
+  private async reportLive(again = false) {
+    const rec = this.record;
+    if (!rec || !this.env.LIVE) return;
+    const s = squadsLiveSummary(rec);
+    const due = this.live.next(`${s.phase}:${s.humans}`, s.phase === "over", Date.now(), again);
+    if (due === null) return;
+    if (due !== "now") {
+      this.ctx.waitUntil(new Promise((r) => setTimeout(r, due)).then(() => this.reportLive(true).catch(() => undefined)));
+      return;
+    }
+    countCall("live.report");
+    await liveHub(this.env).report(s);
   }
 
   /** Placements on profiles (unranked) and rewards in wallets. */
@@ -164,8 +188,10 @@ export class SquadsLobby extends DurableObject<Env> {
           // Already gone.
         }
       }
+      if (this.env.LIVE) await liveHub(this.env).forget(rec.code).catch(() => undefined);
       this.record = null;
       this.matches = {};
+      this.live = new LiveReporter();
       await this.ctx.storage.deleteAlarm();
       await this.ctx.storage.deleteAll();
       console.log(`squads lobby ${rec.code} closed (${reason})`);

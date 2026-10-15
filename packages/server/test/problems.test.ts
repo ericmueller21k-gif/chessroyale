@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { OPS } from "@chessroyale/core";
+
+// (The ops page reads the engine server's health; the real container needs the Workers runtime, and nothing here searches.)
+vi.mock("@cloudflare/containers", () => ({ Container: class {}, getContainer: () => null }));
+
 import { createGuest, createSession, ensureSchema, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { problemLimited } from "../src/limits.ts";
 import {

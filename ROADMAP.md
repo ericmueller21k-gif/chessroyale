@@ -80,9 +80,11 @@ decisions. In this order:
    (the Worker, the cron, every Durable Object's entry points); players report a bug (with diagnostics and a short id to
    share), send feedback or suggest an idea; `/admin/ops` lists the top errors and the reports by kind. Bounded D1 writes, kept 30 days, no IP addresses or emails
    (docs/areas/ops.md, "Errors and player reports").
-2. **A health report and `npm run ops:report`:** an admin-only health view (the deployed version, live players and
-   lobbies, errors in the last hour and day, reports, the engine server's and fair play's budgets, a D1 check, Durable
-   Object errors) and a script that prints a short summary from hunchess.com an AI session can act on.
+2. **A health report and `npm run ops:report`.** Done (the ops lane): an admin-only health view (`/admin/ops`, and
+   `/api/admin/health` for scripts through Cloudflare Access: the deployed version, live players and lobbies with
+   Squads, errors this hour and today, reports, the engine server's and fair play's budgets, a D1 check, Durable
+   Object errors) and a script that prints a short summary from hunchess.com, "Needs attention" first
+   (docs/areas/ops.md, "Health").
 3. **Alerts:** a cron self-check that emails Eric on spikes (errors, failures, budgets), reusing fair play's mailer
    (`fairplay-mail.ts`), plus a daily scheduled AI triage session that reads the report and the new player reports.
 4. **Kill switches and rollback:** per mode, per boss and for the shop, plus a maintenance banner, through Worker
@@ -102,6 +104,10 @@ decisions. In this order:
 - Cloudflare billing and usage alerts (Billing → budget alerts; the suggested $20/month, and D1 and Workers Logs
   usage notifications).
 - A read-only monitoring token for the AI sessions (Cloudflare API: Account Analytics and Workers Observability read).
+- At launch, when Access comes off the rest of the site: keep an Access application on the health path
+  (`hunchess.com/api/admin/health`) with the service-token policy, and give its AUD tag to a session for
+  `ACCESS_AUD` in `wrangler.jsonc` (today's is the whole site's application). Without it, `npm run ops:report` is
+  refused, and only admins signed in can read the view.
 - Any paid service (an uptime monitor, an error service, a paging service), if we ever want one: asked first with a
   monthly price.
 - Legal sign-off: the privacy policy and terms, and the rules for crates before any real money.

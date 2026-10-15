@@ -39,7 +39,8 @@
     "frames:lobbychat": "node scripts/frames-lobby-chat.mjs",
     "frames:squads": "node scripts/frames-squads.mjs",
     "frames:resign": "node scripts/frames-resign.mjs",
-    "perf:boss": "node scripts/perf-boss.mjs"
+    "perf:boss": "node scripts/perf-boss.mjs",
+    "ops:report": "NODE_USE_ENV_PROXY=1 node --disable-warning=UNDICI-EHPA scripts/ops-report.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261002.1",

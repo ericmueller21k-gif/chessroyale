@@ -121,6 +121,7 @@ import {
   type Wallet,
 } from "@chessroyale/chess/squads";
 import { cleanTop, distanceFromVerdict, fallbackTop, topsAgree, verdictMovesOf } from "./squads-bots.ts";
+import type { LobbySummary } from "./live.ts";
 
 /**
  * One Squads lobby's logic, independent of Cloudflare (docs/areas/squads.md, "The server"): seats and parties, the
@@ -379,6 +380,25 @@ export function newSquadsRecord(code: string, now: number, seed: number, opts: {
     ...(opts.test ? { test: opts.test } : {}),
     activeAt: now,
     ...(opts.keepMs ? { keepMs: opts.keepMs } : {}),
+  };
+}
+
+/**
+ * What a Squads lobby tells the live hub (live.ts): its phase as the live line has them, the people connected now, and
+ * when it filled. Counted for the overload limit and the health view, never on the home page's public line.
+ */
+export function squadsLiveSummary(r: SquadsRecord): LobbySummary {
+  const phase = r.phase === "results" ? "over" : r.phase === "vote" || r.phase === "bracket" ? "playing" : "waiting";
+  return {
+    code: r.code,
+    mode: "squads",
+    kind: r.auto ? "queue" : "private",
+    phase,
+    humans: r.humans.filter((h) => h.connected && !h.left).length,
+    alive: null,
+    total: null,
+    bossElo: null,
+    startedAt: r.filledAt,
   };
 }
 

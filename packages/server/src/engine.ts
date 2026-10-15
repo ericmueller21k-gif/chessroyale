@@ -50,6 +50,26 @@ async function takeBudget(env: EngineEnv): Promise<boolean> {
   }
 }
 
+/** When this instance last wrote the engine server's last answer and last failure (meta "engine.ok", "engine.fail"). */
+const marked = { ok: 0, fail: 0 };
+
+/**
+ * The health view's "last success" and "last failure" (ops-admin.ts): times in D1's `meta`, written at most once a
+ * minute (a success) or every 10 s (a failure) per instance, so a busy server costs a write a minute. Never throws.
+ */
+export async function markEngine(env: EngineEnv, ok: boolean, why = ""): Promise<void> {
+  const now = Date.now();
+  if (!env.DB || now - marked[ok ? "ok" : "fail"] < (ok ? 60_000 : 10_000)) return;
+  marked[ok ? "ok" : "fail"] = now;
+  try {
+    await env.DB.prepare("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value")
+      .bind(ok ? "engine.ok" : "engine.fail", ok ? String(now) : JSON.stringify({ at: now, why }))
+      .run();
+  } catch {
+    // (The health view just shows an older time.)
+  }
+}
+
 /**
  * The one way into the engine server's searches: `serverScoreAt` (every match's re-checks, the judges' verdicts, Squads'
  * bot work, `/api/engine/score`) and fair play's deep re-check (`fairplay-engine.ts`) all search through here. A
@@ -70,12 +90,33 @@ export async function containerScore(env: EngineEnv, instance: string, fen: stri
       stub.fetch("http://engine/score", { method: "POST", body: JSON.stringify({ fen, moves: [...new Set(moves)], nodes }) }),
       new Promise<null>((r) => setTimeout(() => r(null), timeoutMs)),
     ]);
-    if (!res || !res.ok) return null;
+    if (!res || !res.ok) {
+      await markEngine(env, false, res ? `answered ${res.status}` : "no answer in time");
+      return null;
+    }
     const body = (await res.json()) as { moves?: MoveScore[] };
+    await markEngine(env, Array.isArray(body.moves), "an answer without moves");
     return Array.isArray(body.moves) ? body.moves : null;
-  } catch {
+  } catch (e) {
+    await markEngine(env, false, String(e).slice(0, 120));
     return null;
   }
+}
+
+/** The engine server today, for the health view: searches used of the day's budget, its last answer and last failure. */
+export async function engineHealth(env: EngineEnv, now: number): Promise<{ on: boolean; searches: number; cap: number; lastOk: number | null; lastFail: { at: number; why: string } | null }> {
+  const day = new Date(now).toISOString().slice(0, 10);
+  const read = async <T>(sql: string, ...params: unknown[]) => (env.DB ? await env.DB.prepare(sql).bind(...params).first<T>().catch(() => null) : null);
+  const used = await read<{ searches: number }>("SELECT searches FROM engine_usage WHERE day = ?", day);
+  const ok = await read<{ value: string }>("SELECT value FROM meta WHERE key = 'engine.ok'");
+  const fail = await read<{ value: string }>("SELECT value FROM meta WHERE key = 'engine.fail'");
+  let lastFail: { at: number; why: string } | null = null;
+  try {
+    lastFail = fail ? (JSON.parse(fail.value) as { at: number; why: string }) : null;
+  } catch {
+    // An unreadable mark: none.
+  }
+  return { on: engineOn(env), searches: used?.searches ?? 0, cap: Number(env.ENGINE_DAILY_SEARCHES ?? 3000), lastOk: ok ? Number(ok.value) : null, lastFail };
 }
 
 /** One restricted search on the engine server; null if there's no server, no budget left, or no answer in time. */
