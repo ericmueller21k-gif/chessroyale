@@ -26,6 +26,7 @@ const h = await res.json();
 const utc = (t) => (t ? new Date(t).toISOString().slice(0, 16).replace("T", " ") : "never");
 const ago = (t) => (t ? `${utc(t)} (${Math.round((h.at - t) / 60_000)} min ago)` : "never");
 const share = (used, cap) => (cap ? used / cap : 0);
+const count = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 // What needs someone now: each line says what's wrong and where to look.
 const attention = [];
@@ -36,12 +37,12 @@ const e = h.errors;
 if (e.thisHour >= 20 || (e.thisHour >= 5 && e.thisHour >= 3 * Math.max(1, e.lastHour))) {
   attention.push(`Errors are up: ${e.thisHour} this hour against ${e.lastHour} the hour before (top below; /admin/ops has each one's diagnostics).`);
 }
-if (h.durableObjects.thisHour) attention.push(`Durable Objects threw ${h.durableObjects.thisHour} times this hour: ${Object.keys(h.durableObjects.byEntry).join(", ")}.`);
+if (h.durableObjects.thisHour) attention.push(`Durable Objects threw ${count(h.durableObjects.thisHour, "error")} this hour: ${Object.keys(h.durableObjects.byEntry).join(", ")}.`);
 const en = h.engine;
 if (en.on && en.lastFail && (!en.lastOk || en.lastFail.at > en.lastOk)) attention.push(`The engine server's last search failed (${ago(en.lastFail.at)}: ${en.lastFail.why}); players' devices' numbers stand meanwhile.`);
 if (share(en.searches, en.cap) >= 0.8) attention.push(`The engine server has used ${en.searches} of today's ${en.cap} searches.`);
 if (share(h.fairplay.searches, h.fairplay.cap) >= 0.8) attention.push(`Fair play's deep re-checks have used ${h.fairplay.searches} of today's ${h.fairplay.cap} searches.`);
-if (h.reports.day.bug) attention.push(`${h.reports.day.bug} bug report(s) in the last 24 hours to read: /admin/ops?kind=bug.`);
+if (h.reports.day.bug) attention.push(`${count(h.reports.day.bug, "bug report")} in the last 24 hours to read: /admin/ops?kind=bug.`);
 
 const lines = [];
 lines.push(`HunChess health at ${utc(h.at)} UTC (${base})`);
@@ -62,7 +63,7 @@ for (const x of e.top.slice(0, 5)) {
 }
 const doEntries = Object.entries(h.durableObjects.byEntry);
 lines.push(`Durable Objects: ${doEntries.length ? doEntries.map(([k, n]) => `${k} ${n}`).join(", ") : "no errors"} in 24 hours`);
-const kinds = ["bug", "feedback", "idea"].map((k) => `${h.reports.day[k] ?? 0} ${k === "bug" ? "bugs" : k === "idea" ? "ideas" : "feedback"}`);
+const kinds = [count(h.reports.day.bug ?? 0, "bug"), `${h.reports.day.feedback ?? 0} feedback`, count(h.reports.day.idea ?? 0, "idea")];
 lines.push(`Reports (24 hours): ${kinds.join(", ")}`);
 for (const r of h.reports.latest) lines.push(`  ${r.id} ${r.kind} ${utc(r.at)}: ${r.note ? JSON.stringify(r.note.slice(0, 100)) : "(no note)"}`);
 lines.push(`Engine server: ${en.on ? "on" : "off"}, ${en.searches} of ${en.cap} searches today; last answer ${ago(en.lastOk)}; last failure ${en.lastFail ? `${ago(en.lastFail.at)}: ${en.lastFail.why}` : "never"}`);
