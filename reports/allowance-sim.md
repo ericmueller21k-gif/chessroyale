@@ -12,10 +12,12 @@ Eric's goal: "the goal is simply to still cut players playing poor, and not puni
 | | before | after |
 | --- | ---: | ---: |
 | Players cut (per match) | 16.0 | 15.1 |
+| **Of those who played only top-8 moves (nothing poor), went through** | 96% | 99% |
+| **Of those who had played poorly, cut** | 38% | 39% |
 | Cut players who played poorly (a material error, a loss of 20+ or a miss) | 83% | 91% |
 | Cut players with a negative score | 100% | 97% |
 | Cut players' bot temperature (median; higher is looser) | 15.3 | 11.4 |
-| Survivors who played only top-8 moves, still in | 91% | 93% |
+| Survivors who played only top-8 moves | 91% | 93% |
 | Survivors who had played poorly | 26% | 25% |
 | Kept in by a tie at the line, owed by the next cut (per match) | 0.0 | 0.9 |
 
@@ -24,10 +26,12 @@ Eric's goal: "the goal is simply to still cut players playing poor, and not puni
 | | before | after |
 | --- | ---: | ---: |
 | Players cut (per match) | 14.0 | 12.2 |
+| **Of those who played only top-8 moves (nothing poor), went through** | 92% | 97% |
+| **Of those who had played poorly, cut** | 38% | 44% |
 | Cut players who played poorly (a material error, a loss of 20+ or a miss) | 66% | 86% |
 | Cut players with a negative score | 99% | 75% |
 | Cut players' bot temperature (median; higher is looser) | 9.9 | 10.4 |
-| Survivors who played only top-8 moves, still in | 93% | 95% |
+| Survivors who played only top-8 moves | 93% | 95% |
 | Survivors who had played poorly | 22% | 18% |
 | Kept in by a tie at the line, owed by the next cut (per match) | 0.0 | 2.8 |
 
