@@ -1,38 +1,39 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { account } from "../account.ts";
 import type { GameView, StrikeState } from "../game.ts";
 import { kingLine, kingSay, setKingFallen, type KingCue } from "../godKing.ts";
-import { play } from "../sound.ts";
-import { useFrameNow } from "./Countdown.tsx";
+import { play, warmSounds } from "../sound.ts";
+import { TICK_FROM_SECONDS, useFrameNow } from "./Countdown.tsx";
 import { GodKingFallen, GodKingSprite, kingCommandAct } from "./GodKing.tsx";
 import { Chevrons, type useHistoryView } from "./HistoryNav.tsx";
 import { COMPUTER_LAYOUT } from "./MatchMenu.tsx";
 import { Bolt } from "./PowerUpButton.tsx";
 import { useMedia } from "./QuickChat.tsx";
 import { SpeechBox } from "../speech.tsx";
-import { kingBlocked, mockKingHelp } from "./Recluse.tsx";
+import { bulletIncrementOn, kingBlocked, mockKingHelp } from "./Recluse.tsx";
 
 /**
  * Boss battle: everything below the board, the same on every screen (your move,
  * the reveal, the boss's turn) so nothing moves from one to the next:
  *
- * - on the left, one row: the arrows for stepping through the game either side
- *   of a status box (two lines at most) saying what's happening right now, or
- *   which move you're looking at while you step back;
- * - on the right, the God King himself, standing by and breathing, with his
- *   charges at his feet. He says a few words now and then (`cues`). Tap him
+ * - one row, the board's width and lined up with its edges: the arrows for
+ *   stepping through the game either side of a status box. In the box, centered,
+ *   what's happening right now (two lines at most), or which move you're looking
+ *   at while you step back; at its right, your clock, always there (DockClock);
+ * - the God King himself, standing by and breathing, with his charges at his
+ *   feet: on a phone, on a line of his own under the row (beside it where the
+ *   screen has room right of the board). He says a few words now and then (`cues`). Tap him
  *   and his commands pop up above his head, like an old Final Fantasy battle
  *   menu: play this move, or strike the boss. Tap him again to close it.
  *   After his Last Stand he lies there fallen, and the charges he had left are
  *   the crowd's power-ups: a ⚡ button with the count, above his fallen figure,
  *   where his menu was (the engine's top 3 moves, as in Crowd).
  *
- * On a computer (styles.css, .boss-dock) the status row is the board's width,
- * centered under it, and the God King stands by the board's bottom-right corner,
- * facing the boss across the board (Eric, Oct 11); his words and menu open
- * outwards there. On a phone, as above.
+ * On a computer (styles.css, .boss-dock) the God King stands by the board's
+ * bottom-right corner instead, facing the boss across the board (Eric, Oct 11);
+ * his words and menu open outwards there.
  */
 export function BossDock({
   match,
@@ -49,6 +50,7 @@ export function BossDock({
   fallen: fallenNow,
   charges: chargesShown,
   powerUp,
+  clock,
 }: {
   match: GameView;
   /** Your move: step back through the game (the arrows are grayed out elsewhere). */
@@ -77,6 +79,11 @@ export function BossDock({
    * this move (its arrows are on the board). Other screens just show how many you hold.
    */
   powerUp?: { enabled: boolean; inUse: boolean };
+  /**
+   * Your clock at the status box's right (DockClock): your move's, counting down. Left out, it holds where your last move
+   * stopped it (the boss's turn, the reveal, the waiting); null: none on this screen.
+   */
+  clock?: DockClockRun | null;
 }) {
   const boss = match.boss;
   const fallen = fallenNow ?? !!boss?.lastStand;
@@ -102,23 +109,31 @@ export function BossDock({
   useEffect(() => {
     if (!ready) setMenu(false);
   }, [ready]);
+  const dockRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => lineUpWithBoard(dockRef.current!), []);
+  // (His "can't" made ahead in the sound worker, so its first tap never stalls a slow phone.)
+  useEffect(() => warmSounds(["kingCant"]), []);
   return (
     <>
-    <div class="boss-dock">
+    <div class="boss-dock" ref={dockRef}>
       <div class={`history-nav boss-dock-main${view?.browsing ? " browsing" : ""}${wide ? " wide" : ""}`}>
         {!wide && (
           <button type="button" class="nav-btn" aria-label="Previous move" disabled={!view || view.ply === 0} onClick={() => view?.go(view.ply - 1)}>
             <Chevrons back />
           </button>
         )}
-        <div class="boss-dock-status" role="status" aria-live="polite">
-          {view?.browsing ? (
-            <button type="button" class="history-label" onClick={() => view.live()} aria-label="Back to the live position">
-              Move {moveNo(view.ply)} · {view.ply}/{nav!.total} · back to live
-            </button>
-          ) : (
-            status
-          )}
+        <div class="boss-dock-status">
+          <div class="dk-text" role="status" aria-live="polite">
+            {view?.browsing ? (
+              <button type="button" class="history-label" onClick={() => view.live()} aria-label="Back to the live position">
+                Move {moveNo(view.ply)} · {view.ply}/{nav!.total} · back to live
+              </button>
+            ) : (
+              status
+            )}
+          </div>
+          {/* (Lights out's prompt takes the whole box, as it takes the arrows' room.) */}
+          {!wide && clock !== null && <DockClock match={match} boss={boss} run={clock} />}
         </div>
         {!wide && (
           <button type="button" class="nav-btn" aria-label="Next move" disabled={!view?.browsing} onClick={() => view?.go(view.ply + 1)}>
@@ -165,6 +180,104 @@ export function BossDock({
     {!computer && <EngineMove match={match} />}
     {!computer && <BrainDebug match={match} />}
     </>
+  );
+}
+
+/** The room right of the board the God King needs to stand beside the dock's row on a phone: his 58 px and a gap. */
+export const KING_BESIDE_PX = 66;
+
+/** Where an element's box starts across the page, without transforms (a board that shakes or turns keeps its place). */
+function pageLeft(el: HTMLElement): number {
+  let x = 0;
+  for (let e: HTMLElement | null = el; e; e = e.offsetParent as HTMLElement | null) x += e.offsetLeft;
+  return x;
+}
+
+/**
+ * The dock's row lined up with the board (Eric, Oct 15: "exactly the board's width and aligned with the board's left and
+ * right edges", on every screen): the board as drawn (its squares, a whole number of device pixels, written by the board
+ * itself) or, when the board's place holds more than one (the Hidden Boss's phase 2 on a computer), that place. Written
+ * on the dock as --dk-left and --dk-w before the first paint, and again whenever either changes size (the scoreboard
+ * opened or closed, the window turned); styles.css places the row and the God King by them. Where the screen's column
+ * has KING_BESIDE_PX right of the board, the God King stands beside the row (`dk-beside`); otherwise under it (Eric,
+ * Oct 15: decided by the room there is, not the device).
+ */
+function lineUpWithBoard(dock: HTMLElement): (() => void) | void {
+  const wrap = dock.parentElement?.querySelector<HTMLElement>(".board-area .board-row > .board-wrap");
+  if (!wrap) return;
+  const board = wrap.querySelector<HTMLElement>(":scope > .hb > .hb-container") ?? wrap;
+  const place = () => {
+    const left = pageLeft(board) - pageLeft(dock);
+    const width = board.offsetWidth;
+    dock.style.setProperty("--dk-left", `${left}px`);
+    dock.style.setProperty("--dk-w", `${width}px`);
+    // (Room in the screen's column right of the board for the God King: he stands beside the row, not under it.)
+    dock.classList.toggle("dk-beside", dock.clientWidth - left - width >= KING_BESIDE_PX);
+  };
+  place();
+  const watch = new ResizeObserver(place);
+  watch.observe(board);
+  watch.observe(dock);
+  return () => watch.disconnect();
+}
+
+/** Your move's clock (BossDock's `clock`): it runs from `startsAt` to `deadline`, standing still while `frozen`. */
+export type DockClockRun = { startsAt: number; deadline: number; frozen?: { at: number; until: number } };
+
+/** What's left on a running clock at `now` (ms). */
+export const clockLeft = (run: DockClockRun, now: number): number =>
+  Math.max(0, run.deadline - (run.frozen && now >= run.frozen.at && now < run.frozen.until ? run.frozen.until : Math.max(now, run.startsAt)));
+
+/** m:ss, in whole seconds rounded up, as the big 3-2-1 counts (its "1" is the dock's 0:01). */
+export const clockShown = (ms: number): string => {
+  const s = Math.ceil(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
+/** Where each match's dock clock stopped: it holds there between your moves, whichever screen shows it. */
+const held = new WeakMap<object, { run: DockClockRun | null; ms: number | null }>();
+
+/** How long the "+2" of the bullet clock's increment shows beside the clock as your move begins (ms). */
+export const DOCK_PLUS_MS = 1600;
+
+/**
+ * Your clock, bold at the status box's right, the same on every boss battle screen (Eric, Oct 15: "never disappears or
+ * jumps between moves"): on your move, counting down (red from TICK_FROM_SECONDS); otherwise, dimmed, what you had
+ * left when your move went in. Under the Hidden Boss's bullet clock with its increment, a move begins with the 2 s
+ * added, and a brief "+2" beside the number says so. It re-renders itself, once each time the second shown changes;
+ * the screen around it doesn't.
+ */
+export function DockClock({ match, boss, run }: { match: GameView; boss: GameView["boss"]; run?: DockClockRun }) {
+  let h = held.get(match);
+  if (!h) held.set(match, (h = { run: null, ms: null }));
+  const now = Date.now();
+  // (The first look after your move went in: what was left then is what it holds.)
+  if (run) h.run = run;
+  const ms = h.run ? clockLeft(h.run, now) : h.ms;
+  if (!run && h.run) h.run = null;
+  h.ms = ms;
+  const [, setShown] = useState(0);
+  useEffect(() => {
+    if (!run) return;
+    const t = setInterval(() => setShown(Math.ceil(clockLeft(run, Date.now()) / 1000)), 200);
+    return () => clearInterval(t);
+  }, [run?.startsAt, run?.deadline, run?.frozen?.until]);
+  // (Before your first move of the battle there's nothing to hold yet: none, and the words have the whole box.)
+  if (ms === null) return null;
+  const inc = run ? bulletIncrementOn(boss) : 0;
+  const plus = inc > 0 && now - run!.startsAt < DOCK_PLUS_MS;
+  const low = !!run && Math.ceil(ms / 1000) <= TICK_FROM_SECONDS;
+  return (
+    <span class={`dk-clock${run ? " running" : " held"}${low ? " low" : ""}`} role="timer" aria-label={`Your clock: ${clockShown(ms)}`}>
+      {plus && (
+        <span class="dk-plus" key={run!.startsAt} aria-hidden="true">
+          +{inc}
+        </span>
+      )}
+      <span class="dk-time" aria-hidden="true">
+        {clockShown(ms)}
+      </span>
+    </span>
   );
 }
 
@@ -245,6 +358,9 @@ export function BrainDebug({ match }: { match: GameView }) {
   );
 }
 
+/** How long his "can't" shake and dimming last (ms; styles.css, .gk-unit.nope). */
+const NOPE_MS = 400;
+
 /** The God King standing by: breathing, his sword swaying, his charges at his feet; his words in a bubble above. */
 function GodKingUnit({
   side,
@@ -273,6 +389,7 @@ function GodKingUnit({
 }) {
   const now = useFrameNow();
   const line = kingLine(now);
+  const [nopeAt, setNopeAt] = useState(0);
   // Commanding from his spot: his sword raised, then his bolt or his slashes (in step with KingCommand on the board).
   const act = command ? kingCommandAct(command.mode, command.startAt, now) : undefined;
   // His leap (his Last Stand) plays from when it starts.
@@ -307,10 +424,23 @@ function GodKingUnit({
       </div>
     );
   }
+  // No charges left (Eric, Oct 15): a tap gets his soft "can't" and a tiny shake, dimmed a moment; nothing else.
+  const spent = charges <= 0 && !away && !leaping && !act;
+  const nope = nopeAt > 0 && now - nopeAt < NOPE_MS;
   return (
-    <div class={`gk-unit${ready ? " ready" : ""}${away ? " away" : ""}${leaping ? " leaping" : ""}${act ? " acting" : ""}${charges <= 0 ? " spent" : ""}${menu ? " open" : ""}`}>
+    <div class={`gk-unit${ready ? " ready" : ""}${away ? " away" : ""}${leaping ? " leaping" : ""}${act ? " acting" : ""}${charges <= 0 ? " spent" : ""}${menu ? " open" : ""}${nope ? " nope" : ""}`}>
       {menu ?? (line && !away && !leaping && <SpeechBox key={line.key} class="gk-bubble" text={line.text} at={line.at} until={line.until} now={now} fits={1} />)}
-      <button type="button" class="gk-unit-btn" disabled={!ready} onClick={onTap} aria-label={ready ? "God King: tap to summon him" : "God King"}>
+      <button
+        type="button"
+        class="gk-unit-btn"
+        disabled={!ready && !spent}
+        onClick={() => {
+          if (ready) return onTap();
+          play("kingCant");
+          setNopeAt(Date.now());
+        }}
+        aria-label={ready ? "God King: tap to summon him" : spent ? "God King: no charges left" : "God King"}
+      >
         <GodKingSprite
           side={side}
           anim={leaping ? "leap" : (act?.anim ?? "idle")}

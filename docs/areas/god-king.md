@@ -6,7 +6,9 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 
 - **Who he is.** The crowd's champion in every boss battle (the raid, the Crowd's boss final, solo's "Boss alone"). He
   stands in the dock under the board (a computer: by the board's bottom-right corner, mirroring the boss by its
-  bottom-left, his words and menu opening outwards; Eric, Oct 11), talks now and then, and can be called to act. He is
+  bottom-left, his words and menu opening outwards; Eric, Oct 11; a phone: on a line of his own under the dock's row, in
+  its middle, his words and menu opening above the row, or beside the row where the screen's column has room right of
+  the board; Eric, Oct 15: see [bosses.md](bosses.md), "The dock under the board"), talks now and then, and can be called to act. He is
   secondary to the chess: big moments are rare and short, and there is no instruction text on screen.
 - **Charges.** He has up to `kingChargesMax` (3) charges. Power-ups convert to charges (`kingPowerUpsPerCharge`).
   Tapping him opens his command menu: **play this move** (he plays the best move for the crowd, with his bolt) or
@@ -16,6 +18,9 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   `boss-powers.ts`, from `callStrike` in the runner). Bots in the crowd follow him (`kingBotLoss`, `kingBotFollow`).
 - **His word after Ginger's blizzard** names what the storm left free: the queen's lines, the king's
   (`blizzardKing`), or another piece's (`blizzardOne`), from the moves allowed.
+- **No charges left** (Eric, Oct 15): a tap on him gets his soft "can't" (two quick, muffled low notes falling,
+  synthesized: `characters/god-king-sounds.ts`, made ahead in the sound worker's table as the bosses' are, `kingCant`)
+  and a tiny shake, dimmed a moment (`.gk-unit.nope`, 0.4 s); nothing else (no menu, nothing spent).
 - **The clock stands still** while he acts, for everyone, solo and online: a move lengthens the reveal by
   `KING_COMMAND.moveMs`, a strike stops every deadline for `kingStrikeMs`. Nothing he does costs anyone time.
 - **His Last Stand.** Always armed, once per game. If the crowd's played move gives away at least the bar (in points
@@ -82,7 +87,7 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 | The dock and his command menu | `packages/app/src/components/BossDock.tsx` |
 | His lines | `packages/app/src/godKing.ts` (against the Hidden Boss: `characters/recluse-lines.ts`) |
 | The boss screens | `packages/app/src/screens/Boss.tsx`, the boss parts of `Crowd.tsx` and `Play.tsx` |
-| Sounds | `packages/app/public/sounds/god-king/`, `public/sounds/banner/` (CC0, credited in `CREDITS.md`), `src/sound.ts` |
+| Sounds | `packages/app/public/sounds/god-king/`, `public/sounds/banner/` (CC0, credited in `CREDITS.md`), `src/sound.ts`; synthesized (his "can't"): `src/characters/god-king-sounds.ts` |
 
 ## Settings
 
@@ -92,6 +97,8 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 
 ## Tests and tools
 
+- His "can't" (no charges left): unit `packages/app/test/god-king.test.ts` (under a move's loudness, the same every
+  time, in the sound worker's table); e2e `e2e/recluse.spec.ts` (the sound and the shake, no menu).
 - Against the Hidden Boss: unit `packages/chess/test/recluse.test.ts` (blocked; a try spends its charge, the Last Stand
   nothing), `packages/app/test/recluse-boss.test.ts` (the mocks, his cues, solo's `callKing` spending); e2e
   `e2e/recluse.spec.ts` (the dock's count drops, phase 1 and 2).

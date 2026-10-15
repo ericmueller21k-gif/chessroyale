@@ -176,6 +176,8 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
       <BossDock
         match={match}
         side="w"
+        // (No move is anyone's during the phase change: no clock.)
+        clock={null}
         status={
           <>
             <span class="dock-line">
@@ -340,6 +342,9 @@ export function SimulScreen({ match }: { match: GameView }) {
         match={match}
         side="w"
         canCall={v.playing && !v.decided}
+        // Your board's clock at the box's right: its bank (from his ultimate, the few seconds a move) running on your move,
+        // holding while he answers; none once your board is decided or before the clocks start.
+        clock={mine.result || !v.playing ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + (v.ultAt !== null ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : mine.bankMs) } : undefined}
         status={
           <>
             <span class="dock-line">
@@ -353,11 +358,11 @@ export function SimulScreen({ match }: { match: GameView }) {
               ) : mine.result ? (
                 ""
               ) : v.ultAt !== null ? (
-                // (His ultimate: a few seconds a move, then a random one is played for you.)
-                `${RECLUSE_PHASE2.ultMoveSeconds} s a move · ${yourTurn ? `${(moveLeft(v, mine, now) / 1000).toFixed(1)} s left` : "then a random move"}`
+                // (His ultimate: a few seconds a move, then a random one is played for you; the seconds are your clock.)
+                `${RECLUSE_PHASE2.ultMoveSeconds} s a move, or a random one`
               ) : (
-                // (The slow moves themselves: the marks beside every board.)
-                `Your clock ${clock(moveLeft(v, mine, now))}`
+                // (The slow moves themselves: the marks beside every board; your time: the clock at the box's right.)
+                ""
               )}
             </span>
           </>

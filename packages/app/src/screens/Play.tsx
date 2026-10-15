@@ -17,7 +17,6 @@ import { LiveGhosts } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, crowdView } from "../components/BossPowers.tsx";
 import { duelCount, duelTurn } from "../components/Pig.tsx";
 import { bulletControl, bulletIncrementOn, bulletOn, kingBlocked } from "../components/Recluse.tsx";
-import { clockText } from "../components/RaceTower.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { useReplay } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
@@ -256,6 +255,8 @@ export function PlayScreen({
           strike={strike}
           // After his Last Stand: the power-ups he left you (the engine's top 3 moves, as in Crowd).
           powerUp={{ enabled: canMove, inUse: hint !== null }}
+          // Your clock, at the status box's right: running on your move; once it's in, it holds (DockClock).
+          clock={!waiting && deadline > 0 ? { startsAt, deadline, frozen: strike?.at ? { at: strike.at, until: strike.until! } : undefined } : undefined}
           status={
             striking ? (
               <span>
@@ -302,11 +303,10 @@ export function PlayScreen({
                 ) : barred ? (
                   <span class="muted barred-note">✕ {toSan(board.fen, barred)}</span>
                 ) : bulletOn(match.boss) ? (
-                  // (The Hidden Boss's bullet clock: what's left in your bank, ticking, on every move to the end; once he
-                  // has added time per move, the time control too: "Bullet 1+2".)
+                  // (The Hidden Boss's bullet clock, on every move to the end; once he has added time per move, the time
+                  // control too: "Bullet 1+2". What's left in your bank is the dock's clock, at the box's right.)
                   <span class="bullet-note">
-                    <strong>Bullet{bulletIncrementOn(match.boss) ? ` ${bulletControl(bulletIncrementOn(match.boss))}` : ""}</strong>{" "}
-                    <span class="muted">· {clockText(Math.max(0, deadline - Math.max(now, startsAt)))} left</span>
+                    <strong>Bullet{bulletIncrementOn(match.boss) ? `\u00a0${bulletControl(bulletIncrementOn(match.boss))}` : ""}</strong>
                   </span>
                 ) : (
                   match.boss.staggerNext && <span class="muted">Boss staggered.</span>

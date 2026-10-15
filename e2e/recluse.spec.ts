@@ -184,7 +184,9 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes,
   const BANK = BOSS_POWERS.bulletBankSeconds * 1000;
   const allowed = await page.evaluate(() => (window as any).match.phase.allowedMs as number);
   expect(allowed).toBe(BANK);
-  await expect(page.locator(".boss-dock-status .bullet-note")).toContainText(/Bullet · \d:\d\d left/);
+  // (The time control on the left; what's left of the bank is your clock, bold at the box's right.)
+  await expect(page.locator(".boss-dock-status .bullet-note")).toHaveText("Bullet");
+  await expect(page.locator(".boss-dock-status .dk-clock.running")).toHaveText(/^[01]:\d\d$/);
   // No increment: a move's time comes out of the bank, nothing goes back.
   await page.waitForTimeout(1500);
   await play(page, await quietMove(page));
@@ -223,14 +225,27 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes,
     setTimeout(() => obs.disconnect(), 120_000);
     return out;
   });
+  // As that move begins, your clock goes up by the increment, a "+2" over it (Eric, Oct 15: "the number ticks up with a
+  // brief +2"): from what it held through his moment to that plus 2 s.
+  const tick = await watchFor(page, { plus: { selector: ".dk-clock.running .dk-plus", text: /^\+2$/ } });
   await play(page, await quietMove(page));
+  const heldText = await page.locator(".dk-clock.held .dk-time").textContent();
   await yourMove(page);
   expect(await plus.seen()).toEqual({ text: true, line: true, dock: true, consult: true });
+  await expect.poll(() => tick.seen()).toEqual({ plus: true });
+  const secs = (t: string | null) => (t ? Number(t.split(":")[0]) * 60 + Number(t.split(":")[1]) : NaN);
+  const startText = await page.evaluate(() => {
+    const p = (window as any).match.phase;
+    const s = Math.ceil((p.deadline - p.startsAt) / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  });
+  expect(secs(startText) - secs(heldText)).toBe(INC / 1000);
   const kinds = await during.evaluate((out) => [...new Set(out)]);
   expect(kinds).toEqual(["boss"]);
   b = await bossNow(page);
   expect(b.powers.events.map((e: { kind: string }) => e.kind)).toEqual(["bulletPlus"]);
-  await expect(page.locator(".boss-dock-status .bullet-note")).toContainText(/^Bullet 1\+2 · \d:\d\d left$/);
+  await expect(page.locator(".boss-dock-status .bullet-note")).toHaveText(/^Bullet\s1\+2$/);
+  await expect(page.locator(".boss-dock-status .dk-clock.running")).toHaveText(/^[01]:\d\d$/);
   // From this move on, each made in time adds 2 s: the move may take the bank and the 2 s, and what it took comes out.
   const you = () => page.evaluate(() => {
     const m = (window as any).match;
@@ -246,7 +261,24 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes,
   expect(took).toBeGreaterThan(0);
   expect(after.bank).toBe(before.bank + INC - took);
   expect(after.allowed).toBe(after.bank + INC);
-  await expect(page.locator(".boss-dock-status .bullet-note")).toContainText(/^Bullet 1\+2 · \d:\d\d left$/);
+  await expect(page.locator(".boss-dock-status .bullet-note")).toHaveText(/^Bullet\s1\+2$/);
+  // The last charge, then a tap with none left (Eric, Oct 15): his soft "can't" and a tiny shake, nothing else (no
+  // menu, the move still yours, no charge to spend).
+  await expect(crowns).toHaveAttribute("aria-label", "1 charges left");
+  await king.click();
+  await page.getByRole("menuitem", { name: /Strike/ }).click();
+  await expect(crowns).toHaveAttribute("aria-label", "0 charges left");
+  const spent = page.getByRole("button", { name: "God King: no charges left" });
+  await expect(spent).toBeEnabled();
+  const nope = await watchFor(page, { shake: { selector: ".gk-unit.nope" } });
+  await page.evaluate(() => ((window as any).__soundLog = []));
+  await spent.click();
+  await expect.poll(() => nope.seen()).toEqual({ shake: true });
+  expect(await page.evaluate(() => (window as any).__soundLog as string[])).toContainEqual(expect.stringMatching(/^kingCant:/));
+  await expect(page.getByRole("menu", { name: "God King commands" })).toHaveCount(0);
+  await expect(page.locator(".gk-unit.nope")).toHaveCount(0, { timeout: 2000 });
+  expect(await phase(page)).toBe("play");
+  expect((await bossNow(page)).kingCharges).toBe(0);
   expect(await strikes.seen()).toEqual({ card: false, dock: false, moves: true });
   await expect(page.locator(".boss-next")).toHaveText(/^Move \d+ of \d+$/);
   expect(await kingIntro.seen()).toEqual({ foe: true, usual: false });
@@ -439,7 +471,9 @@ test("phase 2's ultimate (the admins' trigger): \"5 SECONDS!\", his line and spe
   await meetHim(page, "phase=2");
   await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 60_000 }).toBe(true);
   // Before it: your bank in the dock; the team's slow moves beside your board only (no longer in the dock).
-  await expect(page.locator(".boss-dock-status")).toContainText(/Your clock \d:\d\d/);
+  // (Your board's clock: bold at the box's right, the words beside it without the time.)
+  await expect(page.locator(".boss-dock-status .dk-clock .dk-time")).toHaveText(/^\d:\d\d$/);
+  await expect(page.locator(".boss-dock-status .dk-text")).not.toContainText(/\d:\d\d/);
   await expect(page.locator(".boss-dock-status")).not.toContainText(/slow moves \d of/);
   await expect(page.locator(".rc-slow")).toHaveCount(1);
   const ult = await watchFor(page, {

@@ -1,6 +1,7 @@
 import { bigBoySound } from "./bigboy-sounds.ts";
 import { clownSound } from "./clown-sounds.ts";
 import { gingerSound } from "./gingerbread-sounds.ts";
+import { godKingSound } from "./god-king-sounds.ts";
 import { grexSound } from "./grex-sounds.ts";
 import { hollowSound } from "./hollow-sounds.ts";
 import { pigSound } from "./pig-sounds.ts";
@@ -9,12 +10,14 @@ import { sawyerSound } from "./sawyer-sounds.ts";
 
 /**
  * The bosses' synthesized sounds by module, each name its cache's (synth.ts, soundCache): one table for the page and
- * the sound worker (sound-worker.ts), so a sound made ahead off the page is the very one played.
+ * the sound worker (sound-worker.ts), so a sound made ahead off the page is the very one played. (The God King's
+ * synthesized ones too: `godKing`.)
  */
 const MAKERS = {
   bigBoy: bigBoySound,
   clown: clownSound,
   ginger: gingerSound,
+  godKing: godKingSound,
   grex: grexSound,
   hollow: hollowSound,
   pig: pigSound,
