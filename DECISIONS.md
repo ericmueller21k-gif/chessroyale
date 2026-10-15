@@ -4914,6 +4914,48 @@ only in the repository. It's now served as the engines' source is, so it holds w
 - **Testing:** light lane plus the clock specs: typecheck, the unit suite, `boss-dock`, `squads-clocks`, `crowd`,
   `recluse` and `votes` (its bank check now rounds up), and each changed script run once from the repo root.
 
+## e2e on GitHub Actions for every PR (Oct 15, 2026)
+
+Eric approved running the Playwright suite on GitHub Actions for every PR. The repository is public, so standard
+runners are free. Seven helpers queuing for one local e2e machine was the bottleneck. CI runs the full e2e on every
+PR; local runs are for targeted checks and perf (CLAUDE.md "Test lanes"; how it works: docs/areas/ops.md, "CI e2e").
+The calls:
+
+- **One workflow, `e2e.yml`, on every PR to `main` and every push to `main`:** both projects, 5 `shard` jobs side by
+  side, then a `result` job that is red if any shard is. Not a required check yet: the director decides once it has
+  proven itself over a few PRs. If it becomes one, require `result` (one name, whatever the shard count).
+- **5 shards, whole files spread by measured time** (`e2e/ci-shard.mjs`, `e2e/ci-timings.json`), not Playwright's
+  `--shard`. Playwright splits by test count in file order. In the first CI run (4 shards) that put formats (11
+  minutes on the phone alone), crowd and crowd-hidden in one shard: 21 minutes against 15-18 for the others. From
+  that run's per-file times, any number of count-based shards still left that shard at 21 minutes. Balanced by file:
+  4 shards would take about 18.4 minutes of tests, 5 about 15, 6 about 13.4. 5 keeps a run inside 15-20 minutes
+  with setup (about a minute: npm ci, the cached browser, the build) with fewer jobs at once. Inside a file the tests
+  still run in order on one worker, as locally (no `fullyParallel`, which would change how tests run). A new spec
+  counts as the table's median until the table is refreshed from a run's summary.
+- **Retries: 1 until the flaky-test batch lands; the goal is 0** (the director, Oct 15). `playwright.config.ts` sets
+  none, and stays so for local runs. A test that passes only on its retry is "flaky": `result`'s summary lists those
+  first, with their shard and first error, so they stay in view rather than hidden. Flaky in CI so far:
+  `boss-dock.spec.ts:96` and `boss-powers.spec.ts:384` (both desktop: the match had already ended when the test
+  expected a move); the batch also covers Sawyer's split, `crowd.spec.ts:178`, `lobby-chat.spec.ts:28` and
+  `crowd-hidden.spec.ts:106`.
+- **Traces only on the retry** (`on-first-retry`). Measured in the first run, with the same shards run both ways:
+  retain-on-failure (recording every test) made each shard 6-10% slower (1.3-1.6 minutes). On the retry it costs
+  nothing for a passing test, and a flaky or failing test comes with its trace. A shard with a failed or flaky test
+  uploads its HTML report with those traces (kept 7 days); nothing is uploaded for a clean shard.
+- **Left out: the `@perf` specs** (`e2e/perf.spec.ts`, 5 frame-budget tests on a 4x-slowed phone, now tagged
+  `@perf`), because they measure the machine as much as the code, and 2 workers share a runner's CPU. They run
+  locally, or by hand: Actions → e2e → Run workflow, "perf" ticked (one runner, 1 worker; they passed there in 3.4
+  minutes on the first try). Nothing else is left out.
+- **The build is a step of its own** (`E2E_PREBUILT=1` tells Playwright's web server to start wrangler without
+  building again): one build per runner, its time and errors shown on their own. The server is the same
+  `wrangler dev` with the same test variables as locally.
+- **Caches:** npm (setup-node) and Playwright's Chromium (headless shell only, which headless runs use; keyed by
+  Playwright's version). Workers: Playwright's default, half the runner's 4 CPUs (2), as locally.
+- **Concurrency:** a new push to a PR cancels its older run; every push to `main` gets its own run (none skipped).
+  A run takes 6 jobs at once; the account's limit on jobs at once (20 on GitHub Free) queues the rest.
+- **Docs:** CLAUDE.md's test lanes (the batch full run is now CI's run on each push to `main`; the full lane per PR
+  is the PR's own run) and the agents' ship steps: locally only the specs you touched and `@perf`; CI runs the rest.
+
 ## Nothing said twice, nothing over the board: the boss screens (Oct 15, 2026)
 
 From the slop audit (Oct 15: V1, V2, V4, V5, V7, V10, V24, V25, the Crowd's pick count, and `ult2`'s seconds). No rule,
