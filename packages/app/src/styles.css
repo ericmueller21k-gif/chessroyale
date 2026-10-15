@@ -11159,17 +11159,13 @@ img.qicon {
   align-self: stretch;
   align-content: center;
 }
+/* (At least his name's room high, so a short line covers the name and skulls whole, never half of them; nothing under it
+   is hidden, it's only covered while he speaks, as before.) */
 .bc-bar-bubble {
   left: 0;
   bottom: -2px;
+  min-height: calc(100% + 4px);
   max-width: 100%;
-}
-/* (While he speaks, his words take his name's room: the name and skulls under them step aside, so no half of them shows
-   past a short box.) */
-@media (max-width: 899px), (max-height: 599px) {
-  .boss-bar.has-char .boss-name:has(> .bc-bar-bubble) > :not(.bc-bar-bubble) {
-    visibility: hidden;
-  }
 }
 .place-side .bc-bubble {
   right: 0;

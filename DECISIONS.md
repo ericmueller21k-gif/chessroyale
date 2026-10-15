@@ -4999,8 +4999,10 @@ timing, protocol or stored data changes: words, where the speech boxes sit, and 
   an empty place under "The boss rises!".
 - **The boss's words in the boss bar** (V5): in his name's room (BossBar renders the box, `.bc-bar-bubble`), from just
   above the bar's bottom edge upwards over the title line, never over the status at the bar's right ("58 moves left"
-  read "es left", "2 of 4 won" read "4 won") or the line and the board under the bar. His name and skulls step aside
-  while he speaks. A computer's stay by his figure.
+  read "es left", "2 of 4 won" read "4 won") or the line and the board under the bar. The box is at least the name's
+  room high, so a short line covers his name and skulls whole, as the old box did, never half of them; nothing is
+  hidden (a first try hid them while he spoke, and CI's `boss-powers` caught the rage meter hidden). A computer's stay
+  by his figure.
 - **The corner casts are as designed** (the director's call, Oct 15): the boss steps up to the board's top-left corner
   for a moment (the casters, Wrangler's lasso and showdown, Hollow's dark and Lights out, Big Boy's snack), over the
   subtitle and a8, while the board isn't playable; the audit took them for the bar's figure. Nothing players must read
