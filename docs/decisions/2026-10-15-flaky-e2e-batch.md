@@ -1,4 +1,4 @@
-# Seven flaky e2e tests, root-caused (Oct 15, 2026)
+# Eight flaky e2e tests, root-caused (Oct 15, 2026)
 
 CI's `e2e` run (5 shards, one retry) listed these as flaky (passed only on the retry) or failed. Each was traced to its
 cause from CI's traces and logs and reproduced locally with `--repeat-each` before anything changed. No assertion was
@@ -86,6 +86,16 @@ the game.
 - **Fix:** on SQLITE_BUSY only, the test waits 300 ms and writes again (at most 10 times). Any other error fails it,
   now with its message. The assertions are unchanged.
 
+## A cut that put nobody out: `crowd.spec.ts` "online, once you're out, a later cut says so…"
+
+- **Seen:** at the cut after yours, no doomed pawn ever showed. It failed both tries on #242's run. The page read
+  "CUT · Nobody out · 98 left" and "98 players through, 0 cut".
+- **Cause:** since Oct 15 ties at the cut line go through (`2026-10-15-opening-allowance-and-ties.md`), and the
+  opening allowance scores most early moves 0, so a cut in the opening can leave everyone level and put nobody out. Then
+  there is no judgment and no gavel, as the rule says. The test (one-move stages, 4 s a move) took the very next cut.
+- **Fix:** the test waits for the first later cut that puts players out (the break's `knockedOut`), then checks its
+  doomed pawns, the gavel and the message as before, within the same 90 s. No assertion or timeout changed.
+
 ## Before and after (local, `--repeat-each`, failures over runs)
 
 | Test | Before | After |
@@ -97,3 +107,4 @@ the game.
 | `front-door.spec.ts` the live line (phone) | 0 / 10 locally; CI 1 | 0 / 10 |
 | `boss-dock.spec.ts` your clock (phone) | 0 / 10 locally; CI 1 | 0 / 10 |
 | `problems.spec.ts` the feedback sheet (both, beside a Crowd match) | 1 / 8 (SQLITE_BUSY) | 0 / 2 (stopped early; CI is the gate) |
+| `crowd.spec.ts` once you're out, a later cut (phone) | 4 / 6 ("Nobody out") | 0 / 6 |

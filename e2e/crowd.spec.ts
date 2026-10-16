@@ -144,7 +144,7 @@ test("online, once you're out, a later cut says so (not \"You're through\") and 
   await page.getByRole("button", { name: /Start with 1 player/ }).click();
   const cut = () => page.evaluate(() => {
     const p = (window as any).match?.phase;
-    return p?.kind === "stageBreak" ? { stage: p.stage as number, youOut: p.youOut as boolean } : null;
+    return p?.kind === "stageBreak" ? { stage: p.stage as number, youOut: p.youOut as boolean, out: p.knockedOut.length as number } : null;
   });
   let outAt: number | null = null;
   await expect
@@ -157,8 +157,15 @@ test("online, once you're out, a later cut says so (not \"You're through\") and 
   // The cut you went out at.
   await expect(page.locator(".crowd-cut .out-msg")).toContainText("You're out");
   await expect(page.getByRole("button", { name: "Why was I cut?" })).toBeVisible();
-  // The next cut, watched from the sidelines: a new judgment (the doomed pawns glow before the gavel lands).
-  await expect.poll(async () => (await cut())?.stage ?? -1, { timeout: 90_000, intervals: [100] }).toBeGreaterThan(outAt!);
+  // A later cut that puts players out, watched from the sidelines: a new judgment (the doomed pawns glow before the
+  // gavel lands). (Ties at the line go through, so a cut early on, when the opening allowance leaves many level, may put
+  // nobody out and strike nothing: docs/decisions/2026-10-15-flaky-e2e-batch.md.)
+  await expect
+    .poll(async () => {
+      const c = await cut();
+      return c && c.stage > outAt! && c.out > 0 ? c.stage : -1;
+    }, { timeout: 90_000, intervals: [100] })
+    .toBeGreaterThan(outAt!);
   await expect(page.locator(".crowd-cut .grid-pawn.doomed").first()).toBeVisible({ timeout: 1000 });
   await expect(page.locator(".crowd-cut .grid-pawn.cut-now").first()).toBeVisible({ timeout: 5000 });
   // It says you went out before, not that you're through.
