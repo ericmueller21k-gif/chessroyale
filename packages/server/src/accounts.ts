@@ -30,10 +30,10 @@ import {
   type ShopState,
   type StoredChatPicks,
 } from "@chessroyale/core";
-import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, type LockerState } from "./locker.ts";
+import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerMoves, lockerState, type LockerState } from "./locker.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA } from "./fairplay-schema.ts";
-import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, deleteSocial } from "./friends.ts";
+import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
 
 export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
@@ -449,13 +449,19 @@ export async function signInWithIdentity(
   const owner = await sql.first<User>(`SELECT id, name, icon, email, google_sub, created_at FROM users WHERE ${col} = ?`, value);
   if (owner) {
     if (current && current.id !== owner.id && !current.email && !current.google_sub) {
-      // A guest signing in to an existing account: bring the guest's matches along.
-      await sql.run("UPDATE results SET user_id = ? WHERE user_id = ?", owner.id, current.id);
-      await sql.run(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, owner.id);
-      await moveShop(sql, current.id, owner.id);
-      await sql.run("DELETE FROM sessions WHERE user_id = ?", current.id);
-      await deleteSocial(sql, current.id);
-      await sql.run("DELETE FROM users WHERE id = ?", current.id);
+      // A guest signing in to an existing account: its matches, items, coins and the rest join the account and the
+      // guest goes, in one batch (one transaction), so nothing lands halfway: a buy in another tab is wholly before
+      // it (and moves) or wholly after (and finds no guest wallet), two sign-ins at once move the wallet once, and a
+      // failure moves nothing (docs/decisions/2026-10-16-sign-in-races.md).
+      await sql.batch([
+        stmt("UPDATE results SET user_id = ? WHERE user_id = ?", owner.id, current.id),
+        stmt(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, owner.id),
+        ...shopMoves(current.id, owner.id),
+        ...lockerMoves(current.id, owner.id),
+        stmt("DELETE FROM sessions WHERE user_id = ?", current.id),
+        ...socialDeletes(current.id),
+        stmt("DELETE FROM users WHERE id = ?", current.id),
+      ]);
     }
     if (kind === "google" && !owner.email && (await adoptGoogleEmail(sql, owner.id, extra.email))) return (await getUser(sql, owner.id))!;
     return owner;
@@ -980,23 +986,24 @@ export async function grantReward(sql: Sql, userId: string, coins: number, crate
   );
 }
 
-/** A guest's items, equipped choices, coins and crates join the account they sign in to (the account's own choices win). */
-async function moveShop(sql: Sql, from: string, to: string): Promise<void> {
-  await sql.run("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from);
-  await sql.run("INSERT OR IGNORE INTO equipped (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped WHERE user_id = ?", to, from);
-  // The coins and crates join the account and leave the guest in one transaction, so two sign-ins at once move them
-  // once: the second finds no guest wallet (docs/decisions/2026-10-16-sign-in-races.md).
-  await sql.batch([
+/**
+ * A guest's items, equipped choices, coins, crates and chat picks join the account they sign in to (the account's own
+ * choices win): the statements, for the sign-in's one batch. The wallet is added up, so it must leave the guest in the
+ * same transaction.
+ */
+function shopMoves(from: string, to: string): Stmt[] {
+  return [
+    stmt("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from),
+    stmt("INSERT OR IGNORE INTO equipped (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped WHERE user_id = ?", to, from),
     stmt(
       "INSERT INTO wallets (user_id, coins, crates) SELECT ?, coins, crates FROM wallets WHERE user_id = ? AND (coins > 0 OR crates > 0) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates",
       to,
       from,
     ),
+    stmt("INSERT OR IGNORE INTO chat_picks (user_id, lines, emoji) SELECT ?, lines, emoji FROM chat_picks WHERE user_id = ?", to, from),
+    stmt("DELETE FROM inventory WHERE user_id = ?", from),
+    stmt("DELETE FROM equipped WHERE user_id = ?", from),
     stmt("DELETE FROM wallets WHERE user_id = ?", from),
-  ]);
-  await sql.run("INSERT OR IGNORE INTO chat_picks (user_id, lines, emoji) SELECT ?, lines, emoji FROM chat_picks WHERE user_id = ?", to, from);
-  await sql.run("DELETE FROM inventory WHERE user_id = ?", from);
-  await sql.run("DELETE FROM equipped WHERE user_id = ?", from);
-  await sql.run("DELETE FROM chat_picks WHERE user_id = ?", from);
-  await moveLocker(sql, from, to);
+    stmt("DELETE FROM chat_picks WHERE user_id = ?", from),
+  ];
 }

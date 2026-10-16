@@ -13,8 +13,9 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   email used only when Google marks it verified.
 - **Signing in keeps what you played as a guest.** A new identity attaches to your current account; one that already
   belongs to an account switches you to it, moves your guest results, items, coins and crates over and deletes the
-  empty guest. The coins and crates move in one transaction, so two sign-ins at once move them once
-  (`sign-in-races.test.ts`; [docs/decisions/2026-10-16-sign-in-races.md](../decisions/2026-10-16-sign-in-races.md)).
+  empty guest. That whole merge is one batch (one transaction): two sign-ins at once move the coins once, a buy in
+  another tab lands wholly before it or wholly after, and a failure moves nothing (`sign-in-races.test.ts`;
+  [docs/decisions/2026-10-16-sign-in-races.md](../decisions/2026-10-16-sign-in-races.md)).
 - **Sign-in buttons appear only once their secrets are set** (`/api/auth/config`): `GOOGLE_CLIENT_ID` /
   `GOOGLE_CLIENT_SECRET` for Google, `RESEND_API_KEY` for email. They live in the account's Secrets Store (bound in
   `wrangler.jsonc`, `secrets_store_secrets`); `withSecrets()` reads them from the store or as Worker secrets.
@@ -67,7 +68,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 ## Data stored by friends (for the privacy page and account deletion)
 
 Every row is about two accounts; `deleteSocial(sql, userId)` (`friends.ts`) deletes an account's rows on both sides.
-A guest's merge into the account it signs in to calls it, and so does deleting an account (`account-data.ts`, whose
+A guest's merge into the account it signs in to runs its statements (`socialDeletes`), and so does deleting an account (`account-data.ts`, whose
 download has the account's own rows: friends, requests sent and received, blocks made, invites, the caps' counts). The privacy
 policy's "Friends" entry (`screens/Legal.tsx`) says the same in plain words.
 

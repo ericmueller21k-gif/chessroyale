@@ -1,11 +1,14 @@
-import { describe, expect, it } from "vitest";
-import { createGuest, ensureSchema, grantReward, shopState, signInWithIdentity, startEmailCode, verifyEmailCode } from "../src/accounts.ts";
+import { describe, expect, it, vi } from "vitest";
+import { shopItem } from "@chessroyale/core";
+import { buyItem, createGuest, ensureSchema, grantReward, shopState, signInWithIdentity, startEmailCode, stmt, verifyEmailCode, type Sql } from "../src/accounts.ts";
 import { memoryDb } from "./memory-db.ts";
 
 /**
- * Sign-ins at once (docs/decisions/2026-10-16-sign-in-races.md): a guest's wallet joins the account exactly once, and
- * an email code works once and allows its tries, however many requests arrive together.
+ * Sign-ins at once (docs/decisions/2026-10-16-sign-in-races.md): a guest's merge into an account is one transaction,
+ * so its wallet joins the account exactly once and a buy can't land halfway; an email code works once and allows its
+ * tries, however many requests arrive together. Prices count here, so SHOP_FREE is off.
  */
+vi.mock("@chessroyale/core", async (orig) => ({ ...(await orig<typeof import("@chessroyale/core")>()), SHOP_FREE: false }));
 
 async function setup() {
   const { sql, db } = memoryDb();
@@ -39,6 +42,68 @@ describe("a guest signing in to an existing account", () => {
     const { user: empty } = await createGuest(sql, 1300, "Guest");
     await signInWithIdentity(sql, empty, "email", "other@example.com", {}, 1400);
     expect(wallet(other.id)).toBeNull();
+  });
+
+  it("a buy in another tab lands wholly before the merge (the item and the charge move) or wholly after (no charge)", async () => {
+    const item = "king-storm";
+    const price = shopItem(item)!.price;
+    /** The guest signs in while, in another tab, the whole buy runs just before the sign-in's step `at` (or after it). */
+    async function buyDuringSignIn(at: number) {
+      const { sql, db, wallet } = await setup();
+      const owner = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, 1000);
+      const { user: guest } = await createGuest(sql, 1100, "Guest");
+      await grantReward(sql, guest.id, price, 0);
+      let steps = 0;
+      let bought: Awaited<ReturnType<typeof buyItem>> | null = null;
+      const step = async () => {
+        if (steps++ === at) bought = await buyItem(sql, guest.id, item, 1150);
+      };
+      const tab: Sql = {
+        async run(q, ...p) {
+          await step();
+          return sql.run(q, ...p);
+        },
+        async first(q, ...p) {
+          await step();
+          return sql.first(q, ...p);
+        },
+        async all(q, ...p) {
+          await step();
+          return sql.all(q, ...p);
+        },
+        async batch(list) {
+          await step();
+          return sql.batch(list);
+        },
+      };
+      await signInWithIdentity(tab, guest, "email", "owner@example.com", {}, 1200);
+      bought ??= await buyItem(sql, guest.id, item, 1300);
+      const left = db.prepare("SELECT (SELECT COUNT(*) FROM inventory WHERE user_id = ?1) + (SELECT COUNT(*) FROM wallets WHERE user_id = ?1) AS n").get(guest.id);
+      return { steps, bought, shop: await shopState(sql, owner.id), wallet: wallet(owner.id), left };
+    }
+    const { steps } = await buyDuringSignIn(Infinity);
+    for (let at = 0; at <= steps; at++) {
+      const r = await buyDuringSignIn(at);
+      // Bought: the item is the account's, paid for. Not: no item, and every coin moved.
+      if (r.bought.ok) expect([at, r.shop.owned.includes(item), r.shop.coins]).toEqual([at, true, 0]);
+      else expect([at, r.bought.message, r.shop.owned.includes(item), r.shop.coins]).toEqual([at, "Not enough coins.", false, price]);
+      expect(r.left).toEqual({ n: 0 });
+    }
+  });
+
+  it("a merge that fails moves nothing: the whole merge is the one batch", async () => {
+    const { sql, db, wallet } = await setup();
+    const owner = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, 1000);
+    const { user: guest } = await createGuest(sql, 1100, "Guest");
+    await grantReward(sql, guest.id, 100, 0);
+    await sql.run("INSERT INTO inventory (user_id, item_id, acquired_at) VALUES (?, 'king-storm', 1150)", guest.id);
+    const failing: Sql = { ...sql, batch: (list) => sql.batch([...list, stmt("INSERT INTO nowhere VALUES (1)")]) };
+    await expect(signInWithIdentity(failing, guest, "email", "owner@example.com", {}, 1200)).rejects.toThrow();
+    expect(wallet(guest.id)).toEqual({ coins: 100, crates: 0 });
+    expect(wallet(owner.id)).toBeNull();
+    expect((await shopState(sql, guest.id)).owned).toContain("king-storm");
+    expect((await shopState(sql, owner.id)).owned).not.toContain("king-storm");
+    expect(db.prepare("SELECT COUNT(*) AS n FROM users WHERE id = ?").get(guest.id)).toEqual({ n: 1 });
   });
 });
 
