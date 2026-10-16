@@ -38,6 +38,9 @@ function memorySql(): Sql {
     async all(sql, ...p) {
       return db.prepare(sql).all(...(p as never[])) as never;
     },
+    async batch(statements) {
+      for (const s of statements) db.prepare(s.sql).run(...(s.params as never[]));
+    },
   };
 }
 
@@ -50,7 +53,11 @@ function memoryD1(): D1Database {
     first: async () => db.prepare(sql).get(...(params as never[])) ?? null,
     all: async () => ({ results: db.prepare(sql).all(...(params as never[])) }),
   });
-  return { prepare: (sql: string) => stmt(sql) } as unknown as D1Database;
+  return {
+    prepare: (sql: string) => stmt(sql),
+    // (Each statement runs as it's called, in order, so nothing comes between them.)
+    batch: async (stmts: { run(): Promise<unknown> }[]) => Promise.all(stmts.map((s) => s.run())),
+  } as unknown as D1Database;
 }
 
 describe("accounts", () => {

@@ -39,7 +39,16 @@ export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
   first<T>(sql: string, ...params: unknown[]): Promise<T | null>;
   all<T>(sql: string, ...params: unknown[]): Promise<T[]>;
+  /** Runs statements as one transaction: all of them or none (D1's batch). */
+  batch(statements: readonly Stmt[]): Promise<void>;
 }
+
+/** A statement for `Sql.batch`. */
+export interface Stmt {
+  sql: string;
+  params: unknown[];
+}
+export const stmt = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
 
 /** The SQL interface over a D1 binding. */
 export function d1Sql(db: D1Database): Sql {
@@ -55,6 +64,10 @@ export function d1Sql(db: D1Database): Sql {
     async all(sql, ...params) {
       countD1(sql);
       return (await db.prepare(sql).bind(...params).all()).results as never;
+    },
+    async batch(statements) {
+      for (const s of statements) countD1(s.sql);
+      if (statements.length) await db.batch(statements.map((s) => db.prepare(s.sql).bind(...s.params)));
     },
   };
 }
@@ -500,15 +513,18 @@ export async function startEmailCode(sql: Sql, email: string, now: number): Prom
 
 /** Checks a code; it works once, for 10 minutes, with 5 tries. */
 export async function verifyEmailCode(sql: Sql, email: string, code: string, now: number): Promise<boolean> {
-  const row = await sql.first<{ code_hash: string; expires_at: number; attempts: number }>(
-    "SELECT code_hash, expires_at, attempts FROM email_codes WHERE email = ?",
+  // One statement, so checks at once can't share a code or a try (docs/decisions/2026-10-16-sign-in-races.md): it
+  // counts the try while the code is live with tries left, and uses the code up if it's right. Only the check whose
+  // statement used it up gets in.
+  const row = await sql.first<{ used: number }>(
+    `UPDATE email_codes SET attempts = attempts + 1, expires_at = CASE WHEN code_hash = ? THEN 0 ELSE expires_at END
+     WHERE email = ? AND expires_at >= ? AND attempts < ? RETURNING expires_at = 0 AS used`,
+    await sha256(`${email}:${String(code).trim()}`),
     email,
+    now,
+    MAX_ATTEMPTS,
   );
-  if (!row || row.expires_at < now || row.attempts >= MAX_ATTEMPTS) return false;
-  const ok = row.code_hash === (await sha256(`${email}:${String(code).trim()}`));
-  if (ok) await sql.run("UPDATE email_codes SET expires_at = 0 WHERE email = ?", email);
-  else await sql.run("UPDATE email_codes SET attempts = attempts + 1 WHERE email = ?", email);
-  return ok;
+  return row?.used === 1;
 }
 
 // ---------------- Results and profiles ----------------
@@ -946,19 +962,19 @@ export async function grantReward(sql: Sql, userId: string, coins: number, crate
 async function moveShop(sql: Sql, from: string, to: string): Promise<void> {
   await sql.run("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from);
   await sql.run("INSERT OR IGNORE INTO equipped (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped WHERE user_id = ?", to, from);
-  const wallet = await sql.first<{ coins: number; crates: number | null }>("SELECT coins, crates FROM wallets WHERE user_id = ?", from);
-  if ((wallet?.coins ?? 0) > 0 || (wallet?.crates ?? 0) > 0) {
-    await sql.run(
-      "INSERT INTO wallets (user_id, coins, crates) VALUES (?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates",
+  // The coins and crates join the account and leave the guest in one transaction, so two sign-ins at once move them
+  // once: the second finds no guest wallet (docs/decisions/2026-10-16-sign-in-races.md).
+  await sql.batch([
+    stmt(
+      "INSERT INTO wallets (user_id, coins, crates) SELECT ?, coins, crates FROM wallets WHERE user_id = ? AND (coins > 0 OR crates > 0) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates",
       to,
-      wallet?.coins ?? 0,
-      wallet?.crates ?? 0,
-    );
-  }
+      from,
+    ),
+    stmt("DELETE FROM wallets WHERE user_id = ?", from),
+  ]);
   await sql.run("INSERT OR IGNORE INTO chat_picks (user_id, lines, emoji) SELECT ?, lines, emoji FROM chat_picks WHERE user_id = ?", to, from);
   await sql.run("DELETE FROM inventory WHERE user_id = ?", from);
   await sql.run("DELETE FROM equipped WHERE user_id = ?", from);
-  await sql.run("DELETE FROM wallets WHERE user_id = ?", from);
   await sql.run("DELETE FROM chat_picks WHERE user_id = ?", from);
   await moveLocker(sql, from, to);
 }

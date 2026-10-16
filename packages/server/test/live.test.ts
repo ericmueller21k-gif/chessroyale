@@ -20,6 +20,9 @@ function memoryDb() {
     async all(q, ...p) {
       return db.prepare(q).all(...(p as never[])) as never;
     },
+    async batch(statements) {
+      for (const s of statements) db.prepare(s.sql).run(...(s.params as never[]));
+    },
   };
   const stmt = (q: string, params: unknown[] = []) => ({
     bind: (...p: unknown[]) => stmt(q, p),
