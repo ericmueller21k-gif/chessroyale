@@ -1,5 +1,5 @@
 import { CRATES_FREE, crateDef, itemDef, mulberry32, rollCrate, type CrateRoll, type ItemInstance, type ItemLook, type ItemSlot } from "@chessroyale/core";
-import type { Sql } from "./accounts.ts";
+import type { Sql, Stmt } from "./accounts.ts";
 
 /**
  * The locker: crate items a player owns (each with its own color, blemish and seed) and what's equipped in each
@@ -115,9 +115,12 @@ export async function deleteLockerItems(sql: Sql, userId: string, itemIds: unkno
   return { ok: true, locker: await lockerState(sql, userId) };
 }
 
-/** A guest's crate items and choices join the account they sign in to (the account's own choices win). */
-export async function moveLocker(sql: Sql, from: string, to: string): Promise<void> {
-  await sql.run("UPDATE items SET user_id = ? WHERE user_id = ?", to, from);
-  await sql.run("INSERT OR IGNORE INTO equipped_items (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped_items WHERE user_id = ?", to, from);
-  await sql.run("DELETE FROM equipped_items WHERE user_id = ?", from);
-}
+/**
+ * A guest's crate items and choices join the account they sign in to (the account's own choices win): the statements,
+ * for the sign-in's one batch.
+ */
+export const lockerMoves = (from: string, to: string): Stmt[] => [
+  { sql: "UPDATE items SET user_id = ? WHERE user_id = ?", params: [to, from] },
+  { sql: "INSERT OR IGNORE INTO equipped_items (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped_items WHERE user_id = ?", params: [to, from] },
+  { sql: "DELETE FROM equipped_items WHERE user_id = ?", params: [from] },
+];
