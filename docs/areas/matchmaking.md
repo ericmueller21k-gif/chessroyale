@@ -45,7 +45,11 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
   on their accounts (`users.rating`, which the lobby's object reads as each joins: never a number the app sends; none
   yet, or no account: the 1500 prior; docs/decisions/2026-10-16-server-side-rating.md), avoiding the boss most of its
   players met last (each sends theirs on joining).
-- **Ranking today** is the rating on your profile (its rank, chart and "Top N%"); there is no ranked mode yet. A match
+- **Ranked 1 v 1** ([ranked.md](ranked.md)): its own queue (`ranked1v1-default`, the same matchmaker object) of
+  single players paired by the hidden rating (`PAIR_BY_RATING`, core's `pairUp`: the range widens with the wait and
+  the ratings' deviations), each pair a game object of its own (`DuelGame`). Its own rank and tiers; routes under
+  `/api/1v1/`.
+- **Ranking today** (other modes) is the rating on your profile (its rank, chart and "Top N%"). A match
   counts for ranking only if at least `RANKING.rankedMinHumanShare` (30%) of its seats are real players
   (`isRankedMatch`; 30 of a 50 v 50's 100, 15 of a raid's 50). Solo and practice never count (only `online = 1`
   results do, whatever their `ranked`). Stored as
