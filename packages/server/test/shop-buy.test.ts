@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { shopItem } from "@chessroyale/core";
-import { buyItem, createGuest, ensureSchema, grantReward, setChatPicks, shopState } from "../src/accounts.ts";
+import { buyItem, createGuest, ensureSchema, grantReward, setChatPicks, shopState, type Sql } from "../src/accounts.ts";
 import { memoryDb } from "./memory-db.ts";
 
 /**
@@ -59,6 +59,30 @@ describe("buying with coins", () => {
     expect(db.prepare("SELECT COUNT(*) AS n FROM inventory WHERE user_id = ? AND item_id = ?").get(id, item)).toEqual({ n: 1 });
     // Owned already: a no-op success, nothing charged.
     expect((await buyItem(sql, id, item, 1200)).ok).toBe(true);
+    expect((await shopState(sql, id)).coins).toBe(price(item));
+  });
+
+  it("owned by the time the write runs (another device got it): the batch rolls back, no charge, a no-op success", async () => {
+    const item = "king-storm";
+    const { sql, db, id } = await player(price(item));
+    const racing: Sql = {
+      ...sql,
+      async batch(statements) {
+        db.prepare("INSERT INTO inventory (user_id, item_id, acquired_at) VALUES (?, ?, 900)").run(id, item);
+        return sql.batch(statements);
+      },
+    };
+    const got = await buyItem(racing, id, item, 1100);
+    expect(got.ok && got.shop.owned).toContain(item);
+    expect((await shopState(sql, id)).coins).toBe(price(item));
+    expect(db.prepare("SELECT acquired_at FROM inventory WHERE user_id = ? AND item_id = ?").all(id, item)).toEqual([{ acquired_at: 900 }]);
+  });
+
+  it("a write that fails for any other reason: the error, and no charge", async () => {
+    const item = "king-storm";
+    const { sql, id } = await player(price(item));
+    const down: Sql = { ...sql, batch: async () => Promise.reject(new Error("D1 is down")) };
+    await expect(buyItem(down, id, item, 1100)).rejects.toThrow("D1 is down");
     expect((await shopState(sql, id)).coins).toBe(price(item));
   });
 

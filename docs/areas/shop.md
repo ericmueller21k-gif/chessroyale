@@ -10,9 +10,9 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Light the free starter) and chat packs (not equipped: you use every pack you own). Prices in coins; `SHOP_FREE` is
   on (everything free while testing). The pawn hats it used to sell are Beta crate items now (Oct 11, 2026); the shop
   is kept for God King packs and, later, things like boss and attack animations.
-- **Buying with coins is one transaction** (`buyItem`, one D1 batch): the coins come off only if they're still there
-  and the item isn't owned yet, and the item is granted only if they did, so two taps or two devices at once never
-  charge twice or take the coins below zero (`docs/decisions/2026-10-16-atomic-shop-purchase.md`).
+- **Buying with coins is one transaction** (`buyItem`, one D1 batch: all of it or none): the item goes in only if the
+  coins are there (an item owned by then fails the batch), and the coins come off with it, so two taps or two devices
+  at once never charge twice or take the coins below zero (`docs/decisions/2026-10-16-atomic-shop-purchase.md`).
 - **Crates** (`core/crates.ts`): two series, **Beta Crate · Series 001** (listed first; it ships in batches, the plan
   is in the history: complete since Oct 14, 28 items: the Classics, the secret agent, the pirate, the ninja and a
   one-off Smiley Face) and
