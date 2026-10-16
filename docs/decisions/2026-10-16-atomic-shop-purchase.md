@@ -7,7 +7,7 @@ for twice (the grant's `INSERT OR IGNORE` gave it once). Harmless only because `
 to be right before coins are ever spent.
 
 **The fix:** the grant and the charge are one D1 batch, which D1 runs as one transaction: all of it or none
-(`Sql.batch`, the same shape as #240's, so the two merge cleanly).
+(`Sql.batch`, added by #240).
 
 1. `INSERT INTO inventory … SELECT … WHERE EXISTS (the wallet has coins >= price)`: the item goes in only if the
    coins are there. A plain `INSERT`: if the item is owned by then, it fails on the primary key, and the batch fails
