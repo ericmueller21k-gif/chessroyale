@@ -13,6 +13,9 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Light the free starter) and chat packs (not equipped: you use every pack you own). Prices in coins; `SHOP_FREE` is
   on (everything free while testing). The pawn hats it used to sell are Beta crate items now (Oct 11, 2026); the shop
   is kept for God King packs and, later, things like boss and attack animations.
+- **Buying with coins is one transaction** (`buyItem`, one D1 batch: all of it or none): the item goes in only if the
+  coins are there (an item owned by then fails the batch), and the coins come off with it, so two taps or two devices
+  at once never charge twice or take the coins below zero (`docs/decisions/2026-10-16-atomic-shop-purchase.md`).
 - **Crates** (`core/crates.ts`): two series, **Beta Crate · Series 001** (listed first; it ships in batches, the plan
   is in the history: complete since Oct 14, 28 items: the Classics, the secret agent, the pirate, the ninja and a
   one-off Smiley Face) and
@@ -56,7 +59,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 ## Tests and tools
 
 - Unit: `packages/core/test/crates.test.ts`, `bot-looks.test.ts`, `packages/server/test/accounts.test.ts`,
-  `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`, `icon-pixels.test.ts`.
+  `shop-buy.test.ts` (buying with coins, `SHOP_FREE` off), `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`,
+  `icon-pixels.test.ts`.
 - e2e: `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts`.
 - The Fischer Random banner (`.fischer-stage` in styles.css): its band slants but the words stay level, so its padding
   must clear the words' ends (about 0.06 of their width); `crate-banner.spec.ts` measures that every frame.
