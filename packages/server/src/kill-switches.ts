@@ -4,7 +4,7 @@ import { allPausable, bossesOff, pausedLine, pauseVariable, type Pausable } from
  * The kill switches and the maintenance banner, read from the Worker's runtime variables (docs/areas/ops.md, "Kill
  * switches"; the parts and their lines: pauses.ts in core). Everything reads them through here.
  *   - `PAUSE_<NAME>` = "1" (or true, yes, on; a JSON true or 1) rests that part: PAUSE_CLASSIC, PAUSE_CROWD, PAUSE_RAID, PAUSE_SQUADS,
- *     PAUSE_SOLO, PAUSE_SHOP, PAUSE_FRIENDS, PAUSE_BOSS_<ID> (the roster id: PAUSE_BOSS_PIG is Wrangler). Unset, "0" or anything else: on.
+ *     PAUSE_SOLO, PAUSE_SHOP, PAUSE_FRIENDS, PAUSE_RANKED1V1, PAUSE_BOSS_<ID> (the roster id: PAUSE_BOSS_PIG is Wrangler). Unset, "0" or anything else: on.
  *   - `MAINTENANCE_BANNER`: a short message at the top of every screen while it's set (at most 200 characters).
  * Read at most once a minute (CACHE_MS) for each Worker instance's environment object. Changing a variable in the
  * dashboard deploys a new version of the Worker, whose instances start with nothing cached, so in practice a change

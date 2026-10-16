@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./node": "./src/node.ts",
     "./squads": "./src/squads/index.ts",
+    "./duel": "./src/duel/index.ts",
     "./data/*": "./data/*"
   },
   "dependencies": {

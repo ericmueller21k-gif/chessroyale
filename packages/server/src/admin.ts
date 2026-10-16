@@ -15,6 +15,7 @@ import { DELETED_NAME, d1Sql, ensureSchema, userFromToken, type Sql, type User }
 import { SESSION_COOKIE, readCookie, type AccountEnv } from "./api.ts";
 import { caseOf, decide, decideAppeal, purgeEvidence, type Appeal, type Case, type CaseMailer } from "./fairplay.ts";
 import { deepCheckRun, type DeepSearch } from "./fairplay-deep.ts";
+import { checkDuelGames, duelEvidence } from "./fairplay-duel.ts";
 import { chatModDetail, decideChat, type ChatLogRow } from "./chat-mod.ts";
 import { liveHub } from "./live-hub.ts";
 
@@ -199,6 +200,8 @@ export interface CaseDetail {
   appeals: Appeal[];
   /** Accounts that played online from the same device markers. */
   sameDevice: { id: string; name: string; status: string | null }[];
+  /** Their kept ranked 1 v 1 games, newest first, each with the engine's check if a person asked for one (fairplay-duel.ts). */
+  duels: Awaited<ReturnType<typeof duelEvidence>>;
 }
 
 /** Everything about one case: the player, reports, each match's signals and judged picks, the log and appeals. */
@@ -257,6 +260,7 @@ export async function caseDetail(sql: Sql, userId: string, opts: { email: boolea
     log,
     appeals,
     sameDevice,
+    duels: await duelEvidence(sql, userId),
   };
 }
 
@@ -337,7 +341,9 @@ export async function handleAdmin(
       if (!deepSearch) note = "The engine server isn't available here.";
       else {
         const d = await deepCheckRun(sql, deepSearch, now, { all: true, userId: m[1]!, mail, perRun: 60 });
-        note = `Deep re-check: ${d.searches} searches, ${d.matches} matches done.`;
+        // Then their ranked 1 v 1 games, with what's left of this press's 60 searches (and of the day's budget).
+        const g = await checkDuelGames(sql, deepSearch, m[1]!, now, Math.max(0, 60 - d.searches));
+        note = `Deep re-check: ${d.searches} searches, ${d.matches} matches done. 1 v 1: ${g.searches} searches, ${g.games} games done.`;
       }
     } else {
       const r =
@@ -445,6 +451,21 @@ ${chat.log.length ? `<div class="card scroll"><table><tr><th>When</th><th>Decisi
     .join("")}</table></div>` : ""}`;
 }
 
+/** One ranked 1 v 1 game on the case page: who, how it ended, and the engine's check of the player's moves (if made). */
+function duelCard(g: CaseDetail["duels"][number]): string {
+  const s = g.summary;
+  const head = `<b>1 v 1</b> ${esc(g.id.slice(0, 5))}${g.reported ? ' <span class="pill review">reported</span>' : ""} · ${when(g.endedAt)} · ${g.color === "w" ? "White" : "Black"} against <a href="/admin/fairplay/case/${esc(g.opponent.id)}">${esc(g.opponent.name)}</a> · ${esc(g.control)} · ${esc(g.result)} (${esc(g.reason)}) · ${g.moves} plies`;
+  const sum = g.check
+    ? `<br>Engine check${g.check.done ? "" : " (part done)"}: the engine's best on <b>${s.best}</b> of ${s.checked} moves checked · average loss <b>${s.avgLoss ?? "–"}</b> · plays like <b>${s.strength ?? "–"}</b>`
+    : '<br><span class="muted">Not checked yet.</span>';
+  const rows = g.check?.moves.length
+    ? `<details><summary>Moves</summary><div class="scroll"><table><tr><th>Ply</th><th>Pick</th><th>Engine's best</th><th>Rank</th><th>Loss</th><th>Think</th></tr>${g.check.moves
+        .map((m) => `<tr class="${m.rank === 1 ? "hard" : ""}"><td>${m.ply + 1}</td><td>${esc(m.move)}</td><td>${esc(m.best)}</td><td>${m.rank}</td><td>${m.loss}</td><td>${(m.thinkMs / 1000).toFixed(1)} s</td></tr>`)
+        .join("")}</table></div></details>`
+    : "";
+  return `<div class="card">${head}${sum}${rows}</div>`;
+}
+
 function casePage(d: CaseDetail, note: string | null, chat: { block: ChatBlock | null; log: ChatLogRow[] }): string {
   const c = d.case;
   const openAppeal = d.appeals.find((a) => a.status === "open");
@@ -478,6 +499,7 @@ ${note ? `<div class="card">${esc(note)}</div>` : ""}
 ${appealForm}
 <h2>Decide</h2>${decision}
 <form class="row" method="post"><button name="action" value="deep">Check the counted moves with the engine server now</button></form>
+<p class="muted">The button checks their 1 v 1 games too (below), reported ones first, within the day's budget: each move against every legal move, in groups of 8 (about 5 searches a move, so a press covers about 12 moves).</p>
 <p class="muted">Hard positions (fewer than ${Math.round(FAIRPLAY.signals.hardShare * 100)}% of the crowd found the best move) are in bold; grayed rows don't count (opening, forced, obvious, decided, power-up).</p>
 ${chatSection(d.player.id, chat)}
 ${d.sameDevice.length ? `<h2>Same device</h2><p>${d.sameDevice.map((u) => `<a href="/admin/fairplay/case/${esc(u.id)}">${esc(u.name)}</a> (${esc(u.status ?? "no case")})`).join(", ")}</p>` : ""}
@@ -485,6 +507,7 @@ ${d.sameDevice.length ? `<h2>Same device</h2><p>${d.sameDevice.map((u) => `<a hr
     .map((r) => `<tr><td>${when(r.at)}</td><td>${esc(r.reason)}</td><td>${esc(r.match ?? "profile")}</td><td><a href="/admin/fairplay/case/${esc(r.reporter.id)}">${esc(r.reporter.name)}</a>${r.reporter.signedIn ? "" : " (guest)"}</td></tr>`)
     .join("")}</table></div>` : '<p class="muted">None.</p>'}
 <h2>Matches (${d.matches.length})</h2>${d.matches.map(match).join("") || '<p class="muted">No online matches recorded.</p>'}
+<h2>1 v 1 games (${d.duels.length})</h2>${d.duels.map(duelCard).join("") || '<p class="muted">None kept.</p>'}
 <h2>Appeals</h2>${d.appeals.map((a) => `<div class="card">${when(a.at)} · <b>${esc(a.status)}</b>${a.decided_by ? ` by ${esc(a.decided_by)}` : ""}<p>${esc(a.text)}</p>${a.reply ? `<p class="muted">Reply: ${esc(a.reply)}</p>` : ""}</div>`).join("") || '<p class="muted">None.</p>'}
 <h2>Log</h2><div class="card scroll"><table><tr><th>When</th><th>Action</th><th>By</th><th>Reason</th></tr>${d.log
     .map((l) => `<tr><td>${when(l.at)}</td><td>${esc(l.action)}</td><td>${esc(l.by)}</td><td class="wrap">${esc(l.reason)}</td></tr>`)

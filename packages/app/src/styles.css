@@ -8241,6 +8241,14 @@ button.fd-logo {
   padding-left: 4px;
 }
 
+/* Home, 1 v 1 picked: your rank in it, under the row (in the Matchmaking row's place). */
+.fd-rank1v1 {
+  margin: -6px 0 -4px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fd-sub);
+}
 /* -- Boss raid: its card on home and its screen (Eric, Oct 16; rd- for raid) -- */
 .rd-card {
   display: flex;
@@ -10051,6 +10059,7 @@ button.fd-seat {
   stroke-linejoin: round;
 }
 .qto {
+  flex: none;
   display: flex;
   height: 20px;
   margin-left: 6px;
@@ -10073,6 +10082,25 @@ button.fd-seat {
 .qto button.on {
   background: var(--accent);
   color: #1a1406;
+}
+/* A phone's split is narrow: 133 px at 320 wide, 168 at 390, where the switch at its full size needs 171 with the header's
+   two buttons. So in the split the switch leads (no title), tighter, a little taller, and the buttons beside it 28 px: it
+   read "TEAM | AI" at 360. */
+.qchat-split .qhead:has(> .qto) {
+  gap: 0;
+  padding-left: 4px;
+}
+.qchat-split .qto {
+  height: 24px;
+  margin-left: 0;
+}
+.qchat-split .qto button {
+  min-width: 30px;
+  padding: 0 4px;
+  letter-spacing: 0.02em;
+}
+.qchat-split .qhead-btn {
+  width: 28px;
 }
 .qunread {
   flex: none;
@@ -15779,4 +15807,432 @@ button.sq-tiny {
   text-align: center;
   font-size: 13px;
   color: var(--fd-muted);
+}
+
+/* ---- Ranked 1 v 1 (screens/Duel.tsx, components/DuelVote.tsx; classes dv-) ---- */
+
+/* The search: centered in the home screen's frame, like every queue. */
+.dv-search {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px var(--gutter);
+  text-align: center;
+}
+.dv-search h2 {
+  font-family: "Archivo Black", "Archivo", sans-serif;
+  font-size: 28px;
+  margin: 0;
+}
+.dv-sub {
+  margin: -8px 0 0;
+}
+.dv-search-line {
+  font-weight: 700;
+  margin: 4px 0 0;
+}
+.dv-wait {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.dv-few {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--fd-panel-2);
+  border: 1px solid var(--fd-line);
+  width: min(100%, 360px);
+}
+.dv-few-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.dv-few-actions .btn {
+  flex: 1 1 140px;
+}
+.dv-cancel {
+  min-width: 160px;
+}
+
+/* A rank: a small pill in the tier's color. */
+.dv-rank {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 18px;
+  white-space: nowrap;
+  color: var(--rank, var(--muted));
+  border: 1px solid color-mix(in srgb, var(--rank, var(--muted)) 55%, transparent);
+  background: color-mix(in srgb, var(--rank, var(--muted)) 12%, transparent);
+}
+
+/* The versus moment (a placeholder for its art). */
+.dv-versus {
+  gap: 14px;
+}
+.dv-vs-head {
+  font-family: "Archivo Black", "Archivo", sans-serif;
+  font-size: 22px;
+  margin: 0;
+}
+.dv-vs-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+.dv-vs-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 0;
+  max-width: 170px;
+}
+.dv-vs-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dv-vs-word {
+  font-family: "Archivo Black", "Archivo", sans-serif;
+  font-size: 26px;
+  color: var(--accent);
+}
+
+/* The game: the board between the two players' strips, the same width as the board. */
+.screen.game.duel-screen {
+  --dv-w: min(100%, calc(var(--app-h) - 350px));
+}
+.screen.game.duel-screen .board-area .board-wrap {
+  width: var(--dv-w);
+  min-width: 220px;
+}
+.dv-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.dv-title h1 {
+  font-size: 18px;
+  margin: 0;
+  white-space: nowrap;
+}
+.dv-control {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dv-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: var(--dv-w);
+  min-width: 220px;
+  height: 34px;
+  box-sizing: border-box;
+}
+.dv-strip-pawn {
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+.dv-strip-who {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+.dv-name {
+  font-weight: 800;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dv-strip .dv-rank {
+  flex: none;
+  font-size: 11px;
+  line-height: 16px;
+  padding: 0 6px;
+}
+.dv-away {
+  flex: none;
+  font-size: 11px;
+  color: var(--bad);
+  font-weight: 700;
+}
+/* The clock: always here, in chess's own style (m:ss, the last ten seconds in tenths). */
+.dv-clock {
+  flex: none;
+  min-width: 72px;
+  text-align: center;
+  font: 800 20px/30px "Archivo", sans-serif;
+  font-variant-numeric: tabular-nums;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.dv-clock.on {
+  background: var(--text);
+  color: var(--bg);
+}
+.dv-clock.low {
+  color: var(--bad);
+}
+.dv-clock.on.low {
+  background: var(--bad);
+  color: #fff;
+}
+
+.dv-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.dv-status {
+  margin: 0;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.2;
+}
+.dv-status.mine {
+  color: var(--text);
+}
+.btn.dv-small {
+  min-height: 40px;
+  font-size: 15px;
+  padding: 0 14px;
+}
+.dv-draw {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
+}
+.dv-draw-sent {
+  margin: 0;
+}
+.dv-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  max-width: 420px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  text-align: center;
+  box-sizing: border-box;
+}
+.dv-result-title {
+  font-family: "Archivo Black", "Archivo", sans-serif;
+  font-size: 19px;
+}
+.dv-result.won .dv-result-title {
+  color: var(--good);
+}
+.dv-result.lost .dv-result-title {
+  color: var(--bad);
+}
+.dv-result-why {
+  margin: 0;
+  color: var(--muted);
+}
+.dv-result-rank {
+  font-weight: 800;
+}
+.dv-result-coins {
+  font-weight: 800;
+  color: var(--accent);
+}
+.dv-result-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  width: 100%;
+}
+.dv-result-actions .btn {
+  flex: 1 1 0;
+  min-height: 40px;
+  font-size: 16px;
+}
+.dv-chat {
+  min-height: 0;
+}
+.dv-chat > .qchat {
+  flex: 1 1 auto;
+}
+
+/* Phones: one locked screen; the chat takes what's left under the panel. */
+@media (max-width: 899px) and (min-height: 520px) {
+  /* The chat fills what's left under the board, never less than its header, a line of the feed and its buttons. A
+     phone's game screen is locked while the game is played; once it's over, the result card can push the chat below
+     the fold on a short phone, so the screen scrolls then rather than clipping it. */
+  .screen.game.duel-screen .dv-chat {
+    flex: 1 0 0;
+    min-height: 140px;
+    margin: 0 10px;
+  }
+  .screen.game.duel-screen.over {
+    overflow-y: auto;
+  }
+  .screen.game.duel-screen .dv-panel {
+    padding: 0 10px;
+  }
+}
+/* A computer: the board's column (title, strips, board), the panel and the chat beside it. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game.duel-screen {
+    --dv-w: min(100%, calc(var(--app-h) - 250px));
+  }
+  .screen.game.duel-screen .dv-chat {
+    grid-column: 2;
+    grid-row: 4;
+    height: 320px;
+  }
+}
+
+/* The vote on the board: both pawns a little bigger than a crowd's, the other player's solid enough to follow. */
+.vote-layer.dv-vote {
+  --vp: 10.5%;
+  --vp-me: 11.5%;
+}
+.vote-layer.dv-vote .vote-pawn:not(.vote-me) {
+  opacity: 0.85;
+}
+.dv-labels {
+  z-index: 4;
+}
+/* Each zone's control, on its far edge (from your side): one short line, clear of both pawns. */
+.dv-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 0 6px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-size: calc(var(--board-size) * 0.034);
+  font-weight: 800;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+.dv-label.mine {
+  background: #3b82f6;
+}
+/* "Timer: Blitz 3+2": a line over the board after the vote, not a banner. */
+.dv-overlay {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 7;
+  transform: translate(-50%, -50%);
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.74);
+  color: #fff;
+  font-weight: 900;
+  font-size: clamp(18px, 5.5vw, 26px);
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: dv-overlay-in 180ms ease-out;
+}
+@keyframes dv-overlay-in {
+  from {
+    scale: 0.92;
+  }
+}
+
+/* A pawn vote's first-time hint (components/VoteHint.tsx): a short box, placed by its caller. (Not `.vote-hint`: that is
+   Crowd's line above the vote board, Vote.tsx.) */
+.first-vote-hint {
+  max-width: 92%;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+}
+/* 1 v 1's: at the foot of the board, under your pawn, pointing up at it. */
+.first-vote-hint.dv-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 2.5%;
+  z-index: 8;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.first-vote-hint.dv-hint::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  translate: -50% 0;
+  border: 6px solid transparent;
+  border-top: none;
+  border-bottom-color: var(--accent);
+}
+/* The Crowd's and Squads' pre-game votes: the first-time hint just above the zones (ranks 4-5, the board's middle),
+   its arrow pointing down at them. */
+.first-vote-hint.vh-zones {
+  position: absolute;
+  left: 50%;
+  bottom: calc(62.5% + 8px);
+  z-index: 8;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.first-vote-hint.vh-zones::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  translate: -50% 0;
+  border: 6px solid transparent;
+  border-bottom: none;
+  border-top-color: var(--accent);
+}
+/* A profile's 1 v 1 section: the rank, big, and the record. */
+.dv-profile-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.dv-rank.dv-rank-big {
+  font-size: 15px;
+  line-height: 24px;
+  padding: 1px 12px;
+}
+.dv-record {
+  color: var(--fd-sub);
+  font-weight: 600;
 }

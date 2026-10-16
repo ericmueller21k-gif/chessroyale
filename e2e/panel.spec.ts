@@ -185,3 +185,55 @@ test("solo Crowd (no chat): the scoreboard alone, full width, folds to its heade
   await tap(page, "Show the leaderboard");
   await expectShowing(page, { layout: "board", open: true }, "solo, opened");
 });
+
+test("the split chat's Team / All switch: both labels whole at 320, 360 and 390 px, no sideways scroll", async ({ browser }) => {
+  // (It read "TEAM | AI" at 360 px: the switch shrank to the room its header had left.)
+  test.setTimeout(4 * 60_000);
+  test.skip(test.info().project.name !== "phone", "a phone's layout");
+  const p = await (await browser.newContext({ ...devices["iPhone 13"], browserName: undefined } as any)).newPage();
+  await named(p, "Switcher");
+  await p.goto("/?debug&pool=switch");
+  await p.getByRole("button", { name: "PLAY", exact: true }).click();
+  await expect.poll(() => p.evaluate(() => (window as any).match?.chat?.enabled ?? false), { timeout: 90_000 }).toBe(true);
+  await expect.poll(() => phase(p), { timeout: 90_000 }).toMatch(/play|watching/);
+  for (const width of [390, 360, 320]) {
+    await p.setViewportSize({ width, height: 664 });
+    await expect(p.locator(".under-board.ub-split .qchat-split .qto")).toBeVisible();
+    // (Two frames: the layout settles after the resize.)
+    await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const v = await p.evaluate(() => {
+      const box = (e: Element) => {
+        const r = e.getBoundingClientRect();
+        return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, h: r.height };
+      };
+      const panel = document.querySelector(".qchat-split")!;
+      const sw = panel.querySelector(".qto")!;
+      return {
+        panel: box(panel),
+        sw: box(sw),
+        buttons: [...sw.querySelectorAll("button")].map((b) => ({ text: b.textContent, box: box(b), spill: b.scrollWidth - b.clientWidth })),
+        heads: [...panel.querySelectorAll(".qhead button")].map((b) => ({ label: b.getAttribute("aria-label") ?? b.textContent, box: box(b) })),
+        scroll: document.documentElement.scrollWidth - window.innerWidth,
+      };
+    });
+    const where = `${width} px: ${JSON.stringify(v)}`;
+    expect(v.scroll, where).toBeLessThanOrEqual(0);
+    expect(v.buttons.map((b) => b.text), where).toEqual(["Team", "All"]);
+    for (const b of v.buttons) {
+      // The label whole in its button, the button whole in the switch, the switch whole in the panel.
+      expect(b.spill, where).toBeLessThanOrEqual(0);
+      expect(b.box.l, where).toBeGreaterThanOrEqual(v.sw.l - 0.5);
+      expect(b.box.r, where).toBeLessThanOrEqual(v.sw.r + 0.5);
+      expect(b.box.w, `${where}: a tap target`).toBeGreaterThanOrEqual(30);
+      expect(b.box.h, `${where}: a tap target`).toBeGreaterThanOrEqual(22);
+    }
+    expect(v.sw.l, where).toBeGreaterThanOrEqual(v.panel.l);
+    expect(v.sw.r, where).toBeLessThanOrEqual(v.panel.r);
+    // The header's other buttons whole in the panel too, never over the switch.
+    for (const h of v.heads.filter((h) => !v.buttons.some((b) => b.box.l === h.box.l))) {
+      expect(h.box.r, where).toBeLessThanOrEqual(v.panel.r + 0.5);
+      expect(Math.min(h.box.w, h.box.h), `${where}: a tap target`).toBeGreaterThanOrEqual(28);
+      expect(h.box.l >= v.sw.r - 0.5 || h.box.r <= v.sw.l + 0.5, where).toBe(true);
+    }
+  }
+});

@@ -19,6 +19,7 @@ import { FriendsLine } from "../components/Friends.tsx";
 import { testParams } from "../test-switches.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
+import { ranked1v1Label } from "../ranked.ts";
 
 const MODE_KEY = "brc.mode";
 
@@ -562,8 +563,8 @@ export function HomeScreen({
   useEffect(() => {
     if (joinCode) setFriends(true);
   }, [joinCode]);
-  // What PLAY would start, if it's resting: Squads, Solo (you and bots), or 50 v 50 online. (1 v 1: its own, once it has one.)
-  const resting = mode === "squads" ? rest("squads") : mode === "1v1" ? null : type === "solo" ? rest("solo") : mode === "crowd" ? rest("crowd") : null;
+  // What PLAY would start, if it's resting: Squads, 1 v 1 (PAUSE_RANKED1V1), Solo (you and bots), or 50 v 50 online.
+  const resting = mode === "squads" ? rest("squads") : mode === "1v1" ? rest("ranked1v1") : type === "solo" ? rest("solo") : mode === "crowd" ? rest("crowd") : null;
   const soloResting = rest("solo");
   const play = () => {
     if (resting) return;
@@ -744,14 +745,17 @@ export function HomeScreen({
       </div>
     </div>
   );
-  // Under the row: Squads' Party, 50 v 50's Matchmaking; nothing for 1 v 1 (always people, one tap to queue).
+  // Under the row: Squads' Party, 50 v 50's Matchmaking; for 1 v 1 (always people, one tap to queue) your rank in it.
+  const rank1v1 = mode === "1v1" ? ranked1v1Label() : null;
   const under =
     mode === "squads" ? (
       <button type="button" class="fd-btn sq-party-btn" onClick={onParty}>
         Party
         <span>{resting ?? `Play with up to ${SQUADS.partyMax - 1} friends in one squad · create one or join by code`}</span>
       </button>
-    ) : mode === "1v1" ? null : (
+    ) : mode === "1v1" ? (
+      rank1v1 && <p class="fd-rank1v1">Your rank: {rank1v1}</p>
+    ) : (
       <>
         <div class="fd-types-row">
           <div class="fd-modes fd-types" role="radiogroup" aria-label="Matchmaking">

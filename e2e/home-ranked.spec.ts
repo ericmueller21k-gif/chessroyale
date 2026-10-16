@@ -65,19 +65,52 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
   }
 });
 
-test("1 v 1: picked, nothing under the row (always people), its line under PLAY, remembered; PLAY goes to its queue (/1v1)", async ({ page }) => {
+test("1 v 1: picked, your rank under the row (whole at 320 px, even the longest), its line under PLAY, remembered; PLAY queues at once (/1v1)", async ({ page }) => {
   await named(page, "Duel");
-  await page.goto("/");
+  await page.goto(`/?pool=home1v1-${test.info().project.name}-${run}`);
   await page.getByRole("radio", { name: /^1 v 1/ }).click();
   await expect(page.getByRole("radio", { name: /^1 v 1/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("radiogroup", { name: "Matchmaking" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Party/ })).toHaveCount(0);
   await expect(page.locator(".fd-hint")).toHaveText("Ranked chess vs one player near your level");
+  // Your rank (the server's: a new account is in its placements), under the row.
+  await expect(page.locator(".fd-rank1v1")).toHaveText(/^Your rank: Placement 0\/5$/);
+  const row = (await page.getByRole("radiogroup", { name: "RANKED" }).boundingBox())!;
+  const rank = (await page.locator(".fd-rank1v1").boundingBox())!;
+  const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
+  expect(rank.y).toBeGreaterThanOrEqual(row.y + row.height);
+  expect(rank.y + rank.height).toBeLessThanOrEqual(play.y);
   await page.reload();
   await expect(page.getByRole("radio", { name: /^1 v 1/ })).toHaveAttribute("aria-checked", "true");
   expect(await sideways(page)).toBe(0);
+  // PLAY: the 1 v 1 queue at once (startRanked1v1), its address /1v1; Cancel is home.
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
-  await expect.poll(() => new URL(page.url()).pathname).toBe("/1v1");
+  await expect(page.locator(".dv-search-line")).toContainText("Finding an opponent");
+  expect(new URL(page.url()).pathname).toBe("/1v1");
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("radio", { name: /^1 v 1/ })).toHaveAttribute("aria-checked", "true");
+});
+
+test("1 v 1's rank line at its widest (an apex rank with four-digit points) stays one whole line from 320 px", async ({ page }) => {
+  test.skip(desktop(), "the phone's widths");
+  await named(page, "Apex");
+  await page.addInitScript(() => localStorage.setItem("brc.mode", "1v1"));
+  await page.route("**/api/me*", async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    const rank = { placement: null, tier: "Grandmaster", division: null, points: 1234, ladder: 9999, color: "#e05d5d", label: "Grandmaster · 1234 RP" };
+    if (body?.user) body.ranked1v1 = { ...(body.ranked1v1 ?? {}), rank };
+    await route.fulfill({ response: res, json: body });
+  });
+  for (const width of [320, 360, 390]) {
+    await page.setViewportSize({ width, height: 740 });
+    await page.goto("/");
+    const line = page.locator(".fd-rank1v1");
+    await expect(line).toHaveText("Your rank: Grandmaster · 1234 RP");
+    expect(await line.evaluate((e) => e.scrollWidth - e.clientWidth), `${width}`).toBeLessThanOrEqual(0);
+    expect((await line.boundingBox())!.height, `${width}: one line`).toBeLessThan(26);
+    expect(await sideways(page), `${width}`).toBe(0);
+  }
 });
 
 test("the Boss raid card opens its screen; each choice reaches its flow (a raid's queue, people only, a Solo raid, Boss alone's menu, a raid with friends); Back is home", async ({ page }) => {

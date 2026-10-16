@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BOSS_TIERS, FAIRPLAY, SLOT_NAMES, bossInfo, isShiny, itemColor, itemDef, purity, secondColor, tierInfo, type ItemLook } from "@chessroyale/core";
 import { BackButton, DressedPawn, FdButton, GearIcon, RankPill, WORN_ORDER } from "../components/FrontDoor.tsx";
 import { ItemArt } from "../components/Items.tsx";
+import { DuelRankPill } from "../components/DuelRankPill.tsx";
 import { IconEditor, UserIcon } from "../components/PixelIcon.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { QuickChatPicks } from "../components/ChatPicks.tsx";
@@ -112,6 +113,26 @@ function RatingChart({ points, own }: { points: number[]; own: boolean }) {
 
 const dash = (v: number | null) => (v === null ? "—" : String(v));
 const pct = (v: number | null) => (v === null ? "—" : `${v}%`);
+
+/**
+ * Ranked 1 v 1: their rank (or placements) and their record, once they've played a ranked game. Nothing for a banned
+ * player (as the rating), nor for one who never played.
+ */
+function Ranked1v1({ p }: { p: PublicProfile }) {
+  const r = p.ranked1v1;
+  if (!r || r.games === 0) return null;
+  return (
+    <section class="fd-section dv-profile" aria-label="1 v 1 rank">
+      <h2 class="fd-label">1 V 1</h2>
+      <div class="fd-panel dv-profile-row">
+        <DuelRankPill rank={r.rank} class="dv-rank-big" />
+        <span class="dv-record">
+          {r.wins} won · {r.losses} lost · {r.draws} drawn
+        </span>
+      </div>
+    </section>
+  );
+}
 
 function Stats({ p, own }: { p: PublicProfile; own: boolean }) {
   const [tab, setTab] = useState<"crowd" | "boss">("crowd");
@@ -456,6 +477,7 @@ export function PlayerProfileScreen({
       {own && <QuickChatPicks onShop={onShop} focus={target.section === "chat"} />}
       </div>
       <div class="fd-profile-col">
+      <Ranked1v1 p={p} />
       <Stats p={p} own={own} />
       <Bosses beaten={p.bossesBeaten} />
       <Recent p={p} mark={own ? target.match : undefined} />

@@ -1430,6 +1430,127 @@ export const LEAVING = {
   confirmWaitMs: 4_000,
 } as const;
 
+/** One of 1 v 1's time controls: a bank for the game and an increment after every timed move, as chess writes them. */
+export interface DuelControl {
+  id: string;
+  /** Chess's own name for it ("Blitz"): the overlay reads "Timer: Blitz 3+2". */
+  name: string;
+  baseSeconds: number;
+  incrementSeconds: number;
+}
+
+/** A tier of 1 v 1's ladder, and the color its pill is drawn in. */
+export interface RankTierDef {
+  name: string;
+  color: string;
+}
+
+/**
+ * Ranked 1 v 1 ("1 v 1 · Classic chess"; Eric, Oct 16, 2026; docs/areas/ranked.md and
+ * docs/decisions/2026-10-16-ranked-1v1.md): normal chess between two signed-in players, matched by a hidden rating,
+ * with League of Legends style ranks. Every number of the mode is here; core/ranked.ts does the math.
+ */
+export const RANKED_1V1 = {
+  /**
+   * The five time controls, fastest first. The vote's three zones are the first, the middle and the last (Bullet on
+   * the left, Blitz in the middle, Rapid on the right); the two between are what neighbors' picks meet on. The ids are
+   * stored with each game, so they never change; the names and numbers can.
+   */
+  controls: [
+    { id: "bullet", name: "Bullet", baseSeconds: 60, incrementSeconds: 1 },
+    { id: "bullet-blitz", name: "Bullet", baseSeconds: 120, incrementSeconds: 1 },
+    { id: "blitz", name: "Blitz", baseSeconds: 180, incrementSeconds: 2 },
+    { id: "blitz-rapid", name: "Blitz", baseSeconds: 300, incrementSeconds: 3 },
+    { id: "rapid", name: "Rapid", baseSeconds: 600, incrementSeconds: 5 },
+  ] as readonly DuelControl[],
+  /** Neither player picks a zone: this control. */
+  defaultControl: "blitz",
+  /** How long both players have to drag their pawn into a zone. */
+  voteSeconds: 5,
+  /** The "found" moment (the versus screen's), before the vote starts on the board. */
+  versusMs: 2_500,
+  /** "Timer: Blitz 3+2" over the board after the vote, before White's first move. */
+  overlayMs: 1_500,
+  /** A game whose two players aren't both connected this long after it was made is called off (nothing recorded). */
+  joinSeconds: 10,
+  /** Each player's first move must come within this long (White's from the start, Black's from White's), or the game is aborted: no rank change. */
+  firstMoveSeconds: 20,
+  /** After a draw offer is declined (or lapses with a move), its maker offers again only after this many more moves of their own. */
+  drawOfferEveryMoves: 3,
+  /** A finished game's results stay up this long, then the game's object deletes everything it stored. */
+  resultsKeepMinutes: 10,
+  /** In the queue: after this long, "Few players online right now" offers Keep waiting and Play a bot (unranked). */
+  fewPlayersSeconds: 45,
+  /**
+   * Pairing by the hidden rating, widening with the wait: two players meet when their ratings are within
+   * `startRange + perSecond × seconds waited` (the longer wait's) `+ perRd ×` the larger of their two deviations, at most
+   * `maxRange`. (A rating still being found, as in placements, is a guess give or take its deviation: a gap inside that
+   * says nothing, so it shouldn't keep two players apart.)
+   */
+  match: { startRange: 100, perSecond: 10, perRd: 1, maxRange: 1000 },
+  /**
+   * The hidden rating: Glicko-1, each game its own rating period. A new player starts at their account's rating (from
+   * other modes, clamped to `seedMin`-`seedMax`) or `start`, with `startRd`; the deviation shrinks with each game to
+   * `minRd`, and grows back with idle days (`rdPerDay`: sqrt(RD² + c² × days)).
+   */
+  rating: { start: 1500, seedMin: 800, seedMax: 2400, startRd: 350, minRd: 60, rdPerDay: 18 },
+  /**
+   * The ladder (LoL's tiers, Eric: "we can even like take from there exactly"): each tier has divisions 4 → 1 of
+   * `pointsPerDivision` points; past the last tier's division 1 come the apex tiers, with no divisions, each from its
+   * points above Master's start. One number places a player: ladder = division index × 100 + points (Iron 4 0 = 0).
+   */
+  tiers: [
+    { name: "Iron", color: "#8b8580" },
+    { name: "Bronze", color: "#c08457" },
+    { name: "Silver", color: "#aeb6c2" },
+    { name: "Gold", color: "#f2c14e" },
+    { name: "Platinum", color: "#4fd1c5" },
+    { name: "Emerald", color: "#4ade80" },
+    { name: "Diamond", color: "#7aa7ff" },
+  ] as readonly RankTierDef[],
+  divisions: 4,
+  pointsPerDivision: 100,
+  apex: [
+    { name: "Master", color: "#c084fc", from: 0 },
+    { name: "Grandmaster", color: "#f87171", from: 200 },
+    { name: "Champion", color: "#fbbf24", from: 500 },
+  ] as readonly (RankTierDef & { from: number })[],
+  /**
+   * Where the ladder sits on the hidden rating: Iron 4 0 points is `baseRating`, each point `ratingPerPoint` more (so
+   * Master's start, 2800 points, is 2400).
+   */
+  baseRating: 800,
+  ratingPerPoint: 1600 / 2800,
+  /**
+   * Points a game: 2 × `perGame` × (the result − the expected result from the two hidden ratings), so ±`perGame` between
+   * equals, more for beating someone stronger and less for beating someone weaker; plus `perRating` × (hidden rating −
+   * the ladder's rating) after the game, the adjustment at most ±`maxAdjust` (a draw: half): so a player whose rank is
+   * below their play climbs faster, and ranks settle where the hidden rating says. A win never takes points, a loss
+   * never gives them. (Without the expected result, a player who keeps beating weaker ones climbed past their rating
+   * for good, and two accounts trading wins reached Champion: reports/ranked-1v1.md.) No promotion series and no
+   * demotion shields: crossing 100 points is the next division, falling below 0 the one before. Never below Iron 4 0.
+   */
+  points: { perGame: 20, perRating: 0.05, maxAdjust: 10 },
+  /** The first `games` rated games are placements ("Placement 2/5"), then the ladder starts from the hidden rating, at most `maxLadder` (Diamond 4 0). */
+  placements: { games: 5, maxLadder: 2400 },
+  /**
+   * Coins (as Squads pays them), lined up with what a Squads lobby pays per minute played (about 1.8 a minute:
+   * docs/decisions/2026-10-16-ranked-1v1.md): `perMinute` of the game's time from its start to its end, by result, at
+   * least 1 and at most `maxPerGame`; nothing for a game with fewer than `minMoves` moves each, an aborted game, a bot
+   * game, or a player fair play is holding (in review). At most `perDay` paying games a day per account (UTC days; the
+   * director's cap, Oct 16): the next games that day pay nothing.
+   */
+  coins: { perMinute: { win: 2.4, draw: 1.6, loss: 0.8 }, minMoves: 10, maxPerGame: 70, perDay: 20 },
+  /** Each ranked game's moves are kept this long (a reported player's games are checked from them), then deleted. */
+  gamesKeepDays: 30,
+  /**
+   * The bot (unranked; on the player's device): Maia at the player's hidden rating (the bosses' human-like engine, its
+   * own draw), Stockfish at that strength while Maia loads or above `maiaMax`. It thinks within `thinkMs` (never more
+   * than `clockShare` of what its clock has left).
+   */
+  bot: { maiaMin: 600, maiaMax: 2500, thinkMs: [600, 2600] as readonly [number, number], clockShare: 0.05 },
+};
+
 /**
  * Squads' server (phase 2; docs/areas/squads.md, "The server"): the lobby around the rules (`SQUADS`, below), its
  * parties, bot work and rewards. The lobby's life (results kept, idle, abandoned) is LOBBY_LIFE's; the queue's fill

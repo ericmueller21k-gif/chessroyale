@@ -50,6 +50,8 @@ import { LobbyChat } from "./components/LobbyChat.tsx";
 import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, forgetSquads, partyStatus, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
 import { SquadsQueue, SquadsScreen, squadsWaiting } from "./screens/Squads.tsx";
 import { PartySheet } from "./screens/SquadsParty.tsx";
+import { BotDuel, DuelQueue, NetDuel, setRanked1v1Starter, startRanked1v1, type DuelSession } from "./duel.ts";
+import { DuelScreen, DuelSearch } from "./screens/Duel.tsx";
 import { measureSound } from "./sound.ts";
 import { noteWhere } from "./problems.ts";
 import { testParams } from "./test-switches.ts";
@@ -172,6 +174,13 @@ const squadsRejoin = (() => {
   if (linkCode || location.pathname !== "/") return null;
   return currentSquads();
 })();
+
+/**
+ * Ranked 1 v 1's links: /1v1 queues at once (the home screen's 1 v 1 button does the same: startRanked1v1, duel.ts),
+ * /1v1/CODE is a game you're in (a reload goes back to it).
+ */
+const duelLinkCode = location.pathname.match(/^\/1v1\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
+const duelQueueLink = /^\/1v1\/?$/.test(location.pathname);
 
 /** A lobby that has closed (a stale tab, an old link, or the match on screen): the note on the home screen. */
 interface EndedNote {
@@ -451,10 +460,87 @@ export function App() {
     else void lobbyStatus(m.code, 3000).then((s) => go(s?.result ?? null));
   });
 
-  // ?debug (a test switch): the match and the Squads clients on `window`, for tests and the console. (Each render, so
+  // ---------------- Ranked 1 v 1 ----------------
+
+  /** The 1 v 1 queue you're in (its search screen), and the game on screen (a person's, or the bot's). */
+  const [duelQueue, setDuelQueue] = useState<DuelQueue | null>(null);
+  const [duel, setDuel] = useState<DuelSession | null>(null);
+  /** Into a ranked game (from the queue, or a link to it). */
+  const joinDuel = (code: string) => {
+    const d = new NetDuel(code.toUpperCase());
+    setDuel((old) => {
+      old?.dispose();
+      return d;
+    });
+    setDuelQueue(null);
+    history.replaceState(null, "", `/1v1/${d.code}${location.search}`);
+    d.connect();
+  };
+  /** Out of the 1 v 1 queue or game: home. */
+  const leaveDuel = () => {
+    duelQueue?.cancel();
+    setDuelQueue(null);
+    duel?.dispose();
+    setDuel(null);
+    if (location.pathname !== "/") history.replaceState(null, "", `/${location.search}`);
+  };
+  /**
+   * One tap into the 1 v 1 queue (startRanked1v1): online play needs an account where sign-in is set up (the sign-in
+   * page instead, as every mode's PLAY), and nothing while the mode rests (its line, as the server would say).
+   */
+  const startDuel = () => {
+    unlockAudio();
+    if (mustSignInToPlayOnline()) return chooseGuest(false);
+    if (isPaused("ranked1v1")) return setError(pausedLine("ranked1v1"));
+    duel?.dispose();
+    setDuel(null);
+    setError(null);
+    const q = new DuelQueue();
+    q.subscribe(() => {
+      const s = q.state;
+      if (s.kind === "found") joinDuel(s.code);
+      else if (s.kind === "refused" && s.banned) {
+        setDuelQueue(null);
+        if (location.pathname !== "/") history.replaceState(null, "", `/${location.search}`);
+        showBanNotice();
+      } else if (s.kind === "refused" && s.signIn) {
+        setDuelQueue(null);
+        chooseGuest(false);
+      }
+    });
+    setDuelQueue(q);
+    history.replaceState(null, "", `/1v1${location.search}`);
+    void q.start();
+  };
+  /** "Play a bot (unranked)": out of the queue, into a game on this device against a bot near your hidden rating. */
+  const botDuel = () => {
+    const rating = duelQueue?.botRating ?? account().profile?.rating ?? 1500;
+    duelQueue?.cancel();
+    setDuelQueue(null);
+    setDuel((old) => {
+      old?.dispose();
+      return new BotDuel(rating);
+    });
+    if (location.pathname !== "/") history.replaceState(null, "", `/${location.search}`);
+  };
+  setRanked1v1Starter(startDuel);
+  // A link: /1v1/CODE goes back into that game; /1v1 queues once your account has loaded (the queue needs it).
+  const duelLinkUsed = useRef(false);
+  useEffect(() => {
+    if (duelLinkUsed.current) return;
+    if (duelLinkCode) {
+      duelLinkUsed.current = true;
+      joinDuel(duelLinkCode);
+    } else if (duelQueueLink && profile) {
+      duelLinkUsed.current = true;
+      startDuel();
+    }
+  }, [!!profile]);
+
+  // ?debug (a test switch): the match, the Squads clients and the 1 v 1 game on `window`, for tests and the console. (Each render, so
   // they're there once your account says you may, and a match joined before that, from a link, is too.)
   const debug = testParams().has("debug");
-  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, __measureSound: measureSound, ...(match ? { match } : {}) });
+  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, duel, __measureSound: measureSound, ...(match ? { match } : {}) });
 
   // ---------------- Squads ----------------
 
@@ -894,7 +980,7 @@ export function App() {
     },
   });
   // In a match (not its lobby or results): the live line says so, for friends' lists.
-  setLiveBusy((!!match && !["loading", "lobby", "results"].includes(match.phase.kind)) || (!!squads && !squadsWaiting(squads.lobby)));
+  setLiveBusy((!!match && !["loading", "lobby", "results"].includes(match.phase.kind)) || (!!squads && !squadsWaiting(squads.lobby)) || (!!duel && !duel.snapshot().end));
 
   /**
    * The side menu while you're in the queue (it stays on a computer): Play is where you are, and your profile opens over
@@ -923,6 +1009,36 @@ export function App() {
   const noLanding = testParams().has("nolanding");
   const inviteCode = invite === "open" ? linkCode : undefined;
   const notice = ended ? (ended.why === "idle" ? "That lobby has closed." : ended.why === "left" ? leftNote(ended.how) : "That match has ended.") : (squadsNote ?? undefined);
+  // Ranked 1 v 1: the game on screen, or the search (in the home screen's frame, as every queue).
+  if ((duel || duelQueue) && !match && !squads) {
+    const overlayD = profileOpen && (
+      <div class="fd-overlay">
+        <FrontFrame>
+          <PlayerProfileScreen target={profileOpen} onBack={closeProfile} match={duel?.snapshot().code ?? undefined} />
+        </FrontFrame>
+      </div>
+    );
+    if (duel)
+      return (
+        <>
+          <DuelScreen
+            session={duel}
+            onHome={leaveDuel}
+            onAgain={() => {
+              leaveDuel();
+              startDuel();
+            }}
+          />
+          {overlayD}
+        </>
+      );
+    return (
+      <>
+        {homeFrame(<DuelSearch queue={duelQueue!} onCancel={leaveDuel} onBot={botDuel} />)}
+        {overlayD}
+      </>
+    );
+  }
   // Squads: the lobby you're in (the waiting room is the home screen's queue, as for Crowd).
   if (squads && !match) {
     const overlayS = profileOpen && (
@@ -1091,10 +1207,7 @@ export function App() {
             history.replaceState(null, "", `${location.pathname}${q.size ? `?${q}` : ""}`);
           }
         }}
-        onRanked1v1={() => {
-          // Ranked 1 v 1's queue (its route arrives with the 1 v 1 core; startRanked1v1 then, in place of the load).
-          location.assign(`/1v1${location.search}`);
-        }}
+        onRanked1v1={startRanked1v1}
         loading={loading}
         error={error}
         joinCode={mustSignInToPlayOnline() ? undefined : inviteCode}

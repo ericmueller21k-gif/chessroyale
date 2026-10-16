@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, LEAVING, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, LEAVING, RANKED_1V1, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
 import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
@@ -452,5 +452,27 @@ describe("the FAQ's text format", () => {
 
   it("a heading without an id gets one from its words", () => {
     expect(parse("### The God King's save")[0]).toEqual({ kind: "heading", id: "the-god-king-s-save", text: "The God King's save" });
+  });
+});
+
+describe("the FAQ: 1 v 1", () => {
+  it("the mode, the vote's rule worked out by the game's own rule, the clocks, ranks, placements and coins, from the settings", () => {
+    const t = text();
+    expect(faqAnchors(faqPage())).toContain("mode-1v1");
+    expect(t).toContain("Bullet 1+1 on the left, Blitz 3+2 in the middle and Rapid 10+5 on the right");
+    expect(t).toContain("Bullet and Blitz make Bullet 2+1, Blitz and Rapid Blitz 5+3. Bullet against Rapid makes Blitz 3+2.");
+    expect(t).toContain(`you both have ${RANKED_1V1.voteSeconds} seconds to drag your pawn`);
+    expect(t).toContain(`Each side has ${RANKED_1V1.firstMoveSeconds} seconds for its first move`);
+    expect(t).toContain("Iron, Bronze, Silver, Gold, Platinum, Emerald and Diamond");
+    expect(t).toContain(`your first ${RANKED_1V1.placements.games} games show "Placement 1/${RANKED_1V1.placements.games}"`);
+    expect(t).toContain("at most Diamond 4.");
+    expect(t).toContain(`about +${RANKED_1V1.points.perGame} for a win and −${RANKED_1V1.points.perGame} for a loss against a player at your level`);
+    expect(t).toContain(`${RANKED_1V1.coins.perMinute.win} coins a minute for a win`);
+    expect(t).toContain(`Up to ${RANKED_1V1.coins.perDay} games a day pay coins`);
+    // Changed numbers change the words.
+    const R = { ...RANKED_1V1, voteSeconds: 7, controls: RANKED_1V1.controls.map((c) => (c.id === "blitz-rapid" ? { ...c, baseSeconds: 240 } : c)) };
+    const changed = text({ ...FAQ_DEFAULTS, ranked: R });
+    expect(changed).toContain("you both have 7 seconds");
+    expect(changed).toContain("Blitz and Rapid Blitz 4+3");
   });
 });

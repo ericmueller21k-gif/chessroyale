@@ -50,7 +50,13 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   once `percentileMinPlayers` have ratings), the rating chart, stats (All, Classic, Crowd), "Boss tiers beaten"
   (online raids only: a solo win is the browser's word), recent matches, what
   they're wearing (drawn with the real item art), their quick-chat picks. A profile others see never shows an email,
-  a sign-in method or anything not on the approved list; a banned player's says "Banned".
+  a sign-in method or anything not on the approved list; a banned player's says "Banned". A "1 V 1" section shows
+  their ranked rank (tier, division and RP, or "Placement N/5") and record, once they've played one (none for a banned
+  player).
+- **Ranked 1 v 1's way in** ([ranked.md](ranked.md)): `/1v1` queues in one tap; the home screen's button (not built
+  yet) calls `startRanked1v1()` (`packages/app/src/duel.ts`) and shows `ranked1v1Label()` (`packages/app/src/ranked.ts`:
+  the rank's label from the profile, null until it loads). The first-time pawn-vote hint is `VoteHint`
+  (`components/VoteHint.tsx`, once per device: `brc.voteHintSeen`), for every pawn vote to use.
 - **Friends** (Oct 15; [docs/decisions/2026-10-15-friends-and-invites.md](../decisions/2026-10-15-friends-and-invites.md); the rules and data on [accounts.md](accounts.md)):
   - **Where:** a phone's home has a line above the live line ("Friends · 2 online", "N new" for requests and
     invites); a computer's live panel has a FRIENDS section above the live line (friends online, each with Invite,
