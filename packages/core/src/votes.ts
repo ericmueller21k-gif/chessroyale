@@ -29,7 +29,8 @@ export interface PregameVote {
   /**
    * Three options, left to right on every screen, the same in every game and on every device (Eric, Oct 13: "The
    * voting rounds in all modes should never change position"). From Black's side too: the board turns, the order
-   * doesn't (screens/Vote.tsx). A speed or clock vote runs slowest to fastest.
+   * doesn't (screens/Vote.tsx). A speed or clock vote runs fastest to slowest: Bullet on the left, the longest on the
+   * right (Eric, Oct 16).
    */
   options: readonly VoteOption[];
   /** The option that wins if nobody votes: its index, found by its id (`optionIndex`), so a reorder never moves it. */
@@ -66,17 +67,18 @@ function timeControl(id: string, icon: string, name: string, tc: TimeControl): V
 }
 
 /**
- * The 50 v 50's "How fast?": real chess time controls (Eric, Oct 13, 2026), slowest on the left, fastest on the right
- * (Eric, Oct 13: "always slowest on the left, fastest on the right"). Each move adds the increment to your bank; what
+ * The 50 v 50's "How fast?": real chess time controls (Eric, Oct 13, 2026), Bullet on the left, the longest on the right
+ * (Eric, Oct 16: "the left should always be bullet, and then the far right on it should always be the longest time
+ * control"; it reverses his Oct 13 "always slowest on the left"). Each move adds the increment to your bank; what
  * you think comes out of it, so a quick move banks the rest. No move takes longer than its cap: 50 people pick
  * together, and every turn has to end. Bullet is 3+2, not 2+1: at 7-8 s a move, 2+1 runs dry before the final
  * (DECISIONS.md).
  */
 function speedVote(): PregameVote {
   const options = [
-    timeControl("rapid", "⏱️", "Rapid", { timeBankSeconds: 600, timeIncrementSeconds: 5, moveClockSeconds: 20 }),
-    timeControl("blitz", "🔥", "Blitz", { timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15 }),
     timeControl("bullet", "⚡", "Bullet", { timeBankSeconds: 180, timeIncrementSeconds: 2, moveClockSeconds: 10 }),
+    timeControl("blitz", "🔥", "Blitz", { timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15 }),
+    timeControl("rapid", "⏱️", "Rapid", { timeBankSeconds: 600, timeIncrementSeconds: 5, moveClockSeconds: 20 }),
   ];
   // Nobody votes: Blitz, by its id (DECISIONS.md, "Crowd 50 v 50: three chess time controls").
   return { id: "speed", title: "How fast?", defaultOption: optionIndex(options, "blitz"), options };

@@ -182,7 +182,7 @@ export function squadsVotes(s: SquadsSettings = SQUADS): readonly SquadsVote[] {
       title: "How fast?",
       // (By its id: the option a reorder can't move.)
       defaultOption: Math.max(0, s.clocks.indexOf(defaultClock(s))),
-      // Slowest on the left, fastest on the right, in the settings' order. (Icons as the 50 v 50's, by id.)
+      // Bullet on the left, the longest on the right (Eric, Oct 16), in the settings' order. (Icons as the 50 v 50's, by id.)
       options: s.clocks.map((c) => ({
         id: c.id,
         icon: CLOCK_ICONS[c.id] ?? "⏱️",

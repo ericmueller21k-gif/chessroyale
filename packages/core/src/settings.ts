@@ -2053,7 +2053,8 @@ export interface SquadsSettings {
   /**
    * The Clock vote's options (Eric, Oct 13: Bullet, Blitz and Rapid, chess time controls like the 50 v 50's; tuned by
    * the sim), each a team clock: the starting bank, the top-up a round, the free seconds a move, the increment and the
-   * cap on one move. In the vote's order, left to right: slowest to fastest. And the one if nobody votes, by its id.
+   * cap on one move. In the vote's order, left to right: Bullet first, the longest last (Eric, Oct 16). And the one if
+   * nobody votes, by its id.
    */
   clocks: readonly SquadsClock[];
   clockDefault: string;
@@ -2217,10 +2218,11 @@ export const SQUADS: SquadsSettings = {
   // (DECISIONS.md, "Squads: three chess time controls"). Eric, Oct 14: Rapid was too long ("It shouldn't be 55
   // minutes"): 5+2, was 5+3 (DECISIONS.md, "Squads: Rapid 5+2").
   clocks: [
-    // Left to right, slowest to fastest (Eric, Oct 13: "always slowest on the left, fastest on the right").
-    { id: "rapid", label: "Rapid", bankSeconds: 300, topUpSeconds: 60, delaySeconds: 2, incrementSeconds: 2, capSeconds: 20 },
-    { id: "blitz", label: "Blitz", bankSeconds: 180, topUpSeconds: 30, delaySeconds: 2, incrementSeconds: 2, capSeconds: 15 },
+    // Left to right, Bullet first and the longest last (Eric, Oct 16: "the left should always be bullet, and then the
+    // far right on it should always be the longest time control"; it reverses his Oct 13 "always slowest on the left").
     { id: "bullet", label: "Bullet", bankSeconds: 60, topUpSeconds: 15, delaySeconds: 2, incrementSeconds: 1, capSeconds: 10 },
+    { id: "blitz", label: "Blitz", bankSeconds: 180, topUpSeconds: 30, delaySeconds: 2, incrementSeconds: 2, capSeconds: 15 },
+    { id: "rapid", label: "Rapid", bankSeconds: 300, topUpSeconds: 60, delaySeconds: 2, incrementSeconds: 2, capSeconds: 20 },
   ],
   // Nobody votes: Blitz (as Normal was), by its id, so reordering the options never changes it.
   clockDefault: "blitz",
