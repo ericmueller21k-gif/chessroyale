@@ -291,13 +291,15 @@ function summary() {
       add("| Rule | F's pickers: mean error | P's pickers: mean error | Other re-checked picks: mean error (mean of its size) | Positions searched |", "| --- | ---: | ---: | ---: | ---: |");
       for (const [label, k] of designs) {
         const a = acc[k]!;
-        add(`| ${label} | ${f(mean(a.F), 2)} | ${f(mean(a.P), 2)} | ${f(mean(a.X), 2)} (${f(mean(a.X.map(Math.abs)), 2)}) | ${a.searched} |`);
+        // (Measured from the deep search's best by construction under the last two: a consistency check, not accuracy.)
+        const x = k === "chosen" || k === "every" ? "0 (by construction)" : `${f(mean(a.X), 2)} (${f(mean(a.X.map(Math.abs)), 2)})`;
+        add(`| ${label} | ${f(mean(a.F), 2)} | ${f(mean(a.P), 2)} | ${x} | ${a.searched} |`);
       }
       add("");
     }
     const several = all.filter((r) => r.overs.length > 1).length;
     add(
-      `Online the engine server re-checks, so there a re-check is about right whatever it searches: what argues against searching every such pick is the server's daily budget, not accuracy. On a device the re-check is noisy at this scale too. With several picks above F (${several} of ${all.filter((r) => r.overs.length).length} positions), F's pickers are charged the largest gap.`,
+      `"0 (by construction)": under the last two rules every re-checked pick is measured from the deep search's best, so this column checks they're consistent, not that they're accurate. On a device the chosen rule leaves P's pickers a little further off than before (2.51 against 2.47 points): where a re-check runs, the device's noisy re-check charges them instead of the quick numbers' 0. Online the engine server re-checks, so there a re-check is about right whatever it searches: what argues against searching every such pick is the server's daily budget, not accuracy. With several picks above F (${several} of ${all.filter((r) => r.overs.length).length} positions), F's pickers are charged the largest gap.`,
       "",
     );
   }

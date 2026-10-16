@@ -51,8 +51,8 @@ Re-checked by a device (lite, 700k nodes), 90 positions:
 | --- | ---: | ---: | ---: | ---: |
 | Main: anchored on F, P never re-checked (labels named after) | 1.63 | 2.47 | 0.73 (1.14) | 43 |
 | This PR's first version: anchored on P, F re-checked from 5 points | 1.19 | 2.40 | -1.24 (1.24) | 45 |
-| Anchored on F, P re-checked with any re-check (chosen) | 0.92 | 2.51 | 0.00 (0.00) | 45 |
-| Every such P re-checked, a search of its own if need be | 0.65 | 2.06 | 0.00 (0.00) | 90 |
+| Anchored on F, P re-checked with any re-check (chosen) | 0.92 | 2.51 | 0 (by construction) | 45 |
+| Every such P re-checked, a search of its own if need be | 0.65 | 2.06 | 0 (by construction) | 90 |
 
 Re-checked by the engine server (its stand-in, full network, 2M nodes), 90 positions:
 
@@ -60,10 +60,10 @@ Re-checked by the engine server (its stand-in, full network, 2M nodes), 90 posit
 | --- | ---: | ---: | ---: | ---: |
 | Main: anchored on F, P never re-checked (labels named after) | 1.63 | 2.47 | 0.09 (1.49) | 43 |
 | This PR's first version: anchored on P, F re-checked from 5 points | 1.19 | 2.19 | -1.60 (1.60) | 45 |
-| Anchored on F, P re-checked with any re-check (chosen) | 0.59 | 1.43 | 0.00 (0.00) | 45 |
-| Every such P re-checked, a search of its own if need be | 0.00 | 0.00 | 0.00 (0.00) | 90 |
+| Anchored on F, P re-checked with any re-check (chosen) | 0.59 | 1.43 | 0 (by construction) | 45 |
+| Every such P re-checked, a search of its own if need be | 0.00 | 0.00 | 0 (by construction) | 90 |
 
-Online the engine server re-checks, so there a re-check is about right whatever it searches: what argues against searching every such pick is the server's daily budget, not accuracy. On a device the re-check is noisy at this scale too. With several picks above F (11 of 90 positions), F's pickers are charged the largest gap.
+"0 (by construction)": under the last two rules every re-checked pick is measured from the deep search's best, so this column checks they're consistent, not that they're accurate. On a device the chosen rule leaves P's pickers a little further off than before (2.51 against 2.47 points): where a re-check runs, the device's noisy re-check charges them instead of the quick numbers' 0. Online the engine server re-checks, so there a re-check is about right whatever it searches: what argues against searching every such pick is the server's daily budget, not accuracy. With several picks above F (11 of 90 positions), F's pickers are charged the largest gap.
 
 ## The exchange check
 

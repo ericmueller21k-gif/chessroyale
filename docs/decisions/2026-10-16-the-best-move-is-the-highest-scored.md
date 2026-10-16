@@ -61,11 +61,14 @@ server's.
 | --- | ---: | ---: | ---: | ---: |
 | Before: anchored on F, P never re-checked | 1.63 / 1.63 | 2.47 / 2.47 | +0.73 / +0.09 | 43 |
 | This PR's first version: anchored on P, F re-checked from 5 points | 1.19 / 1.19 | 2.40 / 2.19 | −1.24 / −1.60 | 45 |
-| **Anchored on F, P re-checked with any re-check (chosen)** | 0.92 / 0.59 | 2.51 / 1.43 | 0 / 0 | 45 |
-| Every P re-checked, with a search of its own if need be | 0.65 / 0 | 2.06 / 0 | 0 / 0 | 90 |
+| **Anchored on F, P re-checked with any re-check (chosen)** | 0.92 / 0.59 | 2.51 / 1.43 | 0 (by construction) | 45 |
+| Every P re-checked, with a search of its own if need be | 0.65 / 0 | 2.06 / 0 | 0 (by construction) | 90 |
 
-- **The chosen rule** removes the error on every other re-checked pick and roughly halves F's on the server. It needs
-  no more searches than the first version: in 43 of its 45, a re-check was running anyway.
+- **The chosen rule** measures every other re-checked pick from the deep search's best. Its "0" is by construction: a
+  consistency check, not accuracy. It roughly halves F's error on the server, and needs no more searches than the first
+  version: in 43 of its 45, a re-check was running anyway.
+- **On a device** it leaves P's pickers a little further off than before (2.51 against 2.47 points): where a re-check
+  runs, the device's noisy re-check charges them instead of the quick numbers' 0. On the server it's 1.43.
 - **Re-checking every such pick** would be exact online, where the engine server re-checks. So the argument against it
   isn't accuracy; it's the extra searches:
   - one of its own in half these positions, about 1.4% of rounds with a person;
@@ -90,9 +93,10 @@ server's.
   leaves P out:
   - **No engine server:** the two re-checks disagree and the quick numbers stand. An older app whose own list came out
     empty sends none, so the round waits `deepWaitMs` for it, then takes the other device's.
-  - **Deep checks on, engine server up:** the server re-checks. The lobby only blames a device whose re-check covered
-    every move the board's re-check does, so an honest older app is never struck for leaving P out.
-  - **The catch:** a device that leaves a move out on purpose escapes blame for it, but the server's numbers decide and
+  - **Deep checks on, engine server up:** the server re-checks. A device's re-check that leaves out only the picks above
+    F (an older app's pattern) isn't compared, so an honest older app is never struck for that. Any other omission is
+    blamed as before.
+  - **The catch:** a device that copies that pattern on purpose escapes blame for it, but the server's numbers decide and
     it costs a server search. That's acceptable while deep checks ship off; revisit before turning them on.
 - **The God King** plays the best move: after any re-check, the highest-scored pick, the move the reveal names. It's
   within a point of F in 70% of cases. Where a re-check ran, P was weighed against F first. Without one it can be a

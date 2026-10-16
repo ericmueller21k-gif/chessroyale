@@ -45,8 +45,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   `engineSpeed()`, then `botWork` jobs on the engine pool; [squads.md](squads.md), "The server" and "The screens").
 - **Close calls are re-checked deeper** before a cut (`recheckCloseCalls()` in `runner.ts`: `recheckLoss`,
   `recheckMax`, `recheckNodes` 700k), only for groups with a human pick, in one search with the best move (the anchor),
-  and with any pick scored above it. A device's re-check is blamed against the server's only if it searched every move
-  the board's re-check does (an older app's leaves out a pick above the first line). The re-check goes first to the
+  and with any pick scored above it. A device's re-check that leaves out only the picks above the first line (an older
+  app's pattern) isn't compared with the server's for blame; any other omission is. The re-check goes first to the
   **engine server**: native Stockfish 17.1 (full network) in a Cloudflare Container (`engine/Dockerfile`, `engine/server.mjs`,
   class `EngineServer`, binding `ENGINE`, instance `standard-2`) at 2M nodes (`SERVER_RECHECK_NODES`). If it doesn't
   answer in time, the host re-checks on its own device. Server searches are capped per day by
@@ -57,8 +57,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   server's own Stockfish, checked in CI").
 - **Deep checks on players' computers** (`JUDGES.deepOnDevices`) are built and ship **off**: the browsers' lite network
   is less accurate than the server's (`reports/deep-accuracy.md`), and fairness comes first. A device whose re-check
-  leaves out a move the board's re-check covers is never blamed (an older app's leaves out a pick above the first
-  line), which a device could use to dodge blame: revisit before turning this on.
+  leaves out only the picks above the first line (an older app's pattern) is never blamed, which a device could copy
+  to dodge blame: revisit before turning this on.
 - **Bosses' strength.** `bossMoveFrom` in `runner.ts` plays at a UCI_Elo set from the lobby's ratings (`bossElo`:
   weighted toward the best players, `bossEloOffset`, `bossEloRange`; the raid's tiers `BOSS_TIERS`, `bossFixedElo`;
   each boss's `offset` in `BOSS_ROSTER`; solo's difficulty `BOSS_DIFFICULTY`). Below `bossStumbleBelow` it may slip
@@ -171,10 +171,10 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   `packages/server/test/judges.test.ts`, `engine-server.test.ts` (a refused position never reaches the container, from
   any path; a legal one does, Chess960 too). (Engine tests run real Stockfish.)
 - The best move (a pick above the first line): `packages/chess/test/best-move.test.ts` (solo, the lobby's numbers, a
-  judge's board, the re-check's targets and anchor, other re-checked picks, the exchange check, the God King, every
-  judge alike), `packages/app/test/host-score.test.ts` (the host), `judges.test.ts` ("the best move is the
-  highest-scored pick": two judges, the engine server's re-check, devices' re-checks, an older host, an older app's
-  device beside this one's), `bestOf` in `packages/core/test/scoring.test.ts`; `e2e/boss-dock.spec.ts` (the dock's
+  judge's board, the re-check's targets and anchor, other re-checked picks, the exchange check, the God King with and
+  without a re-check, every judge alike), `packages/app/test/host-score.test.ts` (the host), `judges.test.ts` ("the
+  best move is the highest-scored pick": two judges, the engine server's re-check, devices' re-checks, an older host,
+  an older app's device beside this one's, any other omission from a re-check still blamed), `bestOf` in `packages/core/test/scoring.test.ts`; `e2e/boss-dock.spec.ts` (the dock's
   "· the best").
 - e2e: `e2e/judges.spec.ts` (with containers off); `e2e/sawyer.spec.ts`'s last test (a refused position never sent;
   a worker's exit kept off the page, the engine answering on).

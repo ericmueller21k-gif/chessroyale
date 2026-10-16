@@ -694,6 +694,34 @@ describe("the best move is the highest-scored pick (docs/decisions/2026-10-16-th
     expect(strikes(L)).toMatchObject({ p1: 0, p2: 0 });
   });
 
+  it("deep checks on computers: a re-check that leaves out an ordinary close call (not an older app's pattern) is still blamed", async () => {
+    const L = setup({ server: true, judges: { deepOnDevices: true } });
+    L.begin(4, [1_000_000, 1_000_000, 300_000, 300_000], [], [0, 1]);
+    // Close calls, and nothing above the first line (the honest engine).
+    const fen = L.last("p1", "round")!.board!.fen;
+    L.pickAll(4, { p1: ranked(fen)[3]!, p2: ranked(fen)[4]!, p3: ranked(fen)[5]!, p4: ranked(fen)[6]! });
+    expect([...L.judgesOf()].sort()).toEqual(["p1", "p2"]);
+    const jobs = (id: string) => (L.take(id, "judge") as Extract<Msg, { t: "judge" }>[]).flatMap((m) => m.jobs.map((job) => ({ job, key: m.key })));
+    for (const id of ["p1", "p2"]) {
+      for (const { job, key } of jobs(id)) {
+        const quick = await runQuickJob(honest, job);
+        L.core.message(id, { t: "judged", key, id: job.id, report: quick });
+        const t = deepTargets(job, quick)!;
+        expect(t.flagged.length).toBeGreaterThanOrEqual(2);
+        expect(t.flagged.every((m) => truth(fen, m) <= truth(fen, t.best))).toBe(true);
+        const deep = await honest.scoreMovesAt!(job.fen, [t.best, ...t.flagged], job.recheck!.recheckNodes);
+        // p2 leaves out one close call, and scores another 20 points low.
+        const [left, low] = t.flagged.slice(-2) as [string, string];
+        const lie = deep.filter((m) => m.move !== left).map((m) => (m.move === low ? { ...m, expected: Math.max(0, m.expected - 0.2) } : m));
+        L.core.message(id, { t: "judgedDeep", key, id: job.id, deep: id === "p2" ? lie : deep });
+      }
+    }
+    expect(L.core.record.judges!.stats.deepDisagreed).toBe(1);
+    L.serve();
+    expect(L.core.record.phase).toBe("reveal");
+    expect(strikes(L)).toMatchObject({ p1: 0, p2: 1 });
+  });
+
   it("a host's numbers that name the first line (an older app) still make the pick above it the best", () => {
     const L = setup({ judges: { on: false } });
     const { fen, first, worst } = start(L);

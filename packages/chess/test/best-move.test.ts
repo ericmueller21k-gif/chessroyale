@@ -23,12 +23,12 @@ import {
  *
  * The stand-in engine keeps the judge's two searches apart. Its top-8 search lists a position's first 8 legal moves,
  * the first line at 0.50, then 0.49, 0.48 and so on. Its second search (the picks outside those 8, each with more of
- * the budget) scores the last legal move 0.58, above the first line, as Oct 16's Qe2 was charged against, and any other
- * move 0.30. The re-check's deep numbers are the quick ones unless `deep` says otherwise.
+ * the budget) scores the last legal move 0.58 (or `over`), above the first line, as Oct 16's Qe2 was charged against,
+ * and any other move 0.30. The re-check's deep numbers are the quick ones unless `deep` says otherwise.
  */
-function engine(deep: Record<string, number> = {}): EngineLike {
+function engine(deep: Record<string, number> = {}, over = 0.58): EngineLike {
   const top = (fen: string) => legalMoves(fen).slice(0, 8).map((move, i) => ({ move, expected: 0.5 - 0.01 * i }));
-  const quick = (fen: string, m: string) => top(fen).find((x) => x.move === m)?.expected ?? (m === legalMoves(fen).at(-1) ? 0.58 : 0.3);
+  const quick = (fen: string, m: string) => top(fen).find((x) => x.move === m)?.expected ?? (m === legalMoves(fen).at(-1) ? over : 0.3);
   return {
     topMoves: async (fen, n) => top(fen).slice(0, n),
     scoreMoves: async (fen, moves) => [...new Set(moves)].sort().map((move) => ({ move, expected: quick(fen, move) })),
@@ -168,6 +168,33 @@ describe("a pick scored above the engine's first line", () => {
       expect(host.bestExpected).toBe(device.bestExpected);
       for (const m of picks) expect(host.expectedAfter[m]).toBe(device.expectedAfter[m]);
     }
+  });
+
+  it("the God King plays the best move with no re-check at all: a pick 3 points above the first line, nothing else close (resolveBoard names it)", async () => {
+    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossMaxMoves: 12, lastStandFrom: 999, bossId: "clown" } as Settings;
+    const quick = engine({}, 0.53);
+    let deepSearches = 0;
+    const counted: EngineLike = { ...quick, scoreMovesAt: async (fen, moves, nodes) => (deepSearches++, quick.scoreMovesAt!(fen, moves, nodes)) };
+    const runner = new MatchRunner({
+      settings,
+      rng: mulberry32(11),
+      engines: [counted],
+      library: [{ ...library[0]!, moves: line, namedPlies: line.length }],
+      entrants: Array.from({ length: 6 }, (_, i) => ({ id: `h${i}`, name: `H${i}`, isBot: false })),
+    });
+    runner.deal();
+    const fen = runner.boards.get(0)!.fen;
+    expect(runner.crowdAllowed()).toBeNull();
+    for (const id of ["h0", "h1", "h2", "h3"]) runner.kingCallers.add(id);
+    const last = legalMoves(fen).at(-1)!;
+    const k = await runner.score(new Map([["h4", { move: last, thinkMs: 1000 }], ["h5", { move: legalMoves(fen)[0]!, thinkMs: 1000 }]]));
+    const b = k.boards[0]!;
+    // (The first line's pickers lose 3 points: under the re-check's range, and there's no other close call.)
+    expect(deepSearches).toBe(0);
+    expect(b.king).toBe(true);
+    expect(b.bestMove).toBe(last);
+    expect(b.result.playedMove).toBe(last);
+    consistent(b);
   });
 
   it("the God King plays the best move: the pick above the first line", async () => {
