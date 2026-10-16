@@ -85,7 +85,7 @@ test("1 v 1: picked, your rank under the row (whole at 320 px, even the longest)
   expect(await sideways(page)).toBe(0);
   // PLAY: the 1 v 1 queue at once (startRanked1v1), its address /1v1; Cancel is home.
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
-  await expect(page.locator(".dv-search-line")).toContainText("Finding an opponent");
+  await expect(page.locator(".dv-st-finding")).toContainText("Finding opponent");
   expect(new URL(page.url()).pathname).toBe("/1v1");
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("radio", { name: /^1 v 1/ })).toHaveAttribute("aria-checked", "true");
