@@ -62,6 +62,7 @@ message, without a code change: each is a Worker variable (docs/areas/ops.md, "K
 2. **To rest a part:** name `PAUSE_SQUADS` (or another below), type **Text**, value `1`. **Save and deploy.**
    - `PAUSE_CROWD`, `PAUSE_RAID`, `PAUSE_CLASSIC`: that mode online (its PLAY and new lobbies).
    - `PAUSE_SQUADS`: Squads' PLAY and new parties.
+   - `PAUSE_RANKED1V1`: ranked 1 v 1's queue (games already running finish; the bot game is reached only from the queue).
    - `PAUSE_SOLO`: Solo and Boss alone.
    - `PAUSE_SHOP`: getting shop items and opening crates (the locker stays).
    - `PAUSE_FRIENDS`: friends and invites.

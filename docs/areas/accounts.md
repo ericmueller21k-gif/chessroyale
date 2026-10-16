@@ -76,6 +76,10 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
       on the review page as "Deleted player"). A new account with the identity is banned again, or goes to review.
   - **A lobby or a reward that finishes later** records nothing for a deleted account: its writes say `WHERE EXISTS`
     the account.
+  - **Ranked 1 v 1** (store `ranked1v1`: `ranked_1v1`, `ranked_1v1_games`; [ranked.md](ranked.md), "Data stored"):
+    the download has the rank and the player's kept games (the opponent by name); deleting removes the rank and makes
+    the player "deleted" in their opponents' games. A guest's rank moves to the account on sign-in only if the account
+    has none.
   - **Every table is accounted for:** each is in a store in `ACCOUNT_STORES` (`account-data.ts`) or listed in
     `NO_ACCOUNT_DATA`. `account-data.test.ts` fails on a table in neither, from the schema or any `CREATE TABLE` in
     the server. It also pins every table's columns (`SCHEMA_COLUMNS`), so any schema change means checking the two

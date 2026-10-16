@@ -6,12 +6,13 @@ import { BOSS_ROSTER, bossDef, bossInText } from "./boss.ts";
  * resting, the app hides or disables its way in with its line below, and the server refuses new matches (or sales) for
  * it; matches already running finish normally.
  *   - "classic", "crowd", "raid", "squads": that mode online (its queue, new lobbies and parties);
+ *   - "ranked1v1": 1 v 1 (PAUSE_RANKED1V1): its queue and new games (the bot game is reached only from the queue);
  *   - "solo": Solo and Boss alone (played in the browser: only the app can stop them);
  *   - "shop": the shop and crates (getting items, opening crates; your locker stays);
  *   - "friends": friends;
  *   - "boss:<id>": one boss (PAUSE_BOSS_<ID>): never met, at random or picked.
  */
-export const PAUSABLE = ["classic", "crowd", "raid", "squads", "solo", "shop", "friends"] as const;
+export const PAUSABLE = ["classic", "crowd", "raid", "squads", "ranked1v1", "solo", "shop", "friends"] as const;
 export type Pausable = (typeof PAUSABLE)[number] | `boss:${string}`;
 
 /** Every switch there is: the parts above, then one per boss in the roster. */
@@ -26,6 +27,7 @@ const NAMES: Record<(typeof PAUSABLE)[number], string> = {
   crowd: "Crowd is",
   raid: "Boss raids are",
   squads: "Squads is",
+  ranked1v1: "1 v 1 is",
   solo: "Solo and Boss alone are",
   shop: "The shop is",
   friends: "Friends are",

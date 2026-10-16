@@ -32,6 +32,7 @@ import {
   PRIOR_RATING,
   PURITY_BANDS,
   RAID_SETTINGS,
+  RANKED_1V1,
   RANKING,
   RECLUSE_PHASE2,
   RATING_MIN_MOVES,
@@ -62,6 +63,10 @@ import {
   type PregameVote,
   type Settings,
   type SquadsSettings,
+  controlLabel,
+  rankView,
+  votedControl,
+  zoneControl,
 } from "@chessroyale/core";
 import { clockLabel, defaultClock, minutesName } from "@chessroyale/chess/squads";
 import { anchorsOf, parse, plainText, type Block } from "./markdown.ts";
@@ -100,6 +105,8 @@ export interface FaqSources {
   phase2: typeof RECLUSE_PHASE2;
   /** The opening allowance: points off each early move's loss, through which move, gone by which, the material bar. */
   allowance: { points: number; flatThrough: number; goneBy: number; materialPawns: number };
+  /** Ranked 1 v 1: the time controls and their vote, the game's timings, the ladder, rank points, placements, coins. */
+  ranked: typeof RANKED_1V1;
 }
 
 export const FAQ_DEFAULTS: FaqSources = {
@@ -129,6 +136,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   squadsWatching: SQUADS_LOBBY.watching,
   phase2: RECLUSE_PHASE2,
   allowance: OPENING_ALLOWANCE,
+  ranked: RANKED_1V1,
 };
 
 // ---------------- Numbers as words ----------------
@@ -227,6 +235,8 @@ function modes(src: FaqSources): FaqSection {
 
 ${mercenary(Q)}
 
+${ranked1v1(src.ranked)}
+
 ${leaving(src)}
 
 ### Classic {#mode-classic}
@@ -255,13 +265,41 @@ function squadsClocks(Q: SquadsSettings): string {
   return `Each squad has **one clock for the whole tournament**, a chess time control voted before round 1: ${list}. Nobody voting means ${clockLabel(def)}. ${free}; then your squad's clock runs, twice as fast while two of you are moving. Every move made in time adds its seconds back, so a quick move saves time for later, as on a chess clock. What's left carries into the next round, ${topUps} as you go through. When it runs out, it's **sudden death**: every move within the free seconds, until moves made in time earn some back.`;
 }
 
+/**
+ * Ranked 1 v 1 (Eric, Oct 16; RANKED_1V1): the mode, the time-control vote and its rule (every pair of picks worked out
+ * by the game's own rule, votedControl), the clocks, how a game ends, ranks, rank points, placements and coins.
+ */
+export function ranked1v1(R: typeof RANKED_1V1): string {
+  const z = (id: "bullet" | "blitz" | "rapid") => controlLabel(zoneControl(id, R));
+  const meet = (a: "bullet" | "blitz" | "rapid", b: "bullet" | "blitz" | "rapid") => `**${controlLabel(votedControl(a, b, R))}**`;
+  const def = R.controls.find((c) => c.id === R.defaultControl) ?? R.controls[0]!;
+  const blitz = zoneControl("blitz", R);
+  const tiers = R.tiers.map((t) => t.name);
+  const top = rankView({ games: R.placements.games, ladder: R.placements.maxLadder }, R);
+  const apex = R.apex;
+  const C = R.coins;
+  return `### 1 v 1 · Classic chess {#mode-1v1}
+
+- **Normal chess against one other person, ranked.** Checkmate wins, the clocks are real, and nothing else: no power-ups, no scoring of your moves. One tap on **1 v 1** finds you an opponent near your strength; the longer you wait, the wider the search. If nobody turns up within ${n(R.fewPlayersSeconds, "second")}, you can keep waiting or **play a bot** (unranked: nothing on your record, no coins).
+- **The time control, voted on the board:** before move 1, three zones appear in the middle of the board, **${z("bullet")}** on the left, **${z("blitz")}** in the middle and **${z("rapid")}** on the right, and you both have ${n(R.voteSeconds, "second")} to drag your pawn into one. The same pick plays that control. Picks next to each other meet in between: Bullet and Blitz make ${meet("bullet", "blitz")}, Blitz and Rapid ${meet("blitz", "rapid")}. Bullet against Rapid makes ${meet("bullet", "rapid")}. If only one of you picks, that pick counts; if neither does, it's **${controlLabel(def)}**.
+- **The clocks:** "${controlLabel(blitz)}" means ${n(blitz.baseSeconds / 60, "minute")} each, plus ${n(blitz.incrementSeconds, "second")} after every move. They start after Black's first move. Each side has ${n(R.firstMoveSeconds, "second")} for its first move, or the game is called off (no result, no rank change).
+- **How a game ends:** checkmate; resigning; running out of time, a loss (but a draw if the other player has only a king, or a king and one knight or one bishop, so they couldn't mate); or a draw, by stalemate, threefold repetition, the 50-move rule, too little material for either side to mate, or agreement. **Offer a draw** is under the board: the other player accepts or declines, and after a decline you can offer again once you've made ${n(R.drawOfferEveryMoves, "more move")}.
+- **Lost your connection?** Your clock keeps running: open the app again (or reload) and you're straight back in the game.
+- **Ranks**, as in League of Legends: ${tiers.slice(0, -1).join(", ")} and ${tiers.at(-1)}, each with divisions 4 (the lowest) to 1, then ${apex.map((a) => a.name).slice(0, -1).join(", ")} and ${apex.at(-1)!.name}, with no divisions. A division is ${n(R.pointsPerDivision, "rank point")} (RP): reach ${num(R.pointsPerDivision)} and you go up a division, the extra carried over; drop below 0 and you go down one. There are no promotion series, and nobody goes below ${tiers[0]} 4 with 0 RP. ${apex[1]!.name} starts ${num(apex[1]!.from)} RP into ${apex[0]!.name}, ${apex[2]!.name} ${num(apex[2]!.from)}.
+- **Rank points:** about +${num(R.points.perGame)} for a win and −${num(R.points.perGame)} for a loss against a player at your level, about 0 for a draw; more for beating someone stronger, less for beating someone weaker. Behind them is a hidden rating, worked out from your results and whom you played them against: when your rank is lower than it, you gain more and lose less (up to ${n(R.points.maxAdjust, "RP", "RP")} more or less), so your rank settles where your play is. A win never costs you points.
+- **Placements:** your first ${n(R.placements.games, "game")} show "Placement 1/${R.placements.games}", "2/${R.placements.games}" and so on; after the last of them you're placed by your hidden rating, at most ${top.label.replace(/ · .*/, "")}.
+- **Coins:** a game pays ${num(C.perMinute.win)} coins a minute for a win, ${num(C.perMinute.draw)} for a draw and ${num(C.perMinute.loss)} for a loss, at least 1 and at most ${num(C.maxPerGame)}, once both sides have made ${n(C.minMoves, "move")}. Up to ${n(C.perDay, "game")} a day pay coins; after that they still count for your rank. A called-off game and a bot game pay nothing.
+- **Quick chat** works as in other online matches, and you can mute the other player.`;
+}
+
 /** Leaving or resigning a match, in every mode (LEAVING in settings.ts; Eric, Oct 13). */
 function leaving(src: FaqSources): string {
   const away = src.leaving.awayMs / 1000;
   const gone = away % 60 ? n(away, "second") : n(away / 60, "minute");
   return `### Leaving or resigning {#leaving}
 
-- **To resign:** on a phone, tap **⋯** at the top right of the match, then **Resign**; on a computer, click the **flag** beside the sound button. It asks once more, so a stray tap never resigns. (There's no undo and no draw offer.)
+- **To resign:** on a phone, tap **⋯** at the top right of the match, then **Resign**; on a computer, click the **flag** beside the sound button. It asks once more, so a stray tap never resigns. (There's no undo; only [1 v 1](#mode-1v1) has draw offers.)
+- **1 v 1:** resigning ends the game, a loss. Before both first moves are made it's **Leave** instead: the game is called off, with no result and no rank change.
 - **Solo games and Boss alone:** the game ends there, and it counts as a loss.
 - **Online (Crowd, boss raids, Squads):** you can't end the game for everyone else, so resigning means you leave it. You're out in the last place still open, it counts as a loss (in a match that counts for ranking, for your ranking too), and a bot plays your seat so your team isn't a player short (with Bots off, only when your side would otherwise have nobody left). In Squads your squad plays on with a bot in your seat, and your record has the worst place your squad could still finish.
 - **Before the first move** (the votes, a boss's entrance), it's just **Leave**: you go home, a bot takes your seat, and nothing goes on your record.

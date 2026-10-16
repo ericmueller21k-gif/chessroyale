@@ -12,6 +12,7 @@ and `docs/history/`.
 | The board every screen draws (taps, drags, animation, overlays' sizes, the pieces) | [board.md](board.md) | the director |
 | Squads: 8 squads of 4 in a bracket (Relay, Pairs, the team vote; tokens and blocks); the rules, the sim and the server | [squads.md](squads.md) | the director |
 | Matchmaking, lobbies and ranked | [matchmaking.md](matchmaking.md) | `hub` (joining), `ranked` (matching rules) |
+| Ranked 1 v 1: classic chess, the on-board time-control vote, ranks and placements | [ranked.md](ranked.md) | `ranked` (ratings, ranks, pairing), the director (rules, screens) |
 | The front door: home, queue, profiles, the live line | [hub.md](hub.md) | `hub` |
 | Accounts and sign-in | [accounts.md](accounts.md) | `hub` |
 | Chat: quick chat, lobby chat, global chat | [chat.md](chat.md) | `social` |

@@ -4,10 +4,12 @@ import { Lobby } from "./lobby-do.ts";
 import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
 import { Matchmaker } from "./matchmaker.ts";
+import { DuelGame } from "./duel-do.ts";
 import { LiveHub } from "./live-hub.ts";
 import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
-import { d1Sql, ensureSchema, lobbyResult, purgeEmailCodes, type User } from "./accounts.ts";
+import { d1Sql, ensureSchema, lobbyResult, purgeEmailCodes, sha256, type User } from "./accounts.ts";
+import { duelEntrant, purgeDuelGames } from "./ranked.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
@@ -26,7 +28,7 @@ import type { AccessEnv } from "./access.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 import { isPaused, pausedResponse, switchStatus, type KillSwitchEnv } from "./kill-switches.ts";
 
-export { Lobby, SquadsLobby, SquadsParty, Matchmaker, LiveHub };
+export { Lobby, SquadsLobby, SquadsParty, Matchmaker, LiveHub, DuelGame };
 export { EngineServer } from "./engine.ts";
 
 // The Durable Objects' entry points (their fetch, WebSocket handlers, alarm and the methods the Worker calls): an
@@ -34,7 +36,8 @@ export { EngineServer } from "./engine.ts";
 guardEntries(Lobby, "Lobby", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "joinable", "reserve", "release", "hurry"]);
 guardEntries(SquadsLobby, "SquadsLobby", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "reserve"]);
 guardEntries(SquadsParty, "SquadsParty", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "create", "status"]);
-guardEntries(Matchmaker, "Matchmaker", ["next"]);
+guardEntries(Matchmaker, "Matchmaker", ["next", "duelNext", "cancel"]);
+guardEntries(DuelGame, "DuelGame", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "abandon"]);
 guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "health", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
 
 export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv {
@@ -42,6 +45,8 @@ export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwi
   /** Squads: one object per lobby, and one per party (squads-do.ts). */
   SQUADS: DurableObjectNamespace<SquadsLobby>;
   PARTIES: DurableObjectNamespace<SquadsParty>;
+  /** Ranked 1 v 1: one object per game (duel-do.ts). */
+  DUELS: DurableObjectNamespace<DuelGame>;
   /** "1" (local and e2e only, never production): anyone may use Squads' test controls (else admins only). */
   SQUADS_TEST?: string;
   /**
@@ -80,7 +85,7 @@ export default {
 
   /**
    * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), chat
-   * moderation's old decisions (chat-mod.ts), and fair play's deep re-check of flagged players' moves on the engine
+   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games (ranked.ts), and fair play's deep re-check of flagged players' moves on the engine
    * server (cases in review at once, the rest off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(_event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
@@ -96,6 +101,8 @@ export default {
         await purgeEmailCodes(sql, Date.now()).catch(failed("codes"));
         // Chat moderation's decisions past keeping (chat-mod.ts).
         await pruneChatMod(sql, Date.now()).catch(failed("chat"));
+        // Ranked 1 v 1's games past keeping (ranked.ts: RANKED_1V1.gamesKeepDays, longer for a player in a fair-play review).
+        await purgeDuelGames(sql, Date.now()).catch(failed("duels"));
         const env = await withSecrets(rawEnv);
         const search = containerSearch(env);
         if (!search) return;
@@ -121,7 +128,7 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
     {
       ip: request.headers.get("cf-connecting-ip"),
       session: readCookie(request, SESSION_COOKIE),
-      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname)),
+      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || url.pathname === "/api/1v1/play" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname)),
       friends: request.method === "POST" && url.pathname.startsWith("/api/friends/"),
     },
     t,
@@ -231,6 +238,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // Squads (docs/areas/squads.md, "The server"): its queue, parties and lobbies, and the test lobby.
     const squads = await squadsRoute(request, env, url, waitUntil);
     if (squads) return squads;
+    // Ranked 1 v 1 (docs/areas/ranked.md): its queue and its games.
+    const duel = await duelRoute(request, env, url, waitUntil);
+    if (duel) return duel;
     // GET /api/lobby/CODE → { open: true, phase } | 404 { open: false, message }: whether a lobby (an invite link, a
     // stale tab) is still open. Once its match is over, also your result in it, for "See your result".
     const st = url.pathname.match(/^\/api\/lobby\/([A-Z2-9]{5})$/i);
@@ -312,6 +322,64 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
   if (m[3]) return (await stub.exists()) ? stub.fetch(request) : json({ message: "We couldn't find that lobby." }, 404);
   const status = request.method === "GET" ? await stub.status() : null;
   return status ? json({ open: true, phase: status.phase }) : json({ open: false, message: MATCH_ENDED }, 404);
+}
+
+/**
+ * Ranked 1 v 1 (docs/areas/ranked.md):
+ *   POST /api/1v1/play[?ticket=&pool=&clock=] → { code } | { searching, ticket, waitedMs } | { expired } | busy: the
+ *     queue. The first ask reads the player from their account (name, look, rank, hidden rating: ranked.ts) and makes
+ *     a ticket; the app asks again with it at once (each ask waits up to CAPACITY.queue.holdMs) until it's paired. A
+ *     ticket the queue doesn't know (gone while the app slept) is `expired`: the app asks afresh. Signed in where
+ *     sign-in is set up, not banned (mayPlay), as every mode; refused while PAUSE_RANKED1V1 rests the mode.
+ *     Test switches: `pool` (a queue of its own), `clock=SECONDS` (each side's clock, no increment).
+ *   POST /api/1v1/cancel?ticket= → {}: Cancel. A ticket paired just now: that game is called off for its player (an
+ *     abort before any move: nothing recorded; the other player hears it at once).
+ *   GET /api/1v1/game/CODE → { open, phase } | 404; /api/1v1/game/CODE/ws: its WebSocket (the two players only).
+ */
+async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUntil): Promise<Response | null> {
+  if (!url.pathname.startsWith("/api/1v1/")) return null;
+  const region = regionOf(request.cf as { continent?: unknown } | undefined);
+  const queue = async () => env.MATCHMAKER.get(env.MATCHMAKER.idFromName(queueName("ranked1v1", "default", await testPool(request, env, url, waitUntil), region)), region ? { locationHint: REGION_HINT[region] } : undefined);
+  const ticket = ((t) => (t && /^[\w-]{8,64}$/.test(t) ? t : null))(url.searchParams.get("ticket"));
+  if (url.pathname === "/api/1v1/play" && request.method === "POST") {
+    if (isPaused(env, "ranked1v1")) return pausedResponse("ranked1v1");
+    const refused = await mayPlay(request, env, waitUntil);
+    if (refused) return refused;
+    if (!env.DB) return json({ message: "Ranked 1 v 1 isn't available here." }, 503);
+    try {
+      if (ticket) return json(await (await queue()).duelNext(ticket));
+      const me = await accountOf(request, env, waitUntil);
+      if (!me) return json({ message: SIGN_IN_TO_PLAY }, 401);
+      const sql = d1Sql(env.DB);
+      await ensureSchema(sql, env.DB);
+      const { player, rating, rd } = await duelEntrant(sql, me);
+      const clock = Number(url.searchParams.get("clock"));
+      const testSeconds = url.searchParams.has("clock") && Number.isFinite(clock) && clock > 0 && (await testSwitches(request, env, waitUntil)) ? Math.min(3600, Math.round(clock)) : null;
+      // (The first answer also carries the hidden rating, rounded: the bot a player may choose meets them there.)
+      // (The device's marker, hashed: two accounts on one device never meet. Fair play's device cookie.)
+      const deviceCookie = readCookie(request, DEVICE_COOKIE);
+      const device = deviceCookie ? (await sha256(`1v1:${deviceCookie}`)).slice(0, 24) : null;
+      const first = await (await queue()).duelNext(null, { uid: me.id, rating, rd, player, device, ...(testSeconds ? { testSeconds } : {}) });
+      return json({ ...first, botRating: Math.round(rating) });
+    } catch {
+      return json({ message: "Couldn't find a match. Try again." }, 500);
+    }
+  }
+  if (url.pathname === "/api/1v1/cancel" && request.method === "POST") {
+    if (!ticket) return json({});
+    const placed: { code?: string } = await (await queue()).cancel(ticket).catch(() => ({}));
+    if (placed.code) {
+      const me = await accountOf(request, env, waitUntil).catch(() => null);
+      if (me) await env.DUELS.get(env.DUELS.idFromName(placed.code)).abandon(me.id).catch(() => undefined);
+    }
+    return json({});
+  }
+  const m = url.pathname.match(/^\/api\/1v1\/game\/([A-Z2-9]{5})(\/ws)?$/i);
+  if (!m) return json({ message: "Not found" }, 404);
+  const stub = env.DUELS.get(env.DUELS.idFromName(m[1]!.toUpperCase()));
+  if (m[2]) return (await stub.exists()) ? stub.fetch(request) : json({ message: "That game has ended." }, 404);
+  const status = request.method === "GET" ? await stub.status() : null;
+  return status ? json({ open: true, phase: status.phase }) : json({ open: false, message: "That game has ended." }, 404);
 }
 
 /**
