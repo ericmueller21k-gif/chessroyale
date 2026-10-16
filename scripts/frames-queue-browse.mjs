@@ -79,6 +79,8 @@ async function run(scheme) {
   await a.screenshot({ path: join(out, `${scheme}-2-home.png`) });
   await a.getByRole("button", { name: "Shop & crates" }).click();
   await a.getByRole("heading", { name: "Shop" }).waitFor();
+  // (The tap scrolled home down to its button; a player in the shop starts at its top.)
+  await a.evaluate(() => window.scrollTo(0, 0));
   log(`  shop at ${t()} ms ${JSON.stringify(await where(a))}`);
   await sleep(1800);
   await a.screenshot({ path: join(out, `${scheme}-3-shop.png`) });
