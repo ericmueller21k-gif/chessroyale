@@ -15975,8 +15975,9 @@ button.sq-tiny {
   }
 }
 
-/* A pawn vote's first-time hint (components/VoteHint.tsx): a short box, placed by its caller. */
-.vote-hint {
+/* A pawn vote's first-time hint (components/VoteHint.tsx): a short box, placed by its caller. (Not `.vote-hint`: that is
+   Crowd's line above the vote board, Vote.tsx.) */
+.first-vote-hint {
   max-width: 92%;
   padding: 6px 10px;
   border-radius: 10px;
@@ -15990,7 +15991,7 @@ button.sq-tiny {
   pointer-events: none;
 }
 /* 1 v 1's: at the foot of the board, under your pawn, pointing up at it. */
-.vote-hint.dv-hint {
+.first-vote-hint.dv-hint {
   position: absolute;
   left: 50%;
   bottom: 2.5%;
@@ -15998,7 +15999,7 @@ button.sq-tiny {
   transform: translateX(-50%);
   white-space: nowrap;
 }
-.vote-hint.dv-hint::before {
+.first-vote-hint.dv-hint::before {
   content: "";
   position: absolute;
   left: 50%;

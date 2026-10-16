@@ -49,7 +49,7 @@ export function useVoteHint(active: boolean, done: boolean): boolean {
 export function VoteHint({ text, show, class: cls = "" }: { text: string; show: boolean; class?: string }) {
   if (!show) return null;
   return (
-    <div class={`vote-hint ${cls}`} role="note">
+    <div class={`first-vote-hint ${cls}`} role="note">
       {text}
     </div>
   );
