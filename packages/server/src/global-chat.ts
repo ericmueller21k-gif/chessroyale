@@ -153,6 +153,19 @@ export class GlobalChat {
     return this.add({ at: now, from: name, name, rating: null, bot: true, icon: PAWN, say });
   }
 
+  /** A player's own lines still kept (their download). */
+  linesOf(accountId: string): GlobalLine[] {
+    return this.kept.filter((l) => l.from === accountId && !l.bot);
+  }
+
+  /** A deleted account: its lines leave the chat (their drawn icons with them, by unusedIcons). Whether any did. */
+  forgetAccount(accountId: string): boolean {
+    this.lastPost.delete(accountId);
+    const before = this.kept.length;
+    this.kept = this.kept.filter((l) => l.from !== accountId || !!l.bot);
+    return this.kept.length !== before;
+  }
+
   /** A drawn icon by its key (one on a line still kept). */
   icon(key: string): string | undefined {
     return this.drawn.get(key);

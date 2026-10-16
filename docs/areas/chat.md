@@ -29,6 +29,8 @@ Lane: `social`.
   account every `GLOBAL_CHAT.gapMs`, the last `keep` lines kept for newcomers. Reading rides on the live line's poll
   (`/api/live?chat=N`): no socket or poll of its own. Posting is POST `/api/chat`; guests read only. With
   `GLOBAL_CHAT_BOTS` on, a bot line now and then while someone has it open (made when someone asks, never on a timer).
+  A deleted account's lines leave it (`GlobalChat.forgetAccount`, through the live hub), and a player's own lines are
+  in their data download ([accounts.md](accounts.md)).
 
 ## Where the code is
 
