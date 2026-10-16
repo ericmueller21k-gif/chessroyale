@@ -28,11 +28,29 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   that very moment is called off for that player (`DuelGame.abandon`: an abort before any move, nothing recorded).
   After `fewPlayersSeconds` (45) the app offers "Few players online right now" with Keep waiting and Play a bot
   (unranked).
+- **The stage** (Eric, Oct 16: "your character's sitting there, and then there's like kind of this empty platform thing
+  like waiting, and then when your opponent joins, like their pawn loads up next to you"; `components/DuelStage.tsx`,
+  styles `dv-st-`; why: [docs/decisions/2026-10-16-ranked-1v1-versus-screen.md](../decisions/2026-10-16-ranked-1v1-versus-screen.md)).
+  The search and the versus moment are one screen, in the home screen's frame (the side menu stays on a computer; any
+  of its pages but your profile leaves the queue or the game first):
+  - **searching:** "1 v 1 / Classic chess" at the top; your big dressed pawn drops onto a platform on the left (gold
+    rim), your name and rank under it; on the right an empty platform, a faint pawn's outline breathing and rings
+    rising off it, "Finding opponent…" and the time waited under it; Cancel at the bottom, and "Few players online right
+    now" above it when it comes;
+  - **found:** while the game object waits for both players the right platform stays empty ("Opponent found…"); as the
+    versus moment starts the opponent's pawn drops onto it (0.42 s), their name and rank rise in under it, "VS" pops in
+    between, and "You play White" (or Black) takes Cancel's place. It holds for the rest of `versusMs`, then the board
+    (the bot game: the same, with the bot's pawn);
+  - **sizes:** each side half the width (the pawn's box a little wider, into the gutter and the gap), never so tall
+    that the stage with "Few players online" and Cancel leaves the screen, at most 320 px (a computer). The space under
+    the stage is always as tall as "Few players online" and Cancel together, and the names' space as tall as the
+    longest name and rank on two lines each, so nothing on the stage moves when the opponent (or the bot) arrives;
+  - **motion:** transforms and opacity only (the drops, the waiting rings and outline, a slight breathing of each pawn
+    from its foot, "VS"); `prefers-reduced-motion` turns them all off.
 - **A game** (`duel-room.ts`, pure, around the rules in `@chessroyale/chess/duel`; `duel-do.ts`, the `DuelGame` object):
   - **waiting** for both players' sockets (seats by account: a reload or another device of theirs goes straight back
     in), at most `joinSeconds` (10), or it's called off ("no_show", nothing recorded);
-  - **versus** (`versusMs`, 2.5 s): the "found" moment, both players' names, looks and ranks (the versus art comes
-    later; today a plain placeholder, `DuelVersus`);
+  - **versus** (`versusMs`, 2.5 s): the "found" moment on the stage (above): both players' pawns, names and ranks;
   - **the vote** (`voteSeconds`, 5): three zones on the game's own board (ranks 4 and 5; Bullet, Blitz, Rapid left to
     right from either side), each player's dressed pawn off the grid on their own side's line between their second and
     third ranks. Drag it into a zone, or tap it and then a zone; it can change until time's up; the other's moves live.
@@ -136,7 +154,8 @@ entry says the same.
 | Routes, the cron's purge | `packages/server/src/index.ts` (`duelRoute`, `scheduled`) |
 | Fair play's engine check of 1 v 1 games | `packages/server/src/fairplay-duel.ts`; the case page in `admin.ts` |
 | The app: queue, online game, bot game, the way in | `packages/app/src/duel.ts` |
-| The screens; the vote on the board; the hint; the rank pill | `packages/app/src/screens/Duel.tsx`, `components/DuelVote.tsx`, `VoteHint.tsx`, `DuelRankPill.tsx`; styles `dv-` in `styles.css` |
+| The screens (`DuelFront`: the stage, then the board); the stage; the vote on the board; the hint; the rank pill | `packages/app/src/screens/Duel.tsx`, `components/DuelStage.tsx`, `DuelVote.tsx`, `VoteHint.tsx`, `DuelRankPill.tsx`; styles `dv-` in `styles.css` |
+| The stage, recorded (GIFs and stills, light and dark, 320-1280 px) | `scripts/frames-versus.mjs` |
 | The home screen's helper | `packages/app/src/ranked.ts` (`ranked1v1Label`, `ranked1v1Rank`) |
 | Wiring (`/1v1`, `/1v1/CODE`) | `packages/app/src/App.tsx` |
 
@@ -176,7 +195,14 @@ kill switch `PAUSE_RANKED1V1`.
   tap, the overlay, the board unmoved from the vote to the game, checkmate by taps, ranks moving; resigning, then a
   flag after Play again; an aborted game; a reload mid-game back into the same game with its clocks running, a
   declined draw offer then a draw both agree to; Leave before the first moves; the search's Cancel, "Few players
-  online", Keep waiting, a bot game).
+  online", Keep waiting, a bot game arriving on the same stage; the stage: your pawn on the left platform while
+  searching, the opponent's pawn, name and rank on the right when found, your pawn's element kept and nothing on the
+  stage moved, held for `versusMs`, then the board; the stage whole at 320, 360 and 390 px (1280 on a computer) with
+  the longest names and ranks, searching with "Few players online" and in the versus moment (held there by the test's
+  own copy of the game's messages), no scroll either way, nothing animating under reduced motion).
+- Frames: `node scripts/frames-versus.mjs <dir>` (against a local Worker) records the search and an opponent arriving
+  at 390 px, light and dark (GIFs), stills at 320, 360, 390 and 1280 px, "Few players online" and the bot, and flags
+  the stage moving or the page scrolling sideways.
 
 ## Rules for this area
 
@@ -184,6 +210,10 @@ kill switch `PAUSE_RANKED1V1`.
   move a rank.
 - Every number in `RANKED_1V1`; the FAQ quotes them from there. A change to the rating, the points, placements or
   pairing is measured with the simulation first (the ranked lane's rule).
+- The search and the versus moment are the same `DuelStage` element under the same component (`DuelFront`), so Preact
+  keeps it from one to the other: your pawn is never drawn again (its drop would play twice). Render them through
+  `searchStage` / `versusStage`, never as components of their own.
+- Nothing on the stage moves when something arrives or goes: anything new on it is absolute, or has its room kept.
 - 1 v 1's CSS classes start with `dv-` (the shared hint's is `first-vote-hint`): a generic name can already be someone
   else's. (`.vote-hint` was Crowd's line above its vote board; styling it moved that board 12 px, caught by
   `votes.spec.ts`.)
