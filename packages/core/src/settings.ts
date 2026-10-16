@@ -1630,6 +1630,23 @@ export const FRIENDS = {
 } as const;
 
 /**
+ * The age gate (Eric, Oct 16, 2026: "13 younger is guest only. If they lie then so be it, we did our part.";
+ * docs/decisions/2026-10-16-age-gate-and-real-money.md): before any sign-in, a neutral question asks for the birth
+ * month and year. Old enough: sign in. Younger: guest play only, under the default name and icon, and this device can't
+ * sign in. Self-declared; the birth date is never sent or stored, only the answer (age-gate.ts).
+ */
+export const AGE_GATE = {
+  /** The youngest age that may make an account (sign in), in whole years. */
+  minAge: 13,
+  /** The question's years go back this far from this year (newest first, none chosen to start with). */
+  years: 100,
+  /** An "old enough" answer lets this device sign in once, within this many minutes; then it's asked again. */
+  answerMinutes: 60,
+  /** A "too young" answer stays on this device this long (400 days: the most a browser keeps a cookie). */
+  tooYoungDays: 400,
+} as const;
+
+/**
  * Capacity (the `ops` delegate): the matchmaker's batches and admission, overload, presence and the live line's
  * write limits, and the API's rate limits. See DECISIONS.md, "Capacity: built".
  */

@@ -13,8 +13,8 @@
  * scrubbed from any text). Rows older than OPS.store.keepDays go with the 15-minute cron (pruneProblems).
  */
 import { OPS } from "@chessroyale/core";
-import { d1Sql, ensureSchema, type Sql } from "./accounts.ts";
-import { SESSION_COOKIE, readCookie, type WaitUntil } from "./api.ts";
+import { d1Sql, ensureSchema, getUser, type Sql } from "./accounts.ts";
+import { SESSION_COOKIE, ageAnswer, isSignedIn, readCookie, type WaitUntil } from "./api.ts";
 import { randomCode } from "./codes.ts";
 import { RateLimiter, TOO_MANY, isSessionToken, problemLimited } from "./limits.ts";
 import { cachedUserId } from "./presence.ts";
@@ -504,6 +504,16 @@ export async function handleProblems(request: Request, env: ProblemsEnv, waitUnt
   if (!env.DB) return json({ message: "Not set up here." }, 503);
   const sql = d1Sql(env.DB);
   await ensureSchema(sql, env.DB);
+  // A guest on a device that answered the age question "too young" sends nothing it typed: a bug keeps its diagnostics
+  // without the note, and feedback or an idea (a note alone) isn't taken. Someone signed in there is as anywhere
+  // (docs/decisions/2026-10-16-age-gate-and-real-money.md). (A read only for such a device's reports.)
+  if (p.kind !== "errors" && ageAnswer(request) === "under") {
+    const uid = isSessionToken(token) ? await cachedUserId(sql, token, now) : null;
+    if (!isSignedIn(uid ? await getUser(sql, uid) : null)) {
+      if (p.kind !== "bug") return json({ message: "Bad request" }, 400);
+      p.note = "";
+    }
+  }
   // The account id only if it's this session's (the app sends it only when signed in, and only with errors and bugs);
   // cached, so rarely a D1 read.
   const account = p.kind !== "feedback" && p.kind !== "idea" && p.diag.account && isSessionToken(token) && (await cachedUserId(sql, token, now)) === p.diag.account ? p.diag.account : null;

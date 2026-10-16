@@ -174,6 +174,14 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
   never takes the form away). Opened on Report a bug from the match menu (a phone's "⋯" sheet; a computer's 🐞 button
   beside the sound button, except where an admin's testing items fill that line), and on Feedback from Settings
   (HELP).
+- **Under the age gate** (Oct 16; [docs/decisions/2026-10-16-age-gate-and-real-money.md](../decisions/2026-10-16-age-gate-and-real-money.md)):
+  a guest on a device that answered "too young" (the `hc_age=under` cookie) types nothing to us.
+  - **The sheet:** opened from anywhere, it's a bug report with no kinds and no note box: "Sends details of this
+    screen and device, to help us fix a bug. Nothing you type."
+  - **`/api/problems`:** for such a request (any `hc_age=under` in it, and no signed-in session), a bug is kept with
+    its diagnostics and an empty note, and feedback or an idea gets a 400. Someone signed in on that device is treated
+    as anywhere else.
+  - Errors are unchanged.
 - **The endpoint:** `POST /api/problems` (`packages/server/src/problems.ts`), `{kind: "errors"}`, or a report:
   `{kind: "bug" | "feedback" | "idea"}`. In order: 415 unless the body is JSON (`content-type: application/json`: a
   form can't send it) and 403 when the browser says another site's page sent it (`sec-fetch-site` other than

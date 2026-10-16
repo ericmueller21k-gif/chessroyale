@@ -3481,6 +3481,26 @@ button.history-label {
 .signin-row .btn {
   flex: none;
 }
+/* The age question: the month and the year share the row, 3 to 2 (measured at 320 px: "September" and a year each
+   have about 28 px to spare; evenly, the month had 7), Continue below them. */
+.signin-born select {
+  flex: 3 1 0;
+  min-width: 0;
+  font: inherit;
+  padding: 0 10px;
+  min-height: 50px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+.signin-born select:last-child {
+  flex-grow: 2;
+}
+.signin-ask,
+.signin-young {
+  margin: 0;
+}
 .profile-actions {
   display: flex;
   gap: 8px;

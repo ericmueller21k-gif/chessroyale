@@ -13,6 +13,25 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   ([docs/decisions/2026-10-16-integrity-followups.md](../decisions/2026-10-16-integrity-followups.md)). Codes and session tokens are stored
   hashed (SHA-256). Google's ID token comes straight from Google's token endpoint over TLS; `aud` is checked and the
   email used only when Google marks it verified.
+- **The age gate** (Oct 16; [docs/decisions/2026-10-16-age-gate-and-real-money.md](../decisions/2026-10-16-age-gate-and-real-money.md)):
+  13 or older for an account (Eric). Before every sign-in, the sign-in box asks "when were you born?" (a month and a
+  year, nothing chosen, no age mentioned).
+  - The app works the answer out (`oldEnough` in `packages/core/src/age-gate.ts`, whole months) and posts only
+    `{oldEnough}` to POST `/api/auth/age`. The birth date is never sent or stored.
+  - **Old enough:** the cookie `hc_age=ok` lets this device sign in once, within `AGE_GATE.answerMinutes`. Each
+    sign-in's start (an emailed code, the trip to Google) gives it that time again, so it can't run out halfway. The
+    sign-in uses it up and sets `users.age_ok_at` (the first time only). Accounts from before the gate are asked at
+    their next sign-in.
+  - **Refused for want of it** (it ran out, or another tab's sign-in used it up): the question comes back with
+    `ASK_AGE_LINE` (Google's start: `?signin=age`).
+  - **Too young:** `hc_age=under` (HttpOnly, `AGE_GATE.tooYoungDays`) and the app's `brc.tooYoung` flag, each putting
+    the other back. Every sign-in step refuses that device (email start and verify, Google start and callback), and no
+    later answer replaces it. Any `hc_age=under` in a request counts (`ageAnswer`), however many `hc_age` it carries.
+  - **Its guest:** the default name and icon (reset at the answer; a guest's PATCH `/api/me` refused; "Edit name &
+    icon" hidden). No sign-in prompts: the landing says "Online play needs an account". The feedback sheet sends a bug
+    report with no note (`problems.ts` drops a guest's). Someone already signed in on that browser keeps all of these
+    (`youngGuest` in the app).
+  - "Delete account" keeps the flag.
 - **Signing in keeps what you played as a guest.** A new identity attaches to your current account; one that already
   belongs to an account switches you to it, moves your guest results, items, coins and crates over and deletes the
   empty guest. That whole merge is one batch (one transaction): two sign-ins at once move the coins once, a buy in
@@ -99,6 +118,7 @@ stay in the live hub's memory (never written).
 | Accounts, sessions, identities, profiles, results (D1, behind a tiny SQL interface) | `packages/server/src/accounts.ts` |
 | The account API (`/api/me`, `/api/auth/*`, `/api/profile/*`, `/api/results`, …) | `packages/server/src/api.ts`, routed from `index.ts` |
 | App side: your account, signing in | `packages/app/src/account.ts`, `components/SignIn.tsx` |
+| The age gate: its rule and lines (core), the answer's route and checks (`ageAnswer`, `ageRefusal`, POST `/api/auth/age`), the app's question and flag (`answerAge`, `tooYoung`) | `packages/core/src/age-gate.ts`, `packages/server/src/api.ts`, `packages/app/src/account.ts`, `components/SignIn.tsx` |
 | The privacy policy, terms and copyright page | `packages/app/src/screens/Legal.tsx` |
 | Download my data and deleting an account: every store's part (`ACCOUNT_STORES`), the routes `/api/me/data` and `/api/me/delete` | `packages/server/src/account-data.ts`, `api.ts`; the live hub's part `live-hub.ts` (`accountData`, `forgetAccount`) |
 | App side: Settings → ACCOUNT's download link and delete confirmation | `packages/app/src/components/AccountData.tsx`, `account.ts` (`deleteMyAccount`) |
@@ -110,16 +130,20 @@ stay in the live hub's memory (never written).
 
 Worker variables and secrets (see `DEPLOY.md`): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`,
 `EMAIL_FROM`, `ADMIN_EMAILS`, `PAUSE_FRIENDS`; the D1 binding `DB`. Rate limits on the API: `CAPACITY.rateLimits` (its
-`friends` burst limit); friends' caps and expiries: `FRIENDS`.
+`friends` burst limit); friends' caps and expiries: `FRIENDS`. The age gate: `AGE_GATE` (the minimum age, the years
+offered, how long each answer lasts).
 
 ## Tests
 
-- Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `account-data.test.ts` (every
+- Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `age-gate.test.ts` (every
+  sign-in behind the answer, a too-young device refused, the guest's defaults, nothing but the answer kept), with the
+  rule's in `packages/core/test/age-gate.test.ts` and the app's in `packages/app/test/age-gate.test.ts`; `account-data.test.ts` (every
   table covered, the download, deleting in every store, a kept ban, the API, the live hub's part); `friends.test.ts` (requests,
   blocks, invites and the settings, the caps, expiry, hidden status, `deleteSocial`, the API and its kill switch, the
   live board's news and "in a match"); `packages/app/test/friends.test.ts` (the list, the toast, hiding blocked chat,
   inviting from the front door).
-- e2e: `e2e/account.spec.ts`, `account-delete.spec.ts` (download, the confirmation, deleting; reads the local D1),
+- e2e: `e2e/age-gate.spec.ts` (the question, the under-13 path into guest play, the 13+ path making an account),
+  `e2e/account.spec.ts`, `account-delete.spec.ts` (download, the confirmation, deleting; reads the local D1),
   `profile.spec.ts`, `legal.spec.ts` (the privacy policy, terms and copyright page),
   `friends.spec.ts` (two players: request, accept, online, the invites setting, an invite joined from its toast, a
   block).
@@ -128,5 +152,8 @@ Worker variables and secrets (see `DEPLOY.md`): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIE
 
 - Secrets never in the repo or in output; Eric does sign-ups and purchases.
 - A profile others can see never shows an email, a sign-in method or anything not on the approved list.
+- Every way to sign in goes through `ageRefusal`, and a guest under the gate gets nothing that takes typed text or lets
+  others reach them (the decision file's guest audit). A new way to sign in, or a new place to type, checks the age
+  answer in the same PR.
 - A new table goes in `ACCOUNT_STORES` (`account-data.ts`: its part of the download, and what deleting does to it)
   with its line in the privacy policy, or in `NO_ACCOUNT_DATA` with why it holds nothing about anyone, in the same PR.
