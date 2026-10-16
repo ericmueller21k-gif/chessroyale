@@ -144,6 +144,13 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   When an engine's answer looks impossible, find out why and measure how often across many positions before adding a
   fallback where it showed.
 
+- **A queen banner that came back after the ult** (Oct 16, [story](../docs/history/lessons.md#a-queen-banner-that-came-back-after-the-ult-oct-16-2026)):
+  - A banner for something that happened (a capture, a power) is keyed to that event happening, never to a state that
+    stays true afterwards: a power that pauses the turn shows the same state again (`queenSlain`, not "the last move
+    took a queen").
+  - When a turn has more than one screen of the same kind (a thinking before a power and one after it), check
+    everything drawn from that state on each of them.
+
 ## Servers: everything ends
 
 - **A lobby that never closed** (Oct 7, [story](../docs/history/lessons.md#a-lobby-that-never-closed-oct-7-2026)):

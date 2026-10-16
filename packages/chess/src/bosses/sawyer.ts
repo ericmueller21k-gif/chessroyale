@@ -21,17 +21,17 @@ import { VALUE, crowdHalf, from, meterFull, other, powerRoll, testSwitch, to, tu
 
 /**
  * The split, beat by beat (ms into its moment, after his first move shows; nobody's clock runs):
- *   0         "SPLIT PAWN!" (his banner).
+ *   0         "SPLIT PAWN!" (his banner, to `bannerMs`).
  *   hopAt     he leaps from his corner onto the pawn (`landAt`: his saw's tip over it).
  *   sawAt     he saws (his `sawDown`, its `cut` cue at `cutAt`), the blade buzzing in the pawn.
  *   crackAt   the pawn cracks in two (a wood crack): the halves come apart, one onto the square beside it,
  *             settled by `settledAt` (the board shows both as halves from then).
  *   backAt    he hops back to his corner (gone from the board by `total`).
  */
-export const SPLIT = { hopAt: 1100, landAt: 1600, sawAt: 1650, cutAt: 1970, crackAt: 2450, settledAt: 2950, backAt: 3050, total: 3600 } as const;
+export const SPLIT = { bannerMs: 1300, hopAt: 1100, landAt: 1600, sawAt: 1650, cutAt: 1970, crackAt: 2450, settledAt: 2950, backAt: 3050, total: 3600 } as const;
 
 /** A saw cut: the banner, his `sawDown` at the board's corner, its `cut` cue as the groove opens along the edge (`openMs`). */
-export const SAW_CUT = { cutAt: 1500, openMs: 380, ms: 3300 } as const;
+export const SAW_CUT = { cutAt: 1500, openMs: 380, ms: 2300 } as const;
 
 /**
  * The board saw, beat by beat (ms into its moment, as the crowd's turn begins):

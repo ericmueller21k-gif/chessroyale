@@ -13,7 +13,7 @@ import {
   bossThinkMs,
   powerMomentMs,
   LAST_STAND_MS,
-  lastMoveTookQueen,
+  queenSlain,
   legalMoves,
   netBoard,
   boardSlots,
@@ -1237,7 +1237,8 @@ export class LobbyCore {
         return this.bossTimeout();
       case "bossPlay":
         this.r.bossMinAt = undefined;
-        return this.r.bossPending ? this.playBoss(this.r.bossPending, this.r.bossPendingExtras ?? {}) : undefined;
+        // (A held bounce may be "": nothing within the cap, the bounces still play.)
+        return this.r.bossPending !== undefined ? this.playBoss(this.r.bossPending, this.r.bossPendingExtras ?? {}) : undefined;
       case "autoStart":
         // Matchmade: time's up, bots fill the rest (if anyone is still here). Bots off: a raid with enough people begins.
         if (this.r.humans.some((h) => h.connected) && this.dueToStart()) this.startMatch();
@@ -1349,17 +1350,24 @@ export class LobbyCore {
     this.r.phase = "boss";
     this.r.bossKey = `b-${++this.r.counter}`;
     this.r.bossKind = this.runner!.bossMoveKind();
-    // You just took its queen: the boss's reply waits for your banner (otherwise it shows as soon as it's ready).
-    const board = this.runner!.boards.get(this.runner!.state.boards[0]!)!;
-    // (G-REX's fire has just burnt something: that plays first too.)
-    const b = this.runner!.state.boss;
-    const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves && (x.piece || x.fizzled));
-    this.r.bossMinAt = lastMoveTookQueen(board.history, board.bases) || burnt ? this.io.now() + bossThinkMs(board.history, board.bases, burnt) : undefined;
+    this.r.bossMinAt = this.thinkMinAt();
     this.broadcast(this.bossMessage(0, { thinking: true }));
     const host = this.hostNow();
     this.r.hostId = host;
     if (host) this.sendBossRequest(host);
     this.setTimer("bossTimeout", this.io.now() + bossTimeoutMs(this.bossAsks()));
+  }
+
+  /**
+   * The soonest the boss's thinking may end (undefined: as soon as the host answers). You just took his queen: your
+   * banner plays first (queenSlain: in the thinking straight after your move only, so Big Boy's bounce waits for it and
+   * his move after the bounce doesn't). G-REX's fire has just burnt something: that plays first too.
+   */
+  private thinkMinAt(): number | undefined {
+    const view = this.runner!.bossView()!;
+    const b = this.runner!.state.boss;
+    const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves && (x.piece || x.fizzled));
+    return queenSlain(view) || burnt ? this.io.now() + bossThinkMs(view, burnt) : undefined;
   }
 
   /** What the boss's own turn asks the host for besides its move (Wrangler's long pull, drag or showdown), or null. */
@@ -1416,7 +1424,7 @@ export class LobbyCore {
     this.r.phase = "boss";
     this.r.bossKey = `y-${++this.r.counter}`;
     this.r.bossKind = "bounce";
-    this.r.bossMinAt = undefined;
+    this.r.bossMinAt = this.thinkMinAt();
     this.r.bounceCandidates = this.runner!.bounceCandidates();
     this.broadcast(this.bossMessage(0, { thinking: true }));
     const host = this.hostNow();
@@ -1460,6 +1468,14 @@ export class LobbyCore {
 
   private playBoss(move: string, extras: { drag?: string; showdown?: string; outside?: boolean } = {}) {
     this.r.bossKey = undefined;
+    // Too soon (your queen banner is still up): hold the move (or Big Boy's bounce) until then.
+    if (this.r.bossMinAt && this.io.now() < this.r.bossMinAt - 50) {
+      this.r.bossPending = move;
+      this.r.bossPendingExtras = extras;
+      return this.setTimer("bossPlay", this.r.bossMinAt);
+    }
+    this.r.bossPending = undefined;
+    this.r.bossPendingExtras = undefined;
     if (this.r.bossKind === "bounce") {
       // The Big Bounce: the position the host picked (one of the candidates, else nothing moves); it plays out, then
       // his move.
@@ -1487,14 +1503,6 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
-    // Too soon (your queen banner is still up): hold the move until then.
-    if (this.r.bossMinAt && this.io.now() < this.r.bossMinAt - 50) {
-      this.r.bossPending = move;
-      this.r.bossPendingExtras = extras;
-      return this.setTimer("bossPlay", this.r.bossMinAt);
-    }
-    this.r.bossPending = undefined;
-    this.r.bossPendingExtras = undefined;
     // (Wrangler's drag or showdown line-up: the runner checks each against his rules before it's used.)
     this.runner!.applyBossMove(move, undefined, { drag: extras.drag ?? null, showdown: extras.showdown ?? null, outside: extras.outside ?? null });
     // As the turn passes to the crowd, any power that comes with it (a freeze, a pie, the warning, the blizzard)

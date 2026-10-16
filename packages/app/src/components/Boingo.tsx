@@ -12,7 +12,7 @@ import { Flight, hash, onSquare, type BossUi, type Moment, type MomentProps } fr
  * rules: packages/chess/src/bosses/boingo.ts.
  */
 
-/** The pie's beats: the banner, then his throw, the pie's flight from his side, the splat. */
+/** The pie's beats: the banner (gone as he throws), then his throw, the pie's flight from his side, the splat. */
 export const PIE = { flyAt: 1450, landAt: 1800 } as const;
 
 // ---------------- The funhouse's beats (ms into its moment) ----------------
@@ -23,9 +23,9 @@ export const PIE = { flyAt: 1450, landAt: 1800 } as const;
  * its `flip` cue), his joke, the crowd's move he plays for it (Eric, Oct 12: "the forced move is the joke"), and he
  * bounces off. Then he replies with his own move.
  */
-export const FUNHOUSE = { clownAt: 2300, flipMs: 700, lineAt: 3700, moveAt: 4500, exitAt: 5500 } as const;
+export const FUNHOUSE = { clownAt: 1300, flipMs: 700, lineAt: 2700, moveAt: 3500, exitAt: 4500 } as const;
 /** Each later step of the funhouse (the board turns again as a crowd turn begins): its banner, then the turn. */
-export const SPIN = { spinAt: 2300, spinMs: 700, lineAt: 2300 } as const;
+export const SPIN = { spinAt: 1300, spinMs: 700, lineAt: 1300 } as const;
 
 /** When the board starts its spin (ms into the funhouse's moment): on the funhouse animation's `flip` cue. */
 export function funhouseFlipAt(kit: BossKit | null): number {
@@ -84,7 +84,7 @@ export const SPIN_LINES = ["Wheee! Round we go!", "Dizzy yet? Honk!", "Hold on t
 function pieMoment({ moment, t, orientation, banner, cast }: MomentProps) {
   return (
     <div class="power-moment pm-pie">
-      {t < 2500 && banner("PIE!", moment.square ? `Splat on ${moment.square}` : undefined)}
+      {banner("PIE!", moment.square ? `Splat on ${moment.square}` : undefined, "", PIE.flyAt)}
       {cast("throw", PIE.flyAt)}
       {moment.square && t >= PIE.flyAt && t < PIE.landAt && <Flight name="pieFly" square={moment.square} orientation={orientation} since={moment.at + PIE.flyAt} ms={PIE.landAt - PIE.flyAt} />}
     </div>
@@ -95,7 +95,7 @@ function funhouseMoment({ boss, moment, t, banner, anim: kitAnim }: MomentProps)
   // (His line, as he lands on the board, is in his text box: FUNHOUSE.lineAt, said into his voice.)
   return (
     <div class="power-moment pm-funhouse">
-      {t < 2500 && banner("FUNHOUSE!", "Upside down!", "fun")}
+      {banner("FUNHOUSE!", "Upside down!", "fun")}
       {t >= FUNHOUSE.clownAt && (
         <span class={`pm-pogo${t >= FUNHOUSE.exitAt ? " out" : ""}`}>
           {kitAnim() ? <BossMoment boss={boss.name} anim={kitAnim()!} since={moment.at + FUNHOUSE.clownAt} then="idle" /> : <BossFace boss={boss} />}
@@ -106,13 +106,13 @@ function funhouseMoment({ boss, moment, t, banner, anim: kitAnim }: MomentProps)
 }
 
 /** A later step: the board turns again (round to a side, or back the right way up). */
-function spinMoment({ boss, t, banner }: MomentProps) {
+function spinMoment({ boss, banner }: MomentProps) {
   const p = boss.powers;
   const to: BoardAngle = p?.angle ?? 0;
   const from = funhouseAngle(p?.funhouse ?? null, (p?.turn ?? 0) - 1);
   const s = spinOf(from, to);
   const sub = to === 0 ? "Right way up again" : s === "half" ? "To the other side" : s === "cw" ? "A quarter turn right" : "A quarter turn left";
-  return <div class="power-moment pm-spin">{t < SPIN.spinAt && banner(to === 0 ? "BACK AGAIN!" : "SPIN!", sub, "fun")}</div>;
+  return <div class="power-moment pm-spin">{banner(to === 0 ? "BACK AGAIN!" : "SPIN!", sub, "fun", SPIN.spinAt)}</div>;
 }
 
 export const BOINGO_UI = {

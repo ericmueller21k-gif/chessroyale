@@ -15,7 +15,7 @@ import type { MoveScore } from "../uci.ts";
 import { bossPowers, from, meterFull, moveSquares, other, powerRoll, testSwitch, to, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). The extra move: his banner over the board as it lands. */
-export const HOLLOW_FX = { dark: 2700, extra: 3200 } as const;
+export const HOLLOW_FX = { dark: 2700, extra: 2200 } as const;
 
 /** Hollow's first cover of the dark holds longer, for his first-cover line ("Don't forget what's there…"). */
 export const DARK_FIRST_EXTRA_MS = 1300;

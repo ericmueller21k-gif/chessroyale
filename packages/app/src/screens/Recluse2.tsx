@@ -368,7 +368,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
               </span>
             )}
             {t >= C.arcAt && t < C.arcEnd + ARC_LIFE && <Arcs t={t} hands={CHANT_HANDS} />}
-            {t >= C.bannerAt && <FightBanner text="PHASE 2" sub="Win all four boards" tone="boss" sound="bannerStart" />}
+            {t >= C.bannerAt && <FightBanner text="PHASE 2" sub="Win all four boards" tone="boss" sound="bannerStart" ms={C.bannerMs} />}
           </div>
         </div>
       </div>
@@ -514,7 +514,7 @@ export function SimulScreen({ match }: { match: GameView }) {
   // (On every board at once; nobody waits for it: the 5 s start now.)
   const ultOn = v.ultAt !== null && now - v.ultAt < PHASE2_ULT_BANNER_MS;
   // (Its name alone: what it means, "5 s a move, or a random one", is the dock's.)
-  const ultBanner = ultOn && <FightBanner text={`${RECLUSE_PHASE2.ultMoveSeconds} SECONDS!`} tone="boss" sound="bannerStart" />;
+  const ultBanner = ultOn && <FightBanner text={`${RECLUSE_PHASE2.ultMoveSeconds} SECONDS!`} tone="boss" sound="bannerStart" ms={PHASE2_ULT_BANNER_MS} />;
 
   // (How many are won: the boss bar's right side.)
   const status = v.decided

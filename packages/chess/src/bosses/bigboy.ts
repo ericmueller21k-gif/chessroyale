@@ -50,7 +50,7 @@ export const BOUNCE = {
 export const BLOCK = { flyAt: 1450, landAt: 1850 } as const;
 
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). */
-export const BIGBOY_FX = { block: 3300, bounce: BOUNCE.total } as const;
+export const BIGBOY_FX = { block: 2300, bounce: BOUNCE.total } as const;
 
 /** Big Boy opens with his snack: the battle starts from the starting position less one of the crowd's center pawns. */
 export const startsWithSnack = (def: { powers: { passive: string } | null } | null | undefined): boolean => def?.powers?.passive === "blocks";

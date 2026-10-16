@@ -1,4 +1,4 @@
-import { RECLUSE_PHASE2 } from "@chessroyale/core";
+import { BOSS_BANNER, RECLUSE_PHASE2 } from "@chessroyale/core";
 import { RECLUSE, RECLUSE_JUMP } from "./characters/recluse.ts";
 import { animLength, cueAt } from "./characters/power-art.ts";
 import {
@@ -81,8 +81,8 @@ export const PHASE_CHANGE = (() => {
   const backAt = pickupAt + len("pickup");
   const homeAt = backAt + len("leap2");
   const bannerAt = Math.max(homeAt, shuffleAt + shuffleMs) + 100;
-  // ("PHASE 2": 2.4 s, every banner a second longer since Eric, Oct 15; the clocks start after it.)
-  const bannerMs = 2400;
+  // ("PHASE 2": a boss's banner, 1.4 s; Eric, Oct 16, a second shorter again. The clocks start after it.)
+  const bannerMs = BOSS_BANNER.phase2Ms;
   return {
     fallMs,
     kingAt,
@@ -221,10 +221,10 @@ export function smoothPath(pts: readonly Pt[]): string {
 /** His ultimate where he stands (playInPlace): the spellbook opened, held, slammed shut. */
 export const PHASE2_ULT_ANIMS = ["spellbook2", "spellLoop2", "spellClose2"] as const;
 /**
- * "5 SECONDS!" shows this long as his ultimate comes (ms): the banner's whole 2.5 s. It had its extra second first (Eric,
- * Oct 14); since Oct 15 every banner has it, so it's as long as the rest now.
+ * "5 SECONDS!" shows this long as his ultimate comes (ms): a boss's banner (BOSS_BANNER.ms, 1.5 s; Eric, Oct 16, a
+ * second shorter again: it showed 2.5 s, the extra second it had first, Oct 14, and every banner had since Oct 15).
  */
-export const PHASE2_ULT_BANNER_MS = 2800;
+export const PHASE2_ULT_BANNER_MS = BOSS_BANNER.ms;
 
 /**
  * Whether his phase 2 follows phase 1 won, on this device (solo): alone (Boss alone), or in a solo Crowd's boss final

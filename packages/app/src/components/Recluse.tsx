@@ -33,11 +33,11 @@ import { hash, type BossUi, type KitMoment, type MomentProps } from "./PowerPart
 
 /** The bullet clock's moment where he stands: the book consulted, opened like a spell book, the spell held, slammed shut. */
 export const BULLET_ANIMS = ["consult", "spellbook", "spellLoop", "spellClose"] as const;
-/** Its beats (ms into the moment): "BULLET!" as the book falls open (spellbook's `open`), for `bannerMs`; its runs' end. */
+/** Its beats (ms into the moment): "BULLET!" as the book falls open (spellbook's `open`), for BOSS_BANNER.ms; its runs' end. */
 export const BULLET = (() => {
   const a = RECLUSE.anims;
   const bannerAt = animLength(a.consult!) + (cueAt(a.spellbook!, "open") ?? 0);
-  return { bannerAt, bannerMs: 2600, runMs: BULLET_ANIMS.reduce((t, n) => t + animLength(a[n]!), 0) };
+  return { bannerAt, runMs: BULLET_ANIMS.reduce((t, n) => t + animLength(a[n]!), 0) };
 })();
 
 /** The bullet clock is on: his ultimate has come (to the end of the battle). */
@@ -60,11 +60,11 @@ function InPlace({ runKey, anims, since }: { runKey: string; anims: readonly str
   return null;
 }
 
-function bulletMoment({ moment, t, banner }: MomentProps) {
+function bulletMoment({ moment, banner }: MomentProps) {
   return (
     <div class="power-moment pm-bullet pm-stay">
       <InPlace runKey={moment.key} anims={BULLET_ANIMS} since={moment.at} />
-      {t >= BULLET.bannerAt && t < BULLET.bannerAt + BULLET.bannerMs && banner("BULLET!", "No added time.", "rage")}
+      {banner("BULLET!", "No added time.", "rage", Infinity, BULLET.bannerAt)}
     </div>
   );
 }
