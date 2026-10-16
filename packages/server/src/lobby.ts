@@ -127,7 +127,10 @@ export interface Human {
   connected: boolean;
   device: "phone" | "computer";
   practice?: boolean;
-  /** The rating on their profile (for a boss raid's strength). */
+  /**
+   * The rating stored on their account (`users.rating`, which the Durable Object reads as they join; never a number
+   * their app sends), for a boss raid's strength. Null: none yet, or no account (the prior).
+   */
   rating?: number | null;
   /** The boss they met last (a BOSS_ROSTER id): the next raid avoids the one most of the lobby met. */
   lastBoss?: string | null;

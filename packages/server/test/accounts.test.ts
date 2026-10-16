@@ -191,6 +191,17 @@ describe("account API", () => {
     expect((await call(env, "/api/me", { cookie: ok.cookie })).body.stats.crowd.matches).toBe(1);
   });
 
+  it("POST /api/results: a solo result never becomes your rating, whatever rating (or online, ranked) it claims", async () => {
+    const env = { DB: memoryD1() };
+    const me = await call(env, "/api/me?name=Solo");
+    await call(env, "/api/results", { method: "POST", body: JSON.stringify({ mode: "boss", placement: 1, players: 50, rating: 400, online: true, ranked: true }), cookie: me.cookie });
+    const after = await call(env, "/api/me", { cookie: me.cookie });
+    expect(after.body.stats.boss.matches).toBe(1);
+    // (So a raid, which reads the stored rating as you join, never meets a boss matched to it.)
+    expect(after.body.rating).toBeNull();
+    expect((await call(env, `/api/profile/${me.body.user.id}`, { cookie: me.cookie })).body.rating).toBeNull();
+  });
+
   it("POST /api/shop/chat: your quick chat picks, saved to your account and on your profile", async () => {
     const env = { DB: memoryD1() };
     const me = await call(env, "/api/me?name=Chatty");

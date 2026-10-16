@@ -41,8 +41,10 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
   the same matchmaker object) whose tickets are parties (up to 4, under a code and invite link, the leader queuing) or
   single players, each seated whole in a Squads lobby that still fits it; the lobby fills with bots after
   `MATCH_FILL_SECONDS`, like Crowd's Default. Routes under `/api/squads/`.
-- **The boss of a raid** is matched to the people only (bots don't count toward its strength), avoiding the boss most
-  of its players met last (each sends theirs on joining).
+- **The boss of a raid** is matched to the people only (bots don't count toward its strength), by the ratings stored
+  on their accounts (`users.rating`, which the lobby's object reads as each joins: never a number the app sends; none
+  yet, or no account: the 1500 prior; docs/decisions/2026-10-16-server-side-rating.md), avoiding the boss most of its
+  players met last (each sends theirs on joining).
 - **Ranking today** is the rating on your profile (its rank, chart and "Top N%"); there is no ranked mode yet. A match
   counts for ranking only if at least `RANKING.rankedMinHumanShare` (30%) of its seats are real players
   (`isRankedMatch`; 30 of a 50 v 50's 100, 15 of a raid's 50). Solo and practice never count. Stored as
@@ -70,6 +72,7 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
 
 - Unit: `packages/server/test/matchmaker.test.ts`, `lobby-types.test.ts`, `lobby-life.test.ts`, `lobby.test.ts`,
   `resign.test.ts` (leaving: seats to bots, the loss, the last one out closing the lobby and its code, the away rule),
+  `lobby-do-rating.test.ts` (a raid's boss from the stored ratings, whatever an app claims),
   `packages/core/test/rating.test.ts`, `profile.test.ts`.
 - e2e: `e2e/matchmaking.spec.ts`, `lobby-close.spec.ts`, `multiplayer.spec.ts`, `busy.spec.ts`, `front-door.spec.ts`,
   `resign.spec.ts`.
