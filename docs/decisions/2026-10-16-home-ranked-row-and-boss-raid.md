@@ -33,9 +33,14 @@ Eric, Oct 16. Lane: `hub` (the director's brief). Area pages: [hub.md](../areas/
   canvas the boss menu draws), "Boss raid" and "Team up vs a boss · up to 50", and a chevron. The brief suggested
   "unranked" in that line. Left out: an online raid with at least 15 real players still changes your rating
   (`isRankedMatch`), and the ⓘ under Matchmaking still says so. "Up to 50" says what it is instead.
-- **Where the card sits.** On a phone it sits under the RANKED row and PLAY, as asked. On a computer it sits above the row,
-  with Play with friends: Eric's Oct 9 rule puts PLAY at the bottom of the column with the picker right above it, and
-  a card under PLAY would break both.
+- **Where the card sits.** On a phone it sits under the RANKED row and PLAY, as asked. On a computer it sits above the
+  row: Eric's Oct 9 rule puts PLAY at the bottom of the column with the picker right above it, and a card under PLAY
+  would break both. There it shares a row with Play with friends (2 : 1, 64 px tall), as Play with friends and Boss
+  alone did. A card stacked on its own row took about 120 px from the live window above (its board went from about
+  300 to 178 px at 1280 × 800, under the 240 px its test asks for).
+- **After a match:** Home from the results, and a lobby that closed (its note), land on home itself, not on the Boss raid
+  screen they may have started from. Cancel in a raid's queue goes back to the Boss raid screen. The Boss raid screen
+  shows home's note too, if one arrives while it's open.
 - **The Boss raid screen** is a page of its own in the home frame (state in `App`, so the computer's side menu can show
   "Boss raid" as the current page). It has a Back arrow, the portrait with one line ("Up to 50 of you pick the crowd's
   moves together against a boss. The most popular pick is played."), and five choices, each an existing flow:

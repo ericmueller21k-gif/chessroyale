@@ -435,8 +435,8 @@ function RaidOption({ label, sub, disabled, onClick }: { label: string; sub: str
  * Boss raid card, and the smaller buttons. A note goes under the live line when a lobby you opened has closed. Light or
  * dark is in Settings.
  *
- * On a computer (1024 px and wider, the side menu's frame) the play column is the Boss raid card and Play with friends,
- * then the RANKED row, then PLAY at the bottom (Eric, Oct 9: PLAY at the bottom): the shop and your profile are in the
+ * On a computer (1024 px and wider, the side menu's frame) the play column is the Boss raid card and Play with friends
+ * side by side (so the live window above keeps its room), then the RANKED row, then PLAY at the bottom (Eric, Oct 9: PLAY at the bottom): the shop and your profile are in the
  * side menu. From 1280 px the live window fills the room above (LiveWindow: a real match, or a bot match played back).
  *
  * With `raid`, the Boss raid screen (a simple one for now; Eric, Oct 16): each way to play a raid, through the flows
@@ -694,6 +694,8 @@ export function HomeScreen({
           <h1>Boss raid</h1>
           <span class="fd-head-spacer" />
         </header>
+        {/* (Why you're here: a match that closed while this screen was where you'd come back to, as on home.) */}
+        {notice && <Notice notice={notice} />}
         <section class="rd-hero">
           <span class="rd-face rd-face-big" aria-hidden="true">
             <BossFace boss={CARD_BOSS} />
@@ -855,8 +857,13 @@ export function HomeScreen({
            * the Boss raid card under them (Eric, Oct 16), then the smaller buttons.
            */}
           {wide && <LiveWindow />}
-          {computer && bossCard}
-          {computer && actions}
+          {computer && (
+            // (Side by side, as Play with friends and Boss alone were: the live window above keeps its room.)
+            <div class="fd-door-row">
+              {bossCard}
+              {actions}
+            </div>
+          )}
           {ranked}
           {under}
           {go}

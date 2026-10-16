@@ -8354,6 +8354,33 @@ button.fd-logo {
 .rd-option:active:not(:disabled) {
   transform: scale(0.98);
 }
+/* A computer: the card and Play with friends in one row (2 : 1), the card a little shorter. */
+.fd-door-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.fd-door-row .fd-actions {
+  display: flex;
+}
+.fd-door-row .fd-actions > * {
+  flex: 1 1 auto;
+}
+.fd-door-row .rd-card {
+  min-height: 64px;
+  padding: 8px 12px 8px 8px;
+}
+.fd-door-row .rd-face {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+.fd-door-row .rd-face .boss-portrait {
+  width: 42px;
+}
+.fd-door-row .rd-card-text strong {
+  font-size: 18px;
+}
 
 /* -- Sheets (Play with friends) -- */
 .fd-sheet-scrim {

@@ -268,6 +268,8 @@ export function App() {
     if (currentMatch() === code) setCurrentMatch(null);
     setInvite(null);
     if (location.pathname !== "/") history.replaceState(null, "", "/");
+    // (Home itself, where the note is: not the Boss raid screen a ?mode=raid link opened.)
+    setRaidOpen(false);
     setEnded({ code, why, result, how });
   };
   const chooseGuest = (on: boolean) => {

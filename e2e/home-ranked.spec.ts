@@ -12,7 +12,7 @@ const run = Date.now().toString(36).slice(-5);
 const sideways = (p: Page) => p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const box = async (p: Page, sel: string) => (await p.locator(sel).first().boundingBox())!;
 
-test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal buttons whole at every width; the Boss raid card under it (above it on a computer, PLAY last)", async ({ page }) => {
+test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal buttons whole at every width; the Boss raid card under it (above it on a computer, beside Play with friends; PLAY last)", async ({ page }) => {
   await named(page, "Ranked");
   const widths = desktop() ? [[1280, 800], [1024, 768]] : [[320, 640], [360, 740], [390, 844]];
   for (const [w, h] of widths) {
@@ -45,10 +45,12 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
       expect(b.font).toBeGreaterThanOrEqual(11);
     }
     expect(buttons.map((b) => b.x)).toEqual([...buttons.map((b) => b.x)].sort((a, b) => a - b));
-    // The card's words whole too, and it's prominent: full width of the column, as tall as a big button.
+    // The card's words whole too, and it's prominent: the column's full width on a phone (two thirds of it on a
+    // computer, beside Play with friends), as tall as a big button.
     const c = (await card.boundingBox())!;
-    expect(c.height).toBeGreaterThanOrEqual(64);
-    expect(Math.abs(c.width - r.width), `${w}: full width`).toBeLessThan(2);
+    expect(c.height).toBeGreaterThanOrEqual(desktop() ? 60 : 64);
+    if (desktop()) expect(c.width, `${w}`).toBeGreaterThan(r.width * 0.6);
+    else expect(Math.abs(c.width - r.width), `${w}: full width`).toBeLessThan(2);
     expect(await card.evaluate((e) => [...e.querySelectorAll(".rd-card-text > *")].every((x) => x.scrollWidth <= x.clientWidth + 0.5)), `${w}`).toBe(true);
     const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
     if (desktop()) {
