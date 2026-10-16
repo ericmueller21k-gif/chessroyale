@@ -59,6 +59,59 @@ describe("the 1 v 1 queue and game in the app", () => {
     expect(q.state).toEqual({ kind: "found", code: "ABCDE" });
   });
 
+  it("a search is saved for a reload after every ask, carried on with its ticket and wait, and forgotten once found", async () => {
+    const saved = new Map<string, string>();
+    vi.stubGlobal("sessionStorage", { getItem: (k: string) => saved.get(k) ?? null, setItem: (k: string, v: string) => void saved.set(k, v), removeItem: (k: string) => void saved.delete(k) });
+    vi.stubGlobal("location", { search: "" });
+    let answers: object[] = [{ searching: true, ticket: "t-1" }];
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (url: string) => {
+      asked.push(url);
+      const a = answers.shift();
+      // (No answer left: the search goes on, as it would while you browse; the test cancels it.)
+      return a ? new Response(JSON.stringify(a), { status: 200 }) : new Promise<Response>(() => undefined);
+    });
+    vi.resetModules();
+    const { DuelQueue, savedDuelQueue } = await import("../src/duel.ts");
+    const q = new DuelQueue();
+    void q.start();
+    await vi.waitFor(() => expect(savedDuelQueue()?.ticket).toBe("t-1"));
+    const since = (q.state as { since: number }).since;
+    expect(savedDuelQueue()!.since).toBe(since);
+    // A reload: the same ticket, the same wait.
+    answers = [{ code: "ABCDE" }];
+    asked.length = 0;
+    const again = new DuelQueue(savedDuelQueue());
+    expect(again.state).toEqual({ kind: "searching", since });
+    await again.start();
+    expect(asked).toEqual(["/api/1v1/play?ticket=t-1"]);
+    expect(again.state).toEqual({ kind: "found", code: "ABCDE" });
+    expect(savedDuelQueue()).toBeNull();
+    // Too old (no ask for 2 minutes): not carried on.
+    saved.set("brc.duelQueue", JSON.stringify({ ticket: "t-2", since: 0, at: Date.now() - 3 * 60_000, test: {} }));
+    expect(savedDuelQueue()).toBeNull();
+  });
+
+  it("Cancel while the first ask is still out: its ticket, once it comes, is cancelled too", async () => {
+    vi.stubGlobal("location", { search: "" });
+    const asked: string[] = [];
+    let answer: (r: Response) => void = () => undefined;
+    vi.stubGlobal("fetch", (url: string) => {
+      asked.push(url);
+      return url.startsWith("/api/1v1/play") ? new Promise<Response>((r) => (answer = r)) : Promise.resolve(new Response("{}"));
+    });
+    vi.resetModules();
+    const { DuelQueue } = await import("../src/duel.ts");
+    const q = new DuelQueue();
+    const run = q.start();
+    q.cancel();
+    expect(asked).toEqual(["/api/1v1/play"]);
+    answer(new Response(JSON.stringify({ searching: true, ticket: "t-late" }), { status: 200 }));
+    await run;
+    expect(asked).toEqual(["/api/1v1/play", "/api/1v1/cancel?ticket=t-late"]);
+    expect(q.state).toEqual({ kind: "cancelled" });
+  });
+
   it("the server's clock: the quickest message's sample is kept, not the latest", async () => {
     const { NetDuel } = await import("../src/duel.ts");
     const d = new NetDuel("ABCDE") as unknown as { onMessage(m: unknown): void; offset: number };

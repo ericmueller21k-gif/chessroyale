@@ -4,6 +4,7 @@ import { App } from "./App.tsx";
 import { BanNotice } from "./components/FairPlay.tsx";
 import { ErrorBoundary, ReportSheet } from "./components/Problems.tsx";
 import { MaintenanceBanner } from "./components/MaintenanceBanner.tsx";
+import { DuelQueueBar } from "./components/DuelQueueBar.tsx";
 import { startStatus } from "./status.ts";
 import { setUpInstall } from "./install.ts";
 import { watchErrors } from "./problems.ts";
@@ -26,7 +27,8 @@ for (const ev of ["pointerdown", "touchend", "click", "keydown"]) window.addEven
 // The kill switches and the maintenance banner (status.ts), asked now and every minute.
 startStatus();
 // (Fair play's ban notice sits over any screen: PLAY, a new lobby or joining one can bring it up; so does the
-// feedback sheet, from the match menu or Settings, and the maintenance banner, at the top. A render error anywhere
+// feedback sheet, from the match menu or Settings, and the maintenance banner, at the top, with the 1 v 1 search's bar
+// under it while you browse. A render error anywhere
 // shows "Something went wrong" instead of a blank page.)
 render(
   <ErrorBoundary>
@@ -34,6 +36,7 @@ render(
     <BanNotice />
     <ReportSheet />
     <MaintenanceBanner />
+    <DuelQueueBar />
   </ErrorBoundary>,
   document.getElementById("app")!,
 );

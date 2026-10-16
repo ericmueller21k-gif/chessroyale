@@ -24,16 +24,17 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   ones at 160); never two accounts on one device (fair play's device cookie, hashed, on the ticket). A ticket is only
   made with its player: one being seated (its game opening) is still known, so its ask waits for the game; one the
   queue doesn't know (gone while the app slept, or made up) is answered `expired` and
-  the app asks afresh. Cancel takes the ticket out; a pairing made
+  the app asks afresh. Cancel takes the ticket out (one still on its way back with the first ask is cancelled when it
+  comes); a pairing made
   that very moment is called off for that player (`DuelGame.abandon`: an abort before any move, nothing recorded).
   After `fewPlayersSeconds` (45) the app offers "Few players online right now" with Keep waiting and Play a bot
   (unranked).
 - **The stage** (Eric, Oct 16: "your character's sitting there, and then there's like kind of this empty platform thing
   like waiting, and then when your opponent joins, like their pawn loads up next to you"; `components/DuelStage.tsx`,
   styles `dv-st-`; why: [docs/decisions/2026-10-16-ranked-1v1-versus-screen.md](../decisions/2026-10-16-ranked-1v1-versus-screen.md)).
-  The search and the versus moment are one screen, in the home screen's frame (the side menu stays on a computer; any
-  of its pages but your profile leaves the queue or the game first):
-  - **searching:** "1 v 1 / Classic chess" at the top; your big dressed pawn drops onto a platform on the left (gold
+  The search and the versus moment are one screen, in the home screen's frame (the side menu stays on a computer; its
+  pages browse with the search going, below; during the versus moment they leave the game):
+  - **searching:** "‹ Home" at the top left (browse, still searching: below), "1 v 1 / Classic chess" at the top; your big dressed pawn drops onto a platform on the left (gold
     rim), your name and rank under it; on the right an empty platform, a faint pawn's outline breathing and rings
     rising off it, "Finding opponent…" and the time waited under it; Cancel at the bottom, and "Few players online right
     now" above it when it comes;
@@ -47,6 +48,28 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     longest name and rank on two lines each, so nothing on the stage moves when the opponent (or the bot) arrives;
   - **motion:** transforms and opacity only (the drops, the waiting rings and outline, a slight breathing of each pawn
     from its foot, "VS"); `prefers-reduced-motion` turns them all off.
+- **Browsing while queued** (Eric, Oct 16: "a back button or they can view inventory", "no confirmation needed";
+  `components/DuelQueueBar.tsx`, styles `dq-`; why:
+  [docs/decisions/2026-10-16-1v1-browse-while-queued.md](../decisions/2026-10-16-1v1-browse-while-queued.md)):
+  - **away from the stage:** "‹ Home" on the search stage (or a computer's side menu) goes home and keeps the search
+    going: the queue is the app's (`DuelQueue` in App.tsx), not the screen's, so it keeps asking (and its ticket stays
+    known) wherever you are. No confirm. Cancel on the stage still leaves the queue;
+  - **the bar,** at the top of every screen while you browse: a green dot, "Searching 1 v 1 · 0:42 ›" (back to the
+    stage, the same search and wait) and Cancel (out of the queue, no confirm; the page stays). Under the maintenance
+    banner; its height is `--qbar-h`, which `--banner-h` adds to the banner's `--maint-h`, so the page starts under it;
+  - **few players:** at `fewPlayersSeconds` the bar turns gold and says "Few players online · 0:45 ›"; its words take
+    you to the stage, where Keep waiting and Play a bot (unranked) are. Keep waiting is the queue's (`keepWaiting`), so
+    it holds as you come and go;
+  - **found while browsing:** a sound (`bannerStart`) and a buzz (`navigator.vibrate`, 90-60-160 ms; none while sound is
+    off), the page you were on closes, and the stage opens with the game's waiting and versus moment as ever;
+  - **another mode while searching** (PLAY for 50 v 50 or Squads, the Boss raid's choices, Boss alone, a lobby made or
+    joined from home): "Leave the 1 v 1 queue?" / "Starting this ends your 1 v 1 search." / Stay, Leave queue: the only
+    confirm. 1 v 1's PLAY goes back to the stage. Anything else that puts you in a match (an invite's lobby, a party's)
+    ends the search;
+  - **a reload** carries on with the search (`savedDuelQueue`: its ticket, when it began and its test switches in the
+    tab's sessionStorage after every ask; dropped when found, cancelled or refused, or 2 minutes after the last ask):
+    on the stage from /1v1, else with the bar. A refusal while browsing (the mode resting) brings you to the stage,
+    which says why.
 - **A game** (`duel-room.ts`, pure, around the rules in `@chessroyale/chess/duel`; `duel-do.ts`, the `DuelGame` object):
   - **waiting** for both players' sockets (seats by account: a reload or another device of theirs goes straight back
     in), at most `joinSeconds` (10), or it's called off ("no_show", nothing recorded);
@@ -156,6 +179,7 @@ entry says the same.
 | The app: queue, online game, bot game, the way in | `packages/app/src/duel.ts` |
 | The screens (`DuelFront`: the stage, then the board); the stage; the vote on the board; the hint; the rank pill | `packages/app/src/screens/Duel.tsx`, `components/DuelStage.tsx`, `DuelVote.tsx`, `VoteHint.tsx`, `DuelRankPill.tsx`; styles `dv-` in `styles.css` |
 | The stage, recorded (GIFs and stills, light and dark, 320-1280 px) | `scripts/frames-versus.mjs` |
+| Browsing while queued: the bar, the leave confirm, the found alert; App's `duelAway` | `packages/app/src/components/DuelQueueBar.tsx` (mounted in `main.tsx`), `App.tsx`; recorded by `scripts/frames-queue-browse.mjs` |
 | The home screen's helper | `packages/app/src/ranked.ts` (`ranked1v1Label`, `ranked1v1Rank`) |
 | Wiring (`/1v1`, `/1v1/CODE`) | `packages/app/src/App.tsx` |
 
@@ -200,6 +224,14 @@ kill switch `PAUSE_RANKED1V1`.
   stage moved, held for `versusMs`, then the board; the stage whole at 320, 360 and 390 px (1280 on a computer) with
   the longest names and ranks, searching with "Few players online" and in the versus moment (held there by the test's
   own copy of the game's messages), no scroll either way, nothing animating under reduced motion).
+- e2e: `e2e/ranked-1v1-browse.spec.ts` (phones and computers: Home from the search, still asking, the bar on home and
+  in the shop over nothing, back to the stage with the same wait, Cancel from the bar; found in the shop: the sound and
+  the buzz, straight to the stage, the versus moment whole, then the board; 1 v 1's PLAY back to the stage, another
+  mode's confirm, Stay and Leave queue; a reload on the stage and from home carrying on, then found, no buzz with
+  sound off, no bar after; the bar whole at 320/360/390 (1280), gold at Few players online and to its choices).
+- Frames: `node scripts/frames-queue-browse.mjs <dir>` records browsing while queued at 390 px, light and dark: the
+  stage, home and the shop with the bar, found in the shop, the board (GIFs), and the bar at Few players online, the
+  confirm and home at 320 px.
 - Frames: `node scripts/frames-versus.mjs <dir>` (against a local Worker) records the search and an opponent arriving
   at 390 px, light and dark (GIFs), stills at 320, 360, 390 and 1280 px, "Few players online" and the bot, and flags
   the stage moving or the page scrolling sideways.
