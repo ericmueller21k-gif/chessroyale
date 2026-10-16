@@ -1093,13 +1093,14 @@ export class SoloMatch implements GameView {
 
   private async score(move: string | null) {
     if (this.phase.kind !== "play") return;
-    if (this.timer) clearTimeout(this.timer);
     const { board, allowedMs: allowed } = this.phase;
     if (move !== null && Date.now() < this.playStartedAt - 300) return; // Before the clock starts.
     // Boss battle: only a move allowed this turn (a power's limits; the move the God King took back).
     if (move !== null && this.runner.boss && !(this.runner.crowdAllowed() ?? [move]).includes(move)) return;
     const now = Date.now();
     if (move !== null && this.frozen && now < this.frozen.until) return; // While the King strikes.
+    // (Only now, the move accepted: a refused one leaves the turn's timeout running, so the turn still ends.)
+    if (this.timer) clearTimeout(this.timer);
     const frozen = this.frozen ? Math.max(0, Math.min(now, this.frozen.until) - this.frozen.at) : 0;
     const thinkMs = Math.max(0, Math.min(now - this.playStartedAt - frozen, allowed));
     const usedPowerUp = this.hint !== null;

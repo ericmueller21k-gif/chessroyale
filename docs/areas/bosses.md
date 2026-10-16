@@ -331,7 +331,10 @@ build): online, phase 1 won is the crowd's victory):
   move's screen draws, for what they read as they're drawn); the dock on the same key plus the few clock-read values
   its words use (the moment's dock words, the burn line, the snack window, the funhouse's move, "Your move in N";
   every frame during Lights out, whose prompt counts down). The phase change and phase 2 keep the header and the boss's place
-  the same way; their docks draw every frame. What draws itself every frame inside them does it on its own
+  the same way. The phase change's dock draws every frame (its words change with the clock); phase 2's (`SimulDock`,
+  Oct 16, docs/decisions/2026-10-16-the-reveal-draws-only-what-changed.md) is memoized on its words, the still key and
+  the whole seconds on your clock, read from the same frame time as the boards' clocks, so it and they tick in the same
+  frame. The crowd's reveal in a raid and the Last Stand (`CrowdReveal`) does the same: [crowd.md](crowd.md). What draws itself every frame inside them does it on its own
   clock: Hollow's bulb strip through his turn (`BossBarExtra`), the speakers' words (`VoiceBubble`), the God King
   while he commands or says "can't"; their figures animate on their own canvases' loops as before.
 - **The bars at the back, the ice on its square, the queen banners silent** (Eric, Oct 11): the move clock's bars above

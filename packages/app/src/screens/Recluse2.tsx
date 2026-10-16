@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { createPortal } from "preact/compat";
+import { createPortal, memo } from "preact/compat";
 import { RECLUSE_PHASE2 } from "@chessroyale/core";
 import { moveLeft } from "@chessroyale/chess";
 import { RECLUSE, RECLUSE_BUST, RECLUSE_JUMP, palmOf } from "../characters/recluse.ts";
@@ -13,7 +13,7 @@ import { EFFECTS } from "../characters/power-art.ts";
 import { Board } from "../components/Board.tsx";
 import { SpriteAnim } from "../components/BossEffect.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
-import { BossDock } from "../components/BossDock.tsx";
+import { BossDock, clockLeft, type DockClockRun } from "../components/BossDock.tsx";
 import { useFrameNow } from "../components/Countdown.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
@@ -505,6 +505,8 @@ export function SimulScreen({ match }: { match: GameView }) {
   const still = useStillKey(match, now);
   const hud = useMemo(() => <Hud match={match} />, [match, still]);
   const bossSide = useMemo(() => <BossSide match={match} />, [match, still]);
+  // (Back to your board, the first: the same callback every frame, so the dock isn't drawn again for it.)
+  const back = useCallback(() => setWatch(match.simul?.boards[0]?.id ?? 0), [match]);
   if (!v) return null;
   const mine = v.boards[0]!;
   const big = v.boards.find((b) => b.id === watch) ?? mine;
@@ -516,6 +518,10 @@ export function SimulScreen({ match }: { match: GameView }) {
   // (Its name alone: what it means, "5 s a move, or a random one", is the dock's.)
   const ultBanner = ultOn && <FightBanner text={`${RECLUSE_PHASE2.ultMoveSeconds} SECONDS!`} tone="boss" sound="bannerStart" />;
 
+  // Your board's clock in the dock (DockClock): running on your move, holding (undefined) while he answers, none (null)
+  // once your board is decided or before the clocks start.
+  const run: DockClockRun | null | undefined =
+    mine.result || !v.playing ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + (v.ultAt !== null ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : mine.bankMs) } : undefined;
   // (How many are won: the boss bar's right side.)
   const status = v.decided
     ? v.beaten
@@ -563,36 +569,75 @@ export function SimulScreen({ match }: { match: GameView }) {
           )}
         </div>
       </div>
-      <BossDock
+      <SimulDock
         match={match}
-        side="w"
-        king="gone"
-        // Your board's clock at the box's right: its bank (from his ultimate, the few seconds a move) running on your move,
-        // holding while he answers; none once your board is decided or before the clocks start.
-        clock={mine.result || !v.playing ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + (v.ultAt !== null ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : mine.bankMs) } : undefined}
-        status={
-          <>
-            <span class="dock-line">
-              <strong>{status}</strong>
-            </span>
-            <span class="dock-line muted">
-              {!computer && big.id !== mine.id ? (
-                <button type="button" class="rc-back" onClick={() => setWatch(mine.id)}>
-                  Back to my board
-                </button>
-              ) : mine.result ? (
-                ""
-              ) : v.ultAt !== null ? (
-                // (His ultimate: a few seconds a move, then a random one is played for you; the seconds are your clock.)
-                `${RECLUSE_PHASE2.ultMoveSeconds} s a move, or a random one`
-              ) : (
-                // (The slow moves themselves: the marks beside every board; your time: the clock at the box's right.)
-                ""
-              )}
-            </span>
-          </>
-        }
+        still={still}
+        secs={run ? Math.ceil(clockLeft(run, now) / 1000) : null}
+        status={status}
+        line={!computer && big.id !== mine.id ? "back" : mine.result ? "" : v.ultAt !== null ? "ult" : ""}
+        onBack={back}
+        runFrom={run ? run.startsAt : null}
+        runTo={run ? run.deadline : null}
+        held={run === undefined}
       />
     </div>
   );
 }
+
+/**
+ * Phase 2's dock, drawn when what it shows changes rather than every frame of the screen: its words, your clock's run,
+ * the whole seconds your clock shows at the screen's frame (`secs`, worked out from the same time as the boards' clocks,
+ * so the dock's clock and theirs tick in the same frame), and as the match changes and five times a second (`still`,
+ * for what the dock's other parts read as they're drawn). docs/decisions/2026-10-16-the-reveal-draws-only-what-changed.md.
+ */
+const SimulDock = memo(function SimulDock({
+  match,
+  status,
+  line,
+  onBack,
+  runFrom,
+  runTo,
+  held,
+}: {
+  match: GameView;
+  still: string;
+  secs: number | null;
+  status: string;
+  line: "back" | "ult" | "";
+  onBack: () => void;
+  runFrom: number | null;
+  runTo: number | null;
+  held: boolean;
+}) {
+  return (
+    <BossDock
+      match={match}
+      side="w"
+      king="gone"
+      // Your board's clock at the box's right: its bank (from his ultimate, the few seconds a move) running on your move,
+      // holding while he answers; none once your board is decided or before the clocks start.
+      clock={runFrom !== null && runTo !== null ? { startsAt: runFrom, deadline: runTo } : held ? undefined : null}
+      status={
+        <>
+          <span class="dock-line">
+            <strong>{status}</strong>
+          </span>
+          <span class="dock-line muted">
+            {line === "back" ? (
+              <button type="button" class="rc-back" onClick={onBack}>
+                Back to my board
+              </button>
+            ) : line === "ult" ? (
+              // (His ultimate: a few seconds a move, then a random one is played for you; the seconds are your clock.)
+              `${RECLUSE_PHASE2.ultMoveSeconds} s a move, or a random one`
+            ) : (
+              // (Your board decided, or the slow moves themselves: the marks beside every board; your time: the clock at
+              // the box's right.)
+              ""
+            )}
+          </span>
+        </>
+      }
+    />
+  );
+});
