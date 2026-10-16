@@ -40,7 +40,8 @@ Why it's built this way: [docs/decisions/2026-10-16-chat-moderation.md](../decis
 - **Mute** (one tap: a name or a line opens its menu: Profile, Mute, Report). By account, on this device
   (`localStorage` `brc.muted`, at most 300), for every chat (global, lobby, match) until unmuted (the menu, a chat's
   options, the global chat's "N muted · unmute"). A player without an account (a bot) is muted for that match only, as
-  before. In a match the server also stops sending their lines to that device (`chatPrefs`). Blocking (friends) counts
+  before. In a match the server also stops sending their lines to that device (`chatPrefs`), and sends their recent
+  lines again when they're unmuted. Blocking (friends) counts
   as muted (`MatchChat.hidden`).
 - **Report** a line (the same menu): POST `/api/chat/report {n, lobby?}`. The server takes the line from its own copy
   (the lobby's log, `QUICK_CHAT.logSize`; the global chat's last `keep`), never from the device: a line the reporter
@@ -53,7 +54,7 @@ Why it's built this way: [docs/decisions/2026-10-16-chat-moderation.md](../decis
 - **The automatic pause:** reports from `CHAT_MOD.autoMuteReporters` different players, all within
   `autoMuteWindowMs` and none reviewed yet, pause the player's chat until a moderator looks (at most `autoMuteMs`).
 - **The review page** `/admin/chat` (admins only, `ADMIN_EMAILS`, like `/admin/fairplay` and `/admin/ops`, on the same
-  page shell, `adminPage`; no test switch opens it: the e2e makes its moderator's account an admin, `asServerAdmin`).
+  page shell, `adminPage`; the Worker answers it first, `run_worker_first` in `wrangler.jsonc`; no test switch opens it: the e2e makes its moderator's account an admin, `asServerAdmin`).
   Players with open reports, by how many players reported them;
   each report with its lines around it (the line reported in bold). Decisions, each with a reason for the log (except
   to dismiss) and an optional note to the player: dismiss the reports, warn, chat ban for 1, 7 or 30 days
