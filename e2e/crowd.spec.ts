@@ -1,8 +1,14 @@
+import { readFileSync } from "node:fs";
 import { devices, expect } from "@playwright/test";
 import { CROWD_SETTINGS } from "@chessroyale/core";
 import { createLobbyFromHome, engineTop, expectCoordsInSquares, named, soloFromHome, submitMove, test } from "./helpers.ts";
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
+
+/** The longest name in the opening library (a Classic board's name, at any of its plies). */
+const LONGEST_OPENING = (JSON.parse(readFileSync(new URL("../packages/chess/data/openings.json", import.meta.url), "utf8")) as { names: Record<string, string> }[])
+  .flatMap((o) => Object.values(o.names))
+  .reduce((a, b) => (b.length > a.length ? b : a), "");
 
 test("narrow phones: the top bar's numbers stay clear of the options button, and the cut lists whole rows of names", async ({ browser }) => {
   test.setTimeout(5 * 60_000);
@@ -138,7 +144,7 @@ test("online, once you're out, a later cut says so (not \"You're through\") and 
   await page.getByRole("button", { name: /Start with 1 player/ }).click();
   const cut = () => page.evaluate(() => {
     const p = (window as any).match?.phase;
-    return p?.kind === "stageBreak" ? { stage: p.stage as number, youOut: p.youOut as boolean } : null;
+    return p?.kind === "stageBreak" ? { stage: p.stage as number, youOut: p.youOut as boolean, out: p.knockedOut.length as number } : null;
   });
   let outAt: number | null = null;
   await expect
@@ -151,8 +157,15 @@ test("online, once you're out, a later cut says so (not \"You're through\") and 
   // The cut you went out at.
   await expect(page.locator(".crowd-cut .out-msg")).toContainText("You're out");
   await expect(page.getByRole("button", { name: "Why was I cut?" })).toBeVisible();
-  // The next cut, watched from the sidelines: a new judgment (the doomed pawns glow before the gavel lands).
-  await expect.poll(async () => (await cut())?.stage ?? -1, { timeout: 90_000, intervals: [100] }).toBeGreaterThan(outAt!);
+  // A later cut that puts players out, watched from the sidelines: a new judgment (the doomed pawns glow before the
+  // gavel lands). (Ties at the line go through, so a cut early on, when the opening allowance leaves many level, may put
+  // nobody out and strike nothing: docs/decisions/2026-10-15-flaky-e2e-batch.md.)
+  await expect
+    .poll(async () => {
+      const c = await cut();
+      return c && c.stage > outAt! && c.out > 0 ? c.stage : -1;
+    }, { timeout: 90_000, intervals: [100] })
+    .toBeGreaterThan(outAt!);
   await expect(page.locator(".crowd-cut .grid-pawn.doomed").first()).toBeVisible({ timeout: 1000 });
   await expect(page.locator(".crowd-cut .grid-pawn.cut-now").first()).toBeVisible({ timeout: 5000 });
   // It says you went out before, not that you're through.
@@ -243,15 +256,17 @@ test("the board never moves or resizes during a turn (Crowd and Classic)", async
     const rects = new Map<string, Set<string>>();
     const stopAt = Date.now() + 25_000;
     while (Date.now() < stopAt) {
-      const [kind, rect] = await page.evaluate(async () => {
+      const [kind, rect] = await page.evaluate(() => {
         const m = (window as any).match;
         const k = m.phase.kind;
         if (k === "play" && !(window as any).__sub && Date.now() > m.phase.startsAt + 1000) {
           (window as any).__sub = 1;
-          const top = await m.runner.topMovesFor(m.phase.board.fen);
-          // (Played after this evaluate has answered: see submitMove.)
-          setTimeout(() => m.phase.kind === "play" && m.submit(top[0].move));
-          setTimeout(() => ((window as any).__sub = 0), 500);
+          // (The search isn't awaited in this evaluate: .claude/LESSONS.md, "A navigation that never happened".)
+          const fen = m.phase.board.fen;
+          void m.runner.topMovesFor(fen).then((top: { move: string }[]) => {
+            if (m.phase.kind === "play" && m.phase.board.fen === fen) m.submit(top[0]!.move);
+            setTimeout(() => ((window as any).__sub = 0), 500);
+          });
         }
         const r = document.querySelector(".board-wrap .board")?.getBoundingClientRect();
         return [k, r ? `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}` : "none"];
@@ -266,5 +281,41 @@ test("the board never moves or resizes during a turn (Crowd and Classic)", async
     const summary = [...rects].map(([r, k]) => `${r} (${[...k].join("/")})`);
     expect(summary, `${mode}: board positions seen`).toHaveLength(1);
     expect([...rects.values()][0]!.size).toBeGreaterThanOrEqual(3);
+    if (mode !== "classic") continue;
+    // Classic's line above the board is the board's opening name, and the next round can put you on any board: the
+    // library's longest name stays on one line and leaves the board where it was (a long one used to wrap and push it
+    // down a line on a phone: docs/decisions/2026-10-15-flaky-e2e-batch.md).
+    const at = [...rects.keys()][0]!;
+    // (Measured against a short name's line on the same board: one line, whatever the line height is.)
+    type Look = { text: string; height: number; rect: string };
+    let seen = null as { short: Look; long: Look } | null;
+    for (let i = 0; i < 5 && seen?.long.text !== LONGEST_OPENING; i++) {
+      await expect
+        .poll(async () => {
+          const k = await phase(page);
+          if (k === "stageBreak") await page.evaluate(() => (window as any).match.continueFromBreak());
+          return k;
+        }, { timeout: 60_000 })
+        .toBe("play");
+      seen = await page.evaluate(async (longest) => {
+        const m = (window as any).match;
+        const look = async (name: string) => {
+          m.phase = { ...m.phase, board: { ...m.phase.board, openingName: name } };
+          m.emit();
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          const line = document.querySelector<HTMLElement>(".board-area .opening-name")!;
+          const r = document.querySelector(".board-wrap .board")!.getBoundingClientRect();
+          return { text: line.textContent ?? "", height: line.getBoundingClientRect().height, rect: `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}` };
+        };
+        const short = await look("Slav Defense");
+        return { short, long: await look(longest) };
+      }, LONGEST_OPENING);
+    }
+    expect(seen!.short.text).toBe("Slav Defense");
+    expect(seen!.long.text).toBe(LONGEST_OPENING);
+    expect(seen!.short.height).toBeGreaterThan(0);
+    expect(seen!.long.height).toBe(seen!.short.height);
+    expect(seen!.short.rect).toBe(at);
+    expect(seen!.long.rect).toBe(at);
   }
 });

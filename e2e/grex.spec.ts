@@ -26,12 +26,19 @@ async function play(page: Page, opts: { leave?: boolean; step?: boolean } = {}) 
     const m = (window as any).match;
     return { fire: (m.boss?.powers?.fire ?? []) as { square: string; stage: number }[], allowed: (m.boss?.powers?.allowed ?? null) as string[] | null };
   });
-  const best = top[0]?.move ?? null;
   const chess = new Chess(fen);
+  // Never a move that ends the game: the test watches the candle's waves through turn 13, and the engine's best moves
+  // can mate him before then (docs/decisions/2026-10-15-flaky-e2e-batch.md).
+  const goesOn = (mv: string) => {
+    const after = new Chess(fen);
+    after.move({ from: mv.slice(0, 2), to: mv.slice(2, 4), promotion: mv[4] });
+    return !after.isGameOver();
+  };
   const legal = chess
     .moves({ verbose: true })
     .map((mv) => mv.from + mv.to + (mv.promotion ?? ""))
-    .filter((mv) => !allowed || allowed.includes(mv));
+    .filter((mv) => (!allowed || allowed.includes(mv)) && goesOn(mv));
+  const best = top.map((t) => t.move).find((mv) => legal.includes(mv)) ?? null;
   const mine = (sq: string) => {
     const pc = chess.get(sq as never);
     return !!pc && pc.color === chess.turn() && pc.type !== "k";

@@ -7,7 +7,7 @@ import { Matchmaker } from "./matchmaker.ts";
 import { LiveHub } from "./live-hub.ts";
 import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
-import { d1Sql, ensureSchema, lobbyResult, type User } from "./accounts.ts";
+import { d1Sql, ensureSchema, lobbyResult, purgeEmailCodes, type User } from "./accounts.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
@@ -90,6 +90,8 @@ export default {
         const sql = d1Sql(db);
         await ensureSchema(sql, db);
         await pruneProblems(sql, Date.now()).catch(failed("prune"));
+        // Sign-in code records an hour old (the privacy policy says an hour).
+        await purgeEmailCodes(sql, Date.now()).catch(failed("codes"));
         const env = await withSecrets(rawEnv);
         const search = containerSearch(env);
         if (!search) return;

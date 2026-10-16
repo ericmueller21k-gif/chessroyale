@@ -190,6 +190,14 @@ export class LiveBoard {
    */
   private news = new Map<string, number>();
 
+  /** A deleted account: no longer online, in a match or with news, and nothing left to write. */
+  forgetSeen(id: string) {
+    this.seen.delete(id);
+    this.written.delete(id);
+    this.busy.delete(id);
+    this.news.delete(id);
+  }
+
   /** `busy`: what these accounts' apps said about being in a match (only the live line's own request says). */
   markSeen(ids: readonly string[], at: number, busy?: Readonly<Record<string, boolean>>) {
     for (const id of ids) if ((this.seen.get(id) ?? 0) < at) this.seen.set(id, at);

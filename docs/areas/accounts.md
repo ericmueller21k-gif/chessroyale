@@ -30,6 +30,28 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   page, the boss battle's "Trigger ultimate (testing)" button, and the test switches in the address (`?debug`,
   `?rounds=`, …; [ops.md](ops.md), "Test switches").
 - **Bans** (from [fairplay.md](fairplay.md)) stop online play; solo stays open.
+- **Download my data and Delete account** (Settings → ACCOUNT, for guests too;
+  [docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md](../decisions/2026-10-15-delete-my-account-and-download-my-data.md)):
+  - **The download:** GET `/api/me/data` answers a JSON file of everything kept about the account (every store's rows,
+    the global chat's lines from the live hub). It leaves out who has blocked them and fair play's detection records
+    (on request, by email).
+  - **Deleting:** POST `/api/me/delete` `{confirm: "delete"}`, from the site's own origin, as JSON, after the app's
+    confirmation. It removes everything personal in every store, in one batch (one transaction), and signs the
+    account out on every device. The live hub forgets it (online, global chat lines). The app clears its local
+    storage and starts afresh.
+  - **What stays:**
+    - results, written again under the shared account id `deleted` with new ids, only their day, and without their
+      lobby code, rating, best move or eval-bar flag;
+    - fair play's file if banned or in review (case, log, hashed identities, device markers, under the old id, shown
+      on the review page as "Deleted player"). A new account with the identity is banned again, or goes to review.
+  - **A lobby or a reward that finishes later** records nothing for a deleted account: its writes say `WHERE EXISTS`
+    the account.
+  - **Every table is accounted for:** each is in a store in `ACCOUNT_STORES` (`account-data.ts`) or listed in
+    `NO_ACCOUNT_DATA`. `account-data.test.ts` fails on a table in neither, from the schema or any `CREATE TABLE` in
+    the server. It also pins every table's columns (`SCHEMA_COLUMNS`), so any schema change means checking the two
+    lists first.
+- **Sign-in code records** go an hour after their code was sent (the Worker's 15-minute schedule, `purgeEmailCodes`). A new account is called "Player" until its owner picks
+  a name (never a Google name or the start of an email).
 - **The privacy policy, terms and copyright page** (`/privacy`, `/terms`, `/copyright`, `screens/Legal.tsx`) are drafts
   written from the code, with the decisions still to make at the top. They list every kind of personal data the game keeps, why and for how long:
   a PR that stores something new, or keeps it for a different time, changes the policy in the same PR. Linked from the
@@ -45,7 +67,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 ## Data stored by friends (for the privacy page and account deletion)
 
 Every row is about two accounts; `deleteSocial(sql, userId)` (`friends.ts`) deletes an account's rows on both sides.
-A guest's merge into the account it signs in to calls it; account deletion, when it's built, must too. The privacy
+A guest's merge into the account it signs in to calls it, and so does deleting an account (`account-data.ts`, whose
+download has the account's own rows: friends, requests sent and received, blocks made, invites, the caps' counts). The privacy
 policy's "Friends" entry (`screens/Legal.tsx`) says the same in plain words.
 
 | Table / column | What | Kept |
@@ -69,6 +92,8 @@ stay in the live hub's memory (never written).
 | The account API (`/api/me`, `/api/auth/*`, `/api/profile/*`, `/api/results`, …) | `packages/server/src/api.ts`, routed from `index.ts` |
 | App side: your account, signing in | `packages/app/src/account.ts`, `components/SignIn.tsx` |
 | The privacy policy, terms and copyright page | `packages/app/src/screens/Legal.tsx` |
+| Download my data and deleting an account: every store's part (`ACCOUNT_STORES`), the routes `/api/me/data` and `/api/me/delete` | `packages/server/src/account-data.ts`, `api.ts`; the live hub's part `live-hub.ts` (`accountData`, `forgetAccount`) |
+| App side: Settings → ACCOUNT's download link and delete confirmation | `packages/app/src/components/AccountData.tsx`, `account.ts` (`deleteMyAccount`) |
 | Fair play's tables (made with the rest of the schema) | `packages/server/src/fairplay-schema.ts` |
 | Friends: requests, blocks, invites, settings, caps (D1); the API (`/api/friends`, its kill switch) | `packages/server/src/friends.ts`, `friends-api.ts`; shared types `packages/core/src/friends.ts` |
 | App side: the friends list, actions, the invite toast, who's blocked | `packages/app/src/friends.ts`; screens on [hub.md](hub.md) |
@@ -81,11 +106,13 @@ Worker variables and secrets (see `DEPLOY.md`): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIE
 
 ## Tests
 
-- Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `friends.test.ts` (requests,
+- Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `account-data.test.ts` (every
+  table covered, the download, deleting in every store, a kept ban, the API, the live hub's part); `friends.test.ts` (requests,
   blocks, invites and the settings, the caps, expiry, hidden status, `deleteSocial`, the API and its kill switch, the
   live board's news and "in a match"); `packages/app/test/friends.test.ts` (the list, the toast, hiding blocked chat,
   inviting from the front door).
-- e2e: `e2e/account.spec.ts`, `profile.spec.ts`, `legal.spec.ts` (the privacy policy, terms and copyright page),
+- e2e: `e2e/account.spec.ts`, `account-delete.spec.ts` (download, the confirmation, deleting; reads the local D1),
+  `profile.spec.ts`, `legal.spec.ts` (the privacy policy, terms and copyright page),
   `friends.spec.ts` (two players: request, accept, online, the invites setting, an invite joined from its toast, a
   block).
 
@@ -93,4 +120,5 @@ Worker variables and secrets (see `DEPLOY.md`): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIE
 
 - Secrets never in the repo or in output; Eric does sign-ups and purchases.
 - A profile others can see never shows an email, a sign-in method or anything not on the approved list.
-- A new table that keeps anything about an account is listed in this page's data table and deleted with the account.
+- A new table goes in `ACCOUNT_STORES` (`account-data.ts`: its part of the download, and what deleting does to it)
+  with its line in the privacy policy, or in `NO_ACCOUNT_DATA` with why it holds nothing about anyone, in the same PR.

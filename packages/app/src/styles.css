@@ -362,6 +362,15 @@ p {
   text-align: center;
 }
 
+/* An opening's name (Classic) stays on one line, cut with "…" when it's long: a name that wrapped pushed the board down
+   a line on a phone when the next round put you on its board (docs/decisions/2026-10-15-flaky-e2e-batch.md). */
+.opening-title {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .board-wrap {
   position: relative;
   width: 100%;
@@ -8367,6 +8376,29 @@ a.fd-row-link {
   display: flex;
   align-items: center;
   text-decoration: none;
+}
+/* Settings → ACCOUNT: deleting your account, and its confirmation (components/AccountData.tsx). */
+.fd-row-link.fd-row-danger {
+  color: var(--fd-danger);
+}
+.fd-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--fd-danger-line);
+}
+.fd-delete p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.fd-delete-error {
+  color: var(--fd-danger);
+}
+.fd-delete-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 .fd-seg {
   display: grid;
