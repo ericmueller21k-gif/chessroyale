@@ -38,6 +38,7 @@ async function sample(page: Page) {
         boss: !!document.querySelector(".ka-boss canvas"),
         flip: !!document.querySelector(".ka-boss.flip"),
         hp: [...document.querySelectorAll(".ka-hp")].map((e) => e.textContent),
+        lashes: [...document.querySelectorAll(".ka-hp")].map((e) => Number(e.getAttribute("data-lash"))),
         red: document.querySelectorAll(".ls-dmg").length,
         real,
         copy: copy ? getComputedStyle(copy).opacity : null,
@@ -50,6 +51,19 @@ async function sample(page: Page) {
     tick();
   }, BOARD_SEL.piece);
   return () => page.evaluate(() => (window as any).__ka as any[]);
+}
+
+/**
+ * Every lash lands (0 to 9), each with its "−N" off the king, and the attack's beat goes forward a lash at a time, to the
+ * last. Each "−N" is on screen for a second and says which lash it is (`data-lash`), so every one shows in some frame
+ * however busy the machine. The beat's own marker (`data-hit`) holds each lash for only 170 ms: one frame that long on
+ * a busy runner skipped a lash (docs/decisions/2026-10-16-flaky-e2e-batch-2.md).
+ */
+function expectEveryLash(during: { hit: number; lashes: number[] }[]) {
+  expect(new Set(during.flatMap((x) => x.lashes))).toEqual(new Set(Array.from({ length: LASHES }, (_, i) => i)));
+  const hits = during.map((x) => x.hit);
+  expect(hits.every((h, i) => h >= -1 && h < LASHES && (i === 0 || h >= hits[i - 1]!))).toBe(true);
+  expect(hits.at(-1)).toBe(LASHES - 1);
 }
 
 test("Hollow's mate: he lashes your king, it topples into the dark, then the result", async ({ page }) => {
@@ -66,7 +80,7 @@ test("Hollow's mate: he lashes your king, it topples into the dark, then the res
   const result = s.find((x) => x.phase === "results")!;
   expect(result.now).toBeGreaterThanOrEqual(start + ATTACK_MS);
   // Every lash lands (0 to 9), each with its "−N" off the king.
-  expect(new Set(during.map((x) => x.hit).filter((h) => h >= 0))).toEqual(new Set(Array.from({ length: LASHES }, (_, i) => i)));
+  expectEveryLash(during);
   expect(Math.max(...during.map((x) => x.hp.length))).toBeGreaterThanOrEqual(3);
   for (const x of during) for (const t of x.hp) expect(t).toMatch(/^−\d+$/);
   // Your (white) king: hidden on the board the whole time, its copy there instead, gone by the end.
@@ -108,7 +122,7 @@ test("the God King's Last Stand against Hollow: Hollow lashes him, then he falls
   expect(during.length).toBeGreaterThan(20);
   // It starts at its beat in the Last Stand (as the piece slides back).
   expect(Math.abs(during[0].start - (standAt + ATTACK_AT))).toBeLessThanOrEqual(1);
-  expect(new Set(during.map((x) => x.hit).filter((h) => h >= 0))).toEqual(new Set(Array.from({ length: LASHES }, (_, i) => i)));
+  expectEveryLash(during);
   // Gold "−N" hits off him, never the anonymous red slashes' numbers; his blows are its lashes.
   expect(Math.max(...during.map((x) => x.hp.length))).toBeGreaterThanOrEqual(3);
   expect(s.every((x) => x.red === 0)).toBe(true);

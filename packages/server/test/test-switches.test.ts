@@ -69,7 +69,7 @@ describe("a new lobby's options", () => {
 
   it("for those allowed, the switches work", () => {
     const o = lobbyOptions(q(`mode=crowd&${all}`), true);
-    expect(o.overrides).toMatchObject({ roundsPerStage: 1, firstStageRounds: 1, finalMaxTurns: 2, bossMaxMoves: 3, drawRuleByStage: ["weighted"], bossPowerTest: "candle", finalFormat: "boss", botSkillRange: WEAK_BOT_SKILL });
+    expect(o.overrides).toMatchObject({ roundsPerStage: 1, firstStageRounds: 1, finalMaxTurns: 2, bossMaxMoves: 3, drawRuleByStage: ["weighted"], bossPowerTest: "candle", finalFormat: "boss", botSkillRange: WEAK_BOT_SKILL, peopleFirst: true });
     expect(o.keepMs).toBe(5000);
     expect(lobbyOptions(q(`mode=raid&boss=${BOSS_TIERS[0]}`), true).overrides).toMatchObject({ bossFixedElo: BOSS_TIERS[0], bossFixed: BOSS_TIERS[0] });
     expect(lobbyOptions(q(`mode=crowd&boss=${playable}`), true).overrides.bossId).toBe(playable);

@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type MatchmakingType, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type MatchmakingType, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -114,8 +114,9 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     ...(q.get("mate") === "1" ? { bossMateTest: true } : {}),
     // Testing, solo: ?win=1, you mate the boss at once (1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6, your move: Qxf7): a boss beaten.
     ...(q.get("win") === "1" ? { bossWinTest: true } : {}),
-    // Testing: ?weakbots=1, every bot plays loosely (WEAK_BOT_SKILL), so a test's strong player surely survives the cuts.
-    ...(q.get("weakbots") === "1" ? { botSkillRange: WEAK_BOT_SKILL } : {}),
+    // Testing: ?weakbots=1, every bot plays loosely and people rank above bots (WEAK_BOTS), so a test's player surely
+    // survives the cuts.
+    ...(q.get("weakbots") === "1" ? WEAK_BOTS : {}),
     // Testing: ?laststand=0, the God King never makes his Last Stand (a test that leaves a piece to burn on purpose).
     ...(q.get("laststand") === "0" ? { lastStandFrom: 999 } : {}),
     // Testing, solo: ?boss=<id>&wip=1 meets a boss whose powers are built before its art is (placeholders show).

@@ -453,12 +453,13 @@ const scoreThinkMs = (p: Pick<PlayerState, "stageThinkMs" | "thinkMsTotal">, set
 /**
  * Alive players ordered best first: stage score; for an exact tie, less raw loss over the match (before the opening
  * allowance), then less thinking time, then a coin flip. Only the last cut before a fixed-size ending goes by anything
- * but the score (see cutPlan): elsewhere these only order the list.
+ * but the score (see cutPlan): elsewhere these only order the list. (Testing, `peopleFirst`: people above bots.)
  */
 export function standings(state: MatchState, rng: Rng, settings: Settings = DEFAULT_SETTINGS): PlayerState[] {
   const tiebreak = new Map(alivePlayers(state).map((p) => [p.id, rng()]));
   return alivePlayers(state).sort(
     (a, b) =>
+      (settings.peopleFirst ? Number(a.isBot) - Number(b.isBot) : 0) ||
       standingPoints(b, settings) - standingPoints(a, settings) ||
       rawLossTotal(a, settings) - rawLossTotal(b, settings) ||
       scoreThinkMs(a, settings) - scoreThinkMs(b, settings) ||
