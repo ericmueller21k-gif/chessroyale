@@ -1,5 +1,7 @@
 import { isBlocked } from "./friends.ts";
 import { GLOBAL_CHAT, chatSay } from "@chessroyale/core";
+import type { ChatBlock } from "@chessroyale/chess";
+import { chatBlockText, mutes, setChatBlock } from "./chat-mod.ts";
 import { rideLive } from "./live.ts";
 
 /**
@@ -31,18 +33,6 @@ interface Slice {
   reset?: true;
 }
 
-const MUTE_KEY = "brc.globalChatMuted";
-const MUTE_MAX = 200;
-
-function loadMuted(): string[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(MUTE_KEY) ?? "[]") as unknown;
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(-MUTE_MAX) : [];
-  } catch {
-    return [];
-  }
-}
-
 const isSlice = (x: unknown): x is Slice => !!x && typeof x === "object" && typeof (x as Slice).n === "number" && Array.isArray((x as Slice).lines);
 
 export class GlobalChatStore {
@@ -55,16 +45,18 @@ export class GlobalChatStore {
   sending = false;
   /** Whether the server has answered yet (the panel says "Loading" until then). */
   loaded = false;
-  private muted: string[] = loadMuted();
   private listeners = new Set<() => void>();
   private opened = 0;
   private unride: (() => void) | null = null;
 
-  constructor(private keep = GLOBAL_CHAT.keep) {}
+  constructor(private keep = GLOBAL_CHAT.keep) {
+    // (Someone muted in another chat: their lines go here too.)
+    mutes.on(() => this.emit());
+  }
 
-  /** The lines to show, oldest first (muted players' and blocked accounts' left out). */
+  /** The lines to show, oldest first (muted players' left out, chat-mod.ts's mutes as in every chat, and blocked accounts'). */
   lines(): GlobalLine[] {
-    return this.list.filter((l) => !this.muted.includes(l.from) && !isBlocked(l.from));
+    return this.list.filter((l) => !mutes.has(l.from) && !isBlocked(l.from));
   }
 
   /** New lines from the server (the live line's answer, or a post's). */
@@ -111,10 +103,16 @@ export class GlobalChatStore {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ say: id, since: this.last }),
       });
-      const body = (await res.json().catch(() => ({}))) as { chat?: unknown; waitMs?: number; retryMs?: number; message?: string };
+      const body = (await res.json().catch(() => ({}))) as { chat?: unknown; waitMs?: number; retryMs?: number; message?: string; block?: ChatBlock };
       this.take(body.chat);
-      if (res.ok) this.waitUntil = Date.now() + (body.waitMs ?? GLOBAL_CHAT.gapMs);
-      else {
+      if (res.ok) {
+        this.waitUntil = Date.now() + (body.waitMs ?? GLOBAL_CHAT.gapMs);
+        setChatBlock(null);
+      } else if (body.block) {
+        // Your chat is off (a moderator's chat ban): the panel says why instead of its buttons.
+        setChatBlock(body.block);
+        this.error = chatBlockText(body.block);
+      } else {
         if (typeof body.retryMs === "number") this.waitUntil = Date.now() + body.retryMs;
         this.error = body.message ?? `That didn't go (${res.status}).`;
       }
@@ -127,26 +125,21 @@ export class GlobalChatStore {
   }
 
   isMuted(id: string) {
-    return this.muted.includes(id);
+    return mutes.has(id);
   }
 
-  /** Mute (or unmute) someone's lines in the global chat, on this device. */
+  /** Mute (or unmute) someone, on this device: their lines go from every chat (chat-mod.ts). */
   mute(id: string, on: boolean) {
-    this.muted = on ? [...this.muted.filter((x) => x !== id), id].slice(-MUTE_MAX) : this.muted.filter((x) => x !== id);
-    try {
-      localStorage.setItem(MUTE_KEY, JSON.stringify(this.muted));
-    } catch {
-      // Kept for this visit only.
-    }
-    this.emit();
+    mutes.set(id, on);
   }
 
   unmuteAll() {
-    for (const id of [...this.muted]) this.mute(id, false);
+    mutes.clear();
   }
 
+  /** How many players are muted on this device (in any chat). */
   mutedCount() {
-    return this.muted.length;
+    return mutes.count;
   }
 
   clearError() {

@@ -17,7 +17,8 @@ import {
   type ChatTo,
   type StoredChatPicks,
 } from "@chessroyale/core";
-import type { ChatRefusal, ClientMessage, NetChatLine } from "@chessroyale/chess";
+import type { ChatBlock, ChatRefusal, ClientMessage, NetChatLine } from "@chessroyale/chess";
+import { chatBlockNow, mutes, setChatBlock } from "./chat-mod.ts";
 import { chatBubbles, chatOff, onPrefsChange, setChatOff } from "./prefs.ts";
 import { play } from "./sound.ts";
 
@@ -46,14 +47,20 @@ export interface ChatHost {
   teams: () => boolean;
   /** The lines and emoji this player picked in their profile (their account's; missing: the defaults). */
   picks: () => StoredChatPicks | null | undefined;
-  /** A player's account (their seat's uid), for what's kept by account: who you've blocked (friends.ts). */
+  /**
+   * A player's account (their seat's uid), for what's kept by account: who you've muted (chat-mod.ts) and who you've
+   * blocked (friends.ts). Missing: a bot, or no account.
+   */
   uidOf?: (playerId: string) => string | undefined;
+  /** Everyone seated here (the lobby's players, the match's standings): whose account you muted shows as muted here. */
+  seats?: () => readonly string[];
 }
 
 /**
  * Quick chat in one online match: the lines this player can see, the icons that came with them, their packs, who
  * they muted, and the limits mirrored from the server (so the buttons gray out instead of failing). The server
- * decides everything; this only shows it.
+ * decides everything; this only shows it. A mute is by account, on this device, for every chat (chat-mod.ts); a
+ * player without an account (a bot) is muted for this match only.
  */
 export class MatchChat {
   /** The server opened chat for this match (Crowd and boss raids, once the match has begun). */
@@ -79,7 +86,7 @@ export class MatchChat {
 
   constructor(private readonly host: ChatHost) {}
 
-  /** Muted for this match (kept on the device with the lobby's code, so a reload keeps them). */
+  /** Players without an account muted for this match (kept on the device with the lobby's code, so a reload keeps them). */
   private get muted(): Set<string> {
     if (!this.mutedSet) {
       this.mutedSet = new Set(this.loadMuted());
@@ -117,8 +124,9 @@ export class MatchChat {
     else this.arrived(l);
   }
 
-  /** The server dropped a line: gray the buttons until it says. */
-  onRefused(say: string, reason: ChatRefusal, retryAt: number) {
+  /** The server dropped a line: gray the buttons until it says (or, your chat banned, say why instead of them). */
+  onRefused(say: string, reason: ChatRefusal, retryAt: number, block?: ChatBlock) {
+    if (reason === "mod") setChatBlock(block ? { ...block, until: block.until === null ? null : this.host.local(block.until) } : { until: null });
     if (reason === "gap" || reason === "burst") this.blockedUntil = Math.max(this.blockedUntil, this.host.local(retryAt));
     if (reason === "repeat") this.sent = { ...this.sent, last: { say, at: this.host.local(retryAt) - QUICK_CHAT.repeatMs } };
     this.wakeAt(this.readyAt());
@@ -147,10 +155,15 @@ export class MatchChat {
     return Math.max(chatReadyAt(this.sent), this.blockedUntil);
   }
 
+  /** Your chat ban, if any (a moderator's): the panel says why instead of its buttons. */
+  banned(now = Date.now()): ChatBlock | null {
+    return chatBlockNow(now);
+  }
+
   /** Whether this line's button works right now (chat open, owned, the switch allows it, within the limits). */
   canSay(id: string, now = Date.now()): boolean {
     const say = chatSay(id);
-    if (!this.enabled || !say || !this.packs.includes(say.pack) || chatOff()) return false;
+    if (!this.enabled || !say || !this.packs.includes(say.pack) || chatOff() || this.banned(now)) return false;
     if (this.to === "all" && this.host.teams() && !canSayToAll(id)) return false;
     return now >= this.blockedUntil && chatCheck(this.sent, id, now).ok;
   }
@@ -179,27 +192,46 @@ export class MatchChat {
 
   // ---------------- Muting and off ----------------
 
-  isMuted(id: string) {
-    return this.muted.has(id);
-  }
-
-  /** A sender whose lines don't show: muted for this match, or an account you've blocked (friends.ts). */
+  /**
+   * A sender whose lines don't show here: muted (their account on this device, or a bot for this match), or an account
+   * you've blocked (friends.ts).
+   */
   hidden(from: string): boolean {
-    return this.muted.has(from) || isBlocked(this.host.uidOf?.(from));
+    const uid = this.host.uidOf?.(from);
+    return this.muted.has(from) || mutes.has(uid) || isBlocked(uid);
   }
 
+  /** Muted by this device (their account, or a bot for this match); a block is friends' (hidden, not muted). */
+  isMuted(id: string) {
+    return this.muted.has(id) || mutes.has(this.host.uidOf?.(id));
+  }
+
+  /** The players muted here: this match's, and those seated here (or with a line in this chat) whose account is muted. */
   mutedIds(): string[] {
-    return [...this.muted];
+    // (Most players mute nobody: then there's nothing to look up.)
+    if (!mutes.count) return [...this.muted];
+    const here = [...(this.host.seats?.() ?? []), ...this.list.map((l) => l.from)];
+    return [...new Set([...this.muted, ...here.filter((id) => id !== this.host.me() && this.isMuted(id))])];
   }
 
-  /** Mutes (or unmutes) a player for this match: their lines and emoji disappear, and the server stops sending them. */
+  /**
+   * Mutes (or unmutes) a player: their account on this device for every chat, or a player without one (a bot) for
+   * this match. Their lines and emoji disappear, and the server stops sending them to this match.
+   */
   mute(id: string, on: boolean) {
     if (id === this.host.me()) return;
-    if (on) this.muted.add(id);
+    const uid = this.host.uidOf?.(id);
+    if (uid) mutes.set(uid, on);
+    if (on && !uid) this.muted.add(id);
     else this.muted.delete(id);
     this.saveMuted();
-    this.host.send({ t: "chatPrefs", muted: [...this.muted] });
+    this.host.send({ t: "chatPrefs", muted: this.mutedIds() });
     this.host.emit();
+  }
+
+  /** A player whose mute is by account (for every chat on this device), not for this match only (a bot). */
+  mutesByAccount(id: string): boolean {
+    return !!this.host.uidOf?.(id);
   }
 
   get off() {

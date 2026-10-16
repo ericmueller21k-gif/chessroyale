@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { GLOBAL_CHAT, chatSay, defaultChatPicks, homeChatButtons, type ChatSay } from "@chessroyale/core";
-import { account, mustSignInToPlayOnline, onAccountChange } from "../account.ts";
+import { account, mustSignInToPlayOnline, onAccountChange, refreshChatStanding } from "../account.ts";
+import { chatBlockNow, chatBlockText } from "../chat-mod.ts";
 import { globalChat, type GlobalLine } from "../global-chat.ts";
 import { chatOff, onPrefsChange, setChatOff } from "../prefs.ts";
 import { openProfile } from "../profile-nav.ts";
@@ -40,7 +41,7 @@ function Row({ line, you, onName }: { line: GlobalLine; you: boolean; onName: (l
       <LineIcon line={line} />
       <div class="gline-body">
         <div class="gline-head">
-          <button type="button" class="gline-name" onClick={() => onName(line)} aria-label={`${you ? "You" : line.name}: profile or mute`}>
+          <button type="button" class="gline-name" onClick={() => onName(line)} aria-label={you ? "You: profile" : `${line.name}: profile or mute`}>
             {you ? "You" : line.name}
           </button>
           {line.bot && <span class="gline-bot">bot</span>}
@@ -100,6 +101,10 @@ export function GlobalChat({ onSignIn }: { onSignIn?: () => void }) {
   const chips: ChatSay[] = buttons[tab];
   const busy = waitS > 0 || globalChat.sending;
   const muted = globalChat.mutedCount();
+  // Your chat is banned (a moderator's decision): why, instead of the buttons. Your profile is read again as this
+  // shows, so a ban lifted meanwhile goes.
+  const banned = guest ? null : chatBlockNow(now);
+  useEffect(() => void (banned && refreshChatStanding()), [!!banned]);
   const status = globalChat.error && waitS === 0 ? globalChat.error : waitS > 0 ? `Next message in ${waitS} s` : `One message every ${GLOBAL_CHAT.gapMs / 1000} s`;
   if (off) {
     return (
@@ -177,6 +182,10 @@ export function GlobalChat({ onSignIn }: { onSignIn?: () => void }) {
                 Sign in
               </button>
             )}
+          </div>
+        ) : banned ? (
+          <div class="gchat-guest" role="status">
+            <span>{chatBlockText(banned)}</span>
           </div>
         ) : (
           <div class="gchat-say">

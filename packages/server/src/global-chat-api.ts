@@ -1,6 +1,8 @@
 import { GLOBAL_CHAT } from "@chessroyale/core";
 import { shopState, type Sql, type User } from "./accounts.ts";
 import { caseOf } from "./fairplay.ts";
+import { CHAT_OFF, chatBlock } from "./chat-mod.ts";
+import { isBlockedText } from "./text-filter.ts";
 import { isIconKey, linesSince, type GlobalChatSnapshot, type GlobalPost, type GlobalSender } from "./global-chat.ts";
 import type { LiveHub } from "./live-hub.ts";
 
@@ -50,10 +52,15 @@ export async function chatPostResponse(request: Request, sql: Sql, hub: ChatHub,
   const body = (await request.json().catch(() => ({}))) as { say?: unknown; since?: unknown };
   if (typeof body.say !== "string") return json({ message: "Only the preset lines can go in the chat." }, 400);
   if ((await caseOf(sql, user.id))?.status === "banned") return json({ message: BANNED_FROM_CHAT, banned: true }, 403);
+  // A moderator's chat ban (chat-mod.ts): reading only.
+  const block = await chatBlock(sql, user.id, now);
+  if (block) return json({ message: CHAT_OFF, block }, 403);
   const row = await sql.first<{ name: string; icon: string | null; rating: number | null }>("SELECT name, icon, rating FROM users WHERE id = ?", user.id);
+  // (A name from before the name filter that it refuses goes out as "Player".)
+  const name = row?.name ?? user.name;
   const sender: GlobalSender = {
     id: user.id,
-    name: row?.name ?? user.name,
+    name: isBlockedText(name) ? "Player" : name,
     rating: typeof row?.rating === "number" ? Math.round(row.rating) : null,
     icon: row?.icon ?? null,
     owned: (await shopState(sql, user.id)).owned,

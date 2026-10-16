@@ -27,6 +27,7 @@ import {
   type RoundReport,
   type RunnerSnapshot,
   type LivePick,
+  type ChatBlock,
   type ChatRefusal,
   type NetChatLine,
   type NetVote,
@@ -53,6 +54,7 @@ import {
   type MoveScore,
   type NetBossBrain,
 } from "@chessroyale/chess";
+import { seatName } from "./text-filter.ts";
 import { assignJudges, cutBubble, drawJudges, emptyStats, seedFor, type JudgeDevice, type JudgeHow, type JudgeStats, type JudgeTask } from "./judges.ts";
 
 /**
@@ -118,6 +120,8 @@ interface ChatRecord {
   muted: Record<string, string[]>;
   /** When the bots' lines are said (to keep them to a few a minute). */
   bots: number[];
+  /** Chat moderation: accounts with a chat ban in force (they can't send), as the Durable Object last read them. */
+  blocked?: Record<string, ChatBlock>;
 }
 
 export interface Human {
@@ -708,7 +712,8 @@ export class LobbyCore {
     if (this.r.phase === "results") return { ok: false as const, message: MATCH_ENDED, ended: true as const };
     if (this.r.phase !== "lobby" || this.r.auto?.filledAt) return { ok: false as const, message: "This match has already started." };
     if (this.r.humans.length >= this.settings.lobbySize) return { ok: false as const, message: "This lobby is full." };
-    const clean = (name ?? "").replace(/\s+/g, " ").trim().slice(0, 16) || `Player ${this.r.humans.length + 1}`;
+    // (A name the filter refuses becomes "Player N", like an empty one: text-filter.ts.)
+    const clean = seatName(name, `Player ${this.r.humans.length + 1}`);
     const id = `p${++this.r.counter}`;
     const newToken = reseat ? token! : Array.from({ length: 24 }, () => Math.floor(this.rng() * 16).toString(16)).join("");
     this.r.humans.push({
@@ -3004,9 +3009,12 @@ export class LobbyCore {
   private chatSay(playerId: string, say: unknown, to: unknown) {
     const now = this.io.now();
     const c = this.chat;
-    const refuse = (reason: ChatRefusal, retryAt = now) => this.io.send(playerId, { t: "chatNo", say: String(say).slice(0, 40), reason, retryAt });
+    const refuse = (reason: ChatRefusal, retryAt = now, block?: ChatBlock) =>
+      this.io.send(playerId, { t: "chatNo", say: String(say).slice(0, 40), reason, retryAt, ...(block ? { block } : {}) });
     if (!this.chatOpen() || !this.human(playerId)) return refuse("closed");
     if (c.off[playerId]) return refuse("off");
+    const block = this.chatBlockOf(playerId, now);
+    if (block) return refuse("mod", block.until ?? now, block);
     const line = chatSay(say);
     if (!line) return refuse("unknown");
     if (!canSay(line.id, c.owned[playerId])) return refuse("locked");
@@ -3021,6 +3029,26 @@ export class LobbyCore {
     this.chatPost(this.chatLine(playerId, line.id, toAll ? "all" : "team", now));
   }
 
+  /** A player's chat ban in force now (chat moderation: chatStanding), if any. */
+  private chatBlockOf(playerId: string, now: number): ChatBlock | null {
+    const uid = this.r.accounts?.[playerId];
+    const block = uid ? this.r.chat?.blocked?.[uid] : undefined;
+    return block && (block.until === null || block.until > now) ? block : null;
+  }
+
+  /**
+   * Chat moderation: an account's chat ban as the Durable Object read it (when they join, and again at most every
+   * CHAT_MOD.recheckMs as they chat). Null: none.
+   */
+  chatStanding(userId: string, block: ChatBlock | null) {
+    const c = this.chat;
+    if (block) c.blocked = { ...c.blocked, [userId]: block };
+    else if (c.blocked?.[userId]) {
+      const { [userId]: _gone, ...rest } = c.blocked;
+      c.blocked = rest;
+    }
+  }
+
   /** A line to post: in the lobby, to everyone there; in the match, to the sender's team (or everyone). */
   private chatLine(from: string, say: string, to: "team" | "all", at: number): Omit<NetChatLine, "n"> {
     if (this.chatInLobby()) return { from, say, to: "all", team: null, at, lobby: true };
@@ -3032,14 +3060,17 @@ export class LobbyCore {
     if (!this.human(playerId)) return;
     const c = this.chat;
     const wasOff = !!c.off[playerId];
+    const wasMuted = c.muted[playerId] ?? [];
     if (off === true) c.off[playerId] = true;
     else if (off === false) delete c.off[playerId];
     if (Array.isArray(muted)) {
       const ids = new Set([...this.r.humans.map((h) => h.id), ...this.r.bots.map((b) => b.id)]);
       c.muted[playerId] = [...new Set(muted.filter((m): m is string => typeof m === "string" && m !== playerId && ids.has(m)))].slice(0, 100);
     }
-    // Back on: the lines missed meanwhile.
+    // Back on: the lines missed meanwhile. Someone unmuted: their recent lines (never sent meanwhile, even to a device
+    // reloaded since).
     if (wasOff && !c.off[playerId]) this.sendChatLog(playerId);
+    else if (!c.off[playerId] && wasMuted.some((m) => !c.muted[playerId]?.includes(m))) this.sendChatLog(playerId, false);
   }
 
   /** Bots chat a little (see botChatLines): their lines are sent now, shown a moment later (`at`). */
