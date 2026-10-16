@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "preact/hooks";
+import { tooYoung } from "../account.ts";
 import { SignIn } from "../components/SignIn.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
 import { CROWD_SETTINGS, DEFAULT_SETTINGS, bossInText, crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
@@ -88,12 +89,15 @@ export function LandingScreen({
             </p>
           )}
           <section class="signin landing-signin">
-            <h2>{joinCode ? `Sign in to join lobby ${joinCode}` : "Sign in to play online"}</h2>
+            {/* (A device that answered the age question "too young": no sign-in, the guest button below.) */}
+            <h2>{tooYoung() ? "Online play needs an account" : joinCode ? `Sign in to join lobby ${joinCode}` : "Sign in to play online"}</h2>
             <SignIn google={google} email={email} next={joinCode ? `/lobby/${joinCode}` : "/"} failed={failed} />
           </section>
-          <div class="or-line" aria-hidden="true">
-            <span>or</span>
-          </div>
+          {!tooYoung() && (
+            <div class="or-line" aria-hidden="true">
+              <span>or</span>
+            </div>
+          )}
           <button type="button" class="btn btn-secondary btn-wide" onClick={onGuest}>
             Play vs {CROWD.lobbySize - 1} bots as a guest
           </button>

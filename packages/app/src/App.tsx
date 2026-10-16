@@ -27,7 +27,7 @@ import { PlayerProfileScreen } from "./screens/PlayerProfile.tsx";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
-import { account, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult } from "./account.ts";
+import { account, askAgeAgain, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult } from "./account.ts";
 import { isAdmin } from "./boss-brain.ts";
 import { difficultyElo } from "./boss-difficulty.ts";
 import { setLiveBusy, startLive } from "./live.ts";
@@ -191,7 +191,10 @@ function leftNote(how: LeftHow | null | undefined): string {
   return "You resigned that match.";
 }
 
-/** Back from Google: ?signin=google (or failed). Read once, then tidied out of the address bar. */
+/**
+ * Back from Google: ?signin=google (or failed; or age: the server wanted the age question answered again first). Read
+ * once, then tidied out of the address bar.
+ */
 const signinParam = new URLSearchParams(location.search).get("signin");
 
 const GUEST_KEY = "brc.guest";
@@ -273,6 +276,7 @@ export function App() {
   const { config, profile } = useAccount();
   useEffect(() => {
     if (!signinParam) return;
+    if (signinParam === "age") askAgeAgain();
     const q = new URLSearchParams(location.search);
     q.delete("signin");
     history.replaceState(null, "", `${location.pathname}${q.size ? `?${q}` : ""}`);

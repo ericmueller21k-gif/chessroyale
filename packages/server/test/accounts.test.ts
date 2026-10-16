@@ -212,11 +212,13 @@ describe("account API", () => {
       sentCode = /(\d{6}) is your/.exec(JSON.parse(String(init.body)).subject)![1]!;
       return new Response("{}", { status: 200 });
     }) as unknown as typeof fetch;
-    const start = await call(env, "/api/auth/email/start", { method: "POST", body: JSON.stringify({ email: "Eric@Example.com" }), cookie: me.cookie }, fakeResend);
+    // (This device answered the age question "old enough": age-gate.test.ts has the question itself.)
+    const answered = `${me.cookie}; hc_age=ok`;
+    const start = await call(env, "/api/auth/email/start", { method: "POST", body: JSON.stringify({ email: "Eric@Example.com" }), cookie: answered }, fakeResend);
     expect(start.body).toEqual({ ok: true });
-    const bad = await call(env, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "eric@example.com", code: "000000" === sentCode ? "111111" : "000000" }), cookie: me.cookie });
+    const bad = await call(env, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "eric@example.com", code: "000000" === sentCode ? "111111" : "000000" }), cookie: answered });
     expect(bad.res.status).toBe(400);
-    const ok = await call(env, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "eric@example.com", code: sentCode }), cookie: me.cookie });
+    const ok = await call(env, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "eric@example.com", code: sentCode }), cookie: answered });
     expect(ok.body.user.signedIn).toBe(true);
     expect(ok.body.user.email).toBe("eric@example.com");
     // Results go on the profile.
@@ -253,7 +255,9 @@ describe("account API", () => {
   it("Google: start redirects with state; the callback checks it and signs in", async () => {
     const env = { DB: memoryD1(), GOOGLE_CLIENT_ID: "cid", GOOGLE_CLIENT_SECRET: "secret" };
     const me = await call(env, "/api/me");
-    const start = await call(env, "/api/auth/google/start", { cookie: me.cookie });
+    // (This device answered the age question "old enough": age-gate.test.ts has the question itself.)
+    const answered = `${me.cookie}; hc_age=ok`;
+    const start = await call(env, "/api/auth/google/start", { cookie: answered });
     const loc = new URL(start.res.headers.get("location")!);
     expect(loc.origin).toBe("https://accounts.google.com");
     expect(loc.searchParams.get("redirect_uri")).toBe(`${origin}/api/auth/google/callback`);
@@ -262,9 +266,9 @@ describe("account API", () => {
     const claims = btoa(JSON.stringify({ sub: "g-123", aud: "cid", email: "e@gmail.com", email_verified: true, name: "Eric M" }));
     const fakeGoogle = (async () => new Response(JSON.stringify({ id_token: `x.${claims}.y` }), { status: 200 })) as unknown as typeof fetch;
     // A wrong state is refused.
-    const forged = await call(env, `/api/auth/google/callback?state=nope&code=c`, { cookie: `${me.cookie}; ${stateCookie}` }, fakeGoogle);
+    const forged = await call(env, `/api/auth/google/callback?state=nope&code=c`, { cookie: `${answered}; ${stateCookie}` }, fakeGoogle);
     expect(forged.res.headers.get("location")).toContain("signin=failed");
-    const cb = await call(env, `/api/auth/google/callback?state=${state}&code=c`, { cookie: `${me.cookie}; ${stateCookie}` }, fakeGoogle);
+    const cb = await call(env, `/api/auth/google/callback?state=${state}&code=c`, { cookie: `${answered}; ${stateCookie}` }, fakeGoogle);
     expect(cb.res.headers.get("location")).toBe(`${origin}/?signin=google`);
     const after = await call(env, "/api/me", { cookie: cb.cookie });
     expect(after.body.user).toMatchObject({ signedIn: true, google: true, email: "e@gmail.com" });
@@ -276,10 +280,11 @@ describe("account API", () => {
     const fakeGoogle = (async () => new Response(JSON.stringify({ id_token: `x.${claims}.y` }), { status: 200 })) as unknown as typeof fetch;
     for (const [next, back] of [["/lobby/ABCDE", "/lobby/ABCDE"], ["//evil.example", "/"], ["https://evil.example", "/"]] as const) {
       const me = await call(env, "/api/me");
-      const start = await call(env, `/api/auth/google/start?next=${encodeURIComponent(next)}`, { cookie: me.cookie });
+      const answered = `${me.cookie}; hc_age=ok`;
+      const start = await call(env, `/api/auth/google/start?next=${encodeURIComponent(next)}`, { cookie: answered });
       const cookies = start.res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
       const state = new URL(start.res.headers.get("location")!).searchParams.get("state");
-      const cb = await call(env, `/api/auth/google/callback?state=${state}&code=c`, { cookie: `${me.cookie}; ${cookies}` }, fakeGoogle);
+      const cb = await call(env, `/api/auth/google/callback?state=${state}&code=c`, { cookie: `${answered}; ${cookies}` }, fakeGoogle);
       expect(cb.res.headers.get("location")).toBe(`${origin}${back}?signin=google`);
     }
   });

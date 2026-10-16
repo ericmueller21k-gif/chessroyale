@@ -134,7 +134,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   results:
     "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar",
   sessions: "token_hash user_id created_at expires_at",
-  users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online",
+  users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online age_ok_at",
   wallets: "user_id coins crates",
 };
 

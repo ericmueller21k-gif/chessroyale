@@ -6,7 +6,7 @@ import { openReport } from "../components/Problems.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { AccountData } from "../components/AccountData.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
-import { signOut } from "../account.ts";
+import { signOut, tooYoung } from "../account.ts";
 import { chatBubbles, chatOff, crowdAnimations, crowdTrail, evalBarOn, onPrefsChange, practiceOn, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail, setEvalBarOn, setPracticeOn } from "../prefs.ts";
 import { REEL_VOICES, getReelVoice, isMuted, onMuteChange, previewPieceSound, previewReel, setMuted, setReelVoice, unlockAudio, type ReelVoice } from "../sound.ts";
 import { PIECE_SOUNDS, pieceSound, setPieceSound } from "../piece-sounds.ts";
@@ -253,7 +253,7 @@ export function SettingsScreen({ onBack, onFaq }: { onBack: () => void; onFaq?: 
             </div>
           ) : config.google || config.email ? (
             <div class="fd-panel">
-              <p class="fd-sub">You're a guest. Sign in to keep your profile on any device and to play online.</p>
+              <p class="fd-sub">{tooYoung() ? "You're a guest on this device." : "You're a guest. Sign in to keep your profile on any device and to play online."}</p>
               <SignIn google={config.google} email={config.email} next="/settings" />
             </div>
           ) : (
