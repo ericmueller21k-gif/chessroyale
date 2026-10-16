@@ -20,11 +20,17 @@ async function intoBattle(page: Page) {
   await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 15_000 }).toBe(true);
 }
 
-/** A quiet legal move once it's your move. */
+/**
+ * A quiet move once it's your move, one the game takes: Ginger's freeze takes a piece's moves away for a turn
+ * (`crowdAllowed`), and a frozen pawn's move would be ignored (docs/decisions/2026-10-15-flaky-e2e-batch.md).
+ */
 async function quietMove(page: Page) {
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
-  const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
-  const moves = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion);
+  const { fen, allowed } = await page.evaluate(() => {
+    const m = (window as any).match;
+    return { fen: m.phase.board.fen as string, allowed: (m.runner.crowdAllowed() ?? null) as string[] | null };
+  });
+  const moves = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion && (!allowed || allowed.includes(m.lan)));
   await submitMove(page, (moves.find((m) => m.piece === "p") ?? moves[0]!).lan, fen);
   await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
 }
