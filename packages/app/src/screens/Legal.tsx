@@ -287,7 +287,8 @@ function Privacy() {
         </li>
         <li>
           <strong>hc_age</strong> holds this device's answer to "when were you born?": only whether you're {AGE_GATE.minAge} or
-          older, never the date. "Old enough" lasts {AGE_GATE.answerMinutes} minutes, or until you sign in; "under{" "}
+          older, never the date. "Old enough" lasts {AGE_GATE.answerMinutes} minutes from the answer or from starting a sign-in, or
+          until you sign in; "under{" "}
           {AGE_GATE.minAge}" lasts {AGE_GATE.tooYoungDays} days.
         </li>
         <li>
