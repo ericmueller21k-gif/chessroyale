@@ -88,7 +88,8 @@ In a terminal, with `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) set:
 2. `npm run rollback -- previous --dry-run` says which version "previous" is and why: the one live just before the
    live code went out, never the bad code under a pause you set to contain it. Flags go after `--`.
 3. `npm run rollback -- previous` rolls back with `wrangler rollback`, which asks before it deploys and about any
-   secret changed since that version. It runs only in a terminal, so nothing is answered for you.
+   secret changed since that version. It runs only in a plain terminal (not one with `CI` set), so nothing is
+   answered for you.
 
 The dashboard does the same: **Workers & Pages → chessroyale → Deployments → a version's ⋯ → Rollback**. A rollback
 lasts until the next merge to `main` deploys again: revert or fix the bad change there first. A version carries its

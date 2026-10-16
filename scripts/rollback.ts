@@ -7,13 +7,13 @@
 //   … --env staging                                     the staging Worker instead of production
 //
 // Flags go after `--` (npm keeps the ones before it for itself: `npm run rollback previous --dry-run` would lose the
-// --dry-run, so this stops when it sees one there). A real rollback runs only in a terminal: wrangler asks before it
-// deploys, and asks again about any secret changed since that version (outside a terminal it would answer yes by
-// itself). Needs CLOUDFLARE_API_TOKEN (wrangler reads it; it's never printed): listing needs read access to Workers,
+// --dry-run, so this stops when it sees one there). A real rollback runs only in a terminal that isn't CI (`CI` and
+// the like unset: whyNotHere): wrangler asks before it deploys, and asks again about any secret changed since that
+// version (outside a terminal, or with CI set, it would answer yes by itself). Needs CLOUDFLARE_API_TOKEN (wrangler reads it; it's never printed): listing needs read access to Workers,
 // rolling back "Workers Scripts: Edit". A rollback lasts until the next deploy from main: revert or fix the bad change
 // on main before anything else merges.
 import { execFileSync, spawnSync } from "node:child_process";
-import { aboutTarget, mainVersion, pickPrevious, type Deployment, type VersionInfo } from "./rollback-pick.ts";
+import { aboutTarget, mainVersion, pickPrevious, whyNotHere, type Deployment, type VersionInfo } from "./rollback-pick.ts";
 
 const fail = (message: string): never => {
   console.error(message);
@@ -109,9 +109,8 @@ if (dryRun) {
   console.log(`\n--dry-run: nothing changed. It would run  npx wrangler ${command.map((a) => (/\s/.test(a) ? JSON.stringify(a) : a)).join(" ")}`);
   process.exit(0);
 }
-if (!process.stdin.isTTY || !process.stdout.isTTY) {
-  fail("\nA real rollback runs only in a terminal: wrangler asks before it deploys, and about any secret changed since that version (outside a terminal it would answer yes by itself). Run it in a terminal, or use the dashboard: Workers & Pages → chessroyale → Deployments.");
-}
+const notHere = whyNotHere({ stdin: !!process.stdin.isTTY, stdout: !!process.stdout.isTTY }, process.env);
+if (notHere) fail(`\n${notHere}`);
 // (wrangler asks for the message, whether to deploy, and about changed secrets; nothing is answered for it.)
 const run = spawnSync("npx", ["wrangler", ...command], { stdio: "inherit" });
 if (run.status === 0) console.log(`\nIf wrangler rolled back: it lasts until the next deploy from main. Fix or revert the bad change there first.`);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aboutTarget, pickPrevious, type Deployment, type VersionInfo } from "../../../scripts/rollback-pick.ts";
+import { aboutTarget, pickPrevious, whyNotHere, type Deployment, type VersionInfo } from "../../../scripts/rollback-pick.ts";
 
 /**
  * `npm run rollback -- previous` (scripts/rollback.ts): the version that was live just before the live code went out,
@@ -61,5 +61,21 @@ describe("rollback: previous", () => {
     expect(aboutTarget(v(15), deployed(...vs)).join(" ")).toMatch(/#15 wasn't live/);
     expect(aboutTarget(v(18, "secret"), deployed(...vs)).join(" ")).toMatch(/settings change/);
     expect(aboutTarget(v(18), deployed(...vs))).toHaveLength(1);
+  });
+});
+
+describe("rollback: where a real one may run", () => {
+  const tty = { stdin: true, stdout: true };
+  it("a plain terminal: yes", () => {
+    expect(whyNotHere(tty, {})).toBeNull();
+    expect(whyNotHere(tty, { CI: "false" })).toBeNull();
+    expect(whyNotHere(tty, { CI: "false", BUILD_ID: "7" })).toBeNull();
+  });
+  it("not a terminal, or one with CI set (wrangler would answer its own questions yes): no, with the dashboard named", () => {
+    expect(whyNotHere({ stdin: false, stdout: true }, {})).toMatch(/^Not a terminal: .*dashboard/);
+    expect(whyNotHere({ stdin: true, stdout: false }, {})).toMatch(/^Not a terminal/);
+    for (const CI of ["1", "true", "0", "yes"]) expect(whyNotHere(tty, { CI })).toMatch(/^CI is set \(wrangler takes this for CI\): .*dashboard/);
+    expect(whyNotHere(tty, { BUILD_NUMBER: "12" })).toMatch(/^BUILD_NUMBER is set/);
+    expect(whyNotHere(tty, { CI: "" })).toBeNull();
   });
 });

@@ -121,6 +121,14 @@ test("the maintenance banner: at the top of every screen, covering nothing at 32
       // (The page starts under it: no control under the banner, nothing scrolling sideways because of it.)
       await expect.poll(() => underBanner(page), { message: `${width} ${path}` }).toEqual([]);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), path).toBe(0);
+      // (A computer's side panels stick under it, not behind it, once the page scrolls.)
+      const tucked = await page.evaluate(() => {
+        scrollTo(0, document.documentElement.scrollHeight);
+        const b = document.querySelector(".maint-banner")!.getBoundingClientRect().bottom;
+        return [...document.querySelectorAll(".fd-side, .fd-right, .tower-side")].filter((el) => el.getBoundingClientRect().height > 0 && el.getBoundingClientRect().top < b - 0.5).map((el) => el.className);
+      });
+      expect(tucked, `${width} ${path}`).toEqual([]);
+      await page.evaluate(() => scrollTo(0, 0));
       if (shots) await page.screenshot({ path: `${shots}/banner-${width}${path === "/" ? "-home" : path.replace("/", "-")}.png` });
     }
   }

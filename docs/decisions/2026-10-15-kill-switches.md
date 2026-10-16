@@ -64,11 +64,17 @@ switches and the maintenance banner". The calls:
   - **Flags go after `--`:** npm keeps `--dry-run`, `--env` and the rest for itself when they come before it (so
     `npm run rollback previous --dry-run` would have rolled back for real, and `--env staging` would have hit
     production). The script stops when npm took one, or when it gets more than one version.
-  - **Only in a terminal:** `wrangler rollback` asks before it deploys and about any secret changed since that
-    version. Outside a terminal it answers its own questions yes (a rotated key could go back to its old value), so
-    the script refuses there, and in a terminal it hands the questions to you. Tested on Oct 15 in list and `--dry-run` mode only: there is no standing staging Worker (the
-  load-test script makes it and deletes it each time), and production isn't for trying it. The token can list
-  versions and deployments. Whether it may roll back ("Workers Scripts: Edit") couldn't be checked without doing it.
+  - **Only in a terminal that isn't CI:** `wrangler rollback` asks before it deploys and about any secret changed
+    since that version. Outside a terminal, or with `CI` (or another variable its ci-info reads) set even in one, it
+    answers its own questions yes (a rotated key could go back to its old value), so the script refuses there
+    (`whyNotHere`), and in a plain terminal it hands the questions to you.
+  - **Tested on production in list and `--dry-run` mode only** (Oct 16, the script as it is now): there is no
+    standing staging Worker (the load-test script makes it and deletes it each time), and production isn't for trying
+    a rollback. Every Workers Builds deploy in the latest 10 versions shows `workers/triggered_by: "upload"` ("code
+    upload"), and the dry-run picked the version live before the live one (#239 under #240), as it should. No
+    dashboard variable save is among them yet, so the trigger such a save records hasn't been seen; the script counts
+    anything other than "upload" as a settings change. The token can list versions and deployments. Whether it may
+    roll back ("Workers Scripts: Edit") couldn't be checked without doing it.
 - **Testing:** full lane (it gates every way in). Unit: `packages/server/test/kill-switches.test.ts` (reading, the
   cache, the lines, `/api/status`, each refusal, the shop, a resting boss never chosen, even in a lobby made before,
   the Crowd final's card) and `rollback.test.ts` (which version "previous" is, in each case above).

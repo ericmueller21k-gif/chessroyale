@@ -125,8 +125,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     takes the deployment before it. So bad code with a `PAUSE_` set on top of it never rolls back to that bad code.
     Or name a version by its id. `--dry-run` says which and why. `--env staging` works on the staging Worker.
   - Flags go after `--` (npm keeps those before it): it stops if npm took one.
-  - A real rollback runs only in a terminal, where `wrangler rollback` asks before it deploys and about any secret
-    changed since that version; outside one, wrangler would answer yes by itself, so the script refuses.
+  - A real rollback runs only in a terminal that isn't CI, where `wrangler rollback` asks before it deploys and about
+    any secret changed since that version; outside one, or with `CI` set, wrangler would answer yes by itself, so the
+    script refuses.
   - **A rollback lasts until the next deploy from `main`:** revert or fix the bad change on `main` before anything
     else merges.
   - **A version carries its own variables:** rolling back to a version from before a `PAUSE_` or banner change undoes

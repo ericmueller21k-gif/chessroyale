@@ -87,3 +87,20 @@ export function aboutTarget(target: VersionInfo, deployments: readonly Deploymen
     `A version carries its own variables: check the PAUSE_ variables and MAINTENANCE_BANNER after.`,
   ];
 }
+
+/**
+ * The variables by which wrangler (its ci-info) takes a run for CI even in a terminal, and then answers its own
+ * questions yes: CI unless it's "false", and the others ci-info reads.
+ */
+const CI_VARS = ["CI", "BUILD_ID", "BUILD_NUMBER", "CI_APP_ID", "CI_BUILD_ID", "CI_BUILD_NUMBER", "CI_NAME", "CONTINUOUS_INTEGRATION", "RUN_ID"] as const;
+
+/**
+ * Why a real rollback can't run here, or null: it needs a terminal that isn't CI, where wrangler asks before it
+ * deploys and about any secret changed since that version (anywhere else it answers yes by itself).
+ */
+export function whyNotHere(tty: { stdin: boolean; stdout: boolean }, env: Readonly<Record<string, string | undefined>>): string | null {
+  const ci = env.CI !== "false" ? CI_VARS.find((k) => env[k]) : undefined;
+  const where = !tty.stdin || !tty.stdout ? "Not a terminal" : ci ? `${ci} is set (wrangler takes this for CI)` : null;
+  if (!where) return null;
+  return `${where}: a real rollback runs only in a terminal that isn't CI, where wrangler asks before it deploys and about any secret changed since that version (here it would answer yes by itself). Run it in a plain terminal, or use the dashboard: Workers & Pages → chessroyale → Deployments.`;
+}
