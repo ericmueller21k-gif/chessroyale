@@ -470,7 +470,9 @@ door's look; every class is `sq-`.
     on it (`BlockArrows`, the beat kept from when it was placed), through your turn and theirs until they've moved.
     The line above the board says it for 3.6 s (`BANNER_MS`; 2.6 s before every banner got a second longer, Eric,
     Oct 15) ("You blocked Qd8–f6 (−3)", "Knights blocked your Qd8–f6", "Block lifted: it would have left no move
-    (refunded)").
+    (refunded)"). Each board keeps its own latest banner (`banners`, `bannerOn` in `squads.ts`), so an event on another
+    board or in another match never cuts it short (until Oct 16 one banner was shared by every board and match:
+    docs/decisions/2026-10-16-flaky-e2e-batch-3.md).
   - **Each squad's block points and tokens** under its clock, both squads, always (`SquadResources`).
   - **The token breakdown** after a Pairs match (`TokenBreakdown`; between matches, and on the results): every use,
     refunded or not, why, with numbers ("Qxd4: refunded, every other move lost at least 3.1 pawns").

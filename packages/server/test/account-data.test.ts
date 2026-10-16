@@ -26,6 +26,7 @@ import { handleAccountApi } from "../src/api.ts";
 import { caseDetail, openCases } from "../src/admin.ts";
 import { appeal, banCheck, caseOf, decide, fairStatus, recordFairPlay, reportPlayer, setCase } from "../src/fairplay.ts";
 import { answerRequest, block, sendInvite, sendRequest, setFriendSettings } from "../src/friends.ts";
+import { chatBlock, decideChat } from "../src/chat-mod.ts";
 import { GlobalChat } from "../src/global-chat.ts";
 import { LiveBoard } from "../src/live.ts";
 import { equipLocker, openCrate } from "../src/locker.ts";
@@ -98,6 +99,9 @@ async function world() {
   await sql.run("INSERT INTO ops_reports (id, at, kind, account, version, note, diag) VALUES ('IDEA45', ?, 'idea', NULL, '', 'more bosses', '{}')", T0 + 12);
   await sql.run("INSERT INTO ops_errors (fingerprint, hour, source, kind, message, version, count, first_seen, last_seen, sample) VALUES ('fp1', ?, 'client', 'error', 'boom', 'v1', 3, ?, ?, ?)", T0, T0, T0 + 13, sample(a.id));
   await sql.run("INSERT INTO ops_errors (fingerprint, hour, source, kind, message, version, count, first_seen, last_seen, sample) VALUES ('fp2', ?, 'client', 'error', 'bang', 'v1', 1, ?, ?, ?)", T0, T0, T0, sample(bo.user.id));
+  // Chat moderation: a moderator warned her (a note to her, a reason for the log); Bo's chat ban stays his.
+  await decideChat(sql, a.id, { action: "warn", reason: "taunting after every move", note: "Keep it friendly." }, "admin:eric@example.com", T0 + 14);
+  await decideChat(sql, bo.user.id, { action: "ban", days: 1, reason: "spamming the lobby" }, "admin:eric@example.com", T0 + 15);
   return { sql, d1, ann, bo, cy, a, phone };
 }
 
@@ -108,6 +112,7 @@ async function world() {
  */
 const SCHEMA_COLUMNS: Record<string, string> = {
   blocks: "user_id blocked_id at",
+  chat_mod_log: "id user_id at action until by reason note ended_at seen",
   chat_picks: "user_id lines emoji",
   email_codes: "email code_hash expires_at attempts sent_at hour_start sends_this_hour",
   equipped: "user_id slot item_id",
@@ -201,9 +206,13 @@ describe("download my data", () => {
     // Her bug report and the error record with her account; not the anonymous idea, not Bo's error.
     expect(d.problemReports.reports.map((r: { id: string; note: string }) => [r.id, r.note])).toEqual([["BUG123", "the board froze"]]);
     expect(d.problemReports.errors.map((e: { message: string; hour: string }) => [e.message, e.hour])).toEqual([["boom", new Date(T0).toISOString()]]);
+    // Chat moderation: the warning as she saw it, with its note (not why, nor who); not Bo's ban.
+    expect(d.chatModeration).toEqual({ decisions: [{ at: new Date(T0 + 14).toISOString(), action: "warn", until: null, note: "Keep it friendly.", ended_at: null }] });
     // Nothing of anyone else's but the names the app shows her: no other email, no report about her, no hash.
     const text = JSON.stringify(d);
-    for (const secret of ["bo@example.com", "cy@example.com", "Offensive name or icon", "token_hash", "code_hash", DEVICE, "more bosses", "bang"]) expect(text).not.toContain(secret);
+    for (const secret of ["bo@example.com", "cy@example.com", "Offensive name or icon", "token_hash", "code_hash", DEVICE, "more bosses", "bang", "taunting", "eric@example.com", "spamming"]) {
+      expect(text).not.toContain(secret);
+    }
   });
 
   it("leaves out who has blocked the player", async () => {
@@ -252,6 +261,8 @@ describe("delete my account", () => {
       { fingerprint: "fp2", count: 1 },
     ]);
     expect(await sql.all("SELECT id FROM ops_reports")).toEqual([{ id: "IDEA45" }]);
+    // Chat moderation: the decisions about her chat are gone; Bo's ban stays his.
+    expect(await sql.all("SELECT user_id, action FROM chat_mod_log")).toEqual([{ user_id: bo.user.id, action: "ban" }]);
     // Nothing of fair play kept for an account that wasn't banned or in review.
     expect(await caseOf(sql, a.id)).toBeNull();
     // Signing in with her email again makes a new, empty account.
@@ -424,6 +435,24 @@ describe("a guest signing in to an existing account (docs/decisions/2026-10-16-i
     expect(await sql.all("SELECT reporter, target FROM reports ORDER BY id")).toEqual([
       { reporter: owner.id, target: bo.id },
       { reporter: bo.id, target: owner.id },
+    ]);
+  });
+
+  it("its chat decisions join the account too: a chat ban, which signing in can't shed, and its notice", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const owner = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, T0);
+    const { user: guest } = await createGuest(sql, T0, "Guest");
+    await decideChat(sql, guest.id, { action: "ban", days: 7, reason: "spamming the lobby", note: "Take a break." }, "admin:eric@example.com", T0 + 4);
+
+    expect((await signInWithIdentity(sql, guest, "email", "owner@example.com", {}, T0 + 5)).id).toBe(owner.id);
+    expect(await rowsNaming(sql, guest.id)).toEqual([]);
+    // The ban is the account's now, with its notice; a line says where it came from.
+    expect(await chatBlock(sql, owner.id, T0 + 6)).toEqual({ until: T0 + 4 + 7 * DAY });
+    expect((await profile(sql, owner)).chatMod?.notice).toMatchObject({ kind: "ban", note: "Take a break." });
+    expect(await sql.all("SELECT action, by FROM chat_mod_log WHERE user_id = ? ORDER BY id", owner.id)).toEqual([
+      { action: "ban", by: "admin:eric@example.com" },
+      { action: "merged", by: "sign-in" },
     ]);
   });
 

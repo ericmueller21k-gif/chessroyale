@@ -9,7 +9,9 @@ import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
 import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
-import { CAPACITY, DEFAULT_SETTINGS } from "@chessroyale/core";
+import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS } from "@chessroyale/core";
+import type { ChatBlock } from "@chessroyale/chess";
+import { chatBlock } from "./chat-mod.ts";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { isAdmin } from "./admin.ts";
@@ -52,6 +54,8 @@ export class Lobby extends DurableObject<Env> {
    * its own key "fair" and only when a round added to it, so a pick or a chat line never rewrites it.
    */
   private fairStored = 0;
+  /** Chat moderation: when each account's chat standing was last read (in memory: a wake reads it again). */
+  private chatChecked = new Map<string, number>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -76,16 +80,21 @@ export class Lobby extends DurableObject<Env> {
    * Someone joining, from their account: their icon and the shop items they own (quick chat's packs, null: unread), and
    * the rating stored on it (`users.rating`, a raid boss's strength; null: none yet). Read once, on joining, never per
    * move. The two reads fail apart, so a failed shop read never costs the rating (the raid's boss would meet the prior).
+   * Also their name (the seat's, so a name a moderator reset stays reset whatever the device sends; null: unread) and
+   * any chat ban (chat moderation; undefined: unread).
    */
-  private async joiningProfileOf(userId: string): Promise<{ icon: string | null; owned: string[] | null; rating: number | null }> {
+  private async joiningProfileOf(userId: string): Promise<{ name: string | null; icon: string | null; owned: string[] | null; rating: number | null; block: ChatBlock | null | undefined }> {
     const sql = d1Sql(this.env.DB!);
-    const [row, shop] = await Promise.all([
-      sql.first<{ icon: string; rating: number | null }>("SELECT icon, rating FROM users WHERE id = ?", userId).catch(() => null),
+    const now = Date.now();
+    const [row, shop, block] = await Promise.all([
+      sql.first<{ name: string; icon: string; rating: number | null }>("SELECT name, icon, rating FROM users WHERE id = ?", userId).catch(() => null),
       shopState(sql, userId).catch(() => null),
+      chatBlock(sql, userId, now).catch(() => undefined),
     ]);
+    if (block !== undefined) this.chatChecked.set(userId, now);
     const icon = row && (isPixelIcon(row.icon) || (ICONS as readonly string[]).includes(row.icon)) ? row.icon : null;
     const rating = typeof row?.rating === "number" && Number.isFinite(row.rating) ? row.rating : null;
-    return { icon, owned: shop?.owned ?? null, rating };
+    return { name: typeof row?.name === "string" ? row.name : null, icon, owned: shop?.owned ?? null, rating, block };
   }
 
   private core(code: string): LobbyCore {
@@ -434,8 +443,13 @@ export class Lobby extends DurableObject<Env> {
     if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId && !this.record.judges?.tasks) {
       msg = { ...msg, boards: await this.recheckOnServer(msg.boards) };
     }
-    // Who's joining (their icon, chat packs and stored rating), read before the lobby is touched, as above.
+    // Who's joining (their name, icon, chat packs, stored rating and any chat ban), read before the lobby is touched, as above.
     const joining = msg.t === "hello" && this.env.DB && attached?.userId && !attached.guest ? await this.joiningProfileOf(attached.userId) : null;
+    // Chat moderation: a chatting player's chat ban, read again at most every CHAT_MOD.recheckMs, as above.
+    const uid = attached?.userId;
+    const recheck = msg.t === "chat" && this.env.DB && uid && Date.now() - (this.chatChecked.get(uid) ?? -Infinity) >= CHAT_MOD.recheckMs;
+    const block = recheck ? await chatBlock(d1Sql(this.env.DB!), uid, Date.now()).catch(() => undefined) : undefined;
+    if (uid && block !== undefined) this.chatChecked.set(uid, Date.now());
     // (Closed while that was being read.)
     if (!this.record) return;
     const core = this.core(this.record.code);
@@ -458,7 +472,7 @@ export class Lobby extends DurableObject<Env> {
       const practice = !!msg.practice && (this.env.TEST_SWITCHES === "1" || !!attached?.admin);
       // Their rating is the one stored on their account, never the app's word: a low one claimed would meet a weaker raid
       // boss. None yet, or no account: null, the prior (docs/decisions/2026-10-16-server-side-rating.md).
-      const result = core.connect(msg.token, msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1");
+      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1");
       // A new player took a seat: one held for the players on their way is theirs (the oldest).
       if (result.ok && this.record.humans.length > before) this.reservations.shift();
       if (!result.ok) {
@@ -469,6 +483,7 @@ export class Lobby extends DurableObject<Env> {
       ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId, ...(attached?.admin ? { admin: true } : {}) });
       if (joining) {
         if (joining.owned) core.chatOwned(result.playerId, joining.owned);
+        if (joining.block !== undefined) core.chatStanding(attached!.userId!, joining.block);
         if (joining.icon && this.icons.get(result.playerId) !== joining.icon) {
           this.icons.set(result.playerId, joining.icon);
           await this.ctx.storage.put(`icon:${result.playerId}`, joining.icon);
@@ -481,6 +496,7 @@ export class Lobby extends DurableObject<Env> {
     }
     const playerId = attached?.playerId;
     if (!playerId) return;
+    if (uid && block !== undefined) core.chatStanding(uid, block);
     if (msg.t === "ultimate") core.ultimateTrigger(playerId, !!attached?.admin);
     else core.message(playerId, msg);
     await this.persist(core);

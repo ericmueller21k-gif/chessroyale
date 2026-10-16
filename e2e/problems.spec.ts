@@ -1,6 +1,5 @@
-import { execFileSync } from "node:child_process";
 import { expect, type Page } from "@playwright/test";
-import { test } from "./helpers.ts";
+import { asServerAdmin, test } from "./helpers.ts";
 
 /**
  * Error capture and the feedback sheet (docs/areas/ops.md, "Errors and player reports"): errors on a device reach the
@@ -11,30 +10,6 @@ import { test } from "./helpers.ts";
 const run = Date.now().toString(36).slice(-6);
 const project = () => test.info().project.name;
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
-
-/**
- * Makes this page's account an admin: the local Worker's ADMIN_EMAILS (playwright.config.ts) has one email per project,
- * given here straight in the local database (no sign-in is set up in tests). Reloads nothing: the server reads it at once.
- * The local database is one SQLite file that the running server writes to as well (presence, live lobbies), and this
- * second process gets "database is locked: SQLITE_BUSY" while a write of the server's is under way: then it waits a
- * moment and asks again, as SQLite's own busy wait would (wrangler's command has none). Any other error fails the test,
- * with its message (docs/decisions/2026-10-15-flaky-e2e-batch.md).
- */
-async function asAdmin(page: Page) {
-  const email = `ops-admin-${project()}@e2e.test`;
-  const id = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
-  const sql = `UPDATE users SET email = NULL WHERE email = '${email}'; UPDATE users SET email = '${email}' WHERE id = '${id}'`;
-  for (let attempt = 1; ; attempt++) {
-    try {
-      execFileSync("npx", ["wrangler", "d1", "execute", "hunchess", "--local", "--command", sql], { stdio: "pipe" });
-      return id;
-    } catch (e) {
-      const why = String((e as { stderr?: unknown }).stderr ?? e);
-      if (!why.includes("SQLITE_BUSY") || attempt >= 10) throw new Error(`d1 execute failed (attempt ${attempt}): ${why.slice(-500)}`);
-      await page.waitForTimeout(300);
-    }
-  }
-}
 
 /** The ops page's text, its diagnostics unescaped. */
 async function opsPage(page: Page, query = ""): Promise<string> {
@@ -72,7 +47,7 @@ test("a thrown error and a rejected promise reach the store, with the screen, th
     ["error", `Error: e2e thrown ${tag}`],
     ["rejection", `Error: e2e rejected ${tag}`],
   ]);
-  await asAdmin(page);
+  await asServerAdmin(page);
   // (Written within OPS.store.flushMs: the first at once, then every 20 s.)
   await expect.poll(async () => opsPage(page, `?q=${tag}`), { timeout: 40_000 }).toContain(`e2e rejected ${tag}`);
   const html = await opsPage(page, `?q=${tag}`);
@@ -112,7 +87,7 @@ test("a render error shows Something went wrong with Reload (not a blank page), 
   );
   // (Still a page error, once: the console and other specs' error checks see it.)
   expect(pageErrors.filter((m) => m === `e2e render ${tag}`)).toHaveLength(1);
-  await asAdmin(page);
+  await asServerAdmin(page);
   await expect.poll(async () => opsPage(page, `?q=${tag}`), { timeout: 40_000 }).toContain(`e2e render ${tag}`);
   // Reload: back in the app.
   await page.getByRole("button", { name: "Reload" }).click();
@@ -141,7 +116,7 @@ test("the feedback sheet: Report a bug from the match menu gives a short id that
   const id = (await shown.textContent())!.match(/Report (\w{6})/)![1]!;
   await sheet.getByRole("button", { name: "Done" }).click();
   await expect(sheet).toHaveCount(0);
-  const accountId = await asAdmin(page);
+  const accountId = await asServerAdmin(page);
   let html = await opsPage(page, `?report=${id}`);
   expect(html).toContain(`Report ${id}`);
   expect(html).toContain(`e2e note ${tag}: the board froze`);
@@ -202,7 +177,7 @@ test("the health view: JSON for an admin (deployed version, live numbers, errors
   await page.goto("/");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect((await page.request.get("/api/admin/health")).status()).toBe(404);
-  await asAdmin(page);
+  await asServerAdmin(page);
   const res = await page.request.get("/api/admin/health");
   expect(res.status()).toBe(200);
   const h = (await res.json()) as {

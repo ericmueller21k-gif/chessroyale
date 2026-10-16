@@ -47,7 +47,9 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   passed over (the engine server never gets one: [engine.md](engine.md)), so it can't stop the queue.
 - **The review page** `/admin/fairplay` (admins only, `ADMIN_EMAILS`) and the reviewer's API `/api/admin/fairplay/*`
   (a bearer token, `FAIRPLAY_REVIEW_TOKEN`). Every decision goes in the case's log with who and why; the automated
-  reviewer never decides appeals nor changes a ban.
+  reviewer never decides appeals nor changes a ban. A player's page also has chat moderation's section (warn, chat
+  ban, lift, reset the name and icon; admins only: [chat.md](chat.md), "Moderation"), and a box on the list opens any
+  player's page by id or profile link.
 - **Emails:** a ban notice and a clearing go to the player's sign-in address through Resend.
 
 ## Where the code is

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, FRONT_DOOR, LOBBY_LIFE, QUICK_CHAT, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
 import { sanLineToUci, type NetChatLine, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, lobbyClosing, newLobbyRecord } from "../src/lobby.ts";
+import { rot13 } from "../src/text-filter.ts";
 
 /**
  * Quick chat in the lobby before the match (DECISIONS.md, "Lobby chat"): the queue, a private lobby, the full grid's
@@ -132,6 +133,10 @@ describe("lobby: quick chat before the match", () => {
     L.say(ann, "hi-all");
     expect(L.people(bo)).toEqual([]);
     expect(L.people(cy).map((l) => l.say)).toEqual(["hi-all"]);
+    // Unmuted: what Ann said meanwhile comes back (a device reloaded since never had it); muted again, as before.
+    L.core.message(bo, { t: "chatPrefs", muted: [] });
+    expect(L.last(bo, "chatLog")!.lines.map((l) => [l.from, l.say])).toEqual([[ann, "hi-all"]]);
+    L.core.message(bo, { t: "chatPrefs", muted: [ann] });
     L.core.message(cy, { t: "chatPrefs", off: true });
     L.advance(3_000);
     L.say(ann, "lets-go");
@@ -299,5 +304,49 @@ describe("lobby: quick chat before the match", () => {
     L.core.disconnect(bo);
     L.core.resendTo(bo);
     expect(L.last(bo, "chatLog")!.lines.find((l) => l.from === ann)).toMatchObject({ lobby: true, icon: "♞" });
+  });
+});
+
+describe("lobby: chat moderation", () => {
+  it("a banned account can't send (and is told why) but still reads; the ban follows the account to a new seat and ends at its time or when lifted", () => {
+    // (A private lobby: nothing starts while the test waits.)
+    const L = setup(CROWD);
+    const [ann, bo] = [L.join("Ann", "u-ann"), L.join("Bo", "u-bo")] as [string, string];
+    L.clear();
+    const until = L.now + 60_000;
+    L.core.chatStanding("u-ann", { until });
+    L.say(ann, "hi-all");
+    expect(L.last(ann, "chatNo")).toMatchObject({ reason: "mod", retryAt: until, block: { until } });
+    expect(L.people(bo)).toEqual([]);
+    L.say(bo, "hi-all");
+    expect(L.people(ann).map((l) => [l.from, l.say])).toEqual([[bo, "hi-all"]]);
+    // Cancel, PLAY again: a new seat, the same account, still banned.
+    L.core.message(ann, { t: "leave" });
+    const again = L.join("Ann", "u-ann");
+    L.say(again, "wow");
+    expect(L.last(again, "chatNo")).toMatchObject({ reason: "mod" });
+    L.advance(until - L.now);
+    L.say(again, "wow");
+    expect(L.people(bo).at(-1)).toMatchObject({ from: again, say: "wow" });
+    // With no end, until it's lifted.
+    L.core.chatStanding("u-ann", { until: null });
+    L.advance(3_000);
+    L.say(again, "oops");
+    expect(L.last(again, "chatNo")).toMatchObject({ reason: "mod", block: { until: null } });
+    L.core.chatStanding("u-ann", null);
+    L.say(again, "oops");
+    expect(L.people(bo).at(-1)).toMatchObject({ from: again, say: "oops" });
+    // Someone else's ban is theirs alone.
+    L.core.chatStanding("u-bo", { until: null });
+    L.advance(3_000);
+    L.say(again, "lets-go");
+    expect(L.people(bo).at(-1)).toMatchObject({ from: again, say: "lets-go" });
+  });
+
+  it("a name the filter refuses takes a seat as Player N", () => {
+    const L = setup(CROWD);
+    const ann = L.join("Ann");
+    const id = L.join(`${rot13("avttre").replace("e", "3")} 1`);
+    expect(L.last(ann, "lobby")!.players.find((p) => p.id === id)!.name).toBe("Player 2");
   });
 });

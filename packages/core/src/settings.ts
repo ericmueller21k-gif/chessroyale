@@ -1718,6 +1718,20 @@ export const GLOBAL_CHAT = {
 } as const;
 
 /**
+ * Chat moderation (docs/decisions/2026-10-16-chat-moderation.md; docs/areas/chat.md): a moderator's chat bans and how
+ * long their decisions are kept. Chat is preset lines only; the free text players see is display names, which the
+ * server's filter checks (server/src/text-filter.ts).
+ */
+export const CHAT_MOD = {
+  /** The chat bans a moderator can give, in days (and one with no end). */
+  banDays: [1, 7, 30] as readonly number[],
+  /** A lobby reads a chatting player's ban again at most this often (and always as they join). */
+  recheckMs: 30_000,
+  /** A moderator's decision about a player is deleted this many days after it ended (a chat ban with no end stays). */
+  keepDecisionsDays: 180,
+} as const;
+
+/**
  * Friends and invites (docs/decisions/2026-10-15-friends-and-invites.md; docs/areas/accounts.md): add a friend from their profile
  * (they accept or decline), invite anyone to your lobby or Squads party, block. Signed-in accounts only, where signing
  * in is set up. The server enforces every number here.

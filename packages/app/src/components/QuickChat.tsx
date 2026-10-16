@@ -1,8 +1,9 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { QUICK_CHAT, chatSay, type ChatSay } from "@chessroyale/core";
-import { onAccountChange } from "../account.ts";
+import { onAccountChange, refreshChatStanding } from "../account.ts";
 import type { ChatLine, MatchChat } from "../chat.ts";
+import { chatBlockText } from "../chat-mod.ts";
 import type { GameView } from "../game.ts";
 import { chatBubbles, foldUnderBoard, onPrefsChange, setChatBubbles, showUnderBoard, underBoardView, type UnderBoardView } from "../prefs.ts";
 import { openProfile } from "../profile-nav.ts";
@@ -82,7 +83,7 @@ function ChatRow({ people, chat, line, teams, onName, tight }: { people: ChatPeo
   return (
     <div class={`qline${who.you ? " you" : ""}${say.kind === "emoji" ? " emoji" : ""}${tag ? ` ${tag}` : ""}`} data-from={line.from}>
       <ChatIcon chat={chat} id={line.from} />
-      <button type="button" class="qline-name" onClick={() => onName(line.from)} aria-label={`${who.you ? "You" : who.name}: profile or mute`}>
+      <button type="button" class="qline-name" onClick={() => onName(line.from)} aria-label={who.you ? "You: profile" : `${who.name}: profile or mute`}>
         {/* (A line said in the lobby had no team yet.) */}
         {tag === "all" && team && <span class={`team-chip ${team}`} aria-label={`${sideName(team)} team`} />}
         <span class="qline-who">{who.you ? "You" : who.name}</span>
@@ -113,7 +114,7 @@ function ChatFeed({ people, chat, scroll, teams, onName, hint, empty }: { people
     ),
     muted.length > 0 && (
       <p key="muted" class="qfeed-empty">
-        🔇 Muted this match: {muted.map((id) => people.nameOf(id)).join(", ")}
+        🔇 Muted: {muted.map((id) => people.nameOf(id)).join(", ")}
       </p>
     ),
     hint && (
@@ -165,6 +166,17 @@ function SayButton({ chat, say, now }: { chat: MatchChat; say: ChatSay; now: num
  * too); "groups": the lines wrapping, then the emoji (a computer).
  */
 function ChatButtons({ chat, layout, fit, now }: { chat: MatchChat; layout: "rows" | "groups"; fit: boolean; now: number }) {
+  // Your chat is banned (a moderator's decision): why, instead of buttons that can't send. Your profile is read again
+  // as this shows, so a ban lifted meanwhile goes.
+  const banned = chat.banned(now);
+  useEffect(() => void (banned && refreshChatStanding()), [!!banned]);
+  if (banned) {
+    return (
+      <p class="qbuttons qchatoff" role="status">
+        {chatBlockText(banned)}
+      </p>
+    );
+  }
   const { lines, emoji } = chat.picked();
   const none = !lines.length && !emoji.length && <p class="qbuttons-none">Nothing picked. Choose your lines and emoji in your profile, under Quick chat and emoji.</p>;
   const lineButtons = lines.map((s) => <SayButton key={s.id} chat={chat} say={s} now={now} />);
@@ -393,7 +405,8 @@ export function ChatPanel({ people, chat, variant, head, fold }: { people: ChatP
                     setMenu(null);
                   }}
                 >
-                  {chat.isMuted(menu) ? "Unmute" : "Mute for this match"}
+                  {/* (By account, for every chat on this device; a bot for this match only.) */}
+                  {chat.isMuted(menu) ? "Unmute" : chat.mutesByAccount(menu) ? "Mute" : "Mute for this match"}
                 </button>
               )}
               <button type="button" class="qchip quiet" aria-label="Close" onClick={() => setMenu(null)}>
@@ -427,7 +440,7 @@ function ChatOptions({ people, chat, bubbles, onDone }: { people: ChatPeople; ch
         <span>Chat off (no messages, on this device)</span>
       </label>
       <div class="qopt-muted">
-        <span class="muted small">{muted.length ? "Muted this match:" : "Tap a name in the chat to mute that player for this match."}</span>
+        <span class="muted small">{muted.length ? "Muted:" : "Tap a name in the chat to mute that player. Mutes stay on this device."}</span>
         {muted.map((id) => (
           <button key={id} type="button" class="qchip" onClick={() => chat.mute(id, false)} aria-label={`Unmute ${people.nameOf(id)}`}>
             {people.nameOf(id)} ✕

@@ -163,6 +163,18 @@ export const ACCOUNT_STORES: AccountStore[] = [
     ],
   },
   {
+    // Chat moderation (chat-mod.ts; docs/areas/chat.md, "What's stored"). The download has the decisions about the
+    // player's chat as they see them: a warning or a chat ban, its end, the note to them. The moderators' reasons and
+    // names are left out (a person answers a request for them). Deleting removes every decision: a chat ban is the
+    // account's alone (unlike fair play's ban, it never follows an email to a new account), so nothing outlives it.
+    name: "chatModeration",
+    tables: ["chat_mod_log"],
+    export: async (sql, u) => ({
+      decisions: await all(sql, "SELECT at, action, until, note, ended_at FROM chat_mod_log WHERE user_id = ? ORDER BY at, id", u.id),
+    }),
+    erase: (u) => [stmt("DELETE FROM chat_mod_log WHERE user_id = ?", u.id)],
+  },
+  {
     // The download has what the player already sees of fair play (banned or not, their appeals and the replies). The
     // detection's own records (judged moves, scores, case notes, reports about them, device markers) are left out, as
     // they'd show how cheating is found: a person answers a request for them (the privacy policy says so).
@@ -215,7 +227,7 @@ const readable = (v: unknown): unknown => {
 };
 
 export const DOWNLOAD_ABOUT =
-  "Everything HunChess keeps about your account, as of exportedAt. Times are UTC. Fair play's detection records (judged moves, match scores, case notes, reports about you, device markers) aren't included: email privacy@hunchess.com for them, and a person will answer.";
+  "Everything HunChess keeps about your account, as of exportedAt. Times are UTC. Fair play's detection records (judged moves, match scores, case notes, reports about you, device markers) and chat moderators' reasons and names aren't included: email privacy@hunchess.com for them, and a person will answer.";
 
 /** "Download my data": everything kept about the account, readable. `extra`: what Durable Objects hold (the live hub's). */
 export async function accountDownload(sql: Sql, user: User, now: number, extra: Record<string, unknown> = {}): Promise<Record<string, unknown>> {

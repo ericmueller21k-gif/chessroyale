@@ -161,6 +161,11 @@ export class GlobalChat {
   /** A deleted account: its lines leave the chat (their drawn icons with them, by unusedIcons). Whether any did. */
   forgetAccount(accountId: string): boolean {
     this.lastPost.delete(accountId);
+    return this.dropLines(accountId);
+  }
+
+  /** A player's lines leave the chat (a moderator reset their name and icon); their wait to post again stays. Whether any did. */
+  dropLines(accountId: string): boolean {
     const before = this.kept.length;
     this.kept = this.kept.filter((l) => l.from !== accountId || !!l.bot);
     return this.kept.length !== before;

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { test as base, expect, type Page } from "@playwright/test";
 
 /**
@@ -297,4 +298,29 @@ export async function asAdmin(page: Page) {
       // The page is gone: nothing to answer.
     }
   });
+}
+
+/**
+ * Makes this page's account a real admin on the server (the admin pages: /admin/ops, /admin/fairplay): the local Worker's
+ * ADMIN_EMAILS (playwright.config.ts) has one email per lane and project (`${who}-admin-${project}@e2e.test`), given
+ * here straight in the local database (no sign-in is set up in tests). Reloads nothing: the server reads it at once.
+ * The local database is one SQLite file that the running server writes to as well (presence, live lobbies), and this
+ * second process gets "database is locked: SQLITE_BUSY" while a write of the server's is under way: then it waits a
+ * moment and asks again, as SQLite's own busy wait would (wrangler's command has none). Any other error fails the test,
+ * with its message (docs/decisions/2026-10-15-flaky-e2e-batch.md). Answers the account's id.
+ */
+export async function asServerAdmin(page: Page, who: "ops" | "chat" = "ops") {
+  const email = `${who}-admin-${test.info().project.name}@e2e.test`;
+  const id = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
+  const sql = `UPDATE users SET email = NULL WHERE email = '${email}'; UPDATE users SET email = '${email}' WHERE id = '${id}'`;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      execFileSync("npx", ["wrangler", "d1", "execute", "hunchess", "--local", "--command", sql], { stdio: "pipe" });
+      return id;
+    } catch (e) {
+      const why = String((e as { stderr?: unknown }).stderr ?? e);
+      if (!why.includes("SQLITE_BUSY") || attempt >= 10) throw new Error(`d1 execute failed (attempt ${attempt}): ${why.slice(-500)}`);
+      await page.waitForTimeout(300);
+    }
+  }
 }

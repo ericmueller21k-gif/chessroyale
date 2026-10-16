@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QUICK_CHAT, defaultChatPicks, mulberry32, type StoredChatPicks } from "@chessroyale/core";
 import type { ClientMessage, NetChatLine } from "@chessroyale/chess";
 import { MatchChat, SoloLobbyChat } from "../src/chat.ts";
+import { chatBlockText, mutes, setChatBlock } from "../src/chat-mod.ts";
+import { GlobalChatStore } from "../src/global-chat.ts";
 import { play } from "../src/sound.ts";
 
 // (The chat's tick: counted, not played.)
@@ -274,5 +276,102 @@ describe("lobby chat in the app (before the match)", () => {
     chat.setOff(false);
     chat.say("hi-all");
     expect(chat.lines().map((l) => l.from)).toEqual(["you"]);
+  });
+});
+
+describe("chat moderation in the app", () => {
+  const storage = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, String(v)), removeItem: (k: string) => void m.delete(k), keys: () => [...m.keys()] };
+  };
+  const PACKS = ["basics", "emoji-basics"];
+  let store = storage();
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    store = storage();
+    vi.stubGlobal("localStorage", store);
+    mutes.reload();
+    setChatBlock(null);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  /** An online match's chat: "p1" is you; `uids` says whose account each seat is (bots have none). */
+  function online(code: string, uids: Record<string, string>) {
+    const sent: ClientMessage[] = [];
+    const chat = new MatchChat({
+      code: () => code,
+      me: () => "p1",
+      send: (m) => sent.push(m),
+      emit: () => {},
+      local: (t) => t,
+      teams: () => false,
+      picks: () => null,
+      uidOf: (id) => uids[id],
+      seats: () => Object.keys(uids),
+    });
+    chat.onLog([], PACKS);
+    const line = (n: number, from: string, say = "gg"): NetChatLine => ({ n, from, say, to: "all", team: null, at: Date.now() });
+    return { chat, sent, line };
+  }
+
+  it("a mute is by account, on this device: Bo stays muted in the next match (a new seat) and in the global chat, until unmuted anywhere", () => {
+    const a = online("AAAAA", { p1: "u-me", p2: "u-bo" });
+    a.chat.onLine(a.line(1, "p2"));
+    a.chat.mute("p2", true);
+    expect(a.sent.at(-1)).toEqual({ t: "chatPrefs", muted: ["p2"] });
+    expect(a.chat.lines()).toEqual([]);
+    expect(a.chat.isMuted("p2")).toBe(true);
+    expect(a.chat.mutesByAccount("p2")).toBe(true);
+    expect(a.chat.mutesByAccount("bot4")).toBe(false);
+    // A reload: the device remembers.
+    mutes.reload();
+    expect(mutes.has("u-bo")).toBe(true);
+    // The next match: Bo is p7 now (shown as muted there before he says anything).
+    const b = online("BBBBB", { p1: "u-me", p7: "u-bo", p8: "u-cy" });
+    expect(b.chat.mutedIds()).toEqual(["p7"]);
+    b.chat.onLine(b.line(1, "p7", "wow"));
+    b.chat.onLine(b.line(2, "p8", "wow"));
+    expect(b.chat.lines().map((l) => l.from)).toEqual(["p8"]);
+    expect(b.chat.mutedIds()).toEqual(["p7"]);
+    // The global chat (by account) too.
+    const g = new GlobalChatStore();
+    g.take({ n: 1, lines: [{ n: 1, at: Date.now(), from: "u-bo", name: "Bo", rating: null, say: "gg" }] });
+    expect(g.lines()).toEqual([]);
+    expect(g.mutedCount()).toBe(1);
+    // Unmuted in this match: everywhere.
+    b.chat.mute("p7", false);
+    expect(b.chat.lines().map((l) => l.from)).toEqual(["p7", "p8"]);
+    expect(g.lines()).toHaveLength(1);
+    expect(store.getItem("brc.muted")).toBeNull();
+  });
+
+  it("a bot (no account) is muted for this match only", () => {
+    const a = online("AAAAA", { p2: "u-bo" });
+    a.chat.onLine(a.line(1, "bot4"));
+    a.chat.mute("bot4", true);
+    expect(a.chat.lines()).toEqual([]);
+    expect(mutes.count).toBe(0);
+    expect(JSON.parse(store.getItem("brc.chatMuted.AAAAA")!)).toEqual(["bot4"]);
+    const b = online("BBBBB", {});
+    b.chat.onLine(b.line(1, "bot4"));
+    expect(b.chat.lines()).toHaveLength(1);
+  });
+
+  it("a chat ban: the server says so, the buttons stop and the panel says why, until the ban ends", () => {
+    const a = online("AAAAA", { p2: "u-bo" });
+    expect(a.chat.canSay("gg")).toBe(true);
+    a.chat.onRefused("gg", "mod", 1_060_000, { until: 1_060_000 });
+    expect(a.chat.banned()).toEqual({ until: 1_060_000 });
+    expect(a.chat.canSay("gg")).toBe(false);
+    expect(chatBlockText(a.chat.banned()!)).toMatch(/^Your chat is off until .+: a moderator's decision\.$/);
+    vi.advanceTimersByTime(60_000);
+    expect(a.chat.banned()).toBeNull();
+    expect(a.chat.canSay("gg")).toBe(true);
+    a.chat.onRefused("gg", "mod", 1_060_000, { until: null });
+    expect(chatBlockText(a.chat.banned()!)).toBe("Your chat is off: a moderator's decision.");
   });
 });

@@ -241,6 +241,9 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
   note.
 - **For 30 days** (`OPS.store.keepDays`): the 15-minute cron deletes older errors (by hour) and player reports
   (`pruneProblems`).
+- **The 15-minute cron's jobs**, in order, each failing apart (`scheduled()` in `index.ts`): old errors and reports
+  (`pruneProblems`), sign-in code records an hour old (`purgeEmailCodes`), chat moderators' decisions past keeping
+  (`pruneChatMod`, [chat.md](chat.md)), then fair play's deep re-check.
 - The privacy policy (`/privacy`, `screens/Legal.tsx`) says the same in plain words.
 
 ## Health

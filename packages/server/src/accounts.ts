@@ -35,6 +35,10 @@ import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
 import { RANKED_SCHEMA, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
+import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
+import { isBlockedText } from "./text-filter.ts";
+import { chatModMoves, chatStanding, type ChatNotice } from "./chat-mod.ts";
+import type { ChatBlock } from "@chessroyale/chess";
 
 export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
@@ -181,6 +185,8 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS ops_reports_at ON ops_reports (at)`,
   // Friends, requests, blocks, invites and their caps (friends.ts).
   ...FRIENDS_SCHEMA,
+  // Chat moderation: the moderators' decisions about a player's chat (chat-mod.ts).
+  ...CHAT_MOD_SCHEMA,
   // Ranked 1 v 1: each player's rank, and each ranked game kept for a while (ranked.ts).
   ...RANKED_SCHEMA,
 ];
@@ -350,11 +356,11 @@ export function isPixelIcon(icon: unknown): icon is string {
   return signature && ihdr && u32(16) === PIXEL_ICON_SIZE && u32(20) === PIXEL_ICON_SIZE;
 }
 
-/** A display name: trimmed, 1-16 visible characters, no control characters. */
+/** A display name: trimmed, 1-16 visible characters, no control characters, nothing the name filter refuses (text-filter.ts). */
 export function cleanName(name: unknown): string | null {
   if (typeof name !== "string") return null;
   const n = name.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 16);
-  return n.length ? n : null;
+  return n.length && !isBlockedText(n) ? n : null;
 }
 
 /** A normalized email address, or null if it doesn't look like one. */
@@ -496,7 +502,7 @@ export async function signInWithIdentity(
   const owner = await sql.first<User>(`SELECT id, name, icon, email, google_sub, created_at FROM users WHERE ${col} = ?`, value);
   if (owner) {
     if (current && current.id !== owner.id && !current.email && !current.google_sub) {
-      // A guest signing in to an existing account: its matches, items, coins, reports, fair-play file and the rest join
+      // A guest signing in to an existing account: its matches, items, coins, reports, fair-play and chat files and the rest join
       // the account and the guest goes, in one batch (one transaction), so nothing lands halfway: a buy in another tab
       // is wholly before it (and moves) or wholly after (and finds no guest wallet), two sign-ins at once move the wallet
       // once, and a failure moves nothing (docs/decisions/2026-10-16-sign-in-races.md). Nothing stays under the guest's
@@ -505,6 +511,7 @@ export async function signInWithIdentity(
       await sql.batch([
         stmt("UPDATE results SET user_id = ? WHERE user_id = ?", owner.id, current.id),
         ...fairPlayMoves(current.id, owner.id, now, await identityHashes(owner)),
+        ...chatModMoves(current.id, owner.id, now),
         stmt(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, owner.id),
         ...shopMoves(current.id, owner.id),
         ...lockerMoves(current.id, owner.id),
@@ -719,6 +726,8 @@ export interface Profile {
   /** Ranked 1 v 1: the rank ("Gold 2 · 45 RP", "Placement 2/5") and the record. */
   ranked1v1: RankedSummary;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
+  /** Your chat ban in force and a moderator's notice you haven't seen (chat-mod.ts); missing when neither. */
+  chatMod?: { block?: ChatBlock; notice?: ChatNotice };
 }
 
 export async function profile(sql: Sql, user: User): Promise<Profile> {
@@ -734,6 +743,7 @@ export async function profile(sql: Sql, user: User): Promise<Profile> {
     best: rs.length ? Math.min(...rs.map((r) => r.placement)) : null,
     teamWins: rs.filter((r) => r.team_won === 1).length,
   });
+  const chatMod = await chatStanding(sql, user.id, Date.now()).catch(() => null);
   return {
     user: { id: user.id, name: user.name, icon: user.icon, signedIn: !!(user.email || user.google_sub), email: user.email, google: !!user.google_sub },
     shop: await shopState(sql, user.id),
@@ -749,6 +759,7 @@ export async function profile(sql: Sql, user: User): Promise<Profile> {
       teamWon: r.team_won === null ? null : r.team_won === 1,
       playedAt: r.played_at,
     })),
+    ...(chatMod ? { chatMod } : {}),
   };
 }
 

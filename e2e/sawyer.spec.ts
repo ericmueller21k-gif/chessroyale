@@ -39,13 +39,27 @@ async function play(page: Page, move: string) {
   }
   await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
 }
-/** The crowd's moves now, ranked as the judge ranks them (his cuts' limits kept), best first; its quiet moves; its pawn takes. */
+/**
+ * The crowd's moves now, ranked as the judge ranks them (his cuts' limits kept), best first, never one that ends the
+ * battle (mate or stalemate: these tests need it to go on, and the engine's best moves mated him before his split now
+ * and then, docs/decisions/2026-10-16-flaky-e2e-batch-3.md); its quiet moves (no castling: its knock is "castle"); its
+ * pawn takes.
+ */
 async function ranked(page: Page) {
   await yourMove(page);
   const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
-  const top = (await engineTop(page)).top as { move: string; expected: number }[];
+  const goesOn = (mv: string) => {
+    const after = new Chess(fen);
+    after.move({ from: mv.slice(0, 2), to: mv.slice(2, 4), promotion: mv[4] ?? "q" });
+    return !after.isGameOver();
+  };
+  const top = ((await engineTop(page)).top as { move: string; expected: number }[]).filter((m) => goesOn(m.move));
   const moves = new Chess(fen).moves({ verbose: true }).filter((m) => !m.promotion);
-  return { top, quiet: moves.filter((m) => !m.captured).map((m) => m.from + m.to), takes: moves.filter((m) => m.captured === "p").map((m) => m.from + m.to) };
+  return {
+    top,
+    quiet: moves.filter((m) => !m.captured && !/[kq]/.test(m.flags)).map((m) => m.from + m.to),
+    takes: moves.filter((m) => m.captured === "p").map((m) => m.from + m.to),
+  };
 }
 /**
  * An allowed move once it's your move that doesn't lose (within a tenth of the best's expected score: such a move never
@@ -55,7 +69,7 @@ async function ranked(page: Page) {
 async function allowedMove(page: Page, want: string[] = [], opts: { quiet?: boolean } = {}): Promise<string> {
   const { top, quiet } = await ranked(page);
   const fine = top.filter((m) => m.expected >= top[0]!.expected - 0.1).map((m) => m.move);
-  const pick = want.find((m) => fine.includes(m)) ?? fine.find((m) => quiet.includes(m));
+  const pick = want.find((m) => fine.includes(m) && (!opts.quiet || quiet.includes(m))) ?? fine.find((m) => quiet.includes(m));
   if (pick) return pick;
   return opts.quiet ? (top.map((m) => m.move).find((m) => quiet.includes(m)) ?? quiet[0]!) : fine[0]!;
 }
