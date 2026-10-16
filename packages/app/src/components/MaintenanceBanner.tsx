@@ -5,7 +5,8 @@ const DISMISSED_KEY = "brc.bannerDismissed";
 
 /**
  * The maintenance banner (the Worker variable MAINTENANCE_BANNER, through /api/status): its message in a slim band at
- * the top of every screen. Its height goes to --banner-h, so the page starts under it and is that much shorter
+ * the top of every screen. Its height goes to --maint-h (part of --banner-h, with the 1 v 1 search bar's), so the page
+ * starts under it and is that much shorter
  * (styles.css: body's padding, --app-h): it never covers a control and nothing scrolls because of it. ✕ hides it on
  * this device until the message changes.
  */
@@ -24,14 +25,14 @@ export function MaintenanceBanner() {
   useLayoutEffect(() => {
     const root = document.documentElement.style;
     const node = el.current;
-    if (!shown || !node) return void root.removeProperty("--banner-h");
-    const set = () => root.setProperty("--banner-h", `${Math.ceil(node.getBoundingClientRect().height)}px`);
+    if (!shown || !node) return void root.removeProperty("--maint-h");
+    const set = () => root.setProperty("--maint-h", `${Math.ceil(node.getBoundingClientRect().height)}px`);
     set();
     const watch = new ResizeObserver(set);
     watch.observe(node);
     return () => {
       watch.disconnect();
-      root.removeProperty("--banner-h");
+      root.removeProperty("--maint-h");
     };
   }, [shown, banner]);
   if (!shown) return null;
