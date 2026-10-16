@@ -108,13 +108,21 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     (`{ paused, banner }`) at start, every minute and when it comes back on screen (`packages/app/src/status.ts`).
   - **How fast:** changing a variable deploys a new version of the Worker, so it applies within seconds of that deploy
     (new instances read it at once). Like any deploy, players in a match reconnect for a moment.
-- **The maintenance banner** (`MAINTENANCE_BANNER`, at most 200 characters): a slim band over the top of every
-  screen while it's set (`components/MaintenanceBanner.tsx`); ✕ hides it on that device until the message changes.
-- **Rolling back** (`npm run rollback`, `scripts/rollback.mjs`; needs `CLOUDFLARE_API_TOKEN`, never printed):
-  - With no arguments, it lists the Worker's latest 10 versions, newest first, the live one marked.
-  - `npm run rollback -- previous` (or a version's id) goes back to the one before the live one, through
-    `wrangler rollback`. `--dry-run` shows what it would do. In a terminal it asks first; elsewhere it needs `--yes`.
-    `--env staging` works on the staging Worker.
+- **The maintenance banner** (`MAINTENANCE_BANNER`, at most 200 characters): a slim band at the top of every screen
+  while it's set (`components/MaintenanceBanner.tsx`). The page starts under it and is that much shorter
+  (`--banner-h`, `--app-h` in styles.css), so it never covers a control; sheets and menus opened over the page cover
+  it. ✕ hides it on that device until the message changes.
+- **Rolling back** (`npm run rollback`, `scripts/rollback.ts`, its choice in `rollback-pick.ts`; needs
+  `CLOUDFLARE_API_TOKEN`, never printed):
+  - With no arguments, it lists the Worker's latest versions, newest first: live now, was live, code upload or
+    settings change.
+  - `npm run rollback -- previous` goes back to the version live just before the live code went out: it steps back
+    past settings changes (saving a variable makes a new version of the same code) to the live code's upload, then
+    takes the deployment before it. So bad code with a `PAUSE_` set on top of it never rolls back to that bad code.
+    Or name a version by its id. `--dry-run` says which and why. `--env staging` works on the staging Worker.
+  - Flags go after `--` (npm keeps those before it): it stops if npm took one.
+  - A real rollback runs only in a terminal, where `wrangler rollback` asks before it deploys and about any secret
+    changed since that version; outside one, wrangler would answer yes by itself, so the script refuses.
   - **A rollback lasts until the next deploy from `main`:** revert or fix the bad change on `main` before anything
     else merges.
   - **A version carries its own variables:** rolling back to a version from before a `PAUSE_` or banner change undoes
@@ -236,7 +244,7 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
 | The build's version | `packages/app/vite.config.ts` (`__APP_VERSION__`, `dist/version.json`) |
 | Test switches: who may (server), a lobby's, the app's | `admin.ts` (`testSwitchesOn`), `lobby-options.ts`; `packages/app/src/test-switches.ts` |
 | Kill switches, the banner | `packages/core/src/pauses.ts` (the parts, their lines), `packages/server/src/kill-switches.ts`; `packages/app/src/status.ts`, `components/MaintenanceBanner.tsx` |
-| Rollback | `scripts/rollback.mjs` (`npm run rollback`) |
+| Rollback | `scripts/rollback.ts` (`npm run rollback`), `scripts/rollback-pick.ts` (which version) |
 | Load tests (simulated players over WebSockets and the API) | `scripts/load/` (`run.ts`, `burst.ts`, `staging.sh`) → `reports/load/` |
 | The engine server | `engine/`, `packages/server/src/engine.ts` |
 | CI | `.github/workflows/check.yml` (typecheck, unit tests), `e2e.yml` (the e2e suite); `e2e/ci-shard.mjs`, `ci-timings.json`, `ci-summary.ts` |
@@ -257,7 +265,7 @@ the live line yet, so the overload limit doesn't count their players.
   and its control-character bypass, caps, cross-site refusals, rate limits and their keys, bounded writes, fair
   counts, row sizes, pruning, fingerprints, lobby codes in paths, the guards, the cron's jobs failing apart, the ops
   page); `kill-switches.test.ts` (the switches, the cache, each refusal, never counted as an error, a resting boss
-  never met).
+  never met, even in a lobby made before); `rollback.test.ts` (which version "previous" is).
 - e2e: `e2e/busy.spec.ts` (servers busy), `lobby-close.spec.ts`, `test-switches.spec.ts` (a player's switches
   ignored, an admin's working), `problems.spec.ts` (errors reach the store, the error boundary, a bug report's id and
   feedback by kind on `/admin/ops`, the size and rate caps), `kill-switches.spec.ts` (its own server on port 8789:

@@ -22,7 +22,7 @@ import { countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
 import { handleOpsAdmin } from "./ops-admin.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
-import { isPaused, pausedBosses, pausedResponse, switchStatus, type KillSwitchEnv } from "./kill-switches.ts";
+import { isPaused, pausedResponse, switchStatus, type KillSwitchEnv } from "./kill-switches.ts";
 
 export { Lobby, SquadsLobby, SquadsParty, Matchmaker, LiveHub };
 export { EngineServer } from "./engine.ts";
@@ -178,14 +178,13 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // you first joined it at the latest. 409 if that lobby has started meanwhile (stay in it).
     if (url.pathname === "/api/play" && request.method === "POST") {
       const raid = url.searchParams.get("mode") === "raid";
-      // (A mode resting, a kill switch: no new matches. The bosses resting are never met.)
+      // (A mode resting, a kill switch: no new matches. The bosses resting are never met: the lobby's object sees to it.)
       if (isPaused(rawEnv, raid ? "raid" : "crowd")) return pausedResponse(raid ? "raid" : "crowd");
       const refused = await mayPlay(request, env, waitUntil);
       if (refused) return refused;
       const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
       const type = url.searchParams.get("type") === "botsoff" ? "botsoff" : "default";
-      const off = pausedBosses(rawEnv);
-      const overrides = { ...(raid ? RAID_SETTINGS : modeSettings("crowd", { augments: true })), ...(off.length ? { bossesOff: off } : {}) };
+      const overrides = raid ? RAID_SETTINGS : modeSettings("crowd", { augments: true });
       // ?pool=NAME: a queue of its own (a test switch: tests run several queues at once without meeting). Split by
       // region when that's on (queue.ts). ?ticket=ID: a player in line asking again (they keep their place).
       const region = regionOf(request.cf as { continent?: unknown } | undefined);
@@ -210,7 +209,8 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     }
     // POST /api/lobby → { code }: the creator's choices, and the test switches for those allowed them (lobby-options.ts).
     if (url.pathname === "/api/lobby" && request.method === "POST") {
-      // (A mode resting, or the boss picked, a kill switch: no new lobby. The bosses resting are never met.)
+      // (A mode resting, or the boss picked, a kill switch: no new lobby. The bosses resting are never met: the lobby's
+      // object sees to it.)
       const part = url.searchParams.get("mode") === "raid" ? "raid" : url.searchParams.get("mode") === "crowd" ? "crowd" : "classic";
       const picked = bossIdFromLink(url.searchParams.get("boss"));
       if (isPaused(rawEnv, part)) return pausedResponse(part);
@@ -219,9 +219,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       if (refused) return refused;
       const test = asksTestSwitches(url.searchParams) && (await testSwitches(request, env, waitUntil));
       const { overrides, keepMs } = lobbyOptions(url.searchParams, test);
-      const off = pausedBosses(rawEnv);
-      const settings = off.length ? { ...overrides, bossesOff: off } : overrides;
-      const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, settings, undefined, keepMs)) !== false);
+      const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, overrides, undefined, keepMs)) !== false);
       return code ? json({ code }) : json({ message: "Couldn't create a lobby. Try again." }, 500);
     }
     // Squads (docs/areas/squads.md, "The server"): its queue, parties and lobbies, and the test lobby.

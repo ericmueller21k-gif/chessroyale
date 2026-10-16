@@ -54,7 +54,7 @@ re-checked, and nobody is auto-banned (a ban needs the deep re-check).
 ## Kill switches and the maintenance banner
 
 To rest one part of the game for a while (a bug in Squads, a boss misbehaving, the shop), or to show everyone a short
-message. No code change and no restart: each is a Worker variable (docs/areas/ops.md, "Kill switches").
+message, without a code change: each is a Worker variable (docs/areas/ops.md, "Kill switches").
 
 1. Open **Workers & Pages → chessroyale → Settings → Variables and Secrets → Add**: the section near the top of
    Settings, not the build variables under **Build**.
@@ -72,19 +72,27 @@ message. No code change and no restart: each is a Worker variable (docs/areas/op
 4. **The banner:** name `MAINTENANCE_BANNER`, type Text, value the message (at most 200 characters, e.g. "Maintenance
    tonight at 10 pm UTC. Matches already running will finish."). Delete it to take the banner down.
 
-**How fast:** Save and deploy puts out a new version of the Worker, so the change is live within seconds. Players in a
-match reconnect for a moment, as with any deploy, and play on. Open apps update their buttons within a minute.
+**How fast:** Save and deploy puts out a new version of the Worker, just as a code deploy does, so the change is live
+within seconds; as with any deploy, players in a match reconnect for a moment and play on. Open apps update their
+buttons within a minute.
 Matches already running finish normally; the server refuses only new ones, with "Squads is resting for a bit. Back
 soon." (or that part's own line). Variables set here stay through every deploy from `main` (`keep_vars`). A
 **rollback** to an older version brings back that version's variables, so check them after one.
 
 ## Rolling back a bad deploy
 
-`npm run rollback` lists the Worker's latest versions (the live one marked). `npm run rollback -- previous --dry-run`
-shows what going back one would do; without `--dry-run` it asks, then rolls back with `wrangler rollback`. It needs
-`CLOUDFLARE_API_TOKEN` (with Workers Scripts: Edit) in the environment. The dashboard does the same: **Workers &
-Pages → chessroyale → Deployments → a version's ⋯ → Rollback**. A rollback lasts until the next merge to `main`
-deploys again: revert or fix the bad change there first (docs/areas/ops.md, "Rolling back").
+In a terminal, with `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) set:
+
+1. `npm run rollback` lists the Worker's latest versions: → live now, • was live, and whether each is a code upload
+   or a settings change (saving a variable makes a new version of the same code).
+2. `npm run rollback -- previous --dry-run` says which version "previous" is and why: the one live just before the
+   live code went out, never the bad code under a pause you set to contain it. Flags go after `--`.
+3. `npm run rollback -- previous` rolls back with `wrangler rollback`, which asks before it deploys and about any
+   secret changed since that version. It runs only in a terminal, so nothing is answered for you.
+
+The dashboard does the same: **Workers & Pages → chessroyale → Deployments → a version's ⋯ → Rollback**. A rollback
+lasts until the next merge to `main` deploys again: revert or fix the bad change there first. A version carries its
+own variables, so check the `PAUSE_` variables and the banner after (docs/areas/ops.md, "Rolling back").
 
 ## Load testing (staging only, never production)
 

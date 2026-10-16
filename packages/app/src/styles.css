@@ -1,4 +1,10 @@
 :root {
+  /*
+   * The window's height for the page: all of it, less the maintenance banner while one shows (MaintenanceBanner.tsx
+   * sets --banner-h), so the banner never covers anything and nothing scrolls because of it.
+   */
+  --banner-h: 0px;
+  --app-h: calc(100dvh - var(--banner-h));
   --bg: #16181d;
   --surface: #20232a;
   --surface-2: #2a2e37;
@@ -52,6 +58,8 @@ body {
 }
 
 body {
+  /* (Room for the maintenance banner, when one shows: the page starts under it.) */
+  padding-top: var(--banner-h);
   -webkit-tap-highlight-color: transparent;
   -webkit-user-select: none;
   user-select: none;
@@ -84,7 +92,7 @@ p {
 
 .screen {
   width: var(--col);
-  min-height: 100dvh;
+  min-height: var(--app-h);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -377,7 +385,7 @@ p {
 }
 
 .board-area .board-wrap {
-  width: min(100%, calc(100dvh - 330px));
+  width: min(100%, calc(var(--app-h) - 330px));
   min-width: 260px;
 }
 
@@ -909,10 +917,10 @@ p {
     gap: 8px;
   }
   .screen.game .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 215px));
+    width: min(100%, calc(var(--app-h) - 215px));
   }
   .screen.game .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 48px), calc(100dvh - 215px));
+    width: min(calc(100% - 48px), calc(var(--app-h) - 215px));
   }
   .screen.game .play-footer,
   .screen.game .reveal,
@@ -952,7 +960,7 @@ p {
   width: 100%;
 }
 .board-row .eval-bar ~ .board-wrap {
-  width: min(calc(100% - 48px), calc(100dvh - 330px));
+  width: min(calc(100% - 48px), calc(var(--app-h) - 330px));
 }
 .eval-bar {
   position: relative;
@@ -1391,7 +1399,7 @@ p {
     position: sticky;
     top: 0;
     align-self: flex-start;
-    max-height: 100dvh;
+    max-height: var(--app-h);
     overflow: auto;
     padding: 14px 0 14px 14px;
   }
@@ -2561,7 +2569,7 @@ button.history-label {
 
 @media (max-width: 899px) and (min-height: 520px) {
   .screen.game {
-    height: 100dvh;
+    height: var(--app-h);
     min-height: 0;
     overflow: hidden;
     gap: 6px;
@@ -2575,18 +2583,18 @@ button.history-label {
     gap: 8px;
   }
   .screen.game .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 330px));
+    width: min(100%, calc(var(--app-h) - 330px));
     min-width: 220px;
   }
   .screen.game .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 48px), calc(100dvh - 330px));
+    width: min(calc(100% - 48px), calc(var(--app-h) - 330px));
   }
   /* With the scoreboard minimized, the board takes the room. */
   .screen.game:has(.mini-tower.closed) .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 255px));
+    width: min(100%, calc(var(--app-h) - 255px));
   }
   .screen.game:has(.mini-tower.closed) .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 48px), calc(100dvh - 255px));
+    width: min(calc(100% - 48px), calc(var(--app-h) - 255px));
   }
   .screen.game .mini-tower {
     flex: 1 1 0;
@@ -4108,7 +4116,7 @@ button.history-label {
 /* Phones: the scoreboard minimized makes the game's board bigger; the vote's board matches it. */
 @media (max-width: 899px) and (min-height: 520px) {
   .screen.game.vote-screen.tower-closed .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 48px), calc(100dvh - 255px));
+    width: min(calc(100% - 48px), calc(var(--app-h) - 255px));
   }
 }
 /* Computers: the cards in the column beside the board, where the game's panel goes. */
@@ -4940,13 +4948,13 @@ button.history-label {
     --gk-screen: var(--col);
     --gk-column: calc(var(--gk-screen) - 2 * var(--gutter) - 368px);
     --bs-need: calc(var(--bs-reach, 0px) - (100vw - var(--col)) / 2 - var(--gutter));
-    --gk-board: min(var(--gk-column) - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
+    --gk-board: min(var(--gk-column) - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
     /* (His box is 120 px; his cape reaches a few pixels past it.) */
     --gk-clear: max(0px, var(--gk-off) + 128px - (var(--gk-column) - var(--gk-board)) / 2 - 28px);
   }
   .screen.game:has(> .boss-dock):has(.board-row > .eval-bar) {
     --gk-off: 26px;
-    --gk-board: min(var(--gk-column) - 48px - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
+    --gk-board: min(var(--gk-column) - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
   }
   .screen.game:has(> .boss-dock) > .board-area {
     grid-row: 3;
@@ -4956,17 +4964,17 @@ button.history-label {
     grid-row: 4;
     align-self: start;
     width: 100%;
-    max-width: min(100% - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
+    max-width: min(100% - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
     justify-self: center;
   }
   .screen.game:has(.board-row > .eval-bar) > .boss-dock {
-    max-width: min(100% - 48px - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
+    max-width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
   }
   .screen.game:has(> .boss-dock) .board-area .board-wrap {
-    width: min(100% - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
+    width: min(100% - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
   }
   .screen.game:has(> .boss-dock) .board-row .eval-bar ~ .board-wrap {
-    width: min(100% - 48px - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
+    width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
   }
   .screen.game:has(> .boss-dock) > .under-board,
   .screen.game:has(> .boss-dock) > .mini-tower {
@@ -7621,7 +7629,7 @@ body:has(.fd-root) {
 .fd-root,
 .fd-splash {
   width: 100%;
-  min-height: 100dvh;
+  min-height: var(--app-h);
   background: var(--fd-bg);
   color: var(--fd-text);
   font-family: Archivo, system-ui, sans-serif;
@@ -7855,7 +7863,7 @@ button.fd-logo {
 
 /* -- Home (docs/mockups/front-door/Main.dc.html) -- */
 .fd-home {
-  min-height: 100dvh;
+  min-height: var(--app-h);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -8260,7 +8268,7 @@ button.fd-logo {
 
 /* -- Pages (settings, profile) -- */
 .fd-page {
-  min-height: 100dvh;
+  min-height: var(--app-h);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -9266,7 +9274,7 @@ button.fd-seat {
   .fd-side {
     position: sticky;
     top: 0;
-    height: 100dvh;
+    height: var(--app-h);
     display: flex;
     flex-direction: column;
     gap: 22px;
@@ -9332,7 +9340,7 @@ button.fd-seat {
   .fd-right {
     position: sticky;
     top: 0;
-    height: 100dvh;
+    height: var(--app-h);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -9405,7 +9413,7 @@ button.fd-seat {
   }
   .fd-root.framed .fd-home {
     padding: 24px 24px 28px;
-    min-height: 100dvh;
+    min-height: var(--app-h);
   }
   .fd-root.framed .fd-home > .fd-top,
   .fd-root.framed .fd-home > .fr-line,
@@ -9437,7 +9445,7 @@ button.fd-seat {
   }
   /* The lobby: the queue screen's parts in a grid (the seats on the panel; your seat and Cancel side by side). */
   .fd-root.framed .fd-home .fd-queue {
-    --q-grid: min(100%, calc(100dvh - 330px));
+    --q-grid: min(100%, calc(var(--app-h) - 330px));
     min-height: 0;
     padding: 0;
     display: grid;
@@ -9526,7 +9534,7 @@ button.fd-seat {
     flex: none;
     display: grid;
     grid-template-columns: minmax(0, 540px) minmax(300px, 320px);
-    grid-template-rows: minmax(min(720px, calc(100dvh - 52px)), auto);
+    grid-template-rows: minmax(min(720px, calc(var(--app-h) - 52px)), auto);
     justify-content: center;
     gap: 24px;
   }
@@ -9603,7 +9611,7 @@ button.fd-seat {
     font-size: 13px;
   }
   .fd-root.framed .fd-home .fd-queue {
-    --q-grid: min(100%, calc(100dvh - 320px));
+    --q-grid: min(100%, calc(var(--app-h) - 320px));
   }
 }
 @media (min-width: 1440px) {
@@ -10145,7 +10153,7 @@ img.qicon {
 .qbubble {
   position: fixed;
   z-index: 45;
-  top: 0;
+  top: var(--banner-h);
   left: 50%;
   display: flex;
   align-items: center;
@@ -10466,10 +10474,10 @@ img.qicon {
     height: 28px;
   }
   .screen.game:has(.under-board.closed) .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 255px));
+    width: min(100%, calc(var(--app-h) - 255px));
   }
   .screen.game:has(.under-board.closed) .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 48px), calc(100dvh - 255px));
+    width: min(calc(100% - 48px), calc(var(--app-h) - 255px));
   }
 }
 
@@ -13187,11 +13195,11 @@ button.sq-tiny {
   line-height: 1.35;
 }
 .sq-game .board-area .board-wrap {
-  width: min(100%, calc(100dvh - 318px));
+  width: min(100%, calc(var(--app-h) - 318px));
   min-width: 250px;
 }
 .sq-game.sq-relay .board-area .board-wrap {
-  width: min(100%, calc(100dvh - 362px));
+  width: min(100%, calc(var(--app-h) - 362px));
 }
 .sq-clockline {
   display: inline-flex;
@@ -14070,10 +14078,10 @@ button.sq-tiny {
     margin-top: 24px;
   }
   .screen.game.sq-game .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 230px));
+    width: min(100%, calc(var(--app-h) - 230px));
   }
   .screen.game.sq-game.sq-relay .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 250px));
+    width: min(100%, calc(var(--app-h) - 250px));
   }
 }
 
@@ -15312,7 +15320,7 @@ button.sq-tiny {
   border-color: #ffd451;
 }
 .screen.game.rc-phone .board-row > .board-wrap {
-  width: min(100%, calc(100dvh - 440px));
+  width: min(100%, calc(var(--app-h) - 440px));
 }
 .rc-back {
   padding: 0;
@@ -15486,13 +15494,17 @@ button.sq-tiny {
   text-align: center;
 }
 
-/* The maintenance banner (MaintenanceBanner.tsx): a slim band over the top of every screen, ✕ to hide it. */
+/*
+ * The maintenance banner (MaintenanceBanner.tsx): a slim band at the top of every screen, ✕ to hide it. The page
+ * starts under it (--banner-h: body's padding, --app-h), so it covers nothing; a sheet or menu opened over the page
+ * (z-index 50 and up) covers it in turn.
+ */
 .maint-banner {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 80;
+  z-index: 48;
   display: flex;
   align-items: center;
   justify-content: center;

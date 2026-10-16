@@ -656,7 +656,7 @@ export function HomeScreen({
             ))}
           </div>
           {squads ? (
-            <button type="button" class="fd-btn sq-party-btn" disabled={!!resting} onClick={onParty}>
+            <button type="button" class="fd-btn sq-party-btn" onClick={onParty}>
               Party
               <span>{resting ?? "Play with up to 3 friends in one squad · create one or join by code"}</span>
             </button>

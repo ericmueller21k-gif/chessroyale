@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtempSync, openSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { pausedLine } from "@chessroyale/core";
 import { soloFromHome, test } from "./helpers.ts";
 
@@ -64,15 +64,24 @@ test.afterAll(async () => {
   if (storage) rmSync(storage, { recursive: true, force: true });
 });
 
-test("Squads resting: PLAY and Party are closed with its line, and the server refuses a new queue or party", async ({ page }) => {
+test("Squads resting: PLAY is closed with its line, a party can be joined but not made, and the server refuses both", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one server, one run");
   const line = pausedLine("squads");
   await page.goto(`${BASE}/?mode=squads`);
   await expect(page.getByRole("radio", { name: /^Squads/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeDisabled();
   await expect(page.locator(".fd-hint")).toHaveText(line);
-  await expect(page.locator(".sq-party-btn")).toBeDisabled();
+  // The Party button (and Play with friends, the same sheet): no new party, joining one by code as the server allows.
   await expect(page.locator(".sq-party-btn")).toContainText(line);
+  for (const open of [page.locator(".sq-party-btn"), page.getByRole("main").getByRole("button", { name: "Play with friends" })]) {
+    await open.click();
+    const sheet = page.getByRole("dialog");
+    await expect(sheet.getByText(line)).toBeVisible();
+    await expect(sheet.getByRole("button", { name: "Create a party" })).toBeDisabled();
+    await expect(sheet.getByLabel("Party code")).toBeEditable();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+  }
   // The server: 503, the same line.
   for (const path of ["/api/squads/play", "/api/squads/party"]) {
     const res = await page.request.post(`${BASE}${path}`);
@@ -85,26 +94,52 @@ test("Squads resting: PLAY and Party are closed with its line, and the server re
   await expect(page.locator(".fd-hint")).not.toHaveText(line);
 });
 
-test("the maintenance banner: at the top of every screen, over the page; ✕ hides it on this device", async ({ page }) => {
+/** The buttons, links and fields any part of which the banner lies over (none, ever). */
+const underBanner = (page: Page) =>
+  page.evaluate(() => {
+    const b = document.querySelector(".maint-banner")!.getBoundingClientRect();
+    return [...document.querySelectorAll("button, a, input, select, [role=radio], [role=tab]")]
+      .filter((el) => !el.closest(".maint-banner"))
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && r.top < b.bottom && r.bottom > 0 && getComputedStyle(el).visibility !== "hidden";
+      })
+      .map((el) => (el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 40));
+  });
+
+test("the maintenance banner: at the top of every screen, covering nothing at 320, 390 and 1280 px; ✕ hides it on this device", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one server, one run");
+  test.setTimeout(150_000);
   const banner = page.locator(".maint-banner");
-  for (const path of ["/", "/settings", "/shop", "/faq"]) {
-    await page.goto(`${BASE}${path}`);
-    await expect(banner, path).toHaveText(new RegExp(BANNER.replace(/[.()]/g, "\\$&")));
-    expect((await banner.boundingBox())!.y, path).toBe(0);
-    // (Over the page: nothing scrolls sideways or down because of it.)
-    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), path).toBe(0);
+  const shots = process.env.KILL_SWITCH_SHOTS;
+  for (const width of [320, 390, 1280]) {
+    await page.setViewportSize({ width, height: width > 1000 ? 800 : 700 });
+    for (const path of ["/", "/settings", "/shop", "/faq"]) {
+      await page.goto(`${BASE}${path}`);
+      await expect(banner, path).toHaveText(new RegExp(BANNER.replace(/[.()]/g, "\\$&")));
+      expect((await banner.boundingBox())!.y, path).toBe(0);
+      // (The page starts under it: no control under the banner, nothing scrolling sideways because of it.)
+      await expect.poll(() => underBanner(page), { message: `${width} ${path}` }).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), path).toBe(0);
+      if (shots) await page.screenshot({ path: `${shots}/banner-${width}${path === "/" ? "-home" : path.replace("/", "-")}.png` });
+    }
   }
-  // In a match too: Solo's queue.
+  // In a match: Solo's queue, then the match itself (its top line, with the match menu, under the banner).
+  await page.setViewportSize({ width: 390, height: 700 });
   await page.goto(`${BASE}/`);
   await soloFromHome(page);
   await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
+  await expect.poll(() => underBanner(page)).toEqual([]);
+  const menu = page.getByRole("button", { name: "Match options" });
+  await expect(menu).toBeVisible({ timeout: 90_000 });
   await expect(banner).toBeVisible();
-  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect.poll(() => underBanner(page)).toEqual([]);
+  if (shots) await page.screenshot({ path: `${shots}/banner-390-match.png` });
   // ✕: gone, and still gone after a reload (until the message changes).
   await page.getByRole("button", { name: "Hide this message" }).click();
   await expect(banner).toHaveCount(0);
-  await page.reload();
+  expect(await page.evaluate(() => getComputedStyle(document.body).paddingTop)).toBe("0px");
+  await page.goto(`${BASE}/`);
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await expect(banner).toHaveCount(0);
 });

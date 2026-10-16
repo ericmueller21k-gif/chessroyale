@@ -1,11 +1,12 @@
-import { useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { useServerStatus } from "../status.ts";
 
 const DISMISSED_KEY = "brc.bannerDismissed";
 
 /**
  * The maintenance banner (the Worker variable MAINTENANCE_BANNER, through /api/status): its message in a slim band at
- * the top of every screen, over the page rather than pushing it down (screens are sized to the window). ✕ hides it on
+ * the top of every screen. Its height goes to --banner-h, so the page starts under it and is that much shorter
+ * (styles.css: body's padding, --app-h): it never covers a control and nothing scrolls because of it. ✕ hides it on
  * this device until the message changes.
  */
 export function MaintenanceBanner() {
@@ -17,9 +18,24 @@ export function MaintenanceBanner() {
       return null;
     }
   });
-  if (!banner || dismissed === banner) return null;
+  const shown = !!banner && dismissed !== banner;
+  const el = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = document.documentElement.style;
+    const node = el.current;
+    if (!shown || !node) return void root.removeProperty("--banner-h");
+    const set = () => root.setProperty("--banner-h", `${Math.ceil(node.getBoundingClientRect().height)}px`);
+    set();
+    const watch = new ResizeObserver(set);
+    watch.observe(node);
+    return () => {
+      watch.disconnect();
+      root.removeProperty("--banner-h");
+    };
+  }, [shown, banner]);
+  if (!shown) return null;
   return (
-    <div class="maint-banner" role="status">
+    <div class="maint-banner" role="status" ref={el}>
       <span class="maint-banner-text">{banner}</span>
       <button
         type="button"

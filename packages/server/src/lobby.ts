@@ -448,6 +448,9 @@ export class LobbyCore {
     private settings: Settings = DEFAULT_SETTINGS,
   ) {
     this.settings = { ...settings, ...(record.overrides ?? {}) };
+    // The bosses resting now (kill switches: the Durable Object passes them in each time): never met, whatever the
+    // lobby was made with (one made before a boss was rested, by code, picked for a raid, or a queue's filling lobby).
+    if (settings.bossesOff) this.settings = { ...this.settings, bossesOff: settings.bossesOff };
     if (record.moveClock) this.settings = { ...this.settings, moveClockSeconds: record.moveClock, moveClockSteps: [] };
     if (record.runner) {
       this.runner = MatchRunner.restore(record.runner, { settings: this.settings, rng, engines: [], library });

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { BOSS_ROSTER, allPausable, bossFinalOption, chooseBoss, crowdFinalBoss, isPlayable, pausedLine, pauseVariable, playableBosses, rosterWithout } from "@chessroyale/core";
+import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, allPausable, bossFinalOption, chooseBoss, crowdFinalBoss, isPlayable, pausedLine, pauseVariable, playableBosses, rosterWithout } from "@chessroyale/core";
 import { createGuest, ensureSchema } from "../src/accounts.ts";
+import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
+import { library } from "./lobby-fixture.ts";
 import { handleAccountApi } from "../src/api.ts";
 import { friendsOn } from "../src/friends-api.ts";
 import { CACHE_MS, isPaused, pausedBosses, pausedResponse, switchStatus } from "../src/kill-switches.ts";
@@ -119,6 +121,25 @@ describe("the server refuses new matches for a part that's resting", () => {
 });
 
 describe("a boss that's resting is never met", () => {
+  it("not even in a lobby made before he was rested (a raid picked for him): the lobby's object passes the live list", () => {
+    const boss = playable;
+    const meets = (bossesOff: string[] | undefined) => {
+      let now = 1_000_000;
+      // (Made with that boss picked, and nothing resting then.)
+      const record = newLobbyRecord("ABCDE", now, JSON.parse(JSON.stringify({ ...RAID_SETTINGS, bossId: boss, bossPicked: boss, bossesOff: [] })));
+      const core = new LobbyCore(record, { now: () => now, send: () => undefined }, library, mulberry32(7), { ...DEFAULT_SETTINGS, boardIntroSeconds: 0, ...(bossesOff ? { bossesOff } : {}) });
+      core.connect(undefined, "P1", "computer", false, 1500);
+      core.message("p1", { t: "start" });
+      now += 1000;
+      if (core.nextAlarm && core.nextAlarm <= now) core.alarm();
+      return core.save().runner?.state.boss?.id;
+    };
+    expect(meets(undefined)).toBe(boss);
+    expect(meets([])).toBe(boss);
+    expect(meets([boss])).not.toBe(boss);
+    expect(meets([boss])).toBeTruthy();
+  });
+
   it("the roster without him: never picked, never at random; if that left none, the whole roster", () => {
     const off = [playable];
     const roster = rosterWithout(off);
