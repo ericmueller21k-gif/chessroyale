@@ -380,7 +380,9 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                         <span class="narrow-only">{allowanceNote(me, true)}</span>
                       </>
                     ) : (
-                      `You: ${toSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore)}) · best ${toSan(fen, mine.bestMove)}`
+                      // (Your pick was the best: said so, as the reveal does, in the line's width: the reveal's own
+                      // words are cut even at 390 px. docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md)
+                      `You: ${toSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore)}) · ${me.move === mine.bestMove ? "the best" : `best ${toSan(fen, mine.bestMove)}`}`
                     )}
               </span>
             </>
