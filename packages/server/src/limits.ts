@@ -39,22 +39,30 @@ const friends = new RateLimiter(L.friends.limit, L.friends.windowMs);
 export const TOO_MANY = "Too many requests. Wait a few seconds and try again.";
 
 /**
+ * A cookie shaped like a session token as accounts.ts makes them (randomToken: 32 bytes, base64url). The shape alone,
+ * not checked against D1: a made-up one of that shape passes, and the per-address limit is what bounds those.
+ */
+export const isSessionToken = (v: string | null): v is string => v !== null && /^[\w-]{43}$/.test(v);
+
+/**
  * Whether this request may go ahead: null if so, else how long to wait. `ip` is skipped when `ipExempt` (a load test
- * from one machine; the LOAD_TEST variable on staging, never production).
+ * from one machine; the LOAD_TEST variable on staging, never production). The account is a key only for a cookie shaped
+ * like a session token (isSessionToken), and the limits are counted in order, the address first, stopping at the first
+ * that refuses: a refused request uses up nothing further.
  */
 export function rateLimited(req: { ip: string | null; session: string | null; play: boolean; friends?: boolean }, now: number, ipExempt = false): number | null {
+  const session = isSessionToken(req.session) ? req.session : null;
   const checks: [RateLimiter, string][] = [];
   if (req.ip && !ipExempt) checks.push([perIp, req.ip]);
-  if (req.session) checks.push([perUser, req.session]);
-  if (req.play) checks.push([play, req.session ?? `ip:${req.ip}`]);
+  if (session) checks.push([perUser, session]);
+  if (req.play) checks.push([play, session ?? `ip:${req.ip}`]);
   // (Friends' actions: a burst limit here; the daily and hourly caps are counted in D1, friends.ts.)
-  if (req.friends) checks.push([friends, req.session ?? `ip:${req.ip}`]);
-  let wait = 0;
+  if (req.friends) checks.push([friends, session ?? `ip:${req.ip}`]);
   for (const [l, k] of checks) {
     const r = l.hit(k, now);
-    if (!r.ok) wait = Math.max(wait, r.retryMs);
+    if (!r.ok) return r.retryMs;
   }
-  return wait > 0 ? wait : null;
+  return null;
 }
 
 const P = OPS.endpoint;
@@ -63,14 +71,11 @@ const problemLimits = {
   report: [new RateLimiter(P.reports.perIp.limit, P.reports.perIp.windowMs), new RateLimiter(P.reports.perUser.limit, P.reports.perUser.windowMs)],
 } as const;
 
-/** A session cookie as accounts.ts makes them (randomToken: 32 bytes, base64url); anything else isn't one. */
-export const isSessionToken = (v: string | null): v is string => v !== null && /^[\w-]{43}$/.test(v);
-
 /**
  * POST /api/problems (problems.ts): error reports and player reports, each with their own limits per address and per
  * account (OPS.endpoint), on top of the API's. Null if this one may go ahead, else how long to wait. The address is
- * only a key in this instance's memory, never stored. The account is counted only for a real session cookie (a made-up
- * one each time would be a fresh key) and only once the address is let through (a refused request uses up nothing).
+ * only a key in this instance's memory, never stored. The account is counted only for a cookie shaped like a session
+ * token (isSessionToken) and only once the address is let through (a refused request uses up nothing).
  */
 export function problemLimited(kind: "errors" | "report", req: { ip: string | null; session: string | null }, now: number): number | null {
   const [perIp, perUser] = problemLimits[kind];

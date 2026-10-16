@@ -41,7 +41,8 @@
     "frames:resign": "node scripts/frames-resign.mjs",
     "frames:allowance": "node scripts/frames-allowance.mjs",
     "perf:boss": "node scripts/perf-boss.mjs",
-    "rollback": "tsx scripts/rollback.ts"
+    "rollback": "tsx scripts/rollback.ts",
+    "ops:report": "NODE_USE_ENV_PROXY=1 node --disable-warning=UNDICI-EHPA scripts/ops-report.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261002.1",

@@ -204,18 +204,30 @@ describe("rate limits", () => {
     let t = 1_000_000;
     // Ten minutes on the home screen (every 5 s) plus a PLAY in line (every 3 s) from one account.
     for (let s = 0; s < 600; s++, t += 1000) {
-      if (s % 5 === 0) expect(rateLimited({ ip: "1.1.1.1", session: "tok-a", play: false }, t)).toBeNull();
-      if (s % 3 === 0) expect(rateLimited({ ip: "1.1.1.1", session: "tok-a", play: true }, t)).toBeNull();
+      if (s % 5 === 0) expect(rateLimited({ ip: "1.1.1.1", session: "tok-a".padEnd(43, "x"), play: false }, t)).toBeNull();
+      if (s % 3 === 0) expect(rateLimited({ ip: "1.1.1.1", session: "tok-a".padEnd(43, "x"), play: true }, t)).toBeNull();
     }
     // A phone reloading a match screen 20 times in a minute, about 15 requests each.
-    for (let i = 0; i < 20 * 15; i++) expect(rateLimited({ ip: "4.4.4.4", session: "tok-c", play: false }, t + i * 200)).toBeNull();
+    for (let i = 0; i < 20 * 15; i++) expect(rateLimited({ ip: "4.4.4.4", session: "tok-c".padEnd(43, "x"), play: false }, t + i * 200)).toBeNull();
     // A script hammering from one account.
     let limited = 0;
-    for (let i = 0; i < L.perUser.limit + 10; i++) if (rateLimited({ ip: "2.2.2.2", session: "tok-b", play: false }, t) !== null) limited++;
+    for (let i = 0; i < L.perUser.limit + 10; i++) if (rateLimited({ ip: "2.2.2.2", session: "tok-b".padEnd(43, "x"), play: false }, t) !== null) limited++;
     expect(limited).toBe(10);
     // The per-address limit can be lifted for a load test from one machine (staging), never the per-account one.
     for (let i = 0; i < L.perIp.limit + 5; i++) rateLimited({ ip: "3.3.3.3", session: null, play: false }, t);
     expect(rateLimited({ ip: "3.3.3.3", session: null, play: false }, t)).not.toBeNull();
     expect(rateLimited({ ip: "3.3.3.3", session: null, play: false }, t, true)).toBeNull();
+  });
+
+  it("an account is a key only for a cookie shaped like a session token, and a refused address uses up nothing of it", () => {
+    const L = CAPACITY.rateLimits;
+    const t = 5_000_000;
+    const tok = "tok-d".padEnd(43, "x");
+    for (let i = 0; i < L.perIp.limit; i++) rateLimited({ ip: "5.5.5.5", session: null, play: false }, t);
+    for (let i = 0; i < L.perUser.limit + 5; i++) expect(rateLimited({ ip: "5.5.5.5", session: tok, play: false }, t)).not.toBeNull();
+    for (let i = 0; i < L.perUser.limit; i++) expect(rateLimited({ ip: `5.5.6.${i}`, session: tok, play: false }, t)).toBeNull();
+    expect(rateLimited({ ip: "5.5.7.1", session: tok, play: false }, t)).not.toBeNull();
+    // A made-up cookie is no key: only the address counts.
+    for (let i = 0; i < L.perUser.limit + 5; i++) expect(rateLimited({ ip: `5.5.8.${i}`, session: "made-up", play: false }, t)).toBeNull();
   });
 });
