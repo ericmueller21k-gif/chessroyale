@@ -138,7 +138,7 @@ test("the maintenance banner: at the top of every screen, covering nothing at 32
   // ✕: gone, and still gone after a reload (until the message changes).
   await page.getByRole("button", { name: "Hide this message" }).click();
   await expect(banner).toHaveCount(0);
-  expect(await page.evaluate(() => getComputedStyle(document.body).paddingTop)).toBe("0px");
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).paddingTop)).toBe("0px");
   await page.goto(`${BASE}/`);
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await expect(banner).toHaveCount(0);

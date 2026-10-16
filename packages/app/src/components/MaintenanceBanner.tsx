@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { useServerStatus } from "../status.ts";
 
 const DISMISSED_KEY = "brc.bannerDismissed";
@@ -20,7 +20,8 @@ export function MaintenanceBanner() {
   });
   const shown = !!banner && dismissed !== banner;
   const el = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  // (Before the frame is painted, so the page moves with the banner as it comes and goes, never a frame apart.)
+  useLayoutEffect(() => {
     const root = document.documentElement.style;
     const node = el.current;
     if (!shown || !node) return void root.removeProperty("--banner-h");
