@@ -1,11 +1,11 @@
-# Six flaky e2e tests: two game bugs, two tests' own doing, two not reproduced (Oct 16, 2026)
+# Seven flaky e2e tests: two game bugs, three tests' own doing, two not reproduced (Oct 16, 2026)
 
 CI's `e2e` run listed these as flaky (passed only on the retry), or they failed once locally. Each was traced from CI's
 logs, the failing tries' page snapshots and the retries' traces, and reproduced locally before anything changed
 (`--repeat-each`, and by forcing the suspected condition). No assertion was loosened, skipped or given a longer
 timeout, and no sleep was added. Two were real bugs a player could meet (a chat menu that closed by itself, an Escape
-the party sheet ignored); two were the tests' own timing or play; two (both in `squads-mercenary.spec.ts`) didn't
-reproduce, and the leads given for them turned out not to be their causes (below).
+the party sheet ignored); three were the tests' own timing or play (the last found on this PR's own CI run); two (both
+in `squads-mercenary.spec.ts`) didn't reproduce, and the leads given for them turned out not to be their causes.
 
 ## A name's menu closed when the round moved on (a real bug): `chat.spec.ts:72` "quick chat picks in the profile…" (desktop)
 
@@ -107,6 +107,18 @@ reproduce, and the leads given for them turned out not to be their causes (below
   at a half's end misses its news (the shield's banner and note): that's how a reconnect works today, and changing it
   is the protocol's (a lane of its own).
 
+## Your board lost during a wait: `recluse.spec.ts:642` "phase 2's slow moves…" (phone; this PR's CI run)
+
+- **Seen:** on this PR's first CI run (it passed on the retry): the test waited 30 s for its next turn on its phase 2
+  board, or the Hidden Boss's ultimate. The failing try's page: "Your board: lost. The others play on.", slow moves 7 of
+  10.
+- **Cause:** the test plays quiet pawn moves (each after 5 s, to be slow) against Stockfish 2750, so its board is often
+  lost before the tenth slow move; it checked for that only before its wait, and Stockfish's answer can end the board
+  right after. Then no turn comes, and the bots' remaining slow moves can take longer than 30 s. The test's own next step
+  already allows "your board decided first: the bots' slow moves bring the rest".
+- **Fix:** the wait also ends when your board is decided, and the loop leaves it to the bots then. Forcing it (your
+  board resigned right after the check, at 6 slow moves): the old test failed 2 of 3 as on CI, the new one 0 of 3.
+
 ## Before and after (local, `--repeat-each` or forced, failures over runs)
 
 | Test | Before | After |
@@ -117,3 +129,4 @@ reproduce, and the leads given for them turned out not to be their causes (below
 | `boss-powers.spec.ts` funhouse at every angle (desktop) | 0 / 12; CI 4 draws | 0 / 12; that game's move 21 no longer repeats |
 | `squads-mercenary.spec.ts` the capture's coins (desktop) | 1 / 93 (a move not made); CI 1 | a sharper check; the Squads files, both projects twice: 0 / 34 |
 | `squads-mercenary.spec.ts` the shield step (desktop) | 0 / 24 (1 / 24 on the Ranked 1 v 1 branch: not heard, a reconnect) | a sharper check; as above |
+| `recluse.spec.ts` phase 2's slow moves (phone) | forced 2 / 3; CI 1 | forced 0 / 3; both projects 0 / 8 |
