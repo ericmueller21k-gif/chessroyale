@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { BOARD_SEL, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, test, watchFor, bossAloneFromHome } from "./helpers.ts";
 import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
 
 /**
@@ -78,7 +78,7 @@ async function meetHim(page: Page, query = "laststand=0&clock=60") {
   await page.goto(`/?debug&${query}`);
   await me;
   await page.waitForTimeout(500);
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
   await expect(menu).toBeVisible();
   // (After the rest, for an admin.)
@@ -91,13 +91,13 @@ test("a player never sees him: not in the boss menu, and ?boss=recluse meets ano
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
   test.setTimeout(3 * 60_000);
   await page.goto("/?debug");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
   await expect(menu).toBeVisible();
   await expect(menu.locator(".boss-row .br-main strong").first()).toBeVisible();
   await expect(menu.getByText("Hidden Boss")).toHaveCount(0);
   await page.goto("/?debug&boss=recluse");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect.poll(async () => (await bossNow(page))?.id ?? null, { timeout: 30_000 }).not.toBeNull();
   expect((await bossNow(page)).id).not.toBe("recluse");
 });
@@ -314,7 +314,7 @@ test("a player in Boss alone never sees Engine move", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
   test.setTimeout(3 * 60_000);
   await page.goto("/?debug&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await page.getByRole("dialog", { name: "Choose your boss" }).locator(".boss-row").first().click();
   await yourMove(page);
   await expect(page.locator(".ult-test, .engine-move")).toHaveCount(0);

@@ -28,6 +28,7 @@ import { underBoardView } from "../prefs.ts";
 import { play } from "../sound.ts";
 import { useBoardAnimations } from "../hooks.ts";
 import { pausedBosses, useServerStatus } from "../status.ts";
+import { VoteHint, useVoteHint } from "../components/VoteHint.tsx";
 
 /** No pieces while the votes run: only everyone's pawns. */
 const EMPTY_FEN = "8/8/8/8/8/8/8/8 w - - 0 1";
@@ -106,6 +107,15 @@ export interface VoteHost {
  * You're with the crowd"), then the banner names the winner; between the votes everyone walks back to their spot,
  * and after the last one the pawns fade and the real pieces drop into place for the game.
  */
+/**
+ * The first-time hint for a pawn vote (the 1 v 1 core's, shared: once per device, whichever mode's vote comes first),
+ * over the board just above the zones, pointing down at them. One per vote (keyed by it), so a player who meets it in
+ * the first vote doesn't see it again in the second.
+ */
+function FirstVoteHint({ open, done }: { open: boolean; done: boolean }) {
+  return <VoteHint show={useVoteHint(open, done)} text="Drag your pawn into a zone to vote" class="vh-zones" />;
+}
+
 export function VoteScreen({
   match,
   vote,
@@ -397,6 +407,7 @@ export function VoteScreen({
                 </span>
               )}
             </div>
+            {counting && <FirstVoteHint key={vote.key} open={open} done={!!mine} />}
             {winner && now >= walkedAt && (
               <div class={`vote-banner${winner.detail ? " with-detail" : ""}${resetting || leaving ? " leaving" : ""}`} role="status">
                 <span class="vote-banner-icon">{winner.icon}</span>

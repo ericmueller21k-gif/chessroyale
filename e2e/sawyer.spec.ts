@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { SAWYER_LOOKS } from "@chessroyale/core";
-import { BOARD_SEL, engineTop, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, engineTop, test, watchFor, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * Sawyer, the raccoon with a saw, played alone on a phone and a computer with real taps: his first move a pawn's and
@@ -113,7 +113,7 @@ test("Sawyer: his first move a pawn's, then the split (two small whole pawns tha
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/?debug&clock=60&boss=sawyer&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Sawyer");
 
@@ -194,7 +194,7 @@ test("Sawyer's board saw (?power=boardsaw): he saws up the middle, the board spl
   page.on("pageerror", (e) => errors.push(e.message));
   await page.addInitScript(() => localStorage.setItem("brc.muted", "1"));
   await page.goto("/?debug&clock=60&boss=sawyer&power=boardsaw&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await yourMove(page);
   await page.evaluate(() => ((window as any).__soundLog = []));
   await play(page, await allowedMove(page, ["g1f3", "b1c3", "g8f6", "b8c6"]));
@@ -262,7 +262,7 @@ test("Sawyer: the board saw from the admins' trigger, a cut taped over and heali
   page.on("pageerror", (e) => errors.push(e.message));
   await asAdmin(page);
   await page.goto("/?debug&clock=60&boss=sawyer&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await yourMove(page);
   const btn = page.locator(".ult-test");
   await btn.click();
@@ -319,7 +319,7 @@ test("Stockfish: a position it refuses is never sent, and a worker's exit never 
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/?debug&clock=60&boss=sawyer&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await yourMove(page);
   const NINE_PAWNS = "4k3/8/8/8/8/P7/PPPPPPPP/4K3 w - - 0 1";
   const ask = (fen: string | null) =>

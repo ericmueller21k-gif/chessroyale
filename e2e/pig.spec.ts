@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { DEFAULT_SETTINGS } from "@chessroyale/core";
-import { BOARD_SEL, createLobbyFromHome, engineTop, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, createLobbyFromHome, engineTop, test, watchFor, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * Wrangler, the cowboy pig, played alone on a phone and a computer with real taps: his long pull as his first move
@@ -202,7 +202,7 @@ test("Wrangler's long pull as his first move, then a lasso drag (?power=drag)", 
   // best moves, and a game more than DRAG_DECIDED pawns one way has no drag, so none came within the turns now and then.)
   await asAdmin(page);
   await page.goto("/?debug&clock=60&boss=pig&power=drag&laststand=0&brain=stockfish");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   const boss = await bossNow(page);
   expect(boss.name).toBe("Wrangler");
@@ -279,7 +279,7 @@ test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle
   const admin = test.info().project.name === "phone";
   if (admin) await asAdmin(page);
   await page.goto("/?debug&clock=60&boss=pig&power=showdown&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await yourMove(page);
   // His meter (the test switch: full from turn 2): his line in his text box, and his ready loop until he fires.
   const ready = await watchFor(page, {
@@ -374,7 +374,7 @@ test("Wrangler's showdown on demand (the admins' trigger): his meter full at onc
   page.on("pageerror", (e) => errors.push(e.message));
   await asAdmin(page);
   await page.goto("/?debug&clock=60&boss=pig&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await play(page, "e2e4");
   await yourMove(page);
   // His meter: one move of his in, nowhere near full.

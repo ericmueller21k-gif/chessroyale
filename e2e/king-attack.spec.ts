@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { KING_ATTACK, LAST_STAND } from "@chessroyale/chess";
-import { BOARD_SEL, test } from "./helpers.ts";
+import { BOARD_SEL, test, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * A boss's attack on a king (Hollow's; Eric, Oct 10), played alone on a phone and a computer with real taps, watched
@@ -69,7 +69,7 @@ function expectEveryLash(during: { hit: number; lashes: number[] }[]) {
 test("Hollow's mate: he lashes your king, it topples into the dark, then the result", async ({ page }) => {
   await page.goto("/?debug&clock=60&boss=hollow&mate=1");
   await page.evaluate(() => ((window as any).__soundLog = []));
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   const samples = await sample(page);
   await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("results");
   const s = await samples();
@@ -102,7 +102,7 @@ test("Hollow's mate: he lashes your king, it topples into the dark, then the res
 
 test("the God King's Last Stand against Hollow: Hollow lashes him, then he falls and you pick again", async ({ page }) => {
   await page.goto("/?debug&clock=60&boss=hollow&laststand=1");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
   await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 10_000 }).toBe(true);
   const samples = await sample(page);

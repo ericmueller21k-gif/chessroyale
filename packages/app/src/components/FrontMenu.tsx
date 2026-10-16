@@ -9,7 +9,8 @@ import { FriendsPanel, InviteToast } from "./Friends.tsx";
 /** Where the computer's side menu can take you. */
 export interface FrontNav {
   home: () => void;
-  bossAlone: () => void;
+  /** The Boss raid screen (Boss alone is one of its choices; Eric, Oct 16). */
+  bossRaid: () => void;
   friends: () => void;
   shop: () => void;
   profile: () => void;
@@ -20,7 +21,7 @@ export interface FrontNav {
   signIn?: () => void;
 }
 
-export type FrontPage = "home" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends";
+export type FrontPage = "home" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends";
 
 const Icon = ({ d, children }: { d?: string; children?: ComponentChildren }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -46,8 +47,9 @@ export function SideMenu({ page, nav }: { page?: FrontPage; nav: FrontNav }) {
       <div class="fd-menu">
         <Item label="Play" on={page === "home" || page === "queue"} onClick={nav.home} icon={<Icon d="M7 4.5v15l12-7.5z" />} />
         <Item
-          label="Boss alone"
-          onClick={nav.bossAlone}
+          label="Boss raid"
+          on={page === "raid"}
+          onClick={nav.bossRaid}
           icon={
             <Icon>
               <path d="M5 20h14M6 20l-1.5-11 4.5 3.5L12 5l3 7.5L19.5 9 18 20" />

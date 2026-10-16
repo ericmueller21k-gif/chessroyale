@@ -145,19 +145,19 @@ describe("Squads: the bracket", () => {
 describe("Squads: pre-game votes", () => {
   const votes = squadsVotes();
 
-  it("three votes: Mode first (Classic, Mercenary, Coming soon), then Start (3 options) and Clock (Rapid, Blitz, Bullet from settings)", () => {
+  it("three votes: Mode first (Classic, Mercenary, Coming soon), then Start (3 options) and Clock (Bullet, Blitz, Rapid from settings)", () => {
     expect(votes.map((v) => v.id)).toEqual(["mode", "start", "clock"]);
     expect(votes[0]!.options.map((o) => o.rule.mode ?? null)).toEqual(["classic", "mercenary", null]);
     expect(votes[0]!.options.map((o) => o.label)).toEqual(["Classic", "Mercenary", "Coming soon"]);
     expect(votes[0]!.options.map((o) => !!o.disabled)).toEqual([false, false, true]);
     expect(votes[1]!.options.map((o) => o.rule.start)).toEqual(["standard", "same", "random"]);
     expect(votes[2]!.options.map((o) => o.rule.clock)).toEqual([...SQUADS.clocks]);
-    expect(votes[2]!.options.map((o) => o.id)).toEqual(["rapid", "blitz", "bullet"]);
-    expect(votes[2]!.options.map((o) => o.icon)).toEqual(["⏱️", "🔥", "⚡"]);
+    expect(votes[2]!.options.map((o) => o.id)).toEqual(["bullet", "blitz", "rapid"]);
+    expect(votes[2]!.options.map((o) => o.icon)).toEqual(["⚡", "🔥", "⏱️"]);
     // Each card in chess form, its numbers from settings: "Bullet 2+1", "2 min + 1 s a move · max 10 s".
     SQUADS.clocks.forEach((c, i) => {
       const o = votes[2]!.options[i]!;
-      expect(o.label).toBe(`${["Rapid", "Blitz", "Bullet"][i]} ${clockName(c)}`);
+      expect(o.label).toBe(`${["Bullet", "Blitz", "Rapid"][i]} ${clockName(c)}`);
       expect(o.label).toBe(clockLabel(c));
       expect(o.blurb).toBe(`${minutesName(c.bankSeconds)} min + ${c.incrementSeconds} s a move · max ${c.capSeconds} s`);
       expect(o.detail).toBe(teamClockDetail(c));
@@ -176,9 +176,9 @@ describe("Squads: pre-game votes", () => {
     );
   });
 
-  it("the three options go from slowest to fastest, left to right: every one with an increment that banks and its own cap on a move", () => {
-    const [rapid, blitz, bullet] = SQUADS.clocks as [SquadsClock, SquadsClock, SquadsClock];
-    expect([rapid.id, blitz.id, bullet.id]).toEqual(["rapid", "blitz", "bullet"]);
+  it("the three options go Bullet, Blitz, Rapid, left to right (Eric, Oct 16: Bullet on the left, the longest on the right): every one with an increment that banks and its own cap on a move", () => {
+    const [bullet, blitz, rapid] = SQUADS.clocks as [SquadsClock, SquadsClock, SquadsClock];
+    expect([bullet.id, blitz.id, rapid.id]).toEqual(["bullet", "blitz", "rapid"]);
     for (const c of SQUADS.clocks) {
       expect(c.incrementSeconds).toBeGreaterThan(0);
       expect(c.delaySeconds).toBeGreaterThan(0);
@@ -204,12 +204,12 @@ describe("Squads: pre-game votes", () => {
     expect(defaultClock().id).toBe("blitz");
     for (const v of votes) expect(v.options[v.defaultOption]!.id).toBe({ mode: "classic", start: "standard", clock: "blitz" }[v.id]);
     expect(rulesFromVotes({ start: 2, clock: 0 })).toEqual({ mode: "classic", start: "random", clock: SQUADS.clocks[0] });
-    expect(rulesFromVotes({ clock: 0 }).clock.id).toBe("rapid");
+    expect(rulesFromVotes({ clock: 0 }).clock.id).toBe("bullet");
     expect(rulesFromVotes({ mode: 1 }).mode).toBe("mercenary");
   });
 
   it("old Clock ids map to the new options (fast → bullet, normal → blitz, long → rapid); an unknown id gets the default, never a crash", () => {
-    const [rapid, blitz, bullet] = SQUADS.clocks as [SquadsClock, SquadsClock, SquadsClock];
+    const [bullet, blitz, rapid] = SQUADS.clocks as [SquadsClock, SquadsClock, SquadsClock];
     expect(clockById("bullet")).toBe(bullet);
     expect(clockById("Blitz")).toBe(blitz);
     expect(clockById(" rapid ")).toBe(rapid);
@@ -217,8 +217,8 @@ describe("Squads: pre-game votes", () => {
     expect(clockById("normal")).toBe(blitz);
     expect(clockById("LONG")).toBe(rapid);
     for (const odd of ["", "slow", "variable", "classic", "constructor", "__proto__", null, undefined]) expect(clockById(odd)).toBe(blitz);
-    // (A vote's result is the option's place, left to right: Rapid, Blitz, Bullet.)
-    expect([0, 1, 2].map((i) => rulesFromVotes({ clock: i }).clock.id)).toEqual(["rapid", "blitz", "bullet"]);
+    // (A vote's result is the option's place, left to right: Bullet, Blitz, Rapid since Oct 16.)
+    expect([0, 1, 2].map((i) => rulesFromVotes({ clock: i }).clock.id)).toEqual(["bullet", "blitz", "rapid"]);
     expect(rulesFromVotes({ clock: 7 }).clock).toBe(blitz);
   });
 

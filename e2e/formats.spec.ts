@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { crowdFinalBoss } from "@chessroyale/core";
-import { BOARD_SEL, createLobbyFromHome, engineTop, named, soloFromHome, submitMove, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, createLobbyFromHome, engineTop, named, soloFromHome, submitMove, test, watchFor, bossAloneFromHome } from "./helpers.ts";
 
 /** The boss final's boss (Eric, Oct 14: always the Hidden Boss), by his roster name. */
 const finalBoss = crowdFinalBoss()!;
@@ -68,22 +68,22 @@ test("pre-game votes: the cards vote too; the winners set the ending and the clo
   // Vote 2: tap the Bullet card.
   await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("radio", { name: /Bullet/ }).click();
-  // (Bullet is the right-hand card: slowest on the left, fastest on the right.)
-  await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(2);
+  // (Bullet is the left-hand card: Bullet on the left, the longest on the right; Eric, Oct 16.)
+  await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(0);
   await expect.poll(() => page.evaluate(() => (window as any).match.phase.vote?.result ?? null), { timeout: 15_000 }).not.toBeNull();
   const result: number = await page.evaluate(() => (window as any).match.phase.vote.result);
   await expect.poll(() => phase(page), { timeout: 20_000 }).toMatch(/play|watching/);
-  // The game's clock is the winning time control's (left to right): Rapid 10+5 (20 s a move at most), Blitz 5+3 (15 s),
-  // Bullet 3+2 (10 s). Everyone's bank starts at its minutes (yours too, until your first move).
+  // The game's clock is the winning time control's (left to right): Bullet 3+2 (10 s a move at most), Blitz 5+3 (15 s),
+  // Rapid 10+5 (20 s). Everyone's bank starts at its minutes (yours too, until your first move).
   const clock = await page.evaluate(() => {
     const r = (window as any).match.runner;
     const me = r.player("you");
     return { cap: r.moveClock(), bank: r.settings.timeBankSeconds, increment: r.settings.timeIncrementSeconds, mine: me.movesTimed ? null : me.bankMs };
   });
   expect(clock).toEqual([
-    { cap: 20, bank: 600, increment: 5, mine: 600_000 },
-    { cap: 15, bank: 300, increment: 3, mine: 300_000 },
     { cap: 10, bank: 180, increment: 2, mine: 180_000 },
+    { cap: 15, bank: 300, increment: 3, mine: 300_000 },
+    { cap: 20, bank: 600, increment: 5, mine: 600_000 },
   ][result]);
 });
 
@@ -135,7 +135,7 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   test.setTimeout(8 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=6");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   // First, the boss menu: a random boss, then every boss you can meet (a complete character and powers), each at
   // your strength plus its own offset. Pick one and it starts.
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
@@ -191,7 +191,7 @@ test("boss raid alone flows like a chess site: your move is played, the boss rep
   test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&clock=30&boss=1600");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 40_000 }).toBe("play");
   // The engine's best move (never a blunder, so no Last Stand), then every phase on the way back to your move, and
   // any ring or countdown seen meanwhile.
@@ -230,7 +230,7 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   test.skip(test.info().project.name !== "phone", "one run is enough");
   // (?boss=1600 skips the boss menu.)
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3&boss=1600&laststand=1");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 40_000 }).toBe("play");
   const fen = await page.evaluate(() => (window as any).match.phase.board.fen);
   // Your move (the test switch makes this one call for him, whatever it is).

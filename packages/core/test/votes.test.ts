@@ -43,7 +43,7 @@ describe("every vote's options keep one fixed order (Eric, Oct 13: \"should neve
   it("each vote's options, left to right, and its default by id", () => {
     expect(PREGAME_VOTES.map((v) => [v.id, v.options.map((o) => o.id), v.options[v.defaultOption]!.id])).toEqual([
       ["format", ["team", "boss", "duel"], "team"],
-      ["speed", ["rapid", "blitz", "bullet"], "blitz"],
+      ["speed", ["bullet", "blitz", "rapid"], "blitz"],
     ]);
   });
 
@@ -89,19 +89,19 @@ describe("how it ends: the boss final is the Hidden Boss's (Eric, Oct 14)", () =
 });
 
 describe("the clock vote: three chess time controls", () => {
-  it("Rapid 10+5, Blitz 5+3, Bullet 3+2 from left to right (slowest to fastest); each patch sets the bank, the increment and the cap", () => {
+  it("Bullet 3+2, Blitz 5+3, Rapid 10+5 from left to right (Eric, Oct 16: Bullet on the left, the longest on the right); each patch sets the bank, the increment and the cap", () => {
     expect(speed.title).toBe("How fast?");
-    expect(speed.options.map((o) => o.id)).toEqual(["rapid", "blitz", "bullet"]);
-    expect(speed.options.map((o) => o.label)).toEqual(["Rapid 10+5", "Blitz 5+3", "Bullet 3+2"]);
+    expect(speed.options.map((o) => o.id)).toEqual(["bullet", "blitz", "rapid"]);
+    expect(speed.options.map((o) => o.label)).toEqual(["Bullet 3+2", "Blitz 5+3", "Rapid 10+5"]);
     expect(speed.options.map((o) => o.blurb)).toEqual([
-      "10 min + 5 s a move · max 20 s",
-      "5 min + 3 s a move · max 15 s",
       "3 min + 2 s a move · max 10 s",
+      "5 min + 3 s a move · max 15 s",
+      "10 min + 5 s a move · max 20 s",
     ]);
     expect(speed.options.map((o) => o.patch)).toEqual([
-      { timeBankSeconds: 600, timeIncrementSeconds: 5, moveClockSeconds: 20, moveClockSteps: [] },
-      { timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15, moveClockSteps: [] },
       { timeBankSeconds: 180, timeIncrementSeconds: 2, moveClockSeconds: 10, moveClockSteps: [] },
+      { timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15, moveClockSteps: [] },
+      { timeBankSeconds: 600, timeIncrementSeconds: 5, moveClockSeconds: 20, moveClockSteps: [] },
     ]);
     // Nothing old is left in the vote.
     expect(speed.options.some((o) => /normal|variable|slow|rising/i.test(o.id + o.label + o.blurb))).toBe(false);

@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, engineTop, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, engineTop, test, watchFor, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * Jefferson (id "grex"; G-REX until Oct 10), the Fire boss, played through alone on a phone and a computer: his sparkler's tile burning in stages with its
@@ -68,7 +68,7 @@ const shadowsShown = (page: Page) =>
 
 test("Jefferson (he was G-REX): a test link's ?boss=jefferson meets him, by his new name", async ({ page }) => {
   await page.goto("/?debug&clock=40&boss=jefferson");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".boss-intro-name")).toHaveText("Jefferson");
   expect(await page.evaluate(() => { const b = (window as any).match.boss; return [b.id, b.name]; })).toEqual(["grex", "Jefferson"]);
@@ -78,7 +78,7 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
   test.setTimeout(9 * 60_000);
   // (?laststand=0: leaving a piece to burn on purpose isn't taken back by the God King.)
   await page.goto("/?debug&clock=40&bossMoves=16&boss=grex&power=candle&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Jefferson");
   await expect(page.locator(".rage-meter")).toBeVisible();
@@ -187,7 +187,7 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
 test("on a computer the dock is under the board at every width, the board and dock on screen, the God King beside it", async ({ page }) => {
   test.skip(test.info().project.name !== "desktop", "a computer's widths");
   await page.goto("/?debug&clock=60&boss=grex");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   for (const [w, h] of [[1024, 800], [1280, 800], [1440, 900], [1600, 900], [1920, 1080], [1590, 923]] as const) {
     await page.setViewportSize({ width: w, height: h });
@@ -221,7 +221,7 @@ async function asAdmin(page: Page) {
 
 test("the test trigger is hidden from players", async ({ page }) => {
   await page.goto("/?debug&clock=40&bossMoves=6&boss=gingerbread");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   await expect(page.locator(".boss-dock")).toBeVisible();
   await expect(page.locator(".ult-test")).toHaveCount(0);
@@ -231,7 +231,7 @@ test("an admin's test trigger against Ginger, pressed during your turn: the bliz
   test.setTimeout(5 * 60_000);
   await asAdmin(page);
   await page.goto("/?debug&clock=40&bossMoves=8&boss=gingerbread");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   const btn = page.locator(".ult-test");
   await expect(btn).toHaveText("Trigger ultimate (testing)");
@@ -280,7 +280,7 @@ test("an admin's test trigger against Boingo, pressed while the boss thinks: the
   test.setTimeout(4 * 60_000);
   await asAdmin(page);
   await page.goto("/?debug&clock=40&bossMoves=6&boss=clown");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   await play(page);
   await expect(page.locator(".boss-screen .ult-test")).toBeVisible({ timeout: 10_000 });

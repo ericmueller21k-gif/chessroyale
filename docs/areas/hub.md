@@ -6,18 +6,37 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 - **Kill switches and the maintenance banner** ([ops.md](ops.md) "Kill switches"): a mode, Solo and Boss alone, or
   Squads resting disables its way in on the home screen with its line ("Squads is resting for a bit. Back soon.": under
-  PLAY, on the Party button, in Play with friends, under the buttons for Boss alone); the boss menu hides a resting
+  PLAY, on the Party button, in Play with friends, on the Boss raid screen under its choices); the boss menu hides a resting
   boss. `MAINTENANCE_BANNER` shows as a slim band over the top of every screen (✕ hides it until the message changes).
 - **The landing page** shows where online play needs signing in (`onlineNeedsSignIn` from `/api/auth/config`) and
   you aren't signed in: sign in, or play against bots as a guest (remembered on the device). An invite link shows it
-  even to a guest. `?nolanding` skips it (tests). Guests play Solo and Boss alone.
-- **Home** (built from the approved mockups in `docs/mockups/front-door/`): the mode picker (Crowd 50 v 50, Squads,
-  Boss raid: Squads took Classic's spot, Oct 11; Classic still plays with `?mode=classic`), the Matchmaking row (Default,
-  Bots off, Solo) with its ⓘ (with Squads picked: the Party button instead, see [squads.md](squads.md)), PLAY, "Play with friends", "Boss alone" (solo's
-  boss menu), the coin pill, your icon, and the live line ("214 online · 9 matches running · 31 in queue") with the
-  typical wait under PLAY.
-  - **Phone:** one column, big tap targets, no sideways scroll at 320–430 px.
-  - **Computer** (1024 px+): a side menu, the play column in the center, a side panel (playing now, global chat).
+  even to a guest. `?nolanding` skips it (tests). Guests play Solo, a Solo raid and Boss alone.
+- **Home** (built from the approved mockups in `docs/mockups/front-door/`; the RANKED row and the Boss raid card, Eric,
+  Oct 16, [docs/decisions/2026-10-16-home-ranked-row-and-boss-raid.md](../decisions/2026-10-16-home-ranked-row-and-boss-raid.md)):
+  - **The RANKED row:** a small "RANKED" label over three buttons, one picked (a radio group, remembered on the device,
+    `brc.mode`): **50 v 50** ("Crowd chess"), **1 v 1** ("Classic chess") and **Squads** ("8 squads of 4"). Classic
+    still plays with `?mode=classic`. Under the row, for the pick: 50 v 50's Matchmaking row (Default, Bots off, Solo)
+    with its ⓘ; Squads' Party button ([squads.md](squads.md)); for 1 v 1 (always people) your rank in it, "Your rank:
+    Gold 2 · 45 RP" or "Your rank: Placement 2/5" (`ranked1v1Label`, from your profile; whole on one line at 320 px at
+    its widest). Then PLAY and its line (1 v 1: "Ranked chess vs one player near your level"). 1 v 1's PLAY is
+    `startRanked1v1()`: its queue at once, at `/1v1` ([ranked.md](ranked.md)); resting (`PAUSE_RANKED1V1`), PLAY is
+    off with its line, as the other modes.
+  - **The Boss raid card** (full width, a boss's portrait, "Boss raid", "Team up vs a boss · up to 50") opens the **Boss
+    raid screen** (`?mode=raid` opens it too; the computer's side menu has "Boss raid" in Boss alone's old place). A
+    simple screen for now, Back to home: each way to play a raid, through the flows home had before: **Join a raid**
+    (the raid's queue, Default), **People only** (Bots off), **Raid with bots** (a Solo raid, you and 49 bots), **Boss
+    alone** (the boss menu: you alone against a boss you pick) and **Play with friends** (a raid's lobby, or join one by
+    code). A resting part disables its choices with its line under them.
+  - **`/bosses`** (unlisted, not admin-gated; Eric's shortcut): opens the solo boss picker (Boss alone's menu) at once.
+  - Then "Play with friends" (a lobby in the row's pick; with 1 v 1 picked, a 50 v 50 lobby: 1 v 1 has none), "Shop &
+    crates" and "Profile" (a phone's), the coin pill, your icon, and the live line ("214 online · 9 matches running ·
+    31 in queue") with the typical wait under PLAY.
+  - A screen that replaces home (a phone's queue, the Boss raid screen, home again) starts at its top. A match's Home
+    and a closed lobby's note land on home itself; Cancel in a raid's queue goes back to the Boss raid screen.
+  - **Phone:** one column: the RANKED row, PLAY, the Boss raid card, then the smaller buttons. Big tap targets, no
+    sideways scroll at 320–430 px.
+  - **Computer** (1024 px+): a side menu, the play column in the center (the Boss raid card and Play with friends side
+    by side, 2 : 1, then the RANKED row, PLAY at the bottom), a side panel (playing now, global chat).
     From 1280 px the play column starts with the **live window**: the featured real match (a matchmade one, most
     people, then newest) or, when none runs, bot-match replays played on a shared clock cycle so everyone sees the same
     moment (`LIVE_WINDOW`; replays in `packages/app/public/replays/crowd-bots.json`, never fetched on phones).
@@ -134,7 +153,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 | What | Where |
 | --- | --- |
-| Screens | `packages/app/src/screens/Home.tsx`, `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx`, `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
+| Screens | `packages/app/src/screens/Home.tsx` (home, the RANKED row, the Boss raid card and screen), `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx`, `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
 | Friends' pieces (rows, the home line, the live panel's section, the toast, Invite friends, the settings, a profile's buttons) | `packages/app/src/components/Friends.tsx`; the list and actions `friends.ts` |
 | The computer's frame and menus | `components/FrontDoor.tsx`, `FrontMenu.tsx`, `LiveWindow.tsx`, `LiveNumber.tsx`, `MiniBoard.tsx`, `TinyBoard.tsx`, `LeaderboardSheet.tsx` |
 | Names and icons everywhere | `components/PlayerName.tsx`, `PixelIcon.tsx` (`UserIcon`), `profile-nav.ts` |
@@ -159,7 +178,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   `piece-sounds.test.ts` (the piece-sound picks: storage, fallback, files), `testers.test.ts` (practice mode and the
   eval bar: testers only), `faq.test.ts` (the FAQ: contents against sections, links, every boss, numbers following the
   settings); `packages/server/test/lobby-do-practice.test.ts` (online practice: testers only).
-- e2e: `e2e/front-door.spec.ts`, `landing.spec.ts`, `home-layout.spec.ts`, `live-window.spec.ts`, `profile.spec.ts`,
+- e2e: `e2e/front-door.spec.ts`, `home-ranked.spec.ts` (the RANKED row at 320-390 px and on a computer, 1 v 1's PLAY,
+  the Boss raid card and screen and each of its choices, `/bosses`), `landing.spec.ts`, `home-layout.spec.ts`, `live-window.spec.ts`, `profile.spec.ts`,
   `install.spec.ts`, `crate-banner.spec.ts`, `friends.spec.ts` (two players: request, accept, online, the invites
   setting, an invite joined from its toast, a block; the phone's line at 320 px), `eval-bar.spec.ts` (testers: the
   switch in Settings only, the board's room, phone and computer; players: no bar, no switch), `piece-sounds.spec.ts`

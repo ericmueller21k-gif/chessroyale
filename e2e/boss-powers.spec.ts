@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, createLobbyFromHome, engineTop, expectCoordsInSquares, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, createLobbyFromHome, engineTop, expectCoordsInSquares, test, watchFor, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * Boss powers, played through: the gingerbread man's freeze and blizzard, Boingo's pie and funhouse, alone (solo) on a
@@ -144,7 +144,7 @@ const thawSquares = async (p: Page): Promise<string[]> => [...(((await powers(p)
 test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the blizzard: one random piece moves, then it thaws", async ({ page }) => {
   test.setTimeout(6 * 60_000);
   await page.goto("/?debug&clock=40&bossMoves=7&boss=gingerbread&power=blizzard");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Ginger");
   await expect(page.locator(".rage-meter")).toBeVisible();
@@ -368,7 +368,7 @@ async function playByHand(page: Page, how: "tap" | "drag", phone: boolean, lasti
 test("Boingo: pies nobody can move onto (up to two, on their squares), the warning, then the funhouse turns the board upside down and plays your move (unscored)", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   await page.goto("/?debug&clock=40&bossMoves=8&boss=clown&power=funhouse&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Boingo the Clown");
 
@@ -418,7 +418,7 @@ test("Boingo's funhouse at every angle: a move by tap and a move by drag, the co
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/?debug&clock=90&bossMoves=20&boss=clown&power=funhouse&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   // Turns 1-2 the right way up, 3-6 upside down (turn 3 his move for you), 7-10 a quarter turn to his side, 11-14 to
   // the other, 15 on back.

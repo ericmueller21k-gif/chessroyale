@@ -1,5 +1,5 @@
 import { devices, expect, type Browser, type Page } from "@playwright/test";
-import { BOARD_SEL, named, test } from "./helpers.ts";
+import { BOARD_SEL, named, test, bossAloneFromHome, openBossRaid } from "./helpers.ts";
 
 /**
  * Resign in every mode (Eric, Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): a phone's "⋯" in the top
@@ -69,7 +69,7 @@ test("Boss alone: Cancel keeps playing; Resign ends the game at once, a loss (\"
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/?debug&clock=60&boss=gingerbread");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   // The confirm stays up while the game moves on under it (the screen is drawn afresh each turn): a move, the boss's
   // reply. Then Cancel: the game goes on.
@@ -180,8 +180,8 @@ test("online boss raid: one resigns, a bot takes the seat, the other plays on (a
   await named(b, "Stayer");
   for (const p of [a, b]) {
     await p.goto(`/?debug&pool=${q}`);
-    await p.getByRole("radio", { name: /^Boss raid/ }).click();
-    await p.getByRole("button", { name: "PLAY", exact: true }).click();
+    await openBossRaid(p);
+    await p.getByRole("button", { name: /^Join a raid/ }).click();
   }
   // Bots fill at 8 s here; the boss's intro, then the crowd's first move.
   await expect.poll(() => phase(a), { timeout: 60_000 }).toBe("play");
