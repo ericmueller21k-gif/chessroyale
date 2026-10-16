@@ -14,6 +14,7 @@ import {
   standings,
   strikeVictim,
   teamFinalStep,
+  WEAK_BOTS,
   type MatchState,
   type PlayerState,
   type Settings,
@@ -142,6 +143,17 @@ describe("Crowd 50 v 50: each team's cut", () => {
     const left = alivePlayers(end.state);
     expect(left.map((p) => p.colour).sort()).toEqual(["b", "w"]);
     expect(end.state.final?.format).toBe("duel");
+  });
+
+  it("the ?weakbots=1 test switch (WEAK_BOTS): people rank above bots, so a cut takes bots first", () => {
+    // p0, White's lowest score, is a person: out as usual, through with the switch (docs/decisions/2026-10-16-flaky-e2e-batch-2.md).
+    const rows = [...[1, 9, 8, 7].map((score) => ({ score, colour: "w" as const })), ...[9, 8, 7, 6].map((score) => ({ score, colour: "b" as const }))];
+    const base = withScores(C, rows);
+    const state = { ...base, players: base.players.map((p) => (p.id === "p0" ? { ...p, isBot: false } : p)) };
+    expect(ids(endStage(state, mulberry32(1), [0], C).knockedOut)).toEqual(["p0", "p3", "p6", "p7"]);
+    const T: Settings = { ...C, ...WEAK_BOTS };
+    expect(standings(state, () => 0.5, T)[0]!.id).toBe("p0");
+    expect(ids(endStage(state, mulberry32(1), [0], T).knockedOut)).toEqual(["p2", "p3", "p6", "p7"]);
   });
 
   it("marks who a cut would take now, the same as the cut itself", () => {

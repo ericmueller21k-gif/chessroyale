@@ -74,9 +74,11 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   three finalists on the other boards (`phase2Follows`, `phase2Mates` in `recluse-phase2.ts`). No reward comes from this
   path (rewards only via Squads: ROADMAP.md). Duel: the last two. `finalMaxTurns` caps a final; the engine
   adjudicates.
-- **Test switch `?weakbots=1`** (solo, and a lobby you create): every bot plays loosely (`WEAK_BOT_SKILL`: a
-  temperature of 8 points or more), so a test playing the engine's best move surely reaches the boss final's top 4 (with
-  the usual bots, the strongest play the engine's move as often as you do, and only two of each team get through).
+- **Test switch `?weakbots=1`** (solo, and a lobby you create; `WEAK_BOTS`): every bot plays loosely (`WEAK_BOT_SKILL`:
+  a temperature of 8 points or more), and people rank above bots in the standings (`peopleFirst`), so every cut takes
+  bots first and a test's player surely reaches the boss final's top 4. Loose bots alone stopped doing it on Oct 15: the
+  opening allowance leaves them level with the engine's best move, and one pick the judge's final numbers rank above it
+  then decides the strict last cut (docs/decisions/2026-10-16-flaky-e2e-batch-2.md). Never for players.
 - **Online, the vote's result** patches the app's settings as the server's (`NetMatch`'s "vote"), so the last cut names
   the right ending and the leaderboard's cut line follows the right knockouts (a reload mid-match falls back to the
   queue's settings: the team final's).

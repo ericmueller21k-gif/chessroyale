@@ -1,4 +1,4 @@
-import { BOSS_TIERS, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, QUICK_PACE, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { BOSS_TIERS, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, QUICK_PACE, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { LobbyRecord } from "./lobby.ts";
 
 /**
@@ -69,8 +69,8 @@ export function lobbyOptions(query: URLSearchParams, test: boolean): { overrides
     })(),
     // ?speed=bullet|blitz|rapid: that time control (for testing, with ?format=; old ids map over, unknown ones are Blitz).
     ...(mode === "crowd" ? (speedOption(q.get("speed"))?.patch ?? {}) : {}),
-    // ?weakbots=1: every bot plays loosely (for testing: a strong player surely survives the cuts).
-    ...(q.get("weakbots") === "1" ? { botSkillRange: WEAK_BOT_SKILL } : {}),
+    // ?weakbots=1: every bot plays loosely and people rank above bots (for testing: a person surely survives the cuts).
+    ...(q.get("weakbots") === "1" ? WEAK_BOTS : {}),
   };
   // ?keep=SECONDS: its results stay up this long (5 s up to the usual 15 minutes), for tests.
   const keepMs = q.has("keep") ? Math.max(5, Math.min(LOBBY_LIFE.lobbyResultsKeepMinutes * 60, Number(q.get("keep")) || 0)) * 1000 : undefined;

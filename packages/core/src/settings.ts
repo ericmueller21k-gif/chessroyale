@@ -256,6 +256,11 @@ export interface Settings {
   finalMovesPerPlayer: number;
   /** In the final, a missed move counts as this many points of loss. */
   finalMissLoss: number;
+  /**
+   * Testing only (the ?weakbots=1 switch, WEAK_BOTS): people rank above bots in the standings, so every cut takes bots
+   * first. Never for players.
+   */
+  peopleFirst?: boolean;
 }
 
 /**
@@ -383,11 +388,17 @@ export const DEFAULT_SETTINGS: Settings = {
   finalMissLoss: 25,
 };
 
-/**
- * Test switch ?weakbots=1 (solo, and a lobby you create): every bot at least this loose (`botSkillRange`), so a test
- * playing the engine's best move is sure to survive the cuts (to the Crowd's top 4, say). Never for players.
- */
+/** The bots' skills under the ?weakbots=1 test switch (WEAK_BOTS): every bot at least this loose (`botSkillRange`). */
 export const WEAK_BOT_SKILL: readonly [number, number] = [8, 32];
+
+/**
+ * Test switch ?weakbots=1 (solo, and a lobby you create): loose bots, and people ranked above bots (`peopleFirst`), so a
+ * test's player is sure to survive the cuts (to the Crowd's top 4, say). Loose bots alone stopped doing it once the
+ * opening allowance forgave every pick within 8 points (Oct 15): a test playing the engine's best move then lost the
+ * last cut to bots that had scored as well, whenever the judge's final numbers ranked one bot pick above its move
+ * (docs/decisions/2026-10-16-flaky-e2e-batch-2.md). Never for players.
+ */
+export const WEAK_BOTS: Pick<Settings, "botSkillRange" | "peopleFirst"> = { botSkillRange: WEAK_BOT_SKILL, peopleFirst: true };
 
 /** `count` bot skills spread evenly on a log scale across `botSkillRange`, strongest first. */
 export function botSkillSpread(count: number, settings: Settings = DEFAULT_SETTINGS): number[] {
