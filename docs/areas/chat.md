@@ -35,6 +35,8 @@ Lane: `social`.
 
 ## Moderation
 
+Why it's built this way: [docs/decisions/2026-10-16-chat-moderation.md](../decisions/2026-10-16-chat-moderation.md).
+
 - **Mute** (one tap: a name or a line opens its menu: Profile, Mute, Report). By account, on this device
   (`localStorage` `brc.muted`, at most 300), for every chat (global, lobby, match) until unmuted (the menu, a chat's
   options, the global chat's "N muted · unmute"). A player without an account (a bot) is muted for that match only, as
@@ -42,15 +44,17 @@ Lane: `social`.
   as muted (`MatchChat.hidden`).
 - **Report** a line (the same menu): POST `/api/chat/report {n, lobby?}`. The server takes the line from its own copy
   (the lobby's log, `QUICK_CHAT.logSize`; the global chat's last `keep`), never from the device: a line the reporter
-  could see (not the other team's plan), not a bot's, not their own. It stores the line and the lines around it
+  could see (not the other team's plan), not a bot's, not their own; a line of someone who has since left the lobby
+  still can be (the lobby keeps who said each seat's lines, `chat.by`). It stores the line and the lines around it
   (`CHAT_MOD.contextBefore`/`contextAfter`). One report per reporter, player and place a day (another answers "You've
   already reported this player here."), `CHAT_MOD.reportsPerDay` a day per reporter; signed in wherever sign-in is set
-  up. The reporter sees "Reported. Thanks: a moderator will look at it." Reporting a player from their profile is fair
-  play's (`fairplay.md`), unchanged.
+  up, so guests (and under-13 devices, guests only) can mute but not report. The reporter sees "Reported. Thanks: a
+  moderator will look at it." Reporting a player from their profile is fair play's (`fairplay.md`), unchanged.
 - **The automatic pause:** reports from `CHAT_MOD.autoMuteReporters` different players, all within
   `autoMuteWindowMs` and none reviewed yet, pause the player's chat until a moderator looks (at most `autoMuteMs`).
-- **The review page** `/admin/chat` (admins only, `ADMIN_EMAILS`, like `/admin/fairplay`; with `CHAT_MOD_TEST` "1"
-  and no sign-in set up, anyone: local and e2e only). Players with open reports, by how many players reported them;
+- **The review page** `/admin/chat` (admins only, `ADMIN_EMAILS`, like `/admin/fairplay` and `/admin/ops`, on the same
+  page shell, `adminPage`; no test switch opens it: the e2e makes its moderator's account an admin, `asServerAdmin`).
+  Players with open reports, by how many players reported them;
   each report with its lines around it (the line reported in bold). Decisions, each with a reason for the log (except
   to dismiss) and an optional note to the player: dismiss the reports, warn, chat ban for 1, 7 or 30 days
   (`CHAT_MOD.banDays`) or with no end, lift a pause, reset the name and icon. A decision reaches the lobbies the
@@ -64,8 +68,8 @@ Lane: `social`.
 - **The name filter** (`server/src/text-filter.ts`): the free text players see is names. A small list of our own
   (slurs and hate terms, not swearing), ROT13-encoded in the file, matched through case, accents, look-alike letters,
   invisible characters, leetspeak and spacing; short words only as whole words. A profile can't take such a name
-  ("That name isn't allowed. Pick another one."); a new account or sign-in gets "Player"; a lobby or Squads seat asked
-  for with one is "Player N"; the global chat shows an old one as "Player".
+  ("That name isn't allowed. Pick another one."); a guest asking for one with its first visit gets "Player"; a lobby or
+  Squads seat asked for with one is "Player N"; the global chat shows an old one as "Player".
 - **Send limits** (unchanged, per account): a lobby's chat one line every `QUICK_CHAT.minGapMs`, `burstMax` in
   `burstWindowMs`, no repeat within `repeatMs` (by account, so a new seat doesn't reset them); the global chat one
   every `GLOBAL_CHAT.gapMs`.
@@ -83,6 +87,14 @@ Lane: `social`.
   stays while it's in force.
 - **Mutes** stay on the player's device only. Nothing about who muted whom reaches the server beyond a match's own
   `chatPrefs` (gone with the lobby).
+- **Download my data** (`account-data.ts`, store `chatModeration`): the lines the player reported (not the lines
+  around them) and the decisions about their chat as they see them (what, when, until, the note). Not the reports about
+  them nor the moderators' reasons and names (a person answers a request).
+- **Delete account:** their reports, the reports about them and every decision about their chat go; nothing is kept
+  (a chat ban is the account's alone). Their name and lines can stay inside the lines kept around someone else's
+  report (no account id) until that report goes.
+- **A guest signing in to an account:** its reports and decisions move to the account (`chatModMoves`, in the sign-in's
+  one batch), so a chat ban can't be shed by signing in; a "merged" line says so.
 - Old records are deleted by the Worker's schedule (every 15 minutes), and as reports come in and the review page is
   used (`pruneChatMod`, at most every 10 minutes per instance).
 
@@ -105,14 +117,15 @@ Lane: `social`.
 ## Settings
 
 `QUICK_CHAT` (limits, bots, defaults, pack prices), `GLOBAL_CHAT`, `GLOBAL_CHAT_BOTS`, `CHAT_MOD` (reports, the
-automatic pause, bans, keeping); Worker variables `ADMIN_EMAILS` (the review page) and `CHAT_MOD_TEST` (local and e2e
-only).
+automatic pause, bans, keeping); the Worker variable `ADMIN_EMAILS` (the review page). No kill switch of its own:
+moderators pause one player's chat; every player can turn chat off on their device.
 
 ## Tests and tools
 
 - Unit: `packages/core/test/chat.test.ts`, `global-chat.test.ts`, `packages/app/test/chat.test.ts`,
   `global-chat.test.ts`, `packages/server/test/lobby-chat.test.ts`, `global-chat.test.ts`, `chat-mod.test.ts`
-  (reports, the pause, decisions, keeping, the routes, the review page), `text-filter.test.ts`.
+  (reports, the pause, decisions, keeping, the routes, the review page), `text-filter.test.ts`, `account-data.test.ts`
+  (the download, deleting, a guest's merge).
 - e2e: `e2e/chat.spec.ts`, `lobby-chat.spec.ts`, `global-chat.spec.ts`, `panel.spec.ts`, `chat-mod.spec.ts` (mute,
   report, the review page, a chat ban, the name filter).
 - Frames: `npm run frames:chat`, `frames:lobbychat`.
