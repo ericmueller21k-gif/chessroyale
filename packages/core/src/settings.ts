@@ -1483,9 +1483,11 @@ export const RANKED_1V1 = {
   fewPlayersSeconds: 45,
   /**
    * Pairing by the hidden rating, widening with the wait: two players meet when their ratings are within
-   * `startRange + perSecond × seconds waited` (the longer wait's), at most `maxRange`.
+   * `startRange + perSecond × seconds waited` (the longer wait's) `+ perRd ×` the larger of their two deviations, at most
+   * `maxRange`. (A rating still being found, as in placements, is a guess give or take its deviation: a gap inside that
+   * says nothing, so it shouldn't keep two players apart.)
    */
-  match: { startRange: 100, perSecond: 10, maxRange: 1000 },
+  match: { startRange: 100, perSecond: 10, perRd: 1, maxRange: 1000 },
   /**
    * The hidden rating: Glicko-1, each game its own rating period. A new player starts at their account's rating (from
    * other modes, clamped to `seedMin`-`seedMax`) or `start`, with `startRd`; the deviation shrinks with each game to
@@ -1520,16 +1522,19 @@ export const RANKED_1V1 = {
   baseRating: 800,
   ratingPerPoint: 1600 / 2800,
   /**
-   * Points a game: `win`, 0 or −`loss`, plus `perRating` × (hidden rating − the ladder's rating) after the game, the
-   * adjustment at most ±`maxAdjust` (a draw: half): so a player whose rank is below their play climbs faster, and
-   * ranks settle where the hidden rating says. No promotion series and no demotion shields: crossing 100 points is
-   * the next division, falling below 0 the one before. Never below Iron 4 0.
+   * Points a game: 2 × `perGame` × (the result − the expected result from the two hidden ratings), so ±`perGame` between
+   * equals, more for beating someone stronger and less for beating someone weaker; plus `perRating` × (hidden rating −
+   * the ladder's rating) after the game, the adjustment at most ±`maxAdjust` (a draw: half): so a player whose rank is
+   * below their play climbs faster, and ranks settle where the hidden rating says. A win never takes points, a loss
+   * never gives them. (Without the expected result, a player who keeps beating weaker ones climbed past their rating
+   * for good, and two accounts trading wins reached Champion: reports/ranked-1v1.md.) No promotion series and no
+   * demotion shields: crossing 100 points is the next division, falling below 0 the one before. Never below Iron 4 0.
    */
-  points: { win: 20, loss: 20, perRating: 0.05, maxAdjust: 10 },
+  points: { perGame: 20, perRating: 0.05, maxAdjust: 10 },
   /** The first `games` rated games are placements ("Placement 2/5"), then the ladder starts from the hidden rating, at most `maxLadder` (Diamond 4 0). */
   placements: { games: 5, maxLadder: 2400 },
   /**
-   * Coins (as Squads pays them), lined up with what a Squads lobby pays per minute played (about 1.9 a minute:
+   * Coins (as Squads pays them), lined up with what a Squads lobby pays per minute played (about 1.8 a minute:
    * docs/decisions/2026-10-16-ranked-1v1.md): `perMinute` of the game's time from its start to its end, by result, at
    * least 1 and at most `maxPerGame`; nothing for a game with fewer than `minMoves` moves each, an aborted game, or a
    * bot game.

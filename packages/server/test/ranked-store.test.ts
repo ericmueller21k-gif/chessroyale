@@ -167,10 +167,10 @@ describe("keeping, the profile and the account", () => {
     expect((await publicProfile(sql, b.id, T0))!.ranked1v1).toBeNull();
   });
 
-  it("the queue's read of a player: their account's name, their look, their rank and hidden rating", async () => {
+  it("the queue's read of a player: their account's name, their look, their rank and hidden rating (with its deviation)", async () => {
     const { sql, a } = await setup();
     const e = await duelEntrant(sql, a);
-    expect(e).toEqual({ player: { uid: a.id, name: "Ann", look: {}, rank: rankView(null) }, rating: 1500 });
+    expect(e).toEqual({ player: { uid: a.id, name: "Ann", look: {}, rank: rankView(null) }, rating: 1500, rd: RANKED_1V1.rating.startRd });
   });
 
   it("the download has the rank and the games (the opponent by name, not fair play's check); deleting leaves the opponent's games", async () => {

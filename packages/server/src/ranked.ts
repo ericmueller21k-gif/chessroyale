@@ -5,7 +5,7 @@
  * the game, never from anything an app sends. The tables, a guest's merge and the profile's read are in
  * ranked-schema.ts (accounts.ts includes them; this file needs accounts.ts).
  */
-import { RANKED_1V1, duelCoins, newRankedRecord, rankView, rankedGame, type RankChange, type RankedRecord } from "@chessroyale/core";
+import { RANKED_1V1, duelCoins, newRankedRecord, rankView, rankedGame, ratingNow, type RankChange, type RankedRecord } from "@chessroyale/core";
 import type { Color, DuelOutcome, DuelPlayerView, DuelResult, DuelReason } from "@chessroyale/chess/duel";
 import { DELETED_ID, randomToken, stmt, type Sql, type Stmt, type User } from "./accounts.ts";
 import { lockerState } from "./locker.ts";
@@ -34,14 +34,15 @@ export async function rankedRecordOf(sql: Sql, userId: string): Promise<{ record
 
 /**
  * A player joining the queue, as the server reads them (never the app's word): their account's name (filtered, as a
- * lobby seat's), what they wear (the locker), their rank, and their hidden rating for pairing.
+ * lobby seat's), what they wear (the locker), their rank, and their hidden rating (and its deviation now) for pairing.
  */
-export async function duelEntrant(sql: Sql, user: Pick<User, "id" | "name">): Promise<{ player: DuelPlayerView; rating: number }> {
+export async function duelEntrant(sql: Sql, user: Pick<User, "id" | "name">, now = Date.now()): Promise<{ player: DuelPlayerView; rating: number; rd: number }> {
   const { record } = await rankedRecordOf(sql, user.id);
   const look = await lockerState(sql, user.id)
     .then((l) => l.look)
     .catch(() => ({}));
-  return { player: { uid: user.id, name: seatName(user.name, "Player"), look, rank: rankView(record) }, rating: record.rating };
+  const { rating, rd } = ratingNow(record, now);
+  return { player: { uid: user.id, name: seatName(user.name, "Player"), look, rank: rankView(record) }, rating, rd: Math.round(rd) };
 }
 
 /** A finished game, as the game's object hands it over to be recorded. */

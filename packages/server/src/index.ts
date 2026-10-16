@@ -351,11 +351,11 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
       if (!me) return json({ message: SIGN_IN_TO_PLAY }, 401);
       const sql = d1Sql(env.DB);
       await ensureSchema(sql, env.DB);
-      const { player, rating } = await duelEntrant(sql, me);
+      const { player, rating, rd } = await duelEntrant(sql, me);
       const clock = Number(url.searchParams.get("clock"));
       const testSeconds = url.searchParams.has("clock") && Number.isFinite(clock) && clock > 0 && (await testSwitches(request, env, waitUntil)) ? Math.min(3600, Math.round(clock)) : null;
       // (The first answer also carries the hidden rating, rounded: the bot a player may choose meets them there.)
-      const first = await (await queue()).duelNext(null, { uid: me.id, rating, player, ...(testSeconds ? { testSeconds } : {}) });
+      const first = await (await queue()).duelNext(null, { uid: me.id, rating, rd, player, ...(testSeconds ? { testSeconds } : {}) });
       return json({ ...first, botRating: Math.round(rating) });
     } catch {
       return json({ message: "Couldn't find a match. Try again." }, 500);

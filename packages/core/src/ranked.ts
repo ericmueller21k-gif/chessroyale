@@ -142,15 +142,18 @@ export function rankView(row: { games: number; ladder: number | null } | null | 
 }
 
 /**
- * The rank points a game gives (after placements): +win, 0 or −loss, plus perRating × (hidden rating after the game −
- * the ladder's rating), that adjustment within ±maxAdjust (a draw: half of it). So wins give 10-30 and losses take
- * 10-30, and a rank below its player's play climbs faster.
+ * The rank points a game gives (after placements): 2 × perGame × (score − the expected score), so ±perGame between
+ * equals, more for beating a stronger player and less for beating a weaker one (Elo's rule, on the ladder); plus
+ * perRating × (hidden rating after the game − the ladder's rating), that adjustment within ±maxAdjust (a draw: half of
+ * it), so a rank below its player's play climbs faster and ranks settle where the hidden rating says. A win never
+ * takes points and a loss never gives them.
  */
-export function pointsFor(score: number, ratingAfter: number, ladder: number, s: Settings = RANKED_1V1): number {
+export function pointsFor(score: number, expected: number, ratingAfter: number, ladder: number, s: Settings = RANKED_1V1): number {
   const p = s.points;
   const adjust = Math.max(-p.maxAdjust, Math.min(p.maxAdjust, p.perRating * (ratingAfter - ladderRating(ladder, s))));
-  const base = score >= 1 ? p.win : score <= 0 ? -p.loss : 0;
-  return Math.round(base + (score > 0 && score < 1 ? adjust / 2 : adjust));
+  const draw = score > 0 && score < 1;
+  const points = Math.round(2 * p.perGame * (score - expected) + (draw ? adjust / 2 : adjust));
+  return score >= 1 ? Math.max(0, points) : score <= 0 ? Math.min(0, points) : points;
 }
 
 /** A player's ranked record (one row of ranked_1v1). */
@@ -196,7 +199,9 @@ export const ratingNow = (r: RankedRecord, now: number, s: Settings = RANKED_1V1
  * the hidden rating; after them, the game's rank points, never below Iron 4 0.
  */
 export function rankedGame(me: RankedRecord, opp: RankedRecord, score: number, now: number, s: Settings = RANKED_1V1): { next: RankedRecord; change: RankChange } {
-  const hidden = glickoUpdate(ratingNow(me, now, s), ratingNow(opp, now, s), score, s);
+  const mine = ratingNow(me, now, s);
+  const theirs = ratingNow(opp, now, s);
+  const hidden = glickoUpdate(mine, theirs, score, s);
   const games = me.games + 1;
   const counts = { wins: me.wins + (score >= 1 ? 1 : 0), losses: me.losses + (score <= 0 ? 1 : 0), draws: me.draws + (score > 0 && score < 1 ? 1 : 0) };
   let ladder = me.ladder;
@@ -208,7 +213,7 @@ export function rankedGame(me: RankedRecord, opp: RankedRecord, score: number, n
       placed = true;
     }
   } else {
-    points = pointsFor(score, hidden.rating, ladder, s);
+    points = pointsFor(score, expectedScore(mine, theirs), hidden.rating, ladder, s);
     ladder = Math.max(0, ladder + points);
   }
   const next: RankedRecord = { rating: hidden.rating, rd: hidden.rd, games, ...counts, ladder, lastAt: now };
@@ -217,16 +222,20 @@ export function rankedGame(me: RankedRecord, opp: RankedRecord, score: number, n
 
 // ---------------- Pairing ----------------
 
-/** How far apart two ratings may be after waiting `waitedMs` (the longer of the two waits). */
-export function pairRange(waitedMs: number, s: Settings = RANKED_1V1): number {
-  return Math.min(s.match.maxRange, s.match.startRange + (s.match.perSecond * Math.max(0, waitedMs)) / 1000);
+/** How far apart two ratings may be after waiting `waitedMs` (the longer of the two waits), the less certain of the two deviations `rd`. */
+export function pairRange(waitedMs: number, rd = 0, s: Settings = RANKED_1V1): number {
+  return Math.min(s.match.maxRange, s.match.startRange + (s.match.perSecond * Math.max(0, waitedMs)) / 1000 + s.match.perRd * Math.max(0, rd));
 }
 
-/** One player in the queue, as pairing needs them: their account, hidden rating and when they started waiting. */
+/**
+ * One player in the queue, as pairing needs them: their account, hidden rating (and its deviation, if known) and when
+ * they started waiting.
+ */
 export interface PairingEntry {
   id: string;
   uid: string;
   rating: number;
+  rd?: number;
   at: number;
 }
 
@@ -244,7 +253,7 @@ export function pairUp<T extends PairingEntry>(entries: readonly T[], now: numbe
     for (const b of waiting) {
       if (b === a || taken.has(b.id) || b.uid === a.uid) continue;
       const gap = Math.abs(a.rating - b.rating);
-      if (gap > pairRange(now - Math.min(a.at, b.at), s)) continue;
+      if (gap > pairRange(now - Math.min(a.at, b.at), Math.max(a.rd ?? 0, b.rd ?? 0), s)) continue;
       if (!best || gap < Math.abs(a.rating - best.rating)) best = b;
     }
     if (!best) continue;

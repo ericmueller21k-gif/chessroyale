@@ -142,19 +142,43 @@ describe("the ladder", () => {
     expect(rankView({ games: 5, ladder: placeLadder(3000) }).label).toBe("Diamond 4 · 0 RP");
   });
 
-  it("rank points: 20 at par, more when the hidden rating is above the rank, within 10-30", () => {
+  it("rank points: ±20 between equals at par; more when the hidden rating is above the rank (within ±10)", () => {
     const par = ladderRating(1200);
-    expect(pointsFor(1, par, 1200)).toBe(20);
-    expect(pointsFor(0, par, 1200)).toBe(-20);
-    expect(pointsFor(0.5, par, 1200)).toBe(0);
-    expect(pointsFor(1, par + 100, 1200)).toBe(25);
-    expect(pointsFor(0, par + 100, 1200)).toBe(-15);
-    expect(pointsFor(0.5, par + 100, 1200)).toBe(3);
-    expect(pointsFor(1, par + 1000, 1200)).toBe(30);
-    expect(pointsFor(0, par + 1000, 1200)).toBe(-10);
-    expect(pointsFor(1, par - 1000, 1200)).toBe(10);
-    expect(pointsFor(0, par - 1000, 1200)).toBe(-30);
-    expect(pointsFor(0.5, par - 1000, 1200)).toBe(-5);
+    expect(pointsFor(1, 0.5, par, 1200)).toBe(20);
+    expect(pointsFor(0, 0.5, par, 1200)).toBe(-20);
+    expect(pointsFor(0.5, 0.5, par, 1200)).toBe(0);
+    expect(pointsFor(1, 0.5, par + 100, 1200)).toBe(25);
+    expect(pointsFor(0, 0.5, par + 100, 1200)).toBe(-15);
+    expect(pointsFor(0.5, 0.5, par + 100, 1200)).toBe(3);
+    expect(pointsFor(1, 0.5, par + 1000, 1200)).toBe(30);
+    expect(pointsFor(0, 0.5, par + 1000, 1200)).toBe(-10);
+    expect(pointsFor(1, 0.5, par - 1000, 1200)).toBe(10);
+    expect(pointsFor(0, 0.5, par - 1000, 1200)).toBe(-30);
+    expect(pointsFor(0.5, 0.5, par - 1000, 1200)).toBe(-5);
+  });
+
+  it("rank points follow the expected result: beating someone stronger pays more, someone weaker less; a win never takes points", () => {
+    const par = ladderRating(1200);
+    expect(pointsFor(1, 0.25, par, 1200)).toBe(30);
+    expect(pointsFor(0, 0.25, par, 1200)).toBe(-10);
+    expect(pointsFor(1, 0.75, par, 1200)).toBe(10);
+    expect(pointsFor(0, 0.75, par, 1200)).toBe(-30);
+    expect(pointsFor(0.5, 0.25, par, 1200)).toBe(10);
+    // Far above your play, beating someone far weaker: nothing (never a loss of points); losing to them: plenty.
+    expect(pointsFor(1, 0.97, par - 1000, 1200)).toBe(0);
+    expect(pointsFor(0, 0.97, par - 1000, 1200)).toBe(-49);
+    // Far below your play, losing to someone far stronger: nothing taken.
+    expect(pointsFor(0, 0.03, par + 1000, 1200)).toBe(0);
+  });
+
+  it("a rank can't be farmed by beating far weaker players: it stops where the hidden rating says", () => {
+    // Beating the same far weaker player again and again: the ladder climbs only until it's level with the hidden
+    // rating (which barely moves for such wins), then stays.
+    let me = settled(1200);
+    const weak = settled(400);
+    for (let i = 0; i < 300; i++) me = rankedGame(me, weak, 1, DAY + i * 60_000).next;
+    expect(ladderRating(me.ladder!)).toBeLessThan(me.rating + 50);
+    expect(me.ladder!).toBeLessThan(1700);
   });
 });
 
@@ -235,6 +259,22 @@ describe("pairing by the hidden rating", () => {
     expect(pairRange(10_000)).toBe(200);
     expect(pairRange(45_000)).toBe(550);
     expect(pairRange(10 * 60_000)).toBe(1000);
+  });
+
+  it("an uncertain rating (placements) widens it by the larger deviation, so two new players after one game still meet", () => {
+    expect(pairRange(0, 60)).toBe(160);
+    expect(pairRange(0, 300)).toBe(400);
+    expect(pairRange(10 * 60_000, 350)).toBe(1000);
+    // One game apart: the winner up, the loser down, both still uncertain. They meet at once.
+    const a = newRankedRecord(null);
+    const won = rankedGame(a, a, 1, 0).next;
+    const lost = rankedGame(a, a, 0, 0).next;
+    const now = 100_000;
+    expect(won.rating - lost.rating).toBeGreaterThan(200);
+    const e = (id: string, r: typeof won) => ({ id, uid: id, rating: r.rating, rd: r.rd, at: now });
+    expect(pairUp([e("w", won), e("l", lost)], now)).toHaveLength(1);
+    // Settled players 250 apart still wait for the range to widen.
+    expect(pairUp([{ id: "a", uid: "a", rating: 1500, rd: 60, at: now }, { id: "b", uid: "b", rating: 1750, rd: 60, at: now }], now)).toEqual([]);
   });
 
   it("the longest wait first, with the closest rating in range; never yourself", () => {

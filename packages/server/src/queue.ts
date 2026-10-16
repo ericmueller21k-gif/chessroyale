@@ -41,13 +41,13 @@ export interface MatchRules {
 export const FILL_IN_ORDER: MatchRules = { group: (tickets) => (tickets.length ? [{ key: "all", tickets }] : []) };
 
 /**
- * Ranked 1 v 1: pairs by the hidden rating (each ticket's `info.uid` and `info.rating`, read by the server), the range
- * widening with the wait (core's pairUp): each pair is a group of its own (a game). Tickets without a partner yet stay
- * in line, in order, for the next batch.
+ * Ranked 1 v 1: pairs by the hidden rating (each ticket's `info.uid`, `info.rating` and `info.rd`, read by the server),
+ * the range widening with the wait and the ratings' uncertainty (core's pairUp): each pair is a group of its own (a
+ * game). Tickets without a partner yet stay in line, in order, for the next batch.
  */
 export const PAIR_BY_RATING: MatchRules = {
   group(tickets, now) {
-    const entries = tickets.map((t) => ({ id: t.id, uid: String(t.info?.uid ?? t.id), rating: Number(t.info?.rating) || 1500, at: t.at, t }));
+    const entries = tickets.map((t) => ({ id: t.id, uid: String(t.info?.uid ?? t.id), rating: Number(t.info?.rating) || 1500, rd: Number(t.info?.rd) || 0, at: t.at, t }));
     return pairUp(entries, now).map(([a, b]) => ({ key: `duel:${a.id}`, tickets: [a.t, b.t] }));
   },
 };

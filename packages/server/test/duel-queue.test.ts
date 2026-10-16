@@ -13,7 +13,7 @@ const cfg = (patch: Partial<QueueConfig> = {}): QueueConfig => ({ admitPerSecond
 const T0 = 1_800_000_000_000;
 let ids = 0;
 const nextId = () => `t${++ids}`;
-const info = (uid: string, rating: number) => ({ uid, rating, player: { uid, name: uid, look: null, rank: rankView(null) } satisfies DuelPlayerView });
+const info = (uid: string, rating: number, rd?: number) => ({ uid, rating, ...(rd === undefined ? {} : { rd }), player: { uid, name: uid, look: null, rank: rankView(null) } satisfies DuelPlayerView });
 
 describe("pairing in the queue (PAIR_BY_RATING)", () => {
   it("close ratings pair at once; far ones only once the range has widened; the rest keep their place", () => {
@@ -31,6 +31,13 @@ describe("pairing in the queue (PAIR_BY_RATING)", () => {
     expect(groups).toHaveLength(1);
     expect(groups[0]!.tickets.map((t) => t.info?.uid)).toEqual(["a", "b"]);
     expect(q.waiting).toBe(0);
+  });
+
+  it("uncertain ratings (each ticket's rd) meet sooner: 300 apart with deviations near 300 pair at once", () => {
+    const q = new QueueCore(cfg(), T0, nextId);
+    q.enqueue(null, T0, info("a", 1500, 290));
+    q.enqueue(null, T0, info("b", 1800, 60));
+    expect(q.admit(T0, 0, PAIR_BY_RATING)).toHaveLength(1);
   });
 
   it("an account is in line once: a second press (another tab) is the same ticket, never paired with itself", () => {

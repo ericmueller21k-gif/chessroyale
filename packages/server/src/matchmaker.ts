@@ -36,7 +36,7 @@ export interface PlayOptions {
    */
   squads?: boolean;
   /**
-   * Ranked 1 v 1: tickets are single players, `info` { uid, rating, name, look, rank, testSeconds } (read by the
+   * Ranked 1 v 1: tickets are single players, `info` { uid, rating, rd, player, testSeconds } (read by the
    * server), paired by rating (PAIR_BY_RATING); each pair gets a game of its own (a DuelGame object).
    */
   duel?: boolean;
