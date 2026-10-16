@@ -41,18 +41,29 @@ Each over and the first line searched again together, as the re-check does: the 
 | another top-8 line | 108 | 41.7% | 70.4% | 15.7% | 9.3% | -0.25 | 39.8% | 23.1% |
 | all | 110 | 41.8% | 70.0% | 16.4% | 10.0% | -0.25 | 40.0% | 23.6% |
 
-## What each rule charges, against the server's stand-in
+## What each rule charges
 
-Every over, against what the full-network search (2M nodes, like for like) says each move gave away: the first line its deep gap if the over is better, the over minus the deep gap if the first line is. The quick numbers charge the first line's pickers the quick gap and the over's nothing (today, and the promoted rule without a re-check: the same numbers). A re-check searches the two together on the device (lite, 700k nodes) and charges what it says. Promoted, the first line is an ordinary pick, so it's re-checked when its loss is in the re-check's range: from 5 points (`recheckLoss`), or from 1 for a player near the cut line (`recheckCutLoss`); the engine's first line never was (it was the anchor). Mean error in points; "2+ off": the share of overs where a side was charged 2 points or more away from the deep search.
+Per position with a pick above the first line (F), its highest such pick P. The truth: the full-network search at 2M nodes (the engine server's stand-in), F and P like for like. F's pickers should pay the deep gap if P is better, P's pickers minus it if F is. A re-check searches F and P together: on a device (the lite build at 700k nodes), or online on the engine server (the stand-in itself, so no error once re-checked). "Other re-checked picks": in positions where the re-check runs anyway (some other pick is a close call), every pick it re-checks (X) is put on the quick scale through the re-check's anchor. Its error against the same deep search's best: main anchors on F but measures losses from P's quick number (X overcharged by the quick gap, less any real gap); this PR's first version anchored on P (X undercharged when the deep search finds F better); anchored on F with P re-checked alongside, X is measured from the deep search's best (no error). Positions searched: where a re-check runs (some pick is a close call, or F's pickers lose 5+ points to P). Near the cut line F's 1+ points count too (not modeled here).
 
-| Rule | Overs re-checked | First line's pickers: mean error | Over's pickers: mean error | 2+ off |
+Re-checked by a device (lite, 700k nodes), 90 positions:
+
+| Rule | F's pickers: mean error | P's pickers: mean error | Other re-checked picks: mean error (mean of its size) | Positions searched |
 | --- | ---: | ---: | ---: | ---: |
-| The quick numbers (today; promoted without a re-check) | 0% | 1.48 | 2.10 | 25% |
-| Promoted, the first line re-checked from 5 points | 3% | 1.12 | 2.04 | 25% |
-| Promoted, near the cut line (from 1 point) | 35% | 0.66 | 1.95 | 29% |
-| Every over re-checked against the first line | 100% | 0.66 | 1.78 | 37% |
+| Main: anchored on F, P never re-checked (labels named after) | 1.63 | 2.47 | 0.73 (1.14) | 43 |
+| This PR's first version: anchored on P, F re-checked from 5 points | 1.19 | 2.40 | -1.24 (1.24) | 45 |
+| Anchored on F, P re-checked with any re-check (chosen) | 0.92 | 2.51 | 0.00 (0.00) | 45 |
+| Every such P re-checked, a search of its own if need be | 0.65 | 2.06 | 0.00 (0.00) | 90 |
 
-(110 overs; the quick gap is 5+ points in 3% of them, 1+ in 35%.)
+Re-checked by the engine server (its stand-in, full network, 2M nodes), 90 positions:
+
+| Rule | F's pickers: mean error | P's pickers: mean error | Other re-checked picks: mean error (mean of its size) | Positions searched |
+| --- | ---: | ---: | ---: | ---: |
+| Main: anchored on F, P never re-checked (labels named after) | 1.63 | 2.47 | 0.09 (1.49) | 43 |
+| This PR's first version: anchored on P, F re-checked from 5 points | 1.19 | 2.19 | -1.60 (1.60) | 45 |
+| Anchored on F, P re-checked with any re-check (chosen) | 0.59 | 1.43 | 0.00 (0.00) | 45 |
+| Every such P re-checked, a search of its own if need be | 0.00 | 0.00 | 0.00 (0.00) | 90 |
+
+Online the engine server re-checks, so there a re-check is about right whatever it searches: what argues against searching every such pick is the server's daily budget, not accuracy. On a device the re-check is noisy at this scale too. With several picks above F (11 of 90 positions), F's pickers are charged the largest gap.
 
 ## The exchange check
 

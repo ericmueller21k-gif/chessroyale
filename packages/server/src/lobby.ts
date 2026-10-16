@@ -2518,9 +2518,12 @@ export class LobbyCore {
         const flagged = recheckTargets(b, [...t.job.picks, ...b.botPicks], this.settings, sj?.priority ?? []);
         const checked = applyRecheck(b, flagged, moves);
         t.done = { ...t.done, board: { ...b, bestMove: checked.bestMove, bestExpected: checked.bestExpected, expectedAfter: checked.expectedAfter, rechecked: checked.rechecked } };
-        // Two devices' re-checks disagreed: the one further from the server's (by blameMargin) is struck.
+        // Two devices' re-checks disagreed: the one further from the server's (by blameMargin) is struck. Only a re-check
+        // that searched every move this one did is compared: an older app's leaves out a pick scored above the first line
+        // (docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md), and an honest device isn't struck for that.
         if (t.deepBoards) {
-          const ids = Object.keys(t.deepBoards).filter((j) => t.deepBoards![j]);
+          const whole = (j: string) => [b.bestMove, ...flagged].every((m) => t.deepReports?.[j]?.some((x) => x?.move === m));
+          const ids = Object.keys(t.deepBoards).filter((j) => t.deepBoards![j] && whole(j));
           if (ids.length === 2) {
             const { blamed, distances } = blameJudge(t.done.board, ids.map((j) => t.deepBoards![j]!), this.jcfg.blameMargin, this.jcfg.soloBlame);
             for (const i of blamed) this.strike(ids[i]!, `re-check on ${t.job.id} ${distances[i]!.toFixed(1)} points off the engine server's`);

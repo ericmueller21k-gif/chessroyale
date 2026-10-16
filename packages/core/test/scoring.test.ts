@@ -111,6 +111,8 @@ describe("checks from the spec", () => {
     // Only picks count: a move nobody picked (e) leaves the best alone, as it leaves the losses.
     expect(bestOf(ev, ["a"]).bestMove).toBe("a");
     expect(bestOf(ev, ["zz"]).bestMove).toBe("a");
+    // The same move with a higher number than the one given as the best's: its own number (never a stale one).
+    expect(bestOf({ bestExpected: 0.5, bestMove: "a", expectedAfter: { a: 0.55, b: 0.52 } }, ["a", "b"])).toEqual({ bestExpected: 0.55, bestMove: "a", expectedAfter: { a: 0.55, b: 0.52 } });
     // The losses are measured from the same number, so the best's pickers are never charged.
     const best = bestOf(ev, ["a", "b"]);
     const r = scoreGroup([{ playerId: "p", move: "a" }, { playerId: "q", move: "b" }], best, mulberry32(1));

@@ -1365,7 +1365,10 @@ export const JUDGES: JudgeConfig = {
    * judging a board, they re-check its close calls themselves, and the engine server is asked only when they
    * disagree or are late. OFF: the browsers' engine (the lite network) re-checks less accurately than the engine
    * server (reports/deep-accuracy.md: unfair cuts of top-quarter players 0.63% against 0.37%), and Eric's rule puts
-   * fair scoring first. On only with an engine on the devices as good as the server's.
+   * fair scoring first. On only with an engine on the devices as good as the server's. (A device's re-check that leaves
+   * out a move the board's re-check covers, as an app from before Oct 16 leaves out a pick above the first line, is never
+   * blamed: the server's numbers decide, and a device could use that to dodge blame. Revisit before turning this on:
+   * docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md.)
    */
   deepOnDevices: false,
   /** The re-check's node count at most: the engine server's (shared by the round's boards, as the server's is). */

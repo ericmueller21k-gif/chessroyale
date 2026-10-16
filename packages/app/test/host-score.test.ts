@@ -4,8 +4,8 @@ import { judgedBoard, legalMoves, runJudgeJob, type BoardScore, type ClientMessa
 import { NetMatch } from "../src/net.ts";
 
 /**
- * The host's scoring (online with fewer than two judges): a pick scored above the engine's first line is the best move,
- * exactly as the judges and solo name it (docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md).
+ * The host's scoring (online with fewer than two judges): a pick scored above the engine's first line is re-checked with
+ * it, exactly as the judges and solo do (docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md).
  *
  * The stand-in engine: the top-8 search lists the first 8 legal moves (the first line 0.50, then 0.49, ...); the second
  * search scores the last legal move 0.58, above the first line; the re-check's numbers are the quick ones unless
@@ -37,18 +37,21 @@ async function hostBoard(e: EngineLike, serverRecheck = false): Promise<BoardSco
 }
 
 describe("the host's board", () => {
-  it("names the pick above the engine's first line the best, with or without its own re-check", async () => {
-    for (const serverRecheck of [false, true]) {
-      const b = await hostBoard(engine(), serverRecheck);
-      expect(b.bestMove).toBe(OVER);
-      expect(b.bestExpected).toBe(0.58);
-    }
+  it("re-checks the pick above the first line with it (the anchor): held up, it's the best; with the server to re-check, the first line and the numbers go as they are", async () => {
+    const checked = await hostBoard(engine());
+    expect(checked.bestMove).toBe(OVER);
+    expect(checked.bestExpected).toBeCloseTo(0.58, 9);
+    // (The engine server re-checks on the Worker, anchored the same way; resolveBoard names the best.)
+    const quick = await hostBoard(engine(), true);
+    expect(quick.bestMove).toBe(FIRST);
+    expect(quick.expectedAfter[OVER]).toBe(0.58);
   });
 
-  it("re-checks the first line against it, like for like: the better one is the best", async () => {
+  it("like for like, the first line is a point better: it stays the best, and the pick above it loses a point", async () => {
     const b = await hostBoard(engine({ [FIRST]: 0.55, [OVER]: 0.54 }));
     expect(b.bestMove).toBe(FIRST);
-    expect(b.bestExpected).toBeCloseTo(0.59, 9);
+    expect(b.bestExpected).toBe(0.5);
+    expect(b.expectedAfter[OVER]).toBeCloseTo(0.49, 9);
   });
 
   it("is the board two judges work out from the same searches", async () => {

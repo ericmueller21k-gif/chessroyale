@@ -65,11 +65,12 @@ export interface GroupResult {
 }
 
 /**
- * The board's best move: the engine's choice, unless a pick scored above it, which then is the best (the highest-scored
- * such pick; a tie keeps the engine's choice, and between equal picks the first by name). Every loss is measured from
- * the highest number (moveLosses), so the move that has it is the best everywhere: the reveal, the God King's move, the
- * exchange check and the re-check's anchor. Every judge runs this on the same numbers, so they agree exactly
- * (docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md).
+ * The board's best move: the judge's best (the top moves' first line, or what the re-check made best), unless a pick
+ * scored above it, which then is the best (the highest-scored pick; a tie keeps the judge's best, and between equal
+ * picks the first by name). Every loss is measured from the highest number (moveLosses), so the move that has it is the
+ * best everywhere: the reveal, the God King's move and the exchange check. The runner's resolveBoard names it on every
+ * path, after any re-check (recheckTargets weighs a pick above the first line against it like for like first).
+ * docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md
  */
 export function bestOf<E extends GroupEvaluation>(evaluation: E, picks: readonly (string | null | undefined)[]): E {
   let { bestMove, bestExpected } = evaluation;
@@ -77,7 +78,7 @@ export function bestOf<E extends GroupEvaluation>(evaluation: E, picks: readonly
     const e = m ? evaluation.expectedAfter[m] : undefined;
     if (e !== undefined && e > bestExpected) [bestMove, bestExpected] = [m!, e];
   }
-  return bestMove === evaluation.bestMove ? evaluation : { ...evaluation, bestMove, bestExpected };
+  return bestMove === evaluation.bestMove && bestExpected === evaluation.bestExpected ? evaluation : { ...evaluation, bestMove, bestExpected };
 }
 
 /**

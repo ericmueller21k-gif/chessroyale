@@ -1,25 +1,39 @@
 # The best move is the highest-scored pick (Oct 16, 2026)
 
-The judge called the first line of its top-8 search the best move, but measured every loss from the highest number
-among that move and the picks. When a pick scored above the first line, the two disagreed. The flaky-test helper found
-it in an online Crowd boss final (docs/decisions/2026-10-16-flaky-e2e-batch-2.md): the player picked Qe2, the round's
-`bestMove` was Qe2, and the loss was 7.55 (5.55 counted after the opening allowance). The reveal said "you found the
-best move, Qe2" while charging 7.55 points. The first line was also the re-check's anchor, so it could never be
-re-checked, whatever it lost. The God King played it, and the exchange check measured against it.
+The judge named the first line of its top-8 search (F) as the best move, but measured every loss from the highest number
+among F and the picks. When a pick (P) scored above F, the two disagreed. The flaky-test helper found it in an online
+Crowd boss final (docs/decisions/2026-10-16-flaky-e2e-batch-2.md): the player picked Qe2, the round's `bestMove` was
+Qe2, and the loss was 7.55 (5.55 counted after the opening allowance). So the reveal said "you found the best move, Qe2"
+while charging 7.55 points. F was also never re-checked, whatever it lost, because it was the re-check's anchor. The God
+King played F, and the exchange check measured against it.
 
-**The rule now:** the best move is the highest-scored of the engine's first line and the picks (`bestOf` in
-`packages/core/src/scoring.ts`). A tie keeps the engine's choice; between equal picks, the first by name. Every loss is
-measured from the same number as before, so no loss changes. What changes is which move is called the best, and so:
-the reveal and the dock, the God King's move, the exchange check's reference, and the re-check's anchor. The first line
-is now an ordinary pick, re-checked like any other when its loss is in range (5 to 60 points, or 1 to 60 for a player
-near the cut line).
+**The rule now:**
+
+- **The best move is the highest-scored pick** when one scored above the judge's best (`bestOf` in
+  `packages/core/src/scoring.ts`). A tie keeps the judge's best; between equal picks, the first by name wins.
+  `MatchRunner.resolveBoard` names it on every path (solo, the host, the judges, an older app's numbers), so the reveal
+  and the dock, the God King's move and the exchange check all follow the move every loss is measured from.
+- **The re-check weighs P against F, like for like, before it counts** (`recheckTargets` in
+  `packages/chess/src/runner.ts`). The re-check stays anchored on F. P is searched with any re-check that runs, on top
+  of the usual picks, and it starts one when F's pickers lose to it within the re-check's range (5+ points, or 1+ for a
+  player near the cut line).
+- **What changes:** the quick losses don't change, because they were already measured from P's number. Where a re-check
+  runs in these positions, its numbers do:
+  - P gets a deep number, and is the best only if it holds up against F.
+  - Every other pick it re-checks (X) is now measured from the deep search's best. Before, X was put on the scale through
+    F's deep number but charged from P's quick number, so X was overcharged by the quick gap, less any real gap: 0.73
+    points on average against a device's re-check.
+  - The first version of this change anchored on P instead, which undercharged X whenever F was really better (1.24
+    points on average; the reviewer's example). Neither is left.
 
 ## How often, and is it real (`reports/best-move-gap.md`)
 
-`packages/sim/scripts/best-move-gap.ts` played 60 games (3,204 positions) through the judge's own code at its own
-budget (the lite build, 250k nodes): 40 Crowd 50 v 50 games from the start (the team's bots picking from the job's
-seed, plus two people: one plays the first line, one a decent player with a 15% chance of a random move), and 20
-Classic-like groups of 8 with a random draw.
+`packages/sim/scripts/best-move-gap.ts` played 60 games (3,204 positions) through the judge's own code at its own budget
+(the lite build, 250k nodes):
+
+- 40 Crowd 50 v 50 games from the start: the team's bots pick from the job's seed, plus two people (one plays F, one a
+  decent player with a 15% chance of a random move);
+- 20 Classic-like groups of 8, the move drawn at random.
 
 | | Crowd | Classic-like | All |
 | --- | ---: | ---: | ---: |
@@ -29,76 +43,88 @@ Classic-like groups of 8 with a random draw.
 | Above it by 1+ point / 5+ points | 1.0% / 0.1% | 0.8% / 0.0% | 1.0% / 0.1% |
 
 - **Nearly all of them come from the top-8 search itself.** A line not searched again at the budget's last depth keeps
-  the previous depth's score, so a later line can come out above the first (the Oct 6 lesson, "the engine's first
-  line"). The second search almost never does it: 2 of the 1,224 picks it scored. The bots' random moves are almost
-  always worse than the first line. So the brief's guess (most Crowd rounds have one, from bots' random moves) didn't
-  hold. The bug is real, but its source is different, and one rule covers both.
-- **By how much:** a median of 0.55 points (p90 2.4, at most 17.2).
-- **Is the higher number real?** Each one was searched again together with the first line, like for like, by the full
-  network at 2M nodes (the engine server's stand-in). The pick was at least as good in 42%, within a point in 70%, and
-  worse by 2+ points in 16% (by 5+ in 10%). The median difference was −0.25 points. That's noise around zero, not a
-  search that inflates weak moves. Promoting these picks changes no score: losses were already measured from them.
+  the previous depth's score, so a later line can come out above F (the Oct 6 lesson, "the engine's first line").
+- **The second search almost never does it:** 2 of the 1,224 picks it scored. The bots' random moves are almost always
+  worse than F.
+- **By how much:** a median of 0.55 points (p90 2.4, at most 17.2). With several picks above F (11 of 90 positions),
+  F's pickers are charged the largest gap.
+- **Is the higher number real?** Each P was searched again together with F, like for like, by the full network at 2M
+  nodes (the engine server's stand-in). P was at least as good in 42%, within a point in 70%, and worse by 2+ points in
+  16% (by 5+ in 10%). The median difference was −0.25 points: noise around zero.
 
-## Why this rule, not "re-check such a pick first"
+## The rule, against the others
 
-The other rule was to re-check every pick above the first line against it before it counts. Against the server's
-stand-in (110 cases):
+90 positions with a P. The truth is the server's stand-in. Each pair of numbers is a device's re-check / the engine
+server's.
 
-| Rule | Re-checked | First line's pickers: mean error | Pick above it: mean error | 2+ points off |
+| Rule | F's pickers: mean error | P's pickers | Other re-checked picks (mean, signed) | Positions searched |
 | --- | ---: | ---: | ---: | ---: |
-| The quick numbers (before, and promoted without a re-check) | 0% | 1.48 | 2.10 | 25% |
-| Promoted: the first line re-checked from 5 points, like any pick | 3% | 1.12 | 2.04 | 25% |
-| Promoted, a player near the cut line (from 1 point) | 35% | 0.66 | 1.95 | 29% |
-| Every such pick re-checked | 100% | 0.66 | 1.78 | 37% |
+| Before: anchored on F, P never re-checked | 1.63 / 1.63 | 2.47 / 2.47 | +0.73 / +0.09 | 43 |
+| This PR's first version: anchored on P, F re-checked from 5 points | 1.19 / 1.19 | 2.40 / 2.19 | −1.24 / −1.60 | 45 |
+| **Anchored on F, P re-checked with any re-check (chosen)** | 0.92 / 0.59 | 2.51 / 1.43 | 0 / 0 | 45 |
+| Every P re-checked, with a search of its own if need be | 0.65 / 0 | 2.06 / 0 | 0 / 0 | 90 |
 
-- Re-checking every such pick gains under a point on average, and makes large misses more common, because a device's
-  re-check is noisy at this scale too. It would also need a new re-check condition and more searches (online, on the
-  engine server's daily budget).
-- Promoted, the pick gets the treatment every other close call gets. The judge already accepts quick-search noise
-  under 5 points for every pick. The re-check reaches the first line where it matters: big gaps, and the cut line's
-  1-point range. Eric: "easier code and less lag over all else, fewer bug risks".
+- **The chosen rule** removes the error on every other re-checked pick and roughly halves F's on the server. It needs
+  no more searches than the first version: in 43 of its 45, a re-check was running anyway.
+- **Re-checking every such pick** would be exact online, where the engine server re-checks. So the argument against it
+  isn't accuracy; it's the extra searches:
+  - one of its own in half these positions, about 1.4% of rounds with a person;
+  - online they come out of the server's daily budget, otherwise out of device time;
+  - it would treat a gap under 5 points differently from every other pick's, which the judge accepts unchecked (a
+    sound move costs a point or two).
 
-## Where it applies
+  It's one condition in `recheckTargets` if wanted.
+- **Rejected: the first version's anchor on P.** Every other pick it re-checked was measured against P's deep number,
+  and P often isn't really the best. The review's example: quick F 0.50, P 0.52, X 0.40; deep F 0.55, P 0.54, X 0.45.
+  X loses 10 to the deep best, F. That was 12 before this change, 9 in the first version, and is 10 now.
 
-There is one function, called where each judge first puts a board's numbers together:
+## Every judge, every app version
 
-- the runner's `scoreBoard` (solo);
-- `baseBoard` in `judge.ts`: each device's judged board, the lobby's check of it, and its re-check targets;
-- `hostScore` in `net.ts` (the host);
-- `recheckCloseCalls`, so the engine server's re-check of a host's numbers is anchored on it too;
-- `resolveBoard`, the final numbers, so a host on an older app still gets it right.
-
-Every judge runs it on the same numbers, so they still agree exactly (`JUDGES.tolerance` stays 0, and `boardsAgree`
-compares `bestMove`). The quick report a device sends is unchanged; only what's worked out from it changes. So an older
-app's report agrees with a new one's. An older device's own deep re-check is anchored on the first line, so when the
-anchor differs it adds nothing (`applyRecheck` keeps the quick numbers). Devices only re-check with no engine server,
-or with deep checks on, which ships off.
-
-- **The God King** plays the best move, now the highest-scored pick. That's the move the reveal names. It's within a
-  point of the first line in 70% of cases. When the first line was picked and the gap is in the re-check's range, the
-  re-check settles it first.
-- **The exchange check** (the opening allowance's material fallback) now measures against the best move. There were 40
-  such picks while an allowance applied. The first line gave up material against the pick in none of them, so no
-  allowance was lost in the data.
+- **One choice everywhere.** `recheckTargets` is what every judge runs: devices, the host, the engine server's re-check
+  of a host's numbers, and the lobby's check of a device's re-check. `bestOf` runs only in `resolveBoard`. So judges
+  agree exactly, as before (`JUDGES.tolerance` 0). `boardsAgree` compares the judges' boards, whose best is still F
+  before any re-check.
+- **The quick report a device sends is unchanged,** so an older app's report agrees with this one's. That covers the
+  shipped configuration: engine server up, devices don't re-check.
+- **Where devices re-check** (no engine server, or deep checks on computers, which ships off), an older app's re-check
+  leaves P out:
+  - **No engine server:** the two re-checks disagree and the quick numbers stand. An older app whose own list came out
+    empty sends none, so the round waits `deepWaitMs` for it, then takes the other device's.
+  - **Deep checks on, engine server up:** the server re-checks. The lobby only blames a device whose re-check covered
+    every move the board's re-check does, so an honest older app is never struck for leaving P out.
+  - **The catch:** a device that leaves a move out on purpose escapes blame for it, but the server's numbers decide and
+    it costs a server search. That's acceptable while deep checks ship off; revisit before turning them on.
+- **The God King** plays the best move: after any re-check, the highest-scored pick, the move the reveal names. It's
+  within a point of F in 70% of cases. Where a re-check ran, P was weighed against F first. Without one it can be a
+  little weaker than F (about 0.26% of the King's moves); consistency with the reveal wins (director, Oct 16).
+- **The exchange check** (the opening allowance's material fallback) measures against the best move. Of the 40 such
+  picks while an allowance applied, F gave up material against P in none, so no allowance was lost.
 - **Sims:** bot-only matches don't change: with no person there's no re-check, and every loss is the same.
   `crowd-sim.ts` over 2 matches gave identical output before and after.
 - **Before → after:** a reveal that said "you found the best move" while charging points: 2.8% of positions → 0.
 
 ## What players see
 
-- The reveal's "best was X" and the dock's "best X" name the highest-scored pick. In 2.8% of positions that's a
-  different move from before.
+- **The best move named:** the reveal's "best was X" and the dock's "best X" name the highest-scored pick. In 2.8% of
+  positions that's a different move from before.
 - **The boss dock, when your pick is the best** (the director's suggestion): "You: e4 (+2.1) · the best" (it was
-  "You: e4 (+2.1) · best e4"). The reveal's own words, "you found the best move, e4", don't fit the dock's one line.
-  Measured in the dock's own box and font (12 px): "You found the best move, e4 (+0.0)" is 187 px. The room is 175 px
-  at 390 px, 146 at 360 and 112 at 320. "· the best" is within 4 px of the old line for a 2-character move, and
-  narrower for longer ones.
-- The FAQ ("Points"): "if your move scores above the engine's own choice, yours counts as the best move, and the
-  engine's choice is charged against it like any other pick".
+  "You: e4 (+2.1) · best e4").
+  - The reveal's own words, "you found the best move, e4", don't fit the dock's one line.
+  - Measured in its box and font (12 px): "You found the best move, e4 (+0.0)" is 187 px. The room is 175 px at 390
+    wide, 146 at 360 and 112 at 320.
+  - "· the best" is within 4 px of the old line for a 2-character move, and narrower for longer ones.
+- **The FAQ:**
+  - "Points": "if picks score above the engine's own choice, the highest-scored pick counts as the best move, and every
+    other pick, the engine's choice included, is measured against it."
+  - "The deeper re-check": "A pick scored above the engine's own choice is searched again too, alongside it, whenever
+    there's a re-check."
+  - The God King's "Play this move": "he plays the judge's best move for the crowd (stronger than the boss)."
 
 ## Calls I made
 
-- **Only picks are compared, not every scored move.** A line nobody picked is left alone, as the losses leave it, so no
-  loss changes. Fair play's `scored[0]` keeps its own reading (the highest of everything scored).
-- **A tie keeps the engine's choice.** Between equal picks, the first by name, so every judge picks the same one.
+- **Only picks are compared, not every scored move.** A line nobody picked is left alone, as the losses leave it. Fair
+  play's `scored[0]` keeps its own reading (the highest of everything scored).
+- **A tie keeps the judge's best.** Between equal picks, the first by name, so every judge picks the same one.
+- **The picks above F go first in the re-check, on top of `recheckMax`.** They're the anchor's rivals, not close calls
+  competing for a slot.
 - **The dock's wording,** above.

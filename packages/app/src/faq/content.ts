@@ -337,7 +337,7 @@ A move's **loss** is what it gives away compared with the best move in that posi
 
 $ loss = 100 × (expected score after the best move − expected score after your move)
 
-A loss is never below zero: if your move scores above the engine's own choice, yours counts as the best move, and the engine's choice is charged against it like any other pick. Your **round score** then compares you with everyone who picked with you (in 50 v 50, your team):
+A loss is never below zero: if picks score above the engine's own choice, the highest-scored pick counts as the best move, and every other pick, the engine's choice included, is measured against it. Your **round score** then compares you with everyone who picked with you (in 50 v 50, your team):
 
 $ round score = the group's average loss − your loss
 
@@ -367,7 +367,7 @@ Each pick is compared only with the best move **in the position on the board now
 
 ### The deeper re-check {#recheck}
 
-A quick search can now and then misjudge a close call, so close calls get a second, much deeper look (at least ${num(S.recheckNodes)} positions instead of ${num(S.engineNodes)}) before they cost anyone. In every round where a person picked, moves that give away from ${range(S.recheckLoss)} points are searched again, the most-picked first, up to ${n(S.recheckMax, "move")} a board. Online, before a cut, the picks of players within ${n(S.recheckCutPoints, "point")} of the cut line are re-checked first, over ${range(S.recheckCutLoss)} points, up to ${n(S.recheckCutMax, "move")} a board. The deeper numbers replace the quick ones.
+A quick search can now and then misjudge a close call, so close calls get a second, much deeper look (at least ${num(S.recheckNodes)} positions instead of ${num(S.engineNodes)}) before they cost anyone. In every round where a person picked, moves that give away from ${range(S.recheckLoss)} points are searched again, the most-picked first, up to ${n(S.recheckMax, "move")} a board. Online, before a cut, the picks of players within ${n(S.recheckCutPoints, "point")} of the cut line are re-checked first, over ${range(S.recheckCutLoss)} points, up to ${n(S.recheckCutMax, "move")} a board. A pick scored above the engine's own choice is searched again too, alongside it, whenever there's a re-check. The deeper numbers replace the quick ones.
 
 ### Brilliant moves {#brilliant}
 
@@ -743,7 +743,7 @@ The crowd's champion in every boss battle: raids, the Crowd's boss final and Bos
 
 He has up to ${n(S.kingChargesMax, "charge")}. In a raid or Boss alone he starts with ${S.kingChargesMax}. In the Crowd's boss final, the finalists' leftover power-ups become his charges: one for every ${S.kingPowerUpsPerCharge}, rounded, at least ${kingCharges(0, S)} and at most ${S.kingChargesMax}.${finalBoss ? ` There a call only spends one: his help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}).` : ""} Tap him to open his menu:
 
-- **Play this move:** he plays the engine's best move for the crowd, at full strength (stronger than the boss).
+- **Play this move:** he plays the judge's best move for the crowd (stronger than the boss).
 - **Strike the boss:** three bolts on the boss's king, and the boss's next move is one that gives away ${range(S.kingStrikeLoss)} points (never a piece for nothing). One strike a move. It enrages the boss too: ${src.powers.rageStrike} on its [rage meter](#rage-meter) (unless an ultimate is under way; Wrangler's meter is his own, and a strike adds nothing to it).
 
 Either needs **more than half the crowd** to call him. Bots back a person's call ${pct(S.kingBotFollow, 0)} of the time, and call him to play themselves when the crowd's popular move would give away ${n(S.kingBotLoss, "point")} or more. In Boss alone, your call is enough. If you call him to play instead of picking, you sit that turn out: no score either way, and it isn't a miss. The clock stands still while he acts, and a move he plays is never brilliant.

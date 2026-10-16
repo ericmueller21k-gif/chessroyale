@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, openingAllowance, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   boardsAgree,
@@ -9,7 +9,9 @@ import {
   recheckCloseCalls,
   runJudgeJob,
   runQuickJob,
+  moveNumber,
   sanLineToUci,
+  recheckTargets,
   type BoardRound,
   type EngineLike,
   type JudgeJob,
@@ -117,7 +119,7 @@ describe("a pick scored above the engine's first line", () => {
     expect(tie.bestMove).toBe(FIRST);
   });
 
-  it("online: a judge's board names it the best; two judges agree; the re-check is anchored on it and weighs the first line (judgedBoard)", async () => {
+  it("online: two judges agree; their re-check weighs it against the first line (its anchor), like for like (judgedBoard)", async () => {
     const job: JudgeJob = {
       id: "k/0",
       fen: FEN,
@@ -126,21 +128,29 @@ describe("a pick scored above the engine's first line", () => {
       seed: 5,
       rules: { botCandidateMoves: 8, botRandomMoveChance: DEFAULT_SETTINGS.botRandomMoveChance, botPowerUpLoss: DEFAULT_SETTINGS.botPowerUpLoss },
     };
+    // A judge's board keeps the engine's numbers and its first line (the re-check's anchor); resolveBoard names the best.
     const one = judgedBoard(job, await runQuickJob(engine(), job))!;
     const two = judgedBoard(job, await runQuickJob(engine(), job))!;
-    expect(one.bestMove).toBe(OVER);
-    expect(one.bestExpected).toBe(0.58);
+    expect(one.bestMove).toBe(FIRST);
+    expect(one.expectedAfter[OVER]).toBe(0.58);
     expect(boardsAgree(one, two).agree).toBe(true);
-    // With the device's re-check: it searches the first line against the pick above it.
+    // With the device's re-check: the first line loses 8 points to the pick above it (a close call), so that pick is
+    // searched with it.
     const checked = { ...job, recheck: DEFAULT_SETTINGS };
-    expect(deepTargets(checked, await runQuickJob(engine(), checked))).toEqual({ best: OVER, flagged: [FIRST] });
+    expect(deepTargets(checked, await runQuickJob(engine(), checked))).toEqual({ best: FIRST, flagged: [OVER] });
+    // Deeper, the first line is a point better: it stays the best, and the pick above it now loses a point.
     const deeper = engine({ [FIRST]: 0.55, [OVER]: 0.54 });
     const a = judgedBoard(checked, await runJudgeJob(deeper, checked))!;
     const b = judgedBoard(checked, await runJudgeJob(deeper, checked))!;
     expect(a.bestMove).toBe(FIRST);
-    expect(a.bestExpected).toBeCloseTo(0.59, 9);
-    expect(a.rechecked).toEqual([FIRST]);
+    expect(a.bestExpected).toBe(0.5);
+    expect(a.expectedAfter[OVER]).toBeCloseTo(0.49, 9);
+    expect(a.rechecked).toEqual([OVER]);
     expect(boardsAgree(a, b).agree).toBe(true);
+    // Deeper, it holds: it's the best.
+    const held = judgedBoard(checked, await runJudgeJob(engine(), checked))!;
+    expect(held.bestMove).toBe(OVER);
+    expect(held.bestExpected).toBeCloseTo(0.58, 9);
   });
 
   it("every judge works out the same board from the same searches: the device's (judgedBoard), the host's and solo's re-check (recheckCloseCalls)", async () => {
@@ -161,7 +171,7 @@ describe("a pick scored above the engine's first line", () => {
   });
 
   it("the God King plays the best move: the pick above the first line", async () => {
-    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossMaxMoves: 12, lastStandFrom: 999, bossId: "ginger" } as Settings;
+    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossMaxMoves: 12, lastStandFrom: 999, bossId: "clown" } as Settings;
     const runner = new MatchRunner({
       settings,
       rng: mulberry32(11),
@@ -182,5 +192,82 @@ describe("a pick scored above the engine's first line", () => {
     expect(b.bestMove).toBe(last);
     expect(b.result.playedMove).toBe(last);
     consistent(b);
+  });
+});
+
+describe("the re-check, with a pick scored above the first line (its anchor)", () => {
+  const s = { recheckLoss: [5, 60] as const, recheckMax: 3, recheckNodes: 1, recheckCutLoss: [1, 60] as const, recheckCutMax: 5 };
+  // The first line F at 0.50, a pick P above it at 0.52 (and Q at 0.51), X losing 12 points to P, Y losing 2.5.
+  const ev = { bestMove: "F", bestExpected: 0.5, expectedAfter: { F: 0.5, P: 0.52, Q: 0.51, X: 0.4, Y: 0.495 } };
+
+  it("searches it with any re-check, first and on top of the usual picks; starts one only for a close call on the first line", () => {
+    // X is a close call: P goes in, ahead of it (outside recheckMax).
+    expect(recheckTargets(ev, ["F", "P", "X", "X"], s)).toEqual(["P", "X"]);
+    expect(recheckTargets(ev, ["F", "P", "X"], { ...s, recheckMax: 1 })).toEqual(["P", "X"]);
+    // Several above it: the highest first, each once (Q loses a point to P: not a target of its own).
+    expect(recheckTargets(ev, ["F", "Q", "P", "X"], s)).toEqual(["P", "Q", "X"]);
+    // Nothing else to re-check, and F's pickers lose 2 points to P: no search for it alone (below the range)...
+    expect(recheckTargets(ev, ["F", "P", "Y"], s)).toEqual([]);
+    // ...but near the cut line (from 1 point), a close call: P is searched with F.
+    expect(recheckTargets(ev, ["F", "P", "Y"], s, ["F"])).toEqual(["P"]);
+    // F losing 5+ to it is a close call for anyone; nobody on F and no other close call: nothing to weigh.
+    const far = { ...ev, expectedAfter: { ...ev.expectedAfter, P: 0.56 } };
+    expect(recheckTargets(far, ["F", "P"], s)).toEqual(["P"]);
+    expect(recheckTargets(far, ["P"], s)).toEqual([]);
+    expect(recheckTargets(far, ["P", "Y"], s)).toEqual(["P", "Y"]);
+  });
+
+  it("every other re-checked pick is measured against the deep search's best (the reviewer's case: X loses 10, not 12 or 9)", async () => {
+    // Quick: F 0.50, P 0.52, X 0.40. Deep: F 0.55, P 0.54, X 0.45: F is the best, X 10 points below it.
+    const quick = { bestMove: "e2e4", bestExpected: 0.5, expectedAfter: { e2e4: 0.5, d2d4: 0.52, a2a3: 0.4 } };
+    const deep: Record<string, number> = { e2e4: 0.55, d2d4: 0.54, a2a3: 0.45 };
+    const e: EngineLike = {
+      topMoves: async () => [],
+      scoreMoves: async () => [],
+      scoreMovesAt: async (_fen, moves) => moves.map((move) => ({ move, expected: deep[move]! })),
+    };
+    const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    const checked = await recheckCloseCalls(e, fen, quick, ["e2e4", "d2d4", "a2a3"], DEFAULT_SETTINGS);
+    expect(checked.bestMove).toBe("e2e4");
+    expect(checked.rechecked).toEqual(["d2d4", "a2a3"]);
+    const loss = (m: string) => (checked.bestExpected - checked.expectedAfter[m]!) * 100;
+    expect(loss("a2a3")).toBeCloseTo(10, 9);
+    expect(loss("d2d4")).toBeCloseTo(1, 9);
+  });
+
+  it("the exchange check measures against the best move: a quiet first line missed the capture scored above it (an older host's numbers too)", () => {
+    // After 5...Nxe4?? White wins the knight (dxe4); the first line here castles. Move 6: the opening allowance applies.
+    const hung = sanLineToUci(["e4", "Nf6", "Nc3", "e5", "d3", "Bc5", "Nf3", "d6", "Be2", "Nxe4"]);
+    const make = () =>
+      new MatchRunner({
+        settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossMaxMoves: 12, lastStandFrom: 999, bossId: "clown" } as Settings,
+        rng: mulberry32(11),
+        engines: [engine()],
+        library: [{ ...library[0]!, moves: hung, namedPlies: hung.length }],
+        entrants: Array.from({ length: 6 }, (_, i) => ({ id: `h${i}`, name: `H${i}`, isBot: false })),
+      });
+    const [castle, take] = ["e1g1", "d3e4"];
+    for (const named of [castle, take]) {
+      const runner = make();
+      const [[boardId, ids]] = [...runner.deal()] as [[number, string[]]];
+      const fen = runner.boards.get(boardId)!.fen;
+      expect(fen).toBe("rnbqk2r/ppp2ppp/3p4/2b1p3/4n3/2NP1N2/PPP1BPPP/R1BQK2R w KQkq - 0 6");
+      expect(openingAllowance(moveNumber(fen))).toBeGreaterThan(0);
+      expect(runner.crowdAllowed()).toBeNull();
+      const picks = Object.fromEntries(ids.map((id, i) => [id, i < 3 ? castle : take]));
+      const expectedAfter = { [castle]: 0.5, [take]: 0.53 };
+      // An older host names the first line; the judges' numbers with a re-check that held the capture name it.
+      const b = runner.resolveBoard(boardId, ids, picks, { bestMove: named, bestExpected: expectedAfter[named]!, expectedAfter });
+      expect(b.bestMove).toBe(take);
+      for (const p of b.result.players) {
+        if (p.move === take) expect(p).toMatchObject({ loss: 0 });
+        else {
+          // It passed up a capture that wins material: no allowance, its whole loss counts.
+          expect(p.material).toBe("missed");
+          expect(p.loss).toBeCloseTo(3, 9);
+          expect(p.counted).toBeUndefined();
+        }
+      }
+    }
   });
 });

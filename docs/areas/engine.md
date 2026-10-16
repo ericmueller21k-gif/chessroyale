@@ -10,14 +10,14 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   the browser (a Web Worker pool, Stockfish 19 lite WASM: `packages/app/src/engine.ts`). The browser engine is
   deterministic (`reports/judge-determinism.md`).
 - **The best move is the highest-scored pick** (`docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md`):
-  the top-8 search's first line, unless a pick scored above it (`bestOf` in `packages/core/src/scoring.ts`; a tie keeps
-  the first line). Every loss is measured from that number, so the move that has it is the best everywhere: the reveal,
-  the God King's move, the exchange check, the re-check's anchor (the first line is re-checked like any pick). A pick
-  scores above the first line in about 3% of positions, nearly always another line of the top-8 search (a line not
-  searched again at the last depth keeps the depth before's score), hardly ever the second search over picks outside the
-  top 8 (`reports/best-move-gap.md`). Each judge calls `bestOf` where it puts a board's numbers together: the runner's
-  `scoreBoard`, `baseBoard` in `judge.ts`, `hostScore` in `net.ts`, `recheckCloseCalls`, and `resolveBoard` (so an
-  older host's numbers too).
+  the judge's best (the top-8 search's first line, or what the re-check made best), unless a pick scored above it
+  (`bestOf` in `packages/core/src/scoring.ts`; a tie keeps the judge's best). `resolveBoard` names it on every path, so
+  the reveal, the God King's move and the exchange check follow the move every loss is measured from. Before that, the
+  re-check weighs such a pick against the first line like for like: the re-check stays anchored on the first line, and
+  a pick above it is searched with any re-check, and starts one when the first line's pickers lose 5+ points to it (1+
+  near the cut) (`recheckTargets`). It happens in about 3% of positions, nearly always another line of the top-8 search
+  (a line not searched again at the last depth keeps the depth before's score), hardly ever the second search over
+  picks outside the top 8 (`reports/best-move-gap.md`).
 - **Positions Stockfish refuses** (DECISIONS.md, "Engines' exits never reach the page", Oct 15): Stockfish 19 ends its
   process on a position it refuses (a ninth pawn, more pieces than promotions could make, the side not to move in
   check, …), and a browser worker's exit was thrown into the page. `stockfishRefuses` (`uci.ts`) holds its rules
@@ -44,9 +44,10 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 - **Squads' bots** get their engine's top moves from players' devices the same way (the page's one speed check,
   `engineSpeed()`, then `botWork` jobs on the engine pool; [squads.md](squads.md), "The server" and "The screens").
 - **Close calls are re-checked deeper** before a cut (`recheckCloseCalls()` in `runner.ts`: `recheckLoss`,
-  `recheckMax`, `recheckNodes` 700k), only for groups with a human pick, in one search with the best move (the anchor).
-  The re-check goes first to the **engine
-  server**: native Stockfish 17.1 (full network) in a Cloudflare Container (`engine/Dockerfile`, `engine/server.mjs`,
+  `recheckMax`, `recheckNodes` 700k), only for groups with a human pick, in one search with the best move (the anchor),
+  and with any pick scored above it. A device's re-check is blamed against the server's only if it searched every move
+  the board's re-check does (an older app's leaves out a pick above the first line). The re-check goes first to the
+  **engine server**: native Stockfish 17.1 (full network) in a Cloudflare Container (`engine/Dockerfile`, `engine/server.mjs`,
   class `EngineServer`, binding `ENGINE`, instance `standard-2`) at 2M nodes (`SERVER_RECHECK_NODES`). If it doesn't
   answer in time, the host re-checks on its own device. Server searches are capped per day by
   `ENGINE_DAILY_SEARCHES` (3000), counted in D1 (`engine_usage`); `ENGINE_OFF=1` turns the server off (local, e2e).
@@ -55,7 +56,9 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   moving it to Stockfish 19 (built from the browsers' stockfish.js source) is recommended (DECISIONS.md, "The engine
   server's own Stockfish, checked in CI").
 - **Deep checks on players' computers** (`JUDGES.deepOnDevices`) are built and ship **off**: the browsers' lite network
-  is less accurate than the server's (`reports/deep-accuracy.md`), and fairness comes first.
+  is less accurate than the server's (`reports/deep-accuracy.md`), and fairness comes first. A device whose re-check
+  leaves out a move the board's re-check covers is never blamed (an older app's leaves out a pick above the first
+  line), which a device could use to dodge blame: revisit before turning this on.
 - **Bosses' strength.** `bossMoveFrom` in `runner.ts` plays at a UCI_Elo set from the lobby's ratings (`bossElo`:
   weighted toward the best players, `bossEloOffset`, `bossEloRange`; the raid's tiers `BOSS_TIERS`, `bossFixedElo`;
   each boss's `offset` in `BOSS_ROSTER`; solo's difficulty `BOSS_DIFFICULTY`). Below `bossStumbleBelow` it may slip
@@ -168,9 +171,10 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   `packages/server/test/judges.test.ts`, `engine-server.test.ts` (a refused position never reaches the container, from
   any path; a legal one does, Chess960 too). (Engine tests run real Stockfish.)
 - The best move (a pick above the first line): `packages/chess/test/best-move.test.ts` (solo, the lobby's numbers, a
-  judge's board, the re-check, the God King, every judge alike), `packages/app/test/host-score.test.ts` (the host),
-  `judges.test.ts` ("the best move is the highest-scored pick": two judges, the engine server's re-check, devices'
-  re-checks, an older host), `bestOf` in `packages/core/test/scoring.test.ts`; `e2e/boss-dock.spec.ts` (the dock's
+  judge's board, the re-check's targets and anchor, other re-checked picks, the exchange check, the God King, every
+  judge alike), `packages/app/test/host-score.test.ts` (the host), `judges.test.ts` ("the best move is the
+  highest-scored pick": two judges, the engine server's re-check, devices' re-checks, an older host, an older app's
+  device beside this one's), `bestOf` in `packages/core/test/scoring.test.ts`; `e2e/boss-dock.spec.ts` (the dock's
   "· the best").
 - e2e: `e2e/judges.spec.ts` (with containers off); `e2e/sawyer.spec.ts`'s last test (a refused position never sent;
   a worker's exit kept off the page, the engine answering on).
@@ -218,8 +222,9 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   asking, with a monthly estimate.
 - Measure before and after: a judge or boss change comes with a sim's before/after table in `reports/`.
 - Never break the fallback: every server path degrades to the host's own engine.
-- "The engine's best move" is the line with the highest score, not the first line. A board's best is `bestOf`'s (the
-  highest-scored of the first line and the picks): anything that names it, in any judge, goes through it.
+- "The engine's best move" is the line with the highest score, not the first line. A board's best is `bestOf`'s,
+  named in `resolveBoard` after any re-check; the re-check's choice of moves is `recheckTargets`'s, the same for every
+  judge. Neither is worked out anywhere else.
 - Stockfish's output goes through `searchLines` (`uci.ts`, the same in `engine/server.mjs`; keep the two the same): a
   slot's last exact line may name another move, so a move listed twice is read again by move (DECISIONS.md, "The
   engine reader", Oct 14).

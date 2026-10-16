@@ -25,7 +25,7 @@
  * (The data behind the report is committed gzipped: reports/best-move-gap/seedN.jsonl.gz.)
  */
 import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, OPENING_ALLOWANCE, botPick, botSkillSpread, mulberry32, openingAllowance, shuffle, type Rng } from "@chessroyale/core";
-import { START_FEN, applyMove, fenAfter, gameEnd, judgedBoard, legalMoves, materialSlips, moveNumber, runQuickJob, type JudgeJob, type MoveScore, type Opening } from "@chessroyale/chess";
+import { START_FEN, applyMove, fenAfter, gameEnd, judgedBoard, legalMoves, materialSlips, moveNumber, recheckTargets, runQuickJob, type JudgeJob, type MoveScore, type Opening } from "@chessroyale/chess";
 import { STOCKFISH_FULL_BUILD, createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -239,31 +239,67 @@ function summary() {
   }
   add("");
   // What each rule charges the first line's pickers and the over's, against the server's stand-in (full, 2M).
-  add("## What each rule charges, against the server's stand-in", "");
+  add("## What each rule charges", "");
   add(
-    "Every over, against what the full-network search (2M nodes, like for like) says each move gave away: the first line its deep gap if the over is better, the over minus the deep gap if the first line is. The quick numbers charge the first line's pickers the quick gap and the over's nothing (today, and the promoted rule without a re-check: the same numbers). A re-check searches the two together on the device (lite, 700k nodes) and charges what it says. Promoted, the first line is an ordinary pick, so it's re-checked when its loss is in the re-check's range: from 5 points (`recheckLoss`), or from 1 for a player near the cut line (`recheckCutLoss`); the engine's first line never was (it was the anchor). Mean error in points; \"2+ off\": the share of overs where a side was charged 2 points or more away from the deep search.",
+    [
+      "Per position with a pick above the first line (F), its highest such pick P. The truth: the full-network search at 2M nodes (the engine server's stand-in), F and P like for like. F's pickers should pay the deep gap if P is better, P's pickers minus it if F is. A re-check searches F and P together: on a device (the lite build at 700k nodes), or online on the engine server (the stand-in itself, so no error once re-checked).",
+      "\"Other re-checked picks\": in positions where the re-check runs anyway (some other pick is a close call), every pick it re-checks (X) is put on the quick scale through the re-check's anchor. Its error against the same deep search's best: main anchors on F but measures losses from P's quick number (X overcharged by the quick gap, less any real gap); this PR's first version anchored on P (X undercharged when the deep search finds F better); anchored on F with P re-checked alongside, X is measured from the deep search's best (no error).",
+      "Positions searched: where a re-check runs (some pick is a close call, or F's pickers lose 5+ points to P). Near the cut line F's 1+ points count too (not modeled here).",
+    ].join(" "),
     "",
   );
-  add("| Rule | Overs re-checked | First line's pickers: mean error | Over's pickers: mean error | 2+ off |", "| --- | ---: | ---: | ---: | ---: |");
   {
-    const xs = overs.filter((x) => x.full !== null && x.lite !== null);
-    const mean = (ys: number[]) => ys.reduce((s2, y) => s2 + y, 0) / Math.max(1, ys.length);
-    const rules: [string, (g: number) => boolean][] = [
-      ["The quick numbers (today; promoted without a re-check)", () => false],
-      [`Promoted, the first line re-checked from ${DEFAULT_SETTINGS.recheckLoss[0]} points`, (g) => g >= DEFAULT_SETTINGS.recheckLoss[0]],
-      [`Promoted, near the cut line (from ${DEFAULT_SETTINGS.recheckCutLoss[0]} point)`, (g) => g >= DEFAULT_SETTINGS.recheckCutLoss[0]],
-      ["Every over re-checked against the first line", () => true],
-    ];
-    for (const [label, checks] of rules) {
-      const errs = xs.map((x) => {
-        const truthFirst = Math.max(0, x.full!);
-        const truthOver = Math.max(0, -x.full!);
-        const [first, over] = checks(x.o.gap) ? [Math.max(0, x.lite!), Math.max(0, -x.lite!)] : [x.o.gap, 0];
-        return { first: Math.abs(first - truthFirst), over: Math.abs(over - truthOver) };
-      });
-      add(`| ${label} | ${pct(xs.filter((x) => checks(x.o.gap)).length, xs.length, 0)} | ${f(mean(errs.map((e) => e.first)), 2)} | ${f(mean(errs.map((e) => e.over)), 2)} | ${pct(errs.filter((e) => e.first >= 2 || e.over >= 2).length, xs.length, 0)} |`);
+    const mean = (ys: number[]) => (ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : NaN);
+    type Acc = { F: number[]; P: number[]; X: number[]; searched: number };
+    const designs = [
+      ["Main: anchored on F, P never re-checked (labels named after)", "main"],
+      ["This PR's first version: anchored on P, F re-checked from 5 points", "first"],
+      ["Anchored on F, P re-checked with any re-check (chosen)", "chosen"],
+      ["Every such P re-checked, a search of its own if need be", "every"],
+    ] as const;
+    for (const eng of ["lite", "full"] as const) {
+      const acc: Record<string, Acc> = Object.fromEntries(designs.map(([, k]) => [k, { F: [], P: [], X: [], searched: 0 }]));
+      let n = 0;
+      for (const r of all) {
+        if (!r.overs.length || !r.lite || !r.full) continue;
+        n++;
+        const F = r.top[0]![0];
+        const P = r.overs.reduce((a, b) => (b.gap > a.gap ? b : a));
+        const exp = Object.fromEntries([...r.top, ...r.extra]);
+        const picks = [...r.people, ...Object.entries(r.bots).flatMap(([m, c]) => Array<string>(c).fill(m))];
+        // (Another close call: a target that isn't a pick above F.)
+        const others = recheckTargets({ bestMove: F, bestExpected: r.top[0]![1], expectedAfter: exp }, picks, DEFAULT_SETTINGS).some((m) => exp[m]! <= r.top[0]![1]);
+        const gd = deepGap(r, eng, P.move)!;
+        const gt = deepGap(r, "full", P.move)!;
+        const gq = P.gap;
+        const truthF = Math.max(0, gt);
+        const truthP = Math.max(0, -gt);
+        const add = (k: string, rechecked: boolean, x: number | null, searched: boolean) => {
+          const [f, p] = rechecked ? [Math.max(0, gd), Math.max(0, -gd)] : [gq, 0];
+          acc[k]!.F.push(Math.abs(f - truthF));
+          acc[k]!.P.push(Math.abs(p - truthP));
+          if (x !== null) acc[k]!.X.push(x);
+          if (searched) acc[k]!.searched++;
+        };
+        const close = gq >= DEFAULT_SETTINGS.recheckLoss[0];
+        add("main", false, others ? gq - Math.max(0, gd) : null, others);
+        add("first", close, others ? (close ? 0 : Math.min(0, gd)) : null, others || close);
+        add("chosen", others || close, others ? 0 : null, others || close);
+        add("every", true, others ? 0 : null, true);
+      }
+      add(`Re-checked by ${eng === "lite" ? "a device (lite, 700k nodes)" : "the engine server (its stand-in, full network, 2M nodes)"}, ${n} positions:`, "");
+      add("| Rule | F's pickers: mean error | P's pickers: mean error | Other re-checked picks: mean error (mean of its size) | Positions searched |", "| --- | ---: | ---: | ---: | ---: |");
+      for (const [label, k] of designs) {
+        const a = acc[k]!;
+        add(`| ${label} | ${f(mean(a.F), 2)} | ${f(mean(a.P), 2)} | ${f(mean(a.X), 2)} (${f(mean(a.X.map(Math.abs)), 2)}) | ${a.searched} |`);
+      }
+      add("");
     }
-    add("", `(${xs.length} overs; the quick gap is ${DEFAULT_SETTINGS.recheckLoss[0]}+ points in ${pct(xs.filter((x) => x.o.gap >= DEFAULT_SETTINGS.recheckLoss[0]).length, xs.length, 0)} of them, ${DEFAULT_SETTINGS.recheckCutLoss[0]}+ in ${pct(xs.filter((x) => x.o.gap >= DEFAULT_SETTINGS.recheckCutLoss[0]).length, xs.length, 0)}.)`, "");
+    const several = all.filter((r) => r.overs.length > 1).length;
+    add(
+      `Online the engine server re-checks, so there a re-check is about right whatever it searches: what argues against searching every such pick is the server's daily budget, not accuracy. On a device the re-check is noisy at this scale too. With several picks above F (${several} of ${all.filter((r) => r.overs.length).length} positions), F's pickers are charged the largest gap.`,
+      "",
+    );
   }
   // The exchange check (the opening allowance's material fallback) is measured against the best move.
   {
