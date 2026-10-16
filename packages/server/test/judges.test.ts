@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, JUDGES, modeSettings, mulberry32, type JudgeConfig, type Settings } from "@chessroyale/core";
-import { deepCheck, judgedBoard, legalMoves, runJudgeJob, runQuickJob, sanLineToUci, type EngineLike, type JudgeJob, type JudgeReport, type MoveScore, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { deepCheck, deepTargets, judgedBoard, legalMoves, runJudgeJob, runQuickJob, sanLineToUci, type EngineLike, type JudgeJob, type JudgeReport, type MoveScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type ServerScoreRequest } from "../src/lobby.ts";
 import { assignJudges, cutBubble, drawJudges, seedFor } from "../src/judges.ts";
 
@@ -546,5 +546,193 @@ describe("deep checks on players' computers (the switch on)", () => {
     for (const id of ["p1", "p2"]) await L.answerSplit(id);
     expect(L.core.record.phase).toBe("reveal");
     expect(L.core.record.judges!.stats.agreed).toBe(1);
+  });
+});
+
+describe("the best move is the highest-scored pick (docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md)", () => {
+  const ranked = (fen: string) => legalMoves(fen).sort((a, b) => truth(fen, b) - truth(fen, a));
+  /**
+   * The honest engine, except that its second search (a pick outside the top moves, searched with more of the budget)
+   * scores the position's worst move 6 points above its best. Its deep search says what each move is really worth.
+   */
+  const inflated: EngineLike = {
+    ...honest,
+    scoreMoves: async (fen, moves) => [...new Set(moves)].sort().map((move) => ({ move, expected: move === ranked(fen).at(-1) ? truth(fen, ranked(fen)[0]!) + 0.06 : truth(fen, move) })),
+  };
+  /** A device answers its jobs with that engine (two such devices agree exactly). */
+  const answerWith = async (L: ReturnType<typeof setup>, id: string, engine: EngineLike) => {
+    const jobs = (L.take(id, "judge") as Extract<Msg, { t: "judge" }>[]).flatMap((m) => m.jobs.map((job) => ({ job, key: m.key })));
+    for (const { job, key } of jobs) L.core.message(id, { t: "judged", key, id: job.id, report: await runJudgeJob(engine, job) });
+  };
+  /** The reveal never charges a pick of the best move, and no pick scores above it. */
+  const consistent = (rev: Extract<Msg, { t: "reveal" }>) => {
+    const best = rev.expectedAfter[rev.bestMove!]!;
+    for (const p of rev.picks) {
+      if (!p.move) continue;
+      if (p.move === rev.bestMove) expect(p.loss).toBe(0);
+      expect(rev.expectedAfter[p.move]!).toBeLessThanOrEqual(best);
+    }
+  };
+  /** Three people on White: p1 and p3 pick the best move, p2 the worst (which the second search scores above it). */
+  const start = (L: ReturnType<typeof setup>) => {
+    L.begin(3, [1_000_000, 900_000, 300_000]);
+    const fen = L.last("p1", "round")!.board!.fen;
+    const [first, worst] = [ranked(fen)[0]!, ranked(fen).at(-1)!];
+    L.pickAll(3, { p1: first, p2: worst, p3: first });
+    return { fen, first, worst };
+  };
+
+  it("two judges agree; the engine server re-checks the pick above the first line with it (the anchor); unanswered, the pick above it is the best", async () => {
+    const L = setup({ server: true });
+    const { first, worst } = start(L);
+    for (const id of L.judgesOf()) await answerWith(L, id, inflated);
+    expect(L.core.record.judges!.stats).toMatchObject({ agreed: 1, disagreed: 0 });
+    // The first line loses 6 points to it: a close call, so the pick above it is searched again with the first line.
+    expect(L.serverAsks).toHaveLength(1);
+    expect(L.serverAsks[0]!.moves[0]).toBe(first);
+    expect(L.serverAsks[0]!.moves).toContain(worst);
+    // The server can't answer: the judges' numbers stand, the pick above the first line the best.
+    L.serve(true);
+    expect(L.core.record.phase).toBe("reveal");
+    const rev = L.last("p1", "reveal")!;
+    expect(rev.bestMove).toBe(worst);
+    expect(rev.picks.find((p) => p.playerId === "p1")!.loss).toBeCloseTo(6, 9);
+    consistent(rev);
+  });
+
+  it("the engine server's re-check weighs the first line against it, like for like: the better one is the best", async () => {
+    const L = setup({ server: true });
+    const { fen, first, worst } = start(L);
+    for (const id of L.judgesOf()) await answerWith(L, id, inflated);
+    L.serve();
+    const rev = L.last("p1", "reveal")!;
+    expect(rev.bestMove).toBe(first);
+    expect(rev.picks.find((p) => p.playerId === "p1")!.loss).toBe(0);
+    // p2's pick is charged what the deep search says it gives away (to within the server's noise).
+    expect(Math.abs(rev.picks.find((p) => p.playerId === "p2")!.loss! - (truth(fen, first) - truth(fen, worst)) * 100)).toBeLessThan(1.5);
+    consistent(rev);
+  });
+
+  it("devices that re-check themselves (no engine server) anchor it the same way and agree", async () => {
+    const L = setup({ server: false });
+    const { first } = start(L);
+    for (const id of L.judgesOf()) await answerWith(L, id, inflated);
+    expect(L.core.record.phase).toBe("reveal");
+    expect(L.core.record.judges!.stats).toMatchObject({ agreed: 1, disagreed: 0 });
+    const rev = L.last("p1", "reveal")!;
+    expect(rev.bestMove).toBe(first);
+    consistent(rev);
+  });
+
+  /** Every strike so far, by device. */
+  const strikes = (L: ReturnType<typeof setup>) => Object.fromEntries(Object.entries(L.core.record.judges!.devices).map(([id, d]) => [id, d.strikes]));
+
+  it("an older app and this one, judging together as shipped (engine server up, devices don't re-check): their reports agree, the round resolves, nobody is struck", async () => {
+    const L = setup({ server: true });
+    start(L);
+    const [older, newer] = L.judgesOf() as [string, string];
+    // The quick part is the same code in both versions (the top moves, then the picks outside them).
+    for (const { job, key } of (L.take(older, "judge") as Extract<Msg, { t: "judge" }>[]).flatMap((m) => m.jobs.map((job) => ({ job, key: m.key })))) {
+      expect(job.recheck).toBeUndefined();
+      L.core.message(older, { t: "judged", key, id: job.id, report: await runQuickJob(inflated, job) });
+    }
+    await answerWith(L, newer, inflated);
+    expect(L.core.record.judges!.stats).toMatchObject({ agreed: 1, disagreed: 0 });
+    L.serve();
+    expect(L.core.record.phase).toBe("reveal");
+    consistent(L.last("p1", "reveal")!);
+    expect(Object.values(strikes(L)).every((n) => n === 0)).toBe(true);
+  });
+
+  it("devices that re-check (no engine server): an older app that sends no re-check (its own list came out empty) holds the round for deepWaitMs, no longer, and isn't struck", async () => {
+    const L = setup({ server: false });
+    start(L);
+    const [older, newer] = L.judgesOf() as [string, string];
+    for (const { job, key } of (L.take(older, "judge") as Extract<Msg, { t: "judge" }>[]).flatMap((m) => m.jobs.map((job) => ({ job, key: m.key })))) {
+      expect(job.recheck).toBeTruthy();
+      L.core.message(older, { t: "judged", key, id: job.id, report: await runQuickJob(inflated, job) });
+    }
+    await answerWith(L, newer, inflated);
+    expect(L.core.record.phase).toBe("scoring");
+    L.advance(JUDGES.deepWaitMs);
+    expect(L.core.record.phase).toBe("reveal");
+    expect(L.core.record.judges!.stats.deepLate).toBe(1);
+    consistent(L.last("p1", "reveal")!);
+    expect(Object.values(strikes(L)).every((n) => n === 0)).toBe(true);
+  });
+
+  it("deep checks on computers with the engine server up: an older app's re-check, without the pick above the first line, is never blamed", async () => {
+    const L = setup({ server: true, judges: { deepOnDevices: true } });
+    L.begin(4, [1_000_000, 1_000_000, 300_000, 300_000], [], [0, 1]);
+    const fen = L.last("p1", "round")!.board!.fen;
+    const [first, worst] = [ranked(fen)[0]!, ranked(fen).at(-1)!];
+    // p3's pick is a close call of its own, so the older app re-checks something too.
+    L.pickAll(4, { p1: first, p2: worst, p3: ranked(fen)[3]!, p4: first });
+    expect([...L.judgesOf()].sort()).toEqual(["p1", "p2"]);
+    const jobs = (id: string) => (L.take(id, "judge") as Extract<Msg, { t: "judge" }>[]).flatMap((m) => m.jobs.map((job) => ({ job, key: m.key })));
+    for (const { job, key } of jobs("p1")) {
+      // The older app: its quick part, then its re-check anchored on the first line, without the pick above it.
+      const quick = await runQuickJob(inflated, job);
+      L.core.message("p1", { t: "judged", key, id: job.id, report: quick });
+      const targets = deepTargets(job, quick)!;
+      expect(targets.best).toBe(first);
+      expect(targets.flagged).toContain(worst);
+      const older = targets.flagged.filter((m) => m !== worst);
+      expect(older.length).toBeGreaterThan(0);
+      L.core.message("p1", { t: "judgedDeep", key, id: job.id, deep: await inflated.scoreMovesAt!(job.fen, [first, ...older], job.recheck!.recheckNodes) });
+    }
+    for (const { job, key } of jobs("p2")) {
+      const quick = await runQuickJob(inflated, job);
+      L.core.message("p2", { t: "judged", key, id: job.id, report: quick });
+      L.core.message("p2", { t: "judgedDeep", key, id: job.id, deep: (await deepCheck(inflated, job, quick))! });
+    }
+    // The two re-checks disagree (only one weighed the pick above the first line): the engine server re-checks.
+    expect(L.core.record.judges!.stats.deepDisagreed).toBe(1);
+    L.serve();
+    expect(L.core.record.phase).toBe("reveal");
+    expect(L.last("p1", "reveal")!.bestMove).toBe(first);
+    expect(strikes(L)).toMatchObject({ p1: 0, p2: 0 });
+  });
+
+  it("deep checks on computers: a re-check that leaves out an ordinary close call (not an older app's pattern) is still blamed", async () => {
+    const L = setup({ server: true, judges: { deepOnDevices: true } });
+    L.begin(4, [1_000_000, 1_000_000, 300_000, 300_000], [], [0, 1]);
+    // Close calls, and nothing above the first line (the honest engine).
+    const fen = L.last("p1", "round")!.board!.fen;
+    L.pickAll(4, { p1: ranked(fen)[3]!, p2: ranked(fen)[4]!, p3: ranked(fen)[5]!, p4: ranked(fen)[6]! });
+    expect([...L.judgesOf()].sort()).toEqual(["p1", "p2"]);
+    const jobs = (id: string) => (L.take(id, "judge") as Extract<Msg, { t: "judge" }>[]).flatMap((m) => m.jobs.map((job) => ({ job, key: m.key })));
+    for (const id of ["p1", "p2"]) {
+      for (const { job, key } of jobs(id)) {
+        const quick = await runQuickJob(honest, job);
+        L.core.message(id, { t: "judged", key, id: job.id, report: quick });
+        const t = deepTargets(job, quick)!;
+        expect(t.flagged.length).toBeGreaterThanOrEqual(2);
+        expect(t.flagged.every((m) => truth(fen, m) <= truth(fen, t.best))).toBe(true);
+        const deep = await honest.scoreMovesAt!(job.fen, [t.best, ...t.flagged], job.recheck!.recheckNodes);
+        // p2 leaves out one close call, and scores another 20 points low.
+        const [left, low] = t.flagged.slice(-2) as [string, string];
+        const lie = deep.filter((m) => m.move !== left).map((m) => (m.move === low ? { ...m, expected: Math.max(0, m.expected - 0.2) } : m));
+        L.core.message(id, { t: "judgedDeep", key, id: job.id, deep: id === "p2" ? lie : deep });
+      }
+    }
+    expect(L.core.record.judges!.stats.deepDisagreed).toBe(1);
+    L.serve();
+    expect(L.core.record.phase).toBe("reveal");
+    expect(strikes(L)).toMatchObject({ p1: 0, p2: 1 });
+  });
+
+  it("a host's numbers that name the first line (an older app) still make the pick above it the best", () => {
+    const L = setup({ judges: { on: false } });
+    const { fen, first, worst } = start(L);
+    const req = L.last("p1", "scoreRequest")!;
+    const expectedAfter = Object.fromEntries(legalMoves(fen).map((m) => [m, truth(fen, m)]));
+    expectedAfter[worst] = truth(fen, first) + 0.06;
+    const boards = req.jobs.map((j) => ({ boardId: j.boardId, bestMove: first, bestExpected: truth(fen, first), expectedAfter, botPicks: Object.fromEntries(j.bots.map((b) => [b.id, first])), botThinkMs: {} }));
+    L.core.message("p1", { t: "scores", key: req.key, boards });
+    const rev = L.last("p2", "reveal")!;
+    expect(rev.bestMove).toBe(worst);
+    expect(rev.picks.find((p) => p.playerId === "p1")!.loss).toBeCloseTo(6, 9);
+    consistent(rev);
   });
 });

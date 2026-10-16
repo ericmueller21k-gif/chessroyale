@@ -167,3 +167,61 @@ test("your clock: bold at the box's right on every boss's screens, counting down
   }
   expect(errors).toEqual([]);
 });
+
+test("your pick the best move: the dock's line says so (\"· the best\"), in one line; another pick names the best", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough: the phone's 390 px");
+  test.setTimeout(6 * 60_000);
+  // A Solo raid (you and 49 bots: a reveal after each crowd move, as in a raid or the Crowd's boss battle).
+  await page.goto("/?debug&pace=quick&clock=30&bossMoves=6&laststand=0");
+  await page.getByRole("radio", { name: /^Boss raid/ }).click();
+  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();
+  await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  // Every line of yours the dock shows, every frame from before it can appear, with what the reveal says: your move,
+  // its loss and score, the best move (docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md).
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__dockLines = [];
+    const tick = () => {
+      const p = w.match?.phase;
+      for (const e of document.querySelectorAll(".boss-dock-status .dock-line.muted")) {
+        const text = e.textContent ?? "";
+        if (!text.startsWith("You:") || p?.kind !== "reveal" || w.__dockLines.some((x: { text: string; fen: string }) => x.text === text && x.fen === p.mine.fenBefore)) continue;
+        const me = p.mine.result.players.find((x: { playerId: string }) => w.match.isYou(x.playerId));
+        w.__dockLines.push({ text, spill: e.scrollWidth - e.clientWidth, fen: p.mine.fenBefore, best: p.mine.bestMove, move: me?.move, loss: me?.loss, score: me?.roundScore });
+      }
+      if (w.__dockLines.length < 200) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  // The engine's first line on each move, until the dock has said "the best" (a bot's pick can score above it now and then).
+  type Line = { text: string; spill: number; fen: string; best: string; move: string; loss: number; score: number };
+  const lines = () => page.evaluate(() => (window as any).__dockLines as Line[]);
+  const stopAt = Date.now() + 4 * 60_000;
+  while (Date.now() < stopAt && !(await lines()).some((l) => l.text.endsWith("· the best")) && (await phase(page)) !== "results") {
+    if ((await phase(page)) === "play") {
+      await page
+        .evaluate(async () => {
+          const m = (window as any).match;
+          if (m.phase.kind !== "play" || Date.now() < m.phase.startsAt) return;
+          const fen = m.phase.board.fen;
+          const [top] = await m.runner.topMovesFor(fen);
+          if (m.phase.kind === "play" && m.phase.board.fen === fen) m.submit(top.move);
+        })
+        .catch(() => undefined);
+    }
+    await page.waitForTimeout(300);
+  }
+  const seen = await lines();
+  const san = (fen: string, m: string) => new Chess(fen).move({ from: m.slice(0, 2), to: m.slice(2, 4), promotion: m[4] }).san;
+  const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
+  const best = seen.filter((l) => l.move === l.best);
+  expect(best.length, JSON.stringify(seen)).toBeGreaterThan(0);
+  for (const l of seen) {
+    if (l.move === l.best) {
+      // Never charged, and said in one line.
+      expect(l.loss).toBe(0);
+      expect(l.text).toBe(`You: ${san(l.fen, l.move)} (${fmt(l.score)}) · the best`);
+      expect(l.spill, l.text).toBeLessThanOrEqual(0);
+    } else expect(l.text).toBe(`You: ${san(l.fen, l.move)} (${fmt(l.score)}) · best ${san(l.fen, l.best)}`);
+  }
+});
