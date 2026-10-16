@@ -128,6 +128,19 @@ export class DuelGame extends DurableObject<Env> {
     return true;
   }
 
+  /**
+   * A player who pressed Cancel just as they were paired (the queue's cancel answered this game): the game is called
+   * off for them (an abort, before any first move: nothing recorded), and the other player hears it at once.
+   */
+  async abandon(uid: string): Promise<void> {
+    if (!this.record || (await this.closeIfDue())) return;
+    const c = this.record.players.w.uid === uid ? "w" : this.record.players.b.uid === uid ? "b" : null;
+    if (!c) return;
+    const core = this.core();
+    core.message(c, { t: "resign" });
+    await this.persist(core);
+  }
+
   async exists(): Promise<boolean> {
     return !!this.record && !(await this.closeIfDue());
   }

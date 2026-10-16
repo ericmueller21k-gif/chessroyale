@@ -1,5 +1,5 @@
 import { ASK_AGE_LINE, CHAT_MOD, oldEnough, type ChatPicks, type ShopState } from "@chessroyale/core";
-import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankEffect } from "@chessroyale/core";
+import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankEffect, RankView } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
 /**
@@ -18,6 +18,15 @@ export interface ModeStats {
   teamWins: number;
 }
 
+/** A player's ranked 1 v 1: the rank (core's RankView) and the record. */
+export interface RankedSummary {
+  rank: RankView;
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+}
+
 export interface Profile {
   user: { id: string; name: string; icon: string; signedIn: boolean; email: string | null; google: boolean };
   /** The shop: coins, items owned and what's equipped (missing from an older server). */
@@ -26,6 +35,8 @@ export interface Profile {
   locker?: Locker;
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss?: ModeStats };
   rating: number | null;
+  /** Ranked 1 v 1: the rank ("Gold 2 · 45 RP", "Placement 2/5") and the record (missing from an older server). */
+  ranked1v1?: RankedSummary;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
   /** An admin (ADMIN_EMAILS, as for the fair-play review): sees the boss battle's test trigger, may use the test switches. */
   admin?: boolean;
@@ -351,6 +362,8 @@ export interface PublicProfile {
   topPercent: number | null;
   /** Banned for fair play (the profile says so; nothing else about fair play is shown). */
   banned?: boolean;
+  /** Ranked 1 v 1: the rank and the record (null when banned; missing from an older server). */
+  ranked1v1?: RankedSummary | null;
   crowd: { games: number; wins: number; avgPlace: number | null; best: number | null; cutsSurvivedPct: number | null; brilliant: number | null };
   boss: { raids: number; bossesBeaten: number; strikesSurvived: number | null; lastStands: number | null; survivedPct: number | null; brilliant: number | null };
   ratingHistory: number[];

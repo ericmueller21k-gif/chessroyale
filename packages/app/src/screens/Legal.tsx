@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { AGE_GATE, CHAT_MOD, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS } from "@chessroyale/core";
+import { AGE_GATE, CHAT_MOD, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS, RANKED_1V1 } from "@chessroyale/core";
 
 /**
  * The privacy policy (/privacy), terms of service (/terms) and copyright page (/copyright): drafts written from what
@@ -146,6 +146,32 @@ function Privacy() {
         kept="with your account. If you delete it, your results stay without your account, name, match code or exact time (below)."
       />
       <Item
+        title="1 v 1 (ranked)"
+        what={
+          <>
+            <p>
+              Your 1 v 1 rank: your tier, division and rank points (or how many placement games you've played), your wins, losses
+              and draws, when you last played, and a hidden rating of how well you play (a number and how sure it is) that
+              decides your rank points and whom you're matched with.
+            </p>
+            <p>
+              Each ranked game: the two players, the time control, the result and how it ended, every move, how long each move
+              took, and when it started and ended. If fair play checks a reported player's games, the engine's view of each of
+              their moves is kept with the game. A game called off before both first moves keeps nothing, and neither does a game
+              against a bot (it's played on your device).
+            </p>
+          </>
+        }
+        why="your rank and record, matching you with players near your strength, and checking reported games for fair play."
+        kept={
+          <>
+            your rank with your account. A game {RANKED_1V1.gamesKeepDays} days after it ends, and longer only while a player in
+            it is under a fair-play review or banned. If you delete your account, your rank goes, and in the games still kept
+            you become the shared "deleted" account (your opponent's games stay theirs).
+          </>
+        }
+      />
+      <Item
         title="Online now and last seen"
         what={<p>When your app last checked in. It checks in every few seconds while it's open.</p>}
         why={'the "online" count on the home screen, "Online now" or "last seen" on your profile, and whether your friends see you online.'}
@@ -253,8 +279,8 @@ function Privacy() {
       <h2>What other players see</h2>
       <p>
         Your profile: your name, the items you wear, when you joined, "Online now" or when you were last seen (unless you hide it in
-        Settings), your rating, rank and "Top %", your stats and last 10 matches (only their day while you hide when you're
-        online), and "Banned" if you are. Your friends also see whether you're online or in a match, unless you hide it. Nobody
+        Settings), your rating, rank and "Top %", your 1 v 1 rank and record, your stats and last 10 matches (only their day
+        while you hide when you're online), and "Banned" if you are. Your friends also see whether you're online or in a match, unless you hide it. Nobody
         sees who you've blocked. Never your email or how you sign in. In matches and chat,
         players see your name, icon, look and rating, and your picks.
       </p>
@@ -368,14 +394,15 @@ function Privacy() {
         <li>
           <strong>Deleted:</strong> your account (name, icon, email or Google id, when you joined and were last seen), every
           sign-in session (you're signed out on every device), your sign-in code's record, your items, coins, crates and shop
-          items, your quick-chat picks, reports you made and reports about you, moderators' decisions about your chat, fair
+          items, your quick-chat picks, your 1 v 1 rank, reports you made and reports about you, moderators' decisions about your chat, fair
           play's records about you, your friends, requests, blocks and invites (from the other players' lists too), your lines
           in the global chat, the bug reports you sent, and your account id on error records.
         </li>
         <li>
           <strong>Kept, without you:</strong> your match results, moved to one shared "deleted" account and kept without your
           account, name, match code or exact time (only the day), rating, best move or eval-bar setting, so the game's numbers
-          stay right. Error records stay counted, without your account. Feedback and ideas never carry your
+          stay right. Your 1 v 1 games still kept (at most {RANKED_1V1.gamesKeepDays} days) stay as the shared "deleted"
+          account's, so your opponents' games stay whole. Error records stay counted, without your account. Feedback and ideas never carry your
           account, so they stay until they expire ({OPS.store.keepDays} days).
         </li>
         <li>

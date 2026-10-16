@@ -37,7 +37,7 @@ guardEntries(Lobby, "Lobby", ["fetch", "webSocketMessage", "webSocketClose", "al
 guardEntries(SquadsLobby, "SquadsLobby", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "reserve"]);
 guardEntries(SquadsParty, "SquadsParty", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "create", "status"]);
 guardEntries(Matchmaker, "Matchmaker", ["next", "duelNext", "cancel"]);
-guardEntries(DuelGame, "DuelGame", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create"]);
+guardEntries(DuelGame, "DuelGame", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "abandon"]);
 guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "health", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
 
 export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv {
@@ -331,8 +331,8 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
  *     asks again with it at once (each ask waits up to CAPACITY.queue.holdMs) until it's paired. Signed in where
  *     sign-in is set up, not banned (mayPlay), as every mode; refused while PAUSE_RANKED1V1 rests the mode.
  *     Test switches: `pool` (a queue of its own), `clock=SECONDS` (each side's clock, no increment).
- *   POST /api/1v1/cancel?ticket= → {} | { code }: Cancel; a ticket paired just now answers its game (the app leaves it:
- *     an abort, nothing recorded).
+ *   POST /api/1v1/cancel?ticket= → {}: Cancel. A ticket paired just now: that game is called off for its player (an
+ *     abort before any move: nothing recorded; the other player hears it at once).
  *   GET /api/1v1/game/CODE → { open, phase } | 404; /api/1v1/game/CODE/ws: its WebSocket (the two players only).
  */
 async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUntil): Promise<Response | null> {
@@ -354,14 +354,21 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
       const { player, rating } = await duelEntrant(sql, me);
       const clock = Number(url.searchParams.get("clock"));
       const testSeconds = url.searchParams.has("clock") && Number.isFinite(clock) && clock > 0 && (await testSwitches(request, env, waitUntil)) ? Math.min(3600, Math.round(clock)) : null;
-      return json(await (await queue()).duelNext(null, { uid: me.id, rating, player, ...(testSeconds ? { testSeconds } : {}) }));
+      // (The first answer also carries the hidden rating, rounded: the bot a player may choose meets them there.)
+      const first = await (await queue()).duelNext(null, { uid: me.id, rating, player, ...(testSeconds ? { testSeconds } : {}) });
+      return json({ ...first, botRating: Math.round(rating) });
     } catch {
       return json({ message: "Couldn't find a match. Try again." }, 500);
     }
   }
   if (url.pathname === "/api/1v1/cancel" && request.method === "POST") {
     if (!ticket) return json({});
-    return json(await (await queue()).cancel(ticket).catch(() => ({})));
+    const placed: { code?: string } = await (await queue()).cancel(ticket).catch(() => ({}));
+    if (placed.code) {
+      const me = await accountOf(request, env, waitUntil).catch(() => null);
+      if (me) await env.DUELS.get(env.DUELS.idFromName(placed.code)).abandon(me.id).catch(() => undefined);
+    }
+    return json({});
   }
   const m = url.pathname.match(/^\/api\/1v1\/game\/([A-Z2-9]{5})(\/ws)?$/i);
   if (!m) return json({ message: "Not found" }, 404);
