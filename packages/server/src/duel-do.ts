@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { CHAT_MOD } from "@chessroyale/core";
-import type { Color, DuelClientMessage, DuelPlayerView } from "@chessroyale/chess/duel";
-import { DuelCore, newDuelRecord, type DuelRecord } from "./duel-room.ts";
+import { DUEL_PROTOCOL, DUEL_UPDATE, type Color, type DuelClientMessage, type DuelOutcome, type DuelPlayerView } from "@chessroyale/chess/duel";
+import { DuelCore, RECORD_RETRY_MS, newDuelRecord, type DuelRecord } from "./duel-room.ts";
 import { accountOf } from "./api.ts";
 import { d1Sql, ensureSchema, shopState } from "./accounts.ts";
 import { eligibleForRanked } from "./fairplay.ts";
@@ -26,6 +26,7 @@ interface Attached {
  */
 export class DuelGame extends DurableObject<Env> {
   private record: DuelRecord | null = null;
+  /** A recording of the finished game is running (in memory only: a wake after an eviction or a deploy tries again). */
   private recording = false;
   /** Chat moderation: when each side's chat ban was last read (in memory: a wake reads it again). */
   private chatChecked = new Map<Color, number>();
@@ -59,30 +60,45 @@ export class DuelGame extends DurableObject<Env> {
     });
   }
 
+  /**
+   * Stores the record and sets the alarm for whatever's next; a finished game whose recording is due (and none of
+   * ours running) starts recording. While one runs, nothing is due sooner than RECORD_RETRY_MS from now (a recording
+   * still running at its retry time or at closing never spins the alarm).
+   */
   private async persist(core: DuelCore) {
+    const finished = this.recording ? null : core.takeFinished();
+    if (finished) this.recording = true;
     this.record = core.r;
     await this.ctx.storage.put("game", this.record);
     countCall("duel.persist");
     const at = core.nextAlarm;
-    if (at !== null) await this.ctx.storage.setAlarm(at);
+    if (at !== null) await this.ctx.storage.setAlarm(this.recording ? Math.max(at, Date.now() + RECORD_RETRY_MS) : at);
     else await this.ctx.storage.deleteAlarm();
-    const finished = core.takeFinished();
-    if (finished) {
-      await this.ctx.storage.put("game", this.record);
-      this.ctx.waitUntil(this.recordFinished(finished));
-    }
+    if (finished) this.ctx.waitUntil(this.recordFinished(finished));
   }
 
-  /** The finished game into D1 (ranks, coins, the kept game); each player then hears what it did for them. */
+  /** Runs `fn` on the room and stores it only if it changed something (a sync, or a refused move, changes nothing). */
+  private async change(core: DuelCore, fn: () => void) {
+    const before = JSON.stringify(core.r);
+    fn();
+    if (JSON.stringify(core.r) !== before || (!this.recording && core.takeFinishedDue())) await this.persist(core);
+  }
+
+  /**
+   * The finished game into D1 (ranks, coins, the kept game); each player then hears what it did for them. A game on a
+   * test's clock where test switches are off (an admin's on the live game) is unranked: nothing recorded, no coins.
+   * A try that fails is tried again on the alarm (takeFinished), a few times.
+   */
   private async recordFinished(finished: NonNullable<ReturnType<DuelCore["takeFinished"]>>) {
-    if (this.recording) return;
-    this.recording = true;
     try {
-      let outcomes = null;
-      if (this.env.DB) {
+      let outcomes: Record<Color, DuelOutcome> | null = null;
+      if (finished.testSeconds && this.env.TEST_SWITCHES !== "1") {
+        const unranked: DuelOutcome = { change: null, coins: 0, unranked: true };
+        outcomes = { w: unranked, b: unranked };
+      } else if (this.env.DB) {
         const sql = d1Sql(this.env.DB);
         await ensureSchema(sql, this.env.DB);
-        // (A player fair play is holding, in review, keeps their rank as it is.)
+        // (A player fair play is holding, in review, keeps their rank as it is, and earns nothing.)
         outcomes = await recordDuel(sql, finished, async (uid) => !(await eligibleForRanked(sql, uid).catch(() => true)));
       }
       if (!this.record) return;
@@ -91,10 +107,6 @@ export class DuelGame extends DurableObject<Env> {
       await this.persist(core);
     } catch (e) {
       serverError(this.env, { kind: "DuelGame.record", route: "DuelGame.record", code: this.record?.code ?? null }, e, (p) => this.ctx.waitUntil(p));
-      if (!this.record) return;
-      const core = this.core();
-      core.recordFailed();
-      await this.persist(core);
     } finally {
       this.recording = false;
     }
@@ -120,8 +132,12 @@ export class DuelGame extends DurableObject<Env> {
     return true;
   }
 
-  /** A new game under this code (false: the code is in use), between these two players (White first). */
+  /**
+   * A new game under this code (false: the code is in use), between these two players (White first). Both must be
+   * there: a seat without a player is refused (an error, never a game nobody can open).
+   */
   async create(code: string, players: Record<Color, DuelPlayerView>, opts: { testSeconds?: number | null } = {}): Promise<boolean> {
+    if (!validPlayer(players?.w) || !validPlayer(players?.b) || players.w.uid === players.b.uid) throw new Error("DuelGame.create: a seat without its player");
     if (this.record && !(await this.closeIfDue())) return false;
     this.record = newDuelRecord(code, Date.now(), players, opts);
     await this.persist(this.core());
@@ -137,8 +153,7 @@ export class DuelGame extends DurableObject<Env> {
     const c = this.record.players.w.uid === uid ? "w" : this.record.players.b.uid === uid ? "b" : null;
     if (!c) return;
     const core = this.core();
-    core.message(c, { t: "resign" });
-    await this.persist(core);
+    await this.change(core, () => core.message(c, { t: "resign" }));
   }
 
   async exists(): Promise<boolean> {
@@ -180,6 +195,15 @@ export class DuelGame extends DurableObject<Env> {
     const sql = this.env.DB && attached.uid ? d1Sql(this.env.DB) : null;
     const now = Date.now();
     if (msg.t === "hello") {
+      // An app on another protocol: it reloads to get this one (DUEL_PROTOCOL).
+      if (msg.v !== DUEL_PROTOCOL) {
+        try {
+          ws.send(JSON.stringify({ t: "error", message: DUEL_UPDATE, reload: true, now }));
+        } catch {
+          // Already gone.
+        }
+        return;
+      }
       // Their chat packs (shop items) and any chat ban, read as they connect: never per move. Each fails on its own.
       const [owned, block] = sql
         ? await Promise.all([shopState(sql, attached.uid!).then((s) => s.owned).catch(() => null), chatBlock(sql, attached.uid!, now).catch(() => undefined)])
@@ -200,12 +224,13 @@ export class DuelGame extends DurableObject<Env> {
     const block = recheck ? await chatBlock(sql!, attached.uid!, now).catch(() => undefined) : undefined;
     if (!this.record) return;
     const core = this.core();
-    if (block !== undefined) {
-      this.chatChecked.set(color, now);
-      core.chatStanding(color, block);
-    }
-    core.message(color, msg);
-    await this.persist(core);
+    await this.change(core, () => {
+      if (block !== undefined) {
+        this.chatChecked.set(color, now);
+        core.chatStanding(color, block);
+      }
+      core.message(color, msg);
+    });
   }
 
   async webSocketClose(ws: WebSocket) {
@@ -213,14 +238,19 @@ export class DuelGame extends DurableObject<Env> {
     if (!color || !this.record) return;
     if (this.socketsOf(color).some((s) => s !== ws)) return;
     const core = this.core(ws);
-    core.disconnect(color);
-    await this.persist(core);
+    await this.change(core, () => core.disconnect(color));
   }
 
   async alarm() {
     if (!this.record || (await this.closeIfDue())) return;
     const core = this.core();
     core.alarm();
+    // (Always stored: the alarm is set again for whatever's next, a recording due included.)
     await this.persist(core);
   }
+}
+
+/** A seat's player as the queue hands it over: their account and a name. */
+function validPlayer(p: DuelPlayerView | undefined): p is DuelPlayerView {
+  return !!p && typeof p.uid === "string" && !!p.uid && typeof p.name === "string";
 }

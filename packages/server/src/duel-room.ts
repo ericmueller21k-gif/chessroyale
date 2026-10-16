@@ -74,9 +74,13 @@ export interface DuelRecord {
   noShow: DuelEnd | null;
   /** A test's clock (seconds a side, no increment): the test switch `clock=`. */
   testSeconds: number | null;
-  /** The finished game has been handed over to be recorded (and how often that failed). */
-  handedOver: boolean;
+  /**
+   * Recording the finished game: the tries started so far, and when the next may start if no outcome has come back
+   * (a try that failed, or one lost to an eviction or a deploy mid-way). Whether a try is running now is the object's
+   * own, in memory: a wake tries again.
+   */
   recordTries: number;
+  recordAt: number | null;
   /** What it did for each player (their rank, their coins), once recorded. */
   outcomes: Partial<Record<Color, DuelOutcome>> | null;
   /** When the room closes (its results kept until then). */
@@ -95,17 +99,17 @@ export function newDuelRecord(code: string, now: number, players: Record<Color, 
     game: null,
     noShow: null,
     testSeconds: opts.testSeconds && opts.testSeconds > 0 ? Math.min(3600, Math.round(opts.testSeconds)) : null,
-    handedOver: false,
     recordTries: 0,
+    recordAt: null,
     outcomes: null,
     closeAt: null,
     chat: { n: 0, lines: [], sent: {}, owned: {}, off: {}, muted: {} },
   };
 }
 
-/** A recording that failed is tried again this long after, at most this many times. */
-const RECORD_RETRY_MS = 15_000;
-const RECORD_TRIES = 4;
+/** A recording with no outcome yet is tried again this long after its last try started, at most this many tries. */
+export const RECORD_RETRY_MS = 15_000;
+export const RECORD_TRIES = 4;
 
 export class DuelCore {
   constructor(
@@ -226,7 +230,7 @@ export class DuelCore {
       if (d !== null) times.push(d);
       // (The vote opens after the versus moment: no event of its own.)
     }
-    if (this.end && !r.handedOver && r.recordTries > 0 && r.recordTries < RECORD_TRIES) times.push(this.end.at + r.recordTries * RECORD_RETRY_MS);
+    if (this.toRecord() && r.recordAt !== null) times.push(r.recordAt);
     if (r.closeAt !== null) times.push(r.closeAt);
     return times.length ? Math.min(...times) : null;
   }
@@ -239,16 +243,31 @@ export class DuelCore {
 
   // ---------------- Recording ----------------
 
+  /** A finished game (not aborted) whose outcome hasn't come back, with tries left. */
+  private toRecord(): boolean {
+    const r = this.r;
+    const end = r.game?.end;
+    return !!end && end.result !== "aborted" && r.outcomes === null && r.recordTries < RECORD_TRIES;
+  }
+
+  /** Whether a recording try is due now (takeFinished would hand the game over). */
+  takeFinishedDue(): boolean {
+    const r = this.r;
+    return this.toRecord() && (r.recordAt === null || this.io.now() >= r.recordAt);
+  }
+
   /**
-   * The finished game, to be recorded (ranks, coins, the kept game): once, and again after a failed try (`recordFailed`)
-   * while tries are left. Null when there's nothing to record (not over, aborted, or handed over already).
+   * The finished game, to be recorded (ranks, coins, the kept game), when a try is due: at once when it ends, then
+   * again RECORD_RETRY_MS after each try while no outcome has come back (recordDuel's nonce makes a repeat harmless),
+   * at most RECORD_TRIES tries. The caller starts it only when none of its own is running. Null when nothing is due.
    */
   takeFinished(): FinishedDuel | null {
     const r = this.r;
     const g = r.game;
-    if (r.handedOver || !g?.end || g.end.result === "aborted" || r.recordTries >= RECORD_TRIES) return null;
-    if (r.recordTries > 0 && this.io.now() < g.end.at + r.recordTries * RECORD_RETRY_MS) return null;
-    r.handedOver = true;
+    if (!this.takeFinishedDue() || !g?.end) return null;
+    const now = this.io.now();
+    r.recordTries++;
+    r.recordAt = now + RECORD_RETRY_MS;
     return {
       id: r.id,
       players: { w: r.players.w.uid, b: r.players.b.uid },
@@ -259,13 +278,8 @@ export class DuelCore {
       times: g.times,
       startedAt: g.startsAt ?? g.end.at,
       endedAt: g.end.at,
+      testSeconds: r.testSeconds,
     };
-  }
-
-  /** The recording failed: tried again later (nextAlarm), a few times. */
-  recordFailed() {
-    this.r.handedOver = false;
-    this.r.recordTries++;
   }
 
   /** The recording's answer: each player hears what the game did for them (null: nothing changed). */

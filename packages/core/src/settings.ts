@@ -1536,10 +1536,11 @@ export const RANKED_1V1 = {
   /**
    * Coins (as Squads pays them), lined up with what a Squads lobby pays per minute played (about 1.8 a minute:
    * docs/decisions/2026-10-16-ranked-1v1.md): `perMinute` of the game's time from its start to its end, by result, at
-   * least 1 and at most `maxPerGame`; nothing for a game with fewer than `minMoves` moves each, an aborted game, or a
-   * bot game.
+   * least 1 and at most `maxPerGame`; nothing for a game with fewer than `minMoves` moves each, an aborted game, a bot
+   * game, or a player fair play is holding (in review). At most `perDay` paying games a day per account (UTC days; the
+   * director's cap, Oct 16): the next games that day pay nothing.
    */
-  coins: { perMinute: { win: 2.4, draw: 1.6, loss: 0.8 }, minMoves: 10, maxPerGame: 70 },
+  coins: { perMinute: { win: 2.4, draw: 1.6, loss: 0.8 }, minMoves: 10, maxPerGame: 70, perDay: 20 },
   /** Each ranked game's moves are kept this long (a reported player's games are checked from them), then deleted. */
   gamesKeepDays: 30,
   /**

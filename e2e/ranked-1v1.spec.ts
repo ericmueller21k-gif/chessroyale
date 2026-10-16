@@ -145,7 +145,7 @@ test("two players: one tap to queue, the vote on the game's own board, checkmate
     await expect.poll(() => p.evaluate(() => (window as unknown as { duel?: { snapshot(): { moves: string[] } } }).duel?.snapshot().moves.length ?? -1).catch(() => -1)).toBe(ply);
   }
   await expect(black.locator(".dv-result-title")).toHaveText("You won");
-  await expect(black.locator(".dv-result-why")).toHaveText("by checkmate");
+  await expect(black.locator(".dv-result-why")).toHaveText("Checkmate.");
   await expect(white.locator(".dv-result-title")).toHaveText("You lost");
   // The ranks moved: one placement game each (the server's record).
   for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 1/5", { timeout: 15_000 });
@@ -200,6 +200,65 @@ test("a first move that never comes: the game is aborted, nobody's rank moves", 
   await expect(white.locator(".dv-result-why")).toHaveText("Your first move didn't come in time. No rank change.");
   await expect(black.locator(".dv-result-why")).toHaveText(/'s first move didn't come in time\. No rank change\.$/);
   await expect(white.locator(".dv-result-rank")).toHaveCount(0);
+  expect((await record(white)).games).toBe(0);
+  expect((await record(black)).games).toBe(0);
+});
+
+test("a reload mid-game comes back to the same game, its clocks running; a declined offer, then a draw both agree to", async ({ browser }) => {
+  test.setTimeout(3 * 60_000);
+  const a = await player(browser, "Ann Draw");
+  const b = await player(browser, "Bo Draw");
+  await meet(a, b, poolName());
+  await waitForPlay(a, b);
+  const { white, black } = await bySide(a, b);
+  await tapMove(white, "e2e4");
+  await expect(black.locator(".dv-status")).toContainText("Your first move", { timeout: 10_000 });
+  await tapMove(black, "e7e5");
+  await expect(white.locator(".dv-status")).toHaveText("Your move", { timeout: 10_000 });
+  // White reloads (its address is the game's: /1v1/CODE): the same game, both moves, White's clock running down.
+  const code = await white.evaluate(() => location.pathname);
+  expect(code).toMatch(/^\/1v1\/[A-Z2-9]{5}$/);
+  const clock = () => white.locator(".dv-strip.dv-you .dv-clock").textContent();
+  await white.reload();
+  await expect(white.locator(".dv-status")).toHaveText("Your move", { timeout: 20_000 });
+  expect(await white.evaluate(() => location.pathname)).toBe(code);
+  expect(await white.evaluate(() => (window as unknown as { duel: { snapshot(): { moves: string[]; running: boolean } } }).duel.snapshot())).toMatchObject({ moves: ["e2e4", "e7e5"], running: true });
+  const t1 = await clock();
+  await expect.poll(clock, { timeout: 5_000 }).not.toBe(t1);
+  // White offers a draw; Black declines; White can't offer again yet.
+  await white.getByRole("button", { name: "Offer a draw" }).click();
+  await expect(white.locator(".dv-draw-sent")).toHaveText("Draw offered");
+  const nameOf = (p: Page) => (p === a ? "Ann Draw" : "Bo Draw");
+  await expect(black.locator(".dv-draw")).toContainText(`${nameOf(white)} offers a draw`);
+  await black.locator(".dv-draw").getByRole("button", { name: "Decline" }).click();
+  await expect(white.locator(".dv-draw-sent")).toHaveCount(0);
+  await expect(white.getByRole("button", { name: "Offer a draw" })).toBeDisabled();
+  // Black offers, after a move each; White accepts: a draw, both told why.
+  await tapMove(white, "g1f3");
+  await expect(black.locator(".dv-status")).toHaveText("Your move", { timeout: 10_000 });
+  await black.getByRole("button", { name: "Offer a draw" }).click();
+  await expect(white.locator(".dv-draw")).toContainText(`${nameOf(black)} offers a draw`);
+  await white.locator(".dv-draw").getByRole("button", { name: "Accept" }).click();
+  for (const p of [white, black]) {
+    await expect(p.locator(".dv-result-title")).toHaveText("Draw");
+    await expect(p.locator(".dv-result-why")).toHaveText("Draw agreed.");
+    await expect(p.locator(".dv-result-rank")).toHaveText("Placement 1/5", { timeout: 15_000 });
+  }
+  expect(await record(white)).toMatchObject({ games: 1, draws: 1 });
+});
+
+test("Leave before the first moves: the game is called off, with no result and no rank change", async ({ browser }) => {
+  test.setTimeout(2 * 60_000);
+  const a = await player(browser, "Ann Leave");
+  const b = await player(browser, "Bo Leave");
+  await meet(a, b, poolName());
+  await waitForPlay(a, b);
+  const { white, black } = await bySide(a, b);
+  await resign(white, "Leave");
+  await expect(white.locator(".dv-result-title")).toHaveText("Game aborted");
+  await expect(white.locator(".dv-result-why")).toHaveText("You left before the first moves. No rank change.");
+  await expect(black.locator(".dv-result-title")).toHaveText("Game aborted");
+  await expect(black.locator(".dv-result-why")).toHaveText(`${white === a ? "Ann Leave" : "Bo Leave"} left before the first moves. No rank change.`);
   expect((await record(white)).games).toBe(0);
   expect((await record(black)).games).toBe(0);
 });

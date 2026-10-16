@@ -59,6 +59,20 @@ describe("pairing in the queue (PAIR_BY_RATING)", () => {
     expect(q.cancel(u.id)).toBe("GAMEX");
   });
 
+  it("a ticket without its player is never paired (and two accounts on one device never meet)", () => {
+    const q = new QueueCore(cfg(), T0, nextId);
+    q.enqueue(null, T0, info("a", 1500));
+    q.enqueue(null, T0, { uid: "b", rating: 1500 });
+    q.enqueue(null, T0, { rating: 1500 });
+    expect(q.admit(T0, 0, PAIR_BY_RATING)).toEqual([]);
+    const d = new QueueCore(cfg(), T0, nextId);
+    d.enqueue(null, T0, { ...info("a", 1500), device: "dev1" });
+    d.enqueue(null, T0, { ...info("b", 1500), device: "dev1" });
+    expect(d.admit(T0, 0, PAIR_BY_RATING)).toEqual([]);
+    d.enqueue(null, T0, { ...info("c", 1500), device: "dev2" });
+    expect(d.admit(T0, 0, PAIR_BY_RATING)).toHaveLength(1);
+  });
+
   it("its own queue name", () => {
     expect(queueName("ranked1v1", "default")).toBe("ranked1v1-default");
     expect(queueName("ranked1v1", "default", "e2e-1")).toBe("ranked1v1-default-e2e-1");
@@ -112,6 +126,34 @@ describe("the Matchmaker's 1 v 1 queue", () => {
     const g = D.made.get(codes[0]!)!;
     expect([g.w.uid, g.b.uid].sort()).toEqual(["ann", "bob"]);
     expect(g.testSeconds).toBe(9);
+  });
+
+  it("a ticket asked about after it went (a phone asleep past its time, or one made up) is expired: never a new, empty ticket", async () => {
+    const D = duels();
+    const mm = matchmaker(D.ns);
+    const first = await mm.duelNext(null, info("ann", 1500));
+    expect(first).toMatchObject({ searching: true });
+    const realNow = Date.now;
+    const t0 = Date.now();
+    Date.now = () => t0 + 20_000;
+    try {
+      // Bob arrives 20 s later; Ann's ticket, unasked-about, goes as the queue forms.
+      const bob = await mm.duelNext(null, info("bob", 1500));
+      expect(bob).toMatchObject({ searching: true });
+      // Ann's app wakes and asks with her old ticket: expired (her app asks afresh, with her player).
+      expect(await mm.duelNext(ticketOf(first))).toEqual({ expired: true });
+      // A made-up ticket, or a first ask without the player: the same.
+      expect(await mm.duelNext("anything8")).toEqual({ expired: true });
+      expect(await mm.duelNext(null, { uid: "eve", rating: 1500 })).toEqual({ expired: true });
+      expect(D.made.size).toBe(0);
+      // Asking afresh, she meets Bob.
+      const again = await Promise.all([mm.duelNext(null, info("ann", 1500)), mm.duelNext(ticketOf(bob))]);
+      expect(again[0]).toMatchObject({ code: expect.any(String) });
+      const g = [...D.made.values()][0]!;
+      expect([g.w.uid, g.b.uid].sort()).toEqual(["ann", "bob"]);
+    } finally {
+      Date.now = realNow;
+    }
   });
 
   it("Cancel: out of line, never paired after", async () => {

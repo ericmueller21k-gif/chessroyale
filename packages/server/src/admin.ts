@@ -499,7 +499,7 @@ ${note ? `<div class="card">${esc(note)}</div>` : ""}
 ${appealForm}
 <h2>Decide</h2>${decision}
 <form class="row" method="post"><button name="action" value="deep">Check the counted moves with the engine server now</button></form>
-<p class="muted">The button checks their 1 v 1 games too (below), reported ones first, within the day's budget.</p>
+<p class="muted">The button checks their 1 v 1 games too (below), reported ones first, within the day's budget: each move against every legal move, in groups of 8 (about 5 searches a move, so a press covers about 12 moves).</p>
 <p class="muted">Hard positions (fewer than ${Math.round(FAIRPLAY.signals.hardShare * 100)}% of the crowd found the best move) are in bold; grayed rows don't count (opening, forced, obvious, decided, power-up).</p>
 ${chatSection(d.player.id, chat)}
 ${d.sameDevice.length ? `<h2>Same device</h2><p>${d.sameDevice.map((u) => `<a href="/admin/fairplay/case/${esc(u.id)}">${esc(u.name)}</a> (${esc(u.status ?? "no case")})`).join(", ")}</p>` : ""}

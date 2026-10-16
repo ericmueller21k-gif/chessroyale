@@ -41,16 +41,25 @@ export interface MatchRules {
 export const FILL_IN_ORDER: MatchRules = { group: (tickets) => (tickets.length ? [{ key: "all", tickets }] : []) };
 
 /**
- * Ranked 1 v 1: pairs by the hidden rating (each ticket's `info.uid`, `info.rating` and `info.rd`, read by the server),
- * the range widening with the wait and the ratings' uncertainty (core's pairUp): each pair is a group of its own (a
- * game). Tickets without a partner yet stay in line, in order, for the next batch.
+ * Ranked 1 v 1: pairs by the hidden rating (each ticket's `info.uid`, `info.rating`, `info.rd` and `info.device`, read
+ * by the server), the range widening with the wait and the ratings' uncertainty (core's pairUp): each pair is a group
+ * of its own (a game). Tickets without a partner yet stay in line, in order, for the next batch. A ticket without its
+ * player (`info.uid`, `info.player`) is never paired (the matchmaker never makes one: duelNext).
  */
 export const PAIR_BY_RATING: MatchRules = {
   group(tickets, now) {
-    const entries = tickets.map((t) => ({ id: t.id, uid: String(t.info?.uid ?? t.id), rating: Number(t.info?.rating) || 1500, rd: Number(t.info?.rd) || 0, at: t.at, t }));
+    const entries = tickets
+      .filter(duelTicketComplete)
+      .map((t) => ({ id: t.id, uid: t.info!.uid as string, rating: Number(t.info?.rating) || 1500, rd: Number(t.info?.rd) || 0, device: typeof t.info?.device === "string" ? t.info.device : null, at: t.at, t }));
     return pairUp(entries, now).map(([a, b]) => ({ key: `duel:${a.id}`, tickets: [a.t, b.t] }));
   },
 };
+
+/** A ranked 1 v 1 ticket that carries its player (an account id and the player as the game shows them). */
+export function duelTicketComplete(t: Ticket): boolean {
+  const p = t.info?.player as { uid?: unknown } | undefined;
+  return typeof t.info?.uid === "string" && !!t.info.uid && !!p && p.uid === t.info.uid;
+}
 
 export interface QueueConfig {
   admitPerSecond: number;
@@ -99,6 +108,11 @@ export class QueueCore {
     this.line.push(t);
     this.byId.set(t.id, t);
     return t;
+  }
+
+  /** Whether this queue knows the ticket: in line (even past its time, until it's dropped), or placed. */
+  known(ticketId: string): boolean {
+    return this.byId.has(ticketId) || this.placed.has(ticketId);
   }
 
   /** The lobby a ticket was placed in (undefined while it waits). */

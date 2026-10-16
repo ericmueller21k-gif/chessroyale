@@ -57,7 +57,12 @@ export interface DuelOutcome {
   /** Null when your rank didn't change (an aborted game, or fair play holding your rank). */
   change: RankChange | null;
   coins: number;
+  /** An unranked game: a test's clock on a server without test switches (nothing recorded). */
+  unranked?: boolean;
 }
+
+/** The server's answer to an app on another protocol: it reloads (once) to get the new app. */
+export const DUEL_UPDATE = "HunChess has been updated. Reloading…";
 
 export type DuelClientMessage =
   | { t: "hello"; v?: number }
@@ -87,6 +92,7 @@ export type DuelServerMessage = (
   | { t: "chatLog"; lines: NetChatLine[]; packs: string[] }
   /** `block`: your chat ban (reason "mod", chat moderation). */
   | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock }
-  | { t: "error"; message: string }
+  /** `reload`: the app is out of date (DUEL_PROTOCOL): it reloads. */
+  | { t: "error"; message: string; reload?: boolean }
   | { t: "closed"; reason: string }
 ) & { now?: number };

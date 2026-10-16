@@ -15875,6 +15875,7 @@ button.sq-tiny {
   color: var(--bad);
 }
 .dv-result-why {
+  margin: 0;
   color: var(--muted);
 }
 .dv-result-rank {
@@ -15904,8 +15905,11 @@ button.sq-tiny {
 
 /* Phones: one locked screen; the chat takes what's left under the panel. */
 @media (max-width: 899px) and (min-height: 520px) {
+  /* The chat fills what's left under the board, never less than its header, a line of the feed and its buttons: on a
+     short phone the result card pushes it down the page (it scrolls) rather than clipping it. */
   .screen.game.duel-screen .dv-chat {
-    flex: 1 1 0;
+    flex: 1 0 0;
+    min-height: 128px;
     margin: 0 10px;
   }
   .screen.game.duel-screen .dv-panel {

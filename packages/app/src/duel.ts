@@ -127,10 +127,17 @@ export class NetDuel implements DuelSession {
   private you: Color = "w";
   private outcome: DuelOutcome | null = null;
   private gone: string | null = null;
-  /** Your move shown before the server's answer (its ply). */
+  /** Your move shown before the server's answer (its ply), and the move (sent again after a reconnect if still due). */
   private pending: number | null = null;
+  private pendingMove: { uci: string; ply: number } | null = null;
   private ws: WebSocket | null = null;
+  /**
+   * The server's clock minus this device's (ms). Each message gives a sample, short by however long it took to
+   * arrive, so the largest sample (the quickest message) is kept; a fresh connection, or one older than OFFSET_KEEP_MS,
+   * starts over.
+   */
   private offset = 0;
+  private offsetAt: number | null = null;
   private retry = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private closed = false;
@@ -169,6 +176,7 @@ export class NetDuel implements DuelSession {
 
   connect() {
     if (this.closed) return;
+    this.offsetAt = null;
     const ws = new WebSocket(`${wsBase()}/api/1v1/game/${this.code}/ws`);
     this.ws = ws;
     let opened = false;
@@ -237,15 +245,31 @@ export class NetDuel implements DuelSession {
     };
   }
 
+  /** One message's clock sample: kept if it's the quickest yet (the largest), or the kept one has grown old. */
+  private sampleOffset(serverNow: number) {
+    const now = Date.now();
+    const sample = serverNow - now;
+    if (this.offsetAt === null || sample > this.offset || now - this.offsetAt > OFFSET_KEEP_MS) {
+      this.offset = sample;
+      this.offsetAt = now;
+    }
+  }
+
   private onMessage(msg: DuelServerMessage) {
-    if (typeof msg.now === "number") this.offset = msg.now - Date.now();
+    if (typeof msg.now === "number") this.sampleOffset(msg.now);
     switch (msg.t) {
-      case "welcome":
+      case "welcome": {
         this.you = msg.you;
         this.view = this.localView(msg.game);
         this.pending = null;
         this.chat.onWelcome();
+        // Back after a dropped socket with your move unanswered: sent again if the game is still waiting for it (the
+        // server never plays a ply twice); gone if it was played meanwhile, or the game moved on.
+        const p = this.pendingMove;
+        this.pendingMove = null;
+        if (p && this.view.moves.length === p.ply) this.move(p.uci);
         break;
+      }
       case "game":
         this.view = this.localView(msg.game);
         this.pending = null;
@@ -269,13 +293,17 @@ export class NetDuel implements DuelSession {
           drawOffer: msg.drawOffer,
           canOffer: msg.canOffer,
         };
-        if (this.pending === msg.ply) this.pending = null;
+        if (this.pending === msg.ply) {
+          this.pending = null;
+          this.pendingMove = null;
+        }
         break;
       }
       case "moveNo":
         crumb(`1v1 move refused: ${msg.reason}`);
         this.view = this.localView(msg.game);
         this.pending = null;
+        this.pendingMove = null;
         break;
       case "draw":
         if (this.view) this.view = { ...this.view, drawOffer: msg.drawOffer, canOffer: msg.canOffer };
@@ -296,6 +324,8 @@ export class NetDuel implements DuelSession {
         this.chat.onRefused(msg.say, msg.reason, msg.retryAt, msg.block);
         break;
       case "error":
+        // An app on an older protocol: reload once for the new one (twice in a minute: say so instead).
+        if (msg.reload && reloadOnce()) return;
         this.gone = msg.message;
         break;
       case "closed":
@@ -378,6 +408,7 @@ export class NetDuel implements DuelSession {
       drawOffer: v.drawOffer === this.you ? v.drawOffer : null,
     };
     this.pending = ply;
+    this.pendingMove = { uci, ply };
     crumb(`1v1 move ${uci}`);
     this.send({ t: "move", uci, ply });
     this.emit();
@@ -394,6 +425,23 @@ export class NetDuel implements DuelSession {
   drawNo() {
     this.send({ t: "drawNo" });
   }
+}
+
+/** A kept clock sample is replaced by a slower one after this long (the two clocks drift a little). */
+const OFFSET_KEEP_MS = 5 * 60_000;
+
+/** Reloads the page for a new app, unless it did so in the last minute (then false: a loop helps nobody). */
+function reloadOnce(): boolean {
+  const key = "brc.duelReloadAt";
+  try {
+    const at = Number(sessionStorage.getItem(key));
+    if (Number.isFinite(at) && Date.now() - at < 60_000) return false;
+    sessionStorage.setItem(key, String(Date.now()));
+  } catch {
+    return false;
+  }
+  location.reload();
+  return true;
 }
 
 /** GET /api/1v1/game/CODE: whether a game is still open (null: no answer). */
@@ -438,7 +486,7 @@ export class BotDuel implements DuelSession {
     this.versusAt = now;
     const test = Number(testParams().get("clock"));
     this.state = newDuel(now + RANKED_1V1.versusMs, { testSeconds: Number.isFinite(test) && test > 0 ? test : null });
-    // The bot's pick, a moment into the vote (or none, now and then: then yours decides).
+    // The bot's pick: a zone at random, 0.8-3.5 s into the vote.
     const voteAt = this.state.voteAt;
     const zones: DuelZone[] = ["bullet", "blitz", "rapid"];
     setTimeout(() => this.botPick(zones[Math.floor(Math.random() * 3)]!), voteAt - now + rnd(800, 3500));
@@ -626,8 +674,9 @@ export type DuelQueueState =
 
 /**
  * The 1 v 1 queue: asks the server for an opponent (POST /api/1v1/play) and asks again at once with its ticket (each
- * ask waits up to a few seconds on the server) until it's paired, or busy (asks again when told). Cancel stops it and
- * tells the server (a pairing made that very moment is called off there).
+ * ask waits up to a few seconds on the server) until it's paired, or busy (asks again when told); a ticket the server
+ * no longer knows (`expired`) is dropped and it asks afresh. Cancel stops it and tells the server (a pairing made
+ * that very moment is called off there).
  */
 export class DuelQueue {
   state: DuelQueueState = { kind: "searching", since: Date.now() };
@@ -683,8 +732,16 @@ export class DuelQueue {
         botRating?: number;
         message?: string;
         banned?: boolean;
+        expired?: boolean;
       };
       if (typeof body.botRating === "number") this.botRating = body.botRating;
+      // The server doesn't know this ticket any more (it went while this device slept): ask afresh, still searching.
+      // (Expired with no ticket sent can't be: refused, rather than asking again and again.)
+      if (body.expired) {
+        if (!this.ticket) return this.set({ kind: "refused", message: "Couldn't find a match. Try again." });
+        this.ticket = null;
+        continue;
+      }
       if (body.ticket) this.ticket = body.ticket;
       if (res.status === 429 || body.busy) {
         await new Promise((r) => setTimeout(r, body.retryMs ?? 3000));

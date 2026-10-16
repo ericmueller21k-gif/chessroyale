@@ -228,8 +228,8 @@ export function pairRange(waitedMs: number, rd = 0, s: Settings = RANKED_1V1): n
 }
 
 /**
- * One player in the queue, as pairing needs them: their account, hidden rating (and its deviation, if known) and when
- * they started waiting.
+ * One player in the queue, as pairing needs them: their account, hidden rating (and its deviation, if known), when
+ * they started waiting, and their device's marker (a hash of fair play's device cookie, if it has one).
  */
 export interface PairingEntry {
   id: string;
@@ -237,11 +237,15 @@ export interface PairingEntry {
   rating: number;
   rd?: number;
   at: number;
+  device?: string | null;
 }
+
+/** Two entries that may never meet: the same account (two tabs), or the same device (two accounts on one phone). */
+const sameOwner = (a: PairingEntry, b: PairingEntry) => a.uid === b.uid || (!!a.device && a.device === b.device);
 
 /**
  * Who plays whom now: the longest-waiting first, each with the closest rating within range (the longer wait's
- * range), never their own account. Everyone left over keeps waiting.
+ * range), never their own account nor another account on their own device. Everyone left over keeps waiting.
  */
 export function pairUp<T extends PairingEntry>(entries: readonly T[], now: number, s: Settings = RANKED_1V1): [T, T][] {
   const waiting = [...entries].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
@@ -251,7 +255,7 @@ export function pairUp<T extends PairingEntry>(entries: readonly T[], now: numbe
     if (taken.has(a.id)) continue;
     let best: T | null = null;
     for (const b of waiting) {
-      if (b === a || taken.has(b.id) || b.uid === a.uid) continue;
+      if (b === a || taken.has(b.id) || sameOwner(a, b)) continue;
       const gap = Math.abs(a.rating - b.rating);
       if (gap > pairRange(now - Math.min(a.at, b.at), Math.max(a.rd ?? 0, b.rd ?? 0), s)) continue;
       if (!best || gap < Math.abs(a.rating - best.rating)) best = b;

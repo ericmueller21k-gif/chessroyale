@@ -21,7 +21,9 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   the longest wait first, with the closest hidden rating within `startRange + perSecond × seconds waited` (the longer
   wait's) `+ perRd ×` the larger of the two deviations (as they stand that day), at most `maxRange` (`RANKED_1V1.match`:
   100, +10 a second, +1 × deviation, 1000; so two players in placements, still uncertain, meet at once, and settled
-  ones at 160). Cancel takes the ticket out; a pairing made
+  ones at 160); never two accounts on one device (fair play's device cookie, hashed, on the ticket). A ticket is only
+  made with its player: one the queue doesn't know (gone while the app slept, or made up) is answered `expired` and
+  the app asks afresh. Cancel takes the ticket out; a pairing made
   that very moment is called off for that player (`DuelGame.abandon`: an abort before any move, nothing recorded).
   After `fewPlayersSeconds` (45) the app offers "Few players online right now" with Keep waiting and Play a bot
   (unranked).
@@ -75,13 +77,17 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     result card ("Gold 2 · 45 RP (+18)", "Placed: Gold 4 · 25 RP"). The home screen's button reads
     `ranked1v1Label()` (`packages/app/src/ranked.ts`).
 - **Coins** (`duelCoins`): per minute of the game's length by result (win 2.4, draw 1.6, loss 0.8), at least 1, at
-  most 70, only when both sides made 10 moves; none for an aborted or a bot game. Lined up with what a Squads lobby pays
-  per minute (the decision file has the table).
+  most 70, only when both sides made 10 moves; none for an aborted or a bot game, nor for a player fair play holds (in
+  review). At most `coins.perDay` (20) paying games a UTC day per account (`coin_day`, `coin_games` on their
+  `ranked_1v1` row, written in the game's batch); later games still count for the rank. Lined up with what a Squads
+  lobby pays per minute (the decision file has the table and the farming numbers).
 - **Recording** (`ranked.ts`, `recordDuel`): one D1 batch per finished game: the game's row, both players' ranks (from
   both records as they stand now), their coins. The game's row goes in only if neither player's record changed since it
   was read (another game of theirs ending at the same moment), and everything else applies only if that row is this
-  recording's (its nonce), so a game is recorded once; a row that didn't go in is read again and retried. A failed
-  recording is tried again on the object's alarm (15 s apart, 4 tries).
+  recording's (its nonce), so a game is recorded once; a row that didn't go in is read again and retried. The object
+  starts a try at the end and again on any wake while no outcome has come back (15 s after the last try started, 4
+  tries: a slow failure, an eviction or a deploy mid-way loses nothing); a game already in answers each player's rank as
+  it stands. A game on a test's clock where `TEST_SWITCHES` isn't "1" records nothing ("Unranked game").
 - **The bot game** (`BotDuel` in `packages/app/src/duel.ts`): "Play a bot (unranked)" plays on the device by the same
   rules, the same vote (the bot picks at random) and the same board: Maia at the player's hidden rating (the first
   queue answer's `botRating`; the bosses' human-like engine, its own draw, `BOSS_BRAIN` temperature and top-p) when
@@ -89,15 +95,17 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   (`playAtElo`, 1320-3190). It thinks within `bot.thinkMs`, never more than `clockShare` of its clock; it takes a draw
   only when clearly behind on material. No chat, no rank, no coins, nothing recorded.
 - **Fair play** ([fairplay.md](fairplay.md), "1 v 1"): reports from the profile, as everywhere (opened from the game,
-  a report names it); the case page's engine check covers the player's kept 1 v 1 games, reported ones first, within
-  the deep re-check's daily budget; shown for the reviewer, never in the suspicion score.
+  a report names it); the case page's engine check covers the player's kept 1 v 1 games, reported ones first, each move
+  against every legal move in the engine server's groups of at most 8, within the deep re-check's daily budget; shown
+  for the reviewer, never in the suspicion score.
 - **The first-time vote hint** (`components/VoteHint.tsx`, shared by every pawn vote): "Drag your pawn into the speed
   you want" at the foot of the board, the first time a device meets a pawn vote (`brc.voteHintSeen`), until the pawn is
   dropped or the vote ends.
 
 ## The protocol
 
-`packages/chess/src/duel/protocol.ts` (`DUEL_PROTOCOL` 1). HTTP: POST `/api/1v1/play[?ticket=&pool=&clock=]`, POST
+`packages/chess/src/duel/protocol.ts` (`DUEL_PROTOCOL` 1; an app on another answers `error` with `reload`, and it
+reloads once). HTTP: POST `/api/1v1/play[?ticket=&pool=&clock=]`, POST
 `/api/1v1/cancel?ticket=`, GET `/api/1v1/game/CODE`, `/api/1v1/game/CODE/ws`. The socket gets `welcome` (your side, the
 game in full), `game` (a phase change, a sync, the end), `picks`, `move` (with the clocks), `moveNo` (with the game),
 `draw`, `presence`, `outcome`, `chat`, `chatLog`, `chatNo`, `error`, `closed`, each with the server's `now`; it sends
@@ -108,8 +116,8 @@ by the clock (`voteAt`); everything else comes as a message.
 
 | Table / column | What | Kept |
 | --- | --- | --- |
-| `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at) | A player's hidden rating, record and ladder place | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
-| `ranked_1v1_games` (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, checked, nonce) | Each ranked game (never an aborted one): moves (UCI), think times (ms), how it ended; fair play's engine check by side | `gamesKeepDays` (30) after it ends (the 15-minute cron, `purgeDuelGames`), longer while a player in it is in review or banned; on account deletion that player becomes "deleted" in it; the download has a player's games (opponent by name, not the check) |
+| `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games) | A player's hidden rating, record and ladder place; the UTC day of their last paying game and how many paid that day | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
+| `ranked_1v1_games` (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, checked, nonce) | Each ranked game (never an aborted one): moves (UCI), think times (ms), how it ended; fair play's engine check by side | `gamesKeepDays` (30) after it ends (the 15-minute cron, `purgeDuelGames`); longer only while a player in it has a fair-play case open (watch or review) or an appeal of a ban waiting (`purgeEvidence`'s rule); on account deletion that player becomes "deleted" in it; the download has a player's games (opponent by name, not the check) |
 
 No `results` rows for 1 v 1 (Crowd's stats and `users.rating` stay as they were). The privacy policy's "1 v 1 (ranked)"
 entry says the same.
@@ -139,25 +147,33 @@ kill switch `PAUSE_RANKED1V1`.
 ## Tests and tools
 
 - Unit: `packages/core/test/ranked.test.ts` (every pair of picks and missing picks, Glicko-1, the ladder's labels,
-  placements, promotion and demotion, the floor, rank points, pairing's widening, coins),
-  `packages/chess/test/duel-rules.test.ts` (the vote and the start, first moves and the abort, Fischer clocks, flags and
-  the draw when the other side can't mate, every ending, resign and abort, draw offers),
-  `packages/server/test/duel-room.test.ts` (the timeline, no-shows, aborts, moves and refusals, checkmate handed over
-  once, a failed recording retried, disconnect and reconnect with the clock running and the flag while gone, draws, a
-  test clock, closing, chat: relay, limits, mute, off, a chat ban), `duel-do.test.ts` (the object on a fake runtime:
-  a game to mate over its sockets, recorded once, a restart, closing; only its two players get in), `duel-queue.test.ts`
-  (pairing and widening, one ticket per account, Cancel, the Matchmaker's duel mode), `ranked-store.test.ts` (recording:
-  placements, ranks, coins, once, a race with another game, aborted games, fair play's hold, a deleted account; the
-  purge; the profile; the download, deleting, a guest's merge), `fairplay-duel.test.ts` (the engine check),
-  `kill-switches.test.ts` (the 1 v 1 queue resting), `account-data.test.ts` (the tables pinned and covered);
-  `packages/app/test/duel.test.ts` (the hint once per device, clocks, the result's words, the home screen's label),
-  `faq.test.ts` (1 v 1's words follow the settings).
+  placements, promotion and demotion, the floor, rank points with the expected result, farming bounded, pairing's
+  widening, deviations and devices, coins), `packages/chess/test/duel-rules.test.ts` (the vote and the start, first
+  moves and the abort, Fischer clocks, flags and the draw when the other side can't mate, every ending, repetition by
+  position (castling rights, en passant), resign and abort, draw offers), `packages/server/test/duel-room.test.ts` (the
+  timeline, no-shows, aborts, moves and refusals, a resent ply never played twice, checkmate handed over, recording
+  tried again until an outcome is in, disconnect and reconnect with the clock running and the flag while gone, draws,
+  a test clock, closing, chat: relay, limits, mute, off, a chat ban), `duel-do.test.ts` (the object on a fake runtime:
+  a game to mate over its sockets, recorded once, a restart, closing; a recording slow to fail or lost to an eviction
+  tried again without the alarm spinning; a test clock unranked without test switches; an old app told to reload;
+  nothing stored for a sync or a refused move; a seat without a player refused; only its two players get in),
+  `duel-queue.test.ts` (pairing and widening, one ticket per account and one device, a ticket without its player
+  never paired, an expired or made-up ticket, Cancel, the Matchmaker's duel mode), `ranked-store.test.ts` (recording:
+  placements, ranks, coins, the daily cap, once (and the answer to a repeat), a race with another game, aborted games,
+  fair play's hold (no rank change, no coins), a deleted account; the purge by fair play's rule; the profile; the
+  download, deleting, a guest's merge), `fairplay-duel.test.ts` (the engine check within the engine server's 8 moves
+  a search), `kill-switches.test.ts` (the 1 v 1 queue resting), `account-data.test.ts` (the tables pinned and covered);
+  `packages/app/test/duel.test.ts` (the hint once per device, an expired ticket, the clock sample, a move resent after
+  a reconnect, clocks, the result's words, the home screen's label), `faq.test.ts` (1 v 1's words follow the
+  settings).
 - Simulation: `npx tsx packages/sim/scripts/ranked-1v1-sim.ts` → `reports/ranked-1v1.md` (synthetic players with a
   known strength through core's own functions: convergence, the rank distribution, the scale, waits and gaps,
   sandbagging, trading wins). Run it again after changing `RANKED_1V1`'s rating, points, placements or pairing.
 - e2e: `e2e/ranked-1v1.spec.ts` (two players on phones and computers: the queue, the vote on the board by drag and by
   tap, the overlay, the board unmoved from the vote to the game, checkmate by taps, ranks moving; resigning, then a
-  flag after Play again; an aborted game; the search's Cancel, "Few players online", Keep waiting, a bot game).
+  flag after Play again; an aborted game; a reload mid-game back into the same game with its clocks running, a
+  declined draw offer then a draw both agree to; Leave before the first moves; the search's Cancel, "Few players
+  online", Keep waiting, a bot game).
 
 ## Rules for this area
 

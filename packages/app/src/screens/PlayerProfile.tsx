@@ -114,10 +114,13 @@ function RatingChart({ points, own }: { points: number[]; own: boolean }) {
 const dash = (v: number | null) => (v === null ? "—" : String(v));
 const pct = (v: number | null) => (v === null ? "—" : `${v}%`);
 
-/** Ranked 1 v 1: their rank (or placements) and their record. Nothing for a banned player (as the rating). */
+/**
+ * Ranked 1 v 1: their rank (or placements) and their record, once they've played a ranked game. Nothing for a banned
+ * player (as the rating), nor for one who never played.
+ */
 function Ranked1v1({ p }: { p: PublicProfile }) {
   const r = p.ranked1v1;
-  if (!r) return null;
+  if (!r || r.games === 0) return null;
   return (
     <section class="fd-section dv-profile" aria-label="1 v 1 rank">
       <h2 class="fd-label">1 V 1</h2>

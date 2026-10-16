@@ -176,6 +176,30 @@ describe("1 v 1: moves and endings", () => {
     expect(s.moves).toHaveLength(8);
   });
 
+  it("repetition counts positions, not boards: castling rights make a position different", () => {
+    // The knights out and back, then the rooks to g1/g8 and back: the board as after 1.Nf3 Nf6, but with only the
+    // queenside castling rights left. That board stood once with all rights (ply 2), so it's a new position.
+    const { s: a, t: ta } = play(...(Object.values(playing()) as [DuelState, number]), ["g1f3", "g8f6", "h1g1", "h8g8", "g1h1", "g8h8", "f3g1", "f6g8", "g1f3", "g8f6"]);
+    // (Counting boards alone, this would be the third time: a draw.)
+    expect(a.end).toBeNull();
+    const { s: b } = play(a, ta, ["f3g1", "f6g8", "g1f3", "g8f6"]);
+    expect(b.end).toMatchObject({ reason: "repetition" });
+    expect(b.moves).toHaveLength(14);
+  });
+
+  it("repetition counts positions, not boards: an en passant capture there makes a position different", () => {
+    const base = playing().s;
+    // White's e-pawn steps past Black's d4 pawn: e3 can be taken en passant, once. The same board with Black to move
+    // later (the kings out and back, twice) is another position: its third time on the board is only its second as a
+    // position, so the game goes on; the draw comes with the next position's third time.
+    const s0: DuelState = { ...base, fen: "4k3/8/8/8/3p4/8/4P3/4K3 w - - 0 1", moves: ["e2e4", "e7e5"], reps: {}, clocks: { w: 60_000, b: 60_000 } };
+    const { s: a, t: ta } = play(s0, base.turnAt, ["e2e4", "e8d8", "e1f1", "d8e8", "f1e1", "e8d8", "e1f1", "d8e8", "f1e1"]);
+    expect(a.fen.split(" ")[3]).toBe("-");
+    expect(a.end).toBeNull();
+    const { s: b } = play(a, ta, ["e8d8"]);
+    expect(b.end).toMatchObject({ reason: "repetition" });
+  });
+
   it("stalemate, not enough material and the 50-move rule draw", () => {
     const base = playing().s;
     const s = { ...base, moves: ["e2e4", "e7e5"], turnAt: base.turnAt, clocks: { w: 60_000, b: 60_000 } };

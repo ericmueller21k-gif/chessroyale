@@ -3,14 +3,32 @@
  * 1 move as it's played, so a reported player's kept games (ranked.ts, RANKED_1V1.gamesKeepDays) are searched on the
  * engine server when a person asks, from the case page's "Check with the engine server" (admin.ts): the deep
  * re-check's own engine instance and its daily budget (FAIRPLAY.deep.dailySearches), never more. Each of the
- * player's moves after the opening is searched with every legal move as a candidate, so the pick's place among them
- * and what it gave away are the engine's. The result is for the reviewer to read; it never feeds the suspicion
- * score or a ban by itself (there are no judged numbers to measure it against, so a false ban can't come from it).
+ * player's moves after the opening is scored against every legal move, so the pick's place among them and what it
+ * gave away are the engine's. The engine server takes at most ENGINE_MOVES_MAX (8) moves a search and has no
+ * unrestricted search (engine/server.mjs; the judges' top-8 search runs on players' devices), so the legal moves go in
+ * groups of at most 8, one search each (the played move's group first), each a search from the day's budget. The
+ * result is for the reviewer to read; it never feeds the suspicion score or a ban by itself (there are no judged
+ * numbers to measure it against, so a false ban can't come from it).
  */
 import { FAIRPLAY, ratingForLoss } from "@chessroyale/core";
 import { START_FEN, applyMove, legalMoves, stockfishRefuses } from "@chessroyale/chess";
 import type { Sql } from "./accounts.ts";
 import { deepResult, takeBudget, type DeepSearch } from "./fairplay-deep.ts";
+
+/** The most moves the engine server scores in one search (it answers 400 to more: engine/server.mjs). */
+export const ENGINE_MOVES_MAX = 8;
+
+/**
+ * A position's legal moves in groups the engine server takes (at most ENGINE_MOVES_MAX each), the played move's group
+ * first. Searches of the same position at the same nodes give comparable expected scores, so the groups' answers
+ * together score every move.
+ */
+export function moveGroups(legal: readonly string[], played: string): string[][] {
+  const order = [played, ...legal.filter((m) => m !== played)].filter((m) => legal.includes(m));
+  const groups: string[][] = [];
+  for (let i = 0; i < order.length; i += ENGINE_MOVES_MAX) groups.push(order.slice(i, i + ENGINE_MOVES_MAX));
+  return groups;
+}
 
 /** One checked move: its place (ply), the pick, the engine's best, the pick's rank among the legal moves, its loss and the think time. */
 export interface DuelCheckedMove {
@@ -80,13 +98,28 @@ export async function checkDuelGames(sql: Sql, search: DeepSearch, userId: strin
         const legal = legalMoves(fen);
         // (A forced move tells nothing; a position Stockfish refuses is never sent: engine.ts.)
         if (legal.length > 1 && !stockfishRefuses(fen)) {
-          if (searches >= maxSearches || !(await takeBudget(sql, now))) {
+          // (Every group of the position within this press's searches and the day's budget, or the move waits for the next.)
+          const groups = moveGroups(legal, move);
+          if (searches + groups.length > maxSearches) {
             complete = false;
             break;
           }
-          searches++;
-          const scores = await search(fen, legal);
-          if (!scores) {
+          const scores: { move: string; expected: number }[] = [];
+          let ok = true;
+          for (const group of groups) {
+            if (!(await takeBudget(sql, now))) {
+              ok = false;
+              break;
+            }
+            searches++;
+            const got = await search(fen, group);
+            if (!got) {
+              ok = false;
+              break;
+            }
+            scores.push(...got);
+          }
+          if (!ok) {
             complete = false;
             break;
           }

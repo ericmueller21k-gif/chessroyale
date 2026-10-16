@@ -5,7 +5,7 @@ import { openLobbyCode } from "./codes.ts";
 import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { serverError } from "./problems.ts";
-import { FILL_IN_ORDER, PAIR_BY_RATING, QueueCore, type MatchRules, type Ticket } from "./queue.ts";
+import { FILL_IN_ORDER, PAIR_BY_RATING, QueueCore, duelTicketComplete, type MatchRules, type Ticket } from "./queue.ts";
 import type { DuelPlayerView } from "@chessroyale/chess/duel";
 
 export { queueName } from "./queue.ts";
@@ -16,8 +16,12 @@ export type PlayAnswer =
   | { code: string; ticket?: string }
   | { busy: true; ticket: string; position: number; waitSeconds: number; retryMs: number; message: string };
 
-/** Ranked 1 v 1's answer: a game, busy, or still looking for an opponent (ask again with the ticket at once: each ask waits up to holdMs). */
-export type DuelPlayAnswer = PlayAnswer | { searching: true; ticket: string; waitedMs: number };
+/**
+ * Ranked 1 v 1's answer: a game, busy, or still looking for an opponent (ask again with the ticket at once: each ask
+ * waits up to holdMs); or `expired`: the queue doesn't know that ticket (it went while the app was asleep, or it never
+ * was one): ask again without it.
+ */
+export type DuelPlayAnswer = PlayAnswer | { searching: true; ticket: string; waitedMs: number } | { expired: true };
 
 export const busyMessage = (seconds: number) => `Servers are busy, you're in line: about ${seconds} s`;
 
@@ -89,9 +93,14 @@ export class Matchmaker extends DurableObject<Env> {
     return (await this.ask(overrides, fillMs, { ...opts, duel: false }, ticketId, info)) as PlayAnswer;
   }
 
-  /** Ranked 1 v 1's PLAY (or a player still looking asking again with their ticket): `info` as PlayOptions.duel says. */
+  /**
+   * Ranked 1 v 1's PLAY (or a player still looking asking again with their ticket): `info` as PlayOptions.duel says.
+   * A ticket is only ever made with its player: an ask with a ticket this queue doesn't know is `expired` (never a new,
+   * empty ticket), and a first ask without the player is refused.
+   */
   async duelNext(ticketId: string | null, info?: Record<string, unknown>): Promise<DuelPlayAnswer> {
-    return this.ask({}, 0, { duel: true }, ticketId, info);
+    if (ticketId ? !this.q.known(ticketId) : !info || !duelTicketComplete({ id: "", at: 0, seenAt: 0, info })) return { expired: true };
+    return this.ask({}, 0, { duel: true }, ticketId, ticketId ? undefined : info);
   }
 
   private async ask(overrides: LobbyRecord["overrides"], fillMs: number, opts: PlayOptions, ticketId?: string | null, info?: Record<string, unknown>): Promise<DuelPlayAnswer> {
@@ -261,6 +270,12 @@ export class Matchmaker extends DurableObject<Env> {
    * in line for the next batch.
    */
   private async seatDuel(tickets: Ticket[]): Promise<boolean> {
+    // (Never a game with a seat nobody can take: a ticket without its player is dropped, its partner back in line.)
+    const whole = tickets.filter(duelTicketComplete);
+    if (whole.length !== tickets.length) {
+      this.q.putBack(whole);
+      return true;
+    }
     if (tickets.length !== 2) {
       this.q.putBack(tickets);
       return false;

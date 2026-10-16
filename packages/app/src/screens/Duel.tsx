@@ -100,28 +100,31 @@ export function resultTitle(end: DuelEnd, you: Color): string {
   return (end.result === "1-0") === (you === "w") ? "You won" : "You lost";
 }
 
-/** Why it ended, in a few plain words, from your side (`them`: the other player's name). */
+/**
+ * Why it ended, in a sentence of its own under the headline, from your side (`them`: the other player's name).
+ * ("You won" / "Bob resigned.": two lines, never run together.)
+ */
 export function resultReason(end: DuelEnd, you: Color, them: string): string {
   const byYou = end.by === you;
   switch (end.reason) {
     case "checkmate":
-      return "by checkmate";
+      return "Checkmate.";
     case "resign":
       return byYou ? "You resigned." : `${them} resigned.`;
     case "timeout":
       return byYou ? "You ran out of time." : `${them} ran out of time.`;
     case "timeout_vs_insufficient":
-      return byYou ? "You ran out of time, but they couldn't mate." : `${them} ran out of time, but you couldn't mate.`;
+      return byYou ? `You ran out of time, but ${them} couldn't checkmate.` : `${them} ran out of time, but you couldn't checkmate.`;
     case "stalemate":
-      return "by stalemate";
+      return "Stalemate.";
     case "repetition":
-      return "by threefold repetition";
+      return "The same position three times.";
     case "fifty_moves":
-      return "by the 50-move rule";
+      return "50 moves each without a capture or a pawn move.";
     case "insufficient_material":
-      return "Not enough material to mate.";
+      return "Not enough material to checkmate.";
     case "agreement":
-      return "by agreement";
+      return "Draw agreed.";
     case "abort":
       return `${byYou ? "You" : them} left before the first moves. No rank change.`;
     case "no_first_move":
@@ -137,6 +140,7 @@ function rankLine(snap: DuelSnapshot): string | null {
   if (!snap.end || snap.end.result === "aborted") return null;
   const o = snap.outcome;
   if (!o) return "Updating your rank…";
+  if (o.unranked) return "Unranked game";
   const c = o.change;
   if (!c) return null;
   if (c.placed) return `Placed: ${c.after.label}`;
@@ -320,9 +324,8 @@ function DuelResult({ snap, onHome, onAgain }: { snap: DuelSnapshot; onHome: () 
   const title = resultTitle(end, you);
   return (
     <div class={`dv-result${title === "You won" ? " won" : title === "You lost" ? " lost" : ""}`} role="status">
-      <span class="dv-result-head">
-        <strong class="dv-result-title">{title}</strong> <span class="dv-result-why">{resultReason(end, you, snap.players[other(you)].name)}</span>
-      </span>
+      <strong class="dv-result-title">{title}</strong>
+      <p class="dv-result-why">{resultReason(end, you, snap.players[other(you)].name)}</p>
       {(line || coins > 0) && (
         <span class="dv-result-line">
           {line && <span class="dv-result-rank">{line}</span>}

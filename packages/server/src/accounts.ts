@@ -34,7 +34,7 @@ import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerMoves, lockerState, type Locker
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
-import { RANKED_SCHEMA, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
+import { RANKED_COLUMNS, RANKED_SCHEMA, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
 import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { chatModMoves, chatStanding, type ChatNotice } from "./chat-mod.ts";
@@ -235,6 +235,8 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // they signed in after the question. NULL: signed in before the gate, or a guest. Never the birth date
   // (docs/decisions/2026-10-16-age-gate-and-real-money.md).
   { table: "users", column: "age_ok_at", type: "INTEGER" },
+  // Ranked 1 v 1's columns added after its table first shipped (to a test server).
+  ...RANKED_COLUMNS,
 ];
 const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,

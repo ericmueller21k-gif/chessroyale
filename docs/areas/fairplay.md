@@ -48,10 +48,12 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 - **1 v 1** ([ranked.md](ranked.md)): no judged picks, so no signals and no part in the suspicion score. Reports from
   the profile, as everywhere (one opened from the game names it). On a case's page, "Check the counted moves with the
   engine server" also checks the player's kept 1 v 1 games (`fairplay-duel.ts`, `checkDuelGames`): reported ones
-  first, the player's moves after the book, every legal move a candidate, on `fairplay-1` within the same daily budget
-  (`takeBudget`); each game's result kept by side (`ranked_1v1_games.checked`) and shown in the page's "1 v 1 games"
-  section. A player in review keeps their rank as it is (their games don't move it); their games are kept past 30
-  days while they're in review or banned.
+  first, the player's moves after the book, each against every legal move: the engine server scores at most 8 moves
+  a search and has no unrestricted search, so the legal moves go in groups of 8 (`moveGroups`, the played move's
+  first), one search each (about 5 a move), on `fairplay-1` within the same daily budget (`takeBudget`); each game's
+  result kept by side (`ranked_1v1_games.checked`) and shown in the page's "1 v 1 games" section. A player in review
+  keeps their rank as it is (their games don't move it) and earns no 1 v 1 coins; their games are kept past 30 days
+  only while their case is open (watch or review) or an appeal of a ban is waiting (purgeEvidence's rule).
 - **The review page** `/admin/fairplay` (admins only, `ADMIN_EMAILS`) and the reviewer's API `/api/admin/fairplay/*`
   (a bearer token, `FAIRPLAY_REVIEW_TOKEN`). Every decision goes in the case's log with who and why; the automated
   reviewer never decides appeals nor changes a ban. A player's page also has chat moderation's section (warn, chat

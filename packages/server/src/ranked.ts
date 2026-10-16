@@ -20,16 +20,25 @@ export interface RankedRow {
   draws: number;
   ladder: number | null;
   last_at: number | null;
+  coin_day: number | null;
+  coin_games: number;
 }
+
+const DAY = 86_400_000;
+/** A time's UTC day (the daily coin cap's day). */
+const dayOf = (t: number) => Math.floor(t / DAY);
 
 const fromRow = (r: RankedRow): RankedRecord => ({ rating: r.rating, rd: r.rd, games: r.games, wins: r.wins, losses: r.losses, draws: r.draws, ladder: r.ladder, lastAt: r.last_at });
 
-/** A player's ranked record, or a new one (seeded from their account's rating from other modes) if they have none. */
-export async function rankedRecordOf(sql: Sql, userId: string): Promise<{ record: RankedRecord; stored: boolean }> {
-  const row = await sql.first<RankedRow>("SELECT rating, rd, games, wins, losses, draws, ladder, last_at FROM ranked_1v1 WHERE user_id = ?", userId);
-  if (row) return { record: fromRow(row), stored: true };
+/**
+ * A player's ranked record, or a new one (seeded from their account's rating from other modes) if they have none; and
+ * their paying games so far on a day (`day`, a UTC day: the daily coin cap).
+ */
+export async function rankedRecordOf(sql: Sql, userId: string, day: number | null = null): Promise<{ record: RankedRecord; stored: boolean; paidToday: number }> {
+  const row = await sql.first<RankedRow>("SELECT rating, rd, games, wins, losses, draws, ladder, last_at, coin_day, coin_games FROM ranked_1v1 WHERE user_id = ?", userId);
+  if (row) return { record: fromRow(row), stored: true, paidToday: day !== null && row.coin_day === day ? row.coin_games : 0 };
   const u = await sql.first<{ rating: number | null }>("SELECT rating FROM users WHERE id = ?", userId);
-  return { record: newRankedRecord(u?.rating ?? null), stored: false };
+  return { record: newRankedRecord(u?.rating ?? null), stored: false, paidToday: 0 };
 }
 
 /**
@@ -57,6 +66,8 @@ export interface FinishedDuel {
   times: readonly number[];
   startedAt: number;
   endedAt: number;
+  /** A test's clock (seconds a side): unranked where test switches are off (duel-do.ts). */
+  testSeconds?: number | null;
 }
 
 const scoreFor = (result: DuelResult, c: Color): number => (result === "1/2-1/2" ? 0.5 : (result === "1-0") === (c === "w") ? 1 : 0);
@@ -66,21 +77,24 @@ const resultWord = (score: number) => (score >= 1 ? "win" : score <= 0 ? "loss" 
  * Records a finished game and moves both players' ranks, in one batch (one transaction), once:
  *   - an aborted game records nothing;
  *   - each player's new record from both records as they stand now (core's rankedGame), unless fair play is holding
- *     them (`held`: in review): their rank stays as it is; the opponent's game counts;
- *   - coins (duelCoins) to each player's wallet;
+ *     them (`held`: in review): their rank stays as it is and they earn nothing; the opponent's game counts;
+ *   - coins (duelCoins) to each player's wallet, at most RANKED_1V1.coins.perDay paying games a UTC day per account
+ *     (the count is kept on their ranked_1v1 row, written in the same batch);
  *   - the game's row goes in only if neither player's record changed since it was read (another game of theirs ending
  *     at the same moment): then everything else in the batch applies only if that row is this recording's (its
  *     nonce), so a game recorded twice changes nothing the second time. A row that didn't go in is read again and
  *     retried.
- * Returns what it did for each player (null: an aborted game, or one already recorded).
+ * Returns what it did for each player (null: an aborted game). A game recorded before (a try whose answer was lost)
+ * answers each player's rank as it stands, with no points or coins named.
  */
 export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: string) => Promise<boolean>, now = g.endedAt): Promise<Record<Color, DuelOutcome> | null> {
   if (g.result === "aborted") return null;
   // (Black's count: never more than White's.)
   const fewest = Math.floor(g.moves.length / 2);
   const isHeld: Record<Color, boolean> = { w: await held(g.players.w), b: await held(g.players.b) };
+  const day = dayOf(g.endedAt);
   for (let attempt = 0; attempt < 4; attempt++) {
-    const before = { w: await rankedRecordOf(sql, g.players.w), b: await rankedRecordOf(sql, g.players.b) };
+    const before = { w: await rankedRecordOf(sql, g.players.w, day), b: await rankedRecordOf(sql, g.players.b, day) };
     const nonce = randomToken(9);
     const outcome = {} as Record<Color, DuelOutcome>;
     const writes: Stmt[] = [];
@@ -89,18 +103,22 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
       const me = before[c].record;
       const opp = before[c === "w" ? "b" : "w"].record;
       const score = scoreFor(g.result, c);
-      const coins = duelCoins(resultWord(score), g.endedAt - g.startedAt, fewest);
+      // (Nothing while fair play holds them, nor past the day's paying games.)
+      const paid = before[c].paidToday;
+      const coins = isHeld[c] || paid >= RANKED_1V1.coins.perDay ? 0 : duelCoins(resultWord(score), g.endedAt - g.startedAt, fewest);
       let change: RankChange | null = null;
       if (!isHeld[c]) {
         const r = rankedGame(me, opp, score, now);
         change = r.change;
         const n = r.next;
+        const paidNow = coins > 0 ? paid + 1 : paid;
         writes.push(
           stmt(
-            `INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at)
-             SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ?) AND ${mine}
+            `INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games)
+             SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ?) AND ${mine}
              ON CONFLICT (user_id) DO UPDATE SET rating = excluded.rating, rd = excluded.rd, games = excluded.games, wins = excluded.wins,
-               losses = excluded.losses, draws = excluded.draws, ladder = excluded.ladder, last_game = excluded.last_game, last_at = excluded.last_at`,
+               losses = excluded.losses, draws = excluded.draws, ladder = excluded.ladder, last_game = excluded.last_game, last_at = excluded.last_at,
+               coin_day = excluded.coin_day, coin_games = excluded.coin_games`,
             g.players[c],
             n.rating,
             n.rd,
@@ -111,6 +129,8 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
             n.ladder,
             g.id,
             n.lastAt,
+            paidNow > 0 ? day : null,
+            paidNow,
             g.players[c],
             g.id,
             nonce,
@@ -161,22 +181,29 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
     ]);
     const row = await sql.first<{ nonce: string }>("SELECT nonce FROM ranked_1v1_games WHERE id = ?", g.id);
     if (row?.nonce === nonce) return outcome;
-    // Recorded before (a second call for the same game): nothing more to do.
-    if (row) return null;
+    // Recorded before (a try whose answer was lost): nothing more to do; each player hears their rank as it stands.
+    if (row) {
+      const now2 = { w: await rankedRecordOf(sql, g.players.w), b: await rankedRecordOf(sql, g.players.b) };
+      const asItStands = (c: Color): DuelOutcome => {
+        const v = rankView(now2[c].record);
+        return { change: isHeld[c] ? null : { before: v, after: v, points: null, placed: false }, coins: 0 };
+      };
+      return { w: asItStands("w"), b: asItStands("b") };
+    }
   }
   throw new Error(`ranked 1 v 1: game ${g.id} couldn't be recorded (its players' records kept changing)`);
 }
 
-const DAY = 86_400_000;
-
 /**
- * Deletes games older than RANKED_1V1.gamesKeepDays, except those of a player fair play has in review or banned (kept
- * as long as that lasts). On the Worker's 15-minute schedule.
+ * Deletes games older than RANKED_1V1.gamesKeepDays, except while a player in one has a fair-play case open (watch or
+ * review) or an appeal of a ban waiting: fair play's own rule for evidence (fairplay.ts, purgeEvidence). A banned
+ * player's games go like anyone's once no appeal is open. On the Worker's 15-minute schedule.
  */
 export async function purgeDuelGames(sql: Sql, now: number): Promise<void> {
   await sql.run(
     `DELETE FROM ranked_1v1_games WHERE ended_at < ?
-       AND NOT EXISTS (SELECT 1 FROM fairplay_cases c WHERE c.user_id IN (ranked_1v1_games.white_id, ranked_1v1_games.black_id) AND c.status IN ('review', 'banned'))`,
+       AND NOT EXISTS (SELECT 1 FROM fairplay_cases c WHERE c.user_id IN (ranked_1v1_games.white_id, ranked_1v1_games.black_id) AND c.status IN ('watch', 'review'))
+       AND NOT EXISTS (SELECT 1 FROM fairplay_appeals a WHERE a.user_id IN (ranked_1v1_games.white_id, ranked_1v1_games.black_id) AND a.status = 'open')`,
     now - RANKED_1V1.gamesKeepDays * DAY,
   );
 }
@@ -208,7 +235,7 @@ export function duelGamesOf(sql: Sql, userId: string, limit = 50): Promise<DuelG
 /** The account's part of "Download my data": its rank and its kept games (the opponent by name; not fair play's check). */
 export async function rankedDownload(sql: Sql, userId: string): Promise<unknown> {
   return {
-    rank: await sql.first("SELECT rating, rd, games, wins, losses, draws, ladder, last_at FROM ranked_1v1 WHERE user_id = ?", userId),
+    rank: await sql.first("SELECT rating, rd, games, wins, losses, draws, ladder, last_at, coin_day, coin_games FROM ranked_1v1 WHERE user_id = ?", userId),
     games: await sql.all(
       `SELECT CASE WHEN g.white_id = ?1 THEN 'white' ELSE 'black' END AS color, u.name AS opponent, g.control, g.result, g.reason, g.moves, g.times,
          g.started_at, g.ended_at

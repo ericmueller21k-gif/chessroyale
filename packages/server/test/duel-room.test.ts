@@ -162,6 +162,7 @@ describe("1 v 1's room: playing", () => {
     const f = r.core().takeFinished();
     expect(f).toMatchObject({ id: r.record.id, players: { w: "uw", b: "ub" }, control: "blitz", result: "0-1", reason: "checkmate", moves: ["f2f3", "e7e5", "g2g4", "d8h4"], startedAt: start, endedAt: t });
     expect(f!.times).toEqual([2000, 2000, 2000, 2000]);
+    // (Not again while that try may still be running.)
     expect(r.core().takeFinished()).toBeNull();
     r.core().recorded({ w: { change: null, coins: 0 }, b: { change: null, coins: 0 } });
     expect(r.last("b", "outcome")).toEqual({ t: "outcome", outcome: { change: null, coins: 0 } });
@@ -171,18 +172,54 @@ describe("1 v 1's room: playing", () => {
     expect(r.last("w", "outcome")).toBeDefined();
   });
 
-  it("a failed recording is tried again later, a few times", () => {
+  it("a recording with no outcome (failed, or lost mid-way to an eviction) is tried again later, a few times; never once it's in", () => {
     const r = playing();
     r.send("w", { t: "move", uci: "e2e4", ply: 0 });
     r.send("b", { t: "move", uci: "e7e5", ply: 1 });
     r.send("w", { t: "resign" });
     const end = r.core().end!.at;
     expect(r.core().takeFinished()).not.toBeNull();
-    r.core().recordFailed();
+    // Nothing back yet: the next try is due 15 s after this one started (the alarm), not before.
+    expect(r.record.recordTries).toBe(1);
     expect(r.core().takeFinished()).toBeNull();
     expect(r.core().nextAlarm).toBe(end + 15_000);
-    r.set(end + 15_000);
-    expect(r.core().takeFinished()).not.toBeNull();
+    // (What a fresh object reads back from storage after an eviction: the same, so a wake tries again.)
+    const stored = JSON.parse(JSON.stringify(r.record)) as typeof r.record;
+    expect(new DuelCore(stored, { now: () => end + 15_000, send: () => {}, connected: () => false }).takeFinished()).not.toBeNull();
+    for (let k = 1; k < 4; k++) {
+      r.set(end + k * 15_000);
+      expect(r.core().takeFinished()).not.toBeNull();
+    }
+    // Four tries: no more, and no alarm for it.
+    r.set(end + 60_000);
+    expect(r.core().takeFinished()).toBeNull();
+    expect(r.core().nextAlarm).toBe(r.record.closeAt);
+    // Once an outcome is in, never again.
+    const r2 = playing();
+    r2.send("w", { t: "move", uci: "e2e4", ply: 0 });
+    r2.send("b", { t: "move", uci: "e7e5", ply: 1 });
+    r2.send("w", { t: "resign" });
+    expect(r2.core().takeFinished()).not.toBeNull();
+    r2.core().recorded({ w: { change: null, coins: 0 }, b: { change: null, coins: 0 } });
+    r2.set(r2.core().end!.at + 15_000);
+    expect(r2.core().takeFinished()).toBeNull();
+    expect(r2.core().nextAlarm).toBe(r2.record.closeAt);
+  });
+
+  it("a move resent for a ply already played (a reconnect) is never played twice, nor answered as a refusal", () => {
+    const r = playing();
+    r.send("w", { t: "move", uci: "e2e4", ply: 0 });
+    r.send("b", { t: "move", uci: "e7e5", ply: 1 });
+    const before = JSON.stringify(r.record.game);
+    const sent = r.inbox.w.length;
+    r.send("w", { t: "move", uci: "e2e4", ply: 0 });
+    r.send("w", { t: "move", uci: "g1f3", ply: 0 });
+    expect(JSON.stringify(r.record.game)).toBe(before);
+    expect(r.inbox.w.slice(sent).filter((m) => m.t === "moveNo")).toEqual([]);
+    // A ply ahead of the game: out of step, answered with the game.
+    r.send("w", { t: "move", uci: "g1f3", ply: 5 });
+    expect(r.last("w", "moveNo")).toMatchObject({ ply: 5, reason: "step" });
+    expect(r.record.game!.moves).toEqual(["e2e4", "e7e5"]);
   });
 
   it("a disconnected player's clock keeps running: they come back to the same game, or lose on time", () => {

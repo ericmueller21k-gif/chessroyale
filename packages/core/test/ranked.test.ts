@@ -288,6 +288,11 @@ describe("pairing by the hidden rating", () => {
     expect(pairUp(four, now).map(([x, y]) => [x.id, y.id])).toEqual([["a", "c"], ["b", "d"]]);
     // The same account twice (two tabs) never plays itself.
     expect(pairUp([e("a", "u1", 1500, now - 60_000), e("b", "u1", 1500, now)], now)).toEqual([]);
+    // Nor two accounts on one device (its marker); a device unknown to either side doesn't count as the same.
+    const on = (id: string, uid: string, device: string | null) => ({ ...e(id, uid, 1500, now), device });
+    expect(pairUp([on("a", "u1", "d1"), on("b", "u2", "d1")], now)).toEqual([]);
+    expect(pairUp([on("a", "u1", "d1"), on("b", "u2", "d1"), on("c", "u3", "d2")], now).map(([x, y]) => [x.id, y.id])).toEqual([["a", "c"]]);
+    expect(pairUp([on("a", "u1", null), on("b", "u2", null)], now)).toHaveLength(1);
     // An odd one out waits.
     expect(pairUp([e("a", "u1", 1500, now), e("b", "u2", 1500, now), e("c", "u3", 1500, now)], now)).toHaveLength(1);
   });

@@ -468,6 +468,7 @@ describe("the FAQ: 1 v 1", () => {
     expect(t).toContain("at most Diamond 4.");
     expect(t).toContain(`about +${RANKED_1V1.points.perGame} for a win and −${RANKED_1V1.points.perGame} for a loss against a player at your level`);
     expect(t).toContain(`${RANKED_1V1.coins.perMinute.win} coins a minute for a win`);
+    expect(t).toContain(`Up to ${RANKED_1V1.coins.perDay} games a day pay coins`);
     // Changed numbers change the words.
     const R = { ...RANKED_1V1, voteSeconds: 7, controls: RANKED_1V1.controls.map((c) => (c.id === "blitz-rapid" ? { ...c, baseSeconds: 240 } : c)) };
     const changed = text({ ...FAQ_DEFAULTS, ranked: R });

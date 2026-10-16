@@ -152,7 +152,8 @@ function Privacy() {
             <p>
               Your 1 v 1 rank: your tier, division and rank points (or how many placement games you've played), your wins, losses
               and draws, when you last played, and a hidden rating of how well you play (a number and how sure it is) that
-              decides your rank points and whom you're matched with.
+              decides your rank points and whom you're matched with; and how many of today's games paid you coins (at most{" "}
+              {RANKED_1V1.coins.perDay} a day do).
             </p>
             <p>
               Each ranked game: the two players, the time control, the result and how it ended, every move, how long each move
@@ -165,9 +166,9 @@ function Privacy() {
         why="your rank and record, matching you with players near your strength, and checking reported games for fair play."
         kept={
           <>
-            your rank with your account. A game {RANKED_1V1.gamesKeepDays} days after it ends, and longer only while a player in
-            it is under a fair-play review or banned. If you delete your account, your rank goes, and in the games still kept
-            you become the shared "deleted" account (your opponent's games stay theirs).
+            your rank with your account. A game usually {RANKED_1V1.gamesKeepDays} days after it ends; longer only while a
+            fair-play review of a player in it is open, or their appeal of a ban. If you delete your account, your rank goes,
+            and in the games still kept you become the shared "deleted" account (your opponent's games stay theirs).
           </>
         }
       />
@@ -401,8 +402,8 @@ function Privacy() {
         <li>
           <strong>Kept, without you:</strong> your match results, moved to one shared "deleted" account and kept without your
           account, name, match code or exact time (only the day), rating, best move or eval-bar setting, so the game's numbers
-          stay right. Your 1 v 1 games still kept (at most {RANKED_1V1.gamesKeepDays} days) stay as the shared "deleted"
-          account's, so your opponents' games stay whole. Error records stay counted, without your account. Feedback and ideas never carry your
+          stay right. Your 1 v 1 games still kept (usually {RANKED_1V1.gamesKeepDays} days; longer while a player in the game is
+          under review) stay as the shared "deleted" account's, so your opponents' games stay whole. Error records stay counted, without your account. Feedback and ideas never carry your
           account, so they stay until they expire ({OPS.store.keepDays} days).
         </li>
         <li>

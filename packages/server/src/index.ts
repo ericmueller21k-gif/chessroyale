@@ -8,7 +8,7 @@ import { DuelGame } from "./duel-do.ts";
 import { LiveHub } from "./live-hub.ts";
 import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
-import { d1Sql, ensureSchema, lobbyResult, purgeEmailCodes, type User } from "./accounts.ts";
+import { d1Sql, ensureSchema, lobbyResult, purgeEmailCodes, sha256, type User } from "./accounts.ts";
 import { duelEntrant, purgeDuelGames } from "./ranked.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
@@ -326,9 +326,10 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
 
 /**
  * Ranked 1 v 1 (docs/areas/ranked.md):
- *   POST /api/1v1/play[?ticket=&pool=&clock=] → { code } | { searching, ticket, waitedMs } | busy: the queue. The first
- *     ask reads the player from their account (name, look, rank, hidden rating: ranked.ts) and makes a ticket; the app
- *     asks again with it at once (each ask waits up to CAPACITY.queue.holdMs) until it's paired. Signed in where
+ *   POST /api/1v1/play[?ticket=&pool=&clock=] → { code } | { searching, ticket, waitedMs } | { expired } | busy: the
+ *     queue. The first ask reads the player from their account (name, look, rank, hidden rating: ranked.ts) and makes
+ *     a ticket; the app asks again with it at once (each ask waits up to CAPACITY.queue.holdMs) until it's paired. A
+ *     ticket the queue doesn't know (gone while the app slept) is `expired`: the app asks afresh. Signed in where
  *     sign-in is set up, not banned (mayPlay), as every mode; refused while PAUSE_RANKED1V1 rests the mode.
  *     Test switches: `pool` (a queue of its own), `clock=SECONDS` (each side's clock, no increment).
  *   POST /api/1v1/cancel?ticket= → {}: Cancel. A ticket paired just now: that game is called off for its player (an
@@ -355,7 +356,10 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
       const clock = Number(url.searchParams.get("clock"));
       const testSeconds = url.searchParams.has("clock") && Number.isFinite(clock) && clock > 0 && (await testSwitches(request, env, waitUntil)) ? Math.min(3600, Math.round(clock)) : null;
       // (The first answer also carries the hidden rating, rounded: the bot a player may choose meets them there.)
-      const first = await (await queue()).duelNext(null, { uid: me.id, rating, rd, player, ...(testSeconds ? { testSeconds } : {}) });
+      // (The device's marker, hashed: two accounts on one device never meet. Fair play's device cookie.)
+      const deviceCookie = readCookie(request, DEVICE_COOKIE);
+      const device = deviceCookie ? (await sha256(`1v1:${deviceCookie}`)).slice(0, 24) : null;
+      const first = await (await queue()).duelNext(null, { uid: me.id, rating, rd, player, device, ...(testSeconds ? { testSeconds } : {}) });
       return json({ ...first, botRating: Math.round(rating) });
     } catch {
       return json({ message: "Couldn't find a match. Try again." }, 500);
