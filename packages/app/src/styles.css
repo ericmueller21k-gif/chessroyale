@@ -9896,6 +9896,7 @@ button.fd-seat {
   stroke-linejoin: round;
 }
 .qto {
+  flex: none;
   display: flex;
   height: 20px;
   margin-left: 6px;
@@ -9918,6 +9919,25 @@ button.fd-seat {
 .qto button.on {
   background: var(--accent);
   color: #1a1406;
+}
+/* A phone's split is narrow: 133 px at 320 wide, 168 at 390, where the switch at its full size needs 171 with the header's
+   two buttons. So in the split the switch leads (no title), tighter, a little taller, and the buttons beside it 28 px: it
+   read "TEAM | AI" at 360. */
+.qchat-split .qhead:has(> .qto) {
+  gap: 0;
+  padding-left: 4px;
+}
+.qchat-split .qto {
+  height: 24px;
+  margin-left: 0;
+}
+.qchat-split .qto button {
+  min-width: 30px;
+  padding: 0 4px;
+  letter-spacing: 0.02em;
+}
+.qchat-split .qhead-btn {
+  width: 28px;
 }
 .qunread {
   flex: none;

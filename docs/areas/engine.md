@@ -175,7 +175,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   without a re-check, every judge alike), `packages/app/test/host-score.test.ts` (the host), `judges.test.ts` ("the
   best move is the highest-scored pick": two judges, the engine server's re-check, devices' re-checks, an older host,
   an older app's device beside this one's, any other omission from a re-check still blamed), `bestOf` in `packages/core/test/scoring.test.ts`; `e2e/boss-dock.spec.ts` (the dock's
-  "· the best").
+  "Best move · You: …", and the verdict whole at 320/360/390 px).
 - e2e: `e2e/judges.spec.ts` (with containers off); `e2e/sawyer.spec.ts`'s last test (a refused position never sent;
   a worker's exit kept off the page, the engine answering on).
 - Chess960: `packages/chess/test/chess960.test.ts` (perft against the published table, each castling rule, FEN, SAN,

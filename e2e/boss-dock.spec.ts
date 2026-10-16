@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, submitMove, test } from "./helpers.ts";
+import { BOARD_SEL, engineTop, submitMove, test } from "./helpers.ts";
 
 /**
  * The boss battle's dock under the board, on every screen (Eric, Oct 15, after his Hidden Boss playtest):
@@ -168,7 +168,7 @@ test("your clock: bold at the box's right on every boss's screens, counting down
   expect(errors).toEqual([]);
 });
 
-test("your pick the best move: the dock's line says so (\"· the best\"), in one line; another pick names the best", async ({ page }) => {
+test("your pick the best move: the dock's line says so (\"Best move · You: …\"), in one line; another pick names the best", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: the phone's 390 px");
   test.setTimeout(6 * 60_000);
   // A Solo raid (you and 49 bots: a reveal after each crowd move, as in a raid or the Crowd's boss battle).
@@ -185,7 +185,7 @@ test("your pick the best move: the dock's line says so (\"· the best\"), in one
       const p = w.match?.phase;
       for (const e of document.querySelectorAll(".boss-dock-status .dock-line.muted")) {
         const text = e.textContent ?? "";
-        if (!text.startsWith("You:") || p?.kind !== "reveal" || w.__dockLines.some((x: { text: string; fen: string }) => x.text === text && x.fen === p.mine.fenBefore)) continue;
+        if (!/^Best (move|was) /.test(text) || p?.kind !== "reveal" || w.__dockLines.some((x: { text: string; fen: string }) => x.text === text && x.fen === p.mine.fenBefore)) continue;
         const me = p.mine.result.players.find((x: { playerId: string }) => w.match.isYou(x.playerId));
         w.__dockLines.push({ text, spill: e.scrollWidth - e.clientWidth, fen: p.mine.fenBefore, best: p.mine.bestMove, move: me?.move, loss: me?.loss, score: me?.roundScore });
       }
@@ -193,11 +193,11 @@ test("your pick the best move: the dock's line says so (\"· the best\"), in one
     };
     requestAnimationFrame(tick);
   });
-  // The engine's first line on each move, until the dock has said "the best" (a bot's pick can score above it now and then).
+  // The engine's first line on each move, until the dock has said "Best move" (a bot's pick can score above it now and then).
   type Line = { text: string; spill: number; fen: string; best: string; move: string; loss: number; score: number };
   const lines = () => page.evaluate(() => (window as any).__dockLines as Line[]);
   const stopAt = Date.now() + 4 * 60_000;
-  while (Date.now() < stopAt && !(await lines()).some((l) => l.text.endsWith("· the best")) && (await phase(page)) !== "results") {
+  while (Date.now() < stopAt && !(await lines()).some((l) => l.text.startsWith("Best move · ")) && (await phase(page)) !== "results") {
     if ((await phase(page)) === "play") {
       await page
         .evaluate(async () => {
@@ -220,8 +220,85 @@ test("your pick the best move: the dock's line says so (\"· the best\"), in one
     if (l.move === l.best) {
       // Never charged, and said in one line.
       expect(l.loss).toBe(0);
-      expect(l.text).toBe(`You: ${san(l.fen, l.move)} (${fmt(l.score)}) · the best`);
+      expect(l.text).toBe(`Best move · You: ${san(l.fen, l.move)} (${fmt(l.score)})`);
       expect(l.spill, l.text).toBeLessThanOrEqual(0);
-    } else expect(l.text).toBe(`You: ${san(l.fen, l.move)} (${fmt(l.score)}) · best ${san(l.fen, l.best)}`);
+    } else expect(l.text).toBe(`Best was ${san(l.fen, l.best)} · You: ${san(l.fen, l.move)} (${fmt(l.score)})`);
+  }
+});
+
+/** Into a Solo raid's first reveal with your pick in it, then frozen there (the match halted: nothing moves on). */
+async function intoFrozenReveal(page: Page) {
+  await page.goto("/?debug&pace=quick&clock=30&bossMoves=6&laststand=0");
+  await page.getByRole("radio", { name: /^Boss raid/ }).click();
+  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();
+  await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  // Watched from before it can appear: the first frame of a reveal whose dock line has your pick, then halted.
+  await page.evaluate(() => {
+    const w = window as any;
+    const tick = () => {
+      const line = document.querySelector(".boss-dock-status .dock-line.muted .dk-verdict");
+      if (w.match?.phase.kind === "reveal" && line) {
+        w.match.halt();
+        w.__frozen = true;
+      } else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  // The engine's first line each move: a weak pick in the opening can show the opening allowance's note instead.
+  const stopAt = Date.now() + 3 * 60_000;
+  while (Date.now() < stopAt && !(await page.evaluate(() => (window as any).__frozen === true))) {
+    if ((await phase(page)) === "play" && (await page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt))) {
+      const { fen, top } = await engineTop(page).catch(() => ({ fen: "", top: [] as { move: string }[] }));
+      if (top[0] && (await phase(page)) === "play") await submitMove(page, top[0].move, fen).catch(() => undefined);
+    }
+    await page.waitForTimeout(300);
+  }
+  expect(await page.evaluate(() => (window as any).__frozen === true), "a reveal with your pick").toBe(true);
+}
+
+test("the dock's line under the reveal: the verdict first and whole at 320, 360 and 390 px, with the widest move and number", async ({ page }) => {
+  // It was "You: Nbxd7+ ⚡ (+45.3) · the best": 182 px in a room of 112 at 320, cut in the verdict itself.
+  test.skip(test.info().project.name !== "phone", "a phone's widths");
+  test.setTimeout(5 * 60_000);
+  await intoFrozenReveal(page);
+  const measure = () =>
+    page.evaluate(() => {
+      const line = document.querySelector(".boss-dock-status .dock-line.muted")!;
+      const v = line.querySelector(".dk-verdict")!;
+      const a = line.getBoundingClientRect();
+      const b = v.getBoundingClientRect();
+      return { text: line.textContent, verdict: v.textContent, first: line.firstElementChild === v && line.firstChild === v, line: [a.left, a.right], box: [b.left, b.right] };
+    });
+  // The real line first: the verdict leads, in the reveal's words.
+  const real = await measure();
+  expect(real.first, JSON.stringify(real)).toBe(true);
+  expect(real.verdict, JSON.stringify(real)).toMatch(/^(Best move|Best was \S+)$/);
+  expect(real.text, JSON.stringify(real)).toMatch(/^Best (move|was \S+) · You: \S+( ⚡)? \([+-]\d+\.\d\)$/);
+  // Then the widest: the longest SAN either side (a capture with both disambiguation and check) and a big score.
+  const widest = [
+    { verdict: "Best was Nbxd7+", rest: " · You: Qxe7+ ⚡ (+45.3)" },
+    { verdict: "Best was Qxe7+", rest: " · You: Nbxd7+ ⚡ (+45.3)" },
+    { verdict: "Best move", rest: " · You: Nbxd7+ ⚡ (+45.3)" },
+  ];
+  for (const width of [390, 360, 320]) {
+    await page.setViewportSize({ width, height: 664 });
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    for (const w of widest) {
+      const m = await page.evaluate((w) => {
+        const line = document.querySelector(".boss-dock-status .dock-line.muted")!;
+        const v = line.querySelector(".dk-verdict")!;
+        v.textContent = w.verdict;
+        v.nextSibling!.textContent = w.rest;
+        const a = line.getBoundingClientRect();
+        const b = v.getBoundingClientRect();
+        return { text: line.textContent, line: [a.left, a.right], box: [b.left, b.right], vw: window.innerWidth, scroll: document.documentElement.scrollWidth - window.innerWidth };
+      }, w);
+      const where = `${width} px: ${JSON.stringify(m)}`;
+      expect(m.text, where).toBe(w.verdict + w.rest);
+      expect(m.box[0]!, where).toBeGreaterThanOrEqual(m.line[0]! - 0.5);
+      expect(m.box[1]!, `${where}: the verdict whole`).toBeLessThanOrEqual(m.line[1]! + 0.5);
+      expect(m.line[1]!, where).toBeLessThanOrEqual(m.vw);
+      expect(m.scroll, where).toBeLessThanOrEqual(0);
+    }
   }
 });
