@@ -50,21 +50,21 @@ test("narrow phones: the top bar's numbers stay clear of the options button, and
     expect(bar.spill, `${device}: ${bar.text}`).toBeLessThanOrEqual(0);
     expect(bar.clear, `${device}: the cut pill runs under the options button`).toBeGreaterThanOrEqual(0);
     expect(bar.labelCut, `${device}: "Move 34 · cut in 2" is cut short`).toBe(false);
-    // Play to the first cut (up to 16 go out: ties at the line go through) and hold it there.
-    await expect
-      .poll(
-        async () => {
-          await page.evaluate(() => {
-            const m = (window as any).match;
-            const move = [...(m.runner.planned?.values() ?? [])][0];
-            if (m.phase.kind === "play" && move) m.submit(move);
-          });
-          return phase(page);
-        },
-        { timeout: 120_000, intervals: [250] },
-      )
-      .toBe("stageBreak");
+    // Play to the first cut (up to 16 go out: ties at the line go through) and hold it there. You play the engine's best
+    // move, so you go through: nobody's pick scores better than yours, and you start well above your team's line. (A
+    // bot's pick, which this copied before, is now and then a random legal move, `botRandomMoveChance`; one put you out,
+    // and then the first name listed is yours, "You" in red and not struck through, by design.)
+    const stopAt = Date.now() + 120_000;
+    while ((await phase(page)) !== "stageBreak" && Date.now() < stopAt) {
+      if ((await phase(page)) === "play") {
+        const { fen, top } = await engineTop(page);
+        await submitMove(page, top[0]?.move, fen);
+      }
+      await page.waitForTimeout(250);
+    }
+    expect(await phase(page)).toBe("stageBreak");
     await page.evaluate(() => clearTimeout((window as any).match.timer));
+    expect(await page.evaluate(() => (window as any).match.phase.youOut), `${device}: you went through`).toBe(false);
     const names = page.locator(".crowd-cut .cut-out");
     await expect(names).toBeVisible({ timeout: 5000 });
     const list = await names.evaluate((box) => {

@@ -55,8 +55,9 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  // (Two rounds a stage: with one, the team that hasn't moved yet is a coin flip at the first cut. Loose bots, ?weakbots=1:
-  // the strongest bots play the engine's best as often as you do, and only two of each team reach the final.)
+  // (Two rounds a stage: with one, the team that hasn't moved yet is a coin flip at the first cut. ?weakbots=1: people rank
+  // above bots, so the cuts take bots first and you surely reach the final. Playing well isn't enough: the opening
+  // allowance leaves bots level with you, and only two of each team reach it. docs/decisions/2026-10-16-flaky-e2e-batch-2.md)
   await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=2&clock=30&win=1&weakbots=1");
   await soloFromHome(page);
   await knockouts(page, 8);
@@ -68,7 +69,7 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   expect(boss.name).toBe(him.name);
   expect(boss.raid).toBe(false);
   expect(await alive(page)).toBe(crowdFinalists("boss"));
-  expect(await mine(page), "you reached the final (the engine's best move every time, the bots loose)").toBe(true);
+  expect(await mine(page), "you reached the final (?weakbots=1: the cuts take bots first)").toBe(true);
   await expect(page.locator(".boss-name").filter({ hasText: him.name }).first()).toBeVisible();
   // The other finalists: phase 2's other players later.
   const mates: string[] = await page.evaluate(() => (window as any).match.standings().filter((s: any) => !s.out && !s.isYou).map((s: any) => s.name));
@@ -117,9 +118,9 @@ test("online: a Crowd boss final meets him: his intro by name for everyone, four
   expect(boss.name).toBe(him.name);
   expect(boss.board.ply).toBe(0);
   await expect(page.locator(".boss-name").filter({ hasText: him.name }).first()).toBeVisible();
-  // Four in the battle (the rest out at the cuts); you among them, having played the engine's best moves.
+  // Four in the battle (the rest out at the cuts); you among them (?weakbots=1: the cuts take bots first).
   expect(await alive(page)).toBe(crowdFinalists("boss"));
-  expect(await mine(page), "you reached the final").toBe(true);
+  expect(await mine(page), "you reached the final (?weakbots=1: the cuts take bots first)").toBe(true);
   const banner = await watchFor(page, { bullet: { selector: ".fight-banner.power-cut", text: /BULLET!/ } });
   // His chatter (recluse-talk.ts): this device drives it from its own view of the battle. When its first line shows.
   await page.evaluate((lines) => {
