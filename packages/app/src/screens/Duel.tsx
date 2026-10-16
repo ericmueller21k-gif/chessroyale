@@ -37,12 +37,6 @@ function useSession(s: { subscribe(fn: () => void): () => void }, running: boole
 
 // ---------------- The stage: the search, then the versus moment ----------------
 
-/** How long before "Few players online right now" (`?fewAfter=` seconds, a test switch). */
-const fewAfterMs = () => {
-  const t = Number(testParams().get("fewAfter"));
-  return (Number.isFinite(t) && t > 0 ? t : RANKED_1V1.fewPlayersSeconds) * 1000;
-};
-
 /** The stage's title: the mode, as the search always said it. */
 const stageHead = (
   <>
@@ -63,7 +57,7 @@ function youOnStage(): StageSide {
  * returning the stage, not a component of its own: the search and the versus moment must be the same `DuelStage`, so
  * Preact keeps it, and your pawn on it, from one to the other.)
  */
-function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => void, onCancel: () => void, onBot: () => void) {
+function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => void, onCancel: () => void, onBot: () => void, onAway: () => void) {
   const s = queue.state;
   const waited = s.kind === "searching" ? Math.max(0, now - s.since) : 0;
   return (
@@ -71,7 +65,15 @@ function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => 
       label="Finding opponent"
       you={youOnStage()}
       them={null}
-      head={stageHead}
+      head={
+        <>
+          {/* Home, still searching (Eric, Oct 16: "a back button or they can view inventory"): the bar comes with you. */}
+          <button type="button" class="dv-st-home" onClick={onAway} aria-label="Home: keep searching while you look around">
+            <span aria-hidden="true">‹</span> Home
+          </button>
+          {stageHead}
+        </>
+      }
       waiting={
         <>
           <span class="dv-st-finding">Finding opponent…</span>
@@ -212,6 +214,7 @@ export function DuelFront({
   frame,
   onCancel,
   onBot,
+  onAway,
   onHome,
   onAgain,
 }: {
@@ -220,6 +223,8 @@ export function DuelFront({
   frame: (stage: ComponentChildren) => VNode;
   onCancel: () => void;
   onBot: () => void;
+  /** Home (or anywhere else) while the search goes on: the bar on every screen brings you back. */
+  onAway: () => void;
   onHome: () => void;
   onAgain: () => void;
 }) {
@@ -227,8 +232,8 @@ export function DuelFront({
   const first = session?.snapshot();
   const live = first ? !first.end && !first.gone : queue!.state.kind === "searching";
   const now = useSession(src, live, session ? 100 : 500);
-  // "Keep waiting": the choice goes until this search ends.
-  const [kept, setKept] = useState<DuelQueue | null>(null);
+  // ("Keep waiting" is the queue's: it holds while you browse and come back. This redraws for it.)
+  const [, redraw] = useState(0);
   if (!session) {
     const q = queue!;
     const s = q.state;
@@ -242,8 +247,12 @@ export function DuelFront({
           </button>
         </div>,
       );
-    const few = kept !== q && s.kind === "searching" && now - s.since >= fewAfterMs();
-    return frame(searchStage(q, now, few, () => setKept(q), onCancel, onBot));
+    const few = !q.keepWaiting && s.kind === "searching" && now >= q.fewAt;
+    const keep = () => {
+      q.keepWaiting = true;
+      redraw((n) => n + 1);
+    };
+    return frame(searchStage(q, now, few, keep, onCancel, onBot, onAway));
   }
   const snap = session.snapshot();
   if (snap.gone && !snap.end)

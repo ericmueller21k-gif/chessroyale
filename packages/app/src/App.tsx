@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useReducer, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
 import { type MatchmakingType, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, raidInUrl } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
@@ -50,7 +50,8 @@ import { LobbyChat } from "./components/LobbyChat.tsx";
 import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, forgetSquads, partyStatus, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
 import { SquadsQueue, SquadsScreen, squadsWaiting } from "./screens/Squads.tsx";
 import { PartySheet } from "./screens/SquadsParty.tsx";
-import { BotDuel, DuelQueue, NetDuel, setRanked1v1Starter, startRanked1v1, type DuelSession } from "./duel.ts";
+import { BotDuel, DuelQueue, NetDuel, savedDuelQueue, setRanked1v1Starter, startRanked1v1, type DuelSession } from "./duel.ts";
+import { confirmLeaveDuelQueue, duelFoundAlert, setAwaySearch } from "./components/DuelQueueBar.tsx";
 import { DuelFront } from "./screens/Duel.tsx";
 import { measureSound } from "./sound.ts";
 import { noteWhere } from "./problems.ts";
@@ -465,8 +466,23 @@ export function App() {
   /** The 1 v 1 queue you're in (its search screen), and the game on screen (a person's, or the bot's). */
   const [duelQueue, setDuelQueue] = useState<DuelQueue | null>(null);
   const [duel, setDuel] = useState<DuelSession | null>(null);
-  /** Into a ranked game (from the queue, or a link to it). */
+  /**
+   * Browsing while queued (docs/areas/ranked.md, "Browsing while queued"): you went Home from the search stage, and
+   * the search goes on (the bar on every screen: DuelQueueBar.tsx). The ref is for the queue's own callbacks.
+   */
+  const [duelAway, setDuelAwayState] = useState(false);
+  const duelAwayRef = useRef(false);
+  const setDuelAway = (v: boolean) => {
+    duelAwayRef.current = v;
+    setDuelAwayState(v);
+  };
+  /** Into a ranked game (from the queue, or a link to it). Found while you browse: a sound and a buzz, then the stage. */
   const joinDuel = (code: string) => {
+    if (duelAwayRef.current) {
+      duelFoundAlert();
+      nav.home();
+    }
+    setDuelAway(false);
     const d = new NetDuel(code.toUpperCase());
     setDuel((old) => {
       old?.dispose();
@@ -480,36 +496,73 @@ export function App() {
   const leaveDuel = () => {
     duelQueue?.cancel();
     setDuelQueue(null);
+    setDuelAway(false);
     duel?.dispose();
     setDuel(null);
     if (location.pathname !== "/") history.replaceState(null, "", `/${location.search}`);
+  };
+  /** Out of the search while browsing (the bar's Cancel, or another mode): the page you're on stays. */
+  const dropDuelSearch = () => {
+    duelQueue?.cancel();
+    setDuelQueue(null);
+    setDuelAway(false);
+  };
+  /** Home (or another page) from the search stage, still searching. */
+  const duelGoAway = () => {
+    setDuelAway(true);
+    if (location.pathname !== "/") history.replaceState(null, "", `/${location.search}`);
+  };
+  /** Back to the search stage from anywhere (the bar, or 1 v 1's PLAY while searching). */
+  const duelBackToStage = () => {
+    nav.home();
+    setDuelAway(false);
+    history.replaceState(null, "", `/1v1${location.search}`);
+  };
+  /**
+   * Another mode while the search goes on: "Leave the 1 v 1 queue?" first (the only confirm), then the search ends and
+   * that mode starts.
+   */
+  const leavingDuelFirst = (go: () => void) => {
+    if (!duelQueue || duel || duelQueue.state.kind !== "searching") return go();
+    confirmLeaveDuelQueue(() => {
+      dropDuelSearch();
+      go();
+    });
   };
   /**
    * One tap into the 1 v 1 queue (startRanked1v1): online play needs an account where sign-in is set up (the sign-in
    * page instead, as every mode's PLAY), and nothing while the mode rests (its line, as the server would say).
    */
-  const startDuel = () => {
+  const startDuel = (resume?: ReturnType<typeof savedDuelQueue>, away = false) => {
     unlockAudio();
+    // Already searching (1 v 1's PLAY while you browse): back to the stage, the same search.
+    if (duelQueue && !duel && duelQueue.state.kind === "searching") return duelBackToStage();
     if (mustSignInToPlayOnline()) return chooseGuest(false);
     if (isPaused("ranked1v1")) return setError(pausedLine("ranked1v1"));
     duel?.dispose();
     setDuel(null);
     setError(null);
-    const q = new DuelQueue();
+    const q = new DuelQueue(resume);
     q.subscribe(() => {
       const s = q.state;
       if (s.kind === "found") joinDuel(s.code);
       else if (s.kind === "refused" && s.banned) {
         setDuelQueue(null);
+        setDuelAway(false);
         if (location.pathname !== "/") history.replaceState(null, "", `/${location.search}`);
         showBanNotice();
       } else if (s.kind === "refused" && s.signIn) {
         setDuelQueue(null);
+        setDuelAway(false);
         chooseGuest(false);
+      } else if (s.kind === "refused" && duelAwayRef.current) {
+        // (Refused while you browse, the mode resting: the stage says why.)
+        duelBackToStage();
       }
     });
     setDuelQueue(q);
-    history.replaceState(null, "", `/1v1${location.search}`);
+    setDuelAway(away);
+    if (!away) history.replaceState(null, "", `/1v1${location.search}`);
     void q.start();
   };
   /** "Play a bot (unranked)": out of the queue, into a game on this device against a bot near your hidden rating. */
@@ -517,25 +570,37 @@ export function App() {
     const rating = duelQueue?.botRating ?? account().profile?.rating ?? 1500;
     duelQueue?.cancel();
     setDuelQueue(null);
+    setDuelAway(false);
     setDuel((old) => {
       old?.dispose();
       return new BotDuel(rating);
     });
     if (location.pathname !== "/") history.replaceState(null, "", `/${location.search}`);
   };
-  setRanked1v1Starter(startDuel);
-  // A link: /1v1/CODE goes back into that game; /1v1 queues once your account has loaded (the queue needs it).
+  setRanked1v1Starter(() => startDuel());
+  /**
+   * A link: /1v1/CODE goes back into that game; /1v1 queues once your account has loaded (the queue needs it). A
+   * reload during a search carries on with it (`savedDuelQueue`: its ticket and its wait): on the stage from /1v1, else
+   * with the bar on whatever page you were on.
+   */
   const duelLinkUsed = useRef(false);
   useEffect(() => {
     if (duelLinkUsed.current) return;
     if (duelLinkCode) {
       duelLinkUsed.current = true;
       joinDuel(duelLinkCode);
-    } else if (duelQueueLink && profile) {
+    } else if (profile) {
       duelLinkUsed.current = true;
-      startDuel();
+      const saved = savedDuelQueue();
+      if (duelQueueLink || saved) startDuel(saved, !duelQueueLink);
     }
   }, [!!profile]);
+  // Another way into a match while the search goes on (an invite's lobby, a party's): the search ends, no ghost bar.
+  useEffect(() => {
+    if ((match || squads) && duelQueue && !duel) dropDuelSearch();
+  }, [match, squads]);
+  // The bar over every screen while you browse with a search going (DuelQueueBar reads this after every render).
+  useLayoutEffect(() => setAwaySearch(duelQueue && duelAway && !duel && !match && !squads ? { queue: duelQueue, back: duelBackToStage, cancel: dropDuelSearch } : null));
 
   // ?debug (a test switch): the match, the Squads clients and the 1 v 1 game on `window`, for tests and the console. (Each render, so
   // they're there once your account says you may, and a match joined before that, from a link, is too.)
@@ -989,7 +1054,13 @@ export function App() {
    */
   const queueNav: FrontNav = {
     ...nav,
-    home: () => undefined,
+    // (The 1 v 1 search: Play is home, and every page browses with the search still going, the bar along.)
+    home: () => {
+      if (duelQueue && !duel) {
+        duelGoAway();
+        nav.home();
+      }
+    },
     profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
     ...Object.fromEntries(
       (["bossRaid", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
@@ -997,7 +1068,8 @@ export function App() {
         () => {
           if (match) leave();
           else if (squads) leaveSquads();
-          else if (duel || duelQueue) leaveDuel();
+          else if (duel) leaveDuel();
+          else if (duelQueue) duelGoAway();
           else leaveLine();
           nav[k]();
         },
@@ -1011,7 +1083,7 @@ export function App() {
   const inviteCode = invite === "open" ? linkCode : undefined;
   const notice = ended ? (ended.why === "idle" ? "That lobby has closed." : ended.why === "left" ? leftNote(ended.how) : "That match has ended.") : (squadsNote ?? undefined);
   // Ranked 1 v 1: the search and the versus moment (one stage, in the home screen's frame, as every queue), then the game.
-  if ((duel || duelQueue) && !match && !squads) {
+  if ((duel || (duelQueue && !duelAway)) && !match && !squads) {
     const overlayD = profileOpen && (
       <div class="fd-overlay">
         <FrontFrame>
@@ -1028,6 +1100,7 @@ export function App() {
           frame={(stage) => homeFrame(stage, undefined, false)}
           onCancel={leaveDuel}
           onBot={botDuel}
+          onAway={duelGoAway}
           onHome={leaveDuel}
           onAgain={() => {
             leaveDuel();
@@ -1228,11 +1301,11 @@ export function App() {
             : undefined
         }
         onlineLocked={mustSignInToPlayOnline()}
-        onPlay={(mode, type) => void playNow(mode, type)}
-        onSolo={(mode, opts) => void startSolo(mode, opts)}
-        onCreateLobby={(mode) => void createLobby(mode)}
-        onJoinLobby={(code) => joinLobby(code, { typed: code !== inviteCode })}
-        onSquads={() => void squadsPlay()}
+        onPlay={(mode, type) => leavingDuelFirst(() => void playNow(mode, type))}
+        onSolo={(mode, opts) => leavingDuelFirst(() => void startSolo(mode, opts))}
+        onCreateLobby={(mode) => leavingDuelFirst(() => void createLobby(mode))}
+        onJoinLobby={(code) => leavingDuelFirst(() => joinLobby(code, { typed: code !== inviteCode }))}
+        onSquads={() => leavingDuelFirst(() => void squadsPlay())}
         onParty={openParty}
         onFriends={nav.friendsList}
         onSignIn={() => chooseGuest(false)}

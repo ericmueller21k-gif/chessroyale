@@ -30,7 +30,7 @@ import { maiaAllowed } from "./boss-brain.ts";
 import { ownEngine } from "./engine.ts";
 import { startMaia } from "./maia.ts";
 import { crumb } from "./problems.ts";
-import { testParams } from "./test-switches.ts";
+import { testParams, testSwitchesAllowed } from "./test-switches.ts";
 
 /**
  * Ranked 1 v 1 in the app (docs/areas/ranked.md): the queue (`DuelQueue`), a game against a person through its
@@ -672,19 +672,76 @@ export type DuelQueueState =
   | { kind: "found"; code: string }
   | { kind: "cancelled" };
 
+/** Where a search in progress is kept for this tab (sessionStorage), so a reload carries on with it. */
+const SAVED_QUEUE_KEY = "brc.duelQueue";
+/** A saved search older than this (no ask since) is dropped: the server forgets an unasked ticket long before. */
+const SAVED_QUEUE_MS = 2 * 60_000;
+
+/** A search in progress, as saved: its ticket, when it began, its test switches, and when it last asked. */
+interface SavedQueue {
+  ticket: string | null;
+  since: number;
+  at: number;
+  test: Record<string, string>;
+}
+
+/** The search this tab was in before a reload (null: none, or too old). */
+export function savedDuelQueue(): SavedQueue | null {
+  try {
+    const raw = sessionStorage.getItem(SAVED_QUEUE_KEY);
+    const q = raw ? (JSON.parse(raw) as SavedQueue) : null;
+    return q && typeof q.since === "number" && typeof q.at === "number" && Date.now() - q.at < SAVED_QUEUE_MS ? q : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveQueue(q: SavedQueue | null) {
+  try {
+    if (q) sessionStorage.setItem(SAVED_QUEUE_KEY, JSON.stringify(q));
+    else sessionStorage.removeItem(SAVED_QUEUE_KEY);
+  } catch {
+    // No storage: a reload ends the search (the server forgets its ticket).
+  }
+}
+
 /**
  * The 1 v 1 queue: asks the server for an opponent (POST /api/1v1/play) and asks again at once with its ticket (each
  * ask waits up to a few seconds on the server) until it's paired, or busy (asks again when told); a ticket the server
  * no longer knows (`expired`) is dropped and it asks afresh. Cancel stops it and tells the server (a pairing made
- * that very moment is called off there).
+ * that very moment is called off there). It belongs to the app, not to a screen: it keeps asking while you browse the
+ * shop or a profile (docs/areas/ranked.md, "Browsing while queued"), and a reload carries on with it (`savedDuelQueue`).
  */
 export class DuelQueue {
-  state: DuelQueueState = { kind: "searching", since: Date.now() };
+  state: DuelQueueState;
   /** Your hidden rating, rounded (the first answer's): the bot game's strength. */
   botRating: number | null = null;
-  private ticket: string | null = null;
+  /** "Keep waiting" was picked: no more "Few players online right now" for this search. */
+  keepWaiting = false;
+  /** When "Few players online right now" is due (RANKED_1V1.fewPlayersSeconds after the search began; `?fewAfter=`). */
+  readonly fewAt: number;
+  private ticket: string | null;
+  /** Test switches, read once (the address changes as you browse): a pool of its own, each side's clock. */
+  private readonly test: Record<string, string>;
   private stopped = false;
   private listeners = new Set<() => void>();
+
+  /** `resume`: carry on with a search saved before a reload (its ticket, its wait). */
+  constructor(resume?: SavedQueue | null) {
+    const t = testParams();
+    // (A resumed search keeps its own, where the test switches are allowed: the address may have lost them.)
+    this.test = resume && testSwitchesAllowed() ? { ...resume.test } : {};
+    if (!resume)
+      for (const k of ["pool", "clock", "fewAfter"]) {
+        const v = t.get(k);
+        if (v) this.test[k] = v;
+      }
+    this.ticket = resume?.ticket ?? null;
+    const since = resume?.since ?? Date.now();
+    this.state = { kind: "searching", since };
+    const few = Number(this.test.fewAfter);
+    this.fewAt = since + (Number.isFinite(few) && few > 0 ? few : RANKED_1V1.fewPlayersSeconds) * 1000;
+  }
 
   subscribe(fn: () => void): () => void {
     this.listeners.add(fn);
@@ -697,23 +754,27 @@ export class DuelQueue {
 
   private set(s: DuelQueueState) {
     this.state = s;
+    if (s.kind !== "searching") saveQueue(null);
     this.emit();
   }
 
-  /** Test switches: a queue of its own (`pool`) and each side's clock (`clock`, seconds). */
+  /** The test switches the server reads (`pool`, `clock`), and the ticket. */
   private params(): string {
     const q = new URLSearchParams();
-    const t = testParams();
-    for (const k of ["pool", "clock"]) {
-      const v = t.get(k);
-      if (v) q.set(k, v);
-    }
+    for (const k of ["pool", "clock"]) if (this.test[k]) q.set(k, this.test[k]!);
     if (this.ticket) q.set("ticket", this.ticket);
     const s = q.toString();
     return s ? `?${s}` : "";
   }
 
+  /** Saved for a reload, after every ask. */
+  private save() {
+    if (this.stopped || this.state.kind !== "searching") return;
+    saveQueue({ ticket: this.ticket, since: this.state.since, at: Date.now(), test: this.test });
+  }
+
   async start() {
+    this.save();
     while (!this.stopped) {
       let res: Response;
       try {
@@ -740,9 +801,11 @@ export class DuelQueue {
       if (body.expired) {
         if (!this.ticket) return this.set({ kind: "refused", message: "Couldn't find a match. Try again." });
         this.ticket = null;
+        this.save();
         continue;
       }
       if (body.ticket) this.ticket = body.ticket;
+      this.save();
       if (res.status === 429 || body.busy) {
         await new Promise((r) => setTimeout(r, body.retryMs ?? 3000));
         continue;

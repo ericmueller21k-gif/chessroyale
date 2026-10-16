@@ -1,9 +1,10 @@
 :root {
   /*
-   * The window's height for the page: all of it, less the maintenance banner while one shows (MaintenanceBanner.tsx
-   * sets --banner-h), so the banner never covers anything and nothing scrolls because of it.
+   * The window's height for the page: all of it, less the bands at the top while they show (the maintenance banner,
+   * MaintenanceBanner.tsx, sets --maint-h; the 1 v 1 search's bar, DuelQueueBar.tsx, --qbar-h), so a band never
+   * covers anything and nothing scrolls because of it.
    */
-  --banner-h: 0px;
+  --banner-h: calc(var(--maint-h, 0px) + var(--qbar-h, 0px));
   --app-h: calc(100dvh - var(--banner-h));
   --bg: #16181d;
   --surface: #20232a;
@@ -15801,6 +15802,143 @@ button.sq-tiny {
   font-size: 16px;
   cursor: pointer;
 }
+/*
+ * The 1 v 1 search's bar while you browse (DuelQueueBar.tsx): under the maintenance banner, over every screen; the
+ * page starts under it (--qbar-h, part of --banner-h). "Searching 1 v 1 · 0:42 ›" goes back to the search; Cancel
+ * leaves the queue. Gold at "Few players online" (its choices are on the stage). A sheet or menu (z-index 50 and up)
+ * covers it.
+ */
+.dq-bar {
+  position: fixed;
+  top: var(--maint-h, 0px);
+  left: 0;
+  right: 0;
+  z-index: 48;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: max(0px, env(safe-area-inset-top) - var(--maint-h, 0px)) calc(6px + env(safe-area-inset-right)) 0 calc(6px + env(safe-area-inset-left));
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+  border-bottom: 1px solid var(--fd-line);
+  box-shadow: var(--shadow);
+}
+.dq-go {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.dq-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.dq-time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--fd-sub);
+  font-weight: 600;
+}
+.dq-chev {
+  flex: none;
+  margin-left: auto;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--fd-sub);
+}
+/* A dot pulsing while it searches (opacity only; off under reduced motion). */
+.dq-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--fd-green);
+  animation: dq-pulse 1.4s ease-in-out infinite;
+}
+@keyframes dq-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.dq-cancel {
+  flex: none;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--fd-line);
+  border-radius: 10px;
+  background: var(--fd-panel);
+  color: var(--fd-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.dq-bar.few {
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  border-bottom-color: transparent;
+}
+.dq-bar.few :is(.dq-time, .dq-chev) {
+  color: inherit;
+}
+.dq-bar.few .dq-dot {
+  background: var(--fd-gold-ink);
+}
+.dq-bar.few .dq-cancel {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: transparent;
+  color: var(--fd-gold-ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dq-dot {
+    animation: none;
+  }
+}
+/* "Leave the 1 v 1 queue?" before another mode starts. */
+.dq-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--fd-scrim);
+}
+.dq-confirm {
+  width: min(100%, 360px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 16px;
+  background: var(--fd-panel);
+  color: var(--fd-text);
+  box-shadow: var(--shadow);
+}
+.dq-confirm strong {
+  font-size: 18px;
+}
+.dq-confirm p {
+  margin: 0 0 6px;
+  color: var(--fd-sub);
+}
+.dq-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
 /* A part resting (a kill switch): its line under the home screen's buttons (Boss alone, when PLAY's line doesn't say it). */
 .fd-rest {
   grid-column: 1 / -1;
@@ -15836,6 +15974,40 @@ button.sq-tiny {
   flex-direction: column;
   align-items: center;
   gap: 2px;
+}
+/* Home while searching (the search goes on: the bar comes along). Top left, clear of the title. */
+.dv-stage {
+  position: relative;
+}
+.dv-st-home {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 12px);
+  left: calc(10px + env(safe-area-inset-left));
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 0 14px 0 10px;
+  border: 1px solid var(--fd-line);
+  border-radius: 999px;
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.dv-st-home span {
+  font-size: 22px;
+  line-height: 1;
+  margin-top: -2px;
+}
+@media (min-width: 1024px) {
+  .fd-root.framed .dv-st-home {
+    top: 0;
+    left: 0;
+  }
 }
 .dv-st-head h2 {
   font-family: "Archivo Black", "Archivo", sans-serif;
