@@ -15905,12 +15905,16 @@ button.sq-tiny {
 
 /* Phones: one locked screen; the chat takes what's left under the panel. */
 @media (max-width: 899px) and (min-height: 520px) {
-  /* The chat fills what's left under the board, never less than its header, a line of the feed and its buttons: on a
-     short phone the result card pushes it down the page (it scrolls) rather than clipping it. */
+  /* The chat fills what's left under the board, never less than its header, a line of the feed and its buttons. A
+     phone's game screen is locked while the game is played; once it's over, the result card can push the chat below
+     the fold on a short phone, so the screen scrolls then rather than clipping it. */
   .screen.game.duel-screen .dv-chat {
     flex: 1 0 0;
-    min-height: 128px;
+    min-height: 140px;
     margin: 0 10px;
+  }
+  .screen.game.duel-screen.over {
+    overflow-y: auto;
   }
   .screen.game.duel-screen .dv-panel {
     padding: 0 10px;

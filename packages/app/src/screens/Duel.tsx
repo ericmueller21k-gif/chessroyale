@@ -268,7 +268,7 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
     </Board>
   );
   return (
-    <div class="screen game duel-screen">
+    <div class={`screen game duel-screen${over ? " over" : ""}`}>
       <div class="hud-row">
         <div class="hud dv-title">
           <h1>1 v 1</h1>
