@@ -220,9 +220,15 @@ test("the shop between rounds, a Stockfish token, a Time chip and a shield: boug
   await expect(tokenButton).toBeVisible();
   await tokenButton.click();
   await expect(page.locator(".mc-stockfish-on")).toHaveText("Your Stockfish lines", { timeout: 15_000 });
-  await expect(page.locator(".mc-stockfish .sq-cheat-lines li")).toHaveCount(3, { timeout: 30_000 });
+  // As many lines as the position allows, at most three: the moves left once the blocks on that board are taken out.
+  // (Usually three; but a strong bot's first move can be a check with two answers: the Danish's Bxf7+, among others
+  // in Pairs' openings.)
+  const blocked = await page.evaluate(([key, board]) => (window as any).squads.matches.get(key).blocks.filter((x: any) => x.board === board).map((x: any) => x.move.slice(0, 4)), [s.key, s.duty!.board] as const);
+  const allowed = new Chess(s.fen!).moves({ verbose: true }).filter((m) => !blocked.includes(m.from + m.to)).length;
+  const lineCount = Math.min(SQUADS.mercenary.stockfish.lines, allowed);
+  await expect(page.locator(".mc-stockfish .sq-cheat-lines li")).toHaveCount(lineCount, { timeout: 30_000 });
   await expect(page.locator(".mc-stockfish .sq-cheat-lines li").first()).toContainText(/^1 · /);
-  // (Three lines besides your partner's pick, a blue arrow once their bot has picked: it picks in its own time.)
+  // (The token's lines besides your partner's pick, a blue arrow once their bot has picked: it picks in its own time.)
   const tokenArrows = () =>
     page.evaluate(
       ([key, board, sel]) => {
@@ -232,8 +238,10 @@ test("the shop between rounds, a Stockfish token, a Time chip and a shield: boug
       },
       [s.key, s.duty!.board, `.board-area ${BOARD_SEL.arrowLine}`] as const,
     );
-  await expect.poll(tokenArrows, { timeout: 5_000 }).toBe(3);
-  const assist = await page.evaluate((key) => (window as any).squads.matches.get(key).assisting, s.key);
+  await expect.poll(tokenArrows, { timeout: 5_000 }).toBe(lineCount);
+  // Your token, once (the other squad's bots buy tokens too and may use one in this match: theirs aren't yours).
+  const myId = await page.evaluate(() => (window as any).squads.myId);
+  const assist = await page.evaluate(([key, me]) => (window as any).squads.matches.get(key).assisting.filter((a: any) => a.by === me), [s.key, myId] as const);
   expect(assist).toHaveLength(1);
   // Your side to move in that position: your moves, never theirs.
   expect(assist[0].fen.split(" ")[1]).toBe(s.fen!.split(" ")[1]);
@@ -244,7 +252,9 @@ test("the shop between rounds, a Stockfish token, a Time chip and a shield: boug
     const partner = d.players.find((x: any) => x !== me);
     return m.visible[partner] ?? null;
   }, [s.key, await page.evaluate(() => (window as any).squads.myId)] as const);
-  const mine = new Chess(s.fen!).moves({ verbose: true }).map((m) => m.from + m.to).find((m) => m !== partnerPick && m.slice(0, 2) !== partnerPick?.slice(0, 2))!;
+  // (Another piece's move if there is one; in a check with only king moves, the other one.)
+  const moves = new Chess(s.fen!).moves({ verbose: true }).map((m) => m.from + m.to);
+  const mine = moves.find((m) => m !== partnerPick && m.slice(0, 2) !== partnerPick?.slice(0, 2)) ?? moves.find((m) => m !== partnerPick?.slice(0, 4)) ?? moves[0]!;
   await tapSquare(page, mine.slice(0, 2));
   await tapSquare(page, mine.slice(2, 4));
   // (If the half's time ran out meanwhile, there's nothing to lock in.)

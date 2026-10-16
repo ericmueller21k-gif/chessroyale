@@ -165,6 +165,9 @@ kill switch `PAUSE_RANKED1V1`.
   move a rank.
 - Every number in `RANKED_1V1`; the FAQ quotes them from there. A change to the rating, the points, placements or
   pairing is measured with the simulation first (the ranked lane's rule).
+- 1 v 1's CSS classes start with `dv-` (the shared hint's is `first-vote-hint`): a generic name can already be someone
+  else's. (`.vote-hint` was Crowd's line above its vote board; styling it moved that board 12 px, caught by
+  `votes.spec.ts`.)
 - The board never moves from the vote to the result: anything new for the vote or the game is drawn over it, in
   eighths of `--board-size`.
 - Anything the game object starts has an end (a result, an abort, a no-show, closing after its results): a test for
