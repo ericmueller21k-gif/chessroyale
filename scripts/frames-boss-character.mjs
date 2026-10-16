@@ -26,9 +26,7 @@ const [out = "character-frames", bossName = "Boingo", which = "both"] = argv.fil
 import { resolve } from "node:path";
 const outDir = resolve(out);
 mkdirSync(outDir, { recursive: true });
-// From the app's folder, so its build steps (the engine copied into public/) land where the dev server serves them.
-process.chdir("packages/app");
-const server = await createServer({ root: ".", configFile: "vite.config.ts", server: { port: 5196, strictPort: false, fs: { allow: [resolve("../..")] } }, logLevel: "error" });
+const server = await createServer({ root: "packages/app", configFile: "packages/app/vite.config.ts", server: { port: 5196, strictPort: false, fs: { allow: [resolve(".")] } }, logLevel: "error" });
 await server.listen();
 const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch();
@@ -95,7 +93,7 @@ async function run(name, context) {
 
 /** The power art over this screen, frame by frame: each sequence mounted where it plays, a shot every ~70 ms. */
 async function powers(p, name, sq, board) {
-  const lab = `/@fs${resolve("../../scripts/fx-lab.ts")}`;
+  const lab = `/@fs${resolve("scripts/fx-lab.ts")}`;
   const cell = board.width / 8;
   const at = (s, w = 1, h = 1) => ({ x: sq(s).x - (cell * w) / 2, y: sq(s).y - (cell * h) / 2, w: cell * w, h: cell * h });
   const char = p.locator(".boss-char:visible").first();
@@ -162,7 +160,7 @@ async function powers(p, name, sq, board) {
  * plain board and then under the storm. Nothing here may add lag (.claude/LESSONS.md: "Lag that grows with the match").
  */
 async function perf(p, name, sq, board, fen) {
-  const lab = `/@fs${resolve("../../scripts/fx-lab.ts")}`;
+  const lab = `/@fs${resolve("scripts/fx-lab.ts")}`;
   const cdp = await p.context().newCDPSession(p);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
   const cell = board.width / 8;

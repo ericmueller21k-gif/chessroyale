@@ -161,11 +161,12 @@ export function KingAttack({
           <SpriteAnim ch={ch} anim={ka.anim} since={startAt} sounds={kit.sounds} id={`attack-${seed}`} />
         </span>
       )}
+      {/* (Each lash's "−N" says which lash it is, for e2e/king-attack.spec.ts: every one shows.) */}
       {hits.map((at, i) => {
         if (t < at || t >= at + 1000) return null;
         const p = hpSpot(i, col, row);
         return (
-          <span key={i} class="ks-hp ka-hp" style={{ left: sq(col + 0.5 + p.x), top: sq(row + 0.5 + p.y) }}>
+          <span key={i} class="ks-hp ka-hp" data-lash={i} style={{ left: sq(col + 0.5 + p.x), top: sq(row + 0.5 + p.y) }}>
             −{hp[i]}
           </span>
         );

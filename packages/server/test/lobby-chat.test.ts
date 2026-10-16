@@ -24,7 +24,7 @@ const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
 
 type Msg = ServerMessage;
 const MIN = 60_000;
-const CROWD = modeSettings("crowd", { crowdTeams: true, augments: false });
+const CROWD = modeSettings("crowd", { augments: false });
 
 /** A lobby on a fake clock, an outbox per player; `join` seats someone the way the Durable Object does (then resendTo). */
 function setup(settings: Partial<Settings> = CROWD, icons: Record<string, string> = {}) {

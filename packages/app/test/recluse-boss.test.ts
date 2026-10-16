@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, menuBosses, type Settings } from "@chessroyale/core";
+import { BOSS_BANNER, BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, menuBosses, type Settings } from "@chessroyale/core";
 import { RECLUSE_FX, legalMoves, type UciEngine } from "@chessroyale/chess";
 import { SoloMatch } from "../src/solo.ts";
 import { BOSS_KITS } from "../src/characters/kits.ts";
@@ -65,7 +65,7 @@ describe("his ultimate, the bullet clock, on screen", () => {
     expect(BULLET_ANIMS).toEqual(["consult", "spellbook", "spellLoop", "spellClose"]);
     for (const n of BULLET_ANIMS) expect(RECLUSE_BUST.anims[n], n).toBeTruthy();
     expect(BULLET.runMs).toBeLessThanOrEqual(RECLUSE_FX.bullet);
-    expect(BULLET.bannerAt + BULLET.bannerMs).toBeLessThanOrEqual(RECLUSE_FX.bullet);
+    expect(BULLET.bannerAt + BOSS_BANNER.ms).toBeLessThanOrEqual(RECLUSE_FX.bullet);
     // "BULLET!" as the book falls open (after the consult).
     expect(BULLET.bannerAt).toBeGreaterThan(animLength(RECLUSE.anims.consult!));
   });
@@ -94,7 +94,8 @@ describe("then he adds time per move (Eric, Oct 14)", () => {
     for (const l of RECLUSE_LINES.bulletPlus) expect(l).not.toMatch(/\d/);
     expect(momentPriority({ kind: "bulletPlus" })).toBe(CRITICAL);
     expect(BULLET_PLUS.text()).toBe("+2 s a move from now on");
-    expect(dockLine({ kind: "bulletPlus" })).toBe("+2 s a move");
+    // (The board says it: the dock keeps the turn's own line, never the increment a second time.)
+    expect(dockLine({ kind: "bulletPlus" })).toBeNull();
     // Within its moment: the consult, and the text up for a couple of seconds before the clock starts.
     expect(BULLET_PLUS.anims).toEqual(["consult"]);
     expect(animLength(RECLUSE_BUST.anims.consult!)).toBeLessThanOrEqual(RECLUSE_FX.bulletPlus);

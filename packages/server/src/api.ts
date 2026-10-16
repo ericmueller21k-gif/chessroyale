@@ -1,11 +1,14 @@
 import { deleteLockerItems, equipLocker, lockerState, openCrate } from "./locker.ts";
 import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
-import { cachedUserId, firstSighting, forgetToken, markSeen } from "./presence.ts";
+import { cachedUserId, firstSighting, forgetToken, inboxOf, markSeen, rememberInbox } from "./presence.ts";
 import { REPORT_THANKS, appeal, fairStatus, reportPlayer } from "./fairplay.ts";
 import { NAME_NOT_ALLOWED, isBlockedText } from "./text-filter.ts";
-import { isAdmin, type AdminEnv } from "./admin.ts";
+import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
+import { isPaused, pausedResponse } from "./kill-switches.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
+import { accountDownload, deleteAccount } from "./account-data.ts";
+import { AGE_GATE, ASK_AGE_LINE, TOO_YOUNG_LINE } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -15,10 +18,12 @@ import {
   endSession,
   ensureSchema,
   equipItem,
+  markAgeOk,
   profile,
   publicProfile,
   randomToken,
   recordResult,
+  resetNameAndIcon,
   setChatPicks,
   shopState,
   signInWithIdentity,
@@ -91,6 +96,13 @@ export const SESSION_COOKIE = "hc_session";
 export const DEVICE_COOKIE = "hc_device";
 const STATE_COOKIE = "hc_oauth";
 const NEXT_COOKIE = "hc_next";
+/**
+ * The age gate's answer on this device (docs/decisions/2026-10-16-age-gate-and-real-money.md): "ok" (old enough, for one
+ * sign-in within AGE_GATE.answerMinutes) or "under" (too young, AGE_GATE.tooYoungDays, and no later answer replaces it).
+ * Never the birth date: the app works the answer out and sends only that. HttpOnly, so the page can't clear it; the app
+ * keeps "too young" in its storage too, and each puts the other back.
+ */
+export const AGE_COOKIE = "hc_age";
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...headers } });
@@ -102,6 +114,30 @@ export function readCookie(request: Request, name: string): string | null {
 const cookie = (name: string, value: string, maxAge: number) =>
   `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 const sessionCookie = (token: string) => cookie(SESSION_COOKIE, token, 365 * 86_400);
+
+/**
+ * This device's answer to the age question (AGE_COOKIE), or null if it hasn't answered (or its "ok" has run out). An
+ * "under" anywhere in the request wins: a second hc_age (set by hand for another path, which the browser sends first)
+ * can't hide it.
+ */
+export function ageAnswer(request: Request): "ok" | "under" | null {
+  const values = [...(request.headers.get("cookie") ?? "").matchAll(new RegExp(`(?:^|;\\s*)${AGE_COOKIE}=([^;]*)`, "g"))].map((m) => m[1]!.trim());
+  return values.includes("under") ? "under" : values.includes("ok") ? "ok" : null;
+}
+/**
+ * An "old enough" answer, good for AGE_GATE.answerMinutes from now. Given again as a sign-in starts (an emailed code, a
+ * trip to Google), so it can't run out halfway through one: a code lasts 10 minutes, Google's state cookie 10.
+ */
+const ageOk = () => cookie(AGE_COOKIE, "ok", AGE_GATE.answerMinutes * 60);
+/**
+ * Every sign-in needs this device's "old enough" answer first (null: go ahead). A device that answered "too young"
+ * can't sign in at all (new account or not: the email would be a child's), and one that hasn't answered is asked.
+ */
+function ageRefusal(request: Request): Response | null {
+  const age = ageAnswer(request);
+  if (age === "ok") return null;
+  return age === "under" ? json({ message: TOO_YOUNG_LINE, tooYoung: true }, 403) : json({ message: ASK_AGE_LINE, askAge: true }, 403);
+}
 
 /** Online play needs a signed-in account once a way to sign in is set up (guests play solo against bots). */
 export const signInRequired = (env: AccountEnv) => !!((env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) || env.RESEND_API_KEY);
@@ -118,6 +154,9 @@ export async function accountOf(request: Request, env: AccountEnv, waitUntil?: W
   await ensureSchema(sql, env.DB);
   return userFromToken(sql, readCookie(request, SESSION_COOKIE), Date.now(), presenceTouch(env, waitUntil));
 }
+
+/** A time as its day only (noon UTC that day), for a profile that hides when its player is online. */
+export const dayOf = (at: number) => Math.floor(at / 86_400_000) * 86_400_000 + 43_200_000;
 
 /** The live line's numbers, shared by every request to this Worker instance for a few seconds. */
 let liveCache: { at: number; body: LiveCounts } | null = null;
@@ -145,7 +184,19 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
   const email = !!env.RESEND_API_KEY;
-  if (path === "/api/auth/config") return json({ accounts: !!env.DB, google, email, onlineNeedsSignIn: !!env.DB && signInRequired(env) });
+  // (`testSwitches`: TEST_SWITCHES is on here, so the app honors its test switches for everyone: local, e2e, staging.
+  // `age`: this device's answer to the age question, once it has one.)
+  if (path === "/api/auth/config") {
+    const age = ageAnswer(request);
+    return json({
+      accounts: !!env.DB,
+      google,
+      email,
+      onlineNeedsSignIn: !!env.DB && signInRequired(env),
+      ...((env as AdminEnv).TEST_SWITCHES === "1" ? { testSwitches: true } : {}),
+      ...(age ? { age } : {}),
+    });
+  }
   if (!env.DB) return json({ message: "Accounts aren't set up yet." }, 503);
   const sql: Sql = d1Sql(env.DB);
   await ensureSchema(sql, env.DB);
@@ -155,16 +206,23 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // GET /api/live: the live line (online, matches running, in queue, the playing-now list, typical waits). Polled by
   // the front door every few seconds and by matches every 30 s, so it also marks you as online.
   if (path === "/api/live" && request.method === "GET") {
-    const touch = presenceTouch(env, waitUntil);
-    if (touch) {
+    // ?busy=1: the app is in a match (friends lists show "In a match"). `inbox`: friends' news for you (presence.ts).
+    const busy = url.searchParams.get("busy") === "1";
+    let inbox: number | undefined;
+    if (env.LIVE && waitUntil) {
       // The live hub: presence in batches (the session lookup cached), the numbers from its memory.
       const uid = await cachedUserId(sql, token, now);
       if (uid && firstSighting(uid, now)) {
         // Just arrived: the hub hears at once, and its numbers (which include you) refresh this instance's.
         // (Typed as sent: RPC's types widen the votes' [SAN, count] pairs to plain arrays.)
-        const counts = (await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).arrive(uid, now).catch(() => null)) as LiveCounts | null;
-        if (counts) liveCache = { at: now, body: counts };
-      } else if (uid) touch(uid);
+        const counts = (await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).arrive(uid, now, busy).catch(() => null)) as (LiveCounts & { inbox?: number }) | null;
+        if (counts) {
+          const { inbox: news, ...numbers } = counts;
+          if (news) rememberInbox(uid, news);
+          liveCache = { at: now, body: numbers };
+        }
+      } else if (uid) markSeen(env as Required<Pick<AccountEnv, "LIVE">>, uid, now, waitUntil, busy);
+      if (uid) inbox = inboxOf(uid);
     } else await touchSession(sql, token, now);
     if (!liveCache || now - liveCache.at > LIVE_CACHE_MS) {
       if (env.LIVE) liveCache = { at: now, body: (await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).liveCounts()) as LiveCounts };
@@ -179,7 +237,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     // ?chat=N (the home page's global chat is open): its lines after N ride along (global-chat-api.ts).
     const chatSince = url.searchParams.get("chat");
     const chat = chatSince !== null && env.LIVE ? await chatSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(chatSince), now).catch(() => null) : null;
-    return json({ ...liveCache.body, fillSeconds: Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60)), ...(chat ? { chat } : {}) });
+    return json({ ...liveCache.body, fillSeconds: Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60)), ...(chat ? { chat } : {}), ...(inbox ? { inbox } : {}) });
   }
 
   // GET /api/chat/icon/KEY: a drawn icon on a line in the global chat (anyone may read the chat).
@@ -193,8 +251,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (pm && request.method === "GET") {
     const p = await publicProfile(sql, pm[1]!, now);
     if (!p) return json({ message: "No such player." }, 404);
-    // Online now, from the live hub (D1's last_seen is written once a minute).
-    if (env.LIVE) {
+    // Hiding when you're online hides when you played too: others get each recent match's day, not its time (you get
+    // yours exact: "See your result" finds a match by it). The session from this instance's cache, usually no D1 read.
+    if (p.hidden && (await cachedUserId(sql, token, now).catch(() => null)) !== p.id) {
+      for (const r of p.recent) r.playedAt = dayOf(r.playedAt);
+    }
+    // Online now, from the live hub (D1's last_seen is written once a minute); never for someone who hides it.
+    if (env.LIVE && !p.hidden) {
       const live = await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).presence(p.id).catch(() => null);
       if (live?.lastSeen && live.lastSeen > (p.lastSeen ?? 0)) Object.assign(p, { lastSeen: live.lastSeen, online: live.online });
     }
@@ -203,12 +266,18 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
 
   const current = await userFromToken(sql, token, now, presenceTouch(env, waitUntil));
 
-  /** Switches the browser to `user` (a new session) and answers with `body` or a redirect. */
+  /**
+   * Switches the browser to `user` (a new session) and answers with `body` or a redirect. Every sign-in comes through
+   * the age gate (ageRefusal): the account keeps that its holder said they were old enough, and the answer is used up,
+   * so the next sign-in on this device asks again.
+   */
   const signInAs = async (user: User, redirect?: string) => {
-    if (token && current?.id === user.id) return redirect ? Response.redirect(redirect, 302) : json(await profile(sql, user));
-    if (token) await endSession(sql, token);
-    const t = await createSession(sql, user.id, now);
-    const headers = new Headers({ "set-cookie": sessionCookie(t), "cache-control": "no-store" });
+    await markAgeOk(sql, user.id, now);
+    const headers = new Headers({ "set-cookie": cookie(AGE_COOKIE, "", 0), "cache-control": "no-store" });
+    if (!token || current?.id !== user.id) {
+      if (token) await endSession(sql, token);
+      headers.append("set-cookie", sessionCookie(await createSession(sql, user.id, now)));
+    }
     if (redirect) {
       headers.set("location", redirect);
       return new Response(null, { status: 302, headers });
@@ -223,22 +292,77 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (!readCookie(request, DEVICE_COOKIE)) headers.append("set-cookie", cookie(DEVICE_COOKIE, randomToken(16), 400 * 86_400));
     // (Admins, ADMIN_EMAILS as for the fair-play review, also see the boss battle's test trigger.)
     if (current) return new Response(JSON.stringify({ ...(await profile(sql, current)), ...(isAdmin(env as AdminEnv, current) ? { admin: true } : {}) }), { headers });
-    const g = await createGuest(sql, now, url.searchParams.get("name") ?? "Player");
+    // (A device that answered "too young" plays under the default name.)
+    const g = await createGuest(sql, now, ageAnswer(request) === "under" ? "Player" : (url.searchParams.get("name") ?? "Player"));
     headers.append("set-cookie", sessionCookie(g.token));
     return new Response(JSON.stringify(await profile(sql, g.user)), { headers });
   }
   if (!current) return json({ message: "No account on this device yet." }, 401);
 
-  // PATCH /api/me {name?, icon?}
+  // PATCH /api/me {name?, icon?}. Not from a guest on a device that answered "too young": it keeps the default name and
+  // icon. (Someone signed in there, say in a tab opened before the answer, still may.)
   if (path === "/api/me" && request.method === "PATCH") {
+    if (ageAnswer(request) === "under" && !isSignedIn(current)) return json({ message: "Guests play under the default name and icon." }, 403);
     const body = (await request.json().catch(() => ({}))) as { name?: unknown; icon?: unknown };
     // (A name with a slur or a hate term in it: text-filter.ts.)
     if (typeof body.name === "string" && isBlockedText(body.name)) return json({ message: NAME_NOT_ALLOWED }, 400);
     return json(await profile(sql, await updateProfile(sql, current.id, body)));
   }
 
+  // POST /api/auth/age {oldEnough}: the age question's answer, asked before any sign-in (the app works it out from the
+  // birth month and year and sends only this; the date never leaves the device). Old enough: this device may sign in
+  // once within AGE_GATE.answerMinutes. Too young: for AGE_GATE.tooYoungDays this device can't sign in, a later answer
+  // doesn't change that, and its guest goes back to the default name and icon. From this site's own page, as JSON.
+  if (path === "/api/auth/age" && request.method === "POST") {
+    if (request.headers.get("origin") !== url.origin) return json({ message: "Not from here." }, 403);
+    if (!/^application\/json\b/i.test(request.headers.get("content-type") ?? "")) return json({ message: "Send JSON." }, 415);
+    const b = (await request.json().catch(() => ({}))) as { oldEnough?: unknown };
+    if (typeof b?.oldEnough !== "boolean") return json({ message: "Answer the question." }, 400);
+    if (b.oldEnough && ageAnswer(request) !== "under") return json({ age: "ok" }, 200, { "set-cookie": ageOk() });
+    if (!isSignedIn(current)) await resetNameAndIcon(sql, current.id);
+    return json({ age: "under" }, 200, { "set-cookie": cookie(AGE_COOKIE, "under", AGE_GATE.tooYoungDays * 86_400) });
+  }
+
+  // GET /api/me/data: "Download my data" (Settings), everything kept about your account as a JSON file, the global
+  // chat's lines (the live hub's) included. See account-data.ts.
+  if (path === "/api/me/data" && request.method === "GET") {
+    const hub = env.LIVE
+      ? await liveHub(env as Required<Pick<AccountEnv, "LIVE">>)
+          .accountData(current.id)
+          .catch((e: unknown) => void console.error(`download: the live hub's part is missing (${String(e)})`))
+      : null;
+    const body = await accountDownload(sql, current, now, hub ? { globalChat: hub.globalChat } : {});
+    return new Response(JSON.stringify(body, null, 2), {
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-disposition": `attachment; filename="hunchess-data-${new Date(now).toISOString().slice(0, 10)}.json"`,
+      },
+    });
+  }
+  // POST /api/me/delete {confirm: "delete"}: "Delete account" (Settings, after a confirmation). Everything personal goes
+  // (account-data.ts), every session with it (signed out on every device), and the live hub forgets the account
+  // (online now, its global chat lines). The app then starts afresh as a new guest.
+  if (path === "/api/me/delete" && request.method === "POST") {
+    // Only from this site's own page, as JSON (a form from anywhere else can't send it), and only confirmed.
+    if (request.headers.get("origin") !== url.origin) return json({ message: "Not from here." }, 403);
+    if (!/^application\/json\b/i.test(request.headers.get("content-type") ?? "")) return json({ message: "Send JSON." }, 415);
+    const b = (await request.json().catch(() => ({}))) as { confirm?: unknown };
+    if (b?.confirm !== "delete") return json({ message: "Confirm that you want to delete your account." }, 400);
+    await deleteAccount(sql, current, now);
+    if (token) forgetToken(token);
+    if (env.LIVE) {
+      await liveHub(env as Required<Pick<AccountEnv, "LIVE">>)
+        .forgetAccount(current.id)
+        .catch((e: unknown) => console.error(`account deleted, but the live hub kept its chat lines and presence (${String(e)})`));
+    }
+    return json({ ok: true }, 200, { "set-cookie": cookie(SESSION_COOKIE, "", 0) });
+  }
+
   // The shop. GET /api/shop: your coins, items and what's equipped. POST /api/shop/buy {item}, /api/shop/equip {item}.
   if (path === "/api/shop" && request.method === "GET") return json(await shopState(sql, current.id));
+  // (The shop resting, a kill switch: nothing new from it. Equipping what you have still works.)
+  if ((path === "/api/shop/buy" || path === "/api/locker/open") && request.method === "POST" && isPaused(env, "shop")) return pausedResponse("shop");
   if ((path === "/api/shop/buy" || path === "/api/shop/equip") && request.method === "POST") {
     const { item } = (await request.json().catch(() => ({}))) as { item?: unknown };
     const r = path === "/api/shop/buy" ? await buyItem(sql, current.id, item, now) : await equipItem(sql, current.id, item);
@@ -251,13 +375,14 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return json(await setChatPicks(sql, current.id, b && typeof b === "object" ? b : {}));
   }
 
-  // The locker. GET /api/locker; POST /api/locker/open {crate, fischer?, shiny?} (the test switches work only while
-  // crates are free); POST /api/locker/equip {slot, item} (item null empties the slot); POST /api/locker/delete
+  // The locker. GET /api/locker; POST /api/locker/open {crate, fischer?, shiny?} (the test switches: admins, or
+  // TEST_SWITCHES, and only while crates are free); POST /api/locker/equip {slot, item} (item null empties the slot); POST /api/locker/delete
   // {items} (deletes your crate items for good).
   if (path === "/api/locker" && request.method === "GET") return json(await lockerState(sql, current.id));
   if (path === "/api/locker/open" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { crate?: unknown; fischer?: unknown; shiny?: unknown };
-    const r = await openCrate(sql, current.id, b.crate, { fischer: b.fischer === true, shiny: b.shiny === true }, now);
+    const force = testSwitchesOn(env as AdminEnv, current) ? { fischer: b.fischer === true, shiny: b.shiny === true } : {};
+    const r = await openCrate(sql, current.id, b.crate, force, now);
     return r.ok ? json(r) : json({ message: r.message }, 400);
   }
   if (path === "/api/locker/equip" && request.method === "POST") {
@@ -313,9 +438,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return json(await profile(sql, g.user), 200, { "set-cookie": sessionCookie(g.token) });
   }
 
-  // ---- Email: a 6-digit code ----
+  // ---- Email: a 6-digit code (each step behind the age gate: no email is taken from a device that hasn't answered) ----
   if (path === "/api/auth/email/start" && request.method === "POST") {
     if (!email) return json({ message: "Email sign-in isn't set up yet." }, 503);
+    const tooYoung = ageRefusal(request);
+    if (tooYoung) return tooYoung;
     const { email: raw } = (await request.json().catch(() => ({}))) as { email?: unknown };
     const address = cleanEmail(raw);
     if (!address) return json({ message: "That doesn't look like an email address." }, 400);
@@ -333,9 +460,12 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       }),
     });
     if (!sent.ok) return json({ message: "We couldn't send the email. Try again in a minute." }, 502);
-    return json({ ok: true });
+    // (The answer starts its time again, so it outlasts the code.)
+    return json({ ok: true }, 200, { "set-cookie": ageOk() });
   }
   if (path === "/api/auth/email/verify" && request.method === "POST") {
+    const tooYoung = ageRefusal(request);
+    if (tooYoung) return tooYoung;
     const b = (await request.json().catch(() => ({}))) as { email?: unknown; code?: unknown };
     const address = cleanEmail(b.email);
     if (!address || typeof b.code !== "string") return json({ message: "Enter the 6-digit code." }, 400);
@@ -343,10 +473,12 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return signInAs(await signInWithIdentity(sql, current, "email", address, {}, now));
   }
 
-  // ---- Google ----
+  // ---- Google (behind the age gate too: without an "old enough" answer, back to the page, which asks) ----
   const redirectUri = `${url.origin}/api/auth/google/callback`;
   if (path === "/api/auth/google/start" && request.method === "GET") {
     if (!google) return json({ message: "Google sign-in isn't set up yet." }, 503);
+    // (?signin=age: the app shows ASK_AGE_LINE on the question, or the friendly line to a device that's too young.)
+    if (ageRefusal(request)) return Response.redirect(`${url.origin}${safeNext(url.searchParams.get("next"))}?signin=age`, 302);
     const state = randomToken(16);
     const q = new URLSearchParams({
       client_id: env.GOOGLE_CLIENT_ID!,
@@ -359,13 +491,15 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const headers = new Headers({ location: `https://accounts.google.com/o/oauth2/v2/auth?${q}`, "cache-control": "no-store" });
     headers.append("set-cookie", cookie(STATE_COOKIE, state, 600));
     headers.append("set-cookie", cookie(NEXT_COOKIE, safeNext(url.searchParams.get("next")), 600));
+    // (The answer starts its time again, so it outlasts the trip to Google.)
+    headers.append("set-cookie", ageOk());
     return new Response(null, { status: 302, headers });
   }
   if (path === "/api/auth/google/callback" && request.method === "GET") {
     if (!google) return json({ message: "Google sign-in isn't set up yet." }, 503);
     const state = url.searchParams.get("state");
     const code = url.searchParams.get("code");
-    if (!state || state !== readCookie(request, STATE_COOKIE) || !code) return Response.redirect(`${url.origin}/?signin=failed`, 302);
+    if (!state || state !== readCookie(request, STATE_COOKIE) || !code || ageRefusal(request)) return Response.redirect(`${url.origin}/?signin=failed`, 302);
     const res = await fetcher("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -374,9 +508,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (!res.ok) return Response.redirect(`${url.origin}/?signin=failed`, 302);
     const { id_token } = (await res.json()) as { id_token?: string };
     // The token came straight from Google over TLS, so its claims can be read without checking the signature.
-    const claims = id_token ? (JSON.parse(atob(id_token.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/"))) as { sub?: string; email?: string; email_verified?: boolean; name?: string; aud?: string }) : null;
+    const claims = id_token ? (JSON.parse(atob(id_token.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/"))) as { sub?: string; email?: string; email_verified?: boolean; aud?: string }) : null;
     if (!claims?.sub || claims.aud !== env.GOOGLE_CLIENT_ID) return Response.redirect(`${url.origin}/?signin=failed`, 302);
-    const user = await signInWithIdentity(sql, current, "google", claims.sub, { email: claims.email_verified ? (claims.email ?? null) : null, name: claims.name ?? null }, now);
+    const user = await signInWithIdentity(sql, current, "google", claims.sub, { email: claims.email_verified ? (claims.email ?? null) : null }, now);
     return signInAs(user, `${url.origin}${safeNext(readCookie(request, NEXT_COOKIE))}?signin=google`);
   }
 

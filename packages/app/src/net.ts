@@ -55,6 +55,7 @@ import {
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { account } from "./account.ts";
+import { crumb } from "./problems.ts";
 import { evalBarOn } from "./prefs.ts";
 import { RoundProgress } from "./progress.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
@@ -416,7 +417,7 @@ export class NetMatch implements GameView {
         // No storage: join as a new player.
       }
       const device = matchMedia("(pointer: coarse)").matches ? "phone" : "computer";
-      this.send({ t: "hello", token, name: this.playerName, device, practice: this.practice, rating: account().profile?.rating ?? null, look: account().profile?.locker?.look ?? {}, lastBoss: lastBoss(), evalBar: evalBarOn() });
+      this.send({ t: "hello", token, name: this.playerName, device, practice: this.practice, look: account().profile?.locker?.look ?? {}, lastBoss: lastBoss(), evalBar: evalBarOn() });
     };
     ws.onmessage = (e) => this.onMessage(JSON.parse(e.data as string) as ServerMessage);
     ws.onclose = () => {
@@ -1103,6 +1104,7 @@ export class NetMatch implements GameView {
     this.myPick = move;
     const away = this.lookAways.stop();
     this.send({ t: "pick", key: this.key, move, ...(away ? { away } : {}) });
+    crumb(`move ${move}`);
     if (this.myId) this.progress.mark(this.myId);
     this.setPhase({ kind: "scoring", board: this.phase.board, move, strike: this.phase.strike });
   }

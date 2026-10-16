@@ -4,6 +4,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 ## How it works today
 
+- **Kill switches and the maintenance banner** ([ops.md](ops.md) "Kill switches"): a mode, Solo and Boss alone, or
+  Squads resting disables its way in on the home screen with its line ("Squads is resting for a bit. Back soon.": under
+  PLAY, on the Party button, in Play with friends, under the buttons for Boss alone); the boss menu hides a resting
+  boss. `MAINTENANCE_BANNER` shows as a slim band over the top of every screen (✕ hides it until the message changes).
 - **The landing page** shows where online play needs signing in (`onlineNeedsSignIn` from `/api/auth/config`) and
   you aren't signed in: sign in, or play against bots as a guest (remembered on the device). An invite link shows it
   even to a guest. `?nolanding` skips it (tests). Guests play Solo and Boss alone.
@@ -21,20 +25,66 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     and always silent, whatever the sound setting (its board is `silent`; Eric, Oct 12).
 - **The live line** is GET `/api/live`: polled every `FRONT_DOOR.livePollMs` while a front-door screen shows it, every
   `heartbeatMs` elsewhere (a match), never while the tab is hidden. The same request says you're here. Online = seen
-  within `onlineWindowMs`. The numbers come from the live hub (see [ops.md](ops.md)).
+  within `onlineWindowMs`. The numbers come from the live hub (see [ops.md](ops.md)). Squads' lobbies report to the
+  hub too (Oct 15) but stay off this line: they count for the overload limit and the ops health view only.
 - **The queue screen:** the lobby's seats fill on screen (people, then bots popping in after the fill time), the wait
   so far, "Switch to Default" in Bots off. The match starts in place.
 - **Profiles** (yours and anyone's, by tapping a name): icon, name, rank (from the rating, `RATING_RANKS`; "Top N%"
-  once `percentileMinPlayers` have ratings), the rating chart, stats (All, Classic, Crowd), recent matches, what
+  once `percentileMinPlayers` have ratings), the rating chart, stats (All, Classic, Crowd), "Boss tiers beaten"
+  (online raids only: a solo win is the browser's word), recent matches, what
   they're wearing (drawn with the real item art), their quick-chat picks. A profile others see never shows an email,
   a sign-in method or anything not on the approved list; a banned player's says "Banned".
+- **Friends** (Oct 15; [docs/decisions/2026-10-15-friends-and-invites.md](../decisions/2026-10-15-friends-and-invites.md); the rules and data on [accounts.md](accounts.md)):
+  - **Where:** a phone's home has a line above the live line ("Friends · 2 online", "N new" for requests and
+    invites); a computer's live panel has a FRIENDS section above the live line (friends online, each with Invite,
+    at most `FRIENDS.panelMax`, and "All friends ›"). Both open the friends list (`/friends`): invites to you (Join,
+    ✕), friend requests (Accept, Decline), your friends online first (In a match next, then the rest; Invite on each),
+    the requests you sent (Cancel) and who you've blocked (Unblock).
+  - **Someone's profile:** Add friend (or Cancel request, Accept friend, Remove friend), Invite to play, Block and
+    Report; Remove and Block ask for a second tap. Blocked: Unblock and Report only.
+  - **Inviting:** to your private lobby while it waits, or your Squads party; at the front door with neither, the
+    server is asked whether they'd take an invite, then a lobby (or, with Squads picked, a party) is made in the home
+    screen's mode and they're invited into it. Not during a match. A lobby and a party have "Invite friends" (a sheet
+    of your friends) under their link.
+  - **A new invite** shows as a toast at the top of a front-door page (never over a match or the queue) for
+    `FRIENDS.toastMs`: Join (into the lobby or party; the invite leaves your list) or ✕ (declines it).
+  - **Settings → Friends:** "Invites from" (Everyone, Friends, No one) and "Show when I'm online".
+  - **Fresh:** the list loads with your account and again when the live line's `inbox` grows (something new arrived
+    for you). While a list is on screen (the phone's line, the computer's panel, the friends list, Invite friends) and
+    you have a friend who shows when they're online, who's online in it refreshes every `FRIENDS.refreshMs`
+    (`/api/friends/online`: the cached session, one D1 read, one hub call). Who's online and in a match come from the
+    live hub (the app says "in a match" with its live line, `?busy=1`).
+  - **The toast waits** for a front-door page: an invite that arrives during a match or in the queue shows when you're
+    back (if it's still open), and its `FRIENDS.toastMs` start only once it's on screen.
 - **Light and dark:** follows the device until you pick (Settings); same layout and accents in both.
-- **The eval bar's switch** (Settings → Playing, "Eval bar"; Eric, Oct 10): on by default. Off, no bar on any board
-  (every mode: the play, reveal, vote, final and boss screens all use `EvalBar`, which draws nothing) and the board
-  takes its room, centered, on a phone and a computer. Only in Settings, never on a board screen. Kept on the device
-  (`prefs.ts`: `evalBarOn`, `brc.evalBar`; accounts keep no preferences). The value is still worked out (the God
-  King's word on how it's going reads it). Each result records it (`results.eval_bar`: 1 on, 0 off, NULL from older
-  apps), from solo's post and the online `hello`, to see later who turns it off and how they play.
+- **Gone from Settings (Eric, Oct 15):** "Relaxed pace" (each mode plays its own pace; `?pace=quick` is a test switch)
+  and Crowd's "50 v 50 / Everyone moves" choice (Crowd is always team turns). A device's old picks (`brc.pace`,
+  `brc.crowdTurns`) are no longer read.
+- **Settings, in order** (the overhaul, Eric, Oct 15: "smoothness, quickness, with some variety offered";
+  [docs/decisions/2026-10-15-settings-overhaul.md](../decisions/2026-10-15-settings-overhaul.md)): THEME · SOUND
+  (sound on or off, Move, Capture and Reveal sound) · BOARD (Animations, Motion trail) · QUICK CHAT · FRIENDS · HOW TO
+  PLAY · ACCOUNT · PRIVACY AND TERMS · **TESTING**, shown only to admins (`profile.admin`, ADMIN_EMAILS). Gone the same
+  day: the pre-game votes' switch (always on; `?augments=0` is a test switch), Classic's
+  opening moves stepper (Classic plays its default), the sound lab (`?soundlab`: its choice is the Reveal sound).
+- **Board** (Animations: picks as ghost pieces, or just names; Motion trail: each pick flies to its square): wherever
+  picks show, Crowd and raids (`CrowdGhosts`) and Classic's and Squads' reveals (`ShadeMoves`: without the trail the
+  see-through pieces appear on their squares, without animations only the names, which then carry the reel). Kept on
+  the device (`brc.crowdAnim`, `brc.crowdTrail`, the same keys as before); `useBoardAnimations` and `useMotionTrail` in
+  `hooks.ts`.
+- **Testing (admins): practice mode and the eval bar** (Eric, Oct 15: "The engine moves and eval settings will be
+  phased to an admin only menu for testers"). Both count only where the test switches do (`prefs.ts`: `practiceOn`,
+  `evalBarOn` read `testSwitchesAllowed()`: an admin, a server with TEST_SWITCHES on, Vite's dev server). For players
+  practice is off and there's no eval bar, whatever the device stored (`brc.practice`, `brc.evalBar`). Online the lobby
+  checks too: a `hello`'s practice counts only from an admin's socket or where TEST_SWITCHES is "1" (`lobby-do.ts`).
+- **The eval bar** (testers; its switch since Oct 10, testers only since Oct 15): on by default. Off, no bar on any
+  board (every mode: the play, reveal, vote, final and boss screens all use `EvalBar`, which draws nothing) and the
+  board takes its room, centered, on a phone and a computer. Only in Settings, never on a board screen. Kept on the
+  device (`brc.evalBar`; accounts keep no preferences). The value is still worked out (the God King's word on how it's
+  going reads it). Each result records it (`results.eval_bar`: 1 on, 0 off, NULL from older apps), from solo's post and
+  the online `hello`: every player's reads 0 since Oct 15.
+- **The Reveal sound** (Settings → Sound, Oct 15; was the sound lab): the roulette's voice as the crowd's move is
+  chosen (`REEL_VOICES` in `sound.ts`, `brc.reelVoice`): Steel pan (the default), Kalimba, Marimba, Glockenspiel, Music
+  box, 8-bit blip. Picking plays a whole roulette (`previewReel`), as ▶ does without picking.
 - **Piece sounds** (Settings → Sound; Eric, Oct 11; all wood, Oct 12; the classics back as the defaults, Oct 12): a
   **Move sound** and a **Capture sound** picker, chosen separately, each option a radio (picking plays it) with its own
   ▶. Nine each, every one wood (Eric: "slightly different wooden sounds, not chips or clicks"). Moves: Classic knock
@@ -54,11 +104,13 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - **The first tap of a visit** doesn't wait for sound (Oct 12): the audio graph is made while the page is idle
   (`prepareAudio`), so a tap only switches it on; the samples start loading after that tap's frame.
 - **The FAQ, "How HunChess works"** (Eric, Oct 11): Settings → HOW TO PLAY → "📖 FAQ · How it works" (`/faq`; back
-  goes to Settings). A long page for the curious: a table of contents with tap-to-jump links, then the modes, how
+  goes to Settings), or "📖 How each mode works" (`/faq#faq-modes`). Settings keeps no rules of its own: the FAQ is
+  the one copy (Oct 15). A long page for the curious: a table of contents with tap-to-jump links, then the modes, how
   moves are scored (with the math and a worked example), how a boss decides its moves (its strength, Stockfish and
   Maia, the handover between them, what a rating gap means), boss powers and the rage meter (one block per boss), the
   God King and his Last Stand, leaving or resigning (the modes' last entry), crates and items, fair play (high level
-  only) and credits. Its words are in
+  only), credits, and links to the privacy policy and terms (the game's own pages open in the same tab, so their Back
+  returns to the FAQ). Its words are in
   `packages/app/src/faq/content.ts`, one entry per section in a small Markdown-like format (`faq/markdown.ts`), drawn
   by `screens/Faq.tsx`. **Every number comes from the settings objects** (`FaqSources`), never typed in.
   - **When a rule changes, its words in the FAQ change in the same PR** (a new boss: its block in `BOSS_BLOCKS`; a
@@ -76,7 +128,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 | What | Where |
 | --- | --- |
-| Screens | `packages/app/src/screens/Home.tsx`, `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx`, `Settings.tsx`, `Lobby.tsx`, `Legal.tsx` |
+| Screens | `packages/app/src/screens/Home.tsx`, `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx`, `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
+| Friends' pieces (rows, the home line, the live panel's section, the toast, Invite friends, the settings, a profile's buttons) | `packages/app/src/components/Friends.tsx`; the list and actions `friends.ts` |
 | The computer's frame and menus | `components/FrontDoor.tsx`, `FrontMenu.tsx`, `LiveWindow.tsx`, `LiveNumber.tsx`, `MiniBoard.tsx`, `TinyBoard.tsx`, `LeaderboardSheet.tsx` |
 | Names and icons everywhere | `components/PlayerName.tsx`, `PixelIcon.tsx` (`UserIcon`), `profile-nav.ts` |
 | The live line, app side | `packages/app/src/live.ts` |
@@ -97,12 +150,15 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 - Unit: `packages/server/test/accounts.test.ts`, `live.test.ts`, `packages/core/test/profile.test.ts`,
   `packages/app/test/theme.test.ts`, `under-board.test.ts`, `king-attack.test.ts` (the eval bar's setting),
-  `piece-sounds.test.ts` (the piece-sound picks: storage, fallback, files), `faq.test.ts` (the FAQ: contents against
-  sections, links, every boss, numbers following the settings).
+  `piece-sounds.test.ts` (the piece-sound picks: storage, fallback, files), `testers.test.ts` (practice mode and the
+  eval bar: testers only), `faq.test.ts` (the FAQ: contents against sections, links, every boss, numbers following the
+  settings); `packages/server/test/lobby-do-practice.test.ts` (online practice: testers only).
 - e2e: `e2e/front-door.spec.ts`, `landing.spec.ts`, `home-layout.spec.ts`, `live-window.spec.ts`, `profile.spec.ts`,
-  `install.spec.ts`, `crate-banner.spec.ts`, `eval-bar.spec.ts` (the switch: Settings only, the board's room, phone and
-  computer), `piece-sounds.spec.ts` (pick, preview, reload, what loads, every file's start and loudness), `faq.spec.ts`
-  (Settings → FAQ, a jump to a section, a link to a heading, back).
+  `install.spec.ts`, `crate-banner.spec.ts`, `friends.spec.ts` (two players: request, accept, online, the invites
+  setting, an invite joined from its toast, a block; the phone's line at 320 px), `eval-bar.spec.ts` (testers: the
+  switch in Settings only, the board's room, phone and computer; players: no bar, no switch), `piece-sounds.spec.ts`
+  (pick, preview, reload, what loads, every file's start and loudness; the Reveal sound), `faq.spec.ts` (Settings →
+  FAQ, a jump to a section, a link to a heading, back).
 - Frames: `npm run frames:home`, `frames:queue`.
 - Real-phone check by Eric: `TESTING.md`.
 

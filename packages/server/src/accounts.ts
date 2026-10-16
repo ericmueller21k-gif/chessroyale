@@ -30,9 +30,10 @@ import {
   type ShopState,
   type StoredChatPicks,
 } from "@chessroyale/core";
-import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, type LockerState } from "./locker.ts";
+import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerMoves, lockerState, type LockerState } from "./locker.ts";
 import { LIVE_SCHEMA } from "./live.ts";
-import { FAIRPLAY_SCHEMA } from "./fairplay-schema.ts";
+import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
+import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
 import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { chatStanding, type ChatNotice } from "./chat-mod.ts";
@@ -42,7 +43,16 @@ export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
   first<T>(sql: string, ...params: unknown[]): Promise<T | null>;
   all<T>(sql: string, ...params: unknown[]): Promise<T[]>;
+  /** Runs statements as one transaction: all of them or none (D1's batch). */
+  batch(statements: readonly Stmt[]): Promise<void>;
 }
+
+/** A statement for `Sql.batch`. */
+export interface Stmt {
+  sql: string;
+  params: unknown[];
+}
+export const stmt = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
 
 /** The SQL interface over a D1 binding. */
 export function d1Sql(db: D1Database): Sql {
@@ -58,6 +68,10 @@ export function d1Sql(db: D1Database): Sql {
     async all(sql, ...params) {
       countD1(sql);
       return (await db.prepare(sql).bind(...params).all()).results as never;
+    },
+    async batch(statements) {
+      for (const s of statements) countD1(s.sql);
+      if (statements.length) await db.batch(statements.map((s) => db.prepare(s.sql).bind(...s.params)));
     },
   };
 }
@@ -141,6 +155,35 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS reports_reporter ON reports (reporter, at)`,
   // Fair play: cases and their log (fairplay.ts).
   ...FAIRPLAY_SCHEMA,
+  // Errors (the app's and the server's), one row per kind of error per hour, and the feedback sheet's reports: bugs,
+  // feedback and ideas (problems.ts).
+  // Nothing personal beyond a signed-in account's id: no IP addresses, emails or chat (docs/areas/ops.md).
+  `CREATE TABLE IF NOT EXISTS ops_errors (
+    fingerprint TEXT NOT NULL,
+    hour INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    message TEXT NOT NULL,
+    version TEXT NOT NULL,
+    count INTEGER NOT NULL,
+    first_seen INTEGER NOT NULL,
+    last_seen INTEGER NOT NULL,
+    sample TEXT NOT NULL,
+    PRIMARY KEY (fingerprint, hour)
+  )`,
+  `CREATE INDEX IF NOT EXISTS ops_errors_hour ON ops_errors (hour)`,
+  `CREATE TABLE IF NOT EXISTS ops_reports (
+    id TEXT PRIMARY KEY,
+    at INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    account TEXT,
+    version TEXT NOT NULL,
+    note TEXT NOT NULL,
+    diag TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS ops_reports_at ON ops_reports (at)`,
+  // Friends, requests, blocks, invites and their caps (friends.ts).
+  ...FRIENDS_SCHEMA,
   // Chat moderation: reports of chat lines and the moderators' decisions (chat-mod.ts).
   ...CHAT_MOD_SCHEMA,
 ];
@@ -183,22 +226,33 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "wallets", column: "crates", type: "INTEGER NOT NULL DEFAULT 0" },
   // Each account's latest rating, for the percentile (filled in from the results already stored).
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
+  // Friends (Oct 15, 2026): who may invite you, hiding when you're online (friends.ts).
+  ...FRIENDS_COLUMNS,
+  // The age gate (Oct 16, 2026): when the account's holder said they were old enough (AGE_GATE.minAge), the first time
+  // they signed in after the question. NULL: signed in before the gate, or a guest. Never the birth date
+  // (docs/decisions/2026-10-16-age-gate-and-real-money.md).
+  { table: "users", column: "age_ok_at", type: "INTEGER" },
 ];
 const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,
   // (The deep re-check's queue: only the matches waiting, so the scheduled run never scans the whole table.)
   `CREATE INDEX IF NOT EXISTS fairplay_matches_deep ON fairplay_matches (deep_queued) WHERE deep_queued = 1`,
+  // Solo results stopped counting for ranking (Oct 16, 2026: their rating is the browser's word, and the ones from
+  // before Oct 7 were stored with ranked NULL, which counted). The accounts that have one get their rating again from
+  // their online results; only those, so it's cheap each time the schema changes
+  // (docs/decisions/2026-10-16-server-side-rating.md).
+  `UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id IN (SELECT user_id FROM results WHERE online = 0 AND ranked IS NULL AND rating IS NOT NULL)`,
 ];
 
 /**
- * The latest rating among a user's results that count for ranking (ranked, or from before the rule, and not held by a
- * fair-play review), in SQL.
+ * The latest rating among a user's results that count for ranking (online, ranked or from before the rule, and not
+ * held by a fair-play review), in SQL. Never a solo result's: its rating is the browser's word.
  */
 function LATEST_RATING(userId: string) {
-  return `(SELECT r.rating FROM results r WHERE r.user_id = ${userId} AND r.rating IS NOT NULL AND (r.ranked IS NULL OR r.ranked = 1) AND (r.held IS NULL OR r.held = 0) ORDER BY r.played_at DESC, r.id DESC LIMIT 1)`;
+  return `(SELECT r.rating FROM results r WHERE r.user_id = ${userId} AND r.online = 1 AND r.rating IS NOT NULL AND (r.ranked IS NULL OR r.ranked = 1) AND (r.held IS NULL OR r.held = 0) ORDER BY r.played_at DESC, r.id DESC LIMIT 1)`;
 }
-/** A result row counts for ranking (ranked, or from before the rule; not held by a fair-play review). */
-const countsForRanking = (r: { ranked: number | null; held?: number | null }) => r.ranked !== 0 && !r.held;
+/** A result row counts for ranking (online; ranked, or from before the rule; not held by a fair-play review). */
+const countsForRanking = (r: { online: number; ranked: number | null; held?: number | null }) => r.online === 1 && r.ranked !== 0 && !r.held;
 
 /** Sets an account's ranking rating from its results again (after results are held or released by fair play). */
 export async function refreshRating(sql: Sql, userId: string): Promise<void> {
@@ -227,6 +281,9 @@ export async function ensureSchema(sql: Sql, key: object = sql): Promise<void> {
     return;
   }
   for (const s of SCHEMA) await sql.run(s);
+  // fairplay_identities' key gained the owner (Oct 16, 2026): a table from before is rebuilt once (fairplay-schema.ts).
+  const ownerColumn = (await sql.all<{ name: string; pk: number }>("PRAGMA table_info(fairplay_identities)")).find((c) => c.name === "user_id");
+  if (ownerColumn && !ownerColumn.pk) await sql.batch(IDENTITIES_REKEY);
   for (const s of LOCKER_MIGRATIONS)
     await sql.run(s).catch((e: unknown) => {
       if (!/duplicate column/i.test(String(e))) throw e;
@@ -310,6 +367,39 @@ export function cleanEmail(email: unknown): string | null {
   return e.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : null;
 }
 
+/**
+ * An email as one person's address (fair play's ban evasion): lower case, without a "+tag", and for Gmail without dots
+ * (Gmail ignores them), so a.b+2@gmail.com and ab@gmail.com are the same.
+ */
+export function normalizeEmail(email: string): string {
+  const [local = "", domain = ""] = email.trim().toLowerCase().split("@");
+  const base = local.split("+")[0]!;
+  const gmail = domain === "gmail.com" || domain === "googlemail.com";
+  return `${gmail ? base.replace(/\./g, "") : base}@${gmail ? "gmail.com" : domain}`;
+}
+
+/** An account's sign-in identities as fair play keeps them for a ban: hashed. */
+export async function identityHashes(u: Pick<User, "email" | "google_sub">): Promise<[string, string][]> {
+  const out: [string, string][] = [];
+  if (u.email) out.push(["email", await sha256(`email:${normalizeEmail(u.email)}`)]);
+  if (u.google_sub) out.push(["google", await sha256(`google:${u.google_sub}`)]);
+  return out;
+}
+
+/**
+ * A deleted account's results keep this as their account (account-data.ts): no account has it (ids are 16 random
+ * characters), so no profile shows them, while the game's own numbers stay right.
+ */
+export const DELETED_ID = "deleted";
+/** What an admin's page shows for an account that was deleted (its fair-play file can outlive it). */
+export const DELETED_NAME = "Deleted player";
+
+/**
+ * Writes for an account that may have been deleted since (a lobby's results, a reward) go through this in the same
+ * statement, so a deleted account gets nothing new and no extra read is made.
+ */
+const IF_ACCOUNT = "WHERE EXISTS (SELECT 1 FROM users WHERE id = ?)";
+
 export interface User {
   id: string;
   name: string;
@@ -379,6 +469,19 @@ export async function updateProfile(sql: Sql, userId: string, patch: { name?: un
 }
 
 /**
+ * The age gate (docs/decisions/2026-10-16-age-gate-and-real-money.md). An account signed in after its holder said they
+ * were old enough keeps when they first did (and nothing else about it); later sign-ins leave that time as it is.
+ */
+export async function markAgeOk(sql: Sql, userId: string, now: number): Promise<void> {
+  await sql.run("UPDATE users SET age_ok_at = ? WHERE id = ? AND age_ok_at IS NULL", now, userId);
+}
+
+/** A guest whose device answered "too young": back to the default name and icon (anything they chose is gone). */
+export async function resetNameAndIcon(sql: Sql, userId: string): Promise<void> {
+  await sql.run("UPDATE users SET name = 'Player', icon = '♟' WHERE id = ?", userId);
+}
+
+/**
  * Signs in with a Google account or an email address. If that identity already
  * has an account, you switch to it (and a guest account's results move over);
  * otherwise it's attached to the account you're on, or a new one if that
@@ -389,19 +492,29 @@ export async function signInWithIdentity(
   current: User | null,
   kind: "google" | "email",
   value: string,
-  extra: { email?: string | null; name?: string | null } = {},
+  extra: { email?: string | null } = {},
   now: number,
 ): Promise<User> {
   const col = kind === "google" ? "google_sub" : "email";
   const owner = await sql.first<User>(`SELECT id, name, icon, email, google_sub, created_at FROM users WHERE ${col} = ?`, value);
   if (owner) {
     if (current && current.id !== owner.id && !current.email && !current.google_sub) {
-      // A guest signing in to an existing account: bring the guest's matches along.
-      await sql.run("UPDATE results SET user_id = ? WHERE user_id = ?", owner.id, current.id);
-      await sql.run(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, owner.id);
-      await moveShop(sql, current.id, owner.id);
-      await sql.run("DELETE FROM sessions WHERE user_id = ?", current.id);
-      await sql.run("DELETE FROM users WHERE id = ?", current.id);
+      // A guest signing in to an existing account: its matches, items, coins, reports, fair-play file and the rest join
+      // the account and the guest goes, in one batch (one transaction), so nothing lands halfway: a buy in another tab
+      // is wholly before it (and moves) or wholly after (and finds no guest wallet), two sign-ins at once move the wallet
+      // once, and a failure moves nothing (docs/decisions/2026-10-16-sign-in-races.md). Nothing stays under the guest's
+      // id, where deleting the account couldn't reach it, and a case can't be shed by signing in
+      // (docs/decisions/2026-10-16-integrity-followups.md).
+      await sql.batch([
+        stmt("UPDATE results SET user_id = ? WHERE user_id = ?", owner.id, current.id),
+        ...fairPlayMoves(current.id, owner.id, now, await identityHashes(owner)),
+        stmt(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, owner.id),
+        ...shopMoves(current.id, owner.id),
+        ...lockerMoves(current.id, owner.id),
+        stmt("DELETE FROM sessions WHERE user_id = ?", current.id),
+        ...socialDeletes(current.id),
+        stmt("DELETE FROM users WHERE id = ?", current.id),
+      ]);
     }
     if (kind === "google" && !owner.email && (await adoptGoogleEmail(sql, owner.id, extra.email))) return (await getUser(sql, owner.id))!;
     return owner;
@@ -412,14 +525,9 @@ export async function signInWithIdentity(
     return (await getUser(sql, current.id))!;
   }
   const id = randomToken(12);
-  await sql.run(
-    `INSERT INTO users (id, name, ${col}, created_at, last_seen) VALUES (?, ?, ?, ?, ?)`,
-    id,
-    cleanName(extra.name) ?? (kind === "email" ? cleanName(value.split("@")[0]) : null) ?? "Player",
-    value,
-    now,
-    now,
-  );
+  // A new account is "Player" until its owner picks a name: never their Google name or the start of their email,
+  // which everyone would see (docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md).
+  await sql.run(`INSERT INTO users (id, name, ${col}, created_at, last_seen) VALUES (?, 'Player', ?, ?, ?)`, id, value, now, now);
   if (kind === "google") await adoptGoogleEmail(sql, id, extra.email);
   return (await getUser(sql, id))!;
 }
@@ -444,44 +552,57 @@ const MAX_ATTEMPTS = 5;
 
 export type CodeStart = { ok: true; code: string } | { ok: false; message: string };
 
+/**
+ * Sign-in code records go an hour after their last code was sent (by then it has expired and its hour's count is
+ * spent): the Worker's 15-minute schedule runs this (index.ts), so none stays much past the hour.
+ */
+export async function purgeEmailCodes(sql: Sql, now: number): Promise<void> {
+  await sql.run("DELETE FROM email_codes WHERE sent_at < ?", now - 3_600_000);
+}
+
 /** A fresh 6-digit sign-in code for an address (rate-limited). */
 export async function startEmailCode(sql: Sql, email: string, now: number): Promise<CodeStart> {
-  const row = await sql.first<{ sent_at: number; hour_start: number; sends_this_hour: number }>(
-    "SELECT sent_at, hour_start, sends_this_hour FROM email_codes WHERE email = ?",
-    email,
-  );
-  if (row && now - row.sent_at < RESEND_SECONDS * 1000) return { ok: false, message: "A code was just sent. Wait a few seconds and try again." };
-  const newHour = !row || now - row.hour_start > 3_600_000;
-  const sends = newHour ? 0 : row!.sends_this_hour;
-  if (sends >= SENDS_PER_HOUR) return { ok: false, message: "Too many codes for this address. Try again in an hour." };
   const n = crypto.getRandomValues(new Uint32Array(1))[0]! % 1_000_000;
   const code = String(n).padStart(6, "0");
-  await sql.run(
-    `INSERT INTO email_codes (email, code_hash, expires_at, attempts, sent_at, hour_start, sends_this_hour)
-     VALUES (?, ?, ?, 0, ?, ?, ?)
-     ON CONFLICT (email) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = 0,
-       sent_at = excluded.sent_at, hour_start = excluded.hour_start, sends_this_hour = excluded.sends_this_hour`,
+  // One statement checks the limits and records the send, so starts at once can't all pass them and send more emails
+  // (docs/decisions/2026-10-16-integrity-followups.md): it writes the code only if the last one went RESEND_SECONDS
+  // ago or more and the hour has sends left (a new hour starts the count again). Only the start that wrote it sends it.
+  const sent = await sql.first<{ sent: number }>(
+    `INSERT INTO email_codes (email, code_hash, expires_at, attempts, sent_at, hour_start, sends_this_hour) VALUES (?1, ?2, ?3, 0, ?4, ?4, 1)
+     ON CONFLICT (email) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = 0, sent_at = excluded.sent_at,
+       hour_start = CASE WHEN ?4 - hour_start > ?7 THEN ?4 ELSE hour_start END,
+       sends_this_hour = CASE WHEN ?4 - hour_start > ?7 THEN 1 ELSE sends_this_hour + 1 END
+     WHERE ?4 - sent_at >= ?5 AND (?4 - hour_start > ?7 OR sends_this_hour < ?6)
+     RETURNING 1 AS sent`,
     email,
     await sha256(`${email}:${code}`),
     now + CODE_MINUTES * 60_000,
     now,
-    newHour ? now : row!.hour_start,
-    sends + 1,
+    RESEND_SECONDS * 1000,
+    SENDS_PER_HOUR,
+    3_600_000,
   );
-  return { ok: true, code };
+  if (sent) return { ok: true, code };
+  // Refused: the resend gap, or the hour's limit (the read only picks the message).
+  const row = await sql.first<{ sent_at: number }>("SELECT sent_at FROM email_codes WHERE email = ?", email);
+  if (row && now - row.sent_at < RESEND_SECONDS * 1000) return { ok: false, message: "A code was just sent. Wait a few seconds and try again." };
+  return { ok: false, message: "Too many codes for this address. Try again in an hour." };
 }
 
 /** Checks a code; it works once, for 10 minutes, with 5 tries. */
 export async function verifyEmailCode(sql: Sql, email: string, code: string, now: number): Promise<boolean> {
-  const row = await sql.first<{ code_hash: string; expires_at: number; attempts: number }>(
-    "SELECT code_hash, expires_at, attempts FROM email_codes WHERE email = ?",
+  // One statement, so checks at once can't share a code or a try (docs/decisions/2026-10-16-sign-in-races.md): it
+  // counts the try while the code is live with tries left, and uses the code up if it's right. Only the check whose
+  // statement used it up gets in.
+  const row = await sql.first<{ used: number }>(
+    `UPDATE email_codes SET attempts = attempts + 1, expires_at = CASE WHEN code_hash = ? THEN 0 ELSE expires_at END
+     WHERE email = ? AND expires_at >= ? AND attempts < ? RETURNING expires_at = 0 AS used`,
+    await sha256(`${email}:${String(code).trim()}`),
     email,
+    now,
+    MAX_ATTEMPTS,
   );
-  if (!row || row.expires_at < now || row.attempts >= MAX_ATTEMPTS) return false;
-  const ok = row.code_hash === (await sha256(`${email}:${String(code).trim()}`));
-  if (ok) await sql.run("UPDATE email_codes SET expires_at = 0 WHERE email = ?", email);
-  else await sql.run("UPDATE email_codes SET attempts = attempts + 1 WHERE email = ?", email);
-  return ok;
+  return row?.used === 1;
 }
 
 // ---------------- Results and profiles ----------------
@@ -532,7 +653,7 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   await sql.run(
     `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
        brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}`,
     userId,
     mode,
     r.online ? 1 : 0,
@@ -557,6 +678,8 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     r.held ? 1 : 0,
     typeof r.bossId === "string" && bossDef(r.bossId) ? r.bossId : null,
     flag(r.evalBar),
+    // (An account deleted mid-match gets nothing new.)
+    userId,
   );
   // Only a ranked match moves your ranking (and not while fair play holds your results).
   if (rating !== null && ranked && !r.held) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);
@@ -647,7 +770,7 @@ export interface CrowdStats {
 
 export interface RaidStats {
   raids: number;
-  /** Different bosses (tiers) beaten. */
+  /** Different bosses (tiers) beaten online (a solo win is the browser's word). */
   bossesBeaten: number;
   /** The boss's strikes you lived through (it struck someone else). */
   strikesSurvived: number | null;
@@ -670,6 +793,8 @@ export interface PublicProfile {
   joinedAt: number;
   lastSeen: number | null;
   online: boolean;
+  /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null, whatever the truth. */
+  hidden?: boolean;
   rating: number | null;
   /** The rank ("Weighty"), its place on the ladder (0 = Novice), its color and a top rank's pill effect. */
   tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
@@ -681,14 +806,14 @@ export interface PublicProfile {
   boss: RaidStats;
   /** The rating after each of the last 30 rated matches, oldest first. */
   ratingHistory: number[];
-  /** Boss tiers (their strengths) beaten in raids. */
+  /** Boss tiers (their strengths) beaten in online raids (a solo win is the browser's word). */
   bossesBeaten: number[];
   recent: {
     mode: string;
     online: boolean;
     placement: number;
     players: number;
-    /** Crowd: the side played (50 v 50), or null (everyone moves). */
+    /** Crowd: the side played (50 v 50), or null (everyone moves, a choice until Oct 15, 2026). */
     team: "w" | "b" | null;
     won: boolean | null;
     /** A boss battle: still standing at the end. */
@@ -749,7 +874,7 @@ export function raidStats(rows: ResultRow[]): RaidStats {
   const standing = rows.filter((r) => r.survived !== null);
   return {
     raids: rows.length,
-    bossesBeaten: new Set(rows.filter((r) => r.team_won === 1 && r.boss_elo !== null).map((r) => r.boss_elo)).size,
+    bossesBeaten: new Set(rows.filter((r) => r.online === 1 && r.team_won === 1 && r.boss_elo !== null).map((r) => r.boss_elo)).size,
     strikesSurvived: sumOf(rows, (r) => r.strikes_survived),
     lastStands: sumOf(rows, (r) => r.last_stand),
     survivedPct: standing.length ? pct(standing.filter((r) => r.survived === 1).length, standing.length) : null,
@@ -759,8 +884,8 @@ export function raidStats(rows: ResultRow[]): RaidStats {
 
 /** Anyone's profile by account id (null if there's no such account). */
 export async function publicProfile(sql: Sql, userId: string, now: number): Promise<PublicProfile | null> {
-  const u = await sql.first<{ id: string; name: string; created_at: number; last_seen: number | null; rating: number | null }>(
-    "SELECT id, name, created_at, last_seen, rating FROM users WHERE id = ?",
+  const u = await sql.first<{ id: string; name: string; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null }>(
+    "SELECT id, name, created_at, last_seen, rating, hide_online FROM users WHERE id = ?",
     userId,
   );
   if (!u) return null;
@@ -787,8 +912,9 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
     name: u.name,
     look: (await lockerState(sql, u.id)).look,
     joinedAt: u.created_at,
-    lastSeen: u.last_seen,
-    online: u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,
+    lastSeen: u.hide_online ? null : u.last_seen,
+    online: !u.hide_online && u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,
+    ...(u.hide_online ? { hidden: true } : {}),
     rating: banned ? null : rating,
     tier: tier ? { label: tier.label, level: tier.level, color: tier.color, effect: tier.effect } : null,
     topPercent: banned ? null : top,
@@ -800,7 +926,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
       .slice(0, 30)
       .map((r) => r.rating!)
       .reverse(),
-    bossesBeaten: [...new Set(raids.filter((r) => r.team_won === 1 && r.boss_elo !== null).map((r) => r.boss_elo!))].sort((a, b) => a - b),
+    bossesBeaten: [...new Set(raids.filter((r) => r.online === 1 && r.team_won === 1 && r.boss_elo !== null).map((r) => r.boss_elo!))].sort((a, b) => a - b),
     recent: rows.slice(0, 10).map((r) => ({
       mode: r.mode,
       online: !!r.online,
@@ -878,8 +1004,31 @@ export async function buyItem(sql: Sql, userId: string, itemId: unknown, now: nu
   if (state.owned.includes(item.id)) return { ok: true, shop: state };
   const price = SHOP_FREE ? 0 : item.price;
   if (price > state.coins) return { ok: false, message: "Not enough coins." };
-  if (price > 0) await sql.run("UPDATE wallets SET coins = coins - ? WHERE user_id = ?", price, userId);
-  await sql.run("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) VALUES (?, ?, ?)", userId, item.id, now);
+  if (price > 0) {
+    // One transaction (D1's batch: all of it or none), as another buy may have run since the read above
+    // (docs/decisions/2026-10-16-atomic-shop-purchase.md). The item goes in only if the coins are there; a plain
+    // INSERT, so an item owned by then fails it and nothing happens. Then the coins come off, only if they're there
+    // and the item is in. Nothing can change the wallet between the two statements of one transaction, so when the
+    // item went in, the coins come off. Two taps on one item pay once; two items at once can't go below zero.
+    const failed = await sql
+      .batch([
+        stmt("INSERT INTO inventory (user_id, item_id, acquired_at) SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND coins >= ?)", userId, item.id, now, userId, price),
+        stmt(
+          "UPDATE wallets SET coins = coins - ? WHERE user_id = ? AND coins >= ? AND EXISTS (SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?)",
+          price,
+          userId,
+          price,
+          userId,
+          item.id,
+        ),
+      ])
+      .then(() => null, (e: unknown) => e);
+    // Owned: bought now, or by another buy since (the batch failed and changed nothing): a no-op success, as above.
+    if (!(await sql.first("SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?", userId, item.id))) {
+      if (failed) throw failed;
+      return { ok: false, message: "Not enough coins." };
+    }
+  } else await sql.run("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) VALUES (?, ?, ?)", userId, item.id, now);
   // A chat pack's lines go into any empty slots of the player's quick chat (the rest they pick in their profile).
   if (item.slot === "chat" && item.look.pack) {
     const { picks, added } = chatPicksAfterGetting(state.chat, item.look.pack);
@@ -908,31 +1057,35 @@ export async function grantReward(sql: Sql, userId: string, coins: number, crate
   const c = Math.max(0, Math.round(coins));
   const k = Math.max(0, Math.round(crates));
   if (!c && !k) return;
+  // (Not for an account deleted mid-match.)
   await sql.run(
-    "INSERT INTO wallets (user_id, coins, crates) VALUES (?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates",
+    `INSERT INTO wallets (user_id, coins, crates) SELECT ?, ?, ? ${IF_ACCOUNT}
+     ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates`,
     userId,
     c,
     k,
+    userId,
   );
 }
 
-/** A guest's items, equipped choices, coins and crates join the account they sign in to (the account's own choices win). */
-async function moveShop(sql: Sql, from: string, to: string): Promise<void> {
-  await sql.run("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from);
-  await sql.run("INSERT OR IGNORE INTO equipped (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped WHERE user_id = ?", to, from);
-  const wallet = await sql.first<{ coins: number; crates: number | null }>("SELECT coins, crates FROM wallets WHERE user_id = ?", from);
-  if ((wallet?.coins ?? 0) > 0 || (wallet?.crates ?? 0) > 0) {
-    await sql.run(
-      "INSERT INTO wallets (user_id, coins, crates) VALUES (?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates",
+/**
+ * A guest's items, equipped choices, coins, crates and chat picks join the account they sign in to (the account's own
+ * choices win): the statements, for the sign-in's one batch. The wallet is added up, so it must leave the guest in the
+ * same transaction.
+ */
+function shopMoves(from: string, to: string): Stmt[] {
+  return [
+    stmt("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from),
+    stmt("INSERT OR IGNORE INTO equipped (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped WHERE user_id = ?", to, from),
+    stmt(
+      "INSERT INTO wallets (user_id, coins, crates) SELECT ?, coins, crates FROM wallets WHERE user_id = ? AND (coins > 0 OR crates > 0) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates",
       to,
-      wallet?.coins ?? 0,
-      wallet?.crates ?? 0,
-    );
-  }
-  await sql.run("INSERT OR IGNORE INTO chat_picks (user_id, lines, emoji) SELECT ?, lines, emoji FROM chat_picks WHERE user_id = ?", to, from);
-  await sql.run("DELETE FROM inventory WHERE user_id = ?", from);
-  await sql.run("DELETE FROM equipped WHERE user_id = ?", from);
-  await sql.run("DELETE FROM wallets WHERE user_id = ?", from);
-  await sql.run("DELETE FROM chat_picks WHERE user_id = ?", from);
-  await moveLocker(sql, from, to);
+      from,
+    ),
+    stmt("INSERT OR IGNORE INTO chat_picks (user_id, lines, emoji) SELECT ?, lines, emoji FROM chat_picks WHERE user_id = ?", to, from),
+    stmt("DELETE FROM inventory WHERE user_id = ?", from),
+    stmt("DELETE FROM equipped WHERE user_id = ?", from),
+    stmt("DELETE FROM wallets WHERE user_id = ?", from),
+    stmt("DELETE FROM chat_picks WHERE user_id = ?", from),
+  ];
 }

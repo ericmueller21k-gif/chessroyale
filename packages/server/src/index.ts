@@ -1,34 +1,45 @@
 import { stockfishRefuses } from "@chessroyale/chess";
-import { BOSS_TIERS, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
-import type { Lobby } from "./lobby-do.ts";
-import type { SquadsLobby, SquadsParty } from "./squads-do.ts";
+import { RAID_SETTINGS, bossIdFromLink, modeSettings } from "@chessroyale/core";
+import { Lobby } from "./lobby-do.ts";
+import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
-import type { Matchmaker } from "./matchmaker.ts";
-import type { LiveHub } from "./live-hub.ts";
+import { Matchmaker } from "./matchmaker.ts";
+import { LiveHub } from "./live-hub.ts";
 import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
-import { d1Sql, ensureSchema, lobbyResult, type User } from "./accounts.ts";
+import { d1Sql, ensureSchema, lobbyResult, purgeEmailCodes, type User } from "./accounts.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
-import { handleAdmin, isAdmin, type AdminEnv } from "./admin.ts";
-import { pruneChatMod } from "./chat-mod.ts";
-import { handleChatMod } from "./chat-mod-api.ts";
-import { handleChatAdmin } from "./chat-mod-admin.ts";
+import { handleAdmin, isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
+import { asksTestSwitches, lobbyOptions } from "./lobby-options.ts";
 import { deepCheckRun } from "./fairplay-deep.ts";
 import { containerSearch } from "./fairplay-engine.ts";
 import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
+import { handleFriendsApi } from "./friends-api.ts";
 import { countRoute, opsStats, routeOf } from "./ops.ts";
+import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
+import { handleOpsAdmin } from "./ops-admin.ts";
+import { pruneChatMod } from "./chat-mod.ts";
+import { handleChatMod } from "./chat-mod-api.ts";
+import { handleChatAdmin } from "./chat-mod-admin.ts";
+import type { AccessEnv } from "./access.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
+import { isPaused, pausedResponse, switchStatus, type KillSwitchEnv } from "./kill-switches.ts";
 
-export { Lobby } from "./lobby-do.ts";
-export { SquadsLobby, SquadsParty } from "./squads-do.ts";
-export { Matchmaker } from "./matchmaker.ts";
+export { Lobby, SquadsLobby, SquadsParty, Matchmaker, LiveHub };
 export { EngineServer } from "./engine.ts";
-export { LiveHub } from "./live-hub.ts";
 
-export interface Env extends AccountEnv, EngineEnv, AdminEnv {
+// The Durable Objects' entry points (their fetch, WebSocket handlers, alarm and the methods the Worker calls): an
+// error in one is logged and counted (problems.ts), then thrown on as before.
+guardEntries(Lobby, "Lobby", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "joinable", "reserve", "release", "hurry"]);
+guardEntries(SquadsLobby, "SquadsLobby", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "reserve"]);
+guardEntries(SquadsParty, "SquadsParty", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "create", "status"]);
+guardEntries(Matchmaker, "Matchmaker", ["next"]);
+guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "health", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
+
+export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
   /** Squads: one object per lobby, and one per party (squads-do.ts). */
   SQUADS: DurableObjectNamespace<SquadsLobby>;
@@ -50,82 +61,111 @@ export interface Env extends AccountEnv, EngineEnv, AdminEnv {
   OPS_STATS?: string;
   /** "1" on staging for load tests from one machine: the per-address rate limit is off (never in production). */
   LOAD_TEST?: string;
-  /** "1" (local and e2e only): anyone may use the chat review page while no sign-in is set up (chat-mod-admin.ts). */
-  CHAT_MOD_TEST?: string;
+  /** "1": friends and invites switched off for everyone (a kill switch, kill-switches.ts, as every PAUSE_ variable). */
+  PAUSE_FRIENDS?: string;
 }
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...headers } });
 
 export default {
+  /** Every request: an error anywhere in it is logged and counted (problems.ts), and the answer is a plain 500. */
   async fetch(request: Request, rawEnv: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-    // (The fair-play and chat review pages are the Worker's own; everything else outside /api is the app.)
-    const admin = /^\/admin\/(fairplay|chat)(\/|$)/.test(url.pathname);
-    if (!url.pathname.startsWith("/api/") && !admin) return rawEnv.ASSETS.fetch(request);
-    // Load-test counters (OPS_STATS set, and the matching key): see ops.ts.
-    if (url.pathname === "/api/ops/stats" && rawEnv.OPS_STATS && request.headers.get("x-ops-key") === rawEnv.OPS_STATS) {
-      return json(opsStats(url.searchParams.get("reset") === "1"));
+    try {
+      return await handle(request, rawEnv, ctx);
+    } catch (e) {
+      const url = new URL(request.url);
+      serverError(rawEnv, { kind: "fetch", route: routeOf(request.method, url.pathname), code: codeInPath(url.pathname) }, e, (p) => ctx.waitUntil(p));
+      return json({ message: "Something went wrong. Try again." }, 500);
     }
-    const t = Date.now();
-    // Rate limits (limits.ts): a friendly 429 with when to try again.
-    const wait = rateLimited(
-      {
-        ip: request.headers.get("cf-connecting-ip"),
-        session: readCookie(request, SESSION_COOKIE),
-        play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname)),
-      },
-      t,
-      rawEnv.LOAD_TEST === "1",
-    );
-    if (wait !== null) {
-      countRoute("429", 0);
-      return json({ message: TOO_MANY, retryMs: wait }, 429, { "retry-after": String(Math.ceil(wait / 1000)) });
-    }
-    const res = await route(request, rawEnv, url, (p) => ctx.waitUntil(p));
-    const ms = Date.now() - t;
-    countRoute(routeOf(request.method, url.pathname), ms);
-    // How long the Worker took (the load test reads it; browsers show it in their network panel).
-    if (res.status === 101 || res.webSocket) return res;
-    const out = new Response(res.body, res);
-    out.headers.append("server-timing", `app;dur=${ms}`);
-    return out;
   },
 
   /**
-   * The Worker's schedule (wrangler.jsonc, every 15 minutes): fair play's deep re-check of flagged players' moves on
-   * the engine server (cases in review at once, the rest off-peak; fairplay-deep.ts), and chat moderation's pruning.
+   * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), chat moderation's old records (chat-mod.ts), and
+   * fair play's deep re-check of flagged players' moves on the engine server (cases in review at once, the rest
+   * off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(_event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
     if (!rawEnv.DB) return;
-    const sql = d1Sql(rawEnv.DB);
-    // Chat moderation's records past keeping go, whatever else runs (chat-mod.ts).
-    ctx.waitUntil(ensureSchema(sql, rawEnv.DB).then(() => pruneChatMod(sql, Date.now())).catch(() => undefined));
-    const env = await withSecrets(rawEnv);
-    const search = containerSearch(env);
-    if (!search) return;
+    const db = rawEnv.DB;
+    const failed = (route: string) => (e: unknown) => serverError(rawEnv, { kind: "cron", route }, e, (p) => ctx.waitUntil(p));
     ctx.waitUntil(
-      ensureSchema(sql, rawEnv.DB)
-        .then(() => deepCheckRun(sql, search, Date.now(), { mail: caseMailer(env) }))
-        .then((r) => r.searches && console.log(`fair play deep re-check: ${r.searches} searches, ${r.matches} matches done`))
-        .catch((e: unknown) => console.log(`fair play deep re-check: ${String(e)}`)),
+      (async () => {
+        const sql = d1Sql(db);
+        await ensureSchema(sql, db);
+        await pruneProblems(sql, Date.now()).catch(failed("prune"));
+        // Sign-in code records an hour old (the privacy policy says an hour).
+        await purgeEmailCodes(sql, Date.now()).catch(failed("codes"));
+        // Chat moderation's records past keeping (chat-mod.ts).
+        await pruneChatMod(sql, Date.now()).catch(failed("chat"));
+        const env = await withSecrets(rawEnv);
+        const search = containerSearch(env);
+        if (!search) return;
+        const r = await deepCheckRun(sql, search, Date.now(), { mail: caseMailer(env) });
+        if (r.searches) console.log(`fair play deep re-check: ${r.searches} searches, ${r.matches} matches done`);
+      })().catch(failed("scheduled")),
     );
   },
 } satisfies ExportedHandler<Env>;
 
+async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Promise<Response> {
+  const url = new URL(request.url);
+  // (The admin pages, fair play's, ops' and chat's, are the Worker's own; everything else outside /api is the app.)
+  const admin = /^\/admin\/(fairplay|ops|chat)(\/|$)/.test(url.pathname);
+  if (!url.pathname.startsWith("/api/") && !admin) return rawEnv.ASSETS.fetch(request);
+  // Load-test counters (OPS_STATS set, and the matching key): see ops.ts.
+  if (url.pathname === "/api/ops/stats" && rawEnv.OPS_STATS && request.headers.get("x-ops-key") === rawEnv.OPS_STATS) {
+    return json(opsStats(url.searchParams.get("reset") === "1"));
+  }
+  const t = Date.now();
+  // Rate limits (limits.ts): a friendly 429 with when to try again.
+  const wait = rateLimited(
+    {
+      ip: request.headers.get("cf-connecting-ip"),
+      session: readCookie(request, SESSION_COOKIE),
+      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname)),
+      friends: request.method === "POST" && url.pathname.startsWith("/api/friends/"),
+    },
+    t,
+    rawEnv.LOAD_TEST === "1",
+  );
+  if (wait !== null) {
+    countRoute("429", 0);
+    return json({ message: TOO_MANY, retryMs: wait }, 429, { "retry-after": String(Math.ceil(wait / 1000)) });
+  }
+  const res = await route(request, rawEnv, url, (p) => ctx.waitUntil(p));
+  const ms = Date.now() - t;
+  countRoute(routeOf(request.method, url.pathname), ms);
+  // How long the Worker took (the load test reads it; browsers show it in their network panel).
+  if (res.status === 101 || res.webSocket) return res;
+  const out = new Response(res.body, res);
+  out.headers.append("server-timing", `app;dur=${ms}`);
+  return out;
+}
+
 async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUntil): Promise<Response> {
+  // GET /api/status → { paused, banner }: the kill switches that are off and the maintenance banner (kill-switches.ts).
+  if (url.pathname === "/api/status" && request.method === "GET") return json(switchStatus(rawEnv));
   {
+    // POST /api/problems: errors a device caught, or the feedback sheet's report (a bug, feedback, an idea: problems.ts).
+    if (url.pathname === "/api/problems") return handleProblems(request, rawEnv, waitUntil);
     // (The sign-in secrets may live in the Secrets Store: read them as strings.)
     const env = await withSecrets(rawEnv);
     // Fair play's review page and the automated reviewer's API (admins and the reviewer's token only).
     const review = await handleAdmin(request, env, caseMailer(env), waitUntil, containerSearch(env));
     if (review) return review;
+    // The ops page and the health view (admins only; the health view's JSON also for scripts through Access).
+    const ops = await handleOpsAdmin(request, env);
+    if (ops) return ops;
     // Chat moderation: reports, a player's notice, and the chat review page (chat-mod-api.ts, chat-mod-admin.ts).
     const chatMod = (await handleChatAdmin(request, env, waitUntil)) ?? (await handleChatMod(request, env));
     if (chatMod) return chatMod;
     // Accounts: /api/me, /api/results, /api/auth/*
     const account = await handleAccountApi(request, env, fetch, waitUntil);
     if (account) return account;
+    // Friends and invites: /api/friends (friends-api.ts).
+    const friends = await handleFriendsApi(request, env, waitUntil);
+    if (friends) return friends;
     // POST /api/engine/score {fen, moves} → {moves}: the engine server's deeper look at a few moves (solo games'
     // re-checks); 503 when there's no server or today's budget is spent (the device then re-checks itself). A position
     // Stockfish refuses is a bad request, turned away before the budget (it would end the server's Stockfish: engine.ts).
@@ -148,16 +188,18 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // &from=CODE with { seat }: Bots off → Default, keeping your wait: you leave that lobby and bots fill a minute after
     // you first joined it at the latest. 409 if that lobby has started meanwhile (stay in it).
     if (url.pathname === "/api/play" && request.method === "POST") {
+      const raid = url.searchParams.get("mode") === "raid";
+      // (A mode resting, a kill switch: no new matches. The bosses resting are never met: the lobby's object sees to it.)
+      if (isPaused(rawEnv, raid ? "raid" : "crowd")) return pausedResponse(raid ? "raid" : "crowd");
       const refused = await mayPlay(request, env, waitUntil);
       if (refused) return refused;
       const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
-      const raid = url.searchParams.get("mode") === "raid";
       const type = url.searchParams.get("type") === "botsoff" ? "botsoff" : "default";
-      const overrides = raid ? RAID_SETTINGS : modeSettings("crowd", { crowdTeams: true, augments: true });
-      // ?pool=NAME: a queue of its own (tests run several queues at once without meeting). Split by region when
-      // that's on (queue.ts). ?ticket=ID: a player in line asking again (they keep their place).
+      const overrides = raid ? RAID_SETTINGS : modeSettings("crowd", { augments: true });
+      // ?pool=NAME: a queue of its own (a test switch: tests run several queues at once without meeting). Split by
+      // region when that's on (queue.ts). ?ticket=ID: a player in line asking again (they keep their place).
       const region = regionOf(request.cf as { continent?: unknown } | undefined);
-      const name = queueName(raid ? "raid" : "crowd", type, url.searchParams.get("pool"), region);
+      const name = queueName(raid ? "raid" : "crowd", type, await testPool(request, env, url, waitUntil), region);
       const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(name), region ? { locationHint: REGION_HINT[region] } : undefined);
       const ticket = url.searchParams.get("ticket");
       let since: number | undefined;
@@ -176,58 +218,19 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
         return json({ message: "Couldn't find a match. Try again." }, 500);
       }
     }
-    // POST /api/lobby → { code }
+    // POST /api/lobby → { code }: the creator's choices, and the test switches for those allowed them (lobby-options.ts).
     if (url.pathname === "/api/lobby" && request.method === "POST") {
+      // (A mode resting, or the boss picked, a kill switch: no new lobby. The bosses resting are never met: the lobby's
+      // object sees to it.)
+      const part = url.searchParams.get("mode") === "raid" ? "raid" : url.searchParams.get("mode") === "crowd" ? "crowd" : "classic";
+      const picked = bossIdFromLink(url.searchParams.get("boss"));
+      if (isPaused(rawEnv, part)) return pausedResponse(part);
+      if (picked && isPaused(rawEnv, `boss:${picked}`)) return pausedResponse(`boss:${picked}`);
       const refused = await mayPlay(request, env, waitUntil);
       if (refused) return refused;
-      // Playtest overrides, e.g. POST /api/lobby?rounds=2&clock=15
-      const n = (k: string) => (url.searchParams.has(k) ? Math.max(1, Math.min(600, Number(url.searchParams.get(k)) || 0)) : undefined);
-      const draw = url.searchParams.get("draw") as DrawRule | null;
-      // The mode first (its own pace and rules), then pace and playtest overrides on top.
-      const raid = url.searchParams.get("mode") === "raid";
-      const mode = raid || url.searchParams.get("mode") === "crowd" ? "crowd" : "classic";
-      const overrides = {
-        ...(raid ? RAID_SETTINGS : modeSettings(mode, { crowdTeams: url.searchParams.get("turns") !== "all", augments: url.searchParams.get("augments") !== "0" })),
-        ...(url.searchParams.get("pace") === "quick" ? (mode === "crowd" ? { revealSeconds: 2, drawnMoveSeconds: 1.2, stageBreakSeconds: 4 } : PACE_SETTINGS.quick) : {}),
-        // Playtest overrides and the creator's choices: only the ones that are set.
-        ...definedOnly({
-          // Boss raid: the boss the creator picked (a playable one), else a random one; a test link's tier fixes its
-          // strength (else a step above the group, plus the boss's offset). ?power= brings a power at once (tests).
-          ...(() => {
-            const q = bossIdFromLink(url.searchParams.get("boss"));
-            const b = Number(q);
-            if (raid && BOSS_TIERS.includes(b)) return { bossFixedElo: b, bossFixed: b };
-            return q && isPlayable(bossDef(q)) ? { bossId: q, bossPicked: q } : {};
-          })(),
-          ...(() => {
-            const p = url.searchParams.get("power");
-            return p && (POWER_IDS as readonly string[]).includes(p) ? { bossPowerTest: p } : {};
-          })(),
-          roundsPerStage: n("rounds"),
-          firstStageRounds: n("rounds"),
-          moveClockSeconds: n("clock"),
-          finalMaxTurns: n("finalTurns"),
-          bossMaxMoves: n("bossMoves"),
-          drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
-          // Opening moves per side on each board (0-10), chosen by the lobby's creator.
-          openingMoves: mode === "classic" && url.searchParams.has("moves")
-            ? Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(Number(url.searchParams.get("moves")) || 0)))
-            : undefined,
-        }),
-        // ?format=team|boss|duel: skip the pre-game votes and play that ending (for testing).
-        ...(() => {
-          const f = url.searchParams.get("format") as FinalFormat | null;
-          return mode === "crowd" && f && f in CROWD_KNOCKOUTS ? { finalFormat: f, knockoutsPerStage: CROWD_KNOCKOUTS[f], augments: false } : {};
-        })(),
-        // ?speed=bullet|blitz|rapid: that time control (for testing, with ?format=; old ids map over, unknown ones are Blitz).
-        ...(mode === "crowd" ? (speedOption(url.searchParams.get("speed"))?.patch ?? {}) : {}),
-        // ?weakbots=1: every bot plays loosely (for testing: a strong player surely survives the cuts).
-        ...(url.searchParams.get("weakbots") === "1" ? { botSkillRange: WEAK_BOT_SKILL } : {}),
-      };
-      // ?keep=SECONDS: its results stay up this long (5 s up to the usual 15 minutes), for tests.
-      const keep = url.searchParams.has("keep") ? Math.max(5, Math.min(LOBBY_LIFE.lobbyResultsKeepMinutes * 60, Number(url.searchParams.get("keep")) || 0)) * 1000 : undefined;
-      const plain = JSON.parse(JSON.stringify(overrides));
-      const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, plain, undefined, keep)) !== false);
+      const test = asksTestSwitches(url.searchParams) && (await testSwitches(request, env, waitUntil));
+      const { overrides, keepMs } = lobbyOptions(url.searchParams, test);
+      const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, overrides, undefined, keepMs)) !== false);
       return code ? json({ code }) : json({ message: "Couldn't create a lobby. Try again." }, 500);
     }
     // Squads (docs/areas/squads.md, "The server"): its queue, parties and lobbies, and the test lobby.
@@ -273,11 +276,13 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
   if (!url.pathname.startsWith("/api/squads/")) return null;
   const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
   const region = regionOf(request.cf as { continent?: unknown } | undefined);
-  const queue = queueName("squads", "default", url.searchParams.get("pool"), region);
+  const queue = async () => queueName("squads", "default", await testPool(request, env, url, waitUntil), region);
+  // (Squads resting, a kill switch: no new queue or party. Its test lobbies, admins only, still open.)
+  if ((url.pathname === "/api/squads/play" || url.pathname === "/api/squads/party") && request.method === "POST" && isPaused(env, "squads")) return pausedResponse("squads");
   if (url.pathname === "/api/squads/play" && request.method === "POST") {
     const refused = await mayPlay(request, env, waitUntil);
     if (refused) return refused;
-    const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(queue), region ? { locationHint: REGION_HINT[region] } : undefined);
+    const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(await queue()), region ? { locationHint: REGION_HINT[region] } : undefined);
     const ticket = url.searchParams.get("ticket");
     try {
       return json(await mm.next({}, fill * 1000, { squads: true }, ticket && /^[\w-]{8,64}$/.test(ticket) ? ticket : null, { size: 1, pass: "" }));
@@ -288,7 +293,8 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
   if (url.pathname === "/api/squads/party" && request.method === "POST") {
     const refused = await mayPlay(request, env, waitUntil);
     if (refused) return refused;
-    const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, queue, fill * 1000));
+    const name = await queue();
+    const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, name, fill * 1000));
     return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
   }
   if (url.pathname === "/api/squads/lobby" && request.method === "POST") {
@@ -311,6 +317,21 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
   if (m[3]) return (await stub.exists()) ? stub.fetch(request) : json({ message: "We couldn't find that lobby." }, 404);
   const status = request.method === "GET" ? await stub.status() : null;
   return status ? json({ open: true, phase: status.phase }) : json({ open: false, message: MATCH_ENDED }, 404);
+}
+
+/**
+ * Whether this request may use the test switches (testSwitchesOn in admin.ts): TEST_SWITCHES on here, or an admin's.
+ * Asked only when a request carries one, so other requests never look up who's asking for it.
+ */
+async function testSwitches(request: Request, env: Env, waitUntil: WaitUntil): Promise<boolean> {
+  if (env.TEST_SWITCHES === "1") return true;
+  return testSwitchesOn(env, await accountOf(request, env, waitUntil).catch(() => null));
+}
+
+/** ?pool=NAME, a queue of its own: a test switch (else the usual queue). */
+async function testPool(request: Request, env: Env, url: URL, waitUntil: WaitUntil): Promise<string | null> {
+  const pool = url.searchParams.get("pool");
+  return pool && (await testSwitches(request, env, waitUntil)) ? pool : null;
 }
 
 /**

@@ -3,7 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import {
   PREGAME_VOTES,
+  bossFinalOption,
   clampToZone,
+  rosterWithout,
   voteHomeSpots,
   voteZoneAt,
   voteZoneBox,
@@ -24,7 +26,8 @@ import type { GameView, VoteView } from "../game.ts";
 import { pawnLook } from "../looks.ts";
 import { underBoardView } from "../prefs.ts";
 import { play } from "../sound.ts";
-import { useCrowdAnimations } from "./Crowd.tsx";
+import { useBoardAnimations } from "../hooks.ts";
+import { pausedBosses, useServerStatus } from "../status.ts";
 
 /** No pieces while the votes run: only everyone's pawns. */
 const EMPTY_FEN = "8/8/8/8/8/8/8/8 w - - 0 1";
@@ -106,7 +109,7 @@ export interface VoteHost {
 export function VoteScreen({
   match,
   vote,
-  def = PREGAME_VOTES[vote.index]!,
+  def: given = PREGAME_VOTES[vote.index]!,
   next,
   evalBar = true,
   extra,
@@ -131,8 +134,16 @@ export function VoteScreen({
   /** At the top line's end: the match's control (Sound, and Leave: MatchMenu); without one, the sound button. */
   menu?: ComponentChildren;
 }) {
+  // The Crowd's boss final while its boss is resting (a kill switch, status.ts): another boss stands in, so the card
+  // names none (bossFinalOption without him).
+  useServerStatus();
+  const off = pausedBosses();
+  const def =
+    off.length && given.id === "format"
+      ? { ...given, options: given.options.map((o) => (o.id === "boss" ? { ...bossFinalOption(rosterWithout(off)), ...(o.disabled ? { disabled: true } : {}) } : o)) }
+      : given;
   const now = useFrameNow();
-  const animate = useCrowdAnimations();
+  const animate = useBoardAnimations();
   const side = match.standings().find((s) => s.isYou)?.team ?? "w";
   const orientation: Orientation = side === "w" ? "white" : "black";
   // Option to zone and back, for this screen: the options run left to right whichever side you're on (voteZoneFor).

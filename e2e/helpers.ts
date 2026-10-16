@@ -142,6 +142,36 @@ export async function engineTop(page: Page, kind: "judged" | "raw" = "judged", t
 }
 
 /**
+ * Starts watching the page, every frame, for a selector (and, optionally, text in it): `spans()` then says when each
+ * was first and last on screen (the page's clock, ms; null: never). For what must come in order on screen, frame by
+ * frame: a power's banner off the board before the power plays (docs/decisions/2026-10-16-banner-timing.md).
+ */
+export async function watchSpans(page: Page, what: Record<string, { selector: string; text?: RegExp }>) {
+  const tag = Math.random().toString(36).slice(2);
+  await page.evaluate(
+    ({ tag, what }) => {
+      const w = window as unknown as { __spans?: Record<string, Record<string, { first: number; last: number } | null>> };
+      const spans: Record<string, { first: number; last: number } | null> = Object.fromEntries(Object.keys(what).map((k) => [k, null]));
+      (w.__spans ??= {})[tag] = spans;
+      const end = performance.now() + 120_000;
+      const frame = () => {
+        const now = performance.now();
+        for (const [k, { selector, text }] of Object.entries(what as Record<string, { selector: string; text?: { source: string; flags: string } }>)) {
+          const on = [...document.querySelectorAll(selector)].some((e) => !text || new RegExp(text.source, text.flags).test(e.textContent ?? ""));
+          if (on) spans[k] = { first: spans[k]?.first ?? now, last: now };
+        }
+        if (now < end) requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    },
+    { tag, what: Object.fromEntries(Object.entries(what).map(([k, v]) => [k, { selector: v.selector, text: v.text ? { source: v.text.source, flags: v.text.flags } : undefined }])) as never },
+  );
+  return {
+    spans: () => page.evaluate((t) => (window as unknown as { __spans: Record<string, Record<string, { first: number; last: number } | null>> }).__spans[t]!, tag),
+  };
+}
+
+/**
  * Starts watching the page for a selector (and, optionally, text in another): `seen()` then says whether each ever
  * showed, however briefly. For things on screen for a moment (a piece burning for 1.5 s), so a test never misses one
  * by checking a beat too late.
@@ -244,4 +274,27 @@ export async function expectCoordsInSquares(page: Page, orientation?: "white" | 
     )
     .toBe("in their squares");
   return last.orientation!;
+}
+
+/** The server's config as production's says it: TEST_SWITCHES off. */
+export async function switchesOff(page: Page) {
+  await page.route("**/api/auth/config", async (route) => {
+    const res = await route.fetch();
+    const { testSwitches: _, ...body } = (await res.json()) as Record<string, unknown>;
+    await route.fulfill({ response: res, json: body });
+  });
+}
+
+/** Your profile says you're an admin (as /api/me does for an email in ADMIN_EMAILS). */
+export async function asAdmin(page: Page) {
+  await page.route("**/api/me*", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    try {
+      const res = await route.fetch();
+      const body = await res.json().catch(() => null);
+      await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
+    } catch {
+      // The page is gone: nothing to answer.
+    }
+  });
 }

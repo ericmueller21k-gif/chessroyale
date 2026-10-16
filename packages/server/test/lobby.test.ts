@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, FRONT_DOOR, crowdFinalists, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, FRONT_DOOR, OPENING_ALLOWANCE, crowdFinalists, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
 import { LAST_STAND_MS, applyMove, bossIntroTimeline, legalMoves, sanLineToUci, toSan, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -291,7 +291,12 @@ describe("lobby: Crowd mode", () => {
     }
     const brk = L.last("p1", "stageBreak")!;
     expect(brk.augments).toBe(true);
-    expect(brk.knockedOut).toHaveLength(16);
+    // Up to the cut's 16 (8 a team): ties at the line go through (at move 1 the opening allowance makes many). The cut
+    // is exactly the rows the leaderboard marked, and the cutoff counts the rest.
+    expect(brk.knockedOut.length).toBeGreaterThan(0);
+    expect(brk.knockedOut.length).toBeLessThanOrEqual(16);
+    expect([...brk.knockedOut].sort()).toEqual(brk.standings.filter((s) => s.cut).map((s) => s.id).sort());
+    expect(brk.cutoff).toBe(brk.standings.filter((s) => !s.out).length - brk.knockedOut.length);
     L.core.message("p1", { t: "augment", choice: "more" });
     L.core.message("p2", { t: "augment", choice: "more" });
     L.advance(10_000);
@@ -374,7 +379,7 @@ describe("lobby: Crowd mode", () => {
   });
 
   it("pre-game votes: everyone votes on the ending and the speed; the winners set the match's settings", () => {
-    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }), boardIntroSeconds: 0 });
+    const L = setup({ ...modeSettings("crowd", { augments: true }), boardIntroSeconds: 0 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
@@ -423,7 +428,7 @@ describe("lobby: Crowd mode", () => {
   });
 
   it("pre-game votes: nobody votes, so the default wins (Team final, then Blitz 5+3) and everyone joins it", () => {
-    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }), boardIntroSeconds: 0, voteBotSkip: 1 });
+    const L = setup({ ...modeSettings("crowd", { augments: true }), boardIntroSeconds: 0, voteBotSkip: 1 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
@@ -444,7 +449,7 @@ describe("lobby: Crowd mode", () => {
   });
 
   it("the clock vote online: the winner's time control sets every bank, each move's increment and cap, and survives the lobby sleeping", () => {
-    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }), firstStageRounds: 20, roundsPerStage: 2, boardIntroSeconds: 0, voteBotSkip: 1 });
+    const L = setup({ ...modeSettings("crowd", { augments: true }), firstStageRounds: 20, roundsPerStage: 2, boardIntroSeconds: 0, voteBotSkip: 1 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
@@ -497,7 +502,7 @@ describe("lobby: Crowd mode", () => {
 
   it("pre-game votes: one vote each (a second is ignored); with voteChangeAllowed it replaces the first", () => {
     for (const allowed of [false, true]) {
-      const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }), boardIntroSeconds: 0, voteChangeAllowed: allowed });
+      const L = setup({ ...modeSettings("crowd", { augments: true }), boardIntroSeconds: 0, voteChangeAllowed: allowed });
       L.core.connect(undefined, "Ann", "computer");
       L.core.connect(undefined, "Bo", "phone");
       L.core.message("p1", { t: "start" });
@@ -518,7 +523,7 @@ describe("lobby: Crowd mode", () => {
       { fromMove: 1, seconds: 10 },
       { fromMove: 6, seconds: 15 },
     ];
-    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }), firstStageRounds: 20, roundsPerStage: 2, boardIntroSeconds: 0, moveClockSteps: rising });
+    const L = setup({ ...modeSettings("crowd", { augments: false }), firstStageRounds: 20, roundsPerStage: 2, boardIntroSeconds: 0, moveClockSteps: rising });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
@@ -545,7 +550,7 @@ describe("lobby: Crowd mode", () => {
   });
 
   it("the boss final online (always the Hidden Boss): the host plays his moves, he never strikes, results carry the outcome", () => {
-    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }), finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0, bossMaxMoves: 7 });
+    const L = setup({ ...modeSettings("crowd", { augments: false }), finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0, bossMaxMoves: 7 });
     // (Ann has switched the eval bar off; Bo's app is from before the setting: it doesn't say.)
     L.core.connect(undefined, "Ann", "computer", false, null, undefined, undefined, null, false);
     L.core.connect(undefined, "Bo", "phone");
@@ -616,7 +621,7 @@ describe("lobby: Crowd mode", () => {
   });
 
   it("matchmade lobbies start by themselves: at the fill time with bots, or as soon as they're full", () => {
-    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }) });
+    const L = setup({ ...modeSettings("crowd", { augments: true }) });
     L.core.setAuto(L.now + 60_000);
     L.core.connect(undefined, "Ann", "phone");
     expect(L.core.joinable()).toBe(true);
@@ -638,7 +643,7 @@ describe("lobby: Crowd mode", () => {
     L.advance(FRONT_DOOR.fillShowMs);
     expect(L.core.record.phase).toBe("vote");
 
-    const F = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }), lobbySize: 3 });
+    const F = setup({ ...modeSettings("crowd", { augments: false }), lobbySize: 3 });
     F.core.setAuto(F.now + 60_000);
     for (const n of ["A", "B", "C"]) F.core.connect(undefined, n, "phone");
     expect(F.core.record.phase).toBe("lobby");
@@ -648,7 +653,7 @@ describe("lobby: Crowd mode", () => {
   });
 
   it("the queue: join order, looks sent once, account ids, Cancel frees the seat, waits are measured", () => {
-    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }) });
+    const L = setup({ ...modeSettings("crowd", { augments: true }) });
     L.core.setAuto(L.now + 60_000);
     const hat = { head: { def: "santa-hat", color: "red", blemish: 10, seed: 3 } };
     L.core.connect(undefined, "Ann", "phone", false, null, hat, "user-ann");
@@ -767,8 +772,13 @@ describe("lobby: Crowd mode", () => {
       // His three charges are everyone's power-ups now.
       expect(v.standings.map((s) => s.powerUps)).toEqual([3, 3]);
     }
-    // Scores stand: both lost 49 on the move.
-    for (const p of L.core.save().runner!.state.players) expect(p.finalLosses.map((x) => Math.round(x))).toEqual([49]);
+    // Scores stand: both lost 49 on the move (the Last Stand weighs the raw loss); the boss's strikes count it after the
+    // opening allowance (a raid starts at move 6), unless the move gave up material.
+    const mine = L.last("p1", "reveal")!.picks.find((p) => p.playerId === "p1")!;
+    expect(Math.round(mine.loss!)).toBe(49);
+    const counted = mine.material ? 49 : 49 - OPENING_ALLOWANCE.points;
+    expect(mine.counted === undefined ? 49 : Math.round(mine.counted)).toBe(counted);
+    for (const p of L.core.save().runner!.state.players) expect(p.finalLosses.map((x) => Math.round(x))).toEqual([counted]);
     // Through the reveal: the crowd picks again, same position, the blunder barred, a fresh clock.
     L.advance(RAID_SETTINGS.revealSeconds! * 1000 + RAID_SETTINGS.drawnMoveSeconds! * 1000 + LAST_STAND_MS);
     const again = L.last("p1", "round")!;

@@ -758,3 +758,28 @@ didn't change. `packages/app/test/boss-clock.test.ts` plays Eric's path.
   as any countdown drawn over the board. Never only inside a line of text that changes with the moment.
 - Before hunting a "fired early" bug, work out the player's own time on the path they really played (the bank, the
   increment, how fast they moved) and check it against what they saw last; then test that path.
+
+## A queen banner that came back after the ult (Oct 16, 2026)
+
+**What Eric saw:** against Big Boy, "he used his ult and idk what happened but the queen slayed banner appeared for
+like 1 second very fast".
+
+**The cause:** QUEEN SLAIN! was drawn whenever the boss screen showed the boss thinking and the board's last move had
+taken a queen (`lastMoveTookQueen`). Big Boy's Big Bounce comes at the start of his turn, between your move and his, so
+his turn thinks twice on the same last move: once while his bounce is picked, once for his move. Take his queen with
+the move before his bounce and the banner played in the first thinking, then again in the second, after the bounce,
+cut off by his move (in Boss alone his move comes as soon as his engine answers: about a second). Online, the lobby
+held his move after the bounce for the banner again, while the bounce itself didn't wait for it. The same check, which
+never asked whose move it was, would also have shown "QUEEN SLAIN! You take Hollow's queen" when Hollow took yours and
+thought again for his extra move. Reproduced in the browser by placing his queen where a pawn takes it before the
+bounce turn: the banner showed for 3 s, the bounce played, then the banner again.
+
+**The fix:** one check for the screen, the solo game's wait and the lobby's (`queenSlain` in `boss-timing.ts`): the
+crowd's capture of the boss's queen, only in the thinking straight after it (not once the bounce has played this
+turn). The bounce now waits for the banner online as it did solo.
+
+**The rule:**
+- A banner for something that happened (a capture, a power) is keyed to that event happening, never to a state that
+  stays true afterwards: a power that pauses the turn shows the same state again.
+- When a turn has more than one screen of the same kind (a thinking before a power and one after it), check everything
+  drawn from that state on each of them.

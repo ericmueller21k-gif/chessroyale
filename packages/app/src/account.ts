@@ -1,7 +1,6 @@
-import type { ChatPicks, ShopState } from "@chessroyale/core";
+import { ASK_AGE_LINE, oldEnough, type ChatPicks, type ShopState } from "@chessroyale/core";
 import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankEffect } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
-import { evalBarOn } from "./prefs.ts";
 
 /**
  * Your account, as the screens see it: a guest account made the first time
@@ -28,7 +27,7 @@ export interface Profile {
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss?: ModeStats };
   rating: number | null;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
-  /** An admin (ADMIN_EMAILS, as for the fair-play review): sees the boss battle's test trigger. */
+  /** An admin (ADMIN_EMAILS, as for the fair-play review): sees the boss battle's test trigger, may use the test switches. */
   admin?: boolean;
   /** Your chat's pause in force, and a moderator's warning or chat ban you haven't seen yet (chat-mod.ts). */
   chatMod?: { block?: ChatBlock; notice?: ChatNotice };
@@ -46,12 +45,25 @@ export interface ChatNotice {
 }
 
 export interface AccountState {
-  /** Sign-in options the server has set up (null until known; accounts false = no accounts here). */
-  config: { accounts: boolean; google: boolean; email: boolean; onlineNeedsSignIn?: boolean } | null;
+  /**
+   * Sign-in options the server has set up (null until known; accounts false = no accounts here). `testSwitches`: the
+   * server has TEST_SWITCHES on (local, e2e, staging), so the address's test switches work for everyone (test-switches.ts).
+   */
+  config: { accounts: boolean; google: boolean; email: boolean; onlineNeedsSignIn?: boolean; testSwitches?: boolean; age?: AgeAnswer } | null;
   profile: Profile | null;
+  /**
+   * This device's answer to the age question, asked before any sign-in (AGE_GATE; null: not asked yet, or its "ok" was
+   * used by a sign-in). "ok": sign-in may go ahead. "under": guest play only, here for good.
+   */
+  age: AgeAnswer | null;
+  /** Why the age question is back (a sign-in refused: the answer ran out), shown on it until it's answered. */
+  ageNote: string | null;
 }
 
-let state: AccountState = { config: null, profile: null };
+/** The age question's answer: old enough to sign in, or too young (docs/decisions/2026-10-16-age-gate-and-real-money.md). */
+export type AgeAnswer = "ok" | "under";
+
+let state: AccountState = { config: null, profile: null, age: null, ageNote: null };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<AccountState>) => {
   state = { ...state, ...patch };
@@ -66,23 +78,93 @@ export function onAccountChange(fn: () => void): () => void {
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { credentials: "same-origin", ...init, headers: { "content-type": "application/json", ...init?.headers } });
-  const body = (await res.json().catch(() => ({}))) as T & { message?: string };
-  if (!res.ok) throw new Error(body.message ?? `Something went wrong (${res.status}).`);
+  const body = (await res.json().catch(() => ({}))) as T & { message?: string; askAge?: boolean; tooYoung?: boolean };
+  if (!res.ok) {
+    // A sign-in the age gate refused: ask the question again, saying why (the answer ran out), or too young after all.
+    if (body.askAge) askAgeAgain(body.message ?? ASK_AGE_LINE);
+    if (body.tooYoung) rememberTooYoung();
+    throw new Error(body.message ?? `Something went wrong (${res.status}).`);
+  }
   return body;
+}
+
+/**
+ * "Too young" is kept twice: in this device's storage and in the server's cookie (hc_age, which the page can't clear).
+ * Each puts the other back, so clearing one isn't enough to answer again. Never the birth date, only the answer.
+ */
+export const TOO_YOUNG_KEY = "brc.tooYoung";
+function storedTooYoung(): boolean {
+  try {
+    return localStorage.getItem(TOO_YOUNG_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+/** This device is too young: remembered here, sign-in gone, and the name it may have chosen forgotten. */
+function rememberTooYoung() {
+  try {
+    localStorage.setItem(TOO_YOUNG_KEY, "1");
+    localStorage.removeItem("brc.name");
+  } catch {
+    // No storage: the server's cookie still holds it.
+  }
+  set({ age: "under" });
+}
+/** This device answered the age question "too young": guest play only, under the default name and icon. */
+export const tooYoung = () => state.age === "under";
+/**
+ * A guest on a device that answered "too young": no name or icon of their own, nothing typed to us. (Someone signed in
+ * there, say in a tab opened before the answer, keeps their account as it is.)
+ */
+export const youngGuest = () => tooYoung() && !state.profile?.user.signedIn;
+/**
+ * A sign-in was refused for want of an "old enough" answer (it ran out, or a sign-in in another tab used it up): the
+ * question comes back, with `why` on it. (Too young stays too young.)
+ */
+export function askAgeAgain(why: string = ASK_AGE_LINE) {
+  if (!tooYoung()) set({ age: null, ageNote: why });
 }
 
 /** Loads the sign-in options and your profile (making a guest account the first time). */
 export async function loadAccount(name?: string): Promise<void> {
   try {
     const config = await api<NonNullable<AccountState["config"]>>("/api/auth/config");
-    set({ config });
+    const young = storedTooYoung() || config.age === "under";
+    set({ config, age: young ? "under" : (config.age ?? null) });
+    if (young) rememberTooYoung();
     if (!config.accounts) return;
-    const q = name ? `?name=${encodeURIComponent(name)}` : "";
+    const q = name && !young ? `?name=${encodeURIComponent(name)}` : "";
     set({ profile: await api<Profile>(`/api/me${q}`) });
+    // The server forgot (its cookie was cleared): tell it again, which also puts the guest back to the defaults.
+    if (young && config.age !== "under") await sendAgeAnswer(false).catch(() => undefined);
   } catch {
     // No server (local dev) or offline: play on without an account.
     set({ config: { accounts: false, google: false, email: false } });
   }
+}
+
+async function sendAgeAnswer(ok: boolean): Promise<AgeAnswer> {
+  const { age } = await api<{ age: AgeAnswer }>("/api/auth/age", { method: "POST", body: JSON.stringify({ oldEnough: ok }) });
+  if (age === "under") set({ profile: await api<Profile>("/api/me") });
+  return age;
+}
+
+/**
+ * Answers the age question (before any sign-in): the birth month (1-12) and year are checked here, on the device, and
+ * only the answer goes to the server. Too young is remembered at once, before the server hears, so a failed request
+ * can't be retried with another answer. Throws the server's message if an "old enough" answer didn't reach it.
+ */
+export async function answerAge(month: number, year: number): Promise<AgeAnswer> {
+  const ok = oldEnough(month, year, new Date());
+  if (!ok) {
+    rememberTooYoung();
+    await sendAgeAnswer(false).catch(() => undefined);
+    return "under";
+  }
+  const age = await sendAgeAnswer(true);
+  if (age === "under") rememberTooYoung();
+  else set({ age, ageNote: null });
+  return age;
 }
 
 export async function updateProfile(patch: { name?: string; icon?: string }): Promise<void> {
@@ -123,7 +205,10 @@ export interface Locker {
   keys: number | null;
 }
 
-/** Opens a crate on the server. `force`: the test switches (?fischer=1, ?shiny=1), honored only while testing. */
+/**
+ * Opens a crate on the server. `force`: the test switches (?fischer=1, ?shiny=1), honored only for those allowed them
+ * (test-switches.ts; the server checks too) and while crates are free.
+ */
 export async function openCrate(crate: string, force: { fischer?: boolean; shiny?: boolean } = {}): Promise<{ roll: CrateRoll; item: ItemInstance }> {
   const r = await api<{ roll: CrateRoll; item: ItemInstance; locker: Locker }>("/api/locker/open", { method: "POST", body: JSON.stringify({ crate, ...force }) });
   if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
@@ -157,11 +242,31 @@ export async function sendEmailCode(email: string): Promise<void> {
 }
 
 export async function verifyEmailCode(email: string, code: string): Promise<void> {
-  set({ profile: await api<Profile>("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code }) }) });
+  // (Signing in uses the age answer up: the next sign-in on this device asks again.)
+  set({ profile: await api<Profile>("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code }) }), age: null });
 }
 
 export async function signOut(): Promise<void> {
-  set({ profile: await api<Profile>("/api/auth/logout", { method: "POST" }) });
+  set({ profile: await api<Profile>("/api/auth/logout", { method: "POST" }), age: tooYoung() ? "under" : null });
+}
+
+/** "Download my data" (Settings): everything the server keeps about your account, as a JSON file. */
+export const ACCOUNT_DATA_URL = "/api/me/data";
+
+/**
+ * Deletes your account for good (Settings → Delete account, after its confirmation): the server deletes everything
+ * personal and signs you out on every device. Then this device forgets you too (everything the app keeps in its
+ * storage, settings included) and the app starts afresh, as a new visitor. Throws the server's message on failure.
+ */
+export async function deleteMyAccount(): Promise<void> {
+  await api("/api/me/delete", { method: "POST", body: JSON.stringify({ confirm: "delete" }) });
+  try {
+    // (Except a "too young" answer: it's this device's, not the account's.)
+    for (const k of Object.keys(localStorage)) if ((k.startsWith("brc.") || k.startsWith("hunchess-")) && k !== TOO_YOUNG_KEY) localStorage.removeItem(k);
+  } catch {
+    // No storage to clear.
+  }
+  location.replace("/");
 }
 
 /** A solo match's result, onto your profile (online matches are saved by the server). */
@@ -183,11 +288,12 @@ export async function recordSoloResult(r: {
   survived?: boolean | null;
   lastStand?: boolean | null;
   bossElo?: number | null;
+  /** Whether the eval bar was on (testers only since Oct 15), so we can see later who played without it. */
+  evalBar: boolean;
 }): Promise<void> {
   if (!state.profile) return;
   try {
-    // (With the eval bar's setting at the time, so we can see later who plays without it.)
-    await api("/api/results", { method: "POST", body: JSON.stringify({ ...r, evalBar: evalBarOn() }) });
+    await api("/api/results", { method: "POST", body: JSON.stringify(r) });
     set({ profile: await api<Profile>("/api/me") });
   } catch {
     // Not important enough to bother the player.
@@ -213,6 +319,8 @@ export interface PublicProfile {
   joinedAt: number;
   lastSeen: number | null;
   online: boolean;
+  /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null. */
+  hidden?: boolean;
   rating: number | null;
   tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
   topPercent: number | null;

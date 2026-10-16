@@ -48,7 +48,7 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   await expect(page.getByText("Weighty · 1612")).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit name & icon" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open locker" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Report" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Report", exact: true })).toHaveCount(0);
   // Wearing shows the item itself (its drawing, in its color), not a color swatch.
   await expect(page.locator(".fd-item .fd-thumb .item-art svg")).toHaveCount(1);
   // Stats: Crowd and Boss raid tabs, real numbers.
@@ -58,7 +58,7 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   await expect(tiles.filter({ hasText: "cuts survived" })).toContainText("100%");
   await page.getByRole("tab", { name: "Boss raid" }).click();
   await expect(tiles.filter({ hasText: "raids" })).toContainText("0");
-  await expect(page.getByText("BOSSES BEATEN · 0 / 10")).toBeVisible();
+  await expect(page.getByText("BOSS TIERS BEATEN · 0 / 10")).toBeVisible();
   await expect(page.locator(".fd-match")).toContainText("Best move Nxe5");
   // Rename.
   await page.getByRole("button", { name: "Edit name & icon" }).click();
@@ -68,7 +68,7 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   // Settings from here, and back home.
   await page.getByRole("button", { name: "Settings" }).first().click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.locator(".fd-hero-name")).toHaveText("Hunter");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
@@ -95,18 +95,20 @@ test("home → queue → match, then tap a name for that player's profile (phone
   // A pawn in the queue opens that player's profile too.
   await desk.getByRole("button", { name: "Phoney's profile" }).click();
   await expect(desk.locator(".fd-overlay").getByRole("heading", { name: "Phoney" })).toBeVisible();
-  await desk.locator(".fd-overlay").getByRole("button", { name: "Back" }).click();
+  await desk.locator(".fd-overlay").getByRole("button", { name: "Back", exact: true }).click();
   // Into the raid (8 s locally, then the boss's intro).
   for (const p of [desk, phone]) await expect.poll(() => phase(p), { timeout: 60_000 }).toMatch(/boss|play/);
   // Computer: the leaderboard beside the board; tap the other player's name.
   await desk.locator(".tower-side").getByRole("button", { name: "Phoney's profile" }).click();
   const sheet = desk.locator(".fd-overlay");
   await expect(sheet.getByRole("heading", { name: "Phoney" })).toBeVisible();
-  await expect(sheet.getByRole("button", { name: "Report" })).toBeVisible();
-  await expect(sheet.getByRole("button", { name: "Add friend (later)" })).toBeDisabled();
+  await expect(sheet.getByRole("button", { name: "Report", exact: true })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Add friend" })).toBeEnabled();
+  // (Mid-match there's no game of yours to invite them to: no Invite to play.)
+  await expect(sheet.getByRole("button", { name: "Invite to play" })).toHaveCount(0);
   await expect(sheet.getByRole("button", { name: "Edit name & icon" })).toHaveCount(0);
   await expect(sheet).not.toContainText(/@|Google|email/i);
-  await sheet.getByRole("button", { name: "Back" }).click();
+  await sheet.getByRole("button", { name: "Back", exact: true }).click();
   await expect(sheet).toHaveCount(0);
   // Phone: open the leaderboard, tap the other player's name.
   await expect.poll(() => phase(phone), { timeout: 30_000 }).toBe("play");
@@ -115,12 +117,12 @@ test("home → queue → match, then tap a name for that player's profile (phone
   await expect(phone.locator(".fd-overlay").getByRole("heading", { name: "Desky" })).toBeVisible();
   await expect(phone.locator(".fd-overlay")).toContainText("Online now");
   // Report them: a reason, then the thanks. The report is about this match: a second one in it isn't counted again.
-  await phone.locator(".fd-overlay").getByRole("button", { name: "Report" }).click();
+  await phone.locator(".fd-overlay").getByRole("button", { name: "Report", exact: true }).click();
   for (const reason of ["Cheating", "Offensive name or icon", "Something else"]) await expect(phone.getByRole("button", { name: reason, exact: true })).toBeVisible();
   await phone.getByRole("button", { name: "Cheating", exact: true }).click();
   await expect(phone.getByText("Thanks, we'll look into it.")).toBeVisible();
   await phone.getByRole("dialog", { name: "Report Desky" }).getByRole("button", { name: "Close" }).click();
-  await phone.locator(".fd-overlay").getByRole("button", { name: "Report" }).click();
+  await phone.locator(".fd-overlay").getByRole("button", { name: "Report", exact: true }).click();
   await phone.getByRole("button", { name: "Something else", exact: true }).click();
   await expect(phone.getByText("You've already reported this player in this match.")).toBeVisible();
 });
@@ -135,7 +137,7 @@ test("in a match: a bot's name opens a bot's card, yours opens your profile", as
   if (test.info().project.name !== "desktop") await page.locator(".mini-tower-title").click();
   await board.locator(".tower-row:not(.you) .player-name").first().click();
   await expect(page.locator(".fd-overlay")).toContainText("Bots fill the empty seats in a match");
-  await page.locator(".fd-overlay").getByRole("button", { name: "Back" }).click();
+  await page.locator(".fd-overlay").getByRole("button", { name: "Back", exact: true }).click();
   await board.getByRole("button", { name: "Your profile" }).click();
   await expect(page.locator(".fd-overlay").getByRole("heading", { name: "Solo" })).toBeVisible();
   await expect(page.locator(".fd-overlay").getByRole("button", { name: "Edit name & icon" })).toBeVisible();

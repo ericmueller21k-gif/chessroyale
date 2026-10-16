@@ -1,5 +1,5 @@
 import { toSan, type BoardRound, type Base, type BoardSlot, type LivePick, type NetBoss, type NetFinal, type NetLightsOut, type NetStanding, type NetVote } from "@chessroyale/chess";
-import { brilliance } from "@chessroyale/core";
+import { brilliance, type MaterialSlip } from "@chessroyale/core";
 import { roundsInStage, type Augment, type Settings } from "@chessroyale/core";
 import type { MatchChat } from "./chat.ts";
 
@@ -46,16 +46,36 @@ export interface MoveRecord {
   move: string | null;
   san: string;
   loss: number | null;
+  /** The loss as it counted for points, when the opening allowance took something off; or why it didn't (material). */
+  counted?: number;
+  material?: MaterialSlip;
   roundScore: number;
   /** The engine's best move (after the re-check), and how many of those who picked found it (within 1.5 points). */
   bestMove?: string;
   found?: number;
   pickers?: number;
-  /** Everyone's average loss that turn. */
+  /** Everyone's average loss that turn, as it counted for points (the round score is measured from it). */
   avgLoss?: number | null;
+  /** The same before the opening allowance, when that differs. */
+  avgRaw?: number;
   /** Your pick separated the field (a brilliant move, made without a power-up). */
   brilliant?: boolean;
   usedPowerUp?: boolean;
+}
+
+/**
+ * The opening allowance on a pick, in a few plain words for the reveal (one line, even at 320 px), one number at most:
+ * what it forgave ("1.2 forgiven · opening", "8 of 9.6 forgiven · opening"), or why it didn't cover the pick
+ * ("no allowance · gave up material", "no allowance · missed a capture"). `short`: the boss dock on the narrowest
+ * phones ("8 of 9.6 forgiven", "no allowance"). Null when it made no difference (no loss, or no allowance on this move).
+ */
+export function allowanceNote(p: { loss: number | null; counted?: number; material?: MaterialSlip }, short = false): string | null {
+  if (p.loss === null || p.loss < 0.05) return null;
+  if (p.material) return short ? "no allowance" : `no allowance · ${p.material === "missed" ? "missed a capture" : "gave up material"}`;
+  if (p.counted === undefined) return null;
+  const pts = (x: number) => x.toFixed(1).replace(/\.0$/, "");
+  const forgiven = p.counted < 0.05 ? `${pts(p.loss)} forgiven` : `${pts(p.loss - p.counted)} of ${pts(p.loss)} forgiven`;
+  return short ? forgiven : `${forgiven} · opening`;
 }
 
 /** Your move from a reveal, with what the elimination breakdown needs (null if you weren't picking). */
@@ -72,11 +92,14 @@ export function moveRecordFrom(stage: number, round: number, mine: GroupReveal, 
     move: me.move,
     san: me.move ? toSan(mine.fenBefore, me.move) : "—",
     loss: me.loss,
+    ...(me.counted !== undefined ? { counted: me.counted } : {}),
+    ...(me.material ? { material: me.material } : {}),
     roundScore: me.roundScore,
     bestMove: mine.bestMove,
     found: picked.filter((p) => p.loss! <= 1.5).length,
     pickers: picked.length,
-    avgLoss: picked.length ? picked.reduce((s, p) => s + p.loss!, 0) / picked.length : null,
+    avgLoss: picked.length ? picked.reduce((s, p) => s + (p.counted ?? p.loss!), 0) / picked.length : null,
+    ...(picked.some((p) => p.counted !== undefined) ? { avgRaw: picked.reduce((s, p) => s + p.loss!, 0) / picked.length } : {}),
     brilliant: !!bril?.players.includes(me.playerId),
     usedPowerUp: !!me.usedPowerUp,
   };
@@ -86,7 +109,7 @@ export function moveRecordFrom(stage: number, round: number, mine: GroupReveal, 
  * Your last elimination (Crowd): your score and the cut line's when you went out, for the breakdown on the
  * cut screen and the results.
  */
-export const elimination: { current: { stage: number; you: number; line: number; placement: number | null; out: number; left: number } | null } = { current: null };
+export const elimination: { current: { stage: number; you: number; line: number; placement: number | null; out: number; left: number; lastCut?: boolean } | null } = { current: null };
 
 /** The 2v2 final as the screens see it (same shape the server sends, with the board as a view). */
 export type FinalView = Omit<NetFinal, "board"> & { board: BoardView };
@@ -257,7 +280,7 @@ export interface GameView {
   readonly done: ReadonlySet<string>;
   /** Moves already seen on each board (key "id:generation"), to replay only what you missed. */
   readonly seen: Map<string, number>;
-  /** Players ranked at or below this many go out at the end of the stage. */
+  /** How many of those still in would go through if the stage's cut came now (ties at the line go through). */
   readonly cutoff: number;
   nameOf(id: string): string;
   isYou(id: string): boolean;
@@ -339,6 +362,12 @@ export interface GameView {
   resign(): void;
 }
 
+/**
+ * Boss alone: you against a boss, nobody else (a raid of one). Its screens speak to you, never to a crowd: no pick
+ * count, no place in a crowd of one, no crowd table.
+ */
+export const bossAlone = (m: Pick<GameView, "settings" | "totalPlayers">) => !!m.settings.raid && m.totalPlayers === 1;
+
 /** Crowd 50 v 50: your team (the side you play all match), if you have one. */
 export function myTeam(m: Pick<GameView, "standings">): "w" | "b" | null {
   return m.standings().find((s) => s.isYou)?.team ?? null;
@@ -346,26 +375,48 @@ export function myTeam(m: Pick<GameView, "standings">): "w" | "b" | null {
 
 /**
  * The leaderboard as you should see it: in Crowd 50 v 50 each team has its own
- * cut (half the knockouts each), so it shows your team with your team's cut line.
+ * cut (half the knockouts each), so it shows your team with your team's cut line
+ * (where the cut would fall now: the rows it would take are marked `cut`; ties at the line go through).
  */
-export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" | "stage"> & { boss?: BossView | null }): { standings: Standing[]; cutoff: number; teamLabel: string | null } {
+export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" | "stage" | "totalPlayers"> & { boss?: BossView | null }): { standings: Standing[]; cutoff: number; teamLabel: string | null } {
   const all = m.standings();
-  // Boss battle: one crowd, no cut line (the boss strikes instead).
-  if (m.boss) return { standings: all, cutoff: all.filter((s) => !s.out).length, teamLabel: "The crowd" };
+  // Boss battle: one crowd, no cut line (the boss strikes instead). Boss alone: just you, your own row.
+  if (m.boss) return { standings: all, cutoff: all.filter((s) => !s.out).length, teamLabel: bossAlone(m) ? "You" : "The crowd" };
   const team = all.find((s) => s.isYou)?.team ?? null;
   if (!team) return { standings: all, cutoff: m.cutoff, teamLabel: null };
   const mine = all.filter((s) => s.team === team);
-  const alive = mine.filter((s) => !s.out).length;
-  const k = m.settings.knockoutsPerStage[m.stage] ?? 0;
-  return { standings: mine, cutoff: alive - Math.floor(k / 2), teamLabel: team === "w" ? "White team" : "Black team" };
+  const alive = mine.filter((s) => !s.out);
+  return { standings: mine, cutoff: alive.filter((s) => !s.cut).length, teamLabel: team === "w" ? "White team" : "Black team" };
 }
 
 export const isCrowd = (m: Pick<GameView, "settings">) => m.settings.mode === "crowd";
 
-/** What the last cut leads to, by name: the team final, the boss battle, the duel (or the final four). */
-export function finalName(s: Pick<Settings, "mode" | "crowdTeams" | "finalFormat">): string {
-  if (s.mode !== "crowd" || !s.crowdTeams) return "Final four";
-  return s.finalFormat === "boss" ? "Boss battle" : s.finalFormat === "duel" ? "Duel" : "Team final";
+/** What a Crowd match's last cut leads to, by name: the team final, the boss final or the duel. */
+export function finalName(s: Pick<Settings, "finalFormat">): string {
+  return s.finalFormat === "boss" ? "Boss final" : s.finalFormat === "duel" ? "Duel" : "Team final";
+}
+
+/**
+ * The results table's rows: your average loss per move in each part of the match, named for what was played. Classic:
+ * each stage, then "Final". Crowd: the knockouts as one row (a stage there is a move or two), then its ending (team
+ * final, boss final or duel). A raid or Boss alone: the boss battle.
+ */
+export function lossRows(match: Pick<GameView, "settings" | "lossesByStage">): { label: string; avg: number }[] {
+  const s = match.settings;
+  const stages = s.knockoutsPerStage.length;
+  const avg = (l: readonly number[]) => l.reduce((a, b) => a + b, 0) / l.length;
+  const parts: { label: string; losses: number[] }[] = [];
+  const add = (label: string, l: readonly number[]) => {
+    const last = parts.at(-1);
+    if (last?.label === label) last.losses.push(...l);
+    else parts.push({ label, losses: [...l] });
+  };
+  match.lossesByStage.forEach((l, i) => {
+    if (s.raid) add("Boss battle", l);
+    else if (i >= stages) add(s.mode === "crowd" ? finalName(s) : "Final", l);
+    else add(s.mode === "crowd" ? "Knockouts" : `Stage ${i + 1}`, l);
+  });
+  return parts.filter((p) => p.losses.length).map((p) => ({ label: p.label, avg: avg(p.losses) }));
 }
 
 /** The board you're on this turn (highlighted in the strip), if any. */

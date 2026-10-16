@@ -1,11 +1,13 @@
 import { useState } from "preact/hooks";
-import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, shopItem, wornFromLocker, type ShopSlot } from "@chessroyale/core";
+import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, pausedLine, shopItem, wornFromLocker, type ShopSlot } from "@chessroyale/core";
 import { account, buyShopItem } from "../account.ts";
 import { openProfile } from "../profile-nav.ts";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
 import { CratesPanel, LockerPanel } from "./Crates.tsx";
+import { BackButton } from "../components/FrontDoor.tsx";
+import { isPaused, useServerStatus } from "../status.ts";
 
 /**
  * The shop: cosmetics by category. Get an item (free while we test); it goes to your locker, where you wear it
@@ -14,6 +16,7 @@ import { CratesPanel, LockerPanel } from "./Crates.tsx";
  */
 export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: "shop" | "crates" | "locker" | "chat" }) {
   const { profile, config } = useAccount();
+  useServerStatus();
   // (A profile's locked quick chat line opens it on the chat packs.)
   const [slot, setSlot] = useState<ShopSlot>(initial === "chat" ? "chat" : "king");
   // (A profile's "Open locker" opens it on the locker.)
@@ -51,9 +54,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
   return (
     <div class="screen shop">
       <div class="shop-head">
-        <button type="button" class="btn btn-secondary" onClick={onBack}>
-          ‹ Back
-        </button>
+        <BackButton onClick={onBack} />
         <h1>Shop</h1>
         <span class="shop-coins" aria-label={`${shop?.coins ?? 0} coins`}>
           🪙 {shop?.coins ?? 0}
@@ -66,15 +67,19 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
           </button>
         ))}
       </div>
-      {config?.accounts && profile && area === "crates" ? (
+      {/* (The shop resting, a kill switch: the shop and crates say so; your locker stays.) */}
+      {area !== "locker" && isPaused("shop") ? (
+        <p class="shop-note">{pausedLine("shop")}</p>
+      ) : config?.accounts && profile && area === "crates" ? (
         <CratesPanel />
       ) : config?.accounts && profile && area === "locker" ? (
         <LockerPanel onShop={() => setArea("shop")} />
       ) : (
         <>
       {SHOP_FREE && <p class="shop-note">Everything is free while we test the shop.</p>}
-      {!config?.accounts || !shop ? (
-        <p class="muted">The shop needs your account, which isn't available here.</p>
+      {!shop ? (
+        // (Still loading on a first visit: the guest account is being made. Unavailable only once that's known.)
+        <p class="muted">{config && (!config.accounts || profile) ? "The shop needs your account, which isn't available here." : "Loading the shop…"}</p>
       ) : (
         <>
           <div class="shop-tabs" role="tablist">

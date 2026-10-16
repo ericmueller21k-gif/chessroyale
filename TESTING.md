@@ -16,11 +16,11 @@ that a real iPhone runs the chess engine fast enough, so that's the main thing t
 
 **New: 64 players and a 2v2 final.** 8 boards with 8 players each; each cut removes the bottom 8 and the most
 lopsided board, down to 4 players on the last board. Then a 2v2 final: seeds 1 & 4 against 2 & 3, teammates take
-turns, and the best average move quality wins. A solo match is about 25 minutes at the relaxed pace
-(`?rounds=1&pace=quick` for a very fast run-through that still reaches the final).
+turns, and the best average move quality wins. A solo match is about 25 minutes (as an admin, add
+`?rounds=1&pace=quick` for a very fast run-through that still reaches the final).
 
 **Also new in recent versions** (worth a look while you play):
-- Tick **Practice mode** on the first screen if you want unlimited power-ups (the engine's top 3 moves with arrows).
+- Switch on **Practice mode** in Settings → Testing (admins) if you want unlimited power-ups (the engine's top 3 moves with arrows).
 - The strip above the board shows your position and how far you are above or below the elimination line; tap it
   for the full leaderboard. On a computer the leaderboard sits on the left all the time.
 - You keep one color per stage. When you land on a board, the last few moves you missed replay before you move.
@@ -84,3 +84,35 @@ On your phone, with the ringer switch on:
    at once, about as loud as the others, none harsh or clipped through the phone's speaker.
 2. Pick one of each (picking plays it too), then play a few moves in **Boss alone**: your picks should sound for
    every move and capture. Tell me which ones you like, and any to drop or replace.
+
+## Friends and invites (Oct 15, about 10 minutes)
+
+Two signed-in accounts: your phone and your computer (or a friend's phone), each signed in with a different Google
+account or email.
+
+1. **Add a friend.** On the computer, open the other account's profile (tap its name in a lobby, or open its profile
+   link) and tap **Add friend**. Within about 10 seconds the phone's home shows **Friends · … 1 new** above the live
+   line: tap it, then **Accept**.
+2. **Online.** The computer's right column lists the phone under **FRIENDS** as **Online**. Start a match on the phone:
+   within a minute it reads **In a match**.
+3. **Invite.** With the phone back on its home screen, tap **Invite** beside it on the computer. The computer goes into
+   a new lobby; the phone shows **… invited you to a Crowd lobby** at the top with **Join**. Tap Join: the phone is in
+   the lobby.
+4. **The setting.** On the phone, **Settings → Friends → Invites from: No one**. An invite from the computer now says
+   "This player isn't taking invites right now."
+5. Tell me whether the invite at the top is easy to see and to dismiss on the iPhone (it sits under the notch).
+
+## The age question (Oct 16, about 3 minutes)
+
+Try the under-13 answer **only in a private tab**: a browser that answers it can't sign in for 400 days (that's the
+point). Closing the private tab forgets it.
+
+1. **Private tab, under 13.** On your phone, open hunchess.com in a private tab. Under "Sign in to play online" the box
+   asks **when were you born?** Tap **Month** and **Year**: each should open the phone's own picker, easy to scroll,
+   with nothing chosen at first. Pick this month and a year 12 years ago, then **Continue**. The box should say
+   "Accounts are for players 13 and older, so you'll play as a guest." Reload: still that line, no question. Close the
+   private tab.
+2. **Your own browser, with Google.** Sign out (Settings → Sign out), then sign in again **with Google** (not the email
+   code): the question comes first, then **Continue with Google**, and you should come back signed in, on the page you
+   started from. Google's return trip is the one path the automatic tests can't run. Tell me if the question is in the
+   way or reads oddly.

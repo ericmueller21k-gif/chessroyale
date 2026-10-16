@@ -38,6 +38,9 @@ function memorySql(): Sql {
     async all(sql, ...p) {
       return db.prepare(sql).all(...(p as never[])) as never;
     },
+    async batch(statements) {
+      for (const s of statements) db.prepare(s.sql).run(...(s.params as never[]));
+    },
   };
 }
 
@@ -50,7 +53,11 @@ function memoryD1(): D1Database {
     first: async () => db.prepare(sql).get(...(params as never[])) ?? null,
     all: async () => ({ results: db.prepare(sql).all(...(params as never[])) }),
   });
-  return { prepare: (sql: string) => stmt(sql) } as unknown as D1Database;
+  return {
+    prepare: (sql: string) => stmt(sql),
+    // (Each statement runs as it's called, in order, so nothing comes between them.)
+    batch: async (stmts: { run(): Promise<unknown> }[]) => Promise.all(stmts.map((s) => s.run())),
+  } as unknown as D1Database;
 }
 
 describe("accounts", () => {
@@ -92,11 +99,40 @@ describe("accounts", () => {
     expect(rows.map((r) => r.eval_bar)).toEqual([1, 0, null]);
   });
 
+  it("a solo result from before the ranked rule (ranked NULL, the browser's rating) never counts, and the next schema run fixes a rating it set", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000);
+    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 3, players: 100, rating: 1700, ranked: true }, 2000);
+    // An old solo post, as stored before Oct 7 (no `ranked`), with the rating its browser sent; the old rule took it.
+    await sql.run("INSERT INTO results (user_id, mode, online, placement, players, rating, played_at) VALUES (?, 'classic', 0, 1, 64, 3000, 3000)", user.id);
+    await sql.run("UPDATE users SET rating = 3000 WHERE id = ?", user.id);
+    expect((await profile(sql, user)).rating).toBe(1700);
+    // The deploy's schema run (a newer schema than the one recorded) gets the stored rating again from online results.
+    await sql.run("UPDATE meta SET value = 'older' WHERE key = 'schema'");
+    await ensureSchema(sql, {});
+    expect((await sql.first<{ rating: number }>("SELECT rating FROM users WHERE id = ?", user.id))!.rating).toBe(1700);
+    const pub = (await publicProfile(sql, user.id, 4000))!;
+    expect(pub.rating).toBe(1700);
+    expect(pub.ratingHistory).toEqual([1700]);
+  });
+
+  it("Boss tiers beaten: online raids only (a solo boss win is the browser's word)", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000);
+    await recordResult(sql, user.id, { mode: "boss", online: true, placement: 1, players: 50, teamWon: true, bossElo: 1800 }, 2000);
+    await recordResult(sql, user.id, { mode: "boss", online: false, placement: 1, players: 1, teamWon: true, bossElo: 3190 }, 3000);
+    const pub = (await publicProfile(sql, user.id, 4000))!;
+    expect(pub.bossesBeaten).toEqual([1800]);
+    expect(pub.boss.bossesBeaten).toBe(1);
+  });
+
   it("signing in: attaches to the guest, or switches to the existing account and brings the guest's results", async () => {
     const sql = memorySql();
     await ensureSchema(sql);
     const a = await createGuest(sql, 1000);
-    const linked = await signInWithIdentity(sql, a.user, "google", "sub-1", { email: "e@x.com", name: "Eric" }, 2000);
+    const linked = await signInWithIdentity(sql, a.user, "google", "sub-1", { email: "e@x.com" }, 2000);
     expect(linked.id).toBe(a.user.id);
     expect(linked.google_sub).toBe("sub-1");
     expect(linked.email).toBe("e@x.com");
@@ -115,8 +151,11 @@ describe("accounts", () => {
     const sql = memorySql();
     await ensureSchema(sql);
     // No guest on this device: a new account made by Google keeps the email (normalized).
-    const fresh = await signInWithIdentity(sql, null, "google", "sub-2", { email: "Admin@Example.com", name: "A" }, 1000);
+    const fresh = await signInWithIdentity(sql, null, "google", "sub-2", { email: "Admin@Example.com" }, 1000);
     expect(fresh.email).toBe("admin@example.com");
+    // Its name is "Player" until its owner picks one: never from Google or the email address.
+    expect(fresh.name).toBe("Player");
+    expect((await signInWithIdentity(sql, null, "email", "jane.doe1987@example.com", {}, 1100)).name).toBe("Player");
     // An older Google account saved without its email gets it when it signs in again.
     await sql.run("INSERT INTO users (id, name, google_sub, created_at, last_seen) VALUES ('old', 'Old', 'sub-3', 0, 0)");
     const g = await createGuest(sql, 2000);
@@ -173,16 +212,29 @@ describe("account API", () => {
       sentCode = /(\d{6}) is your/.exec(JSON.parse(String(init.body)).subject)![1]!;
       return new Response("{}", { status: 200 });
     }) as unknown as typeof fetch;
-    const start = await call(env, "/api/auth/email/start", { method: "POST", body: JSON.stringify({ email: "Eric@Example.com" }), cookie: me.cookie }, fakeResend);
+    // (This device answered the age question "old enough": age-gate.test.ts has the question itself.)
+    const answered = `${me.cookie}; hc_age=ok`;
+    const start = await call(env, "/api/auth/email/start", { method: "POST", body: JSON.stringify({ email: "Eric@Example.com" }), cookie: answered }, fakeResend);
     expect(start.body).toEqual({ ok: true });
-    const bad = await call(env, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "eric@example.com", code: "000000" === sentCode ? "111111" : "000000" }), cookie: me.cookie });
+    const bad = await call(env, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "eric@example.com", code: "000000" === sentCode ? "111111" : "000000" }), cookie: answered });
     expect(bad.res.status).toBe(400);
-    const ok = await call(env, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "eric@example.com", code: sentCode }), cookie: me.cookie });
+    const ok = await call(env, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "eric@example.com", code: sentCode }), cookie: answered });
     expect(ok.body.user.signedIn).toBe(true);
     expect(ok.body.user.email).toBe("eric@example.com");
     // Results go on the profile.
     await call(env, "/api/results", { method: "POST", body: JSON.stringify({ mode: "crowd", placement: 2, players: 100 }), cookie: ok.cookie });
     expect((await call(env, "/api/me", { cookie: ok.cookie })).body.stats.crowd.matches).toBe(1);
+  });
+
+  it("POST /api/results: a solo result never becomes your rating, whatever rating (or online, ranked) it claims", async () => {
+    const env = { DB: memoryD1() };
+    const me = await call(env, "/api/me?name=Solo");
+    await call(env, "/api/results", { method: "POST", body: JSON.stringify({ mode: "boss", placement: 1, players: 50, rating: 400, online: true, ranked: true }), cookie: me.cookie });
+    const after = await call(env, "/api/me", { cookie: me.cookie });
+    expect(after.body.stats.boss.matches).toBe(1);
+    // (So a raid, which reads the stored rating as you join, never meets a boss matched to it.)
+    expect(after.body.rating).toBeNull();
+    expect((await call(env, `/api/profile/${me.body.user.id}`, { cookie: me.cookie })).body.rating).toBeNull();
   });
 
   it("POST /api/shop/chat: your quick chat picks, saved to your account and on your profile", async () => {
@@ -203,7 +255,9 @@ describe("account API", () => {
   it("Google: start redirects with state; the callback checks it and signs in", async () => {
     const env = { DB: memoryD1(), GOOGLE_CLIENT_ID: "cid", GOOGLE_CLIENT_SECRET: "secret" };
     const me = await call(env, "/api/me");
-    const start = await call(env, "/api/auth/google/start", { cookie: me.cookie });
+    // (This device answered the age question "old enough": age-gate.test.ts has the question itself.)
+    const answered = `${me.cookie}; hc_age=ok`;
+    const start = await call(env, "/api/auth/google/start", { cookie: answered });
     const loc = new URL(start.res.headers.get("location")!);
     expect(loc.origin).toBe("https://accounts.google.com");
     expect(loc.searchParams.get("redirect_uri")).toBe(`${origin}/api/auth/google/callback`);
@@ -212,9 +266,9 @@ describe("account API", () => {
     const claims = btoa(JSON.stringify({ sub: "g-123", aud: "cid", email: "e@gmail.com", email_verified: true, name: "Eric M" }));
     const fakeGoogle = (async () => new Response(JSON.stringify({ id_token: `x.${claims}.y` }), { status: 200 })) as unknown as typeof fetch;
     // A wrong state is refused.
-    const forged = await call(env, `/api/auth/google/callback?state=nope&code=c`, { cookie: `${me.cookie}; ${stateCookie}` }, fakeGoogle);
+    const forged = await call(env, `/api/auth/google/callback?state=nope&code=c`, { cookie: `${answered}; ${stateCookie}` }, fakeGoogle);
     expect(forged.res.headers.get("location")).toContain("signin=failed");
-    const cb = await call(env, `/api/auth/google/callback?state=${state}&code=c`, { cookie: `${me.cookie}; ${stateCookie}` }, fakeGoogle);
+    const cb = await call(env, `/api/auth/google/callback?state=${state}&code=c`, { cookie: `${answered}; ${stateCookie}` }, fakeGoogle);
     expect(cb.res.headers.get("location")).toBe(`${origin}/?signin=google`);
     const after = await call(env, "/api/me", { cookie: cb.cookie });
     expect(after.body.user).toMatchObject({ signedIn: true, google: true, email: "e@gmail.com" });
@@ -226,10 +280,11 @@ describe("account API", () => {
     const fakeGoogle = (async () => new Response(JSON.stringify({ id_token: `x.${claims}.y` }), { status: 200 })) as unknown as typeof fetch;
     for (const [next, back] of [["/lobby/ABCDE", "/lobby/ABCDE"], ["//evil.example", "/"], ["https://evil.example", "/"]] as const) {
       const me = await call(env, "/api/me");
-      const start = await call(env, `/api/auth/google/start?next=${encodeURIComponent(next)}`, { cookie: me.cookie });
+      const answered = `${me.cookie}; hc_age=ok`;
+      const start = await call(env, `/api/auth/google/start?next=${encodeURIComponent(next)}`, { cookie: answered });
       const cookies = start.res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
       const state = new URL(start.res.headers.get("location")!).searchParams.get("state");
-      const cb = await call(env, `/api/auth/google/callback?state=${state}&code=c`, { cookie: `${me.cookie}; ${cookies}` }, fakeGoogle);
+      const cb = await call(env, `/api/auth/google/callback?state=${state}&code=c`, { cookie: `${answered}; ${cookies}` }, fakeGoogle);
       expect(cb.res.headers.get("location")).toBe(`${origin}${back}?signin=google`);
     }
   });

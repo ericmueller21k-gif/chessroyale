@@ -171,7 +171,7 @@ export const CRATES: readonly CrateDef[] = [
   {
     id: "beta-001",
     name: "Beta Crate · Series 001",
-    blurb: "Secret agents, pirates, ninjas, the old shop's hats and a smile",
+    blurb: "Secret agents, pirates, ninjas, classic hats and a smile",
     look: "beta",
     // Eric (Oct 11): the same odds as Winter.
     strip: [
@@ -281,7 +281,10 @@ export const liveStrip = (crate: CrateDef) => crate.strip.filter((x) => (x.tier 
 
 export const crateDef = (id: string) => CRATES.find((c) => c.id === id);
 
-/** While testing: unlimited crates and keys, and the test switches (?fischer=1, ?shiny=1) work. */
+/**
+ * While testing: unlimited crates and keys, and the test switches (?fischer=1, ?shiny=1) work for those allowed them
+ * (an admin, or TEST_SWITCHES: docs/areas/ops.md, "Test switches").
+ */
 export const CRATES_FREE = true;
 
 /**

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "preact/hooks";
-import { SQUADS } from "@chessroyale/core";
+import { SQUADS, pausedLine } from "@chessroyale/core";
 import { FdButton } from "../components/FrontDoor.tsx";
 import type { PartyClient } from "../squads.ts";
+import { InviteFriends } from "../components/Friends.tsx";
+import { isPaused, useServerStatus } from "../status.ts";
 
 /**
  * Squads' party (docs/areas/squads.md, "The screens"): make one (a code and an invite link, /squads/party/CODE), or
@@ -35,6 +37,8 @@ export function PartySheet({
   onClose: () => void;
 }) {
   const [code, setCode] = useState(joinCode ?? "");
+  useServerStatus();
+  const resting = isPaused("squads") ? pausedLine("squads") : null;
   const [copied, setCopied] = useState(false);
   const [, redraw] = useState(0);
   useEffect(() => party?.subscribe(() => redraw((n) => n + 1)), [party]);
@@ -85,6 +89,7 @@ export function PartySheet({
                 {copied ? "Copied" : "Copy link"}
               </FdButton>
             </div>
+            <InviteFriends />
             <ul class="sq-party-members" aria-label="Members">
               {p?.members.map((m) => (
                 <li key={m.id} class={`${m.connected ? "" : "away"}${m.id === party.memberId ? " you" : ""}`}>
@@ -126,8 +131,9 @@ export function PartySheet({
           </>
         ) : (
           <>
-            <p class="fd-sub">Play Squads with up to {SQUADS.partyMax - 1} friends: you all sit in one squad, and bots fill the rest.</p>
-            <FdButton primary disabled={loading} onClick={onCreate}>
+            {/* (Squads resting, a kill switch: no new party, as the server refuses one; joining one still works.) */}
+            <p class="fd-sub">{resting ?? `Play Squads with up to ${SQUADS.partyMax - 1} friends: you all sit in one squad, and bots fill the rest.`}</p>
+            <FdButton primary disabled={loading || !!resting} onClick={onCreate}>
               Create a party
             </FdButton>
             <div class="fd-or">or join one</div>

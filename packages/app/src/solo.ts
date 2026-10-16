@@ -15,9 +15,11 @@ import { crowdMoveCues, kingSay, resetKingSpeech } from "./godKing.ts";
 import { CRITICAL, LOW, NORMAL, bossVoice } from "./speech.tsx";
 import { SoloLobbyChat } from "./chat.ts";
 import { account } from "./account.ts";
+import { crumb } from "./problems.ts";
 import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
 import { prefetchMaia, startMaia } from "./maia.ts";
 import { MaiaGate, type GateEnd } from "./maia-gate.ts";
+import { testParams } from "./test-switches.ts";
 
 export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
@@ -70,9 +72,9 @@ export class SoloMatch implements GameView {
   readonly seen = new Map<string, number>();
   private progress = new RoundProgress(() => this.emit());
   /** Test switch (?laststand=1): the boss battle's first crowd move calls for the God King's Last Stand, whatever it is. */
-  forceLastStand = typeof location !== "undefined" && new URLSearchParams(location.search).get("laststand") === "1";
+  forceLastStand = testParams().get("laststand") === "1";
   /** Test switch (?side=b): a boss raid alone, playing Black (to see the God King in black). */
-  private raidSide = typeof location !== "undefined" && new URLSearchParams(location.search).get("side") === "b" ? ("b" as const) : undefined;
+  private raidSide = testParams().get("side") === "b" ? ("b" as const) : undefined;
 
   constructor(
     private readonly engines: UciEngine[],
@@ -176,7 +178,7 @@ export class SoloMatch implements GameView {
     return whiteExpected(fen, await this.runner.topMovesFor(fen));
   }
   get cutoff(): number {
-    return this.runner.alive().length - (this.settings.knockoutsPerStage[this.runner.state.stage] ?? 0);
+    return this.runner.cutoff();
   }
 
   subscribe(fn: () => void) {
@@ -749,7 +751,7 @@ export class SoloMatch implements GameView {
     // (Alone, it has been "thinking" since your move went in: scoring your move counts toward it.)
     // (G-REX's fire has just burnt something: it plays out before the boss's move.)
     const burnt = !!snap.powers?.burnt?.some((b) => b.turn === snap.crowdMoves && (b.piece || b.fizzled));
-    const minThink = bossThinkMs(snap.board.history, snap.board.bases, burnt) - (this.alone && !burnt ? Date.now() - this.movedAt : 0);
+    const minThink = bossThinkMs(snap, burnt) - (this.alone && !burnt ? Date.now() - this.movedAt : 0);
     await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
     if (this.stopped) return;
     // As the turn passes to you, any power that comes with it (a freeze, a pie, the warning, the blizzard) plays out
@@ -771,7 +773,7 @@ export class SoloMatch implements GameView {
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
     // (No engine answer: he skips it, as online.)
     const pick = this.runner.playExtraMove(this.engines[0]).catch(() => this.runner.applyExtraMove(null));
-    const [played] = await Promise.all([pick, new Promise((r) => setTimeout(r, bossThinkMs(snap.board.history, snap.board.bases)))]);
+    const [played] = await Promise.all([pick, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
     if (this.stopped) return;
     if (!played) return this.nextRound();
     const showMs = powerMomentMs([{ kind: "extra" }]);
@@ -794,13 +796,14 @@ export class SoloMatch implements GameView {
   /**
    * Big Boy's Big Bounce (at the start of his turn, after your move): he gets ready (thinking) while this device's
    * engines score the candidate positions, then the bounce plays out (nobody's clock runs), then his move. No engine
-   * answer: the bounces play and nothing moves, as online.
+   * answer: the bounces play and nothing moves, as online. (Your move took his queen: its banner plays in this thinking,
+   * held for it, and not again in the thinking after the bounce: queenSlain.)
    */
   private async bounceTurn() {
     const snap = this.bossSnapshot();
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
     const bounce = this.runner.playBounce(this.engines).catch(() => this.runner.applyBounce(null));
-    await Promise.all([bounce, new Promise((r) => setTimeout(r, bossThinkMs(snap.board.history, snap.board.bases)))]);
+    await Promise.all([bounce, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
     if (this.stopped) return;
     const showMs = powerMomentMs([{ kind: "bounce" }]);
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
@@ -836,7 +839,7 @@ export class SoloMatch implements GameView {
   // ---------------- The Hidden Boss's phase 2 ----------------
 
   /** Testing (?phase=2): an admin's Hidden Boss starts at his phase change, skipping phase 1. */
-  private phase2Jump = typeof location !== "undefined" && new URLSearchParams(location.search).get("phase") === "2";
+  private phase2Jump = testParams().get("phase") === "2";
   /** Phase 2's boards (from the phase change on), and whether its clocks have started. */
   private phase2: Phase2Game | null = null;
   private phase2Playing = false;
@@ -1091,19 +1094,21 @@ export class SoloMatch implements GameView {
 
   private async score(move: string | null) {
     if (this.phase.kind !== "play") return;
-    if (this.timer) clearTimeout(this.timer);
     const { board, allowedMs: allowed } = this.phase;
     if (move !== null && Date.now() < this.playStartedAt - 300) return; // Before the clock starts.
     // Boss battle: only a move allowed this turn (a power's limits; the move the God King took back).
     if (move !== null && this.runner.boss && !(this.runner.crowdAllowed() ?? [move]).includes(move)) return;
     const now = Date.now();
     if (move !== null && this.frozen && now < this.frozen.until) return; // While the King strikes.
+    // (Only now, the move accepted: a refused one leaves the turn's timeout running, so the turn still ends.)
+    if (this.timer) clearTimeout(this.timer);
     const frozen = this.frozen ? Math.max(0, Math.min(now, this.frozen.until) - this.frozen.at) : 0;
     const thinkMs = Math.max(0, Math.min(now - this.playStartedAt - frozen, allowed));
     const usedPowerUp = this.hint !== null;
     const inFinal = !!this.runner.final;
     this.movedAt = now;
     this.progress.mark(HUMAN);
+    crumb(move ? `move ${move}` : "no move in time");
     if (this.live) {
       // Your pick shows straight away; the bots still thinking finish quickly (as they do on the leaderboard).
       const now = Date.now();

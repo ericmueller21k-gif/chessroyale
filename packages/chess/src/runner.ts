@@ -19,6 +19,9 @@ import {
   keepBoards,
   outcomesFromGroup,
   scoreGroup,
+  openingAllowance,
+  OPENING_ALLOWANCE,
+  type Allowance,
   stageComplete,
   stagePlan,
   type GroupEvaluation,
@@ -33,11 +36,14 @@ import {
   estimateRating,
   standingPoints,
   standings,
+  cutCount,
+  cutPlan,
   bossElo,
   bossStrength,
   bossThreat,
   chooseBoss,
   crowdFinalBoss,
+  rosterWithout,
   BOSS_POWERS,
   bossStumbleChance,
   bossStartPly,
@@ -58,7 +64,7 @@ import {
 import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./protocol.ts";
 import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
-import { applyMove, gameEnd, legalMoves, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
+import { applyMove, gameEnd, legalMoves, materialSlips, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { BOSS_BRAIN, bossBrainFor, type BossBrain, type BossBrainPlan } from "@chessroyale/core";
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
@@ -368,7 +374,8 @@ export class MatchRunner {
     // Which boss: the one picked, else a random playable one (not the one to avoid). One draw from the match's random
     // source, which also seeds its powers.
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
-    const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished, !!this.settings.bossHidden);
+    // (Never a boss that's resting: a kill switch, rosterWithout.)
+    const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, rosterWithout(this.settings.bossesOff), this.settings.bossUnfinished, !!this.settings.bossHidden);
     let crowdSide = sideToMove(board.fen);
     // A boss whose battle starts from the starting position (no opening moves), and one who always plays Black (Hollow):
     // if the usual pick made the crowd Black, he claims the dark side before move 1.
@@ -807,6 +814,7 @@ export class MatchRunner {
       this.opts.rng,
       this.settings,
       drawRuleFor(this.state.stage, this.settings),
+      this.allowanceFor(board.fen, evaluation.bestMove, playerIds.map((id) => picks[id] ?? null)),
     );
     const pickedExpected = playerIds.flatMap((id) => {
       const m = picks[id];
@@ -832,6 +840,22 @@ export class MatchRunner {
       ...(this.state.boss ? { king: king.plays, kingCalls: king.calls } : {}),
       ...(lastStand ? { lastStand } : {}),
       ...(powerTurn(this.state.boss) ? { power: true } : {}),
+    };
+  }
+
+  /**
+   * The opening allowance on a board's position, for each picked move (OPENING_ALLOWANCE, on the game's own move number:
+   * the position's fullmove number). A pick that gives up material against the best move by the exchange check gets
+   * none (`materialSlips`, run on the distinct picks only, and only while there's an allowance). Undefined once it's
+   * nothing.
+   */
+  private allowanceFor(fen: string, best: string, picks: readonly (string | null)[]): ((move: string) => Allowance) | undefined {
+    const points = openingAllowance(moveNumber(fen));
+    if (points <= 0) return undefined;
+    const slips = materialSlips(fen, best, picks.flatMap((m) => (m ? [m] : [])), OPENING_ALLOWANCE.materialPawns);
+    return (m) => {
+      const material = slips.get(m);
+      return material ? { points: 0, material } : { points };
     };
   }
 
@@ -1459,7 +1483,9 @@ export class MatchRunner {
     // strength: the crowd's plus its own offset (his is fixed). One draw from the match's random source either way, which
     // also seeds its powers.
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
-    const def = crowdFinalBoss() ?? chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
+    // (He or a random boss only while not resting: a kill switch, rosterWithout.)
+    const roster = rosterWithout(this.settings.bossesOff);
+    const def = crowdFinalBoss(roster) ?? chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, roster, this.settings.bossUnfinished);
     // (A boss who plays from the starting position: Hollow, the Hidden Boss; Big Boy too, less the pawn he eats.)
     const start = bossRules(def)?.opening;
     if (start?.fromStart) startPly = 0;
@@ -1578,7 +1604,10 @@ export class MatchRunner {
   /** Ends the stage: knockouts, then shrink to the most balanced boards. */
   endStage() {
     const plan = stagePlan(this.settings);
-    const nextBoards = plan[this.state.stage + 1]?.boards ?? 1;
+    // The plan's boards for the next stage, or more when ties at the cut line kept more players in (cutPlan): never more
+    // than groupSize a board on average, so groups keep their size (one board fewer each cut, as long as the numbers allow).
+    const survivors = this.alive().length - cutCount(this.state, this.settings);
+    const nextBoards = Math.max(plan[this.state.stage + 1]?.boards ?? 1, Math.ceil(survivors / this.settings.groupSize));
     // One board fewer each cut (finished games first, then the most lopsided); boards are never swapped.
     // Keep both sides to move as even as possible, so each color still has boards to play on.
     const status = this.state.boards.map((id) => boardStatus(this.boards.get(id)!));
@@ -1630,7 +1659,14 @@ export class MatchRunner {
     });
     const alive = standings(this.state, () => 0.5, this.settings);
     const out = this.state.players.filter((p) => !p.alive).sort((a, b) => (a.placement ?? 99) - (b.placement ?? 99));
-    return [...alive, ...out].map(row);
+    // Who the stage's cut would take now (ties at the line go through), so every screen draws the same line.
+    const cut = new Set(this.state.final || this.state.boss ? [] : cutPlan(this.state, alive, this.settings).out);
+    return [...alive, ...out].map((p) => (cut.has(p.id) ? { ...row(p), cut: true } : row(p)));
+  }
+
+  /** How many of those still in would go through if the stage's cut came now (ties at the line go through: cutPlan). */
+  cutoff(): number {
+    return this.alive().length - (this.state.final || this.state.boss ? 0 : cutCount(this.state, this.settings));
   }
 
   /**

@@ -8,7 +8,7 @@ import { CHAT_MOD } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 import { d1Sql, ensureSchema, userFromToken } from "./accounts.ts";
 import { SESSION_COOKIE, readCookie, signInRequired } from "./api.ts";
-import { esc, html, isAdmin, when } from "./admin.ts";
+import { adminPage, esc, isAdmin, when } from "./admin.ts";
 import { chatDecisions, chatPaused, chatPlayer, chatQueue, decideChat, pruneChatMod, type ChatLogRow, type ChatPlayerDetail, type ChatQueueRow, type ChatReportView } from "./chat-mod.ts";
 import { lobbyCodes, lobbyOf, type ChatModEnv } from "./chat-mod-api.ts";
 
@@ -48,10 +48,10 @@ export async function handleChatAdmin(request: Request, env: ChatModEnv, waitUnt
   const pm = url.pathname.match(PLAYER);
   if (pm) {
     const d = await chatPlayer(sql, pm[1]!, now);
-    return d ? html(playerPage(d, url.searchParams.get("note")), "Chat reports") : notFound();
+    return d ? adminPage("Chat reports", playerPage(d, url.searchParams.get("note"))) : notFound();
   }
   if (url.pathname === "/admin/chat") {
-    return html(listPage(await chatQueue(sql, now), await chatPaused(sql, now), await chatDecisions(sql), by), "Chat reports");
+    return adminPage("Chat reports", listPage(await chatQueue(sql, now), await chatPaused(sql, now), await chatDecisions(sql), by));
   }
   return notFound();
 }

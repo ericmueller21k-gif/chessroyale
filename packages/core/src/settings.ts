@@ -30,7 +30,10 @@ export type FinalFormat = "team" | "boss" | "duel";
 
 export interface Settings {
   mode: GameMode;
-  /** Crowd: two teams, 50 v 50, each playing one side all game (false: everyone picks for whichever side is to move). */
+  /**
+   * Crowd: two teams, 50 v 50, each playing one side all game. False only in a boss raid (RAID_SETTINGS): everyone
+   * picks the crowd's moves against the boss.
+   */
   crowdTeams: boolean;
   /** Crowd 50 v 50: before the game, everyone votes on how it ends and how fast it is (see votes.ts). */
   augments: boolean;
@@ -77,6 +80,12 @@ export interface Settings {
    */
   bossId: string;
   bossAvoid: string;
+  /**
+   * Bosses resting (kill switches: pauses.ts), by id: never met, at random or picked (a picked one is replaced by a
+   * random one), nor in the Crowd's boss final (another boss takes his place). Set by the server for a lobby, by the
+   * app for a solo game.
+   */
+  bossesOff?: readonly string[];
   /** Test switch (?power=freeze|blizzard|pie|funhouse|sparkler|candle): that power comes at once (an ultimate after its warning). */
   bossPowerTest: string;
   /**
@@ -247,6 +256,11 @@ export interface Settings {
   finalMovesPerPlayer: number;
   /** In the final, a missed move counts as this many points of loss. */
   finalMissLoss: number;
+  /**
+   * Testing only (the ?weakbots=1 switch, WEAK_BOTS): people rank above bots in the standings, so every cut takes bots
+   * first. Never for players.
+   */
+  peopleFirst?: boolean;
 }
 
 /**
@@ -272,11 +286,13 @@ export function moveClockAt(s: Pick<Settings, "moveClockSeconds" | "moveClockSte
   return seconds;
 }
 
-/** "Relaxed" is the default; "quick" shortens the reveal and the settling-in time on a new board. */
-export type Pace = "relaxed" | "quick";
-export const PACE_SETTINGS: Record<Pace, Partial<Settings>> = {
-  relaxed: {},
-  quick: { revealSeconds: 3, drawnMoveSeconds: 2.5, boardIntroSeconds: 2 },
+/**
+ * The test switch `?pace=quick` (the e2e and playtests, test-switches.ts): a shorter reveal and less settling in, on top
+ * of the mode's own pace. Players always play the mode's own pace (the Relaxed pace toggle went on Oct 15, 2026).
+ */
+export const QUICK_PACE: Record<GameMode, Partial<Settings>> = {
+  classic: { revealSeconds: 3, drawnMoveSeconds: 2.5, boardIntroSeconds: 2 },
+  crowd: { revealSeconds: 2, drawnMoveSeconds: 1.2, stageBreakSeconds: 4 },
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -372,11 +388,17 @@ export const DEFAULT_SETTINGS: Settings = {
   finalMissLoss: 25,
 };
 
-/**
- * Test switch ?weakbots=1 (solo, and a lobby you create): every bot at least this loose (`botSkillRange`), so a test
- * playing the engine's best move is sure to survive the cuts (to the Crowd's top 4, say). Never for players.
- */
+/** The bots' skills under the ?weakbots=1 test switch (WEAK_BOTS): every bot at least this loose (`botSkillRange`). */
 export const WEAK_BOT_SKILL: readonly [number, number] = [8, 32];
+
+/**
+ * Test switch ?weakbots=1 (solo, and a lobby you create): loose bots, and people ranked above bots (`peopleFirst`), so a
+ * test's player is sure to survive the cuts (to the Crowd's top 4, say). Loose bots alone stopped doing it once the
+ * opening allowance forgave every pick within 8 points (Oct 15): a test playing the engine's best move then lost the
+ * last cut to bots that had scored as well, whenever the judge's final numbers ranked one bot pick above its move
+ * (docs/decisions/2026-10-16-flaky-e2e-batch-2.md). Never for players.
+ */
+export const WEAK_BOTS: Pick<Settings, "botSkillRange" | "peopleFirst"> = { botSkillRange: WEAK_BOT_SKILL, peopleFirst: true };
 
 /** `count` bot skills spread evenly on a log scale across `botSkillRange`, strongest first. */
 export function botSkillSpread(count: number, settings: Settings = DEFAULT_SETTINGS): number[] {
@@ -395,12 +417,22 @@ export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRo
   stage === 0 ? s.firstStageRounds : s.roundsPerStage;
 
 /**
- * Crowd mode: 100 players on one board from the starting position, the most
- * popular pick always played. No cuts for the first 10 moves (20 plies), then
- * a cut after every move (2 plies) down to the final four, who play the 2v2.
- * Scores carry over all game (a stage is only one move long). 3 power-ups,
- * none earned.
+ * The opening allowance (Eric, Oct 15, 2026; docs/decisions/2026-10-15-opening-allowance-and-ties.md): early in a game a
+ * move's loss counts for points only beyond `points`, so a sound move off the engine's line costs nothing, while poor
+ * play still costs. The move number is the game's own (the position's fullmove number: "Move 6" on the top bar), the
+ * same in every mode: the whole allowance through move `flatThrough`, then falling in a line to nothing at move
+ * `goneBy` (nothing from there on). A move that gives up at least `materialPawns` pawns of material against the
+ * engine's best move by the exchange check (it leaves something to be taken, or passes up a capture that wins
+ * material: `materialSlips` in the chess package) gets no allowance at all. Measured in reports/opening-allowance.md.
+ * The FAQ and the screens read these numbers from here.
  */
+export const OPENING_ALLOWANCE = {
+  points: 8,
+  flatThrough: 10,
+  goneBy: 14,
+  materialPawns: 1,
+} as const;
+
 /**
  * Crowd 50 v 50 knockouts for each way to end: they leave 8 (team final), 4 (the boss final, against the Hidden Boss) or
  * 2 (duel); `crowdFinalists` says how many. The boss final's are the duel's cuts stopping at four (Eric, Oct 14: "the top
@@ -411,11 +443,17 @@ export const CROWD_KNOCKOUTS: Record<FinalFormat, readonly number[]> = {
   boss: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2],
   duel: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2, 2],
 };
-/** Crowd "everyone moves": down to 4 for the 2v2 final. */
-export const CROWD_EVERYONE_KNOCKOUTS: readonly number[] = [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2];
 
+/**
+ * Crowd mode: 100 players, 50 v 50, on one board from the starting position; each team picks its side's moves and the
+ * most popular pick is played. No cuts for the first 10 moves (20 plies), then a cut after every move (2 plies, half
+ * from each team) down to the ending the pre-game vote picked (CROWD_KNOCKOUTS). Scores carry over all game (a stage
+ * is only one move long). 3 power-ups, none earned.
+ */
 export const CROWD_SETTINGS: Partial<Settings> = {
   mode: "crowd",
+  // Always team turns (Crowd's "everyone moves" went on Oct 15, 2026); only a raid sets it false.
+  crowdTeams: true,
   lobbySize: 100,
   groupSize: 100,
   knockoutsPerStage: CROWD_KNOCKOUTS.team,
@@ -429,7 +467,7 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   powerUpsPerStage: 0,
   openingMoves: 0,
   // With DEFAULT_SETTINGS' 10-minute bank and +5 s: Rapid 10+5, the clock whenever there's no clock vote (votes off,
-  // everyone moves, raids). The vote's options are in votes.ts.
+  // raids). The vote's options are in votes.ts.
   moveClockSeconds: 20,
   boardIntroSeconds: 0,
   // One board from the starting position: no opening grid to show.
@@ -893,6 +931,22 @@ export type BossPowerSettings = {
 };
 
 /**
+ * A boss's fighting-game banners over the board: each power's (the rage warning, his passive, his ultimate), QUEEN
+ * SLAIN! and QUEEN DOWN!, "START!", and the Hidden Boss's "PHASE 2" and "5 SECONDS!". Each slides in, holds and slides
+ * off by its end (styles.css times the band's exit from it). Eric, Oct 15: every banner a second longer (2.5 s); Oct 16,
+ * a boss's a second shorter again: "when the bosses ult they are ulting while the banner is still up, same thing for
+ * Toy Blocks... Do 1 second less" (docs/decisions/2026-10-16-banner-timing.md). A power's banner ends sooner where the
+ * power itself starts sooner (the beat it gives way to, in its boss's file), so nothing it does plays under it. The
+ * God King's cut-ins and FISCHER RANDOM! keep 2.5 s.
+ */
+export const BOSS_BANNER = {
+  /** How long one shows (ms). */
+  ms: 1500,
+  /** "PHASE 2", as the Hidden Boss's phase change ends (its clocks start after it). */
+  phase2Ms: 1400,
+} as const;
+
+/**
  * How long every speech line stays up, and how lines take turns (Eric, Oct 10: Ginger's line came and went at once).
  * The rule for every boss's lines and the God King's, in one place (packages/app/src/speech.tsx): a line types out
  * (`typeMs` a character), then stays fully readable for `readMs` plus `perCharMs` a character, at most `maxReadMs`,
@@ -1078,15 +1132,9 @@ export function definedOnly<T extends object>(o: T): Partial<T> {
 }
 
 /** Settings for a mode (Classic is the default). */
-export function modeSettings(mode: GameMode, opts: { crowdTeams?: boolean; augments?: boolean } = {}): Partial<Settings> {
+export function modeSettings(mode: GameMode, opts: { augments?: boolean } = {}): Partial<Settings> {
   if (mode !== "crowd") return {};
-  return {
-    ...CROWD_SETTINGS,
-    ...(opts.crowdTeams !== undefined ? { crowdTeams: opts.crowdTeams } : {}),
-    ...(opts.augments !== undefined ? { augments: opts.augments } : {}),
-    // Everyone moves keeps the 2v2 final of the last four.
-    ...(opts.crowdTeams === false ? { knockoutsPerStage: CROWD_EVERYONE_KNOCKOUTS } : {}),
-  };
+  return { ...CROWD_SETTINGS, ...(opts.augments !== undefined ? { augments: opts.augments } : {}) };
 }
 
 export type Augment = "more" | "same" | "less";
@@ -1552,7 +1600,7 @@ export const GLOBAL_CHAT = {
 } as const;
 
 /**
- * Chat moderation (see DECISIONS.md, "Chat moderation for launch"): reports of chat lines, the moderators' decisions
+ * Chat moderation (docs/decisions/2026-10-16-chat-moderation.md; docs/areas/chat.md): reports of chat lines, the moderators' decisions
  * (the review page, /admin/chat), the automatic pause, and how long each record is kept. Chat is preset lines only;
  * the free text players see is display names, which the server's filter checks (server/src/text-filter.ts).
  */
@@ -1579,6 +1627,53 @@ export const CHAT_MOD = {
   keepResolvedDays: 30,
   /** A moderator's decision about a player is deleted this many days after it ended (a chat ban with no end stays). */
   keepDecisionsDays: 180,
+} as const;
+
+/**
+ * Friends and invites (docs/decisions/2026-10-15-friends-and-invites.md; docs/areas/accounts.md): add a friend from their profile
+ * (they accept or decline), invite anyone to your lobby or Squads party, block. Signed-in accounts only, where signing
+ * in is set up. The server enforces every number here.
+ */
+export const FRIENDS = {
+  /** Friends one account can have. */
+  max: 200,
+  /** Friend requests one account has waiting for an answer at once. */
+  maxPendingSent: 50,
+  /** A request nobody answered is dropped after this many days. */
+  requestDays: 30,
+  /** Friend requests one account can send in a day. */
+  requestsPerDay: 30,
+  /** Players one account can have blocked. */
+  maxBlocked: 500,
+  /** Invites one account can send in an hour. */
+  invitesPerHour: 60,
+  /** Inviting the same player again: not sooner than this. */
+  reinviteMs: 30_000,
+  /** An invite stays open this long (in the friend's list, and as a toast while it's new), then it's gone. */
+  inviteMinutes: 10,
+  /** The friends list refreshes this often while it's on screen (and at once when something new arrives for you). */
+  refreshMs: 60_000,
+  /** A new invite's toast stays this long unless it's tapped (the invite stays in the list until it expires). */
+  toastMs: 20_000,
+  /** The computer's live panel lists at most this many friends who are online. */
+  panelMax: 8,
+} as const;
+
+/**
+ * The age gate (Eric, Oct 16, 2026: "13 younger is guest only. If they lie then so be it, we did our part.";
+ * docs/decisions/2026-10-16-age-gate-and-real-money.md): before any sign-in, a neutral question asks for the birth
+ * month and year. Old enough: sign in. Younger: guest play only, under the default name and icon, and this device can't
+ * sign in. Self-declared; the birth date is never sent or stored, only the answer (age-gate.ts).
+ */
+export const AGE_GATE = {
+  /** The youngest age that may make an account (sign in), in whole years. */
+  minAge: 13,
+  /** The question's years go back this far from this year (newest first, none chosen to start with). */
+  years: 100,
+  /** An "old enough" answer lets this device sign in once, within this many minutes; then it's asked again. */
+  answerMinutes: 60,
+  /** A "too young" answer stays on this device this long (400 days: the most a browser keeps a cookie). */
+  tooYoungDays: 400,
 } as const;
 
 /**
@@ -1635,6 +1730,59 @@ export const CAPACITY = {
     perUser: { limit: 1_200, windowMs: 60_000 },
     /** PLAY and new lobbies (a player in line asks every 3 s). */
     play: { limit: 40, windowMs: 60_000 },
+    /** Friends' actions (requests, answers, invites, blocks, settings): FRIENDS has the daily and hourly caps. */
+    friends: { limit: 30, windowMs: 60_000 },
+  },
+} as const;
+
+/**
+ * Error capture and the feedback sheet (the `ops` delegate; docs/areas/ops.md, "Errors and player reports"): what a
+ * device sends, how POST /api/problems guards itself, and how D1 writes stay bounded in an error storm.
+ */
+export const OPS = {
+  client: {
+    /** Different errors one page load reports at most (each one once, however often it happens). */
+    maxErrorsPerPage: 10,
+    /** Errors wait this long to go in one request (or until the page is hidden: then sendBeacon). */
+    batchMs: 3_000,
+    /** The breadcrumbs kept: the last app events (screens and moments, moves sent). */
+    breadcrumbs: 20,
+  },
+  endpoint: {
+    /** A request's body, at most (bigger: 413). */
+    maxBytes: 20_000,
+    /** Errors in one request, at most (the rest are dropped). */
+    maxErrorsPerPost: 5,
+    /**
+     * Requests per window, counted per Worker instance: per address (generous, as for the API: many players can share
+     * one) and per account (its session). A page load sends at most two error requests.
+     */
+    errors: { perIp: { limit: 120, windowMs: 60_000 }, perUser: { limit: 10, windowMs: 60_000 } },
+    reports: { perIp: { limit: 30, windowMs: 3_600_000 }, perUser: { limit: 5, windowMs: 3_600_000 } },
+  },
+  store: {
+    /**
+     * Each Worker instance (and Durable Object instance) counts its errors in memory and writes them to D1 at most
+     * this often (the first at once), at most `maxRowsPerFlush` rows a time (the most frequent; the rest wait for the
+     * next write). Kept under 30 s: a flush waits in the request's waitUntil.
+     */
+    flushMs: 20_000,
+    maxRowsPerFlush: 5,
+    /** Different errors held in memory between writes, at most (more are dropped and logged as a number). */
+    maxGroups: 100,
+    /** The breadcrumbs an error's row keeps with its latest occurrence (a bug report keeps all `client.breadcrumbs`). */
+    sampleCrumbs: 10,
+    /** Player reports (bugs, feedback, ideas) each instance writes a minute, at most (one row each, written at once). */
+    maxReportsPerMinute: 20,
+    /**
+     * Caps for the whole database, whatever the instances (a flood from many addresses can't grow D1 without bound):
+     * new kinds of error an hour (one already stored keeps counting) and player reports a day, each in its insert.
+     * Under 0.9 GB in all over keepDays with every cap hit every hour (docs/areas/ops.md, "Small rows").
+     */
+    maxNewErrorsPerHour: 100,
+    maxReportsPerDay: 2_000,
+    /** Errors and player reports are deleted after this many days (the 15-minute cron). */
+    keepDays: 30,
   },
 } as const;
 

@@ -71,6 +71,49 @@ on Eric's account.
      where a teammate may still be thinking: squads can talk it over (on Discord, say) and help. Eric: helping is fine
      for now, "it is squads after all", so viewing stays free; players may weigh in, and it could be restricted later.
 
+## Launch readiness (the director's plan, Oct 15, 2026)
+
+At launch, AI sessions run the game day to day; Eric relays player reports and approves money, account and legal
+decisions. In this order:
+
+1. **Error capture and the feedback sheet.** Done (the ops lane): every device reports its errors, the server its own
+   (the Worker, the cron, every Durable Object's entry points); players report a bug (with diagnostics and a short id to
+   share), send feedback or suggest an idea; `/admin/ops` lists the top errors and the reports by kind. Bounded D1 writes, kept 30 days, no IP addresses or emails
+   (docs/areas/ops.md, "Errors and player reports").
+2. **A health report and `npm run ops:report`.** Done (the ops lane): an admin-only health view (`/admin/ops`, and
+   `/api/admin/health` for scripts through Cloudflare Access: the deployed version, live players and lobbies with
+   Squads, errors this hour and today, reports, the engine server's and fair play's budgets, a D1 check, Durable
+   Object errors) and a script that prints a short summary from hunchess.com, "Needs attention" first
+   (docs/areas/ops.md, "Health").
+3. **Alerts:** a cron self-check that emails Eric on spikes (errors, failures, budgets), reusing fair play's mailer
+   (`fairplay-mail.ts`), plus a daily scheduled AI triage session that reads the report and the new player reports.
+4. **Kill switches and rollback:** per mode, per boss and for the shop, plus a maintenance banner, through Worker
+   runtime variables (no deploy needed), and a tested one-command rollback to the previous deploy.
+5. **`RUNBOOK.md` for AI sessions:** what to check each day, what each alert means, the switches and the rollback, and
+   what to bring to Eric.
+6. **A D1 restore drill on staging** (Time Travel), and gradual or canary deploys.
+7. **The known blockers:**
+   - gate the test switches: done (Oct 15, #224; item (d) under the Hidden Boss's notes above);
+   - the engine container's Stockfish 17.1 against the browsers' 19;
+   - chat moderation (report and mute);
+   - the privacy policy and terms (Eric's sign-off);
+   - loot-box rules before any real-money crates.
+
+**Only Eric can do:**
+
+- Cloudflare billing and usage alerts (Billing → budget alerts; the suggested $20/month, and D1 and Workers Logs
+  usage notifications).
+- A read-only monitoring token for the AI sessions (Cloudflare API: Account Analytics and Workers Observability read).
+- At launch, when Access comes off the rest of the site: keep an Access application on the health path
+  (`hunchess.com/api/admin/health`) with the service-token policy, and give its AUD tag to a session for
+  `ACCESS_AUD` in `wrangler.jsonc` (today's is the whole site's application). Without it, `npm run ops:report` is
+  refused, and only admins signed in can read the view. Optional, any time: pin the view to the one service token by
+  adding the Worker secret `OPS_ACCESS_CLIENT_ID` (its client ID) in Cloudflare (Workers, chessroyale, Settings,
+  Variables and Secrets); unset, any service token the application admits may read it.
+- Any paid service (an uptime monitor, an error service, a paging service), if we ever want one: asked first with a
+  monthly price.
+- Legal sign-off: the privacy policy and terms, and the rules for crates before any real money.
+
 ## Later: Eric's ideas (Oct 9, 2026; not started, not queued)
 
 Eric: "too big a change for now". Recorded so they aren't lost; nothing gets built until he says so.
@@ -290,17 +333,18 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       - **(c) His name will change** (Eric: something like "a powerful foe"; "Hidden Boss" doesn't do him justice).
         Not decided. It's one string, his `name` in `BOSS_ROSTER` (`packages/core/src/boss.ts`): the vote's card, the
         FAQ and every screen take it from there.
-      - **(d) Before launch: the test switches (director's note, Oct 15).** The lobby-create playtest overrides
-        (`packages/server/src/index.ts`: `?weakbots`, `?format`, `?power`, `?rounds`, `?clock`, `?bossMoves`, `?keep`, …)
-        and the app's URL test switches (`overridesFromUrl` in `packages/app/src/App.tsx`: `?win`, `?phase`, `?mate`, …)
-        get gated behind an admin account or a test environment variable, or any lobby or solo game that uses one is
-        made unscored: no record, coins or rewards. Today anyone who reaches the site could make easy wins (loose bots,
-        a short game, a mate in one); harmless while Cloudflare Access lets only Eric in.
+      - **(d) The test switches: gated (built Oct 15; DECISIONS.md, "The test switches: admins and test servers
+        only").** The lobby-create playtest overrides (`?weakbots`, `?format`, `?rounds`, `?clock`, `?bossMoves`,
+        `?keep`, …), a queue's `?pool=`, a crate's forced roll and the app's address switches (`?win`, `?phase`,
+        `?mate`, `?debug`, …) work only for admins or where `TEST_SWITCHES` is on (local, e2e, staging); for anyone
+        else they're ignored, so no easy wins (docs/areas/ops.md, "Test switches").
 
 Added Oct 14, 2026 (Eric; notes only, nothing built):
 
 - **Friends and invites** (Eric, Oct 14: "we're gonna need like a, something where you can tap on somebody and just
-  add them as a friend").
+  add them as a friend"). **Built Oct 15** (docs/decisions/2026-10-15-friends-and-invites.md): requests accepted or declined, block,
+  invites to your lobby or party for anyone your setting allows, "Show when I'm online"; the open questions below are
+  answered there.
   - **Add a friend:** tap a player, then "Add friend". No chat with friends ("in today's day and age, it's not
     necessary").
   - **Friends online:** your friends who are online, in their own list above the players online.
@@ -322,7 +366,11 @@ Added Oct 14, 2026 (Eric; notes only, nothing built):
   real-phone check (`TESTING.md`, "Maia").
 - **privacy@hunchess.com:** forward it to yourself with Cloudflare Email Routing (free), or name another address.
 - **Workers Paid ($5 a month):** only when real traffic outgrows the free limits.
-- **Privacy policy and terms:** drafted at /privacy and /terms; Eric to read them over.
+- **Privacy policy, terms and copyright page:** drafts at /privacy, /terms and /copyright, written from the code (Oct
+  15). Each lists the decisions that are yours or a lawyer's: who runs HunChess (a person or company, a postal
+  address), the contact address, the minimum age outside the US (13 is decided and built: Eric, Oct 16), governing
+  law, a DMCA agent ($6 at the US Copyright Office), real-money purchases, the EU/UK points, and how long fair-play
+  records are kept.
 - **Real-phone testing** of matchmaking with friends.
 - **Art:** simple icons and emotes can be drawn in code; polished custom art would mean an artist or a paid pack.
 - **At launch (Eric, Oct 13-14):**

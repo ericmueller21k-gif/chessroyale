@@ -1,19 +1,21 @@
+import { useRef } from "preact/hooks";
 import type { Standing } from "../game.ts";
 import type { ChatFloat } from "../chat.ts";
 import { PlayerName } from "./PlayerName.tsx";
 import { LiveNumber } from "./LiveNumber.tsx";
+import { clockShown } from "../clock-text.ts";
 
 const pts = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
-export const clockText = (ms: number) => {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
+/** A row moving more places than this fades in at its new place rather than sliding there. */
+const JUMP_ROWS = 4;
 
 /**
  * The live leaderboard, styled like a racing timing tower. Rows slide to their
  * new places after every round; a red line marks the knockout cut, and the
  * players either side of it (the bubble) pulse. `compact` shows the top 5,
- * the bubble, you, and the bottom 5.
+ * the bubble, you, and the bottom 5. A row that moves more than JUMP_ROWS places
+ * fades in at its new place instead of sliding through the rows in between (a
+ * reveal can reorder fifty at once).
  */
 export function RaceTower({
   standings,
@@ -24,6 +26,7 @@ export function RaceTower({
   done,
   cutLabel = "Cut line",
   floats,
+  bank = true,
 }: {
   standings: readonly Standing[];
   cutoff: number;
@@ -42,6 +45,11 @@ export function RaceTower({
    * when it went to everyone.
    */
   floats?: ReadonlyMap<string, ChatFloat>;
+  /**
+   * The time bank column (off in the Hidden Boss's phase 2, from his phase change: each player's time is their board's
+   * own clock then, on its tag, and the bank would show a clock nobody plays on).
+   */
+  bank?: boolean;
 }) {
   const ROW = mini ? 22 : 30;
   const alive = standings.filter((s) => !s.out);
@@ -82,11 +90,21 @@ export function RaceTower({
     y += ROW;
   });
   if (knockouts && line === null && rows.length && !compact && !keepOnly) line = y;
+  // Rows that moved far since the last draw: drawn anew (a new key) where they land, fading in.
+  const last = useRef(new Map<string, { y: number; n: number }>());
+  const keys = new Map<string, string>();
+  for (const r of rows) {
+    const y1 = ys.get(r.id)!;
+    const was = last.current.get(r.id);
+    const n = was && Math.abs(y1 - was.y) > JUMP_ROWS * ROW ? was.n + 1 : (was?.n ?? 0);
+    last.current.set(r.id, { y: y1, n });
+    keys.set(r.id, n ? `${r.id}:${n}` : r.id);
+  }
   const shown = new Set(rows.map((r) => r.id));
   const away = floats ? [...floats].filter(([id]) => !shown.has(id)).map(([, f]) => f).slice(-3) : [];
 
   return (
-    <div class={`tower${compact ? " tower-compact" : ""}${mini ? " tower-mini" : ""}`} style={{ "--row": `${ROW}px` }}>
+    <div class={`tower${compact ? " tower-compact" : ""}${mini ? " tower-mini" : ""}${bank ? "" : " tower-nobank"}`} style={{ "--row": `${ROW}px` }}>
       <div class="tower-head">
         <span>Pos</span>
         <span>Player</span>
@@ -114,20 +132,24 @@ export function RaceTower({
           const podium = !r.out && i < 3 ? ` p${i + 1}` : "";
           return (
             <div
-              key={r.id}
-              class={`tower-row${r.isYou ? " you" : ""}${done?.has(r.id) ? " done" : ""}${done && !r.out && !done.has(r.id) ? " thinking" : ""}${zone ? " zone" : ""}${bubble ? " bubble" : ""}${r.out ? " out" : ""}${podium}`}
+              key={keys.get(r.id)}
+              class={`tower-row${keys.get(r.id) !== r.id ? " jump" : ""}${r.isYou ? " you" : ""}${done?.has(r.id) ? " done" : ""}${done && !r.out && !done.has(r.id) ? " thinking" : ""}${zone ? " zone" : ""}${bubble ? " bubble" : ""}${r.out ? " out" : ""}${podium}`}
               style={{ transform: `translateY(${ys.get(r.id)}px)` }}
             >
               <span class="t-pos">{r.out ? `${r.placement ?? "✕"}` : r.rank}</span>
               <span class="t-name">
-                {done?.has(r.id) && <span class="t-check">✓ </span>}
-                {mini ? r.name : <PlayerName name={r.name} uid={r.uid} you={r.isYou} bot={r.isBot} />}
-                {r.practice && <span title="Practice mode (unlimited power-ups)"> 💡</span>}
+                {done?.has(r.id) && <span class="t-check">✓</span>}
+                {mini ? <span class="t-name-text">{r.name}</span> : <PlayerName class="t-name-text" name={r.name} uid={r.uid} you={r.isYou} bot={r.isBot} />}
+                {r.practice && (
+                  <span class="t-practice" title="Practice mode (unlimited power-ups)">
+                    💡
+                  </span>
+                )}
               </span>
               <span class="t-pts">{r.out ? "out" : <LiveNumber value={r.points} format={pts} />}</span>
               <span class="t-avg">{r.out ? "" : pts(r.avg)}</span>
               <span class={`t-elo${r.rating !== null && r.rating === topRating ? " top" : ""}`}>{r.rating ?? "—"}</span>
-              <span class="t-bank">{r.out ? "" : clockText(r.bankMs)}</span>
+              <span class="t-bank">{r.out ? "" : clockShown(r.bankMs)}</span>
               <span class="t-pu">{r.out ? "" : r.practice ? "∞" : r.powerUps}</span>
               {floats?.get(r.id) && (
                 <span key={floats.get(r.id)!.key} class="t-float" aria-hidden="true">

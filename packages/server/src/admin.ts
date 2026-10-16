@@ -11,7 +11,7 @@
  */
 import { FAIRPLAY, crowdRate, skipReason, type FairMove, type FairSummary } from "@chessroyale/core";
 import { toSan } from "@chessroyale/chess";
-import { d1Sql, ensureSchema, userFromToken, type Sql, type User } from "./accounts.ts";
+import { DELETED_NAME, d1Sql, ensureSchema, userFromToken, type Sql, type User } from "./accounts.ts";
 import { SESSION_COOKIE, readCookie, type AccountEnv } from "./api.ts";
 import { caseOf, decide, decideAppeal, purgeEvidence, type Appeal, type Case, type CaseMailer } from "./fairplay.ts";
 import { deepCheckRun, type DeepSearch } from "./fairplay-deep.ts";
@@ -24,6 +24,11 @@ export interface AdminEnv extends AccountEnv {
   ADMIN_EMAILS?: string;
   /** The automated reviewer's bearer token: a Worker secret or a Secrets Store binding, like ADMIN_EMAILS. */
   FAIRPLAY_REVIEW_TOKEN?: string;
+  /**
+   * "1" (local, e2e and staging; never production): anyone may use the test switches (testSwitchesOn), as an admin
+   * may.
+   */
+  TEST_SWITCHES?: string;
 }
 
 /** A setting as a string (anything else, such as a Secrets Store binding nobody read, counts as unset). */
@@ -36,6 +41,15 @@ export function isAdmin(env: AdminEnv, user: Pick<User, "email"> | null): boolea
   if (!user?.email) return false;
   const list = text(env.ADMIN_EMAILS).split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean);
   return list.includes(user.email.toLowerCase());
+}
+
+/**
+ * Whether this person may use the test switches: playtest shortcuts that would make easy wins (a lobby's `?rounds=`,
+ * `?weakbots=1`, …: lobby-options.ts; a queue's own `?pool=`; a crate's forced Fischer or Shiny). An admin may, and
+ * anyone where TEST_SWITCHES is "1"; for everyone else they're ignored, silently (docs/areas/ops.md, "Test switches").
+ */
+export function testSwitchesOn(env: AdminEnv, user: Pick<User, "email"> | null): boolean {
+  return env.TEST_SWITCHES === "1" || isAdmin(env, user);
 }
 
 /** Constant-time comparison of the reviewer's token. */
@@ -77,8 +91,10 @@ export async function openCases(sql: Sql, now: number, status: "open" | "review"
         ? "1 = 1"
         : "c.status = ?";
   const rows = await sql.all<Case & { name: string }>(
-    `SELECT c.user_id, c.status, c.reason, c.opened_at, c.updated_at, c.decided_at, c.decided_by, u.name FROM fairplay_cases c
-     JOIN users u ON u.id = c.user_id WHERE ${where} ORDER BY c.updated_at DESC LIMIT 500`,
+    // (A ban outlives a deleted account: it's listed as a deleted player.)
+    `SELECT c.user_id, c.status, c.reason, c.opened_at, c.updated_at, c.decided_at, c.decided_by, COALESCE(u.name, ?) AS name FROM fairplay_cases c
+     LEFT JOIN users u ON u.id = c.user_id WHERE ${where} ORDER BY c.updated_at DESC LIMIT 500`,
+    DELETED_NAME,
     ...(status === "open" || status === "all" ? [] : [status]),
   );
   const out: CaseRow[] = [];
@@ -172,7 +188,8 @@ function evidenceMove(m: FairMove): EvidenceMove {
 }
 
 export interface CaseDetail {
-  player: { id: string; name: string; joinedAt: number; signedIn: boolean; email: string | null; onlineMatches: number };
+  /** (joinedAt null: the account was deleted and its fair-play file kept.) */
+  player: { id: string; name: string; joinedAt: number | null; signedIn: boolean; email: string | null; onlineMatches: number };
   case: Case | null;
   reports: { at: number; reason: string; match: string | null; reporter: { id: string; name: string; signedIn: boolean } }[];
   matches: { lobby: string | null; mode: string; playedAt: number; counted: number; perf: number | null; score: number; level: string; summary: FairSummary; moves: EvidenceMove[] | null; keepUntil: number | null }[];
@@ -184,11 +201,15 @@ export interface CaseDetail {
 
 /** Everything about one case: the player, reports, each match's signals and judged picks, the log and appeals. */
 export async function caseDetail(sql: Sql, userId: string, opts: { email: boolean; limit?: number } = { email: false }): Promise<CaseDetail | null> {
-  const u = await sql.first<{ id: string; name: string; created_at: number; email: string | null; google_sub: string | null }>(
+  const found = await sql.first<{ id: string; name: string; created_at: number; email: string | null; google_sub: string | null }>(
     "SELECT id, name, created_at, email, google_sub FROM users WHERE id = ?",
     userId,
   );
-  if (!u) return null;
+  // A deleted account whose fair-play file outlives it (banned or in review; account-data.ts): its case, log and
+  // device markers, under its old id.
+  const kept = found ? null : await caseOf(sql, userId);
+  if (!found && !kept) return null;
+  const u = found ?? { id: userId, name: DELETED_NAME, created_at: null, email: null, google_sub: null };
   const online = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM results WHERE user_id = ? AND online = 1", userId))?.n ?? 0;
   const reports = await sql.all<{ at: number; reason: string; match: string | null; id: string; name: string; email: string | null; google_sub: string | null }>(
     `SELECT r.at, r.reason, r.match, u.id, u.name, u.email, u.google_sub FROM reports r JOIN users u ON u.id = r.reporter
@@ -203,8 +224,9 @@ export async function caseDetail(sql: Sql, userId: string, opts: { email: boolea
   const log = await sql.all<{ at: number; action: string; by: string; reason: string | null }>("SELECT at, action, by, reason FROM fairplay_log WHERE user_id = ? ORDER BY at DESC, id DESC LIMIT 200", userId);
   const appeals = await sql.all<Appeal>("SELECT id, user_id, at, text, status, decided_at, decided_by, reply FROM fairplay_appeals WHERE user_id = ? ORDER BY at DESC", userId);
   const sameDevice = await sql.all<{ id: string; name: string; status: string | null }>(
-    `SELECT DISTINCT u.id, u.name, c.status FROM fairplay_devices d JOIN fairplay_devices o ON o.device = d.device AND o.user_id != d.user_id
-     JOIN users u ON u.id = o.user_id LEFT JOIN fairplay_cases c ON c.user_id = u.id WHERE d.user_id = ? LIMIT 20`,
+    `SELECT DISTINCT o.user_id AS id, COALESCE(u.name, ?) AS name, c.status FROM fairplay_devices d JOIN fairplay_devices o ON o.device = d.device AND o.user_id != d.user_id
+     LEFT JOIN users u ON u.id = o.user_id LEFT JOIN fairplay_cases c ON c.user_id = o.user_id WHERE d.user_id = ? LIMIT 20`,
+    DELETED_NAME,
     userId,
   );
   const parse = <T>(s: string | null): T | null => {
@@ -316,7 +338,7 @@ export async function handleAdmin(
   const cm = url.pathname.match(/^\/admin\/fairplay\/case\/([A-Za-z0-9_-]{1,64})$/);
   if (cm) {
     const d = await caseDetail(sql, cm[1]!, { email: true });
-    return d ? html(casePage(d, url.searchParams.get("note"))) : notFound();
+    return d ? adminPage("Fair play", casePage(d, url.searchParams.get("note"))) : notFound();
   }
   if (url.pathname === "/admin/fairplay") {
     const status = url.searchParams.get("status") ?? "open";
@@ -328,7 +350,7 @@ export async function handleAdmin(
       `SELECT l.user_id, l.at, l.action, l.by, l.reason, u.name FROM fairplay_log l LEFT JOIN users u ON u.id = l.user_id
        WHERE l.by != 'detection' AND l.by != 'reports' ORDER BY l.at DESC, l.id DESC LIMIT 40`,
     );
-    return html(listPage(cases, appeals, log, status, by));
+    return adminPage("Fair play", listPage(cases, appeals, log, status, by));
   }
   return notFound();
 }
@@ -342,8 +364,8 @@ export function policy() {
 
 export const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 export const when = (t: number | null | undefined) => (t ? new Date(t).toISOString().slice(0, 16).replace("T", " ") : "");
-/** An admin page (the chat review, chat-mod-admin.ts, uses it too): server-rendered, light and dark, phone-sized. */
-export const html = (body: string, title = "Fair play") =>
+/** An admin page (fair play's, ops'): server-rendered, light and dark, never framed or indexed. */
+export const adminPage = (title: string, body: string) =>
   new Response(
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
 <title>${esc(title)} · HunChess</title><style>
@@ -357,7 +379,7 @@ td.wrap{white-space:normal;min-width:180px}.pill{display:inline-block;border-rad
 .review,.banned{color:var(--bad)}.cleared{color:var(--ok)}.hard{font-weight:700}.skip{color:var(--muted)}
 form.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}input[type=text],textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);flex:1 1 260px}
 button{font:inherit;min-height:40px;padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}button.ban{border-color:var(--bad);color:var(--bad)}button.clear{border-color:var(--ok);color:var(--ok)}
-nav a{margin-right:12px}
+nav a{margin-right:12px}pre{white-space:pre-wrap;word-break:break-word;font-size:12px;margin:6px 0 0}details summary{cursor:pointer}
 </style></head><body><main>${body}</main></body></html>`,
     { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY" } },
   );
@@ -378,7 +400,7 @@ ${cases.length ? cases
     )
     .join("") : `<tr><td colspan="8" class="muted">Nothing here.</td></tr>`}</table></div>
 <h2>Recent decisions</h2><div class="card scroll"><table><tr><th>When</th><th>Player</th><th>Action</th><th>By</th><th>Reason</th></tr>
-${log.map((l) => `<tr><td>${when(l.at)}</td><td><a href="/admin/fairplay/case/${esc(l.user_id)}">${esc(l.name ?? l.user_id)}</a></td><td>${esc(l.action)}</td><td>${esc(l.by)}</td><td class="wrap">${esc(l.reason)}</td></tr>`).join("")}</table></div>`;
+${log.map((l) => `<tr><td>${when(l.at)}</td><td><a href="/admin/fairplay/case/${esc(l.user_id)}">${esc(l.name ?? DELETED_NAME)}</a></td><td>${esc(l.action)}</td><td>${esc(l.by)}</td><td class="wrap">${esc(l.reason)}</td></tr>`).join("")}</table></div>`;
 }
 
 function casePage(d: CaseDetail, note: string | null): string {
@@ -409,7 +431,7 @@ function casePage(d: CaseDetail, note: string | null): string {
   };
   return `<p><a href="/admin/fairplay">← Fair play</a></p><h1>${esc(d.player.name)}</h1>
 ${note ? `<div class="card">${esc(note)}</div>` : ""}
-<p class="muted">${esc(d.player.id)} · ${d.player.signedIn ? esc(d.player.email ?? "signed in (Google)") : "guest"} · joined ${when(d.player.joinedAt)} · ${d.player.onlineMatches} online matches</p>
+<p class="muted">${esc(d.player.id)} · ${d.player.joinedAt === null ? "the account was deleted; its fair-play file is kept" : `${d.player.signedIn ? esc(d.player.email ?? "signed in (Google)") : "guest"} · joined ${when(d.player.joinedAt)}`} · ${d.player.onlineMatches} online matches</p>
 <div class="card">Status: <b class="${esc(c?.status ?? "")}">${esc(c?.status ?? "no case")}</b> ${c ? `· ${esc(c.reason)} · updated ${when(c.updated_at)}${c.decided_by ? ` · last decided by ${esc(c.decided_by)}` : ""}` : ""}</div>
 ${appealForm}
 <h2>Decide</h2>${decision}

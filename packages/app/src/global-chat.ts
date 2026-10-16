@@ -1,3 +1,4 @@
+import { isBlocked } from "./friends.ts";
 import { GLOBAL_CHAT, chatSay } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 import { chatBlockText, mutes, setChatBlock } from "./chat-mod.ts";
@@ -53,9 +54,9 @@ export class GlobalChatStore {
     mutes.on(() => this.emit());
   }
 
-  /** The lines to show, oldest first (muted players' left out: chat-mod.ts, the same mutes as every chat). */
+  /** The lines to show, oldest first (muted players' left out, chat-mod.ts's mutes as in every chat, and blocked accounts'). */
   lines(): GlobalLine[] {
-    return mutes.count ? this.list.filter((l) => !mutes.has(l.from)) : this.list;
+    return this.list.filter((l) => !mutes.has(l.from) && !isBlocked(l.from));
   }
 
   /** New lines from the server (the live line's answer, or a post's). */

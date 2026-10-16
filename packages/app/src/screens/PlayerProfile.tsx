@@ -6,7 +6,8 @@ import { ItemArt } from "../components/Items.tsx";
 import { IconEditor, UserIcon } from "../components/PixelIcon.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { QuickChatPicks } from "../components/ChatPicks.tsx";
-import { account, fetchProfile, onAccountChange, reportPlayer, updateProfile, type PublicProfile } from "../account.ts";
+import { ProfileFriendActions } from "../components/Friends.tsx";
+import { account, fetchProfile, onAccountChange, reportPlayer, tooYoung, updateProfile, youngGuest, type PublicProfile } from "../account.ts";
 import type { ProfileTarget } from "../profile-nav.ts";
 import { ordinal } from "./StageBreak.tsx";
 
@@ -14,6 +15,7 @@ const nth = (n: number) => `${n}${ordinal(n)}`;
 
 /** "Online now", or when they were last seen. */
 function seenLine(p: PublicProfile, now = Date.now()): string {
+  if (p.hidden) return "Online status hidden";
   if (p.online) return "Online now";
   if (!p.lastSeen) return "Offline";
   const min = Math.round((now - p.lastSeen) / 60_000);
@@ -125,7 +127,7 @@ function Stats({ p, own }: { p: PublicProfile; own: boolean }) {
         ]
       : [
           [String(p.boss.raids), "raids"],
-          [String(p.boss.bossesBeaten), "bosses beaten"],
+          [String(p.boss.bossesBeaten), "tiers beaten"],
           [dash(p.boss.strikesSurvived), "strikes survived"],
           [dash(p.boss.lastStands), "Last Stands"],
           [pct(p.boss.survivedPct), "survived"],
@@ -162,13 +164,13 @@ function Bosses({ beaten }: { beaten: number[] }) {
   return (
     <section class="fd-section">
       <h2 class="fd-label">
-        BOSSES BEATEN · {beaten.length} / {BOSS_TIERS.length}
+        BOSS TIERS BEATEN · {beaten.length} / {BOSS_TIERS.length}
       </h2>
       <div class="fd-bosses">
         {BOSS_TIERS.map((elo) => {
           const won = beaten.includes(elo);
           return (
-            <div key={elo} class={`fd-boss${won ? " won" : ""}`} title={bossInfo(elo).name} aria-label={`${bossInfo(elo).name}, ${elo}: ${won ? "beaten" : "not yet"}`}>
+            <div key={elo} class={`fd-boss${won ? " won" : ""}`} title={`Boss tier ${elo}`} aria-label={`Boss tier ${elo}: ${won ? "beaten" : "not yet"}`}>
               <strong>{elo}</strong>
               <span>{won ? "beaten" : "—"}</span>
             </div>
@@ -191,6 +193,7 @@ function Recent({ p, mark }: { p: PublicProfile; mark?: number }) {
         const boss = r.mode === "boss";
         const place = boss ? (r.won === true ? "Won" : r.won === false ? "Lost" : r.survived === false ? "Out" : r.survived === true ? "Draw" : nth(r.placement)) : nth(r.placement);
         const gold = boss ? r.won === true : r.placement === 1;
+        // (A Crowd match with no team: everyone moves, a choice until Oct 15, 2026. Older records keep saying so.)
         const mode =
           r.mode === "crowd"
             ? `Crowd · ${r.team ? "50 v 50" : "everyone moves"}`
@@ -328,7 +331,7 @@ function ReportSheet({ p, match, onClose }: { p: PublicProfile; match?: string; 
 
 /**
  * A profile (docs/mockups/front-door/Profile.dc.html): one structure for everyone. Yours adds Edit name & icon,
- * Open locker and settings; someone else's adds Report (and Add friend, later). Nothing private is ever shown:
+ * Open locker and settings; someone else's adds Add friend, Invite to play, Block and Report. Nothing private is ever shown:
  * the server's public profile has no email, sign-in method or icon in it.
  */
 export function PlayerProfileScreen({
@@ -434,9 +437,12 @@ export function PlayerProfileScreen({
         </div>
         {own && (
           <div class="fd-card-actions">
-            <FdButton primary class="small" onClick={() => setSheet("edit")}>
-              Edit name &amp; icon
-            </FdButton>
+            {/* (Not for a guest on a device that answered the age question "too young": the default name and icon stay.) */}
+            {!youngGuest() && (
+              <FdButton primary class="small" onClick={() => setSheet("edit")}>
+                Edit name &amp; icon
+              </FdButton>
+            )}
             {onLocker && (
               <FdButton class="small" onClick={onLocker}>
                 Open locker
@@ -455,7 +461,7 @@ export function PlayerProfileScreen({
       <Recent p={p} mark={own ? target.match : undefined} />
       {own ? (
         <>
-          {me && !me.user.signedIn && config && (config.google || config.email) && (
+          {me && !me.user.signedIn && config && (config.google || config.email) && !tooYoung() && (
             <section class="fd-section">
               <h2 class="fd-label">KEEP YOUR PROFILE</h2>
               <div class="fd-panel">
@@ -466,17 +472,12 @@ export function PlayerProfileScreen({
           )}
           {onSettings && (
             <button type="button" class="fd-row-link" onClick={onSettings}>
-              Settings: sound, pace, Crowd options, how to play, your sign-in ›
+              Settings: sound, the board, quick chat, how to play, your sign-in ›
             </button>
           )}
         </>
       ) : (
-        <div class="fd-actions">
-          <FdButton disabled>Add friend (later)</FdButton>
-          <FdButton danger onClick={() => setSheet("report")}>
-            Report
-          </FdButton>
-        </div>
+        <ProfileFriendActions uid={p.id} name={p.name} onReport={() => setSheet("report")} />
       )}
       </div>
       {sheet === "edit" && <EditSheet onClose={() => setSheet(null)} />}

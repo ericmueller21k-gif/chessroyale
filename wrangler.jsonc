@@ -12,7 +12,7 @@
     "directory": "packages/app/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/admin/fairplay", "/admin/fairplay/*"]
+    "run_worker_first": ["/api/*", "/admin/fairplay", "/admin/fairplay/*", "/admin/ops", "/admin/ops/*"]
   },
   "durable_objects": {
     "bindings": [
@@ -48,15 +48,24 @@
     { "pattern": "www.hunchess.com", "custom_domain": true }
   ],
   "observability": { "enabled": true },
-  // Fair play's deep re-check of flagged players' moves (packages/server/src/fairplay-deep.ts).
+  // Cloudflare Access, for the health view's scripts (packages/server/src/access.ts: npm run ops:report): the Zero Trust
+  // team and the Access application whose service token they send. Both public (the login page shows them); no secret.
+  // At launch, when Access leaves the rest of the site, ACCESS_AUD becomes the health path's own application's.
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "odd-wildflower-a76c.cloudflareaccess.com",
+    "ACCESS_AUD": "647483892d23ca09bcddd71ba8e6c8b40a04f627ebfa4282c6504b0778ae30dd"
+  },
+  // Fair play's deep re-check of flagged players' moves (packages/server/src/fairplay-deep.ts), and old errors and
+  // player reports deleted (problems.ts).
   "triggers": { "crons": ["*/15 * * * *"] },
   // Keep variables set in the dashboard when a deploy runs (otherwise each deploy would wipe plain-text ones).
   "keep_vars": true,
   "env": {
     // Staging, for load tests only (never load-test production): its own Worker (chessroyale-staging on workers.dev),
     // Durable Objects and D1 database; no engine server, no sign-in (guests play online), the per-address rate
-    // limit off for a test from one machine. scripts/load/staging.sh creates it, deploys, and tears it down
-    // (DEPLOY.md, "Load testing"). The database id is filled in by that script.
+    // limit off for a test from one machine, the test switches on (a load test's own queue, ?pool=).
+    // scripts/load/staging.sh creates it, deploys, and tears it down (DEPLOY.md, "Load testing"). The database id is
+    // filled in by that script.
     "staging": {
       "routes": [],
       "workers_dev": true,
@@ -70,7 +79,7 @@
         ]
       },
       "d1_databases": [{ "binding": "DB", "database_name": "hunchess-staging", "database_id": "STAGING_D1_ID" }],
-      "vars": { "ENGINE_OFF": "1", "LOAD_TEST": "1" },
+      "vars": { "ENGINE_OFF": "1", "LOAD_TEST": "1", "TEST_SWITCHES": "1" },
       "observability": { "enabled": true }
     }
   }

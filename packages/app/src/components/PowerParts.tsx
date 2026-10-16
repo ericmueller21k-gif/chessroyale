@@ -6,6 +6,7 @@ import type { BossKit } from "../characters/kits.ts";
 import type { BossView } from "../game.ts";
 import { BossFace } from "./BossCharacter.tsx";
 import { BossEffect, type BoardItem } from "./BossEffect.tsx";
+import { bannerLength } from "./FightBanner.tsx";
 import { GodKingPortrait, squareXY } from "./GodKing.tsx";
 import type { Priority } from "../speech.tsx";
 
@@ -46,8 +47,12 @@ export interface MomentProps {
   orientation: "white" | "black";
   side: "w" | "b";
   kit: BossKit | null;
-  /** The power's banner (the God King's cut-in style). */
-  banner: (text: string, sub?: string, tone?: string) => JSX.Element;
+  /**
+   * The power's banner (the God King's cut-in style), from `from` ms into the moment (0: its start): on screen for
+   * BOSS_BANNER.ms, or until `until` ms into the moment where the power itself starts sooner (it's off the board by
+   * then, so nothing the power does plays under it). Null outside that time.
+   */
+  banner: (text: string, sub?: string, tone?: string, until?: number, from?: number) => JSX.Element | null;
   /** The boss casting by the board's top-left corner, its animation's `hit` cue landing at `hitAt` (ms into the moment). */
   cast: (hit: string, hitAt: number) => JSX.Element | null;
   /** The boss's animation for this moment, from its kit (e.g. freezeCast, pieThrow, check, blizzard, funhouse); null without one. */
@@ -60,8 +65,12 @@ export interface MomentUi {
   order: number;
   /** Which of the kit's moments it is. */
   kit: KitMoment;
-  /** The dock's word for it ("Freeze!"): the boss's own words are in its text box (speech.tsx). */
-  dock: string;
+  /**
+   * What it means for you, in the dock, only where no banner says it (a moment without a banner, or whose banner has no
+   * line under its name). Left out: the dock keeps the turn's own line (the boss's move). Never the power's name: the
+   * banner names it, and the boss's bubble is his character (DECISIONS.md, "Nothing said twice").
+   */
+  dock?: (m: Pick<Moment, "kind" | "squares" | "fizzled">) => string | null;
   /** When what it puts on a square appears there (ms, wall clock); undefined: it puts nothing on that square. */
   appearAt?: (m: Moment, square: string, orientation: "white" | "black") => number | undefined;
   /** It plays on a screen of its own (the funhouse, his extra move, the Big Bounce) when this says so. */
@@ -168,10 +177,13 @@ export function Flight({ name, anim, square, orientation, since, ms, aim = false
   );
 }
 
-/** The power's banner: the God King's cut-in style, the boss on the left and the God King on the right. */
-export function PowerBanner({ boss, side, text, sub, tone = "" }: { boss: BossView; side: "w" | "b"; text: string; sub?: string; tone?: string }) {
+/**
+ * The power's banner: the God King's cut-in style, the boss on the left and the God King on the right; off the board by
+ * `ms` (BOSS_BANNER.ms, or sooner where the power starts sooner: PowerMoment's `banner`).
+ */
+export function PowerBanner({ boss, side, text, sub, tone = "", ms }: { boss: BossView; side: "w" | "b"; text: string; sub?: string; tone?: string; ms: number }) {
   return (
-    <div class={`fight-banner king-cut power-cut ${tone}`} role="alert" aria-label={sub ? `${boss.name}: ${text} ${sub}` : `${boss.name}: ${text}`}>
+    <div class={`fight-banner king-cut power-cut ${tone}`} style={bannerLength(ms)} role="alert" aria-label={sub ? `${boss.name}: ${text} ${sub}` : `${boss.name}: ${text}`}>
       <div class="fb-flash" />
       <div class="fb-band">
         <div class="fb-lines" />

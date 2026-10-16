@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { createPortal } from "preact/compat";
+import { createPortal, memo } from "preact/compat";
 import { RECLUSE_PHASE2 } from "@chessroyale/core";
 import { moveLeft } from "@chessroyale/chess";
 import { RECLUSE, RECLUSE_BUST, RECLUSE_JUMP, palmOf } from "../characters/recluse.ts";
@@ -13,7 +13,7 @@ import { EFFECTS } from "../characters/power-art.ts";
 import { Board } from "../components/Board.tsx";
 import { SpriteAnim } from "../components/BossEffect.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
-import { BossDock } from "../components/BossDock.tsx";
+import { BossDock, clockLeft, type DockClockRun } from "../components/BossDock.tsx";
 import { useFrameNow } from "../components/Countdown.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
@@ -25,6 +25,7 @@ import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
 import { BossHeading } from "./Play.tsx";
 import { useStillKey } from "../hooks.ts";
+import { clockShown } from "../clock-text.ts";
 
 /**
  * The Hidden Boss's phase change and his phase 2 (rules: packages/chess/src/bosses/recluse-phase2.ts; the driver:
@@ -39,6 +40,13 @@ import { useStillKey } from "../hooks.ts";
 const QUARTER_BOARD = [1, 2, 0, 3] as const;
 /** Each board's share of the square once split (the rest is the cross between them). */
 const CELL = 0.48;
+/**
+ * A computer's four boards (played where the phase change leaves them): a little smaller, each with a row above it for
+ * its tag (who plays it and their clock), so no tag covers a board's back rank (Chess960's back rank is random). `cell`:
+ * a board's share of the square; `tag`: the row above each, in % of the square. The cross between the rows is what's left
+ * (1.8%), between the columns 11%. Written on the stage for styles.css (.rc-desk .rc-played).
+ */
+export const DESK = { cell: 0.445, tag: 4.6 } as const;
 
 const ease = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
@@ -48,20 +56,22 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
  * growing into a whole board at its corner (its clip opening to the full board as it shrinks toward its corner; the board
  * itself keeps its size: only a transform, which it measures without).
  */
-function quarterStyle(q: number, t: number): Record<string, string> {
+function quarterStyle(q: number, t: number, desk: boolean): Record<string, string> {
   const C = PHASE_CHANGE;
   const right = q % 2 === 1;
   const bottom = q >= 2;
   const part = ease((t - C.partAt) / (C.growAt - C.partAt));
   const grow = ease((t - C.growAt) / C.growMs);
   const gap = (1 - grow) * part * 3;
-  const scale = 1 - (1 - CELL) * grow;
+  const scale = 1 - (1 - (desk ? DESK.cell : CELL)) * grow;
+  // (A computer's top boards end a tag's row down from the square's top: DESK.)
+  const down = desk && !bottom ? DESK.tag * grow : 0;
   const half = 50 * (1 - grow);
   const clip = `inset(${bottom ? half : 0}% ${right ? 0 : half}% ${bottom ? 0 : half}% ${right ? half : 0}%)`;
   return {
     clipPath: clip,
     transformOrigin: `${right ? "100%" : "0"} ${bottom ? "100%" : "0"}`,
-    transform: `translate(${right ? gap : -gap}%, ${bottom ? gap : -gap}%) scale(${scale})`,
+    transform: `translate(${right ? gap : -gap}%, ${bottom ? gap : down - gap}%) scale(${scale})`,
   };
 }
 
@@ -313,7 +323,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
       <div class={`board-area${jolt ? " pw-crash" : ""}`}>
         <div class="opening-name">
           {/* (The title says "phase 2" already, and "the boss is beaten" read wrong as he rises: Chess960 once it splits.) */}
-          <BossHeading side="w" note={split ? "Chess960" : undefined} />
+          <BossHeading side="w" final={!match.settings.raid} note={split ? "Chess960" : undefined} />
         </div>
         <div class="board-row">
           {bossSide}
@@ -325,7 +335,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
             {/* (The four boards from the start, each clipped to its quarter: together they are the whole board until they
                 part, so the split mounts nothing new on a slow phone.) */}
             {QUARTER_BOARD.map((id, q) => (
-              <div key={q} class={`rc-cell rc-split rc-q${q}`} style={quarterStyle(q, t)}>
+              <div key={q} class={`rc-cell rc-split rc-q${q}`} style={quarterStyle(q, t, computer)}>
                 <Board fen={shuffled ? v.boards[id]!.fen : v.from} orientation="white" silent />
               </div>
             ))}
@@ -358,7 +368,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
               </span>
             )}
             {t >= C.arcAt && t < C.arcEnd + ARC_LIFE && <Arcs t={t} hands={CHANT_HANDS} />}
-            {t >= C.bannerAt && <FightBanner text="PHASE 2" sub="Win all four boards" tone="boss" sound="bannerStart" />}
+            {t >= C.bannerAt && <FightBanner text="PHASE 2" sub="Win all four boards" tone="boss" sound="bannerStart" ms={C.bannerMs} />}
           </div>
         </div>
       </div>
@@ -371,7 +381,8 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
         clock={null}
         // (Never what his bubble or the banner says at the same moment, Eric, Oct 15: his "Mind and machine" line had
         // "Mind and engine, one." under it, and "PHASE 2" "win all four boards" had "Phase 2!" "Every board must be
-        // won."; as the banner shows, the clock you'll have, which nothing else on screen says yet.)
+        // won."; as the banner shows, the clock you'll have, which nothing else on screen says yet: on two lines, so
+        // a phone shows it whole.)
         status={
           <>
             <span class="dock-line">
@@ -384,23 +395,17 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
                       ? "The boss rises!"
                       : t < C.bannerAt
                         ? "One board becomes four…"
-                        : `${clock(RECLUSE_PHASE2.bankSeconds * 1000)} on your clock, no added time`}
+                        : `${clockShown(RECLUSE_PHASE2.bankSeconds * 1000)} on your clock`}
               </strong>
             </span>
-            {/* (The second line kept, empty, so the box keeps its height.) */}
-            <span class="dock-line muted" />
+            {/* (The second line kept, empty until then, so the box keeps its height.) */}
+            <span class="dock-line muted">{t >= C.bannerAt ? "No added time." : ""}</span>
           </>
         }
       />
     </div>
   );
 }
-
-/** m:ss. */
-const clock = (ms: number) => {
-  const s = Math.ceil(ms / 1000);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
 
 const RESULT_WORD = (b: SimulBoardView) => {
   const r = b.result!;
@@ -410,9 +415,9 @@ const RESULT_WORD = (b: SimulBoardView) => {
 };
 
 /**
- * A board's tag: who plays it and their clock. Over a computer's four boards, at each one's corner; a phone's small
- * boards, just above each (their clock only: the board's button says whose it is), off their pieces (Eric, Oct 15). A
- * phone's big board: none on yours (your clock is the dock's), the player's name on one you're watching.
+ * A board's tag: who plays it and their clock. A computer's four boards: in the row above each (DESK), off its back rank;
+ * a phone's small boards, just above each (their clock only: the board's button says whose it is), off their pieces
+ * (Eric, Oct 15). A phone's big board: none on yours (your clock is the dock's), the player's name on one you're watching.
  */
 function Tag({ b, v, now, small, big }: { b: SimulBoardView; v: SimulView; now: number; small?: boolean; big?: boolean }) {
   if (big) return b.you ? null : <span class="rc-tag">{b.name}</span>;
@@ -423,7 +428,7 @@ function Tag({ b, v, now, small, big }: { b: SimulBoardView; v: SimulView; now: 
   return (
     <span class={`rc-tag${b.you ? " you" : ""}${running ? " running" : ""}${low ? " low" : ""}`}>
       {!small && <span class="rc-tag-name">{b.name} </span>}
-      <span class="rc-tag-clock">{clock(left)}</span>
+      <span class="rc-tag-clock">{clockShown(left)}</span>
     </span>
   );
 }
@@ -500,6 +505,8 @@ export function SimulScreen({ match }: { match: GameView }) {
   const still = useStillKey(match, now);
   const hud = useMemo(() => <Hud match={match} />, [match, still]);
   const bossSide = useMemo(() => <BossSide match={match} />, [match, still]);
+  // (Back to your board, the first: the same callback every frame, so the dock isn't drawn again for it.)
+  const back = useCallback(() => setWatch(match.simul?.boards[0]?.id ?? 0), [match]);
   if (!v) return null;
   const mine = v.boards[0]!;
   const big = v.boards.find((b) => b.id === watch) ?? mine;
@@ -508,19 +515,26 @@ export function SimulScreen({ match }: { match: GameView }) {
   // His ultimate as it comes: "5 SECONDS!" over the boards.
   // (On every board at once; nobody waits for it: the 5 s start now.)
   const ultOn = v.ultAt !== null && now - v.ultAt < PHASE2_ULT_BANNER_MS;
-  const ultBanner = ultOn && <FightBanner text={`${RECLUSE_PHASE2.ultMoveSeconds} SECONDS!`} sub="A move every 5 s, or a random one" tone="boss" sound="bannerStart" />;
+  // (Its name alone: what it means, "5 s a move, or a random one", is the dock's.)
+  const ultBanner = ultOn && <FightBanner text={`${RECLUSE_PHASE2.ultMoveSeconds} SECONDS!`} tone="boss" sound="bannerStart" ms={PHASE2_ULT_BANNER_MS} />;
 
+  // Your board's clock in the dock (DockClock): running on your move, holding (undefined) while he answers, none (null)
+  // once your board is decided or before the clocks start.
+  const run: DockClockRun | null | undefined =
+    mine.result || !v.playing ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + (v.ultAt !== null ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : mine.bankMs) } : undefined;
+  // (How many are won: the boss bar's right side.)
   const status = v.decided
     ? v.beaten
       ? "All four boards won!"
-      : `${v.won} of ${v.of} won: the boss wins`
+      : "The boss wins."
     : mine.result
       ? `Your board: ${RESULT_WORD(mine).toLowerCase()}. The others play on.`
       : yourTurn
         ? "Your move"
         : "The boss is thinking…";
   return (
-    <div class={`screen game boss-screen rc-simul ${computer ? "rc-desk" : "rc-phone"}${ultOn ? " rc-ult" : ""}`}>
+    // (The small boards' "5 s!" as his ultimate comes, from the setting: styles.css, .rc-ult .rc-mini.)
+    <div class={`screen game boss-screen rc-simul ${computer ? "rc-desk" : "rc-phone"}${ultOn ? " rc-ult" : ""}`} style={{ "--rc-ult-note": `"${RECLUSE_PHASE2.ultMoveSeconds} s!"` }}>
       {hud}
       {!computer && (
         <div class="rc-minis" role="list" aria-label="The other boards">
@@ -534,13 +548,13 @@ export function SimulScreen({ match }: { match: GameView }) {
       <div class="board-area">
         <div class="opening-name">
           {/* (How many are won: the boss bar's right side.) */}
-          <BossHeading side="w" note="Chess960" />
+          <BossHeading side="w" final={!match.settings.raid} note="Chess960" />
         </div>
         <div class="board-row">
           {bossSide}
           <div class="eval-bar rc-evalgap" aria-hidden="true" />
           {computer ? (
-            <div class="board-wrap rc-stage">
+            <div class="board-wrap rc-stage" style={{ "--rc-cell": `${DESK.cell * 100}%`, "--rc-tagrow": `${DESK.tag}%` }}>
               {QUARTER_BOARD.map((id, q) => (
                 <div key={q} class={`rc-cell rc-q${q} rc-played`}>
                   <SimulBoard match={match} v={v} b={v.boards[id]!} now={now} marks={v.boards[id]!.you} />
@@ -555,36 +569,75 @@ export function SimulScreen({ match }: { match: GameView }) {
           )}
         </div>
       </div>
-      <BossDock
+      <SimulDock
         match={match}
-        side="w"
-        king="gone"
-        // Your board's clock at the box's right: its bank (from his ultimate, the few seconds a move) running on your move,
-        // holding while he answers; none once your board is decided or before the clocks start.
-        clock={mine.result || !v.playing ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + (v.ultAt !== null ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : mine.bankMs) } : undefined}
-        status={
-          <>
-            <span class="dock-line">
-              <strong>{status}</strong>
-            </span>
-            <span class="dock-line muted">
-              {!computer && big.id !== mine.id ? (
-                <button type="button" class="rc-back" onClick={() => setWatch(mine.id)}>
-                  Back to my board
-                </button>
-              ) : mine.result ? (
-                ""
-              ) : v.ultAt !== null ? (
-                // (His ultimate: a few seconds a move, then a random one is played for you; the seconds are your clock.)
-                `${RECLUSE_PHASE2.ultMoveSeconds} s a move, or a random one`
-              ) : (
-                // (The slow moves themselves: the marks beside every board; your time: the clock at the box's right.)
-                ""
-              )}
-            </span>
-          </>
-        }
+        still={still}
+        secs={run ? Math.ceil(clockLeft(run, now) / 1000) : null}
+        status={status}
+        line={!computer && big.id !== mine.id ? "back" : mine.result ? "" : v.ultAt !== null ? "ult" : ""}
+        onBack={back}
+        runFrom={run ? run.startsAt : null}
+        runTo={run ? run.deadline : null}
+        held={run === undefined}
       />
     </div>
   );
 }
+
+/**
+ * Phase 2's dock, drawn when what it shows changes rather than every frame of the screen: its words, your clock's run,
+ * the whole seconds your clock shows at the screen's frame (`secs`, worked out from the same time as the boards' clocks,
+ * so the dock's clock and theirs tick in the same frame), and as the match changes and five times a second (`still`,
+ * for what the dock's other parts read as they're drawn). docs/decisions/2026-10-16-the-reveal-draws-only-what-changed.md.
+ */
+const SimulDock = memo(function SimulDock({
+  match,
+  status,
+  line,
+  onBack,
+  runFrom,
+  runTo,
+  held,
+}: {
+  match: GameView;
+  still: string;
+  secs: number | null;
+  status: string;
+  line: "back" | "ult" | "";
+  onBack: () => void;
+  runFrom: number | null;
+  runTo: number | null;
+  held: boolean;
+}) {
+  return (
+    <BossDock
+      match={match}
+      side="w"
+      king="gone"
+      // Your board's clock at the box's right: its bank (from his ultimate, the few seconds a move) running on your move,
+      // holding while he answers; none once your board is decided or before the clocks start.
+      clock={runFrom !== null && runTo !== null ? { startsAt: runFrom, deadline: runTo } : held ? undefined : null}
+      status={
+        <>
+          <span class="dock-line">
+            <strong>{status}</strong>
+          </span>
+          <span class="dock-line muted">
+            {line === "back" ? (
+              <button type="button" class="rc-back" onClick={onBack}>
+                Back to my board
+              </button>
+            ) : line === "ult" ? (
+              // (His ultimate: a few seconds a move, then a random one is played for you; the seconds are your clock.)
+              `${RECLUSE_PHASE2.ultMoveSeconds} s a move, or a random one`
+            ) : (
+              // (Your board decided, or the slow moves themselves: the marks beside every board; your time: the clock at
+              // the box's right.)
+              ""
+            )}
+          </span>
+        </>
+      }
+    />
+  );
+});

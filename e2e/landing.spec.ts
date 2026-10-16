@@ -1,7 +1,14 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 // The landing page shows only where sign-in is set up; locally there are no Google or Resend secrets, so the config is faked.
 const signInOn = { accounts: true, google: true, email: true, onlineNeedsSignIn: true };
+
+/** The age question that comes before the sign-in options (age-gate.spec.ts tests the gate): an adult's answer. */
+async function oldEnough(page: Page) {
+  await page.getByLabel("Birth month").selectOption("6");
+  await page.getByLabel("Birth year").selectOption("1990");
+  await page.getByRole("button", { name: "Continue" }).click();
+}
 
 test("landing: demo loop, sign-in, guests play bots only, FAQ and legal pages, invite links", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough");
@@ -18,6 +25,7 @@ test("landing: demo loop, sign-in, guests play bots only, FAQ and legal pages, i
   await expect(video).toBeVisible();
   expect((await page.request.get("/media/crowd-demo.mp4")).status()).toBe(200);
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0.2);
+  await oldEnough(page);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await expect(page.getByLabel("Email")).toBeVisible();
   // FAQ answers open.
@@ -26,7 +34,9 @@ test("landing: demo loop, sign-in, guests play bots only, FAQ and legal pages, i
   // Legal pages.
   await page.getByRole("link", { name: "Privacy" }).click();
   await expect(page.getByRole("heading", { name: "Privacy policy" })).toBeVisible();
-  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByRole("heading", { name: "DRAFT — not yet reviewed" })).toBeVisible();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Sign in to play online" })).toBeVisible();
   // A guest gets solo play against bots; online asks you to sign in. Crowd is the default mode.
   await page.getByRole("button", { name: "Play vs 99 bots as a guest" }).click();
   await expect(page.getByRole("radio", { name: /Crowd/ })).toHaveAttribute("aria-checked", "true");
@@ -51,6 +61,7 @@ test("landing: demo loop, sign-in, guests play bots only, FAQ and legal pages, i
   await page.route("**/api/lobby/ABCDE", (r) => r.fulfill({ json: { open: true, phase: "waiting" } }));
   await page.goto("/lobby/ABCDE");
   await expect(page.getByRole("heading", { name: "Sign in to join lobby ABCDE" })).toBeVisible();
+  await oldEnough(page);
   await page.getByRole("button", { name: "Continue with Google" }).click();
   await expect.poll(() => googleStart).toContain("next=%2Flobby%2FABCDE");
 });

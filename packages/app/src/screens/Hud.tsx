@@ -5,9 +5,9 @@ import { BrainDebug, EngineMove, UltimateTest } from "../components/BossDock.tsx
 import { COMPUTER_LAYOUT, MatchMenu } from "../components/MatchMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { exitFor } from "../match-exit.ts";
-import { clockText } from "../components/RaceTower.tsx";
+import { clockShown } from "../clock-text.ts";
 import { BoardsStrip } from "../components/TinyBoard.tsx";
-import { isCrowd, myBoardId, towerView, type GameView } from "../game.ts";
+import { bossAlone, isCrowd, myBoardId, towerView, type GameView } from "../game.ts";
 import { roundsInStage } from "@chessroyale/core";
 import { BossBar } from "./Boss.tsx";
 
@@ -31,7 +31,7 @@ function BankTime({ match }: { match: GameView }) {
     : me.bankMs;
   return (
     <span class={`hud-bank${bank < 60_000 ? " low" : ""}`} title="Your total time left (bank): +5 s every move, at most 30 s per move">
-      {clockText(bank)}
+      {clockShown(bank)}
     </span>
   );
 }
@@ -66,8 +66,10 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
   const boss = match.boss;
   const me = alive[alive.findIndex((x) => x.isYou)];
   const knockouts = cutoff > 0 && cutoff < alive.length;
-  // The score on the cut line: the last player who'd go through.
-  const cutScore = knockouts ? alive[cutoff - 1]!.points : null;
+  // The score on the cut line: the last player who'd go through. While nobody would go (ties at the line go through), the
+  // line is the last place, and the pill stays, so the top bar keeps its layout through the stage.
+  const cutStage = !match.final && !boss && (match.settings.knockoutsPerStage[match.stage] ?? 0) > 0;
+  const cutScore = cutoff > 0 && (knockouts || cutStage) && alive.length ? alive[Math.min(cutoff, alive.length) - 1]!.points : null;
   const inZone = knockouts && rank > cutoff;
   // Crowd: the move number on the board, and turns left until the cut.
   const crowd = isCrowd(match);
@@ -109,7 +111,8 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
               </>
             )}
           </span>
-          {rank > 0 && (
+          {/* (Boss alone: no place to show in a crowd of one.) */}
+          {rank > 0 && !bossAlone(match) && (
             <span class={`hud-rank ${inZone ? "danger" : ""}`}>
               P<LiveNumber value={rank} format={(x) => String(Math.round(x))} goodWhenDown />
               <span class="muted">/{match.final ? match.final.order.length : alive.length}</span>

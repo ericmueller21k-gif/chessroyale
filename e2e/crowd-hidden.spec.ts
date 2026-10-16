@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
+import { bossInText, crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
 import { createLobbyFromHome, engineTop, soloFromHome, submitMove, test, watchFor } from "./helpers.ts";
 import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
 
@@ -31,14 +31,14 @@ async function knockouts(page: Page, minutes: number, until: (p: Page) => Promis
 
 test("the vote: the boss final's card is his (his name and icon, the top 4), between Team final and Duel, and fits its card", async ({ page }) => {
   test.setTimeout(2 * 60_000);
-  await page.goto("/?debug&mode=crowd&turns=teams&augments=1");
+  await page.goto("/?debug&mode=crowd&augments=1");
   await soloFromHome(page);
   await expect(page.getByRole("heading", { name: "How does it end?" })).toBeVisible({ timeout: 30_000 });
   const cards = page.locator(".vote-card");
   await expect(cards).toHaveCount(3);
   await expect(cards.locator("strong")).toHaveText(["Team final", him.name, "Duel"]);
   await expect(cards.nth(1).locator(".vote-card-icon")).toHaveText(him.icon);
-  await expect(cards.nth(1).locator(".vote-card-blurb")).toHaveText(`Top ${crowdFinalists("boss")} team up against him`);
+  await expect(cards.nth(1).locator(".vote-card-blurb")).toHaveText(`Boss final: top ${crowdFinalists("boss")} team up against him`);
   // His zone on the board shows his icon too.
   await expect(page.locator(".vote-zone-icon").nth(1)).toHaveText(him.icon);
   // Nothing cut off: the label and blurb wrap inside the card.
@@ -55,9 +55,10 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  // (Two rounds a stage: with one, the team that hasn't moved yet is a coin flip at the first cut. Loose bots, ?weakbots=1:
-  // the strongest bots play the engine's best as often as you do, and only two of each team reach the final.)
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=2&clock=30&win=1&weakbots=1");
+  // (Two rounds a stage: with one, the team that hasn't moved yet is a coin flip at the first cut. ?weakbots=1: people rank
+  // above bots, so the cuts take bots first and you surely reach the final. Playing well isn't enough: the opening
+  // allowance leaves bots level with you, and only two of each team reach it. docs/decisions/2026-10-16-flaky-e2e-batch-2.md)
+  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=2&clock=30&win=1&weakbots=1");
   await soloFromHome(page);
   await knockouts(page, 8);
   // (The battle is set up at the last cut; its intro comes after the cut's screen. Its line counts the finalists.)
@@ -68,7 +69,7 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   expect(boss.name).toBe(him.name);
   expect(boss.raid).toBe(false);
   expect(await alive(page)).toBe(crowdFinalists("boss"));
-  expect(await mine(page), "you reached the final (the engine's best move every time, the bots loose)").toBe(true);
+  expect(await mine(page), "you reached the final (?weakbots=1: the cuts take bots first)").toBe(true);
   await expect(page.locator(".boss-name").filter({ hasText: him.name }).first()).toBeVisible();
   // The other finalists: phase 2's other players later.
   const mates: string[] = await page.evaluate(() => (window as any).match.standings().filter((s: any) => !s.out && !s.isYou).map((s: any) => s.name));
@@ -97,7 +98,7 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   await expect.poll(async () => (await page.evaluate(() => (window as any).match.simul))?.boards[0].toMove, { timeout: 60_000 }).toBe("crowd");
   await page.evaluate(() => (window as any).match.simulMove(0, "h5f7"));
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("results");
-  await expect(page.locator(".team-result")).toHaveText(`You beat ${him.name} on all 4 boards!`);
+  await expect(page.locator(".team-result")).toHaveText(`You beat ${bossInText(him.name)} on all 4 boards!`);
   // Your place is your place in the crowd (not "Victory!", which is Boss alone's headline).
   await expect(page.locator(".results h1")).toHaveText(/^\d+(st|nd|rd|th) of 100$/);
   expect(errors).toEqual([]);
@@ -108,7 +109,7 @@ test("online: a Crowd boss final meets him: his intro by name for everyone, four
   test.skip(test.info().project.name !== "desktop", "one run is enough: a computer");
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=2&clock=30&bossMoves=8&power=bullet&weakbots=1");
+  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=2&clock=30&bossMoves=8&power=bullet&weakbots=1");
   await createLobbyFromHome(page);
   await page.getByRole("button", { name: /Start with 1 player/ }).click();
   await knockouts(page, 9);
@@ -117,9 +118,9 @@ test("online: a Crowd boss final meets him: his intro by name for everyone, four
   expect(boss.name).toBe(him.name);
   expect(boss.board.ply).toBe(0);
   await expect(page.locator(".boss-name").filter({ hasText: him.name }).first()).toBeVisible();
-  // Four in the battle (the rest out at the cuts); you among them, having played the engine's best moves.
+  // Four in the battle (the rest out at the cuts); you among them (?weakbots=1: the cuts take bots first).
   expect(await alive(page)).toBe(crowdFinalists("boss"));
-  expect(await mine(page), "you reached the final").toBe(true);
+  expect(await mine(page), "you reached the final (?weakbots=1: the cuts take bots first)").toBe(true);
   const banner = await watchFor(page, { bullet: { selector: ".fight-banner.power-cut", text: /BULLET!/ } });
   // His chatter (recluse-talk.ts): this device drives it from its own view of the battle. When its first line shows.
   await page.evaluate((lines) => {

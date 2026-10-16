@@ -270,7 +270,7 @@ const rimFilter = (rim = 0, shade = 0): string => {
 
 function splitMoment({ boss, moment, now, t, orientation, banner }: MomentProps) {
   const split = boss.powers?.split;
-  if (!split?.pawn || !split.square) return <div class="power-moment pm-split">{t < 2300 && banner("SPLIT PAWN!", "Two for one", "saw")}</div>;
+  if (!split?.pawn || !split.square) return <div class="power-moment pm-split">{banner("SPLIT PAWN!", "He gets a second pawn", "saw", SPLIT.bannerMs)}</div>;
   const mine = boss.crowdSide === "w" ? "b" : "w";
   const pawn = centreOf(split.pawn, orientation);
   const half = centreOf(split.square, orientation);
@@ -305,7 +305,7 @@ function splitMoment({ boss, moment, now, t, orientation, banner }: MomentProps)
   const r2 = (n: number) => Math.round(n * 100) / 100;
   return (
     <div class="power-moment pm-split">
-      {t < 2300 && banner("SPLIT PAWN!", "Two for one", "saw")}
+      {banner("SPLIT PAWN!", "He gets a second pawn", "saw", SPLIT.bannerMs)}
       <div class="hb-pieces sw-layer" aria-hidden="true" data-look={SAWYER_LOOKS.split} data-split={t < SPLIT.crackAt ? "saw" : t < settledAt ? "apart" : "settled"}>
         {at?.shadow && <Shadow at={at.shadow.at} size={at.shadow.size} />}
         {air.map((h) => (
@@ -389,11 +389,11 @@ export function cutItems(boss: BossView, orientation: Orientation, now: number, 
   return out;
 }
 
-function cutMoment({ moment, t, banner, cast }: MomentProps) {
+function cutMoment({ moment, banner, cast }: MomentProps) {
   const [a, b] = moment.squares ?? [];
   return (
     <div class="power-moment pm-cut">
-      {t < 2500 && banner("SAW CUT!", a && b ? `No crossing ${a}–${b}` : undefined, "saw")}
+      {banner("SAW CUT!", a && b ? `No crossing ${a}–${b}` : undefined, "saw", SAW_CUT.cutAt)}
       {cast("cut", SAW_CUT.cutAt)}
     </div>
   );
@@ -460,7 +460,7 @@ function boardSawMoment({ boss, moment, t, banner }: MomentProps) {
           : { anim: "leap", since: moment.at + BOARD_SAW.offAt - LEAP.upAt };
   return (
     <div class="power-moment pm-boardsaw">
-      {t < 2500 && banner("BOARD SAW!", `No crossing the middle for ${BOSS_POWERS.boardSawTurns} turns`, "saw")}
+      {banner("BOARD SAW!", `No crossing the middle for ${BOSS_POWERS.boardSawTurns} turns`, "saw")}
       <div class="hb-pieces sw-layer" aria-hidden="true" data-boardsaw={t < BOARD_SAW.runAt ? "rev" : t < BOARD_SAW.splitAt ? "run" : "split"}>
         {at?.shadow && <Shadow at={at.shadow.at} size={at.shadow.size} />}
         {at && <Figure boss={boss} at={at.at} flip={false} anim={anim.anim} since={anim.since} id="boardsaw" />}
@@ -500,11 +500,11 @@ const splitLine = (kit: ReturnType<typeof bossKit>, m: Pick<Moment, "key">): str
 /** Sawyer's powers on screen. His rules: packages/chess/src/bosses/sawyer.ts. */
 export const SAWYER_UI = {
   id: "sawyer",
-  ultimate: { name: "the board saw" },
+  ultimate: { name: "the Board Saw" },
   moments: {
-    split: { order: 0, kit: "power", dock: "Split pawn!", line: splitLine, view: splitMoment },
-    cut: { order: 0, kit: "power", dock: "Saw cut!", appearAt: (m, square) => (m.squares?.includes(square) ? m.at + SAW_CUT.cutAt : undefined), view: cutMoment },
-    boardsaw: { order: 2, kit: "ultimate", dock: "Board saw!", view: boardSawMoment },
+    split: { order: 0, kit: "power", line: splitLine, view: splitMoment },
+    cut: { order: 0, kit: "power", appearAt: (m, square) => (m.squares?.includes(square) ? m.at + SAW_CUT.cutAt : undefined), view: cutMoment },
+    boardsaw: { order: 2, kit: "ultimate", view: boardSawMoment },
   },
   // Under the pieces: the cut's groove and tape, the gap down the middle. Over them: his split pawns drawn as halves or
   // small (once they've landed; as ordinary pawns with the morph's "grow"), and markers for tests and readers.

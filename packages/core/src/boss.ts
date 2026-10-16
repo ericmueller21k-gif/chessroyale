@@ -107,6 +107,20 @@ export interface BossDef {
    * like the top four always battle versus [him]"): `crowdFinalBoss`. Hidden from players everywhere else if `adminOnly`.
    */
   crowdFinal?: true;
+  /**
+   * Said with "the" in a sentence ("You beat the Hidden Boss!", "the Hidden Boss mocks it"), never in a label (his card,
+   * his bar): a name that's a title. `bossInText` adds it.
+   */
+  the?: true;
+}
+
+/**
+ * A boss's name as a sentence says it: "the Hidden Boss" (a name said with "the": `the`), "the Pawn Golem" (a name
+ * starting "The "), "Ginger". `start`: at the start of a sentence ("The Hidden Boss").
+ */
+export function bossInText(name: string, start = false, roster: readonly BossDef[] = BOSS_ROSTER): string {
+  const said = roster.find((b) => b.name === name)?.the ? `the ${name}` : name.replace(/^The /, "the ");
+  return start ? said[0]!.toUpperCase() + said.slice(1) : said;
 }
 
 /**
@@ -134,7 +148,7 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // from players (admins, Boss alone) except in the Crowd's boss final, which is always him (Eric, Oct 14). His strength
   // is fixed whatever the player's rating (BOSS_BRAIN.fixed: Maia at its top), so his offset is unused. The God King's
   // help doesn't work against him ("nohelp"), and his ultimate turns the clock into bullet ("bullet").
-  { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true },
+  { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
   { id: "knight", name: "The Black Knight", icon: "🐴", kit: null, offset: 0, powers: null },
@@ -168,6 +182,17 @@ export const crowdFinalBoss = (roster: readonly BossDef[] = BOSS_ROSTER): BossDe
 /** The bosses that can be met, in roster order. */
 export function playableBosses(roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] {
   return roster.filter(isPlayable);
+}
+
+/**
+ * The roster without the bosses resting (`off`: their ids; kill switches, pauses.ts), for choosing a match's boss and
+ * for the boss menu. If that would leave no playable boss, the whole roster: a match never fails for it (the ways in
+ * close first).
+ */
+export function rosterWithout(off: readonly string[] | undefined, roster: readonly BossDef[] = BOSS_ROSTER): readonly BossDef[] {
+  if (!off?.length) return roster;
+  const left = roster.filter((b) => !off.includes(b.id));
+  return playableBosses(left).length ? left : roster;
 }
 
 export const bossDef = (id: string | null | undefined): BossDef | null => (id ? (BOSS_ROSTER.find((b) => b.id === id) ?? null) : null);

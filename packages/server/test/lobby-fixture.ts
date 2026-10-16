@@ -4,7 +4,7 @@ import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 /** A small opening library (every opening the same line). */
 const line = sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1", "b5", "Bb3", "d6", "c3", "O-O", "h3", "Nb8", "d4", "Nbd7", "c4"]);
-const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
+export const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
   id: `o${i}`,
   eco: "C95",
   name: `Opening ${i}`,

@@ -1,13 +1,13 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, test, watchFor, watchSpans } from "./helpers.ts";
 
 /**
  * Big Boy, the baby boss, played alone on a phone and a computer with real taps: his snack before move 1 (he waddles
  * over and eats the crowd's d- or e-pawn), your move's knock first after a real think, his toy block (TOY BLOCK!, the
  * block on an empty square of your half, no move dots onto it, gone after its 3 turns), and the Big Bounce from the
  * admins' test trigger (BIG BOUNCE!, pieces knocked into the air, the crash, every piece settling into the new position,
- * then his move), its sounds through the mute switch.
+ * then his move), its sounds through the mute switch. Each banner is off the board before its power plays (Oct 16).
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers ?? null).catch(() => null);
@@ -83,6 +83,8 @@ test("Big Boy's snack before move 1, your move's knock, and his toy block (no do
   await page.waitForTimeout(2500);
   await page.evaluate(() => ((window as any).__soundLog = []));
   const banner = await watchFor(page, { block: { selector: ".fight-banner.power-cut", text: /TOY BLOCK!/ } });
+  // (Its banner off the board before he throws it: Eric, Oct 16, "he threw it and we couldn't even see".)
+  const order = await watchSpans(page, { banner: { selector: ".fight-banner.power-cut", text: /TOY BLOCK!/ }, flight: { selector: ".pw-flight.blockFly" } });
   await play(page, await allowedMove(page, ["g1f3", "b1c3"]));
   await expect.poll(async () => (await soundsHeard(page)).map((s) => s.split(":")[0]), { timeout: 10_000 }).toContain("move");
   expect((await soundsHeard(page))[0]!.split(":")[0]).toBe("move");
@@ -90,6 +92,9 @@ test("Big Boy's snack before move 1, your move's knock, and his toy block (no do
   // His reply; the 2nd turn begins with his toy block on an empty square of your half.
   await expect.poll(async () => (await banner.seen()).block, { timeout: 30_000 }).toBe(true);
   await yourMove(page);
+  const thrown = await order.spans();
+  expect(thrown.flight).not.toBeNull();
+  expect(thrown.banner!.last).toBeLessThan(thrown.flight!.first);
   const p2 = await powers(page);
   const sq: string = p2.block.square;
   expect(Number(sq[1])).toBeLessThanOrEqual(4);
@@ -154,6 +159,8 @@ test("Big Boy's Big Bounce (the admins' trigger): pieces knocked up, the crash, 
     jolt: { selector: ".board-area.pw-crash" },
     settled: { selector: '.bb-layer[data-bounce="settled"]' },
   });
+  // (Its banner off the board before he leaps: Eric, Oct 16, "they are ulting while the banner is still up".)
+  const order = await watchSpans(page, { banner: { selector: ".fight-banner.power-cut", text: /BIG BOUNCE!/ }, boy: { selector: ".bb-layer .bb-boy" } });
   await page.evaluate(() => ((window as any).__soundLog = []));
   await play(page, await allowedMove(page, ["g1f3", "b1c3"]));
   // At the start of his turn, before his move: the bounce.
@@ -166,6 +173,8 @@ test("Big Boy's Big Bounce (the admins' trigger): pieces knocked up, the crash, 
   await yourMove(page);
   const s = await seen.seen();
   expect(s).toEqual({ banner: true, boy: true, piece: true, crash: true, jolt: true, settled: true });
+  const leap = await order.spans();
+  expect(leap.banner!.last).toBeLessThan(leap.boy!.first);
   const end = await page.evaluate(() => (window as any).match.boss);
   // Not a move: the crowd's one and his one.
   expect(end.board.history.length).toBe(2);

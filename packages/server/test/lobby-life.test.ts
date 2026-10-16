@@ -11,7 +11,7 @@ import { setup } from "./lobby-fixture.ts";
 describe("lobby: closing (LOBBY_LIFE)", () => {
   const MIN = 60_000;
   const crowd = (format: "team" | "boss" | "duel") => ({
-    ...modeSettings("crowd", { crowdTeams: true, augments: false }),
+    ...modeSettings("crowd", { augments: false }),
     finalFormat: format,
     knockoutsPerStage: CROWD_KNOCKOUTS[format],
     // A real match's length (the test lobby's default is one round a stage).
@@ -139,7 +139,7 @@ describe("lobby: closing (LOBBY_LIFE)", () => {
   });
 
   it("a queue whose fill time passed while nobody was there starts as soon as someone comes back", () => {
-    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }) });
+    const L = setup({ ...modeSettings("crowd", { augments: true }) });
     L.core.setAuto(L.now + 60_000);
     L.core.connect(undefined, "Ann", "phone");
     const token = L.core.record.humans[0]!.token;

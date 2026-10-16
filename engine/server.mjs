@@ -21,8 +21,8 @@ sf.stdout.on("data", (chunk) => {
     listener?.(line);
   }
 });
-sf.on("exit", (code) => {
-  console.error(`stockfish exited (${code})`);
+sf.on("exit", (code, signal) => {
+  console.error(`stockfish exited (${signal ?? code})`);
   process.exit(1);
 });
 const send = (cmd) => sf.stdin.write(cmd + "\n");

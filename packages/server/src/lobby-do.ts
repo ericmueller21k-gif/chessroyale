@@ -15,6 +15,7 @@ import { chatBlock, type ReportedLine } from "./chat-mod.ts";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { isAdmin } from "./admin.ts";
+import { pausedBosses } from "./kill-switches.ts";
 
 const library = openings as unknown as Opening[];
 
@@ -75,15 +76,24 @@ export class Lobby extends DurableObject<Env> {
     });
   }
 
-  /** Quick chat: a person's icon, the shop items they own (their chat packs) and any chat pause, from their account. */
-  private async chatProfileOf(userId: string): Promise<{ icon: string | null; owned: string[]; block: ChatBlock | null }> {
+  /**
+   * Someone joining, from their account: their icon and the shop items they own (quick chat's packs, null: unread), and
+   * the rating stored on it (`users.rating`, a raid boss's strength; null: none yet). Read once, on joining, never per
+   * move. The two reads fail apart, so a failed shop read never costs the rating (the raid's boss would meet the prior).
+   * Also their chat's pause, if any (chat moderation; undefined: unread).
+   */
+  private async joiningProfileOf(userId: string): Promise<{ icon: string | null; owned: string[] | null; rating: number | null; block: ChatBlock | null | undefined }> {
     const sql = d1Sql(this.env.DB!);
-    const row = await sql.first<{ icon: string }>("SELECT icon FROM users WHERE id = ?", userId);
-    const icon = row && (isPixelIcon(row.icon) || (ICONS as readonly string[]).includes(row.icon)) ? row.icon : null;
     const now = Date.now();
-    const block = await chatBlock(sql, userId, now).catch(() => null);
-    this.chatChecked.set(userId, now);
-    return { icon, owned: (await shopState(sql, userId)).owned, block };
+    const [row, shop, block] = await Promise.all([
+      sql.first<{ icon: string; rating: number | null }>("SELECT icon, rating FROM users WHERE id = ?", userId).catch(() => null),
+      shopState(sql, userId).catch(() => null),
+      chatBlock(sql, userId, now).catch(() => undefined),
+    ]);
+    if (block !== undefined) this.chatChecked.set(userId, now);
+    const icon = row && (isPixelIcon(row.icon) || (ICONS as readonly string[]).includes(row.icon)) ? row.icon : null;
+    const rating = typeof row?.rating === "number" && Number.isFinite(row.rating) ? row.rating : null;
+    return { icon, owned: shop?.owned ?? null, rating, block };
   }
 
   private core(code: string): LobbyCore {
@@ -113,7 +123,7 @@ export class Lobby extends DurableObject<Env> {
           }
         }
       },
-    }, library);
+    }, library, undefined, { ...DEFAULT_SETTINGS, bossesOff: pausedBosses(this.env) });
   }
 
   /** Re-checks each board's close calls on the engine server (the host's numbers stand where it can't). */
@@ -154,6 +164,7 @@ export class Lobby extends DurableObject<Env> {
     const mail = caseMailer(await withSecrets(this.env));
     for (const r of [...left, ...(over ? core.humanResults() : [])]) {
       const userId = rec.accounts?.[r.playerId];
+      // (Someone who deleted their account mid-match gets nothing recorded: recordFairPlay and recordResult skip them.)
       if (!userId) continue;
       // Fair play: the match's signals and the player's level first (it may put them in review)…
       const moves = core.fairMoves(r.playerId);
@@ -322,10 +333,16 @@ export class Lobby extends DurableObject<Env> {
   }
 
   /** Whether the lobby is open, and where its match is (null: no such lobby, or it has closed). */
-  async status(): Promise<{ phase: "waiting" | "playing" | "over" } | null> {
+  /** Whether it's open and where it's at; `matchmade` (PLAY's queue, not a code's lobby) and `mode` for friends' invites. */
+  async status(): Promise<{ phase: "waiting" | "playing" | "over"; matchmade: boolean; mode: "crowd" | "raid" | "classic" } | null> {
     if (!this.record || (await this.closeIfDue())) return null;
     const r = this.record;
-    return { phase: r.phase === "results" ? "over" : r.phase === "lobby" && !r.auto?.filledAt ? "waiting" : "playing" };
+    const o = r.overrides ?? {};
+    return {
+      phase: r.phase === "results" ? "over" : r.phase === "lobby" && !r.auto?.filledAt ? "waiting" : "playing",
+      matchmade: !!r.auto,
+      mode: o.raid ? "raid" : o.mode === "crowd" ? "crowd" : "classic",
+    };
   }
 
   /**
@@ -443,8 +460,8 @@ export class Lobby extends DurableObject<Env> {
     if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId && !this.record.judges?.tasks) {
       msg = { ...msg, boards: await this.recheckOnServer(msg.boards) };
     }
-    // Quick chat: who's joining (their icon and chat packs), read before the lobby is touched, as above.
-    const chatProfile = msg.t === "hello" && this.env.DB && attached?.userId && !attached.guest ? await this.chatProfileOf(attached.userId).catch(() => null) : null;
+    // Who's joining (their icon, chat packs and stored rating), read before the lobby is touched, as above.
+    const joining = msg.t === "hello" && this.env.DB && attached?.userId && !attached.guest ? await this.joiningProfileOf(attached.userId) : null;
     // Chat moderation: a chatting player's pause, read again now and then (CHAT_MOD.recheckMs), as above.
     const uid = attached?.userId;
     const recheck = msg.t === "chat" && this.env.DB && uid && Date.now() - (this.chatChecked.get(uid) ?? -Infinity) >= CHAT_MOD.recheckMs;
@@ -467,7 +484,12 @@ export class Lobby extends DurableObject<Env> {
         return;
       }
       const before = this.record.humans.length;
-      const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice, msg.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1");
+      // Practice mode (unlimited power-ups) is for testers only (an admin, or a test server: Eric, Oct 15). A player's
+      // request is ignored, so nobody plays a ranked or fair-played match with the engine's moves on tap.
+      const practice = !!msg.practice && (this.env.TEST_SWITCHES === "1" || !!attached?.admin);
+      // Their rating is the one stored on their account, never the app's word: a low one claimed would meet a weaker raid
+      // boss. None yet, or no account: null, the prior (docs/decisions/2026-10-16-server-side-rating.md).
+      const result = core.connect(msg.token, msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1");
       // A new player took a seat: one held for the players on their way is theirs (the oldest).
       if (result.ok && this.record.humans.length > before) this.reservations.shift();
       if (!result.ok) {
@@ -476,12 +498,12 @@ export class Lobby extends DurableObject<Env> {
         return;
       }
       ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId, ...(attached?.admin ? { admin: true } : {}) });
-      if (chatProfile) {
-        core.chatOwned(result.playerId, chatProfile.owned);
-        core.chatStanding(attached!.userId!, chatProfile.block);
-        if (chatProfile.icon && this.icons.get(result.playerId) !== chatProfile.icon) {
-          this.icons.set(result.playerId, chatProfile.icon);
-          await this.ctx.storage.put(`icon:${result.playerId}`, chatProfile.icon);
+      if (joining) {
+        if (joining.owned) core.chatOwned(result.playerId, joining.owned);
+        if (joining.block !== undefined) core.chatStanding(attached!.userId!, joining.block);
+        if (joining.icon && this.icons.get(result.playerId) !== joining.icon) {
+          this.icons.set(result.playerId, joining.icon);
+          await this.ctx.storage.put(`icon:${result.playerId}`, joining.icon);
         }
       }
       // connect() sent the welcome before the socket was attached; send it again now it can be found.

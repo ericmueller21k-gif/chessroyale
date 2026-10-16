@@ -1,4 +1,10 @@
 :root {
+  /*
+   * The window's height for the page: all of it, less the maintenance banner while one shows (MaintenanceBanner.tsx
+   * sets --banner-h), so the banner never covers anything and nothing scrolls because of it.
+   */
+  --banner-h: 0px;
+  --app-h: calc(100dvh - var(--banner-h));
   --bg: #16181d;
   --surface: #20232a;
   --surface-2: #2a2e37;
@@ -52,6 +58,8 @@ body {
 }
 
 body {
+  /* (Room for the maintenance banner, when one shows: the page starts under it.) */
+  padding-top: var(--banner-h);
   -webkit-tap-highlight-color: transparent;
   -webkit-user-select: none;
   user-select: none;
@@ -84,7 +92,7 @@ p {
 
 .screen {
   width: var(--col);
-  min-height: 100dvh;
+  min-height: var(--app-h);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -362,6 +370,15 @@ p {
   text-align: center;
 }
 
+/* An opening's name (Classic) stays on one line, cut with "…" when it's long: a name that wrapped pushed the board down
+   a line on a phone when the next round put you on its board (docs/decisions/2026-10-15-flaky-e2e-batch.md). */
+.opening-title {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .board-wrap {
   position: relative;
   width: 100%;
@@ -377,7 +394,7 @@ p {
 }
 
 .board-area .board-wrap {
-  width: min(100%, calc(100dvh - 330px));
+  width: min(100%, calc(var(--app-h) - 330px));
   min-width: 260px;
 }
 
@@ -909,10 +926,10 @@ p {
     gap: 8px;
   }
   .screen.game .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 215px));
+    width: min(100%, calc(var(--app-h) - 215px));
   }
   .screen.game .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 48px), calc(100dvh - 215px));
+    width: min(calc(100% - 48px), calc(var(--app-h) - 215px));
   }
   .screen.game .play-footer,
   .screen.game .reveal,
@@ -933,11 +950,12 @@ p {
     height: 300px;
   }
   /* Quick chat sits under the panel beside the board (the vote results, the waiting banner, the power-up picks). The
-     panel keeps one height in every phase of a turn (room for five vote rows, yours and the result line), so the
-     chat under it stays put instead of jumping down at each reveal and back up at each move (Eric, Oct 9). */
+     panel keeps one height in every phase of a turn (room for five vote rows, yours, the result line and the opening
+     allowance's line under it), so the chat under it stays put instead of jumping down at each reveal and back up at
+     each move (Eric, Oct 9). */
   .screen.game:has(> .under-board) > .play-footer,
   .screen.game:has(> .under-board) > .poll {
-    min-height: 236px;
+    min-height: 262px;
     align-content: start;
   }
 }
@@ -951,7 +969,7 @@ p {
   width: 100%;
 }
 .board-row .eval-bar ~ .board-wrap {
-  width: min(calc(100% - 48px), calc(100dvh - 330px));
+  width: min(calc(100% - 48px), calc(var(--app-h) - 330px));
 }
 .eval-bar {
   position: relative;
@@ -1164,6 +1182,8 @@ p {
   position: relative;
   transition: height 0.5s ease;
 }
+/* (docs/decisions/2026-10-15-scoreboard-and-final-panel-layout.md. Opaque, the tower's own color under each row's tint: a row sliding past another covers it rather than printing
+   over it. A row that moves far fades in at its place instead: RaceTower's .jump.) */
 .tower-row {
   position: absolute;
   left: 0;
@@ -1171,11 +1191,23 @@ p {
   top: 0;
   height: calc(var(--row) - 2px);
   margin-top: 1px;
-  transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.3s;
+  transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
   border-left: 3px solid transparent;
+  background-color: #101216;
+  z-index: 1;
 }
 .tower-row:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.025);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.025));
+}
+/* (Under the sliding rows while it fades in, so a row sliding past it is never seen through it.) */
+.tower-row.jump {
+  z-index: 0;
+  animation: tower-jump 0.45s ease-out;
+}
+@keyframes tower-jump {
+  from {
+    opacity: 0;
+  }
 }
 .t-pos {
   height: 100%;
@@ -1197,12 +1229,31 @@ p {
   background: #b0703c;
   color: #fff;
 }
+/* (The name shrinks to "…", never the ✓ or 💡 beside it: the name is a button, so it gets the ellipsis itself. On
+   the whole cell, a moved player's name was cut as one block, leaving "✓ …".) */
 .t-name {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
   font-weight: 700;
   padding-left: 6px;
+}
+.t-name > * {
+  flex: none;
+}
+.t-name > .t-name-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.t-check {
+  margin-right: 4px;
+}
+.t-practice {
+  margin-left: 4px;
 }
 .t-pts {
   text-align: right;
@@ -1234,11 +1285,11 @@ p {
   font-weight: 800;
 }
 .tower-row.you {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  background-image: linear-gradient(color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--accent) 22%, transparent));
   border-left-color: var(--accent);
 }
 .tower-row.zone {
-  background: rgba(244, 160, 64, 0.1);
+  background-image: linear-gradient(rgba(244, 160, 64, 0.1), rgba(244, 160, 64, 0.1));
 }
 .tower-row.zone .t-pos {
   background: #6b4a1c;
@@ -1355,9 +1406,10 @@ p {
     display: block;
     flex: 0 0 360px;
     position: sticky;
-    top: 0;
+    /* (Under the maintenance banner, when one shows: --banner-h is 0 otherwise.) */
+    top: var(--banner-h);
     align-self: flex-start;
-    max-height: 100dvh;
+    max-height: var(--app-h);
     overflow: auto;
     padding: 14px 0 14px 14px;
   }
@@ -1610,6 +1662,10 @@ p {
 }
 .shade-tag.you span:first-child {
   background: #2f6fe4;
+}
+/* Animations off (Settings → Board): no see-through pieces, so the names carry the reel. */
+.shade-tag.reel-on span {
+  background: #1f9d5c;
 }
 .round-over {
   position: absolute;
@@ -1906,6 +1962,50 @@ p {
   min-height: 40px;
   font-size: 15px;
 }
+/* The phone's sheet: Report a bug on a row of its own, under Sound and Resign. */
+.mm-wide {
+  grid-column: 1 / -1;
+}
+/* A computer's title line with an admin's testing items has no room for one more button (they'd run over the title):
+   the report button gives way there; Settings and the phone's sheet still have it. */
+.match-tools:not(:empty) ~ .mm .mm-report {
+  display: none;
+}
+/* The error boundary's screen (components/Problems.tsx): its Reload button at its own height (.btn grows in a row). */
+.crash .btn {
+  flex: none;
+}
+/* ---- The feedback sheet (components/Problems.tsx): over any screen, a match's included ---- */
+.rp-scrim {
+  z-index: 75;
+}
+/* Its three kinds: the emoji over the words, on the field's color so the choice reads as one control. */
+.rp-kinds {
+  background: var(--fd-bg);
+}
+.rp-kinds button {
+  line-height: 1.15;
+  text-align: center;
+}
+.rp-kinds b {
+  font-size: 18px;
+  line-height: 1;
+}
+.rp-id {
+  margin: 4px 0;
+  font-size: 17px;
+  text-align: center;
+}
+.rp-id strong {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 22px;
+  letter-spacing: 2px;
+  user-select: all;
+}
+.rp-error {
+  color: var(--danger);
+  font-weight: 700;
+}
 /* A plain "Leave the match" for someone already out (the cut screen, watching, the solo play-out). */
 .leave-match {
   margin-top: 10px;
@@ -2094,7 +2194,8 @@ button.history-label {
 }
 .final-player {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
   align-items: center;
   padding: 6px 8px;
   border-radius: 8px;
@@ -2109,11 +2210,23 @@ button.history-label {
 .final-player.to-move {
   background: color-mix(in srgb, var(--good) 16%, transparent);
 }
+/* (The name shrinks to "…", never the crown before it, never into the score beside it: the name is a button, so it
+   gets the ellipsis itself; on the whole line it was cut as one block, leaving "👑 …".) */
 .final-name {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
   font-weight: 700;
+  white-space: nowrap;
+}
+.final-crown {
+  flex: none;
+  margin-right: 4px;
+}
+.final-name .player-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .final-avg {
   font-weight: 900;
@@ -2444,6 +2557,15 @@ button.history-label {
 .tower-mini .t-bank {
   display: none;
 }
+/* No bank column (RaceTower's `bank`: the Hidden Boss's phase 2, where each clock is its board's). */
+.tower-nobank:not(.tower-mini) .tower-head,
+.tower-nobank:not(.tower-mini) .tower-row {
+  grid-template-columns: 30px minmax(0, 1fr) 46px 40px 46px 20px;
+}
+.tower-nobank .tower-head span:nth-child(6),
+.tower-nobank .t-bank {
+  display: none;
+}
 .tower-mini .t-avg {
   font-size: 11px;
 }
@@ -2457,7 +2579,7 @@ button.history-label {
 
 @media (max-width: 899px) and (min-height: 520px) {
   .screen.game {
-    height: 100dvh;
+    height: var(--app-h);
     min-height: 0;
     overflow: hidden;
     gap: 6px;
@@ -2471,25 +2593,26 @@ button.history-label {
     gap: 8px;
   }
   .screen.game .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 330px));
+    width: min(100%, calc(var(--app-h) - 330px));
     min-width: 220px;
   }
   .screen.game .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 48px), calc(100dvh - 330px));
+    width: min(calc(100% - 48px), calc(var(--app-h) - 330px));
   }
   /* With the scoreboard minimized, the board takes the room. */
   .screen.game:has(.mini-tower.closed) .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 255px));
+    width: min(100%, calc(var(--app-h) - 255px));
   }
   .screen.game:has(.mini-tower.closed) .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 48px), calc(100dvh - 255px));
+    width: min(calc(100% - 48px), calc(var(--app-h) - 255px));
   }
   .screen.game .mini-tower {
     flex: 1 1 0;
     min-height: 28px;
     margin: 0 10px;
   }
-  .screen.game .mini-tower.closed {
+  .screen.game .mini-tower.closed,
+  .screen.game .mini-tower.one {
     flex: none;
   }
   .screen.game .hud,
@@ -2737,49 +2860,6 @@ button.history-label {
   color: var(--danger);
 }
 
-/* ---- Opening moves stepper on the first screen ---- */
-
-.stepper-field {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  color: var(--muted);
-}
-.stepper-field strong {
-  color: var(--text);
-}
-.stepper {
-  flex: none;
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
-  overflow: hidden;
-}
-.stepper button {
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: none;
-  color: var(--text);
-  font-size: 20px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.stepper button:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-.stepper output {
-  min-width: 28px;
-  text-align: center;
-  font-size: 18px;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-}
-
 /* After a round: the tiny boards light up one after another as every move lands. */
 .strip-slot.wave .tiny-board {
   animation: strip-wave 0.6s ease-out both;
@@ -2799,8 +2879,6 @@ button.history-label {
   }
 }
 
-/* ---- Sound lab ---- */
-
 .link-btn {
   align-self: center;
   border: none;
@@ -2811,56 +2889,6 @@ button.history-label {
   font-weight: 700;
   cursor: pointer;
 }
-.lab-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-.lab-list li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  border-radius: 12px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-}
-.lab-list li.chosen {
-  border-color: var(--accent);
-}
-.lab-play {
-  width: 40px;
-  height: 40px;
-  border: none;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-text);
-  font-size: 15px;
-  cursor: pointer;
-}
-.lab-name {
-  flex: 1;
-  font-weight: 700;
-}
-.lab-use {
-  height: 34px;
-  padding: 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-.lab-use:disabled {
-  color: var(--accent);
-  border-color: var(--accent);
-  cursor: default;
-}
-
 /* ---- Mode picker (first screen) ---- */
 
 .mode-pick {
@@ -2986,6 +3014,16 @@ button.history-label {
 .poll-result .round-score {
   font-size: 26px;
 }
+/* The opening allowance on your pick ("1.2 forgiven · opening"): its own line, never wrapped. */
+.allowance-line {
+  flex-basis: 100%;
+  display: block;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .crowd-cut {
   justify-content: center;
   text-align: center;
@@ -3090,6 +3128,7 @@ button.history-label {
 @media (max-width: 899px) and (min-height: 520px) {
   .screen.game .poll {
     gap: 3px;
+    margin: 0 10px;
   }
   .screen.game .poll-row {
     padding: 2px 8px;
@@ -3442,6 +3481,26 @@ button.history-label {
 .signin-row .btn {
   flex: none;
 }
+/* The age question: the month and the year share the row, 3 to 2 (measured at 320 px: "September" and a year each
+   have about 28 px to spare; evenly, the month had 7), Continue below them. */
+.signin-born select {
+  flex: 3 1 0;
+  min-width: 0;
+  font: inherit;
+  padding: 0 10px;
+  min-height: 50px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+.signin-born select:last-child {
+  flex-grow: 2;
+}
+.signin-ask,
+.signin-young {
+  margin: 0;
+}
 .profile-actions {
   display: flex;
   gap: 8px;
@@ -3577,6 +3636,10 @@ button.history-label {
 .legal {
   line-height: 1.5;
 }
+/* A readable line on a computer. */
+.screen.legal {
+  width: min(var(--col), 760px);
+}
 .legal h1 {
   margin: 8px 0 0;
 }
@@ -3595,6 +3658,62 @@ button.history-label {
 .legal .btn {
   flex: none;
   margin-top: 10px;
+}
+.legal h3 {
+  margin: 6px 0 0;
+  font-size: 15px;
+}
+.legal ol {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+}
+.legal li + li {
+  margin-top: 4px;
+}
+/* The draft notice: unmistakable at the top of both pages. */
+.legal-draft {
+  font-size: 14px;
+  line-height: 1.4;
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.legal-draft h3 {
+  margin: 2px 0 0;
+  font-size: 14px;
+}
+.legal-draft li + li {
+  margin-top: 2px;
+}
+.legal-draft h2 {
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+.legal-draft p,
+.legal-draft ol {
+  color: inherit;
+}
+.legal-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.legal-blank {
+  font-weight: 700;
+  color: var(--text, inherit);
+}
+.legal-other {
+  margin-top: 6px;
+}
+.legal-other a + a::before {
+  content: " · ";
+  display: inline-block;
+  white-space: pre;
 }
 @media (min-width: 900px) {
   .screen.landing {
@@ -4028,7 +4147,7 @@ button.history-label {
 /* Phones: the scoreboard minimized makes the game's board bigger; the vote's board matches it. */
 @media (max-width: 899px) and (min-height: 520px) {
   .screen.game.vote-screen.tower-closed .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 48px), calc(100dvh - 255px));
+    width: min(calc(100% - 48px), calc(var(--app-h) - 255px));
   }
 }
 /* Computers: the cards in the column beside the board, where the game's panel goes. */
@@ -4745,11 +4864,12 @@ button.history-label {
   }
 }
 /* Any screen but a computer's (where he stands by the board's corner: see the computer layout below): the God King on a
-   line of his own under the row, in its middle, so the box has the board's whole width (Eric, Oct 15). His words and
-   his menu open above the row, over the board's bottom edge as they did beside it (--gk-lift: the row and the gap), so
-   they never cover the box. Where the screen's column has room right of the board for him (his 58 px and a gap: a
-   phone on its side, its board smaller than the column), he stands beside the row instead, as he always has; BossDock
-   measures that room (`dk-beside`). */
+   line of his own under the row, in its middle, so the box has the board's whole width (Eric, Oct 15). His menu opens
+   above the row, over the board's bottom edge (--gk-lift: the row and the gap), never over the box; his words beside him
+   on his own line, to his right (the room up to the row's right edge), never over the board or the box: they had covered
+   ranks 1 and 2 while you chose a move (Oct 15). A long line runs down past his line, over what's under the dock. Where
+   the screen's column has room right of the board for him (his 58 px and a gap: a phone on its side, its board smaller
+   than the column), he stands beside the row instead, as he always has; BossDock measures that room (`dk-beside`). */
 @media (max-width: 899px), (max-height: 599px) {
   .boss-dock > .gk-unit {
     width: 58px;
@@ -4765,6 +4885,24 @@ button.history-label {
   .boss-dock > .gk-unit > .gk-bubble::after,
   .boss-dock > .gk-unit > .gk-command::after {
     right: calc(50% - 7px);
+  }
+  .boss-dock:not(.dk-beside) > .gk-unit > .gk-bubble {
+    top: 0;
+    bottom: auto;
+    left: calc(100% + 10px);
+    translate: none;
+    max-width: calc(var(--dk-w, 100vw) / 2 - 29px - 10px);
+    padding: 8px 9px 7px;
+    font-size: 8px;
+  }
+  .boss-dock:not(.dk-beside) > .gk-unit > .gk-bubble::after {
+    top: 13px;
+    right: auto;
+    bottom: auto;
+    left: -11px;
+    border: 0;
+    border-left: 3px solid #1a1406;
+    border-bottom: 3px solid #1a1406;
   }
   /* (Absorbed by the Hidden Boss, phase 2: his empty place takes no line; his last words still open above the row.) */
   .boss-dock > .gk-unit.gone {
@@ -4808,6 +4946,14 @@ button.history-label {
 .dock-line:empty {
   display: none;
 }
+/* The first line wraps to two rather than being cut ("The boss is think…" at 360 px): the box holds two of its lines and
+   the muted one under them. */
+.dk-text > .dock-line:first-child {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+}
 .boss-dock-status .gold {
   color: #d4a531;
 }
@@ -4833,13 +4979,13 @@ button.history-label {
     --gk-screen: var(--col);
     --gk-column: calc(var(--gk-screen) - 2 * var(--gutter) - 368px);
     --bs-need: calc(var(--bs-reach, 0px) - (100vw - var(--col)) / 2 - var(--gutter));
-    --gk-board: min(var(--gk-column) - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
+    --gk-board: min(var(--gk-column) - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
     /* (His box is 120 px; his cape reaches a few pixels past it.) */
     --gk-clear: max(0px, var(--gk-off) + 128px - (var(--gk-column) - var(--gk-board)) / 2 - 28px);
   }
   .screen.game:has(> .boss-dock):has(.board-row > .eval-bar) {
     --gk-off: 26px;
-    --gk-board: min(var(--gk-column) - 48px - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
+    --gk-board: min(var(--gk-column) - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
   }
   .screen.game:has(> .boss-dock) > .board-area {
     grid-row: 3;
@@ -4849,17 +4995,17 @@ button.history-label {
     grid-row: 4;
     align-self: start;
     width: 100%;
-    max-width: min(100% - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
+    max-width: min(100% - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
     justify-self: center;
   }
   .screen.game:has(.board-row > .eval-bar) > .boss-dock {
-    max-width: min(100% - 48px - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
+    max-width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
   }
   .screen.game:has(> .boss-dock) .board-area .board-wrap {
-    width: min(100% - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
+    width: min(100% - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
   }
   .screen.game:has(> .boss-dock) .board-row .eval-bar ~ .board-wrap {
-    width: min(100% - 48px - 2 * max(0px, var(--bs-need)), 100dvh - 310px);
+    width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
   }
   .screen.game:has(> .boss-dock) > .under-board,
   .screen.game:has(> .boss-dock) > .mini-tower {
@@ -5141,7 +5287,11 @@ button.history-label {
   border-bottom: 4px solid #fff7d6;
   background: linear-gradient(90deg, #7f1d1d, #dc2626 20%, #f97316 50%, #dc2626 80%, #7f1d1d);
   box-shadow: 0 0 0 3px #1a0a00, 0 10px 30px rgba(0, 0, 0, 0.55);
-  animation: fb-band 2.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  /* In over --fb-in, out over --fb-out, gone at --fb-ms (the banner's length: FightBanner and PowerBanner set it, a
+     boss's from BOSS_BANNER in settings.ts; 2.5 s without, the God King's cut-in and FISCHER RANDOM!). */
+  animation:
+    fb-band-in var(--fb-in, 330ms) cubic-bezier(0.2, 0.9, 0.25, 1) both,
+    fb-band-out var(--fb-out, 240ms) cubic-bezier(0.2, 0.9, 0.25, 1) calc(var(--fb-ms, 2.5s) - var(--fb-out, 240ms)) forwards;
 }
 .fight-banner.boss .fb-band {
   background: linear-gradient(90deg, #0b0612, #3b0764 22%, #7f1d1d 50%, #3b0764 78%, #0b0612);
@@ -5208,25 +5358,29 @@ button.history-label {
   text-shadow: 2px 2px 0 #1a0a00;
   animation: fb-sub 2.5s ease-out both;
 }
-/* Every banner holds about 2.5 s (Eric, Oct 15: "increase the banners for all banners by the extra second we
-   discussed"): the entrance and exit as they were at 1.5 s, the hold between them a second longer (the Hidden Boss's
-   "5 SECONDS!" had it first, Oct 14). Keyframe times are those of the old 1.5 s banner up to the hold's end, scaled to
-   2.5 s, with the second added after it. */
-@keyframes fb-band {
+/* A banner's length is its band's: in, held, and off by --fb-ms (a boss's 1.5 s, Eric, Oct 16: "Do 1 second less"; the
+   God King's cut-in and FISCHER RANDOM! 2.5 s, Oct 15). The entrances inside it (the slam, the face, the line, the
+   flash, the God King's portrait and target) all come in its first 0.6 s and then hold, whatever its length: their 2.5 s
+   keyframes are the 1.5 s banner's entrance times, scaled to 2.5 s. */
+@keyframes fb-band-in {
   0% {
     translate: -110% 0;
   }
-  8.4% {
+  63.64% {
     translate: 0 0;
   }
-  10.8% {
+  81.82% {
     translate: -1.5% 0;
   }
-  13.2%,
-  90.4% {
+  100% {
     translate: 0 0;
   }
-  100% {
+}
+@keyframes fb-band-out {
+  from {
+    translate: 0 0;
+  }
+  to {
     translate: 110% 0;
   }
 }
@@ -6390,6 +6544,10 @@ button.history-label {
   display: grid;
   gap: 4px;
 }
+/* (A crate's series, "Series 001", on its own line under its name.) */
+.crate-series {
+  display: block;
+}
 .crate-row-text strong {
   font-family: "Press Start 2P", ui-monospace, monospace;
   font-size: 11px;
@@ -7064,10 +7222,15 @@ button.history-label {
   background: #3b0309;
 }
 .fight-banner.last-stand-cut .fb-flash,
-.fight-banner.last-stand-cut .fb-band,
 .fight-banner.last-stand-cut .fb-text,
 .fight-banner.last-stand-cut .kc-portrait {
   animation-duration: 3.1s;
+}
+/* (Its band: in and out stretched the same way, 3.1 s in all.) */
+.fight-banner.last-stand-cut {
+  --fb-ms: 3.1s;
+  --fb-in: 409ms;
+  --fb-out: 298ms;
 }
 .fight-banner.last-stand-cut .kc-portrait {
   width: 23cqw;
@@ -7200,15 +7363,18 @@ button.history-label {
   font-size: 12px;
   font-weight: 600;
 }
-.dock-line.blunder-words .narrow-only {
+.dock-line.blunder-words .narrow-only,
+.dock-line.allowance-words .narrow-only {
   display: none;
 }
 /* (Up to 379 px: the dock's row is the board's width, its clock at the right; Oct 15.) */
 @media (max-width: 379px) {
-  .dock-line.blunder-words .wide-only {
+  .dock-line.blunder-words .wide-only,
+  .dock-line.allowance-words .wide-only {
     display: none;
   }
-  .dock-line.blunder-words .narrow-only {
+  .dock-line.blunder-words .narrow-only,
+  .dock-line.allowance-words .narrow-only {
     display: inline;
   }
 }
@@ -7511,7 +7677,7 @@ body:has(.fd-root) {
 .fd-root,
 .fd-splash {
   width: 100%;
-  min-height: 100dvh;
+  min-height: var(--app-h);
   background: var(--fd-bg);
   color: var(--fd-text);
   font-family: Archivo, system-ui, sans-serif;
@@ -7745,7 +7911,7 @@ button.fd-logo {
 
 /* -- Home (docs/mockups/front-door/Main.dc.html) -- */
 .fd-home {
-  min-height: 100dvh;
+  min-height: var(--app-h);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -8150,7 +8316,7 @@ button.fd-logo {
 
 /* -- Pages (settings, profile) -- */
 .fd-page {
-  min-height: 100dvh;
+  min-height: var(--app-h);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -8247,9 +8413,38 @@ button.fd-logo {
   padding: 0 12px;
   cursor: pointer;
 }
+/* A row link that goes to another page (the privacy policy, the terms): the same row as the buttons. */
+a.fd-row-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+/* Settings → ACCOUNT: deleting your account, and its confirmation (components/AccountData.tsx). */
+.fd-row-link.fd-row-danger {
+  color: var(--fd-danger);
+}
+.fd-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--fd-danger-line);
+}
+.fd-delete p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.fd-delete-error {
+  color: var(--fd-danger);
+}
+.fd-delete-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
 .fd-seg {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   background: var(--fd-panel);
   border-radius: 12px;
@@ -8270,40 +8465,12 @@ button.fd-logo {
   gap: 2px;
   cursor: pointer;
 }
-.fd-seg.three {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.fd-seg button span {
-  font-size: 11px;
-  font-weight: 400;
-  opacity: 0.8;
-}
 .fd-seg button.on {
   background: var(--fd-gold);
   color: var(--fd-gold-ink);
   font-weight: 800;
 }
-.fd-stepper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-}
-.fd-stepper button {
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--fd-panel-2);
-  color: var(--fd-text);
-  font-size: 20px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.fd-stepper button:disabled {
-  opacity: 0.4;
-}
-/* Settings → Sound: the Move sound and Capture sound pickers (each option a radio, with its own ▶). */
+/* Settings → Sound: the Move, Capture and Reveal sound pickers (each option a radio, with its own ▶). */
 .ps-picker {
   display: flex;
   flex-direction: column;
@@ -8375,12 +8542,6 @@ button.fd-logo {
 .ps-play:active,
 .ps-choice:active {
   filter: brightness(1.15);
-}
-.fd-stepper output {
-  min-width: 24px;
-  text-align: center;
-  font-weight: 800;
-  font-size: 17px;
 }
 .fd-rules {
   background: var(--fd-panel);
@@ -9183,8 +9344,9 @@ button.fd-seat {
   }
   .fd-side {
     position: sticky;
-    top: 0;
-    height: 100dvh;
+    /* (Under the maintenance banner, when one shows: --banner-h is 0 otherwise.) */
+    top: var(--banner-h);
+    height: var(--app-h);
     display: flex;
     flex-direction: column;
     gap: 22px;
@@ -9249,8 +9411,9 @@ button.fd-seat {
   }
   .fd-right {
     position: sticky;
-    top: 0;
-    height: 100dvh;
+    /* (Under the maintenance banner, when one shows: --banner-h is 0 otherwise.) */
+    top: var(--banner-h);
+    height: var(--app-h);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -9323,9 +9486,10 @@ button.fd-seat {
   }
   .fd-root.framed .fd-home {
     padding: 24px 24px 28px;
-    min-height: 100dvh;
+    min-height: var(--app-h);
   }
   .fd-root.framed .fd-home > .fd-top,
+  .fd-root.framed .fd-home > .fr-line,
   .fd-root.framed .fd-home > .fd-live {
     display: none;
   }
@@ -9354,7 +9518,7 @@ button.fd-seat {
   }
   /* The lobby: the queue screen's parts in a grid (the seats on the panel; your seat and Cancel side by side). */
   .fd-root.framed .fd-home .fd-queue {
-    --q-grid: min(100%, calc(100dvh - 330px));
+    --q-grid: min(100%, calc(var(--app-h) - 330px));
     min-height: 0;
     padding: 0;
     display: grid;
@@ -9443,7 +9607,7 @@ button.fd-seat {
     flex: none;
     display: grid;
     grid-template-columns: minmax(0, 540px) minmax(300px, 320px);
-    grid-template-rows: minmax(min(720px, calc(100dvh - 52px)), auto);
+    grid-template-rows: minmax(min(720px, calc(var(--app-h) - 52px)), auto);
     justify-content: center;
     gap: 24px;
   }
@@ -9520,7 +9684,7 @@ button.fd-seat {
     font-size: 13px;
   }
   .fd-root.framed .fd-home .fd-queue {
-    --q-grid: min(100%, calc(100dvh - 320px));
+    --q-grid: min(100%, calc(var(--app-h) - 320px));
   }
 }
 @media (min-width: 1440px) {
@@ -10079,7 +10243,7 @@ img.qicon {
 .qbubble {
   position: fixed;
   z-index: 45;
-  top: 0;
+  top: var(--banner-h);
   left: 50%;
   display: flex;
   align-items: center;
@@ -10400,10 +10564,10 @@ img.qicon {
     height: 28px;
   }
   .screen.game:has(.under-board.closed) .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 255px));
+    width: min(100%, calc(var(--app-h) - 255px));
   }
   .screen.game:has(.under-board.closed) .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 48px), calc(100dvh - 255px));
+    width: min(calc(100% - 48px), calc(var(--app-h) - 255px));
   }
 }
 
@@ -10582,7 +10746,8 @@ img.qicon {
 .qp-picked.emoji {
   display: grid;
   grid-template-columns: repeat(var(--n), minmax(0, 50px));
-  gap: 6px;
+  /* (Wider than the ✕'s overhang, 7 px with its ring, so it never sits on the next emoji.) */
+  gap: 10px;
 }
 .qp-picked.emoji .qp-chip {
   position: relative;
@@ -10988,7 +11153,8 @@ img.qicon {
   width: 14cqw;
 }
 @media (min-width: 900px) and (min-height: 600px) {
-  .boss-char.place-bar {
+  .boss-char.place-bar,
+  .bc-bar-bubble {
     display: none;
   }
   .boss-bar.has-char {
@@ -11065,9 +11231,21 @@ img.qicon {
 .bc-bubble.leaving {
   opacity: 0;
 }
-.place-bar .bc-bubble {
-  left: calc(100% + 6px);
-  top: 4px;
+/* A phone's boss bar: his words in his name's room, from just above the bar's bottom edge upwards (over his name and the
+   title line above the bar), never over the status at its right or the line and the board under it. (A box laid out at
+   its full size from its first letter would otherwise cover them for the whole line.) */
+.boss-bar.has-char .boss-name {
+  position: relative;
+  align-self: stretch;
+  align-content: center;
+}
+/* (At least his name's room high, so a short line covers the name and skulls whole, never half of them; nothing under it
+   is hidden, it's only covered while he speaks, as before.) */
+.bc-bar-bubble {
+  left: 0;
+  bottom: -2px;
+  min-height: calc(100% + 4px);
+  max-width: 100%;
 }
 .place-side .bc-bubble {
   right: 0;
@@ -13107,11 +13285,11 @@ button.sq-tiny {
   line-height: 1.35;
 }
 .sq-game .board-area .board-wrap {
-  width: min(100%, calc(100dvh - 318px));
+  width: min(100%, calc(var(--app-h) - 318px));
   min-width: 250px;
 }
 .sq-game.sq-relay .board-area .board-wrap {
-  width: min(100%, calc(100dvh - 362px));
+  width: min(100%, calc(var(--app-h) - 362px));
 }
 .sq-clockline {
   display: inline-flex;
@@ -13990,10 +14168,10 @@ button.sq-tiny {
     margin-top: 24px;
   }
   .screen.game.sq-game .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 230px));
+    width: min(100%, calc(var(--app-h) - 230px));
   }
   .screen.game.sq-game.sq-relay .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 250px));
+    width: min(100%, calc(var(--app-h) - 250px));
   }
 }
 
@@ -14517,18 +14695,19 @@ button.sq-tiny {
 .rc-stage > .rc-split {
   will-change: transform, clip-path;
 }
-/* Played on a computer: each board at its corner, 48% of the square (as the phase change leaves them). */
+/* Played on a computer: each board at its corner, as the phase change leaves them (Recluse2.tsx's DESK: --rc-cell of the
+   square, the top two a tag's row down, --rc-tagrow, so each board's tag sits above it, off its back rank). */
 .rc-stage > .rc-played {
   inset: auto;
-  width: 48%;
-  height: 48%;
+  width: var(--rc-cell, 48%);
+  height: var(--rc-cell, 48%);
 }
 .rc-stage > .rc-played.rc-q0 {
-  top: 0;
+  top: var(--rc-tagrow, 0);
   left: 0;
 }
 .rc-stage > .rc-played.rc-q1 {
-  top: 0;
+  top: var(--rc-tagrow, 0);
   right: 0;
 }
 .rc-stage > .rc-played.rc-q2 {
@@ -15055,6 +15234,22 @@ button.sq-tiny {
 .rc-tag.low .rc-tag-clock {
   color: #ff7a7a;
 }
+/* A computer's four boards: the tag in the row above each (DESK in Recluse2.tsx), at its left, off its back rank; its
+   text in the board's own width (cqw), so it fits the row at any size. The slow-move note likewise, at its right. */
+.rc-played .rc-tag {
+  top: auto;
+  bottom: calc(100% + 1px);
+  left: 0;
+  font-size: min(12px, 5.9cqw);
+  line-height: 1.3;
+}
+.rc-played .rc-slow-note {
+  top: auto;
+  bottom: calc(100% + 1px);
+  right: calc(100% - var(--board-size, 100%));
+  font-size: min(11px, 5.4cqw);
+  line-height: 1.3;
+}
 /* A phone's small boards: the clock just above each, off its pieces (Eric, Oct 15), in the room over the row. */
 .rc-mini .rc-tag {
   top: auto;
@@ -15114,9 +15309,10 @@ button.sq-tiny {
   background: none;
   cursor: pointer;
 }
-/* His ultimate, on a phone's small boards too: "5 s!" across each as the banner shows over yours. */
+/* His ultimate, on a phone's small boards too: "5 s!" across each as the banner shows over yours (the seconds from the
+   setting: --rc-ult-note, set by the screen). */
 .rc-ult .rc-mini::after {
-  content: "5 s!";
+  content: var(--rc-ult-note, "5 s!");
   position: absolute;
   inset: 0;
   z-index: 10;
@@ -15214,7 +15410,7 @@ button.sq-tiny {
   border-color: #ffd451;
 }
 .screen.game.rc-phone .board-row > .board-wrap {
-  width: min(100%, calc(100dvh - 440px));
+  width: min(100%, calc(var(--app-h) - 440px));
 }
 .rc-back {
   padding: 0;
@@ -15224,4 +15420,214 @@ button.sq-tiny {
   font: inherit;
   text-decoration: underline;
   cursor: pointer;
+}
+
+/*
+ * -- Friends and invites (components/Friends.tsx, screens/Friends.tsx; DECISIONS.md, "Friends and invites") --
+ * A friend's row (dot, name, status, buttons), the phone home's line above the live line, the computer's live panel
+ * section, the new invite's toast, and the badge. Every class starts with fr-.
+ */
+.fr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 14px;
+  background: var(--fd-panel);
+}
+.fr-row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+.fr-row-text .fr-name {
+  font-weight: 800;
+  max-width: 100%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.fr-status {
+  font-size: 12.5px;
+  color: var(--fd-muted);
+}
+.fr-row-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fr-row-actions .fd-btn.small {
+  padding: 0 12px;
+}
+.fr-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--fd-green);
+}
+.fr-dot.busy {
+  background: var(--fd-gold);
+}
+.fr-dot.off {
+  background: var(--fd-dim);
+}
+.fr-dot.hidden {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--fd-dim);
+}
+.fr-badge {
+  flex: none;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font: 800 12px/1.4 Archivo, system-ui, sans-serif;
+  white-space: nowrap;
+}
+/* The phone home's line, above the live line. */
+.fr-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--fd-panel);
+  color: var(--fd-text);
+  font: 600 14px Archivo, system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.fr-icon {
+  flex: none;
+  color: var(--fd-gold-text);
+}
+.fr-line-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fr-line-text span {
+  color: var(--fd-sub);
+  font-weight: 500;
+}
+.fr-chevron {
+  flex: none;
+  color: var(--fd-muted);
+  font-size: 20px;
+  line-height: 1;
+}
+/* The computer's live panel: friends online, above the live line. */
+.fr-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fr-panel-head .fr-all {
+  margin-left: auto;
+  font-size: 13px;
+}
+.fr-panel .fr-row {
+  min-height: 52px;
+  padding: 4px 6px 4px 12px;
+}
+/* A new invite, at the top of a front-door page (never over a match). */
+.fr-toast {
+  position: fixed;
+  z-index: 65;
+  top: calc(env(safe-area-inset-top) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 16px;
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--fd-line);
+}
+.fr-toast-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.3;
+}
+.fr-toast-x {
+  flex: none;
+  background: var(--fd-panel);
+}
+.fr-invite-friends {
+  width: 100%;
+}
+.fr-setting-head {
+  padding: 2px 2px 0;
+}
+.fr-note {
+  text-align: center;
+}
+
+/*
+ * The maintenance banner (MaintenanceBanner.tsx): a slim band at the top of every screen, ✕ to hide it. The page
+ * starts under it (--banner-h: body's padding, --app-h), so it covers nothing; a sheet or menu opened over the page
+ * (z-index 50 and up) covers it in turn.
+ */
+.maint-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 48;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: calc(6px + env(safe-area-inset-top)) 6px 6px 14px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  box-shadow: var(--shadow);
+}
+.maint-banner-text {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.maint-banner-x {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+/* A part resting (a kill switch): its line under the home screen's buttons (Boss alone, when PLAY's line doesn't say it). */
+.fd-rest {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 13px;
+  color: var(--fd-muted);
 }

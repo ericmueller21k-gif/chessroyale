@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, createLobbyFromHome, engineTop, expectCoordsInSquares, test } from "./helpers.ts";
+import { BOARD_SEL, createLobbyFromHome, engineTop, expectCoordsInSquares, test, watchFor } from "./helpers.ts";
 
 /**
  * Boss powers, played through: the gingerbread man's freeze and blizzard, Boingo's pie and funhouse, alone (solo) on a
@@ -79,6 +79,12 @@ const iceOffSquares = (p: Page) =>
 
 /** The power's banner (boss on the left, the moment, the God King on the right). */
 const banner = (p: Page, text: string) => p.locator(".fight-banner.power-cut", { hasText: text });
+/**
+ * A power's banner with its words, watched for from before it can appear (watchFor): the blizzard's and a thaw's are up
+ * for 1.3 s, off the board as the storm or the melt comes (Oct 16), and a look after a wait can step over them.
+ */
+const watchBanner = (p: Page, words: RegExp) => watchFor(p, { banner: { selector: ".fight-banner.power-cut", text: words } });
+const sawBanner = async (w: Awaited<ReturnType<typeof watchBanner>>, timeout = 30_000) => expect.poll(async () => (await w.seen()).banner, { timeout }).toBe(true);
 
 /**
  * Every square where `selector` (a block on the power layer) shows from now on, sorted: watched from before it can
@@ -141,11 +147,11 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   if (tried) await page.waitForTimeout(300);
   expect(await phase(page)).toBe("play");
 
+  const blizzard = await watchBanner(page, /BLIZZARD!.*Only your (pawn|knight|bishop|rook|queen|king) on [a-h][1-8] moves/);
   await playBest(page);
   // The blizzard: its banner naming the one piece left free (at random from the seed), the sweep across the board,
   // and every crowd piece iced but that one; the meter full on its turn.
-  await expect(banner(page, "BLIZZARD!")).toBeVisible({ timeout: 30_000 });
-  await expect(banner(page, "BLIZZARD!")).toContainText(/Only your (pawn|knight|bishop|rook|queen|king) on [a-h][1-8] moves/);
+  await sawBanner(blizzard);
   await expect(page.locator(".pw-sweep")).toBeVisible({ timeout: 5_000 });
   // The God King speaks of the piece the storm left free.
   await expect(page.locator(".gk-bubble")).toContainText(/queen|king|one/i, { timeout: 6_000 });
@@ -185,14 +191,14 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   for (const sq of p3.thaw) await expect(page.locator(`.power-board .pw-ice.thawing[data-square="${sq}"]`)).toHaveCount(1);
   // (Each thaw's melt is watched for from before the boss's move: it's on screen for about two thirds of a second.)
   const melt4 = await watchSquares(page, ".power-board .pw-ice.melting");
+  const thawing = await watchBanner(page, /THAWING!.*(Your .+ (is|are) free|more of your pieces are free)/);
   await playBest(page);
   // While the boss thinks, the ice stays on.
   await expect.poll(async () => (await powers(page))?.iced.length ?? 0, { timeout: 10_000 }).toBeGreaterThan(5);
   // The thaw as the next turn begins (Eric, Oct 12): its banner names the pieces freed, their ice melts away (each of
   // them, and only them), and four or five are free in all; the rest crack (all of it thaws next turn). The meter empty
   // and dashed throughout.
-  await expect(banner(page, "THAWING!")).toBeVisible({ timeout: 30_000 });
-  await expect(banner(page, "THAWING!")).toContainText(/Your .+ (is|are) free|more of your pieces are free/);
+  await sawBanner(thawing);
   const thawed4 = await thawSquares(page);
   expect(thawed4.length).toBeGreaterThan(0);
   for (const sq of thawed4) expect(p3.iced).toContain(sq);
@@ -215,10 +221,10 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   expect(p4.paused).toBe(true);
   await expect(page.locator(".rage-meter.paused")).toBeVisible();
   const melt5 = await watchSquares(page, ".power-board .pw-ice.melting");
+  const thawed = await watchBanner(page, /THAWED!.*ice is gone/i);
   await playBest(page);
   // Its last turn: the rest thaw (their ice melts away), the ice is gone, every move allowed; the meter still held empty.
-  await expect(banner(page, "THAWED!")).toBeVisible({ timeout: 30_000 });
-  await expect(banner(page, "THAWED!")).toContainText(/ice is gone/i);
+  await sawBanner(thawed);
   const thawed5 = await thawSquares(page);
   expect(thawed5.length).toBeGreaterThan(0);
   for (const sq of thawed5) expect(p4.iced).toContain(sq);

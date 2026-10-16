@@ -21,7 +21,26 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   (no online play, solo stays open; an appeal a person decides; their sign-in identities are kept hashed so a new
   account with them is banned too, and a device they played from puts new accounts in review), **cleared** (held
   results count again), **closed** (a watch with nothing new for `FAIRPLAY.evidenceDays`).
+- **Each banned account keeps its own identity rows** (`fairplay_identities` is keyed by identity and account), so
+  clearing one forgets only its own: another ban with the same email still catches new accounts, banned owners
+  first. For an account cleared by a person or the reviewer (its latest "cleared" line in the log), `banCheck`
+  leaves out the rows written by then (that clearing weighed them) and the rows of accounts banned by evasion (they
+  only repeat a ban). So a cousin cleared of an evasion ban stays cleared through a report, a watch or its closing:
+  those open a watch or a review, never a ban. A real ban of another account with its identity after the clearing
+  catches it. A watch closing on its own doesn't count as a clearing. An account never cleared counts every row
+  ([docs/decisions/2026-10-16-integrity-followups.md](../decisions/2026-10-16-integrity-followups.md)).
+- **A guest's file follows it** when it signs in to an existing account, in the sign-in's one batch
+  (`fairPlayMoves`, `fairplay-schema.ts`): its reports (made and about it), log, judged matches, appeals and device
+  markers become the account's; its log lines are marked "guest …". A guest's open appeal goes if the account has
+  one open. Its case does too if it's open or a ban and stricter than the account's (a cleared or closed one stays
+  behind), with what opening it does (evidence kept, holds, a ban's identities). A guest's decision never becomes the
+  account's (unless it's a ban). Signing in never sheds a case.
 - **Reports** never ban anyone: they raise a player's review priority and record their moves.
+- **Deleting an account never gets around fair play** (`account-data.ts`; [accounts.md](accounts.md)). A banned or
+  in-review account's case, log, hashed identities and device markers stay under its old id; its judged moves, match
+  summaries and appeals go. A new account with one of its identities is banned again, or goes to review (`banCheck`).
+  The review page shows it as "Deleted player", and a person can still decide it (the automated reviewer can't: 409).
+  Lifting a ban, or deciding a review any way but a ban, forgets that account's identities (not another's). An account fair play hasn't acted on leaves nothing in fair play's tables.
 - **A ban needs the deep re-check:** a flagged player's counted moves searched again on the engine server (its own
   instance, `fairplay-1`, its own daily budget, from the Worker's schedule: cases in review at once, the rest
   off-peak). The judges' quick numbers can open a review, never a ban. A move in a position Stockfish refuses is

@@ -152,7 +152,7 @@ function lassoMoment({ boss, moment, now, t, orientation, banner }: MomentProps)
   const pull = moment.kind === "pull";
   const title = pull ? "LONG PULL!" : "LASSO!";
   const sub = pull ? "Three squares in one move" : moment.ult ? "No showdown this time: a tug instead" : l ? `Your ${PIECE_WORD[l.type] ?? "piece"}, dragged a square` : undefined;
-  if (!l) return <div class={`power-moment pm-${moment.kind}`}>{t < 2300 && banner(title, sub, "western")}</div>;
+  if (!l) return <div class={`power-moment pm-${moment.kind}`}>{banner(title, sub, "western", PULL.bannerMs)}</div>;
   const from = centreOf(l.from, orientation);
   const to = centreOf(l.to, orientation);
   const stand = lassoStand(from, to);
@@ -171,7 +171,7 @@ function lassoMoment({ boss, moment, now, t, orientation, banner }: MomentProps)
   const shown = t >= B.hopAt - PIG_LEAP.upAt && t < B.backAt + FLIGHT + 120;
   return (
     <div class={`power-moment pm-${moment.kind}`}>
-      {t < 2300 && banner(title, sub, "western")}
+      {banner(title, sub, "western", PULL.bannerMs)}
       <div class="hb-pieces pg-layer" aria-hidden="true" data-lasso={`${l.from}${l.to}`} data-stage={t < s0 ? "rope" : sliding ? "tug" : "done"}>
         {at.shadow && <Shadow at={at.shadow.at} size={at.shadow.size} />}
         {sliding && <AirPiece code={pieceCode(l.color, l.type)} at={lerp(from, to, u)} square={u < 0.5 ? l.from : l.to} />}
@@ -232,11 +232,11 @@ function showdownMoment({ boss, moment, now, t, orientation, banner }: MomentPro
       } else if (t >= t0 + ms + SLIDE_OVERLAP && t < t0 + ms + SLIDE_OVERLAP + ROPE_BACK) ropes.push({ from: fist, to: lerp(b, fist, ease((t - (t0 + ms + SLIDE_OVERLAP)) / ROPE_BACK)), loop: false, key: `${k}${i}` });
     }
   });
-  const drawing = t >= SHOWDOWN.drawAt;
   return (
     <div class="power-moment pm-showdown">
-      {t < 2300 && banner("SHOWDOWN!", `${pairs.length === 2 ? "Two" : "Three"} duels: you must take one`, "western")}
-      {drawing && banner("DRAW!", "Pick your duel", "western draw")}
+      {banner("SHOWDOWN!", `${pairs.length === 2 ? "Two" : "Three"} duels: you must take one`, "western", SHOWDOWN.bannerMs)}
+      {/* (Its name alone: what to do is the dock's on your move, and the God King says it his way as it comes.) */}
+      {banner("DRAW!", undefined, "western draw", SHOWDOWN.total, SHOWDOWN.drawAt)}
       <SoundAt id={`${moment.key}:draw`} at={moment.at + SHOWDOWN.drawAt} now={now} sound="pigDraw" />
       {pairs.map((_, k) => (
         <SoundAt key={k} id={`${moment.key}:yank${k}`} at={moment.at + yankOf(k).t0} now={now} sound="pigYank" />
@@ -375,9 +375,9 @@ export const PIG_UI = {
   id: "pig",
   ultimate: { name: "SHOWDOWN!" },
   moments: {
-    pull: { order: 0, kit: "power" as KitMoment, dock: "Long pull!", line: lineOf("pull"), view: lassoMoment },
-    drag: { order: 0, kit: "power" as KitMoment, dock: "Lasso!", line: (kit, m) => (m.ult ? lineOf("tug") : lineOf("power"))(kit, m), view: lassoMoment },
-    showdown: { order: 2, kit: "ultimate" as KitMoment, dock: "Showdown!", view: showdownMoment },
+    pull: { order: 0, kit: "power" as KitMoment, line: lineOf("pull"), view: lassoMoment },
+    drag: { order: 0, kit: "power" as KitMoment, line: (kit, m) => (m.ult ? lineOf("tug") : lineOf("power"))(kit, m), view: lassoMoment },
+    showdown: { order: 2, kit: "ultimate" as KitMoment, view: showdownMoment },
   },
   // Over the pieces, on the crowd's duel turn (and from "DRAW!" in the showdown's moment): the three duels glowing.
   board: ({ p, orientation, moments, now }) => {

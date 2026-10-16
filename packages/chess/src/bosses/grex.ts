@@ -22,7 +22,7 @@ import type { MoveScore } from "../uci.ts";
 import { VALUE, crowdHalf, from, logit, other, powerRoll, to, turnOf, warnThenUnleash, type BossRules, type Side } from "./base.ts";
 
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). */
-export const GREX_FX = { spark: 3300, candle: 7100, fireball: 1700, fireproof: 2200 } as const;
+export const GREX_FX = { spark: 2300, candle: 7100, fireball: 1700, fireproof: 2200 } as const;
 
 /**
  * G-REX's fire after the crowd's move: a piece left on a tile ablaze burns (or the tile fizzles under the king) as the

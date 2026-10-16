@@ -1,22 +1,30 @@
 import { useEffect, useRef } from "preact/hooks";
+import { tooYoung } from "../account.ts";
 import { SignIn } from "../components/SignIn.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
+import { CROWD_SETTINGS, DEFAULT_SETTINGS, bossInText, crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
+
+/** The Crowd's numbers, from its settings: its seats, the first cut, the team final's sizes. */
+const CROWD = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS };
+const versus = (n: number) => `${n}v${n}`;
+/** The boss final's boss, by name ("the Hidden Boss"), or any boss. */
+const FINAL_BOSS = crowdFinalBoss() ? bossInText(crowdFinalBoss()!.name) : "a boss";
 
 const FAQ: [string, string][] = [
   [
     "Why do I need an account to play online?",
-    "Every online match is real people against real people, and accounts keep it that way. A ban sticks, your stats and rating mean something, and it's much harder to drop into a match with an engine open in another tab. Guests can still play the whole game against 99 bots.",
+    `Every online match is real people against real people, and accounts keep it that way. A ban sticks, your stats and rating mean something, and it's much harder to drop into a match with an engine open in another tab. Guests can still play the whole game against ${CROWD.lobbySize - 1} bots.`,
   ],
   [
     "How does 50 v 50 work?",
-    "100 players, one game of chess from the first move. You're on White or Black for the whole game. Every turn your team of 50 picks a move, and the most popular pick is played. Stockfish scores every pick, so you score by choosing well, even when the crowd goes the other way. After move 10 the lowest scorers go out after every move. Before the game, everyone votes on how it ends: a team final (4v4 down to 2v2), a boss battle against Stockfish, or a duel between the best of each side.",
+    `${CROWD.lobbySize} players, one game of chess from the first move. You're on White or Black for the whole game. Every turn your team of ${CROWD.lobbySize / 2} picks a move, and the most popular pick is played. Stockfish scores every pick, so you score by choosing well, even when the crowd goes the other way. After move ${CROWD.firstStageRounds / 2} the lowest scorers go out after every move. Before the game, everyone votes on how it ends: a team final (${versus(CROWD.teamFinalSizes[0]!)} down to ${versus(CROWD.teamFinalSizes.at(-1)!)}), a boss final where the top ${crowdFinalists("boss")} take on ${FINAL_BOSS}, or a duel between the best of each side.`,
   ],
   ["Is it free?", "Yes. Coins and cosmetics will be earned by playing, never bought, and they never change the game."],
   [
     "How do you deal with cheating?",
     "Accounts are the first step. Every move is also scored by the engine, so a player who matches it move after move stands out. Automatic checks that flag those players are being built next.",
   ],
-  ["What do you do with my email?", "Sign-in only. No newsletters, and we never sell or share it. See the privacy policy."],
+  ["What do you do with my email?", "Signing in, and an email if a fair-play decision is made about your account. No newsletters, and we never sell it or share it for advertising. See the privacy policy."],
   ["Can I play on my phone?", "It's made for phones. Add it to your home screen and it opens like an app."],
 ];
 
@@ -66,7 +74,7 @@ export function LandingScreen({
           <MuteButton />
         </h1>
         <p class="landing-tag">
-          <strong>100 players. One board.</strong> Pick the best move for your team of 50. The crowd plays it.
+          <strong>{CROWD.lobbySize} players. One board.</strong> Pick the best move for your team of {CROWD.lobbySize / 2}. The crowd plays it.
         </p>
       </header>
       <div class="landing-main">
@@ -81,14 +89,17 @@ export function LandingScreen({
             </p>
           )}
           <section class="signin landing-signin">
-            <h2>{joinCode ? `Sign in to join lobby ${joinCode}` : "Sign in to play online"}</h2>
+            {/* (A device that answered the age question "too young": no sign-in, the guest button below.) */}
+            <h2>{tooYoung() ? "Online play needs an account" : joinCode ? `Sign in to join lobby ${joinCode}` : "Sign in to play online"}</h2>
             <SignIn google={google} email={email} next={joinCode ? `/lobby/${joinCode}` : "/"} failed={failed} />
           </section>
-          <div class="or-line" aria-hidden="true">
-            <span>or</span>
-          </div>
+          {!tooYoung() && (
+            <div class="or-line" aria-hidden="true">
+              <span>or</span>
+            </div>
+          )}
           <button type="button" class="btn btn-secondary btn-wide" onClick={onGuest}>
-            Play vs 99 bots as a guest
+            Play vs {CROWD.lobbySize - 1} bots as a guest
           </button>
           <p class="muted small landing-note">Guests play solo against bots. Online matches need an account.</p>
         </div>
@@ -103,7 +114,7 @@ export function LandingScreen({
         ))}
       </section>
       <footer class="landing-foot muted small">
-        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · Engine: <a href="https://stockfishchess.org">Stockfish</a> (GPL-3.0)
+        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/copyright">Copyright</a> · Engine: <a href="https://stockfishchess.org">Stockfish</a> (GPL-3.0)
       </footer>
     </div>
   );

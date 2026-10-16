@@ -110,6 +110,9 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
 
 - Anything drawn over the squares sizes and places itself in eighths of `--board-size`, never % of the wrap.
 - Board coordinates sit inside their edge squares, either way up and turned; `expectCoordsInSquares` measures them.
+- The line above the board keeps one height through a match: Classic's opening name is one line, cut with "…" when
+  long (`.opening-title`), since a wrapped name moved the board down a line as a round changed boards
+  (`docs/decisions/2026-10-15-flaky-e2e-batch.md`; `crowd.spec.ts` checks the library's longest name).
 - Anything that draws what a player sees on a screen's first frame is set up in a layout effect (the board's size is).
 - Never change what the board draws (its way up, its size) while a transform is on it or an ancestor: animate, then
   change it once the transform is gone. (The board measures its size without transforms, but the rule stands.)

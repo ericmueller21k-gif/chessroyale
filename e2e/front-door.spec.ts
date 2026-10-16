@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { named, test } from "./helpers.ts";
+import { asAdmin, named, switchesOff, test } from "./helpers.ts";
 
 const live = (p: import("@playwright/test").Page) => p.evaluate(() => fetch("/api/live").then((r) => r.json()));
 
@@ -17,8 +17,11 @@ test("home: the live line comes from the server, the mode picker changes the lin
   expect(before.online).toBeGreaterThanOrEqual(1);
   // (Other tests' players come and go, so the number itself can move between two looks.)
   await expect(line).toContainText(/[1-9]\d* online/);
-  // Someone else waiting in the queue shows up in the count within a few seconds.
+  // Someone else waiting in the queue shows up in the count within a few seconds. (Bots off, so they stay in it: with
+  // bots they'd be in a match by the fill time, 8 s here, and the line, asked every 5 s, could miss the count between
+  // two looks: docs/decisions/2026-10-15-flaky-e2e-batch.md.)
   const other = await (await browser.newContext()).newPage();
+  await other.addInitScript(() => localStorage.setItem("brc.matchmaking", "botsoff"));
   await other.goto(`/?pool=home-${test.info().project.name}`);
   await other.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(async () => (await live(page)).queue, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
@@ -63,17 +66,39 @@ test("home: Boss alone opens the boss menu; Play with friends offers lobbies (pr
   await expect(sheet.getByRole("button", { name: /Solo vs/ })).toHaveCount(0);
 });
 
-test("settings: the old home's options live here and stick", async ({ page }) => {
+test("settings: the sections in order, the board's choices stick, and Testing (practice mode, the eval bar) only for admins", async ({ page }) => {
+  // A player (this server has TEST_SWITCHES on: the app is told otherwise, as hunchess.com tells a player).
+  await switchesOff(page);
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  // (Friends and Account show once accounts are on, Friends right after Quick chat; the order is the same either way.)
+  const labels = async () => (await page.locator(".fd-settings .fd-label").allTextContents()).filter((l) => l !== "ACCOUNT" && l !== "FRIENDS");
+  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS"]);
+  // Gone (Eric, Oct 15): practice mode and the eval bar for players, the pre-game votes' and Classic's opening moves'
+  // switches, the sound lab (its choice is the Reveal sound picker).
+  await expect(page.getByRole("switch", { name: /Practice mode|Eval bar|Pre-game votes/ })).toHaveCount(0);
+  await expect(page.getByText(/Opening moves|Sound lab/)).toHaveCount(0);
+  await expect(page.getByRole("radiogroup", { name: "Reveal sound" })).toBeVisible();
+  // Board: animations off takes the motion trail with it; both stick.
+  const anim = page.getByRole("switch", { name: /Animations/ });
+  await expect(anim).toBeChecked();
+  await anim.click();
+  await expect(page.getByRole("switch", { name: /Motion trail/ })).toBeDisabled();
+  await page.reload();
+  await expect(page.getByRole("switch", { name: /Animations/ })).not.toBeChecked();
+  await expect(page.getByRole("switch", { name: /Motion trail/ })).not.toBeChecked();
+
+  // An admin: Testing, last, with practice mode (off until switched; it sticks) and the eval bar (on).
+  await asAdmin(page);
+  await page.reload();
+  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS", "TESTING"]);
   const practice = page.getByRole("switch", { name: /Practice mode/ });
   await expect(practice).not.toBeChecked();
+  await expect(page.getByRole("switch", { name: /Eval bar/ })).toBeChecked();
   await practice.click();
-  await page.getByRole("radio", { name: /Everyone moves/ }).click();
   await page.reload();
   await expect(page.getByRole("switch", { name: /Practice mode/ })).toBeChecked();
-  await expect(page.getByRole("radio", { name: /Everyone moves/ })).toHaveAttribute("aria-checked", "true");
-  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
 });
 

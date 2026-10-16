@@ -6,21 +6,49 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 ## How it works today
 
 - **A mode is a preset over one engine.** `modeSettings()` and `CROWD_SETTINGS` / `RAID_SETTINGS` in settings.ts
-  patch `DEFAULT_SETTINGS`. Three modes are played:
+  patch `DEFAULT_SETTINGS`. Two are played on these screens:
   - **Crowd 50 v 50** (the main mode): 100 players, one board, two teams of 50, each playing one side all game. Every
-    player picks a move each turn; the **most popular** pick is played (`drawRuleByStage: ["popular"]`). Bots fill
-    empty seats (see [matchmaking.md](matchmaking.md)).
-  - **Crowd "everyone moves"** (`crowdTeams: false`): everyone picks for whichever side is to move; a 2v2 final of the
-    last four.
-  - **Boss raid** (`RAID_SETTINGS`): up to 50 people (no bots online) pick the crowd's moves together against a boss,
-    from a named opening 5 moves in. Solo's "Boss alone" is a raid with a crowd of one. See [bosses.md](bosses.md).
+    player picks a move on their team's turns; the **most popular** pick is played (`drawRuleByStage: ["popular"]`).
+    Bots fill empty seats (see [matchmaking.md](matchmaking.md)). Always team turns (`crowdTeams` in
+    `CROWD_SETTINGS`): the "everyone moves" choice went on Oct 15, 2026 (DECISIONS.md).
+  - **Boss raid** (`RAID_SETTINGS`, `crowdTeams: false`): up to 50 people (no bots online) pick the crowd's moves
+    together against a boss, from a named opening 5 moves in. Solo's "Boss alone" is a raid with a crowd of one. See
+    [bosses.md](bosses.md).
 - **Scoring.** Every pick is scored by how much expected score it gives away against the best move (1 point = 0.01 of
   expected score), from the judge's numbers. A miss scores `missedMoveScore`. Scores carry over all game in Crowd. A
   **brilliant** move is one that separated the field (among enough pickers); a pick made after a power-up's hints
   can't be brilliant.
+- **The opening allowance** (Eric, Oct 15; docs/decisions/2026-10-15-opening-allowance-and-ties.md;
+  `OPENING_ALLOWANCE`, `reports/opening-allowance.md`). A pick's **counted loss** is its raw loss less
+  `openingAllowance(n)`: `points` (8) through move `flatThrough` (10), then in a line to nothing at `goneBy` (14). `n`
+  is the game's own move number (the position's fullmove number), the same in every mode: Crowd from move 1, a raid
+  from move 6, Classic's boards from move 5 (and a replaced board's again), the Crowd's boss final from move 1 of its
+  fresh board. **The material fallback:** a pick that gives up `materialPawns` (1) or more against the engine's best
+  move by the exchange check (`exchangeNet`, `materialSlips` in `packages/chess/src/rules.ts`: its own small board,
+  one capture and the exchange on its square, about 0.15 ms a move) gets no allowance (`material`: "gave" or
+  "missed"). The runner works it out in `resolveBoard` (`allowanceFor`: only while the allowance applies, only the
+  distinct picks), after the bosses' rules have adjusted the numbers (`judgeEvaluation`), and hands `scoreGroup` each
+  pick's allowance. Counted losses make the round scores (and the group average), standings, cuts, the boss's strikes
+  (`finalLosses`), `matchLoss` (`countedLossSum`) and final placements; **raw** losses stay for the board's draw,
+  brilliance, ratings and fair play (`lossesByStage`), and a miss costs as before. Bots unchanged. The reveal says it
+  in one line of plain words, one number at most (`allowanceNote` in `game.ts`): "1.2 forgiven · opening", "8 of 9.6
+  forgiven · opening", "no allowance · gave up material", "no allowance · missed a capture" (Crowd under the poll,
+  Classic under the round score, a boss battle as the dock's second line, shortened under 380 px: "8 of 9.6
+  forgiven", "no allowance"); the breakdown says what counted, and the group's average as it counted. Squads isn't scored per move: untouched.
 - **The cut.** After each stage (`firstStageRounds`, then `roundsPerStage`) the lowest scorers are knocked out
-  (`knockoutsPerStage`; in 50 v 50 the same number from each team). The cut is a judgment: every player's pawn in a
-  10 × 10 grid, the gavel, the verdict, "Why was I cut?" (the elimination breakdown). `stageBreakSeconds` 10.
+  (`knockoutsPerStage`; in 50 v 50 the same number from each team). **Ties at the line go through** (`cutPlan` in
+  `match.ts`): everyone tied exactly (`sameScore`) with the last player through stays in; nobody goes out on thinking
+  time or a coin flip. What that leaves over is owed by the cuts still to come, spread evenly over them (`cutCarry`, per
+  team in 50 v 50; each cut takes its share rounded up), so the endings keep their sizes and no one cut takes a
+  pile-up of owed places. **The last cut before a fixed-size ending** (`isLastCut`) takes exactly what's owed: an exact tie
+  there goes to less raw loss over the match (`rawLossTotal`, a miss counting `finalMissLoss`), then less thinking time
+  (over the match in Crowd, the stage in Classic), then a coin. `standings()` orders by the same keys, so a cut is always
+  the bottom of the list. The team final's steps break a tie the same way. Classic keeps enough boards for its
+  survivors (`ceil(survivors / groupSize)`, never fewer than the plan's). Every screen draws the line from the runner:
+  `cutoff()` (how many would go through now) and each standing's `cut` flag (a team's line in 50 v 50, `towerView`).
+  The cut is a judgment: every player's pawn in a 10 × 10 grid, the gavel, the verdict ("N out · M left", or "Nobody
+  out, ties go through"), "Why was I cut?" (the elimination breakdown: "level with the last player through" only at the
+  last cut, with why). `stageBreakSeconds` 10.
 - **Pre-game votes (50 v 50, `augments`).** Before move 1 everyone votes by dragging their pawn into one of three zones
   on an empty board (or tapping a card): how it ends (**team final**, **the Hidden Boss** (the boss final), **duel**), then "How fast?", a
   chess time control (**Rapid 10+5**, **Blitz 5+3**, **Bullet 3+2**; Blitz when nobody votes). The options and what
@@ -46,9 +74,11 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   three finalists on the other boards (`phase2Follows`, `phase2Mates` in `recluse-phase2.ts`). No reward comes from this
   path (rewards only via Squads: ROADMAP.md). Duel: the last two. `finalMaxTurns` caps a final; the engine
   adjudicates.
-- **Test switch `?weakbots=1`** (solo, and a lobby you create): every bot plays loosely (`WEAK_BOT_SKILL`: a
-  temperature of 8 points or more), so a test playing the engine's best move surely reaches the boss final's top 4 (with
-  the usual bots, the strongest play the engine's move as often as you do, and only two of each team get through).
+- **Test switch `?weakbots=1`** (solo, and a lobby you create; `WEAK_BOTS`): every bot plays loosely (`WEAK_BOT_SKILL`:
+  a temperature of 8 points or more), and people rank above bots in the standings (`peopleFirst`), so every cut takes
+  bots first and a test's player surely reaches the boss final's top 4. Loose bots alone stopped doing it on Oct 15: the
+  opening allowance leaves them level with the engine's best move, and one pick the judge's final numbers rank above it
+  then decides the strict last cut (docs/decisions/2026-10-16-flaky-e2e-batch-2.md). Never for players.
 - **Online, the vote's result** patches the app's settings as the server's (`NetMatch`'s "vote"), so the last cut names
   the right ending and the leaderboard's cut line follows the right knockouts (a reload mid-match falls back to the
   queue's settings: the team final's).
@@ -58,7 +88,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   takes what you think beyond the increment out of the bank; a quicker move banks the rest, as on a chess clock (the
   bank isn't capped at its start). An empty bank still leaves the increment. The clock vote sets all three; the match is
   made with the default bank, so the vote's patch resets every bank before move 1 (`startBanks`, from
-  `MatchRunner.patchSettings`). Without the vote (votes off, everyone moves, raids) it's Rapid 10+5, 20 s a move. Only
+  `MatchRunner.patchSettings`). Without the vote (raids, or the `?augments=0` test switch) it's Rapid 10+5, 20 s a move. Only
   your own team's moves run your clock. The board's clock shows this move's seconds and your bank, draining live from
   bank + increment as you think; the scoreboard's BANK updates after each move. Online, each `round` message carries
   the move's cap (`moveClock`) and the increment (`increment`), so a reloaded app has them. The finals (team final,
@@ -66,9 +96,17 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   50 v 50: three chess time controls".
 - **Power-ups:** 3 at the start in Crowd (`powerUpsAtStart`); one shows the engine's top 3 moves for that turn.
 - **On screen:** every pick appears live on the board as a ghost with a name pill (one name per square, "+N"), live
-  tallies, an optional motion trail, the eval bar (unless switched off in Settings: [hub.md](hub.md)), the scoreboard
+  tallies, an optional motion trail (Settings → Board), the eval bar (testers only: [hub.md](hub.md)), the scoreboard
   and chat under the board. A crowd of one keeps its
   move on the board (no ghost, no snap-back). The board never moves between screens.
+- **What the reveal draws each frame** (Oct 16; docs/decisions/2026-10-16-the-reveal-draws-only-what-changed.md):
+  Crowd's reveal (`CrowdReveal`, also a raid's and the Last Stand's) keeps a clock that ticks every frame, and Classic's
+  (`RevealScreen`) one that ticks 20 times a second, for what moves with them: the board and what's over it (the ghosts,
+  the reel, the God King's moments), the eval bar, the board's shake. The header, the chat or scoreboard, the boss by the
+  board, the board's clock and Classic's list of picks are elements kept on `useStillKey` (as on a boss screen,
+  [bosses.md](bosses.md)); the dock (raids), the poll (Crowd) and Classic's words under the picks also on the few
+  clock-read values they show (the move landed and played, the vote bars' count, the Last Stand's steps). A new word
+  read from the clock there goes in its list; otherwise it waits up to 200 ms for the next `useStillKey` tick.
 - **Resigning and leaving** (Eric, Oct 13; `LEAVING`; DECISIONS.md, "Resign: leaving a match in every mode"). The
   top line of every match screen ends in the match's control (`components/MatchMenu.tsx`): a phone's "⋯" (a sheet at
   the foot of the screen: Sound, Resign) where the sound button was; a computer's sound button, then the flag. On a
@@ -92,7 +130,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 | What | Where |
 | --- | --- |
 | Stages, grouping, the cut, retirement, bot picks (pure) | `packages/core/src/match.ts` |
-| Scoring, brilliant moves | `packages/core/src/scoring.ts` |
+| Scoring, the opening allowance, brilliant moves | `packages/core/src/scoring.ts`; the exchange check `packages/chess/src/rules.ts` (`exchangeNet`, `materialSlips`) |
+| The cut: ties, what's owed, the last cut's tie-break | `packages/core/src/match.ts` (`cutPlan`, `standings`, `endStage`) |
 | Pre-game votes | `packages/core/src/votes.ts`; screen `packages/app/src/screens/Vote.tsx` |
 | The match runner (rounds, judging, the boss battle) | `packages/chess/src/runner.ts` |
 | Boards and their positions (bases, replays) | `packages/chess/src/boards.ts`, `rules.ts` (`fenAtPly`) |
@@ -105,13 +144,20 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 
 ## Settings
 
-`LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `CROWD_EVERYONE_KNOCKOUTS`, `PACE_SETTINGS`
-(relaxed/quick; tests use quick), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
+`OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
+(the `?pace=quick` test switch, per mode; players always play the mode's own pace), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
 `moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
 time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
 
 ## Tests and tools
 
+- The opening allowance and ties: unit `packages/core/test/opening-allowance.test.ts` (the taper, counted against raw,
+  brilliance on raw), `cut-ties.test.ts` (ties go through, what's owed carries, the endings' sizes, the last cut's
+  tie-break, 50 v 50's teams, the boss's tied strike, the team final's steps), `packages/chess/test/exchange.test.ts`
+  (the exchange check: hanging, a missed capture, a gambit, en passant, promotion, a capture with check; two judges
+  agree), `runner.test.ts` (Classic's boards with ties kept in), `packages/app/test/faq.test.ts`. Sims:
+  `packages/sim/scripts/opening-allowance.ts` (the calibration, `reports/opening-allowance.md`) and
+  `allowance-sim.ts` (before/after Crowd matches, `reports/allowance-sim.md`).
 - Unit: `packages/core/test/match.test.ts`, `scoring.test.ts`, `votes.test.ts`, `brilliance.test.ts`,
   `packages/chess/test/crowd.test.ts`, `runner.test.ts`, `replay-cache.test.ts`, `long-match.test.ts`. The clock vote:
   `votes.test.ts` (each time control, the bank math, the calibration), `crowd.test.ts` (the runner) and

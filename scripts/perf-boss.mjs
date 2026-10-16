@@ -6,7 +6,7 @@
 // (grex: try power=candle for his barrage.) Any boss id works (bigboy, sawyer, hollow, pig), with its ultimate's id.
 // Each row also has `fx`: the frames while a boss's effect was on screen (a power's moment, Lights out, the funhouse's
 // spin), and the long tasks (over 50 ms) in them; `fxBy` the same for each effect ("pm-candle", "lightsout", "spin"). PERF_DIST=<dir>: serve that build instead (build it first with
-// \`npx vite build --outDir <dir>\` in packages/app), to compare two versions with PERF_NO_BUILD=1.
+// \`npx vite build packages/app --outDir $PWD/<dir>\` from the repo root), to compare two versions with PERF_NO_BUILD=1.
 // The production build (vite build + preview), like the live site. Nothing here should grow with the match
 // (.claude/LESSONS.md: "Lag that grows with the match").
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -20,17 +20,17 @@ import { counts, frameStats, instrument, longStats } from "../e2e/perf-probe.js"
 
 const [out = "perf-out", mode = "gingerbread", which = "both", movesArg = "25", power = ""] = process.argv.slice(2);
 const MOVES = Number(movesArg) || 25;
-// online: a Ginger raid on a running local server (npx wrangler dev --port 8788 ..., after npm run build).
+// online: a Ginger raid on a running local server (npx wrangler dev --port 8788 --var TEST_SWITCHES:1 ..., after
+// npm run build).
 const ONLINE = process.env.PERF_URL ?? "http://localhost:8788/";
 const outDir = resolve(out);
 mkdirSync(outDir, { recursive: true });
-process.chdir("packages/app");
 // PERF_PROFILE=<move>: a CPU profile of that move's idle and drag (an unminified build, so the names read).
 // PERF_PROFILE_BOSS=1: the boss's turn after that move instead.
 const PROFILE = Number(process.env.PERF_PROFILE ?? 0);
 const PROFILE_BOSS = !!process.env.PERF_PROFILE_BOSS;
-if (!process.env.PERF_NO_BUILD) execFileSync("npx", ["vite", "build", "--logLevel", "error", ...(PROFILE ? ["--minify", "false"] : [])], { stdio: "inherit" });
-const server = await preview({ root: ".", configFile: "vite.config.ts", preview: { port: 5199, strictPort: false }, logLevel: "error", ...(process.env.PERF_DIST ? { build: { outDir: resolve(process.env.PERF_DIST) } } : {}) });
+if (!process.env.PERF_NO_BUILD) execFileSync("npx", ["vite", "build", "packages/app", "--logLevel", "error", ...(PROFILE ? ["--minify", "false"] : [])], { stdio: "inherit" });
+const server = await preview({ root: "packages/app", configFile: "packages/app/vite.config.ts", preview: { port: 5199, strictPort: false }, logLevel: "error", ...(process.env.PERF_DIST ? { build: { outDir: resolve(process.env.PERF_DIST) } } : {}) });
 const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch();
 
@@ -119,10 +119,13 @@ async function run(kind, name, context, throttle) {
   await cdp.send("Performance.enable");
   const q =
     kind === "crowd"
-      ? "mode=crowd&clock=60&augments=0&turns=all"
+      ? "mode=crowd&clock=60&augments=0"
       : kind === "online"
         ? `mode=raid&boss=gingerbread${power ? `&power=${power}` : ""}&clock=60`
         : `boss=${kind}${power ? `&power=${power}` : ""}&clock=60`;
+  // (The production build allows the address's test switches only where the server says so: no server here, so
+  // its answer is given. Online, the local server's TEST_SWITCHES does it: see its command above.)
+  if (kind !== "online") await p.route("**/api/auth/config", (r) => r.fulfill({ json: { accounts: false, google: false, email: false, testSwitches: true } }));
   await p.goto(`${kind === "online" ? ONLINE : url}?debug&nolanding&${q}`);
   if (kind === "crowd") {
     await p.getByRole("radio", { name: /^Solo/ }).click();

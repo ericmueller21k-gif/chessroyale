@@ -18,6 +18,9 @@ move.
 
 ## How it works today
 
+- **Its kill switch** (`PAUSE_SQUADS`, [ops.md](ops.md) "Kill switches"): no new queue or party (503 with "Squads is
+  resting for a bit. Back soon."); a party already in line waits with that line and goes in once it's back; lobbies
+  already running finish; admins' test lobbies stay open.
 - **Pure rules in `packages/chess/src/squads/`**, imported as `@chessroyale/chess/squads`. They live in the chess
   package because they need chess.js (legal moves, mate in one) and the opening library; `core` stays chess-free.
   **No engine in the rules but one**: a same-move token's refund weighs the judge's top moves, given to the rules as
@@ -406,7 +409,7 @@ in its deadlines, and the clock line whole at 320 px); `e2e/squads-watch.spec.ts
 default and switched off, remembered; a headless teammate showing your board: his pawn, dressed, and the eye over it,
 the board not moving, gone when he looks away or disconnects); `e2e/squads-mercenary.spec.ts` (choosing Mercenary in the Mode vote, earning coins, the shop between rounds, a
 Stockfish token and a shield). The full-lobby run: `npx tsx scripts/squads-headless.ts
---url http://localhost:8787 --device` against `wrangler dev` (`--var SQUADS_TEST:1` for test lobbies).
+--url http://localhost:8787 --device` against `wrangler dev` (`--var SQUADS_TEST:1` for test lobbies, `--var TEST_SWITCHES:1` for `--pool`).
 
 ## The screens (phase 3)
 

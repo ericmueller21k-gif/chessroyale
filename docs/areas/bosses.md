@@ -6,6 +6,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 
 ## How it works today
 
+- **A boss can be rested** (`PAUSE_BOSS_<ID>`, [ops.md](ops.md) "Kill switches"): the boss menu hides him, a raid
+  lobby picked for him is refused, and every match's pick skips him (`rosterWithout` in `boss.ts`, a lobby's or solo
+  game's `bossesOff`). The Crowd's boss final meets another while his boss rests, and its vote card names none.
 - **Where bosses are met:** the boss raid (up to 50 people, online; or a Solo raid with 49 bots), the Crowd 50 v 50's
   boss final (the top 4, always against the Hidden Boss since Oct 14), and solo's "Boss alone" (you pick every move
   against a boss you choose from the boss menu, at a difficulty from Easy to Hardest, `BOSS_DIFFICULTY`). The Hidden Boss
@@ -22,7 +25,14 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   Hidden Boss) is the only boss it meets, for everyone, whatever was picked or met last (the runner's `startBoss`); with
   none marked it would be a random playable boss again. His name is one string in the roster (Eric will rename him): the
   vote's card, the FAQ and every screen take it from there. Details: [crowd.md](crowd.md), "The endings".
-- **Strength:** a rating on Stockfish's scale from the crowd's ratings (people only; Eric, Oct 12), the raid's tiers or
+- **The strike** (`bossKillDue`, `strikeVictim`, `bossKill` in `match.ts`): every `bossKillEvery` crowd moves the boss
+  knocks out the player with the most **counted** points lost since its last strike (the opening allowance taken off:
+  a raid starts at move 6, so its first moves are covered; [crowd.md](crowd.md)), a tie going against the weaker
+  player over the match (`matchLoss`), down to `minSurvivors` (half a raid). Still tied on both (everyone sound in the
+  opening, say): nobody is struck, and the strike is due again after the next crowd move (`strikeIn` stays at "Strikes
+  after this move"; never two at once). docs/decisions/2026-10-15-opening-allowance-and-ties.md.
+- **Strength:** a rating on Stockfish's scale from the crowd's ratings (people only; Eric, Oct 12), the raid's tiers (a
+  step above the people's ratings as the server stores them, never the app's word: [matchmaking.md](matchmaking.md)) or
   solo's difficulty, plus the boss's offset. Stockfish plays it at that UCI_Elo with the blunder guard (see
   [engine.md](engine.md)).
 - **The brain (Oct 12: every boss on Maia; DECISIONS.md, "Every boss on Maia"):** every boss plays its normal moves
@@ -97,7 +107,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 | Jefferson (`grex`; G-REX until Oct 10) | the game so far | **Sparkler:** a tile on the crowd's half catches fire and burns in `fireStages` stages, one a crowd turn; a crowd piece left on it after the crowd's move on the last stage burns (never the king, never one whose loss leaves a king in check: it fizzles) | **Roman candle:** `candleShots` fireballs in waves (`candleWaves`) from `candleDelay` turns later, each wave's squares shown as growing shadows `candleAhead` turns ahead; `candleOwnShare` (0.4) of each wave, rounded, falls on his own half (Eric, Oct 11: too strong; 10 of the 24 there, 14 on the crowd's), where his pieces never burn (a crowd piece there still would). The first time one of his pieces stands in the candle's fire (`fireproof`, once a match) he laughs it off: a `fireproof` moment, his smug look and one of four lines picked from the seed (`FIREPROOF_LINES`; he has no laugh sound of his own, so none) |
 | Hollow (`hollow`) | always Black, from the starting position (he claims the dark side in the intro if the crowd would have been Black) | **The dark:** after his first move he covers the square of the piece he moved, then another every `darkEvery`-th move (a random occupied square, never a king's) for `darkTurns`; pieces there are hidden; a move touching the dark goes unchecked, an illegal one costs `darkTryCost` and the `darkTries`-th ends the turn as a miss | **Lights out:** at the start of his turn, a memory test in rounds (`lightsOutRounds`: find 1, 2, then 3 of his pieces); each piece missed costs `lightsOutMiss`; below `lightsOutHold` found, he plays an extra quiet move (`lightsOutExtraGain`) |
 | Big Boy (`bigboy`) | from the starting position less the crowd's d- or e-pawn, which he eats (his snack) | **Toy blocks:** every `blockEvery` turns from turn 2, a block on an empty square in the crowd's half that a crowd piece could move to, for `blockTurns`; nothing (either side) may move onto it or slide through it; a knight jumps it; it never stops an attack | **Big Bounce:** at the start of his turn (after the warning), `bouncePieces` crowd pieces thrown to empty squares within `bounceReach` (pawns sideways), into a position `bounceLoss` pawns worse for the crowd (nearest `bounceTarget`) |
-| Wrangler (`pig`; the code id stays `pig`: "wrangler" is Cloudflare's CLI here) | from the starting position, Black as every raid boss (`?side=b` turns it round); his first move is the **long pull** (`pullOptions`, `pullFrom`): a center pawn's double step, then lassoed one square further, three squares in one move (e2-e5 or d2-d5 as White; d7-d4 or e7-e4 as Black after the crowd's first move), the engine's pick of the d- or e-pawn; none sound (it would hang the pawn: a crowd pawn on it, more attackers than defenders, or more than `pullMaxLoss` pawns against his best ordinary move; its path or square taken): an ordinary first move. The board's history keeps the legal double step and a base with the pawn one square on; the screens name it as the pull (`d4`) | **Lasso drag** (`dragOptions`, `dragFrom`): after his move, from turn `dragFirst`, every `dragEvery` turns, a crowd piece (never the king, never a bishop: it would change color) dragged one square up, down, left or right onto an empty square (a pawn never onto the first or last rank; never leaving the crowd in check or without a move, nor his king attacked), the one costing the crowd nearest the middle of `dragLoss` (0.1 to 0.9 pawns, log-odds as Big Boy's bounce), seeded among ties; none in the band (or a game already decided): none, and he tries again after his next move. A base on the board; `?power=drag`: from turn 2, every 2 | **SHOWDOWN!** (an engine-shaped power, below; Eric, Oct 13: "he checks every turn after three or four moves, and the moment it's ready he fires it with no warning"): **his own meter**, not the rage meter (`BossRules.meter`, `showdownMeter`): his moves fill it, `showdownMeterTurns` (5) from empty, nothing else (no strike rage, no eval speed-up); full, he says "I've got you in my sights." once (a beat of his, `ready`) and swings both ropes (his `ready` loop) until he fires. From then on, on the first of his turns where a line-up qualifies after his move, he fires, no other warning, no "Not yet...": three pairs, a rook, a bishop and a knight of each side (never queens; a pair that can't be formed is replaced by a second rook pair, then a second knight pair), or two (the rook and a minor) when no three-pair line-up qualifies, facing each other anywhere on ranks 2-7 (0 or 1 empty squares between, knights a jump apart, bishops on their color), his pieces protected (`checkLineup`, `pairKinds`); the crowd's next move must be one of the duels (its piece taking his; none legal: a normal move). The best duel gains him `showdownEdge` pawns over the position before (nearest `showdownTarget`), a wrong one costs the crowd `showdownTrap` more. Nothing qualifies: he plays on (drags carry on) and tries again next turn. His reply to the duel, and his next moves while a line-up piece is still attacked, up to `showdownEngineMoves`, are the engine's best at full strength (`engineMoveDue`; never his brain's). Then the meter empties and fills again; at most `showdownMax` a battle (then no meter). The admins' trigger: the meter full at once, fired at his next turn, the best line-up even outside the band (`outside`, on their debug line) if none inside is found in `showdownTestMs`; no pairs to line up: a drag stands in. On screen he drops into the middle winding up both loops, leaps to his corner and his ropes yank each pair in; "DRAW!"; the duels glow and the dock says "Showdown! Take one of his three." (the God King quiet about threats he can't heed, his own word at "DRAW!") |
+| Wrangler (`pig`; the code id stays `pig`: "wrangler" is Cloudflare's CLI here) | from the starting position, Black as every raid boss (`?side=b` turns it round); his first move is the **long pull** (`pullOptions`, `pullFrom`): a center pawn's double step, then lassoed one square further, three squares in one move (e2-e5 or d2-d5 as White; d7-d4 or e7-e4 as Black after the crowd's first move), the engine's pick of the d- or e-pawn; none sound (it would hang the pawn: a crowd pawn on it, more attackers than defenders, or more than `pullMaxLoss` pawns against his best ordinary move; its path or square taken): an ordinary first move. The board's history keeps the legal double step and a base with the pawn one square on; the screens name it as the pull (`d4`) | **Lasso drag** (`dragOptions`, `dragFrom`): after his move, from turn `dragFirst`, every `dragEvery` turns, a crowd piece (never the king, never a bishop: it would change color) dragged one square up, down, left or right onto an empty square (a pawn never onto the first or last rank; never leaving the crowd in check or without a move, nor his king attacked), the one costing the crowd nearest the middle of `dragLoss` (0.1 to 0.9 pawns, log-odds as Big Boy's bounce), seeded among ties; none in the band (or a game already decided): none, and he tries again after his next move. A base on the board; `?power=drag`: from turn 2, every 2 | **SHOWDOWN!** (an engine-shaped power, below; Eric, Oct 13: "he checks every turn after three or four moves, and the moment it's ready he fires it with no warning"): **his own meter**, not the rage meter (`BossRules.meter`, `showdownMeter`): his moves fill it, `showdownMeterTurns` (5) from empty, nothing else (no strike rage, no eval speed-up); full, he says "I've got you in my sights." once (a beat of his, `ready`) and swings both ropes (his `ready` loop) until he fires. From then on, on the first of his turns where a line-up qualifies after his move, he fires, no other warning, no "Not yet...": three pairs, a rook, a bishop and a knight of each side (never queens; a pair that can't be formed is replaced by a second rook pair, then a second knight pair), or two (the rook and a minor) when no three-pair line-up qualifies, facing each other anywhere on ranks 2-7 (0 or 1 empty squares between, knights a jump apart, bishops on their color), his pieces protected (`checkLineup`, `pairKinds`); the crowd's next move must be one of the duels (its piece taking his; none legal: a normal move). The best duel gains him `showdownEdge` pawns over the position before (nearest `showdownTarget`), a wrong one costs the crowd `showdownTrap` more. Nothing qualifies: he plays on (drags carry on) and tries again next turn. His reply to the duel, and his next moves while a line-up piece is still attacked, up to `showdownEngineMoves`, are the engine's best at full strength (`engineMoveDue`; never his brain's). Then the meter empties and fills again; at most `showdownMax` a battle (then no meter). The admins' trigger: the meter full at once, fired at his next turn, the best line-up even outside the band (`outside`, on their debug line) if none inside is found in `showdownTestMs`; no pairs to line up: a drag stands in. On screen he drops into the middle winding up both loops, leaps to his corner and his ropes yank each pair in; "DRAW!"; the duels glow and the dock says "Take one of his three duels." (the God King quiet about threats he can't heed, his own word at "DRAW!") |
 | Hidden Boss (`recluse`; an admin's Boss alone, and the Crowd's boss final for everyone, solo and online: his phase 1, Oct 14) | from the starting position, never a book opening (`opening.fromStart`: he has no memorized lines; Eric, Oct 14), sides as usual (`?side=b`: he's White and moves first); his brain fixed: Maia-3 at its top rating, raw, at a fixed 2650 | **No help** (`nohelp`, `blocksKing`): the God King's move, strike and Last Stand never come; the dock's "Play move" and "Strike" have him slam the book shut and mock it (`mockKingHelp`: his lines in turn, the God King's blocked line), and each try spends its charge as if it had worked (Eric, Oct 14: `kingTried`, solo's `callKing`; one a try, the dock's count drops, none left and the God King can't be called; your move goes on). The Last Stand, which nobody calls, spends nothing. **No strikes** (`noStrikes`, Oct 14): he never knocks out the crowd's worst mover, so his card counts the moves left ("12 moves left"; the title says which move it is, Oct 15) and his intro says nothing about strikes: his real fight is a squad of four who must all reach phase 2 | **Bullet** (Eric, Oct 14): **his own meter** (`bulletMeter`), empty at turn 1, full at `bulletTurn` (7), when it comes with no warning: where he stands, the book consulted, opened like a spell book, slammed shut (`playInPlace`), his line, "BULLET!" "No added time."; from then to the end every bank is `bulletBankSeconds` (60 s; Eric, Oct 14: was 180), no per-move cap (`bulletClock`; the dock says "Bullet", the bank is your clock at the box's right), and a bank that runs out loses on time (`bossOutOfTime`: the move isn't played; "won on time"). **Then he adds time per move** (Eric, Oct 14): the first `bulletPlainMoves` (3) moves add nothing (1+0); as the next turn begins, his moment (`bulletPlus`, `RECLUSE_FX.bulletPlus` 2.8 s, the clock after it): he consults the book with a grudging line (`RECLUSE_LINES.bulletPlus`), and "+2 s a move from now on" lies across the board's middle (`.rc-plus`, not a banner); from then on each move made in time adds `bulletIncrementSeconds` (2 s) to that player's bank (`bulletIncrement`: the runner's round settings give the bullet clock that increment, and a cap no bank can reach), and the dock says "Bullet 1+2"; a move starts with the 2 s added, so as each begins your clock goes up by 2, a "+2" over it (Eric, Oct 15). The trigger at the next turn, `?power=bullet` on turn 2. Beaten: the board holds `fallMs` (4.5 s) while he collapses and mumbles (online too: the lobby's boss message with `fall`, then the results); where his **phase change** and **phase 2** follow (below: Boss alone, a solo Crowd's final), only `PHASE_CHANGE.fallMs` (1.8 s). **Online** (the Crowd's boss final) every piece runs in the shared runner as solo's: his brain on the host's device (`bossBrain` maia-raw at 2500, his moves asked at 2650, Stockfish's meanwhile or as the fallback), the God King's tries (`NetMatch.callKing` sends them, the lobby spends a charge: never a turn or a strike), the bullet clock and its increment (each person's deadline from `allowedMsFor`), a loss on time (the results' `timeout`), no strikes, his lines and moments from the shared boss view; only the mock plays on the device that tried. All through it he mutters about the team against him, about every 15 s (his chatter, below; Oct 15). Not yet sim-tested |
 | Sawyer (`sawyer`) | the game so far; his first move is a pawn's, then the **split pawn**: that pawn sawn in two, a second pawn of his on an empty square beside it (a seeded side; never where it attacks a crowd piece or gives check), both tracked. On screen (`SAWYER_LOOKS`, Oct 11) the sawn pawn morphs into two smaller whole pawns that hop to their squares and grow back to a pawn's size as they land (my call: they're ordinary pawns); `split: "halves"` brings back the old look (cut in two halves, drawn as halves wherever they go), `settle: "small"` keeps them small. If that pawn has no such square, another of his that has one (the most central, from the seed: `chooseSplit`); none, or a first move that wasn't a pawn's (a check left him none): it waits for his next pawn move. With no room for another pawn of his (8 already, 32 pieces, or as many promoted pieces as his missing pawns: the engine's limits) it waits for his first pawn move once there is | **Saw cuts:** every `sawEvery` turns from `sawFirst` (turn 3), an edge between two squares of the crowd's half that one of its moves crosses, for `sawTurns`: no straight move across it (a slide, a pawn's step, the king's, castling's way), either side; knights and diagonal moves pass; taped over as it heals | **Board saw:** the meter full, turn `boardSawFrom` or later, and a half of the board (a-d or e-h) his on material: the warning, then for `boardSawTurns` no move crosses between the d and e files (knights included), either side; then the halves rejoin |
 
@@ -106,7 +116,7 @@ solo Crowd's boss final you reached, where the other three finalists take the ot
 `phase2Mates`). **Not online yet** (four boards online, his server-side Stockfish and its fair-play hooks are a separate
 build): online, phase 1 won is the crowd's victory):
 - **The phase change** (Eric, Oct 14, reworked, then opened with the God King's absorption; `PHASE_CHANGE` in
-  `packages/app/src/recluse-phase2.ts`, about 15.8 s after a 1.8 s fall (its "PHASE 2" banner 2.4 s, Oct 15), one timeline, not skippable like a boss's
+  `packages/app/src/recluse-phase2.ts`, about 14.8 s after a 1.8 s fall (its "PHASE 2" banner 1.4 s, `BOSS_BANNER.phase2Ms`, Oct 16), one timeline, not skippable like a boss's
   intro; drawn by `screens/Recluse2.tsx`, `PhaseChangeScreen`):
   - **The absorption** (Eric, Oct 14: he plays with an engine in phase 2, so he takes the God King's; DECISIONS.md, "The
     Hidden Boss absorbs the God King"): in his place in the dock (BossDock's `king`, from `absorbKing`) the God King
@@ -138,8 +148,11 @@ build): online, phase 1 won is the crowd's victory):
   on the Hidden Boss's screens"): the subtitle adds nothing before the split (the title says "phase 2"), then
   "Chess960"; the boss bar's right side is empty (in phase 2, "N of 4 won": `bossNote`, `""` in the phase change, null
   outside phase 2, so it's tested against null); the dock never says what his or the God King's bubble or the banner
-  says: no sub-line under "The boss rises!", and as "PHASE 2" "Win all four boards" shows, "2:00 on your clock, no
-  added time".
+  says: no sub-line under "The boss rises!", and as "PHASE 2" "Win all four boards" shows, "2:00 on your clock" over
+  "No added time." (two lines: one was cut off at 360 px). The God King's bubble goes with him once he's absorbed
+  (`king="gone"`: none from an empty place). Phase 2's end: "The boss wins." (the bar says how many were won) or "All
+  four boards won!". "5 SECONDS!" is its name alone; the dock says "5 s a move, or a random one", and his `ult2` lines
+  never name the seconds (placeholders; the number is a setting).
 - **His half-engine look** (Eric, Oct 14: "if we can avoid doing any sort of changing to the sprite and just do an
   overlay, that would be sick"): from the absorption to the end of the battle (the result screen too), over every
   drawing of him (the bust, his figure by the board, his figure on the board, the results): his left eye (our right)
@@ -157,8 +170,11 @@ build): online, phase 1 won is the crowd's victory):
   Stockfish only (`phase2Brain`, `phase2BossMove`: `RECLUSE_PHASE2.elo` 2750, `nodes`, `moveMs` 900 a move), one engine
   serving the boards in turn (`phase2Next`: yours first). Each player's bank `bankSeconds` (120 s), no increment; he
   has no clock. Yours is the dock's clock, at the box's right (Oct 15). Each board's tag (`Tag`): on a computer, the
-  player's name and clock at each board's corner; on a phone, each small board's clock just above it, off its pieces,
-  and the big board none when it's yours (the player's name on one you watch). A board ends by mate, a draw, time
+  player's name and clock in a row of its own above each board, off its back rank (the four boards a little smaller for
+  it, `DESK` in `Recluse2.tsx`: 44.5% of the square each, a 4.6% row above; the phase change ends them there too; the
+  "slow move" note at the row's right); on a phone, each small board's clock just above it, off its pieces,
+  and the big board none when it's yours (the player's name on one you watch). The scoreboard has no Bank column from
+  the phase change on (`RaceTower`'s `bank`): each clock is its board's. A board ends by mate, a draw, time
   (`phase2Flags`) or resigning (`phase2Resign`); the others play on;
   the battle ends when every board is decided, won only with all four won (`phase2Outcome`). Then his reaction
   (`RECLUSE_PHASE2.endMs`: beaten, the spellbook's glow as a placeholder for his transformation; he won, his laugh) and
@@ -169,7 +185,7 @@ build): online, phase 1 won is the crowd's victory):
   `recluseSlow`; the marks flash and that board gets a "slow move" note); each shows as a red pixel X beside your board
   only (`SlowMarks`: ten slots in a column by its right edge, as Jefferson's candle shots; on a phone, by the big board;
   once, since the count is the team's: Eric, Oct 14). The team's `slowMovesForUlt`-th (10; Eric, Oct 14) brings it (`phase2Ult`): his line (`ult2`), the
-  spellbook where he stands, "5 SECONDS!" over every board (`PHASE2_ULT_BANNER_MS` 2.8 s: it had the extra second every banner has now); everyone
+  spellbook where he stands, "5 SECONDS!" over every board (`PHASE2_ULT_BANNER_MS`: a boss's banner, 1.5 s, Oct 16); everyone
   whose move it is gets a fresh 5 s from then; from then on every move has `ultMoveSeconds` (5 s), no bank, and out of
   time a random legal move is played for that player (`phase2Timeouts`, as Squads plays a missed move; never a loss on
   time). The dock's clock counts it down ("5 s a move, or a random one" beside it). Bots think past 5 s now and then before it (`botSlowChance`, `botSlowMs`). The
@@ -237,19 +253,35 @@ build): online, phase 1 won is the crowd's victory):
   turn). Solo, the battle stops there (Boss alone: "You resigned", the boss won) and the moment's timers, its engine
   work, Maia and both voices are cleared. Online, the others' battle goes on: a host who resigns hands the boss's move
   to the next device at once, and someone resigning in Lights out leaves the test (a round no longer waits for them).
-- **Banners** (Eric, Oct 15: "increase the banners for all banners by the extra second we discussed"; DECISIONS.md,
-  "Every banner a second longer"): the fighting-game banner (`FightBanner`, the powers' `PowerBanner`, the God King's
-  cut-in) is 2.5 s, its entrance and exit as at 1.5 s and the hold a second longer (one set of keyframes in
-  styles.css; FightBanner's `long` option is gone); the Last Stand's cut-in 3.1 s. Each window a banner is shown for in
-  code is a second longer (the powers' `t < …`, `THAW.bannerMs`, `BULLET.bannerMs`, `BOSS_INTRO.bannerMs`, the queen
-  banners, `KING_COMMAND.cutMs`, `LAST_STAND.bannerMs`, `PHASE_CHANGE.bannerMs`). A moment the banner would outlive
-  grows a second (`POWER_FX`: the rage warning, freeze, thaw, pie, sparkler, Hollow's extra move, toy block, saw cut,
-  the showdown's "DRAW!"); one that holds it already keeps its length, its later beats under the banner's last second
-  (the Big Bounce, the split, the lasso, the board saw, the candle, Lights out's drop). Where what follows can't run
-  under it, it moves a second later: Boingo's board turning (it would turn the banner with it: the funhouse and each
-  spin), the God King's bolt and slashes after his cut-in, the Last Stand's slide and blows. The clock rule is
-  unchanged everywhere (the crowd's clock starts after the moments; a strike stops it for `kingStrikeMs`, 4.7 s).
-  Tests: `packages/app/test/banners.test.ts`.
+- **Banners** (Eric, Oct 16: "when the bosses ult they are ulting while the banner is still up, same thing for Toy
+  Blocks: he threw it and we couldn't even see due to long banner time. Do 1 second less";
+  docs/decisions/2026-10-16-banner-timing.md): **a boss's banners are 1.5 s** (`BOSS_BANNER.ms` in settings.ts): each
+  power's (`PowerBanner`, through `PowerMoment`'s `banner`), QUEEN SLAIN! and QUEEN DOWN!, "START!", BULLET!, "5
+  SECONDS!"; "PHASE 2" 1.4 s (`BOSS_BANNER.phase2Ms`). Each is a second shorter than on Oct 15 (when every banner got a
+  second longer), and **off the board before its power plays**: a power's banner ends sooner where the power starts
+  sooner, at the beat its view passes as `until` (the toy block's, the pie's and the sparkler's throw at 1.45 s, the
+  blizzard's sweep and a thaw's melt at 1.3 s, the Big Bounce's leap at 1.3 s, Lights out's drop at 1.3 s, Boingo's spin;
+  the split's, the lasso's and the showdown's 1.3 s and the darkness's 1.25 s are their tables' `bannerMs`); Wrangler's
+  "DRAW!" from its beat to the moment's end (1.4 s). The banner's length is its band's: it slides in, holds, and is off
+  by `--fb-ms`, which `FightBanner`'s and `PowerBanner`'s `ms` set (styles.css: `fb-band-in`, then `fb-band-out` timed
+  from it; the entrances inside it come in its first 0.6 s whatever its length). The moments that grew a second for the
+  longer banner are a second shorter again (`POWER_FX`: the rage warning 1.7 s, freeze 2.3, thaw 2.2, pie 2.3, sparkler
+  2.3, Hollow's extra move 2.2, toy block 2.3, saw cut 2.3, the showdown 6 s), Boingo's board turns a second sooner
+  (`FUNHOUSE`, `SPIN`; the funhouse 5.2 s, each spin 2.6 s), "START!" makes the intro a second shorter, the phase change
+  is a second shorter, and the boss thinks at least 2 s after you take his queen (the banner and a beat:
+  `bossThinkMs`). The God King's cut-ins (2.5 s, `KING_COMMAND.cutMs`), the Last Stand's (3.1 s), FISCHER RANDOM!,
+  Squads' block line and the votes' result banner keep their Oct 15 lengths. The clock rule is unchanged everywhere
+  (the crowd's clock starts after the moments; a strike stops it for `kingStrikeMs`, 4.7 s). Tests:
+  `packages/app/test/banners.test.ts` (each power's banner read from its view's own code), `e2e/bigboy.spec.ts` (the
+  toy block's and the Big Bounce's banners off the board before the throw and the leap, frame by frame: `watchSpans`).
+- **QUEEN SLAIN! once, and only for your capture** (Eric, Oct 16: "he used his ult and idk what happened but the queen
+  slayed banner appeared for like 1 second very fast"): it plays while the boss thinks after your move took his queen
+  (`queenSlain` in `boss-timing.ts`, the screen's banner and `bossThinkMs`'s wait alike, solo and the lobby's
+  `thinkMinAt`). Big Boy's turn thinks twice on the same last move (for the bounce, then for his move), so it was played
+  again after his bounce, cut off by his move in Boss alone; now it plays only in the thinking straight after your move
+  (`powers.bounce.at` this turn: old news), the bounce waits for it online as solo did, and his move after the bounce
+  doesn't. It never plays for the boss taking your queen (Hollow thinks again after his own move for his extra move).
+  Tests: `packages/chess/test/boss-guard.test.ts`, `bigboy.test.ts`, `packages/server/test/boss-powers-lobby.test.ts`.
 - **What a boss says** (`packages/app/src/speech.tsx`, numbers in `SPEECH`; Eric, Oct 10: Ginger's line came and went
   at once): every line (its powers' moments, its ultimate, its warning, its reactions, Hollow's claim and Lights out
   words, Big Boy's snack) goes into the boss's voice and shows in its text box beside it (in the boss bar on a phone,
@@ -258,10 +290,23 @@ build): online, phase 1 won is the crowd's victory):
   line about 2.5 s, a long one about 4 s; Eric, later on Oct 10: "a few seconds… not that long"), whatever the screen
   does next. One line at a time: only a critical line (an ultimate's, Hollow's first cover of the dark, his
   claim, the battle's end) cuts in on another; the rest wait their turn, highest first, and lapse after 5 s of waiting.
-  A move that brings a power's moment says nothing of its own (the moment's line is the boss's word that turn). The
-  dock says the moment's word ("Freeze!"). Lights out's round prompt keeps its own box above the board for the whole
-  round (and the dock). Each speaker's box keeps itself current (`VoiceBubble`: it listens to its voice and draws
-  every frame while a line types and fades), so nothing around it has to be drawn again for it.
+  A move that brings a power's moment says nothing of its own (the moment's line is the boss's word that turn). Lights
+  out's round prompt keeps its own box above the board for the whole round (and the dock). Each speaker's box keeps
+  itself current (`VoiceBubble`: it listens to its voice and draws every frame while a line types and fades), so
+  nothing around it has to be drawn again for it. On a phone the boss's box is in the boss bar's name column (BossBar,
+  `.bc-bar-bubble`), from just above the bar's bottom edge upwards, never over the bar's status at its right or the line
+  and board under the bar.
+- **Nothing said twice during a power** (Oct 15; DECISIONS.md, "Nothing said twice"): **the banner names the power**
+  (with its line saying what it does to you, as before); **the dock says what it means for you, or just your clock**:
+  through a moment it keeps the turn's own line ("Boss plays Nf6"), unless the moment has words of its own where no
+  banner says it (`MomentUi.dock`: the Big Bounce, "Your pieces land on new squares."; the fireballs, "Fire on e4 and f5" or "Fire on 3 squares";
+  the fireproof laugh, "Fire burns only your pieces."); **the boss's bubble is a character line, never the power's
+  name** (Eric's own lines stay: Big Boy's "Big boy BOUNCE!", Sawyer's "Two for one!", whose banner now says "He gets a
+  second pawn"). Hollow's claim and Big Boy's snack lines are the bubble's only (the snack's dock: "You start a pawn
+  down."); Wrangler's "DRAW!" is its name alone and your move's dock says "Take one of his three duels."; the Hidden
+  Boss's "+2 s a move from now on" is the board's alone. The corner casts (the boss steps up to the board's top-left
+  corner, over the subtitle and a8, while the board isn't playable) are as designed. Test:
+  `packages/app/test/nothing-twice.test.ts`.
 - **Same for everyone online:** what a boss does and says on screen comes only from the shared match state
   (`boss-beats.ts`): one-shot animations play once per moment from when the device first saw it, loops run by the
   clock, lines are picked by a hash of the moment. No new protocol for a boss's looks (Hollow's `lights`, a field of
@@ -279,11 +324,15 @@ build): online, phase 1 won is the crowd's victory):
   In the box, the words centered and, at its right, **your clock** (`DockClock`): bold, m:ss rounded up as the big 3-2-1
   counts; running on your move, red in its last 10 s; once your move is in, it holds where it stopped, dimmed, through
   the boss's turn, the reveal and the moments, whichever screen shows it; under the bullet clock's increment a "+2"
-  rises over it as each move begins. None during Lights out, the phase change, or before your first move. The words
-  never carry the time. On a phone the God King stands on a line of his own under the row, in its middle, his words and
-  menu opening above the row; beside it only where the screen's column has 66 px right of the board
-  (`KING_BESIDE_PX`: a phone on its side). Tests: `e2e/boss-dock.spec.ts` (the edges within 1 px at six sizes, the
-  clock in every frame of three moves), `packages/app/test/boss-clock.test.ts`.
+  rises over it as each move begins. None during Lights out's rounds (their prompt and meter take the box: before the
+  first round, as the night falls, the dock keeps its layout and your held clock, "Remember where his pieces are." over
+  "Clocks stopped."), the phase change, or before your first move. Its first line wraps to two rather than being cut
+  (the box holds two and the muted line under them). The words never carry the time, nor how many have
+  picked (the line above the board says it). On a phone the God King stands on a line of his own under the row, in its
+  middle, his menu opening above the row and his words beside him to his right, on his line (a long line runs down past
+  it), never over the board or the box; beside the row only where the screen's column has 66 px right of the board
+  (`KING_BESIDE_PX`: a phone on its side, his words above him as before). Tests: `e2e/boss-dock.spec.ts` (the edges
+  within 1 px at six sizes, the clock in every frame of three moves), `packages/app/test/boss-clock.test.ts`.
 - **The boss screen on a computer** (Eric, Oct 11): the boss by the board's bottom-left corner, the God King by its
   bottom-right, mirroring him (feet level, as far from the board); the status box under the board at its width; the
   column beside the board starts after the God King. The eval bar draws behind them both. A phone is unchanged.
@@ -296,9 +345,12 @@ build): online, phase 1 won is the crowd's victory):
   alone until their key changes: the header with the boss bar, the boss by the board and the chat or scoreboard under
   it, on `useStillKey` (`hooks.ts`: the match changing, the boss's state changing, and every 200 ms, as often as your
   move's screen draws, for what they read as they're drawn); the dock on the same key plus the few clock-read values
-  its words use (the moment, the burn line, the claim and snack windows, the funhouse's move, "Your move in N"; every
-  frame during Lights out, whose prompt counts down). The phase change and phase 2 keep the header and the boss's place
-  the same way; their docks draw every frame. What draws itself every frame inside them does it on its own
+  its words use (the moment's dock words, the burn line, the snack window, the funhouse's move, "Your move in N";
+  every frame during Lights out, whose prompt counts down). The phase change and phase 2 keep the header and the boss's place
+  the same way. The phase change's dock draws every frame (its words change with the clock); phase 2's (`SimulDock`,
+  Oct 16, docs/decisions/2026-10-16-the-reveal-draws-only-what-changed.md) is memoized on its words, the still key and
+  the whole seconds on your clock, read from the same frame time as the boards' clocks, so it and they tick in the same
+  frame. The crowd's reveal in a raid and the Last Stand (`CrowdReveal`) does the same: [crowd.md](crowd.md). What draws itself every frame inside them does it on its own
   clock: Hollow's bulb strip through his turn (`BossBarExtra`), the speakers' words (`VoiceBubble`), the God King
   while he commands or says "can't"; their figures animate on their own canvases' loops as before.
 - **The bars at the back, the ice on its square, the queen banners silent** (Eric, Oct 11): the move clock's bars above
@@ -345,7 +397,7 @@ Each boss lives in its own files, one per layer, on a shared base. The shared fi
 | The lobby server | `packages/server/src/lobby.ts` (the boss's turn; the host-engine requests for the extra move and the bounce, and what his turn `asks` besides his move: Wrangler's pull, drag and showdown), `packages/server/src/bosses/base.ts` (`BossLobby`) | `packages/server/src/bosses/hollow.ts` (dark tries, Lights out) |
 | Solo | `packages/app/src/solo.ts` (drives the same runner; its own timing of Lights out; Wrangler's scout on your turn) | |
 | The host's engine work | `packages/app/src/net.ts` (`hostBoss` and its kin; Wrangler's `pigTurn` and scout) | |
-| Art and sounds | `characters/index.ts` (`CHARACTERS`), `characters/kits.ts` (`BOSS_KITS`: animations per moment, lines, portrait; optional `bar` (a phone's bar's own drawing), `loops` (a loop by another name), `fall` (lines said in turn once beaten), `lineOf` (a line from the battle)), `characters/power-art.ts` (each power's moments and effects) | `characters/<boss>.ts`, `<boss>-sounds.ts` (`gingerbread`, `clown`, `grex`, `hollow`, `bigboy`, `sawyer`, `pig`, `recluse`; his lines in one table, `recluse-lines.ts`) |
+| Art and sounds | `characters/index.ts` (`CHARACTERS`), `characters/kits.ts` (`BOSS_KITS`: animations per moment, lines, portrait; optional `bar` (a phone's bar's own drawing), `loops` (a loop by another name), `fall` (lines said in turn once beaten), `lineOf` (a line from the battle)), `characters/power-art.ts` (each power's moments and effects); a frame's cue sound plays as `SpriteAnim` draws it, or a moment late when a slow frame skipped it (`framesSince`, `components/BossEffect.tsx`) | `characters/<boss>.ts`, `<boss>-sounds.ts` (`gingerbread`, `clown`, `grex`, `hollow`, `bigboy`, `sawyer`, `pig`, `recluse`; his lines in one table, `recluse-lines.ts`) |
 | Board effect sprites | `characters/effects.ts` (`EFFECT_SPRITES`), `characters/effects/common.ts` | `characters/effects/<boss>.ts`: `ginger.ts`, `boingo.ts`, `grex.ts`, `hollow.ts`, `bigboy.ts`, `sawyer.ts` |
 | Speech: every line's time and turn, the text box | `packages/app/src/speech.tsx` (`Voice`, `bossVoice`, `SpeechBox`, `VoiceBubble`, `holdMs`); power moments' lines said in `BossPowers.tsx` (`useMomentSpeech`), reactions in `BossCharacter.tsx` | a moment's `line`, `lineAt` and `priority` in its `BossUi` (only when the kit's lines aren't the whole story) |
 | Powers on screen: moments, banners, the board layer, the rage meter | `components/BossPowers.tsx` (`momentsOf`, `PowerMoment`, `PowerBoard`, `BossBarExtra`, `dockLine`, the warning), `components/PowerParts.tsx` (`BossUi`, `Moment`, `Flight`, `PowerBanner`), `components/BossEffect.tsx`; `playInPlace` (`BossCharacter.tsx`: a run of a boss's own animations where it stands, over its beat) | `components/Ginger.tsx`, `Boingo.tsx`, `Grex.tsx`, `Hollow.tsx` (+ `LightsOut.tsx`), `BigBoy.tsx`, `Sawyer.tsx`, `Pig.tsx`, `Recluse.tsx` |
@@ -385,7 +437,7 @@ A boss's rules are a `BossRules` object; every hook sees only its own boss's bat
 | `opening` | `fromStart`, `crowdWhite`, `setUp` before move 1 | Hollow, Big Boy (the snack), Sawyer (his cuts from turn 3) |
 | `view(p)` | Its fields for the screens (`NetBossPowers`) | Hollow, Big Boy, Sawyer, Wrangler (his meter `ready`, the `scout` cue) |
 
-A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` word, `appearAt`, `own` screen, `line`, `lineAt`, `priority`, `view`), its ultimate's name for the warning, an optional `bar` piece by the rage meter and its `board` layer. A moment's line is said for it (its kit's line for the moment, as the moment begins, an ultimate's critical): a view never draws a boss's words itself. While a moment plays the boss's figure leaves its spot (it steps up to cast), unless the view's root has `pm-stay` (a moment it doesn't cast in: Ginger's thaw).
+A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` words where no banner says what it means, `appearAt`, `own` screen, `line`, `lineAt`, `priority`, `view`), its ultimate's name for the warning, an optional `bar` piece by the rage meter and its `board` layer. A moment's line is said for it (its kit's line for the moment, as the moment begins, an ultimate's critical): a view never draws a boss's words itself. While a moment plays the boss's figure leaves its spot (it steps up to cast), unless the view's root has `pm-stay` (a moment it doesn't cast in: Ginger's thaw).
 
 ### Adding a boss
 

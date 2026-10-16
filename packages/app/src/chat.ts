@@ -1,3 +1,4 @@
+import { isBlocked } from "./friends.ts";
 import {
   QUICK_CHAT,
   botChatLines,
@@ -46,7 +47,10 @@ export interface ChatHost {
   teams: () => boolean;
   /** The lines and emoji this player picked in their profile (their account's; missing: the defaults). */
   picks: () => StoredChatPicks | null | undefined;
-  /** A person's account (a seat's player in this lobby): mutes are by account (chat-mod.ts). Missing: a bot, or no account. */
+  /**
+   * A player's account (their seat's uid), for what's kept by account: who you've muted (chat-mod.ts) and who you've
+   * blocked (friends.ts). Missing: a bot, or no account.
+   */
   uidOf?: (playerId: string) => string | undefined;
 }
 
@@ -186,18 +190,23 @@ export class MatchChat {
 
   // ---------------- Muting, reporting and off ----------------
 
-  /** A player whose lines don't show here: muted (their account on this device, or a bot for this match). */
-  hidden(id: string): boolean {
-    return this.muted.has(id) || mutes.has(this.host.uidOf?.(id));
+  /**
+   * A sender whose lines don't show here: muted (their account on this device, or a bot for this match), or an account
+   * you've blocked (friends.ts).
+   */
+  hidden(from: string): boolean {
+    const uid = this.host.uidOf?.(from);
+    return this.muted.has(from) || mutes.has(uid) || isBlocked(uid);
   }
 
+  /** Muted by this device (their account, or a bot for this match); a block is friends' (hidden, not muted). */
   isMuted(id: string) {
-    return this.hidden(id);
+    return this.muted.has(id) || mutes.has(this.host.uidOf?.(id));
   }
 
   /** The players muted here: this match's, and those with a line in this chat whose account is muted. */
   mutedIds(): string[] {
-    return [...new Set([...this.muted, ...this.list.map((l) => l.from).filter((id) => id !== this.host.me() && this.hidden(id))])];
+    return [...new Set([...this.muted, ...this.list.map((l) => l.from).filter((id) => id !== this.host.me() && this.isMuted(id))])];
   }
 
   /**

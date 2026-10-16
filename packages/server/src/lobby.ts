@@ -13,7 +13,7 @@ import {
   bossThinkMs,
   powerMomentMs,
   LAST_STAND_MS,
-  lastMoveTookQueen,
+  queenSlain,
   legalMoves,
   netBoard,
   boardSlots,
@@ -132,7 +132,10 @@ export interface Human {
   connected: boolean;
   device: "phone" | "computer";
   practice?: boolean;
-  /** The rating on their profile (for a boss raid's strength). */
+  /**
+   * The rating stored on their account (`users.rating`, which the Durable Object reads as they join; never a number
+   * their app sends), for a boss raid's strength. Null: none yet, or no account (the prior).
+   */
   rating?: number | null;
   /** The boss they met last (a BOSS_ROSTER id): the next raid avoids the one most of the lobby met. */
   lastBoss?: string | null;
@@ -188,6 +191,8 @@ export interface LeftHuman {
 
 /** What someone coming back to a seat they left is told (their app goes home with a note of its own). */
 export const LEFT_MATCH = "You left that match.";
+/** What someone coming back to a seat on a different account is told (the seat keeps the account it was taken on). */
+export const OTHER_ACCOUNT = "That seat belongs to another account.";
 
 export type Timer =
   | "bossPlay"
@@ -453,6 +458,9 @@ export class LobbyCore {
     private settings: Settings = DEFAULT_SETTINGS,
   ) {
     this.settings = { ...settings, ...(record.overrides ?? {}) };
+    // The bosses resting now (kill switches: the Durable Object passes them in each time): never met, whatever the
+    // lobby was made with (one made before a boss was rested, by code, picked for a raid, or a queue's filling lobby).
+    if (settings.bossesOff) this.settings = { ...this.settings, bossesOff: settings.bossesOff };
     if (record.moveClock) this.settings = { ...this.settings, moveClockSeconds: record.moveClock, moveClockSteps: [] };
     if (record.runner) {
       this.runner = MatchRunner.restore(record.runner, { settings: this.settings, rng, engines: [], library });
@@ -627,9 +635,9 @@ export class LobbyCore {
     return (this.runner?.leaderboard() ?? []).map((s) => ({ ...s, ...(looks.has(s.id) ? { look: looks.get(s.id)! } : {}), ...(uid(s.id) ? { uid: uid(s.id) } : {}) }));
   }
 
+  /** How many would go through if the stage's cut came now (ties at the line go through). */
   private cutoff(): number {
-    const alive = this.runner!.alive().length;
-    return alive - (this.settings.knockoutsPerStage[this.runner!.state.stage] ?? 0);
+    return this.runner!.cutoff();
   }
 
   private aliveHumans(): Human[] {
@@ -670,6 +678,9 @@ export class LobbyCore {
   ) {
     this.r.activeAt = this.io.now();
     const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
+    // A seat keeps the account it was taken on: its rating set the raid's boss, and its result goes to that account.
+    // Back on another one (or on one when it had none), they're refused (docs/decisions/2026-10-16-server-side-rating.md).
+    if (existing && userId && userId !== this.r.accounts?.[existing.id]) return { ok: false as const, message: OTHER_ACCOUNT };
     // (Bots off: seats of people long gone are freed first, so the count and "full" are real. Not the arriving one's.)
     this.freeGoneSeats(existing?.id);
     if (existing) {
@@ -680,7 +691,6 @@ export class LobbyCore {
       if (look !== undefined) existing.look = cleanLook(look);
       if (bossDef(lastBoss)) existing.lastBoss = lastBoss;
       if (evalBar !== null) existing.evalBar = evalBar;
-      if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [existing.id]: userId };
       if (!this.r.hostId || !this.human(this.r.hostId)?.connected) this.r.hostId = existing.id;
       this.send(existing.id, { t: "welcome", playerId: existing.id, token: existing.token, code: this.r.code }, false);
       this.broadcast(this.lobbyMessage(existing.id), false);
@@ -1233,7 +1243,8 @@ export class LobbyCore {
         return this.bossTimeout();
       case "bossPlay":
         this.r.bossMinAt = undefined;
-        return this.r.bossPending ? this.playBoss(this.r.bossPending, this.r.bossPendingExtras ?? {}) : undefined;
+        // (A held bounce may be "": nothing within the cap, the bounces still play.)
+        return this.r.bossPending !== undefined ? this.playBoss(this.r.bossPending, this.r.bossPendingExtras ?? {}) : undefined;
       case "autoStart":
         // Matchmade: time's up, bots fill the rest (if anyone is still here). Bots off: a raid with enough people begins.
         if (this.r.humans.some((h) => h.connected) && this.dueToStart()) this.startMatch();
@@ -1345,17 +1356,24 @@ export class LobbyCore {
     this.r.phase = "boss";
     this.r.bossKey = `b-${++this.r.counter}`;
     this.r.bossKind = this.runner!.bossMoveKind();
-    // You just took its queen: the boss's reply waits for your banner (otherwise it shows as soon as it's ready).
-    const board = this.runner!.boards.get(this.runner!.state.boards[0]!)!;
-    // (G-REX's fire has just burnt something: that plays first too.)
-    const b = this.runner!.state.boss;
-    const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves && (x.piece || x.fizzled));
-    this.r.bossMinAt = lastMoveTookQueen(board.history, board.bases) || burnt ? this.io.now() + bossThinkMs(board.history, board.bases, burnt) : undefined;
+    this.r.bossMinAt = this.thinkMinAt();
     this.broadcast(this.bossMessage(0, { thinking: true }));
     const host = this.hostNow();
     this.r.hostId = host;
     if (host) this.sendBossRequest(host);
     this.setTimer("bossTimeout", this.io.now() + bossTimeoutMs(this.bossAsks()));
+  }
+
+  /**
+   * The soonest the boss's thinking may end (undefined: as soon as the host answers). You just took his queen: your
+   * banner plays first (queenSlain: in the thinking straight after your move only, so Big Boy's bounce waits for it and
+   * his move after the bounce doesn't). G-REX's fire has just burnt something: that plays first too.
+   */
+  private thinkMinAt(): number | undefined {
+    const view = this.runner!.bossView()!;
+    const b = this.runner!.state.boss;
+    const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves && (x.piece || x.fizzled));
+    return queenSlain(view) || burnt ? this.io.now() + bossThinkMs(view, burnt) : undefined;
   }
 
   /** What the boss's own turn asks the host for besides its move (Wrangler's long pull, drag or showdown), or null. */
@@ -1412,7 +1430,7 @@ export class LobbyCore {
     this.r.phase = "boss";
     this.r.bossKey = `y-${++this.r.counter}`;
     this.r.bossKind = "bounce";
-    this.r.bossMinAt = undefined;
+    this.r.bossMinAt = this.thinkMinAt();
     this.r.bounceCandidates = this.runner!.bounceCandidates();
     this.broadcast(this.bossMessage(0, { thinking: true }));
     const host = this.hostNow();
@@ -1456,6 +1474,14 @@ export class LobbyCore {
 
   private playBoss(move: string, extras: { drag?: string; showdown?: string; outside?: boolean } = {}) {
     this.r.bossKey = undefined;
+    // Too soon (your queen banner is still up): hold the move (or Big Boy's bounce) until then.
+    if (this.r.bossMinAt && this.io.now() < this.r.bossMinAt - 50) {
+      this.r.bossPending = move;
+      this.r.bossPendingExtras = extras;
+      return this.setTimer("bossPlay", this.r.bossMinAt);
+    }
+    this.r.bossPending = undefined;
+    this.r.bossPendingExtras = undefined;
     if (this.r.bossKind === "bounce") {
       // The Big Bounce: the position the host picked (one of the candidates, else nothing moves); it plays out, then
       // his move.
@@ -1483,14 +1509,6 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
-    // Too soon (your queen banner is still up): hold the move until then.
-    if (this.r.bossMinAt && this.io.now() < this.r.bossMinAt - 50) {
-      this.r.bossPending = move;
-      this.r.bossPendingExtras = extras;
-      return this.setTimer("bossPlay", this.r.bossMinAt);
-    }
-    this.r.bossPending = undefined;
-    this.r.bossPendingExtras = undefined;
     // (Wrangler's drag or showdown line-up: the runner checks each against his rules before it's used.)
     this.runner!.applyBossMove(move, undefined, { drag: extras.drag ?? null, showdown: extras.showdown ?? null, outside: extras.outside ?? null });
     // As the turn passes to the crowd, any power that comes with it (a freeze, a pie, the warning, the blizzard)
@@ -1908,7 +1926,7 @@ export class LobbyCore {
         fenBefore: mine?.fenBefore ?? null,
         bestMove: mine?.bestMove ?? null,
         playedMove: mine?.result.playedMove ?? null,
-        picks: mine?.result.players.map((p) => ({ playerId: p.playerId, move: p.move, loss: p.loss, roundScore: p.roundScore, ...(p.usedPowerUp ? { usedPowerUp: true } : {}) })) ?? [],
+        picks: mine?.result.players.map((p) => ({ playerId: p.playerId, move: p.move, loss: p.loss, ...(p.counted !== undefined ? { counted: p.counted } : {}), ...(p.material ? { material: p.material } : {}), roundScore: p.roundScore, ...(p.usedPowerUp ? { usedPowerUp: true } : {}) })) ?? [],
         drawRule: mine?.result.drawRule ?? "random",
         ...(mine?.king !== undefined ? { king: mine.king, kingCalls: mine.kingCalls } : {}),
         ...(mine?.lastStand ? { lastStand: mine.lastStand } : {}),
@@ -2075,7 +2093,7 @@ export class LobbyCore {
     const out = new Set<string>();
     for (const side of ["w", "b"] as const) {
       const team = rows.filter((r) => r.team === side && !r.out);
-      for (const id of cutBubble(team, team.length - Math.floor(k / 2), this.settings.recheckCutPoints)) out.add(id);
+      for (const id of cutBubble(team, team.filter((r) => !r.cut).length, this.settings.recheckCutPoints)) out.add(id);
     }
     return out;
   }

@@ -370,7 +370,7 @@ function blockMoment({ moment, t, orientation, banner, cast }: MomentProps) {
   const letter = moment.square ? blockLetter(moment.square) : "A";
   return (
     <div class="power-moment pm-block">
-      {t < 2500 && banner("TOY BLOCK!", moment.square ? `Blocked: ${moment.square}` : undefined, "toy")}
+      {banner("TOY BLOCK!", moment.square ? `Blocked: ${moment.square}` : undefined, "toy", BLOCK.flyAt)}
       {cast("toss", BLOCK.flyAt)}
       {moment.square && t >= BLOCK.flyAt && t < BLOCK.landAt && (
         <Flight name="blockFly" anim={`fly${letter}`} square={moment.square} orientation={orientation} since={moment.at + BLOCK.flyAt} ms={BLOCK.landAt - BLOCK.flyAt} />
@@ -379,10 +379,10 @@ function blockMoment({ moment, t, orientation, banner, cast }: MomentProps) {
   );
 }
 
-function bounceMoment({ boss, moment, now, t, orientation, banner }: MomentProps) {
+function bounceMoment({ boss, moment, now, orientation, banner }: MomentProps) {
   return (
     <div class="power-moment pm-bounce">
-      {t < 2300 && banner("BIG BOUNCE!", undefined, "toy")}
+      {banner("BIG BOUNCE!", undefined, "toy", BOUNCE.leapAt)}
       <BigBounce boss={boss} moment={moment} now={now} orientation={orientation} />
     </div>
   );
@@ -394,9 +394,10 @@ export const BIGBOY_UI = {
   // (His Big Bounce comes at the start of his turn, after your move.)
   ultimate: { name: "the Big Bounce", when: "After your move" },
   moments: {
-    block: { order: 0, kit: "power", dock: "Toy block!", appearAt: (m, square) => (m.square === square ? m.at + BLOCK.landAt : undefined), view: blockMoment },
+    block: { order: 0, kit: "power", appearAt: (m, square) => (m.square === square ? m.at + BLOCK.landAt : undefined), view: blockMoment },
     // The Big Bounce, at the start of his turn before his move: its own screen.
-    bounce: { order: 3, kit: "ultimate", dock: "Big Bounce!", own: (boss) => !!boss.powers?.bounce && boss.powers.bounce.at === boss.crowdMoves && boss.powers.events.some((e) => e.kind === "bounce"), view: bounceMoment },
+    // (Its banner is its name alone: what it does to you, in the dock.)
+    bounce: { order: 3, kit: "ultimate", dock: () => "Your pieces land on new squares.", own: (boss) => !!boss.powers?.bounce && boss.powers.bounce.at === boss.crowdMoves && boss.powers.events.some((e) => e.kind === "bounce"), view: bounceMoment },
   },
   // His toy block: landing as his toss arrives, sitting while it lasts, puffing away as it goes.
   board: ({ boss, orientation, now, appearAt }) => {

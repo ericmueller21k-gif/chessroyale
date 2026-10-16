@@ -26,12 +26,19 @@ async function play(page: Page, opts: { leave?: boolean; step?: boolean } = {}) 
     const m = (window as any).match;
     return { fire: (m.boss?.powers?.fire ?? []) as { square: string; stage: number }[], allowed: (m.boss?.powers?.allowed ?? null) as string[] | null };
   });
-  const best = top[0]?.move ?? null;
   const chess = new Chess(fen);
+  // Never a move that ends the game: the test watches the candle's waves through turn 13, and the engine's best moves
+  // can mate him before then (docs/decisions/2026-10-15-flaky-e2e-batch.md).
+  const goesOn = (mv: string) => {
+    const after = new Chess(fen);
+    after.move({ from: mv.slice(0, 2), to: mv.slice(2, 4), promotion: mv[4] });
+    return !after.isGameOver();
+  };
   const legal = chess
     .moves({ verbose: true })
     .map((mv) => mv.from + mv.to + (mv.promotion ?? ""))
-    .filter((mv) => !allowed || allowed.includes(mv));
+    .filter((mv) => (!allowed || allowed.includes(mv)) && goesOn(mv));
+  const best = top.map((t) => t.move).find((mv) => legal.includes(mv)) ?? null;
   const mine = (sq: string) => {
     const pc = chess.get(sq as never);
     return !!pc && pc.color === chess.turn() && pc.type !== "k";
@@ -235,19 +242,23 @@ test("an admin's test trigger against Ginger, pressed during your turn: the bliz
   await expect(btn).toBeDisabled();
   // This turn goes on as it was.
   expect((await powers(page)).allowed).toBeNull();
+  // (The blizzard's and a thaw's banners are up for 1.3 s, Oct 16: watched for from before they can appear.)
+  const blizzard = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /BLIZZARD!/ } });
   await play(page);
-  await expect(banner(page, "BLIZZARD!")).toBeVisible({ timeout: 30_000 });
+  await expect.poll(async () => (await blizzard.seen()).banner, { timeout: 30_000 }).toBe(true);
   await expect(banner(page, "RAGE!")).toHaveCount(0);
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
   await expect(btn).toHaveText("Ultimate under way (testing)");
   expect((await powers(page)).allowed.length).toBeGreaterThan(0);
   // Under way through its three turns (Oct 12): the thaw, then the ice gone.
+  const thawing = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /THAWING!/ } });
   await play(page);
-  await expect(banner(page, "THAWING!")).toBeVisible({ timeout: 30_000 });
+  await expect.poll(async () => (await thawing.seen()).banner, { timeout: 30_000 }).toBe(true);
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
   await expect(btn).toHaveText("Ultimate under way (testing)");
+  const thawed = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /THAWED!/ } });
   await play(page);
-  await expect(banner(page, "THAWED!")).toBeVisible({ timeout: 30_000 });
+  await expect.poll(async () => (await thawed.seen()).banner, { timeout: 30_000 }).toBe(true);
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
   await expect(btn).toHaveText("Ultimate under way (testing)");
   expect((await powers(page)).allowed).toBeNull();
@@ -258,8 +269,9 @@ test("an admin's test trigger against Ginger, pressed during your turn: the bliz
   expect((await powers(page)).rage).toBeLessThan(0.5);
   await btn.click();
   await expect(btn).toHaveText("Ultimate next turn (testing)");
+  const again = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /BLIZZARD!/ } });
   await play(page);
-  await expect(banner(page, "BLIZZARD!")).toBeVisible({ timeout: 30_000 });
+  await expect.poll(async () => (await again.seen()).banner, { timeout: 30_000 }).toBe(true);
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
   expect((await powers(page)).ults).toBe(2);
 });

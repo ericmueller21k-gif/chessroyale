@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { BOSS_POWERS } from "@chessroyale/core";
+import { BOSS_BANNER, BOSS_POWERS } from "@chessroyale/core";
 import { LIGHTS_OUT, lightsDeadline, lightsHeld, lightsOutTimeline, lightsRate } from "@chessroyale/chess";
 import { bossKit } from "../characters/kits.ts";
 import { animLength, cueAt, lightsOutSmashes, lightsOutSpot, nightItems, nightWarmList, type NightState, type SquareItem } from "../characters/power-art.ts";
@@ -26,6 +26,8 @@ import { boardSquares } from "../board/dom.ts";
 /** The night closing over a square again, and the dawn crossing the whole board (its stagger from his spot, and a tile's). */
 const CLOSE_MS = 500;
 const DAWN_MS = 1700;
+/** "LIGHTS OUT!": a boss's banner, off the board as he drops onto it (LIGHTS_OUT.dropAt). */
+export const LIGHTS_BANNER_MS = Math.min(BOSS_BANNER.ms, LIGHTS_OUT.dropAt);
 
 /** When this device first saw each found square, wrong tap and round end (a screen drawn again carries on). */
 const seenAt = new Map<string, number>();
@@ -93,7 +95,8 @@ export function lightsStatus(lights: LightsView, graceMs: number, now: number): 
     const text = v === "failed" ? "He moves twice!" : v === "held" ? "The light holds." : "The lights are back.";
     return { prompt: text, short: text, note: n ? `Missed ${n}: −${n * cost}` : "You found every piece.", meter: true, key: "back" };
   }
-  if (b.round < 0) return { prompt: "Lights out!", short: "Lights out!", note: "Clocks stopped.", meter: false, key: "start" };
+  // (Before the first round the boss screen's dock keeps its usual layout and says this itself: Boss.tsx.)
+  if (b.round < 0) return { prompt: "Remember where his pieces are.", short: "Remember his pieces.", note: "Clocks stopped.", meter: false, key: "start" };
   const r = lights.rounds[b.round]!;
   const mine = lights.mine[b.round] ?? { found: [], wrong: [] };
   const targets = r.targets ?? r.pieces;
@@ -256,8 +259,8 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
       </div>
       {!gone && (
         <div class="power-moment pm-lights">
-          {/* (Its banner a second past his drop: every banner a second longer, Eric, Oct 15; nobody's clock runs.) */}
-          {t < LIGHTS_OUT.dropAt + 1000 && <PowerBanner boss={boss} side={boss.crowdSide} text="LIGHTS OUT!" tone="dark" />}
+          {/* (Its banner off the board as he drops: Eric, Oct 16, a boss's banners a second shorter again.) */}
+          {t < LIGHTS_BANNER_MS && <PowerBanner boss={boss} side={boss.crowdSide} text="LIGHTS OUT!" tone="dark" ms={LIGHTS_BANNER_MS} />}
           {anim && (
             <span class="pm-hollow-spot" style={{ left: `${spot.left}%`, top: `${spot.top}%`, width: `${spot.width}%`, aspectRatio: `${kit.ch.w} / ${kit.ch.h}` }}>
               <BossMoment boss={boss.name} anim={(anim as { name: string }).name} since={(anim as { since: number }).since} then={(anim as { then?: string }).then} />

@@ -211,7 +211,8 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes,
   await expect(page.locator(".boss-dock-status .bullet-note strong")).toHaveText("Bullet");
   expect(await page.evaluate(() => (window as any).match.phase.allowedMs as number)).toBe(await page.evaluate(() => (window as any).match.runner.player("you").bankMs as number));
   // Then he adds time per move as the next begins: his line, the increment across the board while his moment holds the
-  // screen (the clock not running), the dock's time control.
+  // screen (the clock not running), the dock's time control. The board says the increment, so the dock never does
+  // (nothing said twice at once).
   const plus = await watchFor(page, {
     text: { selector: ".rc-plus", text: /^\+2 s a move from now on$/ },
     line: { selector: ".bc-bubble", text: /Too fast, even for real chess|a lottery, not chess|real chess this fast/ },
@@ -234,7 +235,7 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes,
   await play(page, await quietMove(page));
   const heldText = await page.locator(".dk-clock.held .dk-time").textContent();
   await yourMove(page);
-  expect(await plus.seen()).toEqual({ text: true, line: true, dock: true, consult: true });
+  expect(await plus.seen()).toEqual({ text: true, line: true, dock: false, consult: true });
   await expect.poll(() => tick.seen()).toEqual({ plus: true });
   const secs = (t: string | null) => (t ? Number(t.split(":")[0]) * 60 + Number(t.split(":")[1]) : NaN);
   const startText = await page.evaluate(() => {
@@ -462,7 +463,7 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     dockRepeat: { selector: ".boss-dock-status", text: /Mind and engine|Phase 2!|Every board must be won/ },
     barPhase: { selector: ".boss-next", text: /Phase 2/ },
     beaten: { selector: ".rc-change .opening-name", text: /the boss is beaten|phase 2:/ },
-    clockLine: { selector: ".boss-dock-status", text: /^2:00 on your clock, no added time$/ },
+    clockLine: { selector: ".boss-dock-status .dk-text", text: /^2:00 on your clockNo added time\.$/ },
   });
   expect(await fall.seen()).toMatchObject({ collapse: true, dock: true });
   const at = Date.now();
@@ -520,7 +521,7 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   await simulPlay(page, "h5f7");
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
   await expect(page.locator(".results h1")).toHaveText("Victory!");
-  await expect(page.locator(".team-result")).toContainText("You beat Hidden Boss on all 4 boards!");
+  await expect(page.locator(".team-result")).toContainText("You beat the Hidden Boss on all 4 boards!");
   // His defeat in phase 2 (a placeholder for his transformation: the spellbook's glow, his hair in the wind).
   await expect(page.locator(".boss-char.place-results")).toHaveAttribute("data-anim", /spellbook2|spellLoop2/, { timeout: 10_000 });
   expect(await change.seen()).toMatchObject({ idle2: true, reviveLine: true });
@@ -550,6 +551,25 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
   expect(eye.x + eye.width).toBeLessThan(fig.x + fig.width);
   expect(eye.y).toBeGreaterThan(fig.y);
   expect(eye.y + eye.height / 2).toBeLessThan(fig.y + fig.height * 0.6);
+  if (test.info().project.name !== "phone") {
+    // A computer: each board's tag (name and clock) in the row above it, never over its back rank (Chess960's is random),
+    // inside the square of four; and the scoreboard has no Bank column (each clock is its board's, on its tag).
+    const tags = await page.evaluate(() =>
+      [...document.querySelectorAll(".rc-played")].map((cell) => {
+        const tag = cell.querySelector(".rc-tag")!.getBoundingClientRect();
+        const board = cell.querySelector(".hb-container")!.getBoundingClientRect();
+        const stage = cell.parentElement!.getBoundingClientRect();
+        return { tagBottom: tag.bottom, tagTop: tag.top, boardTop: board.top, stageTop: stage.top, text: cell.querySelector(".rc-tag")!.textContent };
+      }),
+    );
+    expect(tags).toHaveLength(4);
+    for (const t of tags) {
+      expect(t.tagBottom, t.text ?? "").toBeLessThanOrEqual(t.boardTop + 0.5);
+      expect(t.tagTop, t.text ?? "").toBeGreaterThanOrEqual(t.stageTop - 0.5);
+    }
+    await expect(page.locator(".tower-side .tower-head span:nth-child(6)")).toBeHidden();
+    await expect(page.locator(".tower-side .t-bank").first()).toBeHidden();
+  }
   const v = await simulNow(page);
   expect(new Set(v.boards.map((b: { number: number }) => b.number)).size).toBe(4);
   expect(new Set(v.boards.map((b: { fen: string }) => b.fen)).size).toBe(4);
@@ -585,7 +605,7 @@ test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defea
   await expect.poll(async () => (await simulNow(page))?.boards[0].result?.how ?? null, { timeout: 10_000 }).toBe("resign");
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
   await expect(page.locator(".results h1")).toHaveText("Defeated");
-  await expect(page.locator(".team-result")).toContainText("Hidden Boss won. You won 3 of 4 boards: all 4 must be won.");
+  await expect(page.locator(".team-result")).toContainText("The Hidden Boss won. You won 3 of 4 boards: all 4 must be won.");
   await expect(page.locator(".boss-char.place-results")).toHaveAttribute("data-anim", /laugh2|idle2/, { timeout: 10_000 });
   expect(errors).toEqual([]);
 });

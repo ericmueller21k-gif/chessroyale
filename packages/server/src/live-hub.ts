@@ -1,9 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
-import { CAPACITY, FRONT_DOOR } from "@chessroyale/core";
+import { CAPACITY, FRIENDS, FRONT_DOOR } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
-import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LobbySummary } from "./live.ts";
+import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LiveHealth, type LobbySummary } from "./live.ts";
 import { countCall } from "./ops.ts";
-import { GlobalChat, type GlobalChatSnapshot, type GlobalPost, type GlobalSender } from "./global-chat.ts";
+import { GlobalChat, type GlobalChatSnapshot, type GlobalLine, type GlobalPost, type GlobalSender } from "./global-chat.ts";
+import { pruneFriends, recentNews } from "./friends.ts";
 import type { Env } from "./index.ts";
 
 /** The one live hub (its name). */
@@ -42,6 +43,8 @@ export class LiveHub extends DurableObject<Env> {
           const sql = d1Sql(env.DB);
           await ensureSchema(sql, env.DB);
           this.board.restoreSeen(await sql.all<{ id: string; last_seen: number }>("SELECT id, last_seen FROM users WHERE last_seen > ?", now - FRONT_DOOR.onlineWindowMs));
+          // (Friends' news from the last hour, so an invite sent just before a restart still reaches its app.)
+          for (const n of await recentNews(sql, now)) this.board.notify([n.id], n.at);
         } catch (e) {
           console.log(`live hub: no D1 at start (${String(e)})`);
         }
@@ -53,19 +56,39 @@ export class LiveHub extends DurableObject<Env> {
     if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + CAPACITY.presence.lastSeenWriteMs);
   }
 
-  /** Accounts a Worker instance has seen (each request from the app, the 30 s heartbeat). */
-  async seen(ids: string[], at: number): Promise<void> {
+  /**
+   * Accounts a Worker instance has seen (each request from the app, the 30 s heartbeat), and which of them said they're
+   * in a match. Answers with friends' news for any of them (FRIENDS: the instance passes it on in their live line).
+   */
+  async seen(ids: string[], at: number, busy?: Record<string, boolean>): Promise<Record<string, number>> {
     countCall("hub.seen");
-    this.board.markSeen(ids, Math.min(at, Date.now()));
+    this.board.markSeen(ids, Math.min(at, Date.now()), busy);
     await this.keepAlarm();
+    return this.board.newsFor(ids);
   }
 
-  /** Someone just arrived (their first request to a Worker instance in a minute): counted at once, and the numbers. */
-  async arrive(id: string, at: number): Promise<LiveCounts> {
+  /**
+   * Someone just arrived (their first request to a Worker instance in a minute): counted at once, and the numbers, with
+   * their friends' news as `inbox` (the Worker takes it off before caching the numbers for everyone).
+   */
+  async arrive(id: string, at: number, busy?: boolean): Promise<LiveCounts & { inbox?: number }> {
     countCall("hub.arrive");
-    this.board.markSeen([id], Math.min(at, Date.now()));
+    this.board.markSeen([id], Math.min(at, Date.now()), busy === undefined ? undefined : { [id]: busy });
     await this.keepAlarm();
-    return this.counts();
+    const inbox = this.board.newsFor([id])[id];
+    return inbox === undefined ? this.counts() : { ...(await this.counts()), inbox };
+  }
+
+  /** Something new for these accounts (a friend request, an invite, a request accepted). */
+  async notify(ids: string[], at: number): Promise<void> {
+    countCall("hub.notify");
+    this.board.notify(ids, Math.min(at, Date.now()));
+  }
+
+  /** A friends list: who's online and who's in a match (one call per list, however long). */
+  async presenceOf(ids: string[]): Promise<Record<string, { online: boolean; busy: boolean }>> {
+    countCall("hub.friends");
+    return this.board.presenceOf(ids.slice(0, FRIENDS.max), Date.now());
   }
 
   /** A lobby's report (a change, or its once-a-minute "still running"). */
@@ -108,6 +131,11 @@ export class LiveHub extends DurableObject<Env> {
     return this.board.players(Date.now());
   }
 
+  /** The health view's live numbers (ops-admin.ts): who's online, people in lobbies, each mode's lobbies. */
+  async health(): Promise<LiveHealth> {
+    return this.board.health(Date.now());
+  }
+
   /** For a profile: online now, and the latest time seen (fresher than D1's, which is written once a minute). */
   async presence(id: string): Promise<{ online: boolean; lastSeen: number | null }> {
     const now = Date.now();
@@ -137,6 +165,17 @@ export class LiveHub extends DurableObject<Env> {
     return { post, chat: this.chat.snapshot(now) };
   }
 
+  /** What the hub holds about an account, for its download: its lines in the global chat. */
+  async accountData(id: string): Promise<{ globalChat: GlobalLine[] }> {
+    return { globalChat: this.chat.linesOf(id) };
+  }
+
+  /** A deleted account (account-data.ts): no longer online, and its lines leave the global chat. */
+  async forgetAccount(id: string): Promise<void> {
+    this.board.forgetSeen(id);
+    if (this.chat.forgetAccount(id)) await this.saveChat();
+  }
+
   /** A drawn icon on a line still in the chat (null for any other key). */
   async chatIcon(key: string): Promise<string | null> {
     return this.chat.icon(key) ?? null;
@@ -160,6 +199,7 @@ export class LiveHub extends DurableObject<Env> {
         if (now - this.prunedAt > 10 * 60_000) {
           this.prunedAt = now;
           await pruneLive(sql, now);
+          await pruneFriends(sql, now);
         }
       } catch (e) {
         console.log(`live hub: last_seen not written (${String(e)})`);
