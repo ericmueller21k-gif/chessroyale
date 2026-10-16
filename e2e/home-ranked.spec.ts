@@ -1,0 +1,149 @@
+import { expect, type Page } from "@playwright/test";
+import { named, openBossRaid, test, watchFor } from "./helpers.ts";
+
+/**
+ * Home's RANKED row and the Boss raid's own card and screen (Eric, Oct 16;
+ * docs/decisions/2026-10-16-home-ranked-row-and-boss-raid.md): the row's three ranked modes, 1 v 1's queue, the card
+ * opening the Boss raid screen and each of its choices reaching the flow it always had, and the hidden /bosses.
+ */
+
+const desktop = () => test.info().project.name === "desktop";
+const run = Date.now().toString(36).slice(-5);
+const sideways = (p: Page) => p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+const box = async (p: Page, sel: string) => (await p.locator(sel).first().boundingBox())!;
+
+test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal buttons whole at every width; the Boss raid card under it (above it on a computer, PLAY last)", async ({ page }) => {
+  await named(page, "Ranked");
+  const widths = desktop() ? [[1280, 800], [1024, 768]] : [[320, 640], [360, 740], [390, 844]];
+  for (const [w, h] of widths) {
+    await page.setViewportSize({ width: w!, height: h! });
+    await page.goto("/");
+    const row = page.getByRole("radiogroup", { name: "RANKED" });
+    await expect(row).toBeVisible();
+    // Every text, exactly.
+    await expect(page.locator(".fd-ranked .fd-label")).toHaveText("RANKED");
+    await expect(row.getByRole("radio")).toHaveText(["50 v 50Crowd chess", "1 v 1Classic chess", "Squads8 squads of 4"]);
+    const card = page.getByRole("main").getByRole("button", { name: /^Boss raid/ });
+    await expect(card).toHaveText(/^Boss raidTeam up vs a boss · up to 50›$/);
+    // The label sits right above the row; the three buttons are the same size, side by side, their words whole.
+    const label = await box(page, ".fd-ranked .fd-label");
+    const r = (await row.boundingBox())!;
+    expect(label.y + label.height, `${w}`).toBeLessThanOrEqual(r.y + 1);
+    expect(r.y - (label.y + label.height), `${w}`).toBeLessThan(12);
+    const buttons = await row.getByRole("radio").evaluateAll((els) =>
+      els.map((e) => {
+        const b = e.getBoundingClientRect();
+        const sub = e.querySelector("span")!;
+        return { x: b.x, w: b.width, h: b.height, spill: e.scrollWidth - e.clientWidth, subSpill: sub.scrollWidth - sub.clientWidth, font: parseFloat(getComputedStyle(sub).fontSize), lines: Math.round(e.scrollHeight / parseFloat(getComputedStyle(e).lineHeight)) };
+      }),
+    );
+    for (const b of buttons) {
+      expect(Math.abs(b.w - buttons[0]!.w), `${w}: equal widths`).toBeLessThan(1);
+      expect(b.h, `${w}: a full tap target`).toBeGreaterThanOrEqual(44);
+      expect(b.spill, `${w}: nothing cut`).toBeLessThanOrEqual(0);
+      expect(b.subSpill, `${w}: the line under it whole`).toBeLessThanOrEqual(0);
+      expect(b.font).toBeGreaterThanOrEqual(11);
+    }
+    expect(buttons.map((b) => b.x)).toEqual([...buttons.map((b) => b.x)].sort((a, b) => a - b));
+    // The card's words whole too, and it's prominent: full width of the column, as tall as a big button.
+    const c = (await card.boundingBox())!;
+    expect(c.height).toBeGreaterThanOrEqual(64);
+    expect(Math.abs(c.width - r.width), `${w}: full width`).toBeLessThan(2);
+    expect(await card.evaluate((e) => [...e.querySelectorAll(".rd-card-text > *")].every((x) => x.scrollWidth <= x.clientWidth + 0.5)), `${w}`).toBe(true);
+    const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
+    if (desktop()) {
+      // A computer: the card above the row, which stays right above PLAY, PLAY at the bottom (Eric, Oct 9).
+      expect(c.y + c.height, `${w}`).toBeLessThanOrEqual(label.y);
+      expect(play.y).toBeGreaterThan(r.y + r.height);
+    } else {
+      // A phone: the row, PLAY, then the card (Eric, Oct 16: "under the RANKED row").
+      expect(c.y, `${w}`).toBeGreaterThanOrEqual(play.y + play.height);
+    }
+    expect(await sideways(page), `${w}`).toBe(0);
+  }
+});
+
+test("1 v 1: picked, nothing under the row (always people), its line under PLAY, remembered; PLAY goes to its queue (/1v1)", async ({ page }) => {
+  await named(page, "Duel");
+  await page.goto("/");
+  await page.getByRole("radio", { name: /^1 v 1/ }).click();
+  await expect(page.getByRole("radio", { name: /^1 v 1/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radiogroup", { name: "Matchmaking" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Party/ })).toHaveCount(0);
+  await expect(page.locator(".fd-hint")).toHaveText("Ranked chess vs one player near your level");
+  await page.reload();
+  await expect(page.getByRole("radio", { name: /^1 v 1/ })).toHaveAttribute("aria-checked", "true");
+  expect(await sideways(page)).toBe(0);
+  await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/1v1");
+});
+
+test("the Boss raid card opens its screen; each choice reaches its flow (a raid's queue, people only, a Solo raid, Boss alone's menu, a raid with friends); Back is home", async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await named(page, "Raider");
+  const home = `/?debug&pool=raidscreen-${test.info().project.name}-${run}`;
+  await page.goto(home);
+  await openBossRaid(page);
+  const main = page.getByRole("main");
+  // The choices, in order, every word.
+  await expect(main.locator(".rd-option")).toHaveText([
+    /^Join a raidUp to 50 players · bots fill the crowd after \d+ s$/,
+    /^People onlyNo bots · starts at 50, or 10 after \d+ s$/,
+    "Raid with botsYou and 49 bots · starts at once",
+    "Boss aloneJust you vs a boss you pick",
+    "Play with friendsMake a raid and share its code, or join one",
+  ]);
+  await expect(main.locator(".rd-hero .fd-sub")).toHaveText("Up to 50 of you pick the crowd's moves together against a boss. The most popular pick is played.");
+  await expect(main.locator(".rd-hero canvas.boss-portrait")).toBeVisible();
+  for (const b of await main.locator(".rd-option").all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect(await sideways(page)).toBe(0);
+
+  // Join a raid: the raid's queue (Default); Cancel comes back to this screen.
+  await main.getByRole("button", { name: /^Join a raid/ }).click();
+  await expect(page.locator(".fd-queue-mode")).toHaveText("Boss raid · up to 50");
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  // People only: the raid's queue without bots.
+  await main.getByRole("button", { name: /^People only/ }).click();
+  await expect(page.locator(".fd-queue-mode")).toHaveText("Boss raid · up to 50 · Bots off");
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  // Boss alone: the boss menu (a random boss, then each boss you can meet).
+  await main.getByRole("button", { name: /^Boss alone/ }).click();
+  const menu = page.getByRole("dialog", { name: "Choose your boss" });
+  await expect(menu.locator(".boss-row")).toHaveCount(8);
+  await expect(menu.getByText(/^Your rating/)).toBeVisible();
+  await menu.getByRole("button", { name: "Close" }).click();
+  // Play with friends: a raid's lobby (and joining one by code).
+  await main.getByRole("button", { name: /^Play with friends/ }).click();
+  const sheet = page.getByRole("dialog", { name: "Play with friends" });
+  await expect(sheet.getByRole("button", { name: "Create a raid" })).toBeVisible();
+  await expect(sheet.getByLabel("Lobby code")).toBeVisible();
+  await sheet.getByRole("button", { name: "Close" }).click();
+  // Back: home, the RANKED row.
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.getByRole("radiogroup", { name: "RANKED" })).toBeVisible();
+  // Raid with bots: you and 49 bots, in your browser (Solo), against a boss. (Its queue shows for a moment only:
+  // watched for from before the tap.)
+  await openBossRaid(page);
+  const solo = await watchFor(page, { queue: { selector: ".fd-queue-mode", text: /^Boss raid · up to 50 · Solo$/ } });
+  await main.getByRole("button", { name: /^Raid with bots/ }).click();
+  await expect.poll(async () => (await solo.seen()).queue, { timeout: 30_000 }).toBe(true);
+});
+
+test("the hidden /bosses opens the solo boss picker straight away (a player too); ?mode=raid opens the Boss raid screen", async ({ page }) => {
+  await named(page, "Hidden");
+  await page.goto("/bosses");
+  const menu = page.getByRole("dialog", { name: "Choose your boss" });
+  await expect(menu).toBeVisible();
+  // The solo picker: its difficulty, not a raid's.
+  await expect(menu.getByText(/^For your raid/)).toHaveCount(0);
+  await expect(menu.locator(".boss-row")).toHaveCount(8);
+  await menu.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await page.goto("/?mode=raid");
+  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.getByRole("radiogroup", { name: "RANKED" })).toBeVisible();
+  expect(new URL(page.url()).search).toBe("");
+});

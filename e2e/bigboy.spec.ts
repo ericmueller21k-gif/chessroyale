@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, test, watchFor, watchSpans } from "./helpers.ts";
+import { BOARD_SEL, test, watchFor, watchSpans, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * Big Boy, the baby boss, played alone on a phone and a computer with real taps: his snack before move 1 (he waddles
@@ -63,7 +63,7 @@ test("Big Boy's snack before move 1, your move's knock, and his toy block (no do
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/?debug&clock=60&boss=bigboy&laststand=0");
   const snackSeen = await watchFor(page, { snack: { selector: ".pm-snack .bb-snack" }, nom: { selector: ".bc-bubble", text: /Nom nom\.|Yummy pawn!|Snack time!/ } });
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   const boss = await page.evaluate(() => (window as any).match.boss);
   expect(boss.name).toBe("Big Boy");
@@ -145,7 +145,7 @@ test("Big Boy's Big Bounce (the admins' trigger): pieces knocked up, the crash, 
   // Muted on this device: his sounds are still asked for (the log), and every one stays silent.
   await page.addInitScript(() => localStorage.setItem("brc.muted", "1"));
   await page.goto("/?debug&clock=60&boss=bigboy&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await yourMove(page);
   const btn = page.locator(".ult-test");
   await expect(btn).toHaveText("Trigger ultimate (testing)");

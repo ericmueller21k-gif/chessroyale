@@ -2,7 +2,7 @@ import { devices, expect, type Page } from "@playwright/test";
 import { gunzipSync } from "node:zlib";
 import { Chess } from "chess.js";
 import { BOSS_ROSTER, isPlayable } from "@chessroyale/core";
-import { createLobbyFromHome, joinFromInvite, named, test, watchFor } from "./helpers.ts";
+import { createLobbyFromHome, joinFromInvite, named, test, watchFor, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * The Maia boss (DECISIONS.md, "A human-like boss: Maia-3 for Ginger", Oct 11; "Every boss on Maia", Oct 12): for an
@@ -51,7 +51,7 @@ test("an admin's Brain picker: Ginger on Maia with the full guard, on a phone; M
   const maiaFiles: string[] = [];
   page.on("request", (r) => r.url().includes("/engine/maia/") && maiaFiles.push(new URL(r.url()).pathname));
   await page.goto("/?debug&clock=40&bossMoves=6&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
   const brain = menu.getByRole("combobox", { name: "Boss brain (testing)" });
   await expect(brain).toBeVisible();
@@ -91,7 +91,7 @@ test("every boss is on Maia, no guard, by default for an admin (Boss alone, a ph
   for (const id of bosses) {
     const t0 = Date.now();
     await page.goto(`/?debug&clock=40&bossMoves=3&laststand=0&boss=${id}`);
-    await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+    await bossAloneFromHome(page);
     await expect.poll(() => page.evaluate(() => (window as any).match?.boss?.id ?? null), { timeout: 30_000 }).toBe(id);
     const debug = page.locator(".brain-debug");
     await expect(debug, id).toContainText(/Maia \d+ · no guard/, { timeout: 30_000 });
@@ -203,7 +203,7 @@ test("the loading step: Stockfish's workers end, Maia loads alone behind \"Loadi
     };
     requestAnimationFrame(look);
   });
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 60_000 });
   expect(await seen.seen()).toEqual({ overlay: true, starting: true });
   // Frame by frame: from the step's card to the intro's, always one of them, and the intro's whole from its first frame
@@ -244,7 +244,7 @@ test("the loading step: Stockfish's workers end, Maia loads alone behind \"Loadi
   // The next battle on this device: its files are saved, so it's straight to "Starting…", with no word of a download.
   await page.goto("/?debug&clock=40&bossMoves=4&laststand=0&boss=gingerbread");
   const again = await watchFor(page, { first: { selector: ".boss-loading-first" }, download: { selector: '.boss-loading[data-stage="download"]' }, starting: { selector: ".boss-loading", text: /Starting…/ } });
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 60_000 });
   expect(await again.seen()).toEqual({ first: false, download: false, starting: true });
   expect(await page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/· ready$/);
@@ -261,7 +261,7 @@ test("the loading step gives up when Maia can't load (its model missing): the ba
   await page.goto("/?debug&clock=40&bossMoves=4&laststand=0&boss=gingerbread");
   const seen = await watchFor(page, { overlay: { selector: ".boss-loading", text: /Loading the boss…/ } });
   const t0 = Date.now();
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 60_000 });
   expect(await seen.seen()).toEqual({ overlay: true });
   // (A missing file isn't tried again, nor waited on to the step's limit.)
@@ -284,7 +284,7 @@ test("players meet Maia too (forPlayers on): no Brain picker and no debug line; 
   const maiaFiles: string[] = [];
   page.on("request", (r) => r.url().includes("/engine/maia/") && maiaFiles.push(r.url()));
   await page.goto("/?debug&clock=40&bossMoves=6&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
   await expect(menu.getByRole("button", { name: /Ginger/ })).toBeVisible();
   await expect(menu.getByRole("combobox", { name: "Boss brain (testing)" })).toHaveCount(0);

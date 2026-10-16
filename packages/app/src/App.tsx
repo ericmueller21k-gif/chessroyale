@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
 import { type MatchmakingType, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
-import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode } from "./screens/Home.tsx";
+import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, raidInUrl } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
@@ -234,8 +234,13 @@ export function App() {
   const [showFaq, setShowFaq] = useState(() => location.pathname === "/faq");
   /** Your friends list (/friends: screens/Friends.tsx). */
   const [showFriends, setShowFriends] = useState(() => location.pathname === "/friends");
-  /** The computer's side menu: open the home screen's boss menu or Play with friends. */
-  const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(null);
+  /**
+   * Open the home screen's boss menu or Play with friends: the computer's side menu, or the hidden /bosses (Eric's way
+   * straight to the solo boss picker, unlisted, not admin-gated; Oct 16). Used once: a match started clears it.
+   */
+  const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(() => (location.pathname === "/bosses" ? { kind: "boss", n: 0 } : null));
+  /** The Boss raid screen (its card on home, the side menu's Boss raid, ?mode=raid). */
+  const [raidOpen, setRaidOpen] = useState(raidInUrl);
   const [legal, setLegal] = useState<LegalPage | null>(() => legalPageOf(location.pathname));
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
@@ -567,6 +572,8 @@ export function App() {
     setInvite(null);
     resetBoardsStrip();
     elimination.current = null;
+    // (Asked for once: home after this match doesn't open the boss menu again.)
+    setHomeIntent(null);
     setMatch(m);
     if (testParams().has("debug")) (window as unknown as { match: GameView }).match = m;
   };
@@ -815,10 +822,12 @@ export function App() {
     home: () => {
       goHome();
       setHomeIntent(null);
+      setRaidOpen(false);
     },
-    bossAlone: () => {
+    bossRaid: () => {
       goHome();
-      setHomeIntent({ kind: "boss", n: Date.now() });
+      setHomeIntent(null);
+      setRaidOpen(true);
     },
     friends: () => {
       goHome();
@@ -853,7 +862,9 @@ export function App() {
     },
     canCreate: () => !match && !squads,
     create: async () => {
-      const mode = chosenHomeMode();
+      // (The Boss raid screen: a raid. 1 v 1 has no lobbies: 50 v 50's.)
+      const picked = chosenHomeMode();
+      const mode = raidOpen ? "raid" : picked === "squads" ? "squads" : lobbyModeOf(picked);
       goHome();
       if (mode !== "squads") {
         const code = await createLobby(mode);
@@ -893,7 +904,7 @@ export function App() {
     home: () => undefined,
     profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
     ...Object.fromEntries(
-      (["bossAlone", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
+      (["bossRaid", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
         k,
         () => {
           if (match) leave();
@@ -1062,12 +1073,26 @@ export function App() {
   function homeFrame(queue?: ComponentChildren, chat?: ComponentChildren, side = computer) {
     return (
     // (A phone's queue is the whole screen: no hidden menu or panel to draw again with every arrival.)
-    <FrontFrame page={queue ? "queue" : "home"} nav={!queue ? nav : computer ? queueNav : undefined}>
+    <FrontFrame page={queue ? "queue" : raidOpen ? "raid" : "home"} nav={!queue ? nav : computer ? queueNav : undefined}>
       <HomeScreen
         queue={queue}
         chat={chat}
         side={side}
         intent={homeIntent}
+        raid={raidOpen}
+        onRaid={(open) => {
+          setRaidOpen(open);
+          // (?mode=raid opened it: closed, the address is home's.)
+          if (!open && raidInUrl()) {
+            const q = new URLSearchParams(location.search);
+            q.delete("mode");
+            history.replaceState(null, "", `${location.pathname}${q.size ? `?${q}` : ""}`);
+          }
+        }}
+        onRanked1v1={() => {
+          // Ranked 1 v 1's queue (its route arrives with the 1 v 1 core; startRanked1v1 then, in place of the load).
+          location.assign(`/1v1${location.search}`);
+        }}
         loading={loading}
         error={error}
         joinCode={mustSignInToPlayOnline() ? undefined : inviteCode}

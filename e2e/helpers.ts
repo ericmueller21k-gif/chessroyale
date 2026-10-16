@@ -324,3 +324,15 @@ export async function asServerAdmin(page: Page, who: "ops" | "chat" = "ops") {
     }
   }
 }
+
+/** Home → the Boss raid card → its screen (Eric, Oct 16: the boss raid has a screen of its own). */
+export async function openBossRaid(page: Page) {
+  await page.getByRole("main").getByRole("button", { name: /^Boss raid/ }).click();
+  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+}
+
+/** Home → Boss raid → Boss alone: the boss menu (with ?boss= in the address, the battle at once). */
+export async function bossAloneFromHome(page: Page) {
+  await openBossRaid(page);
+  await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+}

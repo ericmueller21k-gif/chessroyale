@@ -89,7 +89,7 @@ test("Squads resting: PLAY is closed with its line, a party can be joined but no
     expect(await res.json(), path).toEqual({ message: line, paused: "squads" });
   }
   // Another mode is open as usual: Crowd's PLAY.
-  await page.getByRole("radio", { name: /^Crowd/ }).click();
+  await page.getByRole("radio", { name: /^50 v 50/ }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeEnabled();
   await expect(page.locator(".fd-hint")).not.toHaveText(line);
 });

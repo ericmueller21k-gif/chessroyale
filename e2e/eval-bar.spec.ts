@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { BOARD_SEL, asAdmin, switchesOff, test } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, switchesOff, test, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * The eval bar's switch (Eric, Oct 10): on by default, in Settings only (never on a board screen); off, no bar on any
@@ -12,7 +12,7 @@ const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ??
 /** Boss alone, to your first move: the board's box, the row's, and whether the bar shows. */
 async function boardNow(page: Page) {
   await page.goto("/?debug&clock=60&boss=hollow&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
   await page.waitForTimeout(400);
   // (No switch for it on the board's screen: it's in Settings only.)
@@ -69,7 +69,7 @@ test("players never see the eval bar: no bar on the board and no switch, even on
   await expect(page.getByRole("switch", { name: /Eval bar/ })).toHaveCount(0);
   // Boss alone, the boss picked from the menu: the board, and no bar beside it.
   await page.goto("/");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await page.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /Boingo/ }).click();
   await expect(page.locator(".board-row")).toBeVisible({ timeout: 90_000 });
   await expect(page.locator(BOARD_SEL.squares)).toBeVisible();

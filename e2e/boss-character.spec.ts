@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { BOARD_SEL, test } from "./helpers.ts";
+import { BOARD_SEL, test, bossAloneFromHome } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 /** The character the player sees (one placement shows per layout: the boss bar on a phone, by the board on a computer). */
@@ -10,7 +10,7 @@ test("Boingo the Clown: a raid boss as a character, across the board from the Go
   test.setTimeout(6 * 60_000);
   const phone = info.project.name === "phone";
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await page.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /Boingo the Clown/ }).click();
 
   // His entrance, with his portrait on the card instead of an emoji.
