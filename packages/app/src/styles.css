@@ -5267,7 +5267,11 @@ button.history-label {
   border-bottom: 4px solid #fff7d6;
   background: linear-gradient(90deg, #7f1d1d, #dc2626 20%, #f97316 50%, #dc2626 80%, #7f1d1d);
   box-shadow: 0 0 0 3px #1a0a00, 0 10px 30px rgba(0, 0, 0, 0.55);
-  animation: fb-band 2.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  /* In over --fb-in, out over --fb-out, gone at --fb-ms (the banner's length: FightBanner and PowerBanner set it, a
+     boss's from BOSS_BANNER in settings.ts; 2.5 s without, the God King's cut-in and FISCHER RANDOM!). */
+  animation:
+    fb-band-in var(--fb-in, 330ms) cubic-bezier(0.2, 0.9, 0.25, 1) both,
+    fb-band-out var(--fb-out, 240ms) cubic-bezier(0.2, 0.9, 0.25, 1) calc(var(--fb-ms, 2.5s) - var(--fb-out, 240ms)) forwards;
 }
 .fight-banner.boss .fb-band {
   background: linear-gradient(90deg, #0b0612, #3b0764 22%, #7f1d1d 50%, #3b0764 78%, #0b0612);
@@ -5334,25 +5338,29 @@ button.history-label {
   text-shadow: 2px 2px 0 #1a0a00;
   animation: fb-sub 2.5s ease-out both;
 }
-/* Every banner holds about 2.5 s (Eric, Oct 15: "increase the banners for all banners by the extra second we
-   discussed"): the entrance and exit as they were at 1.5 s, the hold between them a second longer (the Hidden Boss's
-   "5 SECONDS!" had it first, Oct 14). Keyframe times are those of the old 1.5 s banner up to the hold's end, scaled to
-   2.5 s, with the second added after it. */
-@keyframes fb-band {
+/* A banner's length is its band's: in, held, and off by --fb-ms (a boss's 1.5 s, Eric, Oct 16: "Do 1 second less"; the
+   God King's cut-in and FISCHER RANDOM! 2.5 s, Oct 15). The entrances inside it (the slam, the face, the line, the
+   flash, the God King's portrait and target) all come in its first 0.6 s and then hold, whatever its length: their 2.5 s
+   keyframes are the 1.5 s banner's entrance times, scaled to 2.5 s. */
+@keyframes fb-band-in {
   0% {
     translate: -110% 0;
   }
-  8.4% {
+  63.64% {
     translate: 0 0;
   }
-  10.8% {
+  81.82% {
     translate: -1.5% 0;
   }
-  13.2%,
-  90.4% {
+  100% {
     translate: 0 0;
   }
-  100% {
+}
+@keyframes fb-band-out {
+  from {
+    translate: 0 0;
+  }
+  to {
     translate: 110% 0;
   }
 }
@@ -7194,10 +7202,15 @@ button.history-label {
   background: #3b0309;
 }
 .fight-banner.last-stand-cut .fb-flash,
-.fight-banner.last-stand-cut .fb-band,
 .fight-banner.last-stand-cut .fb-text,
 .fight-banner.last-stand-cut .kc-portrait {
   animation-duration: 3.1s;
+}
+/* (Its band: in and out stretched the same way, 3.1 s in all.) */
+.fight-banner.last-stand-cut {
+  --fb-ms: 3.1s;
+  --fb-in: 409ms;
+  --fb-out: 298ms;
 }
 .fight-banner.last-stand-cut .kc-portrait {
   width: 23cqw;

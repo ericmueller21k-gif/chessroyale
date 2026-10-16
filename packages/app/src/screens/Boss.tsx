@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
-import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
+import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, queenSlain, withPiece } from "@chessroyale/chess";
 import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, PowerBoard, PowerMoment, RageMeter, funhouseView, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackPawnShown } from "../components/BigBoy.tsx";
@@ -29,7 +29,7 @@ import { ordinal } from "./StageBreak.tsx";
 import { CRITICAL, VoiceBubble, bossVoice } from "../speech.tsx";
 import { kingBlocked } from "../components/Recluse.tsx";
 import { BrainLoading } from "../components/BrainLoading.tsx";
-import { bossInText, crowdFinalists } from "@chessroyale/core";
+import { BOSS_BANNER, bossInText, crowdFinalists } from "@chessroyale/core";
 
 /** The Crowd's boss final as it starts: how many face the boss (crowdFinalists: the top 4), as a word. */
 const NUMBER_WORDS = ["None", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
@@ -243,8 +243,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   }, [boss.board.fen, thinking]);
   // The boss takes your queen: its banner and face.
   const tookQueen = !intro && !thinking && !victim && !funhouse && !bounce && boss.lastMove?.captured === "q";
-  // You take the boss's queen: your banner (the God King's face), while the boss "thinks" (it waits for it).
-  const slewQueen = !intro && !!thinkingNow && !victim && lastMoveTookQueen(history, bases);
+  // You take the boss's queen: your banner (the God King's face), while the boss "thinks" (it waits for it). Only your
+  // capture, and only in the thinking straight after it (queenSlain: not again after Big Boy's bounce).
+  const slewQueen = !intro && !!thinkingNow && !victim && queenSlain(boss);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
   // A boss raid alone plays like any chess site: the boss's move lands and it's your turn (no ring, no countdown).
   const alone = match.standings().length === 1;
@@ -431,11 +432,11 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             <FireBurn burnt={burnt} since={burnAt} now={now} orientation={orientation} />
             {claimed && t >= tl.claimAt && t < tl.bannerAt && <ClaimDark boss={boss} since={mountedAt + tl.claimAt} now={now} />}
             {snack && t >= tl.claimAt && t < tl.bannerAt && <SnackTime boss={boss} since={snackAt} now={now} orientation={orientation} />}
-            {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" />}
+            {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" ms={BOSS_BANNER.ms} />}
             {/* (The queen banners are silent for now: Eric, Oct 11, the gasp sounded wrong. Its file is kept, unused:
                 queenGasp in sound.ts, public/sounds/banner/queen-gasp.mp3.) */}
-            {slewQueen && <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${bossInText(boss.name)}'s queen`} />}
-            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${bossInText(boss.name, true)} takes your queen`} />}
+            {slewQueen && <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${bossInText(boss.name)}'s queen`} ms={BOSS_BANNER.ms} />}
+            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${bossInText(boss.name, true)} takes your queen`} ms={BOSS_BANNER.ms} />}
             {loading && <BrainLoading match={match} boss={boss} />}
             {showCard && (
               // (After the loading step, whose card it takes over from: no entrance, so the board doesn't blink between.)

@@ -19,11 +19,11 @@ import { syncLights } from "../characters/lights.ts";
  */
 
 /**
- * Hollow's cover of the dark: the banner, then (as it goes) his cast by the board's corner (`darkCast`, the darkness
- * leaving the void in his chest at its `cast` cue), the darkness pouring onto the square (`darkPour`), and the square
- * going dark (`darkSquare` gather, then dark).
+ * Hollow's cover of the dark: the banner (to `bannerMs`), then (as it goes) his cast by the board's corner (`darkCast`,
+ * the darkness leaving the void in his chest at its `cast` cue), the darkness pouring onto the square (`darkPour`), and
+ * the square going dark (`darkSquare` gather, then dark).
  */
-export const DARK = { pourAt: 1300, landAt: 1680 } as const;
+export const DARK = { bannerMs: 1250, pourAt: 1300, landAt: 1680 } as const;
 /** Where Hollow casts from in a moment by the board's corner (% of the board): a box his frame's shape. */
 export const HOLLOW_CASTER = { left: -9, top: -27, width: 30 } as const;
 /** The void in his chest as he casts, on the board (%), where the darkness leaves from. */
@@ -106,7 +106,7 @@ function darkMoment({ boss, moment, now, t, orientation, kit, banner }: MomentPr
   const fromPt = hollowCastFrom(kit);
   return (
     <div class="power-moment pm-dark">
-      {t < 2250 && banner("DARKNESS!", moment.square ? `Dark on ${moment.square}` : undefined, "dark")}
+      {banner("DARKNESS!", moment.square ? `Dark on ${moment.square}` : undefined, "dark", DARK.bannerMs)}
       {cast && now >= castSince && (
         <span class="pm-caster pm-hollow" style={{ aspectRatio: `${kit!.ch.w} / ${kit!.ch.h}` }}>
           {/* (His bulbs out as he casts: the last went out with his move.) */}
@@ -120,7 +120,7 @@ function darkMoment({ boss, moment, now, t, orientation, kit, banner }: MomentPr
 }
 
 // Hollow moves twice (the crowd's find rate in Lights out was under lightsOutHold): his banner as it lands.
-const extraMoment = ({ boss, t, banner }: MomentProps) => <div class="power-moment pm-extra">{t < 2800 && banner("TWICE!", `${boss.name.replace(/^The /, "")} moves again`, "dark")}</div>;
+const extraMoment = ({ boss, banner }: MomentProps) => <div class="power-moment pm-extra">{banner("TWICE!", `${boss.name.replace(/^The /, "")} moves again`, "dark")}</div>;
 
 export const HOLLOW_UI = {
   id: "hollow",

@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
-import { BOSS_POWERS, type PowerEventKind } from "@chessroyale/core";
+import { BOSS_BANNER, BOSS_POWERS, type PowerEventKind } from "@chessroyale/core";
 import { powerFxMs, powerMomentMs } from "@chessroyale/chess";
 import { bossKit, type BossKit } from "../characters/kits.ts";
 import { cueAt } from "../characters/power-art.ts";
@@ -46,7 +46,7 @@ const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GRE
 const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
 
 /** The rage warning, the same for every boss: the meter full, its ultimate coming. */
-const WARN: MomentUi = {
+export const WARN: MomentUi = {
   order: 1,
   kit: "ultimateWarn",
   view: ({ boss, t, banner, cast }: MomentProps) => {
@@ -54,7 +54,7 @@ const WARN: MomentUi = {
     const when = ui?.ultimate.when ?? "Next turn";
     return (
       <div class="power-moment pm-warn">
-        {t < 2600 && banner("RAGE!", `${when}: ${ui?.ultimate.name ?? "its ultimate"}`, "rage")}
+        {banner("RAGE!", `${when}: ${ui?.ultimate.name ?? "its ultimate"}`, "rage")}
         {cast("", 0)}
       </div>
     );
@@ -203,7 +203,10 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
   if (!moment) return null;
   const t = now - moment.at;
   const kit = bossKit(boss.name);
-  const banner = (text: string, sub?: string, tone = "") => <PowerBanner key={moment.key} boss={boss} side={side} text={text} sub={sub} tone={tone} />;
+  const banner = (text: string, sub?: string, tone = "", until = Infinity, from = 0) => {
+    const ms = Math.min(BOSS_BANNER.ms, until - from);
+    return t >= from && t < from + ms ? <PowerBanner key={moment.key} boss={boss} side={side} text={text} sub={sub} tone={tone} ms={ms} /> : null;
+  };
   /** The boss casting by the board's top-left corner, its animation's `hit` cue landing at `hitAt` (ms into the moment). */
   const cast = (hit: string, hitAt: number) => {
     const anim = kitAnim(kit, moment.kind);

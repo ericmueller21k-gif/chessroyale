@@ -35,22 +35,22 @@ import { gridAttackers, gridHanging, gridKingAttacked, gridOf, isLight, placemen
 // ---------------- His moments' beats (ms; the app draws them, the server times by POWER_FX) ----------------
 
 /**
- * The long pull, beat by beat (ms into its moment, after his first move (the double step) shows): his banner; he hops
- * from his corner (`hopAt`, landing beside the pawn at `landAt`); his lasso's loop drops over it (`catchAt`: the art's
- * CATCH point on the pawn) and he hauls it one square further (`tugAt`, the art's `tug` cue: it slides for `slideMs`,
- * him stepping with it); he hops back (`backAt`).
+ * The long pull, beat by beat (ms into its moment, after his first move (the double step) shows): his banner (to
+ * `bannerMs`); he hops from his corner (`hopAt`, landing beside the pawn at `landAt`); his lasso's loop drops over it
+ * (`catchAt`: the art's CATCH point on the pawn) and he hauls it one square further (`tugAt`, the art's `tug` cue: it
+ * slides for `slideMs`, him stepping with it); he hops back (`backAt`).
  */
-export const PULL = { hopAt: 500, landAt: 1000, catchAt: 1775, tugAt: 2035, slideMs: 420, backAt: 2950, total: 3500 } as const;
+export const PULL = { bannerMs: 1300, hopAt: 500, landAt: 1000, catchAt: 1775, tugAt: 2035, slideMs: 420, backAt: 2950, total: 3500 } as const;
 /** The lasso drag: the same beats as the pull, on the piece he drags one square. */
 export const DRAG = PULL;
 /**
- * SHOWDOWN!, beat by beat (ms into its moment, as the crowd's turn begins after his move): "SHOWDOWN!" (his banner);
- * he drops into the middle of the board (`dropAt`, landing at `landAt`), both loops spinning (his wind-up, to its
- * throw at `throwAt`), and leaps back to his corner (there at `cornerAt`); from there his ropes yank the pairs into the
- * line-up one at a time (`pairs`, each sliding for `yankMs`); "DRAW!" with a quick-draw sting (`drawAt`); then the
- * crowd picks its duel.
+ * SHOWDOWN!, beat by beat (ms into its moment, as the crowd's turn begins after his move): "SHOWDOWN!" (his banner, to
+ * `bannerMs`); he drops into the middle of the board (`dropAt`, landing at `landAt`), both loops spinning (his wind-up,
+ * to its throw at `throwAt`), and leaps back to his corner (there at `cornerAt`); from there his ropes yank the pairs
+ * into the line-up one at a time (`pairs`, each sliding for `yankMs`); "DRAW!" with a quick-draw sting (`drawAt`, its
+ * banner to the end); then the crowd picks its duel.
  */
-export const SHOWDOWN = { dropAt: 900, landAt: 1400, throwAt: 2400, cornerAt: 2900, pairs: [3000, 3500, 4000] as readonly number[], yankMs: 420, drawAt: 4600, total: 7000 } as const;
+export const SHOWDOWN = { bannerMs: 1300, dropAt: 900, landAt: 1400, throwAt: 2400, cornerAt: 2900, pairs: [3000, 3500, 4000] as readonly number[], yankMs: 420, drawAt: 4600, total: 6000 } as const;
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). */
 export const PIG_FX = { pull: PULL.total, drag: DRAG.total, showdown: SHOWDOWN.total } as const;
 

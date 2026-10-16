@@ -207,7 +207,7 @@ export function CandlePips({ left }: { left: number }) {
 function sparkMoment({ moment, t, orientation, banner, cast }: MomentProps) {
   return (
     <div class="power-moment pm-spark">
-      {t < 2500 && banner("SPARKLER!", moment.square ? `Fire on ${moment.square}` : undefined, "fire")}
+      {banner("SPARKLER!", moment.square ? `Fire on ${moment.square}` : undefined, "fire", SPARK.flyAt)}
       {cast("throw", SPARK.flyAt)}
       {moment.square && t >= SPARK.flyAt && t < SPARK.landAt && <Flight name="sparkFly" square={moment.square} orientation={orientation} since={moment.at + SPARK.flyAt} ms={SPARK.landAt - SPARK.flyAt} />}
     </div>
@@ -220,7 +220,7 @@ function candleMoment({ boss, moment, now, t, kit, banner, anim: kitAnim }: Mome
   const shots = times.filter((x) => now >= x).length;
   return (
     <div class="power-moment pm-candle">
-      {t < 2500 && banner("ROMAN CANDLE!", `${CANDLE_SHOTS} shots up…`, "fire long")}
+      {banner("ROMAN CANDLE!", `${CANDLE_SHOTS} shots up…`, "fire long")}
       {t >= CANDLE.rexAt && (
         <span class={`pm-pogo pm-rex${t >= CANDLE.exitAt ? " out" : ""}`}>
           {/* (His last frame, the candle in hand, holds as he jumps off.) */}
