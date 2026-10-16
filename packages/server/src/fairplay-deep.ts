@@ -17,8 +17,8 @@ import { relevel, type CaseMailer } from "./fairplay.ts";
 /** One deep search over some moves: each one's expected score (the mover's), or null when the server can't answer. */
 export type DeepSearch = (fen: string, moves: readonly string[]) => Promise<{ move: string; expected: number }[] | null>;
 
-/** Takes one search from today's budget; false once it's spent. */
-async function takeBudget(sql: Sql, now: number): Promise<boolean> {
+/** Takes one search from today's budget; false once it's spent (the 1 v 1 check shares it: fairplay-duel.ts). */
+export async function takeBudget(sql: Sql, now: number): Promise<boolean> {
   const day = new Date(now).toISOString().slice(0, 10);
   await sql.run("INSERT INTO fairplay_budget (day, searches) VALUES (?, 1) ON CONFLICT (day) DO UPDATE SET searches = searches + 1", day);
   const used = (await sql.first<{ searches: number }>("SELECT searches FROM fairplay_budget WHERE day = ?", day))?.searches ?? 0;

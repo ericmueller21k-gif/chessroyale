@@ -25,7 +25,7 @@ export const RANKED_SCHEMA = [
   )`,
   // Each ranked game (never an aborted one): its moves (UCI) and each move's thinking time (ms), kept
   // RANKED_1V1.gamesKeepDays (longer while a player in it is in a fair-play review or banned). `checked`: fair play's
-  // engine check of it (fairplay-duel.ts). `nonce`: the recording that wrote it (a game is recorded once).
+  // engine check of each side's moves, by side (fairplay-duel.ts). `nonce`: the recording that wrote it (a game is recorded once).
   `CREATE TABLE IF NOT EXISTS ranked_1v1_games (
     id TEXT PRIMARY KEY,
     white_id TEXT NOT NULL,
