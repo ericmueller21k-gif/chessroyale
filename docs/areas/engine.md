@@ -5,10 +5,19 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 ## How it works today
 
 - **The judge.** Every pick is scored by Stockfish as an expected score (win plus half a draw, 0 to 1) at
-  `engineNodes` (250k) per position, top lines first; the score a pick gets is its loss against the best move (the line
-  with the highest score, not the first line). `packages/chess/src/uci.ts` (`UciEngine`) speaks UCI; the same code runs
-  in Node (tests, sims: `src/node.ts`) and in the browser (a Web Worker pool, Stockfish 19 lite WASM:
-  `packages/app/src/engine.ts`). The browser engine is deterministic (`reports/judge-determinism.md`).
+  `engineNodes` (250k) per position, top lines first; the score a pick gets is its loss against the best move.
+  `packages/chess/src/uci.ts` (`UciEngine`) speaks UCI; the same code runs in Node (tests, sims: `src/node.ts`) and in
+  the browser (a Web Worker pool, Stockfish 19 lite WASM: `packages/app/src/engine.ts`). The browser engine is
+  deterministic (`reports/judge-determinism.md`).
+- **The best move is the highest-scored pick** (`docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md`):
+  the top-8 search's first line, unless a pick scored above it (`bestOf` in `packages/core/src/scoring.ts`; a tie keeps
+  the first line). Every loss is measured from that number, so the move that has it is the best everywhere: the reveal,
+  the God King's move, the exchange check, the re-check's anchor (the first line is re-checked like any pick). A pick
+  scores above the first line in about 3% of positions, nearly always another line of the top-8 search (a line not
+  searched again at the last depth keeps the depth before's score), hardly ever the second search over picks outside the
+  top 8 (`reports/best-move-gap.md`). Each judge calls `bestOf` where it puts a board's numbers together: the runner's
+  `scoreBoard`, `baseBoard` in `judge.ts`, `hostScore` in `net.ts`, `recheckCloseCalls`, and `resolveBoard` (so an
+  older host's numbers too).
 - **Positions Stockfish refuses** (DECISIONS.md, "Engines' exits never reach the page", Oct 15): Stockfish 19 ends its
   process on a position it refuses (a ninth pawn, more pieces than promotions could make, the side not to move in
   check, …), and a browser worker's exit was thrown into the page. `stockfishRefuses` (`uci.ts`) holds its rules
@@ -35,7 +44,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 - **Squads' bots** get their engine's top moves from players' devices the same way (the page's one speed check,
   `engineSpeed()`, then `botWork` jobs on the engine pool; [squads.md](squads.md), "The server" and "The screens").
 - **Close calls are re-checked deeper** before a cut (`recheckCloseCalls()` in `runner.ts`: `recheckLoss`,
-  `recheckMax`, `recheckNodes` 700k), only for groups with a human pick. The re-check goes first to the **engine
+  `recheckMax`, `recheckNodes` 700k), only for groups with a human pick, in one search with the best move (the anchor).
+  The re-check goes first to the **engine
   server**: native Stockfish 17.1 (full network) in a Cloudflare Container (`engine/Dockerfile`, `engine/server.mjs`,
   class `EngineServer`, binding `ENGINE`, instance `standard-2`) at 2M nodes (`SERVER_RECHECK_NODES`). If it doesn't
   answer in time, the host re-checks on its own device. Server searches are capped per day by
@@ -157,6 +167,11 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   cases in `stockfish-refuses-cases.ts`; never a real game's position, Chess960 too; never sent), `judge.test.ts`, `boss-guard.test.ts`, `top-cache.test.ts`, `bots.test.ts`,
   `packages/server/test/judges.test.ts`, `engine-server.test.ts` (a refused position never reaches the container, from
   any path; a legal one does, Chess960 too). (Engine tests run real Stockfish.)
+- The best move (a pick above the first line): `packages/chess/test/best-move.test.ts` (solo, the lobby's numbers, a
+  judge's board, the re-check, the God King, every judge alike), `packages/app/test/host-score.test.ts` (the host),
+  `judges.test.ts` ("the best move is the highest-scored pick": two judges, the engine server's re-check, devices'
+  re-checks, an older host), `bestOf` in `packages/core/test/scoring.test.ts`; `e2e/boss-dock.spec.ts` (the dock's
+  "· the best").
 - e2e: `e2e/judges.spec.ts` (with containers off); `e2e/sawyer.spec.ts`'s last test (a refused position never sent;
   a worker's exit kept off the page, the engine answering on).
 - Chess960: `packages/chess/test/chess960.test.ts` (perft against the published table, each castling rule, FEN, SAN,
@@ -182,6 +197,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   `npx tsx packages/sim/scripts/maia-calibration.ts` (`reports/maia-calibration.md`), `maia-sim.ts`
   (`reports/maia-boss.md`).
 - Sims (`packages/sim/scripts/`, write to `reports/`): `judge-accuracy.ts`, `judge-cuts.ts`, `judge-determinism.ts`,
+  `best-move-gap.ts` (how often a pick scores above the first line, and what a like-for-like search says),
   `many-judges.ts`, `deep-accuracy.ts`, `container-accuracy.ts` (Docker), `deep-timing.ts`, `boss-blunders.ts`,
   `boss-sim.ts`, `calibrate-rating.ts`.
 
@@ -202,7 +218,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   asking, with a monthly estimate.
 - Measure before and after: a judge or boss change comes with a sim's before/after table in `reports/`.
 - Never break the fallback: every server path degrades to the host's own engine.
-- "The engine's best move" is the line with the highest score, not the first line.
+- "The engine's best move" is the line with the highest score, not the first line. A board's best is `bestOf`'s (the
+  highest-scored of the first line and the picks): anything that names it, in any judge, goes through it.
 - Stockfish's output goes through `searchLines` (`uci.ts`, the same in `engine/server.mjs`; keep the two the same): a
   slot's last exact line may name another move, so a move listed twice is read again by move (DECISIONS.md, "The
   engine reader", Oct 14).

@@ -2,7 +2,7 @@ import { LookAways } from "./lookaway.ts";
 import { engineSpeed, ownEngine } from "./engine.ts";
 import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, LEAVING, PREGAME_VOTES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, LEAVING, PREGAME_VOTES, type MatchmakingType, bestOf, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -1027,9 +1027,11 @@ export class NetMatch implements GameView {
           // Each move's best reply and mate score from the same searches (what a blunder loses, for the Last Stand).
           const { replies, mates } = repliesFrom([top, extra]);
           const people = Object.values(job.humanPicks).some((m) => !!m);
-          const checked = serverRecheck || !people
-            ? { bestMove: top[0]!.move, bestExpected: best, expectedAfter }
-            : await recheckCloseCalls(engine, job.fen, { bestMove: top[0]!.move, bestExpected: best, expectedAfter }, [...Object.values(job.humanPicks), ...Object.values(botPicks)], this.settings, job.priority);
+          // The best: the top moves' first line, unless a pick scored above it (bestOf, as on every judge); the re-check
+          // is anchored on it.
+          const picks = [...Object.values(job.humanPicks), ...Object.values(botPicks)];
+          const quick = bestOf({ bestMove: top[0]!.move, bestExpected: best, expectedAfter }, picks);
+          const checked = serverRecheck || !people ? quick : await recheckCloseCalls(engine, job.fen, quick, picks, this.settings, job.priority);
           out[i] = { boardId: job.boardId, bestMove: checked.bestMove, bestExpected: checked.bestExpected, expectedAfter: checked.expectedAfter, botPicks, botThinkMs, botPowerUps, replies, mates };
         }
       }),

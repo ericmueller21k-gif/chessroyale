@@ -65,8 +65,24 @@ export interface GroupResult {
 }
 
 /**
+ * The board's best move: the engine's choice, unless a pick scored above it, which then is the best (the highest-scored
+ * such pick; a tie keeps the engine's choice, and between equal picks the first by name). Every loss is measured from
+ * the highest number (moveLosses), so the move that has it is the best everywhere: the reveal, the God King's move, the
+ * exchange check and the re-check's anchor. Every judge runs this on the same numbers, so they agree exactly
+ * (docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md).
+ */
+export function bestOf<E extends GroupEvaluation>(evaluation: E, picks: readonly (string | null | undefined)[]): E {
+  let { bestMove, bestExpected } = evaluation;
+  for (const m of [...new Set(picks)].sort()) {
+    const e = m ? evaluation.expectedAfter[m] : undefined;
+    if (e !== undefined && e > bestExpected) [bestMove, bestExpected] = [m!, e];
+  }
+  return bestMove === evaluation.bestMove ? evaluation : { ...evaluation, bestMove, bestExpected };
+}
+
+/**
  * Loss of each picked move. If a pick evaluates above the engine's own choice,
- * that pick is treated as the best, so loss is never negative.
+ * that pick is treated as the best (bestOf), so loss is never negative.
  */
 export function moveLosses(evaluation: GroupEvaluation, moves: readonly string[]): Record<string, number> {
   let best = evaluation.bestExpected;

@@ -8,7 +8,7 @@
  * the device and in the lobby (judgedBoard), so the lobby can check a report on its own, and two honest devices'
  * reports are identical (the browser engine is deterministic: reports/judge-determinism.md).
  */
-import { DEFAULT_SETTINGS, botChoose, mulberry32 } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, bestOf, botChoose, mulberry32 } from "@chessroyale/core";
 import { legalMoves, sideToMove } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { applyRecheck, recheckTargets, repliesFrom, type EngineLike, type RecheckSettings } from "./runner.ts";
@@ -166,7 +166,9 @@ function baseBoard(job: JudgeJob, report: JudgeReport, bots: { picks: string[]; 
   // Every pick (people's and bots') must be scored.
   if (![...job.picks, ...bots.picks].every((m) => expectedAfter[m] !== undefined)) return null;
   const { replies, mates } = repliesFrom([top, report.extra]);
-  return { bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter, botPicks: bots.picks, botPowerUps: bots.powerUps, replies, mates, rechecked: [] };
+  // The best: the top moves' first line, unless a pick scored above it (bestOf), as on every judge.
+  const best = bestOf({ bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter }, [...job.picks, ...bots.picks]);
+  return { bestMove: best.bestMove, bestExpected: best.bestExpected, expectedAfter, botPicks: bots.picks, botPowerUps: bots.powerUps, replies, mates, rechecked: [] };
 }
 
 /**

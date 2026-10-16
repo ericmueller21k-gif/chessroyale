@@ -337,7 +337,7 @@ A move's **loss** is what it gives away compared with the best move in that posi
 
 $ loss = 100 × (expected score after the best move − expected score after your move)
 
-A loss is never below zero: if your move scores above the engine's own choice, yours counts as the best. Your **round score** then compares you with everyone who picked with you (in 50 v 50, your team):
+A loss is never below zero: if your move scores above the engine's own choice, yours counts as the best move, and the engine's choice is charged against it like any other pick. Your **round score** then compares you with everyone who picked with you (in 50 v 50, your team):
 
 $ round score = the group's average loss − your loss
 

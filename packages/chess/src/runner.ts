@@ -19,6 +19,7 @@ import {
   keepBoards,
   outcomesFromGroup,
   scoreGroup,
+  bestOf,
   openingAllowance,
   OPENING_ALLOWANCE,
   type Allowance,
@@ -181,16 +182,18 @@ export function applyRecheck(evaluation: Evaluation, flagged: readonly string[],
  * budget, so a good move is now and then marked a mistake (reports/judge-accuracy.md). The picks recheckTargets
  * chooses are searched again with the best move, in one search restricted to them at recheckNodes, and those
  * numbers replace the first ones. Big losses are rechecked too (up to recheckLoss[1]): a sacrifice the quick
- * search called a blunder is the worst miss.
+ * search called a blunder is the worst miss. The best move is the highest-scored of the engine's choice and the picks
+ * (bestOf), so a pick scored above the engine's first line is the anchor, and the first line is re-checked against it.
  */
 export async function recheckCloseCalls(
   engine: EngineLike,
   fen: string,
-  evaluation: Evaluation,
+  quick: Evaluation,
   picks: readonly (string | null)[],
   s: RecheckSettings,
   priority: readonly string[] = [],
 ): Promise<Evaluation & { rechecked: string[] }> {
+  const evaluation = bestOf(quick, picks);
   const none = { ...evaluation, rechecked: [] as string[] };
   if (!engine.scoreMovesAt) return none;
   const flagged = recheckTargets(evaluation, picks, s, priority);
@@ -779,7 +782,8 @@ export class MatchRunner {
     for (const m of extra) known.set(m.move, m.expected);
     // Close calls are re-checked where a person is playing (a group of bots affects nobody real).
     const people = playerIds.some((id) => !this.player(id).isBot && humanPicks.get(id)?.move);
-    const evaluation = { bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter: Object.fromEntries(known) };
+    // The best: the top moves' first line, unless a pick scored above it (bestOf, as on every judge).
+    const evaluation = bestOf({ bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter: Object.fromEntries(known) }, Object.values(picks));
     const checked = people ? await recheckCloseCalls(engine, board.fen, evaluation, Object.values(picks), this.settings) : evaluation;
     return this.resolveBoard(boardId, playerIds, picks, {
       bestMove: checked.bestMove,
@@ -804,8 +808,9 @@ export class MatchRunner {
     const limited = this.withoutBarred(rawPicks, rawEvaluation, boardId);
     const picks = limited.picks;
     // The boss's rules for the judge, e.g. G-REX's fire: a piece left on a tile ablaze counts as already gone (every
-    // path's numbers come in raw).
-    const evaluation = judgeEvaluation(this.state.boss, limited.evaluation, board.fen);
+    // path's numbers come in raw). Then the best move is the highest-scored of the engine's choice and the picks
+    // (bestOf: every judge names it already; a host on an older app may not).
+    const evaluation = bestOf(judgeEvaluation(this.state.boss, limited.evaluation, board.fen), playerIds.map((id) => picks[id] ?? null));
     // Boss battle: humans who called the King instead of picking abstain: no score, not a miss.
     const abstained = new Set(this.state.boss ? playerIds.filter((id) => !picks[id] && !this.player(id).isBot && this.kingCallers.has(id)) : []);
     const result = scoreGroup(
