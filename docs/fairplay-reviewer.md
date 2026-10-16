@@ -47,7 +47,7 @@ agree. Background: DECISIONS.md, "Fair play"; the numbers behind the thresholds:
 - `reason` is required (5 characters or more): it goes in the case's log, with `by: "reviewer"`.
 - `notice` (optional) replaces the standard sentence in the player's email (a ban, or a clearing after a review).
 - Answers `{ ok: true, status, by }`, or `400` (no reason, a bad decision), `404` (no such player), `409` (a banned
-  case or one with an open appeal: those are for a person).
+  case, one with an open appeal, or the case of a deleted account: those are for a person).
 
 ## How to decide
 
@@ -57,6 +57,8 @@ matches.
 
 **Never decide** (leave it for Eric, and move on):
 - a banned case, or one with an appeal waiting (the API refuses anyway);
+- a "Deleted player" (an account deleted while banned or in review): its case is kept so deleting can't get around
+  fair play, with no evidence left to weigh; the API refuses it too;
 - a case open only because of "Offensive name or icon" or "Something else" reports: names and behavior are for a
   person;
 - anything where the evidence was deleted (`moves: null` for every match) and the summaries alone don't settle it.

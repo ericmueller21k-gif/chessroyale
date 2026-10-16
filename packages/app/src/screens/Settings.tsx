@@ -4,6 +4,7 @@ import { InstallCard } from "../components/InstallCard.tsx";
 import { FriendSettings } from "../components/Friends.tsx";
 import { openReport } from "../components/Problems.tsx";
 import { SignIn } from "../components/SignIn.tsx";
+import { AccountData } from "../components/AccountData.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut } from "../account.ts";
 import { chatBubbles, chatOff, crowdAnimations, crowdTrail, evalBarOn, onPrefsChange, practiceOn, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail, setEvalBarOn, setPracticeOn } from "../prefs.ts";
@@ -258,6 +259,7 @@ export function SettingsScreen({ onBack, onFaq }: { onBack: () => void; onFaq?: 
           ) : (
             <p class="fd-note">You're a guest on this device.</p>
           )}
+          <AccountData />
         </section>
       )}
 

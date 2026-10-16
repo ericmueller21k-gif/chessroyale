@@ -148,6 +148,7 @@ export class Lobby extends DurableObject<Env> {
     const mail = caseMailer(await withSecrets(this.env));
     for (const r of [...left, ...(over ? core.humanResults() : [])]) {
       const userId = rec.accounts?.[r.playerId];
+      // (Someone who deleted their account mid-match gets nothing recorded: recordFairPlay and recordResult skip them.)
       if (!userId) continue;
       // Fair play: the match's signals and the player's level first (it may put them in review)…
       const moves = core.fairMoves(r.playerId);
