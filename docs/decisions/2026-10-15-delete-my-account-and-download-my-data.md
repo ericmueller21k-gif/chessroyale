@@ -50,9 +50,11 @@ JSON holds the account id.
   by every deleted account, with new ids, in random order, and the old rows are deleted. They lose their lobby code,
   rating, best move and eval-bar flag, and `played_at` is rounded down to the start of its UTC day. So:
   - the game's own numbers (how often each boss wins, typical placements) stay right;
-  - nothing ties a row to a person or to the match it came from;
-  - one player's rows still sit together as one block of new ids, so they can be told to be one deleted player's,
-    but not whose.
+  - a row can't be tied to a name from the database alone;
+  - but a deleted row still leaves a gap among its match's rows (a missing id and placement, with the new block
+    landing just after), which someone with database access who saw that match's standings could use. One player's
+    rows sit together as one block of new ids. We don't claim more than this: the policy says the results are kept
+    without the account, name, match code or exact time.
 
   Why each step:
   - a lobby saves its players one after another, so an old id sat between rows of the same match, which keep their
@@ -92,6 +94,10 @@ database. So:
   same statement, or at the read they already make).
 
 A few other actions that checked the account a moment before the batch can still write just after it (below).
+
+**Backups.** Cloudflare keeps restore points of the database for up to 30 days (D1 Time Travel; Durable Object
+storage has the same window), so deleted data is gone from those 30 days after it's deleted. The policy says so:
+"Our database host keeps restore points for up to 30 days; after that, what you deleted is gone from them too."
 
 **On the device,** the app forgets everything it keeps (`brc.*` and `hunchess-*` in local storage, settings
 included) and starts afresh, as a new visitor. The response clears the session cookie. The fair-play device marker
@@ -167,7 +173,9 @@ with or without the SameSite=Lax cookie.
   - a friend action;
   - a shop or locker write mid-request.
 
-  Such a row holds only the random id. No sweep for them (no cron); they're rare and point at nothing.
+  Such a row holds the random id and what that action writes: a late fair-play insert keeps the match's summary and
+  score; a late shop or locker write keeps item ids; a report keeps its reason and match code. No sweep job for them;
+  they're rare and point at no account.
 - **Follow-up, not this PR:** a guest signing in to an existing account (`signInWithIdentity`) deletes the guest's
   account row but leaves its reports and fair-play rows under the guest's id. They point at nothing; they should move
   to the account or go with the guest.

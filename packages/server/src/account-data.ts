@@ -13,7 +13,7 @@
  *   - results, without the player: their rows are written again under the account id DELETED_ID with new ids (the old
  *     ones sat next to the same match's other rows), without their lobby code, rating, best move and eval-bar flag, and
  *     with only the day they were played, so the game's own numbers (how often each boss wins, typical placements)
- *     stay right while nothing ties them to anyone;
+ *     stay right while no row names anyone (its place among its match's rows still shows a gap: the decision file);
  *   - fair play's file on an account that's banned or in review: the case, its log, the hashed email and Google id
  *     (fairplay_identities) and the device markers, under the deleted account's random id, so deleting never gets
  *     around fair play (a new account with the same identity is banned again, or goes back to review). Everything

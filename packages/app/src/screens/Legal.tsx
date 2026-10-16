@@ -141,7 +141,7 @@ function Privacy() {
           </p>
         }
         why="your profile, stats, rating and rank, and balancing the game (for example, how often each boss wins)."
-        kept="with your account. If you delete it, your results stay without anything that leads back to you (below)."
+        kept="with your account. If you delete it, your results stay without your account, name, match code or exact time (below)."
       />
       <Item
         title="Online now and last seen"
@@ -357,9 +357,9 @@ function Privacy() {
           sent, and your account id on error records.
         </li>
         <li>
-          <strong>Kept, without you:</strong> your match results, moved to one shared "deleted" account, with only the day they
-          were played and without their match code, rating, best move or eval-bar setting, so nothing leads back to you and the
-          game's numbers stay right. Error records stay counted, without your account. Feedback and ideas never carry your
+          <strong>Kept, without you:</strong> your match results, moved to one shared "deleted" account and kept without your
+          account, name, match code or exact time (only the day), rating, best move or eval-bar setting, so the game's numbers
+          stay right. Error records stay counted, without your account. Feedback and ideas never carry your
           account, so they stay until they expire ({OPS.store.keepDays} days).
         </li>
         <li>
@@ -373,6 +373,10 @@ function Privacy() {
         </li>
         <li>
           <strong>This device</strong> forgets you too: the app clears its settings and choices.
+        </li>
+        <li>
+          <strong>Backups:</strong> our database host keeps restore points for up to 30 days; after that, what you deleted is
+          gone from them too.
         </li>
       </ul>
 
