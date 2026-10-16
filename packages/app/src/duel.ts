@@ -783,7 +783,6 @@ export class DuelQueue {
         await new Promise((r) => setTimeout(r, 2000));
         continue;
       }
-      if (this.stopped) return;
       const body = (await res.json().catch(() => ({}))) as {
         code?: string;
         ticket?: string;
@@ -795,6 +794,12 @@ export class DuelQueue {
         banned?: boolean;
         expired?: boolean;
       };
+      if (this.stopped) {
+        // Cancelled while this ask was out, before any ticket was known (the first ask): the server made one, so it's
+        // told now; otherwise that ticket would wait in the queue to be paired with someone who has gone.
+        if (this.state.kind === "cancelled" && !this.ticket && body.ticket) this.tellCancel(body.ticket);
+        return;
+      }
       if (typeof body.botRating === "number") this.botRating = body.botRating;
       // The server doesn't know this ticket any more (it went while this device slept): ask afresh, still searching.
       // (Expired with no ticket sent can't be: refused, rather than asking again and again.)
@@ -821,8 +826,13 @@ export class DuelQueue {
   cancel() {
     if (this.stopped) return;
     this.stopped = true;
-    if (this.ticket) void fetch(`/api/1v1/cancel?ticket=${encodeURIComponent(this.ticket)}`, { method: "POST" }).catch(() => undefined);
+    // (No ticket yet: the first ask is still out; its answer's ticket is told when it comes, in start.)
+    if (this.ticket) this.tellCancel(this.ticket);
     this.set({ kind: "cancelled" });
+  }
+
+  private tellCancel(ticket: string) {
+    void fetch(`/api/1v1/cancel?ticket=${encodeURIComponent(ticket)}`, { method: "POST" }).catch(() => undefined);
   }
 }
 

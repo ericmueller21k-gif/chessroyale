@@ -15894,8 +15894,19 @@ button.sq-tiny {
 .dq-bar.few :is(.dq-time, .dq-chev) {
   color: inherit;
 }
+/* (Gold says it: no dot, so "Few players online" fits a 320 px phone whole.) */
 .dq-bar.few .dq-dot {
-  background: var(--fd-gold-ink);
+  display: none;
+}
+@media (max-width: 359px) {
+  .dq-go {
+    gap: 6px;
+    padding: 0 4px 0 6px;
+    font-size: 14px;
+  }
+  .dq-cancel {
+    padding: 0 10px;
+  }
 }
 .dq-bar.few .dq-cancel {
   background: rgba(255, 255, 255, 0.35);

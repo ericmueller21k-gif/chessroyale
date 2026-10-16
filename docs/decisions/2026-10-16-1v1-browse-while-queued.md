@@ -41,6 +41,10 @@ still reaching you, and nothing breaking on a reload or a phone's sleep. How it 
   after its last ask (the server forgets an unasked ticket long before; it then answers `expired` and the app asks
   afresh, as #255 built). The queue's test switches (`pool`, `clock`, `fewAfter`) are read once when it starts, since
   the address changes as you browse.
+- **A Cancel during the first ask now reaches the server** (found by this PR's test of "Leave queue" right after
+  queueing): the ticket only comes back with the first ask's answer, up to `CAPACITY.queue.holdMs` later, and Cancel
+  without one told the server nothing, so the ticket stayed in the queue and could be paired with someone who had gone
+  (their game a no-show). Now that answer's ticket is cancelled when it comes (`DuelQueue.start`); a unit test covers it.
 - **A phone asleep** behaves as #255 designed: the asks pause and resume with the page, and a ticket the server
   forgot is answered `expired` and asked again with the wait kept.
 

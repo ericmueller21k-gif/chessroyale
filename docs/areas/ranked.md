@@ -24,7 +24,8 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   ones at 160); never two accounts on one device (fair play's device cookie, hashed, on the ticket). A ticket is only
   made with its player: one being seated (its game opening) is still known, so its ask waits for the game; one the
   queue doesn't know (gone while the app slept, or made up) is answered `expired` and
-  the app asks afresh. Cancel takes the ticket out; a pairing made
+  the app asks afresh. Cancel takes the ticket out (one still on its way back with the first ask is cancelled when it
+  comes); a pairing made
   that very moment is called off for that player (`DuelGame.abandon`: an abort before any move, nothing recorded).
   After `fewPlayersSeconds` (45) the app offers "Few players online right now" with Keep waiting and Play a bot
   (unranked).

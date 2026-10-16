@@ -92,6 +92,26 @@ describe("the 1 v 1 queue and game in the app", () => {
     expect(savedDuelQueue()).toBeNull();
   });
 
+  it("Cancel while the first ask is still out: its ticket, once it comes, is cancelled too", async () => {
+    vi.stubGlobal("location", { search: "" });
+    const asked: string[] = [];
+    let answer: (r: Response) => void = () => undefined;
+    vi.stubGlobal("fetch", (url: string) => {
+      asked.push(url);
+      return url.startsWith("/api/1v1/play") ? new Promise<Response>((r) => (answer = r)) : Promise.resolve(new Response("{}"));
+    });
+    vi.resetModules();
+    const { DuelQueue } = await import("../src/duel.ts");
+    const q = new DuelQueue();
+    const run = q.start();
+    q.cancel();
+    expect(asked).toEqual(["/api/1v1/play"]);
+    answer(new Response(JSON.stringify({ searching: true, ticket: "t-late" }), { status: 200 }));
+    await run;
+    expect(asked).toEqual(["/api/1v1/play", "/api/1v1/cancel?ticket=t-late"]);
+    expect(q.state).toEqual({ kind: "cancelled" });
+  });
+
   it("the server's clock: the quickest message's sample is kept, not the latest", async () => {
     const { NetDuel } = await import("../src/duel.ts");
     const d = new NetDuel("ABCDE") as unknown as { onMessage(m: unknown): void; offset: number };

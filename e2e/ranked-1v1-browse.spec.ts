@@ -205,7 +205,7 @@ test("a reload while queued carries on with the search: on the stage from /1v1, 
 
 test("the bar fits (320, 360, 390 px; 1280 on a computer), and at Few players online it says so and takes you to the choices", async ({ browser }) => {
   test.setTimeout(2 * 60_000);
-  const a = await player(browser, "WWWWWWWWWWWWWWWW");
+  const a = await player(browser, "Ann Fits");
   await a.goto(`/1v1?nolanding&pool=${poolName()}&fewAfter=1`);
   await expect(a.locator(".dv-search")).toBeVisible();
   await goHome(a);
