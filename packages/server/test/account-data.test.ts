@@ -404,12 +404,12 @@ describe("a guest signing in to an existing account (docs/decisions/2026-10-16-i
     expect(await banCheck(sql, owner, null, T0 + 9)).toEqual({ banned: true });
     expect(await count(sql, "fairplay_matches WHERE user_id = ?", owner.id)).toBe(1);
     expect(await sql.all("SELECT device FROM fairplay_devices WHERE user_id = ?", owner.id)).toEqual([{ device: DEVICE }]);
-    // (The first watch is the account's own, opened by the guest's report about it.)
+    // (The watch is the account's own, opened by the guest's report about it; the guest's lines say so.)
     expect((await sql.all<{ action: string }>("SELECT action FROM fairplay_log WHERE user_id = ? ORDER BY id", owner.id)).map((l) => l.action)).toEqual([
       "watch",
-      "watch",
-      "banned",
-      "appeal",
+      "guest watch",
+      "guest banned",
+      "guest appeal",
       "merged",
     ]);
     // A ban's holds: every online result off ranking, no rating; the account's email is kept, so a new account made
@@ -464,8 +464,8 @@ describe("a guest signing in to an existing account (docs/decisions/2026-10-16-i
     expect(await rowsNaming(sql, cleared.id)).toEqual([]);
     expect(await caseOf(sql, plain.id)).toBeNull();
     expect((await sql.all<{ action: string }>("SELECT action FROM fairplay_log WHERE user_id = ? ORDER BY id", plain.id)).map((l) => l.action)).toEqual([
-      "review",
-      "cleared",
+      "guest review",
+      "guest cleared",
       "merged",
     ]);
   });
@@ -492,6 +492,29 @@ describe("a guest signing in to an existing account: what the account keeps", ()
     await setCase(sql, bannedGuest.id, "banned", "admin:other@example.com", "engine moves as a guest", T0 + 6);
     await signInWithIdentity(sql, bannedGuest, "email", "ab+2@gmail.com", {}, T0 + 7);
     expect(await caseOf(sql, cousin.id)).toMatchObject({ status: "banned", decided_at: T0 + 6, decided_by: "admin:other@example.com" });
+  });
+
+  it("a guest's decisions never become the account's: an alias it signs in to is still caught (its line comes from its own clearings)", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const cheat = await signInWithIdentity(sql, null, "email", "a.b@gmail.com", {}, T0);
+    await setCase(sql, cheat.id, "banned", "admin:eric@example.com", "engine moves", T0);
+    // An alias with the banned address (making it runs no check), and a guest the reviewer cleared, watched again since.
+    const alias = await signInWithIdentity(sql, null, "email", "ab+7@gmail.com", {}, T0 + 1);
+    const { user: guest } = await createGuest(sql, T0, "Guest");
+    await setCase(sql, guest.id, "review", "reports", "3 reports", T0 + 2);
+    expect(await decide(sql, guest.id, "clear", "reviewer", "nothing in its games", T0 + 3)).toEqual({ ok: true, status: "cleared" });
+    await setCase(sql, guest.id, "watch", "reports", "reported: Cheating", T0 + 4);
+    await signInWithIdentity(sql, guest, "email", "ab+7@gmail.com", {}, T0 + 5);
+    // The watch comes without the guest's decision, and the guest's clearing is the guest's in the log.
+    expect(await caseOf(sql, alias.id)).toMatchObject({ status: "watch", decided_at: null, decided_by: null });
+    expect((await sql.all<{ action: string }>("SELECT action FROM fairplay_log WHERE user_id = ? ORDER BY id", alias.id)).map((l) => l.action)).toEqual([
+      "guest review",
+      "guest cleared",
+      "guest watch",
+      "merged",
+    ]);
+    expect(await banCheck(sql, alias, null, T0 + 6)).toEqual({ banned: true });
   });
 
   it("keeps one open appeal: the guest's goes when the account has one open", async () => {

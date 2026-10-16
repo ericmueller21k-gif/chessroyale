@@ -143,6 +143,34 @@ describe("bans", () => {
     expect(await banCheck(sql, cousin, null, later + 2)).toEqual({ banned: true });
   });
 
+  it("an alias whose watch closed on its own is still caught: only a clearing by a person or the reviewer sets the line", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const cheat = await player(sql, "Cheat", "a.b@gmail.com");
+    await decide(sql, cheat.id, "ban", "admin:e", "engine", 1000);
+    // An alias with the banned address (making it runs no check), reported once by a guest, then 30 days offline.
+    const alias = await player(sql, "Alias", "ab+7@gmail.com", 2000);
+    const { user: guest } = await createGuest(sql, 2000, "Guest");
+    await reportPlayer(sql, guest, alias.id, "Offensive name or icon", null, 2000);
+    await purgeEvidence(sql, 2000 + (FAIRPLAY.evidenceDays + 1) * DAY, true);
+    expect(await caseOf(sql, alias.id)).toMatchObject({ status: "closed", decided_by: "auto" });
+    expect(await banCheck(sql, alias, null, 2000 + (FAIRPLAY.evidenceDays + 2) * DAY)).toEqual({ banned: true });
+  });
+
+  it("a cleared account isn't put back in review by the identity of an account deleted in review", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const x = await player(sql, "X", "x.y@gmail.com");
+    await setCase(sql, x.id, "review", "reports", "3 reports", 1000);
+    await decide(sql, x.id, "clear", "admin:e", "nothing in its games", 2000);
+    // Later, an account with the same address is deleted while in review (account-data.ts keeps its identity).
+    const [[, hash]] = (await identityHashes({ email: "xy+1@gmail.com", google_sub: null })) as [[string, string]];
+    await sql.run("INSERT INTO fairplay_identities (kind, hash, user_id, at) VALUES ('email', ?, 'deleted-in-review', 3000)", hash);
+    await setCase(sql, "deleted-in-review", "review", "detection", "engine-like moves", 3000);
+    expect(await banCheck(sql, x, null, 4000)).toEqual({ banned: false });
+    expect((await caseOf(sql, x.id))?.status).toBe("cleared");
+  });
+
   it("a fairplay_identities table from before owners had their own rows is rebuilt once, keeping its rows", async () => {
     const { sql } = memoryDb();
     await sql.run("CREATE TABLE fairplay_identities (kind TEXT NOT NULL, hash TEXT NOT NULL, user_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (kind, hash))");

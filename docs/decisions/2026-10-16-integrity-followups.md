@@ -17,8 +17,8 @@ so a guest's file comes mostly from reports. The merge must still be right.)
 | Table | What happens | Why |
 | --- | --- | --- |
 | `reports` | Re-keyed: reporter and target become the account. A report between the guest and the account is deleted. | Reports follow the player. One between the two is the player reporting themselves, which `reportPlayer` refuses. |
-| `fairplay_cases` | The guest's case moves if it's open or a ban (watch, review, banned) and stricter than the account's (banned > review > watch > none): its status and reason, the later `updated_at`. The account keeps its own opening date and decision (`decided_at`, `decided_by`) unless a ban comes in, which brings its own. A cleared or closed guest case doesn't move. The guest's row goes. | A case can't be shed by signing in. A decision date sets aside what was weighed before it (the level, the report count, and since the review the identity rows in `banCheck`). Keeping the account's is what a raise of its own case does: what a person weighed stays weighed, so a cleared account isn't banned again by a guest's watch. A cleared guest case would bring its decision date over the account's own evidence. |
-| `fairplay_log` | Re-keyed, plus a line "merged" (by "sign-in") when the guest had a case. | A person reading the case sees where it came from. The line doesn't name the guest's id, which nothing keeps. |
+| `fairplay_cases` | The guest's case moves if it's open or a ban (watch, review, banned) and stricter than the account's (banned > review > watch > none): its status and reason, the later `updated_at`. A guest's decision never becomes the account's: the account keeps its own opening date and decision (`decided_at`, `decided_by`), or has none, unless a ban comes in, which brings its own. A cleared or closed guest case doesn't move. The guest's row goes. | A case can't be shed by signing in. A decision date sets aside what was weighed before it (the level, the report count). Keeping the account's is what a raise of its own case does: what a person weighed stays weighed. A guest's date would set aside the account's own evidence. (The guest's own weighed matches then count again on the account; where sign-in is set up a guest has none, as it can't play online.) |
+| `fairplay_log` | Re-keyed with each action marked "guest …" ("guest watch", "guest cleared"), plus a line "merged" (by "sign-in") when the guest had a case. | A person reading the case sees where each line came from. A guest's clearing never counts as the account's own (`banCheck`'s line, below). The "merged" line doesn't name the guest's id, which nothing keeps. |
 | `fairplay_matches`, `fairplay_appeals` | Re-keyed. The guest's open appeal is deleted first when the account has one open. | The evidence and an open appeal follow the case. One open appeal at a time: when both have one, both are banned and the account's ban is the one kept. |
 | `fairplay_devices` | Copied to the account (`INSERT OR IGNORE`: the account's own row wins), then the guest's deleted. | Device markers are evidence against ban dodging. |
 | `fairplay_identities` | Nothing to move. | A guest has no email or Google account, so fair play never keeps an identity for it. |
@@ -53,29 +53,34 @@ A's ban still stood.
 We picked this over re-pointing the one row to another banned owner when one is cleared. Re-pointing can't find a
 deleted account's identity once its row was replaced, so it would need the rows this design keeps anyway.
 
-**A decision weighs the identity rows written before it.** Keeping A's row means B, once cleared, would be banned
-again by evasion at its next check, which would make clearing it impossible. For an account with a decision on its
-case (`decided_at`: a person's, the reviewer's, or a watch closing on its own), `banCheck` now leaves out two kinds
-of row:
-- **Rows written at or before that decision.** They were weighed when it was made.
+**A clearing weighs the identity rows written before it.** Keeping A's row means B, once cleared, would be banned
+again by evasion at its next check, which would make clearing it impossible. For an account cleared by a person or
+the reviewer (its latest `cleared` line in `fairplay_log` by `admin:…` or `reviewer`, an overturned appeal included;
+read in the same statement, on the log's `(user_id, at)` index), `banCheck` now leaves out two kinds of row:
+- **Rows written at or before that clearing.** They were weighed when it was made.
 - **Rows of accounts banned by evasion** (`fairplay_cases.decided_by = 'evasion'`, on the case row, so no extra
   read). An evasion ban only repeats a ban already recorded. Without this, the evasion ban of a third account with
   the address, written after B's clearing, would catch B again.
 
 So B stays cleared through a report, a watch opened by detection, that watch closing, or a guest's watch case
-merging in (the merge keeps the account's decision, above). A report or detection opens a watch or review on it,
-never a ban. A real ban of another account with the identity, after the decision, does catch it.
+merging in. A report or detection opens a watch or review on it, never a ban. A real ban of another account with the
+identity, after the clearing, does catch it.
 
-An account with no decision counts every row, evasion bans included, as before: after A's ban is lifted, B's
-evasion ban still catches a brand-new account with the address (`fairplay-admin.test.ts`, "evasion"; skipping
-evasion rows for every account fails that test).
+An account never cleared counts every row, evasion bans included, as before: after A's ban is lifted, B's evasion ban
+still catches a brand-new account with the address (`fairplay-admin.test.ts`, "evasion"; skipping evasion rows for
+every account fails that test).
 
 The identity-based review and the device check still skip a cleared account by its status, as before.
 
-The first version (review of #246, Oct 16) skipped the identity check whenever the status was "cleared". Any report
-moved the status to watch and undid it. A known gap that remains: any decision sets the line, a watch closing on its
-own too. So an account whose watch closes after another account's real ban isn't caught by that ban, unless it asked
-to play in between (it would have been banned then).
+**How the line got here (reviews of #246, Oct 16):**
+- The first version skipped the identity check whenever the status was "cleared". Any report moved the status to
+  watch and undid it.
+- The second took the line from the case's `decided_at`. But that is set by any decision: a watch closing on its own
+  (by "auto"), and an evasion review raise (by "evasion"). A banned player could make an alias with the banned email
+  (making an account runs no check), report it once from a guest, stay offline for `evidenceDays`, and play once the
+  watch closed. A guest's decision copied in by the merge did the same.
+- Now only a clearing by a person or the reviewer sets the line. A closing on its own, an evasion review and a
+  guest's decisions don't, so none of them matters any more.
 
 **The table is rebuilt once.** SQLite can't change a key. `ensureSchema` reads `PRAGMA table_info`. If `user_id`
 isn't in the key yet, it runs `IDENTITIES_REKEY` as one batch: rename the table, create it with the new key, copy
@@ -99,12 +104,15 @@ to choose the message ("A code was just sent…" or "Too many codes…"). The li
   - `account-data.test.ts`, "a guest signing in to an existing account": no row anywhere names the guest after a
     merge; a ban, its appeal, holds and identity follow; the stricter case wins; a cleared guest case stays behind.
     Its second describe: the account keeps its own decision when a guest's watch joins it (a cleared cousin stays
-    cleared), while a ban brings its own; one open appeal stays.
+    cleared), while a ban brings its own; a guest's decisions never become the account's (an alias it signs in to is
+    still caught); one open appeal stays.
   - `fairplay-admin.test.ts`:
     - clearing one of two banned owners keeps the email caught, and the cleared one isn't banned again by a third
       account's evasion ban;
     - a cleared cousin stays cleared through a report and its watch closing, and a later real ban of an alias
       catches it;
+    - an alias whose watch closed on its own is still caught;
+    - a cleared account isn't put back in review by the identity of an account deleted in review;
     - a banned owner counts before a review one;
     - the old table is rebuilt with its rows.
 
@@ -117,8 +125,9 @@ to choose the message ("A code was just sent…" or "Too many codes…"). The li
   - an upsert's `RETURNING` through `first()`;
   - ten starts at once, then the hour's limit;
   - the merge with a banned guest, and the stricter-case upsert;
-  - the cousin case, then the review's paths: a report, the watch closing, a guest's watch merging in (the decision
-    kept), a later real ban of an alias; and one open appeal after a merge.
+  - the cousin case, then the reviews' paths: a report, the watch closing, a guest's watch merging in (the decision
+    kept), a later real ban of an alias, an alias whose watch closed on its own; one open appeal after a merge, and
+    the guest's log lines marked.
 
   Production D1 couldn't be tried from here.
 
