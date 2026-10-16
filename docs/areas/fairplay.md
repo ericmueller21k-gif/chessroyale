@@ -49,8 +49,9 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   the profile, as everywhere (one opened from the game names it). On a case's page, "Check the counted moves with the
   engine server" also checks the player's kept 1 v 1 games (`fairplay-duel.ts`, `checkDuelGames`): reported ones
   first, the player's moves after the book, each against every legal move: the engine server scores at most 8 moves
-  a search and has no unrestricted search, so the legal moves go in groups of 8 (`moveGroups`, the played move's
-  first), one search each (about 5 a move), on `fairplay-1` within the same daily budget (`takeBudget`); each game's
+  a search and has no unrestricted search, so the legal moves go in near-equal groups of at most 8 (`moveGroups`, the
+  played move's first; 17 moves are 6, 6 and 5), one search each (about 5 a move); a position whose groups can't all
+  be searched (the press's searches or the day's budget run out partway) is dropped and searched whole next time, on `fairplay-1` within the same daily budget (`takeBudget`); each game's
   result kept by side (`ranked_1v1_games.checked`) and shown in the page's "1 v 1 games" section. A player in review
   keeps their rank as it is (their games don't move it) and earns no 1 v 1 coins; their games are kept past 30 days
   only while their case is open (watch or review) or an appeal of a ban is waiting (purgeEvidence's rule).

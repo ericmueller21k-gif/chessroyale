@@ -32,13 +32,26 @@ const fromRow = (r: RankedRow): RankedRecord => ({ rating: r.rating, rd: r.rd, g
 
 /**
  * A player's ranked record, or a new one (seeded from their account's rating from other modes) if they have none; and
- * their paying games so far on a day (`day`, a UTC day: the daily coin cap).
+ * the daily coin cap's count as stored (`coins`: the UTC day of their last paying game and how many paid that day).
  */
-export async function rankedRecordOf(sql: Sql, userId: string, day: number | null = null): Promise<{ record: RankedRecord; stored: boolean; paidToday: number }> {
+export async function rankedRecordOf(sql: Sql, userId: string): Promise<{ record: RankedRecord; stored: boolean; coins: { day: number | null; games: number } }> {
   const row = await sql.first<RankedRow>("SELECT rating, rd, games, wins, losses, draws, ladder, last_at, coin_day, coin_games FROM ranked_1v1 WHERE user_id = ?", userId);
-  if (row) return { record: fromRow(row), stored: true, paidToday: day !== null && row.coin_day === day ? row.coin_games : 0 };
+  if (row) return { record: fromRow(row), stored: true, coins: { day: row.coin_day, games: row.coin_games ?? 0 } };
   const u = await sql.first<{ rating: number | null }>("SELECT rating FROM users WHERE id = ?", userId);
-  return { record: newRankedRecord(u?.rating ?? null), stored: false, paidToday: 0 };
+  return { record: newRankedRecord(u?.rating ?? null), stored: false, coins: { day: null, games: 0 } };
+}
+
+/**
+ * The daily coin cap for a game that ended on `day`, against the stored count: the paying games so far that day, and
+ * the count to store after it (paying or not). A game recorded after one of a later day (a retry across midnight)
+ * leaves the later day's count as it is, and isn't held to its own day's (that count is gone): it pays as usual.
+ */
+export function coinCount(stored: { day: number | null; games: number }, day: number, pays: (paidSoFar: number) => boolean): { pays: boolean; store: { day: number | null; games: number } } {
+  if (stored.day !== null && stored.day > day) return { pays: pays(0), store: stored };
+  const paid = stored.day === day ? stored.games : 0;
+  const ok = paid < RANKED_1V1.coins.perDay && pays(paid);
+  const games = ok ? paid + 1 : paid;
+  return { pays: ok, store: games > 0 ? { day, games } : { day: null, games: 0 } };
 }
 
 /**
@@ -94,7 +107,7 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
   const isHeld: Record<Color, boolean> = { w: await held(g.players.w), b: await held(g.players.b) };
   const day = dayOf(g.endedAt);
   for (let attempt = 0; attempt < 4; attempt++) {
-    const before = { w: await rankedRecordOf(sql, g.players.w, day), b: await rankedRecordOf(sql, g.players.b, day) };
+    const before = { w: await rankedRecordOf(sql, g.players.w), b: await rankedRecordOf(sql, g.players.b) };
     const nonce = randomToken(9);
     const outcome = {} as Record<Color, DuelOutcome>;
     const writes: Stmt[] = [];
@@ -104,14 +117,14 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
       const opp = before[c === "w" ? "b" : "w"].record;
       const score = scoreFor(g.result, c);
       // (Nothing while fair play holds them, nor past the day's paying games.)
-      const paid = before[c].paidToday;
-      const coins = isHeld[c] || paid >= RANKED_1V1.coins.perDay ? 0 : duelCoins(resultWord(score), g.endedAt - g.startedAt, fewest);
+      const earned = isHeld[c] ? 0 : duelCoins(resultWord(score), g.endedAt - g.startedAt, fewest);
+      const count = coinCount(before[c].coins, day, () => earned > 0);
+      const coins = count.pays ? earned : 0;
       let change: RankChange | null = null;
       if (!isHeld[c]) {
         const r = rankedGame(me, opp, score, now);
         change = r.change;
         const n = r.next;
-        const paidNow = coins > 0 ? paid + 1 : paid;
         writes.push(
           stmt(
             `INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games)
@@ -129,8 +142,8 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
             n.ladder,
             g.id,
             n.lastAt,
-            paidNow > 0 ? day : null,
-            paidNow,
+            count.store.day,
+            count.store.games,
             g.players[c],
             g.id,
             nonce,

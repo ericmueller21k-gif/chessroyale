@@ -6,7 +6,9 @@
  * player's moves after the opening is scored against every legal move, so the pick's place among them and what it
  * gave away are the engine's. The engine server takes at most ENGINE_MOVES_MAX (8) moves a search and has no
  * unrestricted search (engine/server.mjs; the judges' top-8 search runs on players' devices), so the legal moves go in
- * groups of at most 8, one search each (the played move's group first), each a search from the day's budget. The
+ * near-equal groups of at most 8, one search each (the played move's group first), each a search from the day's
+ * budget. A position whose groups can't all be searched (the press's searches or the day's budget run out partway)
+ * isn't checked: the searches it got are dropped, and it's searched whole next time. The
  * result is for the reviewer to read; it never feeds the suspicion score or a ban by itself (there are no judged
  * numbers to measure it against, so a false ban can't come from it).
  */
@@ -19,14 +21,20 @@ import { deepResult, takeBudget, type DeepSearch } from "./fairplay-deep.ts";
 export const ENGINE_MOVES_MAX = 8;
 
 /**
- * A position's legal moves in groups the engine server takes (at most ENGINE_MOVES_MAX each), the played move's group
- * first. Searches of the same position at the same nodes give comparable expected scores, so the groups' answers
- * together score every move.
+ * A position's legal moves in as few groups as the engine server takes (at most ENGINE_MOVES_MAX each), as near equal
+ * in size as they can be (17 moves: 6, 6 and 5, never 8, 8 and 1, which would search the lone move eight times as
+ * deep), the played move first. Searches of the same position at the same nodes, over about as many moves each, give
+ * comparable expected scores, so the groups' answers together score every move.
  */
 export function moveGroups(legal: readonly string[], played: string): string[][] {
   const order = [played, ...legal.filter((m) => m !== played)].filter((m) => legal.includes(m));
+  const count = Math.ceil(order.length / ENGINE_MOVES_MAX);
   const groups: string[][] = [];
-  for (let i = 0; i < order.length; i += ENGINE_MOVES_MAX) groups.push(order.slice(i, i + ENGINE_MOVES_MAX));
+  for (let g = 0, at = 0; g < count; g++) {
+    const size = Math.floor(order.length / count) + (g < order.length % count ? 1 : 0);
+    groups.push(order.slice(at, at + size));
+    at += size;
+  }
   return groups;
 }
 

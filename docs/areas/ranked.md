@@ -22,7 +22,8 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   wait's) `+ perRd ×` the larger of the two deviations (as they stand that day), at most `maxRange` (`RANKED_1V1.match`:
   100, +10 a second, +1 × deviation, 1000; so two players in placements, still uncertain, meet at once, and settled
   ones at 160); never two accounts on one device (fair play's device cookie, hashed, on the ticket). A ticket is only
-  made with its player: one the queue doesn't know (gone while the app slept, or made up) is answered `expired` and
+  made with its player: one being seated (its game opening) is still known, so its ask waits for the game; one the
+  queue doesn't know (gone while the app slept, or made up) is answered `expired` and
   the app asks afresh. Cancel takes the ticket out; a pairing made
   that very moment is called off for that player (`DuelGame.abandon`: an abort before any move, nothing recorded).
   After `fewPlayersSeconds` (45) the app offers "Few players online right now" with Keep waiting and Play a bot
@@ -96,8 +97,9 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   only when clearly behind on material. No chat, no rank, no coins, nothing recorded.
 - **Fair play** ([fairplay.md](fairplay.md), "1 v 1"): reports from the profile, as everywhere (opened from the game,
   a report names it); the case page's engine check covers the player's kept 1 v 1 games, reported ones first, each move
-  against every legal move in the engine server's groups of at most 8, within the deep re-check's daily budget; shown
-  for the reviewer, never in the suspicion score.
+  against every legal move in near-equal groups of at most 8 (the engine server's limit), within the deep re-check's
+  daily budget; a position whose groups can't all be searched (the press's searches or the day's budget run out
+  partway) is dropped and searched whole next time; shown for the reviewer, never in the suspicion score.
 - **The first-time vote hint** (`components/VoteHint.tsx`, shared by every pawn vote): "Drag your pawn into the speed
   you want" at the foot of the board, the first time a device meets a pawn vote (`brc.voteHintSeen`), until the pawn is
   dropped or the vote ends.
@@ -158,7 +160,8 @@ kill switch `PAUSE_RANKED1V1`.
   tried again without the alarm spinning; a test clock unranked without test switches; an old app told to reload;
   nothing stored for a sync or a refused move; a seat without a player refused; only its two players get in),
   `duel-queue.test.ts` (pairing and widening, one ticket per account and one device, a ticket without its player
-  never paired, an expired or made-up ticket, Cancel, the Matchmaker's duel mode), `ranked-store.test.ts` (recording:
+  never paired, an expired or made-up ticket, an ask while its game is being opened, Cancel, the Matchmaker's duel
+  mode), `ranked-store.test.ts` (recording:
   placements, ranks, coins, the daily cap, once (and the answer to a repeat), a race with another game, aborted games,
   fair play's hold (no rank change, no coins), a deleted account; the purge by fair play's rule; the profile; the
   download, deleting, a guest's merge), `fairplay-duel.test.ts` (the engine check within the engine server's 8 moves

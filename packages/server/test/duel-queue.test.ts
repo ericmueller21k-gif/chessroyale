@@ -59,6 +59,27 @@ describe("pairing in the queue (PAIR_BY_RATING)", () => {
     expect(q.cancel(u.id)).toBe("GAMEX");
   });
 
+  it("a ticket being seated is known (an ask waits for it) until it's placed, put back or forgotten", () => {
+    const q = new QueueCore(cfg(), T0, nextId);
+    const a = q.enqueue(null, T0, info("a", 1500));
+    const b = q.enqueue(null, T0, info("b", 1500));
+    const [g] = q.admit(T0, 0, PAIR_BY_RATING);
+    expect(g!.tickets).toHaveLength(2);
+    expect(q.known(a.id)).toBe(true);
+    // An ask meanwhile is that ticket, not a new one in line.
+    expect(q.enqueue(a.id, T0 + 1).id).toBe(a.id);
+    expect(q.waiting).toBe(0);
+    q.place([g!.tickets[0]!], "ABCDE", T0 + 2);
+    expect(q.placedIn(g!.tickets[0]!.id)).toBe("ABCDE");
+    q.putBack([g!.tickets[1]!]);
+    expect(q.waiting).toBe(1);
+    q.enqueue(null, T0, info("c", 1500));
+    const [h] = q.admit(T0 + 3, 0, PAIR_BY_RATING);
+    expect(h!.tickets.map((t) => t.id)).toContain(b.id);
+    q.forget(h!.tickets);
+    expect(h!.tickets.some((t) => q.known(t.id))).toBe(false);
+  });
+
   it("a ticket without its player is never paired (and two accounts on one device never meet)", () => {
     const q = new QueueCore(cfg(), T0, nextId);
     q.enqueue(null, T0, info("a", 1500));
@@ -154,6 +175,39 @@ describe("the Matchmaker's 1 v 1 queue", () => {
     } finally {
       Date.now = realNow;
     }
+  });
+
+  it("an ask while its pair's game is being opened waits for it: the same game, never expired", async () => {
+    // A create that waits until released: the moment between the pairing and the game being open.
+    const made = new Map<string, { w: DuelPlayerView; b: DuelPlayerView }>();
+    let release: (() => void) | null = null;
+    let entered: () => void = () => {};
+    const inCreate = new Promise<void>((r) => (entered = r));
+    const ns = {
+      idFromName: (n: string) => n,
+      get: () => ({
+        async create(c: string, players: { w: DuelPlayerView; b: DuelPlayerView }) {
+          entered();
+          await new Promise<void>((r) => (release = r));
+          made.set(c, players);
+          return true;
+        },
+      }),
+    };
+    const mm = matchmaker(ns);
+    const ann = await mm.duelNext(null, info("ann", 1500));
+    expect(ann).toMatchObject({ searching: true });
+    const bobP = mm.duelNext(null, info("bob", 1500));
+    await inCreate;
+    // Ann's app asks again with her ticket in that moment.
+    const annP = mm.duelNext(ticketOf(ann));
+    await new Promise((r) => setTimeout(r, 5));
+    release!();
+    const [bob, annAgain] = await Promise.all([bobP, annP]);
+    expect(annAgain).not.toEqual({ expired: true });
+    expect(annAgain).toMatchObject({ code: expect.any(String), ticket: ticketOf(ann) });
+    expect("code" in bob && bob.code).toBe("code" in annAgain && annAgain.code);
+    expect(made.size).toBe(1);
   });
 
   it("Cancel: out of line, never paired after", async () => {

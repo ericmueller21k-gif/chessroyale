@@ -82,7 +82,13 @@ describe("the 1 v 1 engine check", () => {
     expect(await checkDuelGames(sql, engine(calls), ann.id, T0, 60)).toEqual({ searches: 15, games: 1 });
     expect(calls.every((c) => c.moves.length <= ENGINE_MOVES_MAX)).toBe(true);
     expect(moveGroups(["a", "b", "c"], "c")).toEqual([["c", "a", "b"]]);
-    expect(moveGroups(Array.from({ length: 17 }, (_, i) => `m${i}`), "m16").map((g) => g.length)).toEqual([8, 8, 1]);
+    // As few groups as the 8-move limit allows, as near equal as can be: never a lone move searched eight times as deep.
+    const sizes = (n: number) => moveGroups(Array.from({ length: n }, (_, i) => `m${i}`), `m${n - 1}`).map((g) => g.length);
+    expect(sizes(17)).toEqual([6, 6, 5]);
+    expect(sizes(8)).toEqual([8]);
+    expect(sizes(9)).toEqual([5, 4]);
+    expect(sizes(38)).toEqual([8, 8, 8, 7, 7]);
+    expect(moveGroups(Array.from({ length: 17 }, (_, i) => `m${i}`), "m16")[0]![0]).toBe("m16");
   });
 
   it("cut short (a search cap, the day's budget or no answer): carried on next time", async () => {

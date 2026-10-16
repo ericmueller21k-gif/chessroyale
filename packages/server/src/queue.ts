@@ -70,12 +70,21 @@ export interface QueueConfig {
   maxPlayers: number;
 }
 
+/** A ticket being seated longer than this (the seating failed without putting it back) is forgotten. */
+const SEATING_KEEP_MS = 60_000;
+
 export const queueConfig = (): QueueConfig => ({ ...CAPACITY.queue, maxPlayers: CAPACITY.overload.maxPlayers });
 
 export class QueueCore {
   /** Waiting to be placed, oldest first. */
   private line: Ticket[] = [];
   private byId = new Map<string, Ticket>();
+  /**
+   * Tickets taken from the line and being seated now (their lobby or game being opened): known, so an ask in that
+   * moment waits for the seat (the matchmaker's waiter) instead of starting afresh, until placed or put back. One the
+   * seating never settles (an error) is forgotten after SEATING_KEEP_MS.
+   */
+  private seating = new Map<string, { t: Ticket; since: number }>();
   /** Placed tickets: their lobby, until when it's remembered. */
   private placed = new Map<string, { code: string; until: number }>();
   private tokens: number;
@@ -103,6 +112,12 @@ export class QueueCore {
       known.seenAt = now;
       return known;
     }
+    // Being seated this moment: the same ticket (not back in line), so its ask waits for the seat.
+    const seating = ticketId ? this.seating.get(ticketId)?.t : undefined;
+    if (seating) {
+      seating.seenAt = now;
+      return seating;
+    }
     if (ticketId && this.placed.has(ticketId)) return { id: ticketId, at: now, seenAt: now };
     const t: Ticket = { id: this.newId(), at: now, seenAt: now, ...(info ? { info } : {}) };
     this.line.push(t);
@@ -110,9 +125,9 @@ export class QueueCore {
     return t;
   }
 
-  /** Whether this queue knows the ticket: in line (even past its time, until it's dropped), or placed. */
+  /** Whether this queue knows the ticket: in line (even past its time, until it's dropped), being seated, or placed. */
   known(ticketId: string): boolean {
-    return this.byId.has(ticketId) || this.placed.has(ticketId);
+    return this.byId.has(ticketId) || this.seating.has(ticketId) || this.placed.has(ticketId);
   }
 
   /** The lobby a ticket was placed in (undefined while it waits). */
@@ -152,7 +167,11 @@ export class QueueCore {
     const back = taken.filter((t) => !used.has(t.id));
     this.line.unshift(...back);
     this.tokens -= used.size;
-    for (const t of taken) if (used.has(t.id)) this.byId.delete(t.id);
+    for (const t of taken)
+      if (used.has(t.id)) {
+        this.byId.delete(t.id);
+        this.seating.set(t.id, { t, since: now });
+      }
     if (used.size) this.admittedLog.push({ at: now, n: used.size });
     return groups;
   }
@@ -169,14 +188,25 @@ export class QueueCore {
 
   /** These tickets have seats in `code`. */
   place(tickets: Ticket[], code: string, now: number) {
-    for (const t of tickets) this.placed.set(t.id, { code, until: now + this.cfg.placedKeepMs });
+    for (const t of tickets) {
+      this.seating.delete(t.id);
+      this.placed.set(t.id, { code, until: now + this.cfg.placedKeepMs });
+    }
   }
 
   /** Couldn't seat these (a lobby couldn't be opened): back to the front of the line, in order, with their rate back. */
   putBack(tickets: Ticket[]) {
     this.line.unshift(...tickets);
-    for (const t of tickets) this.byId.set(t.id, t);
+    for (const t of tickets) {
+      this.seating.delete(t.id);
+      this.byId.set(t.id, t);
+    }
     this.tokens += tickets.length;
+  }
+
+  /** Tickets taken to be seated that never will be (dropped): forgotten, so an ask with one starts afresh. */
+  forget(tickets: Ticket[]) {
+    for (const t of tickets) this.seating.delete(t.id);
   }
 
   /** Drops tickets whose players stopped asking, and placements old enough to forget. */
@@ -189,6 +219,7 @@ export class QueueCore {
       });
     }
     for (const [id, p] of this.placed) if (p.until < now) this.placed.delete(id);
+    for (const [id, s] of this.seating) if (now - s.since > SEATING_KEEP_MS) this.seating.delete(id);
     this.admittedLog = this.admittedLog.filter((a) => now - a.at < 60_000);
   }
 

@@ -273,6 +273,7 @@ export class Matchmaker extends DurableObject<Env> {
     // (Never a game with a seat nobody can take: a ticket without its player is dropped, its partner back in line.)
     const whole = tickets.filter(duelTicketComplete);
     if (whole.length !== tickets.length) {
+      this.q.forget(tickets.filter((t) => !whole.includes(t)));
       this.q.putBack(whole);
       return true;
     }
