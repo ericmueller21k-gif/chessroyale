@@ -97,6 +97,14 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   tallies, an optional motion trail (Settings → Board), the eval bar (testers only: [hub.md](hub.md)), the scoreboard
   and chat under the board. A crowd of one keeps its
   move on the board (no ghost, no snap-back). The board never moves between screens.
+- **What the reveal draws each frame** (Oct 16; docs/decisions/2026-10-16-the-reveal-draws-only-what-changed.md):
+  Crowd's reveal (`CrowdReveal`, also a raid's and the Last Stand's) keeps a clock that ticks every frame, and Classic's
+  (`RevealScreen`) one that ticks 20 times a second, for what moves with them: the board and what's over it (the ghosts,
+  the reel, the God King's moments), the eval bar, the board's shake. The header, the chat or scoreboard, the boss by the
+  board, the board's clock and Classic's list of picks are elements kept on `useStillKey` (as on a boss screen,
+  [bosses.md](bosses.md)); the dock (raids), the poll (Crowd) and Classic's words under the picks also on the few
+  clock-read values they show (the move landed and played, the vote bars' count, the Last Stand's steps). A new word
+  read from the clock there goes in its list; otherwise it waits up to 200 ms for the next `useStillKey` tick.
 - **Resigning and leaving** (Eric, Oct 13; `LEAVING`; DECISIONS.md, "Resign: leaving a match in every mode"). The
   top line of every match screen ends in the match's control (`components/MatchMenu.tsx`): a phone's "⋯" (a sheet at
   the foot of the screen: Sound, Resign) where the sound button was; a computer's sound button, then the flag. On a

@@ -6,7 +6,7 @@ import { EvalBar } from "../components/EvalBar.tsx";
 import { UnderBoard } from "../components/QuickChat.tsx";
 import { ShadeMoves, SquareRing, type ShadeMove } from "../components/ShadeMoves.tsx";
 import { allowanceNote, type BoardView, type GameView, type GroupReveal } from "../game.ts";
-import { seenKey } from "../hooks.ts";
+import { seenKey, useStillKey } from "../hooks.ts";
 import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
 
@@ -115,18 +115,63 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
         : "your pick"
       : `${others.join(" & ")}'s pick`;
 
+  // The screen draws 20 times a second for the reel; the parts that don't move with it (the header, the picks, the
+  // words under them, the chat) only as the match changes, five times a second (useStillKey), and as the move lands
+  // and plays. The position after the move is worked out once, as it plays (docs/decisions/2026-10-16-the-reveal-draws-only-what-changed.md).
+  const still = useStillKey(match, now);
+  const hud = useMemo(() => <Hud match={match} stripFrozen={!played} />, [match, still, played]);
+  const under = useMemo(() => <UnderBoard match={match} />, [match, still]);
+  const fenShown = useMemo(() => (played ? applyMove(fen, mine.result.playedMove) : fen), [mine, played]);
+  const picks = useMemo(
+    () => (
+      <ul class="picks">
+        {mine.result.players
+          .slice()
+          .sort((a, b) => (a.loss ?? 999) - (b.loss ?? 999))
+          .map((p) => (
+            <li key={p.playerId} class={`${match.isYou(p.playerId) ? "you" : ""}${landed && p.move === mine.result.playedMove ? " chosen" : ""}`}>
+              <span class="pick-name">{match.nameOf(p.playerId)}</span>
+              <span class="pick-move">{p.move ? toSan(fen, p.move) : "no move"}</span>
+              <span class="pick-loss">{p.loss === null ? "−25 pts" : p.loss < 0.05 ? "best" : `−${p.loss.toFixed(1)}`}</span>
+            </li>
+          ))}
+      </ul>
+    ),
+    [match, mine, still, landed],
+  );
+  const drawn = useMemo(
+    () => (
+      <div class="drawn">
+        <span class="drawn-main">
+          {landed ? (
+            <>
+              The board continues with <strong>{toSan(fen, mine.result.playedMove)}</strong>, {whose}: {reason(rule, tied)}.
+            </>
+          ) : (
+            "Everyone's moves are in. One of them will continue the board…"
+          )}
+        </span>
+        <span class="muted small">
+          Your score only depends on your own move. Best was {toSan(fen, mine.bestMove)}.
+          {played && !match.serverPaced ? " Tap to continue." : ""}
+        </span>
+      </div>
+    ),
+    [match, mine, still, landed, played],
+  );
+
   return (
     <div class="screen game" onClick={() => played && match.skipReveal()}>
-      <Hud match={match} stripFrozen={!played} />
+      {hud}
       <div class="board-area">
         <div class="opening-name">
           <span class="opening-title" title={board.openingName}>{board.openingName}</span>
         </div>
         {/* Same row as the play screen (eval bar + board), so the board never moves or resizes between phases. */}
         <div class="board-row">
-        <EvalBar fen={played ? applyMove(fen, mine.result.playedMove) : fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
+        <EvalBar fen={fenShown} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
         <Board
-          fen={played ? applyMove(fen, mine.result.playedMove) : fen}
+          fen={fenShown}
           orientation={orientation}
           lastMove={played ? mine.result.playedMove : board.lastMove}
         >
@@ -144,35 +189,10 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
           <span class="round-score-label">{me.move ? "this round" : "missed move"}</span>
           {allowanceNote(me) && <span class="allowance-line">{allowanceNote(me)}</span>}
         </div>
-        <ul class="picks">
-          {mine.result.players
-            .slice()
-            .sort((a, b) => (a.loss ?? 999) - (b.loss ?? 999))
-            .map((p) => (
-              <li key={p.playerId} class={`${match.isYou(p.playerId) ? "you" : ""}${landed && p.move === mine.result.playedMove ? " chosen" : ""}`}>
-                <span class="pick-name">{match.nameOf(p.playerId)}</span>
-                <span class="pick-move">{p.move ? toSan(fen, p.move) : "no move"}</span>
-                <span class="pick-loss">{p.loss === null ? "−25 pts" : p.loss < 0.05 ? "best" : `−${p.loss.toFixed(1)}`}</span>
-              </li>
-            ))}
-        </ul>
-        <div class="drawn">
-          <span class="drawn-main">
-            {landed ? (
-              <>
-                The board continues with <strong>{toSan(fen, mine.result.playedMove)}</strong>, {whose}: {reason(rule, tied)}.
-              </>
-            ) : (
-              "Everyone's moves are in. One of them will continue the board…"
-            )}
-          </span>
-          <span class="muted small">
-            Your score only depends on your own move. Best was {toSan(fen, mine.bestMove)}.
-            {played && !match.serverPaced ? " Tap to continue." : ""}
-          </span>
-        </div>
+        {picks}
+        {drawn}
       </div>
-      <UnderBoard match={match} />
+      {under}
     </div>
   );
 }

@@ -22,7 +22,7 @@ import { Avatar } from "../components/Items.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { pawnLook } from "../looks.ts";
-import { seenKey, useBoardAnimations, useMotionTrail } from "../hooks.ts";
+import { seenKey, useBoardAnimations, useMotionTrail, useStillKey } from "../hooks.ts";
 import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
 import { exitMatch } from "../match-exit.ts";
@@ -280,66 +280,39 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
     if (landed && !alone) play("select");
   }, [landed]);
 
-  return (
-    <div class="screen game crowd" onClick={() => played && !stand && match.skipReveal()}>
-      <Hud match={match} />
-      <div class={`board-area${stand && ts >= LAST_STAND.crashAt && ts < LAST_STAND.crashAt + 450 ? " ls-shake" : ""}`}>
-        <div class="opening-name">
-          {match.boss ? (
-            <BossHeading
-              side={sideToMove(fen)}
-              final={!match.settings.raid}
-              note={mine.king ? "the God King's move" : stand && played ? (ts < LAST_STAND.freezeAt ? "a blunder" : "the God King's Last Stand") : bossAlone(match) ? undefined : `${voters} ${voters === 1 ? "vote" : "votes"}`}
-            />
-          ) : (
-            <>
-              <strong>{sideName(sideToMove(fen))}</strong> · {voters} {voters === 1 ? "vote" : "votes"}
-            </>
-          )}
-        </div>
-        {/* Same row as the play screen (eval bar + board), so the board never moves or resizes between phases. */}
-        <div class="board-row">
-        {match.boss && <BossSide match={match} />}
-        <EvalBar
-          fen={played && !stand ? applyMove(fen, mine.result.playedMove) : fen}
-          orientation={orientation === "white" ? "w" : "b"}
-          evaluate={(f) => match.evaluate(f)}
-          override={plunge}
-        />
-        <Board fen={onBoard.fen} orientation={orientation} turn={view.turn} lastMove={onBoard.lastMove} marks={stand && played && ts < LAST_STAND.crashAt ? { [mine.result.playedMove.slice(2, 4)]: "ls-blunder" } : undefined}>
-          {match.boss?.powers && <PowerBoard boss={match.boss} orientation={orientation} fen={onBoard.fen} />}
-          {!played && (
-            <CrowdGhosts
-              fen={fen}
-              picks={ordered.slice(0, shown)}
-              orientation={orientation}
-              animate={animate}
-              trail={trail}
-              instant={new Set(ordered.slice(0, seen).map((g) => g.id))}
-              chosen={landed ? mine.result.playedMove : null}
-            />
-          )}
-          {played && !alone && !stand && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
-          {!match.boss && <BoardClock match={match} you={you} turn={null} />}
-          {godKing && t >= godKing.startAt - start && <KingSummon {...godKing} />}
-          {command && t >= command.startAt - start && <KingCommand {...command} />}
-          {stand && standMove && played && <LastStand side={sideToMove(fen)} orientation={orientation} fen={fen} move={standMove} startAt={start + playAt} boss={match.boss} />}
-        </Board>
-        </div>
-      </div>
-      {match.boss ? (
+  // The screen draws every frame for the ghosts and the God King's moments. The parts that don't move with them (the
+  // header, the boss by the board, the board's clock, the chat) are drawn only as the match changes and five times a
+  // second (useStillKey); the dock and the poll also when one of the values they read from the clock changes (a new
+  // one goes in their lists; docs/decisions/2026-10-16-the-reveal-draws-only-what-changed.md).
+  const still = useStillKey(match, now);
+  const hud = useMemo(() => <Hud match={match} />, [match, still]);
+  const bossSide = useMemo(() => (match.boss ? <BossSide match={match} /> : null), [match, still]);
+  const under = useMemo(() => <UnderBoard match={match} />, [match, still]);
+  const boardClock = useMemo(() => (match.boss ? null : <BoardClock match={match} you={you} turn={null} />), [match, still, you]);
+  // (The position after the move, worked out once it's played, not every frame.)
+  const fenAfter = useMemo(() => (played ? applyMove(fen, mine.result.playedMove) : fen), [mine, played]);
+  const away = (!!godKing && now >= godKing.startAt && now < godKing.exitAt + 900) || (!!stand && ts >= LAST_STAND.leapAt + 450 && ts < LAST_STAND.fadeAt);
+  const leaping = !!stand && ts >= LAST_STAND.leapAt && ts < LAST_STAND.leapAt + 450;
+  const charges = stand && ts < LAST_STAND.leapAt ? (match.boss?.lastStand?.charges ?? 0) : undefined;
+  const fallen = stand ? ts >= LAST_STAND.fadeAt : undefined;
+  const warning = ts < LAST_STAND.slideAt;
+  const blow = ts < LAST_STAND.fadeAt;
+  const dockCommand = useMemo(() => (command ? { mode: "move" as const, startAt: command.startAt } : undefined), [command]);
+  const dock = useMemo(
+    () =>
+      match.boss ? (
         <BossDock
           match={match}
           side={sideToMove(fen)}
           cues={mine.king ? kingCues : landed ? kingCues : []}
-          away={(!!godKing && now >= godKing.startAt && now < godKing.exitAt + 900) || (!!stand && ts >= LAST_STAND.leapAt + 450 && ts < LAST_STAND.fadeAt)}
-          command={command ? { mode: "move", startAt: command.startAt } : undefined}
-          leaping={!!stand && ts >= LAST_STAND.leapAt && ts < LAST_STAND.leapAt + 450}
-          charges={stand && ts < LAST_STAND.leapAt ? (match.boss?.lastStand?.charges ?? 0) : undefined}
-          fallen={stand ? ts >= LAST_STAND.fadeAt : undefined}
+          away={away}
+          command={dockCommand}
+          leaping={leaping}
+          charges={charges}
+          fallen={fallen}
           status={
             stand && played ? (
-              ts < LAST_STAND.slideAt ? (
+              warning ? (
                 // The warning: the blunder, and what it loses, in plain words (no numbers but the chances).
                 <>
                   <span class="dock-line">
@@ -353,10 +326,10 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
               ) : (
                 <>
                   <span class="dock-line">
-                    <strong class="gold">{ts < LAST_STAND.fadeAt ? "👑 He takes the blow!" : "👑 The God King has fallen"}</strong>
+                    <strong class="gold">{blow ? "👑 He takes the blow!" : "👑 The God King has fallen"}</strong>
                   </span>
                   <span class="dock-line muted">
-                    {ts < LAST_STAND.fadeAt
+                    {blow
                       ? `${toSan(fen, stand.move)} is taken back`
                       : (match.boss?.lastStand?.charges ?? 0) * match.settings.lastStandPowerUps > 0
                         ? `He leaves you ⚡×${(match.boss?.lastStand?.charges ?? 0) * match.settings.lastStandPowerUps}`
@@ -414,67 +387,124 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
             )
           }
         />
-      ) : (
-      <div class="poll" role="status">
-        {rows.map((r) => {
-          const win = landed && r.move === mine.result.playedMove;
-          return (
-            <div key={r.move} class={`poll-row${win ? " win" : ""}${landed && !win ? " lose" : ""}${r.you ? " you" : ""}`}>
-              <span class="poll-move">{toSan(fen, r.move)}</span>
+      ) : null,
+    [match, mine, still, landed, played, away, leaping, charges, fallen, warning, blow, dockCommand],
+  );
+  // (Crowd: the vote bars count up as the ghosts come in, then hold.)
+  const poll = useMemo(
+    () =>
+      match.boss ? null : (
+        <div class="poll" role="status">
+          {rows.map((r) => {
+            const win = landed && r.move === mine.result.playedMove;
+            return (
+              <div key={r.move} class={`poll-row${win ? " win" : ""}${landed && !win ? " lose" : ""}${r.you ? " you" : ""}`}>
+                <span class="poll-move">{toSan(fen, r.move)}</span>
+                <span class="poll-bar">
+                  <i style={{ width: `${(100 * r.votes * grow) / top}%` }} />
+                </span>
+                <span class="poll-votes">{Math.round(r.votes * grow)}</span>
+                {r.you && <span class="poll-you">you</span>}
+              </div>
+            );
+          })}
+          {yourRow && (
+            <div class="poll-row you">
+              <span class="poll-move">{toSan(fen, yourRow.move)}</span>
               <span class="poll-bar">
-                <i style={{ width: `${(100 * r.votes * grow) / top}%` }} />
+                <i style={{ width: `${(100 * yourRow.votes * grow) / top}%` }} />
               </span>
-              <span class="poll-votes">{Math.round(r.votes * grow)}</span>
-              {r.you && <span class="poll-you">you</span>}
+              <span class="poll-votes">{Math.round(yourRow.votes * grow)}</span>
+              <span class="poll-you">you</span>
             </div>
-          );
-        })}
-        {yourRow && (
-          <div class="poll-row you">
-            <span class="poll-move">{toSan(fen, yourRow.move)}</span>
-            <span class="poll-bar">
-              <i style={{ width: `${(100 * yourRow.votes * grow) / top}%` }} />
-            </span>
-            <span class="poll-votes">{Math.round(yourRow.votes * grow)}</span>
-            <span class="poll-you">you</span>
-          </div>
-        )}
-        {mine.king !== undefined && (mine.kingCalls ?? 0) > 0 && (
-          <div class={`poll-row king-row${landed && mine.king ? " win" : ""}`}>
-            <span class="poll-move">👑 King</span>
-            <span class="poll-bar">
-              <i style={{ width: `${Math.min(100, (100 * (mine.kingCalls ?? 0) * grow) / Math.max(1, voters))}%` }} />
-            </span>
-            <span class="poll-votes">{Math.round((mine.kingCalls ?? 0) * grow)}</span>
-          </div>
-        )}
-        {landed && bril && (
-          <div class={`brilliant-line${youBrilliant ? " you" : ""}`} role="status">
-            <span class="brilliant-mark" aria-hidden="true">‼</span>
-            <span>
-              <strong>{youBrilliant ? "Brilliant! " : "Brilliant move: "}</strong>
-              {bril.moves.map((m) => toSan(fen, m)).join(" / ")} · only {bril.found} of {bril.total} found it
-              {youHelped ? " (with a power-up: it doesn't count)" : ""}
-            </span>
-          </div>
-        )}
-        <div class="poll-result">
-          {me ? (
-            <>
-              <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore)}</span>
-              <span class="muted small">
-                {me.move && me.move === mine.bestMove ? `you found the best move, ${toSan(fen, me.move)}` : `${me.move ? `you picked ${toSan(fen, me.move)}` : "no move from you"} · best was ${toSan(fen, mine.bestMove)}`}
+          )}
+          {mine.king !== undefined && (mine.kingCalls ?? 0) > 0 && (
+            <div class={`poll-row king-row${landed && mine.king ? " win" : ""}`}>
+              <span class="poll-move">👑 King</span>
+              <span class="poll-bar">
+                <i style={{ width: `${Math.min(100, (100 * (mine.kingCalls ?? 0) * grow) / Math.max(1, voters))}%` }} />
               </span>
-              {/* The opening allowance on your pick: what it took off, or why it didn't (one line). */}
-              {allowanceNote(me) && <span class="allowance-line">{allowanceNote(me)}</span>}
-            </>
+              <span class="poll-votes">{Math.round((mine.kingCalls ?? 0) * grow)}</span>
+            </div>
+          )}
+          {landed && bril && (
+            <div class={`brilliant-line${youBrilliant ? " you" : ""}`} role="status">
+              <span class="brilliant-mark" aria-hidden="true">‼</span>
+              <span>
+                <strong>{youBrilliant ? "Brilliant! " : "Brilliant move: "}</strong>
+                {bril.moves.map((m) => toSan(fen, m)).join(" / ")} · only {bril.found} of {bril.total} found it
+                {youHelped ? " (with a power-up: it doesn't count)" : ""}
+              </span>
+            </div>
+          )}
+          <div class="poll-result">
+            {me ? (
+              <>
+                <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore)}</span>
+                <span class="muted small">
+                  {me.move && me.move === mine.bestMove ? `you found the best move, ${toSan(fen, me.move)}` : `${me.move ? `you picked ${toSan(fen, me.move)}` : "no move from you"} · best was ${toSan(fen, mine.bestMove)}`}
+                </span>
+                {/* The opening allowance on your pick: what it took off, or why it didn't (one line). */}
+                {allowanceNote(me) && <span class="allowance-line">{allowanceNote(me)}</span>}
+              </>
+            ) : (
+              <span class="muted small">Your team watched this one · best was {toSan(fen, mine.bestMove)}</span>
+            )}
+          </div>
+        </div>
+      ),
+    [match, mine, still, landed, grow],
+  );
+
+  return (
+    <div class="screen game crowd" onClick={() => played && !stand && match.skipReveal()}>
+      {hud}
+      <div class={`board-area${stand && ts >= LAST_STAND.crashAt && ts < LAST_STAND.crashAt + 450 ? " ls-shake" : ""}`}>
+        <div class="opening-name">
+          {match.boss ? (
+            <BossHeading
+              side={sideToMove(fen)}
+              final={!match.settings.raid}
+              note={mine.king ? "the God King's move" : stand && played ? (ts < LAST_STAND.freezeAt ? "a blunder" : "the God King's Last Stand") : bossAlone(match) ? undefined : `${voters} ${voters === 1 ? "vote" : "votes"}`}
+            />
           ) : (
-            <span class="muted small">Your team watched this one · best was {toSan(fen, mine.bestMove)}</span>
+            <>
+              <strong>{sideName(sideToMove(fen))}</strong> · {voters} {voters === 1 ? "vote" : "votes"}
+            </>
           )}
         </div>
+        {/* Same row as the play screen (eval bar + board), so the board never moves or resizes between phases. */}
+        <div class="board-row">
+        {bossSide}
+        <EvalBar
+          fen={stand ? fen : fenAfter}
+          orientation={orientation === "white" ? "w" : "b"}
+          evaluate={(f) => match.evaluate(f)}
+          override={plunge}
+        />
+        <Board fen={onBoard.fen} orientation={orientation} turn={view.turn} lastMove={onBoard.lastMove} marks={stand && played && ts < LAST_STAND.crashAt ? { [mine.result.playedMove.slice(2, 4)]: "ls-blunder" } : undefined}>
+          {match.boss?.powers && <PowerBoard boss={match.boss} orientation={orientation} fen={onBoard.fen} />}
+          {!played && (
+            <CrowdGhosts
+              fen={fen}
+              picks={ordered.slice(0, shown)}
+              orientation={orientation}
+              animate={animate}
+              trail={trail}
+              instant={new Set(ordered.slice(0, seen).map((g) => g.id))}
+              chosen={landed ? mine.result.playedMove : null}
+            />
+          )}
+          {played && !alone && !stand && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
+          {boardClock}
+          {godKing && t >= godKing.startAt - start && <KingSummon {...godKing} />}
+          {command && t >= command.startAt - start && <KingCommand {...command} />}
+          {stand && standMove && played && <LastStand side={sideToMove(fen)} orientation={orientation} fen={fen} move={standMove} startAt={start + playAt} boss={match.boss} />}
+        </Board>
+        </div>
       </div>
-      )}
-      <UnderBoard match={match} />
+      {match.boss ? dock : poll}
+      {under}
     </div>
   );
 }
