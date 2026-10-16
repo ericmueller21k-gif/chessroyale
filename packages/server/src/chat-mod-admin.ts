@@ -1,13 +1,13 @@
 /**
- * The chat review page, `/admin/chat` (server-rendered, admin emails only, like fair play's `/admin/fairplay`):
- * players with chat reports waiting, the lines reported with the lines around them, and the decisions (chat-mod.ts).
- * Who may look: an admin (signed in with an email in ADMIN_EMAILS); anyone else gets "Not found". With CHAT_MOD_TEST
- * "1" and no way to sign in set up (local and e2e only), anyone may (tests act as moderators).
+ * The chat review page, `/admin/chat` (server-rendered, like fair play's `/admin/fairplay` and `/admin/ops`): players
+ * with chat reports waiting, the lines reported with the lines around them, and the decisions (chat-mod.ts). Who may
+ * look: an admin (signed in with an email in ADMIN_EMAILS); anyone else gets "Not found". No test switch opens it (the
+ * e2e makes its page's account an admin, as ops' does).
  */
 import { CHAT_MOD } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 import { d1Sql, ensureSchema, userFromToken } from "./accounts.ts";
-import { SESSION_COOKIE, readCookie, signInRequired } from "./api.ts";
+import { SESSION_COOKIE, readCookie } from "./api.ts";
 import { adminPage, esc, isAdmin, when } from "./admin.ts";
 import { chatDecisions, chatPaused, chatPlayer, chatQueue, decideChat, pruneChatMod, type ChatLogRow, type ChatPlayerDetail, type ChatQueueRow, type ChatReportView } from "./chat-mod.ts";
 import { lobbyCodes, lobbyOf, type ChatModEnv } from "./chat-mod-api.ts";
@@ -24,10 +24,8 @@ export async function handleChatAdmin(request: Request, env: ChatModEnv, waitUnt
   await ensureSchema(sql, env.DB);
   const now = Date.now();
   const user = await userFromToken(sql, readCookie(request, SESSION_COOKIE), now);
-  const admin = isAdmin(env, user);
-  const test = env.CHAT_MOD_TEST === "1" && !signInRequired(env);
-  if (!admin && !test) return notFound();
-  const by = admin ? `admin:${user!.email!.toLowerCase()}` : "test";
+  if (!isAdmin(env, user)) return notFound();
+  const by = `admin:${user!.email!.toLowerCase()}`;
   waitUntil?.(pruneChatMod(sql, now).catch(() => undefined));
 
   if (request.method === "POST") {
@@ -68,7 +66,7 @@ const player = (id: string, name: string | null | undefined) => `<a href="/admin
 
 function listPage(queue: ChatQueueRow[], paused: ChatLogRow[], log: ChatLogRow[], by: string): string {
   return `<h1>Chat reports</h1>
-<p class="muted">Signed in as ${esc(by === "test" ? "a tester (CHAT_MOD_TEST, no sign-in set up)" : by.replace("admin:", ""))}. Chat is preset lines only: reports are about how someone uses them, their name or their icon. ${CHAT_MOD.autoMuteReporters} players reporting someone pauses their chat until you decide. <a href="/admin/fairplay">Fair play</a></p>
+<p class="muted">Signed in as ${esc(by.replace("admin:", ""))}. Chat is preset lines only: reports are about how someone uses them, their name or their icon. ${CHAT_MOD.autoMuteReporters} players reporting someone pauses their chat until you decide. <a href="/admin/fairplay">Fair play</a></p>
 <h2>Waiting (${queue.length})</h2>
 <div class="card scroll"><table><tr><th>Player</th><th>Reports</th><th>From players</th><th>Latest</th><th>Chat</th></tr>
 ${queue.length ? queue.map((q) => `<tr><td>${player(q.userId, q.name)}</td><td>${q.open}</td><td>${q.reporters}</td><td>${when(q.latest)}</td><td>${pause(q.block)}</td></tr>`).join("") : '<tr><td colspan="5" class="muted">Nothing waiting.</td></tr>'}</table></div>

@@ -1,7 +1,7 @@
 /**
  * The server's filter for the free text players type that others see. Chat is preset lines only, so that's display
  * names: a profile's name, and the name a device sends when it joins a lobby or a Squads party. A name with a slur or
- * a hate term in it is refused (a profile) or replaced (a lobby seat). See DECISIONS.md, "Chat moderation for launch".
+ * a hate term in it is refused (a profile) or replaced (a lobby seat). See docs/decisions/2026-10-16-chat-moderation.md.
  *
  * A small list of our own, slurs and hate terms only (not swearing), ROT13-encoded so the words don't turn up in
  * searches, diffs or screenshots of the code: `rot13("word")` gives a new entry. Matching folds what people use to

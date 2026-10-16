@@ -369,6 +369,14 @@ describe("lobby: chat moderation", () => {
     expect(L.core.chatReportLine("u-bo", boLine.n)).toEqual({ error: "self" });
     expect(L.core.chatReportLine("u-cy", 999)).toEqual({ error: "gone" });
     expect(L.core.chatReportLine("u-stranger", boLine.n)).toEqual({ error: "gone" });
+    // Someone who says something and leaves the lobby can still be reported for it, by their account and name.
+    const flo = people[5]!;
+    L.advance(3_000);
+    L.say(flo, "oops");
+    const floLine = L.core.record.chat!.lines.find((l) => l.from === flo)!;
+    L.core.message(flo, { t: "leave" });
+    expect(L.core.record.accounts![flo]).toBeUndefined();
+    expect(L.core.chatReportLine("u-ann", floLine.n)).toMatchObject({ line: { target: "u-flo", name: "Flo", text: "Oops…" } });
     // The bots' hello as they fill the seats: not a person's line.
     L.advance(60_000);
     const hello = L.core.record.chat!.lines.find((l) => l.from.startsWith("bot"))!;
@@ -376,13 +384,14 @@ describe("lobby: chat moderation", () => {
     // In the match, a team's plan is for that team: someone on the other side can't have seen it.
     L.advance(FRONT_DOOR.fillShowMs);
     L.advance(3_000);
-    for (const id of people) L.say(id, "push-pawns");
+    const seated = people.filter((id) => id !== flo);
+    for (const id of seated) L.say(id, "push-pawns");
     const team = (id: string) => L.core.record.chat!.lines.filter((l) => l.from === id).at(-1)!;
-    const other = people.find((id) => team(id).team !== team(ann).team);
+    const other = seated.find((id) => team(id).team !== team(ann).team);
     expect(other).toBeDefined();
     const otherUid = L.core.record.accounts![other!]!;
     expect(L.core.chatReportLine(otherUid, team(ann).n)).toEqual({ error: "gone" });
-    const mate = people.find((id) => id !== ann && team(id).team === team(ann).team)!;
+    const mate = seated.find((id) => id !== ann && team(id).team === team(ann).team)!;
     expect(L.core.chatReportLine(L.core.record.accounts![mate]!, team(ann).n)).toMatchObject({ line: { target: "u-ann", text: "Push the pawns!" } });
   });
 

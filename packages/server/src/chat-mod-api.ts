@@ -20,11 +20,6 @@ export interface ChatModLobby {
 
 export interface ChatModEnv extends AccountEnv, AdminEnv {
   LOBBIES: { idFromName(name: string): DurableObjectId; get(id: DurableObjectId): ChatModLobby };
-  /**
-   * "1" (local and e2e only, never production): anyone may use the chat review page, but only while no way to sign
-   * in is set up (so it can't open the page where accounts are real). Else admins only.
-   */
-  CHAT_MOD_TEST?: string;
 }
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });

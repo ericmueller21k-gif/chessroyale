@@ -26,6 +26,7 @@ import { handleAccountApi } from "../src/api.ts";
 import { caseDetail, openCases } from "../src/admin.ts";
 import { appeal, banCheck, caseOf, decide, fairStatus, recordFairPlay, reportPlayer, setCase } from "../src/fairplay.ts";
 import { answerRequest, block, sendInvite, sendRequest, setFriendSettings } from "../src/friends.ts";
+import { chatBlock, decideChat, reportChat, type ReportedLine } from "../src/chat-mod.ts";
 import { GlobalChat } from "../src/global-chat.ts";
 import { LiveBoard } from "../src/live.ts";
 import { equipLocker, openCrate } from "../src/locker.ts";
@@ -98,7 +99,24 @@ async function world() {
   await sql.run("INSERT INTO ops_reports (id, at, kind, account, version, note, diag) VALUES ('IDEA45', ?, 'idea', NULL, '', 'more bosses', '{}')", T0 + 12);
   await sql.run("INSERT INTO ops_errors (fingerprint, hour, source, kind, message, version, count, first_seen, last_seen, sample) VALUES ('fp1', ?, 'client', 'error', 'boom', 'v1', 3, ?, ?, ?)", T0, T0, T0 + 13, sample(a.id));
   await sql.run("INSERT INTO ops_errors (fingerprint, hour, source, kind, message, version, count, first_seen, last_seen, sample) VALUES ('fp2', ?, 'client', 'error', 'bang', 'v1', 1, ?, ?, ?)", T0, T0, T0, sample(bo.user.id));
+  // Chat moderation: she reported a line of Bo's; Cy reported one of hers (with Bo's line around it); a moderator
+  // warned her; Bo reported Cy, and her line is among those kept around it.
+  await reportChat(sql, a, "lobby:ABCDE", chatLine(bo.user, "So close!", [["Ann", "Wow!"]]), T0 + 14);
+  await reportChat(sql, cy.user, "global", chatLine(a, "Oops…", [["Bo", "So close!"]]), T0 + 15);
+  await decideChat(sql, a.id, { action: "warn", reason: "taunting after every move", note: "Keep it friendly." }, "admin:eric@example.com", T0 + 16);
+  await reportChat(sql, bo.user, "global", chatLine(cy.user, "GG", [["Ann", "Wow!"]]), T0 + 17);
   return { sql, d1, ann, bo, cy, a, phone };
+}
+
+/** A reported chat line of `target`'s, with the lines kept before it (name, words). */
+function chatLine(target: User, text: string, before: [string, string][] = []): ReportedLine {
+  return {
+    target: target.id,
+    name: target.name,
+    text,
+    saidAt: T0,
+    context: [...before.map(([name, words]) => ({ at: T0 - 1000, name, text: words })), { at: T0, name: target.name, text, mark: "this" as const }],
+  };
 }
 
 /**
@@ -108,7 +126,9 @@ async function world() {
  */
 const SCHEMA_COLUMNS: Record<string, string> = {
   blocks: "user_id blocked_id at",
+  chat_mod_log: "id user_id at action until by reason note ended_at seen",
   chat_picks: "user_id lines emoji",
+  chat_reports: "id at reporter target channel said_at name text context status resolved_at resolved_by",
   email_codes: "email code_hash expires_at attempts sent_at hour_start sends_this_hour",
   equipped: "user_id slot item_id",
   equipped_items: "user_id slot item_id",
@@ -199,9 +219,16 @@ describe("download my data", () => {
     // Her bug report and the error record with her account; not the anonymous idea, not Bo's error.
     expect(d.problemReports.reports.map((r: { id: string; note: string }) => [r.id, r.note])).toEqual([["BUG123", "the board froze"]]);
     expect(d.problemReports.errors.map((e: { message: string; hour: string }) => [e.message, e.hour])).toEqual([["boom", new Date(T0).toISOString()]]);
+    // Chat moderation: the line she reported (not the lines around it), and the warning as she saw it (not why, nor who).
+    expect(d.chatModeration).toEqual({
+      reportsMade: [{ at: new Date(T0 + 14).toISOString(), channel: "lobby:ABCDE", target: bo.user.id, name: "Bo", text: "So close!", said_at: new Date(T0).toISOString(), status: "open" }],
+      decisions: [{ at: new Date(T0 + 16).toISOString(), action: "warn", until: null, note: "Keep it friendly.", ended_at: null }],
+    });
     // Nothing of anyone else's but the names the app shows her: no other email, no report about her, no hash.
     const text = JSON.stringify(d);
-    for (const secret of ["bo@example.com", "cy@example.com", "Offensive name or icon", "token_hash", "code_hash", DEVICE, "more bosses", "bang"]) expect(text).not.toContain(secret);
+    for (const secret of ["bo@example.com", "cy@example.com", "Offensive name or icon", "token_hash", "code_hash", DEVICE, "more bosses", "bang", "Oops…", "taunting", "eric@example.com"]) {
+      expect(text).not.toContain(secret);
+    }
   });
 
   it("leaves out who has blocked the player", async () => {
@@ -250,6 +277,11 @@ describe("delete my account", () => {
       { fingerprint: "fp2", count: 1 },
     ]);
     expect(await sql.all("SELECT id FROM ops_reports")).toEqual([{ id: "IDEA45" }]);
+    // Chat moderation: her reports, the reports about her and the decisions about her chat are gone; Bo's report about
+    // Cy stays, with her name among the lines kept around it (no account).
+    expect(await sql.all("SELECT reporter, target, context FROM chat_reports")).toEqual([
+      { reporter: bo.user.id, target: cy.user.id, context: JSON.stringify(chatLine(cy.user, "GG", [["Ann", "Wow!"]]).context) },
+    ]);
     // Nothing of fair play kept for an account that wasn't banned or in review.
     expect(await caseOf(sql, a.id)).toBeNull();
     // Signing in with her email again makes a new, empty account.
@@ -422,6 +454,32 @@ describe("a guest signing in to an existing account (docs/decisions/2026-10-16-i
     expect(await sql.all("SELECT reporter, target FROM reports ORDER BY id")).toEqual([
       { reporter: owner.id, target: bo.id },
       { reporter: bo.id, target: owner.id },
+    ]);
+  });
+
+  it("its chat file joins the account too: its reports made and about it, and a chat ban, which signing in can't shed", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const bo = await signInWithIdentity(sql, null, "email", "bo@example.com", {}, T0);
+    const owner = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, T0);
+    const { user: guest } = await createGuest(sql, T0, "Guest");
+    await reportChat(sql, guest, "global", chatLine(bo, "GG"), T0 + 1);
+    await reportChat(sql, guest, "lobby:ABCDE", chatLine(owner, "Wow!"), T0 + 2);
+    await reportChat(sql, bo, "global", chatLine(guest, "Oops…"), T0 + 3);
+    await decideChat(sql, guest.id, { action: "ban", days: 7, reason: "spamming the lobby", note: "Take a break." }, "admin:eric@example.com", T0 + 4);
+
+    expect((await signInWithIdentity(sql, guest, "email", "owner@example.com", {}, T0 + 5)).id).toBe(owner.id);
+    expect(await rowsNaming(sql, guest.id)).toEqual([]);
+    // The ban is the account's now (with its notice); the reports are the account's, except the one about itself.
+    expect(await chatBlock(sql, owner.id, T0 + 6)).toEqual({ until: T0 + 4 + 7 * DAY });
+    expect((await profile(sql, owner)).chatMod?.notice).toMatchObject({ kind: "ban", note: "Take a break." });
+    expect(await sql.all("SELECT reporter, target FROM chat_reports ORDER BY id")).toEqual([
+      { reporter: owner.id, target: bo.id },
+      { reporter: bo.id, target: owner.id },
+    ]);
+    expect(await sql.all("SELECT action, by FROM chat_mod_log WHERE user_id = ? ORDER BY id", owner.id)).toEqual([
+      { action: "ban", by: "admin:eric@example.com" },
+      { action: "merged", by: "sign-in" },
     ]);
   });
 

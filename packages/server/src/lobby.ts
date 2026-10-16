@@ -123,6 +123,11 @@ interface ChatRecord {
   bots: number[];
   /** Chat moderation: accounts whose chat is paused (they can't send), as the Durable Object last read them. */
   blocked?: Record<string, ChatBlock>;
+  /**
+   * Chat moderation: who said each seat's lines, their account and name (kept when the seat leaves the lobby, so its
+   * lines can still be reported).
+   */
+  by?: Record<string, { uid: string; name: string }>;
 }
 
 export interface Human {
@@ -3025,6 +3030,9 @@ export class LobbyCore {
     const check = chatCheck(sent, line.id, now);
     if (!check.ok) return refuse(check.limit, check.retryAt);
     c.sent[key] = chatSent(sent, line.id, now);
+    const uid = this.r.accounts?.[playerId];
+    const name = this.nameOf(playerId);
+    if (uid && (c.by?.[playerId]?.uid !== uid || c.by[playerId]!.name !== name)) c.by = { ...c.by, [playerId]: { uid, name } };
     this.chatPost(this.chatLine(playerId, line.id, toAll ? "all" : "team", now));
   }
 
@@ -3051,7 +3059,8 @@ export class LobbyCore {
   /**
    * Chat moderation: the line numbered `n` as the account reporting it saw it (a line they could see: to everyone,
    * or to their team), with the lines around it they could see, for chat-mod.ts to store. Never a bot's line, nor
-   * one of their own. An error when there's no such line any more (the server keeps QUICK_CHAT.logSize).
+   * one of their own. An error when there's no such line any more (the server keeps QUICK_CHAT.logSize), or the
+   * reporter has no seat here.
    */
   chatReportLine(userId: string, n: number): { line: ReportedLine } | { error: "gone" | "bot" | "self" } {
     const accounts = this.r.accounts ?? {};
@@ -3061,11 +3070,14 @@ export class LobbyCore {
     const i = lines.findIndex((l) => l.n === n);
     const said = lines[i];
     if (!said) return { error: "gone" };
-    const target = accounts[said.from];
-    if (!target) return { error: "bot" };
-    if (target === userId) return { error: "self" };
     const bots = new Set(this.r.bots.map((b) => b.id));
-    const name = (id: string) => this.human(id)?.name ?? this.r.left?.find((l) => l.id === id)?.name ?? (bots.has(id) ? this.nameOf(id) : "Someone");
+    if (bots.has(said.from)) return { error: "bot" };
+    // (Someone who has left the lobby since: their account as it was when they said it.)
+    const by = this.r.chat?.by ?? {};
+    const target = accounts[said.from] ?? by[said.from]?.uid;
+    if (!target) return { error: "gone" };
+    if (target === userId) return { error: "self" };
+    const name = (id: string) => this.human(id)?.name ?? this.r.left?.find((l) => l.id === id)?.name ?? by[id]?.name ?? (bots.has(id) ? this.nameOf(id) : "Someone");
     const words = (say: string) => chatSay(say)?.text ?? say;
     const mark = (l: NetChatLine): ContextLine["mark"] =>
       l.n === n ? "this" : l.from === said.from ? "sender" : mine.includes(l.from) ? "reporter" : bots.has(l.from) ? "bot" : undefined;

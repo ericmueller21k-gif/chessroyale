@@ -88,6 +88,6 @@ test("global chat: post a line, everyone on the home page sees it, then the 30 s
   await seen.getByRole("button", { name: /profile, mute or report/ }).click();
   await theirChat.getByRole("button", { name: "Report", exact: true }).click();
   await expect(theirChat.locator(".gchat-note")).toHaveText("Reported. Thanks: a moderator will look at it.");
-  await theirChat.getByRole("button", { name: "Close" }).click();
+  await theirChat.getByRole("button", { name: "Close", exact: true }).click();
   await other.close();
 });

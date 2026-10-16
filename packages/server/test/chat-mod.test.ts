@@ -304,14 +304,15 @@ describe("the routes", () => {
 });
 
 describe("the review page", () => {
-  it("admins only (anyone else: Not found); the test switch works only while no sign-in is set up", async () => {
+  it("admins only: anyone else, test switches or not, gets Not found", async () => {
     forgetSecrets();
-    const { sql, d1, ann } = await world();
-    const page = async (patch: Partial<ChatModEnv>, cookie?: string) => (await handleChatAdmin(new Request("https://x/admin/chat", { headers: cookie ? { cookie } : {} }), env(d1, patch).e))!.status;
-    expect(await page({})).toBe(404);
-    expect(await page({ ADMIN_EMAILS: "ann@example.com" }, await session(sql, ann))).toBe(200);
-    expect(await page({ CHAT_MOD_TEST: "1" })).toBe(200);
-    expect(await page({ CHAT_MOD_TEST: "1", RESEND_API_KEY: "key" })).toBe(404);
+    const { sql, d1, ann, bo } = await world();
+    const page = async (patch: Partial<ChatModEnv>, cookie?: string) => (await handleChatAdmin(new Request("https://x/admin/chat", { headers: cookie ? { cookie } : {} }), env(d1, patch).e))!;
+    const notFound = await page({});
+    expect(notFound.status).toBe(404);
+    expect(await notFound.text()).toBe("Not found");
+    expect((await page({ ADMIN_EMAILS: "ann@example.com" }, await session(sql, ann))).status).toBe(200);
+    expect((await page({ ADMIN_EMAILS: "ann@example.com", TEST_SWITCHES: "1" }, await session(sql, bo))).status).toBe(404);
     expect(await handleChatAdmin(new Request("https://x/admin/fairplay"), env(d1).e)).toBeNull();
   });
 
@@ -326,24 +327,26 @@ describe("the review page", () => {
         ["Troll", 2, 2],
         ["Di", 1, 1],
       ]);
-      const { e, lobbies } = env(d1, { CHAT_MOD_TEST: "1" });
-      const list = await (await handleChatAdmin(new Request("https://x/admin/chat"), e))!.text();
+      const { e, lobbies } = env(d1, { ADMIN_EMAILS: "eric@example.com" });
+      const eric = await player(sql, "Eric");
+      const cookie = await session(sql, eric);
+      const list = await (await handleChatAdmin(new Request("https://x/admin/chat", { headers: { cookie } }), e))!.text();
       expect(list).toContain("Chat reports");
       expect(list).toMatch(/Troll<\/a><\/td><td>2<\/td><td>2<\/td>/);
-      const detail = await (await handleChatAdmin(new Request(`https://x/admin/chat/player/${troll.id}`), e))!.text();
+      const detail = await (await handleChatAdmin(new Request(`https://x/admin/chat/player/${troll.id}`, { headers: { cookie } }), e))!.text();
       expect(detail).toContain("Lobby ABCDE");
       expect(detail).toContain("Global chat");
       expect(detail).toMatch(/class="hard"><td>[^<]*<\/td><td>Troll<\/td><td class="wrap">Oops… <span class="pill">reported<\/span>/);
       expect(detail).toContain('<span class="pill">reporter</span>');
       const form = (fields: Record<string, string>, origin = "https://x") =>
-        new Request(`https://x/admin/chat/player/${troll.id}`, { method: "POST", headers: { origin }, body: new URLSearchParams(fields) });
+        new Request(`https://x/admin/chat/player/${troll.id}`, { method: "POST", headers: { origin, cookie }, body: new URLSearchParams(fields) });
       expect((await handleChatAdmin(form({ action: "ban:7", reason: "spamming" }, "https://evil"), e))!.status).toBe(403);
       const res = (await handleChatAdmin(form({ action: "ban:7", reason: "spam all match", note: "Easy." }), e))!;
       expect(res.status).toBe(303);
       expect(res.headers.get("location")).toBe(`https://x/admin/chat/player/${troll.id}?note=Done.`);
       expect(await chatBlock(sql, troll.id, T0)).toEqual({ until: T0 + 7 * DAY });
       expect(lobbies.get("ABCDE")!.changed).toEqual([[troll.id, { until: T0 + 7 * DAY }]]);
-      expect((await chatPlayer(sql, troll.id, T0))!.log[0]).toMatchObject({ action: "ban", by: "test", reason: "spam all match", note: "Easy." });
+      expect((await chatPlayer(sql, troll.id, T0))!.log[0]).toMatchObject({ action: "ban", by: "admin:eric@example.com", reason: "spam all match", note: "Easy." });
       // A decision without its reason: the page says so.
       const nope = (await handleChatAdmin(form({ action: "warn" }), e))!;
       expect(decodeURIComponent(nope.headers.get("location")!)).toContain("a written reason is required");

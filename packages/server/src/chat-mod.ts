@@ -1,5 +1,5 @@
 /**
- * Chat moderation on the server (docs/areas/chat.md; DECISIONS.md, "Chat moderation for launch"). Chat is preset
+ * Chat moderation on the server (docs/areas/chat.md; docs/decisions/2026-10-16-chat-moderation.md). Chat is preset
  * lines only, so what gets reported is how someone uses them (spam, taunts), their name or their icon.
  *
  *   - A report is about one line in the global chat or a lobby's chat, with the lines around it as the server kept
@@ -16,7 +16,7 @@
  */
 import { CHAT_MOD } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
-import type { Sql, User } from "./accounts.ts";
+import type { Sql, Stmt, User } from "./accounts.ts";
 import type { ContextLine, ReportedLine } from "./chat-mod-schema.ts";
 
 export type { ContextLine, ReportedLine };
@@ -168,6 +168,30 @@ export async function chatStanding(sql: Sql, userId: string, now: number): Promi
 /** The player has read their notices (the app's "Got it"). */
 export async function chatNoticeSeen(sql: Sql, userId: string): Promise<void> {
   await sql.run("UPDATE chat_mod_log SET seen = 1 WHERE user_id = ? AND seen = 0", userId);
+}
+
+/**
+ * A guest signing in to an account (accounts.ts, signInWithIdentity's one batch): the guest's chat reports (made and
+ * about it) and the decisions about its chat become the account's, so nothing stays under the guest's id and a chat
+ * ban can't be shed by signing in, as fair play's file (docs/decisions/2026-10-16-integrity-followups.md). The
+ * decisions keep their actions (a pause in force stays in force); a line "merged" says where they came from. A report
+ * between the guest and the account goes (the player reporting themselves).
+ */
+export function chatModMoves(from: string, to: string, now: number): Stmt[] {
+  const s = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
+  return [
+    s(
+      `INSERT INTO chat_mod_log (user_id, at, action, by, reason) SELECT ?1, ?3, 'merged', 'sign-in', 'a guest account signed in to this account; its chat records moved here'
+       WHERE EXISTS (SELECT 1 FROM chat_mod_log WHERE user_id = ?2)`,
+      to,
+      from,
+      now,
+    ),
+    s("UPDATE chat_mod_log SET user_id = ?1 WHERE user_id = ?2", to, from),
+    s("UPDATE chat_reports SET reporter = ?1 WHERE reporter = ?2", to, from),
+    s("UPDATE chat_reports SET target = ?1 WHERE target = ?2", to, from),
+    s("DELETE FROM chat_reports WHERE reporter = ?1 AND target = ?1", to),
+  ];
 }
 
 let prunedAt = -Infinity;

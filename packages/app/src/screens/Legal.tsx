@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { AGE_GATE, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS } from "@chessroyale/core";
+import { AGE_GATE, CHAT_MOD, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS } from "@chessroyale/core";
 
 /**
  * The privacy policy (/privacy), terms of service (/terms) and copyright page (/copyright): drafts written from what
@@ -172,17 +172,21 @@ function Privacy() {
               your name, rating and icon.
             </p>
             <p>
-              Being built, chat moderation: reporting a message keeps that message, who sent it, who reported it, where and when, and
-              a few messages around it. A chat ban or mute keeps the account, until when, and why. Muting a player is kept on your
-              device only.
+              Reporting a line keeps that line, who said it (their account and the name shown), who reported it, where and when, and
+              the lines around it as the game kept them: names and lines, which can include yours if you chatted nearby. A
+              moderator's decision about your chat keeps what it was (a warning, a chat ban and until when), why, and any note to
+              you. Muting a player is kept on your device only. Names with slurs or hate in them are refused, and nothing about
+              that is kept.
             </p>
           </>
         }
         why="to pass your lines to other players, and to deal with reports."
         kept={
           <>
-            global chat keeps its last {GLOBAL_CHAT.keep} lines and shows none older than {hours(GLOBAL_CHAT.maxAgeMs)} hours. Reports,
-            bans and mutes: <Blank>set when chat moderation ships</Blank>.
+            global chat keeps its last {GLOBAL_CHAT.keep} lines and shows none older than {hours(GLOBAL_CHAT.maxAgeMs)} hours. A report:
+            until a moderator has looked at it, then {CHAT_MOD.keepResolvedDays} days. A moderator's decision:{" "}
+            {CHAT_MOD.keepDecisionsDays} days after it ends (a chat ban with no end, while it lasts). A mute: on your device until you
+            unmute.
           </>
         }
       />
@@ -341,7 +345,8 @@ function Privacy() {
         <li>
           <strong>See it, or get a copy:</strong> Settings → Download my data gives you a file (JSON) of everything we keep about your
           account, your bug reports and the error records with your account included. Fair play's detection records aren't in
-          it, as they'd show how cheating is found: email <Mail /> for those, and a person answers.
+          it, as they'd show how cheating is found, nor reports other players made about you or moderators' notes on your chat:
+          email <Mail /> for those, and a person answers.
         </li>
         <li>
           <strong>Correct it:</strong> change your name and icon in your profile, or email us.
@@ -365,7 +370,8 @@ function Privacy() {
         <li>
           <strong>Deleted:</strong> your account (name, icon, email or Google id, when you joined and were last seen), every
           sign-in session (you're signed out on every device), your sign-in code's record, your items, coins, crates and shop
-          items, your quick-chat picks, reports you made and reports about you, fair play's records about you, your friends,
+          items, your quick-chat picks, reports you made and reports about you (chat reports too), moderators' decisions about
+          your chat, fair play's records about you, your friends,
           requests, blocks and invites (from the other players' lists too), your lines in the global chat, the bug reports you
           sent, and your account id on error records.
         </li>
@@ -373,7 +379,9 @@ function Privacy() {
           <strong>Kept, without you:</strong> your match results, moved to one shared "deleted" account and kept without your
           account, name, match code or exact time (only the day), rating, best move or eval-bar setting, so the game's numbers
           stay right. Error records stay counted, without your account. Feedback and ideas never carry your
-          account, so they stay until they expire ({OPS.store.keepDays} days).
+          account, so they stay until they expire ({OPS.store.keepDays} days). Your name and lines can stay in the lines kept
+          around a chat report about someone else, without your account, until that report is deleted (at most{" "}
+          {CHAT_MOD.keepResolvedDays} days after a moderator has looked at it).
         </li>
         <li>
           <strong>Kept if fair play has acted on your account:</strong> if it's banned, or fair play is looking into it, its
@@ -446,7 +454,11 @@ function Terms() {
       <ul>
         <li>Chat is preset lines and emoji. Don't use them to harass anyone or to spam.</li>
         <li>Don't attack, overload or scrape the game, and don't play with bots or scripts.</li>
-        <li>We can mute you, or suspend or remove an account that breaks these terms. To report a player, tap their name.</li>
+        <li>Names and icons that offend, and names with slurs or hate in them, aren't allowed.</li>
+        <li>
+          We can turn off your chat (for a while or for good), reset your name and icon, or suspend or remove an account that breaks
+          these terms. To report a player or a line in chat, tap their name.
+        </li>
       </ul>
 
       <h2>Virtual items</h2>

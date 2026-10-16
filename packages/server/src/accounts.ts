@@ -36,7 +36,7 @@ import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-sch
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
 import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
 import { isBlockedText } from "./text-filter.ts";
-import { chatStanding, type ChatNotice } from "./chat-mod.ts";
+import { chatModMoves, chatStanding, type ChatNotice } from "./chat-mod.ts";
 import type { ChatBlock } from "@chessroyale/chess";
 
 export interface Sql {
@@ -499,7 +499,7 @@ export async function signInWithIdentity(
   const owner = await sql.first<User>(`SELECT id, name, icon, email, google_sub, created_at FROM users WHERE ${col} = ?`, value);
   if (owner) {
     if (current && current.id !== owner.id && !current.email && !current.google_sub) {
-      // A guest signing in to an existing account: its matches, items, coins, reports, fair-play file and the rest join
+      // A guest signing in to an existing account: its matches, items, coins, reports, fair-play and chat files and the rest join
       // the account and the guest goes, in one batch (one transaction), so nothing lands halfway: a buy in another tab
       // is wholly before it (and moves) or wholly after (and finds no guest wallet), two sign-ins at once move the wallet
       // once, and a failure moves nothing (docs/decisions/2026-10-16-sign-in-races.md). Nothing stays under the guest's
@@ -508,6 +508,7 @@ export async function signInWithIdentity(
       await sql.batch([
         stmt("UPDATE results SET user_id = ? WHERE user_id = ?", owner.id, current.id),
         ...fairPlayMoves(current.id, owner.id, now, await identityHashes(owner)),
+        ...chatModMoves(current.id, owner.id, now),
         stmt(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, owner.id),
         ...shopMoves(current.id, owner.id),
         ...lockerMoves(current.id, owner.id),
