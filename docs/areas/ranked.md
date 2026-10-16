@@ -1,7 +1,7 @@
 # Ranked 1 v 1
 
 Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rules and screens), `hub` (the home screen's
-1 v 1 button: not built yet; it calls `startRanked1v1()` and shows `ranked1v1Label()`). Why it's built this way:
+1 v 1 pick in its RANKED row: PLAY calls `startRanked1v1()`, the line under the row shows `ranked1v1Label()`; [hub.md](hub.md)). Why it's built this way:
 [docs/decisions/2026-10-16-ranked-1v1.md](../decisions/2026-10-16-ranked-1v1.md). Every number is in `RANKED_1V1`
 (`packages/core/src/settings.ts`).
 
@@ -75,8 +75,8 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     game counts as usual.
   - **Shown as** `RankView.label`: "Gold 2 · 45 RP", "Master · 120 RP", "Placement 2/5"; on the profile (yours and
     anyone's: a "1 V 1" section, null for a banned player), in the game's strips and the versus moment, and on the
-    result card ("Gold 2 · 45 RP (+18)", "Placed: Gold 4 · 25 RP"). The home screen's button reads
-    `ranked1v1Label()` (`packages/app/src/ranked.ts`).
+    result card ("Gold 2 · 45 RP (+18)", "Placed: Gold 4 · 25 RP"). With 1 v 1 picked, the home screen's
+    line under its RANKED row reads `ranked1v1Label()` (`packages/app/src/ranked.ts`): "Your rank: Gold 2 · 45 RP".
 - **Coins** (`duelCoins`): per minute of the game's length by result (win 2.4, draw 1.6, loss 0.8), at least 1, at
   most 70, only when both sides made 10 moves; none for an aborted or a bot game, nor for a player fair play holds (in
   review). At most `coins.perDay` (20) paying games a UTC day per account (`coin_day`, `coin_games` on their

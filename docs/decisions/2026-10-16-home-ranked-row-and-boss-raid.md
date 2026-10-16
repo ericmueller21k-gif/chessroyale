@@ -24,9 +24,17 @@ Eric, Oct 16. Lane: `hub` (the director's brief). Area pages: [hub.md](../areas/
   line under PLAY: "Ranked chess vs one player near your level" (the time-control rule stays in the FAQ, as Eric
   asked). A guest: "1 v 1 is online · Sign in to play", as Squads says.
 - **Under the row** for 1 v 1: nothing. 1 v 1 is always against people, so the Matchmaking row has no meaning there.
-- **1 v 1's PLAY** goes to `/1v1`, the 1 v 1 core's queue. Until the core is on `main` this is a page load of `/1v1`
-  (`location.assign`). With the core merged, it calls `startRanked1v1()` and shows `ranked1v1Label()` under the button
-  if it fits at 360 px.
+- **1 v 1's PLAY** calls `startRanked1v1()` (the core's one way in: its queue at once, at `/1v1`). Resting
+  (`PAUSE_RANKED1V1`), PLAY is off with its line under it, as Squads and 50 v 50 are.
+- **Your 1 v 1 rank** (`ranked1v1Label()`): not inside the button. Its third line would have to hold up to "Grandmaster
+  · 1234 RP" in about 90 px at 320 px, and it doesn't fit there. Instead, with 1 v 1 picked, it goes in the slot under
+  the row that 50 v 50's Matchmaking row uses: "Your rank: Placement 0/5", "Your rank: Gold 2 · 45 RP". It's one whole
+  line from 320 px at its widest (tested).
+- **The first-time pawn-vote hint** (the core's `VoteHint`, once per device in any mode): in the Crowd's and Squads'
+  pre-game votes, "Drag your pawn into a zone to vote" sits over the board just above the zones, its arrow pointing
+  down at them. In 1 v 1 it sits at the board's foot, because there your pawn starts in the middle, off the grid. It
+  shows until you vote or the vote ends, in the first vote only. One hint per vote (keyed by it), so a player who
+  meets it in the first vote doesn't see it again in the second.
 - **Play with friends with 1 v 1 picked** makes a 50 v 50 lobby. 1 v 1 has no lobbies, and the button is the same one
   on every pick.
 - **The Boss raid card** is full width with a boss's portrait (Ginger's, drawn by `BossFace` from her kit, the same
@@ -69,7 +77,3 @@ Eric, Oct 16. Lane: `hub` (the director's brief). Area pages: [hub.md](../areas/
   until it reloads. This is pre-launch and lasts only until the app reloads. No stored lobby is affected: a Squads
   lobby keeps the clock itself (`rules.clock`) once its votes close.
 
-## Not in this change
-
-- The first-time pawn-vote hint (`VoteHint`) in the Crowd and Squads pre-game votes, `startRanked1v1()` and
-  `ranked1v1Label()`: they come with the 1 v 1 core and get wired once it's on `main`.

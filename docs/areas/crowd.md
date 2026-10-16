@@ -61,6 +61,10 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   the winner, then the winner's banner; each result shows `voteResultSeconds` (4.2 s since Eric's Oct 15 "every banner a
   second longer"; was 3.2). `?speed=bullet|blitz|rapid` skips the vote for tests (old ids map over: normal → rapid, variable →
   blitz; an unknown id gets Blitz).
+- **The first-time hint** (Oct 16): the first pawn vote a player meets on a device (any mode: this one, Squads' or
+  1 v 1's) shows "Drag your pawn into a zone to vote" over the board just above the zones until they vote; never again
+  on that device (`VoteHint`, `brc.voteHintSeen`; `FirstVoteHint` in `screens/Vote.tsx`, one per vote). e2e
+  `vote-hint.spec.ts`.
 - **The endings.** Each leaves `crowdFinalists(format)` players (the lobby less `CROWD_KNOCKOUTS[format]`). Team final:
   `teamFinalSizes` players a side, the weakest out every `teamFinalMovesPerStep`. **The boss final** (Eric, Oct 14):
   always the Hidden Boss, the top 4 against him (the duel's cuts, stopping at four), for everyone, solo and online; his

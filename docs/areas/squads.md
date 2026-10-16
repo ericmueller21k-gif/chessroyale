@@ -36,7 +36,8 @@ move.
   `botVotes`, `closePregameVote`); `rulesFromVotes` gives `SquadsRules`. Nobody voting: Classic, the normal start, the
   Blitz clock, each named by its option's id (`optionIndex`, `clockDefault: "blitz"`), never by its place. Every vote's
   options keep one order, left to right, every game (Eric, Oct 13): Mode is Classic, Mercenary, Coming soon; Start is
-  Normal, One opening, Random openings; Clock is Bullet, Blitz, Rapid (Eric, Oct 16: "the left should always be bullet";
+  Normal, One opening, Random openings; Clock is Bullet, Blitz, Rapid. The first pawn vote a player meets on a device
+  shows the shared first-time hint (crowd.md, "The first-time hint") (Eric, Oct 16: "the left should always be bullet";
   Rapid, Blitz, Bullet from Oct 13). The app finds the vote it shows by its id. The
   Mode vote's third option is `disabled` ("Coming soon": shown, never votable: `votable`). Bots vote
   on the mode by a lean drawn per lobby (`botModeVotes`, `modeVote.classicLean`: most lobbies' bots lean Classic). A test

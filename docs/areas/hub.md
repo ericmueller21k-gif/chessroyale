@@ -16,9 +16,11 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   - **The RANKED row:** a small "RANKED" label over three buttons, one picked (a radio group, remembered on the device,
     `brc.mode`): **50 v 50** ("Crowd chess"), **1 v 1** ("Classic chess") and **Squads** ("8 squads of 4"). Classic
     still plays with `?mode=classic`. Under the row, for the pick: 50 v 50's Matchmaking row (Default, Bots off, Solo)
-    with its ⓘ; Squads' Party button ([squads.md](squads.md)); nothing for 1 v 1 (always people). Then PLAY and its
-    line (1 v 1: "Ranked chess vs one player near your level"). 1 v 1's PLAY goes to `/1v1`, its queue (the 1 v 1
-    core's; until it lands, a page load of `/1v1`).
+    with its ⓘ; Squads' Party button ([squads.md](squads.md)); for 1 v 1 (always people) your rank in it, "Your rank:
+    Gold 2 · 45 RP" or "Your rank: Placement 2/5" (`ranked1v1Label`, from your profile; whole on one line at 320 px at
+    its widest). Then PLAY and its line (1 v 1: "Ranked chess vs one player near your level"). 1 v 1's PLAY is
+    `startRanked1v1()`: its queue at once, at `/1v1` ([ranked.md](ranked.md)); resting (`PAUSE_RANKED1V1`), PLAY is
+    off with its line, as the other modes.
   - **The Boss raid card** (full width, a boss's portrait, "Boss raid", "Team up vs a boss · up to 50") opens the **Boss
     raid screen** (`?mode=raid` opens it too; the computer's side menu has "Boss raid" in Boss alone's old place). A
     simple screen for now, Back to home: each way to play a raid, through the flows home had before: **Join a raid**
