@@ -227,17 +227,22 @@ const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,
   // (The deep re-check's queue: only the matches waiting, so the scheduled run never scans the whole table.)
   `CREATE INDEX IF NOT EXISTS fairplay_matches_deep ON fairplay_matches (deep_queued) WHERE deep_queued = 1`,
+  // Solo results stopped counting for ranking (Oct 16, 2026: their rating is the browser's word, and the ones from
+  // before Oct 7 were stored with ranked NULL, which counted). The accounts that have one get their rating again from
+  // their online results; only those, so it's cheap each time the schema changes
+  // (docs/decisions/2026-10-16-server-side-rating.md).
+  `UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id IN (SELECT user_id FROM results WHERE online = 0 AND ranked IS NULL AND rating IS NOT NULL)`,
 ];
 
 /**
- * The latest rating among a user's results that count for ranking (ranked, or from before the rule, and not held by a
- * fair-play review), in SQL.
+ * The latest rating among a user's results that count for ranking (online, ranked or from before the rule, and not
+ * held by a fair-play review), in SQL. Never a solo result's: its rating is the browser's word.
  */
 function LATEST_RATING(userId: string) {
-  return `(SELECT r.rating FROM results r WHERE r.user_id = ${userId} AND r.rating IS NOT NULL AND (r.ranked IS NULL OR r.ranked = 1) AND (r.held IS NULL OR r.held = 0) ORDER BY r.played_at DESC, r.id DESC LIMIT 1)`;
+  return `(SELECT r.rating FROM results r WHERE r.user_id = ${userId} AND r.online = 1 AND r.rating IS NOT NULL AND (r.ranked IS NULL OR r.ranked = 1) AND (r.held IS NULL OR r.held = 0) ORDER BY r.played_at DESC, r.id DESC LIMIT 1)`;
 }
-/** A result row counts for ranking (ranked, or from before the rule; not held by a fair-play review). */
-const countsForRanking = (r: { ranked: number | null; held?: number | null }) => r.ranked !== 0 && !r.held;
+/** A result row counts for ranking (online; ranked, or from before the rule; not held by a fair-play review). */
+const countsForRanking = (r: { online: number; ranked: number | null; held?: number | null }) => r.online === 1 && r.ranked !== 0 && !r.held;
 
 /** Sets an account's ranking rating from its results again (after results are held or released by fair play). */
 export async function refreshRating(sql: Sql, userId: string): Promise<void> {
@@ -711,7 +716,7 @@ export interface CrowdStats {
 
 export interface RaidStats {
   raids: number;
-  /** Different bosses (tiers) beaten. */
+  /** Different bosses (tiers) beaten online (a solo win is the browser's word). */
   bossesBeaten: number;
   /** The boss's strikes you lived through (it struck someone else). */
   strikesSurvived: number | null;
@@ -747,7 +752,7 @@ export interface PublicProfile {
   boss: RaidStats;
   /** The rating after each of the last 30 rated matches, oldest first. */
   ratingHistory: number[];
-  /** Boss tiers (their strengths) beaten in raids. */
+  /** Boss tiers (their strengths) beaten in online raids (a solo win is the browser's word). */
   bossesBeaten: number[];
   recent: {
     mode: string;
@@ -815,7 +820,7 @@ export function raidStats(rows: ResultRow[]): RaidStats {
   const standing = rows.filter((r) => r.survived !== null);
   return {
     raids: rows.length,
-    bossesBeaten: new Set(rows.filter((r) => r.team_won === 1 && r.boss_elo !== null).map((r) => r.boss_elo)).size,
+    bossesBeaten: new Set(rows.filter((r) => r.online === 1 && r.team_won === 1 && r.boss_elo !== null).map((r) => r.boss_elo)).size,
     strikesSurvived: sumOf(rows, (r) => r.strikes_survived),
     lastStands: sumOf(rows, (r) => r.last_stand),
     survivedPct: standing.length ? pct(standing.filter((r) => r.survived === 1).length, standing.length) : null,
@@ -867,7 +872,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
       .slice(0, 30)
       .map((r) => r.rating!)
       .reverse(),
-    bossesBeaten: [...new Set(raids.filter((r) => r.team_won === 1 && r.boss_elo !== null).map((r) => r.boss_elo!))].sort((a, b) => a - b),
+    bossesBeaten: [...new Set(raids.filter((r) => r.online === 1 && r.team_won === 1 && r.boss_elo !== null).map((r) => r.boss_elo!))].sort((a, b) => a - b),
     recent: rows.slice(0, 10).map((r) => ({
       mode: r.mode,
       online: !!r.online,

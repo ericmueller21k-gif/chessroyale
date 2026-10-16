@@ -72,12 +72,20 @@ export class Lobby extends DurableObject<Env> {
     });
   }
 
-  /** Quick chat: a person's icon and the shop items they own (their chat packs), from their account. */
-  private async chatProfileOf(userId: string): Promise<{ icon: string | null; owned: string[] }> {
+  /**
+   * Someone joining, from their account: their icon and the shop items they own (quick chat's packs, null: unread), and
+   * the rating stored on it (`users.rating`, a raid boss's strength; null: none yet). Read once, on joining, never per
+   * move. The two reads fail apart, so a failed shop read never costs the rating (the raid's boss would meet the prior).
+   */
+  private async joiningProfileOf(userId: string): Promise<{ icon: string | null; owned: string[] | null; rating: number | null }> {
     const sql = d1Sql(this.env.DB!);
-    const row = await sql.first<{ icon: string }>("SELECT icon FROM users WHERE id = ?", userId);
+    const [row, shop] = await Promise.all([
+      sql.first<{ icon: string; rating: number | null }>("SELECT icon, rating FROM users WHERE id = ?", userId).catch(() => null),
+      shopState(sql, userId).catch(() => null),
+    ]);
     const icon = row && (isPixelIcon(row.icon) || (ICONS as readonly string[]).includes(row.icon)) ? row.icon : null;
-    return { icon, owned: (await shopState(sql, userId)).owned };
+    const rating = typeof row?.rating === "number" && Number.isFinite(row.rating) ? row.rating : null;
+    return { icon, owned: shop?.owned ?? null, rating };
   }
 
   private core(code: string): LobbyCore {
@@ -426,8 +434,8 @@ export class Lobby extends DurableObject<Env> {
     if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId && !this.record.judges?.tasks) {
       msg = { ...msg, boards: await this.recheckOnServer(msg.boards) };
     }
-    // Quick chat: who's joining (their icon and chat packs), read before the lobby is touched, as above.
-    const chatProfile = msg.t === "hello" && this.env.DB && attached?.userId && !attached.guest ? await this.chatProfileOf(attached.userId).catch(() => null) : null;
+    // Who's joining (their icon, chat packs and stored rating), read before the lobby is touched, as above.
+    const joining = msg.t === "hello" && this.env.DB && attached?.userId && !attached.guest ? await this.joiningProfileOf(attached.userId) : null;
     // (Closed while that was being read.)
     if (!this.record) return;
     const core = this.core(this.record.code);
@@ -448,7 +456,9 @@ export class Lobby extends DurableObject<Env> {
       // Practice mode (unlimited power-ups) is for testers only (an admin, or a test server: Eric, Oct 15). A player's
       // request is ignored, so nobody plays a ranked or fair-played match with the engine's moves on tap.
       const practice = !!msg.practice && (this.env.TEST_SWITCHES === "1" || !!attached?.admin);
-      const result = core.connect(msg.token, msg.name, msg.device, practice, msg.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1");
+      // Their rating is the one stored on their account, never the app's word: a low one claimed would meet a weaker raid
+      // boss. None yet, or no account: null, the prior (docs/decisions/2026-10-16-server-side-rating.md).
+      const result = core.connect(msg.token, msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1");
       // A new player took a seat: one held for the players on their way is theirs (the oldest).
       if (result.ok && this.record.humans.length > before) this.reservations.shift();
       if (!result.ok) {
@@ -457,11 +467,11 @@ export class Lobby extends DurableObject<Env> {
         return;
       }
       ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId, ...(attached?.admin ? { admin: true } : {}) });
-      if (chatProfile) {
-        core.chatOwned(result.playerId, chatProfile.owned);
-        if (chatProfile.icon && this.icons.get(result.playerId) !== chatProfile.icon) {
-          this.icons.set(result.playerId, chatProfile.icon);
-          await this.ctx.storage.put(`icon:${result.playerId}`, chatProfile.icon);
+      if (joining) {
+        if (joining.owned) core.chatOwned(result.playerId, joining.owned);
+        if (joining.icon && this.icons.get(result.playerId) !== joining.icon) {
+          this.icons.set(result.playerId, joining.icon);
+          await this.ctx.storage.put(`icon:${result.playerId}`, joining.icon);
         }
       }
       // connect() sent the welcome before the socket was attached; send it again now it can be found.

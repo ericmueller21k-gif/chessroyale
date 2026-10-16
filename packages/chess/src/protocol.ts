@@ -401,7 +401,8 @@ export type ChatRefusal = "unknown" | "locked" | "team" | "gap" | "burst" | "rep
 export type ClientMessage =
   /** `look`: the crate items you wear (others see them on the cut screen). */
   /** `lastBoss`: the boss this player met last (a BOSS_ROSTER id), so a raid can avoid the one most of the lobby met. */
-  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; rating?: number | null; look?: unknown; lastBoss?: string | null; evalBar?: boolean }
+  /** No rating: the lobby reads the one stored on the player's account (one an older app still sends is ignored). */
+  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; look?: unknown; lastBoss?: string | null; evalBar?: boolean }
   | { t: "start" }
   /** `away`: times the page was hidden or lost focus during this move's clock before the pick (fair play). */
   | { t: "pick"; key: string; move: string; away?: number }

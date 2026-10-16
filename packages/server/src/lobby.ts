@@ -127,7 +127,10 @@ export interface Human {
   connected: boolean;
   device: "phone" | "computer";
   practice?: boolean;
-  /** The rating on their profile (for a boss raid's strength). */
+  /**
+   * The rating stored on their account (`users.rating`, which the Durable Object reads as they join; never a number
+   * their app sends), for a boss raid's strength. Null: none yet, or no account (the prior).
+   */
   rating?: number | null;
   /** The boss they met last (a BOSS_ROSTER id): the next raid avoids the one most of the lobby met. */
   lastBoss?: string | null;
@@ -183,6 +186,8 @@ export interface LeftHuman {
 
 /** What someone coming back to a seat they left is told (their app goes home with a note of its own). */
 export const LEFT_MATCH = "You left that match.";
+/** What someone coming back to a seat on a different account is told (the seat keeps the account it was taken on). */
+export const OTHER_ACCOUNT = "That seat belongs to another account.";
 
 export type Timer =
   | "bossPlay"
@@ -668,6 +673,9 @@ export class LobbyCore {
   ) {
     this.r.activeAt = this.io.now();
     const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
+    // A seat keeps the account it was taken on: its rating set the raid's boss, and its result goes to that account.
+    // Back on another one (or on one when it had none), they're refused (docs/decisions/2026-10-16-server-side-rating.md).
+    if (existing && userId && userId !== this.r.accounts?.[existing.id]) return { ok: false as const, message: OTHER_ACCOUNT };
     // (Bots off: seats of people long gone are freed first, so the count and "full" are real. Not the arriving one's.)
     this.freeGoneSeats(existing?.id);
     if (existing) {
@@ -678,7 +686,6 @@ export class LobbyCore {
       if (look !== undefined) existing.look = cleanLook(look);
       if (bossDef(lastBoss)) existing.lastBoss = lastBoss;
       if (evalBar !== null) existing.evalBar = evalBar;
-      if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [existing.id]: userId };
       if (!this.r.hostId || !this.human(this.r.hostId)?.connected) this.r.hostId = existing.id;
       this.send(existing.id, { t: "welcome", playerId: existing.id, token: existing.token, code: this.r.code }, false);
       this.broadcast(this.lobbyMessage(existing.id), false);
