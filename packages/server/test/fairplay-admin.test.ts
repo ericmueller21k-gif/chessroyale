@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
-import { createGuest, createSession, ensureSchema, publicProfile, recordResult, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
-import { appeal, banCheck, caseOf, decide, decideAppeal, eligibleForRanked, fairStatus, normalizeEmail, recordFairPlay, setCase, type CaseMailer } from "../src/fairplay.ts";
+import { createGuest, createSession, ensureSchema, identityHashes, normalizeEmail, publicProfile, recordResult, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
+import { appeal, banCheck, caseOf, decide, decideAppeal, eligibleForRanked, fairStatus, recordFairPlay, setCase, type CaseMailer } from "../src/fairplay.ts";
 import { caseEmail, caseMailer, fairplayFrom } from "../src/fairplay-mail.ts";
 import { handleAdmin, isAdmin } from "../src/admin.ts";
 import { forgetSecrets, handleAccountApi, withSecrets } from "../src/api.ts";
@@ -89,6 +89,46 @@ describe("bans", () => {
     await decide(sql, third0.id, "clear", "admin:e", "appeal: the cousin's account", 6700);
     const third = await player(sql, "Third", "a.b+3@gmail.com");
     expect(await banCheck(sql, third, null, 7000)).toEqual({ banned: false });
+  });
+
+  it("an identity stays caught while any account banned with it is: clearing one forgets only its own row (docs/decisions/2026-10-16-integrity-followups.md)", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const cheat = await player(sql, "Cheat", "a.b@gmail.com");
+    await decide(sql, cheat.id, "ban", "admin:e", "engine", 1000);
+    // A second account with the address is banned as evasion, then cleared (a cousin's): the first ban still stands.
+    const cousin = await player(sql, "Cousin", "ab+2@gmail.com");
+    expect(await banCheck(sql, cousin, null, 2000)).toEqual({ banned: true });
+    await decide(sql, cousin.id, "clear", "admin:e", "appeal: a cousin's account", 3000);
+    expect(await sql.all("SELECT user_id FROM fairplay_identities")).toEqual([{ user_id: cheat.id }]);
+    // So a third account with the address is banned, while the cleared one isn't banned again: a person decided it
+    // (another account's identity no longer catches it, as with a device).
+    const third = await player(sql, "Third", "a.b+3@gmail.com");
+    expect(await banCheck(sql, third, null, 4000)).toEqual({ banned: true });
+    expect(await banCheck(sql, cousin, null, 4100)).toEqual({ banned: false });
+    expect((await caseOf(sql, cousin.id))?.status).toBe("cleared");
+    expect((await sql.all<{ user_id: string }>("SELECT user_id FROM fairplay_identities")).map((r) => r.user_id).sort()).toEqual([cheat.id, third.id].sort());
+    // Each owner has its own row, and a banned owner counts before one in review (kept by accounts deleted in review or
+    // banned: account-data.ts), whichever row comes first.
+    const [[, hash]] = (await identityHashes({ email: null, google_sub: "sub-shared" })) as [[string, string]];
+    await sql.run("INSERT INTO fairplay_identities (kind, hash, user_id, at) VALUES ('google', ?, 'aa-in-review', 6000), ('google', ?, 'zz-banned', 6000)", hash, hash);
+    await setCase(sql, "aa-in-review", "review", "detection", "engine-like moves", 6000);
+    await setCase(sql, "zz-banned", "banned", "admin:e", "engine", 6000);
+    const g = await createGuest(sql, 7000, "New");
+    const fifth = await signInWithIdentity(sql, g.user, "google", "sub-shared", {}, 7000);
+    expect(await banCheck(sql, fifth, null, 7100)).toEqual({ banned: true });
+  });
+
+  it("a fairplay_identities table from before owners had their own rows is rebuilt once, keeping its rows", async () => {
+    const { sql } = memoryDb();
+    await sql.run("CREATE TABLE fairplay_identities (kind TEXT NOT NULL, hash TEXT NOT NULL, user_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (kind, hash))");
+    await sql.run("INSERT INTO fairplay_identities (kind, hash, user_id, at) VALUES ('email', 'h1', 'u1', 5)");
+    await ensureSchema(sql);
+    const key = (await sql.all<{ name: string; pk: number }>("PRAGMA table_info(fairplay_identities)")).filter((c) => c.pk).sort((a, b) => a.pk - b.pk);
+    expect(key.map((c) => c.name)).toEqual(["kind", "hash", "user_id"]);
+    expect(await sql.all("SELECT kind, hash, user_id, at FROM fairplay_identities")).toEqual([{ kind: "email", hash: "h1", user_id: "u1", at: 5 }]);
+    await sql.run("INSERT INTO fairplay_identities (kind, hash, user_id, at) VALUES ('email', 'h1', 'u2', 6)");
+    expect(await sql.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'fairplay_identities%'")).toEqual([{ name: "fairplay_identities" }]);
   });
 });
 

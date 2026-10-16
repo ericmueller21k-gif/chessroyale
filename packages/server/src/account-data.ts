@@ -23,8 +23,8 @@
  * report, a friend action, a shop or locker write) can still leave a row that points at nothing (the decision file's
  * known gaps).
  */
-import { DELETED_ID, stmt, type Sql, type Stmt, type User } from "./accounts.ts";
-import { caseOf, identityHashes } from "./fairplay.ts";
+import { DELETED_ID, identityHashes, stmt, type Sql, type Stmt, type User } from "./accounts.ts";
+import { caseOf } from "./fairplay.ts";
 import { socialDeletes } from "./friends.ts";
 
 /** What a store's erase needs to know, worked out before the batch. */
@@ -164,8 +164,8 @@ export const ACCOUNT_STORES: AccountStore[] = [
     erase: (u, { now, keepFairPlay, identities }) => {
       const gone = [stmt("DELETE FROM fairplay_matches WHERE user_id = ?", u.id), stmt("DELETE FROM fairplay_appeals WHERE user_id = ?", u.id)];
       if (!keepFairPlay) return [...gone, ...["fairplay_cases", "fairplay_log", "fairplay_identities", "fairplay_devices"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, u.id))];
-      // Banned or in review: the file outlives the account, with its identities as they are now (an older deleted
-      // account's row for the same identity keeps it), so a new account made with one is caught (banCheck).
+      // Banned or in review: the file outlives the account, with its identities as they are now (each in its own row;
+      // a ban's are already there), so a new account made with one is caught (banCheck).
       return [
         ...gone,
         ...identities.map(([kind, hash]) => stmt("INSERT OR IGNORE INTO fairplay_identities (kind, hash, user_id, at) VALUES (?, ?, ?, ?)", kind, hash, u.id, now)),

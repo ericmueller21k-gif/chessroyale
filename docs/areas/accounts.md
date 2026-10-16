@@ -8,14 +8,19 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   days). Guests get a profile and stats too.
 - **Two ways to sign in:** Google, and a 6-digit code sent by email (Resend). No passwords. A code works for 10 minutes
   and once, allows 5 tries, needs 30 s between resends and 5 sends an hour per address. One statement counts a try and
-  uses a right code up, so checks at once can't share a code or get extra tries. Codes and session tokens are stored
+  uses a right code up, so checks at once can't share a code or get extra tries. Likewise one statement checks the
+  resend gap and the hour's count and records the send, so starts at once send one email
+  ([docs/decisions/2026-10-16-integrity-followups.md](../decisions/2026-10-16-integrity-followups.md)). Codes and session tokens are stored
   hashed (SHA-256). Google's ID token comes straight from Google's token endpoint over TLS; `aud` is checked and the
   email used only when Google marks it verified.
 - **Signing in keeps what you played as a guest.** A new identity attaches to your current account; one that already
   belongs to an account switches you to it, moves your guest results, items, coins and crates over and deletes the
   empty guest. That whole merge is one batch (one transaction): two sign-ins at once move the coins once, a buy in
   another tab lands wholly before it or wholly after, and a failure moves nothing (`sign-in-races.test.ts`;
-  [docs/decisions/2026-10-16-sign-in-races.md](../decisions/2026-10-16-sign-in-races.md)).
+  [docs/decisions/2026-10-16-sign-in-races.md](../decisions/2026-10-16-sign-in-races.md)). The guest's reports (made
+  and about it) and fair-play file move in the same batch (`fairPlayMoves`, [fairplay.md](fairplay.md)), so nothing
+  stays under the guest's id, where deleting the account couldn't reach it
+  ([docs/decisions/2026-10-16-integrity-followups.md](../decisions/2026-10-16-integrity-followups.md)).
 - **Sign-in buttons appear only once their secrets are set** (`/api/auth/config`): `GOOGLE_CLIENT_ID` /
   `GOOGLE_CLIENT_SECRET` for Google, `RESEND_API_KEY` for email. They live in the account's Secrets Store (bound in
   `wrangler.jsonc`, `secrets_store_secrets`); `withSecrets()` reads them from the store or as Worker secrets.

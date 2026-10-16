@@ -136,4 +136,25 @@ describe("email codes", () => {
     expect(await verifyEmailCode(sql, "a@b.co", ` ${s.code} `, 2000)).toBe(true);
     expect(await verifyEmailCode(sql, "a@b.co", s.code, 3000)).toBe(false);
   });
+
+  it("starts at once send one code (docs/decisions/2026-10-16-integrity-followups.md): the rest wait, and the hour counts one", async () => {
+    const { sql, db } = await setup();
+    const WAIT = "A code was just sent. Wait a few seconds and try again.";
+    const HOUR = "Too many codes for this address. Try again in an hour.";
+    const outcome = (s: Awaited<ReturnType<typeof startEmailCode>>) => (s.ok ? "sent" : s.message);
+    const starts = await Promise.all(Array.from({ length: 10 }, () => startEmailCode(sql, "a@b.co", 0)));
+    expect(starts.map(outcome).sort()).toEqual(["sent", ...Array<string>(9).fill(WAIT)].sort());
+    expect(db.prepare("SELECT sends_this_hour FROM email_codes WHERE email = ?").get("a@b.co")).toEqual({ sends_this_hour: 1 });
+    // The code that went out is the one that works.
+    const sent = starts.find((s) => s.ok);
+    expect(sent?.ok && (await verifyEmailCode(sql, "a@b.co", sent.code, 1000))).toBe(true);
+    // Four more, 30 s apart (five in the hour), each with others at once: one goes each time; then none until the hour is up.
+    for (let i = 1; i <= 5; i++) {
+      const at = await Promise.all(Array.from({ length: 4 }, () => startEmailCode(sql, "a@b.co", i * 30_000)));
+      expect(at.filter((s) => s.ok)).toHaveLength(i < 5 ? 1 : 0);
+      if (i === 5) expect(at.map(outcome)).toEqual(Array<string>(4).fill(HOUR));
+    }
+    expect(db.prepare("SELECT sends_this_hour FROM email_codes WHERE email = ?").get("a@b.co")).toEqual({ sends_this_hour: 5 });
+    expect(await startEmailCode(sql, "a@b.co", 120_000 + 3_600_001)).toMatchObject({ ok: true });
+  });
 });

@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { CRATES, GLOBAL_CHAT, SHOP_ITEMS } from "@chessroyale/core";
+import { CRATES, FAIRPLAY, GLOBAL_CHAT, SHOP_ITEMS } from "@chessroyale/core";
 import {
   DELETED_ID,
   buyItem,
@@ -24,7 +24,7 @@ import {
 import { ACCOUNT_STORES, COVERED_TABLES, NO_ACCOUNT_DATA, accountDownload, deleteAccount } from "../src/account-data.ts";
 import { handleAccountApi } from "../src/api.ts";
 import { caseDetail, openCases } from "../src/admin.ts";
-import { appeal, banCheck, caseOf, decide, recordFairPlay, reportPlayer, setCase } from "../src/fairplay.ts";
+import { appeal, banCheck, caseOf, decide, fairStatus, recordFairPlay, reportPlayer, setCase } from "../src/fairplay.ts";
 import { answerRequest, block, sendInvite, sendRequest, setFriendSettings } from "../src/friends.ts";
 import { GlobalChat } from "../src/global-chat.ts";
 import { LiveBoard } from "../src/live.ts";
@@ -349,11 +349,11 @@ describe("delete my account", () => {
     const again = await signInWithIdentity(sql, g.user, "email", "ann@example.com", {}, T0 + 51);
     expect((await banCheck(sql, again, null, T0 + 52)).banned).toBe(true);
     expect(await deleteAccount(sql, again, T0 + 60)).toEqual({ keptFairPlay: true });
-    // One row for the identity (its key is the identity), a banned deleted account's; a third account is banned too.
+    // A row for each banned deleted account (each owner has its own: docs/decisions/2026-10-16-integrity-followups.md);
+    // a third account is banned too.
     const owners = await sql.all<{ user_id: string }>("SELECT user_id FROM fairplay_identities WHERE kind = 'email'");
-    expect(owners).toHaveLength(1);
-    expect([a.id, again.id]).toContain(owners[0]!.user_id);
-    expect((await caseOf(sql, owners[0]!.user_id))?.status).toBe("banned");
+    expect(owners.map((o) => o.user_id).sort()).toEqual([a.id, again.id].sort());
+    for (const o of owners) expect((await caseOf(sql, o.user_id))?.status).toBe("banned");
     const g3 = await createGuest(sql, T0 + 70);
     const third = await signInWithIdentity(sql, g3.user, "email", "ann@example.com", {}, T0 + 71);
     expect((await banCheck(sql, third, null, T0 + 72)).banned).toBe(true);
@@ -366,6 +366,108 @@ describe("delete my account", () => {
     await startEmailCode(sql, "recent@example.com", T0 + 30 * 60_000);
     await purgeEmailCodes(sql, T0 + 61 * 60_000);
     expect((await sql.all<{ email: string }>("SELECT email FROM email_codes")).map((r) => r.email)).toEqual(["recent@example.com"]);
+  });
+});
+
+describe("a guest signing in to an existing account (docs/decisions/2026-10-16-integrity-followups.md)", () => {
+  const evidence = (sql: Sql, userId: string, at: number) =>
+    sql.run(
+      "INSERT INTO fairplay_matches (user_id, lobby, mode, played_at, counted, perf, score, level, summary, moves, keep_until) VALUES (?, 'FGHJK', 'crowd', ?, 10, 2500, 90, 'ban', '{}', '[]', ?)",
+      userId,
+      at,
+      at + 3 * DAY,
+    );
+
+  it("leaves nothing under the guest's id: its reports and fair-play file join the account, so a ban can't be shed", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const bo = await signInWithIdentity(sql, null, "email", "bo@example.com", {}, T0);
+    const owner = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, T0);
+    await recordResult(sql, owner.id, { mode: "crowd", online: true, placement: 2, players: 100, lobby: "ABCDE", ranked: true, rating: 1500 }, T0 + 1);
+    // The guest plays online from a device, reports Bo (and its own account), is reported, banned, and appeals.
+    const { user: guest } = await createGuest(sql, T0, "Guest");
+    await recordResult(sql, guest.id, { mode: "crowd", online: true, placement: 1, players: 100, lobby: "FGHJK", ranked: true, rating: 2600 }, T0 + 2);
+    await evidence(sql, guest.id, T0 + 2);
+    await banCheck(sql, guest, DEVICE, T0 + 3);
+    await reportPlayer(sql, guest, bo.id, "Cheating", "FGHJK", T0 + 4);
+    await reportPlayer(sql, guest, owner.id, "Cheating", null, T0 + 4);
+    await reportPlayer(sql, bo, guest.id, "Cheating", "FGHJK", T0 + 5);
+    await setCase(sql, guest.id, "banned", "admin:eric@example.com", "engine moves", T0 + 6);
+    expect((await appeal(sql, guest.id, "It wasn't me, I promise you that.", T0 + 7)).ok).toBe(true);
+
+    expect((await signInWithIdentity(sql, guest, "email", "owner@example.com", {}, T0 + 8)).id).toBe(owner.id);
+    // Not a row anywhere names the guest, so deleting the account later reaches everything.
+    expect(await rowsNaming(sql, guest.id)).toEqual([]);
+    // The ban is the account's now, with its appeal, its evidence, its device and its log (and a line saying why).
+    expect(await caseOf(sql, owner.id)).toMatchObject({ status: "banned", reason: "engine moves" });
+    expect(await fairStatus(sql, owner.id)).toMatchObject({ banned: true, appeal: { status: "open" } });
+    expect(await banCheck(sql, owner, null, T0 + 9)).toEqual({ banned: true });
+    expect(await count(sql, "fairplay_matches WHERE user_id = ?", owner.id)).toBe(1);
+    expect(await sql.all("SELECT device FROM fairplay_devices WHERE user_id = ?", owner.id)).toEqual([{ device: DEVICE }]);
+    // (The first watch is the account's own, opened by the guest's report about it.)
+    expect((await sql.all<{ action: string }>("SELECT action FROM fairplay_log WHERE user_id = ? ORDER BY id", owner.id)).map((l) => l.action)).toEqual([
+      "watch",
+      "watch",
+      "banned",
+      "appeal",
+      "merged",
+    ]);
+    // A ban's holds: every online result off ranking, no rating; the account's email is kept, so a new account made
+    // with it (a +tag) is banned too.
+    expect(await sql.all("SELECT held FROM results WHERE user_id = ? ORDER BY played_at", owner.id)).toEqual([{ held: 1 }, { held: 1 }]);
+    expect((await publicProfile(sql, owner.id, T0 + 9))?.rating).toBeNull();
+    const alias = await signInWithIdentity(sql, null, "email", "owner+2@example.com", {}, T0 + 10);
+    expect(await banCheck(sql, alias, null, T0 + 11)).toEqual({ banned: true });
+    // The reports made and about it are the account's; the one about its own account (the same person) is gone.
+    expect(await sql.all("SELECT reporter, target FROM reports ORDER BY id")).toEqual([
+      { reporter: owner.id, target: bo.id },
+      { reporter: bo.id, target: owner.id },
+    ]);
+  });
+
+  it("the stricter case wins, and its holds apply to the account's own results", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    // A clean account with an older result, one from this week and its evidence; its guest is in review.
+    const owner = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, T0);
+    await recordResult(sql, owner.id, { mode: "crowd", online: true, placement: 3, players: 100, ranked: true, rating: 1400 }, T0 - 30 * DAY);
+    await recordResult(sql, owner.id, { mode: "crowd", online: true, placement: 2, players: 100, ranked: true, rating: 1500 }, T0 - DAY);
+    await evidence(sql, owner.id, T0 - DAY);
+    const { user: guest } = await createGuest(sql, T0, "Guest");
+    await setCase(sql, guest.id, "review", "detection", "engine-like moves", T0);
+    await signInWithIdentity(sql, guest, "email", "owner@example.com", {}, T0 + 1);
+    expect(await rowsNaming(sql, guest.id)).toEqual([]);
+    expect((await caseOf(sql, owner.id))?.status).toBe("review");
+    expect(await sql.all("SELECT rating, held FROM results WHERE user_id = ? ORDER BY played_at", owner.id)).toEqual([
+      { rating: 1400, held: 0 },
+      { rating: 1500, held: 1 },
+    ]);
+    expect((await publicProfile(sql, owner.id, T0 + 2))?.rating).toBe(1400);
+    // Its evidence is kept the full time and waits for the deep re-check, as when any case opens.
+    expect(await sql.all("SELECT keep_until, deep_queued FROM fairplay_matches WHERE user_id = ?", owner.id)).toEqual([
+      { keep_until: T0 + 1 + FAIRPLAY.evidenceDays * DAY, deep_queued: 1 },
+    ]);
+    // A banned account stays banned when its guest was only watched.
+    const banned = await signInWithIdentity(sql, null, "email", "banned@example.com", {}, T0);
+    await setCase(sql, banned.id, "banned", "admin:eric@example.com", "engine moves", T0);
+    const { user: watched } = await createGuest(sql, T0, "Guest");
+    await setCase(sql, watched.id, "watch", "reports", "reported: Cheating", T0 + 1);
+    await signInWithIdentity(sql, watched, "email", "banned@example.com", {}, T0 + 2);
+    expect(await caseOf(sql, banned.id)).toMatchObject({ status: "banned", reason: "engine moves" });
+    expect(await caseOf(sql, watched.id)).toBeNull();
+    // A guest's cleared case doesn't move (its date would set aside the account's earlier evidence); its log does.
+    const plain = await signInWithIdentity(sql, null, "email", "plain@example.com", {}, T0);
+    const { user: cleared } = await createGuest(sql, T0, "Guest");
+    await setCase(sql, cleared.id, "review", "reports", "3 reports", T0 + 1);
+    await decide(sql, cleared.id, "clear", "admin:eric@example.com", "nothing in it", T0 + 2);
+    await signInWithIdentity(sql, cleared, "email", "plain@example.com", {}, T0 + 3);
+    expect(await rowsNaming(sql, cleared.id)).toEqual([]);
+    expect(await caseOf(sql, plain.id)).toBeNull();
+    expect((await sql.all<{ action: string }>("SELECT action FROM fairplay_log WHERE user_id = ? ORDER BY id", plain.id)).map((l) => l.action)).toEqual([
+      "review",
+      "cleared",
+      "merged",
+    ]);
   });
 });
 
