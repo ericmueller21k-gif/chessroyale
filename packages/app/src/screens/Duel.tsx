@@ -1,8 +1,8 @@
+import type { ComponentChildren, VNode } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { RANKED_1V1, controlLabel, duelControl } from "@chessroyale/core";
 import { other, type Color, type DuelEnd } from "@chessroyale/chess/duel";
 import { Board } from "../components/Board.tsx";
-import { DressedPawn } from "../components/FrontDoor.tsx";
 import { Avatar } from "../components/Items.tsx";
 import { MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
@@ -10,6 +10,7 @@ import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
 import { ChatPanel, useMedia, type ChatPeople } from "../components/QuickChat.tsx";
 import { DuelOverlay, DuelVote } from "../components/DuelVote.tsx";
 import { DuelRankPill } from "../components/DuelRankPill.tsx";
+import { DuelStage, type StageSide } from "../components/DuelStage.tsx";
 import { clockAt, type DuelQueue, type DuelSession, type DuelSide, type DuelSnapshot } from "../duel.ts";
 import { account } from "../account.ts";
 import { ranked1v1Rank } from "../ranked.ts";
@@ -17,9 +18,9 @@ import { clockShown } from "../clock-text.ts";
 import { testParams } from "../test-switches.ts";
 
 /**
- * Ranked 1 v 1's screens (docs/areas/ranked.md): the search (Cancel, and after RANKED_1V1.fewPlayersSeconds the
- * "Few players online right now" choice), the versus moment (a plain placeholder: its art comes later), and the game,
- * whose board loads once and stays put from the vote to the result. Classes are `dv-`.
+ * Ranked 1 v 1's screens (docs/areas/ranked.md): the stage (components/DuelStage.tsx: the search, with Cancel and after
+ * RANKED_1V1.fewPlayersSeconds the "Few players online right now" choice, then the versus moment on the same stage),
+ * and the game, whose board loads once and stays put from the vote to the result. Classes are `dv-`.
  */
 
 /** Redraws when the session (or queue) changes, and `ms` apart while `running` (the clocks). */
@@ -34,7 +35,7 @@ function useSession(s: { subscribe(fn: () => void): () => void }, running: boole
   return now;
 }
 
-// ---------------- The search ----------------
+// ---------------- The stage: the search, then the versus moment ----------------
 
 /** How long before "Few players online right now" (`?fewAfter=` seconds, a test switch). */
 const fewAfterMs = () => {
@@ -42,38 +43,47 @@ const fewAfterMs = () => {
   return (Number.isFinite(t) && t > 0 ? t : RANKED_1V1.fewPlayersSeconds) * 1000;
 };
 
-export function DuelSearch({ queue, onCancel, onBot }: { queue: DuelQueue; onCancel: () => void; onBot: () => void }) {
-  const now = useSession(queue, queue.state.kind === "searching", 500);
-  const [kept, setKept] = useState(false);
+/** The stage's title: the mode, as the search always said it. */
+const stageHead = (
+  <>
+    <h2>1 v 1</h2>
+    <p class="muted dv-sub">Classic chess</p>
+  </>
+);
+
+/** You on the stage while searching: your account's name, look and 1 v 1 rank. */
+function youOnStage(): StageSide {
   const me = account().profile;
-  const rank = ranked1v1Rank();
+  return { name: me?.user.name ?? "You", look: me?.locker?.look, rank: ranked1v1Rank() };
+}
+
+/**
+ * The search: your pawn on its platform, the other platform empty and waiting ("Finding opponent…" and the time),
+ * Cancel; after RANKED_1V1.fewPlayersSeconds, "Few players online right now" (Keep waiting, or a bot). (A function
+ * returning the stage, not a component of its own: the search and the versus moment must be the same `DuelStage`, so
+ * Preact keeps it, and your pawn on it, from one to the other.)
+ */
+function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => void, onCancel: () => void, onBot: () => void) {
   const s = queue.state;
-  if (s.kind === "refused")
-    return (
-      <div class="dv-search" role="alert">
-        <h2>1 v 1</h2>
-        <p>{s.message}</p>
-        <button type="button" class="btn btn-primary" onClick={onCancel}>
-          Back
-        </button>
-      </div>
-    );
-  const waited = s.kind === "searching" ? now - s.since : 0;
-  const few = !kept && waited >= fewAfterMs();
+  const waited = s.kind === "searching" ? Math.max(0, now - s.since) : 0;
   return (
-    <div class="dv-search">
-      <h2>1 v 1</h2>
-      <p class="muted dv-sub">Classic chess</p>
-      <DressedPawn look={me?.locker?.look} size="profile" shadow />
-      {rank && <DuelRankPill rank={rank} />}
-      <p class="dv-search-line" aria-live="polite">
-        Finding an opponent… <span class="dv-wait">{clockShown(waited)}</span>
-      </p>
+    <DuelStage
+      label="Finding opponent"
+      you={youOnStage()}
+      them={null}
+      head={stageHead}
+      waiting={
+        <>
+          <span class="dv-st-finding">Finding opponent…</span>
+          <span class="dv-wait">{clockShown(waited)}</span>
+        </>
+      }
+    >
       {few && (
         <div class="dv-few" role="status">
           <strong>Few players online right now</strong>
           <div class="dv-few-actions">
-            <button type="button" class="btn btn-secondary" onClick={() => setKept(true)}>
+            <button type="button" class="btn btn-secondary" onClick={onKeep}>
               Keep waiting
             </button>
             <button type="button" class="btn btn-primary" onClick={onBot}>
@@ -85,7 +95,29 @@ export function DuelSearch({ queue, onCancel, onBot }: { queue: DuelQueue; onCan
       <button type="button" class="btn btn-secondary dv-cancel" onClick={onCancel}>
         Cancel
       </button>
-    </div>
+    </DuelStage>
+  );
+}
+
+/**
+ * The versus moment (RANKED_1V1.versusMs, the game's own timing): the same stage, the opponent's pawn dropped onto
+ * the empty platform with their name and rank. While the game object waits for both players (`waiting`), the
+ * platform is still empty: their pawn arrives as the versus moment starts, so it holds for the whole of it.
+ */
+export function versusStage(snap: DuelSnapshot) {
+  const you = snap.you;
+  const side = (c: Color): StageSide => ({ name: snap.players[c].name, look: snap.players[c].look, rank: snap.players[c].rank });
+  const there = snap.phase === "versus";
+  return (
+    <DuelStage
+      label={there ? "Opponent found" : "Opponent found…"}
+      you={side(you)}
+      them={there ? side(other(you)) : null}
+      head={stageHead}
+      waiting={<span class="dv-st-finding">Opponent found…</span>}
+    >
+      <p class={`dv-st-line${there ? "" : " dv-st-hold"}`}>You play {SIDE_NAME[you]}</p>
+    </DuelStage>
   );
 }
 
@@ -168,11 +200,51 @@ function DuelStrip({ p, c, you, ms, running, clockShownNow, away }: { p: DuelSid
   );
 }
 
-/** The game: the versus moment, then the board from the vote to the result (it never moves meanwhile). */
-export function DuelScreen({ session, onHome, onAgain }: { session: DuelSession; onHome: () => void; onAgain: () => void }) {
-  const first = session.snapshot();
-  const live = first.phase === "vote" || first.phase === "overlay" || first.phase === "play" || first.phase === "versus" || first.phase === "waiting";
-  const now = useSession(session, live);
+/**
+ * Ranked 1 v 1 from PLAY to the result, one component throughout: the search and the versus moment are one stage in
+ * the home screen's frame (`frame`; on a computer the side menu stays, as in every queue), so from the search to the
+ * versus moment the stage (and your pawn on it) stays put and only the opponent arrives. Then the game's board, which
+ * loads once and stays put from the vote to the result.
+ */
+export function DuelFront({
+  queue,
+  session,
+  frame,
+  onCancel,
+  onBot,
+  onHome,
+  onAgain,
+}: {
+  queue: DuelQueue | null;
+  session: DuelSession | null;
+  frame: (stage: ComponentChildren) => VNode;
+  onCancel: () => void;
+  onBot: () => void;
+  onHome: () => void;
+  onAgain: () => void;
+}) {
+  const src = (session ?? queue)!;
+  const first = session?.snapshot();
+  const live = first ? !first.end && !first.gone : queue!.state.kind === "searching";
+  const now = useSession(src, live, session ? 100 : 500);
+  // "Keep waiting": the choice goes until this search ends.
+  const [kept, setKept] = useState<DuelQueue | null>(null);
+  if (!session) {
+    const q = queue!;
+    const s = q.state;
+    if (s.kind === "refused")
+      return frame(
+        <div class="dv-stage dv-refused" role="alert">
+          <header class="dv-st-head">{stageHead}</header>
+          <p>{s.message}</p>
+          <button type="button" class="btn btn-primary" onClick={onCancel}>
+            Back
+          </button>
+        </div>,
+      );
+    const few = kept !== q && s.kind === "searching" && now - s.since >= fewAfterMs();
+    return frame(searchStage(q, now, few, () => setKept(q), onCancel, onBot));
+  }
   const snap = session.snapshot();
   if (snap.gone && !snap.end)
     return (
@@ -184,32 +256,8 @@ export function DuelScreen({ session, onHome, onAgain }: { session: DuelSession;
         </button>
       </div>
     );
-  if (snap.phase === "waiting" || snap.phase === "versus") return <DuelVersus snap={snap} />;
+  if (snap.phase === "waiting" || snap.phase === "versus") return frame(versusStage(snap));
   return <DuelBoard session={session} snap={snap} now={now} onHome={onHome} onAgain={onAgain} />;
-}
-
-/** The "found" moment: both players, their pawns and ranks (a placeholder for the versus art to come). */
-export function DuelVersus({ snap }: { snap: DuelSnapshot }) {
-  const you = snap.you;
-  const them = other(you);
-  const card = (c: Color) => (
-    <div class={`dv-vs-card${c === you ? " dv-you" : ""}`}>
-      <DressedPawn look={snap.players[c].look ?? undefined} size="profile" side={c} shadow />
-      <strong class="dv-vs-name">{snap.players[c].name}</strong>
-      <DuelRankPill rank={snap.players[c].rank} />
-    </div>
-  );
-  return (
-    <div class="screen center dv-versus" role="status" aria-live="polite">
-      <p class="dv-vs-head">{snap.phase === "waiting" ? "Opponent found…" : "Opponent found"}</p>
-      <div class="dv-vs-row">
-        {card(you)}
-        <span class="dv-vs-word">VS</span>
-        {card(them)}
-      </div>
-      <p class="muted">You play {SIDE_NAME[you]}</p>
-    </div>
-  );
 }
 
 function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSession; snap: DuelSnapshot; now: number; onHome: () => void; onAgain: () => void }) {

@@ -64,7 +64,7 @@ export function DressedPawn({
   side = "w",
 }: {
   look?: ItemLook;
-  size: "hero" | "profile" | "ring" | "card" | "seat" | "side";
+  size: "hero" | "profile" | "ring" | "card" | "seat" | "side" | "stage";
   shadow?: boolean;
   side?: "w" | "b";
 }) {

@@ -51,7 +51,7 @@ import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, fo
 import { SquadsQueue, SquadsScreen, squadsWaiting } from "./screens/Squads.tsx";
 import { PartySheet } from "./screens/SquadsParty.tsx";
 import { BotDuel, DuelQueue, NetDuel, setRanked1v1Starter, type DuelSession } from "./duel.ts";
-import { DuelScreen, DuelSearch } from "./screens/Duel.tsx";
+import { DuelFront } from "./screens/Duel.tsx";
 import { measureSound } from "./sound.ts";
 import { noteWhere } from "./problems.ts";
 import { testParams } from "./test-switches.ts";
@@ -984,6 +984,7 @@ export function App() {
         () => {
           if (match) leave();
           else if (squads) leaveSquads();
+          else if (duel || duelQueue) leaveDuel();
           else leaveLine();
           nav[k]();
         },
@@ -996,7 +997,7 @@ export function App() {
   const noLanding = testParams().has("nolanding");
   const inviteCode = invite === "open" ? linkCode : undefined;
   const notice = ended ? (ended.why === "idle" ? "That lobby has closed." : ended.why === "left" ? leftNote(ended.how) : "That match has ended.") : (squadsNote ?? undefined);
-  // Ranked 1 v 1: the game on screen, or the search (in the home screen's frame, as every queue).
+  // Ranked 1 v 1: the search and the versus moment (one stage, in the home screen's frame, as every queue), then the game.
   if ((duel || duelQueue) && !match && !squads) {
     const overlayD = profileOpen && (
       <div class="fd-overlay">
@@ -1005,23 +1006,21 @@ export function App() {
         </FrontFrame>
       </div>
     );
-    if (duel)
-      return (
-        <>
-          <DuelScreen
-            session={duel}
-            onHome={leaveDuel}
-            onAgain={() => {
-              leaveDuel();
-              startDuel();
-            }}
-          />
-          {overlayD}
-        </>
-      );
+    // (One component from the search to the result, so the stage stays mounted from the search to the versus moment.)
     return (
       <>
-        {homeFrame(<DuelSearch queue={duelQueue!} onCancel={leaveDuel} onBot={botDuel} />)}
+        <DuelFront
+          queue={duelQueue}
+          session={duel}
+          frame={(stage) => homeFrame(stage, undefined, false)}
+          onCancel={leaveDuel}
+          onBot={botDuel}
+          onHome={leaveDuel}
+          onAgain={() => {
+            leaveDuel();
+            startDuel();
+          }}
+        />
         {overlayD}
       </>
     );
