@@ -1,22 +1,18 @@
 import { useEffect, useState } from "preact/hooks";
-import { account, onAccountChange } from "../account.ts";
-import { chatNoticeSeen } from "../chat-mod.ts";
+import { account, chatNoticeSeen, onAccountChange } from "../account.ts";
 import { FdButton } from "./FrontDoor.tsx";
 
 /**
  * A moderator's warning or chat ban, shown once on the home screen (never over a match): what it is, the moderator's
- * note if any, and "Got it" (then it doesn't show again). The notice comes with your profile (chat-mod.ts).
+ * note if any, and "Got it": it goes from your profile at once (so it doesn't come back as you move around) and on the
+ * server (so it doesn't come back next time). The notice comes with your profile (server/src/chat-mod.ts).
  */
 export function ChatNotice() {
   const [, redraw] = useState(0);
-  const [closed, setClosed] = useState<number | null>(null);
   useEffect(() => onAccountChange(() => redraw((n) => n + 1)), []);
   const notice = account().profile?.chatMod?.notice;
-  if (!notice || closed === notice.id) return null;
-  const close = () => {
-    setClosed(notice.id);
-    void chatNoticeSeen();
-  };
+  if (!notice) return null;
+  const close = () => void chatNoticeSeen();
   const until = notice.until ? new Date(notice.until).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;
   const ban = notice.kind === "ban";
   return (

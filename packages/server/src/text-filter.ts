@@ -4,29 +4,33 @@
  * a hate term in it is refused (a profile) or replaced (a lobby seat). See docs/decisions/2026-10-16-chat-moderation.md.
  *
  * A small list of our own, slurs and hate terms only (not swearing), ROT13-encoded so the words don't turn up in
- * searches, diffs or screenshots of the code: `rot13("word")` gives a new entry. Matching folds what people use to
- * get past filters: case, accents, look-alike letters from other alphabets, zero-width characters, digits and symbols
- * for letters (n1gg3r), letters repeated or spaced out. Two kinds of entry:
- *   - ANYWHERE: long, unambiguous words, found anywhere in the name with every space and symbol removed;
- *   - WORDS: short ones that are parts of ordinary words, found only as a whole word (a plural "s" allowed).
- * ALLOW lists the few ordinary words that contain an ANYWHERE entry.
+ * searches, diffs or screenshots of the code: `rot13("word")` gives a new entry. Matching folds what people use to get
+ * past filters (case, accents, look-alike letters from other alphabets, invisible characters, digits and symbols for
+ * letters), and reads the name word by word: symbols inside a word are dropped (n.i.g), and a run of single letters is
+ * one word (n i g), but two words are never read as one ("Jared Skinner" is two names, nothing else). Three kinds:
+ *   - ANYWHERE: long, unambiguous words, found inside any one word (letters may repeat: "niiigger"). An entry with a
+ *     space is a phrase, found as one word ("WhitePower") or as those words in a row ("white power");
+ *   - WORDS: short ones that are parts of ordinary words, found only as a whole word, exactly (a plural "s" allowed);
+ *   - NUMBERS: hate codes, found in the name's digits.
+ * ALLOW lists the few ordinary words that contain an ANYWHERE entry. Words that are also ordinary names are left out on
+ * purpose (reports and a moderator's reset handle those).
  */
 
 /** ROT13: turns a list entry into the word, and a word into an entry. */
 export const rot13 = (s: string) => s.replace(/[a-z]/g, (c) => String.fromCharCode(((c.charCodeAt(0) - 97 + 13) % 26) + 97));
 
 const ANYWHERE = [
-  "avttre", "avttn", "avtyrg", "sntbg", "ergneq", "genaal", "genaavr", "furznyr", "jrgonpx", "ornare", "wvtnobb", "cbepuzbaxrl",
-  "whatyrohaal", "mvccreurnq", "enturnq", "gbjryurnq", "tbyyvjbt", "fcrnepuhpxre", "erqfxva", "uvgyre", "fvrturvy", "juvgrcbjre",
-  "juvgrcevqr", "xhxyhk",
+  "avttre", "avttn", "avtyrg", "sntbg", "ergneq", "genaal", "genaavr", "furznyr", "jrgonpx", "ornare", "wvtnobb", "tbyyvjbt", "erqfxva", "uvgyre",
+  "juvgr cbjre", "juvgr cevqr", "fvrt urvy", "xh xyhk", "cbepu zbaxrl", "whatyr ohaal", "fcrne puhpxre", "ent urnq", "gbjry urnq", "mvccre urnq",
 ];
-const WORDS = ["avt", "snt", "qlxr", "xvxr", "xlxr", "puvax", "tbbx", "fcvp", "fcvpx", "pbba", "cnxv", "jbt", "wnc", "qnexvr", "fdhnj", "anmv", "xxx"];
+const WORDS = ["avt", "snt", "xlxr", "puvax", "tbbx", "fcvp", "fcvpx", "cnxv", "jbt", "wnc", "qnexvr", "fdhnj", "xxx"];
 const ALLOW = ["favttre", "ergneqnag"];
-/** Hate codes made of digits, found in the name's digits. */
 const NUMBERS = ["1488"];
+/** Only this much of a name is read (a name is at most 16 characters; the rest is never shown, and costs time). */
+const MAX = 64;
 
-/** Digits and symbols used for letters (q for g as in "niqqa"). */
-const LEET: Record<string, string> = { "0": "o", "1": "i", "!": "i", "|": "i", "3": "e", "€": "e", "4": "a", "@": "a", "5": "s", $: "s", "7": "t", "+": "t", "8": "b", "6": "g", "9": "g", q: "g" };
+/** Digits and symbols used for letters. */
+const LEET: Record<string, string> = { "0": "o", "1": "i", "!": "i", "|": "i", "3": "e", "€": "e", "4": "a", "@": "a", "5": "s", $: "s", "7": "t", "+": "t", "8": "b", "6": "g", "9": "g" };
 /** Letters from other alphabets that look like Latin ones (Cyrillic, Greek). */
 const LOOKALIKE: Record<string, string> = {
   а: "a", в: "b", е: "e", к: "k", м: "m", н: "h", о: "o", р: "p", с: "c", т: "t", у: "y", х: "x", і: "i", ј: "j", ѕ: "s", ԁ: "d", ӏ: "l", ɡ: "g",
@@ -40,20 +44,36 @@ const fold = (text: string) =>
     .replace(/[\p{M}\p{Cf}]/gu, "")
     .toLowerCase()
     .replace(/./gsu, (c) => LOOKALIKE[c] ?? LEET[c] ?? c);
-const squash = (text: string) => fold(text).replace(/[^a-z]/g, "");
-/** Each letter of a word, repeated once or more (so "niiigger" is caught, and "niger" isn't "nigger"). */
-const pattern = (word: string) => [...squash(word)].map((c) => `${c}+`).join("");
 
-const ANYWHERE_RE = new RegExp(ANYWHERE.map((w) => pattern(rot13(w))).join("|"));
-const WORD_RE = new RegExp(`^(?:${WORDS.map((w) => pattern(rot13(w))).join("|")})s*$`);
-const ALLOW_RE = new RegExp(ALLOW.map((w) => pattern(rot13(w))).join("|"), "g");
+/** The name's words: letters only within each, a run of single letters as one word. */
+function words(text: string): string[] {
+  const out: string[] = [];
+  let run = false;
+  for (const w of fold(text).split(/\s+/).map((x) => x.replace(/[^a-z]/g, "")).filter(Boolean)) {
+    if (w.length === 1 && run) out[out.length - 1] += w;
+    else out.push(w);
+    run = w.length === 1;
+  }
+  return out;
+}
+
+/** Each letter repeated once or more (so "niiigger" is caught, and "niger" isn't "nigger"). */
+const repeats = (word: string) => [...word].map((c) => `${c}+`).join("");
+const entries = (list: string[]) => list.map((w) => rot13(w));
+
+const ANYWHERE_RE = new RegExp(entries(ANYWHERE).map((w) => repeats(w.replace(/ /g, ""))).join("|"));
+const PHRASE_RE = new RegExp(` (?:${entries(ANYWHERE).filter((w) => w.includes(" ")).map((w) => w.split(" ").map(repeats).join(" ")).join("|")})s* `);
+const WORD_RE = new RegExp(`^(?:${entries(WORDS).join("|")})s?$`);
+const ALLOW_RE = new RegExp(entries(ALLOW).map(repeats).join("|"), "g");
 
 /** Whether free text a player typed (a display name) holds a slur or a hate term. */
 export function isBlockedText(text: string): boolean {
   if (typeof text !== "string" || !text) return false;
-  if (ANYWHERE_RE.test(squash(text).replace(ALLOW_RE, ""))) return true;
-  if (fold(text).split(/[^a-z]+/).some((w) => w && WORD_RE.test(w))) return true;
-  const digits = text.normalize("NFKD").replace(/\D/g, "");
+  const name = text.slice(0, MAX);
+  const ws = words(name);
+  if (ws.some((w) => WORD_RE.test(w) || ANYWHERE_RE.test(w.replace(ALLOW_RE, "")))) return true;
+  if (PHRASE_RE.test(` ${ws.join(" ")} `)) return true;
+  const digits = name.normalize("NFKD").replace(/\D/g, "");
   return NUMBERS.some((n) => digits.includes(n));
 }
 

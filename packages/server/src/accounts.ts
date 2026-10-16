@@ -184,7 +184,7 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS ops_reports_at ON ops_reports (at)`,
   // Friends, requests, blocks, invites and their caps (friends.ts).
   ...FRIENDS_SCHEMA,
-  // Chat moderation: reports of chat lines and the moderators' decisions (chat-mod.ts).
+  // Chat moderation: the moderators' decisions about a player's chat (chat-mod.ts).
   ...CHAT_MOD_SCHEMA,
 ];
 
@@ -720,7 +720,7 @@ export interface Profile {
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss: ModeStats };
   rating: number | null;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
-  /** Your chat's pause in force and a moderator's notice you haven't seen (chat-mod.ts); missing when neither. */
+  /** Your chat ban in force and a moderator's notice you haven't seen (chat-mod.ts); missing when neither. */
   chatMod?: { block?: ChatBlock; notice?: ChatNotice };
 }
 

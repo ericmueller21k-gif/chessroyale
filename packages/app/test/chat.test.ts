@@ -325,6 +325,8 @@ describe("chat moderation in the app", () => {
     expect(a.sent.at(-1)).toEqual({ t: "chatPrefs", muted: ["p2"] });
     expect(a.chat.lines()).toEqual([]);
     expect(a.chat.isMuted("p2")).toBe(true);
+    expect(a.chat.mutesByAccount("p2")).toBe(true);
+    expect(a.chat.mutesByAccount("bot4")).toBe(false);
     // A reload: the device remembers.
     mutes.reload();
     expect(mutes.has("u-bo")).toBe(true);
@@ -359,35 +361,17 @@ describe("chat moderation in the app", () => {
     expect(b.chat.lines()).toHaveLength(1);
   });
 
-  it("reporting: someone else's line, with an account, in an online lobby; the lobby's code goes with it", async () => {
-    const a = online("AAAAA", { p1: "u-me", p2: "u-bo" });
-    expect(a.chat.canReport("p2")).toBe(true);
-    expect(a.chat.canReport("p1")).toBe(false);
-    expect(a.chat.canReport("bot4")).toBe(false);
-    expect(online("", { p2: "u-bo" }).chat.canReport("p2")).toBe(false);
-    const fetcher = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ ok: true, message: "Reported. Thanks: a moderator will look at it." })));
-    vi.stubGlobal("fetch", fetcher);
-    expect(await a.chat.report(5)).toBe("Reported. Thanks: a moderator will look at it.");
-    expect(fetcher.mock.calls[0]![0]).toBe("/api/chat/report");
-    expect(JSON.parse(String(fetcher.mock.calls[0]![1]!.body))).toEqual({ n: 5, lobby: "AAAAA" });
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ message: "That's a lot of reports today. Try again tomorrow." }), { status: 429 })));
-    expect(await a.chat.report(6)).toBe("That's a lot of reports today. Try again tomorrow.");
-    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new Error("offline"))));
-    expect(await a.chat.report(7)).toBe("Couldn't reach the server. Try again in a moment.");
-  });
-
-  it("a paused chat: the server says so, the buttons stop and the panel says why, until the pause ends", () => {
+  it("a chat ban: the server says so, the buttons stop and the panel says why, until the ban ends", () => {
     const a = online("AAAAA", { p2: "u-bo" });
     expect(a.chat.canSay("gg")).toBe(true);
     a.chat.onRefused("gg", "mod", 1_060_000, { until: 1_060_000 });
-    expect(a.chat.paused()).toEqual({ until: 1_060_000 });
+    expect(a.chat.banned()).toEqual({ until: 1_060_000 });
     expect(a.chat.canSay("gg")).toBe(false);
-    expect(chatBlockText(a.chat.paused()!)).toMatch(/^Your chat is off until .+: a moderator's decision\.$/);
+    expect(chatBlockText(a.chat.banned()!)).toMatch(/^Your chat is off until .+: a moderator's decision\.$/);
     vi.advanceTimersByTime(60_000);
-    expect(a.chat.paused()).toBeNull();
+    expect(a.chat.banned()).toBeNull();
     expect(a.chat.canSay("gg")).toBe(true);
     a.chat.onRefused("gg", "mod", 1_060_000, { until: null });
-    expect(chatBlockText(a.chat.paused()!)).toBe("Your chat is off: a moderator's decision.");
-    expect(chatBlockText({ until: 2_000_000, auto: true })).toBe("Your chat is paused while a moderator looks at reports about it.");
+    expect(chatBlockText(a.chat.banned()!)).toBe("Your chat is off: a moderator's decision.");
   });
 });

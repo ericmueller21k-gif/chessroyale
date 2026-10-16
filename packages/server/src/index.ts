@@ -22,8 +22,6 @@ import { countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
 import { handleOpsAdmin } from "./ops-admin.ts";
 import { pruneChatMod } from "./chat-mod.ts";
-import { handleChatMod } from "./chat-mod-api.ts";
-import { handleChatAdmin } from "./chat-mod-admin.ts";
 import type { AccessEnv } from "./access.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 import { isPaused, pausedResponse, switchStatus, type KillSwitchEnv } from "./kill-switches.ts";
@@ -81,9 +79,9 @@ export default {
   },
 
   /**
-   * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), chat moderation's old records (chat-mod.ts), and
-   * fair play's deep re-check of flagged players' moves on the engine server (cases in review at once, the rest
-   * off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
+   * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), chat
+   * moderation's old decisions (chat-mod.ts), and fair play's deep re-check of flagged players' moves on the engine
+   * server (cases in review at once, the rest off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(_event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
     if (!rawEnv.DB) return;
@@ -96,7 +94,7 @@ export default {
         await pruneProblems(sql, Date.now()).catch(failed("prune"));
         // Sign-in code records an hour old (the privacy policy says an hour).
         await purgeEmailCodes(sql, Date.now()).catch(failed("codes"));
-        // Chat moderation's records past keeping (chat-mod.ts).
+        // Chat moderation's decisions past keeping (chat-mod.ts).
         await pruneChatMod(sql, Date.now()).catch(failed("chat"));
         const env = await withSecrets(rawEnv);
         const search = containerSearch(env);
@@ -110,8 +108,8 @@ export default {
 
 async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
-  // (The admin pages, fair play's, ops' and chat's, are the Worker's own; everything else outside /api is the app.)
-  const admin = /^\/admin\/(fairplay|ops|chat)(\/|$)/.test(url.pathname);
+  // (The admin pages, fair play's and ops', are the Worker's own; everything else outside /api is the app.)
+  const admin = /^\/admin\/(fairplay|ops)(\/|$)/.test(url.pathname);
   if (!url.pathname.startsWith("/api/") && !admin) return rawEnv.ASSETS.fetch(request);
   // Load-test counters (OPS_STATS set, and the matching key): see ops.ts.
   if (url.pathname === "/api/ops/stats" && rawEnv.OPS_STATS && request.headers.get("x-ops-key") === rawEnv.OPS_STATS) {
@@ -157,9 +155,6 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // The ops page and the health view (admins only; the health view's JSON also for scripts through Access).
     const ops = await handleOpsAdmin(request, env);
     if (ops) return ops;
-    // Chat moderation: reports, a player's notice, and the chat review page (chat-mod-api.ts, chat-mod-admin.ts).
-    const chatMod = (await handleChatAdmin(request, env, waitUntil)) ?? (await handleChatMod(request, env));
-    if (chatMod) return chatMod;
     // Accounts: /api/me, /api/results, /api/auth/*
     const account = await handleAccountApi(request, env, fetch, waitUntil);
     if (account) return account;

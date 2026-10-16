@@ -17,9 +17,7 @@
  *   - fair play's file on an account that's banned or in review: the case, its log, the hashed email and Google id
  *     (fairplay_identities) and the device markers, under the deleted account's random id, so deleting never gets
  *     around fair play (a new account with the same identity is banned again, or goes back to review). Everything
- *     else of fair play goes (judged moves, match summaries, appeals, reports);
- *   - the player's name and lines inside the lines kept around a chat report about someone else (names and words, no
- *     account id), until that report goes (chat-mod.ts). Their own chat reports and the decisions about their chat go.
+ *     else of fair play goes (judged moves, match summaries, appeals, reports).
  * It all happens in one batch (one transaction), so it's never half done. After it, a lobby's results, a reward and
  * fair play's recording find no account and write nothing; a few other actions in flight at that very moment (a
  * report, a friend action, a shop or locker write) can still leave a row that points at nothing (the decision file's
@@ -154,20 +152,16 @@ export const ACCOUNT_STORES: AccountStore[] = [
     ],
   },
   {
-    // Chat moderation (chat-mod.ts; docs/areas/chat.md, "What's stored"). The download has the chat lines the player
-    // reported (not the lines kept around them, which are other players') and the moderators' decisions about their
-    // chat as they see them: a warning, a pause or a chat ban and its end, the note to them. Reports about the player
-    // (who made them) and the moderators' reasons and names are left out: a person answers a request for them. Deleting
-    // removes the reports they made and the ones about them, and every decision: a chat ban is the account's alone
-    // (unlike fair play's ban, it never follows an email to a new account), so nothing needs to outlive it. Their name
-    // can stay in the lines kept around someone else's report, without their account, until that report goes.
+    // Chat moderation (chat-mod.ts; docs/areas/chat.md, "What's stored"). The download has the decisions about the
+    // player's chat as they see them: a warning or a chat ban, its end, the note to them. The moderators' reasons and
+    // names are left out (a person answers a request for them). Deleting removes every decision: a chat ban is the
+    // account's alone (unlike fair play's ban, it never follows an email to a new account), so nothing outlives it.
     name: "chatModeration",
-    tables: ["chat_reports", "chat_mod_log"],
+    tables: ["chat_mod_log"],
     export: async (sql, u) => ({
-      reportsMade: await all(sql, "SELECT at, channel, target, name, text, said_at, status FROM chat_reports WHERE reporter = ? ORDER BY at, id", u.id),
       decisions: await all(sql, "SELECT at, action, until, note, ended_at FROM chat_mod_log WHERE user_id = ? ORDER BY at, id", u.id),
     }),
-    erase: (u) => [stmt("DELETE FROM chat_reports WHERE reporter = ? OR target = ?", u.id, u.id), stmt("DELETE FROM chat_mod_log WHERE user_id = ?", u.id)],
+    erase: (u) => [stmt("DELETE FROM chat_mod_log WHERE user_id = ?", u.id)],
   },
   {
     // The download has what the player already sees of fair play (banned or not, their appeals and the replies). The
@@ -222,7 +216,7 @@ const readable = (v: unknown): unknown => {
 };
 
 export const DOWNLOAD_ABOUT =
-  "Everything HunChess keeps about your account, as of exportedAt. Times are UTC. Fair play's detection records (judged moves, match scores, case notes, reports about you, device markers) and chat moderators' notes aren't included: email privacy@hunchess.com for them, and a person will answer.";
+  "Everything HunChess keeps about your account, as of exportedAt. Times are UTC. Fair play's detection records (judged moves, match scores, case notes, reports about you, device markers) and chat moderators' reasons and names aren't included: email privacy@hunchess.com for them, and a person will answer.";
 
 /** "Download my data": everything kept about the account, readable. `extra`: what Durable Objects hold (the live hub's). */
 export async function accountDownload(sql: Sql, user: User, now: number, extra: Record<string, unknown> = {}): Promise<Record<string, unknown>> {

@@ -1,4 +1,4 @@
-import { ASK_AGE_LINE, oldEnough, type ChatPicks, type ShopState } from "@chessroyale/core";
+import { ASK_AGE_LINE, CHAT_MOD, oldEnough, type ChatPicks, type ShopState } from "@chessroyale/core";
 import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankEffect } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
@@ -29,7 +29,7 @@ export interface Profile {
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
   /** An admin (ADMIN_EMAILS, as for the fair-play review): sees the boss battle's test trigger, may use the test switches. */
   admin?: boolean;
-  /** Your chat's pause in force, and a moderator's warning or chat ban you haven't seen yet (chat-mod.ts). */
+  /** Your chat ban in force, and a moderator's warning or chat ban you haven't seen yet (chat-mod.ts). */
   chatMod?: { block?: ChatBlock; notice?: ChatNotice };
 }
 
@@ -165,6 +165,31 @@ export async function answerAge(month: number, year: number): Promise<AgeAnswer>
   if (age === "under") rememberTooYoung();
   else set({ age, ageNote: null });
   return age;
+}
+
+/** You've read a moderator's notice (a warning, a chat ban): it goes from your profile here, and on the server. */
+export async function chatNoticeSeen(): Promise<void> {
+  const p = state.profile;
+  if (p?.chatMod?.notice) {
+    const { notice: _seen, ...rest } = p.chatMod;
+    set({ profile: { ...p, chatMod: rest.block ? rest : undefined } });
+  }
+  await fetch("/api/chat/notice", { method: "POST", credentials: "same-origin" }).catch(() => undefined);
+}
+
+let chatReadAt = -Infinity;
+/**
+ * Your chat ban as the server has it now: your profile again, at most every CHAT_MOD.recheckMs. A chat panel showing a
+ * ban asks as it opens, so one a moderator lifted goes without a reload.
+ */
+export async function refreshChatStanding(now = Date.now()): Promise<void> {
+  if (!state.profile || now - chatReadAt < CHAT_MOD.recheckMs) return;
+  chatReadAt = now;
+  try {
+    set({ profile: await api<Profile>("/api/me") });
+  } catch {
+    // Offline: as it was.
+  }
 }
 
 export async function updateProfile(patch: { name?: string; icon?: string }): Promise<void> {

@@ -1,6 +1,6 @@
 import { hollowLobby } from "./bosses/hollow.ts";
 import type { BossLobby } from "./bosses/base.ts";
-import { CHAT_MOD, QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
+import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
 import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
@@ -54,7 +54,6 @@ import {
   type MoveScore,
   type NetBossBrain,
 } from "@chessroyale/chess";
-import type { ContextLine, ReportedLine } from "./chat-mod-schema.ts";
 import { seatName } from "./text-filter.ts";
 import { assignJudges, cutBubble, drawJudges, emptyStats, seedFor, type JudgeDevice, type JudgeHow, type JudgeStats, type JudgeTask } from "./judges.ts";
 
@@ -121,13 +120,8 @@ interface ChatRecord {
   muted: Record<string, string[]>;
   /** When the bots' lines are said (to keep them to a few a minute). */
   bots: number[];
-  /** Chat moderation: accounts whose chat is paused (they can't send), as the Durable Object last read them. */
+  /** Chat moderation: accounts with a chat ban in force (they can't send), as the Durable Object last read them. */
   blocked?: Record<string, ChatBlock>;
-  /**
-   * Chat moderation: who said each seat's lines, their account and name (kept when the seat leaves the lobby, so its
-   * lines can still be reported).
-   */
-  by?: Record<string, { uid: string; name: string }>;
 }
 
 export interface Human {
@@ -2951,17 +2945,13 @@ export class LobbyCore {
     return this.runner?.boss ? null : this.chatSide(id);
   }
 
-  /** Whether a player is sent a line: chat on, sender not muted, and a line they may see (chatVisible). */
+  /** Whether a player is sent a line: chat on, sender not muted, and the line to everyone or to their team. */
   private chatHears(id: string, line: NetChatLine): boolean {
     const c = this.chat;
     if (c.off[id]) return false;
-    if (line.from !== id && c.muted[id]?.includes(line.from)) return false;
-    return this.chatVisible(id, line);
-  }
-
-  /** Whether a line is one a player may see: their own, or to everyone, or to their team. */
-  private chatVisible(id: string, line: NetChatLine): boolean {
-    return line.from === id || line.to === "all" || line.team === null || this.chatSide(id) === line.team;
+    if (line.from === id) return true;
+    if (c.muted[id]?.includes(line.from)) return false;
+    return line.to === "all" || line.team === null || this.chatSide(id) === line.team;
   }
 
   /** The line with its sender's icon, if this player hasn't been sent that icon yet. */
@@ -3030,13 +3020,10 @@ export class LobbyCore {
     const check = chatCheck(sent, line.id, now);
     if (!check.ok) return refuse(check.limit, check.retryAt);
     c.sent[key] = chatSent(sent, line.id, now);
-    const uid = this.r.accounts?.[playerId];
-    const name = this.nameOf(playerId);
-    if (uid && (c.by?.[playerId]?.uid !== uid || c.by[playerId]!.name !== name)) c.by = { ...c.by, [playerId]: { uid, name } };
     this.chatPost(this.chatLine(playerId, line.id, toAll ? "all" : "team", now));
   }
 
-  /** A player's chat pause in force now (chat moderation: chatStanding), if any. */
+  /** A player's chat ban in force now (chat moderation: chatStanding), if any. */
   private chatBlockOf(playerId: string, now: number): ChatBlock | null {
     const uid = this.r.accounts?.[playerId];
     const block = uid ? this.r.chat?.blocked?.[uid] : undefined;
@@ -3044,8 +3031,8 @@ export class LobbyCore {
   }
 
   /**
-   * Chat moderation: an account's chat pause as the Durable Object read it (when they join, now and then as they
-   * chat, and at once when a moderator decides on a report made here). Null: none.
+   * Chat moderation: an account's chat ban as the Durable Object read it (when they join, and again at most every
+   * CHAT_MOD.recheckMs as they chat). Null: none.
    */
   chatStanding(userId: string, block: ChatBlock | null) {
     const c = this.chat;
@@ -3054,38 +3041,6 @@ export class LobbyCore {
       const { [userId]: _gone, ...rest } = c.blocked;
       c.blocked = rest;
     }
-  }
-
-  /**
-   * Chat moderation: the line numbered `n` as the account reporting it saw it (a line they could see: to everyone,
-   * or to their team), with the lines around it they could see, for chat-mod.ts to store. Never a bot's line, nor
-   * one of their own. An error when there's no such line any more (the server keeps QUICK_CHAT.logSize), or the
-   * reporter has no seat here.
-   */
-  chatReportLine(userId: string, n: number): { line: ReportedLine } | { error: "gone" | "bot" | "self" } {
-    const accounts = this.r.accounts ?? {};
-    const mine = Object.keys(accounts).filter((seat) => accounts[seat] === userId);
-    const me = mine.find((seat) => this.human(seat)) ?? mine[0];
-    const lines = me ? (this.r.chat?.lines ?? []).filter((l) => this.chatVisible(me, l)).sort((a, b) => a.n - b.n) : [];
-    const i = lines.findIndex((l) => l.n === n);
-    const said = lines[i];
-    if (!said) return { error: "gone" };
-    const bots = new Set(this.r.bots.map((b) => b.id));
-    if (bots.has(said.from)) return { error: "bot" };
-    // (Someone who has left the lobby since: their account as it was when they said it.)
-    const by = this.r.chat?.by ?? {};
-    const target = accounts[said.from] ?? by[said.from]?.uid;
-    if (!target) return { error: "gone" };
-    if (target === userId) return { error: "self" };
-    const name = (id: string) => this.human(id)?.name ?? this.r.left?.find((l) => l.id === id)?.name ?? by[id]?.name ?? (bots.has(id) ? this.nameOf(id) : "Someone");
-    const words = (say: string) => chatSay(say)?.text ?? say;
-    const mark = (l: NetChatLine): ContextLine["mark"] =>
-      l.n === n ? "this" : l.from === said.from ? "sender" : mine.includes(l.from) ? "reporter" : bots.has(l.from) ? "bot" : undefined;
-    const context = lines.slice(Math.max(0, i - CHAT_MOD.contextBefore), i + CHAT_MOD.contextAfter + 1).map((l) => {
-      const m = mark(l);
-      return { at: l.at, name: name(l.from), text: words(l.say), ...(m ? { mark: m } : {}) };
-    });
-    return { line: { target, name: name(said.from), text: words(said.say), saidAt: said.at, context } };
   }
 
   /** A line to post: in the lobby, to everyone there; in the match, to the sender's team (or everyone). */

@@ -1600,31 +1600,15 @@ export const GLOBAL_CHAT = {
 } as const;
 
 /**
- * Chat moderation (docs/decisions/2026-10-16-chat-moderation.md; docs/areas/chat.md): reports of chat lines, the moderators' decisions
- * (the review page, /admin/chat), the automatic pause, and how long each record is kept. Chat is preset lines only;
- * the free text players see is display names, which the server's filter checks (server/src/text-filter.ts).
+ * Chat moderation (docs/decisions/2026-10-16-chat-moderation.md; docs/areas/chat.md): a moderator's chat bans and how
+ * long their decisions are kept. Chat is preset lines only; the free text players see is display names, which the
+ * server's filter checks (server/src/text-filter.ts).
  */
 export const CHAT_MOD = {
-  /** Chat reports one account can make a day… */
-  reportsPerDay: 20,
-  /** …and one per player and place (the global chat, one lobby) in this long: another is the same report. */
-  dedupeMs: 24 * 60 * 60_000,
-  /** Lines kept with a report around the one reported: this many before it, and this many after (if said by then). */
-  contextBefore: 6,
-  contextAfter: 3,
-  /**
-   * Reports from this many different players, all made within `autoMuteWindowMs` and none reviewed yet, pause the
-   * player's chat until a moderator looks, for at most `autoMuteMs` if nobody has by then.
-   */
-  autoMuteReporters: 3,
-  autoMuteWindowMs: 7 * 24 * 60 * 60_000,
-  autoMuteMs: 72 * 60 * 60_000,
   /** The chat bans a moderator can give, in days (and one with no end). */
   banDays: [1, 7, 30] as readonly number[],
-  /** A lobby reads a chatting player's standing again at most this often (a decision reaches the lobby it was reported in at once). */
+  /** A lobby reads a chatting player's ban again at most this often (and always as they join). */
   recheckMs: 30_000,
-  /** A report is deleted this many days after it's resolved (open ones wait for a moderator). */
-  keepResolvedDays: 30,
   /** A moderator's decision about a player is deleted this many days after it ended (a chat ban with no end stays). */
   keepDecisionsDays: 180,
 } as const;

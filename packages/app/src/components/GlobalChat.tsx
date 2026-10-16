@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { GLOBAL_CHAT, chatSay, defaultChatPicks, homeChatButtons, type ChatSay } from "@chessroyale/core";
-import { account, mustSignInToPlayOnline, onAccountChange } from "../account.ts";
-import { chatBlockNow, chatBlockText, reportChatLine } from "../chat-mod.ts";
+import { account, mustSignInToPlayOnline, onAccountChange, refreshChatStanding } from "../account.ts";
+import { chatBlockNow, chatBlockText } from "../chat-mod.ts";
 import { globalChat, type GlobalLine } from "../global-chat.ts";
 import { chatOff, onPrefsChange, setChatOff } from "../prefs.ts";
 import { openProfile } from "../profile-nav.ts";
@@ -41,7 +41,7 @@ function Row({ line, you, onName }: { line: GlobalLine; you: boolean; onName: (l
       <LineIcon line={line} />
       <div class="gline-body">
         <div class="gline-head">
-          <button type="button" class="gline-name" onClick={() => onName(line)} aria-label={you ? "You: profile" : `${line.name}: profile, mute or report`}>
+          <button type="button" class="gline-name" onClick={() => onName(line)} aria-label={you ? "You: profile" : `${line.name}: profile or mute`}>
             {you ? "You" : line.name}
           </button>
           {line.bot && <span class="gline-bot">bot</span>}
@@ -63,13 +63,7 @@ function Row({ line, you, onName }: { line: GlobalLine; you: boolean; onName: (l
 export function GlobalChat({ onSignIn }: { onSignIn?: () => void }) {
   const [, redraw] = useState(0);
   const [tab, setTab] = useState<Tab>("lobby");
-  /** A line's menu (its sender's profile, mute, report), and the server's answer to a report from it. */
-  const [menu, setMenuLine] = useState<GlobalLine | null>(null);
-  const [reported, setReported] = useState<string | null>(null);
-  const setMenu = (line: GlobalLine | null) => {
-    setMenuLine(line);
-    setReported(null);
-  };
+  const [menu, setMenu] = useState<GlobalLine | null>(null);
   const feed = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   // Chat off (Settings, the same switch as quick chat): nothing is fetched or shown.
@@ -107,8 +101,10 @@ export function GlobalChat({ onSignIn }: { onSignIn?: () => void }) {
   const chips: ChatSay[] = buttons[tab];
   const busy = waitS > 0 || globalChat.sending;
   const muted = globalChat.mutedCount();
-  // Your chat is paused (a moderator, or reports waiting for one): why, instead of the buttons.
-  const paused = chatBlockNow(now);
+  // Your chat is banned (a moderator's decision): why, instead of the buttons. Your profile is read again as this
+  // shows, so a ban lifted meanwhile goes.
+  const banned = guest ? null : chatBlockNow(now);
+  useEffect(() => void (banned && refreshChatStanding()), [!!banned]);
   const status = globalChat.error && waitS === 0 ? globalChat.error : waitS > 0 ? `Next message in ${waitS} s` : `One message every ${GLOBAL_CHAT.gapMs / 1000} s`;
   if (off) {
     return (
@@ -152,47 +148,27 @@ export function GlobalChat({ onSignIn }: { onSignIn?: () => void }) {
         {menu ? (
           <div class="gchat-menu" role="group" aria-label={menu.name}>
             <strong>{menu.from === you ? "You" : menu.name}</strong>
-            {reported ? (
-              <span class="gchat-note" role="status">
-                {reported}
-              </span>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  class="gchip"
-                  onClick={() => {
-                    setMenu(null);
-                    openProfile(menu.bot ? { name: menu.name, bot: true } : { uid: menu.from, name: menu.name, you: menu.from === you });
-                  }}
-                >
-                  Profile
-                </button>
-                {menu.from !== you && (
-                  <button
-                    type="button"
-                    class="gchip"
-                    onClick={() => {
-                      globalChat.mute(menu.from, !globalChat.isMuted(menu.from));
-                      setMenu(null);
-                    }}
-                  >
-                    {globalChat.isMuted(menu.from) ? "Unmute" : "Mute"}
-                  </button>
-                )}
-                {menu.from !== you && !menu.bot && !guest && (
-                  <button
-                    type="button"
-                    class="gchip"
-                    onClick={() => {
-                      setReported("Sending…");
-                      void reportChatLine(menu.n).then(setReported);
-                    }}
-                  >
-                    Report
-                  </button>
-                )}
-              </>
+            <button
+              type="button"
+              class="gchip"
+              onClick={() => {
+                setMenu(null);
+                openProfile(menu.bot ? { name: menu.name, bot: true } : { uid: menu.from, name: menu.name, you: menu.from === you });
+              }}
+            >
+              Profile
+            </button>
+            {menu.from !== you && (
+              <button
+                type="button"
+                class="gchip"
+                onClick={() => {
+                  globalChat.mute(menu.from, !globalChat.isMuted(menu.from));
+                  setMenu(null);
+                }}
+              >
+                {globalChat.isMuted(menu.from) ? "Unmute" : "Mute"}
+              </button>
             )}
             <button type="button" class="gchip quiet" aria-label="Close" onClick={() => setMenu(null)}>
               ✕
@@ -207,9 +183,9 @@ export function GlobalChat({ onSignIn }: { onSignIn?: () => void }) {
               </button>
             )}
           </div>
-        ) : paused ? (
+        ) : banned ? (
           <div class="gchat-guest" role="status">
-            <span>{chatBlockText(paused)}</span>
+            <span>{chatBlockText(banned)}</span>
           </div>
         ) : (
           <div class="gchat-say">

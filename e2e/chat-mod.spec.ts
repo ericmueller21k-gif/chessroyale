@@ -3,10 +3,10 @@ import { asServerAdmin, createLobbyFromHome, joinFromInvite, named, test } from 
 import { rot13 } from "../packages/server/src/text-filter.ts";
 
 /**
- * Chat moderation (docs/areas/chat.md, "Moderation"): mute a player from their name (by account, on this device),
- * report a line (a confirmation; it shows on the review page with the lines around it), a moderator's chat ban (the
- * player can't send, sees why, and gets a notice once), and the name filter. The moderator is an admin: the local
- * Worker's ADMIN_EMAILS has a chat moderator's email per project (playwright.config.ts, asServerAdmin).
+ * Chat moderation (docs/areas/chat.md, "Moderation"): mute a player from their name (by account, on this device), report
+ * them from their profile (fair play's report), a moderator's chat ban from fair play's review page (the player can't
+ * send, sees why, and gets a notice once), and the name filter. (Finding a player by id or profile link: the unit test.) The moderator is an admin: the local Worker's ADMIN_EMAILS has a chat moderator's email per project
+ * (playwright.config.ts, asServerAdmin).
  */
 
 const run = Date.now().toString(36).slice(-4);
@@ -15,7 +15,7 @@ const blocked = `x${rot13("avttre").replace("i", "1").replace("e", "3")}`;
 
 const lobbyChat = (p: Page) => p.locator(".lobby-chat-box .qchat-lobby");
 
-test("chat moderation: mute and report from a name, the review page, a chat ban, the name filter", async ({ browser }, info) => {
+test("chat moderation: mute from a name, a report from the profile, a moderator's chat ban and its notice, the name filter", async ({ browser }, info) => {
   test.setTimeout(3 * 60_000);
   test.skip(info.project.name !== "phone", "one run covers it (the panels are the same on a computer; the review page is the server's)");
   const opts = info.project.use;
@@ -38,10 +38,10 @@ test("chat moderation: mute and report from a name, the review page, a chat ban,
   const boLine = lobbyChat(ann).locator(".qline", { hasText: "Good luck!" }).filter({ hasText: boName });
   await expect(boLine).toBeVisible();
 
-  // Mute, one tap from the name: the line goes, and stays gone after a reload (by account, on this device).
-  await boLine.getByRole("button", { name: `${boName}: profile, mute or report` }).click();
+  // Mute, one tap from the name (the menu: Profile, Mute): the line goes, and stays gone after a reload.
+  await boLine.getByRole("button", { name: `${boName}: profile or mute`, exact: true }).click();
   const menu = lobbyChat(ann).locator(".qmenu");
-  await expect(menu.getByRole("button", { name: "Report", exact: true })).toBeVisible();
+  await expect(menu.getByRole("button")).toHaveText(["Profile", "Mute", "✕"]);
   await ann.screenshot({ path: info.outputPath("chat-mod-menu-phone.png") });
   await menu.getByRole("button", { name: "Mute", exact: true }).click();
   await expect(boLine).toHaveCount(0);
@@ -51,61 +51,57 @@ test("chat moderation: mute and report from a name, the review page, a chat ban,
   await expect(lobbyChat(ann).locator(".qfeed-empty", { hasText: `Muted: ${boName}` })).toBeVisible();
   await expect(boLine).toHaveCount(0);
   expect(await ann.evaluate(() => JSON.parse(localStorage.getItem("brc.muted") ?? "[]").length)).toBe(1);
-  // Unmuted from the chat's options: back.
+  // Unmuted from the chat's options: his line comes back.
   await lobbyChat(ann).getByRole("button", { name: "Chat options", exact: true }).click();
-  await lobbyChat(ann).getByRole("button", { name: `Unmute ${boName}` }).click();
+  await lobbyChat(ann).getByRole("button", { name: `Unmute ${boName}`, exact: true }).click();
   await lobbyChat(ann).getByRole("button", { name: "Done", exact: true }).click();
   await expect(boLine).toBeVisible();
-
-  // Report the line: a short confirmation; again, it's the same report.
-  await boLine.getByRole("button", { name: `${boName}: profile, mute or report` }).click();
-  await menu.getByRole("button", { name: "Report", exact: true }).click();
-  await expect(menu.locator(".qmenu-note")).toHaveText("Reported. Thanks: a moderator will look at it.");
-  await ann.screenshot({ path: info.outputPath("chat-mod-reported-phone.png") });
-  await menu.getByRole("button", { name: "Close", exact: true }).click();
-  await boLine.getByRole("button", { name: `${boName}: profile, mute or report` }).click();
-  await menu.getByRole("button", { name: "Report", exact: true }).click();
-  await expect(menu.locator(".qmenu-note")).toHaveText("You've already reported this player here.");
-  await menu.getByRole("button", { name: "Close", exact: true }).click();
   expect(await ann.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 
-  // The review page, on a phone: Bo with one report from one player, the line among the lines around it.
+  // Reporting is fair play's, from the profile: Ann taps Bo's name, Profile, Report, "Offensive name or icon".
+  await boLine.getByRole("button", { name: `${boName}: profile or mute`, exact: true }).click();
+  await menu.getByRole("button", { name: "Profile", exact: true }).click();
+  const profile = ann.locator(".fd-overlay");
+  await profile.getByRole("button", { name: "Report", exact: true }).click();
+  await ann.getByRole("button", { name: "Offensive name or icon", exact: true }).click();
+  await expect(ann.getByText("Thanks, we'll look into it.")).toBeVisible();
+  await ann.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
+  await profile.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(boLine).toBeVisible();
+
+  // A moderator, on a phone: Bo is in fair play's open cases (the report opened one); his page has the chat section.
+  // A chat ban for a day, with a note.
   const mod = await (await browser.newContext({ ...opts })).newPage();
-  // (Not an admin yet: not there.)
-  expect((await mod.request.get("/admin/chat")).status()).toBe(404);
   await asServerAdmin(mod, "chat");
-  await mod.goto("/admin/chat");
-  await expect(mod.getByRole("heading", { name: "Chat reports" })).toBeVisible();
-  const row = mod.locator("tr", { has: mod.getByRole("link", { name: boName, exact: true }) });
-  await expect(row.locator("td").nth(1)).toHaveText("1");
-  await expect(row.locator("td").nth(2)).toHaveText("1");
-  await row.getByRole("link", { name: boName }).click();
-  await expect(mod.getByRole("heading", { name: boName })).toBeVisible();
-  const report = mod.locator(".card", { hasText: `Lobby ${code}` });
-  await expect(report).toContainText(`reported by ${annName}`);
-  await expect(report.locator("tr.hard")).toContainText("Good luck!");
-  await expect(report.locator("tr.hard .pill")).toHaveText("reported");
+  await mod.goto("/admin/fairplay");
+  await mod.getByRole("link", { name: boName, exact: true }).click();
+  await expect(mod.getByRole("heading", { name: boName, exact: true })).toBeVisible();
+  await expect(mod.getByRole("cell", { name: "Offensive name or icon", exact: true })).toBeVisible();
+  await expect(mod.getByText(/^Chat: open/)).toBeVisible();
+  await mod.locator('input[name="chat_reason"]').fill("e2e: a chat ban");
+  await mod.locator('input[name="chat_note"]').fill("Keep it friendly.");
   expect(await mod.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
   await mod.screenshot({ path: info.outputPath("chat-mod-review-phone.png"), fullPage: true });
-
-  // A chat ban for a day, with a note: the reports close, and it reaches the lobby at once.
-  await mod.getByPlaceholder(/^Reason/).fill("e2e: a chat ban");
-  await mod.getByPlaceholder(/^Note to the player/).fill("Keep it friendly.");
   await mod.getByRole("button", { name: "Chat ban 1 day", exact: true }).click();
   await expect(mod.locator(".card").first()).toHaveText("Done.");
   await expect(mod.getByText(/^Chat: chat ban until/)).toBeVisible();
-  await expect(mod.getByRole("heading", { name: "Open reports (0)" })).toBeVisible();
 
-  // Bo can't send: the server refuses, and his panel says why instead of the buttons. Ann hears nothing.
-  await expect(lobbyChat(bo).locator(".qchip", { hasText: "Have fun!" })).toBeEnabled({ timeout: 10_000 });
-  await lobbyChat(bo).locator(".qchip", { hasText: "Have fun!" }).click();
-  await expect(lobbyChat(bo).locator(".qpaused")).toHaveText(/^Your chat is off until .+: a moderator's decision\.$/);
+  // Bo can't send (the lobby read his ban as he joined... and reads it again as he chats): his panel says why
+  // instead of the buttons, and nothing reaches Ann. (Up to CHAT_MOD.recheckMs for a ban decided while he's seated.)
+  await expect(async () => {
+    await lobbyChat(bo).locator(".qchip", { hasText: "Have fun!" }).click({ timeout: 2_000 });
+    await expect(lobbyChat(bo).locator(".qchatoff")).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 45_000 });
+  await expect(lobbyChat(bo).locator(".qchatoff")).toHaveText(/^Your chat is off until .+: a moderator's decision\.$/);
   await expect(lobbyChat(bo).locator(".qbuttons .qchip")).toHaveCount(0);
+  const before = await lobbyChat(ann).locator(".qline").count();
   await bo.evaluate(() => (window as any).match.send({ t: "chat", say: "gg" }));
   await ann.waitForTimeout(1_000);
-  await expect(lobbyChat(ann).locator(".qline", { hasText: "Have fun!" })).toHaveCount(0);
   await expect(lobbyChat(ann).locator(".qline", { hasText: "GG" })).toHaveCount(0);
-  // Home (Leave, then the app opened again): the notice, once, with the note.
+  expect(await lobbyChat(ann).locator(".qline").count()).toBe(before);
+
+  // Home (Leave, then the app opened again): the notice, once, with the note. Gone for good after "Got it", moving
+  // around the app included.
   await bo.getByRole("button", { name: "Leave", exact: true }).click();
   await expect(bo.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await bo.reload();
@@ -114,6 +110,10 @@ test("chat moderation: mute and report from a name, the review page, a chat ban,
   await expect(notice).toContainText("Keep it friendly.");
   await notice.getByRole("button", { name: "Got it", exact: true }).click();
   await expect(notice).toHaveCount(0);
+  await bo.getByRole("button", { name: "Your profile", exact: true }).click();
+  await bo.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(bo.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(notice).toHaveCount(0);
   await bo.reload();
   await expect(bo.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await expect(notice).toHaveCount(0);
@@ -121,7 +121,7 @@ test("chat moderation: mute and report from a name, the review page, a chat ban,
   expect((await bo.request.post("/api/chat", { data: { say: "gg" } })).status()).toBe(403);
 
   // The name filter: a new device asking for a slur as its name (even dressed up) is "Player", in its profile and its
-  // lobby seat (a seat asked for with one directly is "Player N": lobby-chat.test.ts); a profile can't take one.
+  // lobby seat; a profile can't take one.
   const cy = await (await browser.newContext({ ...opts })).newPage();
   await named(cy, blocked);
   await cy.goto(`/lobby/${code}?debug`);

@@ -396,18 +396,14 @@ export interface NetChatLine {
 }
 
 /**
- * Why the server dropped a chat line (the app mirrors the limits, so this is rare). "mod": the sender's chat is
- * paused (a moderator's chat ban, or reports waiting for a moderator; see ChatBlock).
+ * Why the server dropped a chat line (the app mirrors the limits, so this is rare). "mod": the sender has a
+ * moderator's chat ban (see ChatBlock).
  */
 export type ChatRefusal = "unknown" | "locked" | "team" | "gap" | "burst" | "repeat" | "closed" | "off" | "mod";
 
-/**
- * A player's chat paused, so they can't send (they still read): a moderator's chat ban until `until` (server time;
- * null: no end), or, `auto`, reports from several players waiting for a moderator (`until`: at the latest).
- */
+/** A moderator's chat ban: the player can't send (they still read) until `until` (server time; null: no end). */
 export interface ChatBlock {
   until: number | null;
-  auto?: true;
 }
 
 export type ClientMessage =
@@ -715,7 +711,7 @@ export type ServerMessage = { now: number } & (
   | { t: "chatLog"; lines: NetChatLine[]; packs: string[] }
   /**
    * Quick chat: your line was dropped; `retryAt` (server time) is when it (or anything, for the gap and burst limits)
-   * could go. `block`: why your chat is paused (reason "mod").
+   * could go. `block`: your chat ban (reason "mod").
    */
   | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock }
   | {

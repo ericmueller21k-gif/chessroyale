@@ -10221,17 +10221,11 @@ img.qicon {
 .qopt-muted .muted {
   color: var(--qc-muted);
 }
-/* Chat moderation: your chat paused (in the buttons' place), and a report's answer in a name's menu. */
-.qpaused {
+/* Chat moderation: your chat banned (in the buttons' place). */
+.qchatoff {
   margin: 0;
   padding: 8px 10px;
   color: var(--qc-muted);
-  font-size: 12px;
-  line-height: 16px;
-}
-.qmenu-note {
-  flex: 1 1 140px;
-  color: var(--qc-text);
   font-size: 12px;
   line-height: 16px;
 }

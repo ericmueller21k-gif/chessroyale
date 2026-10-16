@@ -109,7 +109,7 @@ export class GlobalChatStore {
         this.waitUntil = Date.now() + (body.waitMs ?? GLOBAL_CHAT.gapMs);
         setChatBlock(null);
       } else if (body.block) {
-        // Your chat is paused (a moderator, or reports waiting for one): the panel says why instead of its buttons.
+        // Your chat is off (a moderator's chat ban): the panel says why instead of its buttons.
         setChatBlock(body.block);
         this.error = chatBlockText(body.block);
       } else {

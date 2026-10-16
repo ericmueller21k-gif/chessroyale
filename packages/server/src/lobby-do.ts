@@ -11,7 +11,7 @@ import { liveHub } from "./live-hub.ts";
 import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
 import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
-import { chatBlock, type ReportedLine } from "./chat-mod.ts";
+import { chatBlock } from "./chat-mod.ts";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { isAdmin } from "./admin.ts";
@@ -80,20 +80,21 @@ export class Lobby extends DurableObject<Env> {
    * Someone joining, from their account: their icon and the shop items they own (quick chat's packs, null: unread), and
    * the rating stored on it (`users.rating`, a raid boss's strength; null: none yet). Read once, on joining, never per
    * move. The two reads fail apart, so a failed shop read never costs the rating (the raid's boss would meet the prior).
-   * Also their chat's pause, if any (chat moderation; undefined: unread).
+   * Also their name (the seat's, so a name a moderator reset stays reset whatever the device sends; null: unread) and
+   * any chat ban (chat moderation; undefined: unread).
    */
-  private async joiningProfileOf(userId: string): Promise<{ icon: string | null; owned: string[] | null; rating: number | null; block: ChatBlock | null | undefined }> {
+  private async joiningProfileOf(userId: string): Promise<{ name: string | null; icon: string | null; owned: string[] | null; rating: number | null; block: ChatBlock | null | undefined }> {
     const sql = d1Sql(this.env.DB!);
     const now = Date.now();
     const [row, shop, block] = await Promise.all([
-      sql.first<{ icon: string; rating: number | null }>("SELECT icon, rating FROM users WHERE id = ?", userId).catch(() => null),
+      sql.first<{ name: string; icon: string; rating: number | null }>("SELECT name, icon, rating FROM users WHERE id = ?", userId).catch(() => null),
       shopState(sql, userId).catch(() => null),
       chatBlock(sql, userId, now).catch(() => undefined),
     ]);
     if (block !== undefined) this.chatChecked.set(userId, now);
     const icon = row && (isPixelIcon(row.icon) || (ICONS as readonly string[]).includes(row.icon)) ? row.icon : null;
     const rating = typeof row?.rating === "number" && Number.isFinite(row.rating) ? row.rating : null;
-    return { icon, owned: shop?.owned ?? null, rating, block };
+    return { name: typeof row?.name === "string" ? row.name : null, icon, owned: shop?.owned ?? null, rating, block };
   }
 
   private core(code: string): LobbyCore {
@@ -389,24 +390,6 @@ export class Lobby extends DurableObject<Env> {
     return give;
   }
 
-  /**
-   * Chat moderation (POST /api/chat/report): the line numbered `n` as this account saw it here, with the lines around
-   * it, or why it can't be reported.
-   */
-  async chatReportLine(userId: string, n: number): Promise<{ line: ReportedLine } | { error: string }> {
-    if (!this.record || (await this.closeIfDue())) return { error: "gone" };
-    return this.core(this.record.code).chatReportLine(userId, n);
-  }
-
-  /** Chat moderation: an account's chat pause changed (a moderator's decision, or reports): it applies here at once. */
-  async chatStandingChanged(userId: string, block: ChatBlock | null): Promise<void> {
-    if (!this.record || (await this.closeIfDue())) return;
-    const core = this.core(this.record.code);
-    core.chatStanding(userId, block);
-    this.chatChecked.set(userId, Date.now());
-    await this.persist(core);
-  }
-
   /** Bots off → Default: this seat leaves (see LobbyCore.release); when its person first joined, or null. */
   async release(token: string): Promise<{ joinedAt: number } | null> {
     if (!this.record || (await this.closeIfDue())) return null;
@@ -460,9 +443,9 @@ export class Lobby extends DurableObject<Env> {
     if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId && !this.record.judges?.tasks) {
       msg = { ...msg, boards: await this.recheckOnServer(msg.boards) };
     }
-    // Who's joining (their icon, chat packs and stored rating), read before the lobby is touched, as above.
+    // Who's joining (their name, icon, chat packs, stored rating and any chat ban), read before the lobby is touched, as above.
     const joining = msg.t === "hello" && this.env.DB && attached?.userId && !attached.guest ? await this.joiningProfileOf(attached.userId) : null;
-    // Chat moderation: a chatting player's pause, read again now and then (CHAT_MOD.recheckMs), as above.
+    // Chat moderation: a chatting player's chat ban, read again at most every CHAT_MOD.recheckMs, as above.
     const uid = attached?.userId;
     const recheck = msg.t === "chat" && this.env.DB && uid && Date.now() - (this.chatChecked.get(uid) ?? -Infinity) >= CHAT_MOD.recheckMs;
     const block = recheck ? await chatBlock(d1Sql(this.env.DB!), uid, Date.now()).catch(() => undefined) : undefined;
@@ -489,7 +472,7 @@ export class Lobby extends DurableObject<Env> {
       const practice = !!msg.practice && (this.env.TEST_SWITCHES === "1" || !!attached?.admin);
       // Their rating is the one stored on their account, never the app's word: a low one claimed would meet a weaker raid
       // boss. None yet, or no account: null, the prior (docs/decisions/2026-10-16-server-side-rating.md).
-      const result = core.connect(msg.token, msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1");
+      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1");
       // A new player took a seat: one held for the players on their way is theirs (the oldest).
       if (result.ok && this.record.humans.length > before) this.reservations.shift();
       if (!result.ok) {

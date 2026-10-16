@@ -12,7 +12,7 @@
     "directory": "packages/app/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/admin/fairplay", "/admin/fairplay/*", "/admin/ops", "/admin/ops/*", "/admin/chat", "/admin/chat/*"]
+    "run_worker_first": ["/api/*", "/admin/fairplay", "/admin/fairplay/*", "/admin/ops", "/admin/ops/*"]
   },
   "durable_objects": {
     "bindings": [

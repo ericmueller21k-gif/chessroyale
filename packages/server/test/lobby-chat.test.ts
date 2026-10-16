@@ -308,7 +308,7 @@ describe("lobby: quick chat before the match", () => {
 });
 
 describe("lobby: chat moderation", () => {
-  it("a paused account can't send (and is told why) but still reads; the pause follows the account to a new seat and ends at its time or when lifted", () => {
+  it("a banned account can't send (and is told why) but still reads; the ban follows the account to a new seat and ends at its time or when lifted", () => {
     // (A private lobby: nothing starts while the test waits.)
     const L = setup(CROWD);
     const [ann, bo] = [L.join("Ann", "u-ann"), L.join("Bo", "u-bo")] as [string, string];
@@ -320,7 +320,7 @@ describe("lobby: chat moderation", () => {
     expect(L.people(bo)).toEqual([]);
     L.say(bo, "hi-all");
     expect(L.people(ann).map((l) => [l.from, l.say])).toEqual([[bo, "hi-all"]]);
-    // Cancel, PLAY again: a new seat, the same account, still paused.
+    // Cancel, PLAY again: a new seat, the same account, still banned.
     L.core.message(ann, { t: "leave" });
     const again = L.join("Ann", "u-ann");
     L.say(again, "wow");
@@ -328,75 +328,19 @@ describe("lobby: chat moderation", () => {
     L.advance(until - L.now);
     L.say(again, "wow");
     expect(L.people(bo).at(-1)).toMatchObject({ from: again, say: "wow" });
-    // With no end, until it's lifted; a pause from reports says so.
+    // With no end, until it's lifted.
     L.core.chatStanding("u-ann", { until: null });
     L.advance(3_000);
     L.say(again, "oops");
     expect(L.last(again, "chatNo")).toMatchObject({ reason: "mod", block: { until: null } });
-    L.core.chatStanding("u-ann", { until: L.now + 1000, auto: true });
-    L.say(again, "oops");
-    expect(L.last(again, "chatNo")).toMatchObject({ reason: "mod", block: { auto: true } });
     L.core.chatStanding("u-ann", null);
     L.say(again, "oops");
     expect(L.people(bo).at(-1)).toMatchObject({ from: again, say: "oops" });
-    // Someone else's pause is theirs alone.
+    // Someone else's ban is theirs alone.
     L.core.chatStanding("u-bo", { until: null });
     L.advance(3_000);
     L.say(again, "lets-go");
     expect(L.people(bo).at(-1)).toMatchObject({ from: again, say: "lets-go" });
-  });
-
-  it("a report takes the line as the reporter saw it, with the lines around it: never a bot's line, their own, or one they couldn't see", () => {
-    const L = setup(CROWD);
-    L.core.setAuto(L.now + 60_000);
-    const people = ["Ann", "Bo", "Cy", "Di", "Ed", "Flo"].map((n) => L.join(n, `u-${n.toLowerCase()}`));
-    const [ann, bo, cy] = people as [string, string, string];
-    L.say(ann, "hi-all");
-    L.say(bo, "go-mate");
-    L.say(cy, "e-fire");
-    const lines = L.core.record.chat!.lines;
-    const boLine = lines.find((l) => l.from === bo)!;
-    const r = L.core.chatReportLine("u-cy", boLine.n);
-    expect(r).toEqual({
-      line: {
-        target: "u-bo",
-        name: "Bo",
-        text: "Go for mate!",
-        saidAt: boLine.at,
-        context: [
-          { at: lines[0]!.at, name: "Ann", text: "Hi all!" },
-          { at: boLine.at, name: "Bo", text: "Go for mate!", mark: "this" },
-          { at: lines[2]!.at, name: "Cy", text: "🔥", mark: "reporter" },
-        ],
-      },
-    });
-    expect(L.core.chatReportLine("u-bo", boLine.n)).toEqual({ error: "self" });
-    expect(L.core.chatReportLine("u-cy", 999)).toEqual({ error: "gone" });
-    expect(L.core.chatReportLine("u-stranger", boLine.n)).toEqual({ error: "gone" });
-    // Someone who says something and leaves the lobby can still be reported for it, by their account and name.
-    const flo = people[5]!;
-    L.advance(3_000);
-    L.say(flo, "oops");
-    const floLine = L.core.record.chat!.lines.find((l) => l.from === flo)!;
-    L.core.message(flo, { t: "leave" });
-    expect(L.core.record.accounts![flo]).toBeUndefined();
-    expect(L.core.chatReportLine("u-ann", floLine.n)).toMatchObject({ line: { target: "u-flo", name: "Flo", text: "Oops…" } });
-    // The bots' hello as they fill the seats: not a person's line.
-    L.advance(60_000);
-    const hello = L.core.record.chat!.lines.find((l) => l.from.startsWith("bot"))!;
-    expect(L.core.chatReportLine("u-ann", hello.n)).toEqual({ error: "bot" });
-    // In the match, a team's plan is for that team: someone on the other side can't have seen it.
-    L.advance(FRONT_DOOR.fillShowMs);
-    L.advance(3_000);
-    const seated = people.filter((id) => id !== flo);
-    for (const id of seated) L.say(id, "push-pawns");
-    const team = (id: string) => L.core.record.chat!.lines.filter((l) => l.from === id).at(-1)!;
-    const other = seated.find((id) => team(id).team !== team(ann).team);
-    expect(other).toBeDefined();
-    const otherUid = L.core.record.accounts![other!]!;
-    expect(L.core.chatReportLine(otherUid, team(ann).n)).toEqual({ error: "gone" });
-    const mate = seated.find((id) => id !== ann && team(id).team === team(ann).team)!;
-    expect(L.core.chatReportLine(L.core.record.accounts![mate]!, team(ann).n)).toMatchObject({ line: { target: "u-ann", text: "Push the pawns!" } });
   });
 
   it("a name the filter refuses takes a seat as Player N", () => {

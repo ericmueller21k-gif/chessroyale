@@ -71,11 +71,11 @@ describe("global chat in the app", () => {
     }
   });
 
-  it("a paused chat: the server's answer pauses the panel and says why", async () => {
+  it("a chat ban: the server's answer stops the panel and says why", async () => {
     vi.useFakeTimers({ now: T0 });
     setChatBlock(null);
     const c = new GlobalChatStore();
-    await c.say("gg", answer(403, { message: "Your chat is paused: a moderator's decision.", block: { until: T0 + 86_400_000 } }));
+    await c.say("gg", answer(403, { message: "Your chat is off: a moderator's decision.", block: { until: T0 + 86_400_000 } }));
     expect(chatBlockNow()).toEqual({ until: T0 + 86_400_000 });
     expect(c.error).toMatch(/^Your chat is off until .+: a moderator's decision\.$/);
     setChatBlock(null);

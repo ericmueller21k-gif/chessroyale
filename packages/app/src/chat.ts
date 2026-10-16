@@ -18,7 +18,7 @@ import {
   type StoredChatPicks,
 } from "@chessroyale/core";
 import type { ChatBlock, ChatRefusal, ClientMessage, NetChatLine } from "@chessroyale/chess";
-import { chatBlockNow, mutes, reportChatLine, setChatBlock } from "./chat-mod.ts";
+import { chatBlockNow, mutes, setChatBlock } from "./chat-mod.ts";
 import { chatBubbles, chatOff, onPrefsChange, setChatOff } from "./prefs.ts";
 import { play } from "./sound.ts";
 
@@ -124,7 +124,7 @@ export class MatchChat {
     else this.arrived(l);
   }
 
-  /** The server dropped a line: gray the buttons until it says (or, your chat paused, say why instead of them). */
+  /** The server dropped a line: gray the buttons until it says (or, your chat banned, say why instead of them). */
   onRefused(say: string, reason: ChatRefusal, retryAt: number, block?: ChatBlock) {
     if (reason === "mod") setChatBlock(block ? { ...block, until: block.until === null ? null : this.host.local(block.until) } : { until: null });
     if (reason === "gap" || reason === "burst") this.blockedUntil = Math.max(this.blockedUntil, this.host.local(retryAt));
@@ -155,15 +155,15 @@ export class MatchChat {
     return Math.max(chatReadyAt(this.sent), this.blockedUntil);
   }
 
-  /** Your chat's pause (a moderator's chat ban, or reports waiting for one): the panel says why instead of its buttons. */
-  paused(now = Date.now()): ChatBlock | null {
+  /** Your chat ban, if any (a moderator's): the panel says why instead of its buttons. */
+  banned(now = Date.now()): ChatBlock | null {
     return chatBlockNow(now);
   }
 
   /** Whether this line's button works right now (chat open, owned, the switch allows it, within the limits). */
   canSay(id: string, now = Date.now()): boolean {
     const say = chatSay(id);
-    if (!this.enabled || !say || !this.packs.includes(say.pack) || chatOff() || this.paused(now)) return false;
+    if (!this.enabled || !say || !this.packs.includes(say.pack) || chatOff() || this.banned(now)) return false;
     if (this.to === "all" && this.host.teams() && !canSayToAll(id)) return false;
     return now >= this.blockedUntil && chatCheck(this.sent, id, now).ok;
   }
@@ -190,7 +190,7 @@ export class MatchChat {
     return this.host.teams();
   }
 
-  // ---------------- Muting, reporting and off ----------------
+  // ---------------- Muting and off ----------------
 
   /**
    * A sender whose lines don't show here: muted (their account on this device, or a bot for this match), or an account
@@ -229,14 +229,9 @@ export class MatchChat {
     this.host.emit();
   }
 
-  /** A person's line here can be reported: someone else's, with an account, in an online lobby (not Solo's queue). */
-  canReport(id: string): boolean {
-    return !!this.host.code() && id !== this.host.me() && !!this.host.uidOf?.(id);
-  }
-
-  /** Reports the line numbered `n` (the server finds it in its own copy); answers with what to tell the player. */
-  report(n: number): Promise<string> {
-    return reportChatLine(n, this.host.code());
+  /** A player whose mute is by account (for every chat on this device), not for this match only (a bot). */
+  mutesByAccount(id: string): boolean {
+    return !!this.host.uidOf?.(id);
   }
 
   get off() {

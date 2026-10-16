@@ -301,7 +301,7 @@ export async function asAdmin(page: Page) {
 }
 
 /**
- * Makes this page's account a real admin on the server (the review pages: /admin/ops, /admin/chat): the local Worker's
+ * Makes this page's account a real admin on the server (the admin pages: /admin/ops, /admin/fairplay): the local Worker's
  * ADMIN_EMAILS (playwright.config.ts) has one email per lane and project (`${who}-admin-${project}@e2e.test`), given
  * here straight in the local database (no sign-in is set up in tests). Reloads nothing: the server reads it at once.
  * The local database is one SQLite file that the running server writes to as well (presence, live lobbies), and this

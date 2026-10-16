@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { QUICK_CHAT, chatSay, type ChatSay } from "@chessroyale/core";
-import { onAccountChange } from "../account.ts";
+import { onAccountChange, refreshChatStanding } from "../account.ts";
 import type { ChatLine, MatchChat } from "../chat.ts";
 import { chatBlockText } from "../chat-mod.ts";
 import type { GameView } from "../game.ts";
@@ -73,8 +73,8 @@ function ChatIcon({ chat, id }: { chat: MatchChat; id: string }) {
   return <UserIcon icon={chat.icons.get(id) ?? "♟"} class="qicon" />;
 }
 
-/** One line in the feed: icon, name (tap for the menu: profile, mute, report) and what they said. */
-function ChatRow({ people, chat, line, teams, onName, tight }: { people: ChatPeople; chat: MatchChat; line: ChatLine; teams: boolean; onName: (line: ChatLine) => void; tight: boolean }) {
+/** One line in the feed: icon, name (tap for the menu) and what they said. */
+function ChatRow({ people, chat, line, teams, onName, tight }: { people: ChatPeople; chat: MatchChat; line: ChatLine; teams: boolean; onName: (id: string) => void; tight: boolean }) {
   const say = chatSay(line.say);
   if (!say) return null;
   const who = sender(people, line.from);
@@ -83,7 +83,7 @@ function ChatRow({ people, chat, line, teams, onName, tight }: { people: ChatPeo
   return (
     <div class={`qline${who.you ? " you" : ""}${say.kind === "emoji" ? " emoji" : ""}${tag ? ` ${tag}` : ""}`} data-from={line.from}>
       <ChatIcon chat={chat} id={line.from} />
-      <button type="button" class="qline-name" onClick={() => onName(line)} aria-label={who.you ? "You: profile" : `${who.name}: profile, mute or report`}>
+      <button type="button" class="qline-name" onClick={() => onName(line.from)} aria-label={who.you ? "You: profile" : `${who.name}: profile or mute`}>
         {/* (A line said in the lobby had no team yet.) */}
         {tag === "all" && team && <span class={`team-chip ${team}`} aria-label={`${sideName(team)} team`} />}
         <span class="qline-who">{who.you ? "You" : who.name}</span>
@@ -95,7 +95,7 @@ function ChatRow({ people, chat, line, teams, onName, tight }: { people: ChatPeo
 }
 
 /** The feed, newest at the bottom. In a phone's split it shows the newest few that fit; elsewhere it scrolls. */
-function ChatFeed({ people, chat, scroll, teams, onName, hint, empty }: { people: ChatPeople; chat: MatchChat; scroll: boolean; teams: boolean; onName: (line: ChatLine) => void; hint: ComponentChildren; empty: string }) {
+function ChatFeed({ people, chat, scroll, teams, onName, hint, empty }: { people: ChatPeople; chat: MatchChat; scroll: boolean; teams: boolean; onName: (id: string) => void; hint: ComponentChildren; empty: string }) {
   const lines = chat.lines();
   const muted = chat.mutedIds();
   const box = useRef<HTMLDivElement>(null);
@@ -166,12 +166,14 @@ function SayButton({ chat, say, now }: { chat: MatchChat; say: ChatSay; now: num
  * too); "groups": the lines wrapping, then the emoji (a computer).
  */
 function ChatButtons({ chat, layout, fit, now }: { chat: MatchChat; layout: "rows" | "groups"; fit: boolean; now: number }) {
-  // Your chat is paused (a moderator, or reports waiting for one): why, instead of buttons that can't send.
-  const paused = chat.paused(now);
-  if (paused) {
+  // Your chat is banned (a moderator's decision): why, instead of buttons that can't send. Your profile is read again
+  // as this shows, so a ban lifted meanwhile goes.
+  const banned = chat.banned(now);
+  useEffect(() => void (banned && refreshChatStanding()), [!!banned]);
+  if (banned) {
     return (
-      <p class="qbuttons qpaused" role="status">
-        {chatBlockText(paused)}
+      <p class="qbuttons qchatoff" role="status">
+        {chatBlockText(banned)}
       </p>
     );
   }
@@ -291,9 +293,7 @@ export type ChatVariant = "split" | "full" | "side" | "page" | "lobby";
 export function ChatPanel({ people, chat, variant, head, fold }: { people: ChatPeople; chat: MatchChat; variant: ChatVariant; head?: ComponentChildren; fold?: ComponentChildren }) {
   const roomy = useMedia(ROOMY);
   const lobby = variant === "lobby";
-  /** A line's menu (its sender's profile, mute, report), and the server's answer to a report from it. */
-  const [menu, setMenu] = useState<ChatLine | null>(null);
-  const [reported, setReported] = useState<string | null>(null);
+  const [menu, setMenu] = useState<string | null>(null);
   const [options, setOptions] = useState(false);
   const self = useRef({});
   const feed = useRef<HTMLDivElement>(null);
@@ -329,11 +329,7 @@ export function ChatPanel({ people, chat, variant, head, fold }: { people: ChatP
       : teams && chat.to === "all"
         ? "All: Hello and Sporting lines and emoji go to both teams. Plans and reactions stay in your team."
         : null;
-  const target = menu ? sender(people, menu.from) : null;
-  const openMenu = (line: ChatLine | null) => {
-    setMenu(line);
-    setReported(null);
-  };
+  const target = menu ? sender(people, menu) : null;
   return (
     <section
       class={`qchat qchat-${variant}${chat.off ? " off" : ""}`}
@@ -382,7 +378,7 @@ export function ChatPanel({ people, chat, variant, head, fold }: { people: ChatP
               chat={chat}
               scroll={scroll}
               teams={teams}
-              onName={openMenu}
+              onName={(id) => setMenu(id)}
               hint={hint}
               empty={lobby ? "Say hello while the seats fill." : teams ? "Tap a line to send it to your team." : "Tap a line to send it."}
             />
@@ -390,49 +386,30 @@ export function ChatPanel({ people, chat, variant, head, fold }: { people: ChatP
           {target && menu ? (
             <div class="qmenu" role="group" aria-label={`${target.you ? "You" : target.name}`}>
               <strong class="qmenu-name">{target.you ? "You" : target.name}</strong>
-              {reported ? (
-                <span class="qmenu-note" role="status">
-                  {reported}
-                </span>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    class="qchip"
-                    onClick={() => {
-                      openMenu(null);
-                      openProfile({ uid: target.uid, name: target.name, you: target.you, bot: target.bot });
-                    }}
-                  >
-                    Profile
-                  </button>
-                  {!target.you && (
-                    <button
-                      type="button"
-                      class="qchip"
-                      onClick={() => {
-                        chat.mute(menu.from, !chat.isMuted(menu.from));
-                        openMenu(null);
-                      }}
-                    >
-                      {chat.isMuted(menu.from) ? "Unmute" : "Mute"}
-                    </button>
-                  )}
-                  {chat.canReport(menu.from) && (
-                    <button
-                      type="button"
-                      class="qchip"
-                      onClick={() => {
-                        setReported("Sending…");
-                        void chat.report(menu.n).then(setReported);
-                      }}
-                    >
-                      Report
-                    </button>
-                  )}
-                </>
+              <button
+                type="button"
+                class="qchip"
+                onClick={() => {
+                  setMenu(null);
+                  openProfile({ uid: target.uid, name: target.name, you: target.you, bot: target.bot });
+                }}
+              >
+                Profile
+              </button>
+              {!target.you && (
+                <button
+                  type="button"
+                  class="qchip"
+                  onClick={() => {
+                    chat.mute(menu, !chat.isMuted(menu));
+                    setMenu(null);
+                  }}
+                >
+                  {/* (By account, for every chat on this device; a bot for this match only.) */}
+                  {chat.isMuted(menu) ? "Unmute" : chat.mutesByAccount(menu) ? "Mute" : "Mute for this match"}
+                </button>
               )}
-              <button type="button" class="qchip quiet" aria-label="Close" onClick={() => openMenu(null)}>
+              <button type="button" class="qchip quiet" aria-label="Close" onClick={() => setMenu(null)}>
                 ✕
               </button>
             </div>
@@ -463,7 +440,7 @@ function ChatOptions({ people, chat, bubbles, onDone }: { people: ChatPeople; ch
         <span>Chat off (no messages, on this device)</span>
       </label>
       <div class="qopt-muted">
-        <span class="muted small">{muted.length ? "Muted:" : "Tap a name in the chat to mute or report that player. Mutes stay on this device."}</span>
+        <span class="muted small">{muted.length ? "Muted:" : "Tap a name in the chat to mute that player. Mutes stay on this device."}</span>
         {muted.map((id) => (
           <button key={id} type="button" class="qchip" onClick={() => chat.mute(id, false)} aria-label={`Unmute ${people.nameOf(id)}`}>
             {people.nameOf(id)} ✕
