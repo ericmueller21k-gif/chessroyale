@@ -116,7 +116,7 @@ solo Crowd's boss final you reached, where the other three finalists take the ot
 `phase2Mates`). **Not online yet** (four boards online, his server-side Stockfish and its fair-play hooks are a separate
 build): online, phase 1 won is the crowd's victory):
 - **The phase change** (Eric, Oct 14, reworked, then opened with the God King's absorption; `PHASE_CHANGE` in
-  `packages/app/src/recluse-phase2.ts`, about 15.8 s after a 1.8 s fall (its "PHASE 2" banner 2.4 s, Oct 15), one timeline, not skippable like a boss's
+  `packages/app/src/recluse-phase2.ts`, about 14.8 s after a 1.8 s fall (its "PHASE 2" banner 1.4 s, `BOSS_BANNER.phase2Ms`, Oct 16), one timeline, not skippable like a boss's
   intro; drawn by `screens/Recluse2.tsx`, `PhaseChangeScreen`):
   - **The absorption** (Eric, Oct 14: he plays with an engine in phase 2, so he takes the God King's; DECISIONS.md, "The
     Hidden Boss absorbs the God King"): in his place in the dock (BossDock's `king`, from `absorbKing`) the God King
@@ -185,7 +185,7 @@ build): online, phase 1 won is the crowd's victory):
   `recluseSlow`; the marks flash and that board gets a "slow move" note); each shows as a red pixel X beside your board
   only (`SlowMarks`: ten slots in a column by its right edge, as Jefferson's candle shots; on a phone, by the big board;
   once, since the count is the team's: Eric, Oct 14). The team's `slowMovesForUlt`-th (10; Eric, Oct 14) brings it (`phase2Ult`): his line (`ult2`), the
-  spellbook where he stands, "5 SECONDS!" over every board (`PHASE2_ULT_BANNER_MS` 2.8 s: it had the extra second every banner has now); everyone
+  spellbook where he stands, "5 SECONDS!" over every board (`PHASE2_ULT_BANNER_MS`: a boss's banner, 1.5 s, Oct 16); everyone
   whose move it is gets a fresh 5 s from then; from then on every move has `ultMoveSeconds` (5 s), no bank, and out of
   time a random legal move is played for that player (`phase2Timeouts`, as Squads plays a missed move; never a loss on
   time). The dock's clock counts it down ("5 s a move, or a random one" beside it). Bots think past 5 s now and then before it (`botSlowChance`, `botSlowMs`). The
@@ -253,19 +253,35 @@ build): online, phase 1 won is the crowd's victory):
   turn). Solo, the battle stops there (Boss alone: "You resigned", the boss won) and the moment's timers, its engine
   work, Maia and both voices are cleared. Online, the others' battle goes on: a host who resigns hands the boss's move
   to the next device at once, and someone resigning in Lights out leaves the test (a round no longer waits for them).
-- **Banners** (Eric, Oct 15: "increase the banners for all banners by the extra second we discussed"; DECISIONS.md,
-  "Every banner a second longer"): the fighting-game banner (`FightBanner`, the powers' `PowerBanner`, the God King's
-  cut-in) is 2.5 s, its entrance and exit as at 1.5 s and the hold a second longer (one set of keyframes in
-  styles.css; FightBanner's `long` option is gone); the Last Stand's cut-in 3.1 s. Each window a banner is shown for in
-  code is a second longer (the powers' `t < …`, `THAW.bannerMs`, `BULLET.bannerMs`, `BOSS_INTRO.bannerMs`, the queen
-  banners, `KING_COMMAND.cutMs`, `LAST_STAND.bannerMs`, `PHASE_CHANGE.bannerMs`). A moment the banner would outlive
-  grows a second (`POWER_FX`: the rage warning, freeze, thaw, pie, sparkler, Hollow's extra move, toy block, saw cut,
-  the showdown's "DRAW!"); one that holds it already keeps its length, its later beats under the banner's last second
-  (the Big Bounce, the split, the lasso, the board saw, the candle, Lights out's drop). Where what follows can't run
-  under it, it moves a second later: Boingo's board turning (it would turn the banner with it: the funhouse and each
-  spin), the God King's bolt and slashes after his cut-in, the Last Stand's slide and blows. The clock rule is
-  unchanged everywhere (the crowd's clock starts after the moments; a strike stops it for `kingStrikeMs`, 4.7 s).
-  Tests: `packages/app/test/banners.test.ts`.
+- **Banners** (Eric, Oct 16: "when the bosses ult they are ulting while the banner is still up, same thing for Toy
+  Blocks: he threw it and we couldn't even see due to long banner time. Do 1 second less";
+  docs/decisions/2026-10-16-banner-timing.md): **a boss's banners are 1.5 s** (`BOSS_BANNER.ms` in settings.ts): each
+  power's (`PowerBanner`, through `PowerMoment`'s `banner`), QUEEN SLAIN! and QUEEN DOWN!, "START!", BULLET!, "5
+  SECONDS!"; "PHASE 2" 1.4 s (`BOSS_BANNER.phase2Ms`). Each is a second shorter than on Oct 15 (when every banner got a
+  second longer), and **off the board before its power plays**: a power's banner ends sooner where the power starts
+  sooner, at the beat its view passes as `until` (the toy block's, the pie's and the sparkler's throw at 1.45 s, the
+  blizzard's sweep and a thaw's melt at 1.3 s, the Big Bounce's leap at 1.3 s, Lights out's drop at 1.3 s, Boingo's spin;
+  the split's, the lasso's and the showdown's 1.3 s and the darkness's 1.25 s are their tables' `bannerMs`); Wrangler's
+  "DRAW!" from its beat to the moment's end (1.4 s). The banner's length is its band's: it slides in, holds, and is off
+  by `--fb-ms`, which `FightBanner`'s and `PowerBanner`'s `ms` set (styles.css: `fb-band-in`, then `fb-band-out` timed
+  from it; the entrances inside it come in its first 0.6 s whatever its length). The moments that grew a second for the
+  longer banner are a second shorter again (`POWER_FX`: the rage warning 1.7 s, freeze 2.3, thaw 2.2, pie 2.3, sparkler
+  2.3, Hollow's extra move 2.2, toy block 2.3, saw cut 2.3, the showdown 6 s), Boingo's board turns a second sooner
+  (`FUNHOUSE`, `SPIN`; the funhouse 5.2 s, each spin 2.6 s), "START!" makes the intro a second shorter, the phase change
+  is a second shorter, and the boss thinks at least 2 s after you take his queen (the banner and a beat:
+  `bossThinkMs`). The God King's cut-ins (2.5 s, `KING_COMMAND.cutMs`), the Last Stand's (3.1 s), FISCHER RANDOM!,
+  Squads' block line and the votes' result banner keep their Oct 15 lengths. The clock rule is unchanged everywhere
+  (the crowd's clock starts after the moments; a strike stops it for `kingStrikeMs`, 4.7 s). Tests:
+  `packages/app/test/banners.test.ts` (each power's banner read from its view's own code), `e2e/bigboy.spec.ts` (the
+  toy block's and the Big Bounce's banners off the board before the throw and the leap, frame by frame: `watchSpans`).
+- **QUEEN SLAIN! once, and only for your capture** (Eric, Oct 16: "he used his ult and idk what happened but the queen
+  slayed banner appeared for like 1 second very fast"): it plays while the boss thinks after your move took his queen
+  (`queenSlain` in `boss-timing.ts`, the screen's banner and `bossThinkMs`'s wait alike, solo and the lobby's
+  `thinkMinAt`). Big Boy's turn thinks twice on the same last move (for the bounce, then for his move), so it was played
+  again after his bounce, cut off by his move in Boss alone; now it plays only in the thinking straight after your move
+  (`powers.bounce.at` this turn: old news), the bounce waits for it online as solo did, and his move after the bounce
+  doesn't. It never plays for the boss taking your queen (Hollow thinks again after his own move for his extra move).
+  Tests: `packages/chess/test/boss-guard.test.ts`, `bigboy.test.ts`, `packages/server/test/boss-powers-lobby.test.ts`.
 - **What a boss says** (`packages/app/src/speech.tsx`, numbers in `SPEECH`; Eric, Oct 10: Ginger's line came and went
   at once): every line (its powers' moments, its ultimate, its warning, its reactions, Hollow's claim and Lights out
   words, Big Boy's snack) goes into the boss's voice and shows in its text box beside it (in the boss bar on a phone,

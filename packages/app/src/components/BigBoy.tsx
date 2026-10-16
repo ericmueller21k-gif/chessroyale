@@ -370,7 +370,7 @@ function blockMoment({ moment, t, orientation, banner, cast }: MomentProps) {
   const letter = moment.square ? blockLetter(moment.square) : "A";
   return (
     <div class="power-moment pm-block">
-      {t < 2500 && banner("TOY BLOCK!", moment.square ? `Blocked: ${moment.square}` : undefined, "toy")}
+      {banner("TOY BLOCK!", moment.square ? `Blocked: ${moment.square}` : undefined, "toy", BLOCK.flyAt)}
       {cast("toss", BLOCK.flyAt)}
       {moment.square && t >= BLOCK.flyAt && t < BLOCK.landAt && (
         <Flight name="blockFly" anim={`fly${letter}`} square={moment.square} orientation={orientation} since={moment.at + BLOCK.flyAt} ms={BLOCK.landAt - BLOCK.flyAt} />
@@ -379,10 +379,10 @@ function blockMoment({ moment, t, orientation, banner, cast }: MomentProps) {
   );
 }
 
-function bounceMoment({ boss, moment, now, t, orientation, banner }: MomentProps) {
+function bounceMoment({ boss, moment, now, orientation, banner }: MomentProps) {
   return (
     <div class="power-moment pm-bounce">
-      {t < 2300 && banner("BIG BOUNCE!", undefined, "toy")}
+      {banner("BIG BOUNCE!", undefined, "toy", BOUNCE.leapAt)}
       <BigBounce boss={boss} moment={moment} now={now} orientation={orientation} />
     </div>
   );

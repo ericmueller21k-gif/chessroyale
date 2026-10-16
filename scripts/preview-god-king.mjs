@@ -13,8 +13,9 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 820, height: 400 }, deviceScaleFactor: 2 });
 page.on("pageerror", (e) => console.error("page:", e.message));
 await page.goto(`${url}god-king-preview.html?${rest.join("&")}`);
-// Hold the banner mid-way (just after its text lands), and let the epilogue play out.
-await page.addStyleTag({ content: ".fight-banner, .fight-banner * { animation-delay: -0.9s !important; animation-play-state: paused !important; }" });
+// Hold the banner mid-way (just after its text lands), and let the epilogue play out. (The band's exit, its second
+// animation, waits: it would otherwise be over.)
+await page.addStyleTag({ content: ".fight-banner, .fight-banner * { animation-delay: -0.9s !important; animation-play-state: paused !important; } .fight-banner .fb-band { animation-delay: -0.9s, 60s !important; }" });
 await page.waitForTimeout(rest.some((r) => r.startsWith("epilogue")) ? 3600 : 1500);
 await page.screenshot({ path: out, fullPage: true });
 await browser.close();

@@ -16,16 +16,16 @@ import { Flight, PIECE_WORD, onSquare, type BossUi, type MomentProps } from "./P
 /** A freeze's beats: the banner, then (once it has gone) his cast, the ice bolt to the piece, the ice forming. */
 export const FREEZE = { boltAt: 1500, iceAt: 1760 } as const;
 /**
- * The blizzard's beats: the banner, then the storm bursts from his cane and sweeps the board, then the God King's line;
- * then (once the last piece has iced over) the pieces due to thaw next turn crack (`crackAt`).
+ * The blizzard's beats: the banner (gone as the storm comes), then the storm bursts from his cane and sweeps the board,
+ * then the God King's line; then (once the last piece has iced over) the pieces due to thaw next turn crack (`crackAt`).
  */
 export const BLIZZARD = { sweepAt: 1300, sweepMs: animLength(EFFECTS.blizzardSweep.ch.anims.sweep!), lineAt: 2800, crackAt: 3050 } as const;
 /**
- * A thaw's beats (each later turn of the blizzard): its banner naming the pieces freed; as it goes (`meltAt`), their ice
+ * A thaw's beats (each later turn of the blizzard): its banner naming the pieces freed, gone as (`meltAt`) their ice
  * melts away and she has her say; the God King's line (`lineAt`); then the pieces due to thaw next turn crack
  * (`crackAt`).
  */
-export const THAW = { bannerMs: 2500, meltAt: 1300, lineAt: 1700, crackAt: 1750 } as const;
+export const THAW = { meltAt: 1300, lineAt: 1700, crackAt: 1750 } as const;
 /** How long the ice takes to melt away (iceOverlay's thaw; it ends empty). */
 export const MELT_MS = animLength(EFFECTS.iceOverlay.ch.anims.thaw!);
 
@@ -33,7 +33,7 @@ function freezeMoment({ boss, moment, t, orientation, banner, cast }: MomentProp
   const piece = moment.square ? pieceAt(boss.board.fen, moment.square) : null;
   return (
     <div class="power-moment pm-freeze">
-      {t < 2500 && banner("FREEZE!", piece ? `Your ${PIECE_WORD[piece.type]} is frozen` : undefined, "cold")}
+      {banner("FREEZE!", piece ? `Your ${PIECE_WORD[piece.type]} is frozen` : undefined, "cold", FREEZE.boltAt)}
       {cast("freeze", FREEZE.boltAt)}
       {moment.square && t >= FREEZE.boltAt && t < FREEZE.iceAt && <Flight name="iceBolt" square={moment.square} orientation={orientation} since={moment.at + FREEZE.boltAt} ms={FREEZE.iceAt - FREEZE.boltAt} aim />}
       {moment.square && t >= FREEZE.iceAt - 60 && t < FREEZE.iceAt + 900 && <span class="pw-frost" style={{ ...onSquare(moment.square, orientation), animationDelay: `${FREEZE.iceAt - 60 - t}ms` }} />}
@@ -46,7 +46,7 @@ function blizzardMoment({ boss, moment, t, banner, cast }: MomentProps) {
   const piece = moment.square ? pieceAt(boss.board.fen, moment.square) : null;
   return (
     <div class="power-moment pm-blizzard">
-      {t < 2500 && banner("BLIZZARD!", piece ? `Only your ${PIECE_WORD[piece.type]} on ${moment.square} moves` : undefined, "cold")}
+      {banner("BLIZZARD!", piece ? `Only your ${PIECE_WORD[piece.type]} on ${moment.square} moves` : undefined, "cold", BLIZZARD.sweepAt)}
       {cast("blizzard", BLIZZARD.sweepAt)}
       {t >= BLIZZARD.sweepAt && t < BLIZZARD.sweepAt + BLIZZARD.sweepMs && (
         <span class="pw-clip">
@@ -83,11 +83,11 @@ export function thawLine(fen: string, squares: readonly string[]): string | unde
 /** The ice is gone after this thaw: nothing is left to thaw next turn. */
 export const thawOver = (boss: Pick<MomentProps["boss"], "powers">): boolean => !boss.powers?.thaw?.length;
 
-function thawMoment({ boss, moment, t, banner }: MomentProps) {
+function thawMoment({ boss, moment, banner }: MomentProps) {
   const over = thawOver(boss);
   return (
     <div class="power-moment pm-thaw pm-stay">
-      {t < THAW.bannerMs && banner(over ? "THAWED!" : "THAWING!", over ? "The ice is gone: every piece moves" : thawLine(boss.board.fen, moment.squares ?? []), "cold thaw")}
+      {banner(over ? "THAWED!" : "THAWING!", over ? "The ice is gone: every piece moves" : thawLine(boss.board.fen, moment.squares ?? []), "cold thaw", THAW.meltAt)}
     </div>
   );
 }

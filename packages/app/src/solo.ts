@@ -751,7 +751,7 @@ export class SoloMatch implements GameView {
     // (Alone, it has been "thinking" since your move went in: scoring your move counts toward it.)
     // (G-REX's fire has just burnt something: it plays out before the boss's move.)
     const burnt = !!snap.powers?.burnt?.some((b) => b.turn === snap.crowdMoves && (b.piece || b.fizzled));
-    const minThink = bossThinkMs(snap.board.history, snap.board.bases, burnt) - (this.alone && !burnt ? Date.now() - this.movedAt : 0);
+    const minThink = bossThinkMs(snap, burnt) - (this.alone && !burnt ? Date.now() - this.movedAt : 0);
     await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
     if (this.stopped) return;
     // As the turn passes to you, any power that comes with it (a freeze, a pie, the warning, the blizzard) plays out
@@ -773,7 +773,7 @@ export class SoloMatch implements GameView {
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
     // (No engine answer: he skips it, as online.)
     const pick = this.runner.playExtraMove(this.engines[0]).catch(() => this.runner.applyExtraMove(null));
-    const [played] = await Promise.all([pick, new Promise((r) => setTimeout(r, bossThinkMs(snap.board.history, snap.board.bases)))]);
+    const [played] = await Promise.all([pick, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
     if (this.stopped) return;
     if (!played) return this.nextRound();
     const showMs = powerMomentMs([{ kind: "extra" }]);
@@ -796,13 +796,14 @@ export class SoloMatch implements GameView {
   /**
    * Big Boy's Big Bounce (at the start of his turn, after your move): he gets ready (thinking) while this device's
    * engines score the candidate positions, then the bounce plays out (nobody's clock runs), then his move. No engine
-   * answer: the bounces play and nothing moves, as online.
+   * answer: the bounces play and nothing moves, as online. (Your move took his queen: its banner plays in this thinking,
+   * held for it, and not again in the thinking after the bounce: queenSlain.)
    */
   private async bounceTurn() {
     const snap = this.bossSnapshot();
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
     const bounce = this.runner.playBounce(this.engines).catch(() => this.runner.applyBounce(null));
-    await Promise.all([bounce, new Promise((r) => setTimeout(r, bossThinkMs(snap.board.history, snap.board.bases)))]);
+    await Promise.all([bounce, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
     if (this.stopped) return;
     const showMs = powerMomentMs([{ kind: "bounce" }]);
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });

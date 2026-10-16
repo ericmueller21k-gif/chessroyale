@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
-import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type BossState, type Settings } from "@chessroyale/core";
+import { BOSS_BANNER, BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type BossState, type Settings } from "@chessroyale/core";
 import {
   BOUNCE,
   MatchRunner,
@@ -13,6 +13,7 @@ import {
   bounceDue,
   bounceFrom,
   bounceSpots,
+  bossThinkMs,
   chooseBlock,
   crowdAllowed,
   fenAtPly,
@@ -28,6 +29,7 @@ import {
   powerMomentMs,
   powerTurn,
   prepareTurn,
+  queenSlain,
   rageOf,
   sanLineToUci,
   sideToMove,
@@ -83,6 +85,33 @@ async function turn(r: MatchRunner, move?: string) {
   if (r.isOver() || r.stageComplete()) return;
   if (r.bounceDue()) await r.playBounce();
   await r.playBoss();
+}
+
+/**
+ * Before the crowd's turn is dealt: the boss's queen moved where a crowd pawn takes it (never onto the toy block, never
+ * giving check), as a power places pieces (a base on the board). The capture, as UCI.
+ */
+function queenEnPrise(r: MatchRunner): string {
+  const board = r.boards.get(0)!;
+  const crowd = r.boss!.crowdSide;
+  const boss = crowd === "w" ? "b" : "w";
+  const block = r.boss!.powers!.block?.square ?? null;
+  for (const sq of crowd === "w" ? ["d3", "e3", "c3", "f3", "b3", "g3", "a3", "h3"] : ["d6", "e6", "c6", "f6", "b6", "g6", "a6", "h6"]) {
+    const c = new Chess(board.fen);
+    const q = c.findPiece({ type: "q", color: boss })[0];
+    if (!q || sq === block || c.get(sq as never)) continue;
+    c.remove(q as never);
+    c.put({ type: "q", color: boss }, sq as never);
+    const fen = c.fen();
+    const d = new Chess(fen);
+    if (d.inCheck()) continue;
+    const take = d.moves({ verbose: true }).find((m) => m.to === sq && m.piece === "p");
+    if (!take) continue;
+    const ply = board.history.length;
+    r.boards.set(0, { ...board, fen, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen }] });
+    return take.from + take.to;
+  }
+  throw new Error("no square for the queen");
 }
 
 /** Every square of a position, with what's on it. */
@@ -484,6 +513,26 @@ describe("Big Boy's Big Bounce in a battle", () => {
       await turn(r);
       expect(r.boss!.powers!.bounce!.at).toBe(2);
     }
+  });
+
+  it("your move takes his queen just before the bounce: QUEEN SLAIN! (and his wait for it) before the bounce, never again after it", async () => {
+    // (Eric, Oct 16: the banner flashed up again for a second after his ult. His turn thinks twice on the same last move:
+    // for the bounce, then for his move.)
+    const r = raid({ patch: { bossPowerTest: "bounce" } });
+    await turn(r); // crowd turn 1; the warning comes with his move
+    const take = queenEnPrise(r);
+    r.deal();
+    await r.score(new Map([["h0", { move: take, thinkMs: 1000 }]]));
+    expect(r.boards.get(0)!.history.at(-1)).toBe(take);
+    expect(r.bounceDue()).toBe(true);
+    // The bounce's thinking: your banner, and he waits for it.
+    expect(queenSlain(r.bossView()!)).toBe(true);
+    expect(bossThinkMs(r.bossView()!)).toBe(BOSS_BANNER.ms + 500);
+    await r.playBounce();
+    // His move's thinking, the same last move: no banner, no wait for one.
+    expect(r.boards.get(0)!.history.at(-1)).toBe(take);
+    expect(queenSlain(r.bossView()!)).toBe(false);
+    expect(bossThinkMs(r.bossView()!)).toBe(1200);
   });
 
   it("the admins' trigger: at the start of his next turn, without the warning", async () => {

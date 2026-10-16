@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, type Settings } from "@chessroyale/core";
-import { FIRE_BURN_MS, POWER_FX, applyMove, bossMoveFrom, bossShowMs, dragOptions, extraMoveCandidates, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, sanLineToUci, sideToMove, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { BOSS_BANNER, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, type Settings } from "@chessroyale/core";
+import { FIRE_BURN_MS, POWER_FX, applyMove, bossMoveFrom, bossShowMs, dragOptions, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 const hash = (s: string) => {
@@ -566,6 +566,23 @@ describe("Hollow online", () => {
   });
 });
 
+/**
+ * The boss's (Black's) queen moved onto the crowd's third rank where a crowd pawn takes it (never the toy block, never
+ * giving check), as a power places pieces; with that capture.
+ */
+function queenEnPrise(fen: string, block: string | null): { fen: string; take: string } {
+  const squares = "abcdefgh".split("").flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `${f}${n}`));
+  const queen = squares.find((sq) => pieceAt(fen, sq)?.color === "b" && pieceAt(fen, sq)?.type === "q")!;
+  for (const sq of ["d3", "e3", "c3", "f3", "b3", "g3", "a3", "h3"]) {
+    if (sq === block || pieceAt(fen, sq)) continue;
+    const f = withPiece(withoutPiece(fen, queen), sq, { color: "b", type: "q" });
+    if (inCheck(f)) continue;
+    const take = legalMoves(f).find((m) => m.slice(2, 4) === sq && pieceAt(f, m.slice(0, 2))?.type === "p");
+    if (take) return { fen: f, take };
+  }
+  throw new Error("no square for his queen");
+}
+
 describe("Big Boy online", () => {
   /** To the next crowd turn's round message (past the boss's move and his moments). */
   const toRound = (L: ReturnType<typeof setup>) => {
@@ -642,6 +659,48 @@ describe("Big Boy online", () => {
     expect(r3.boss!.powers!.rage).toBe(0);
     expect(r3.boss!.powers!.ultAt).toBeNull();
     expect(r3.boss!.powers!.ults).toBe(1);
+  });
+
+  it("your move takes his queen just before the Big Bounce: the bounce waits for QUEEN SLAIN!, his move after it doesn't", () => {
+    // (Eric, Oct 16: the banner flashed up again for a second after his ult. His turn thinks twice on the same last move:
+    // for the bounce, then for his move; the banner, and the wait for it, belong to the first only.)
+    const L = raid({ bossId: "bigboy", bossPowerTest: "bounce" });
+    play(L);
+    hostBoss(L);
+    // His queen where a crowd pawn takes it, before the next turn is dealt (as a power places pieces: a base).
+    const runner = (L.core as unknown as { runner: MatchRunner }).runner;
+    const board = runner.boards.get(0)!;
+    const ply = board.history.length;
+    const { fen, take } = queenEnPrise(board.fen, runner.state.boss!.powers!.block?.square ?? null);
+    runner.boards.set(0, { ...board, fen, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen }] });
+    const r = toRound(L);
+    expect(r.board!.fen).toBe(fen);
+    expect(r.boss!.powers!.allowed ?? legalMoves(fen)).toContain(take);
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move: take });
+    expect(L.hostScores("p1")).toBe(true);
+    L.advance(30_000);
+    // The bounce's thinking: your banner; the bounce, in at once, waits for it.
+    const ask = L.last("p1", "bossRequest")!;
+    expect(ask.bounce).toBeTruthy();
+    const thinking = L.last("p2", "boss")!;
+    expect(thinking.thinking).toBe(true);
+    expect(thinking.boss.board.history.at(-1)).toBe(take);
+    expect(queenSlain(thinking.boss)).toBe(true);
+    expect(L.core.record.bossMinAt).toBe(thinking.now + BOSS_BANNER.ms + 500);
+    L.core.message("p1", { t: "bossMove", key: ask.key, move: ask.bounce![0]! });
+    expect(L.last("p2", "boss")!.boss.powers!.bounce?.at).not.toBe(thinking.boss.crowdMoves);
+    L.advance(L.core.record.bossMinAt! - L.now + 10);
+    const shown = L.last("p2", "boss")!;
+    expect(shown.boss.powers!.bounce!.at).toBe(shown.boss.crowdMoves);
+    // His move's thinking, the same last move: no banner, and his move shows as soon as it's in.
+    L.advance(shown.until - L.now + 10);
+    const again = L.last("p2", "boss")!;
+    expect(again.thinking).toBe(true);
+    expect(again.boss.board.history.at(-1)).toBe(take);
+    expect(queenSlain(again.boss)).toBe(false);
+    expect(L.core.record.bossMinAt).toBeUndefined();
+    const move = hostBoss(L);
+    expect(L.last("p2", "boss")!.boss.lastMove).toMatchObject({ move: (move.allowed ?? legalMoves(move.fen))[0]! });
   });
 
   it("nothing within the cap (the host answers \"\"), anything that isn't a candidate, or no host at all: the bounces play, nothing moves", () => {
