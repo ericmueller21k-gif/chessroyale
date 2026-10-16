@@ -1,6 +1,6 @@
 import type { ComponentChildren, VNode } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { RANKED_1V1, controlLabel, duelControl } from "@chessroyale/core";
+import { controlLabel, duelControl } from "@chessroyale/core";
 import { other, type Color, type DuelEnd } from "@chessroyale/chess/duel";
 import { Board } from "../components/Board.tsx";
 import { Avatar } from "../components/Items.tsx";
@@ -15,7 +15,6 @@ import { clockAt, type DuelQueue, type DuelSession, type DuelSide, type DuelSnap
 import { account } from "../account.ts";
 import { ranked1v1Rank } from "../ranked.ts";
 import { clockShown } from "../clock-text.ts";
-import { testParams } from "../test-switches.ts";
 
 /**
  * Ranked 1 v 1's screens (docs/areas/ranked.md): the stage (components/DuelStage.tsx: the search, with Cancel and after
