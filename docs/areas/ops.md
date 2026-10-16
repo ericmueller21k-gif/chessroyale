@@ -178,7 +178,8 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
   for an address across the cut): a 20 KB field costs a few milliseconds, not a second.
 - **Stored** (D1, made at runtime with the rest of the schema): `ops_errors` (fingerprint, hour, source, kind, message,
   version, count, first and last seen, the latest occurrence's diagnostics) and `ops_reports` (id, when, kind, a bug's
-  account id or none, a bug's version, the note, a bug's diagnostics).
+  account id or none, a bug's version, the note, a bug's diagnostics). Deleting an account deletes its bug reports and
+  takes its id out of error samples (the counts stay); the download has both (`account-data.ts`, "problemReports").
 - **The ops page:** `/admin/ops` (admins only, as `/admin/fairplay`: `isAdmin`; anyone else gets "Not found"): the
   most frequent errors of the last 7 days (the last 24 hours' first, then the newest), with their versions, first and
   last seen, and the latest diagnostics a tap away; a search by message (`?q=`); player reports by id (`?report=ID`)

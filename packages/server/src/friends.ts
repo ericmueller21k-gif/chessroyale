@@ -1,5 +1,5 @@
 import { FRIENDS, FRONT_DOOR, CAPACITY, isInviteSetting, type FriendsState, type InviteKind, type InviteSetting } from "@chessroyale/core";
-import type { Sql } from "./accounts.ts";
+import type { Sql, Stmt } from "./accounts.ts";
 
 /**
  * Friends and invites in D1 (docs/decisions/2026-10-15-friends-and-invites.md; the tables are listed in docs/areas/accounts.md for the
@@ -360,9 +360,15 @@ export async function pruneFriends(sql: Sql, now: number): Promise<void> {
  * signs in to another). The two settings live on the users row and go with it.
  */
 export async function deleteSocial(sql: Sql, userId: string): Promise<void> {
-  await sql.run("DELETE FROM friends WHERE user_id = ? OR friend_id = ?", userId, userId);
-  await sql.run("DELETE FROM friend_requests WHERE from_id = ? OR to_id = ?", userId, userId);
-  await sql.run("DELETE FROM blocks WHERE user_id = ? OR blocked_id = ?", userId, userId);
-  await sql.run("DELETE FROM invites WHERE from_id = ? OR to_id = ?", userId, userId);
-  await sql.run("DELETE FROM friend_limits WHERE user_id = ?", userId);
+  for (const s of socialDeletes(userId)) await sql.run(s.sql, ...s.params);
 }
+
+/** The statements deleteSocial runs, for deleting an account in one batch (account-data.ts). */
+export const socialDeletes = (userId: string): Stmt[] =>
+  [
+    "DELETE FROM friends WHERE user_id = ?1 OR friend_id = ?1",
+    "DELETE FROM friend_requests WHERE from_id = ?1 OR to_id = ?1",
+    "DELETE FROM blocks WHERE user_id = ?1 OR blocked_id = ?1",
+    "DELETE FROM invites WHERE from_id = ?1 OR to_id = ?1",
+    "DELETE FROM friend_limits WHERE user_id = ?1",
+  ].map((sql) => ({ sql, params: [userId] }));
