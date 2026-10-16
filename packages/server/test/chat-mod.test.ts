@@ -137,14 +137,17 @@ describe("fair play's review page: a player's chat", () => {
       const { sql, d1, troll } = await world();
       const eric = await player(sql, "Eric");
       // The live hub (the global chat): a reset takes the player's lines out of it.
-      const forgot: string[] = [];
-      const LIVE = { idFromName: (n: string) => n, get: () => ({ forgetAccount: async (id: string) => void forgot.push(id) }) };
+      const dropped: string[] = [];
+      const LIVE = { idFromName: (n: string) => n, get: () => ({ dropChatLines: async (id: string) => void dropped.push(id) }) };
       const env = { DB: d1, ADMIN_EMAILS: "eric@example.com", LIVE } as never;
       const cookie = `hc_session=${await createSession(sql, eric.id, T0)}`;
       const get = async (path: string, c = cookie) => (await handleAdmin(new Request(`https://x${path}`, { headers: { cookie: c } }), env))!;
       expect((await get(`/admin/fairplay/case/${troll.id}`, "")).status).toBe(404);
       const page = await (await get(`/admin/fairplay/case/${troll.id}`)).text();
       expect(page).toContain("<h2>Chat</h2>");
+      // Fair play's own ban says what it bans, apart from the chat bans; a chat decision leaves the watch case open.
+      expect(page).toContain('value="ban">Ban from online play</button>');
+      expect(page).toContain("A reset or a chat ban doesn't close the report's watch case: click Clear (under Decide) for that.");
       expect(page).toContain(`Chat: <span class="cleared">open</span> · <a href="/profile/${troll.id}">Their profile (name and icon)</a>`);
       const form = (fields: Record<string, string>, origin = "https://x") =>
         handleAdmin(new Request(`https://x/admin/fairplay/case/${troll.id}`, { method: "POST", headers: { origin, cookie }, body: new URLSearchParams(fields) }), env);
@@ -161,10 +164,10 @@ describe("fair play's review page: a player's chat", () => {
       const after = await (await get(`/admin/fairplay/case/${troll.id}`)).text();
       expect(after).toContain('Chat: <b class="banned">chat ban</b> until');
       expect(after).toMatch(/chat ban until [^<]+<\/td><td>admin:eric@example.com<\/td><td class="wrap">spamming taunts<\/td><td class="wrap">Easy\.<\/td>/);
-      expect(forgot).toEqual([]);
+      expect(dropped).toEqual([]);
       await form({ action: "chat:reset", chat_reason: "rude name" });
       expect(await getUser(sql, troll.id)).toMatchObject({ name: "Player" });
-      expect(forgot).toEqual([troll.id]);
+      expect(dropped).toEqual([troll.id]);
       // A guest's decisions merged in (a sign-in) are labeled as such.
       await sql.run("INSERT INTO chat_mod_log (user_id, at, action, by, reason) VALUES (?, ?, 'merged', 'sign-in', 'a guest signed in')", troll.id, T0 + 1);
       expect(await (await get(`/admin/fairplay/case/${troll.id}`)).text()).toContain("<td>a guest&#39;s decisions merged in</td><td>sign-in</td>");

@@ -326,10 +326,10 @@ export async function handleAdmin(
       const [, chat, days] = action.split(":");
       const r = await decideChat(sql, m[1]!, { action: chat, days, reason: form.get("chat_reason"), note: form.get("chat_note") }, by, now);
       note = r.ok ? "Done." : r.message;
-      // A reset name and icon: their lines leave the global chat too (as a deleted account's), old name and all.
+      // A reset name and icon: their lines leave the global chat too, old name and all (only those: live-hub.ts).
       if (r.ok && chat === "reset" && env.LIVE) {
         await liveHub(env as Required<Pick<AdminEnv, "LIVE">>)
-          .forgetAccount(m[1]!)
+          .dropChatLines(m[1]!)
           .catch((e: unknown) => console.error(`name and icon reset, but the global chat kept their lines (${String(e)})`));
       }
     } else if (action === "deep") {
@@ -439,6 +439,7 @@ function chatSection(id: string, chat: { block: ChatBlock | null; log: ChatLogRo
 <input type="text" name="chat_note" placeholder="Note to the player (optional)" maxlength="500">
 <button name="action" value="chat:warn">Warn</button>${bans}<button name="action" value="chat:lift">Lift the chat ban</button><button name="action" value="chat:reset">Reset name and icon</button></form>
 <p class="muted">Every chat decision needs a reason. A chat ban only stops sending: they still read chat and play. A warning or a chat ban shows the player your note once, on their home screen.</p>
+<p class="muted">A reset or a chat ban doesn't close the report's watch case: click Clear (under Decide) for that.</p>
 ${chat.log.length ? `<div class="card scroll"><table><tr><th>When</th><th>Decision</th><th>By</th><th>Reason</th><th>Note to the player</th></tr>${chat.log
     .map((l) => `<tr><td>${when(l.at)}</td><td>${decision(l)}</td><td>${esc(l.by)}</td><td class="wrap">${esc(l.reason)}</td><td class="wrap">${esc(l.note)}</td></tr>`)
     .join("")}</table></div>` : ""}`;
@@ -450,7 +451,7 @@ function casePage(d: CaseDetail, note: string | null, chat: { block: ChatBlock |
   const decision = `<form class="row" method="post">
   <input type="text" name="reason" placeholder="Reason (for the log; required)" required minlength="5">
   <input type="text" name="notice" placeholder="Note to the player (optional; in the email)">
-  <button class="ban" name="action" value="ban">Ban</button><button class="clear" name="action" value="clear">Clear</button>
+  <button class="ban" name="action" value="ban">Ban from online play</button><button class="clear" name="action" value="clear">Clear</button>
   <button name="action" value="watch">Watch</button><button name="action" value="review">Review</button></form>`;
   const appealForm = openAppeal
     ? `<div class="card"><b>Open appeal</b> (${when(openAppeal.at)})<p>${esc(openAppeal.text)}</p><form class="row" method="post"><input type="hidden" name="action" value="appeal"><input type="hidden" name="appeal" value="${openAppeal.id}">

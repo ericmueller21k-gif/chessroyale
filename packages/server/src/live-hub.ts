@@ -176,6 +176,14 @@ export class LiveHub extends DurableObject<Env> {
     if (this.chat.forgetAccount(id)) await this.saveChat();
   }
 
+  /**
+   * A moderator reset a player's name and icon (admin.ts): their lines leave the global chat, old name and all.
+   * Nothing else about them changes (online, in a match, their friends' news, their wait to post again).
+   */
+  async dropChatLines(id: string): Promise<void> {
+    if (this.chat.dropLines(id)) await this.saveChat();
+  }
+
   /** A drawn icon on a line still in the chat (null for any other key). */
   async chatIcon(key: string): Promise<string | null> {
     return this.chat.icon(key) ?? null;

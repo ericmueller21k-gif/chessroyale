@@ -49,8 +49,11 @@ The preset lines are all friendly, so what can offend is a player's name and dra
 - **Moderators** (admins, `ADMIN_EMAILS`) act from a player's page on fair play's review page (`/admin/fairplay`,
   `admin.ts`), reached from the reports in its open cases or from the box that takes a player's id or profile link.
   Its "Chat" section: warn, chat ban for 1, 7 or 30 days (`CHAT_MOD.banDays`) or with no end, lift the ban, reset the
-  name and icon ("Player", a pawn; their lines leave the global chat too). Each needs a reason for the log; a warning
-  or a ban can carry a note to the player. A link opens the player's profile in the game, to see the name and icon.
+  name and icon ("Player", a pawn; only their lines leave the global chat too, `LiveHub.dropChatLines`). Each needs a
+  reason for the log; a warning or a ban can carry a note to the player. A link opens the player's profile in the
+  game, to see the name and icon. A chat decision doesn't close the report's watch case (fair play's Clear does; its
+  own ban button is "Ban from online play"). Known and rare: a ban lifted while its panel is on screen shows there
+  until the panel is shown again or the page reloads.
 - **A chat ban only stops sending** (lobby: refused with reason "mod" and the `ChatBlock`; global chat: 403 with it).
   The player still reads chat and plays. A lobby reads a chatting player's ban as they join and again at most every
   `CHAT_MOD.recheckMs` (30 s) as they chat. The panels show why instead of their buttons ("Your chat is off until
@@ -59,12 +62,15 @@ The preset lines are all friendly, so what can offend is a player's name and dra
   home screen (never over a match), with the note ("Got it": POST `/api/chat/notice`, and the app forgets it). The
   profile (`/api/me`) carries `chatMod: {block?, notice?}`.
 - **The name filter** (`server/src/text-filter.ts`): the free text players see is names. A small list of our own
-  (slurs and hate terms, not swearing), ROT13-encoded in the file. It reads at most 64 characters, word by word: case,
-  accents, look-alike letters, invisible characters and leetspeak fold away; symbols inside a word go; a run of single
-  letters joins into one word. Long terms match inside a word, short ones only as the whole word (or its plural). A
+  (slurs and hate terms, not swearing), ROT13-encoded in the file; the list and the words left off on purpose are in
+  the decision file. It reads at most 64 characters, word by word: case, accents, look-alike letters, invisible
+  characters and leetspeak fold away; symbols inside a word go; a run of two or more short words (two letters or fewer
+  each) joins into one; digits at a word's end are read as letters and as a number left out. Long terms match inside a
+  word (with q for g; the n-word's also across the whole name), short ones only as the exact whole word (or its
+  plural). A
   profile can't take such a name ("That name isn't allowed. Pick another one."); a guest asking for one with its first
   visit gets "Player"; a lobby or Squads seat asked for with one is "Player N"; the global chat shows an old one as
-  "Player". Lobby seats take the account's name and icon as a player joins, so a reset holds.
+  "Player". Lobby and Squads seats take the account's name as a player joins, so a reset holds.
 - **Send limits** (unchanged, per account): a lobby's chat one line every `QUICK_CHAT.minGapMs`, `burstMax` in
   `burstWindowMs`, no repeat within `repeatMs` (by account, so a new seat doesn't reset them); the global chat one
   every `GLOBAL_CHAT.gapMs`.

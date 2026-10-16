@@ -57,10 +57,50 @@ describe("the name filter", () => {
     for (const name of [
       "Player 7", "Niger", "Nigeria", "Scunthorpe", "Bob 1999", "Hello World", "Kasparov", "♞ Knight", "😀", "", rot13("favttre"), rot13("sverergneqnag"),
       "Jared Skinner", "Fred Skinner", "Alfred Skinner", "Mildred Skinner", "Andre Tardif", "Pierre Tardif", "Claire Tardy", "Andre Tardieu",
-      "Whit Lerner", "Mustafa Gotti", "Ashe Malek", "Tran Ny", "Jaap", "Van Dyke", "Dykes", "Chris Coons", "Carrie Coon", "Kike Garcia",
-      "Nazi Paikidze", "FAQ",
+      "Whit Lerner", "Mustafa Gotti", "Ashe Malek", "Tran Ny", "Jo Jo", "Magnus2009", "Jaap", "FAQ", "Iraqi", "Niqab", "Ni Gao",
+      // Surnames that are also slurs are left off the list (written ROT13 here, as in the list): reports and a reset.
+      rot13("Ina Qlxr"), rot13("Qlxrf"), rot13("Puevf Pbbaf"), rot13("Pneevr Pbba"),
     ]) {
       expect(isBlockedText(name), name).toBe(false);
+    }
+  });
+
+  it("blocks by design a real name whose first word is a listed word on its own (another display name it is)", () => {
+    for (const name of [rot13("Xvxr Tnepvn"), rot13("Anmv Cnvxvqmr")]) expect(isBlockedText(name), name).toBe(true);
+    for (const word of ["xvxr", "anmv"]) {
+      expect(isBlockedText(rot13(word)), word).toBe(true);
+      expect(isBlockedText(`${rot13(word)}s`), word).toBe(true);
+      expect(isBlockedText(rot13(word).toUpperCase()), word).toBe(true);
+    }
+  });
+
+  it("sees through q for g, letters spaced in pairs, digits after the word, and halves of the word apart", () => {
+    const pairs = (w: string, sep: string, inner = "") => w.match(/.{1,2}/g)!.map((p) => [...p].join(inner)).join(sep);
+    for (const name of [
+      // q for g (the long entries), with and without digits for letters.
+      rot13("avddre"),
+      rot13("avtdre"),
+      rot13("avddn"),
+      rot13("avddre").replace("i", "1").replace("e", "3"),
+      `xX${rot13("snddbg")}Xx`,
+      // Letter pairs, spaced, dotted inside, or spread with symbols.
+      pairs(slur, " "),
+      pairs(slur, " ", "."),
+      pairs(slur, " ", "_"),
+      pairs(rot13("avttn"), "  "),
+      // A number after the word.
+      `${slur}69`,
+      `${short}69`,
+      `${short}_69`,
+      `${rot13("xvxr")}2009`,
+      `${rot13("anmv")}.88`,
+      `${rot13("anmv")}1`,
+      `${rot13("xvxr").replace("i", "1").replace("e", "3")}69`,
+      // The word's halves as two words.
+      `${slur.slice(0, 3)} ${slur.slice(3)}`,
+      `${slur.slice(0, 4)} ${slur.slice(4)}`,
+    ]) {
+      expect(isBlockedText(name), name).toBe(true);
     }
   });
 

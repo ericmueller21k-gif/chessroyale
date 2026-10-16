@@ -57,17 +57,23 @@ So:
   - The section links to the player's profile in the game, which shows the name and drawn icon to judge.
   - It reuses what's there: `isAdmin` (`ADMIN_EMAILS`), the page and its origin check on posts, "admin:<email>" in
     the log, and a written reason for every decision. The reviewer's token reaches only fair play's API, never these.
+  - Fair play's own red "Ban" button sat just above the red chat bans, so it now says "Ban from online play".
+  - A reset or a chat ban doesn't close the watch case the report opened: a line in the section says to click Clear
+    for that. One click more, and fair play's decisions stay fair play's.
   - A chat ban isn't a fair-play ban (that holds results and blocks online play), so it has its own table,
     `chat_mod_log`: both the log and how a ban is in force. The decisions list labels the "merged" rows a guest's
     sign-in adds.
 - **What a decision does.**
   - A chat ban only stops sending: the player still reads chat and plays.
-  - A reset makes the name "Player" and the icon a pawn. Their lines also leave the global chat, as a deleted
-    account's do, so the old name doesn't stay on the home page until 50 newer lines push it out.
-  - Lobby seats take the name and icon from the account as a player joins, so a reset holds in the next lobby.
+  - A reset makes the name "Player" and the icon a pawn. Their lines also leave the global chat, so the old name
+    doesn't stay on the home page until 50 newer lines push it out. Only their lines (the live hub's `dropChatLines`):
+    they stay online, in their match, with their friends' news and their wait to post again.
+  - Lobby and Squads seats take the name from the account as a player joins (the device's name only without one), so a
+    reset holds in the next lobby or party.
 - **The player is told, never over a match.**
   - The chat panels show why instead of their buttons. Showing one reads the profile again (at most every 30 s), so a
-    lifted ban goes without a reload.
+    lifted ban goes without a reload. Known, rare and left as is: a ban lifted while its panel is already on screen
+    shows there until the panel is shown again or the page reloads.
   - A warning or a chat ban shows once on the home screen, with the moderator's note. "Got it" clears it on the
     server and in the app, so it doesn't come back on the next screen.
   - There's no appeal form for chat bans (fair play's appeal is for play bans). A moderator who hears from them can
@@ -80,11 +86,33 @@ So:
   - The well-known open lists (LDNOOBW, CC-BY-4.0, for one) are mostly swearing and sexual words. They'd refuse many
     ordinary names and need a credit, and Eric's brief was slurs and hate. Nothing third-party is used, so
     `LICENSES.md` is unchanged.
-  - It reads a name word by word. Case, accents, look-alike letters, invisible characters and leetspeak fold away;
-    symbols inside a word go, and a run of single letters ("n i g g e r") joins into one word. Other words never run
-    together, so "Jared Skinner" passes.
-  - Long terms match inside a word; short ones only as the exact whole word (or its plural). "Dyke" and "coon" were
-    dropped: they're surnames (Van Dyke, Chris Coons), and a report and a reset handle the rest.
+  - **How it reads a name.** Word by word. Case, accents, look-alike letters, invisible characters and leetspeak fold
+    away, and symbols inside a word go. A run of two or more short words (two letters or fewer each) joins into one,
+    so letters spaced out, or spaced in pairs, are read as the word. Digits at a word's end are read both as letters
+    (leetspeak) and as a number left out (a year, a "69"): "Magnus2009" is "magnus", and a slur with "69" after it is
+    the slur. Other words never run together, so "Jared Skinner" passes; only the n-word's two entries are also
+    looked for across the whole name, which no real name we tried trips.
+  - **Long entries** match inside any one word, letters repeated or not, with q for g. **Short entries** match only as
+    the exact whole word or its plural, so "faq" stays an ordinary word.
+  - **The list** (ROT13, as in the file; `rot13()` turns an entry back):
+    - inside any word: avttre, avttn, avtyrg, sntbg, ergneq, genaal, genaavr, furznyr, jrgonpx, ornare, wvtnobb,
+      tbyyvjbt, erqfxva, uvgyre;
+    - phrases (as one word or as words in a row): juvgr cbjre, juvgr cevqr, fvrt urvy, xh xyhk, cbepu zbaxrl,
+      whatyr ohaal, fcrne puhpxre, ent urnq, gbjry urnq, mvccre urnq;
+    - whole words only: avt, snt, xvxr, xlxr, anmv, puvax, tbbx, fcvp, fcvpx, cnxv, jbt, wnc, qnexvr, fdhnj, xxx;
+    - let through (ordinary words that contain an entry): favttre, ergneqnag;
+    - hate codes, in the digits: 1488;
+    - off the list on purpose: qlxr and pbba, common English surnames (and their plurals).
+  - **The director's call on two words** (after the delta review): "xvxr" and "anmv" (ROT13) are on the list as exact
+    whole words. On an English-language game for 13+, their main use as a word on its own is hate. A false positive
+    only means picking another display name, while a false negative shows a slur to other players until a moderator
+    acts. So the two real names in the tests whose first word is one of them are refused: accepted, and tested as
+    blocked by design. "qlxr" and "pbba" stay off: they collide with common English surnames, and a report plus a
+    reset handle those.
+  - **What it still misses, knowingly:** a long entry split into longer pieces (three letters, a space, three letters),
+    since reading words together is what refused real names in the first version (a first name and a surname ran
+    into an entry across the space); and a short entry with q for g or a letter repeated (exact on purpose). Reports
+    and a reset handle these.
   - It reads at most 64 characters, so a long input can't cost CPU.
 - **Where the filter applies.**
   - A profile can't save such a name, and it says so.
@@ -112,10 +140,14 @@ Full lane (stored data, a protocol change, security):
 - the whole unit suite:
   - `chat-mod.test.ts`: decisions, the notice, keeping, the global chat's refusal, the profile's name check, and fair
     play's page (the chat section, its actions, finding a player);
-  - `text-filter.test.ts`: the catches, the names that must pass, and 160,000-letter input;
+  - `text-filter.test.ts`: the catches, q for g, letters in pairs, digits after the word, the word's halves apart, the
+    names that must pass (Tran Ny, Jo Jo and Magnus2009 among them), the two blocked by design, and 160,000-letter
+    input;
+  - `global-chat.test.ts`: a reset takes only the player's lines out of the global chat (still online, still waiting
+    to post); `squads-do.test.ts`: a Squads seat takes its account's name;
   - `lobby-chat.test.ts` (a ban in a lobby, unmuting) and `lobby-do-chat.test.ts` (the lobby reading a ban as a
     player joins and every 30 s, a failing read never throwing, a seat taking its account's name);
   - `account-data.test.ts`: columns, download, deletion, a ban surviving a guest's merge;
   - the app's `chat.test.ts` and `global-chat.test.ts`;
 - e2e: `chat-mod.spec.ts` (mute, a profile report, a moderator's chat ban, the notice, the name filter),
-  `chat.spec.ts` (the new labels), and the `lobby-chat`, `global-chat` and `fairplay` specs.
+  `chat.spec.ts` (the new labels), and the `lobby-chat`, `global-chat`, `fairplay` and `squads` specs.
