@@ -17,7 +17,7 @@
  * when the player was flagged or reported, and never deleted while their case is open (see purgeEvidence).
  */
 import { FAIRPLAY, matchSignals, playerLevel, referenceStrength, type FairLevel, type FairMove, type FairSummary, type LevelInput, type LevelVerdict } from "@chessroyale/core";
-import { getUser, refreshRating, sha256, type Sql, type User } from "./accounts.ts";
+import { getUser, identityHashes, refreshRating, type Sql, type User } from "./accounts.ts";
 
 /** A case's status; "closed": a watch with nothing new for FAIRPLAY.evidenceDays (not a decision on the merits). */
 export type CaseStatus = "watch" | "review" | "banned" | "cleared" | "closed";
@@ -123,25 +123,6 @@ export async function setCase(sql: Sql, userId: string, status: CaseStatus, by: 
 export const BANNED_MESSAGE = "Your account can't play online: it was banned for fair play. Solo games against bots are still open.";
 
 /**
- * An email as one person's address: lower case, without a "+tag", and for Gmail without dots (Gmail ignores them),
- * so a.b+2@gmail.com and ab@gmail.com are the same.
- */
-export function normalizeEmail(email: string): string {
-  const [local = "", domain = ""] = email.trim().toLowerCase().split("@");
-  const base = local.split("+")[0]!;
-  const gmail = domain === "gmail.com" || domain === "googlemail.com";
-  return `${gmail ? base.replace(/\./g, "") : base}@${gmail ? "gmail.com" : domain}`;
-}
-
-/** An account's sign-in identities as fair play keeps them for a ban: hashed. */
-export async function identityHashes(u: Pick<User, "email" | "google_sub">): Promise<[string, string][]> {
-  const out: [string, string][] = [];
-  if (u.email) out.push(["email", await sha256(`email:${normalizeEmail(u.email)}`)]);
-  if (u.google_sub) out.push(["google", await sha256(`google:${u.google_sub}`)]);
-  return out;
-}
-
-/**
  * Whether an account may play online, checked when it asks to (PLAY, a new lobby, joining one). Banned: no. Also
  * catches evasion: an account signed in with a banned account's identity (the same normalized email or Google
  * account) is banned too; one seen on a device a banned account played from goes to review (families share devices).
@@ -161,10 +142,19 @@ export async function banCheck(sql: Sql, user: User | null, device: string | nul
       now,
     );
   }
+  // The account's last clearing by a person or the reviewer (a closing on its own, or an evasion review, isn't one).
+  const cleared = `(SELECT MAX(at) FROM fairplay_log WHERE user_id = ?3 AND action = 'cleared' AND (by LIKE 'admin:%' OR by = 'reviewer'))`;
   for (const [kind, hash] of await identityHashes(user)) {
-    // (A banned account's identities, or those of an account deleted while banned or in review: account-data.ts.)
+    // (A banned account's identities, or those of an account deleted while banned or in review: account-data.ts. Each
+    // owner has its own row; a banned one counts first.) An account cleared by a person or the reviewer leaves out the
+    // rows that clearing weighed (written by then) and later evasion bans, which only repeat bans already weighed. So
+    // a cousin cleared of an evasion ban stays cleared through a report, a watch or its closing, while a later real
+    // ban of an account with its identity catches it (docs/decisions/2026-10-16-integrity-followups.md).
     const owner = await sql.first<{ user_id: string; status: string | null }>(
-      "SELECT i.user_id, c.status FROM fairplay_identities i LEFT JOIN fairplay_cases c ON c.user_id = i.user_id WHERE i.kind = ? AND i.hash = ? AND i.user_id != ?",
+      `SELECT i.user_id, c.status FROM fairplay_identities i LEFT JOIN fairplay_cases c ON c.user_id = i.user_id
+       WHERE i.kind = ?1 AND i.hash = ?2 AND i.user_id != ?3
+         AND (${cleared} IS NULL OR (i.at > ${cleared} AND (c.status IS NOT 'banned' OR c.decided_by IS NOT 'evasion')))
+       ORDER BY COALESCE(c.status, 'banned') = 'banned' DESC LIMIT 1`,
       kind,
       hash,
       user.id,

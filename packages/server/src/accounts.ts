@@ -32,7 +32,7 @@ import {
 } from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerMoves, lockerState, type LockerState } from "./locker.ts";
 import { LIVE_SCHEMA } from "./live.ts";
-import { FAIRPLAY_SCHEMA } from "./fairplay-schema.ts";
+import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
 
 export interface Sql {
@@ -271,6 +271,9 @@ export async function ensureSchema(sql: Sql, key: object = sql): Promise<void> {
     return;
   }
   for (const s of SCHEMA) await sql.run(s);
+  // fairplay_identities' key gained the owner (Oct 16, 2026): a table from before is rebuilt once (fairplay-schema.ts).
+  const ownerColumn = (await sql.all<{ name: string; pk: number }>("PRAGMA table_info(fairplay_identities)")).find((c) => c.name === "user_id");
+  if (ownerColumn && !ownerColumn.pk) await sql.batch(IDENTITIES_REKEY);
   for (const s of LOCKER_MIGRATIONS)
     await sql.run(s).catch((e: unknown) => {
       if (!/duplicate column/i.test(String(e))) throw e;
@@ -352,6 +355,25 @@ export function cleanEmail(email: unknown): string | null {
   if (typeof email !== "string") return null;
   const e = email.trim().toLowerCase();
   return e.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : null;
+}
+
+/**
+ * An email as one person's address (fair play's ban evasion): lower case, without a "+tag", and for Gmail without dots
+ * (Gmail ignores them), so a.b+2@gmail.com and ab@gmail.com are the same.
+ */
+export function normalizeEmail(email: string): string {
+  const [local = "", domain = ""] = email.trim().toLowerCase().split("@");
+  const base = local.split("+")[0]!;
+  const gmail = domain === "gmail.com" || domain === "googlemail.com";
+  return `${gmail ? base.replace(/\./g, "") : base}@${gmail ? "gmail.com" : domain}`;
+}
+
+/** An account's sign-in identities as fair play keeps them for a ban: hashed. */
+export async function identityHashes(u: Pick<User, "email" | "google_sub">): Promise<[string, string][]> {
+  const out: [string, string][] = [];
+  if (u.email) out.push(["email", await sha256(`email:${normalizeEmail(u.email)}`)]);
+  if (u.google_sub) out.push(["google", await sha256(`google:${u.google_sub}`)]);
+  return out;
 }
 
 /**
@@ -454,12 +476,15 @@ export async function signInWithIdentity(
   const owner = await sql.first<User>(`SELECT id, name, icon, email, google_sub, created_at FROM users WHERE ${col} = ?`, value);
   if (owner) {
     if (current && current.id !== owner.id && !current.email && !current.google_sub) {
-      // A guest signing in to an existing account: its matches, items, coins and the rest join the account and the
-      // guest goes, in one batch (one transaction), so nothing lands halfway: a buy in another tab is wholly before
-      // it (and moves) or wholly after (and finds no guest wallet), two sign-ins at once move the wallet once, and a
-      // failure moves nothing (docs/decisions/2026-10-16-sign-in-races.md).
+      // A guest signing in to an existing account: its matches, items, coins, reports, fair-play file and the rest join
+      // the account and the guest goes, in one batch (one transaction), so nothing lands halfway: a buy in another tab
+      // is wholly before it (and moves) or wholly after (and finds no guest wallet), two sign-ins at once move the wallet
+      // once, and a failure moves nothing (docs/decisions/2026-10-16-sign-in-races.md). Nothing stays under the guest's
+      // id, where deleting the account couldn't reach it, and a case can't be shed by signing in
+      // (docs/decisions/2026-10-16-integrity-followups.md).
       await sql.batch([
         stmt("UPDATE results SET user_id = ? WHERE user_id = ?", owner.id, current.id),
+        ...fairPlayMoves(current.id, owner.id, now, await identityHashes(owner)),
         stmt(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, owner.id),
         ...shopMoves(current.id, owner.id),
         ...lockerMoves(current.id, owner.id),
@@ -514,29 +539,31 @@ export async function purgeEmailCodes(sql: Sql, now: number): Promise<void> {
 
 /** A fresh 6-digit sign-in code for an address (rate-limited). */
 export async function startEmailCode(sql: Sql, email: string, now: number): Promise<CodeStart> {
-  const row = await sql.first<{ sent_at: number; hour_start: number; sends_this_hour: number }>(
-    "SELECT sent_at, hour_start, sends_this_hour FROM email_codes WHERE email = ?",
-    email,
-  );
-  if (row && now - row.sent_at < RESEND_SECONDS * 1000) return { ok: false, message: "A code was just sent. Wait a few seconds and try again." };
-  const newHour = !row || now - row.hour_start > 3_600_000;
-  const sends = newHour ? 0 : row!.sends_this_hour;
-  if (sends >= SENDS_PER_HOUR) return { ok: false, message: "Too many codes for this address. Try again in an hour." };
   const n = crypto.getRandomValues(new Uint32Array(1))[0]! % 1_000_000;
   const code = String(n).padStart(6, "0");
-  await sql.run(
-    `INSERT INTO email_codes (email, code_hash, expires_at, attempts, sent_at, hour_start, sends_this_hour)
-     VALUES (?, ?, ?, 0, ?, ?, ?)
-     ON CONFLICT (email) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = 0,
-       sent_at = excluded.sent_at, hour_start = excluded.hour_start, sends_this_hour = excluded.sends_this_hour`,
+  // One statement checks the limits and records the send, so starts at once can't all pass them and send more emails
+  // (docs/decisions/2026-10-16-integrity-followups.md): it writes the code only if the last one went RESEND_SECONDS
+  // ago or more and the hour has sends left (a new hour starts the count again). Only the start that wrote it sends it.
+  const sent = await sql.first<{ sent: number }>(
+    `INSERT INTO email_codes (email, code_hash, expires_at, attempts, sent_at, hour_start, sends_this_hour) VALUES (?1, ?2, ?3, 0, ?4, ?4, 1)
+     ON CONFLICT (email) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = 0, sent_at = excluded.sent_at,
+       hour_start = CASE WHEN ?4 - hour_start > ?7 THEN ?4 ELSE hour_start END,
+       sends_this_hour = CASE WHEN ?4 - hour_start > ?7 THEN 1 ELSE sends_this_hour + 1 END
+     WHERE ?4 - sent_at >= ?5 AND (?4 - hour_start > ?7 OR sends_this_hour < ?6)
+     RETURNING 1 AS sent`,
     email,
     await sha256(`${email}:${code}`),
     now + CODE_MINUTES * 60_000,
     now,
-    newHour ? now : row!.hour_start,
-    sends + 1,
+    RESEND_SECONDS * 1000,
+    SENDS_PER_HOUR,
+    3_600_000,
   );
-  return { ok: true, code };
+  if (sent) return { ok: true, code };
+  // Refused: the resend gap, or the hour's limit (the read only picks the message).
+  const row = await sql.first<{ sent_at: number }>("SELECT sent_at FROM email_codes WHERE email = ?", email);
+  if (row && now - row.sent_at < RESEND_SECONDS * 1000) return { ok: false, message: "A code was just sent. Wait a few seconds and try again." };
+  return { ok: false, message: "Too many codes for this address. Try again in an hour." };
 }
 
 /** Checks a code; it works once, for 10 minutes, with 5 tries. */
