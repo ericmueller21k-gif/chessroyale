@@ -39,7 +39,16 @@ export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
   first<T>(sql: string, ...params: unknown[]): Promise<T | null>;
   all<T>(sql: string, ...params: unknown[]): Promise<T[]>;
+  /** Runs statements as one transaction: all of them or none (D1's batch). */
+  batch(statements: readonly Stmt[]): Promise<void>;
 }
+
+/** A statement for `Sql.batch`. */
+export interface Stmt {
+  sql: string;
+  params: unknown[];
+}
+export const stmt = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
 
 /** The SQL interface over a D1 binding. */
 export function d1Sql(db: D1Database): Sql {
@@ -55,6 +64,10 @@ export function d1Sql(db: D1Database): Sql {
     async all(sql, ...params) {
       countD1(sql);
       return (await db.prepare(sql).bind(...params).all()).results as never;
+    },
+    async batch(statements) {
+      for (const s of statements) countD1(s.sql);
+      if (statements.length) await db.batch(statements.map((s) => db.prepare(s.sql).bind(...s.params)));
     },
   };
 }
@@ -904,8 +917,25 @@ export async function buyItem(sql: Sql, userId: string, itemId: unknown, now: nu
   if (state.owned.includes(item.id)) return { ok: true, shop: state };
   const price = SHOP_FREE ? 0 : item.price;
   if (price > state.coins) return { ok: false, message: "Not enough coins." };
-  if (price > 0) await sql.run("UPDATE wallets SET coins = coins - ? WHERE user_id = ?", price, userId);
-  await sql.run("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) VALUES (?, ?, ?)", userId, item.id, now);
+  if (price > 0) {
+    // One transaction, as another buy may have run since the read above: the coins come off only if they're still
+    // there and the item still isn't owned, and the item is granted only if they came off (changes(): the rows the
+    // update changed). Two taps on one item pay once; two items at once can't take the coins below zero
+    // (docs/decisions/2026-10-16-atomic-shop-purchase.md).
+    await sql.batch([
+      stmt(
+        "UPDATE wallets SET coins = coins - ? WHERE user_id = ? AND coins >= ? AND NOT EXISTS (SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?)",
+        price,
+        userId,
+        price,
+        userId,
+        item.id,
+      ),
+      stmt("INSERT INTO inventory (user_id, item_id, acquired_at) SELECT ?, ?, ? WHERE changes() = 1", userId, item.id, now),
+    ]);
+    // Not granted, and not owned through another buy either: the coins went on something else in the meantime.
+    if (!(await sql.first("SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?", userId, item.id))) return { ok: false, message: "Not enough coins." };
+  } else await sql.run("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) VALUES (?, ?, ?)", userId, item.id, now);
   // A chat pack's lines go into any empty slots of the player's quick chat (the rest they pick in their profile).
   if (item.slot === "chat" && item.look.pack) {
     const { picks, added } = chatPicksAfterGetting(state.chat, item.look.pack);

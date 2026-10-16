@@ -324,7 +324,7 @@ describe("the health view", () => {
   });
 
   it("a database that doesn't answer: D1's error, zeros, and still what's deployed", async () => {
-    const broken = { first: async () => Promise.reject(new Error("D1 is down")), all: async () => Promise.reject(new Error("D1 is down")), run: async () => undefined };
+    const broken = { first: async () => Promise.reject(new Error("D1 is down")), all: async () => Promise.reject(new Error("D1 is down")), run: async () => undefined, batch: async () => undefined };
     const h = await health({ ASSETS }, broken, NOW);
     expect(h.d1).toMatchObject({ ok: false, error: "Error: D1 is down" });
     expect(h.errors).toMatchObject({ thisHour: 0, day: 0, top: [] });

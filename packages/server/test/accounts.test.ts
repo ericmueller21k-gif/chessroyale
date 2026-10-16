@@ -38,6 +38,9 @@ function memorySql(): Sql {
     async all(sql, ...p) {
       return db.prepare(sql).all(...(p as never[])) as never;
     },
+    async batch(statements) {
+      for (const s of statements) db.prepare(s.sql).run(...(s.params as never[]));
+    },
   };
 }
 
