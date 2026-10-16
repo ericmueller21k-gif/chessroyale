@@ -85,7 +85,8 @@ function speedVote(): PregameVote {
 /**
  * The boss final's card (Eric, Oct 14: "instead of saying boss raid it'll say hidden boss"): the boss it always meets
  * (crowdFinalBoss: the Hidden Boss), named and drawn as the roster has him, so renaming him is one edit there; the blurb
- * says how many face him (crowdFinalists: the top 4) without naming him again. With no such boss: a random one.
+ * names the ending and says how many face him (crowdFinalists: the top 4) without naming him again. With no such boss:
+ * a random one.
  */
 function bossFinalOption(): VoteOption {
   const boss = crowdFinalBoss();
@@ -93,8 +94,9 @@ function bossFinalOption(): VoteOption {
   return {
     id: "boss",
     icon: boss?.icon ?? "👹",
-    label: boss?.name ?? "Boss battle",
-    blurb: boss ? `Top ${n} team up against him` : `Top ${n} team up against a boss`,
+    label: boss?.name ?? "Boss final",
+    // (The card names the boss; its line names the ending, the boss final, as everywhere else.)
+    blurb: boss ? `Boss final: top ${n} team up against him` : `Boss final: top ${n} team up against a boss`,
     patch: { finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss },
   };
 }

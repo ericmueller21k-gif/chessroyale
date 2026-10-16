@@ -1,13 +1,13 @@
 import { applyMove } from "@chessroyale/chess";
 import { MiniBoard } from "../components/MiniBoard.tsx";
-import { elimination, myTeam, type GameView } from "../game.ts";
+import { elimination, lossRows, myTeam, type GameView } from "../game.ts";
 import { useState } from "preact/hooks";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { ordinal } from "./StageBreak.tsx";
 import { GodKingEpilogue, LastStandCard } from "../components/LastStand.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { ChatSection } from "../components/QuickChat.tsx";
-import { crowdFinalists, rankedMinHumans } from "@chessroyale/core";
+import { bossInText, crowdFinalists, rankedMinHumans } from "@chessroyale/core";
 import { BossCharacter, hasCharacter } from "../components/BossCharacter.tsx";
 import { FlagIcon } from "../components/MatchMenu.tsx";
 
@@ -97,13 +97,13 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
           {simul
             ? // (The Hidden Boss's phase 2: every board must be won.)
               simul.won === simul.of
-              ? `You beat ${match.boss.name} on all ${simul.of} boards!`
-              : `${match.boss.name} won. You won ${simul.won} of ${simul.of} boards: all ${simul.of} must be won.`
+              ? `You beat ${bossInText(match.boss.name)} on all ${simul.of} boards!`
+              : `${bossInText(match.boss.name, true)} won. You won ${simul.won} of ${simul.of} boards: all ${simul.of} must be won.`
             : bossResult === "crowd"
-            ? `The crowd beat ${match.boss.name}!${survived ? " A win on your record." : ""}`
+            ? `${alone ? "You" : "The crowd"} beat ${bossInText(match.boss.name)}!${survived ? " A win on your record." : ""}`
             : bossResult === "boss"
-              ? `${match.boss.name} won${onTime ? " on time" : ""}.`
-              : `A draw with ${match.boss.name}.`}
+              ? `${bossInText(match.boss.name, true)} won${onTime ? " on time" : ""}.`
+              : `A draw with ${bossInText(match.boss.name)}.`}
         </p>
       )}
       {/* After his Last Stand: he rises again if the crowd won; otherwise he stays down. */}
@@ -126,7 +126,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
         <p class="results-unranked">
           {match.serverPaced
             ? `Unranked: fewer than ${rankedMinHumans(match.settings.lobbySize)} real players, so your ranking didn't change.`
-            : "Unranked: solo games don't change your ranking."}
+            : "Unranked: solo games don't count for ranking."}
         </p>
       )}
       {/* Online: quick chat, for the GGs. */}
@@ -147,7 +147,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
           </div>
         </div>
       )}
-      {scariest.length > 0 && (
+      {/* (Boss alone: you'd be the whole list.) */}
+      {scariest.length > 0 && !alone && (
         <div class="scariest">
           <h2 class="small muted">Most dangerous players this match</h2>
           <ol>
@@ -168,14 +169,12 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
           </tr>
         </thead>
         <tbody>
-          {match.lossesByStage.map((l, i) =>
-            l.length ? (
-              <tr key={i}>
-                <td>{i < match.settings.knockoutsPerStage.length ? `Stage ${i + 1}` : "Duel"}</td>
-                <td>{(l.reduce((a, b) => a + b, 0) / l.length).toFixed(1)} pts</td>
-              </tr>
-            ) : null,
-          )}
+          {lossRows(match).map((r) => (
+            <tr key={r.label}>
+              <td>{r.label}</td>
+              <td>{r.avg.toFixed(1)} pts</td>
+            </tr>
+          ))}
         </tbody>
       </table>
       <p class="muted small">Lower is better: 0 means you matched the engine's best move.</p>

@@ -196,3 +196,27 @@ test("POST /api/problems: only JSON from this site, 413 past its size cap, 429 p
   expect(ops.status()).toBe(404);
   expect(await ops.text()).toBe("Not found");
 });
+
+test("the health view: JSON for an admin (deployed version, live numbers, errors, budgets, D1), on /admin/ops too; Not found for a player", async ({ page }) => {
+  test.skip(project() !== "desktop", "one run is enough");
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  expect((await page.request.get("/api/admin/health")).status()).toBe(404);
+  await asAdmin(page);
+  const res = await page.request.get("/api/admin/health");
+  expect(res.status()).toBe(200);
+  const h = (await res.json()) as {
+    deploy: { version: string };
+    live: { online: number; modes: Record<string, unknown> } | null;
+    errors: { day: number };
+    engine: { on: boolean; cap: number };
+    fairplay: { cap: number };
+    d1: { ok: boolean };
+  };
+  expect(h.deploy.version).toMatch(/^([0-9a-f]{12}|dev)$/);
+  expect(h.live?.online).toBeGreaterThanOrEqual(1);
+  expect(Object.keys(h.live!.modes).sort()).toEqual(["boss", "classic", "crowd", "squads"]);
+  expect(h.engine).toMatchObject({ on: false });
+  expect(h.d1.ok).toBe(true);
+  expect(await opsPage(page)).toContain("<h2>Health</h2>");
+});

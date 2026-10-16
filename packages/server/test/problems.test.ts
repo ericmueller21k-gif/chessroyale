@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { OPS } from "@chessroyale/core";
 
-// (The Worker's module, for its cron: the engine server's container needs the Workers runtime.)
+// (The Worker's module, for its cron, and the ops page's health section: the engine server's container needs the
+// Workers runtime, and nothing here searches.)
 vi.mock("@cloudflare/containers", () => ({ Container: class {}, getContainer: () => ({ fetch: async () => new Response("{}") }) }));
 
 import { createGuest, createSession, ensureSchema, signInWithIdentity, type Sql } from "../src/accounts.ts";
@@ -346,7 +347,7 @@ describe("rate limits", () => {
     expect(problemLimited("errors", { ip: "9.9.9.6", session: tok("s-errors") }, now + L.errors.perUser.windowMs)).toBeNull();
   });
 
-  it("an account is counted only for a real session cookie, and not when the address is already refused", () => {
+  it("an account is counted only for a cookie shaped like a session token, and not when the address is already refused", () => {
     const now = T0 + 7 * DAY;
     const L = OPS.endpoint.reports;
     expect(isSessionToken(tok("a"))).toBe(true);
@@ -356,7 +357,7 @@ describe("rate limits", () => {
     for (let i = 0; i < 20; i++) expect(problemLimited("report", { ip: "9.8.0.1", session: tok("s-fresh") }, now)).toBeGreaterThan(0);
     for (let i = 0; i < L.perUser.limit; i++) expect(problemLimited("report", { ip: `9.8.1.${i}`, session: tok("s-fresh") }, now)).toBeNull();
     expect(problemLimited("report", { ip: "9.8.2.1", session: tok("s-fresh") }, now)).toBeGreaterThan(0);
-    // A cookie that isn't a session's is no key: only the address counts.
+    // A cookie not shaped like a session token is no key: only the address counts.
     for (let i = 0; i < L.perUser.limit + 3; i++) expect(problemLimited("report", { ip: `9.8.3.${i}`, session: "made-up" }, now)).toBeNull();
   });
 });
