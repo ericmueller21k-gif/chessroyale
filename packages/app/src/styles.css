@@ -3481,6 +3481,22 @@ button.history-label {
 .signin-row .btn {
   flex: none;
 }
+/* The age question: the month and the year share the row evenly, Continue below them. */
+.signin-born select {
+  flex: 1 1 0;
+  min-width: 0;
+  font: inherit;
+  padding: 0 10px;
+  min-height: 50px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+.signin-ask,
+.signin-young {
+  margin: 0;
+}
 .profile-actions {
   display: flex;
   gap: 8px;

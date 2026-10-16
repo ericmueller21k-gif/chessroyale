@@ -14,7 +14,7 @@
  */
 import { OPS } from "@chessroyale/core";
 import { d1Sql, ensureSchema, type Sql } from "./accounts.ts";
-import { SESSION_COOKIE, readCookie, type WaitUntil } from "./api.ts";
+import { SESSION_COOKIE, ageAnswer, readCookie, type WaitUntil } from "./api.ts";
 import { randomCode } from "./codes.ts";
 import { RateLimiter, TOO_MANY, isSessionToken, problemLimited } from "./limits.ts";
 import { cachedUserId } from "./presence.ts";
@@ -501,6 +501,12 @@ export async function handleProblems(request: Request, env: ProblemsEnv, waitUnt
   if (wait !== null) return json({ message: TOO_MANY, retryMs: wait }, 429, { "retry-after": String(Math.ceil(wait / 1000)) });
   const p = readProblem(body);
   if (!p) return json({ message: "Bad request" }, 400);
+  // A device that answered the age question "too young" sends nothing it typed: a bug keeps its diagnostics without
+  // the note, and feedback or an idea (a note alone) isn't taken (docs/decisions/2026-10-16-age-gate-and-real-money.md).
+  if (p.kind !== "errors" && ageAnswer(request) === "under") {
+    if (p.kind !== "bug") return json({ message: "Bad request" }, 400);
+    p.note = "";
+  }
   if (!env.DB) return json({ message: "Not set up here." }, 503);
   const sql = d1Sql(env.DB);
   await ensureSchema(sql, env.DB);

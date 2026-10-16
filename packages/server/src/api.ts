@@ -7,6 +7,7 @@ import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { isPaused, pausedResponse } from "./kill-switches.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
+import { AGE_GATE, TOO_YOUNG_LINE } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -16,10 +17,12 @@ import {
   endSession,
   ensureSchema,
   equipItem,
+  markAgeOk,
   profile,
   publicProfile,
   randomToken,
   recordResult,
+  resetNameAndIcon,
   setChatPicks,
   shopState,
   signInWithIdentity,
@@ -92,6 +95,13 @@ export const SESSION_COOKIE = "hc_session";
 export const DEVICE_COOKIE = "hc_device";
 const STATE_COOKIE = "hc_oauth";
 const NEXT_COOKIE = "hc_next";
+/**
+ * The age gate's answer on this device (docs/decisions/2026-10-16-age-gate-and-real-money.md): "ok" (old enough, for one
+ * sign-in within AGE_GATE.answerMinutes) or "under" (too young, AGE_GATE.tooYoungDays, and no later answer replaces it).
+ * Never the birth date: the app works the answer out and sends only that. HttpOnly, so the page can't clear it; the app
+ * keeps "too young" in its storage too, and each puts the other back.
+ */
+export const AGE_COOKIE = "hc_age";
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...headers } });
@@ -103,6 +113,22 @@ export function readCookie(request: Request, name: string): string | null {
 const cookie = (name: string, value: string, maxAge: number) =>
   `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 const sessionCookie = (token: string) => cookie(SESSION_COOKIE, token, 365 * 86_400);
+
+/** This device's answer to the age question (AGE_COOKIE), or null if it hasn't answered (or its "ok" has run out). */
+export function ageAnswer(request: Request): "ok" | "under" | null {
+  const v = readCookie(request, AGE_COOKIE);
+  return v === "ok" || v === "under" ? v : null;
+}
+const ASK_AGE = "Tell us when you were born first.";
+/**
+ * Every sign-in needs this device's "old enough" answer first (null: go ahead). A device that answered "too young"
+ * can't sign in at all (new account or not: the email would be a child's), and one that hasn't answered is asked.
+ */
+function ageRefusal(request: Request): Response | null {
+  const age = ageAnswer(request);
+  if (age === "ok") return null;
+  return age === "under" ? json({ message: TOO_YOUNG_LINE, tooYoung: true }, 403) : json({ message: ASK_AGE, askAge: true }, 403);
+}
 
 /** Online play needs a signed-in account once a way to sign in is set up (guests play solo against bots). */
 export const signInRequired = (env: AccountEnv) => !!((env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) || env.RESEND_API_KEY);
@@ -149,9 +175,18 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
   const email = !!env.RESEND_API_KEY;
-  // (`testSwitches`: TEST_SWITCHES is on here, so the app honors its test switches for everyone: local, e2e, staging.)
+  // (`testSwitches`: TEST_SWITCHES is on here, so the app honors its test switches for everyone: local, e2e, staging.
+  // `age`: this device's answer to the age question, once it has one.)
   if (path === "/api/auth/config") {
-    return json({ accounts: !!env.DB, google, email, onlineNeedsSignIn: !!env.DB && signInRequired(env), ...((env as AdminEnv).TEST_SWITCHES === "1" ? { testSwitches: true } : {}) });
+    const age = ageAnswer(request);
+    return json({
+      accounts: !!env.DB,
+      google,
+      email,
+      onlineNeedsSignIn: !!env.DB && signInRequired(env),
+      ...((env as AdminEnv).TEST_SWITCHES === "1" ? { testSwitches: true } : {}),
+      ...(age ? { age } : {}),
+    });
   }
   if (!env.DB) return json({ message: "Accounts aren't set up yet." }, 503);
   const sql: Sql = d1Sql(env.DB);
@@ -222,12 +257,18 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
 
   const current = await userFromToken(sql, token, now, presenceTouch(env, waitUntil));
 
-  /** Switches the browser to `user` (a new session) and answers with `body` or a redirect. */
+  /**
+   * Switches the browser to `user` (a new session) and answers with `body` or a redirect. Every sign-in comes through
+   * the age gate (ageRefusal): the account keeps that its holder said they were old enough, and the answer is used up,
+   * so the next sign-in on this device asks again.
+   */
   const signInAs = async (user: User, redirect?: string) => {
-    if (token && current?.id === user.id) return redirect ? Response.redirect(redirect, 302) : json(await profile(sql, user));
-    if (token) await endSession(sql, token);
-    const t = await createSession(sql, user.id, now);
-    const headers = new Headers({ "set-cookie": sessionCookie(t), "cache-control": "no-store" });
+    await markAgeOk(sql, user.id, now);
+    const headers = new Headers({ "set-cookie": cookie(AGE_COOKIE, "", 0), "cache-control": "no-store" });
+    if (!token || current?.id !== user.id) {
+      if (token) await endSession(sql, token);
+      headers.append("set-cookie", sessionCookie(await createSession(sql, user.id, now)));
+    }
     if (redirect) {
       headers.set("location", redirect);
       return new Response(null, { status: 302, headers });
@@ -242,16 +283,32 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (!readCookie(request, DEVICE_COOKIE)) headers.append("set-cookie", cookie(DEVICE_COOKIE, randomToken(16), 400 * 86_400));
     // (Admins, ADMIN_EMAILS as for the fair-play review, also see the boss battle's test trigger.)
     if (current) return new Response(JSON.stringify({ ...(await profile(sql, current)), ...(isAdmin(env as AdminEnv, current) ? { admin: true } : {}) }), { headers });
-    const g = await createGuest(sql, now, url.searchParams.get("name") ?? "Player");
+    // (A device that answered "too young" plays under the default name.)
+    const g = await createGuest(sql, now, ageAnswer(request) === "under" ? "Player" : (url.searchParams.get("name") ?? "Player"));
     headers.append("set-cookie", sessionCookie(g.token));
     return new Response(JSON.stringify(await profile(sql, g.user)), { headers });
   }
   if (!current) return json({ message: "No account on this device yet." }, 401);
 
-  // PATCH /api/me {name?, icon?}
+  // PATCH /api/me {name?, icon?}. Not from a device that answered "too young": it keeps the default name and icon.
   if (path === "/api/me" && request.method === "PATCH") {
+    if (ageAnswer(request) === "under") return json({ message: "Guests play under the default name and icon." }, 403);
     const body = (await request.json().catch(() => ({}))) as { name?: unknown; icon?: unknown };
     return json(await profile(sql, await updateProfile(sql, current.id, body)));
+  }
+
+  // POST /api/auth/age {oldEnough}: the age question's answer, asked before any sign-in (the app works it out from the
+  // birth month and year and sends only this; the date never leaves the device). Old enough: this device may sign in
+  // once within AGE_GATE.answerMinutes. Too young: for AGE_GATE.tooYoungDays this device can't sign in, a later answer
+  // doesn't change that, and its guest goes back to the default name and icon. From this site's own page, as JSON.
+  if (path === "/api/auth/age" && request.method === "POST") {
+    if (request.headers.get("origin") !== url.origin) return json({ message: "Not from here." }, 403);
+    if (!/^application\/json\b/i.test(request.headers.get("content-type") ?? "")) return json({ message: "Send JSON." }, 415);
+    const b = (await request.json().catch(() => ({}))) as { oldEnough?: unknown };
+    if (typeof b?.oldEnough !== "boolean") return json({ message: ASK_AGE }, 400);
+    if (b.oldEnough && ageAnswer(request) !== "under") return json({ age: "ok" }, 200, { "set-cookie": cookie(AGE_COOKIE, "ok", AGE_GATE.answerMinutes * 60) });
+    if (!isSignedIn(current)) await resetNameAndIcon(sql, current.id);
+    return json({ age: "under" }, 200, { "set-cookie": cookie(AGE_COOKIE, "under", AGE_GATE.tooYoungDays * 86_400) });
   }
 
   // GET /api/me/data: "Download my data" (Settings), everything kept about your account as a JSON file, the global
@@ -369,9 +426,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return json(await profile(sql, g.user), 200, { "set-cookie": sessionCookie(g.token) });
   }
 
-  // ---- Email: a 6-digit code ----
+  // ---- Email: a 6-digit code (each step behind the age gate: no email is taken from a device that hasn't answered) ----
   if (path === "/api/auth/email/start" && request.method === "POST") {
     if (!email) return json({ message: "Email sign-in isn't set up yet." }, 503);
+    const tooYoung = ageRefusal(request);
+    if (tooYoung) return tooYoung;
     const { email: raw } = (await request.json().catch(() => ({}))) as { email?: unknown };
     const address = cleanEmail(raw);
     if (!address) return json({ message: "That doesn't look like an email address." }, 400);
@@ -392,6 +451,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return json({ ok: true });
   }
   if (path === "/api/auth/email/verify" && request.method === "POST") {
+    const tooYoung = ageRefusal(request);
+    if (tooYoung) return tooYoung;
     const b = (await request.json().catch(() => ({}))) as { email?: unknown; code?: unknown };
     const address = cleanEmail(b.email);
     if (!address || typeof b.code !== "string") return json({ message: "Enter the 6-digit code." }, 400);
@@ -399,10 +460,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return signInAs(await signInWithIdentity(sql, current, "email", address, {}, now));
   }
 
-  // ---- Google ----
+  // ---- Google (behind the age gate too: without an "old enough" answer, back to the page, which asks) ----
   const redirectUri = `${url.origin}/api/auth/google/callback`;
   if (path === "/api/auth/google/start" && request.method === "GET") {
     if (!google) return json({ message: "Google sign-in isn't set up yet." }, 503);
+    if (ageRefusal(request)) return Response.redirect(`${url.origin}${safeNext(url.searchParams.get("next"))}`, 302);
     const state = randomToken(16);
     const q = new URLSearchParams({
       client_id: env.GOOGLE_CLIENT_ID!,
@@ -421,7 +483,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (!google) return json({ message: "Google sign-in isn't set up yet." }, 503);
     const state = url.searchParams.get("state");
     const code = url.searchParams.get("code");
-    if (!state || state !== readCookie(request, STATE_COOKIE) || !code) return Response.redirect(`${url.origin}/?signin=failed`, 302);
+    if (!state || state !== readCookie(request, STATE_COOKIE) || !code || ageRefusal(request)) return Response.redirect(`${url.origin}/?signin=failed`, 302);
     const res = await fetcher("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },

@@ -1,5 +1,6 @@
 import { Component, type ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
+import { tooYoung } from "../account.ts";
 import { captureError, reportProblem, type ReportKind } from "../problems.ts";
 import { FdButton } from "./FrontDoor.tsx";
 
@@ -45,7 +46,8 @@ const KINDS: { id: ReportKind; emoji: string; label: string; placeholder: string
 let sheet: ReportKind | null = null;
 const sheetSeen = new Set<(kind: ReportKind | null) => void>();
 export function openReport(kind: ReportKind | null) {
-  sheet = kind;
+  // (A device that answered the age question "too young" types nothing to us: a bug report, its diagnostics only.)
+  sheet = kind && tooYoung() ? "bug" : kind;
   for (const f of sheetSeen) f(kind);
 }
 
@@ -71,6 +73,7 @@ export function ReportSheet() {
   }, []);
   if (!open) return null;
   const kind = KINDS.find((k) => k.id === open)!;
+  const young = tooYoung();
   return (
     <div class="fd-sheet-scrim rp-scrim" onClick={(e) => e.target === e.currentTarget && close()}>
       <div class="fd-sheet" role="dialog" aria-modal="true" aria-labelledby="rp-title">
@@ -95,26 +98,30 @@ export function ReportSheet() {
           </>
         ) : (
           <>
-            <div class="fd-seg three rp-kinds" role="radiogroup" aria-label="What kind">
-              {KINDS.map((k) => (
-                <button
-                  type="button"
-                  role="radio"
-                  key={k.id}
-                  aria-checked={k.id === open}
-                  class={k.id === open ? "on" : ""}
-                  onClick={() => {
-                    setAnswer(null);
-                    setOpen(k.id);
-                  }}
-                >
-                  <b aria-hidden="true">{k.emoji}</b>
-                  {k.label}
-                </button>
-              ))}
-            </div>
-            <textarea class="fp-appeal" rows={3} maxLength={500} aria-label={kind.placeholder} placeholder={kind.placeholder} value={note} onInput={(e) => setNote(e.currentTarget.value)} />
-            <p class="fd-sub">{kind.hint}</p>
+            {!young && (
+              <>
+                <div class="fd-seg three rp-kinds" role="radiogroup" aria-label="What kind">
+                  {KINDS.map((k) => (
+                    <button
+                      type="button"
+                      role="radio"
+                      key={k.id}
+                      aria-checked={k.id === open}
+                      class={k.id === open ? "on" : ""}
+                      onClick={() => {
+                        setAnswer(null);
+                        setOpen(k.id);
+                      }}
+                    >
+                      <b aria-hidden="true">{k.emoji}</b>
+                      {k.label}
+                    </button>
+                  ))}
+                </div>
+                <textarea class="fp-appeal" rows={3} maxLength={500} aria-label={kind.placeholder} placeholder={kind.placeholder} value={note} onInput={(e) => setNote(e.currentTarget.value)} />
+              </>
+            )}
+            <p class="fd-sub">{young ? "Sends details of this screen and device, to help us fix a bug. Nothing you type." : kind.hint}</p>
             {answer && (
               <p class="fd-sub rp-error" role="alert">
                 {answer.error}

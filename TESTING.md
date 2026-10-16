@@ -101,3 +101,16 @@ account or email.
 4. **The setting.** On the phone, **Settings → Friends → Invites from: No one**. An invite from the computer now says
    "This player isn't taking invites right now."
 5. Tell me whether the invite at the top is easy to see and to dismiss on the iPhone (it sits under the notch).
+
+## The age question (Oct 16, about 3 minutes)
+
+Try the under-13 answer **only in a private tab**: a browser that answers it can't sign in for 400 days (that's the
+point). Closing the private tab forgets it.
+
+1. **Private tab, under 13.** On your phone, open hunchess.com in a private tab. Under "Sign in to play online" the box
+   asks **when were you born?** Tap **Month** and **Year**: each should open the phone's own picker, easy to scroll,
+   with nothing chosen at first. Pick this month and a year 12 years ago, then **Continue**. The box should say
+   "Accounts are for players 13 and older, so you'll play as a guest." Reload: still that line, no question. Close the
+   private tab.
+2. **Your own browser.** Sign out (Settings → Sign out), then sign in again: the question comes first, then Google and
+   the email code as before. Tell me if it's in the way or reads oddly.

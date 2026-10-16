@@ -222,6 +222,10 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
   // Friends (Oct 15, 2026): who may invite you, hiding when you're online (friends.ts).
   ...FRIENDS_COLUMNS,
+  // The age gate (Oct 16, 2026): when the account's holder said they were old enough (AGE_GATE.minAge), the first time
+  // they signed in after the question. NULL: signed in before the gate, or a guest. Never the birth date
+  // (docs/decisions/2026-10-16-age-gate-and-real-money.md).
+  { table: "users", column: "age_ok_at", type: "INTEGER" },
 ];
 const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,
@@ -456,6 +460,19 @@ export async function updateProfile(sql: Sql, userId: string, patch: { name?: un
     await sql.run("UPDATE users SET icon = ? WHERE id = ?", patch.icon, userId);
   }
   return (await getUser(sql, userId))!;
+}
+
+/**
+ * The age gate (docs/decisions/2026-10-16-age-gate-and-real-money.md). An account signed in after its holder said they
+ * were old enough keeps when they first did (and nothing else about it); later sign-ins leave that time as it is.
+ */
+export async function markAgeOk(sql: Sql, userId: string, now: number): Promise<void> {
+  await sql.run("UPDATE users SET age_ok_at = ? WHERE id = ? AND age_ok_at IS NULL", now, userId);
+}
+
+/** A guest whose device answered "too young": back to the default name and icon (anything they chose is gone). */
+export async function resetNameAndIcon(sql: Sql, userId: string): Promise<void> {
+  await sql.run("UPDATE users SET name = 'Player', icon = '♟' WHERE id = ?", userId);
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { ChatPicks, ShopState } from "@chessroyale/core";
+import { oldEnough, type ChatPicks, type ShopState } from "@chessroyale/core";
 import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankEffect } from "@chessroyale/core";
 
 /**
@@ -35,11 +35,19 @@ export interface AccountState {
    * Sign-in options the server has set up (null until known; accounts false = no accounts here). `testSwitches`: the
    * server has TEST_SWITCHES on (local, e2e, staging), so the address's test switches work for everyone (test-switches.ts).
    */
-  config: { accounts: boolean; google: boolean; email: boolean; onlineNeedsSignIn?: boolean; testSwitches?: boolean } | null;
+  config: { accounts: boolean; google: boolean; email: boolean; onlineNeedsSignIn?: boolean; testSwitches?: boolean; age?: AgeAnswer } | null;
   profile: Profile | null;
+  /**
+   * This device's answer to the age question, asked before any sign-in (AGE_GATE; null: not asked yet, or its "ok" was
+   * used by a sign-in). "ok": sign-in may go ahead. "under": guest play only, here for good.
+   */
+  age: AgeAnswer | null;
 }
 
-let state: AccountState = { config: null, profile: null };
+/** The age question's answer: old enough to sign in, or too young (docs/decisions/2026-10-16-age-gate-and-real-money.md). */
+export type AgeAnswer = "ok" | "under";
+
+let state: AccountState = { config: null, profile: null, age: null };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<AccountState>) => {
   state = { ...state, ...patch };
@@ -54,23 +62,81 @@ export function onAccountChange(fn: () => void): () => void {
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { credentials: "same-origin", ...init, headers: { "content-type": "application/json", ...init?.headers } });
-  const body = (await res.json().catch(() => ({}))) as T & { message?: string };
-  if (!res.ok) throw new Error(body.message ?? `Something went wrong (${res.status}).`);
+  const body = (await res.json().catch(() => ({}))) as T & { message?: string; askAge?: boolean; tooYoung?: boolean };
+  if (!res.ok) {
+    // A sign-in the age gate refused: ask the question again (the answer ran out), or too young after all.
+    if (body.askAge) set({ age: null });
+    if (body.tooYoung) rememberTooYoung();
+    throw new Error(body.message ?? `Something went wrong (${res.status}).`);
+  }
   return body;
 }
+
+/**
+ * "Too young" is kept twice: in this device's storage and in the server's cookie (hc_age, which the page can't clear).
+ * Each puts the other back, so clearing one isn't enough to answer again. Never the birth date, only the answer.
+ */
+export const TOO_YOUNG_KEY = "brc.tooYoung";
+function storedTooYoung(): boolean {
+  try {
+    return localStorage.getItem(TOO_YOUNG_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+/** This device is too young: remembered here, sign-in gone, and the name it may have chosen forgotten. */
+function rememberTooYoung() {
+  try {
+    localStorage.setItem(TOO_YOUNG_KEY, "1");
+    localStorage.removeItem("brc.name");
+  } catch {
+    // No storage: the server's cookie still holds it.
+  }
+  set({ age: "under" });
+}
+/** This device answered the age question "too young": guest play only, under the default name and icon. */
+export const tooYoung = () => state.age === "under";
 
 /** Loads the sign-in options and your profile (making a guest account the first time). */
 export async function loadAccount(name?: string): Promise<void> {
   try {
     const config = await api<NonNullable<AccountState["config"]>>("/api/auth/config");
-    set({ config });
+    const young = storedTooYoung() || config.age === "under";
+    set({ config, age: young ? "under" : (config.age ?? null) });
+    if (young) rememberTooYoung();
     if (!config.accounts) return;
-    const q = name ? `?name=${encodeURIComponent(name)}` : "";
+    const q = name && !young ? `?name=${encodeURIComponent(name)}` : "";
     set({ profile: await api<Profile>(`/api/me${q}`) });
+    // The server forgot (its cookie was cleared): tell it again, which also puts the guest back to the defaults.
+    if (young && config.age !== "under") await sendAgeAnswer(false).catch(() => undefined);
   } catch {
     // No server (local dev) or offline: play on without an account.
     set({ config: { accounts: false, google: false, email: false } });
   }
+}
+
+async function sendAgeAnswer(ok: boolean): Promise<AgeAnswer> {
+  const { age } = await api<{ age: AgeAnswer }>("/api/auth/age", { method: "POST", body: JSON.stringify({ oldEnough: ok }) });
+  if (age === "under") set({ profile: await api<Profile>("/api/me") });
+  return age;
+}
+
+/**
+ * Answers the age question (before any sign-in): the birth month (1-12) and year are checked here, on the device, and
+ * only the answer goes to the server. Too young is remembered at once, before the server hears, so a failed request
+ * can't be retried with another answer. Throws the server's message if an "old enough" answer didn't reach it.
+ */
+export async function answerAge(month: number, year: number): Promise<AgeAnswer> {
+  const ok = oldEnough(month, year, new Date());
+  if (!ok) {
+    rememberTooYoung();
+    await sendAgeAnswer(false).catch(() => undefined);
+    return "under";
+  }
+  const age = await sendAgeAnswer(true);
+  if (age === "under") rememberTooYoung();
+  else set({ age });
+  return age;
 }
 
 export async function updateProfile(patch: { name?: string; icon?: string }): Promise<void> {
@@ -148,11 +214,12 @@ export async function sendEmailCode(email: string): Promise<void> {
 }
 
 export async function verifyEmailCode(email: string, code: string): Promise<void> {
-  set({ profile: await api<Profile>("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code }) }) });
+  // (Signing in uses the age answer up: the next sign-in on this device asks again.)
+  set({ profile: await api<Profile>("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code }) }), age: null });
 }
 
 export async function signOut(): Promise<void> {
-  set({ profile: await api<Profile>("/api/auth/logout", { method: "POST" }) });
+  set({ profile: await api<Profile>("/api/auth/logout", { method: "POST" }), age: tooYoung() ? "under" : null });
 }
 
 /** "Download my data" (Settings): everything the server keeps about your account, as a JSON file. */
@@ -166,7 +233,8 @@ export const ACCOUNT_DATA_URL = "/api/me/data";
 export async function deleteMyAccount(): Promise<void> {
   await api("/api/me/delete", { method: "POST", body: JSON.stringify({ confirm: "delete" }) });
   try {
-    for (const k of Object.keys(localStorage)) if (k.startsWith("brc.") || k.startsWith("hunchess-")) localStorage.removeItem(k);
+    // (Except a "too young" answer: it's this device's, not the account's.)
+    for (const k of Object.keys(localStorage)) if ((k.startsWith("brc.") || k.startsWith("hunchess-")) && k !== TOO_YOUNG_KEY) localStorage.removeItem(k);
   } catch {
     // No storage to clear.
   }

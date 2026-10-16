@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS } from "@chessroyale/core";
+import { AGE_GATE, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS } from "@chessroyale/core";
 
 /**
  * The privacy policy (/privacy), terms of service (/terms) and copyright page (/copyright): drafts written from what
@@ -10,7 +10,7 @@ import { FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS } from "@chessroyale/co
 
 /** The contact address: a placeholder until Eric sets up its forwarding (ROADMAP.md, "Needs Eric"). */
 export const CONTACT = "privacy@hunchess.com";
-export const UPDATED = "October 15, 2026";
+export const UPDATED = "October 16, 2026";
 
 const hours = (ms: number) => Math.round(ms / 3_600_000);
 /** The report sheet's reason for a name or icon. */
@@ -39,9 +39,9 @@ function Draft() {
           <strong>The contact address:</strong> {CONTACT} has to reach a real inbox, or another address goes here (Eric).
         </li>
         <li>
-          <strong>Minimum age</strong> (proposed below, not built yet): 13, asked as a neutral birth month and year before signing
-          in, choosing a name or drawing an icon; under 13, guest play only, with a default name (Eric; a lawyer to confirm, with
-          the EU's and UK's ages).
+          <strong>Minimum age outside the US:</strong> 13 for an account is decided and built (Eric, Oct 16), asked as a neutral
+          birth month and year before signing in; under 13, guest play only. Whether some EU countries need a higher age (up to
+          16), and the UK's, is a lawyer's call.
         </li>
         <li>
           <strong>Governing law:</strong> your state, and courts or arbitration for disputes (Eric; arbitration is a lawyer's call).
@@ -97,6 +97,7 @@ function Privacy() {
       <ul>
         <li>No ads, no ad tracking and no analytics services. We never sell your data.</li>
         <li>Guests play solo against bots without signing in: no email, no Google account.</li>
+        <li>Accounts are for players {AGE_GATE.minAge} and older. Younger players play as guests.</li>
         <li>Your email is for signing in and for fair-play notices. Never newsletters.</li>
         <li>Everything is stored by Cloudflare, which hosts the game.</li>
         <li>Download your data or delete your account any time, in Settings.</li>
@@ -108,7 +109,8 @@ function Privacy() {
         what={
           <p>
             A random account id, your display name, your icon (an emoji or a drawing you make), and when you joined. If you sign in:
-            your email address, or your Google account id and the email Google has verified. There's no password to keep.
+            your email address, or your Google account id and the email Google has verified, and when you told us you're{" "}
+            {AGE_GATE.minAge} or older (never your birth date). There's no password to keep.
           </p>
         }
         why="to run your account and keep your profile on every device you sign in on."
@@ -270,8 +272,8 @@ function Privacy() {
 
       <h2>Cookies and storage on your device</h2>
       <p>
-        Only what the game needs to work: signing in, and fair play's device marker against ban dodging. Nothing for advertising
-        or analytics and nothing from other companies, so there's nothing to accept.
+        Only what the game needs to work: signing in, the answer to the age question, and fair play's device marker against ban
+        dodging. Nothing for advertising or analytics and nothing from other companies, so there's nothing to accept.
       </p>
       <ul>
         <li>
@@ -284,8 +286,13 @@ function Privacy() {
           <strong>hc_oauth</strong> and <strong>hc_next</strong> exist only during "Continue with Google". 10 minutes.
         </li>
         <li>
+          <strong>hc_age</strong> holds this device's answer to "when were you born?": only whether you're {AGE_GATE.minAge} or
+          older, never the date. "Old enough" lasts {AGE_GATE.answerMinutes} minutes, or until you sign in; "under{" "}
+          {AGE_GATE.minAge}" lasts {AGE_GATE.tooYoungDays} days.
+        </li>
+        <li>
           <strong>Local storage</strong> keeps your settings and choices on this device: theme, sound, eval bar, chat on or off,
-          players you muted, your boss picks, and the match you're in, so you can rejoin it.
+          players you muted, your boss picks, the match you're in, so you can rejoin it, and an "under {AGE_GATE.minAge}" answer.
         </li>
         <li>
           <strong>The app's files</strong> are kept on your device (a service worker) so it opens quickly. No personal data.
@@ -315,12 +322,17 @@ function Privacy() {
 
       <h2>Children</h2>
       <p>
-        HunChess is a game for a general audience, not directed to children under 13. If we learn we have personal information
-        from a child under 13, we delete it. Parents: email <Mail />.
+        HunChess is a game for a general audience, not directed to children under {AGE_GATE.minAge}. Accounts are for players{" "}
+        {AGE_GATE.minAge} and older.
       </p>
       <p>
-        <Blank>Proposed, for Eric to decide</Blank> Before you sign in, choose a name or draw an icon, we ask your birth month and
-        year. Under 13, you play as a guest with a default name: no sign-in, no email, and no name or drawing of your own.
+        Before anyone signs in, we ask their birth month and year. It's checked on the device and never sent to us or kept: only
+        the answer is. Under {AGE_GATE.minAge}, you play as a guest: no sign-in and no email, the default name and icon, and
+        nothing you type reaches us or other players (a bug report sends its details without a note). Guests can't play online,
+        post in the global chat, add friends or get invites. The device remembers the answer, so it can't simply be answered again.
+      </p>
+      <p>
+        If we learn we have personal information from a child under {AGE_GATE.minAge}, we delete it. Parents: email <Mail />.
       </p>
 
       <h2>Your rights</h2>
@@ -372,7 +384,8 @@ function Privacy() {
           {LOBBY_LIFE.lobbyResultsKeepMinutes} minutes after it ends), and records nothing for you.
         </li>
         <li>
-          <strong>This device</strong> forgets you too: the app clears its settings and choices.
+          <strong>This device</strong> forgets you too: the app clears its settings and choices (an "under {AGE_GATE.minAge}"
+          answer stays with the device).
         </li>
         <li>
           <strong>Backups:</strong> our database host keeps restore points for up to 30 days; after that, what you deleted is
@@ -402,8 +415,9 @@ function Terms() {
 
       <h2>Who can play</h2>
       <p>
-        You must be 13 or older, or the minimum age where you live if it's higher. One account per person.{" "}
-        <Blank>Proposed, for Eric to decide</Blank> Under 13, you play as a guest only, with a default name.
+        Anyone can play as a guest. To make an account (sign in), you must be {AGE_GATE.minAge} or older, or the minimum age where
+        you live if it's higher. One account per person. Under {AGE_GATE.minAge}, you play as a guest only, with the default name
+        and icon.
       </p>
 
       <h2>Your account</h2>

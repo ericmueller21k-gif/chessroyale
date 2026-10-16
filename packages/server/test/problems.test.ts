@@ -454,6 +454,26 @@ describe("POST /api/problems", () => {
     expect(await latestReports(sql)).toHaveLength(2);
   });
 
+  it("a device that answered the age question too young types nothing to us: a bug keeps no note, feedback and ideas aren't taken", async () => {
+    const { sql, d1 } = memoryDb();
+    await ensureSchema(sql, d1);
+    const bg = background();
+    await vi.advanceTimersByTimeAsync(60_000);
+    const young = { headers: { cookie: "hc_age=under" } };
+    const res = await handleProblems(post({ kind: "bug", note: "I'm Sam Lee, 11, from Ohio", where, trail: ["1.0s boss"], recent: [], version: "dev", device }, young), { DB: d1 }, bg.waitUntil);
+    expect(res.status).toBe(200);
+    const row = (await reportById(sql, ((await res.json()) as { id: string }).id))!;
+    expect(row).toMatchObject({ kind: "bug", note: "" });
+    expect(JSON.parse(row.diag)).toMatchObject({ where, device });
+    for (const kind of ["feedback", "idea"]) {
+      expect((await handleProblems(post({ kind, note: "I'm Sam Lee" }, young), { DB: d1 }, bg.waitUntil)).status, kind).toBe(400);
+    }
+    expect(await sql.all("SELECT kind, note FROM ops_reports")).toEqual([{ kind: "bug", note: "" }]);
+    // (An "old enough" answer, or none, changes nothing.)
+    const ok = await handleProblems(post({ kind: "idea", note: "more bosses" }, { headers: { cookie: "hc_age=ok" } }), { DB: d1 }, bg.waitUntil);
+    expect(ok.status).toBe(200);
+  });
+
   it("the database's own cap: at most maxReportsPerDay reports a day, whatever the instance (a cap line logged)", async () => {
     const { sql, d1 } = memoryDb();
     await ensureSchema(sql, d1);

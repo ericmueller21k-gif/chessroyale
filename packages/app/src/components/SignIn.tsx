@@ -1,5 +1,6 @@
-import { useState } from "preact/hooks";
-import { sendEmailCode, signInWithGoogle, verifyEmailCode } from "../account.ts";
+import { useEffect, useState } from "preact/hooks";
+import { MONTHS, TOO_YOUNG_LINE, birthYears } from "@chessroyale/core";
+import { account, answerAge, onAccountChange, sendEmailCode, signInWithGoogle, verifyEmailCode } from "../account.ts";
 
 const GoogleG = () => (
   <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
@@ -10,8 +11,70 @@ const GoogleG = () => (
   </svg>
 );
 
-/** Google, or a 6-digit code sent to your email. `next` is where Google sends you back to. */
-export function SignIn({ google, email, next, failed }: { google: boolean; email: boolean; next?: string; failed?: boolean }) {
+type SignInProps = { google: boolean; email: boolean; next?: string; failed?: boolean };
+
+/**
+ * Signing in, wherever it's offered: the age question first (each sign-in, until it's answered), then Google or a
+ * 6-digit code sent to your email; a device that answered "too young" gets a friendly line instead. `next` is where
+ * Google sends you back to. See docs/decisions/2026-10-16-age-gate-and-real-money.md.
+ */
+export function SignIn(props: SignInProps) {
+  const [, rerender] = useState(0);
+  useEffect(() => onAccountChange(() => rerender((n) => n + 1)), []);
+  const age = account().age;
+  if (age === "under") return <p class="signin-young" role="status">{TOO_YOUNG_LINE}</p>;
+  return age === "ok" ? <SignInOptions {...props} /> : <AgeQuestion />;
+}
+
+/**
+ * The age question: a birth month and year, nothing chosen to start with and no age mentioned, so the answer can't
+ * be steered. It's checked on this device; only the answer goes to the server, and "too young" sticks.
+ */
+function AgeQuestion() {
+  const [month, setMonth] = useState("");
+  const [year, setYear] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const answer = () => {
+    setBusy(true);
+    setMsg(null);
+    answerAge(Number(month), Number(year))
+      .catch((e: unknown) => setMsg((e as Error).message))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <div class="signin-options">
+      <p class="signin-ask" id="signin-ask">
+        Before you sign in: when were you born?
+      </p>
+      <div class="signin-row signin-born" role="group" aria-labelledby="signin-ask">
+        <select aria-label="Birth month" value={month} onChange={(e) => setMonth(e.currentTarget.value)}>
+          <option value="">Month</option>
+          {MONTHS.map((m, i) => (
+            <option key={m} value={String(i + 1)}>
+              {m}
+            </option>
+          ))}
+        </select>
+        <select aria-label="Birth year" value={year} onChange={(e) => setYear(e.currentTarget.value)}>
+          <option value="">Year</option>
+          {birthYears(new Date()).map((y) => (
+            <option key={y} value={String(y)}>
+              {y}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button type="button" class="btn btn-primary" disabled={busy || !month || !year} onClick={answer}>
+        Continue
+      </button>
+      {msg && <p class="muted small signin-msg">{msg}</p>}
+    </div>
+  );
+}
+
+/** Google, or a 6-digit code sent to your email. */
+function SignInOptions({ google, email, next, failed }: SignInProps) {
   const [address, setAddress] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);

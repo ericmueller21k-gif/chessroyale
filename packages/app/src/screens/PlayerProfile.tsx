@@ -7,7 +7,7 @@ import { IconEditor, UserIcon } from "../components/PixelIcon.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { QuickChatPicks } from "../components/ChatPicks.tsx";
 import { ProfileFriendActions } from "../components/Friends.tsx";
-import { account, fetchProfile, onAccountChange, reportPlayer, updateProfile, type PublicProfile } from "../account.ts";
+import { account, fetchProfile, onAccountChange, reportPlayer, tooYoung, updateProfile, type PublicProfile } from "../account.ts";
 import type { ProfileTarget } from "../profile-nav.ts";
 import { ordinal } from "./StageBreak.tsx";
 
@@ -437,9 +437,12 @@ export function PlayerProfileScreen({
         </div>
         {own && (
           <div class="fd-card-actions">
-            <FdButton primary class="small" onClick={() => setSheet("edit")}>
-              Edit name &amp; icon
-            </FdButton>
+            {/* (Not on a device that answered the age question "too young": the default name and icon stay.) */}
+            {!tooYoung() && (
+              <FdButton primary class="small" onClick={() => setSheet("edit")}>
+                Edit name &amp; icon
+              </FdButton>
+            )}
             {onLocker && (
               <FdButton class="small" onClick={onLocker}>
                 Open locker
@@ -458,7 +461,7 @@ export function PlayerProfileScreen({
       <Recent p={p} mark={own ? target.match : undefined} />
       {own ? (
         <>
-          {me && !me.user.signedIn && config && (config.google || config.email) && (
+          {me && !me.user.signedIn && config && (config.google || config.email) && !tooYoung() && (
             <section class="fd-section">
               <h2 class="fd-label">KEEP YOUR PROFILE</h2>
               <div class="fd-panel">
