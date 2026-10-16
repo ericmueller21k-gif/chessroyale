@@ -505,7 +505,8 @@ function MatchView({
   );
   // Every blocked move on this board, for everyone, from when it's placed until the other squad has moved.
   const shownBlocks = history.browsing ? [] : blocksShown(m, boardId);
-  const banner = client.banner && client.banner.key === m.key && client.banner.board === boardId && now - client.banner.at < BANNER_MS ? client.banner : null;
+  const onBoard = client.bannerOn(m.key, boardId);
+  const banner = onBoard && now - onBoard.at < BANNER_MS ? onBoard : null;
   // (The banner goes when its time is up, whatever else is drawn meanwhile.)
   useEffect(() => {
     if (!banner) return;

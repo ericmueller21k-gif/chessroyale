@@ -182,7 +182,8 @@ test("the shop between rounds, a Stockfish token, a Time chip and a shield: boug
         // board from the same start, and both may have a shield.)
         for (const e of m.last?.events ?? []) if (e.kind === "block" && e.outcome === "shielded" && !w.__shielded.some((x: any) => x.key === m.key && x.seq === m.last.seq && x.board === e.board && x.side === e.side && x.move === e.move)) w.__shielded.push({ key: m.key, seq: m.last.seq, board: e.board, move: e.move, side: e.side });
       }
-      if (s.banner?.kind && !w.__banners.includes(s.banner.kind)) w.__banners.push(s.banner.kind);
+      // (Every board's banner: each board keeps its own, so another board's or match's never replaces it.)
+      for (const b of Object.values(s.banners) as any[]) if (b.kind && !w.__banners.some((x: any) => x.key === b.key && x.board === b.board && x.at === b.at)) w.__banners.push({ key: b.key, board: b.board, kind: b.kind, at: b.at });
     }, 100);
   });
   // The match starts: the shop closes, the kit comes in (both squads see it under the board).
@@ -221,7 +222,17 @@ test("the shop between rounds, a Stockfish token, a Time chip and a shield: boug
   await expect(page.locator(".mc-stockfish-on")).toHaveText("Your Stockfish lines", { timeout: 15_000 });
   await expect(page.locator(".mc-stockfish .sq-cheat-lines li")).toHaveCount(3, { timeout: 30_000 });
   await expect(page.locator(".mc-stockfish .sq-cheat-lines li").first()).toContainText(/^1 · /);
-  await expect(page.locator(`.board-area ${BOARD_SEL.arrowLine}`)).toHaveCount(3);
+  // (Three lines besides your partner's pick, a blue arrow once their bot has picked: it picks in its own time.)
+  const tokenArrows = () =>
+    page.evaluate(
+      ([key, board, sel]) => {
+        const m = (window as any).squads.matches.get(key);
+        const picks = new Set((m.current?.duties ?? []).filter((d: any) => d.board === board && d.role !== "move").flatMap((d: any) => d.players.map((p: string) => m.visible[p]).filter(Boolean)));
+        return document.querySelectorAll(sel).length - picks.size;
+      },
+      [s.key, s.duty!.board, `.board-area ${BOARD_SEL.arrowLine}`] as const,
+    );
+  await expect.poll(tokenArrows, { timeout: 5_000 }).toBe(3);
   const assist = await page.evaluate((key) => (window as any).squads.matches.get(key).assisting, s.key);
   expect(assist).toHaveLength(1);
   // Your side to move in that position: your moves, never theirs.
@@ -243,6 +254,7 @@ test("the shop between rounds, a Stockfish token, a Time chip and a shield: boug
   const ours = () => page.evaluate(([key, side]) => (window as any).__shielded.filter((x: any) => x.key === key && x.side !== side), [s.key, s.side!] as const);
   await expect.poll(async () => (await ours()).length, { timeout: 120_000, intervals: [250] }).toBe(1);
   expect(await page.evaluate(([key, side]) => (window as any).squads.matches.get(key).shields[side], [s.key, s.side!] as const)).toBe(0);
-  // Both squads are told (the line above the board: your shield canceled their block).
-  expect(await page.evaluate(() => (window as any).__banners)).toContain("shield");
+  // Both squads are told (the line above that board: your shield canceled their block).
+  const canceled = (await ours())[0];
+  expect(await page.evaluate(() => (window as any).__banners)).toContainEqual(expect.objectContaining({ key: s.key, board: canceled.board, kind: "shield" }));
 });
