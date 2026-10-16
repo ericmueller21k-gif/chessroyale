@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { BOSS_ROSTER } from "@chessroyale/core";
 import { pickLine, type Beat } from "../src/characters/boss-beats.ts";
 import { HOLLOW_SOUNDS, hollowSound } from "../src/characters/hollow-sounds.ts";
-import { BULBS, BULB_KEYS, HOLLOW_CAST_FROM, HOLLOW_HEART, STRAND_SECTIONS, bulbsLook, findLine, findShort, hollowBuild } from "../src/characters/hollow.ts";
+import { BULBS, BULB_KEYS, HOLLOW_ATTACK, HOLLOW_CAST_FROM, HOLLOW_HEART, HOLLOW_PALETTE, STRAND_SECTIONS, bulbsLook, findLine, findShort, hollowBuild } from "../src/characters/hollow.ts";
+import { LIGHT_BULBS } from "../src/characters/lights.ts";
 import { bossKit } from "../src/characters/kits.ts";
 import { DAWN_STAGGER, EFFECTS, POWER_MOMENTS, animLength, cueAt, darkItem, lightsOutSmashes, lightsOutSpot, nightItems } from "../src/characters/power-art.ts";
 import { frameKeys, lazyParts, renderFrame, type Anim, type Character } from "../src/characters/sprite.ts";
@@ -57,7 +58,44 @@ describe("Hollow, the Darkness boss", () => {
     expect(new Set(glints.flat()).size).toBe(BULBS);
   });
 
-  it("counts down on his strand: each look puts about a third of the bulbs out", () => {
+  it("paints the whole strand, every one of its bulbs, in every pose of every animation, his attack's too", () => {
+    // (Eric, Oct 16: "make sure it's showing for all of his animations".) The strand's own part, as each frame stacks
+    // it: a smashed bulb keeps its socket and a tooth of glass in its shade key, so Lights out's frames count too (his
+    // claw closing on a section may cover a bulb or two of it for a frame: the next test checks what shows); a frame
+    // without him (dropping in, gone) has no layers.
+    for (const c of [ch, HOLLOW_ATTACK])
+      for (const [name, a] of Object.entries(c.anims))
+        a.frames.forEach((f, i) => {
+          if (!f.layers.length) return;
+          const strands = f.layers.filter((l) => l.part.startsWith("strand:"));
+          expect(strands, `${c.id} ${name} frame ${i}: one strand`).toHaveLength(1);
+          const keys = new Set(c.parts[strands[0]!.part]!.grid.join(""));
+          const painted = BULB_KEYS.filter(([main, shade]) => keys.has(main) || keys.has(shade)).length;
+          expect(painted, `${c.id} ${name} frame ${i}`).toBe(LIGHT_BULBS);
+        });
+  });
+
+  it("holds his strand lit in full in battle: no countdown on it, whatever the strip by the bar says", () => {
+    // The countdown to his next cover is the strip of three alone; his figure wears no look from the battle's state.
+    expect(kit.lookOf).toBeUndefined();
+    // Every pose he stands in through a battle (not his entrance lighting up, a hit's flicker, his defeat, Lights out
+    // and its test, or the fresh strand spilling out): every bulb's glass visible and in its lit color, frame by frame.
+    const steady: [Character, string][] = [
+      ...["idle", "thinking", "move", "capture", "check", "smug", "rattled", "victory", "darkCast", "claimDark"].map((n): [Character, string] => [ch, n]),
+      [HOLLOW_ATTACK, "kingAttack"],
+    ];
+    for (const [c, name] of steady)
+      c.anims[name]!.frames.forEach((f, i) => {
+        if (!f.layers.length) return;
+        const keys = new Set(frameKeys(c, { ...f, specks: [] }).flat());
+        BULB_KEYS.forEach(([main], b) => {
+          expect(keys.has(main), `${name} ${i}: bulb ${b} shown`).toBe(true);
+          expect((f.pal?.[main] ?? HOLLOW_PALETTE[main])!.toLowerCase(), `${name} ${i}: bulb ${b} lit`).toBe(HOLLOW_PALETTE[main]!.toLowerCase());
+        });
+      });
+  });
+
+  it("can still put the strand out a third at a time (his entrance and defeat): each look puts about a third of the bulbs out", () => {
     const f = anim("idle").frames[0]!;
     // The pixels in a lit bulb's own colors (main, shade, glint).
     const litColours = new Set(BULB_KEYS.flatMap((b) => b.slice(0, 3).map((k) => ch.palette[k]!.toLowerCase())));
@@ -134,12 +172,14 @@ describe("Hollow, the Darkness boss", () => {
     expect(kit.sounds.tick).toBe("hollowTick");
   });
 
-  it("brings the lights back: a fresh strand spills out of the void and lights, then he leaps back to his corner", () => {
+  it("brings the lights back: a fresh strand drops out of the void and lights, then he leaps back to his corner", () => {
     const lb = anim("lightsBack");
     expect(cueAt(lb, "relight")).not.toBeNull();
-    // The strand grows out of the void over a few frames (its parts name how much of it is out).
-    const outs = lb.frames.map((f) => f.layers.find((l) => l.part.startsWith("strand:"))?.part.split(":").at(-1)).filter(Boolean);
-    expect(outs.slice(1, 5)).toEqual(["0.25", "0.5", "0.75", "1"]);
+    // The whole strand drops out of the void over a few frames, every bulb on it (Oct 16): its lowest bulb lower each
+    // frame, its bulbs lit a third at a time.
+    const mains = BULB_KEYS.map((b) => b[0]);
+    const lowest = (i: number) => Math.max(...frameKeys(ch, { ...lb.frames[i]!, specks: [] }).flatMap((row, y) => (row.some((k) => k && mains.includes(k)) ? [y] : [])));
+    for (let i = 2; i <= 4; i++) expect(lowest(i), `frame ${i}`).toBeGreaterThan(lowest(i - 1));
     expect(lb.frames.at(-1)!.layers).toEqual([]);
   });
 

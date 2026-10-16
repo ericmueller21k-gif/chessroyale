@@ -12,7 +12,7 @@ import { BIGBOY, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT } from "./bigboy.t
 import { CLOWN, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
 import { GREX, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
-import { HOLLOW, HOLLOW_ATTACK, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT, bulbsLook } from "./hollow.ts";
+import { HOLLOW, HOLLOW_ATTACK, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT } from "./hollow.ts";
 import { SAWYER, SAWYER_CHANCE, SAWYER_LINES, SAWYER_PORTRAIT } from "./sawyer.ts";
 import { PIG, PIG_CHANCE, PIG_LINES, PIG_PORTRAIT } from "./pig.ts";
 import { RECLUSE, RECLUSE_BUST, RECLUSE_PORTRAIT } from "./recluse.ts";
@@ -72,7 +72,7 @@ export interface BossKit extends BeatLines {
   /** Wider than the boss bar's usual box (Sawyer's saw and tail): on a phone his box is wider, so neither the screen's
    * edge nor the boss's name cuts into him. */
   wide?: boolean;
-  /** A recolor (one of the character's `looks`) from the battle's state: Hollow's bulbs still lit. */
+  /** A recolor (one of the character's `looks`) from the battle's state: Big Boy's black pawn. */
   lookOf?: (boss: BossView) => string | undefined;
   /** Its attack on a king (the God King's Last Stand, its mate), if it has one: see KingAttackKit. */
   kingAttack?: KingAttackKit;
@@ -148,11 +148,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
     lines: HOLLOW_LINES,
     chance: HOLLOW_CHANCE,
     portrait: { ...HOLLOW_PORTRAIT, anim: "idle", frame: 0 },
-    // His strand shows the bulbs still lit before his next cover of the dark (the power rules' `bulbs`, 0-3).
-    lookOf: (boss) => {
-      const n = (boss.powers as { bulbs?: number } | undefined)?.bulbs;
-      return n === undefined ? undefined : bulbsLook(n);
-    },
+    // (No `lookOf`: his strand is lit in full in every pose, Eric, Oct 16. The countdown to his next cover is the strip
+    // of three bulbs by the boss bar alone: docs/decisions/2026-10-16-hollow-full-strand.md.)
     // He drops in beside the king and whips his strand at it (hollow.ts: kingAttack), a lash of color on its square each hit.
     kingAttack: { ch: HOLLOW_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: lashItem },
   },
@@ -351,12 +348,6 @@ export const wipKit = (): BossKit | null => {
   const name = wipKitName();
   return name ? (BOSS_KITS[name] ?? Object.entries(BOSS_KITS).find(([k]) => k.replace(/\s/g, "") === name.replace(/\s/g, ""))?.[1] ?? null) : null;
 };
-/**
- * For a test link's preview of a moment (components/WipPreview.tsx): a look to show instead of the kit's own (his bulbs
- * counting down before the power rules exist).
- */
-export const wipLook: { now: (() => string | undefined) | null } = { now: null };
-
 /**
  * A boss's kit by the name its screens have (the boss view's `name`): the kit of that name, or else the kit the roster
  * gives the boss of that name (BossDef.kit). So a boss renamed in the roster keeps its kit: renaming one (the Hidden Boss,

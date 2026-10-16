@@ -6,7 +6,7 @@
  *
  * "Neighbors" (my call: with ten bulbs and eight colors, no color can be kept off the strand twice): a bulb's
  * color differs from the next three bulbs' along the wire either way. The next one is its neighbor; the one after
- * hangs on the same side of the wire; and the countdown to his next cover puts every third bulb out at a time
+ * hangs on the same side of the wire; and his entrance and defeat light or put out every third bulb at a time
  * (`bulbs2` leaves 0, 1, 3, 4, 6, 7, 9 lit, `bulbs1` 0, 3, 6, 9), so bulbs two or three apart end up side by side
  * among the lit ones. So no two bulbs that ever show next to each other share a color. Bulbs 0-4 run up the inner
  * half to his hand and 5-9 down the outer half, so 4 and 5 (either side of his hand) are neighbors; the two ends
