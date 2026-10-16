@@ -105,12 +105,12 @@ ${note ? `<div class="card">${esc(note)}</div>` : ""}
 <div class="card">Chat: ${pause(d.block)}</div>
 <h2>Decide</h2>
 <form class="row" method="post">
-<input type="text" name="reason" placeholder="Reason (for the log; required except to dismiss)" maxlength="500">
-<input type="text" name="note" placeholder="Note to the player (optional; shown with a warning or a chat ban)" maxlength="500">
+<input type="text" name="reason" placeholder="Reason (for the log)" maxlength="500">
+<input type="text" name="note" placeholder="Note to the player (optional)" maxlength="500">
 <button class="clear" name="action" value="dismiss">Dismiss the reports</button><button name="action" value="warn">Warn</button>
 ${bans}<button class="ban" name="action" value="ban:forever">Chat ban, no end</button>
 <button name="action" value="lift">Lift the pause</button><button name="action" value="reset">Reset name and icon</button></form>
-<p class="muted">Dismiss, warn, ban and reset close the open reports. A chat ban only stops sending: they still read chat and play. A warning or a ban shows the player your note once.</p>
+<p class="muted">Every decision but a dismissal needs a reason. Dismiss, warn, ban and reset close the open reports. A chat ban only stops sending: they still read chat and play. A warning or a ban shows the player your note once.</p>
 <h2>Open reports (${d.open.length})</h2>${d.open.map(reportCard).join("") || '<p class="muted">None.</p>'}
 <h2>Decisions</h2>${d.log.length ? `<div class="card scroll"><table><tr><th>When</th><th>Decision</th><th>By</th><th>Reason</th><th>Note to the player</th></tr>${d.log
     .map((l) => `<tr><td>${when(l.at)}</td><td>${decision(l)}</td><td>${esc(l.by)}</td><td class="wrap">${esc(l.reason)}</td><td class="wrap">${esc(l.note)}</td></tr>`)

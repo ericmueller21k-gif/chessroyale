@@ -135,6 +135,6 @@ test("chat moderation: mute and report from a name, the review page, a chat ban,
   await ann.getByRole("button", { name: "Edit name & icon", exact: true }).click();
   await ann.getByLabel("Your name").fill(blocked);
   await ann.getByRole("button", { name: "Save name", exact: true }).click();
-  await expect(ann.locator(".fd-note")).toHaveText("That name isn't allowed. Pick another one.");
+  await expect(ann.getByRole("dialog", { name: "Edit name & icon" }).locator(".fd-note")).toHaveText("That name isn't allowed. Pick another one.");
   expect(await ann.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.user.name))).toBe(annName);
 });

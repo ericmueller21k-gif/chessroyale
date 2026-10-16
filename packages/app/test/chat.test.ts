@@ -302,7 +302,17 @@ describe("chat moderation in the app", () => {
   /** An online match's chat: "p1" is you; `uids` says whose account each seat is (bots have none). */
   function online(code: string, uids: Record<string, string>) {
     const sent: ClientMessage[] = [];
-    const chat = new MatchChat({ code: () => code, me: () => "p1", send: (m) => sent.push(m), emit: () => {}, local: (t) => t, teams: () => false, picks: () => null, uidOf: (id) => uids[id] });
+    const chat = new MatchChat({
+      code: () => code,
+      me: () => "p1",
+      send: (m) => sent.push(m),
+      emit: () => {},
+      local: (t) => t,
+      teams: () => false,
+      picks: () => null,
+      uidOf: (id) => uids[id],
+      seats: () => Object.keys(uids),
+    });
     chat.onLog([], PACKS);
     const line = (n: number, from: string, say = "gg"): NetChatLine => ({ n, from, say, to: "all", team: null, at: Date.now() });
     return { chat, sent, line };
@@ -318,8 +328,9 @@ describe("chat moderation in the app", () => {
     // A reload: the device remembers.
     mutes.reload();
     expect(mutes.has("u-bo")).toBe(true);
-    // The next match: Bo is p7 now.
+    // The next match: Bo is p7 now (shown as muted there before he says anything).
     const b = online("BBBBB", { p1: "u-me", p7: "u-bo", p8: "u-cy" });
+    expect(b.chat.mutedIds()).toEqual(["p7"]);
     b.chat.onLine(b.line(1, "p7", "wow"));
     b.chat.onLine(b.line(2, "p8", "wow"));
     expect(b.chat.lines().map((l) => l.from)).toEqual(["p8"]);

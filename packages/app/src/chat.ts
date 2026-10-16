@@ -52,6 +52,8 @@ export interface ChatHost {
    * blocked (friends.ts). Missing: a bot, or no account.
    */
   uidOf?: (playerId: string) => string | undefined;
+  /** Everyone seated here (the lobby's players, the match's standings): whose account you muted shows as muted here. */
+  seats?: () => readonly string[];
 }
 
 /**
@@ -204,9 +206,12 @@ export class MatchChat {
     return this.muted.has(id) || mutes.has(this.host.uidOf?.(id));
   }
 
-  /** The players muted here: this match's, and those with a line in this chat whose account is muted. */
+  /** The players muted here: this match's, and those seated here (or with a line in this chat) whose account is muted. */
   mutedIds(): string[] {
-    return [...new Set([...this.muted, ...this.list.map((l) => l.from).filter((id) => id !== this.host.me() && this.isMuted(id))])];
+    // (Most players mute nobody: then there's nothing to look up.)
+    if (!mutes.count) return [...this.muted];
+    const here = [...(this.host.seats?.() ?? []), ...this.list.map((l) => l.from)];
+    return [...new Set([...this.muted, ...here.filter((id) => id !== this.host.me() && this.isMuted(id))])];
   }
 
   /**

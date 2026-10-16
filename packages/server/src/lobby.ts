@@ -3099,14 +3099,17 @@ export class LobbyCore {
     if (!this.human(playerId)) return;
     const c = this.chat;
     const wasOff = !!c.off[playerId];
+    const wasMuted = c.muted[playerId] ?? [];
     if (off === true) c.off[playerId] = true;
     else if (off === false) delete c.off[playerId];
     if (Array.isArray(muted)) {
       const ids = new Set([...this.r.humans.map((h) => h.id), ...this.r.bots.map((b) => b.id)]);
       c.muted[playerId] = [...new Set(muted.filter((m): m is string => typeof m === "string" && m !== playerId && ids.has(m)))].slice(0, 100);
     }
-    // Back on: the lines missed meanwhile.
+    // Back on: the lines missed meanwhile. Someone unmuted: their recent lines (never sent meanwhile, even to a device
+    // reloaded since).
     if (wasOff && !c.off[playerId]) this.sendChatLog(playerId);
+    else if (!c.off[playerId] && wasMuted.some((m) => !c.muted[playerId]?.includes(m))) this.sendChatLog(playerId, false);
   }
 
   /** Bots chat a little (see botChatLines): their lines are sent now, shown a moment later (`at`). */

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { CHAT_MOD, GLOBAL_CHAT } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
@@ -304,6 +305,12 @@ describe("the routes", () => {
 });
 
 describe("the review page", () => {
+  it("is the Worker's, not the app's: wrangler.jsonc runs the Worker first for it", () => {
+    const config = readFileSync(new URL("../../../wrangler.jsonc", import.meta.url), "utf8");
+    const first = JSON.parse(config.match(/"run_worker_first":\s*(\[[^\]]*\])/)![1]!) as string[];
+    expect(first).toEqual(expect.arrayContaining(["/admin/chat", "/admin/chat/*"]));
+  });
+
   it("admins only: anyone else, test switches or not, gets Not found", async () => {
     forgetSecrets();
     const { sql, d1, ann, bo } = await world();

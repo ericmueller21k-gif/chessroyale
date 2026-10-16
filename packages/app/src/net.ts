@@ -191,6 +191,7 @@ export class NetMatch implements GameView {
     picks: () => account().profile?.shop?.chat,
     // (A seat's account, for mutes by account: the lobby's players, then the match's standings.)
     uidOf: (id) => this.players.find((p) => p.id === id)?.uid ?? this.standingsList.find((s) => s.id === id)?.uid,
+    seats: () => [...this.players.map((p) => p.id), ...this.standingsList.map((s) => s.id)],
   });
 
   private ws: WebSocket | null = null;

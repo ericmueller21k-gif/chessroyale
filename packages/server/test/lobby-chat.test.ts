@@ -133,6 +133,10 @@ describe("lobby: quick chat before the match", () => {
     L.say(ann, "hi-all");
     expect(L.people(bo)).toEqual([]);
     expect(L.people(cy).map((l) => l.say)).toEqual(["hi-all"]);
+    // Unmuted: what Ann said meanwhile comes back (a device reloaded since never had it); muted again, as before.
+    L.core.message(bo, { t: "chatPrefs", muted: [] });
+    expect(L.last(bo, "chatLog")!.lines.map((l) => [l.from, l.say])).toEqual([[ann, "hi-all"]]);
+    L.core.message(bo, { t: "chatPrefs", muted: [ann] });
     L.core.message(cy, { t: "chatPrefs", off: true });
     L.advance(3_000);
     L.say(ann, "lets-go");
