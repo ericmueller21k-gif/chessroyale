@@ -107,11 +107,14 @@ const strength = (status: string) => `CASE ${status} WHEN 'banned' THEN 3 WHEN '
  * A guest's fair-play file joins the account it signs in to: the statements, for the sign-in's one batch, run once the
  * guest's results are the account's and before its rating is worked out again. So signing in never sheds a case
  * (docs/decisions/2026-10-16-integrity-followups.md):
- *   - the guest's case, if open or a ban, replaces the account's when it's stricter (its log joins the account's either
- *     way, with a line saying so). A guest's cleared or closed case doesn't move: its decision date would set aside the
- *     account's own earlier evidence;
+ *   - the guest's case, if open or a ban, takes over the account's when it's stricter (its log joins the account's
+ *     either way, with a line saying so). The account keeps its own decision (decided_at, decided_by) and opening date
+ *     unless a ban comes in, as when a case of its own is raised: what a person weighed stays weighed, and a cleared
+ *     account's identity rows stay set aside (banCheck). A guest's cleared or closed case doesn't move: its decision
+ *     date would set aside the account's own earlier evidence;
  *   - the guest's log, judged matches, appeals, device markers and reports (made and about it) become the account's; a
- *     report between the two goes (it's the same person);
+ *     report between the two goes (it's the same person), and so does the guest's open appeal when the account has one
+ *     open (one at a time: the account's case is the one kept);
  *   - then what setCase does as a case opens: a guest's open case keeps the account's evidence the full time and queues
  *     it for the deep re-check; the account in review or banned has its online results of the last holdBackDays held,
  *     banned all of them, and a ban keeps its sign-in identities (`identities`, hashed: identityHashes).
@@ -131,12 +134,14 @@ export function fairPlayMoves(from: string, to: string, now: number, identities:
     s(
       `INSERT INTO fairplay_cases (user_id, status, reason, opened_at, updated_at, decided_at, decided_by)
        SELECT ?1, status, reason, opened_at, updated_at, decided_at, decided_by FROM fairplay_cases WHERE user_id = ?2 AND status IN ('watch', 'review', 'banned')
-       ON CONFLICT (user_id) DO UPDATE SET status = excluded.status, reason = excluded.reason, opened_at = excluded.opened_at,
-         updated_at = excluded.updated_at, decided_at = excluded.decided_at, decided_by = excluded.decided_by
+       ON CONFLICT (user_id) DO UPDATE SET status = excluded.status, reason = excluded.reason, updated_at = MAX(updated_at, excluded.updated_at),
+         decided_at = CASE WHEN excluded.status = 'banned' THEN excluded.decided_at ELSE decided_at END,
+         decided_by = CASE WHEN excluded.status = 'banned' THEN excluded.decided_by ELSE decided_by END
        WHERE ${strength("excluded.status")} > ${strength("fairplay_cases.status")}`,
       to,
       from,
     ),
+    s("DELETE FROM fairplay_appeals WHERE user_id = ?2 AND status = 'open' AND EXISTS (SELECT 1 FROM fairplay_appeals WHERE user_id = ?1 AND status = 'open')", to, from),
     ...["fairplay_log", "fairplay_matches", "fairplay_appeals"].map((t) => s(`UPDATE ${t} SET user_id = ?1 WHERE user_id = ?2`, to, from)),
     s("INSERT OR IGNORE INTO fairplay_devices (device, user_id, first_seen, last_seen) SELECT device, ?1, first_seen, last_seen FROM fairplay_devices WHERE user_id = ?2", to, from),
     s("DELETE FROM fairplay_devices WHERE user_id = ?", from),

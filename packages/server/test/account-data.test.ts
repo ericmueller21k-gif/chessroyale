@@ -471,6 +471,45 @@ describe("a guest signing in to an existing account (docs/decisions/2026-10-16-i
   });
 });
 
+describe("a guest signing in to an existing account: what the account keeps", () => {
+  it("the account keeps its own decision when the guest's open case joins it (a cleared cousin stays cleared); a ban brings its own", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    // A cousin's account: banned as evasion of a cheat's ban, then cleared by a person.
+    const cheat = await signInWithIdentity(sql, null, "email", "a.b@gmail.com", {}, T0);
+    await setCase(sql, cheat.id, "banned", "admin:eric@example.com", "engine moves", T0);
+    const cousin = await signInWithIdentity(sql, null, "email", "ab+2@gmail.com", {}, T0);
+    expect((await banCheck(sql, cousin, null, T0 + 1)).banned).toBe(true);
+    await decide(sql, cousin.id, "clear", "admin:eric@example.com", "a cousin's account", T0 + 2);
+    // Its guest, on watch, signs in to it: a watch, with the cousin's decision kept (what was weighed stays weighed).
+    const { user: guest } = await createGuest(sql, T0, "Guest");
+    await setCase(sql, guest.id, "watch", "reports", "reported: Cheating", T0 + 3);
+    await signInWithIdentity(sql, guest, "email", "ab+2@gmail.com", {}, T0 + 4);
+    expect(await caseOf(sql, cousin.id)).toMatchObject({ status: "watch", reason: "reported: Cheating", decided_at: T0 + 2, decided_by: "admin:eric@example.com" });
+    expect(await banCheck(sql, cousin, null, T0 + 5)).toEqual({ banned: false });
+    // A banned guest brings its ban's decision.
+    const { user: bannedGuest } = await createGuest(sql, T0, "Guest");
+    await setCase(sql, bannedGuest.id, "banned", "admin:other@example.com", "engine moves as a guest", T0 + 6);
+    await signInWithIdentity(sql, bannedGuest, "email", "ab+2@gmail.com", {}, T0 + 7);
+    expect(await caseOf(sql, cousin.id)).toMatchObject({ status: "banned", decided_at: T0 + 6, decided_by: "admin:other@example.com" });
+  });
+
+  it("keeps one open appeal: the guest's goes when the account has one open", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const owner = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, T0);
+    await setCase(sql, owner.id, "banned", "admin:eric@example.com", "engine moves", T0);
+    expect((await appeal(sql, owner.id, "The account's own appeal, please read it.", T0 + 1)).ok).toBe(true);
+    const { user: guest } = await createGuest(sql, T0, "Guest");
+    await setCase(sql, guest.id, "banned", "admin:eric@example.com", "engine moves as a guest", T0 + 2);
+    expect((await appeal(sql, guest.id, "The guest's appeal, please read it too.", T0 + 3)).ok).toBe(true);
+    await signInWithIdentity(sql, guest, "email", "owner@example.com", {}, T0 + 4);
+    expect(await sql.all("SELECT text FROM fairplay_appeals WHERE user_id = ? AND status = 'open'", owner.id)).toEqual([{ text: "The account's own appeal, please read it." }]);
+    expect(await caseOf(sql, owner.id)).toMatchObject({ status: "banned", reason: "engine moves" });
+    expect(await rowsNaming(sql, guest.id)).toEqual([]);
+  });
+});
+
 describe("the API: GET /api/me/data and POST /api/me/delete", () => {
   const origin = "https://hunchess.com";
   const call = async (env: object, path: string, init: RequestInit & { cookie?: string } = {}) => {

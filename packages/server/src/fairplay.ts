@@ -142,25 +142,28 @@ export async function banCheck(sql: Sql, user: User | null, device: string | nul
       now,
     );
   }
-  // A cleared account (a person or the reviewer decided it) isn't caught again by another account's identity, as by a
-  // device: a cousin cleared of an evasion ban stays cleared while the first ban still catches new accounts
-  // (docs/decisions/2026-10-16-integrity-followups.md).
-  for (const [kind, hash] of c?.status === "cleared" ? [] : await identityHashes(user)) {
+  for (const [kind, hash] of await identityHashes(user)) {
     // (A banned account's identities, or those of an account deleted while banned or in review: account-data.ts. Each
-    // owner has its own row; a banned one counts first.)
+    // owner has its own row; a banned one counts first.) A decision on this account's case (its decided_at) weighed the
+    // rows written by then, and later evasion bans only repeat bans already weighed: both are left out. So a cousin
+    // cleared of an evasion ban stays cleared through a report, a watch or its closing, while a later real ban of an
+    // account with its identity catches it (docs/decisions/2026-10-16-integrity-followups.md).
     const owner = await sql.first<{ user_id: string; status: string | null }>(
       `SELECT i.user_id, c.status FROM fairplay_identities i LEFT JOIN fairplay_cases c ON c.user_id = i.user_id
-       WHERE i.kind = ? AND i.hash = ? AND i.user_id != ? ORDER BY COALESCE(c.status, 'banned') = 'banned' DESC LIMIT 1`,
+       WHERE i.kind = ?1 AND i.hash = ?2 AND i.user_id != ?3
+         AND (?4 IS NULL OR (i.at > ?4 AND (c.status IS NOT 'banned' OR c.decided_by IS NOT 'evasion')))
+       ORDER BY COALESCE(c.status, 'banned') = 'banned' DESC LIMIT 1`,
       kind,
       hash,
       user.id,
+      c?.decided_at ?? null,
     );
     const what = kind === "email" ? "email address" : "Google account";
     if (owner?.status === "banned" || (owner && owner.status === null)) {
       await setCase(sql, user.id, "banned", "evasion", `signed in with the ${what} of banned account ${owner.user_id}`, now);
       return { banned: true };
     }
-    if (owner?.status === "review" && c?.status !== "review") {
+    if (owner?.status === "review" && c?.status !== "review" && c?.status !== "cleared") {
       await raiseCase(sql, user.id, "review", "evasion", `signed in with the ${what} of account ${owner.user_id}, deleted while in review`, now);
     }
   }

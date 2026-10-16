@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
 import { createGuest, createSession, ensureSchema, identityHashes, normalizeEmail, publicProfile, recordResult, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
-import { appeal, banCheck, caseOf, decide, decideAppeal, eligibleForRanked, fairStatus, recordFairPlay, setCase, type CaseMailer } from "../src/fairplay.ts";
+import { appeal, banCheck, caseOf, decide, decideAppeal, eligibleForRanked, fairStatus, purgeEvidence, recordFairPlay, reportPlayer, setCase, type CaseMailer } from "../src/fairplay.ts";
 import { caseEmail, caseMailer, fairplayFrom } from "../src/fairplay-mail.ts";
 import { handleAdmin, isAdmin } from "../src/admin.ts";
 import { forgetSecrets, handleAccountApi, withSecrets } from "../src/api.ts";
@@ -117,6 +117,30 @@ describe("bans", () => {
     const g = await createGuest(sql, 7000, "New");
     const fifth = await signInWithIdentity(sql, g.user, "google", "sub-shared", {}, 7000);
     expect(await banCheck(sql, fifth, null, 7100)).toEqual({ banned: true });
+  });
+
+  it("a cleared cousin stays cleared through a report and its watch closing; a later real ban of an alias catches it (docs/decisions/2026-10-16-integrity-followups.md)", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const cheat = await player(sql, "Cheat", "a.b@gmail.com");
+    await decide(sql, cheat.id, "ban", "admin:e", "engine", 1000);
+    const cousin = await player(sql, "Cousin", "ab+2@gmail.com");
+    expect(await banCheck(sql, cousin, null, 2000)).toEqual({ banned: true });
+    await decide(sql, cousin.id, "clear", "admin:e", "appeal: a cousin's account", 3000);
+    // Anyone's report (a guest's too) opens a watch on it, never a ban.
+    const { user: guest } = await createGuest(sql, 4000, "Guest");
+    expect(await reportPlayer(sql, guest, cousin.id, "Cheating", null, 4000)).toEqual({ ok: true });
+    expect((await caseOf(sql, cousin.id))?.status).toBe("watch");
+    expect(await banCheck(sql, cousin, null, 4100)).toEqual({ banned: false });
+    // The watch closes on its own (nothing new for evidenceDays): still no ban.
+    await purgeEvidence(sql, 4100 + (FAIRPLAY.evidenceDays + 1) * DAY, true);
+    expect((await caseOf(sql, cousin.id))?.status).toBe("closed");
+    const later = 4100 + (FAIRPLAY.evidenceDays + 2) * DAY;
+    expect(await banCheck(sql, cousin, null, later)).toEqual({ banned: false });
+    // A real ban of another account with the address, after that, does catch it.
+    const alias = await player(sql, "Alias", "a.b+5@gmail.com", later);
+    await decide(sql, alias.id, "ban", "admin:e", "engine, its own matches", later + 1);
+    expect(await banCheck(sql, cousin, null, later + 2)).toEqual({ banned: true });
   });
 
   it("a fairplay_identities table from before owners had their own rows is rebuilt once, keeping its rows", async () => {
