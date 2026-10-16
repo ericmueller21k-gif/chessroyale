@@ -184,6 +184,17 @@ export function playableBosses(roster: readonly BossDef[] = BOSS_ROSTER): BossDe
   return roster.filter(isPlayable);
 }
 
+/**
+ * The roster without the bosses resting (`off`: their ids; kill switches, pauses.ts), for choosing a match's boss and
+ * for the boss menu. If that would leave no playable boss, the whole roster: a match never fails for it (the ways in
+ * close first).
+ */
+export function rosterWithout(off: readonly string[] | undefined, roster: readonly BossDef[] = BOSS_ROSTER): readonly BossDef[] {
+  if (!off?.length) return roster;
+  const left = roster.filter((b) => !off.includes(b.id));
+  return playableBosses(left).length ? left : roster;
+}
+
 export const bossDef = (id: string | null | undefined): BossDef | null => (id ? (BOSS_ROSTER.find((b) => b.id === id) ?? null) : null);
 
 /**

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, adminPlayable, bossDef, bossIdFromLink, bossStrength, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
+import { BOSS_TIERS, adminPlayable, bossDef, bossIdFromLink, bossStrength, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, raidBossElo, rankedMinHumans, pausedLine, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { chosenDifficulty, difficultyElo, rememberDifficulty } from "../boss-difficulty.ts";
 import { powersLine } from "../power-words.ts";
@@ -17,6 +17,7 @@ import { LiveWindow } from "../components/LiveWindow.tsx";
 import { LIVE_WINDOW_MEDIA } from "../bot-replays.ts";
 import { FriendsLine } from "../components/Friends.tsx";
 import { testParams } from "../test-switches.ts";
+import { isPaused, useServerStatus } from "../status.ts";
 
 const MODE_KEY = "brc.mode";
 
@@ -131,7 +132,9 @@ export function BossMenu({
   const you = rating ?? PRIOR_RATING;
   const base = raidBossElo([rating]);
   // (Admins, Boss alone: the bosses hidden from players too, after the rest: the Hidden Boss, for testing.)
-  const bosses = menuBosses({ admin: isAdmin(), raid: forRaid });
+  // (Not the bosses resting: kill switches, status.ts.)
+  useServerStatus();
+  const bosses = menuBosses({ admin: isAdmin(), raid: forRaid }).filter((b) => !isPaused(`boss:${b.id}`));
   // Solo: a difficulty on top of the boss's strength (online, the lobby's strength stands).
   const [difficulty, setDifficulty] = useState(chosenDifficulty);
   const extra = forRaid ? 0 : difficultyElo(difficulty);
@@ -263,6 +266,7 @@ function FriendsSheet({
   code: initialCode,
   loading,
   onlineLocked,
+  resting,
   onCreate,
   onJoin,
   onSignIn,
@@ -272,6 +276,8 @@ function FriendsSheet({
   code?: string;
   loading: boolean;
   onlineLocked?: boolean;
+  /** This mode is resting (a kill switch): its line, and no new lobby (joining one still works). */
+  resting?: string | null;
   onCreate: () => void;
   onJoin: (code: string) => void;
   onSignIn: () => void;
@@ -304,8 +310,8 @@ function FriendsSheet({
           <>
             {!initialCode && (
               <>
-                <p class="fd-sub">Make a lobby and share its code. Empty seats fill with bots when you start.</p>
-                <FdButton primary disabled={loading} onClick={onCreate}>
+                <p class="fd-sub">{resting ?? "Make a lobby and share its code. Empty seats fill with bots when you start."}</p>
+                <FdButton primary disabled={loading || !!resting} onClick={onCreate}>
                   {label}
                 </FdButton>
               </>
@@ -458,6 +464,9 @@ export function HomeScreen({
 }) {
   const { profile } = useAccount();
   const live = useLive();
+  // A part resting (a kill switch, status.ts): its way in is disabled, with its line.
+  useServerStatus();
+  const rest = (what: Pausable) => (isPaused(what) ? pausedLine(what) : null);
   // (The same line as the stylesheet's frame: from 1024 px the side menu has the shop and your profile.)
   const computer = useMedia("(min-width: 1024px)");
   // (From 1280 px the play column sits beside your card, with room at its top for the live window: a computer's only,
@@ -488,7 +497,8 @@ export function HomeScreen({
   const [friends, setFriends] = useState(!!joinCode);
   // Boss raid: pick the boss first, for a raid alone or one you create (skipped with ?boss=N).
   const [bossMenu, setBossMenu] = useState<null | "solo" | "raid">(null);
-  const bossAlone = () => (bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
+  // (Not while Solo and Boss alone rest: the side menu's Boss alone lands here too, and the line says why.)
+  const bossAlone = () => (rest("solo") ? undefined : bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
   const pickBoss = (id: string) => {
     rememberBossPick(id);
     const forRaid = bossMenu === "raid";
@@ -504,7 +514,11 @@ export function HomeScreen({
   useEffect(() => {
     if (joinCode) setFriends(true);
   }, [joinCode]);
+  // What PLAY would start, if it's resting: Squads, Solo (you and bots), or the mode online.
+  const resting = squads ? rest("squads") : type === "solo" ? rest("solo") : mode !== "classic" ? rest(mode) : null;
+  const soloResting = rest("solo");
   const play = () => {
+    if (resting) return;
     if (mode === "squads") return onlineLocked ? onSignIn() : onSquads();
     if (type === "solo") return onSolo(mode, { fill: true });
     if (mode !== "classic") onPlay(mode, type);
@@ -514,8 +528,9 @@ export function HomeScreen({
   const bots = (mode === "raid" ? RAID_SIZE : mode === "classic" ? S.lobbySize : CROWD_SIZE) - 1;
   // The line under PLAY: what PLAY does, for this mode and way of being matched.
   const soloLine = mode === "raid" ? `You and ${bots} bots against a boss` : `Solo vs ${bots} bots`;
-  const hint =
-    mode === "squads" ? (
+  const hint = resting ? (
+    resting
+  ) : mode === "squads" ? (
       onlineLocked ? (
         <>
           Squads is online ·{" "}
@@ -571,7 +586,7 @@ export function HomeScreen({
   // PLAY and the line under it (and an error, if any).
   const go = (
     <div class="fd-go">
-      <button type="button" class="fd-play" disabled={loading || (mode === "classic" && type !== "solo")} onClick={play}>
+      <button type="button" class="fd-play" disabled={loading || !!resting || (mode === "classic" && type !== "solo")} onClick={play}>
         PLAY
       </button>
       <div class="fd-hint" aria-live="polite">
@@ -584,7 +599,7 @@ export function HomeScreen({
   const actions = (
     <div class="fd-actions">
       <FdButton onClick={() => (squads ? onParty() : setFriends(true))}>Play with friends</FdButton>
-      <FdButton disabled={loading} onClick={bossAlone}>
+      <FdButton disabled={loading || !!soloResting} onClick={bossAlone}>
         Boss alone
       </FdButton>
       {!computer && (
@@ -593,6 +608,8 @@ export function HomeScreen({
           <FdButton onClick={onProfile}>Profile</FdButton>
         </>
       )}
+      {/* (Boss alone resting: its line, unless the line under PLAY already says it.) */}
+      {soloResting && resting !== soloResting && <p class="fd-rest">{soloResting}</p>}
     </div>
   );
   if (queueing)
@@ -645,7 +662,7 @@ export function HomeScreen({
           {squads ? (
             <button type="button" class="fd-btn sq-party-btn" onClick={onParty}>
               Party
-              <span>Play with up to {SQUADS.partyMax - 1} friends in one squad · create one or join by code</span>
+              <span>{resting ?? `Play with up to ${SQUADS.partyMax - 1} friends in one squad · create one or join by code`}</span>
             </button>
           ) : (
             <>
@@ -700,6 +717,7 @@ export function HomeScreen({
           code={joinCode}
           loading={loading}
           onlineLocked={onlineLocked}
+          resting={rest(mode)}
           onCreate={() => {
             if (mode === "raid" && !bossInUrl()) {
               setFriends(false);

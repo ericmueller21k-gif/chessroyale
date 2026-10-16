@@ -80,6 +80,12 @@ export interface Settings {
    */
   bossId: string;
   bossAvoid: string;
+  /**
+   * Bosses resting (kill switches: pauses.ts), by id: never met, at random or picked (a picked one is replaced by a
+   * random one), nor in the Crowd's boss final (another boss takes his place). Set by the server for a lobby, by the
+   * app for a solo game.
+   */
+  bossesOff?: readonly string[];
   /** Test switch (?power=freeze|blizzard|pie|funhouse|sparkler|candle): that power comes at once (an ultimate after its warning). */
   bossPowerTest: string;
   /**

@@ -4,6 +4,7 @@ import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, inboxOf, markSeen, rememberInbox } from "./presence.ts";
 import { REPORT_THANKS, appeal, fairStatus, reportPlayer } from "./fairplay.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
+import { isPaused, pausedResponse } from "./kill-switches.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
 import {
@@ -291,6 +292,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
 
   // The shop. GET /api/shop: your coins, items and what's equipped. POST /api/shop/buy {item}, /api/shop/equip {item}.
   if (path === "/api/shop" && request.method === "GET") return json(await shopState(sql, current.id));
+  // (The shop resting, a kill switch: nothing new from it. Equipping what you have still works.)
+  if ((path === "/api/shop/buy" || path === "/api/locker/open") && request.method === "POST" && isPaused(env, "shop")) return pausedResponse("shop");
   if ((path === "/api/shop/buy" || path === "/api/shop/equip") && request.method === "POST") {
     const { item } = (await request.json().catch(() => ({}))) as { item?: unknown };
     const r = path === "/api/shop/buy" ? await buyItem(sql, current.id, item, now) : await equipItem(sql, current.id, item);

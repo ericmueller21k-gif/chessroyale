@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type MatchmakingType, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type MatchmakingType, POWER_IDS, WEAK_BOT_SKILL, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -54,6 +54,7 @@ import { measureSound } from "./sound.ts";
 import { noteWhere } from "./problems.ts";
 import { testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
+import { isPaused, pausedBosses } from "./status.ts";
 
 /**
  * A match's settings: the mode and the choices made on the home screen, plus playtest overrides from the URL, e.g.
@@ -105,6 +106,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     ...speed,
     // Any boss battle: not the boss you met last (when it's random); ?power= brings a boss power at once (tests).
     bossAvoid: lastBoss() ?? "",
+    // Never a boss that's resting (a kill switch, status.ts): a solo game skips them as the server's lobbies do.
+    ...(pausedBosses().length ? { bossesOff: pausedBosses() } : {}),
     ...((POWER_IDS as readonly string[]).includes(q.get("power") ?? "") ? { bossPowerTest: q.get("power")! } : {}),
     ...(raid ? {} : chosenBoss() && bossInUrl() ? { bossId: chosenBoss() } : {}),
     // Testing, solo: ?mate=1, the boss mates you at once (1.f3 e5 2.g4, its move): its attack on your king, then the result.
@@ -569,6 +572,11 @@ export function App() {
    * picked from the menu, at once.
    */
   const startSolo = async (mode?: ModeChoiceId, opts: { fill?: boolean } = {}) => {
+    // (Solo and Boss alone resting, a kill switch: not even from a results screen's "again".)
+    if (isPaused("solo")) {
+      leave();
+      return setError(pausedLine("solo"));
+    }
     unlockAudio();
     setLoading(true);
     const engines = await enginePool();

@@ -1,5 +1,5 @@
 import { stockfishRefuses } from "@chessroyale/chess";
-import { RAID_SETTINGS, modeSettings } from "@chessroyale/core";
+import { RAID_SETTINGS, bossIdFromLink, modeSettings } from "@chessroyale/core";
 import { Lobby } from "./lobby-do.ts";
 import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
@@ -23,6 +23,7 @@ import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } 
 import { handleOpsAdmin } from "./ops-admin.ts";
 import type { AccessEnv } from "./access.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
+import { isPaused, pausedResponse, switchStatus, type KillSwitchEnv } from "./kill-switches.ts";
 
 export { Lobby, SquadsLobby, SquadsParty, Matchmaker, LiveHub };
 export { EngineServer } from "./engine.ts";
@@ -35,7 +36,7 @@ guardEntries(SquadsParty, "SquadsParty", ["fetch", "webSocketMessage", "webSocke
 guardEntries(Matchmaker, "Matchmaker", ["next"]);
 guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "health", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
 
-export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv {
+export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
   /** Squads: one object per lobby, and one per party (squads-do.ts). */
   SQUADS: DurableObjectNamespace<SquadsLobby>;
@@ -57,7 +58,7 @@ export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv {
   OPS_STATS?: string;
   /** "1" on staging for load tests from one machine: the per-address rate limit is off (never in production). */
   LOAD_TEST?: string;
-  /** "1": friends and invites switched off for everyone (friends-api.ts). */
+  /** "1": friends and invites switched off for everyone (a kill switch, kill-switches.ts, as every PAUSE_ variable). */
   PAUSE_FRIENDS?: string;
 }
 
@@ -138,6 +139,8 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
 }
 
 async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUntil): Promise<Response> {
+  // GET /api/status → { paused, banner }: the kill switches that are off and the maintenance banner (kill-switches.ts).
+  if (url.pathname === "/api/status" && request.method === "GET") return json(switchStatus(rawEnv));
   {
     // POST /api/problems: errors a device caught, or the feedback sheet's report (a bug, feedback, an idea: problems.ts).
     if (url.pathname === "/api/problems") return handleProblems(request, rawEnv, waitUntil);
@@ -177,10 +180,12 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // &from=CODE with { seat }: Bots off → Default, keeping your wait: you leave that lobby and bots fill a minute after
     // you first joined it at the latest. 409 if that lobby has started meanwhile (stay in it).
     if (url.pathname === "/api/play" && request.method === "POST") {
+      const raid = url.searchParams.get("mode") === "raid";
+      // (A mode resting, a kill switch: no new matches. The bosses resting are never met: the lobby's object sees to it.)
+      if (isPaused(rawEnv, raid ? "raid" : "crowd")) return pausedResponse(raid ? "raid" : "crowd");
       const refused = await mayPlay(request, env, waitUntil);
       if (refused) return refused;
       const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
-      const raid = url.searchParams.get("mode") === "raid";
       const type = url.searchParams.get("type") === "botsoff" ? "botsoff" : "default";
       const overrides = raid ? RAID_SETTINGS : modeSettings("crowd", { augments: true });
       // ?pool=NAME: a queue of its own (a test switch: tests run several queues at once without meeting). Split by
@@ -207,6 +212,12 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     }
     // POST /api/lobby → { code }: the creator's choices, and the test switches for those allowed them (lobby-options.ts).
     if (url.pathname === "/api/lobby" && request.method === "POST") {
+      // (A mode resting, or the boss picked, a kill switch: no new lobby. The bosses resting are never met: the lobby's
+      // object sees to it.)
+      const part = url.searchParams.get("mode") === "raid" ? "raid" : url.searchParams.get("mode") === "crowd" ? "crowd" : "classic";
+      const picked = bossIdFromLink(url.searchParams.get("boss"));
+      if (isPaused(rawEnv, part)) return pausedResponse(part);
+      if (picked && isPaused(rawEnv, `boss:${picked}`)) return pausedResponse(`boss:${picked}`);
       const refused = await mayPlay(request, env, waitUntil);
       if (refused) return refused;
       const test = asksTestSwitches(url.searchParams) && (await testSwitches(request, env, waitUntil));
@@ -258,6 +269,8 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
   const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
   const region = regionOf(request.cf as { continent?: unknown } | undefined);
   const queue = async () => queueName("squads", "default", await testPool(request, env, url, waitUntil), region);
+  // (Squads resting, a kill switch: no new queue or party. Its test lobbies, admins only, still open.)
+  if ((url.pathname === "/api/squads/play" || url.pathname === "/api/squads/party") && request.method === "POST" && isPaused(env, "squads")) return pausedResponse("squads");
   if (url.pathname === "/api/squads/play" && request.method === "POST") {
     const refused = await mayPlay(request, env, waitUntil);
     if (refused) return refused;

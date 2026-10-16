@@ -51,6 +51,50 @@ re-checked, and nobody is auto-banned (a ban needs the deep re-check).
 **Emails** about bans and clearings go through Resend with the sign-in key, from `fairplay@` the domain of `EMAIL_FROM`
 (default hunchess.com). Nothing to set up if sign-in codes already send.
 
+## Kill switches and the maintenance banner
+
+To rest one part of the game for a while (a bug in Squads, a boss misbehaving, the shop), or to show everyone a short
+message, without a code change: each is a Worker variable (docs/areas/ops.md, "Kill switches").
+
+1. Open **Workers & Pages → chessroyale → Settings → Variables and Secrets → Add**: the section near the top of
+   Settings, not the build variables under **Build**.
+2. **To rest a part:** name `PAUSE_SQUADS` (or another below), type **Text**, value `1`. **Save and deploy.**
+   - `PAUSE_CROWD`, `PAUSE_RAID`, `PAUSE_CLASSIC`: that mode online (its PLAY and new lobbies).
+   - `PAUSE_SQUADS`: Squads' PLAY and new parties.
+   - `PAUSE_SOLO`: Solo and Boss alone.
+   - `PAUSE_SHOP`: getting shop items and opening crates (the locker stays).
+   - `PAUSE_FRIENDS`: friends and invites.
+   - One boss, never met while it's set (its id, from `BOSS_ROSTER` in `packages/core/src/boss.ts`, isn't always its
+     name): Ginger `PAUSE_BOSS_GINGERBREAD`, Boingo the Clown `PAUSE_BOSS_CLOWN`, Jefferson `PAUSE_BOSS_GREX`, Hollow
+     `PAUSE_BOSS_HOLLOW`, Big Boy `PAUSE_BOSS_BIGBOY`, Sawyer `PAUSE_BOSS_SAWYER`, Wrangler `PAUSE_BOSS_PIG`, the
+     Hidden Boss `PAUSE_BOSS_RECLUSE` (the Crowd's boss final then meets another boss).
+3. **To bring it back:** delete the variable (or set it to `0`), then Save and deploy.
+4. **The banner:** name `MAINTENANCE_BANNER`, type Text, value the message (at most 200 characters, e.g. "Maintenance
+   tonight at 10 pm UTC. Matches already running will finish."). Delete it to take the banner down.
+
+**How fast:** Save and deploy puts out a new version of the Worker, just as a code deploy does, so the change is live
+within seconds; as with any deploy, players in a match reconnect for a moment and play on. Open apps update their
+buttons within a minute.
+Matches already running finish normally; the server refuses only new ones, with "Squads is resting for a bit. Back
+soon." (or that part's own line). Variables set here stay through every deploy from `main` (`keep_vars`). A
+**rollback** to an older version brings back that version's variables, so check them after one.
+
+## Rolling back a bad deploy
+
+In a terminal, with `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) set:
+
+1. `npm run rollback` lists the Worker's latest versions: → live now, • was live, and whether each is a code upload
+   or a settings change (saving a variable makes a new version of the same code).
+2. `npm run rollback -- previous --dry-run` says which version "previous" is and why: the one live just before the
+   live code went out, never the bad code under a pause you set to contain it. Flags go after `--`.
+3. `npm run rollback -- previous` rolls back with `wrangler rollback`, which asks before it deploys and about any
+   secret changed since that version. It runs only in a plain terminal (not one with `CI` set), so nothing is
+   answered for you.
+
+The dashboard does the same: **Workers & Pages → chessroyale → Deployments → a version's ⋯ → Rollback**. A rollback
+lasts until the next merge to `main` deploys again: revert or fix the bad change there first. A version carries its
+own variables, so check the `PAUSE_` variables and the banner after (docs/areas/ops.md, "Rolling back").
+
 ## Load testing (staging only, never production)
 
 Simulated players (`scripts/load/`) speak the app's real protocol: a guest account, the home screen's live line, PLAY,

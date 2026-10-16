@@ -43,6 +43,7 @@ import {
   bossThreat,
   chooseBoss,
   crowdFinalBoss,
+  rosterWithout,
   BOSS_POWERS,
   bossStumbleChance,
   bossStartPly,
@@ -373,7 +374,8 @@ export class MatchRunner {
     // Which boss: the one picked, else a random playable one (not the one to avoid). One draw from the match's random
     // source, which also seeds its powers.
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
-    const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished, !!this.settings.bossHidden);
+    // (Never a boss that's resting: a kill switch, rosterWithout.)
+    const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, rosterWithout(this.settings.bossesOff), this.settings.bossUnfinished, !!this.settings.bossHidden);
     let crowdSide = sideToMove(board.fen);
     // A boss whose battle starts from the starting position (no opening moves), and one who always plays Black (Hollow):
     // if the usual pick made the crowd Black, he claims the dark side before move 1.
@@ -1481,7 +1483,9 @@ export class MatchRunner {
     // strength: the crowd's plus its own offset (his is fixed). One draw from the match's random source either way, which
     // also seeds its powers.
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
-    const def = crowdFinalBoss() ?? chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
+    // (He or a random boss only while not resting: a kill switch, rosterWithout.)
+    const roster = rosterWithout(this.settings.bossesOff);
+    const def = crowdFinalBoss(roster) ?? chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, roster, this.settings.bossUnfinished);
     // (A boss who plays from the starting position: Hollow, the Hidden Boss; Big Boy too, less the pawn he eats.)
     const start = bossRules(def)?.opening;
     if (start?.fromStart) startPly = 0;

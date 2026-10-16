@@ -1,4 +1,5 @@
 import { useState } from "preact/hooks";
+import { pausedLine } from "@chessroyale/core";
 import { FdButton, BackButton } from "../components/FrontDoor.tsx";
 import { FriendRow, InviteButton, InviteRow } from "../components/Friends.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
@@ -26,7 +27,7 @@ export function FriendsScreen({ onBack, onSettings }: { onBack: () => void; onSe
         <span class="fd-head-spacer" />
       </header>
       {status === "signIn" && <p class="fd-sub">Sign in to add friends, see when they're online and invite them to play.</p>}
-      {status === "off" && <p class="fd-sub">Friends are switched off for now. Try again later.</p>}
+      {status === "off" && <p class="fd-sub">{pausedLine("friends")}</p>}
       {status === "unknown" && <p class="fd-sub">Loading…</p>}
       {note && (
         <p class={note.error ? "fd-error" : "fd-note fr-note"} role={note.error ? "alert" : "status"}>

@@ -4,6 +4,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 ## How it works today
 
+- **Kill switches and the maintenance banner** ([ops.md](ops.md) "Kill switches"): a mode, Solo and Boss alone, or
+  Squads resting disables its way in on the home screen with its line ("Squads is resting for a bit. Back soon.": under
+  PLAY, on the Party button, in Play with friends, under the buttons for Boss alone); the boss menu hides a resting
+  boss. `MAINTENANCE_BANNER` shows as a slim band over the top of every screen (✕ hides it until the message changes).
 - **The landing page** shows where online play needs signing in (`onlineNeedsSignIn` from `/api/auth/config`) and
   you aren't signed in: sign in, or play against bots as a guest (remembered on the device). An invite link shows it
   even to a guest. `?nolanding` skips it (tests). Guests play Solo and Boss alone.

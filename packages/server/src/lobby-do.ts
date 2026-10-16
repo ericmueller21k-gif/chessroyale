@@ -13,6 +13,7 @@ import { CAPACITY, DEFAULT_SETTINGS } from "@chessroyale/core";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { isAdmin } from "./admin.ts";
+import { pausedBosses } from "./kill-switches.ts";
 
 const library = openings as unknown as Opening[];
 
@@ -106,7 +107,7 @@ export class Lobby extends DurableObject<Env> {
           }
         }
       },
-    }, library);
+    }, library, undefined, { ...DEFAULT_SETTINGS, bossesOff: pausedBosses(this.env) });
   }
 
   /** Re-checks each board's close calls on the engine server (the host's numbers stand where it can't). */

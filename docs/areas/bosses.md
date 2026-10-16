@@ -6,6 +6,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 
 ## How it works today
 
+- **A boss can be rested** (`PAUSE_BOSS_<ID>`, [ops.md](ops.md) "Kill switches"): the boss menu hides him, a raid
+  lobby picked for him is refused, and every match's pick skips him (`rosterWithout` in `boss.ts`, a lobby's or solo
+  game's `bossesOff`). The Crowd's boss final meets another while his boss rests, and its vote card names none.
 - **Where bosses are met:** the boss raid (up to 50 people, online; or a Solo raid with 49 bots), the Crowd 50 v 50's
   boss final (the top 4, always against the Hidden Boss since Oct 14), and solo's "Boss alone" (you pick every move
   against a boss you choose from the boss menu, at a difficulty from Easy to Hardest, `BOSS_DIFFICULTY`). The Hidden Boss

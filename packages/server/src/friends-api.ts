@@ -1,4 +1,4 @@
-import { isGameCode, isInviteKind, type InviteKind } from "@chessroyale/core";
+import { isGameCode, isInviteKind, pausedLine, type InviteKind } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, accountOf, isSignedIn, readCookie, signInRequired, type AccountEnv, type WaitUntil } from "./api.ts";
 import { cachedUserId } from "./presence.ts";
@@ -20,6 +20,7 @@ import {
   type PresenceOf,
 } from "./friends.ts";
 import { liveHub } from "./live-hub.ts";
+import { isPaused } from "./kill-switches.ts";
 import type { Lobby } from "./lobby-do.ts";
 import type { SquadsParty } from "./squads-do.ts";
 
@@ -31,16 +32,13 @@ export interface FriendsEnv extends AccountEnv {
   PAUSE_FRIENDS?: string;
 }
 
-/**
- * Friends and invites are on unless PAUSE_FRIENDS is set (the gates' kill switches: once kill-switches.ts is on main,
- * this becomes `!isPaused(env, "friends")`).
- */
-export function friendsOn(env: { PAUSE_FRIENDS?: unknown }): boolean {
-  const v = env.PAUSE_FRIENDS;
-  return !(v === true || (typeof v === "string" && /^(1|true|yes|on)$/i.test(v.trim())));
+/** Friends and invites are on unless PAUSE_FRIENDS is set: the kill switches (kill-switches.ts). */
+export function friendsOn(env: object): boolean {
+  return !isPaused(env, "friends");
 }
 
-export const FRIENDS_OFF = "Friends are switched off for now. Try again later.";
+/** The kill switch's line, as every part's (pauses.ts). */
+export const FRIENDS_OFF = pausedLine("friends");
 export const SIGN_IN_FOR_FRIENDS = "Sign in to add friends and send invites.";
 const GAME_GONE = "That lobby or party has started or closed.";
 

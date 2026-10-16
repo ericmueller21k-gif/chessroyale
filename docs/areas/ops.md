@@ -97,6 +97,42 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     (results, ranking, fair-play signals, Squads' coins and crates, crate items) comes from a game made without them.
     Solo results are posted by the browser and are never ranked and earn nothing.
   - **A new test switch:** read it through `testParams()` (app) or behind `testSwitchesOn` (server), and list it here.
+- **Kill switches** (Oct 15; docs/decisions/2026-10-15-kill-switches.md): Worker runtime variables that rest one part
+  of the game, set in the dashboard (how: `DEPLOY.md`, "Kill switches and the maintenance banner"). `PAUSE_<NAME>` =
+  "1" rests it, deleting it brings it back: `PAUSE_CLASSIC`, `PAUSE_CROWD`, `PAUSE_RAID`, `PAUSE_SQUADS`,
+  `PAUSE_SOLO` (Solo and Boss alone), `PAUSE_SHOP` (buying and crates; the locker stays), `PAUSE_FRIENDS`,
+  `PAUSE_BOSS_<ID>` (one boss by its roster id, e.g. `PAUSE_BOSS_PIG` for Wrangler; DEPLOY.md lists them all).
+  - **While resting:** the app disables the way in with the part's line ("Squads is resting for a bit. Back soon.";
+    `pausedLine`, core's `pauses.ts`), and the server refuses anything new for it with the same line (503,
+    `{ message, paused }`: a refusal, not an error, so error capture never counts it). Matches already running finish normally, and lobbies already made still start and take
+    joins by code. A Squads party in line waits with the line and goes in once it's back. Admins' Squads test lobbies
+    stay open. A boss resting is never met, at random or picked; the Crowd's boss final meets another while his is
+    resting (`rosterWithout`, `bossesOff` in a lobby's or solo game's settings).
+  - **One module reads them** (`kill-switches.ts`, cached 60 s per Worker instance); the app asks `GET /api/status`
+    (`{ paused, banner }`) at start, every minute and when it comes back on screen (`packages/app/src/status.ts`).
+  - **How fast:** changing a variable deploys a new version of the Worker, so it applies within seconds of that deploy
+    (new instances read it at once). Like any deploy, players in a match reconnect for a moment.
+- **The maintenance banner** (`MAINTENANCE_BANNER`, at most 200 characters): a slim band at the top of every screen
+  while it's set (`components/MaintenanceBanner.tsx`). The page starts under it and is that much shorter
+  (`--banner-h`, `--app-h` in styles.css), so it never covers a control; sheets and menus opened over the page cover
+  it. ✕ hides it on that device until the message changes.
+- **Rolling back** (`npm run rollback`, `scripts/rollback.ts`, its choice in `rollback-pick.ts`; needs
+  `CLOUDFLARE_API_TOKEN`, never printed):
+  - With no arguments, it lists the Worker's latest versions, newest first: live now, was live, code upload or
+    settings change.
+  - `npm run rollback -- previous` goes back to the version live just before the live code went out: it steps back
+    past settings changes (saving a variable makes a new version of the same code) to the live code's upload, then
+    takes the deployment before it. So bad code with a `PAUSE_` set on top of it never rolls back to that bad code.
+    Or name a version by its id. `--dry-run` says which and why. `--env staging` works on the staging Worker.
+  - Flags go after `--` (npm keeps those before it): it stops if npm took one.
+  - A real rollback runs only in a terminal that isn't CI, where `wrangler rollback` asks before it deploys and about
+    any secret changed since that version; outside one, or with `CI` set, wrangler would answer yes by itself, so the
+    script refuses.
+  - **A rollback lasts until the next deploy from `main`:** revert or fix the bad change on `main` before anything
+    else merges.
+  - **A version carries its own variables:** rolling back to a version from before a `PAUSE_` or banner change undoes
+    that change too. Check the switches after a rollback.
+  - The database's schema only grows (columns are added, never removed), so an older version still runs on it.
 - **Errors and player reports** (below): every device reports its errors, the server its own, players report bugs
   and send feedback and ideas, and admins read them all on `/admin/ops`.
 - **Health** (below): one snapshot of the game for an admin (`/admin/ops`) or a script (`npm run ops:report`).
@@ -253,6 +289,8 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
 | On a device: capture, breadcrumbs, the feedback sheet | `packages/app/src/problems.ts`, `components/Problems.tsx` (the error boundary, the feedback sheet) |
 | The build's version | `packages/app/vite.config.ts` (`__APP_VERSION__`, `dist/version.json`) |
 | Test switches: who may (server), a lobby's, the app's | `admin.ts` (`testSwitchesOn`), `lobby-options.ts`; `packages/app/src/test-switches.ts` |
+| Kill switches, the banner | `packages/core/src/pauses.ts` (the parts, their lines), `packages/server/src/kill-switches.ts`; `packages/app/src/status.ts`, `components/MaintenanceBanner.tsx` |
+| Rollback | `scripts/rollback.ts` (`npm run rollback`), `scripts/rollback-pick.ts` (which version) |
 | The health view, its Access check, the report script | `packages/server/src/health.ts`, `access.ts`, `ops-admin.ts`; `scripts/ops-report.mjs` |
 | Load tests (simulated players over WebSockets and the API) | `scripts/load/` (`run.ts`, `burst.ts`, `staging.sh`) → `reports/load/` |
 | The engine server | `engine/`, `packages/server/src/engine.ts` |
@@ -265,8 +303,8 @@ writes, retention), `LOBBY_LIFE` in settings.ts; Worker variables
 `MATCH_FILL_SECONDS`, `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`, `OPS_STATS`, `LOAD_TEST` (staging only), `SQUADS_TEST`
 (local and e2e only: anyone may use Squads' test controls), `TEST_SWITCHES` (local, e2e and staging only: anyone may
 use the test switches), `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` (public, in `wrangler.jsonc`: the health view's Access
-check). Squads lobbies report to the live hub, so the overload limit counts their players (since Oct 15); the home
-page's line still leaves them out.
+check), the kill switches `PAUSE_<NAME>` and `MAINTENANCE_BANNER` (above). Squads lobbies report to the live hub, so
+the overload limit counts their players (since Oct 15); the home page's line still leaves them out.
 
 ## Tests and tools
 
@@ -275,11 +313,13 @@ page's line still leaves them out.
   and its control-character bypass, caps, cross-site refusals, rate limits and their keys, bounded writes, fair
   counts, row sizes, pruning, fingerprints, lobby codes in paths, the guards, the cron's jobs failing apart, the ops
   page); `health.test.ts` (Access's token, Squads on the live hub, the engine server's marks, the view and who may read
-  it).
+  it); `kill-switches.test.ts` (the switches, the cache, each refusal, never counted as an error, a resting boss never
+  met, even in a lobby made before); `rollback.test.ts` (which version "previous" is).
 - e2e: `e2e/busy.spec.ts` (servers busy), `lobby-close.spec.ts`, `test-switches.spec.ts` (a player's switches
   ignored, an admin's working), `problems.spec.ts` (errors reach the store, the error boundary, a bug report's id and
-  feedback by kind on `/admin/ops`, the size and rate caps, the health view). The e2e Worker's `ADMIN_EMAILS` has one
-  email per project; a test makes its account an admin with `wrangler d1 execute --local`.
+  feedback by kind on `/admin/ops`, the size and rate caps, the health view), `kill-switches.spec.ts` (its own server
+  on port 8789: Squads resting, the banner). The e2e Worker's `ADMIN_EMAILS` has one email per project; a test makes
+  its account an admin with `wrangler d1 execute --local`.
 - Load: see `DEPLOY.md`, "Load testing". Run wrangler from a copy you aren't editing (it reloads on every change).
 
 ## Rules for this area
