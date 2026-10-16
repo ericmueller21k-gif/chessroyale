@@ -1,4 +1,4 @@
-import { BOSS_ROSTER, bossDef } from "./boss.ts";
+import { BOSS_ROSTER, bossDef, bossInText } from "./boss.ts";
 
 /**
  * Kill switches (docs/areas/ops.md, "Kill switches"): parts of the game Eric can rest for a while from the Cloudflare
@@ -33,7 +33,9 @@ const NAMES: Record<(typeof PAUSABLE)[number], string> = {
 
 /** The short friendly line for a part that's resting: on its way in (the app), and in the server's refusal. */
 export function pausedLine(what: Pausable): string {
-  const who = what.startsWith("boss:") ? `${bossDef(what.slice(5))?.name ?? "This boss"} is` : (NAMES[what as keyof typeof NAMES] ?? "This is");
+  // (A boss as a sentence says him: "The Hidden Boss is …", "Wrangler is …"; bossInText.)
+  const boss = what.startsWith("boss:") ? bossDef(what.slice(5)) : null;
+  const who = what.startsWith("boss:") ? `${boss ? bossInText(boss.name, true) : "This boss"} is` : (NAMES[what as keyof typeof NAMES] ?? "This is");
   return `${who} resting for a bit. Back soon.`;
 }
 

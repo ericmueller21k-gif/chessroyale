@@ -1,6 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, RAID_SETTINGS as R, BOSS_TIERS, PREGAME_VOTES, crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
 import { FriendSettings } from "../components/Friends.tsx";
 import { openReport } from "../components/Problems.tsx";
@@ -23,69 +22,6 @@ function Toggle({ title, checked, disabled, onChange, children }: { title: strin
       </span>
       <input type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={(e) => onChange(e.currentTarget.checked)} />
     </label>
-  );
-}
-
-/** How each mode works, in plain words (moved here from the old home screen). */
-export function HowToPlay() {
-  const LOW = BOSS_TIERS[0]!;
-  const HIGH = BOSS_TIERS[BOSS_TIERS.length - 1]!;
-  // The clock vote's time controls, from the vote's own data.
-  const speed = PREGAME_VOTES.find((v) => v.id === "speed")!;
-  // The endings: how many play each (the knockouts), the boss final's boss by its roster name (the Hidden Boss).
-  const teamSizes = S.teamFinalSizes.map((x) => `${x}v${x}`);
-  const finalBoss = crowdFinalBoss()?.name ?? "a boss";
-  return (
-    <div class="fd-rules">
-      <h3>Crowd · 50 v 50</h3>
-      <ol>
-        <li>
-          <strong>{C.lobbySize} players, one game, from the first move.</strong> Two teams of 50: you play White or Black all game. Your team
-          picks a move together, the other team answers.
-        </li>
-        <li>
-          <strong>The most popular move is played.</strong> Stockfish scores every pick, and you score by picking better than the others who
-          picked with you.
-        </li>
-        <li>
-          <strong>No cuts for the first {(C.firstStageRounds ?? 20) / 2} moves.</strong> Then after every move the lowest scorers go out (the
-          same number from each team).
-        </li>
-        <li>
-          <strong>⚡ {C.powerUpsAtStart} power-ups</strong> show the engine's top 3 moves. That's all you get, so pick your moments.
-        </li>
-        <li>
-          <strong>You vote on the ending.</strong> Before the first move everyone drags their own pawn into a zone (or taps a card): a team
-          final (top {crowdFinalists("team")} play {teamSizes.slice(0, -1).join(", ")}, then {teamSizes.at(-1)} to the end), a boss battle (top{" "}
-          {crowdFinalists("boss")} against {finalBoss}) or a duel (the best of each side, 1v1). You have {S.voteSeconds} seconds; if you don't vote, you go with the crowd (the most popular choice). Winning the game goes on
-          your record; your own move quality places you.
-        </li>
-        <li>
-          <strong>Then the clock: a chess time control.</strong> {speed.options.map((o) => `${o.label} (${o.blurb})`).join(", ")}. Your
-          minutes last the whole game and every move adds its seconds as it starts; what a quick move doesn't use stays in your bank, as on a
-          chess clock. No move can go past its cap, because your whole team picks together. Nobody votes?{" "}
-          {speed.options[speed.defaultOption]!.label}.
-        </li>
-      </ol>
-      <h3>Boss raid</h3>
-      <ol>
-        <li>
-          <strong>You and others against a boss.</strong> Up to {R.lobbySize} players pick the crowd's move together; the most popular pick is
-          played. PLAY joins a raid; the boss is the weakest that's stronger than the group's average rating.
-        </li>
-        <li>
-          <strong>A named opening, {R.openingMoves} moves in.</strong> The boss picks one from the classics and you play on from there.
-        </li>
-        <li>
-          <strong>Ten bosses</strong> from {LOW} to {HIGH} strength. Alone, or in a raid you create, you pick yours. Every {S.bossKillEvery}{" "}
-          moves it strikes down whoever played worst, down to half the group.
-        </li>
-        <li>
-          <strong>👑 The God King</strong> fights for you {S.kingChargesMax} times: call him to play a move at full strength, or to strike the
-          boss so its next move is a weaker one. More than half of you have to call.
-        </li>
-      </ol>
-    </div>
   );
 }
 
@@ -162,7 +98,7 @@ function ThemeChoice() {
  * feedback sheet: bugs, feedback, ideas), installing, your sign-in, privacy and terms; and for admins, testing
  * (practice mode, the eval bar).
  */
-export function SettingsScreen({ onBack, onFaq }: { onBack: () => void; onFaq?: () => void }) {
+export function SettingsScreen({ onBack, onFaq }: { onBack: () => void; onFaq?: (section?: string) => void }) {
   const { config, profile } = useAccount();
   const [, rerender] = useState(0);
   useEffect(() => onMuteChange(() => rerender((n) => n + 1)), []);
@@ -271,15 +207,18 @@ export function SettingsScreen({ onBack, onFaq }: { onBack: () => void; onFaq?: 
 
       <FriendSettings />
 
-      <section class="fd-section">
-        <h2 class="fd-label">HOW TO PLAY</h2>
-        {onFaq && (
-          <button type="button" class="fd-row-link" onClick={onFaq}>
+      {/* (How each mode works lives in one place, the FAQ: these open it.) */}
+      {onFaq && (
+        <section class="fd-section">
+          <h2 class="fd-label">HOW TO PLAY</h2>
+          <button type="button" class="fd-row-link" onClick={() => onFaq("modes")}>
+            📖 How each mode works ›
+          </button>
+          <button type="button" class="fd-row-link" onClick={() => onFaq()}>
             📖 FAQ · How it works ›
           </button>
-        )}
-        <HowToPlay />
-      </section>
+        </section>
+      )}
 
       <section class="fd-section">
         <h2 class="fd-label">HELP</h2>

@@ -57,6 +57,9 @@ describe("reading the switches", () => {
     expect(pausedLine("solo")).toBe("Solo and Boss alone are resting for a bit. Back soon.");
     expect(pausedLine("shop")).toBe("The shop is resting for a bit. Back soon.");
     expect(pausedLine(`boss:${playable}`)).toBe(`${BOSS_ROSTER.find((b) => b.id === playable)!.name} is resting for a bit. Back soon.`);
+    // (A name that's a title takes "the", as every sentence says him.)
+    expect(pausedLine("boss:recluse")).toBe("The Hidden Boss is resting for a bit. Back soon.");
+    expect(pausedLine("boss:pig")).toBe("Wrangler is resting for a bit. Back soon.");
     const res = pausedResponse("squads");
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ message: pausedLine("squads"), paused: "squads" });
@@ -155,6 +158,7 @@ describe("a boss that's resting is never met", () => {
     const roster = rosterWithout([final.id]);
     expect(crowdFinalBoss(roster)).toBeNull();
     expect(bossFinalOption().label).toBe(final.name);
-    expect(bossFinalOption(roster).label).toBe("Boss battle");
+    expect(bossFinalOption(roster).label).toBe("Boss final");
+    expect(bossFinalOption(roster).blurb).toMatch(/against a boss$/);
   });
 });

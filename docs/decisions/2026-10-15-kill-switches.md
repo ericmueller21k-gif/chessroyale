@@ -32,8 +32,9 @@ switches and the maintenance banner". The calls:
     and every match's boss pick (online and solo) skips him (`rosterWithout` in core). Online, the lobby's object
     passes the list resting now into every match it runs (`lobby-do.ts`), so a lobby made before he was rested (one
     joined by code, a raid picked for him, the queue's filling lobby) doesn't meet him either. The Crowd's boss final meets
-    another boss while his is resting, and its vote card says "Boss battle" / "Top 4 team up against a boss" instead
-    of his name. If every boss were resting, the whole roster stands, so a match never fails for it.
+    another boss while his is resting, and its vote card says "Boss final" / "Boss final: top 4 team up against a
+    boss" instead of his name (the card's own fallback). A resting boss's line says him as a sentence does
+    (`bossInText`): "The Hidden Boss is resting for a bit. Back soon." If every boss were resting, the whole roster stands, so a match never fails for it.
   - **Friends:** the friends API answers "off" and the Friends page says so (`friendsOn` in `friends-api.ts`, now
     `!isPaused(env, "friends")`, as agreed with the friends lane). Its words join the others': "Friends are resting
     for a bit. Back soon." (was "Friends are switched off for now. Try again later.").

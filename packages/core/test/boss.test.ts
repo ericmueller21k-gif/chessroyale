@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_DIFFICULTY, ENGINE_MAX_ELO, BOSS_ROSTER, bossDef, bossIdFromLink, bossStrength, bossThreat, chooseBoss, crowdFinalBoss, isPlayable, playableBosses, type BossDef } from "../src/index.ts";
+import { BOSS_DIFFICULTY, ENGINE_MAX_ELO, BOSS_ROSTER, bossDef, bossIdFromLink, bossInText, bossStrength, bossThreat, chooseBoss, crowdFinalBoss, isPlayable, playableBosses, type BossDef } from "../src/index.ts";
 
 describe("the boss template: who can be met", () => {
   it("only a boss with a complete character and its powers is playable", () => {
@@ -79,5 +79,18 @@ describe("the boss template: who can be met", () => {
     expect(chooseBoss(0.5, "b", null, wip).id).toBe("a");
     expect(chooseBoss(0.5, "b", null, wip, true).id).toBe("b");
     expect(chooseBoss(0.5, "c", null, wip, true).id).toBe("a");
+  });
+});
+
+describe("a boss's name in a sentence", () => {
+  it("the Hidden Boss takes \"the\" (his roster's `the`); a name starting \"The \" keeps it, lower case mid-sentence; others as they are", () => {
+    expect(bossInText("Hidden Boss")).toBe("the Hidden Boss");
+    expect(bossInText("Hidden Boss", true)).toBe("The Hidden Boss");
+    expect(bossInText("The Pawn Golem")).toBe("the Pawn Golem");
+    expect(bossInText("The Pawn Golem", true)).toBe("The Pawn Golem");
+    expect(bossInText("Ginger")).toBe("Ginger");
+    expect(bossInText("Boingo the Clown", true)).toBe("Boingo the Clown");
+    // Renamed without the flag: no article.
+    expect(bossInText("Hidden Boss", false, BOSS_ROSTER.map(({ the: _, ...b }) => b))).toBe("Hidden Boss");
   });
 });

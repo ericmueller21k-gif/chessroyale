@@ -25,9 +25,9 @@ test("home: Default, Bots off and Solo; the ⓘ says what they do; Bots off warn
   const types = page.getByRole("radiogroup", { name: "Matchmaking" });
   await expect(types.getByRole("radio")).toHaveCount(3);
   await expect(types.getByRole("radio", { name: /^Default/ })).toHaveAttribute("aria-checked", "true");
-  // The ⓘ: Default adds bots after 60 seconds.
+  // The ⓘ: Default adds bots after the server's fill time (8 s on the test server).
   await page.getByRole("button", { name: "About matchmaking" }).click();
-  await expect(page.locator(".fd-types-info")).toContainText("Default adds bots after 60 seconds to keep the wait short.");
+  await expect(page.locator(".fd-types-info")).toContainText("Default adds bots after 8 s to keep the wait short.");
   await expect(page.locator(".fd-types-info")).toContainText("Your ranking changes only in a match with at least 30 real players (15 in a raid).");
   await page.getByRole("button", { name: "About matchmaking" }).click();
   await expect(page.locator(".fd-types-info")).toHaveCount(0);
@@ -117,7 +117,7 @@ test("Boss raid: the three types too; a Solo raid is you and 49 bots against a b
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=1");
   await page.getByRole("radio", { name: /^Boss raid/ }).click();
   await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots off/ }).click();
-  await expect(page.locator(".fd-hint")).toHaveText("People only: starts at 50, or 10 after a minute");
+  await expect(page.locator(".fd-hint")).toHaveText("People only: starts at 50, or 10 after 8 s");
   await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Default/ }).click();
   await expect(page.locator(".fd-hint")).toHaveText(/^Join a raid; bots fill the crowd after \d+ s$/);
   // Boss alone is still here (you against a boss you pick).
@@ -153,7 +153,7 @@ test("Boss raid: the three types too; a Solo raid is you and 49 bots against a b
     await page.waitForTimeout(300);
   }
   expect(await phase(page)).toBe("results");
-  await expect(page.locator(".results-unranked")).toHaveText("Unranked: solo games don't change your ranking.");
+  await expect(page.locator(".results-unranked")).toHaveText("Unranked: solo games don't count for ranking.");
 });
 
 test("opening the app from scratch during a live match puts you back in it; leaving on purpose doesn't", async ({ browser }) => {

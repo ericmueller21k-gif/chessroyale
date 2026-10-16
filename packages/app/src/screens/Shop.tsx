@@ -6,6 +6,7 @@ import { KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
 import { CratesPanel, LockerPanel } from "./Crates.tsx";
+import { BackButton } from "../components/FrontDoor.tsx";
 import { isPaused, useServerStatus } from "../status.ts";
 
 /**
@@ -53,9 +54,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
   return (
     <div class="screen shop">
       <div class="shop-head">
-        <button type="button" class="btn btn-secondary" onClick={onBack}>
-          ‹ Back
-        </button>
+        <BackButton onClick={onBack} />
         <h1>Shop</h1>
         <span class="shop-coins" aria-label={`${shop?.coins ?? 0} coins`}>
           🪙 {shop?.coins ?? 0}
@@ -78,8 +77,9 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
       ) : (
         <>
       {SHOP_FREE && <p class="shop-note">Everything is free while we test the shop.</p>}
-      {!config?.accounts || !shop ? (
-        <p class="muted">The shop needs your account, which isn't available here.</p>
+      {!shop ? (
+        // (Still loading on a first visit: the guest account is being made. Unavailable only once that's known.)
+        <p class="muted">{config && (!config.accounts || profile) ? "The shop needs your account, which isn't available here." : "Loading the shop…"}</p>
       ) : (
         <>
           <div class="shop-tabs" role="tablist">
