@@ -269,3 +269,62 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await expect(unread).toHaveCount(0);
   expect(await rect(phone, `.board-area ${BOARD_SEL.squares}`)).toEqual(boardBefore);
 });
+
+test("a name's menu and the chat options stay open when the round moves on (each phase draws its own screen)", async ({ browser }) => {
+  // (Kept by each screen's panel, the menu closed by itself at the next phase: the test above then waited for its Mute
+  // button until it timed out. docs/decisions/2026-10-16-flaky-e2e-batch-4.md)
+  test.setTimeout(4 * 60_000);
+  test.skip(test.info().project.name !== "desktop", "the computer's chat column");
+  const desk = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  await named(desk, "Menus");
+  await desk.goto("/?debug&pool=chatmenu");
+  await desk.getByRole("button", { name: "PLAY", exact: true }).click();
+  await expect.poll(() => phase(desk), { timeout: 90_000 }).toMatch(/play|watching/);
+  const name = desk.locator(".qchat-side .qline .qline-name").first();
+  await expect(name).toBeVisible({ timeout: 30_000 });
+  // Every frame from before the tap: the phase, and whether the menu (then the options) is on screen.
+  await desk.evaluate(() => {
+    const w = window as any;
+    w.__open = [];
+    const tick = () => {
+      w.__open.push([w.match?.phase.kind, !!document.querySelector(".qchat-side .qmenu"), !!document.querySelector(".qchat-side .qoptions")]);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  const frames = () => desk.evaluate(() => (window as any).__open as [string, boolean, boolean][]);
+  /** Waits for the phase after this one, and a moment of the next screen. */
+  const nextPhase = async () => {
+    const at = await phase(desk);
+    await expect.poll(() => phase(desk), { timeout: 60_000 }).not.toBe(at);
+    const n = (await frames()).length;
+    await expect.poll(async () => (await frames()).length, { timeout: 5_000 }).toBeGreaterThan(n + 10);
+  };
+  /** From the first frame it showed, the panel (`i`: 1 the menu, 2 the options) was on screen in every frame, across a phase change. */
+  const heldOpen = async (i: 1 | 2) => {
+    const f = await frames();
+    const from = f.findIndex((x) => x[i]);
+    expect(from, "it opened").toBeGreaterThanOrEqual(0);
+    const since = f.slice(from);
+    expect(new Set(since.map((x) => x[0])).size, "a phase change while it was open").toBeGreaterThan(1);
+    expect(since.filter((x) => !x[i]).map((x) => x[0]), "frames without it").toEqual([]);
+  };
+  await name.click();
+  const menu = desk.locator(".qchat-side .qmenu");
+  await expect(menu).toBeVisible();
+  await nextPhase();
+  await heldOpen(1);
+  // And it still works: Mute (a bot's lines, for this match).
+  const who = (await menu.getAttribute("aria-label"))!;
+  await menu.getByRole("button", { name: /^Mute/ }).click();
+  await expect(menu).toHaveCount(0);
+  await expect(desk.locator(".qchat-side .qline .qline-name", { hasText: who })).toHaveCount(0);
+  // The options too.
+  await desk.evaluate(() => ((window as any).__open = []));
+  await desk.getByRole("button", { name: "Chat options" }).click();
+  await expect(desk.locator(".qchat-side .qoptions")).toBeVisible();
+  await nextPhase();
+  await heldOpen(2);
+  await desk.locator(".qchat-side .qoptions").getByRole("button", { name: "Done" }).click();
+  await expect(desk.locator(".qchat-side .qoptions")).toHaveCount(0);
+});

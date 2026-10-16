@@ -71,6 +71,13 @@ export class MatchChat {
   to: ChatTo = "team";
   /** Senders' icons, kept as they come with their first line. */
   readonly icons = new Map<string, string>();
+  /**
+   * What's open in the chat panel: the name whose menu (Profile, Mute) was tapped, and the options. Kept here, not in
+   * the panel: each phase's screen draws a panel of its own, so a menu kept by the panel closed by itself when the
+   * round moved on (docs/decisions/2026-10-16-flaky-e2e-batch-4.md).
+   */
+  menuFor: string | null = null;
+  optionsOpen = false;
   private list: ChatLine[] = [];
   private mutedSet: Set<string> | null = null;
   private sent: ChatSent = noChatSent();

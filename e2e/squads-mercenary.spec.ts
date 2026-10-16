@@ -108,8 +108,22 @@ test("earning coins: your capture pays your squad's wallet (a knight's worth), s
   expect(s.fen).toBe(BG5);
   // Both squads' coins under the board from the start (Mercenary).
   await expect(page.locator(".mc-kitline-side")).toHaveCount(2);
+  const ply = await page.evaluate(([key, board]) => (window as any).squads.matches.get(key).boards[board].moves.length, [s.key, s.duty!.board] as const);
   await tapSquare(page, "g5");
   await tapSquare(page, "f6");
+  // Your move is in: locked in by the server, or already played on the board (the half may end with it). Once (1 of 93
+  // local runs) the two taps didn't make it and the half ran to its cap without it: if that comes back, it fails here,
+  // with the page as it was then (docs/decisions/2026-10-16-flaky-e2e-batch-4.md).
+  const taken = () =>
+    page.evaluate(
+      ([key, board, ply]) => {
+        const sq = (window as any).squads;
+        const m = sq.matches.get(key);
+        return (m.visible[sq.myId] === "g5f6" && m.locked.includes(sq.myId)) || m.boards[board].moves[ply] === "g5f6";
+      },
+      [s.key, s.duty!.board, ply] as const,
+    );
+  await expect.poll(taken, { message: "your move, taken", timeout: 5_000 }).toBe(true);
   // The half's coins: your capture, a knight's worth, to your squad.
   await expect
     .poll(
@@ -262,8 +276,10 @@ test("the shop between rounds, a Stockfish token, a Time chip and a shield: boug
   // The shield: the other squad's bots block whenever they can; the first that would take effect is canceled.
   // (In your match, a block by the other squad: other matches' squads buy shields too, and so may your opponent.)
   const ours = () => page.evaluate(([key, side]) => (window as any).__shielded.filter((x: any) => x.key === key && x.side !== side), [s.key, s.side!] as const);
-  await expect.poll(async () => (await ours()).length, { timeout: 120_000, intervals: [250] }).toBe(1);
-  expect(await page.evaluate(([key, side]) => (window as any).squads.matches.get(key).shields[side], [s.key, s.side!] as const)).toBe(0);
+  // (With your squad's shields left in the match beside it: once, locally, the shield was spent but its half never reached
+  // the page, a reconnect's snapshot instead, and this says which. docs/decisions/2026-10-16-flaky-e2e-batch-4.md)
+  const shieldsLeft = () => page.evaluate(([key, side]) => (window as any).squads.matches.get(key).shields[side] as number, [s.key, s.side!] as const);
+  await expect.poll(async () => ({ seen: (await ours()).length, shieldsLeft: await shieldsLeft() }), { timeout: 120_000, intervals: [250] }).toEqual({ seen: 1, shieldsLeft: 0 });
   // Both squads are told (the line above that board: your shield canceled their block).
   const canceled = (await ours())[0];
   expect(await page.evaluate(() => (window as any).__banners)).toContainEqual(expect.objectContaining({ key: s.key, board: canceled.board, kind: "shield" }));
