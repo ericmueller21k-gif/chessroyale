@@ -30,7 +30,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - **The queue screen:** the lobby's seats fill on screen (people, then bots popping in after the fill time), the wait
   so far, "Switch to Default" in Bots off. The match starts in place.
 - **Profiles** (yours and anyone's, by tapping a name): icon, name, rank (from the rating, `RATING_RANKS`; "Top N%"
-  once `percentileMinPlayers` have ratings), the rating chart, stats (All, Classic, Crowd), recent matches, what
+  once `percentileMinPlayers` have ratings), the rating chart, stats (All, Classic, Crowd), "Boss tiers beaten"
+  (online raids only: a solo win is the browser's word), recent matches, what
   they're wearing (drawn with the real item art), their quick-chat picks. A profile others see never shows an email,
   a sign-in method or anything not on the approved list; a banned player's says "Banned".
 - **Friends** (Oct 15; [docs/decisions/2026-10-15-friends-and-invites.md](../decisions/2026-10-15-friends-and-invites.md); the rules and data on [accounts.md](accounts.md)):

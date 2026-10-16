@@ -99,6 +99,35 @@ describe("accounts", () => {
     expect(rows.map((r) => r.eval_bar)).toEqual([1, 0, null]);
   });
 
+  it("a solo result from before the ranked rule (ranked NULL, the browser's rating) never counts, and the next schema run fixes a rating it set", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000);
+    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 3, players: 100, rating: 1700, ranked: true }, 2000);
+    // An old solo post, as stored before Oct 7 (no `ranked`), with the rating its browser sent; the old rule took it.
+    await sql.run("INSERT INTO results (user_id, mode, online, placement, players, rating, played_at) VALUES (?, 'classic', 0, 1, 64, 3000, 3000)", user.id);
+    await sql.run("UPDATE users SET rating = 3000 WHERE id = ?", user.id);
+    expect((await profile(sql, user)).rating).toBe(1700);
+    // The deploy's schema run (a newer schema than the one recorded) gets the stored rating again from online results.
+    await sql.run("UPDATE meta SET value = 'older' WHERE key = 'schema'");
+    await ensureSchema(sql, {});
+    expect((await sql.first<{ rating: number }>("SELECT rating FROM users WHERE id = ?", user.id))!.rating).toBe(1700);
+    const pub = (await publicProfile(sql, user.id, 4000))!;
+    expect(pub.rating).toBe(1700);
+    expect(pub.ratingHistory).toEqual([1700]);
+  });
+
+  it("Boss tiers beaten: online raids only (a solo boss win is the browser's word)", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000);
+    await recordResult(sql, user.id, { mode: "boss", online: true, placement: 1, players: 50, teamWon: true, bossElo: 1800 }, 2000);
+    await recordResult(sql, user.id, { mode: "boss", online: false, placement: 1, players: 1, teamWon: true, bossElo: 3190 }, 3000);
+    const pub = (await publicProfile(sql, user.id, 4000))!;
+    expect(pub.bossesBeaten).toEqual([1800]);
+    expect(pub.boss.bossesBeaten).toBe(1);
+  });
+
   it("signing in: attaches to the guest, or switches to the existing account and brings the guest's results", async () => {
     const sql = memorySql();
     await ensureSchema(sql);

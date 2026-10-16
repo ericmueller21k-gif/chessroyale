@@ -47,7 +47,8 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
   players met last (each sends theirs on joining).
 - **Ranking today** is the rating on your profile (its rank, chart and "Top N%"); there is no ranked mode yet. A match
   counts for ranking only if at least `RANKING.rankedMinHumanShare` (30%) of its seats are real players
-  (`isRankedMatch`; 30 of a 50 v 50's 100, 15 of a raid's 50). Solo and practice never count. Stored as
+  (`isRankedMatch`; 30 of a 50 v 50's 100, 15 of a raid's 50). Solo and practice never count (only `online = 1`
+  results do, whatever their `ranked`). Stored as
   `results.ranked`. The draft for ranked proper (Weng–Lin ratings, rank points, seasons, ranked queues) is in
   `docs/history/matchmaking-and-lobbies.md` and waits for Eric and for trustworthy scoring.
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { RAID_SETTINGS, raidBossElo } from "@chessroyale/core";
 import { createGuest, ensureSchema, recordResult, signInWithIdentity, type Sql } from "../src/accounts.ts";
-import type { LobbyRecord } from "../src/lobby.ts";
+import { OTHER_ACCOUNT, type LobbyRecord } from "../src/lobby.ts";
 import { memoryDb } from "./memory-db.ts";
 
 // (The engine server is a Container, which needs the Workers runtime: not here.)
@@ -66,13 +66,18 @@ async function raid(db = true) {
   await loading;
   await lobby.create("RAIDS", { ...RAID_SETTINGS } as LobbyRecord["overrides"]);
   const record = () => store.get("lobby") as LobbyRecord;
-  /** Someone joins (on a socket opened with `userId`'s session; none: no account), their app claiming `claimed`. */
-  const join = async (name: string, userId: string | undefined, claimed: number) => {
+  /** A hello (on a socket opened with `userId`'s session; none: no account), the app claiming `claimed`; `token`: a seat's. */
+  const hello = async (name: string, userId: string | undefined, claimed: number, token?: string) => {
     const ws = new FakeSocket();
     ws.serializeAttachment({ userId, guest: false, banned: false });
     sockets.push(ws);
     // (Raw JSON: the protocol has no rating any more, but an app can still send one.)
-    await lobby.webSocketMessage(ws as unknown as WebSocket, JSON.stringify({ t: "hello", name, device: "computer", rating: claimed }));
+    await lobby.webSocketMessage(ws as unknown as WebSocket, JSON.stringify({ t: "hello", name, device: "computer", rating: claimed, ...(token ? { token } : {}) }));
+    return ws;
+  };
+  /** Someone joins: welcomed to a seat. */
+  const join = async (name: string, userId: string | undefined, claimed: number) => {
+    const ws = await hello(name, userId, claimed);
     expect(ws.sent.some((m) => m.t === "welcome")).toBe(true);
     return ws;
   };
@@ -83,7 +88,7 @@ async function raid(db = true) {
     expect(record().phase).not.toBe("lobby");
     return record().overrides?.bossFixedElo;
   };
-  return { sql, join, ratings, start };
+  return { sql, hello, join, record, ratings, start };
 }
 
 describe("a raid's boss strength comes from the ratings the server stores", () => {
@@ -129,5 +134,32 @@ describe("a raid's boss strength comes from the ratings the server stores", () =
     const solo = await S.join("Bo", "u-bo", 400);
     expect(S.ratings()).toEqual({ Bo: null });
     expect(await S.start(solo)).toBe(raidBossElo([null]));
+  });
+
+  it("a failed shop read (chat packs) doesn't cost the rating", async () => {
+    const R = await raid();
+    const ann = await account(R.sql, "Ann", 2350, true);
+    await R.sql.run("DROP TABLE inventory");
+    await R.join("Ann", ann, 400);
+    expect(R.ratings()).toEqual({ Ann: 2350 });
+  });
+
+  it("a seat keeps the account it was taken on: back with its token on another account, refused", async () => {
+    const R = await raid();
+    const alt = await account(R.sql, "Alt", 400, true);
+    const main = await account(R.sql, "Main", 2600, true);
+    const seat = await R.join("Alt", alt, 400);
+    const token = (seat.sent.find((m) => m.t === "welcome") as { token?: string }).token!;
+    // Otherwise the boss would play to Alt's 400 while the result went on Main's account.
+    const other = await R.hello("Main", main, 2600, token);
+    expect(other.sent).toContainEqual(expect.objectContaining({ t: "error", message: OTHER_ACCOUNT }));
+    expect(other.sent.some((m) => m.t === "welcome")).toBe(false);
+    expect(R.record().accounts).toEqual({ p1: alt });
+    // Back on Alt's account (or with no session at all): their seat, as ever.
+    expect((await R.hello("Alt", alt, 400, token)).sent.some((m) => m.t === "welcome")).toBe(true);
+    expect((await R.hello("Alt", undefined, 400, token)).sent.some((m) => m.t === "welcome")).toBe(true);
+    expect(R.record().accounts).toEqual({ p1: alt });
+    expect(R.ratings()).toEqual({ Alt: 400 });
+    expect(await R.start(seat)).toBe(raidBossElo([400]));
   });
 });

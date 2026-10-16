@@ -73,15 +73,19 @@ export class Lobby extends DurableObject<Env> {
   }
 
   /**
-   * Someone joining, from their account: their icon and the shop items they own (quick chat's packs), and the rating
-   * stored on it (`users.rating`, a raid boss's strength; null: none yet). Read once, on joining, never per move.
+   * Someone joining, from their account: their icon and the shop items they own (quick chat's packs, null: unread), and
+   * the rating stored on it (`users.rating`, a raid boss's strength; null: none yet). Read once, on joining, never per
+   * move. The two reads fail apart, so a failed shop read never costs the rating (the raid's boss would meet the prior).
    */
-  private async joiningProfileOf(userId: string): Promise<{ icon: string | null; owned: string[]; rating: number | null }> {
+  private async joiningProfileOf(userId: string): Promise<{ icon: string | null; owned: string[] | null; rating: number | null }> {
     const sql = d1Sql(this.env.DB!);
-    const row = await sql.first<{ icon: string; rating: number | null }>("SELECT icon, rating FROM users WHERE id = ?", userId);
+    const [row, shop] = await Promise.all([
+      sql.first<{ icon: string; rating: number | null }>("SELECT icon, rating FROM users WHERE id = ?", userId).catch(() => null),
+      shopState(sql, userId).catch(() => null),
+    ]);
     const icon = row && (isPixelIcon(row.icon) || (ICONS as readonly string[]).includes(row.icon)) ? row.icon : null;
     const rating = typeof row?.rating === "number" && Number.isFinite(row.rating) ? row.rating : null;
-    return { icon, owned: (await shopState(sql, userId)).owned, rating };
+    return { icon, owned: shop?.owned ?? null, rating };
   }
 
   private core(code: string): LobbyCore {
@@ -431,7 +435,7 @@ export class Lobby extends DurableObject<Env> {
       msg = { ...msg, boards: await this.recheckOnServer(msg.boards) };
     }
     // Who's joining (their icon, chat packs and stored rating), read before the lobby is touched, as above.
-    const joining = msg.t === "hello" && this.env.DB && attached?.userId && !attached.guest ? await this.joiningProfileOf(attached.userId).catch(() => null) : null;
+    const joining = msg.t === "hello" && this.env.DB && attached?.userId && !attached.guest ? await this.joiningProfileOf(attached.userId) : null;
     // (Closed while that was being read.)
     if (!this.record) return;
     const core = this.core(this.record.code);
@@ -464,7 +468,7 @@ export class Lobby extends DurableObject<Env> {
       }
       ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId, ...(attached?.admin ? { admin: true } : {}) });
       if (joining) {
-        core.chatOwned(result.playerId, joining.owned);
+        if (joining.owned) core.chatOwned(result.playerId, joining.owned);
         if (joining.icon && this.icons.get(result.playerId) !== joining.icon) {
           this.icons.set(result.playerId, joining.icon);
           await this.ctx.storage.put(`icon:${result.playerId}`, joining.icon);

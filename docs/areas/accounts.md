@@ -22,7 +22,9 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 - **The database** is Cloudflare D1. The schema is made at runtime (`CREATE TABLE IF NOT EXISTS`, once per Worker
   instance; later columns by `ALTER TABLE` migrations that tolerate re-runs), so a deploy needs no migration step.
 - **Results.** The server records online matches when a lobby reaches results, for every connected player with an
-  account (`results.ranked` says whether it counts for ranking). The browser posts solo matches (`online = 0`). Each
+  account (`results.ranked` says whether it counts for ranking). The browser posts solo matches (`online = 0`): the
+  browser's word, so they never count for ranking (even the ones from before Oct 7, stored with `ranked` NULL) nor
+  toward "Boss tiers beaten" (docs/decisions/2026-10-16-server-side-rating.md). Each
   result keeps whether its player had the eval bar on (`results.eval_bar`, NULL from older apps; see [hub.md](hub.md)).
 - **Squads' placements** (unranked): a result with mode "squads" (placement 1, 2, 3 or 5 of 8 squads) and its reward:
   coins into `wallets.coins`, crates counted in `wallets.crates` (for when crates stop being free), both carried over
