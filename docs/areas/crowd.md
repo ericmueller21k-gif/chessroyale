@@ -51,10 +51,11 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   last cut, with why). `stageBreakSeconds` 10.
 - **Pre-game votes (50 v 50, `augments`).** Before move 1 everyone votes by dragging their pawn into one of three zones
   on an empty board (or tapping a card): how it ends (**team final**, **the Hidden Boss** (the boss final), **duel**), then "How fast?", a
-  chess time control (**Rapid 10+5**, **Blitz 5+3**, **Bullet 3+2**; Blitz when nobody votes). The options and what
+  chess time control (**Bullet 3+2**, **Blitz 5+3**, **Rapid 10+5**, left to right; Blitz when nobody votes). The options and what
   they change are plain data in `packages/core/src/votes.ts` (a time control is one `timeControl(...)` entry: its bank,
   increment and cap; the card's label and blurb are made from them). **Every vote's options keep one order** on every
-  screen, every game (Eric, Oct 13): the data's order, left to right, speeds slowest to fastest. From Black's side the
+  screen, every game (Eric, Oct 13): the data's order, left to right; a speed vote Bullet on the left, the longest on
+  the right (Eric, Oct 16; slowest-left until then). From Black's side the
   board turns but the order doesn't: the zones are taken the other way round (`voteZoneFor`), and the cards never
   flip. A default is named by its option's id (`optionIndex`), never by its place. Non-voters (and `voteBotSkip` of the bots) join
   the winner, then the winner's banner; each result shows `voteResultSeconds` (4.2 s since Eric's Oct 15 "every banner a
