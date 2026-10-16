@@ -1,5 +1,5 @@
 import { QUICK_CHAT, RANKED_1V1, canSay, chatCheck, chatSay, chatSent, noChatSent, ownedChatPacks, type ChatSent } from "@chessroyale/core";
-import { START_FEN, type ChatRefusal, type NetChatLine } from "@chessroyale/chess";
+import { START_FEN, type ChatBlock, type ChatRefusal, type NetChatLine } from "@chessroyale/chess";
 import {
   DUEL_PROTOCOL,
   callOff,
@@ -56,6 +56,8 @@ interface DuelChat {
   off: Partial<Record<Color, true>>;
   /** This side has muted the other (their lines aren't sent to it). */
   muted: Partial<Record<Color, true>>;
+  /** Chat moderation: a side with a chat ban in force (it can't send), as the game's object last read it. */
+  blocked?: Partial<Record<Color, ChatBlock>>;
 }
 
 export interface DuelRecord {
@@ -375,14 +377,31 @@ export class DuelCore {
   }
 
   /**
+   * Chat moderation (chat-mod.ts): a side's chat ban as the game's object read it (as they connect, and again at most
+   * every CHAT_MOD.recheckMs as they chat). Null: none.
+   */
+  chatStanding(c: Color, block: ChatBlock | null) {
+    const ch = this.r.chat;
+    if (block) ch.blocked = { ...ch.blocked, [c]: block };
+    else if (ch.blocked?.[c]) {
+      const { [c]: _gone, ...rest } = ch.blocked;
+      ch.blocked = rest;
+    }
+  }
+
+  /**
    * A line from a player: only known lines they own, within the limits (QUICK_CHAT: one every 3 s, 5 in 30 s, no
-   * repeats). There are no teams in a 1 v 1, so every line goes to both (as the lobby's chat before a match).
+   * repeats), and never from a player with a chat ban in force. There are no teams in a 1 v 1, so every line goes to
+   * both (as the lobby's chat before a match).
    */
   private chatSay(c: Color, say: unknown) {
     const now = this.io.now();
     const ch = this.r.chat;
-    const refuse = (reason: ChatRefusal, retryAt = now) => this.io.send(c, { t: "chatNo", say: String(say).slice(0, 40), reason, retryAt });
+    const refuse = (reason: ChatRefusal, retryAt = now, block?: ChatBlock) =>
+      this.io.send(c, { t: "chatNo", say: String(say).slice(0, 40), reason, retryAt, ...(block ? { block } : {}) });
     if (ch.off[c]) return refuse("off");
+    const block = ch.blocked?.[c];
+    if (block && (block.until === null || block.until > now)) return refuse("mod", block.until ?? now, block);
     const line = chatSay(say);
     if (!line) return refuse("unknown");
     if (!canSay(line.id, ch.owned[c])) return refuse("locked");

@@ -5,9 +5,11 @@
  * the game, never from anything an app sends. The tables, a guest's merge and the profile's read are in
  * ranked-schema.ts (accounts.ts includes them; this file needs accounts.ts).
  */
-import { RANKED_1V1, duelCoins, newRankedRecord, rankedGame, type RankChange, type RankedRecord } from "@chessroyale/core";
-import type { Color, DuelOutcome, DuelResult, DuelReason } from "@chessroyale/chess/duel";
-import { DELETED_ID, randomToken, stmt, type Sql, type Stmt } from "./accounts.ts";
+import { RANKED_1V1, duelCoins, newRankedRecord, rankView, rankedGame, type RankChange, type RankedRecord } from "@chessroyale/core";
+import type { Color, DuelOutcome, DuelPlayerView, DuelResult, DuelReason } from "@chessroyale/chess/duel";
+import { DELETED_ID, randomToken, stmt, type Sql, type Stmt, type User } from "./accounts.ts";
+import { lockerState } from "./locker.ts";
+import { seatName } from "./text-filter.ts";
 
 export interface RankedRow {
   rating: number;
@@ -28,6 +30,18 @@ export async function rankedRecordOf(sql: Sql, userId: string): Promise<{ record
   if (row) return { record: fromRow(row), stored: true };
   const u = await sql.first<{ rating: number | null }>("SELECT rating FROM users WHERE id = ?", userId);
   return { record: newRankedRecord(u?.rating ?? null), stored: false };
+}
+
+/**
+ * A player joining the queue, as the server reads them (never the app's word): their account's name (filtered, as a
+ * lobby seat's), what they wear (the locker), their rank, and their hidden rating for pairing.
+ */
+export async function duelEntrant(sql: Sql, user: Pick<User, "id" | "name">): Promise<{ player: DuelPlayerView; rating: number }> {
+  const { record } = await rankedRecordOf(sql, user.id);
+  const look = await lockerState(sql, user.id)
+    .then((l) => l.look)
+    .catch(() => ({}));
+  return { player: { uid: user.id, name: seatName(user.name, "Player"), look, rank: rankView(record) }, rating: record.rating };
 }
 
 /** A finished game, as the game's object hands it over to be recorded. */

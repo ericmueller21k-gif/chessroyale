@@ -1,5 +1,5 @@
 import type { DuelZone, ItemLook, RankChange, RankView } from "@chessroyale/core";
-import type { ChatRefusal, NetChatLine } from "../protocol.ts";
+import type { ChatBlock, ChatRefusal, NetChatLine } from "../protocol.ts";
 import type { Color, DuelEnd } from "./rules.ts";
 
 /**
@@ -85,7 +85,8 @@ export type DuelServerMessage = (
   | { t: "outcome"; outcome: DuelOutcome }
   | { t: "chat"; line: NetChatLine }
   | { t: "chatLog"; lines: NetChatLine[]; packs: string[] }
-  | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number }
+  /** `block`: your chat ban (reason "mod", chat moderation). */
+  | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock }
   | { t: "error"; message: string }
   | { t: "closed"; reason: string }
 ) & { now?: number };

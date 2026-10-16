@@ -22,9 +22,10 @@ const playable = playableBosses()[0]!.id;
 describe("reading the switches", () => {
   it("one variable each: PAUSE_ and the part's name, a boss's by its id", () => {
     expect(pauseVariable("squads")).toBe("PAUSE_SQUADS");
+    expect(pauseVariable("ranked1v1")).toBe("PAUSE_RANKED1V1");
     expect(pauseVariable("shop")).toBe("PAUSE_SHOP");
     expect(pauseVariable("boss:pig")).toBe("PAUSE_BOSS_PIG");
-    expect(allPausable()).toEqual(expect.arrayContaining(["classic", "crowd", "raid", "squads", "solo", "shop", "friends", ...BOSS_ROSTER.map((b) => `boss:${b.id}`)]));
+    expect(allPausable()).toEqual(expect.arrayContaining(["classic", "crowd", "raid", "squads", "ranked1v1", "solo", "shop", "friends", ...BOSS_ROSTER.map((b) => `boss:${b.id}`)]));
   });
 
   it("on with 1, true, yes or on (or a JSON true or 1); anything else, or unset, leaves it running", () => {
@@ -56,6 +57,7 @@ describe("reading the switches", () => {
     expect(pausedLine("raid")).toBe("Boss raids are resting for a bit. Back soon.");
     expect(pausedLine("solo")).toBe("Solo and Boss alone are resting for a bit. Back soon.");
     expect(pausedLine("shop")).toBe("The shop is resting for a bit. Back soon.");
+    expect(pausedLine("ranked1v1")).toBe("1 v 1 is resting for a bit. Back soon.");
     expect(pausedLine(`boss:${playable}`)).toBe(`${BOSS_ROSTER.find((b) => b.id === playable)!.name} is resting for a bit. Back soon.`);
     // (A name that's a title takes "the", as every sentence says him.)
     expect(pausedLine("boss:recluse")).toBe("The Hidden Boss is resting for a bit. Back soon.");
@@ -84,7 +86,7 @@ describe("the server refuses new matches for a part that's resting", () => {
     expect((await call({ PAUSE_SQUADS: "1", MAINTENANCE_BANNER: "Maintenance at 6 pm." }, "GET", "/api/status")).body).toEqual({ paused: ["squads"], banner: "Maintenance at 6 pm." });
   });
 
-  it("PLAY, a new lobby, Squads' queue and a new party", async () => {
+  it("PLAY, a new lobby, Squads' queue and a new party, the 1 v 1 queue", async () => {
     const cases: [object, string, string][] = [
       [{ PAUSE_CROWD: "1" }, "/api/play", "crowd"],
       [{ PAUSE_RAID: "1" }, "/api/play?mode=raid", "raid"],
@@ -94,6 +96,7 @@ describe("the server refuses new matches for a part that's resting", () => {
       [{ [pauseVariable(`boss:${playable}`)]: "1" }, `/api/lobby?mode=raid&boss=${playable}`, `boss:${playable}`],
       [{ PAUSE_SQUADS: "1" }, "/api/squads/play", "squads"],
       [{ PAUSE_SQUADS: "1" }, "/api/squads/party", "squads"],
+      [{ PAUSE_RANKED1V1: "1" }, "/api/1v1/play", "ranked1v1"],
     ];
     // (A refusal, not an error: the Worker's error capture, problems.ts, would answer 500 "Something went wrong".)
     for (const [env, path, part] of cases) {

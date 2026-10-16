@@ -1,9 +1,11 @@
 import { DurableObject } from "cloudflare:workers";
+import { CHAT_MOD } from "@chessroyale/core";
 import type { Color, DuelClientMessage, DuelPlayerView } from "@chessroyale/chess/duel";
 import { DuelCore, newDuelRecord, type DuelRecord } from "./duel-room.ts";
 import { accountOf } from "./api.ts";
 import { d1Sql, ensureSchema, shopState } from "./accounts.ts";
 import { eligibleForRanked } from "./fairplay.ts";
+import { chatBlock } from "./chat-mod.ts";
 import { recordDuel } from "./ranked.ts";
 import { countCall } from "./ops.ts";
 import { serverError } from "./problems.ts";
@@ -25,6 +27,8 @@ interface Attached {
 export class DuelGame extends DurableObject<Env> {
   private record: DuelRecord | null = null;
   private recording = false;
+  /** Chat moderation: when each side's chat ban was last read (in memory: a wake reads it again). */
+  private chatChecked = new Map<Color, number>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -160,17 +164,33 @@ export class DuelGame extends DurableObject<Env> {
     const attached = ws.deserializeAttachment() as Attached | null;
     const color = attached?.color;
     if (!color) return;
+    const sql = this.env.DB && attached.uid ? d1Sql(this.env.DB) : null;
+    const now = Date.now();
     if (msg.t === "hello") {
-      // Their chat packs (shop items), read as they connect: never per message.
-      const owned = this.env.DB && attached.uid ? await shopState(d1Sql(this.env.DB), attached.uid).then((s) => s.owned).catch(() => null) : null;
+      // Their chat packs (shop items) and any chat ban, read as they connect: never per move. Each fails on its own.
+      const [owned, block] = sql
+        ? await Promise.all([shopState(sql, attached.uid!).then((s) => s.owned).catch(() => null), chatBlock(sql, attached.uid!, now).catch(() => undefined)])
+        : [null, undefined];
       if (!this.record) return;
       const core = this.core();
       if (owned) core.chatOwned(color, owned);
+      if (block !== undefined) {
+        this.chatChecked.set(color, now);
+        core.chatStanding(color, block);
+      }
       core.connect(color);
       await this.persist(core);
       return;
     }
+    // A chatting player's chat ban, read again at most every CHAT_MOD.recheckMs.
+    const recheck = msg.t === "chat" && sql && now - (this.chatChecked.get(color) ?? -Infinity) >= CHAT_MOD.recheckMs;
+    const block = recheck ? await chatBlock(sql!, attached.uid!, now).catch(() => undefined) : undefined;
+    if (!this.record) return;
     const core = this.core();
+    if (block !== undefined) {
+      this.chatChecked.set(color, now);
+      core.chatStanding(color, block);
+    }
     core.message(color, msg);
     await this.persist(core);
   }
