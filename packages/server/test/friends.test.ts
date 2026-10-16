@@ -390,8 +390,8 @@ describe("the friends API", () => {
 
   it("friends' actions have a burst limit of their own (limits.ts)", () => {
     let wait: number | null = null;
-    for (let i = 0; i < 40 && wait === null; i++) wait = rateLimited({ ip: null, session: "friends-burst", play: false, friends: true }, T0);
+    for (let i = 0; i < 40 && wait === null; i++) wait = rateLimited({ ip: null, session: "friends-burst".padEnd(43, "x"), play: false, friends: true }, T0);
     expect(wait).not.toBeNull();
-    expect(rateLimited({ ip: null, session: "friends-burst", play: false }, T0)).toBeNull();
+    expect(rateLimited({ ip: null, session: "friends-burst".padEnd(43, "x"), play: false }, T0)).toBeNull();
   });
 });

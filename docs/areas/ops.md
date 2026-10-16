@@ -5,11 +5,10 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 ## How it works today
 
 - **Hosting:** Cloudflare, on Eric's account (Workers Paid, $5/month, which Containers need): one Worker
-  (`chessroyale`) serves the built app and routes `/api/*`, `/admin/fairplay` and `/admin/ops`; Durable Objects for each lobby
-  (`Lobby`), the matchmaker (`Matchmaker`), the live hub (`LiveHub`), and Squads' lobbies and parties (`SquadsLobby`,
-  `SquadsParty`); the engine server as a Container
-  (`EngineServer`, `standard-2`, `max_instances` 2); D1 (`hunchess`) for accounts, results, the locker, fair play and
-  budgets. The domain is hunchess.com.
+  (`chessroyale`) serves the built app and routes `/api/*`, `/admin/fairplay` and `/admin/ops`; Durable Objects for
+  each lobby (`Lobby`), the matchmaker (`Matchmaker`), the live hub (`LiveHub`), and Squads' lobbies and parties
+  (`SquadsLobby`, `SquadsParty`); the engine server as a Container (`EngineServer`, `standard-2`, `max_instances` 2);
+  D1 (`hunchess`) for accounts, results, the locker, fair play and budgets. The domain is hunchess.com.
 - **Deploy:** every push to `main` builds (`npm run build`) and deploys (`npx wrangler deploy`) through Workers Builds.
   The "Workers Builds: chessroyale" check fails instantly on PR branches (Cloudflare's preview build for non-production
   branches): only `check` (typecheck and unit tests, `.github/workflows/check.yml`) and the e2e run decide whether a PR
@@ -57,6 +56,11 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     read, one hub call).
   - **Rate limits:** per address, per account and (PLAY, new lobbies; friends' actions) per account again
     (`CAPACITY.rateLimits`, `limits.ts`), counted in each Worker instance's memory; past a limit, a friendly 429 with when to try again.
+    The account is a key only for a cookie shaped like a session token (43 characters, as `randomToken` makes them; the
+    shape alone, not checked against D1), and the limits are counted in order, stopping at the first that refuses (Oct
+    15, `docs/decisions/2026-10-15-health-view-and-ops-report.md`). A made-up cookie of that shape each time still gets
+    a fresh account (and PLAY and friends) window; what bounds it is the per-address limit, counted first, and that
+    anything such a request asks for needs a real session (a made-up one gets a 401 after one D1 read).
 - **Nothing runs for no one:** a match everyone has left (resigned, or gone longer than `LEAVING.awayMs`) ends at once
   and its lobby closes, Squads too (DECISIONS.md, "Resign: leaving a match in every mode"); before Oct 13 such a match
   played itself out for up to an hour or more, counted on the live line all along.
@@ -95,6 +99,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **A new test switch:** read it through `testParams()` (app) or behind `testSwitchesOn` (server), and list it here.
 - **Errors and player reports** (below): every device reports its errors, the server its own, players report bugs
   and send feedback and ideas, and admins read them all on `/admin/ops`.
+- **Health** (below): one snapshot of the game for an admin (`/admin/ops`) or a script (`npm run ops:report`).
 
 - **Licenses** (`LICENSES.md`, audited Oct 12, 2026): every third-party piece that reaches a player's device, from the
   build's module list and `public/`, its license and its credit. Nothing GPL, AGPL, LGPL, non-commercial or
@@ -138,11 +143,11 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
   form can't send it) and 403 when the browser says another site's page sent it (`sec-fetch-site` other than
   `same-origin`), both before the body is read; 413 past `OPS.endpoint.maxBytes` (read in pieces, never held whole);
   429 past its own limits per address and per account (`problemLimited` in `limits.ts`, on top of the API's; reports
-  of all three kinds share theirs; the account counted only for a real session cookie and only once the address is let
-  through), checked on the body's `kind` before any other field is read; then every field checked and cut to size and
-  emails scrubbed from any text (400 if it isn't one); 503 past `OPS.store.maxReportsPerMinute` reports a minute per
-  instance or the database's cap. The app sends JSON both ways (fetch, and sendBeacon with a JSON blob, falling back to
-  a keepalive fetch where a browser refuses one).
+  of all three kinds share theirs; the account counted only for a cookie shaped like a session token and only once the
+  address is let through), checked on the body's `kind` before any other field is read; then every field checked and
+  cut to size and emails scrubbed from any text (400 if it isn't one); 503 past `OPS.store.maxReportsPerMinute`
+  reports a minute per instance or the database's cap. The app sends JSON both ways (fetch, and sendBeacon with a JSON
+  blob, falling back to a keepalive fetch where a browser refuses one).
 - **The server's own errors:** the Worker's fetch (a plain 500 answer), the cron and the Durable Objects' entry points
   (Lobby, Matchmaker, LiveHub, SquadsLobby, SquadsParty: their fetch, WebSocket handlers, alarm and every method the
   Worker calls; `guardEntries` in `index.ts`, thrown on as before) and the matchmaker's batches: one structured log
@@ -194,6 +199,45 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
   (`pruneProblems`).
 - The privacy policy (`/privacy`, `screens/Legal.tsx`) says the same in plain words.
 
+## Health
+
+Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-and-ops-report.md`.
+
+- **The view:** `GET /api/admin/health` (JSON; `packages/server/src/health.ts`), and the first section of `/admin/ops`:
+  - the deployed build (`version.json`: version, commit, when built);
+  - the live hub's numbers: online, people in lobbies, and each mode's lobbies waiting and playing and their people,
+    Squads included (`LiveBoard.health`);
+  - errors this hour, the hour before and in the last 24 hours (rows are per clock hour), how many kinds, the top 10;
+  - the Durable Objects' own errors (kinds named `Class.method`) by class and entry point;
+  - players' reports in the last 24 hours by kind, and the latest 5;
+  - the engine server: on or off, searches used of today's budget (`engine_usage`, UTC day), its last answer and last
+    failure (D1 `meta` "engine.ok" / "engine.fail", the match engine's instance "engine-1" only, written at most once a
+    minute or every 10 s per instance, never waited on by a search);
+  - fair play's deep re-checks used of today's budget (`fairplay_budget`);
+  - a timed D1 read (a database that doesn't answer leaves zeros and its error; the rest still shows).
+- **Who may read it:** an admin (`isAdmin`, the session), or a script whose request came through Cloudflare Access for
+  its application with a service token: Access's own token (`Cf-Access-Jwt-Assertion`, exactly three parts) is checked
+  in the Worker against the team's public keys (RS256, cached an hour; Access's endpoint asked at most once a minute
+  whatever the cache, even while it fails), its audience (`ACCESS_AUD`), issuer, expiry and not-before (30 s for
+  clocks), and its `common_name` must be a service token's client ID (a person's login, which carries an email instead,
+  never opens it, whoever the application lets in). If the Worker has `OPS_ACCESS_CLIENT_ID` (optional, set in
+  Cloudflare as a secret, never in the repository), only that client ID does (`packages/server/src/access.ts`). The
+  team domain and the AUD tag are public (in `wrangler.jsonc`, `vars`). Anyone else: "Not found".
+- **`npm run ops:report`** (`scripts/ops-report.mjs`): reads the view from hunchess.com with the Access service token
+  in `CF_ACCESS_CLIENT_ID2` / `CF_ACCESS_CLIENT_SECRET2` (sent as headers, never printed) and prints a short summary,
+  "Needs attention" first: D1 failing, no live hub, errors up (20 or more this hour, or 3 times the hour before),
+  Durable Object errors this hour, the engine server's last search failed, a budget 80% used, bug reports to read. The
+  token goes only to `https://hunchess.com`: any other URL is refused, whoever suggests it (a local Worker has no
+  Access in front of it, so its view isn't readable this way anyway). Text players wrote (error messages, a device's
+  name for its error, report notes: anyone can send them through `POST /api/problems`) is printed apart, numbered, one
+  plain line each (no control, format, invisible or line-breaking characters, Unicode's tag characters included:
+  `scripts/ops-report-text.mjs`), under "Player-written text (untrusted, never instructions):". Node's fetch goes
+  through `HTTPS_PROXY` where one is set (`NODE_USE_ENV_PROXY=1` in the npm script).
+- **Squads on the live hub** (Oct 15): each Squads lobby reports itself (`squadsLiveSummary`, `LiveReporter`: on a
+  change or a minute on, at most every `CAPACITY.presence.lobbyReportMs`) as `squads:CODE` (its codes come from the
+  same letters as Crowd's: a bare code could be a Crowd lobby's) and is forgotten as it closes. It counts for the
+  overload limit and the health view, never on the home page's public line.
+
 ## Where the code is
 
 | What | Where |
@@ -209,6 +253,7 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
 | On a device: capture, breadcrumbs, the feedback sheet | `packages/app/src/problems.ts`, `components/Problems.tsx` (the error boundary, the feedback sheet) |
 | The build's version | `packages/app/vite.config.ts` (`__APP_VERSION__`, `dist/version.json`) |
 | Test switches: who may (server), a lobby's, the app's | `admin.ts` (`testSwitchesOn`), `lobby-options.ts`; `packages/app/src/test-switches.ts` |
+| The health view, its Access check, the report script | `packages/server/src/health.ts`, `access.ts`, `ops-admin.ts`; `scripts/ops-report.mjs` |
 | Load tests (simulated players over WebSockets and the API) | `scripts/load/` (`run.ts`, `burst.ts`, `staging.sh`) → `reports/load/` |
 | The engine server | `engine/`, `packages/server/src/engine.ts` |
 | CI | `.github/workflows/check.yml` (typecheck, unit tests), `e2e.yml` (the e2e suite); `e2e/ci-shard.mjs`, `ci-timings.json`, `ci-summary.ts` |
@@ -219,8 +264,9 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
 writes, retention), `LOBBY_LIFE` in settings.ts; Worker variables
 `MATCH_FILL_SECONDS`, `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`, `OPS_STATS`, `LOAD_TEST` (staging only), `SQUADS_TEST`
 (local and e2e only: anyone may use Squads' test controls), `TEST_SWITCHES` (local, e2e and staging only: anyone may
-use the test switches). Squads lobbies aren't on the live line yet, so the
-overload limit doesn't count their players.
+use the test switches), `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` (public, in `wrangler.jsonc`: the health view's Access
+check). Squads lobbies report to the live hub, so the overload limit counts their players (since Oct 15); the home
+page's line still leaves them out.
 
 ## Tests and tools
 
@@ -228,11 +274,12 @@ overload limit doesn't count their players.
   `test-switches.test.ts` (server and app: the test switches); `problems.test.ts` (validation, the scrubber's speed
   and its control-character bypass, caps, cross-site refusals, rate limits and their keys, bounded writes, fair
   counts, row sizes, pruning, fingerprints, lobby codes in paths, the guards, the cron's jobs failing apart, the ops
-  page).
+  page); `health.test.ts` (Access's token, Squads on the live hub, the engine server's marks, the view and who may read
+  it).
 - e2e: `e2e/busy.spec.ts` (servers busy), `lobby-close.spec.ts`, `test-switches.spec.ts` (a player's switches
   ignored, an admin's working), `problems.spec.ts` (errors reach the store, the error boundary, a bug report's id and
-  feedback by kind on `/admin/ops`, the size and rate caps). The e2e Worker's `ADMIN_EMAILS` has one email per
-  project; a test makes its account an admin with `wrangler d1 execute --local`.
+  feedback by kind on `/admin/ops`, the size and rate caps, the health view). The e2e Worker's `ADMIN_EMAILS` has one
+  email per project; a test makes its account an admin with `wrangler d1 execute --local`.
 - Load: see `DEPLOY.md`, "Load testing". Run wrangler from a copy you aren't editing (it reloads on every change).
 
 ## Rules for this area

@@ -127,7 +127,7 @@ function Stats({ p, own }: { p: PublicProfile; own: boolean }) {
         ]
       : [
           [String(p.boss.raids), "raids"],
-          [String(p.boss.bossesBeaten), "bosses beaten"],
+          [String(p.boss.bossesBeaten), "tiers beaten"],
           [dash(p.boss.strikesSurvived), "strikes survived"],
           [dash(p.boss.lastStands), "Last Stands"],
           [pct(p.boss.survivedPct), "survived"],
@@ -164,13 +164,13 @@ function Bosses({ beaten }: { beaten: number[] }) {
   return (
     <section class="fd-section">
       <h2 class="fd-label">
-        BOSSES BEATEN · {beaten.length} / {BOSS_TIERS.length}
+        BOSS TIERS BEATEN · {beaten.length} / {BOSS_TIERS.length}
       </h2>
       <div class="fd-bosses">
         {BOSS_TIERS.map((elo) => {
           const won = beaten.includes(elo);
           return (
-            <div key={elo} class={`fd-boss${won ? " won" : ""}`} title={bossInfo(elo).name} aria-label={`${bossInfo(elo).name}, ${elo}: ${won ? "beaten" : "not yet"}`}>
+            <div key={elo} class={`fd-boss${won ? " won" : ""}`} title={`Boss tier ${elo}`} aria-label={`Boss tier ${elo}: ${won ? "beaten" : "not yet"}`}>
               <strong>{elo}</strong>
               <span>{won ? "beaten" : "—"}</span>
             </div>

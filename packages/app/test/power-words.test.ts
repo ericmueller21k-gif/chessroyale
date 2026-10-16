@@ -23,6 +23,6 @@ describe("the boss menu's cards: each boss's powers in words", () => {
     const listed = playableBosses();
     expect(listed.map((b) => b.id)).toContain("hollow");
     for (const b of listed) expect(powersLine(b), b.name).toMatch(/^\S.* · \S.*$/);
-    expect(powersLine(listed.find((b) => b.id === "hollow")!)).toBe("darkens a square · lights out");
+    expect(powersLine(listed.find((b) => b.id === "hollow")!)).toBe("darkens a square · Lights Out");
   });
 });

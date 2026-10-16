@@ -1,4 +1,4 @@
-import { FRONT_DOOR } from "@chessroyale/core";
+import { CAPACITY, FRONT_DOOR } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import type { LiveMatchBoard } from "./lobby.ts";
 
@@ -40,7 +40,12 @@ export const LIVE_SCHEMA = [
   `CREATE INDEX IF NOT EXISTS users_seen ON users (last_seen)`,
 ];
 
-export type LiveMode = "crowd" | "boss" | "classic";
+/**
+ * A lobby's mode on the live line. Squads lobbies report to the live hub too (Oct 15): they count for the overload
+ * limit and the health view, never on the home page's public line (matches, queue, playing now, the live window).
+ */
+export type LiveMode = "crowd" | "boss" | "classic" | "squads";
+export const LIVE_MODES: readonly LiveMode[] = ["crowd", "boss", "classic", "squads"];
 
 
 /** What a lobby says about itself. `over` (results) and a private lobby still waiting are taken off the list. */
@@ -269,15 +274,20 @@ export class LiveBoard {
     return n;
   }
 
-  counts(now: number, waits: LiveCounts["waits"]): LiveCounts {
+  private online(now: number): number {
     let online = 0;
     for (const at of this.seen.values()) if (now - at < FRONT_DOOR.onlineWindowMs) online++;
+    return online;
+  }
+
+  /** The home page's public line (Squads left out: its lobbies count for the overload limit and the health view only). */
+  counts(now: number, waits: LiveCounts["waits"]): LiveCounts {
+    const online = this.online(now);
     const fresh = now - FRONT_DOOR.matchStaleMs;
-    const playing = [...this.lobbies.values()]
-      .filter((l) => l.phase === "playing" && l.humans > 0 && l.updatedAt > fresh)
-      .sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
+    const shown = [...this.lobbies.values()].filter((l) => l.mode !== "squads" && l.updatedAt > fresh);
+    const playing = shown.filter((l) => l.phase === "playing" && l.humans > 0).sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
     let queue = 0;
-    for (const l of this.lobbies.values()) if (l.phase === "waiting" && l.kind === "queue" && l.updatedAt > fresh) queue += l.humans;
+    for (const l of shown) if (l.phase === "waiting" && l.kind === "queue") queue += l.humans;
     // (Matchmade only: a private lobby's game is its friends', not the front page's.)
     const watch = playing.filter((l) => l.board && l.kind === "queue").sort((a, b) => b.humans - a.humans || (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
     return {
@@ -288,6 +298,20 @@ export class LiveBoard {
       featured: watch ? { mode: watch.mode, alive: watch.alive, total: watch.total, bossElo: watch.bossElo, startedAt: watch.startedAt, board: watch.board! } : null,
       waits,
     };
+  }
+
+  /** For the health view: who's online, people in lobbies, and each mode's lobbies (waiting, playing) and people. */
+  health(now: number): LiveHealth {
+    const fresh = now - FRONT_DOOR.matchStaleMs;
+    const modes = Object.fromEntries(LIVE_MODES.map((m) => [m, { waiting: 0, playing: 0, humans: 0 }])) as LiveHealth["modes"];
+    for (const l of this.lobbies.values()) {
+      if (l.updatedAt <= fresh) continue;
+      const m = modes[l.mode];
+      if (l.phase === "playing") m.playing++;
+      else m.waiting++;
+      m.humans += l.humans;
+    }
+    return { online: this.online(now), players: this.players(now), modes };
   }
 
   /** Accounts whose `last_seen` should be written now (seen since it was last written, at most once per `everyMs`). */
@@ -326,6 +350,40 @@ export class LiveBoard {
 
   get size() {
     return { seen: this.seen.size, lobbies: this.lobbies.size };
+  }
+}
+
+export interface LiveHealth {
+  online: number;
+  /** People in lobbies (queues and running matches, Squads included): what the overload limit counts. */
+  players: number;
+  modes: Record<LiveMode, { waiting: number; playing: number; humans: number }>;
+}
+
+/**
+ * When a lobby tells the live hub about itself (Squads' lobbies; `Lobby` has the same rules in its own reportLive,
+ * with the queue's waits and the live window's boards): when what it shows changes, or a minute on, at most every
+ * CAPACITY.presence.lobbyReportMs (the state as it is then follows once that's up).
+ */
+export class LiveReporter {
+  private last: { key: string; at: number } | null = null;
+  private waiting = false;
+
+  /**
+   * "now": report it. A number: too soon, call again after that many ms (once: later calls answer null meanwhile;
+   * pass `again` on that call). Null: nothing new to say. `final`: the lobby's over (said at once, then never again).
+   */
+  next(key: string, final: boolean, now: number, again = false): "now" | number | null {
+    if (again) this.waiting = false;
+    if (this.last?.key === key && (final || now - this.last.at < 60_000)) return null;
+    const since = this.last ? now - this.last.at : Infinity;
+    if (since < CAPACITY.presence.lobbyReportMs && !final) {
+      if (this.waiting) return null;
+      this.waiting = true;
+      return CAPACITY.presence.lobbyReportMs - since;
+    }
+    this.last = { key, at: now };
+    return "now";
   }
 }
 

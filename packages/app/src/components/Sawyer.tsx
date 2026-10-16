@@ -500,7 +500,7 @@ const splitLine = (kit: ReturnType<typeof bossKit>, m: Pick<Moment, "key">): str
 /** Sawyer's powers on screen. His rules: packages/chess/src/bosses/sawyer.ts. */
 export const SAWYER_UI = {
   id: "sawyer",
-  ultimate: { name: "the board saw" },
+  ultimate: { name: "the Board Saw" },
   moments: {
     split: { order: 0, kit: "power", line: splitLine, view: splitMoment },
     cut: { order: 0, kit: "power", appearAt: (m, square) => (m.squares?.includes(square) ? m.at + SAW_CUT.cutAt : undefined), view: cutMoment },

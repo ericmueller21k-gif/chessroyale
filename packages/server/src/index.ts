@@ -21,6 +21,7 @@ import { handleFriendsApi } from "./friends-api.ts";
 import { countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
 import { handleOpsAdmin } from "./ops-admin.ts";
+import type { AccessEnv } from "./access.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 
 export { Lobby, SquadsLobby, SquadsParty, Matchmaker, LiveHub };
@@ -32,9 +33,9 @@ guardEntries(Lobby, "Lobby", ["fetch", "webSocketMessage", "webSocketClose", "al
 guardEntries(SquadsLobby, "SquadsLobby", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "reserve"]);
 guardEntries(SquadsParty, "SquadsParty", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "create", "status"]);
 guardEntries(Matchmaker, "Matchmaker", ["next"]);
-guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
+guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "health", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
 
-export interface Env extends AccountEnv, EngineEnv, AdminEnv {
+export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
   /** Squads: one object per lobby, and one per party (squads-do.ts). */
   SQUADS: DurableObjectNamespace<SquadsLobby>;
@@ -145,7 +146,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // Fair play's review page and the automated reviewer's API (admins and the reviewer's token only).
     const review = await handleAdmin(request, env, caseMailer(env), waitUntil, containerSearch(env));
     if (review) return review;
-    // The ops page: errors and player reports (admins only).
+    // The ops page and the health view (admins only; the health view's JSON also for scripts through Access).
     const ops = await handleOpsAdmin(request, env);
     if (ops) return ops;
     // Accounts: /api/me, /api/results, /api/auth/*

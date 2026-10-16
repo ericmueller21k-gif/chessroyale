@@ -48,6 +48,13 @@
     { "pattern": "www.hunchess.com", "custom_domain": true }
   ],
   "observability": { "enabled": true },
+  // Cloudflare Access, for the health view's scripts (packages/server/src/access.ts: npm run ops:report): the Zero Trust
+  // team and the Access application whose service token they send. Both public (the login page shows them); no secret.
+  // At launch, when Access leaves the rest of the site, ACCESS_AUD becomes the health path's own application's.
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "odd-wildflower-a76c.cloudflareaccess.com",
+    "ACCESS_AUD": "647483892d23ca09bcddd71ba8e6c8b40a04f627ebfa4282c6504b0778ae30dd"
+  },
   // Fair play's deep re-check of flagged players' moves (packages/server/src/fairplay-deep.ts), and old errors and
   // player reports deleted (problems.ts).
   "triggers": { "crons": ["*/15 * * * *"] },
