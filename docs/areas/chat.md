@@ -13,7 +13,9 @@ Lane: `social`.
   director's: no change to the board, clock, picks or reveal). Four groups of phrases: Hello and Sporting can go to
   everyone (the Team / All switch); Reactions and Plans stay inside your team, so plans stay secret. Emoji can go to
   everyone and float up from the sender's scoreboard row. On a phone the space under the board is split between the
-  scoreboard and chat (one view at a time, never an empty box).
+  scoreboard and chat (one view at a time, never an empty box). In the split, the Team / All switch takes the chat
+  header's title place, tighter, with 28 px buttons beside it, so both labels fit whole down to 320 px
+  (`e2e/panel.spec.ts`).
 - **Your picks.** Each player's profile chooses which lines they see in their games: up to `QUICK_CHAT.maxLines`
   phrases and `maxEmoji` emoji (the defaults until they choose). Bots use the whole list.
 - **Packs.** Free packs everyone has; more are sold in the shop (`QUICK_CHAT.packPrices`; `core/shop.ts` lists them
