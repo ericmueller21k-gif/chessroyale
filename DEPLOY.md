@@ -32,7 +32,8 @@ repository.**
    the "Variables and secrets" box under **Build** further down: build variables only reach the build, never the
    running site (Oct 8: the page said "Not found" until the setting moved). Name: `ADMIN_EMAILS`. Value: the email you
    sign in to HunChess with (several, separated by commas, if others should review too). Type: Secret (or Text). Save
-   and deploy. Then sign in to HunChess with that email and open the page; everyone else gets "Not found".
+   and deploy. Then sign in to HunChess with that email and open the page; everyone else gets "Not found". Chat
+   moderation is on the same page (a player's page, "Chat"): nothing more to add.
 2. **The automated reviewer's key** (only when the scheduled reviewer is set up): the same screen, name
    `FAIRPLAY_REVIEW_TOKEN`, type **Secret**, value at least 16 random characters (for example the output of
    `openssl rand -hex 24`). Give the same value to the reviewer's scheduled task in its own secret settings, not in a

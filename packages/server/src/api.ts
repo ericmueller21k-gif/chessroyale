@@ -3,6 +3,8 @@ import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, inboxOf, markSeen, rememberInbox } from "./presence.ts";
 import { REPORT_THANKS, appeal, fairStatus, reportPlayer } from "./fairplay.ts";
+import { NAME_NOT_ALLOWED, isBlockedText } from "./text-filter.ts";
+import { chatNoticeSeen } from "./chat-mod.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { isPaused, pausedResponse } from "./kill-switches.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
@@ -178,6 +180,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     path !== "/api/fairplay/status" &&
     path !== "/api/appeal" &&
     path !== "/api/chat" &&
+    path !== "/api/chat/notice" &&
     !path.startsWith("/api/chat/icon/")
   )
     return null;
@@ -303,6 +306,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (path === "/api/me" && request.method === "PATCH") {
     if (ageAnswer(request) === "under" && !isSignedIn(current)) return json({ message: "Guests play under the default name and icon." }, 403);
     const body = (await request.json().catch(() => ({}))) as { name?: unknown; icon?: unknown };
+    // (A name with a slur or a hate term in it: text-filter.ts.)
+    if (typeof body.name === "string" && isBlockedText(String(body.name).slice(0, 64))) return json({ message: NAME_NOT_ALLOWED }, 400);
     return json(await profile(sql, await updateProfile(sql, current.id, body)));
   }
 
@@ -409,6 +414,12 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const b = (await request.json().catch(() => ({}))) as { text?: unknown };
     const r = await appeal(sql, current.id, b.text, now);
     return r.ok ? json({ ok: true, ...(await fairStatus(sql, current.id)) }) : json({ message: r.message }, 400);
+  }
+
+  // POST /api/chat/notice: the player has read the notice of a moderator's warning or chat ban (chat-mod.ts).
+  if (path === "/api/chat/notice" && request.method === "POST") {
+    await chatNoticeSeen(sql, current.id);
+    return json({ ok: true });
   }
 
   // POST /api/chat {say}: a line in the home page's global chat (signed in where sign-in is set up; guests read).

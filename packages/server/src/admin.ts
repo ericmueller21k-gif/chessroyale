@@ -9,12 +9,14 @@
  * Every decision goes in the case's log with who made it ("admin:<email>" or "reviewer") and why. The reviewer never
  * decides appeals, nor changes a ban (fairplay.ts, decide).
  */
-import { FAIRPLAY, crowdRate, skipReason, type FairMove, type FairSummary } from "@chessroyale/core";
-import { toSan } from "@chessroyale/chess";
+import { CHAT_MOD, FAIRPLAY, crowdRate, skipReason, type FairMove, type FairSummary } from "@chessroyale/core";
+import { toSan, type ChatBlock } from "@chessroyale/chess";
 import { DELETED_NAME, d1Sql, ensureSchema, userFromToken, type Sql, type User } from "./accounts.ts";
 import { SESSION_COOKIE, readCookie, type AccountEnv } from "./api.ts";
 import { caseOf, decide, decideAppeal, purgeEvidence, type Appeal, type Case, type CaseMailer } from "./fairplay.ts";
 import { deepCheckRun, type DeepSearch } from "./fairplay-deep.ts";
+import { chatModDetail, decideChat, type ChatLogRow } from "./chat-mod.ts";
+import { liveHub } from "./live-hub.ts";
 
 export interface AdminEnv extends AccountEnv {
   /**
@@ -319,7 +321,18 @@ export async function handleAdmin(
     if (!m) return notFound();
     const action = String(form.get("action") ?? "");
     let note: string;
-    if (action === "deep") {
+    if (action.startsWith("chat:")) {
+      // Chat moderation (chat-mod.ts): chat:warn, chat:ban:<days|forever>, chat:lift, chat:reset.
+      const [, chat, days] = action.split(":");
+      const r = await decideChat(sql, m[1]!, { action: chat, days, reason: form.get("chat_reason"), note: form.get("chat_note") }, by, now);
+      note = r.ok ? "Done." : r.message;
+      // A reset name and icon: their lines leave the global chat too, old name and all (only those: live-hub.ts).
+      if (r.ok && chat === "reset" && env.LIVE) {
+        await liveHub(env as Required<Pick<AdminEnv, "LIVE">>)
+          .dropChatLines(m[1]!)
+          .catch((e: unknown) => console.error(`name and icon reset, but the global chat kept their lines (${String(e)})`));
+      }
+    } else if (action === "deep") {
       // The deep re-check of this player's matches now, whatever the hour (within the day's budget).
       if (!deepSearch) note = "The engine server isn't available here.";
       else {
@@ -338,7 +351,12 @@ export async function handleAdmin(
   const cm = url.pathname.match(/^\/admin\/fairplay\/case\/([A-Za-z0-9_-]{1,64})$/);
   if (cm) {
     const d = await caseDetail(sql, cm[1]!, { email: true });
-    return d ? adminPage("Fair play", casePage(d, url.searchParams.get("note"))) : notFound();
+    return d ? adminPage("Fair play", casePage(d, url.searchParams.get("note"), await chatModDetail(sql, cm[1]!, now))) : notFound();
+  }
+  // Any player's page by their id or their profile's link (to act on a name, an icon or their chat).
+  if (url.pathname === "/admin/fairplay/find") {
+    const id = (url.searchParams.get("q") ?? "").trim().split(/[/?#]/).filter(Boolean).find((p, i, all) => i === all.length - 1 || all[i - 1] === "profile");
+    return /^[A-Za-z0-9_-]{1,64}$/.test(id ?? "") ? Response.redirect(`${url.origin}/admin/fairplay/case/${id}`, 303) : notFound();
   }
   if (url.pathname === "/admin/fairplay") {
     const status = url.searchParams.get("status") ?? "open";
@@ -391,6 +409,7 @@ function listPage(cases: CaseRow[], appeals: (Appeal & { name: string })[], log:
 ${appeals.length ? `<h2>Appeals waiting (${appeals.length})</h2><div class="card scroll"><table><tr><th>When</th><th>Player</th><th>Appeal</th></tr>${appeals
     .map((a) => `<tr><td>${when(a.at)}</td><td><a href="/admin/fairplay/case/${esc(a.user_id)}">${esc(a.name)}</a></td><td class="wrap">${esc(a.text)}</td></tr>`)
     .join("")}</table></div>` : ""}
+<form class="row" method="get" action="/admin/fairplay/find"><input type="text" name="q" placeholder="A player's id or profile link" aria-label="A player's id or profile link"><button>Open</button></form>
 <h2>Cases</h2><nav>${tabs}</nav>
 <div class="card scroll"><table><tr><th>Player</th><th>Status</th><th>Why</th><th>Cheating reports (7 d)</th><th>Max score (30 d)</th><th>Latest strength</th><th>Matches</th><th>Updated</th></tr>
 ${cases.length ? cases
@@ -403,13 +422,36 @@ ${cases.length ? cases
 ${log.map((l) => `<tr><td>${when(l.at)}</td><td><a href="/admin/fairplay/case/${esc(l.user_id)}">${esc(l.name ?? DELETED_NAME)}</a></td><td>${esc(l.action)}</td><td>${esc(l.by)}</td><td class="wrap">${esc(l.reason)}</td></tr>`).join("")}</table></div>`;
 }
 
-function casePage(d: CaseDetail, note: string | null): string {
+const CHAT_ACTIONS: Record<string, string> = { warn: "warning", ban: "chat ban", lift: "chat ban lifted", reset: "name and icon reset", merged: "a guest's decisions merged in" };
+const chatState = (b: ChatBlock | null) => (b ? `<b class="banned">chat ban</b> ${b.until ? `until ${when(b.until)}` : "with no end"}` : '<span class="cleared">open</span>');
+
+/** A player's chat (chat moderation, chat-mod.ts): any ban in force, the decisions, and the form to decide. */
+function chatSection(id: string, chat: { block: ChatBlock | null; log: ChatLogRow[] }): string {
+  const bans = [...CHAT_MOD.banDays.map((n) => [String(n), `Chat ban ${n} ${n === 1 ? "day" : "days"}`]), ["forever", "Chat ban, no end"]]
+    .map(([v, label]) => `<button class="ban" name="action" value="chat:ban:${v}">${label}</button>`)
+    .join("");
+  const decision = (l: ChatLogRow) =>
+    `${esc(CHAT_ACTIONS[l.action] ?? l.action)}${l.action === "ban" ? (l.until ? ` until ${when(l.until)}` : " (no end)") : ""}${l.action === "ban" && l.ended_at ? ` <span class="muted">(ended ${when(l.ended_at)})</span>` : ""}`;
+  return `<h2>Chat</h2>
+<div class="card">Chat: ${chatState(chat.block)} · <a href="/profile/${esc(id)}">Their profile (name and icon)</a></div>
+<form class="row" method="post">
+<input type="text" name="chat_reason" placeholder="Reason (for the log)" maxlength="500">
+<input type="text" name="chat_note" placeholder="Note to the player (optional)" maxlength="500">
+<button name="action" value="chat:warn">Warn</button>${bans}<button name="action" value="chat:lift">Lift the chat ban</button><button name="action" value="chat:reset">Reset name and icon</button></form>
+<p class="muted">Every chat decision needs a reason. A chat ban only stops sending: they still read chat and play. A warning or a chat ban shows the player your note once, on their home screen.</p>
+<p class="muted">A reset or a chat ban doesn't close the report's watch case: click Clear (under Decide) for that.</p>
+${chat.log.length ? `<div class="card scroll"><table><tr><th>When</th><th>Decision</th><th>By</th><th>Reason</th><th>Note to the player</th></tr>${chat.log
+    .map((l) => `<tr><td>${when(l.at)}</td><td>${decision(l)}</td><td>${esc(l.by)}</td><td class="wrap">${esc(l.reason)}</td><td class="wrap">${esc(l.note)}</td></tr>`)
+    .join("")}</table></div>` : ""}`;
+}
+
+function casePage(d: CaseDetail, note: string | null, chat: { block: ChatBlock | null; log: ChatLogRow[] }): string {
   const c = d.case;
   const openAppeal = d.appeals.find((a) => a.status === "open");
   const decision = `<form class="row" method="post">
   <input type="text" name="reason" placeholder="Reason (for the log; required)" required minlength="5">
   <input type="text" name="notice" placeholder="Note to the player (optional; in the email)">
-  <button class="ban" name="action" value="ban">Ban</button><button class="clear" name="action" value="clear">Clear</button>
+  <button class="ban" name="action" value="ban">Ban from online play</button><button class="clear" name="action" value="clear">Clear</button>
   <button name="action" value="watch">Watch</button><button name="action" value="review">Review</button></form>`;
   const appealForm = openAppeal
     ? `<div class="card"><b>Open appeal</b> (${when(openAppeal.at)})<p>${esc(openAppeal.text)}</p><form class="row" method="post"><input type="hidden" name="action" value="appeal"><input type="hidden" name="appeal" value="${openAppeal.id}">
@@ -437,6 +479,7 @@ ${appealForm}
 <h2>Decide</h2>${decision}
 <form class="row" method="post"><button name="action" value="deep">Check the counted moves with the engine server now</button></form>
 <p class="muted">Hard positions (fewer than ${Math.round(FAIRPLAY.signals.hardShare * 100)}% of the crowd found the best move) are in bold; grayed rows don't count (opening, forced, obvious, decided, power-up).</p>
+${chatSection(d.player.id, chat)}
 ${d.sameDevice.length ? `<h2>Same device</h2><p>${d.sameDevice.map((u) => `<a href="/admin/fairplay/case/${esc(u.id)}">${esc(u.name)}</a> (${esc(u.status ?? "no case")})`).join(", ")}</p>` : ""}
 <h2>Reports (${d.reports.length})</h2>${d.reports.length ? `<div class="card scroll"><table><tr><th>When</th><th>Reason</th><th>Match</th><th>By</th></tr>${d.reports
     .map((r) => `<tr><td>${when(r.at)}</td><td>${esc(r.reason)}</td><td>${esc(r.match ?? "profile")}</td><td><a href="/admin/fairplay/case/${esc(r.reporter.id)}">${esc(r.reporter.name)}</a>${r.reporter.signedIn ? "" : " (guest)"}</td></tr>`)

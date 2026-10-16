@@ -1,5 +1,6 @@
 import { SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
 import type { LobbyCloseReason } from "@chessroyale/chess";
+import { seatName } from "./text-filter.ts";
 import { SQUADS_PROTOCOL, type NetParty, type PartyClientMessage, type PartyServerMessage } from "@chessroyale/chess/squads";
 
 /**
@@ -119,7 +120,7 @@ export class PartyCore {
     }
     if (this.r.members.length >= SQUADS.partyMax) return { ok: false, message: "This party is full." };
     const id = `m${++this.r.counter}`;
-    const name = (opts.name ?? "").replace(/\s+/g, " ").trim().slice(0, 16) || `Player ${this.r.members.length + 1}`;
+    const name = seatName(opts.name, `Player ${this.r.members.length + 1}`);
     const member: PartyMember = { id, name, token: this.random(), connected: true, device: opts.device === "phone" ? "phone" : "computer", joinedAt: now };
     this.r.members.push(member);
     this.r.leaderId ??= id;

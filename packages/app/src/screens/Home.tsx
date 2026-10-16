@@ -18,6 +18,7 @@ import { LIVE_WINDOW_MEDIA } from "../bot-replays.ts";
 import { FriendsLine } from "../components/Friends.tsx";
 import { testParams } from "../test-switches.ts";
 import { isPaused, useServerStatus } from "../status.ts";
+import { ChatNotice } from "../components/ChatNotice.tsx";
 
 const MODE_KEY = "brc.mode";
 
@@ -732,6 +733,8 @@ export function HomeScreen({
       {bossMenu && (
         <BossMenu forRaid={bossMenu === "raid"} value={chosenBoss(bossMenu === "solo" && isAdmin())} rating={profile?.rating ?? null} onPick={pickBoss} onClose={() => setBossMenu(null)} />
       )}
+      {/* (A moderator's warning or chat ban, once: chat moderation's.) */}
+      <ChatNotice />
     </div>
   );
 }

@@ -178,4 +178,14 @@ describe("the Squads lobby's Durable Object", () => {
     expect(banned.last("error")).toMatchObject({ banned: true });
     void SQUADS_LOBBY;
   });
+
+  it("a seat takes its account's name, whatever the device asks for (a moderator's reset sticks); no account's name: the device's", async () => {
+    const rt = runtime();
+    const lobby = await rt.make();
+    await lobby.create("NAMES", { fillAt: Date.now() + 60_000 });
+    // (The account's name comes with the socket: whoIsAsking reads it with the session as they connect.)
+    await send(lobby, rt.socket({ userId: "u1", name: "Player" }), { t: "hello", v: SQUADS_PROTOCOL, name: "Rude Name" });
+    await send(lobby, rt.socket({}), { t: "hello", v: SQUADS_PROTOCOL, name: "Ann" });
+    expect((rt.store.get("lobby") as { humans: { name: string }[] }).humans.map((h) => h.name)).toEqual(["Player", "Ann"]);
+  });
 });

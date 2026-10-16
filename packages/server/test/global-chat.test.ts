@@ -182,6 +182,21 @@ describe("global chat: the live hub relays and keeps history", () => {
     expect([...store.keys()].filter((k) => k.startsWith("chat-icon:"))).toEqual([]);
     expect((store.get("chat") as { lines: unknown[] }).lines).toHaveLength(50);
   });
+
+  it("a moderator's reset (dropChatLines): the player's lines leave, kept that way; they stay online and still wait to post again", async () => {
+    vi.useFakeTimers({ now: T0 });
+    const { hub, store, ready } = hubWith();
+    await ready();
+    await hub.seen([ann.id], T0);
+    expect((await hub.chatPost(ann, "l-raid")).post).toMatchObject({ ok: true });
+    expect((await hub.chatPost(bo, "gg")).post).toMatchObject({ ok: true });
+    await hub.dropChatLines(ann.id);
+    expect((await hub.chatRead()).lines.map((l) => l.from)).toEqual([bo.id]);
+    expect((store.get("chat") as { lines: { from: string }[] }).lines.map((l) => l.from)).toEqual([bo.id]);
+    expect(await hub.presence(ann.id)).toEqual({ online: true, lastSeen: T0 });
+    vi.setSystemTime(T0 + 1_000);
+    expect((await hub.chatPost(ann, "gg")).post).toMatchObject({ ok: false, reason: "rate" });
+  });
 });
 
 describe("global chat: the API", () => {

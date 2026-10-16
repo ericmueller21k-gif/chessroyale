@@ -189,7 +189,9 @@ export class NetMatch implements GameView {
     teams: () => !this.boss && this.standingsList.some((s) => !!s.team),
     // (The profile's picks, from the account: they follow the player like the rest of the profile.)
     picks: () => account().profile?.shop?.chat,
-    uidOf: (id) => this.players.find((p) => p.id === id)?.uid,
+    // (A seat's account, for mutes by account: the lobby's players, then the match's standings.)
+    uidOf: (id) => this.players.find((p) => p.id === id)?.uid ?? this.standingsList.find((s) => s.id === id)?.uid,
+    seats: () => [...this.players.map((p) => p.id), ...this.standingsList.map((s) => s.id)],
   });
 
   private ws: WebSocket | null = null;
@@ -704,7 +706,7 @@ export class NetMatch implements GameView {
       case "chatLog":
         return this.chat.onLog(m.lines, m.packs);
       case "chatNo":
-        return this.chat.onRefused(m.say, m.reason, m.retryAt);
+        return this.chat.onRefused(m.say, m.reason, m.retryAt, m.block);
       case "results":
         this.freeBrain();
         this.scout?.reset();

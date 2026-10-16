@@ -22,13 +22,15 @@ const library = openings as unknown as Opening[];
 interface Attached {
   playerId?: string;
   userId?: string;
+  /** The account's name as it connected: a seat's name (so a name a moderator reset stays reset whatever the device sends). */
+  name?: string;
   guest?: boolean;
   banned?: boolean;
   /** May use the test controls (an admin, or SQUADS_TEST on). */
   test?: boolean;
 }
 
-/** Who is asking (from the session cookie): refused as a guest where sign-in is set up, or banned; an admin. */
+/** Who is asking (from the session cookie): their account and its name; refused as a guest where sign-in is set up, or banned; an admin. */
 async function whoIsAsking(request: Request, env: Env, waitUntil: (p: Promise<unknown>) => void, seated: (userId: string) => boolean): Promise<Attached> {
   const account = await accountOf(request, env, waitUntil).catch(() => null);
   const secrets = await withSecrets(env);
@@ -38,7 +40,7 @@ async function whoIsAsking(request: Request, env: Env, waitUntil: (p: Promise<un
       ? (await banCheck(d1Sql(env.DB), account, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }))).banned
       : false;
   const test = !guest && (env.SQUADS_TEST === "1" || isAdmin(secrets, account));
-  return { userId: account?.id, guest, banned, ...(test ? { test: true } : {}) };
+  return { userId: account?.id, ...(account?.name ? { name: account.name } : {}), guest, banned, ...(test ? { test: true } : {}) };
 }
 
 /**
@@ -271,7 +273,7 @@ export class SquadsLobby extends DurableObject<Env> {
       const known = token ? this.record.humans.find((h) => h.token === token) : undefined;
       if (known) ws.serializeAttachment({ ...attached, playerId: known.id });
       const result = core.connect(token, {
-        name: typeof msg.name === "string" ? msg.name : undefined,
+        name: attached.name ?? (typeof msg.name === "string" ? msg.name : undefined),
         device: msg.device === "phone" ? "phone" : "computer",
         party: typeof msg.party === "string" ? msg.party : undefined,
         look: msg.look,
@@ -428,7 +430,7 @@ export class SquadsParty extends DurableObject<Env> {
       const token = typeof msg.token === "string" ? msg.token : undefined;
       const known = token ? this.record.members.find((m) => m.token === token) : undefined;
       if (known) ws.serializeAttachment({ ...attached, playerId: known.id });
-      const result = core.connect(token, { name: typeof msg.name === "string" ? msg.name : undefined, device: msg.device === "phone" ? "phone" : "computer", v: msg.v });
+      const result = core.connect(token, { name: attached.name ?? (typeof msg.name === "string" ? msg.name : undefined), device: msg.device === "phone" ? "phone" : "computer", v: msg.v });
       if (!result.ok) return refuse(result.message);
       if (!known) {
         ws.serializeAttachment({ ...attached, playerId: result.memberId });

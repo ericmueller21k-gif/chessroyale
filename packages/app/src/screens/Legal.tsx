@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { AGE_GATE, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS } from "@chessroyale/core";
+import { AGE_GATE, CHAT_MOD, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS } from "@chessroyale/core";
 
 /**
  * The privacy policy (/privacy), terms of service (/terms) and copyright page (/copyright): drafts written from what
@@ -172,17 +172,19 @@ function Privacy() {
               your name, rating and icon.
             </p>
             <p>
-              Being built, chat moderation: reporting a message keeps that message, who sent it, who reported it, where and when, and
-              a few messages around it. A chat ban or mute keeps the account, until when, and why. Muting a player is kept on your
-              device only.
+              A moderator's decision about your chat or your name keeps what it was (a warning, a chat ban and until when, lifting a
+              ban, or resetting your name and icon), when, who decided and why, and any note to you. Decisions about a guest's chat
+              join your account when you sign in from it. Muting a player is kept on your device only. Names with slurs or hate in
+              them are refused, and nothing about that is kept.
             </p>
           </>
         }
-        why="to pass your lines to other players, and to deal with reports."
+        why="to pass your lines to other players, and to act when a name, an icon or how someone chats breaks the rules."
         kept={
           <>
-            global chat keeps its last {GLOBAL_CHAT.keep} lines and shows none older than {hours(GLOBAL_CHAT.maxAgeMs)} hours. Reports,
-            bans and mutes: <Blank>set when chat moderation ships</Blank>.
+            global chat keeps its last {GLOBAL_CHAT.keep} lines and shows none older than {hours(GLOBAL_CHAT.maxAgeMs)} hours. A
+            moderator's decision: {CHAT_MOD.keepDecisionsDays} days after it ends (a chat ban with no end, while it lasts). A mute: on
+            your device until you unmute.
           </>
         }
       />
@@ -341,7 +343,8 @@ function Privacy() {
         <li>
           <strong>See it, or get a copy:</strong> Settings → Download my data gives you a file (JSON) of everything we keep about your
           account, your bug reports and the error records with your account included. Fair play's detection records aren't in
-          it, as they'd show how cheating is found: email <Mail /> for those, and a person answers.
+          it, as they'd show how cheating is found, nor the reasons and names behind moderators' decisions about your chat (the
+          decisions and their notes to you are in it): email <Mail /> for those, and a person answers.
         </li>
         <li>
           <strong>Correct it:</strong> change your name and icon in your profile, or email us.
@@ -365,9 +368,9 @@ function Privacy() {
         <li>
           <strong>Deleted:</strong> your account (name, icon, email or Google id, when you joined and were last seen), every
           sign-in session (you're signed out on every device), your sign-in code's record, your items, coins, crates and shop
-          items, your quick-chat picks, reports you made and reports about you, fair play's records about you, your friends,
-          requests, blocks and invites (from the other players' lists too), your lines in the global chat, the bug reports you
-          sent, and your account id on error records.
+          items, your quick-chat picks, reports you made and reports about you, moderators' decisions about your chat, fair
+          play's records about you, your friends, requests, blocks and invites (from the other players' lists too), your lines
+          in the global chat, the bug reports you sent, and your account id on error records.
         </li>
         <li>
           <strong>Kept, without you:</strong> your match results, moved to one shared "deleted" account and kept without your
@@ -446,7 +449,11 @@ function Terms() {
       <ul>
         <li>Chat is preset lines and emoji. Don't use them to harass anyone or to spam.</li>
         <li>Don't attack, overload or scrape the game, and don't play with bots or scripts.</li>
-        <li>We can mute you, or suspend or remove an account that breaks these terms. To report a player, tap their name.</li>
+        <li>Names and icons that offend, and names with slurs or hate in them, aren't allowed.</li>
+        <li>
+          We can turn off your chat (for a while or for good), reset your name and icon, or suspend or remove an account that breaks
+          these terms. To report a player, tap their name.
+        </li>
       </ul>
 
       <h2>Virtual items</h2>

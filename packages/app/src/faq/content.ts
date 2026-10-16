@@ -844,6 +844,7 @@ function fairPlay(): FaqSection {
 - **Engine help is cheating, and we look for it.** Using an engine, another device or anyone else's help to pick your moves is against the rules. We watch for engine assistance and act on it. We don't explain how, so it stays hard to dodge.
 - **What happens:** while an account is under review, its online results are held off the rankings. A confirmed cheater is banned from online play (solo stays open). Borderline cases go to a person, never straight to a ban, and a ban can be appealed.
 - **Reporting:** tap a player's name to report them. A report never bans anyone by itself: it puts their games in front of a reviewer sooner.
+- **Chat** is preset lines and emoji only. Tap a name in a chat to mute that player on your device, or to open their profile and report an offensive name or icon. A moderator can turn a player's chat off, or reset their name and icon. Names with slurs or hate in them aren't allowed.
 - **Practice mode** is for our testers: unlimited power-ups, in the open. A tester practicing is marked 💡 on the leaderboard, and practice never counts toward any ranking.
 `,
   };

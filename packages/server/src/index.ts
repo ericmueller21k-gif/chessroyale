@@ -21,6 +21,7 @@ import { handleFriendsApi } from "./friends-api.ts";
 import { countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
 import { handleOpsAdmin } from "./ops-admin.ts";
+import { pruneChatMod } from "./chat-mod.ts";
 import type { AccessEnv } from "./access.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 import { isPaused, pausedResponse, switchStatus, type KillSwitchEnv } from "./kill-switches.ts";
@@ -78,9 +79,9 @@ export default {
   },
 
   /**
-   * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), and
-   * fair play's deep re-check of flagged players' moves on the engine server (cases in review at once, the rest
-   * off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
+   * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), chat
+   * moderation's old decisions (chat-mod.ts), and fair play's deep re-check of flagged players' moves on the engine
+   * server (cases in review at once, the rest off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(_event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
     if (!rawEnv.DB) return;
@@ -93,6 +94,8 @@ export default {
         await pruneProblems(sql, Date.now()).catch(failed("prune"));
         // Sign-in code records an hour old (the privacy policy says an hour).
         await purgeEmailCodes(sql, Date.now()).catch(failed("codes"));
+        // Chat moderation's decisions past keeping (chat-mod.ts).
+        await pruneChatMod(sql, Date.now()).catch(failed("chat"));
         const env = await withSecrets(rawEnv);
         const search = containerSearch(env);
         if (!search) return;

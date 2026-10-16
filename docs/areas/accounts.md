@@ -54,9 +54,12 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   coins into `wallets.coins`, crates counted in `wallets.crates` (for when crates stop being free), both carried over
   when a guest signs in (`grantReward`).
 - **Admins** are the emails in `ADMIN_EMAILS` (a Worker variable or secret, never in the repo): the fair-play review
-  page, the boss battle's "Trigger ultimate (testing)" button, and the test switches in the address (`?debug`,
-  `?rounds=`, …; [ops.md](ops.md), "Test switches").
+  page (chat moderation included), the boss battle's "Trigger ultimate (testing)" button, and the test switches in the
+  address (`?debug`, `?rounds=`, …; [ops.md](ops.md), "Test switches").
 - **Bans** (from [fairplay.md](fairplay.md)) stop online play; solo stays open.
+- **Names** pass the server's name filter (slurs and hate: [chat.md](chat.md), "Moderation"): a profile can't take
+  such a name, and a lobby or Squads seat asked for with one is "Player N". A moderator can reset a name and icon from
+  the player's page on fair play's review page. A lobby seat takes its account's name as the player joins.
 - **Download my data and Delete account** (Settings → ACCOUNT, for guests too;
   [docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md](../decisions/2026-10-15-delete-my-account-and-download-my-data.md)):
   - **The download:** GET `/api/me/data` answers a JSON file of everything kept about the account (every store's rows,
