@@ -1,5 +1,6 @@
 import { expect, type Browser, type Page } from "@playwright/test";
-import { BOARD_SEL, named, test, watchFor } from "./helpers.ts";
+import { RANKED_1V1 } from "@chessroyale/core";
+import { BOARD_SEL, named, test, watchFor, watchSpans } from "./helpers.ts";
 
 /**
  * Ranked 1 v 1 through the real server (docs/areas/ranked.md), two players on emulated phones (and computers): both
@@ -49,12 +50,12 @@ async function tapMove(page: Page, uci: string) {
   await page.mouse.click(b.x, b.y);
 }
 
-/** Both players queue in `pool` and meet: the versus moment, then the vote on the board. */
+/** Both players queue in `pool` and meet: the versus moment (each other's pawn on the stage), then the vote on the board. */
 async function meet(a: Page, b: Page, pool: string, extra = "") {
   await a.goto(`/1v1?nolanding&debug&pool=${pool}${extra}`);
-  await expect(a.locator(".dv-search")).toContainText("Finding an opponent");
+  await expect(a.locator(".dv-search")).toContainText("Finding opponent…");
   await b.goto(`/1v1?nolanding&debug&pool=${pool}${extra}`);
-  for (const p of [a, b]) await expect(p.locator(".dv-versus")).toContainText("Opponent found", { timeout: 20_000 });
+  for (const p of [a, b]) await expect(p.locator(".dv-versus .dv-st-them .dv-st-pawn")).toBeVisible({ timeout: 20_000 });
   for (const p of [a, b]) await expect(p.locator(".dv-vote")).toBeVisible({ timeout: 10_000 });
 }
 
@@ -269,20 +270,33 @@ test("nobody to play: the search's Cancel, then Few players online: Keep waiting
   const pool = poolName();
   // (`fewAfter=2`: the choice after 2 s instead of 45.)
   await a.goto(`/1v1?nolanding&pool=${pool}&fewAfter=2`);
-  await expect(a.locator(".dv-search")).toContainText("Finding an opponent");
+  await expect(a.locator(".dv-search")).toContainText("Finding opponent…");
   const few = a.locator(".dv-few");
   await expect(few).toContainText("Few players online right now", { timeout: 10_000 });
   await few.getByRole("button", { name: "Keep waiting" }).click();
   await expect(few).toHaveCount(0);
-  await expect(a.locator(".dv-search")).toContainText("Finding an opponent");
+  await expect(a.locator(".dv-search")).toContainText("Finding opponent…");
   // Cancel: home.
   await a.getByRole("button", { name: "Cancel" }).click();
   await expect(a.locator(".dv-search")).toHaveCount(0);
   await expect(a).toHaveURL(/\/(\?.*)?$/);
+  // A computer keeps its side menu while searching: another page from it leaves the queue first.
+  if (isComputer()) {
+    await a.goto(`/1v1?nolanding&pool=${pool}`);
+    await expect(a.locator(".dv-search")).toBeVisible();
+    await a.locator(".fd-side").getByRole("button", { name: "Settings" }).click();
+    await expect(a.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+    await expect(a.locator(".dv-stage")).toHaveCount(0);
+  }
   // Again, and this time a bot.
   await a.goto(`/1v1?nolanding&pool=${pool}&fewAfter=2`);
+  // The bot arrives on the same stage: its pawn on the right platform, yours still on the left.
+  const yours = await a.locator(".dv-st-you .dv-st-spot").boundingBox();
   await a.locator(".dv-few").getByRole("button", { name: "Play a bot (unranked)" }).click();
-  await expect(a.locator(".dv-versus")).toContainText("Bot");
+  await expect(a.locator(".dv-versus .dv-st-them .dv-st-name")).toHaveText("Bot");
+  await expect(a.locator(".dv-versus .dv-st-them .dv-st-pawn")).toBeVisible();
+  await expect(a.locator(".dv-versus .dv-st-them .dv-st-rank")).toHaveText("Unranked");
+  expect(await a.locator(".dv-st-you .dv-st-spot").boundingBox()).toEqual(yours);
   await expect(a.locator(".dv-vote")).toBeVisible({ timeout: 10_000 });
   await expect(a.locator(".dv-status")).toContainText(/first move/, { timeout: 15_000 });
   // Your first move (the bot's first, if it has White); the bot answers; then it's yours again: resign.
@@ -293,4 +307,159 @@ test("nobody to play: the search's Cancel, then Few players online: Keep waiting
   await expect(a.locator(".dv-result-title")).toHaveText("You lost");
   await expect(a.locator(".dv-result-rank")).toHaveText("Unranked game");
   expect((await record(a)).games).toBe(0);
+});
+
+// ---------------- The stage: the search and the versus moment (docs/areas/ranked.md, "The stage") ----------------
+
+/** The stage's boxes: each side's spot (pawn and platform), and how far the page scrolls each way. */
+const stageBoxes = (page: Page) =>
+  page.evaluate(() => {
+    const box = (sel: string) => {
+      const r = document.querySelector(sel)?.getBoundingClientRect();
+      return r ? { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) } : null;
+    };
+    const d = document.documentElement;
+    return { you: box(".dv-st-you .dv-st-spot"), them: box(".dv-st-them .dv-st-spot"), sideways: d.scrollWidth - d.clientWidth, down: d.scrollHeight - d.clientHeight };
+  });
+
+test("the stage: your pawn on the left platform while searching; the opponent's pawn, name and rank arrive on the right, hold, then the board", async ({ browser }) => {
+  test.setTimeout(2 * 60_000);
+  const a = await player(browser, "Ann Stage");
+  const b = await player(browser, "Bo Stage");
+  const pool = poolName();
+  await a.goto(`/1v1?nolanding&pool=${pool}`);
+  // Searching: your dressed pawn on the left platform, your name and rank under it; the right platform empty and
+  // waiting, "Finding opponent…" under it.
+  const stage = a.locator(".dv-stage");
+  await expect(stage.locator(".dv-st-you .dv-st-pawn .avatar")).toBeVisible();
+  await expect(stage.locator(".dv-st-you .dv-st-name")).toHaveText("Ann Stage");
+  await expect(stage.locator(".dv-st-you .dv-st-rank")).toHaveText("Placement 0/5");
+  await expect(stage.locator(".dv-st-them .dv-st-empty")).toBeVisible();
+  await expect(stage.locator(".dv-st-them .dv-st-pawn")).toHaveCount(0);
+  await expect(stage.locator(".dv-st-them")).toContainText("Finding opponent…");
+  await expect(stage.getByRole("button", { name: "Cancel" })).toBeVisible();
+  const before = await stageBoxes(a);
+  // Left and right, level, a big part of the width (each pawn's box at least 40% of the screen on a phone).
+  const width = a.viewportSize()!.width;
+  expect(before.you!.x + before.you!.w / 2).toBeLessThan(width / 2);
+  expect(before.them!.x + before.them!.w / 2).toBeGreaterThan(width / 2);
+  expect(before.you!.y).toBe(before.them!.y);
+  if (!isComputer()) expect(before.you!.w).toBeGreaterThan(width * 0.4);
+  expect(before.sideways).toBe(0);
+  // (Your pawn's element, marked: the same one must still be there when the opponent arrives, never drawn again.)
+  await a.locator(".dv-st-you .dv-st-pawn").evaluate((e) => e.setAttribute("data-kept", "1"));
+  const spans = await watchSpans(a, { versus: { selector: ".dv-st-them .dv-st-name", text: /^Bo Stage$/ }, board: { selector: ".dv-vote" } });
+
+  await b.goto(`/1v1?nolanding&pool=${pool}`);
+  // Found: Bo's pawn on the right platform, his name and rank under it, "VS" between; nothing else on the stage moved.
+  await expect(stage.locator(".dv-st-them .dv-st-name")).toHaveText("Bo Stage", { timeout: 20_000 });
+  await expect(stage.locator(".dv-st-them .dv-st-pawn .avatar")).toBeVisible();
+  await expect(stage.locator(".dv-st-them .dv-st-rank")).toHaveText("Placement 0/5");
+  await expect(stage.locator(".dv-st-vs")).toHaveText("VS");
+  await expect(stage.locator(".dv-st-line")).toHaveText(/^You play (White|Black)$/);
+  await expect(stage.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+  const found = await stageBoxes(a);
+  expect(found).toEqual(before);
+  await expect(a.locator('.dv-st-you .dv-st-pawn[data-kept="1"]')).toHaveCount(1);
+  // Bo sees the same from his side: himself on the left, Ann on the right.
+  await expect(b.locator(".dv-st-you .dv-st-name")).toHaveText("Bo Stage", { timeout: 10_000 });
+  await expect(b.locator(".dv-st-them .dv-st-name")).toHaveText("Ann Stage");
+
+  // It holds for the game's versus moment, then the board loads with the vote on it, and the stage is gone.
+  await expect(a.locator(".dv-vote")).toBeVisible({ timeout: 10_000 });
+  await expect(a.locator(".dv-stage")).toHaveCount(0);
+  const s = await spans.spans();
+  const held = s.versus!.last - s.versus!.first;
+  expect(held).toBeGreaterThan(RANKED_1V1.versusMs - 1000);
+  expect(held).toBeLessThan(RANKED_1V1.versusMs + 500);
+  expect(s.board!.first).toBeGreaterThan(s.versus!.last);
+});
+
+test("the stage fits: 320, 360 and 390 px phones (a computer at 1280), the longest names and ranks, no sideways scroll", async ({ browser }) => {
+  test.setTimeout(2 * 60_000);
+  // The widest a name (16 characters) and a rank can be ("Grandmaster · 499 RP"), for both players: your own from
+  // the server's answer, the opponent's (and the game's timing, held in the versus moment) from the game's.
+  const WIDE = "WWWWWWWWWWWWWWWW";
+  const gm = { placement: null, tier: "Grandmaster", division: null, points: 499, ladder: 2299, color: "#f87171", label: "Grandmaster · 499 RP" };
+  const a = await player(browser, "Ann Fit");
+  const b = await player(browser, "Bo Fit");
+  await a.route(/\/api\/me(\?|$)/, async (route) => {
+    const res = await route.fetch();
+    const me = await res.json();
+    await route.fulfill({ response: res, json: { ...me, user: { ...me.user, name: WIDE }, ranked1v1: { ...me.ranked1v1, rank: gm } } });
+  });
+  await a.routeWebSocket(/\/api\/1v1\/game\/[A-Z2-9]{5}\/ws/, (ws) => {
+    const server = ws.connectToServer();
+    ws.onMessage((m) => server.send(m));
+    let held = false;
+    server.onMessage((m) => {
+      if (held) return;
+      const msg = JSON.parse(String(m));
+      const g = msg.game;
+      if (g?.players) for (const c of ["w", "b"]) g.players[c] = { ...g.players[c], name: WIDE, rank: gm };
+      // The versus moment: kept on screen (the vote "opens" in 10 minutes; nothing after this reaches the page).
+      if (g?.phase === "versus") {
+        g.voteAt += 600_000;
+        g.voteEndsAt += 600_000;
+        held = true;
+      }
+      ws.send(JSON.stringify(msg));
+    });
+  });
+  await a.reload();
+  await expect(a.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  const pool = poolName();
+  const sizes = isComputer() ? [{ width: 1280, height: 800 }] : [{ width: 320, height: 568 }, { width: 360, height: 640 }, { width: 390, height: 664 }];
+  /** Everything on the stage whole and in view at each size, nothing scrolling sideways or down. */
+  const fits = async (what: string) => {
+    for (const size of sizes) {
+      await a.setViewportSize(size);
+      await expect
+        .poll(
+          () =>
+            a.evaluate(() => {
+              const vw = document.documentElement.clientWidth;
+              const vh = document.documentElement.clientHeight;
+              const bad: string[] = [];
+              const sel = ".dv-st-head h2, .dv-st-spot, .dv-st-name, .dv-st-rank, .dv-st-finding, .dv-st-vs, .dv-st-line, .dv-few, .dv-few .btn, .dv-cancel";
+              for (const e of document.querySelectorAll<HTMLElement>(sel)) {
+                const r = e.getBoundingClientRect();
+                const name = `${e.className} "${e.textContent?.slice(0, 20)}"`;
+                if (r.left < -0.5 || r.right > vw + 0.5) bad.push(`${name}: sideways ${Math.round(r.left)}-${Math.round(r.right)} of ${vw}`);
+                if (r.top < -0.5 || r.bottom > vh + 0.5) bad.push(`${name}: below ${Math.round(r.bottom)} of ${vh}`);
+                if (e.scrollWidth > e.clientWidth + 1 && !e.classList.contains("dv-st-spot")) bad.push(`${name}: cut ${e.scrollWidth} > ${e.clientWidth}`);
+              }
+              // The names and ranks never under "VS".
+              const vs = document.querySelector(".dv-st-vs")?.getBoundingClientRect();
+              if (vs)
+                for (const e of document.querySelectorAll(".dv-st-name, .dv-st-rank")) {
+                  const r = e.getBoundingClientRect();
+                  if (r.left < vs.right && r.right > vs.left && r.top < vs.bottom && r.bottom > vs.top) bad.push(`"VS" over ${e.className}`);
+                }
+              const d = document.documentElement;
+              if (d.scrollWidth > d.clientWidth) bad.push(`page scrolls sideways ${d.scrollWidth - d.clientWidth}`);
+              if (d.scrollHeight > d.clientHeight) bad.push(`page scrolls down ${d.scrollHeight - d.clientHeight}`);
+              return bad;
+            }),
+          { message: `${what} at ${size.width} px` },
+        )
+        .toEqual([]);
+    }
+  };
+  // Searching, with "Few players online right now" (after 1 s here) above Cancel: the tallest the search gets.
+  await a.goto(`/1v1?nolanding&pool=${pool}&fewAfter=1`);
+  await expect(a.locator(".dv-st-you .dv-st-name")).toHaveText(WIDE);
+  await expect(a.locator(".dv-st-you .dv-st-rank")).toHaveText("Grandmaster · 499 RP");
+  await expect(a.locator(".dv-few")).toBeVisible({ timeout: 10_000 });
+  await fits("searching");
+  // Found (held in the versus moment): both pawns, names and ranks at their widest, VS between.
+  await b.goto(`/1v1?nolanding&pool=${pool}`);
+  await expect(a.locator(".dv-st-them .dv-st-name")).toHaveText(WIDE, { timeout: 20_000 });
+  await fits("versus");
+  // Reduced motion: nothing on the stage animates.
+  await a.emulateMedia({ reducedMotion: "reduce" });
+  const moving = await a.evaluate(() =>
+    [...document.querySelectorAll(".dv-stage, .dv-stage *")].filter((e) => getComputedStyle(e).animationName !== "none").map((e) => e.className),
+  );
+  expect(moving).toEqual([]);
 });

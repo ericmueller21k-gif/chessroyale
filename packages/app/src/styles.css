@@ -15811,31 +15811,371 @@ button.sq-tiny {
 
 /* ---- Ranked 1 v 1 (screens/Duel.tsx, components/DuelVote.tsx; classes dv-) ---- */
 
-/* The search: centered in the home screen's frame, like every queue. */
-.dv-search {
+/*
+ * The stage (components/DuelStage.tsx; Eric, Oct 16): the search and the versus moment, one screen in the home
+ * screen's frame. Your big pawn on a platform on the left, the opponent's platform on the right (empty and waiting,
+ * then their pawn drops onto it). The pawns are as big as the width allows (half of it each), and never so tall that
+ * Cancel leaves the screen. Only transforms and opacity animate.
+ */
+.dv-stage {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 24px var(--gutter);
+  min-height: var(--app-h);
+  padding: calc(env(safe-area-inset-top) + 18px) calc(12px + env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 20px)
+    calc(12px + env(safe-area-inset-left));
   text-align: center;
+  container-type: inline-size;
+  /* (A pawn's box reaches the screen's edge; what sticks out past it, or its breathing, never scrolls the page.) */
+  overflow-x: clip;
 }
-.dv-search h2 {
+.dv-st-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.dv-st-head h2 {
   font-family: "Archivo Black", "Archivo", sans-serif;
   font-size: 28px;
+  line-height: 1.1;
   margin: 0;
 }
 .dv-sub {
-  margin: -8px 0 0;
+  margin: 0;
 }
-.dv-search-line {
+/* The two sides, left and right, centered in the room between the title and Cancel. */
+.dv-st-row {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+}
+.dv-st-pair {
+  /*
+   * A side's width: half the row; a pawn's box is a little wider (`--dv-over` each side, into the gutter and the gap:
+   * the box has room for what sticks out, the pawn itself is narrower). Never so tall that the stage, with "Few
+   * players online" and Cancel, runs off the screen; at most 320 px (a computer).
+   */
+  --dv-over: 12px;
+  --dv-pw: min(50cqi - 6px, (var(--app-h) - 410px) * 1.08, 320px);
+  --dv-sw: calc(var(--dv-pw) + 2 * var(--dv-over));
+  /* Names and ranks grow with the stage (a computer's are bigger). */
+  --dv-name: clamp(18px, 3.4cqi, 26px);
+  --dv-pill: clamp(12px, 2cqi, 15px);
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 12px;
+}
+.dv-st-side {
+  width: var(--dv-pw);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+/* A pawn's box (124 x 112, as every dressed pawn) standing on its platform, whose top is level with the pawn's foot. */
+.dv-st-spot {
+  position: relative;
+  flex: none;
+  width: var(--dv-sw);
+  aspect-ratio: 124 / 115;
+}
+.fd-pawn-stage {
+  width: 100%;
+  aspect-ratio: 124 / 112;
+}
+/* A soft light on each platform from above (still; the empty one's is dim until someone stands there). */
+.dv-st-spot::before {
+  content: "";
+  position: absolute;
+  inset: -4% 6% 4%;
+  border-radius: 50% 50% 46% 46%;
+  background: radial-gradient(ellipse 50% 58% at 50% 72%, var(--dv-light), transparent 72%);
+  opacity: 0.45;
+  transition: opacity 300ms ease-out;
+}
+.dv-st-side.on .dv-st-spot::before {
+  opacity: 1;
+}
+.dv-st-you .dv-st-spot::before {
+  background: radial-gradient(ellipse 50% 58% at 50% 72%, var(--dv-light-you), transparent 72%);
+}
+.dv-st-pawn,
+.dv-st-empty {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+}
+/* The platform: a disc seen from a little above (its top, and its edge under it), the pawn's shadow on it. */
+.dv-st-plat {
+  position: absolute;
+  left: 15%;
+  width: 70%;
+  top: 79%;
+  height: 18%;
+  border-radius: 50%;
+  background: var(--dv-plat-edge);
+}
+.dv-st-plat::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 26%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 40%, var(--dv-plat-hi), var(--dv-plat-top) 70%);
+  box-shadow: inset 0 0 0 2px var(--dv-plat-rim);
+}
+/* The pawn's shadow on the platform (it grows as an arriving pawn lands). */
+.dv-st-plat::after {
+  content: "";
+  position: absolute;
+  left: 27%;
+  width: 46%;
+  top: 22%;
+  height: 30%;
+  border-radius: 50%;
+  background: #000;
+  opacity: 0;
+}
+.dv-st-side.on .dv-st-plat::after {
+  opacity: var(--fd-shadow, 0.35);
+}
+.dv-st-you .dv-st-plat::before {
+  box-shadow: inset 0 0 0 2px var(--fd-gold);
+}
+:root {
+  --dv-plat-top: #2a2f3a;
+  --dv-plat-hi: #3a4150;
+  --dv-plat-edge: #1c1f27;
+  --dv-plat-rim: #3d4453;
+  --dv-light: rgba(170, 190, 230, 0.13);
+  --dv-light-you: rgba(242, 193, 78, 0.13);
+}
+:root[data-theme="light"] {
+  --dv-plat-top: #e3dfd6;
+  --dv-plat-hi: #f6f3ee;
+  --dv-plat-edge: #c9c3b7;
+  --dv-plat-rim: #d3cdc2;
+  --dv-light: rgba(255, 255, 255, 0.95);
+  --dv-light-you: rgba(255, 244, 214, 0.95);
+}
+/* The empty platform, waiting: a faint pawn's outline breathing, and rings rising off the platform. */
+.dv-st-ghost {
+  display: block;
+  opacity: 0.1;
+  animation: dv-st-breathe 1.8s ease-in-out infinite;
+}
+.dv-st-ghost .fd-pawn-box {
+  filter: brightness(0) invert(var(--dv-ghost-invert, 1));
+}
+:root[data-theme="light"] .dv-st-ghost .fd-pawn-box {
+  --dv-ghost-invert: 0;
+}
+@keyframes dv-st-breathe {
+  50% {
+    opacity: 0.26;
+  }
+}
+.dv-st-ring {
+  position: absolute;
+  left: 15%;
+  width: 70%;
+  top: 79%;
+  height: 13.3%;
+  border-radius: 50%;
+  border: 2px solid var(--fd-gold);
+  opacity: 0;
+  animation: dv-st-ring 1.8s ease-out infinite;
+}
+.dv-st-ring.two {
+  animation-delay: 0.9s;
+}
+@keyframes dv-st-ring {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.05);
+    opacity: 0;
+  }
+}
+/* Arriving (yours as the search opens, theirs when they're found): a quick drop onto the platform and a little settle. */
+.dv-st-pawn {
+  transform-origin: 50% 92%;
+  animation: dv-st-drop 420ms cubic-bezier(0.3, 0, 0.6, 1) both;
+}
+@keyframes dv-st-drop {
+  0% {
+    transform: translateY(-45%);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  62% {
+    transform: translateY(0) scale(1.06, 0.92);
+  }
+  82% {
+    transform: translateY(-3%) scale(0.98, 1.03);
+  }
+  100% {
+    transform: none;
+  }
+}
+.dv-st-side.on .dv-st-plat::after {
+  animation: dv-st-shadow 420ms cubic-bezier(0.3, 0, 0.6, 1) both;
+}
+@keyframes dv-st-shadow {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  62% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* Then it stands there, breathing a little (from its foot). */
+.dv-st-idle {
+  display: block;
+  transform-origin: 50% 92%;
+  animation: dv-st-idle 2.4s ease-in-out 420ms infinite;
+}
+@keyframes dv-st-idle {
+  50% {
+    transform: scale(1.015, 0.985);
+  }
+}
+/* The names and ranks under the platforms; the empty side says what's happening. */
+.dv-st-id {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  /* (Room for the longest: a name on two lines and a rank on two, so the pair never moves when one arrives.) */
+  min-height: calc(2.4 * var(--dv-name) + 3 * var(--dv-pill) + 8px);
+}
+.dv-st-name {
+  font-size: var(--dv-name);
+  font-weight: 800;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+/* (A rank's pill may take two lines in a narrow column: "Grandmaster · 499 RP" at 320 px.) */
+.dv-stage .dv-st-rank {
+  font-size: var(--dv-pill);
+  line-height: 1.5;
+  white-space: normal;
+  border-radius: 10px;
+  max-width: 100%;
+}
+.dv-st-them.on .dv-st-id > * {
+  animation: dv-st-rise 260ms ease-out 200ms both;
+}
+@keyframes dv-st-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.dv-st-finding {
   font-weight: 700;
-  margin: 4px 0 0;
+  line-height: 1.2;
+}
+/* "VS", between the two once both are there (absolute, so nothing moves to make room for it). */
+.dv-st-vs {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--dv-sw) * 0.5);
+  z-index: 2;
+  font-family: "Archivo Black", "Archivo", sans-serif;
+  font-size: clamp(22px, 9cqi, 40px);
+  line-height: 1;
+  color: var(--fd-gold-text);
+  transform: translate(-50%, -50%);
+  animation: dv-st-vs 300ms cubic-bezier(0.25, 0.6, 0.35, 1) 180ms both;
+}
+@keyframes dv-st-vs {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+  }
+  70% {
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 1;
+  }
+}
+/*
+ * Under the stage: Cancel (or which side you play) at the bottom, "Few players online" above it when it comes. Always
+ * as tall as both together, in the search and the versus moment, so the pawns never move when it comes or goes (a
+ * bot arriving from it).
+ */
+.dv-st-foot {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 170px;
+}
+.dv-st-line {
+  margin: 0;
+  font-weight: 700;
+  color: var(--fd-sub);
+  line-height: 50px;
+}
+/* (While the game waits for both players, which side you play isn't known yet: the line keeps its place.) */
+.dv-st-line.dv-st-hold {
+  visibility: hidden;
+}
+.dv-refused {
+  justify-content: center;
+}
+/* A computer: the stage takes the whole center of the frame (no card column beside it: your pawn is on the stage). */
+@media (min-width: 1024px) {
+  .fd-root.framed .fd-home-main > .dv-stage {
+    grid-column: 1 / -1;
+    min-height: calc(var(--app-h) - 52px);
+    padding: 0;
+  }
+  .fd-root.framed .dv-st-pair {
+    --dv-pw: min(50cqi - 6px - var(--dv-over), (var(--app-h) - 462px) * 1.08, 320px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dv-st-pawn,
+  .dv-st-idle,
+  .dv-st-ghost,
+  .dv-st-ring,
+  .dv-st-vs,
+  .dv-st-side.on .dv-st-plat::after,
+  .dv-st-them.on .dv-st-id > * {
+    animation: none;
+  }
+  .dv-st-ring {
+    display: none;
+  }
+  .dv-st-spot::before {
+    transition: none;
+  }
 }
 .dv-wait {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
+/* "Few players online right now": one line and two buttons side by side, as tall at 320 px as on a computer. */
 .dv-few {
   display: flex;
   flex-direction: column;
@@ -15844,18 +16184,20 @@ button.sq-tiny {
   border-radius: 14px;
   background: var(--fd-panel-2);
   border: 1px solid var(--fd-line);
-  width: min(100%, 360px);
+  width: min(100%, 380px);
 }
 .dv-few-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-  justify-content: center;
 }
 .dv-few-actions .btn {
-  flex: 1 1 140px;
+  padding: 0 8px;
+  font-size: 16px;
+  line-height: 1.15;
 }
 .dv-cancel {
+  flex: none;
   min-width: 160px;
 }
 
@@ -15871,43 +16213,6 @@ button.sq-tiny {
   color: var(--rank, var(--muted));
   border: 1px solid color-mix(in srgb, var(--rank, var(--muted)) 55%, transparent);
   background: color-mix(in srgb, var(--rank, var(--muted)) 12%, transparent);
-}
-
-/* The versus moment (a placeholder for its art). */
-.dv-versus {
-  gap: 14px;
-}
-.dv-vs-head {
-  font-family: "Archivo Black", "Archivo", sans-serif;
-  font-size: 22px;
-  margin: 0;
-}
-.dv-vs-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  width: 100%;
-}
-.dv-vs-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  flex: 1 1 0;
-  max-width: 170px;
-}
-.dv-vs-name {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dv-vs-word {
-  font-family: "Archivo Black", "Archivo", sans-serif;
-  font-size: 26px;
-  color: var(--accent);
 }
 
 /* The game: the board between the two players' strips, the same width as the board. */
