@@ -26,6 +26,7 @@
 import { DELETED_ID, identityHashes, stmt, type Sql, type Stmt, type User } from "./accounts.ts";
 import { caseOf } from "./fairplay.ts";
 import { socialDeletes } from "./friends.ts";
+import { rankedDownload, rankedErase } from "./ranked.ts";
 
 /** What a store's erase needs to know, worked out before the batch. */
 export interface EraseContext {
@@ -131,6 +132,16 @@ export const ACCOUNT_STORES: AccountStore[] = [
     },
     // Both sides: their friendships, requests, blocks and invites go from everyone's lists.
     erase: (u) => socialDeletes(u.id),
+  },
+  {
+    // Ranked 1 v 1 (ranked.ts): the player's rank (the hidden rating too: it's theirs) and their kept games, each with
+    // the opponent's name. Deleting: the rank goes, and in the games kept for a while the player becomes the shared id
+    // "deleted" (the opponent's games stay theirs). Fair play's check of a game (`checked`) isn't in the download, as
+    // the rest of detection's records.
+    name: "ranked1v1",
+    tables: ["ranked_1v1", "ranked_1v1_games"],
+    export: (sql, u) => rankedDownload(sql, u.id),
+    erase: (u) => rankedErase(u.id),
   },
   {
     // Error records and the feedback sheet's reports (problems.ts). A bug report carries the account (if signed in);

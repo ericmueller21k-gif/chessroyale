@@ -1,4 +1,4 @@
-import { CAPACITY } from "@chessroyale/core";
+import { CAPACITY, pairUp } from "@chessroyale/core";
 
 /**
  * The matchmaker's queue, as pure logic (the Durable Object in matchmaker.ts does the calls). See DECISIONS.md,
@@ -40,6 +40,18 @@ export interface MatchRules {
 /** Unranked "Play now": everyone together, in the order they pressed PLAY. */
 export const FILL_IN_ORDER: MatchRules = { group: (tickets) => (tickets.length ? [{ key: "all", tickets }] : []) };
 
+/**
+ * Ranked 1 v 1: pairs by the hidden rating (each ticket's `info.uid` and `info.rating`, read by the server), the range
+ * widening with the wait (core's pairUp): each pair is a group of its own (a game). Tickets without a partner yet stay
+ * in line, in order, for the next batch.
+ */
+export const PAIR_BY_RATING: MatchRules = {
+  group(tickets, now) {
+    const entries = tickets.map((t) => ({ id: t.id, uid: String(t.info?.uid ?? t.id), rating: Number(t.info?.rating) || 1500, at: t.at, t }));
+    return pairUp(entries, now).map(([a, b]) => ({ key: `duel:${a.id}`, tickets: [a.t, b.t] }));
+  },
+};
+
 export interface QueueConfig {
   admitPerSecond: number;
   admitBurst: number;
@@ -71,9 +83,13 @@ export class QueueCore {
     this.refilledAt = now;
   }
 
-  /** A PLAY press (or a player in line asking again with their ticket: it keeps its place). */
+  /**
+   * A PLAY press (or a player in line asking again with their ticket: it keeps its place). A press from an account
+   * already in line (`info.uid`: ranked 1 v 1, a second tab) is that account's ticket, so an account is in line once.
+   */
   enqueue(ticketId: string | null | undefined, now: number, info?: Record<string, unknown>): Ticket {
-    const known = ticketId ? this.byId.get(ticketId) : undefined;
+    const uid = typeof info?.uid === "string" ? info.uid : null;
+    const known = (ticketId ? this.byId.get(ticketId) : undefined) ?? (uid ? this.line.find((t) => t.info?.uid === uid) : undefined);
     if (known) {
       known.seenAt = now;
       return known;
@@ -127,6 +143,16 @@ export class QueueCore {
     return groups;
   }
 
+  /** The player stopped looking (Cancel): their ticket leaves the line. Answers the lobby it was placed in, if it was. */
+  cancel(ticketId: string): string | undefined {
+    const t = this.byId.get(ticketId);
+    if (t) {
+      this.line = this.line.filter((x) => x !== t);
+      this.byId.delete(ticketId);
+    }
+    return this.placedIn(ticketId);
+  }
+
   /** These tickets have seats in `code`. */
   place(tickets: Ticket[], code: string, now: number) {
     for (const t of tickets) this.placed.set(t.id, { code, until: now + this.cfg.placedKeepMs });
@@ -169,9 +195,9 @@ export class QueueCore {
  * Which matchmaker a PLAY press goes to: one per mode and matchmaking type ("crowd-default", "raid-botsoff"), so
  * Default and Bots off never share a lobby; a test's own pool (?pool=NAME); and, with CAPACITY.queue.byRegion on, one
  * per continent ("crowd-default@EU"), created near its players. Squads has its own ("squads-default": parties and solo
- * players, squads-lobby.ts). Ranked queues would add their own names here.
+ * players, squads-lobby.ts), and so does ranked 1 v 1 ("ranked1v1-default": PAIR_BY_RATING, duel-room.ts).
  */
-export function queueName(mode: "crowd" | "raid" | "squads", type: "default" | "botsoff", pool?: string | null, region?: string | null): string {
+export function queueName(mode: "crowd" | "raid" | "squads" | "ranked1v1", type: "default" | "botsoff", pool?: string | null, region?: string | null): string {
   const base = `${mode}-${type}${pool && /^[a-z0-9-]{1,24}$/.test(pool) ? `-${pool}` : ""}`;
   return region ? `${base}@${region}` : base;
 }

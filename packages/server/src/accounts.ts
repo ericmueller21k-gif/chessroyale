@@ -34,6 +34,7 @@ import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerMoves, lockerState, type Locker
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
+import { RANKED_SCHEMA, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
 
 export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
@@ -180,6 +181,8 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS ops_reports_at ON ops_reports (at)`,
   // Friends, requests, blocks, invites and their caps (friends.ts).
   ...FRIENDS_SCHEMA,
+  // Ranked 1 v 1: each player's rank, and each ranked game kept for a while (ranked.ts).
+  ...RANKED_SCHEMA,
 ];
 
 /**
@@ -505,6 +508,7 @@ export async function signInWithIdentity(
         stmt(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, owner.id),
         ...shopMoves(current.id, owner.id),
         ...lockerMoves(current.id, owner.id),
+        ...rankedMoves(current.id, owner.id),
         stmt("DELETE FROM sessions WHERE user_id = ?", current.id),
         ...socialDeletes(current.id),
         stmt("DELETE FROM users WHERE id = ?", current.id),
@@ -712,6 +716,8 @@ export interface Profile {
   locker: LockerState;
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss: ModeStats };
   rating: number | null;
+  /** Ranked 1 v 1: the rank ("Gold 2 · 45 RP", "Placement 2/5") and the record. */
+  ranked1v1: RankedSummary;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
 }
 
@@ -734,6 +740,7 @@ export async function profile(sql: Sql, user: User): Promise<Profile> {
     locker: await lockerState(sql, user.id),
     stats: { all: stats(rows), classic: stats(rows.filter((r) => r.mode === "classic")), crowd: stats(rows.filter((r) => r.mode === "crowd")), boss: stats(rows.filter((r) => r.mode === "boss")) },
     rating: rows.find((r) => r.rating !== null && countsForRanking(r))?.rating ?? null,
+    ranked1v1: await rankedSummary(sql, user.id),
     recent: rows.slice(0, 10).map((r) => ({
       mode: r.mode,
       online: !!r.online,
@@ -792,6 +799,8 @@ export interface PublicProfile {
   topPercent: number | null;
   /** Banned for fair play (the profile says "Banned"; nothing else about a fair-play case is ever shown). */
   banned: boolean;
+  /** Ranked 1 v 1: the rank and the record (null when banned, as the rating). */
+  ranked1v1: RankedSummary | null;
   crowd: CrowdStats;
   boss: RaidStats;
   /** The rating after each of the last 30 rated matches, oldest first. */
@@ -909,6 +918,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
     tier: tier ? { label: tier.label, level: tier.level, color: tier.color, effect: tier.effect } : null,
     topPercent: banned ? null : top,
     banned,
+    ranked1v1: banned ? null : await rankedSummary(sql, u.id),
     crowd: crowdStats(rows.filter((r) => r.mode === "crowd")),
     boss: raidStats(raids),
     ratingHistory: rows

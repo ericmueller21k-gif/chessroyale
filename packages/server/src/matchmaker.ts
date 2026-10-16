@@ -5,7 +5,8 @@ import { openLobbyCode } from "./codes.ts";
 import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { serverError } from "./problems.ts";
-import { FILL_IN_ORDER, QueueCore, type MatchRules, type Ticket } from "./queue.ts";
+import { FILL_IN_ORDER, PAIR_BY_RATING, QueueCore, type MatchRules, type Ticket } from "./queue.ts";
+import type { DuelPlayerView } from "@chessroyale/chess/duel";
 
 export { queueName } from "./queue.ts";
 import { liveHub } from "./live-hub.ts";
@@ -14,6 +15,9 @@ import { liveHub } from "./live-hub.ts";
 export type PlayAnswer =
   | { code: string; ticket?: string }
   | { busy: true; ticket: string; position: number; waitSeconds: number; retryMs: number; message: string };
+
+/** Ranked 1 v 1's answer: a game, busy, or still looking for an opponent (ask again with the ticket at once: each ask waits up to holdMs). */
+export type DuelPlayAnswer = PlayAnswer | { searching: true; ticket: string; waitedMs: number };
 
 export const busyMessage = (seconds: number) => `Servers are busy, you're in line: about ${seconds} s`;
 
@@ -31,6 +35,11 @@ export interface PlayOptions {
    * group, `info` { size, pass }: a party of `size` under its pass (a solo player: size 1, no pass), seated whole.
    */
   squads?: boolean;
+  /**
+   * Ranked 1 v 1: tickets are single players, `info` { uid, rating, name, look, rank, testSeconds } (read by the
+   * server), paired by rating (PAIR_BY_RATING); each pair gets a game of its own (a DuelGame object).
+   */
+  duel?: boolean;
 }
 
 /**
@@ -53,12 +62,13 @@ export class Matchmaker extends DurableObject<Env> {
   private current = new Map<string, string>();
   private forming: Promise<void> | null = null;
   private again: ReturnType<typeof setTimeout> | null = null;
-  private lobbyOptions: { overrides: LobbyRecord["overrides"]; fillMs: number; botsOff: boolean; crowdWaitsForFull: boolean; squads: boolean } = {
+  private lobbyOptions: { overrides: LobbyRecord["overrides"]; fillMs: number; botsOff: boolean; crowdWaitsForFull: boolean; squads: boolean; duel: boolean } = {
     overrides: {},
     fillMs: 60_000,
     botsOff: false,
     crowdWaitsForFull: false,
     squads: false,
+    duel: false,
   };
   private players: { at: number; n: number } = { at: 0, n: 0 };
   /** The matching rules (ranked replaces these). */
@@ -76,8 +86,17 @@ export class Matchmaker extends DurableObject<Env> {
 
   /** PLAY (or a player in line asking again with their ticket). `info`: for matching rules (ranked). */
   async next(overrides: LobbyRecord["overrides"], fillMs: number, opts: PlayOptions = {}, ticketId?: string | null, info?: Record<string, unknown>): Promise<PlayAnswer> {
+    return (await this.ask(overrides, fillMs, { ...opts, duel: false }, ticketId, info)) as PlayAnswer;
+  }
+
+  /** Ranked 1 v 1's PLAY (or a player still looking asking again with their ticket): `info` as PlayOptions.duel says. */
+  async duelNext(ticketId: string | null, info?: Record<string, unknown>): Promise<DuelPlayAnswer> {
+    return this.ask({}, 0, { duel: true }, ticketId, info);
+  }
+
+  private async ask(overrides: LobbyRecord["overrides"], fillMs: number, opts: PlayOptions, ticketId?: string | null, info?: Record<string, unknown>): Promise<DuelPlayAnswer> {
     countCall("mm.next");
-    this.lobbyOptions = { overrides, fillMs, botsOff: !!opts.botsOff, crowdWaitsForFull: !!opts.crowdWaitsForFull, squads: !!opts.squads };
+    this.lobbyOptions = { overrides, fillMs, botsOff: !!opts.botsOff, crowdWaitsForFull: !!opts.crowdWaitsForFull, squads: !!opts.squads, duel: !!opts.duel };
     const now = Date.now();
     const t = this.q.enqueue(ticketId, now, opts.since !== undefined ? { ...info, since: opts.since } : info);
     const done = this.q.placedIn(t.id);
@@ -90,9 +109,17 @@ export class Matchmaker extends DurableObject<Env> {
     // Placed just now, after the wait ran out?
     const late = this.q.placedIn(t.id);
     if (late) return { code: late, ticket: t.id };
+    // Ranked 1 v 1: no opponent yet (unless the servers are full: then busy, as every queue).
+    if (opts.duel && this.players.n < this.q.cfg.maxPlayers && this.q.position(t.id) > 0) return { searching: true, ticket: t.id, waitedMs: Math.max(0, Date.now() - t.at) };
     countCall("mm.busy");
     const waitSeconds = this.q.estimateSeconds(t.id, Date.now(), this.players.n);
     return { busy: true, ticket: t.id, position: this.q.position(t.id), waitSeconds, retryMs: CAPACITY.queue.retryMs, message: busyMessage(waitSeconds) };
+  }
+
+  /** Ranked 1 v 1's Cancel: the ticket leaves the line. Answers its game if it was paired already (the app then leaves it). */
+  async cancel(ticketId: string): Promise<{ code?: string }> {
+    const code = this.q.cancel(ticketId);
+    return code ? { code } : {};
   }
 
   /** Starts a batch now, unless one is running (it picks up whoever arrived meanwhile when it's done). */
@@ -128,7 +155,7 @@ export class Matchmaker extends DurableObject<Env> {
   private async form(): Promise<boolean> {
     for (;;) {
       const now = Date.now();
-      const groups = this.q.admit(now, await this.playersNow(now), this.rules);
+      const groups = this.q.admit(now, await this.playersNow(now), this.lobbyOptions.duel ? PAIR_BY_RATING : this.rules);
       if (!groups.length) return this.q.waiting > 0;
       countCall("mm.batch");
       for (const g of groups) if (!(await this.seat(g.key, g.tickets))) return true;
@@ -138,6 +165,7 @@ export class Matchmaker extends DurableObject<Env> {
   /** Seats a group: the seats left in its filling lobby first, then new lobbies. */
   private async seat(key: string, tickets: Ticket[]): Promise<boolean> {
     if (this.lobbyOptions.squads) return this.seatSquads(key, tickets);
+    if (this.lobbyOptions.duel) return this.seatDuel(tickets);
     let rest = tickets;
     const code = this.current.get(key);
     if (code) {
@@ -225,6 +253,29 @@ export class Matchmaker extends DurableObject<Env> {
       this.placeAll(placed, fresh);
       rest = rest.filter((t) => !placed.includes(t));
     }
+    return true;
+  }
+
+  /**
+   * Ranked 1 v 1: a pair gets a game of its own, colors drawn at random. A game that couldn't be opened puts them back
+   * in line for the next batch.
+   */
+  private async seatDuel(tickets: Ticket[]): Promise<boolean> {
+    if (tickets.length !== 2) {
+      this.q.putBack(tickets);
+      return false;
+    }
+    const view = (t: Ticket): DuelPlayerView => t.info?.player as DuelPlayerView;
+    const [w, b] = crypto.getRandomValues(new Uint8Array(1))[0]! & 1 ? [tickets[1]!, tickets[0]!] : [tickets[0]!, tickets[1]!];
+    const testSeconds = [w, b].map((t) => Number(t.info?.testSeconds)).find((x) => Number.isFinite(x) && x > 0) ?? null;
+    countCall("mm.duel");
+    const code = await openLobbyCode(async (c) => this.env.DUELS.get(this.env.DUELS.idFromName(c)).create(c, { w: view(w), b: view(b) }, { testSeconds }));
+    if (!code) {
+      countCall("mm.createFailed");
+      this.q.putBack(tickets);
+      return false;
+    }
+    this.placeAll(tickets, code);
     return true;
   }
 

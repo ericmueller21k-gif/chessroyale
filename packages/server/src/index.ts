@@ -4,6 +4,7 @@ import { Lobby } from "./lobby-do.ts";
 import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
 import { Matchmaker } from "./matchmaker.ts";
+import { DuelGame } from "./duel-do.ts";
 import { LiveHub } from "./live-hub.ts";
 import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
@@ -25,7 +26,7 @@ import type { AccessEnv } from "./access.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 import { isPaused, pausedResponse, switchStatus, type KillSwitchEnv } from "./kill-switches.ts";
 
-export { Lobby, SquadsLobby, SquadsParty, Matchmaker, LiveHub };
+export { Lobby, SquadsLobby, SquadsParty, Matchmaker, LiveHub, DuelGame };
 export { EngineServer } from "./engine.ts";
 
 // The Durable Objects' entry points (their fetch, WebSocket handlers, alarm and the methods the Worker calls): an
@@ -33,7 +34,8 @@ export { EngineServer } from "./engine.ts";
 guardEntries(Lobby, "Lobby", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "joinable", "reserve", "release", "hurry"]);
 guardEntries(SquadsLobby, "SquadsLobby", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "reserve"]);
 guardEntries(SquadsParty, "SquadsParty", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "create", "status"]);
-guardEntries(Matchmaker, "Matchmaker", ["next"]);
+guardEntries(Matchmaker, "Matchmaker", ["next", "duelNext", "cancel"]);
+guardEntries(DuelGame, "DuelGame", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create"]);
 guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "health", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
 
 export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv {
@@ -41,6 +43,8 @@ export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwi
   /** Squads: one object per lobby, and one per party (squads-do.ts). */
   SQUADS: DurableObjectNamespace<SquadsLobby>;
   PARTIES: DurableObjectNamespace<SquadsParty>;
+  /** Ranked 1 v 1: one object per game (duel-do.ts). */
+  DUELS: DurableObjectNamespace<DuelGame>;
   /** "1" (local and e2e only, never production): anyone may use Squads' test controls (else admins only). */
   SQUADS_TEST?: string;
   /**
