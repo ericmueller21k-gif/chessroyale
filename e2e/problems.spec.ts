@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { asServerAdmin, test } from "./helpers.ts";
+import { asServerAdmin, test, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * Error capture and the feedback sheet (docs/areas/ops.md, "Errors and player reports"): errors on a device reach the
@@ -21,7 +21,7 @@ async function opsPage(page: Page, query = ""): Promise<string> {
 /** Boss alone against Ginger, to the first move. */
 async function bossAlone(page: Page) {
   await page.goto("/?debug&clock=60&boss=gingerbread");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
 }
 

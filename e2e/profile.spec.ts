@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { ratingTier } from "@chessroyale/core";
-import { named, soloFromHome, test } from "./helpers.ts";
+import { named, soloFromHome, test, openBossRaid } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -84,8 +84,8 @@ test("home → queue → match, then tap a name for that player's profile (phone
   for (const p of [desk, phone]) {
     // (A queue of its own, so other tests' players don't land in it.)
     await p.goto("/?debug&pool=profile");
-    await p.getByRole("radio", { name: /Boss raid/ }).click();
-    await p.getByRole("button", { name: "PLAY", exact: true }).click();
+    await openBossRaid(p);
+    await p.getByRole("button", { name: /^Join a raid/ }).click();
     await expect(p.locator(".fd-seats")).toBeVisible();
   }
   await expect(desk.locator(".fd-seats .fd-seat")).toHaveCount(50);

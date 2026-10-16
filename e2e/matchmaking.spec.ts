@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { named, test, watchFor } from "./helpers.ts";
+import { named, test, watchFor, openBossRaid } from "./helpers.ts";
 
 /**
  * Matchmaking types (DECISIONS.md, "Matchmaking types"): Default (bots after the fill time; 8 s locally), Bots off
@@ -111,24 +111,22 @@ test("Bots off: people only, it waits; one tap switches to Default, keeping your
   expect(await phase(other)).toBe("lobby");
 });
 
-test("Boss raid: the three types too; a Solo raid is you and 49 bots against a boss, and its results say Unranked", async ({ page }) => {
+test("Boss raid: its screen has the three types too (and Boss alone); a Solo raid is you and 49 bots against a boss, and its results say Unranked", async ({ page }) => {
   test.setTimeout(6 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=1");
-  await page.getByRole("radio", { name: /^Boss raid/ }).click();
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots off/ }).click();
-  await expect(page.locator(".fd-hint")).toHaveText("People only: starts at 50, or 10 after 8 s");
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Default/ }).click();
-  await expect(page.locator(".fd-hint")).toHaveText(/^Join a raid; bots fill the crowd after \d+ s$/);
+  await openBossRaid(page);
+  // Each way of being matched is a choice of its own, with its line.
+  await expect(page.getByRole("button", { name: /^Join a raid/ })).toContainText(/Up to 50 players · bots fill the crowd after \d+ s/);
+  await expect(page.getByRole("button", { name: /^People only/ })).toContainText("No bots · starts at 50, or 10 after 8 s");
+  await expect(page.getByRole("button", { name: /^Raid with bots/ })).toContainText("You and 49 bots · starts at once");
   // Boss alone is still here (you against a boss you pick).
-  await expect(page.getByRole("main").getByRole("button", { name: "Boss alone" })).toBeVisible();
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();
-  await expect(page.locator(".fd-hint")).toContainText("You and 49 bots against a boss");
+  await expect(page.getByRole("main").getByRole("button", { name: /^Boss alone/ })).toBeVisible();
   // The full count is on screen for only MATCHMAKING.soloHoldMs (0.9 s) before the match begins: less than the gap
   // between two of Playwright's looks (1 s), so it's watched for from before PLAY (.claude/LESSONS.md, "A melt the test
   // blinked through").
   const full = await watchFor(page, { fifty: { selector: ".fd-count-n", text: /^50$/ } });
-  await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await page.getByRole("button", { name: /^Raid with bots/ }).click();
   await expect(page.locator(".fd-queue-mode")).toHaveText("Boss raid · up to 50 · Solo");
   await expect.poll(async () => (await full.seen()).fifty, { timeout: 6_000 }).toBe(true);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });

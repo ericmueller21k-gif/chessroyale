@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { SPEECH } from "@chessroyale/core";
-import { engineTop, test } from "./helpers.ts";
+import { engineTop, test, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * Speech stays up long enough to read (Eric, Oct 10: Ginger froze his queen, and her text box came and went at once).
@@ -123,7 +123,7 @@ for (const boss of BOSSES) {
     test.setTimeout(4 * 60_000);
     const speech = await watchSpeech(page);
     await page.goto(`/?debug&clock=60&boss=${boss.id}`);
-    await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+    await bossAloneFromHome(page);
     await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
     // Best moves until the moment comes (Ginger, Boingo, Jefferson and Big Boy as your second turn begins, Sawyer's saw
     // cut as your third does; Hollow after his first move).

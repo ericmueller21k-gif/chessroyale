@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { asAdmin, soloFromHome, switchesOff, test } from "./helpers.ts";
+import { asAdmin, soloFromHome, switchesOff, test, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * The test switches in the address (docs/areas/ops.md, "Test switches"): `?debug`, `?boss=`, `?fischer=1`, … work only
@@ -15,7 +15,7 @@ test("a player's test switches are ignored: no menu skipped, no match on window,
 
   // A player. ?boss= would skip the boss menu: Boss alone opens it.
   await page.goto("/?debug&boss=pig&laststand=1");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect(page.getByRole("dialog", { name: "Choose your boss" })).toBeVisible();
   await page.goto("/?debug&boss=pig");
   // ?debug would put the match on `window`: a Solo match starts without it.

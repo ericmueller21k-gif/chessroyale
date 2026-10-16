@@ -8226,6 +8226,169 @@ button.fd-logo {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
+/* (Play with friends on a row of its own: the shop and your profile share the next.) */
+.fd-actions .fd-wide {
+  grid-column: 1 / -1;
+}
+/* The RANKED row (Eric, Oct 16): its small label right above the three ranked modes. */
+.fd-ranked {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fd-ranked .fd-label {
+  font-size: 12px;
+  padding-left: 4px;
+}
+
+/* Home, 1 v 1 picked: your rank in it, under the row (in the Matchmaking row's place). */
+.fd-rank1v1 {
+  margin: -6px 0 -4px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fd-sub);
+}
+/* -- Boss raid: its card on home and its screen (Eric, Oct 16; rd- for raid) -- */
+.rd-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 84px;
+  padding: 10px 14px 10px 10px;
+  border: 0;
+  border-radius: 18px;
+  background: linear-gradient(100deg, var(--fd-gold-soft), var(--fd-panel) 70%);
+  box-shadow: inset 0 0 0 2px var(--fd-gold);
+  color: var(--fd-text);
+  font-family: Archivo, system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 80ms;
+}
+.rd-face {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  background: var(--fd-panel-2);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.rd-face .boss-portrait {
+  width: 56px;
+}
+.rd-face-big {
+  width: 88px;
+  height: 88px;
+}
+.rd-face-big .boss-portrait {
+  width: 78px;
+}
+.rd-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.rd-card-text strong {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.15;
+}
+.rd-card-text span {
+  font-size: 13px;
+  color: var(--fd-sub);
+}
+.rd-card-go {
+  margin-left: auto;
+  flex: none;
+  font-size: 30px;
+  line-height: 1;
+  color: var(--fd-gold-text);
+}
+.rd-page {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+.rd-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.rd-hero .fd-sub {
+  line-height: 1.4;
+}
+.rd-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rd-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  min-height: 64px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--fd-panel);
+  box-shadow: inset 0 0 0 1px var(--fd-line);
+  color: var(--fd-text);
+  font-family: Archivo, system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 80ms;
+}
+.rd-option strong {
+  font-size: 16px;
+  font-weight: 800;
+}
+.rd-option span {
+  font-size: 13px;
+  color: var(--fd-sub);
+}
+.rd-option:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.rd-card:active,
+.rd-option:active:not(:disabled) {
+  transform: scale(0.98);
+}
+/* A computer: the card and Play with friends in one row (2 : 1), the card a little shorter. */
+.fd-door-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.fd-door-row .fd-actions {
+  display: flex;
+}
+.fd-door-row .fd-actions > * {
+  flex: 1 1 auto;
+}
+.fd-door-row .rd-card {
+  min-height: 64px;
+  padding: 8px 12px 8px 8px;
+}
+.fd-door-row .rd-face {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+.fd-door-row .rd-face .boss-portrait {
+  width: 42px;
+}
+.fd-door-row .rd-card-text strong {
+  font-size: 18px;
+}
 
 /* -- Sheets (Play with friends) -- */
 .fd-sheet-scrim {
@@ -16341,6 +16504,26 @@ button.sq-tiny {
   border: 6px solid transparent;
   border-top: none;
   border-bottom-color: var(--accent);
+}
+/* The Crowd's and Squads' pre-game votes: the first-time hint just above the zones (ranks 4-5, the board's middle),
+   its arrow pointing down at them. */
+.first-vote-hint.vh-zones {
+  position: absolute;
+  left: 50%;
+  bottom: calc(62.5% + 8px);
+  z-index: 8;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.first-vote-hint.vh-zones::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  translate: -50% 0;
+  border: 6px solid transparent;
+  border-bottom: none;
+  border-top-color: var(--accent);
 }
 /* A profile's 1 v 1 section: the rank, big, and the record. */
 .dv-profile-row {

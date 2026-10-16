@@ -270,7 +270,7 @@ describe("the FAQ's numbers come from the settings", () => {
 
   it("the clock vote's time controls, the default, and a raid's clock", () => {
     const t = section("modes");
-    expect(t).toContain("Rapid 10+5 (10 minutes, +5 s a move, at most 20 s on a move), Blitz 5+3 (5 minutes, +3 s a move, at most 15 s on a move) or Bullet 3+2 (3 minutes, +2 s a move, at most 10 s on a move)");
+    expect(t).toContain("Bullet 3+2 (3 minutes, +2 s a move, at most 10 s on a move), Blitz 5+3 (5 minutes, +3 s a move, at most 15 s on a move) or Rapid 10+5 (10 minutes, +5 s a move, at most 20 s on a move)");
     expect(t).toContain("Nobody voting means Blitz 5+3.");
     expect(t).toContain("as on a chess clock");
     // (A boss raid's clock by its name, as the vote names it.)

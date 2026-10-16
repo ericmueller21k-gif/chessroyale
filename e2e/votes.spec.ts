@@ -126,9 +126,9 @@ test("the vote board: your pawn is solid, drag it into a zone, the count goes up
 
   // The second vote: everyone back on their spot (yours too), and the time controls left to right.
   await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 10_000 });
-  // Slowest on the left, fastest on the right, from either side (Eric, Oct 13: never change position).
-  await expect(page.locator(".vote-card strong")).toHaveText(["Rapid 10+5", "Blitz 5+3", "Bullet 3+2"]);
-  await expect(page.locator(".vote-card-blurb")).toHaveText(["10 min + 5 s a move · max 20 s", "5 min + 3 s a move · max 15 s", "3 min + 2 s a move · max 10 s"]);
+  // Bullet on the left, the longest on the right (Eric, Oct 16), from either side (Eric, Oct 13: never change position).
+  await expect(page.locator(".vote-card strong")).toHaveText(["Bullet 3+2", "Blitz 5+3", "Rapid 10+5"]);
+  await expect(page.locator(".vote-card-blurb")).toHaveText(["3 min + 2 s a move · max 10 s", "5 min + 3 s a move · max 15 s", "10 min + 5 s a move · max 20 s"]);
   await expectLeftToRight(page);
   await expect.poll(async () => {
     const c = await centre(page, ".vote-me");

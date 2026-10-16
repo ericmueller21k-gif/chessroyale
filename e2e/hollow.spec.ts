@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, createLobbyFromHome, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, createLobbyFromHome, test, watchFor, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * Hollow, the Darkness boss, played alone on a phone and a computer with real taps: his first cover of the dark (the
@@ -73,7 +73,7 @@ test("Hollow's dark: his first cover, a dark square selected, a wrong attempt (-
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/?debug&clock=60&boss=hollow&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   const boss = await page.evaluate(() => (window as any).match.boss);
   expect(boss.name).toBe("Hollow");
@@ -211,7 +211,7 @@ test("Hollow's Lights out (the admins' trigger): the night over every square, a 
   page.on("pageerror", (e) => errors.push(e.message));
   await asAdmin(page);
   await page.goto("/?debug&clock=60&boss=hollow&laststand=0");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await yourMove(page);
   // Pressed during your turn: it comes at the start of his turn, after your move.
   const btn = page.locator(".ult-test");

@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, engineTop, submitMove, test } from "./helpers.ts";
+import { BOARD_SEL, engineTop, submitMove, test, bossAloneFromHome, openBossRaid } from "./helpers.ts";
 
 /**
  * The boss battle's dock under the board, on every screen (Eric, Oct 15, after his Hidden Boss playtest):
@@ -15,7 +15,7 @@ const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ??
 /** Boss alone against Ginger (any boss's dock is the same component), a minute a move so nothing runs out. */
 async function intoBattle(page: Page) {
   await page.goto("/?debug&laststand=0&boss=gingerbread&clock=60");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 120_000 }).toBe("play");
   await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 15_000 }).toBe(true);
 }
@@ -173,9 +173,8 @@ test("your pick the best move: the dock's line says so (\"Best move · You: …\
   test.setTimeout(6 * 60_000);
   // A Solo raid (you and 49 bots: a reveal after each crowd move, as in a raid or the Crowd's boss battle).
   await page.goto("/?debug&pace=quick&clock=30&bossMoves=6&laststand=0");
-  await page.getByRole("radio", { name: /^Boss raid/ }).click();
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();
-  await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await openBossRaid(page);
+  await page.getByRole("button", { name: /^Raid with bots/ }).click();
   // Every line of yours the dock shows, every frame from before it can appear, with what the reveal says: your move,
   // its loss and score, the best move (docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md).
   await page.evaluate(() => {
@@ -229,9 +228,8 @@ test("your pick the best move: the dock's line says so (\"Best move · You: …\
 /** Into a Solo raid's first reveal with your pick in it, then frozen there (the match halted: nothing moves on). */
 async function intoFrozenReveal(page: Page) {
   await page.goto("/?debug&pace=quick&clock=30&bossMoves=6&laststand=0");
-  await page.getByRole("radio", { name: /^Boss raid/ }).click();
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();
-  await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await openBossRaid(page);
+  await page.getByRole("button", { name: /^Raid with bots/ }).click();
   // Watched from before it can appear: the first frame of a reveal whose dock line has your pick, then halted.
   await page.evaluate(() => {
     const w = window as any;

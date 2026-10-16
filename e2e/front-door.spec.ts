@@ -1,9 +1,9 @@
 import { expect } from "@playwright/test";
-import { asAdmin, named, switchesOff, test } from "./helpers.ts";
+import { asAdmin, named, openBossRaid, switchesOff, test } from "./helpers.ts";
 
 const live = (p: import("@playwright/test").Page) => p.evaluate(() => fetch("/api/live").then((r) => r.json()));
 
-test("home: the live line comes from the server, the mode picker changes the line under PLAY, Squads in Classic's place", async ({ page, browser }) => {
+test("home: the live line comes from the server, the RANKED row changes the line under PLAY", async ({ page, browser }) => {
   await named(page, "Eric");
   await page.goto("/");
   // The logo you can see: the top bar's on a phone, the side menu's on a computer (both are in the page).
@@ -27,35 +27,30 @@ test("home: the live line comes from the server, the mode picker changes the lin
   await expect.poll(async () => (await live(page)).queue, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
   await expect(line).toContainText(/[1-9]\d* in queue/, { timeout: 10_000 });
   await other.close();
-  // The line under PLAY follows the mode. Squads took Classic's place (Crowd · Squads · Boss raid): PLAY is its solo
-  // queue, with Party in the Matchmaking row's place.
-  await page.getByRole("radio", { name: /Boss raid/ }).click();
-  await expect(page.locator(".fd-hint")).toHaveText(/^Join a raid; bots fill the crowd after \d+ s$/);
-  await expect(page.getByRole("radiogroup", { name: "Mode" }).getByRole("radio")).toHaveText([/^Crowd/, /^Squads/, /^Boss raid/]);
+  // The line under PLAY follows the RANKED row's pick (50 v 50 · 1 v 1 · Squads; Eric, Oct 16). Squads: PLAY is its
+  // solo queue, with Party in the Matchmaking row's place.
+  await expect(page.getByRole("radiogroup", { name: "RANKED" }).getByRole("radio")).toHaveText([/^50 v 50/, /^1 v 1/, /^Squads/]);
   await page.getByRole("radio", { name: /Squads/ }).click();
   await expect(page.locator(".fd-hint")).toHaveText(/^Solo queue: you join a squad of 4 · bots fill any empty seat after \d+ s$/);
   await expect(page.getByRole("button", { name: /^Party/ })).toBeVisible();
   await expect(page.getByRole("radiogroup", { name: "Matchmaking" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeEnabled();
-  await page.getByRole("radio", { name: /Crowd/ }).click();
+  await page.getByRole("radio", { name: /^50 v 50/ }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeEnabled();
-  // No sideways scrolling, and big tap targets.
+  // No sideways scrolling, and big tap targets. (Boss alone isn't on home any more: the Boss raid screen has it.)
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
-  // (A computer's home has two: the shop and your profile are in its side menu.)
-  const buttons = test.info().project.name === "desktop" ? ["Play with friends", "Boss alone"] : ["Play with friends", "Boss alone", "Shop & crates", "Profile"];
+  await expect(page.getByRole("main").getByRole("button", { name: /^Boss alone/ })).toHaveCount(0);
+  // (A computer's home has the card and one button: the shop and your profile are in its side menu.)
+  const buttons = test.info().project.name === "desktop" ? ["Play with friends"] : ["Play with friends", "Shop & crates", "Profile"];
   for (const name of buttons) {
     const box = (await page.getByRole("main").getByRole("button", { name, exact: true }).boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(44);
   }
+  expect((await page.getByRole("main").getByRole("button", { name: /^Boss raid/ }).boundingBox())!.height).toBeGreaterThanOrEqual(64);
 });
 
-test("home: Boss alone opens the boss menu; Play with friends offers lobbies (practice is Solo, on the home screen)", async ({ page }) => {
+test("home: Play with friends offers lobbies (practice is Solo, on the home screen)", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
-  const menu = page.getByRole("dialog", { name: "Choose your boss" });
-  // A random boss, then the bosses you can meet (Ginger, Boingo, Jefferson, Hollow, Big Boy, Sawyer, Wrangler).
-  await expect(menu.locator(".boss-row")).toHaveCount(8);
-  await menu.getByRole("button", { name: "Close" }).click();
   await page.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
   const sheet = page.getByRole("dialog", { name: "Play with friends" });
   await expect(sheet.getByRole("button", { name: "Create a lobby" })).toBeVisible();
@@ -168,9 +163,13 @@ test("computer: a side menu, the center and a live panel; the phone keeps one co
   await expect(menu.getByRole("button", { name: "Settings" })).toHaveAttribute("aria-current", "page");
   await menu.getByRole("button", { name: "Profile" }).click();
   await expect(page.locator(".fd-card")).toBeVisible();
-  await menu.getByRole("button", { name: "Boss alone" }).click();
-  await expect(page.getByRole("dialog", { name: "Choose your boss" })).toBeVisible();
-  await page.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: "Close" }).click();
+  // Boss raid: its screen, the menu showing where you are; Play is home again.
+  await menu.getByRole("button", { name: "Boss raid" }).click();
+  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  await expect(menu.getByRole("button", { name: "Boss raid" })).toHaveAttribute("aria-current", "page");
+  await expect(menu.getByRole("button", { name: "Boss alone" })).toHaveCount(0);
+  await menu.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await menu.getByRole("button", { name: "Play with friends" }).click();
   await expect(page.getByRole("dialog", { name: "Play with friends" })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
