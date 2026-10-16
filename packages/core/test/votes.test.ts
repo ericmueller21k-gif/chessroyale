@@ -68,8 +68,8 @@ describe("how it ends: the boss final is the Hidden Boss's (Eric, Oct 14)", () =
     expect(boss.label).toBe(him.name);
     expect(boss.label).toBe("Hidden Boss");
     expect(boss.icon).toBe(him.icon);
-    expect(boss.blurb).toBe(`Top ${crowdFinalists("boss")} team up against him`);
-    expect(boss.blurb).toBe("Top 4 team up against him");
+    expect(boss.blurb).toBe(`Boss final: top ${crowdFinalists("boss")} team up against him`);
+    expect(boss.blurb).toBe("Boss final: top 4 team up against him");
     // Its place and the default stay (Team final; Eric, Oct 13: options never move).
     expect(format.options.indexOf(boss)).toBe(1);
     expect(format.options[format.defaultOption]!.id).toBe("team");

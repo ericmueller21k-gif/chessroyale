@@ -91,6 +91,22 @@ function getUnseen(): Unseen | null {
   return unseenHere;
 }
 
+/** A crate's name with its series on a line of its own ("Beta Crate", then "Series 001"): no line ends on the " · ". */
+function CrateName({ name }: { name: string }) {
+  const [head, series] = name.split(" · ");
+  return (
+    <>
+      {head}
+      {series && (
+        <>
+          {" "}
+          <span class="crate-series">{series}</span>
+        </>
+      )}
+    </>
+  );
+}
+
 /** Your crates and keys, and each crate's page: what's inside and the odds, and the button to open one. */
 export function CratesPanel() {
   const { profile } = useAccount();
@@ -113,6 +129,7 @@ export function CratesPanel() {
           </span>
           Keys × {count(locker?.keys)}
         </span>
+        <span class="stock">Crates × {count(locker?.crates)}</span>
       </div>
       {CRATES.map((c) => {
         const { Crate } = CRATE_LOOKS[c.look];
@@ -122,11 +139,11 @@ export function CratesPanel() {
               <Crate />
             </span>
             <span class="crate-row-text">
-              <strong>{c.name}</strong>
+              <strong>
+                <CrateName name={c.name} />
+              </strong>
               <span class="crate-row-blurb">{c.blurb}</span>
-              <span>
-                {c.items.length} items · × {count(locker?.crates)}
-              </span>
+              <span>{c.items.length} items</span>
             </span>
             <span class="ff-cursor" aria-hidden="true">
               ▶
@@ -161,7 +178,9 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         <span class="crate-hero-art">
           <look.Crate />
         </span>
-        <strong>{crate.name}</strong>
+        <strong>
+          <CrateName name={crate.name} />
+        </strong>
         <span class="small">{crate.blurb}</span>
       </div>
       <h3 class="ff-title">{look.boxes}</h3>
@@ -432,7 +451,9 @@ function CrateOpening({
   };
   return (
     <div class="crate-opening">
-      <h2 class="ff-title">{crate.name}</h2>
+      <h2 class="ff-title">
+        <CrateName name={crate.name} />
+      </h2>
       {error && <p class="shop-error">{error}</p>}
       {!result && !error && <p class="muted">Opening…</p>}
       {strips && stage === "spin" && <Spin key={`a${round}`} tiles={strips.one} land={38} ms={6200} look={crate.look} onDone={afterFirst} />}

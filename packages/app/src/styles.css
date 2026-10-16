@@ -2593,7 +2593,8 @@ button.history-label {
     min-height: 28px;
     margin: 0 10px;
   }
-  .screen.game .mini-tower.closed {
+  .screen.game .mini-tower.closed,
+  .screen.game .mini-tower.one {
     flex: none;
   }
   .screen.game .hud,
@@ -6496,6 +6497,10 @@ button.history-label {
 .crate-row-text {
   display: grid;
   gap: 4px;
+}
+/* (A crate's series, "Series 001", on its own line under its name.) */
+.crate-series {
+  display: block;
 }
 .crate-row-text strong {
   font-family: "Press Start 2P", ui-monospace, monospace;

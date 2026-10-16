@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
+import { bossInText, crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
 import { createLobbyFromHome, engineTop, soloFromHome, submitMove, test, watchFor } from "./helpers.ts";
 import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
 
@@ -38,7 +38,7 @@ test("the vote: the boss final's card is his (his name and icon, the top 4), bet
   await expect(cards).toHaveCount(3);
   await expect(cards.locator("strong")).toHaveText(["Team final", him.name, "Duel"]);
   await expect(cards.nth(1).locator(".vote-card-icon")).toHaveText(him.icon);
-  await expect(cards.nth(1).locator(".vote-card-blurb")).toHaveText(`Top ${crowdFinalists("boss")} team up against him`);
+  await expect(cards.nth(1).locator(".vote-card-blurb")).toHaveText(`Boss final: top ${crowdFinalists("boss")} team up against him`);
   // His zone on the board shows his icon too.
   await expect(page.locator(".vote-zone-icon").nth(1)).toHaveText(him.icon);
   // Nothing cut off: the label and blurb wrap inside the card.
@@ -97,7 +97,7 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   await expect.poll(async () => (await page.evaluate(() => (window as any).match.simul))?.boards[0].toMove, { timeout: 60_000 }).toBe("crowd");
   await page.evaluate(() => (window as any).match.simulMove(0, "h5f7"));
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("results");
-  await expect(page.locator(".team-result")).toHaveText(`You beat ${him.name} on all 4 boards!`);
+  await expect(page.locator(".team-result")).toHaveText(`You beat ${bossInText(him.name)} on all 4 boards!`);
   // Your place is your place in the crowd (not "Victory!", which is Boss alone's headline).
   await expect(page.locator(".results h1")).toHaveText(/^\d+(st|nd|rd|th) of 100$/);
   expect(errors).toEqual([]);
