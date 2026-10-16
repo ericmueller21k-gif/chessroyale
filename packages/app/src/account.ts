@@ -1,4 +1,4 @@
-import { oldEnough, type ChatPicks, type ShopState } from "@chessroyale/core";
+import { ASK_AGE_LINE, oldEnough, type ChatPicks, type ShopState } from "@chessroyale/core";
 import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankEffect } from "@chessroyale/core";
 
 /**
@@ -42,12 +42,14 @@ export interface AccountState {
    * used by a sign-in). "ok": sign-in may go ahead. "under": guest play only, here for good.
    */
   age: AgeAnswer | null;
+  /** Why the age question is back (a sign-in refused: the answer ran out), shown on it until it's answered. */
+  ageNote: string | null;
 }
 
 /** The age question's answer: old enough to sign in, or too young (docs/decisions/2026-10-16-age-gate-and-real-money.md). */
 export type AgeAnswer = "ok" | "under";
 
-let state: AccountState = { config: null, profile: null, age: null };
+let state: AccountState = { config: null, profile: null, age: null, ageNote: null };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<AccountState>) => {
   state = { ...state, ...patch };
@@ -64,8 +66,8 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { credentials: "same-origin", ...init, headers: { "content-type": "application/json", ...init?.headers } });
   const body = (await res.json().catch(() => ({}))) as T & { message?: string; askAge?: boolean; tooYoung?: boolean };
   if (!res.ok) {
-    // A sign-in the age gate refused: ask the question again (the answer ran out), or too young after all.
-    if (body.askAge) set({ age: null });
+    // A sign-in the age gate refused: ask the question again, saying why (the answer ran out), or too young after all.
+    if (body.askAge) askAgeAgain(body.message ?? ASK_AGE_LINE);
     if (body.tooYoung) rememberTooYoung();
     throw new Error(body.message ?? `Something went wrong (${res.status}).`);
   }
@@ -96,6 +98,18 @@ function rememberTooYoung() {
 }
 /** This device answered the age question "too young": guest play only, under the default name and icon. */
 export const tooYoung = () => state.age === "under";
+/**
+ * A guest on a device that answered "too young": no name or icon of their own, nothing typed to us. (Someone signed in
+ * there, say in a tab opened before the answer, keeps their account as it is.)
+ */
+export const youngGuest = () => tooYoung() && !state.profile?.user.signedIn;
+/**
+ * A sign-in was refused for want of an "old enough" answer (it ran out, or a sign-in in another tab used it up): the
+ * question comes back, with `why` on it. (Too young stays too young.)
+ */
+export function askAgeAgain(why: string = ASK_AGE_LINE) {
+  if (!tooYoung()) set({ age: null, ageNote: why });
+}
 
 /** Loads the sign-in options and your profile (making a guest account the first time). */
 export async function loadAccount(name?: string): Promise<void> {
@@ -135,7 +149,7 @@ export async function answerAge(month: number, year: number): Promise<AgeAnswer>
   }
   const age = await sendAgeAnswer(true);
   if (age === "under") rememberTooYoung();
-  else set({ age });
+  else set({ age, ageNote: null });
   return age;
 }
 

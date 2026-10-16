@@ -112,5 +112,7 @@ point). Closing the private tab forgets it.
    with nothing chosen at first. Pick this month and a year 12 years ago, then **Continue**. The box should say
    "Accounts are for players 13 and older, so you'll play as a guest." Reload: still that line, no question. Close the
    private tab.
-2. **Your own browser.** Sign out (Settings → Sign out), then sign in again: the question comes first, then Google and
-   the email code as before. Tell me if it's in the way or reads oddly.
+2. **Your own browser, with Google.** Sign out (Settings → Sign out), then sign in again **with Google** (not the email
+   code): the question comes first, then **Continue with Google**, and you should come back signed in, on the page you
+   started from. Google's return trip is the one path the automatic tests can't run. Tell me if the question is in the
+   way or reads oddly.

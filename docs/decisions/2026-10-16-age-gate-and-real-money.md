@@ -28,13 +28,20 @@
   - The sign-in box says: "Accounts are for players 13 and older, so you'll play as a guest. Bots and bosses are all
     yours."
   - The landing's heading becomes "Online play needs an account", and the guest button stays.
-  - The guest goes back to the default name ("Player") and icon (♟). The server refuses name and icon changes from that
-    device, and the profile hides "Edit name & icon".
+  - The guest goes back to the default name ("Player") and icon (♟). The server refuses the guest's name and icon
+    changes from that device, and the profile hides "Edit name & icon".
   - The feedback sheet sends a bug report with no note, and feedback and ideas (a note alone) aren't offered. The server
-    drops a note from that device too.
-  - The device can't sign in at all: email start, email verify, Google start and Google's callback all refuse it.
-- **13 or older:** that device may sign in once, within `AGE_GATE.answerMinutes` (60). The sign-in uses the answer up,
-  and the account gets `users.age_ok_at`: when its holder first said so.
+    drops a guest's note from that device too.
+  - The device can't sign in at all: email start, email verify, Google start and Google's callback all refuse it. Any
+    `hc_age=under` in a request counts, wherever it sits: a second `hc_age` set by hand for another path (which the
+    browser sends first) can't hide it.
+- **13 or older:** that device may sign in once, within `AGE_GATE.answerMinutes` (60). An emailed code and the trip to
+  Google each give the answer its 60 minutes again as they start, so it can't run out between the start and the end
+  (a code lasts 10 minutes, Google's state cookie 10). The sign-in uses the answer up, and the account gets
+  `users.age_ok_at`: when its holder first said so.
+- **A sign-in refused for want of the answer** (it ran out, or a sign-in in another tab used it up) brings the question
+  back with "Please answer again before you sign in." Google's start sends the page back with `?signin=age` for the
+  same line.
 
 ## The calls I made
 
@@ -74,11 +81,14 @@
 9. **Neutral, as screening should be:** nothing in the question hints at the cutoff. The landing's FAQ sits under the
    question, so it doesn't mention the age either. The privacy policy and terms state it, on their own pages, as they
    must. The cutoff shows only after a "too young" answer, when it can't change anything.
-10. **Guests who never answer keep choosing a name and drawing an icon.** The question is about accounts (Eric's
+10. **The limits are a guest's, not the device's.** An adult already signed in on that browser (a tab opened before a
+    child answered in another) keeps their name, icon and feedback notes: their account was made before, by someone who
+    said they were old enough. The `hc_age=under` cookie still refuses every new sign-in there.
+11. **Guests who never answer keep choosing a name and drawing an icon.** The question is about accounts (Eric's
     decision), and nobody else sees a guest's name or icon where sign-in is set up, since guests don't play online. An
     "under 13" answer later wipes both.
-11. **Old app versions** (the service worker's cache) have no question. Their sign-in is refused ("Tell us when you were
-    born first.") until the app updates itself. Before launch that's only Eric's devices.
+12. **Old app versions** (the service worker's cache) have no question. Their sign-in is refused ("Please answer again
+    before you sign in.") until the app updates itself. Before launch that's only Eric's devices.
 
 ## Guest audit (where sign-in is set up, as on hunchess.com)
 
@@ -105,23 +115,29 @@ Nothing in the game takes free text from one player to another: chat is preset l
 - `packages/server/test/age-gate.test.ts`:
   - every sign-in asks first, by email and Google;
   - one answer, one sign-in, and `age_ok_at` keeps the first time;
+  - an emailed code's start and Google's start each give the answer its time again;
   - an account from before the gate is asked at its next sign-in;
   - a too-young device is refused everywhere, and a later answer can't change it;
+  - any `hc_age=under` in the request counts, even after a second `hc_age=ok`;
+  - someone signed in on that device (a tab from before the answer) keeps their name, and its guest doesn't;
   - its guest goes back to the defaults;
   - the endpoint takes only JSON from the site's own page;
   - no birth date is stored: an answer writes nothing to the database beyond the guest's reset, and the cookie holds the
     answer alone.
-- `packages/server/test/problems.test.ts`: a too-young device's bug report keeps no note, and its feedback and ideas are
-  refused.
+- `packages/server/test/problems.test.ts`: a too-young device's guest: its bug report keeps no note, and its feedback and
+  ideas are refused; someone signed in there keeps their note.
 - `packages/app/test/age-gate.test.ts`:
   - only `{oldEnough}` is sent, and nothing on the device holds the date;
   - the flag and the server put each other back;
-  - an answer that ran out asks again.
+  - an answer that ran out asks again, saying why;
+  - someone signed in on a too-young device isn't a young guest.
 - `e2e/age-gate.spec.ts`, on a phone:
   - the neutral question;
   - the under-13 path: the friendly line; still too young after a reload, a new answer and cleared cookies; guest play
-    under "Player", with no name editing and a bug-only feedback sheet;
+    under "Player", with no name editing; Settings → Feedback becomes a bug report that sends, kept with an empty note;
   - the 13+ path: an account made through the real code check, with `age_ok_at` in the local database.
 - `e2e/landing.spec.ts` answers the question before the sign-in options.
-- On Eric's phone: `TESTING.md`, "The age question". The phone's own month and year pickers, and the under-13 answer
-  tried only in a private tab, since it locks that browser's sign-in for 400 days.
+- On Eric's phone: `TESTING.md`, "The age question":
+  - the phone's own month and year pickers;
+  - the under-13 answer, tried only in a private tab, since it locks that browser's sign-in for 400 days;
+  - a sign-in with Google, the one path the automatic tests can't run (Google's return trip).

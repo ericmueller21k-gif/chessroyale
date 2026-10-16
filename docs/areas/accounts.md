@@ -18,15 +18,19 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   year, nothing chosen, no age mentioned).
   - The app works the answer out (`oldEnough` in `packages/core/src/age-gate.ts`, whole months) and posts only
     `{oldEnough}` to POST `/api/auth/age`. The birth date is never sent or stored.
-  - **Old enough:** the cookie `hc_age=ok` lets this device sign in once, within `AGE_GATE.answerMinutes`. The sign-in
-    uses it up and sets `users.age_ok_at` (the first time only). Accounts from before the gate are asked at their next
-    sign-in.
+  - **Old enough:** the cookie `hc_age=ok` lets this device sign in once, within `AGE_GATE.answerMinutes`. Each
+    sign-in's start (an emailed code, the trip to Google) gives it that time again, so it can't run out halfway. The
+    sign-in uses it up and sets `users.age_ok_at` (the first time only). Accounts from before the gate are asked at
+    their next sign-in.
+  - **Refused for want of it** (it ran out, or another tab's sign-in used it up): the question comes back with
+    `ASK_AGE_LINE` (Google's start: `?signin=age`).
   - **Too young:** `hc_age=under` (HttpOnly, `AGE_GATE.tooYoungDays`) and the app's `brc.tooYoung` flag, each putting
     the other back. Every sign-in step refuses that device (email start and verify, Google start and callback), and no
-    later answer replaces it.
-  - **Its guest:** the default name and icon (reset at the answer; PATCH `/api/me` refused; "Edit name & icon" hidden).
-    No sign-in prompts: the landing says "Online play needs an account". The feedback sheet sends a bug report with no
-    note (`problems.ts` drops one).
+    later answer replaces it. Any `hc_age=under` in a request counts (`ageAnswer`), however many `hc_age` it carries.
+  - **Its guest:** the default name and icon (reset at the answer; a guest's PATCH `/api/me` refused; "Edit name &
+    icon" hidden). No sign-in prompts: the landing says "Online play needs an account". The feedback sheet sends a bug
+    report with no note (`problems.ts` drops a guest's). Someone already signed in on that browser keeps all of these
+    (`youngGuest` in the app).
   - "Delete account" keeps the flag.
 - **Signing in keeps what you played as a guest.** A new identity attaches to your current account; one that already
   belongs to an account switches you to it, moves your guest results, items, coins and crates over and deletes the

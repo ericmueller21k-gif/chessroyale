@@ -34,7 +34,8 @@ function AgeQuestion() {
   const [month, setMonth] = useState("");
   const [year, setYear] = useState("");
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  // (Back after a refused sign-in: why, until it's answered.)
+  const [msg, setMsg] = useState<string | null>(account().ageNote);
   const answer = () => {
     setBusy(true);
     setMsg(null);

@@ -143,6 +143,12 @@ test("under 13: a neutral question, a friendly line, guest play, and no sign-in 
   await expect(sheet.getByText("Nothing you type.")).toBeVisible();
   await expect(sheet.locator("textarea")).toHaveCount(0);
   await expect(sheet.getByRole("radiogroup")).toHaveCount(0);
+  // Settings opens it on Feedback, which becomes a bug report here: it sends, and it's kept without a note.
+  await sheet.getByRole("button", { name: "Send" }).click();
+  const shown = sheet.getByRole("status");
+  await expect(shown).toHaveText(/^Report [A-HJKMNP-Z2-9]{6} — share this id$/);
+  const id = (await shown.textContent())!.match(/Report (\w{6})/)![1]!;
+  expect(d1<{ kind: string; note: string }>("SELECT kind, note FROM ops_reports WHERE id = ?", id)).toEqual([{ kind: "bug", note: "" }]);
 });
 
 test("13 or older: the sign-in options after the question, and the account made keeps when its holder said so", async ({ page }) => {

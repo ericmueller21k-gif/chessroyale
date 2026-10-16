@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { AGE_GATE, TOO_YOUNG_LINE } from "@chessroyale/core";
+import { AGE_GATE, ASK_AGE_LINE, TOO_YOUNG_LINE } from "@chessroyale/core";
 import { ensureSchema, signInWithIdentity, startEmailCode } from "../src/accounts.ts";
-import { handleAccountApi } from "../src/api.ts";
+import { ageAnswer, handleAccountApi } from "../src/api.ts";
 import { memoryDb } from "./memory-db.ts";
 
 /**
@@ -70,12 +70,12 @@ describe("the age gate: old enough", () => {
     const p = phone(s);
     await p.call("/api/me");
     expect((await p.call("/api/auth/config")).body.age).toBeUndefined();
-    // Not answered: no email is taken, Google sends you back to the page (which asks).
+    // Not answered: no email is taken, Google sends you back to the page (which asks, saying why).
     const unasked = await p.post("/api/auth/email/start", { email: "ann@example.com" });
-    expect([unasked.res.status, unasked.body.askAge]).toEqual([403, true]);
+    expect([unasked.res.status, unasked.body]).toEqual([403, { message: ASK_AGE_LINE, askAge: true }]);
     expect((await p.post("/api/auth/email/verify", { email: "ann@example.com", code: "123456" })).res.status).toBe(403);
     const google = await p.call("/api/auth/google/start?next=/settings");
-    expect(google.res.headers.get("location")).toBe(`${origin}/settings`);
+    expect(google.res.headers.get("location")).toBe(`${origin}/settings?signin=age`);
     expect(s.sent).toEqual([]);
 
     const a = await p.answer(true);
@@ -124,6 +124,23 @@ describe("the age gate: old enough", () => {
     expect((await q.call(`/api/auth/google/callback?state=${state2}&code=c`)).res.headers.get("location")).toBe(`${origin}/?signin=failed`);
   });
 
+  it("a sign-in that starts gives the answer its time again, so it can't run out between the start and the end", async () => {
+    const s = await setUp();
+    const p = phone(s);
+    await p.call("/api/me");
+    await p.answer(true);
+    const fresh = `hc_age=ok; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${AGE_GATE.answerMinutes * 60}`;
+    // An emailed code: the start gives the answer another AGE_GATE.answerMinutes (a code lasts 10).
+    const start = await p.post("/api/auth/email/start", { email: "ann@example.com" });
+    expect(ageCookie(start.res)).toBe(fresh);
+    // A refused start gives nothing.
+    expect(ageCookie((await p.post("/api/auth/email/start", { email: "nope" })).res)).toBeUndefined();
+    // Google: the trip there does too (its state cookie lasts 10 minutes).
+    const google = await p.call("/api/auth/google/start");
+    expect(new URL(google.res.headers.get("location")!).origin).toBe("https://accounts.google.com");
+    expect(ageCookie(google.res)).toBe(fresh);
+  });
+
   it("an account from before the gate is asked at its next sign-in, and keeps that time from then on", async () => {
     const s = await setUp();
     await signInWithIdentity(s.sql, null, "email", "old@example.com", {}, 1000);
@@ -159,13 +176,56 @@ describe("the age gate: too young", () => {
     expect([verify.res.status, verify.body.tooYoung]).toEqual([403, true]);
     // Google: back to the page at the start (no state, no trip to Google), and the callback refuses.
     const google = await p.call("/api/auth/google/start");
-    expect(google.res.headers.get("location")).toBe(`${origin}/`);
+    expect(google.res.headers.get("location")).toBe(`${origin}/?signin=age`);
     expect(p.jar.has("hc_oauth")).toBe(false);
     p.jar.set("hc_oauth", "forged");
     expect((await p.call("/api/auth/google/callback?state=forged&code=c")).res.headers.get("location")).toBe(`${origin}/?signin=failed`);
     // No account was made or given an identity.
     expect(s.db.prepare("SELECT COUNT(*) AS n FROM users WHERE email IS NOT NULL OR google_sub IS NOT NULL").get()).toEqual({ n: 0 });
     expect((await p.call("/api/me")).body.user.signedIn).toBe(false);
+  });
+
+  it("any hc_age=under in the request counts, wherever it sits (a second hc_age set by hand for another path can't hide it)", async () => {
+    const at = (cookie: string) => new Request(`${origin}/api/auth/email/start`, { headers: { cookie } });
+    expect(ageAnswer(at("hc_age=ok; hc_session=x; hc_age=under"))).toBe("under");
+    expect(ageAnswer(at("hc_age=under; hc_age=ok"))).toBe("under");
+    expect(ageAnswer(at("hc_session=x; hc_age=ok"))).toBe("ok");
+    expect(ageAnswer(at("hc_age=yes; hc_ages=under"))).toBeNull();
+    // And the server refuses the sign-in.
+    const s = await setUp();
+    const p = phone(s);
+    await p.call("/api/me");
+    await p.answer(false);
+    // (The browser sends the more specific path's cookie first: "ok" before this device's "under".)
+    const cookie = `hc_age=ok; ${[...p.jar].map(([k, v]) => `${k}=${v}`).join("; ")}`;
+    expect(cookie).toMatch(/^hc_age=ok; .*hc_age=under/);
+    const res = (await handleAccountApi(
+      new Request(`${origin}/api/auth/email/start`, { method: "POST", headers: { origin, "content-type": "application/json", cookie }, body: JSON.stringify({ email: "kid@example.com" }) }),
+      s.env as never,
+      s.fetcher,
+    ))!;
+    expect([res.status, ((await res.json()) as { tooYoung?: boolean }).tooYoung]).toEqual([403, true]);
+    expect(s.sent).toEqual([]);
+  });
+
+  it("someone already signed in on that device (a tab from before the answer) keeps their account as it is", async () => {
+    const s = await setUp();
+    const p = phone(s);
+    await p.call("/api/me");
+    await p.answer(true);
+    await p.post("/api/auth/email/start", { email: "ann@example.com" });
+    await p.post("/api/auth/email/verify", { email: "ann@example.com", code: s.sent[0]!.code });
+    await p.call("/api/me", { method: "PATCH", body: JSON.stringify({ name: "Ann" }) });
+    // Another tab still showing the question answers "too young".
+    await p.answer(false);
+    expect(p.jar.get("hc_age")).toBe("under");
+    const me = (await p.call("/api/me")).body.user;
+    expect(me).toMatchObject({ signedIn: true, name: "Ann" });
+    expect((await p.call("/api/me", { method: "PATCH", body: JSON.stringify({ name: "Annie" }) })).body.user.name).toBe("Annie");
+    // Signed out, the guest on this device is under the gate.
+    await p.post("/api/auth/logout", {});
+    expect((await p.call("/api/me", { method: "PATCH", body: JSON.stringify({ name: "Sam" }) })).res.status).toBe(403);
+    expect((await p.post("/api/auth/email/start", { email: "ann@example.com" })).body.tooYoung).toBe(true);
   });
 
   it("its guest goes back to the default name and icon, and keeps them", async () => {

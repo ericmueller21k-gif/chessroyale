@@ -1,6 +1,6 @@
 import { Component, type ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { tooYoung } from "../account.ts";
+import { youngGuest } from "../account.ts";
 import { captureError, reportProblem, type ReportKind } from "../problems.ts";
 import { FdButton } from "./FrontDoor.tsx";
 
@@ -46,9 +46,10 @@ const KINDS: { id: ReportKind; emoji: string; label: string; placeholder: string
 let sheet: ReportKind | null = null;
 const sheetSeen = new Set<(kind: ReportKind | null) => void>();
 export function openReport(kind: ReportKind | null) {
-  // (A device that answered the age question "too young" types nothing to us: a bug report, its diagnostics only.)
-  sheet = kind && tooYoung() ? "bug" : kind;
-  for (const f of sheetSeen) f(kind);
+  // (A guest on a device that answered the age question "too young" types nothing to us: a bug report, its diagnostics
+  // only. The sheet opens on that kind, whichever was asked for.)
+  sheet = kind && youngGuest() ? "bug" : kind;
+  for (const f of sheetSeen) f(sheet);
 }
 
 /**
@@ -73,7 +74,7 @@ export function ReportSheet() {
   }, []);
   if (!open) return null;
   const kind = KINDS.find((k) => k.id === open)!;
-  const young = tooYoung();
+  const young = youngGuest();
   return (
     <div class="fd-sheet-scrim rp-scrim" onClick={(e) => e.target === e.currentTarget && close()}>
       <div class="fd-sheet" role="dialog" aria-modal="true" aria-labelledby="rp-title">

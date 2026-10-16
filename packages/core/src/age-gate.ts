@@ -29,3 +29,9 @@ export const MONTHS = ["January", "February", "March", "April", "May", "June", "
  * itself never mentions an age.)
  */
 export const TOO_YOUNG_LINE = `Accounts are for players ${AGE_GATE.minAge} and older, so you'll play as a guest. Bots and bosses are all yours.`;
+
+/**
+ * A sign-in refused because this device's "old enough" answer ran out (or another tab's sign-in used it up): shown on
+ * the question when it comes back.
+ */
+export const ASK_AGE_LINE = "Please answer again before you sign in.";

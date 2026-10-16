@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MONTHS } from "@chessroyale/core";
-import { TOO_YOUNG_KEY, account, answerAge, loadAccount, tooYoung, verifyEmailCode } from "../src/account.ts";
+import { ASK_AGE_LINE, MONTHS } from "@chessroyale/core";
+import { TOO_YOUNG_KEY, account, answerAge, askAgeAgain, loadAccount, tooYoung, verifyEmailCode, youngGuest } from "../src/account.ts";
 
 /**
  * The age question in the app (docs/decisions/2026-10-16-age-gate-and-real-money.md): the birth month and year are
@@ -17,6 +17,7 @@ vi.stubGlobal("localStorage", {
 });
 let serverAge: "ok" | "under" | null = null;
 let name = "Sam Lee";
+let signedIn = false;
 const requests: { path: string; body: unknown }[] = [];
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
@@ -29,8 +30,8 @@ vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
     if (serverAge === "under") name = "Player";
     return json({ age: serverAge });
   }
-  if (path.startsWith("/api/me")) return json({ user: { id: "g1", name, icon: "♟", signedIn: false, email: null, google: false }, stats: {}, rating: null, recent: [] });
-  if (path === "/api/auth/email/verify") return serverAge === "ok" ? json({ user: { id: "g1", name, signedIn: true } }) : json({ message: "Tell us when you were born first.", askAge: true }, 403);
+  if (path.startsWith("/api/me")) return json({ user: { id: "g1", name, icon: "♟", signedIn, email: null, google: false }, stats: {}, rating: null, recent: [] });
+  if (path === "/api/auth/email/verify") return serverAge === "ok" ? json({ user: { id: "g1", name, signedIn: true } }) : json({ message: ASK_AGE_LINE, askAge: true }, 403);
   return json({ message: "Not found" }, 404);
 });
 
@@ -55,6 +56,7 @@ describe("the age question in the app", () => {
     expect(sentAnswers()).toEqual([{ oldEnough: false }]);
     expect(tooYoung()).toBe(true);
     expect(store.get(TOO_YOUNG_KEY)).toBe("1");
+    expect(youngGuest()).toBe(true);
     expect(store.has("brc.name")).toBe(false);
     expect(account().profile?.user.name).toBe("Player");
     // No birth date anywhere: not in what was sent, not in this device's storage.
@@ -76,9 +78,18 @@ describe("the age question in the app", () => {
     await loadAccount();
     expect(tooYoung()).toBe(true);
     expect(store.get(TOO_YOUNG_KEY)).toBe("1");
-    // And a new answer changes nothing.
+    // And a new answer changes nothing, nor does a sign-in's "answer again".
     expect(await answerAge(1, 1980)).toBe("under");
+    askAgeAgain();
     expect(tooYoung()).toBe(true);
+  });
+
+  it("someone signed in on a too-young device (a tab from before the answer) isn't a young guest: their name and notes are theirs", async () => {
+    signedIn = true;
+    await loadAccount();
+    expect(tooYoung()).toBe(true);
+    expect(youngGuest()).toBe(false);
+    signedIn = false;
   });
 
   it("13 exactly: old enough, sent as that alone, nothing kept on the device; a sign-in refused for want of it asks again", async () => {
@@ -90,12 +101,14 @@ describe("the age question in the app", () => {
     expect(sentAnswers()).toEqual([{ oldEnough: true }]);
     expect(account().age).toBe("ok");
     expect([...store.keys()]).toEqual([]);
-    // The answer ran out before the code was entered: the server refuses, and the question comes back.
+    // The answer ran out (or another tab's sign-in used it up): the server refuses, and the question comes back saying why.
     serverAge = null;
-    await expect(verifyEmailCode("ann@example.com", "123456")).rejects.toThrow("Tell us when you were born first.");
+    await expect(verifyEmailCode("ann@example.com", "123456")).rejects.toThrow(ASK_AGE_LINE);
     expect(account().age).toBeNull();
-    // Answered again, the sign-in goes ahead and uses the answer up.
+    expect(account().ageNote).toBe(ASK_AGE_LINE);
+    // Answered again, the note goes, and the sign-in goes ahead and uses the answer up.
     await answerAge(thirteen.month, thirteen.year);
+    expect(account().ageNote).toBeNull();
     await verifyEmailCode("ann@example.com", "123456");
     expect(account().profile?.user.signedIn).toBe(true);
     expect(account().age).toBeNull();

@@ -7,7 +7,7 @@ import { IconEditor, UserIcon } from "../components/PixelIcon.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { QuickChatPicks } from "../components/ChatPicks.tsx";
 import { ProfileFriendActions } from "../components/Friends.tsx";
-import { account, fetchProfile, onAccountChange, reportPlayer, tooYoung, updateProfile, type PublicProfile } from "../account.ts";
+import { account, fetchProfile, onAccountChange, reportPlayer, tooYoung, updateProfile, youngGuest, type PublicProfile } from "../account.ts";
 import type { ProfileTarget } from "../profile-nav.ts";
 import { ordinal } from "./StageBreak.tsx";
 
@@ -437,8 +437,8 @@ export function PlayerProfileScreen({
         </div>
         {own && (
           <div class="fd-card-actions">
-            {/* (Not on a device that answered the age question "too young": the default name and icon stay.) */}
-            {!tooYoung() && (
+            {/* (Not for a guest on a device that answered the age question "too young": the default name and icon stay.) */}
+            {!youngGuest() && (
               <FdButton primary class="small" onClick={() => setSheet("edit")}>
                 Edit name &amp; icon
               </FdButton>

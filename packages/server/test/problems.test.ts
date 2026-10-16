@@ -472,6 +472,16 @@ describe("POST /api/problems", () => {
     // (An "old enough" answer, or none, changes nothing.)
     const ok = await handleProblems(post({ kind: "idea", note: "more bosses" }, { headers: { cookie: "hc_age=ok" } }), { DB: d1 }, bg.waitUntil);
     expect(ok.status).toBe(200);
+    // Someone signed in on that device (a tab from before the answer) writes to us as anywhere; its guest still can't.
+    const guest = await createGuest(sql, T0, "Kid");
+    const guestToken = await createSession(sql, guest.user.id, T0);
+    const pat = await signInWithIdentity(sql, (await createGuest(sql, T0, "Pat")).user, "email", "pat-young-device@example.com", {}, T0);
+    const patToken = await createSession(sql, pat.id, T0);
+    const from = (token: string) => ({ headers: { cookie: `hc_session=${token}; hc_age=under` } });
+    expect((await handleProblems(post({ kind: "idea", note: "a guest's idea" }, from(guestToken)), { DB: d1 }, bg.waitUntil)).status).toBe(400);
+    const signedIn = await handleProblems(post({ kind: "feedback", note: "Pat's feedback" }, from(patToken)), { DB: d1 }, bg.waitUntil);
+    expect(signedIn.status).toBe(200);
+    expect(await sql.all("SELECT kind, note FROM ops_reports WHERE kind IN ('feedback', 'idea') AND note != 'more bosses'")).toEqual([{ kind: "feedback", note: "Pat's feedback" }]);
   });
 
   it("the database's own cap: at most maxReportsPerDay reports a day, whatever the instance (a cap line logged)", async () => {
