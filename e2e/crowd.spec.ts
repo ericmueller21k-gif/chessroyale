@@ -279,8 +279,10 @@ test("the board never moves or resizes during a turn (Crowd and Classic)", async
     // library's longest name stays on one line and leaves the board where it was (a long one used to wrap and push it
     // down a line on a phone: docs/decisions/2026-10-15-flaky-e2e-batch.md).
     const at = [...rects.keys()][0]!;
-    let seen = null as { text: string; height: number; line: number; rect: string } | null;
-    for (let i = 0; i < 5 && seen?.text !== LONGEST_OPENING; i++) {
+    // (Measured against a short name's line on the same board: one line, whatever the line height is.)
+    type Look = { text: string; height: number; rect: string };
+    let seen = null as { short: Look; long: Look } | null;
+    for (let i = 0; i < 5 && seen?.long.text !== LONGEST_OPENING; i++) {
       await expect
         .poll(async () => {
           const k = await phase(page);
@@ -288,18 +290,25 @@ test("the board never moves or resizes during a turn (Crowd and Classic)", async
           return k;
         }, { timeout: 60_000 })
         .toBe("play");
-      seen = await page.evaluate(async (name) => {
+      seen = await page.evaluate(async (longest) => {
         const m = (window as any).match;
-        m.phase = { ...m.phase, board: { ...m.phase.board, openingName: name } };
-        m.emit();
-        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-        const line = document.querySelector<HTMLElement>(".board-area .opening-name")!;
-        const r = document.querySelector(".board-wrap .board")!.getBoundingClientRect();
-        return { text: line.textContent ?? "", height: line.getBoundingClientRect().height, line: parseFloat(getComputedStyle(line).lineHeight), rect: `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}` };
+        const look = async (name: string) => {
+          m.phase = { ...m.phase, board: { ...m.phase.board, openingName: name } };
+          m.emit();
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          const line = document.querySelector<HTMLElement>(".board-area .opening-name")!;
+          const r = document.querySelector(".board-wrap .board")!.getBoundingClientRect();
+          return { text: line.textContent ?? "", height: line.getBoundingClientRect().height, rect: `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}` };
+        };
+        const short = await look("Slav Defense");
+        return { short, long: await look(longest) };
       }, LONGEST_OPENING);
     }
-    expect(seen!.text).toBe(LONGEST_OPENING);
-    expect(seen!.height).toBeLessThanOrEqual(seen!.line + 0.5);
-    expect(seen!.rect).toBe(at);
+    expect(seen!.short.text).toBe("Slav Defense");
+    expect(seen!.long.text).toBe(LONGEST_OPENING);
+    expect(seen!.short.height).toBeGreaterThan(0);
+    expect(seen!.long.height).toBe(seen!.short.height);
+    expect(seen!.short.rect).toBe(at);
+    expect(seen!.long.rect).toBe(at);
   }
 });

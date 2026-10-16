@@ -1,4 +1,4 @@
-# Six flaky e2e tests, root-caused (Oct 15, 2026)
+# Seven flaky e2e tests, root-caused (Oct 15, 2026)
 
 CI's `e2e` run (5 shards, one retry) listed these as flaky (passed only on the retry) or failed. Each was traced to its
 cause from CI's traces and logs and reproduced locally with `--repeat-each` before anything changed. No assertion was
@@ -75,13 +75,25 @@ the game.
   off.
 - **Fix:** the test picks its quiet move from the moves the game allows.
 
+## The local database locked: `problems.spec.ts` "the feedback sheet: Report a bug…"
+
+- **Seen:** `npx wrangler d1 execute hunchess --local` failed in the test's `asAdmin` (its output was thrown away).
+- **Cause:** with the output kept, "database is locked: SQLITE_BUSY". The local D1 database is one SQLite file that
+  the running test server writes too (presence, live lobbies, every few seconds while other tests play), and the test
+  writes to it from a second process. A write that comes while the server's is under way is refused at once: wrangler's
+  command doesn't wait for the lock as SQLite's busy timeout would. Reproduced locally: 1 in 8 with a Crowd match
+  running beside it.
+- **Fix:** on SQLITE_BUSY only, the test waits 300 ms and writes again (at most 10 times). Any other error fails it,
+  now with its message. The assertions are unchanged.
+
 ## Before and after (local, `--repeat-each`, failures over runs)
 
 | Test | Before | After |
 | --- | --- | --- |
-| `crowd.spec.ts` the board never moves (phone) | 1 / 8 (129 vs 143) | 0 / 8 |
+| `crowd.spec.ts` the board never moves (phone) | 1 / 8 (129 vs 143) | 0 / 8; both projects 0 / 6 |
 | `squads-v2.spec.ts` a block (phone) | 0 / 44 locally; CI 6 of 25 runs, one red | 0 / 16 |
 | `hollow.spec.ts` Hollow online (desktop) | 1 / 10 ("skipped") | 0 / 10 |
 | `grex.spec.ts` Jefferson's tiles and candle (phone) | 1 / 8 (mated on move 12) | 0 / 8 |
 | `front-door.spec.ts` the live line (phone) | 0 / 10 locally; CI 1 | 0 / 10 |
 | `boss-dock.spec.ts` your clock (phone) | 0 / 10 locally; CI 1 | 0 / 10 |
+| `problems.spec.ts` the feedback sheet (both, beside a Crowd match) | 1 / 8 (SQLITE_BUSY) | 0 / 2 (stopped early; CI is the gate) |
