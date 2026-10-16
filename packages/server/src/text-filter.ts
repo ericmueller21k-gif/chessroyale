@@ -9,10 +9,11 @@
  * letters), and reads the name word by word: symbols inside a word are dropped (letters dotted apart), a run of short
  * words (two letters or fewer each) is one word (letters spaced out, or spaced in pairs), and digits at a word's end
  * are read both as letters and as a number (a year, a "69"). Other words are never read as one
- * ("Jared Skinner" is two names, nothing else), except that the n-word's entries are also looked for across the whole
- * name. Three kinds:
+ * ("Jared Skinner" is two names, nothing else), except that the n-word's entries are also looked for across the
+ * words, starting where a word starts (so a surname ending in its first letters, before a given name, isn't read as
+ * one: "König Gábor"). Three kinds:
  *   - ANYWHERE: long, unambiguous words, found inside any one word (letters may repeat, and q may stand for g). An entry
- *     with a space is a phrase, found as one word ("WhitePower") or as those words in a row ("white power");
+ *     with a space is a phrase, found as one word or as those words in a row (two words written as one, or apart);
  *   - WORDS: short ones that are parts of ordinary words, found only as a whole word, exactly (a plural "s" allowed);
  *   - NUMBERS: hate codes, found in the name's digits.
  * ALLOW lists the few ordinary words that contain an ANYWHERE entry. Words that are also common surnames are left out
@@ -81,14 +82,14 @@ const loose = (word: string) => [...word].map((c) => (c === "g" ? "[gq]+" : `${c
 const entries = (list: string[]) => list.map((w) => rot13(w));
 
 const ANYWHERE_RE = new RegExp(entries(ANYWHERE).map((w) => loose(w.replace(/ /g, ""))).join("|"));
-const ACROSS_RE = new RegExp(entries(ACROSS).map(loose).join("|"));
+const ACROSS_RE = new RegExp(`^(?:${entries(ACROSS).map(loose).join("|")})`);
 const PHRASE_RE = new RegExp(` (?:${entries(ANYWHERE).filter((w) => w.includes(" ")).map((w) => w.split(" ").map(loose).join(" ")).join("|")})s* `);
 const WORD_RE = new RegExp(`^(?:${entries(WORDS).join("|")})s?$`);
 const ALLOW_RE = new RegExp(entries(ALLOW).map(repeats).join("|"), "g");
 
 /** Whether these words (one reading of a name) hold a listed word. */
 const listed = (ws: string[]) =>
-  ws.some((w) => WORD_RE.test(w) || ANYWHERE_RE.test(w.replace(ALLOW_RE, ""))) || PHRASE_RE.test(` ${ws.join(" ")} `) || ACROSS_RE.test(ws.join("").replace(ALLOW_RE, ""));
+  ws.some((w) => WORD_RE.test(w) || ANYWHERE_RE.test(w.replace(ALLOW_RE, ""))) || PHRASE_RE.test(` ${ws.join(" ")} `) || ws.some((_, i) => ACROSS_RE.test(ws.slice(i).join("").replace(ALLOW_RE, "")));
 
 /** Whether free text a player typed (a display name) holds a slur or a hate term. */
 export function isBlockedText(text: string): boolean {

@@ -58,6 +58,8 @@ describe("the name filter", () => {
       "Player 7", "Niger", "Nigeria", "Scunthorpe", "Bob 1999", "Hello World", "Kasparov", "♞ Knight", "😀", "", rot13("favttre"), rot13("sverergneqnag"),
       "Jared Skinner", "Fred Skinner", "Alfred Skinner", "Mildred Skinner", "Andre Tardif", "Pierre Tardif", "Claire Tardy", "Andre Tardieu",
       "Whit Lerner", "Mustafa Gotti", "Ashe Malek", "Tran Ny", "Jo Jo", "Magnus2009", "Jaap", "FAQ", "Iraqi", "Niqab", "Ni Gao",
+      // Surname first, the surname ending in the n-word's first letters (the across-the-words check starts at a word).
+      "König Gábor", "König Gergely", "Wenig Gerald", "Pfennig Gabriel", "Hennig Gerhard", "Aniq Qasim",
       // Surnames that are also slurs are left off the list (written ROT13 here, as in the list): reports and a reset.
       rot13("Ina Qlxr"), rot13("Qlxrf"), rot13("Puevf Pbbaf"), rot13("Pneevr Pbba"),
     ]) {

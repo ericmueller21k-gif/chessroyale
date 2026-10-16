@@ -91,7 +91,9 @@ So:
     so letters spaced out, or spaced in pairs, are read as the word. Digits at a word's end are read both as letters
     (leetspeak) and as a number left out (a year, a "69"): "Magnus2009" is "magnus", and a slur with "69" after it is
     the slur. Other words never run together, so "Jared Skinner" passes; only the n-word's two entries are also
-    looked for across the whole name, which no real name we tried trips.
+    looked for across the words, starting where a word starts (the director, after the final review: a surname that
+    ends in its first letters, written before a given name, was read as one, as "König Gábor"; starting at a word
+    lets those through and still catches every split).
   - **Long entries** match inside any one word, letters repeated or not, with q for g. **Short entries** match only as
     the exact whole word or its plural, so "faq" stays an ordinary word.
   - **The list** (ROT13, as in the file; `rot13()` turns an entry back):

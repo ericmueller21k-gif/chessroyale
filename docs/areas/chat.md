@@ -66,7 +66,7 @@ The preset lines are all friendly, so what can offend is a player's name and dra
   the decision file. It reads at most 64 characters, word by word: case, accents, look-alike letters, invisible
   characters and leetspeak fold away; symbols inside a word go; a run of two or more short words (two letters or fewer
   each) joins into one; digits at a word's end are read as letters and as a number left out. Long terms match inside a
-  word (with q for g; the n-word's also across the whole name), short ones only as the exact whole word (or its
+  word (with q for g; the n-word's also across the words, from the start of a word), short ones only as the exact whole word (or its
   plural). A
   profile can't take such a name ("That name isn't allowed. Pick another one."); a guest asking for one with its first
   visit gets "Player"; a lobby or Squads seat asked for with one is "Player N"; the global chat shows an old one as
