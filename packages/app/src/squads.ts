@@ -144,6 +144,17 @@ export interface SquadsNote {
   kind?: "no" | "news";
 }
 
+/** A short banner over one board of one match (both squads see it). */
+export interface SquadsBanner {
+  key: string;
+  board: number;
+  text: string;
+  at: number;
+  kind?: "brilliant" | "shield";
+}
+
+const bannerKey = (key: string, board: number) => `${key}:${board}`;
+
 const REFUSED: Record<string, string> = {
   no_tokens: "No same-move tokens left: pick a different move.",
   blocked: "That move is blocked this turn.",
@@ -235,8 +246,12 @@ export class SquadsClient {
   /** Each match's choices and locks as the server last said (the screen shows them with `mine` on top). */
   private server = new Map<string, { visible: Record<string, string>; locked: string[] }>();
   note: SquadsNote | null = null;
-  /** A short banner over a board: a block placed or lifted, a shield, a brilliant move (both squads see it). */
-  banner: { key: string; board: number; text: string; at: number; kind?: "brilliant" | "shield" } | null = null;
+  /**
+   * The latest short banner over each board (by `bannerKey`): a block placed or lifted, a shield, a brilliant move (both
+   * squads see it). One per board, so an event on another board or in another match never cuts a board's banner short
+   * (it did: docs/decisions/2026-10-16-flaky-e2e-batch-3.md).
+   */
+  banners: Record<string, SquadsBanner> = {};
   /** Mercenary: a Time chip just tapped (both squads see "+30 s" on that squad's clock for a moment). */
   chipFlash: { key: string; board: number; side: 0 | 1; by: string; at: number } | null = null;
   /** Mercenary: every squad's wallet and shop (empty in Classic). */
@@ -661,7 +676,7 @@ export class SquadsClient {
         const by = msg.block.by === this.myId ? "You" : this.nameOf(msg.block.by);
         const squad = squadName(m.sides[msg.block.side].squadId);
         const mine = sideIn(m, this.myId) === msg.block.side;
-        this.banner = { key: m.key, board: msg.block.board, at: Date.now(), text: mine ? `${by} blocked ${blockName(msg.block)} (−${msg.block.cost})` : `${squad} blocked your ${blockName(msg.block)}` };
+        this.setBanner({ key: m.key, board: msg.block.board, at: Date.now(), text: mine ? `${by} blocked ${blockName(msg.block)} (−${msg.block.cost})` : `${squad} blocked your ${blockName(msg.block)}` });
         break;
       }
       case "assist": {
@@ -711,7 +726,7 @@ export class SquadsClient {
           const san = m && msg.move ? sanBefore(m, msg.board, msg.move) : (msg.move ?? "");
           // (Past the squad's cap for the match: still a brilliant move, but no coins.)
           const pay = msg.capped ? `no coins (cap of ${SQUADS.mercenary.brilliant.capPerMatch} a match reached)` : `+${coinText(msg.coins)} coins for ${squadName(msg.squadId)}`;
-          this.banner = { key: msg.key, board: msg.board, at: Date.now(), kind: "brilliant", text: `Brilliant! ${san}${who ? ` by ${who}` : ""}: ${pay}` };
+          this.setBanner({ key: msg.key, board: msg.board, at: Date.now(), kind: "brilliant", text: `Brilliant! ${san}${who ? ` by ${who}` : ""}: ${pay}` });
         }
         break;
       }
@@ -813,6 +828,15 @@ export class SquadsClient {
     this.emit();
   }
 
+  /** The banner over a board now, if any (the screen shows it for BANNER_MS from its `at`). */
+  bannerOn(key: string, board: number): SquadsBanner | null {
+    return this.banners[bannerKey(key, board)] ?? null;
+  }
+
+  private setBanner(b: SquadsBanner) {
+    this.banners = { ...this.banners, [bannerKey(b.key, b.board)]: b };
+  }
+
   /** A half has been played: its moves join each board's list (checked against the server's count; "sync" if off). */
   private onHalf(msg: Extract<SquadsServerMessage, { t: "half" }>) {
     const had = this.matches.get(msg.key);
@@ -832,19 +856,27 @@ export class SquadsClient {
     // announced to both squads (its points stay spent).
     const me = sideIn(m, this.myId);
     const blocks = msg.events.filter((e): e is Extract<typeof e, { kind: "block" }> => e.kind === "block");
-    const shielded = blocks.find((e) => e.outcome === "shielded");
-    const lifted = blocks.find((e) => e.outcome !== "on" && e.outcome !== "shielded" && me !== null && (e.outcome !== "impossible" || e.side === me));
-    if (shielded) {
-      const ours = me === shielded.side;
-      const text = ours
-        ? `${possessive(squadName(m.sides[shielded.side === 0 ? 1 : 0].squadId))} shield canceled your block on ${blockName(shielded)} (−${shielded.cost})`
-        : me !== null
-          ? `Your shield canceled ${possessive(squadName(m.sides[shielded.side].squadId))} block on your ${blockName(shielded)}`
-          : `A shield canceled ${possessive(squadName(m.sides[shielded.side].squadId))} block on ${blockName(shielded)}`;
-      this.banner = { key: m.key, board: shielded.board, at: Date.now(), kind: "shield", text };
-      // (The line above the board is that board's; the squads in the match hear of it wherever they're looking.)
-      if (me !== null) this.note = { text, at: Date.now(), kind: "news" };
-    } else if (lifted && lifted.outcome !== "on" && lifted.outcome !== "shielded") this.banner = { key: m.key, board: lifted.board, at: Date.now(), text: `Block lifted: ${LIFTED[lifted.outcome]} (refunded)` };
+    // (Each board's line says its own: a shield canceled on one board and a block lifted on the other both show.)
+    let told = false;
+    for (const board of new Set(blocks.map((e) => e.board))) {
+      const here = blocks.filter((e) => e.board === board);
+      const shielded = here.find((e) => e.outcome === "shielded");
+      const lifted = here.find((e) => e.outcome !== "on" && e.outcome !== "shielded" && me !== null && (e.outcome !== "impossible" || e.side === me));
+      if (shielded) {
+        const ours = me === shielded.side;
+        const text = ours
+          ? `${possessive(squadName(m.sides[shielded.side === 0 ? 1 : 0].squadId))} shield canceled your block on ${blockName(shielded)} (−${shielded.cost})`
+          : me !== null
+            ? `Your shield canceled ${possessive(squadName(m.sides[shielded.side].squadId))} block on your ${blockName(shielded)}`
+            : `A shield canceled ${possessive(squadName(m.sides[shielded.side].squadId))} block on ${blockName(shielded)}`;
+        this.setBanner({ key: m.key, board, at: Date.now(), kind: "shield", text });
+        // (The line above the board is that board's; the squads in the match hear of it wherever they're looking.)
+        if (me !== null && !told) {
+          this.note = { text, at: Date.now(), kind: "news" };
+          told = true;
+        }
+      } else if (lifted && lifted.outcome !== "on" && lifted.outcome !== "shielded") this.setBanner({ key: m.key, board, at: Date.now(), text: `Block lifted: ${LIFTED[lifted.outcome]} (refunded)` });
+    }
     if (off) this.sync();
     // Decided (a winner): over once its last half has been shown (the server says so only in the lobby's bracket). A
     // drawn final isn't: its Armageddon comes as a "match".
