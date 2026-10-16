@@ -127,6 +127,20 @@ describe("the 1 v 1 game object", () => {
     expect(await again.exists()).toBe(false);
   });
 
+  it("Cancel just as it paired (abandon): called off before anyone arrives, nothing recorded; a stranger can't", async () => {
+    const rt = await runtime();
+    const game = await rt.make();
+    const sql = d1Sql(rt.d1);
+    await game.create("ABCDE", { w: (await duelEntrant(sql, rt.ann)).player, b: (await duelEntrant(sql, rt.bob)).player });
+    await game.abandon("someone-else");
+    expect(await game.status()).toMatchObject({ phase: "waiting" });
+    await game.abandon(rt.bob.id);
+    expect((rt.store.get("game") as { noShow: { result: string; reason: string; by: string } }).noShow).toMatchObject({ result: "aborted", reason: "abort", by: "b" });
+    expect(await game.status()).toMatchObject({ phase: "over" });
+    expect((await rankedRecordOf(sql, rt.ann.id)).stored).toBe(false);
+    expect(await duelGamesOf(sql, rt.ann.id)).toEqual([]);
+  });
+
   it("only its two players get in", async () => {
     const rt = await runtime();
     const game = await rt.make();
