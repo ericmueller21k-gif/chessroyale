@@ -1192,7 +1192,12 @@ export function App() {
   }
 
   const screen = renderPhase(match, {
-    leave,
+    // (Home from a match's results, or a lobby's Leave: home itself, not the Boss raid screen it may have started from.
+    // Cancel in the queue goes back to where you were.)
+    leave: () => {
+      setRaidOpen(false);
+      leave();
+    },
     // (Solo again as it was: through the queue screen, or Boss alone straight in.)
     again: () => (match instanceof SoloMatch ? void startSolo(match.settings.raid ? "raid" : match.settings.mode, { fill: match.players.length > 0 }) : leave()),
   });
