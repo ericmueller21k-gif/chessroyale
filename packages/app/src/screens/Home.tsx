@@ -8,7 +8,7 @@ import { BossBrainPicker } from "../components/BossBrain.tsx";
 import { isAdmin, maiaAllowed, maiaLikely, pickedBrain, rememberBrain } from "../boss-brain.ts";
 import { prefetchMaia } from "../maia.ts";
 import type { ComponentChildren } from "preact";
-import { AccountBar, BackButton, DressedPawn, FdButton, LiveLine, Logo, RankLine, wearingNames } from "../components/FrontDoor.tsx";
+import { AccountBar, BackButton, DressedPawn, FdButton, GearIcon, LiveLine, Logo, RankLine, wearingNames } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
 import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/BossSelect.tsx";
 import { BossFace } from "../components/BossCharacter.tsx";
@@ -477,6 +477,7 @@ export function HomeScreen({
   onRaid,
   onFriends,
   onProfile,
+  onSettings,
   onShop,
   onSignIn,
 }: {
@@ -515,6 +516,8 @@ export function HomeScreen({
   /** Your friends list. */
   onFriends: () => void;
   onProfile: () => void;
+  /** The phone's gear in the top bar: Settings, as Profile → Settings opens it. */
+  onSettings: () => void;
   onShop: () => void;
   onSignIn: () => void;
 }) {
@@ -868,11 +871,17 @@ export function HomeScreen({
   );
   return (
     <div class="fd-home">
-      {/* (A phone's top bar. A computer has the logo in its side menu, your coins and pawn top right.) */}
+      {/*
+       * (A phone's top bar: the logo, your coins and pawn, and a gear for Settings (Eric, Oct 17: one tap, not two
+       * through Profile). A computer has the logo and Settings in its side menu, your coins and pawn top right.)
+       */}
       <header class="fd-top">
         <Logo />
         <div class="fd-top-end">
           <AccountBar onProfile={onProfile} />
+          <button type="button" class="fd-icon-btn fd-top-gear" aria-label="Settings" onClick={onSettings}>
+            <GearIcon />
+          </button>
         </div>
       </header>
       {/* (A phone's: friends above the players online. A computer has them in its live panel.) */}
