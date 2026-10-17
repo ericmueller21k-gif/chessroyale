@@ -70,7 +70,13 @@ export interface QueueConfig {
   maxPlayers: number;
 }
 
-/** A ticket being seated longer than this (the seating failed without putting it back) is forgotten. */
+/**
+ * A ticket still marked as being seated this long after its batch began is forgotten: a backstop only. Every seating
+ * ends with its tickets placed or put back (the matchmaker's form() catches a seating that throws), and this is checked
+ * only as a batch begins, never while one is running, so it can't cut a slow seating short. Kept at a minute: no call
+ * a seating makes has a time limit, so a healthy one can't be bounded
+ * (docs/decisions/2026-10-17-seating-throw-puts-back.md).
+ */
 const SEATING_KEEP_MS = 60_000;
 
 export const queueConfig = (): QueueConfig => ({ ...CAPACITY.queue, maxPlayers: CAPACITY.overload.maxPlayers });
@@ -81,8 +87,8 @@ export class QueueCore {
   private byId = new Map<string, Ticket>();
   /**
    * Tickets taken from the line and being seated now (their lobby or game being opened): known, so an ask in that
-   * moment waits for the seat (the matchmaker's waiter) instead of starting afresh, until placed or put back. One the
-   * seating never settles (an error) is forgotten after SEATING_KEEP_MS.
+   * moment waits for the seat (the matchmaker's waiter) instead of starting afresh, until placed or put back (or, as
+   * a backstop, forgotten after SEATING_KEEP_MS).
    */
   private seating = new Map<string, { t: Ticket; since: number }>();
   /** Placed tickets: their lobby, until when it's remembered. */
@@ -103,7 +109,8 @@ export class QueueCore {
 
   /**
    * A PLAY press (or a player in line asking again with their ticket: it keeps its place). A press from an account
-   * already in line (`info.uid`: ranked 1 v 1, a second tab) is that account's ticket, so an account is in line once.
+   * already in line or being seated (`info.uid`: ranked 1 v 1, a second tab or device) is that account's ticket, so an
+   * account is in line once.
    */
   enqueue(ticketId: string | null | undefined, now: number, info?: Record<string, unknown>): Ticket {
     const uid = typeof info?.uid === "string" ? info.uid : null;
@@ -112,8 +119,9 @@ export class QueueCore {
       known.seenAt = now;
       return known;
     }
-    // Being seated this moment: the same ticket (not back in line), so its ask waits for the seat.
-    const seating = ticketId ? this.seating.get(ticketId)?.t : undefined;
+    // Being seated this moment: the same ticket (not back in line), so its ask waits for the seat. So is the account's
+    // (its other device): two tickets of one account could be paired into two games once a failed seating puts it back.
+    const seating = (ticketId ? this.seating.get(ticketId)?.t : undefined) ?? (uid ? this.seatingOf(uid) : undefined);
     if (seating) {
       seating.seenAt = now;
       return seating;
@@ -194,14 +202,24 @@ export class QueueCore {
     }
   }
 
-  /** Couldn't seat these (a lobby couldn't be opened): back to the front of the line, in order, with their rate back. */
+  private seatingOf(uid: string): Ticket | undefined {
+    for (const s of this.seating.values()) if (s.t.info?.uid === uid) return s.t;
+    return undefined;
+  }
+
+  /**
+   * Couldn't seat these (a lobby couldn't be opened, or a call threw): those still being seated go back to the front of
+   * the line, in order, with their rate back. One placed meanwhile keeps its seat (putting it back would seat it
+   * twice), and one already back in line or dropped is left as it is.
+   */
   putBack(tickets: Ticket[]) {
-    this.line.unshift(...tickets);
-    for (const t of tickets) {
+    const back = tickets.filter((t) => this.seating.has(t.id));
+    this.line.unshift(...back);
+    for (const t of back) {
       this.seating.delete(t.id);
       this.byId.set(t.id, t);
     }
-    this.tokens += tickets.length;
+    this.tokens += back.length;
   }
 
   /** Tickets taken to be seated that never will be (dropped): forgotten, so an ask with one starts afresh. */

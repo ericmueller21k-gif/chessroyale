@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { MATCHMAKING } from "@chessroyale/core";
+import { describe, expect, it, vi } from "vitest";
+import { CAPACITY, MATCHMAKING } from "@chessroyale/core";
 import { Matchmaker, queueName, type PlayAnswer } from "../src/matchmaker.ts";
 import { openLobbyCode, randomCode } from "../src/codes.ts";
 import { QueueCore, regionOf, type MatchRules, type QueueConfig } from "../src/queue.ts";
+import { opsStats } from "../src/ops.ts";
 
 /**
  * "Play now": tickets seated in batches, never a used code, never an overfilled lobby, and a surge past the
@@ -11,9 +12,10 @@ import { QueueCore, regionOf, type MatchRules, type QueueConfig } from "../src/q
 
 /**
  * Lobbies by code. Codes are random, so the first `inUse` codes tried stand for lobbies that are still open (a match,
- * or its results): creating one again is refused. Each lobby has `size` seats and gives out reservations.
+ * or its results): creating one again is refused. Each lobby has `size` seats and gives out reservations. `throws`:
+ * which create calls (1 for the first) throw instead, as a call to an object that's being reset does.
  */
-function lobbies(inUse: number, size = 100) {
+function lobbies(inUse: number, size = 100, throws: (call: number) => boolean = () => false) {
   const open = new Map<string, { joinable: boolean; seats: number; auto?: { fillAt: number | null; botsOff?: boolean }; hurried?: number }>();
   const tried: string[] = [];
   let calls = 0;
@@ -23,6 +25,7 @@ function lobbies(inUse: number, size = 100) {
       async create(c: string, _o: unknown, auto?: { fillAt: number | null; botsOff?: boolean; reserve?: number }) {
         calls++;
         tried.push(c);
+        if (throws(tried.length)) throw new Error("Network connection lost.");
         if (tried.length <= inUse || open.has(c)) return false;
         const give = Math.min(auto?.reserve ?? 0, size);
         open.set(c, { joinable: true, seats: give, auto: auto && { fillAt: auto.fillAt, botsOff: auto.botsOff } });
@@ -57,13 +60,13 @@ class TestMatchmaker extends Matchmaker {
   }
 }
 
-function matchmaker(ns: unknown, opts: { q?: QueueCore; players?: number; rules?: MatchRules } = {}) {
+function matchmaker(ns: unknown, opts: { q?: QueueCore; players?: number; rules?: MatchRules; live?: unknown } = {}) {
   const store = new Map<string, unknown>();
   const ctx = {
     storage: { get: async (k: string) => store.get(k), put: async (k: string, v: unknown) => void store.set(k, v) },
     blockConcurrencyWhile: <T>(fn: () => Promise<T>) => fn(),
   };
-  const live = opts.players === undefined ? undefined : { idFromName: () => "g", get: () => ({ players: async () => opts.players }) };
+  const live = opts.live ?? (opts.players === undefined ? undefined : { idFromName: () => "g", get: () => ({ players: async () => opts.players }) });
   return new TestMatchmaker(ctx as unknown as DurableObjectState, { LOBBIES: ns, LIVE: live } as never, opts.q, opts.rules);
 }
 
@@ -189,6 +192,59 @@ describe("matchmaker", () => {
     L.open.get(a)!.joinable = false;
     const b = codeOf(await mm.next({}, 60_000, { since: now - 600_000 }))!;
     expect(L.open.get(b)!.auto!.fillAt! - Date.now()).toBeGreaterThan(MATCHMAKING.switchMinWaitMs - 1000);
+  });
+
+  it("a create that throws after a lobby's worth is placed: those keep their seats, the rest go back in line in order and are seated next, nobody twice", async () => {
+    // (The second lobby's create throws: 100 are placed in the first, 150 are still being seated.)
+    const L = lobbies(0, 100, (call) => call === 2);
+    const mm = matchmaker(L.ns);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const threw = opsStats().calls["mm.seatThrew"] ?? 0;
+    const first = await Promise.all(Array.from({ length: 250 }, () => mm.next({}, 60_000)));
+    // Logged and counted, as before.
+    expect(opsStats().calls["mm.seatThrew"]).toBe(threw + 1);
+    expect(logged).toHaveBeenCalledWith(expect.objectContaining({ kind: "Matchmaker.form", message: "Error: Network connection lost." }));
+    logged.mockRestore();
+    const a = codeOf(first[0]!)!;
+    expect(first.slice(0, 100).every((x) => codeOf(x) === a)).toBe(true);
+    // The rest are back in line at once (never stuck being seated), in the order they pressed PLAY.
+    const back = first.slice(100) as Extract<PlayAnswer, { busy: true }>[];
+    expect(back.map((x) => x.position)).toEqual(Array.from({ length: 150 }, (_, i) => i + 1));
+    expect(L.tried).toHaveLength(2);
+    // Asking again with their tickets: seated in new lobbies; the first keeps its 100, nobody has two seats.
+    const again = await Promise.all(back.map((x) => mm.next({}, 60_000, {}, x.ticket)));
+    expect(again.map((x) => x.ticket)).toEqual(back.map((x) => x.ticket));
+    const per = new Map<string, number>();
+    for (const x of again) per.set(codeOf(x)!, (per.get(codeOf(x)!) ?? 0) + 1);
+    expect(per.has(a)).toBe(false);
+    expect([...per.values()].sort((x, y) => y - x)).toEqual([100, 50]);
+    expect(L.open.get(a)!.seats).toBe(100);
+    expect([...L.open.values()].reduce((n, l) => n + l.seats, 0)).toBe(250);
+  });
+
+  it("anything that throws in a batch waits formEveryMs before the next batch: it never spins", async () => {
+    vi.useFakeTimers();
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      // The live hub's count throwing (synchronously, before the batch takes anyone); after 50 calls it works.
+      let gets = 0;
+      const live = {
+        idFromName: () => "g",
+        get: () => {
+          if (++gets < 50) throw new Error("hub down");
+          return { players: async () => 0 };
+        },
+      };
+      const mm = matchmaker(lobbies(0).ns, { live });
+      const ask = mm.next({}, 60_000);
+      await vi.advanceTimersByTimeAsync(3_500);
+      expect("busy" in (await ask)).toBe(true);
+      // Tried at once, then once every CAPACITY.queue.formEveryMs (a second): never 50 tries in a row.
+      expect(gets).toBe(1 + Math.floor(3_500 / CAPACITY.queue.formEveryMs));
+    } finally {
+      logged.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it("openLobbyCode: skips codes in use, gives up after its tries", async () => {

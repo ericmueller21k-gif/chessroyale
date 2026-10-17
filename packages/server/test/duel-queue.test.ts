@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { rankView } from "@chessroyale/core";
+import { describe, expect, it, vi } from "vitest";
+import { CAPACITY, rankView } from "@chessroyale/core";
 import type { DuelPlayerView } from "@chessroyale/chess/duel";
 import { Matchmaker, type DuelPlayAnswer } from "../src/matchmaker.ts";
 import { PAIR_BY_RATING, QueueCore, queueName, type QueueConfig } from "../src/queue.ts";
@@ -80,6 +80,39 @@ describe("pairing in the queue (PAIR_BY_RATING)", () => {
     expect(h!.tickets.some((t) => q.known(t.id))).toBe(false);
   });
 
+  it("putBack: only tickets still being seated go back, in order (one placed keeps its seat; one back in line or dropped is left)", () => {
+    const q = new QueueCore(cfg(), T0, nextId);
+    const [a, b, c, d] = ["a", "b", "c", "d"].map((u, i) => q.enqueue(null, T0 + i, info(u, 1500)));
+    const groups = q.admit(T0 + 10, 0, PAIR_BY_RATING);
+    expect(groups.map((g) => g.tickets.map((t) => t.info?.uid))).toEqual([
+      ["a", "b"],
+      ["c", "d"],
+    ]);
+    q.place([a!], "GAME1", T0 + 11);
+    q.forget([d!]);
+    q.putBack(groups.flatMap((g) => g.tickets));
+    // (Again: already in line, so nothing changes.)
+    q.putBack([b!, c!]);
+    expect(q.waiting).toBe(2);
+    expect([q.position(b!.id), q.position(c!.id)]).toEqual([1, 2]);
+    expect(q.placedIn(a!.id)).toBe("GAME1");
+    expect(q.position(a!.id)).toBe(0);
+    expect(q.known(d!.id)).toBe(false);
+  });
+
+  it("an account's first ask while its ticket is being seated (its other device) is that ticket: never a second one to pair", () => {
+    const q = new QueueCore(cfg(), T0, nextId);
+    const a = q.enqueue(null, T0, { ...info("a", 1500), device: "phone" });
+    q.enqueue(null, T0, info("b", 1500));
+    const [g] = q.admit(T0, 0, PAIR_BY_RATING);
+    expect(q.enqueue(null, T0 + 1, { ...info("a", 1500), device: "computer" }).id).toBe(a.id);
+    expect(q.waiting).toBe(0);
+    // The seating fails: one ticket for the account back in line, not two.
+    q.putBack(g!.tickets);
+    expect(q.enqueue(null, T0 + 2, { ...info("a", 1500), device: "computer" }).id).toBe(a.id);
+    expect(q.waiting).toBe(2);
+  });
+
   it("a ticket without its player is never paired (and two accounts on one device never meet)", () => {
     const q = new QueueCore(cfg(), T0, nextId);
     q.enqueue(null, T0, info("a", 1500));
@@ -100,36 +133,42 @@ describe("pairing in the queue (PAIR_BY_RATING)", () => {
   });
 });
 
-/** Games by code: each create succeeds unless its code is taken. */
-function duels() {
+/**
+ * Games by code: each create succeeds unless its code is taken. The first `throws` creates throw instead, as a call to
+ * an object that's being reset does.
+ */
+function duels(throws = 0) {
   const made = new Map<string, { w: DuelPlayerView; b: DuelPlayerView; testSeconds: number | null }>();
-  const ns = {
+  const D = { made, ns: {} as unknown, calls: 0 };
+  D.ns = {
     idFromName: (name: string) => name,
     get: (code: string) => ({
       async create(c: string, players: { w: DuelPlayerView; b: DuelPlayerView }, opts: { testSeconds?: number | null }) {
+        if (++D.calls <= throws) throw new Error("Durable Object reset because its code was updated.");
         if (made.has(c)) return false;
         made.set(c, { ...players, testSeconds: opts.testSeconds ?? null });
         return true;
       },
     }),
   };
-  return { made, ns };
+  return D;
 }
 
 class TestMatchmaker extends Matchmaker {
-  constructor(ctx: DurableObjectState, env: never) {
+  constructor(ctx: DurableObjectState, env: never, q?: QueueCore) {
     super(ctx, env);
     this.holdMs = 60;
+    if (q) this.q = q;
   }
 }
 
-function matchmaker(ns: unknown) {
+function matchmaker(ns: unknown, q?: QueueCore) {
   const store = new Map<string, unknown>();
   const ctx = {
     storage: { get: async (k: string) => store.get(k), put: async (k: string, v: unknown) => void store.set(k, v) },
     blockConcurrencyWhile: <T>(fn: () => Promise<T>) => fn(),
   };
-  return new TestMatchmaker(ctx as unknown as DurableObjectState, { DUELS: ns } as never);
+  return new TestMatchmaker(ctx as unknown as DurableObjectState, { DUELS: ns } as never, q);
 }
 
 const ticketOf = (a: DuelPlayAnswer) => ("ticket" in a ? a.ticket! : "");
@@ -208,6 +247,78 @@ describe("the Matchmaker's 1 v 1 queue", () => {
     expect(annAgain).toMatchObject({ code: expect.any(String), ticket: ticketOf(ann) });
     expect("code" in bob && bob.code).toBe("code" in annAgain && annAgain.code);
     expect(made.size).toBe(1);
+  });
+
+  it("a game whose opening throws: the pair is back in line at once, in order and still known; their next asks get one game", async () => {
+    const D = duels(1);
+    const q = new QueueCore(cfg(), Date.now());
+    const mm = matchmaker(D.ns, q);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const ann = await mm.duelNext(null, info("ann", 1500));
+    const [annAgain, bob] = await Promise.all([mm.duelNext(ticketOf(ann)), mm.duelNext(null, info("bob", 1500))]);
+    logged.mockRestore();
+    expect(D.calls).toBe(1);
+    expect(D.made.size).toBe(0);
+    // Still searching (never stuck "being seated" for a minute), Ann first as she queued first.
+    expect(annAgain).toMatchObject({ searching: true, ticket: ticketOf(ann) });
+    expect(bob).toMatchObject({ searching: true });
+    expect([q.position(ticketOf(ann)), q.position(ticketOf(bob))]).toEqual([1, 2]);
+    expect(q.known(ticketOf(ann)) && q.known(ticketOf(bob))).toBe(true);
+    const both = await Promise.all([mm.duelNext(ticketOf(ann)), mm.duelNext(ticketOf(bob))]);
+    const codes = both.map((a) => ("code" in a ? a.code : null));
+    expect(codes[0]).toBeTruthy();
+    expect(codes[1]).toBe(codes[0]);
+    expect(D.made.size).toBe(1);
+    const g = D.made.get(codes[0]!)!;
+    expect([g.w.uid, g.b.uid].sort()).toEqual(["ann", "bob"]);
+  });
+
+  it("a throw on a batch's first pair puts back the pairs after it too, never left being seated; then each pair gets its game", async () => {
+    const D = duels(1);
+    const q = new QueueCore(cfg(), Date.now());
+    const mm = matchmaker(D.ns, q);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const first = await Promise.all([info("ann", 1500), info("bob", 1500), info("cat", 2000), info("dan", 2000)].map((p) => mm.duelNext(null, p)));
+    logged.mockRestore();
+    expect(D.calls).toBe(1);
+    for (const a of first) expect(a).toMatchObject({ searching: true });
+    // (All four in line again; pressed in the same millisecond, their order is the pairing's.)
+    expect(first.map((a) => q.position(ticketOf(a))).sort()).toEqual([1, 2, 3, 4]);
+    const again = await Promise.all(first.map((a) => mm.duelNext(ticketOf(a))));
+    const codes = again.map((a) => ("code" in a ? a.code : null));
+    expect(codes[0]).toBe(codes[1]);
+    expect(codes[2]).toBe(codes[3]);
+    expect(codes[0]).not.toBe(codes[2]);
+    expect(D.made.size).toBe(2);
+  });
+
+  it("a game that always throws: tried again about once a second, never at once; every ask still answered within its hold", async () => {
+    vi.useFakeTimers();
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const D = duels(Infinity);
+      const mm = matchmaker(D.ns);
+      const annP = mm.duelNext(null, info("ann", 1500));
+      await vi.advanceTimersByTimeAsync(100);
+      const ann = await annP;
+      const pair = Promise.all([mm.duelNext(ticketOf(ann)), mm.duelNext(null, info("bob", 1500))]);
+      await vi.advanceTimersByTimeAsync(100);
+      for (const a of await pair) expect(a).toMatchObject({ searching: true });
+      expect(D.calls).toBe(1);
+      // Nobody asks for 5 s: the batch is tried again once every CAPACITY.queue.formEveryMs (a second).
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(D.calls).toBe(1 + Math.floor(5_200 / CAPACITY.queue.formEveryMs));
+      // Asking again: searching, within the hold, with the same tickets.
+      const asks = Promise.all([mm.duelNext(ticketOf(ann)), mm.duelNext(null, info("bob", 1500))]);
+      await vi.advanceTimersByTimeAsync(100);
+      const [a, b] = await asks;
+      expect(a).toMatchObject({ searching: true, ticket: ticketOf(ann) });
+      expect(b).toMatchObject({ searching: true });
+      expect(D.made.size).toBe(0);
+    } finally {
+      logged.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it("Cancel: out of line, never paired after", async () => {

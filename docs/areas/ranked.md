@@ -15,20 +15,21 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   for a bit. Back soon."; games already running finish.
 - **The queue** (`matchmaker.ts`'s duel mode, `queue.ts` `PAIR_BY_RATING`, core's `pairUp`): the Matchmaker object for
   `ranked1v1-default` (and a test's `?pool=`). The first ask reads the player on the server (`duelEntrant`: the
-  account's name through the name filter, the locker's look, the rank, the hidden rating) and makes a ticket; one
-  ticket per account (a second tab is the same ticket, and an account never meets itself). The app asks again at once
-  with its ticket (each ask waits up to `CAPACITY.queue.holdMs`): `{ searching }` until paired, then `{ code }`. Pairs:
-  the longest wait first, with the closest hidden rating within `startRange + perSecond × seconds waited` (the longer
-  wait's) `+ perRd ×` the larger of the two deviations (as they stand that day), at most `maxRange` (`RANKED_1V1.match`:
-  100, +10 a second, +1 × deviation, 1000; so two players in placements, still uncertain, meet at once, and settled
-  ones at 160); never two accounts on one device (fair play's device cookie, hashed, on the ticket). A ticket is only
-  made with its player: one being seated (its game opening) is still known, so its ask waits for the game; one the
-  queue doesn't know (gone while the app slept, or made up) is answered `expired` and
-  the app asks afresh. Cancel takes the ticket out (one still on its way back with the first ask is cancelled when it
-  comes); a pairing made
-  that very moment is called off for that player (`DuelGame.abandon`: an abort before any move, nothing recorded).
-  After `fewPlayersSeconds` (45) the app offers "Few players online right now" with Keep waiting and Play a bot
-  (unranked).
+  account's name through the name filter, the locker's look, the rank, the hidden rating) and makes a ticket; one ticket
+  per account (a second tab or device is the same ticket, also while it's being seated, and an account never meets
+  itself). The app asks again at once with its ticket (each ask waits up to `CAPACITY.queue.holdMs`): `{ searching }`
+  until paired, then `{ code }`. Pairs: the longest wait first, with the closest hidden rating within
+  `startRange + perSecond × seconds waited` (the longer wait's) `+ perRd ×` the larger of the two deviations (as they
+  stand that day), at most `maxRange` (`RANKED_1V1.match`: 100, +10 a second, +1 × deviation, 1000; so two players in
+  placements, still uncertain, meet at once, and settled ones at 160); never two accounts on one device (fair play's
+  device cookie, hashed, on the ticket). A ticket is only made with its player: one being seated (its game opening) is
+  still known, so its ask waits for the game; a game that couldn't be opened (`create` answered no, or the call threw)
+  puts the pair back at the front of the line at once, still searching, and the next batch tries again (a second later,
+  or at their next ask); one the queue doesn't know (gone while the app slept, or made up) is answered `expired` and the
+  app asks afresh. Cancel takes the ticket out (one still on its way back with the first ask is canceled when it
+  comes); a pairing made that very moment is called off for that player (`DuelGame.abandon`: an abort before any move,
+  nothing recorded). After `fewPlayersSeconds` (45) the app offers "Few players online right now" with Keep waiting and
+  Play a bot (unranked).
 - **The stage** (Eric, Oct 16: "your character's sitting there, and then there's like kind of this empty platform thing
   like waiting, and then when your opponent joins, like their pawn loads up next to you"; `components/DuelStage.tsx`,
   styles `dv-st-`; why: [docs/decisions/2026-10-16-ranked-1v1-versus-screen.md](../decisions/2026-10-16-ranked-1v1-versus-screen.md)).
@@ -204,7 +205,9 @@ kill switch `PAUSE_RANKED1V1`.
   nothing stored for a sync or a refused move; a seat without a player refused; only its two players get in),
   `duel-queue.test.ts` (pairing and widening, one ticket per account and one device, a ticket without its player
   never paired, an expired or made-up ticket, an ask while its game is being opened, Cancel, the Matchmaker's duel
-  mode), `ranked-store.test.ts` (recording:
+  mode; a game whose opening throws: the pair back in line in order and seated next, the batch's other pairs too, a
+  throw every time tried once a second, never at once; putBack leaving placed tickets placed; an account's other
+  device while its ticket is being seated), `ranked-store.test.ts` (recording:
   placements, ranks, coins, the daily cap, once (and the answer to a repeat), a race with another game, aborted games,
   fair play's hold (no rank change, no coins), a deleted account; the purge by fair play's rule; the profile; the
   download, deleting, a guest's merge), `fairplay-duel.test.ts` (the engine check within the engine server's 8 moves

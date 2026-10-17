@@ -20,6 +20,14 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
   (one seat reservation per lobby per batch); admission is limited per second and by `maxPlayers` on the servers
   (`CAPACITY.queue`, `CAPACITY.overload`). `MatchRules.group` splits a batch into groups that must not share a lobby
   (where ranked's skill bands will go); the default keeps everyone together in the order they pressed.
+- **A seating that fails** (a lobby or game that couldn't be opened, or any call in it that threw: `create`, `reserve`,
+  storage; docs/decisions/2026-10-17-seating-throw-puts-back.md): `form()` catches it in one place, logs it
+  (`Matchmaker.form`, counted as `mm.seatThrew` when it threw, `mm.createFailed` when a create answered no), and stops
+  the batch. Everyone in the batch still being seated goes back to the front of the line in order (`putBack` leaves
+  anyone placed already in their seat: no one is seated twice), so their asks keep waiting in line; the next batch
+  tries again after `CAPACITY.queue.formEveryMs` (1 s), or at the next ask. Anything else that escapes a batch waits
+  the same second, so a failure that persists never spins. A ticket still marked as being seated a minute after its
+  batch began is forgotten (`SEATING_KEEP_MS`, a backstop no seating reaches today).
 - **Lobbies.** One Durable Object per lobby, under a 5-character code with no look-alikes (`codes.ts`; a code is never
   reused while its lobby exists). "Play with friends" makes a private lobby (invite link `/lobby/CODE`); a private raid
   stays people-only. Seats survive reloads (a seat token on the device). The host (a connected computer before a
@@ -75,7 +83,9 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
 
 ## Tests and tools
 
-- Unit: `packages/server/test/matchmaker.test.ts`, `lobby-types.test.ts`, `lobby-life.test.ts`, `lobby.test.ts`,
+- Unit: `packages/server/test/matchmaker.test.ts` (with `duel-queue.test.ts` and `squads-queue.test.ts`: a seating
+  that throws after some are placed, those keep their seats and the rest are seated next; a throw outside a seating
+  waits formEveryMs), `lobby-types.test.ts`, `lobby-life.test.ts`, `lobby.test.ts`,
   `resign.test.ts` (leaving: seats to bots, the loss, the last one out closing the lobby and its code, the away rule),
   `lobby-do-rating.test.ts` (a raid's boss from the stored ratings, whatever an app claims),
   `packages/core/test/rating.test.ts`, `profile.test.ts`.
