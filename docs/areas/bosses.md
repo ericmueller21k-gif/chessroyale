@@ -571,7 +571,7 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   long pull, his meter filling, SHOWDOWN! and the duels, then a drag), `frames:character -- <dir> [boss] [phone|desktop|both]`, `frames:wip`,
   `frames:rage -- <dir> [boss] [phone|desktop] [moves] [strikes]` (the rage meter: strikes, the warning, the
   ultimate, its slide down and refill, every frame, with the meter's own numbers sampled each frame).
-- Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect; `only=pig` for Wrangler).
+- Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect; `only=pig` for Wrangler; `extra=<module.ts>` adds a draft character not yet in `CHARACTERS`; `ground=#f3f1ec` draws on the light theme's ground).
   The Hidden Boss's bust and his book (art only, not shown) aren't in the character lists: add
   `extra=packages/app/src/characters/recluse.ts only=recluse,recluse-bust,recluse-book`.
 - The Hidden Boss in the Crowd's final: `packages/chess/test/crowd.test.ts` ("50 v 50 boss final"),

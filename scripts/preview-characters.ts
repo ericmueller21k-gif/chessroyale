@@ -1,6 +1,7 @@
 // Boss characters' preview: for each character, an animated GIF per animation and a showreel (4x), a frame sheet
 // (PNG, every frame with its time and cue), and one comparison PNG of them all at phone size on the game's ground.
-//   npm run preview:characters -- [outDir] [ref=reference.png] [scale=4] [looks=none]
+//   npm run preview:characters -- [outDir] [ref=reference.png] [scale=4] [looks=none] [ground=#f3f1ec]
+// `ground` draws the characters on another ground than the game's dark one (#14161b), such as the light theme's.
 // A character with recolors (`looks`, such as the God King's black armor) is drawn once per look too, its files
 // named <id>-<look>-*. `looks=none` draws each character in its own colors only.
 // `ref` puts a reference picture first in the comparison (its white or transparent background is keyed out).
@@ -18,7 +19,7 @@ const args = process.argv.slice(2);
 const opt = (k: string) => args.find((a) => a.startsWith(`${k}=`))?.slice(k.length + 1);
 const outDir = args.find((a) => !a.includes("=")) ?? "characters-preview";
 const SCALE = Number(opt("scale") ?? 4);
-const GROUND = "#14161b";
+const GROUND = opt("ground") ?? "#14161b";
 const INK = "#8b93a7";
 const GOLD = "#f2c14e";
 mkdirSync(outDir, { recursive: true });
