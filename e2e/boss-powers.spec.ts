@@ -10,29 +10,53 @@ import { BOARD_SEL, createLobbyFromHome, engineTop, expectCoordsInSquares, test,
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers ?? null).catch(() => null);
 
-/** Whether a move mates from this position (a test that needs the battle to last avoids it). */
-function mates(fen: string, mv: string): boolean {
-  const c = new Chess(fen);
+/**
+ * The board as it stands (solo: from the runner, its moves since the start; else from the position alone), to ask of a
+ * move whether the battle lasts after it.
+ */
+async function boardNow(page: Page): Promise<{ fen: string; history: string[] | null }> {
+  return page.evaluate(() => {
+    const m = (window as any).match;
+    const b = m.runner?.boards.get(0);
+    return { fen: m.phase.board.fen as string, history: b && !b.bases?.length ? ([...b.history] as string[]) : null };
+  });
+}
+
+/**
+ * Whether the battle lasts after this move: not mate, stalemate or any other draw, and not a position the board has
+ * already had. A test that needs the battle to last avoids the rest. (Bosses play Maia for players too, and a human-like
+ * boss can be mated sooner than Stockfish was; and once the battle is won, many moves score the same, the mate among
+ * them: passing over the mate, the test's queen went back and forth and so did the boss's king, a draw by repetition.
+ * docs/decisions/2026-10-16-flaky-e2e-batch-4.md)
+ */
+function lasts(board: { fen: string; history: string[] | null }, mv: string): boolean {
+  const step = (c: Chess, m: string) => c.move({ from: m.slice(0, 2), to: m.slice(2, 4), promotion: m[4] ?? "q" });
+  const key = (c: Chess) => c.fen().split(" ").slice(0, 4).join(" ");
+  const c = new Chess(board.history ? undefined : board.fen);
+  const seen = new Set([key(c)]);
   try {
-    c.move({ from: mv.slice(0, 2), to: mv.slice(2, 4), promotion: mv[4] ?? "q" });
+    for (const m of board.history ?? []) {
+      step(c, m);
+      seen.add(key(c));
+    }
+    step(c, mv);
   } catch {
     return false;
   }
-  return c.isCheckmate();
+  return !c.isGameOver() && !seen.has(key(c));
 }
 
-/** The first of these moves that doesn't mate (else any legal one that doesn't; else the first). */
-function firstNoMate(fen: string, moves: string[], legal?: string[] | null): string {
-  const all = legal ?? new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
-  return moves.find((mv) => all.includes(mv) && !mates(fen, mv)) ?? all.find((mv) => !mates(fen, mv)) ?? moves[0]!;
+/** The first of these moves after which the battle lasts (else any legal one; else the first). */
+function firstLasting(board: { fen: string; history: string[] | null }, moves: string[], legal?: string[] | null): string {
+  const all = legal ?? new Chess(board.fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
+  return moves.find((mv) => all.includes(mv) && lasts(board, mv)) ?? all.find((mv) => lasts(board, mv)) ?? moves[0]!;
 }
 
 /**
  * Waits for your move, then plays the engine's best allowed move (a power-up's hints follow the same rules). With
- * `noMate`, the best one that doesn't mate: a test that needs the battle to last (bosses play Maia for players too, and
- * a human-like boss can be mated sooner than Stockfish was).
+ * `lasting`, the best one after which the battle lasts (`lasts`): a test that needs the battle to last.
  */
-async function playBest(page: Page, noMate = false) {
+async function playBest(page: Page, lasting = false) {
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   await page.waitForTimeout(300);
   // (The engine's answer is polled for, never awaited inside the page: see engineTop.)
@@ -43,9 +67,9 @@ async function playBest(page: Page, noMate = false) {
   });
   // (Solo, the runner's are already the allowed moves, as the judge sees them; online, this device's engine's are filtered.)
   let move = solo ? (top[0]?.move ?? null) : ((allowed ? top.find((t) => allowed.includes(t.move))?.move : top[0]?.move) ?? allowed?.[0] ?? null);
-  if (noMate && move) {
-    const fen: string = await page.evaluate(() => (window as any).match.phase.board.fen);
-    if (mates(fen, move)) move = firstNoMate(fen, top.map((t) => t.move), allowed);
+  if (lasting && move) {
+    const board = await boardNow(page);
+    if (!lasts(board, move)) move = firstLasting(board, top.map((t) => t.move), allowed);
   }
   if (allowed && move && !allowed.includes(move)) throw new Error(`hint ${move} isn't allowed`);
   await page.evaluate((mv) => {
@@ -300,18 +324,19 @@ async function touchDrag(page: Page, from: { x: number; y: number }, to: { x: nu
 
 /**
  * Your move, played by hand on the board as it's drawn now: the engine's best allowed move, by two taps (`tap`) or a
- * drag (`drag`; on a phone a finger's, on a computer the mouse's). Returns the move, once the game has it.
+ * drag (`drag`; on a phone a finger's, on a computer the mouse's). Returns the move, once the game has it. With
+ * `lasting`, as playBest's.
  */
-async function playByHand(page: Page, how: "tap" | "drag", phone: boolean, noMate = false): Promise<string> {
+async function playByHand(page: Page, how: "tap" | "drag", phone: boolean, lasting = false): Promise<string> {
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   await page.locator(".cc-banner", { hasText: "Round start" }).waitFor({ state: "detached", timeout: 15_000 }).catch(() => undefined);
   await page.waitForTimeout(400);
   const { top } = await engineTop(page);
   let move = top[0]!.move;
-  if (noMate) {
-    const fen: string = await page.evaluate(() => (window as any).match.phase.board.fen);
+  if (lasting) {
+    const board = await boardNow(page);
     const allowed: string[] | null = await page.evaluate(() => (window as any).match.boss?.powers?.allowed ?? null);
-    if (mates(fen, move)) move = firstNoMate(fen, top.map((t) => t.move), allowed);
+    if (!lasts(board, move)) move = firstLasting(board, top.map((t) => t.move), allowed);
   }
   const plies: number = await page.evaluate(() => (window as any).match.runner.boards.get(0).history.length);
   const a = await squareOnScreen(page, move.slice(0, 2));

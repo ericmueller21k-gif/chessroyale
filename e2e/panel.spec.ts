@@ -27,6 +27,8 @@ function look(p: Page) {
     const feed = seen(screen.querySelector(".qchat .qfeed-wrap, .qchat .qoff"));
     const labels = [...(panel?.querySelectorAll("button[aria-label]") ?? [])].filter((b) => !!seen(b)).map((b) => b.getAttribute("aria-label")!);
     return {
+      // (Read with the sizes: a phase change between two looks is a different screen.)
+      phase: ((window as any).match?.phase.kind ?? "none") as string,
       layout: tower && chat ? "split" : tower ? "board" : chat ? "chat" : "none",
       height: Math.round(box?.height ?? 0),
       right: Math.round(box?.right ?? 0),
@@ -42,16 +44,22 @@ function look(p: Page) {
 /** Never an empty box: open shows rows or chat; folded is a small header bar; and it fits the screen. */
 async function expectShowing(p: Page, want: { layout: "split" | "board" | "chat"; open: boolean }, step: string) {
   // Measured while a move is being chosen: a reveal adds its tally row above the panel (about 90 px on a phone), so
-  // a check that happened to land in one read the chat as too short (the test's steps don't wait for the round).
-  await expect.poll(() => phase(p), { message: `${step}: a move being chosen`, timeout: 60_000 }).toMatch(/^(play|watching)$/);
-  await expect
-    .poll(async () => {
-      const v = await look(p);
-      return { layout: v.layout, open: v.height > 44 };
-    }, { message: `${step}: the layout`, timeout: 5_000 })
-    .toEqual(want);
-  const v = await look(p);
+  // a check that happened to land in one read the chat as too short (the test's steps don't wait for the round). The
+  // phase is read in the same look as the sizes: the round can move on between the wait and the look (on CI the
+  // chat's feed measured 24 px, in the reveal), and then the next move being chosen is measured instead.
+  let v = await look(p);
+  for (let round = 0; round < 5; round++) {
+    await expect.poll(() => phase(p), { message: `${step}: a move being chosen`, timeout: 60_000 }).toMatch(/^(play|watching)$/);
+    await expect
+      .poll(async () => {
+        v = await look(p);
+        return { layout: v.layout, open: v.height > 44 };
+      }, { message: `${step}: the layout`, timeout: 5_000 })
+      .toEqual(want);
+    if (/^(play|watching)$/.test(v.phase)) break;
+  }
   const where = `${step}: ${JSON.stringify(v)}`;
+  expect(v.phase, where).toMatch(/^(play|watching)$/);
   if (want.open) {
     if (want.layout !== "chat") expect(v.rows, where).toBeGreaterThan(0);
     if (want.layout !== "board") expect(v.feed, where).toBeGreaterThan(30);
