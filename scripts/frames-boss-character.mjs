@@ -46,7 +46,9 @@ async function run(name, context) {
         m.BOSS_KITS[k] = m.BOSS_KITS[name];
       }
     }, kitName);
-  await p.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  // (Home → Boss raid → Boss alone, since Oct 16.)
+  await p.getByRole("main").getByRole("button", { name: /^Boss raid/ }).click();
+  await p.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
   await p.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: new RegExp(bossName) }).click();
   // The placement showing (the boss bar on a phone, by the board on a computer).
   const char = () => p.locator(".boss-char:visible").first();
