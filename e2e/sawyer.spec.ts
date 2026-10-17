@@ -378,6 +378,14 @@ test("Sawyer's board saw lifted for his only move (Eric's position, Oct 17): Qxf
     await page.setViewportSize({ width: 320, height: 664 });
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   }
+  // (First the turn's own searches on the old position: the round's plan reads the board again after its search, so
+  // a position changed under it would mix the two, which play never does: a move waits for the plan.)
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__planned = false;
+    void Promise.resolve(w.match.runner.planning).then(() => (w.__planned = true), () => (w.__planned = "failed"));
+  });
+  await expect.poll(() => page.evaluate(() => (window as any).__planned), { timeout: 30_000 }).toBe(true);
   // Eric's position on the runner and the screen's board, as the unit test sets it (r.boards.set, r.state): his split
   // done, no cut. You White, as Eric was; when this battle made you Black, the same position with the colors swapped.
   const white = (await page.evaluate(() => (window as any).match.boss.crowdSide)) === "w";

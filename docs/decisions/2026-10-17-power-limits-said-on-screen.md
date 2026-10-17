@@ -123,6 +123,10 @@ The independent review found the cause sound and no blockers. Its smaller points
   test switch: no new one), as the unit test sets it; the crowd Black, the same position with the colors swapped.
   Qxb7 refused with its words; Nf6+ by taps; his Qxf6; then every frame of your turn shows "His only move: across the
   saw." alone and whole, at 320 px on the phone. Until now the Maia test met the lift only if a random reply did.
+  The test sets the position only once the turn's own plan has settled (`planBotPicks`): its first run set it while
+  that search on the old position was still out, and the plan, which reads the board again after its search, scored
+  the new position's moves on the old one and failed, so the move after it never scored (reproduced in Node). Play
+  never changes the board under the plan (a move's scoring waits for it), so the game is unchanged.
   The rage test's stand-in engine names a legal move, so Wrangler's reply after his duel is played as on main and
   nothing is logged; the lobby test restores its spies after each test.
 
