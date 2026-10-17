@@ -3,15 +3,16 @@
  * elephant, the alfil). After Eric's reference picture, redrawn: a shaggy brown mammoth up on his hind legs in a
  * fighting stance, his front legs raised like fists (pale toenails), big curved ivory tusks, angry brows, his trunk
  * curling at its tip, a tufted tail; a red and blue Nettipattam on his brow and a matching caparison over his back,
- * diamond patterns, gold trim and gold tassels. Drawn three-quarters on, facing our left as in the reference, light
- * from the top left.
+ * diamond patterns, gold trim and gold tassels. In his far fist, held to his side, the ankus he took from his rider: a
+ * gold goad as long as a scepter, its spike and hook beside his head and its butt by his feet (Eric, Oct 17). Drawn
+ * three-quarters on, facing our left as in the reference, light from the top left.
  *
  * A still for Eric's review (Oct 17): one pose, idle frame 0. Not in the roster or the game yet; his poses,
  * animations, powers and sounds come after Eric's edits.
  *
  * Rigging, as the other bosses: the head (with its Nettipattam), the ears, the body, the caparison, the feet and the
- * shadow are painted once; the legs, the trunk, the tusks and the tail from their points, so a new pose is a few
- * numbers. Fur is shaggy: its locks hang a pixel or two below every lower edge and stick out along the sides.
+ * shadow are painted once; the legs, the trunk, the tusks, the tail and the ankus from their points, so a new pose is a
+ * few numbers. Fur is shaggy: its locks hang a pixel or two below every lower edge and stick out along the sides.
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part } from "./sprite.ts";
@@ -38,6 +39,7 @@ export const ALFIL_PALETTE: Record<string, string> = {
   Y: "#f2c14e", // gold (the game's gold), its light, its shade
   y: "#ffe58a",
   O: "#b4840f",
+  P: "#7c5609", // brass, the ankus's deepest shade
   z: "#0d0e12", // ground shadow
 };
 
@@ -328,6 +330,70 @@ function shadow(): Part {
   return { grid: toGrid(cv), outline: false };
 }
 
+/**
+ * The ankus: the goad an elephant's rider commands him with, taken from his rider and carried as a trophy, a
+ * scepter's length (longer than a real one). All gold: a straight spike at its tip, a knob under it set with a red
+ * stone, the hook curving out of the knob and back down; a blue band under the head, red and blue wraps at the grip
+ * (either side of his fist) and a knob at its butt. Drawn along its axis from the butt to the tip: `grip` is how far
+ * below the tip his fist holds it.
+ */
+function ankus(butt: Pt, top: Pt, grip: number): { part: Part; at: Pt } {
+  const L = Math.hypot(top[0] - butt[0], top[1] - butt[1]);
+  const ax = (top[0] - butt[0]) / L;
+  const ay = (top[1] - butt[1]) / L;
+  // Across it: v > 0 is to our right (toward his head); the hook goes out the other way.
+  const nx = -ay;
+  const ny = ax;
+  const at = (s: number, v: number): Pt => [top[0] - ax * s + nx * v, top[1] - ay * s + ny * v];
+  const hook = [at(7.4, -1.8), at(6.2, -3.9), at(7.2, -5.3), at(9.6, -5.4), at(11.4, -4.5)];
+  const b = boxOf([butt, top, ...hook], 3);
+  return painted(b.x0, b.y0, b.w, b.h, (F) => {
+    const local = (x: number, y: number) => {
+      const dx = x + 0.5 - top[0];
+      const dy = y + 0.5 - top[1];
+      return { s: -(dx * ax + dy * ay), v: dx * nx + dy * ny };
+    };
+    const ell = (s: number, c: number, along: number, across: number) => across * Math.sqrt(Math.max(0, 1 - ((s - c) / along) ** 2));
+    /** Its half-width at a distance s below the tip, and what's there. */
+    const profile = (s: number): [number, string] => {
+      if (s < 0 || s > L) return [0, ""];
+      if (s <= 5.6) return [0.4 + s * 0.3, "spike"];
+      if (s <= 10) return [ell(s, 7.8, 2.2, 2.9), "knob"];
+      if (s <= 12) return [1.1, "gold"];
+      if (s <= 13.6) return [1.6, "blue"];
+      if (s <= 14.6) return [1.3, "gold"];
+      if (s >= L - 2.8) return [Math.max(1.05, ell(s, L - 1.4, 1.4, 1.7)), "gold"];
+      const g = Math.abs(s - grip);
+      if (g >= 6 && g < 7.6) return [1.4, "red"];
+      if (g >= 7.6 && g < 9) return [1.4, "blue"];
+      return [1.05, "gold"];
+    };
+    const onHook = (x: number, y: number) => {
+      const h = stroke(hook, 1.6, 0.6, [x + 0.5, y + 0.5]);
+      return h.d <= h.rr ? h : null;
+    };
+    F(
+      (x, y) => {
+        const { s, v } = local(x, y);
+        return Math.abs(v) <= profile(s)[0] || !!onHook(x, y);
+      },
+      (x, y) => {
+        const { s, v } = local(x, y);
+        const [hw, what] = profile(s);
+        if (Math.abs(v) > hw) {
+          const h = onHook(x, y)!;
+          return ramp("POYy", 0.62 - 0.45 * (h.nx / h.rr) - 0.55 * (h.ny / h.rr));
+        }
+        const l = 0.6 - 0.55 * (v / hw) + (what === "spike" ? 0.15 : 0);
+        if (what === "knob" && Math.abs(s - 7.8) < 1.1 && Math.abs(v) < 1.1) return v < 0 && s < 7.8 ? "R" : "r";
+        if (what === "blue") return l > 0.5 ? "B" : "N";
+        if (what === "red") return l > 0.5 ? "R" : "r";
+        return ramp("POYy", l);
+      },
+    );
+  });
+}
+
 // ---- Parts and the pose.
 
 const { parts: PARTS, add } = lazyParts();
@@ -366,10 +432,17 @@ export interface AlfilPose {
   foreN?: Pt;
   /** The trunk's tip, from where it hangs (its curl follows). */
   trunkTip?: Pt;
+  /** The ankus in his far fist: the end of its butt and the tip of its spike. */
+  ankusButt?: Pt;
+  ankusTip?: Pt;
 }
 
-/** At rest, in his stance: the far front foot out to our left, the near one cocked across his chest. */
-const REST: Required<AlfilPose> = { bob: 0, foreF: [4, 37], foreN: [34, 34], trunkTip: [23, 42] };
+/**
+ * At rest, in his stance: the far front foot out to our left holding the ankus, the near one cocked across his chest.
+ * The ankus leans out a little so its tip stays level with his crown and its hook no further left than his reach: a
+ * taller or wider figure would be drawn smaller on the select stage, or reach past his room beside the board.
+ */
+const REST: Required<AlfilPose> = { bob: 0, foreF: [4, 37], foreN: [34, 34], trunkTip: [23, 42], ankusButt: [11.4, 66.6], ankusTip: [7.6, 0] };
 
 export function alfilLayers(pose: AlfilPose = {}): Layer[] {
   const p = { ...REST, ...pose };
@@ -387,6 +460,9 @@ export function alfilLayers(pose: AlfilPose = {}): Layer[] {
   const trunkPts = ([[26.8, 17.5], [26, 26], [24.6, 34], [tx, ty], [tx - 0.6, ty + 2.6], [tx + 1.2, ty + 4.4], [tx + 3.2, ty + 3.4], [tx + 2.6, ty + 1.6]] as Pt[]).map(([x, y]): Pt => [x, y + b]);
   const tuskF = bezier([21, 23.5 + b], [11.5, 37 + b], [0.5, 31 + b], [7.5, 18.5 + b]);
   const tuskN = bezier([31.5, 23 + b], [40.5, 25 + b], [41, 33 + b], [33.5, 36 + b]);
+  // How far below the ankus's tip his far fist (the middle of its pad) holds it.
+  const [ux, uy] = p.ankusTip;
+  const grip = Math.hypot(p.foreF[0] + 6 - ux, p.foreF[1] + 5.5 - uy);
   const tailPts: Pt[] = [[61.5, 45 + b], [66, 47.5 + b], [68, 52 + b]];
   return [
     at("shadow", 19, GROUND - 2),
@@ -399,6 +475,7 @@ export function alfilLayers(pose: AlfilPose = {}): Layer[] {
     at("hindFoot", 23, GROUND - 6),
     L(placed("earF", () => ear(13.5, 16, 6, 8.4, 4))),
     L(placed("earN", () => ear(43, 13.5, 8.2, 10.6, 6))),
+    L(placed(`ankus:${key([p.ankusButt, p.ankusTip, [grip, 0]])}`, () => ankus(p.ankusButt, p.ankusTip, grip))),
     L(placed(`arm:${key(armF)}`, () => leg(armF, 4.4, 3.4, 13, 0.16)), 0),
     at("foreFootL", fF[0], fF[1]),
     L(placed("head", head)),
@@ -428,4 +505,4 @@ export const ALFIL: Character = {
 };
 
 /** The part of him a portrait shows (his head, headpiece and tusks), in frame pixels. */
-export const ALFIL_PORTRAIT = { x: OX + 3, y: OY - 3, w: 46, h: 38 } as const;
+export const ALFIL_PORTRAIT = { x: OX, y: OY - 3, w: 50, h: 38 } as const;
