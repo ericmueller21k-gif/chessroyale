@@ -27,18 +27,24 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     (`bossCardFadeMs`), never the Hidden Boss or a resting boss, the card's size fixed; it waits while the app is
     hidden, and under reduced motion there's no fade (`BossCardFace` in `components/BossSelect.tsx`; test switch
     `?cardMs=`). The animated card with lines is shelved (a later idea).
-  - **The Boss raid screen: a character select** (Eric, Oct 16; [docs/decisions/2026-10-16-boss-character-select.md](../decisions/2026-10-16-boss-character-select.md);
+  - **The Boss raid screen: a character select** (Eric, Oct 16;
+    [docs/decisions/2026-10-16-boss-character-select.md](../decisions/2026-10-16-boss-character-select.md);
     `BossSelect`): slanted tiles at the top, one per boss you can meet (five to a row on a phone, all nine in one row
     from 600 px), the Hidden Boss's dark and locked, and "?" for a random boss; under them a stage (the 1 v 1 stage's
-    platform) with the picked boss in its idle, its name and its strength against you (skulls and the rating, as the
-    boss menu works it out). A tap drops the boss on, plays its sound once and says one of its lines (the boss
-    section, [bosses.md](bosses.md)). Under the stage the ways to play, each through its flow: **Join a raid** and
-    **People only** (the raid's queues, always a random boss: "Random boss · …"), **Raid with bots** (a Solo raid
-    against the boss picked), **Boss alone** (its menu: the difficulty and the boss picked) and **Play with friends**
-    (a raid made for the boss picked: the lobby's `bossPicked`; or join one by code). With the Hidden Boss picked every
-    choice is locked (grayed out, a small lock). The pick is kept on the device (`brc.bossId`; the Hidden Boss never).
-    A resting part disables its choices with its line under them; a resting boss has no tile (a pick of one reads as
-    random). While a 1 v 1 search runs, a choice asks "Leave the 1 v 1 queue?" first (App's `leavingDuelFirst`).
+    platform) with the picked boss in its idle, its name and its strength against you: skulls and Boss alone's rating at
+    your difficulty ("💀 Rating 1600 · Hard"; the difficulty named unless it's Normal), the same number Boss alone's menu
+    shows, worked out by one function (`bossAloneElo`) and following the menu's difficulty as it changes. One number per
+    boss: the raids show none
+    ([docs/decisions/2026-10-17-boss-sheet-fit.md](../decisions/2026-10-17-boss-sheet-fit.md)). A tap drops the boss on,
+    plays its sound once and says one of its lines (the boss section, [bosses.md](bosses.md)). Under the stage the ways
+    to play, each through its flow: **Join a raid** and **People only** (the raid's queues, always a random boss:
+    "Random boss · …"), **Raid with bots** (a Solo raid against the boss picked), **Boss alone** (its menu: the
+    difficulty and the boss picked; a phone's sheet at the foot under 600 px wide, a dialog in the middle with room all
+    round from 600 px at any height, its rows scrolling inside so it always fits) and **Play with friends** (a raid made
+    for the boss picked: the lobby's `bossPicked`; or join one by code). With the Hidden Boss picked every choice is
+    locked (grayed out, a small lock). The pick is kept on the device (`brc.bossId`; the Hidden Boss never). A resting
+    part disables its choices with its line under them; a resting boss has no tile (a pick of one reads as random).
+    While a 1 v 1 search runs, a choice asks "Leave the 1 v 1 queue?" first (App's `leavingDuelFirst`).
   - **`/bosses`** (unlisted, not admin-gated; Eric's shortcut): opens the solo boss picker at once ("Choose your boss":
     every boss you can meet and a random one, and for an admin the Hidden Boss after them; the difficulty), over home.
   - Then "Play with friends" (a lobby in the row's pick; with 1 v 1 picked, a 50 v 50 lobby: 1 v 1 has none), "Shop &
@@ -194,7 +200,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - e2e: `e2e/front-door.spec.ts`, `home-ranked.spec.ts` (the RANKED row at 320-390 px and on a computer, 1 v 1's PLAY,
   the Boss raid card and screen and each of its choices, `/bosses`), `boss-select.spec.ts` (the character select: a
   tap's drop, sound and line, "?", the Hidden Boss dark and locked and never named, the pick reaching Boss alone, a Solo
-  raid and a raid you make, resting bosses, the layout at 320-1280 px, the card turning), `landing.spec.ts`, `home-layout.spec.ts`, `live-window.spec.ts`, `profile.spec.ts`,
+  raid and a raid you make, resting bosses, the layout at 320-1280 px, the card turning; Boss alone's menu and
+  `/bosses` fitting 1280×600 to 1920×1080 and phones at 320-390 px, its last row reachable; one number per boss, the
+  stage's and the menu's and the battle's), `landing.spec.ts`, `home-layout.spec.ts`, `live-window.spec.ts`, `profile.spec.ts`,
   `install.spec.ts`, `crate-banner.spec.ts`, `friends.spec.ts` (two players: request, accept, online, the invites
   setting, an invite joined from its toast, a block; the phone's line at 320 px), `eval-bar.spec.ts` (testers: the
   switch in Settings only, the board's room, phone and computer; players: no bar, no switch), `piece-sounds.spec.ts`
@@ -205,7 +213,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 ## Rules for this area
 
-- Phone first, the computer as good: check both in Playwright screenshots, at 320–430 px and 1024 px+.
+- Phone first, the computer as good: check both in Playwright screenshots, at 320–430 px and 1024 px+, and a laptop's
+  maximized window (1280×600, 1366×768): a sheet on a computer sits in the middle with room all round (Oct 17).
 - A new piece sound: wood, CC0 or ours (then CC BY, credited in Settings; never non-commercial). GPL only as a
   separate data file, credited, with the license served, as the PyChess classics and their variations are (Eric's
   call, Oct 12). Record its source (and, if changed, how) in `public/sounds/SOURCES.md` and level it with

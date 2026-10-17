@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { bossStrength, bossThreat, hiddenBosses, menuBosses, raidBossElo, type BossDef } from "@chessroyale/core";
+import { bossThreat, hiddenBosses, menuBosses, type BossDef, type BossDifficultyId } from "@chessroyale/core";
+import { bossAloneElo, difficultyLabel } from "../boss-difficulty.ts";
 import { bossKit } from "../characters/kits.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
 import { SELECT_SOUND, selectLine } from "../characters/boss-select.ts";
@@ -15,7 +16,8 @@ import { useMedia } from "./QuickChat.tsx";
  * boss that's selected… shows their full sprite… standing there doing its idle animation"): a grid of slanted tiles, one
  * per boss you can meet (a resting one is left out, as the boss menu leaves it out), the Hidden Boss's dark and locked,
  * and "?" for a random boss; under them a stage, the 1 v 1 versus stage's platform (`dv-st-`), the picked boss on it in
- * its idle animation, its name and its strength against you.
+ * its idle animation, its name and its strength against you: Boss alone's at your difficulty (the number its menu shows
+ * for it, so a boss never has two numbers on screen), the difficulty named after it unless it's Normal.
  *
  * A tap drops the boss onto the stage (the 1 v 1 opponent's drop, `dv-st-drop`), plays its sound once (SELECT_SOUND,
  * through the mute switch) and says one of its lines in its speech bubble (SELECT_LINES, its own voice here). The Hidden
@@ -60,7 +62,7 @@ function placeOnStage(ch: Character, idle: string): { left: number; width: numbe
 /** The "?" tile's value, and the stage's when a random boss is picked. */
 export const RANDOM = "";
 
-export function BossSelect({ value, rating, onPick }: { value: string; rating: number | null; onPick: (id: string) => void }) {
+export function BossSelect({ value, rating, difficulty, onPick }: { value: string; rating: number | null; difficulty: BossDifficultyId; onPick: (id: string) => void }) {
   useServerStatus();
   const { bosses, hidden } = selectBosses();
   const still = useMedia("(prefers-reduced-motion: reduce)");
@@ -87,8 +89,9 @@ export function BossSelect({ value, rating, onPick }: { value: string; rating: n
       selectVoice.say(line, `select:${id}:${Date.now()}`, NORMAL);
     }
   };
-  // Its strength against you, as the boss menu works it out (a raid's: a step above your rating, plus its own offset).
-  const elo = def && !dark ? bossStrength(raidBossElo([rating]), def) : null;
+  // Its strength against you: Boss alone's at your difficulty, the number Boss alone's menu shows for it (a Solo raid's
+  // is the same at Normal: no difficulty on top).
+  const elo = def && !dark ? bossAloneElo(rating, def, difficulty) : null;
   const kit = def ? bossKit(def.name) : null;
   const idle = kit ? (kit.anims.idle ?? "idle") : null;
   const tile = (id: string, label: string, body: preact.ComponentChildren, cls = "") => (
@@ -132,6 +135,7 @@ export function BossSelect({ value, rating, onPick }: { value: string; rating: n
                   {"💀".repeat(bossThreat(elo))}
                 </span>{" "}
                 Rating {elo}
+                {difficulty !== "normal" && ` · ${difficultyLabel(difficulty)}`}
               </>
             ) : (
               "A different boss from last time"

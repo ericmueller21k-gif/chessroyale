@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossStrength, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, raidBossElo, rankedMinHumans, pausedLine, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
+import { BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, rankedMinHumans, pausedLine, type BossDifficultyId, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
-import { chosenDifficulty, difficultyElo, rememberDifficulty } from "../boss-difficulty.ts";
+import { bossAloneElo, chosenDifficulty, rememberDifficulty } from "../boss-difficulty.ts";
 import { powersLine } from "../power-words.ts";
 import { BossDifficulty } from "../components/BossDifficulty.tsx";
 import { BossBrainPicker } from "../components/BossBrain.tsx";
@@ -115,7 +115,9 @@ function versus(elo: number, you: number): { text: string; tone: "easy" | "even"
 
 /**
  * Boss alone's menu: your difficulty (and, for admins, the boss's brain), and the boss to fight, each at your strength
- * plus its own offset, with its threat and its strength against yours. A tap on a boss starts.
+ * plus its own offset and your difficulty (`bossAloneElo`, as the Boss raid screen's stage shows it), with its threat
+ * and its strength against yours. A tap on a boss starts. The difficulty is the screen's (`difficulty`,
+ * `onDifficulty`), so the stage follows it as it changes.
  * - From the Boss raid screen (`only`: the boss picked there, or "" for a random one): that boss alone, under the title
  *   "Boss alone" (the pick is made on the screen's tiles).
  * - The hidden /bosses (no `only`): every boss you can meet and a random one, "Choose your boss"; for an admin the
@@ -125,29 +127,29 @@ export function BossMenu({
   only,
   value,
   rating,
+  difficulty,
+  onDifficulty,
   onPick,
   onClose,
 }: {
   only?: string;
   value: string;
   rating: number | null;
+  difficulty: BossDifficultyId;
+  onDifficulty: (id: BossDifficultyId) => void;
   onPick: (id: string) => void;
   onClose: () => void;
 }) {
   const you = rating ?? PRIOR_RATING;
-  const base = raidBossElo([rating]);
   // (Admins, Boss alone: the bosses hidden from players too, after the rest: the Hidden Boss, for testing.)
   // (Not the bosses resting: kill switches, status.ts.)
   useServerStatus();
   const bosses = menuBosses({ admin: isAdmin(), raid: false }).filter((b) => !isPaused(`boss:${b.id}`) && (only === undefined || b.id === only));
-  // A difficulty on top of the boss's strength.
-  const [difficulty, setDifficulty] = useState(chosenDifficulty);
-  const extra = difficultyElo(difficulty);
   // Testing, admins (Boss alone): the boss's brain (Maia-3 or Stockfish). Maia's files are fetched ahead when it may
   // play: Boss alone below Stockfish's strengths. (A raid you make fetches them as you make it: Play with friends.)
   const [brain, setBrain] = useState(pickedBrain);
   const picked = useRef<HTMLButtonElement>(null);
-  const maiaAhead = () => maiaLikely(bosses.map((b) => bossStrength(base, b, extra)));
+  const maiaAhead = () => maiaLikely(bosses.map((b) => bossAloneElo(rating, b, difficulty)));
   useEffect(() => {
     if (maiaAhead()) prefetchMaia();
     picked.current?.scrollIntoView({ block: "nearest" });
@@ -170,13 +172,7 @@ export function BossMenu({
             ✕
           </button>
         </div>
-        <BossDifficulty
-          value={difficulty}
-          onChange={(d) => {
-            rememberDifficulty(d);
-            setDifficulty(d);
-          }}
-        />
+        <BossDifficulty value={difficulty} onChange={onDifficulty} />
         {isAdmin() && (
           <BossBrainPicker
             value={brain}
@@ -200,7 +196,7 @@ export function BossMenu({
             </button>
           )}
           {bosses.map((b) => {
-            const elo = bossStrength(base, b, extra);
+            const elo = bossAloneElo(rating, b, difficulty);
             const vs = versus(elo, you);
             return (
               <button
@@ -571,6 +567,12 @@ export function HomeScreen({
   };
   // Boss alone's menu ("solo": the difficulty for the tiles' pick) or the full picker (/bosses: "pick").
   const [bossMenu, setBossMenu] = useState<null | "solo" | "pick">(null);
+  // Boss alone's difficulty (remembered on this device): its menu changes it, the stage's number follows it.
+  const [difficulty, setDifficulty] = useState(chosenDifficulty);
+  const pickDifficulty = (d: BossDifficultyId) => {
+    rememberDifficulty(d);
+    setDifficulty(d);
+  };
   // (Not while Solo and Boss alone rest: the hidden /bosses lands here too, and the Boss raid screen says why.)
   const bossAlone = () => (rest("solo") ? undefined : bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
   const pickBoss = (id: string) => {
@@ -685,7 +687,7 @@ export function HomeScreen({
         />
       )}
       {bossMenu && (
-        <BossMenu only={bossMenu === "solo" ? pick : undefined} value={bossMenu === "solo" ? pick : chosenBoss(isAdmin())} rating={profile?.rating ?? null} onPick={pickBoss} onClose={() => setBossMenu(null)} />
+        <BossMenu only={bossMenu === "solo" ? pick : undefined} value={bossMenu === "solo" ? pick : chosenBoss(isAdmin())} rating={profile?.rating ?? null} difficulty={difficulty} onDifficulty={pickDifficulty} onPick={pickBoss} onClose={() => setBossMenu(null)} />
       )}
       {/* (A moderator's warning or chat ban, once: chat moderation's.) */}
       <ChatNotice />
@@ -723,7 +725,7 @@ export function HomeScreen({
         {/* (Why you're here: a match that closed while this screen was where you'd come back to, as on home.) */}
         {notice && <Notice notice={notice} />}
         {/* The character select (Eric, Oct 16): the tiles, the stage; the ways to play under it. */}
-        <BossSelect value={pick} rating={profile?.rating ?? null} onPick={pickTile} />
+        <BossSelect value={pick} rating={profile?.rating ?? null} difficulty={difficulty} onPick={pickTile} />
         <div class="rd-options">
           {/* (The public queues share their lobby: always a random boss.) */}
           <RaidOption

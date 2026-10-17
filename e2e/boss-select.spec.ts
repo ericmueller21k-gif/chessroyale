@@ -127,8 +127,12 @@ test("the pick reaches Boss alone, a Solo raid and a raid you make; the public q
   await openBossRaid(page);
   await expect(tile(page, "Jefferson")).toHaveAttribute("aria-checked", "true");
   await tile(page, "Sawyer").click();
+  // (Its strength: the stage's at Normal, a fresh device's difficulty: a Solo raid has no difficulty on top.)
+  await expect(page.locator(".bs-rating")).toHaveText(/^💀+ Rating \d{3,4}$/u);
+  const raidElo = Number((await page.locator(".bs-rating").textContent())!.match(/\d+/)![0]);
   await main.getByRole("button", { name: /^Raid with bots/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match?.boss?.id ?? null), { timeout: 60_000 }).toBe("sawyer");
+  expect(await page.evaluate(() => (window as any).match.runner.state.boss.elo)).toBe(raidElo);
 
   // Boss alone: the difficulty, and the boss picked (no list to pick from again).
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3");
@@ -137,8 +141,13 @@ test("the pick reaches Boss alone, a Solo raid and a raid you make; the public q
   await main.getByRole("button", { name: /^Boss alone/ }).click();
   const menu = page.getByRole("dialog", { name: "Boss alone" });
   await expect(menu.locator(".boss-row")).toHaveCount(1);
+  // (Hard: the battle's strength is the number the menu and the stage show.)
+  await menu.getByRole("radio", { name: "Hard", exact: true }).click();
+  const aloneElo = Number(await menu.locator(".boss-row .br-elo strong").textContent());
+  await expect(page.locator(".bs-rating")).toHaveText(new RegExp(`^💀+ Rating ${aloneElo} · Hard$`, "u"));
   await menu.getByRole("button", { name: /^Wrangler/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match?.boss?.id ?? null), { timeout: 60_000 }).toBe("pig");
+  expect(await page.evaluate(() => (window as any).match.runner.state.boss.elo)).toBe(aloneElo);
 });
 
 test("a resting boss has no tile, and a pick of it reads as a random boss", async ({ page }) => {
@@ -213,4 +222,121 @@ test("home's Boss raid card: a still portrait that moves on to the next boss you
   for (let i = 1; i < seen.length; i++) expect(order.indexOf(seen[i]!), seen.join(" ")).toBe((order.indexOf(seen[i - 1]!) + 1) % order.length);
   // Still portraits: one canvas each, no animation loop (no data-frame on them).
   await expect(card.locator("canvas[data-frame]")).toHaveCount(0);
+});
+
+/**
+ * Your profile as the server would answer it, with a rating (and an admin's brain picker, the menu's tallest content):
+ * Eric's, Oct 17 (1580).
+ */
+async function rated(page: Page, rating: number, admin = false) {
+  await page.route("**/api/me*", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    try {
+      const res = await route.fetch();
+      const body = await res.json().catch(() => null);
+      await route.fulfill({ response: res, json: body ? { ...body, rating, ...(admin ? { admin: true } : {}) } : body });
+    } catch {
+      // The page is gone: nothing to answer.
+    }
+  });
+}
+
+/**
+ * The menu's box inside the window (on a computer, a dialog with room all round: never glued to the window's foot), and
+ * its last row: scrolled to inside the menu, inside the window and the list's visible box, and clickable (a trial click:
+ * nothing else over it).
+ */
+async function expectMenuFits(page: Page, menu: ReturnType<Page["getByRole"]>, what: string) {
+  const vw = page.viewportSize()!;
+  const box = (await menu.boundingBox())!;
+  expect(box.y, `${what}: its top`).toBeGreaterThanOrEqual(0);
+  expect(box.x, `${what}: its left`).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width, `${what}: its right`).toBeLessThanOrEqual(vw.width + 0.5);
+  expect(box.y + box.height, `${what}: its foot`).toBeLessThanOrEqual(vw.height + 0.5);
+  if (vw.width >= 600) {
+    expect(box.y, `${what}: room above`).toBeGreaterThanOrEqual(15.5);
+    expect(vw.height - (box.y + box.height), `${what}: room below`).toBeGreaterThanOrEqual(15.5);
+  }
+  const last = menu.locator(".boss-row").last();
+  await last.scrollIntoViewIfNeeded();
+  const row = (await last.boundingBox())!;
+  const list = (await menu.locator(".boss-menu-list").boundingBox())!;
+  expect(row.y, `${what}: the last row's top`).toBeGreaterThanOrEqual(Math.max(0, list.y) - 0.5);
+  expect(row.y + row.height, `${what}: the last row's foot`).toBeLessThanOrEqual(Math.min(vw.height, list.y + list.height) + 0.5);
+  await last.click({ trial: true, timeout: 5_000 });
+}
+
+test("Boss alone's menu and the /bosses picker fit any window: whole, or their rows scrolling to the last, which can be tapped; a computer's in the middle with room all round", async ({ page }) => {
+  // (Eric, Oct 17: on a laptop the menu sat glued to the window's foot, its row under the taskbar.)
+  await named(page, "Fitter");
+  await rated(page, 1580, true);
+  const sizes = desktop()
+    ? [[1280, 600], [1280, 720], [1366, 768], [1920, 1080]]
+    : [[320, 568], [360, 640], [390, 844]];
+  for (const [w, h] of sizes) {
+    await page.setViewportSize({ width: w!, height: h! });
+    // Boss alone's menu, for the boss picked (an admin's: the brain picker too).
+    await page.goto("/?mode=raid");
+    await tile(page, "Sawyer").click();
+    await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    const alone = page.getByRole("dialog", { name: "Boss alone" });
+    await expect(alone.getByRole("combobox")).toBeVisible();
+    await expectMenuFits(page, alone, `${w}x${h} Boss alone`);
+    // The full picker (/bosses): every boss and a random one, for an admin the Hidden Boss too: the longest list.
+    await page.goto("/bosses");
+    const all = page.getByRole("dialog", { name: "Choose your boss" });
+    await expect(all.locator(".boss-row")).toHaveCount(9);
+    await expectMenuFits(page, all, `${w}x${h} /bosses`);
+    expect(await sideways(page), `${w}x${h}`).toBe(0);
+  }
+});
+
+test("one number per boss: the stage shows Boss alone's strength at your difficulty, as its menu does, and follows the difficulty as it changes", async ({ page }) => {
+  test.skip(desktop(), "one run is enough: a phone");
+  await named(page, "Counter");
+  // (1580: the tier a step above is 1600; Sawyer and Big Boy are 250 under it, Ginger 100: BOSS_DIFFICULTY's
+  // Easy −300, Normal 0, Hard +250, Hardest +500 on top.)
+  await rated(page, 1580);
+  await page.goto("/?mode=raid");
+  const main = page.getByRole("main");
+  const stage = page.locator(".bs-rating");
+  const menu = page.getByRole("dialog", { name: "Boss alone" });
+  const cases: [string, string, number][] = [
+    ["Sawyer", "Hard", 1600],
+    ["Sawyer", "Normal", 1350],
+    ["Ginger", "Easy", 1200],
+    ["Ginger", "Hardest", 2000],
+    ["Big Boy", "Hard", 1600],
+  ];
+  for (const [boss, level, elo] of cases) {
+    await tile(page, boss).click();
+    await main.getByRole("button", { name: /^Boss alone/ }).click();
+    await menu.getByRole("radio", { name: level, exact: true }).click();
+    // The menu's row and the stage behind it: the same number, the difficulty named on the stage unless it's Normal.
+    await expect(menu.locator(".boss-row .br-elo strong")).toHaveText(String(elo));
+    await expect(stage).toHaveText(new RegExp(`^💀+ Rating ${elo}${level === "Normal" ? "" : ` · ${level}`}$`, "u"));
+    await menu.getByRole("button", { name: "Close" }).click();
+    await expect(menu).toHaveCount(0);
+    await expect(stage).toHaveText(new RegExp(`^💀+ Rating ${elo}${level === "Normal" ? "" : ` · ${level}`}$`, "u"));
+  }
+  // Remembered on this device: the stage after a reload, before the menu opens.
+  await page.reload();
+  await expect(page.locator(".bs-name")).toHaveText("Big Boy");
+  await expect(stage).toHaveText(/^💀+ Rating 1600 · Hard$/u);
+
+  // The widest line (five skulls, four digits, Hardest) on one line at 320 px, inside the window.
+  await rated(page, 2950);
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.reload();
+  await tile(page, "Ginger").click();
+  await main.getByRole("button", { name: /^Boss alone/ }).click();
+  await menu.getByRole("radio", { name: "Hardest", exact: true }).click();
+  await menu.getByRole("button", { name: "Close" }).click();
+  await expect(stage).toHaveText(/^💀{5} Rating \d{4} · Hardest$/u);
+  const line = (await stage.boundingBox())!;
+  expect(line.x).toBeGreaterThanOrEqual(0);
+  expect(line.x + line.width).toBeLessThanOrEqual(320);
+  // (One line of 14 px text is about 20 px tall with its emoji; two would be over 32.)
+  expect(line.height).toBeLessThan(28);
+  expect(await sideways(page)).toBe(0);
 });
