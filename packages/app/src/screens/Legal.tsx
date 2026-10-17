@@ -9,7 +9,7 @@ import { AGE_GATE, CHAT_MOD, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS, RA
  */
 
 /** The contact address: a placeholder until Eric sets up its forwarding (ROADMAP.md, "Needs Eric"). */
-export const CONTACT = "privacy@hunchess.com";
+export const CONTACT = "support@hunchess.com";
 export const UPDATED = "October 16, 2026";
 
 const hours = (ms: number) => Math.round(ms / 3_600_000);
@@ -36,7 +36,8 @@ function Draft() {
           <strong>Who runs HunChess:</strong> you or a company, and a postal address (a P.O. box or mail service is fine) (Eric).
         </li>
         <li>
-          <strong>The contact address:</strong> {CONTACT} has to reach a real inbox, or another address goes here (Eric).
+          <strong>The contact address:</strong> {CONTACT}, one address for everything (Eric, Oct 17). It has to reach a real
+          inbox before launch: Cloudflare Email Routing, with a catch-all so replies to login@ and fairplay@ arrive too (Eric).
         </li>
         <li>
           <strong>Minimum age outside the US:</strong> 13 for an account is decided and built (Eric, Oct 16), asked as a neutral

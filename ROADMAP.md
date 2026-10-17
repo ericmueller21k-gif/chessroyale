@@ -364,7 +364,7 @@ Added Oct 14, 2026 (Eric; notes only, nothing built):
   (`/engine/maia/maia-box-source.tar.gz`) and Stockfish's (`/engine/stockfish-source.tar.gz`), and `BOSS_BRAIN.forPlayers`
   is on (Eric: "flip it"), so every player's bosses play with Maia as admins' did. What remains is yours: the
   real-phone check (`TESTING.md`, "Maia").
-- **privacy@hunchess.com:** forward it to yourself with Cloudflare Email Routing (free), or name another address.
+- **support@hunchess.com** (one address for everything, Oct 17): forward it to yourself with Cloudflare Email Routing (free), and turn on its catch-all so replies to login@ and fairplay@ reach you too.
 - **Workers Paid ($5 a month):** only when real traffic outgrows the free limits.
 - **Privacy policy, terms and copyright page:** drafts at /privacy, /terms and /copyright, written from the code (Oct
   15). Each lists the decisions that are yours or a lawyer's: who runs HunChess (a person or company, a postal

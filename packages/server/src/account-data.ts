@@ -227,7 +227,7 @@ const readable = (v: unknown): unknown => {
 };
 
 export const DOWNLOAD_ABOUT =
-  "Everything HunChess keeps about your account, as of exportedAt. Times are UTC. Fair play's detection records (judged moves, match scores, case notes, reports about you, device markers) and chat moderators' reasons and names aren't included: email privacy@hunchess.com for them, and a person will answer.";
+  "Everything HunChess keeps about your account, as of exportedAt. Times are UTC. Fair play's detection records (judged moves, match scores, case notes, reports about you, device markers) and chat moderators' reasons and names aren't included: email support@hunchess.com for them, and a person will answer.";
 
 /** "Download my data": everything kept about the account, readable. `extra`: what Durable Objects hold (the live hub's). */
 export async function accountDownload(sql: Sql, user: User, now: number, extra: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
