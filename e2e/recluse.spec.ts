@@ -661,9 +661,16 @@ test("phase 2's slow moves (?phase=2): each marks a red X for the team in one co
   for (let i = 0; i < 14; i++) {
     const v = await simulNow(page);
     if (v.ultAt !== null || v.boards[0].result) break;
-    await expect.poll(async () => (await simulNow(page)).boards[0].toMove === "crowd" || (await simulNow(page)).ultAt !== null, { timeout: 30_000 }).toBe(true);
+    // (Or your board decided meanwhile: Stockfish's answer can end it after the check above. On CI it lost there and
+    // this waited for a turn that never came. docs/decisions/2026-10-16-flaky-e2e-batch-4.md)
+    await expect
+      .poll(async () => {
+        const x = await simulNow(page);
+        return x.boards[0].toMove === "crowd" || x.ultAt !== null || !!x.boards[0].result;
+      }, { timeout: 30_000 })
+      .toBe(true);
     const w = await simulNow(page);
-    if (w.ultAt !== null) break;
+    if (w.ultAt !== null || w.boards[0].result) break;
     const mine = w.boards[0];
     await page.waitForTimeout(Math.max(0, mine.turnAt + 5_400 - (await page.evaluate(() => Date.now()))));
     const legal = new Chess(mine.fen.replace(/ [A-Ha-h]+ /, " - ")).moves({ verbose: true });

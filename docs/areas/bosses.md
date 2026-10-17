@@ -319,6 +319,15 @@ build): online, phase 1 won is the crowd's victory):
   takes them (his sprite and moments, his attack and lashes, Lights out, the strip by the boss bar): each bulb has its
   own palette keys, recolored as frames are drawn (`characters/lights.ts`, `Swap` in `sprite.ts`). Unit:
   `packages/app/test/lights.test.ts`.
+- **Hollow's whole strand in every pose** (Eric, Oct 16: "make sure it's showing for all of his animations";
+  docs/decisions/2026-10-16-hollow-full-strand.md): all ten bulbs lit on his figure through the battle (idle, thinking,
+  his move, a capture, check, smug, rattled, victory, casting the dark, the claim, his attack's lashes), whatever the
+  countdown. Until Oct 16 his figure wore the countdown (`bulbs3`…`bulbs0`, a third of the strand out per move, 10 → 7
+  → 4 → 0); now only the strip of three by the boss bar counts down (unchanged), and Hollow's kit has no `lookOf`. The
+  looks stay (the battle's colors swap the same keys): his entrance lights the strand a third at a time, a hit makes it
+  flicker, his defeat puts it out, Lights out smashes it and the fresh strand drops out of the void whole (its halves
+  lengthening) and lights a third at a time. Unit: `packages/app/test/hollow.test.ts` (every frame of every animation
+  paints all ten bulbs; the battle's poses show all ten lit).
 - **The dock under the board, every boss battle** (Eric, Oct 15; DECISIONS.md, "The boss dock after Eric's Hidden Boss
   playtest"): the row (« status ») exactly the board's width, under its left and right edges, on every screen (BossDock
   measures the board as drawn, before the first paint and on every resize: `lineUpWithBoard`, `--dk-left`, `--dk-w`).

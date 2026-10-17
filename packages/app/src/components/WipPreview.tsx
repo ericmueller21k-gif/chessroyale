@@ -1,7 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { cueAt, animLength, darkItem, lightsOutSmashes, lightsOutSpot, nightItems, nightWarmList, type NightState, type SquareItem } from "../characters/power-art.ts";
-import { HOLLOW_CAST_FROM, bulbsLook, findLine } from "../characters/hollow.ts";
-import { wipKit, wipLook } from "../characters/kits.ts";
+import { HOLLOW_CAST_FROM, findLine } from "../characters/hollow.ts";
+import { wipKit } from "../characters/kits.ts";
 import { testParams } from "../test-switches.ts";
 import { pickLine } from "../characters/boss-beats.ts";
 import { BoardEffects, BossEffect, BossMoment, prewarm } from "./BossEffect.tsx";
@@ -82,12 +82,6 @@ export function WipPreview({ fen, orientation, crowd }: { fen: string; orientati
     return () => clearInterval(id);
   }, [moment]);
   const kit = wipKit();
-  useEffect(() => {
-    if (moment !== "bulbs") return;
-    // His own strand counts down with the strip.
-    wipLook.now = () => bulbsLook(bulbsAt(Date.now() - start).lit);
-    return () => void (wipLook.now = null);
-  }, [moment]);
   // The night drawn ahead, a slice a frame, from the start (the rules do it as he drops in).
   useEffect(() => (moment === "lightsout" || moment === "test" || moment === "back" ? prewarm("nightSquare", nightWarmList()) : undefined), [moment]);
   if (!moment || !kit) return null;
@@ -128,7 +122,7 @@ export function WipPreview({ fen, orientation, crowd }: { fen: string; orientati
       parts.push(
         <div class="power-moment" key="cast">
           <span style={{ position: "absolute", zIndex: 8, pointerEvents: "none", ...caster }}>
-            <BossMoment boss={BOSS} anim="darkCast" since={t0 + castAt} then="idle" look={moment === "bulbs" ? "bulbs0" : undefined} />
+            <BossMoment boss={BOSS} anim="darkCast" since={t0 + castAt} then="idle" />
           </span>
         </div>,
       );

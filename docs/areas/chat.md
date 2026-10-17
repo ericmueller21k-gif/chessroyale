@@ -45,7 +45,9 @@ The preset lines are all friendly, so what can offend is a player's name and dra
   at most 300), for every chat (global, lobby, match) until unmuted (the menu, a chat's options, the global chat's
   "N muted · unmute"). A player without an account (a bot) is muted for that match only, as before ("Mute for this
   match"). In a match the server also stops sending their lines to that device (`chatPrefs`), and sends their recent
-  lines again when they're unmuted. Blocking (friends) counts as muted (`MatchChat.hidden`).
+  lines again when they're unmuted. Blocking (friends) counts as muted (`MatchChat.hidden`). A name's open menu and a
+  chat's open options are the match chat's (`MatchChat.menuFor`, `optionsOpen`), not the panel's: each phase's screen
+  draws its own panel, and they stay open when the round moves on (Oct 16, `2026-10-16-flaky-e2e-batch-4.md`).
 - **Reporting** is fair play's report on a player's profile ("Offensive name or icon", [fairplay.md](fairplay.md)),
   reached from their name in a chat (Profile). It opens a watch case on fair play's review page. There's no report of
   a chat line.

@@ -109,8 +109,8 @@ function darkMoment({ boss, moment, now, t, orientation, kit, banner }: MomentPr
       {banner("DARKNESS!", moment.square ? `Dark on ${moment.square}` : undefined, "dark", DARK.bannerMs)}
       {cast && now >= castSince && (
         <span class="pm-caster pm-hollow" style={{ aspectRatio: `${kit!.ch.w} / ${kit!.ch.h}` }}>
-          {/* (His bulbs out as he casts: the last went out with his move.) */}
-          <BossMoment boss={boss.name} anim="darkCast" since={castSince} then="idle" look="bulbs0" />
+          {/* (His strand lit in full as he casts, as in every pose: the strip by the bar counts down.) */}
+          <BossMoment boss={boss.name} anim="darkCast" since={castSince} then="idle" />
         </span>
       )}
       {moment.square && t >= DARK.pourAt && t < DARK.landAt && <Flight name="darkPour" square={moment.square} orientation={orientation} since={moment.at + DARK.pourAt} ms={DARK.landAt - DARK.pourAt} aim from={fromPt} />}

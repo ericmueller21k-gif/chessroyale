@@ -72,8 +72,8 @@
  *                               show him back in his corner). From `relight`, nightItems() step "dawn" spreads the
  *                               light from his spot out across the board. Lines: `kit.lines.lightsBack`.
  *       bulbs      the countdown to his next cover: `bulbStrand` (a strip: `lit3`…`lit0`, `out3`/`out2`/`out1` as a
- *                               bulb goes out, `relight` after the last), and the same on his own strand: his look
- *                               `bulbs3`…`bulbs0` (kit.lookOf, from the battle's state).
+ *                               bulb goes out, `relight` after the last). Only the strip counts down: his own strand
+ *                               stays lit in full in every pose (Eric, Oct 16).
  *
  *   Not a power, but on the board like one: a boss's attack on a king (the God King in his Last Stand, the crowd's king
  *   at its mate) is its kit's `kingAttack` (kits.ts): Hollow's is HOLLOW_ATTACK's "kingAttack" (hollow.ts), with

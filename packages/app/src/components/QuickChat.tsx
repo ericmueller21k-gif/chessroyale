@@ -293,13 +293,22 @@ export type ChatVariant = "split" | "full" | "side" | "page" | "lobby";
 export function ChatPanel({ people, chat, variant, head, fold }: { people: ChatPeople; chat: MatchChat; variant: ChatVariant; head?: ComponentChildren; fold?: ComponentChildren }) {
   const roomy = useMedia(ROOMY);
   const lobby = variant === "lobby";
-  const [menu, setMenu] = useState<string | null>(null);
-  const [options, setOptions] = useState(false);
   const self = useRef({});
   const feed = useRef<HTMLDivElement>(null);
   // (The buttons are the profile's picks: redraw if they change, e.g. picked in your profile during the match.)
   const [, redraw] = useState(0);
   useEffect(() => onAccountChange(() => redraw((n) => n + 1)), []);
+  // A name's menu and the options stay open across the match's screens: they're the chat's, not this panel's.
+  const menu = chat.menuFor;
+  const setMenu = (id: string | null) => {
+    chat.menuFor = id;
+    redraw((n) => n + 1);
+  };
+  const options = chat.optionsOpen;
+  const setOptions = (on: boolean) => {
+    chat.optionsOpen = on;
+    redraw((n) => n + 1);
+  };
   const teams = chat.hasTeams();
   const now = Date.now();
   // On screen while its feed has room to show something (a minimized panel is only its header).
