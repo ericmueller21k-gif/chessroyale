@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { BOARD_SEL, engineTop, test, bossAloneFromHome } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, engineTop, test, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * Alfil, the woolly mammoth, through his test link (?boss=alfil&wip=1: his rules are built before his art, so he's
@@ -11,6 +11,8 @@ import { BOARD_SEL, engineTop, test, bossAloneFromHome } from "./helpers.ts";
  *   next turn, the elephant (a bishop) on one of their squares, the pawns gone.
  * - The Mammoth Slam (?power=slam: warned as turn 2 begins, at the start of his turn after your move): up to three of
  *   your pieces off the board, their shadows' sizes 1, 2, 3 over your next turns, back down as the turn after begins.
+ *   (A Slam whose every lift would swing the game past its cap lifts nothing, about one in six: then the admins'
+ *   trigger brings the next, until one lifts.)
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers ?? null).catch(() => null);
@@ -85,15 +87,15 @@ test("Alfil's Tusks (the test switch): two of his pawns marked before his move, 
   const fen2 = await fenNow(page);
   expect(fused.tusks).toBeNull();
   expect([...fused.fusion.from].sort()).toEqual([...marked].sort());
-  if (fused.fusion.to) {
-    // The elephant: a bishop of his on the board (where it stands now: it may have moved), two pawns fewer (unless he
-    // took or lost one with his move: counted from the position before his move would be his own business).
-    expect(fused.fusion.from).toContain(fused.fusion.to);
-    expect(fused.elephants).toHaveLength(1);
-    expect(new Chess(fen2).get(fused.elephants[0] as never)).toMatchObject({ color: his, type: "b" });
-    expect(counted(fen2, his, "b")).toBeGreaterThanOrEqual(bishops);
-    expect(counted(fen2, his, "p")).toBeLessThanOrEqual(pawns - 2);
-  } else expect(fused.fusion.why).toBe("nowhere");
+  // The elephant (uncountered, it always comes: only a position where neither square is allowed stops it, not this
+  // quiet game): a bishop of his on one of the two squares, tracked where it stands now (his move may have moved it),
+  // two pawns fewer (fewer still if his move gave one up).
+  expect(fused.fusion.why).toBeUndefined();
+  expect(fused.fusion.from).toContain(fused.fusion.to);
+  expect(fused.elephants).toHaveLength(1);
+  expect(new Chess(fen2).get(fused.elephants[0] as never)).toMatchObject({ color: his, type: "b" });
+  expect(counted(fen2, his, "b")).toBeGreaterThanOrEqual(bishops);
+  expect(counted(fen2, his, "p")).toBeLessThanOrEqual(pawns - 2);
   // The board draws the position: his bishops and pawns as the state has them.
   await expect.poll(() => drawn(page, his === "b" ? "black" : "white", "bishop")).toBe(counted(fen2, his, "b"));
   await expect.poll(() => drawn(page, his === "b" ? "black" : "white", "pawn")).toBe(counted(fen2, his, "p"));
@@ -104,6 +106,8 @@ test("Alfil's Mammoth Slam (the test switch): your pieces up for three turns, th
   test.setTimeout(8 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  // (An admin, for the trigger if a Slam lifts nothing.)
+  await asAdmin(page);
   await page.goto("/?debug&clock=60&boss=alfil&wip=1&power=slam&laststand=0");
   await bossAloneFromHome(page);
   await yourMove(page);
@@ -112,29 +116,36 @@ test("Alfil's Mammoth Slam (the test switch): your pieces up for three turns, th
   await play(page, await goodMove(page));
   await yourMove(page);
   expect((await powers(page)).warned).toBe(true);
-  const mine = await goodMove(page);
-  const before = new Chess(await fenNow(page));
-  before.move({ from: mine.slice(0, 2), to: mine.slice(2, 4) });
-  await play(page, mine);
-  // At the start of his turn, before his move: the Slam (this device's engines pick the lift), then his move.
-  await yourMove(page);
-  const p = await powers(page);
-  expect(p.ults).toBe(1);
-  expect(p.slam.at).toBe(2);
-  expect(p.slam.lands).toBe(2 + 1 + BOSS_POWERS.slamTurns);
-  expect(p.slam.pieces.length).toBeLessThanOrEqual(BOSS_POWERS.slamPawns + BOSS_POWERS.slamMinors);
-  for (const x of p.slam.pieces) {
-    expect(["p", "n", "b"]).toContain(x.piece);
-    expect(before.get(x.square as never)).toMatchObject({ color: crowd, type: x.piece });
+  let p: any = null;
+  for (let tries = 1; tries <= 4 && !p?.slam.pieces.length; tries++) {
+    if (tries > 1) {
+      // (The last lifted nothing: within the cap, none could go; the meter spent anyway. The trigger: the next one.)
+      expect(p.airborne).toEqual([]);
+      const btn = page.locator(".ult-test");
+      await expect(btn).toHaveText("Trigger ultimate (testing)");
+      await btn.click();
+      await expect(btn).toHaveText("Ultimate next turn (testing)");
+    }
+    const mine = await goodMove(page);
+    const before = new Chess(await fenNow(page));
+    before.move({ from: mine.slice(0, 2), to: mine.slice(2, 4) });
+    const at = await page.evaluate(() => (window as any).match.boss.crowdMoves + 1);
+    await play(page, mine);
+    // At the start of his turn, before his move: the Slam (this device's engines pick the lift), then his move.
+    await yourMove(page);
+    p = await powers(page);
+    expect(p.ults).toBe(tries);
+    expect(p.slam.at).toBe(at);
+    expect(p.slam.lands).toBe(at + 1 + BOSS_POWERS.slamTurns);
+    expect(p.slam.pieces.length).toBeLessThanOrEqual(BOSS_POWERS.slamPawns + BOSS_POWERS.slamMinors);
+    for (const x of p.slam.pieces) {
+      expect(["p", "n", "b"]).toContain(x.piece);
+      expect(before.get(x.square as never)).toMatchObject({ color: crowd, type: x.piece });
+    }
+    expect(p.airborne.map((x: { square: string }) => x.square)).toEqual(p.slam.pieces.map((x: { square: string }) => x.square));
   }
-  expect(p.airborne.map((x: { square: string }) => x.square)).toEqual(p.slam.pieces.map((x: { square: string }) => x.square));
   const up: { piece: string; square: string }[] = p.slam.pieces;
-  if (!up.length) {
-    // (Nothing could go within the cap: none lifts, the meter spent anyway.)
-    expect(p.airborne).toEqual([]);
-    expect(errors).toEqual([]);
-    return;
-  }
+  expect(up.length).toBeGreaterThan(0);
   // Three of your turns with them up: off the board (drawn and in the state), their shadows' sizes 1, 2, 3.
   const total = (fen: string) => (["p", "n", "b"] as const).reduce((t, k) => t + counted(fen, crowd, k), 0);
   for (let i = 0; i < BOSS_POWERS.slamTurns; i++) {

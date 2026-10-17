@@ -814,8 +814,8 @@ export class SoloMatch implements GameView {
   /**
    * Alfil's turn begins with a step before his move (the fusion of his last cast, a new cast, the Mammoth Slam): he gets
    * ready (thinking) while this device's engines pick the cast's pair, the fusion's square or the Slam's lift, then it
-   * plays out (nobody's clock runs), then the next step or his move. No engine answer: the cast's first pair, no fusion,
-   * nothing lifts, as online.
+   * plays out (nobody's clock runs), then the next step or his move. No engine answer: the cast's first pair, the fusion's
+   * first square, nothing lifts, as online.
    * (Your move took his queen, or his pieces came down early: that plays in this thinking first; not again after it.)
    */
   private async alfilTurn() {
@@ -1313,7 +1313,7 @@ export class SoloMatch implements GameView {
             this.runner.finishLightsOut({});
           }
           if (this.runner.bounceDue()) await this.runner.playBounce(this.engines).catch(() => this.runner.applyBounce(null));
-          // (Alfil's steps, one after another: no engine answer, the cast's first pair, no fusion or nothing lifts.)
+          // (Alfil's steps, one after another: no engine answer, the cast's first pair, the fusion's first square or nothing lifts.)
           for (let i = 0; i < 3 && this.runner.alfilStep(); i++) await this.runner.playAlfil(this.engines).catch(() => this.runner.applyAlfil(null));
           await this.runner.playBoss(this.engines[0]);
           continue;

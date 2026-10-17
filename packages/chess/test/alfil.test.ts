@@ -185,14 +185,14 @@ describe("Tusks: the cast", () => {
     expect(tusksPairs("4k3/p7/8/8/8/8/8/4K3 b - - 0 1", "b", 1, 3)).toEqual([]);
   });
 
-  it("the cast marks the pair the engine picked (by its ways to go, as the fusion is picked); none, the first", async () => {
+  it("the cast marks the pair that helps him most (Eric), by its ways to go as the fusion is picked; no engine, the first", async () => {
     const pairs = tusksPairs(MID, "b", 4, 3);
     const ways = pairs.flatMap((p) => p.options.map((o) => o.fen));
     const at = (pawns: number) => 1 / (1 + Math.exp(-pawns * BOSS_POWERS.bouncePawnLogit));
-    // The engine: the third pair's way gains him about a pawn, the rest two (past the cap).
+    // The engine: the third pair's way gains him two pawns, the rest one.
     const third = pairs[2]!.options[0]!.fen;
-    const pick = await fuseFrom([fakeEngine((f) => (f === MID ? 0.5 : f === third ? at(1) : at(2)))], MID, ways);
-    expect(pick!.fen).toBe(third);
+    const pick = await fuseFrom([fakeEngine((f) => (f === MID ? 0.5 : f === third ? at(2) : at(1)))], MID, ways);
+    expect(pick).toEqual({ fen: third, gain: 2 });
     expect(castPick(pairs, pick!.fen)).toEqual(pairs[2]!.pawns);
     expect(castPick(pairs, null)).toEqual(pairs[0]!.pawns);
     expect(castPick(pairs, "junk")).toEqual(pairs[0]!.pawns);
@@ -303,20 +303,16 @@ describe("Tusks: the counter and the fusion", () => {
     const options = alfilBattle.candidates(b);
     expect(options).toHaveLength(2);
     expect(alfilBattle.needsEngine(b)).toBe(true);
-    // The engine: the position before 0.5 for him; the elephant on a7 gains him about a pawn, on h7 two (past the cap).
+    // The engine: the position before 0.5 for him; the elephant on a7 gains him a pawn, on h7 two: h7 (whichever the
+    // engine prefers, Eric; unbounded: docs/decisions/2026-10-17-alfil-rules.md).
     const at = (pawns: number) => 1 / (1 + Math.exp(-pawns * BOSS_POWERS.bouncePawnLogit));
     const engine = fakeEngine((f) => (f === options[0] ? at(1) : f === options[1] ? at(2) : 0.5));
-    const pick = await fuseFrom([engine], fen, options);
-    expect(pick).toEqual({ fen: options[0], gain: 1 });
-    // Both within the band: the one nearest a pawn; one a little under it and none in the band: that one.
-    const near = fakeEngine((f) => (f === options[0] ? at(0.6) : f === options[1] ? at(1.3) : 0.5));
-    expect((await fuseFrom([near], fen, options))!.fen).toBe(options[1]);
-    const under = fakeEngine((f) => (f === options[0] ? at(0.2) : f === options[1] ? at(3) : 0.5));
-    expect((await fuseFrom([under], fen, options))!.fen).toBe(options[0]);
-    // Both past the cap: none (no fusion).
-    expect(await fuseFrom([fakeEngine((f) => (f === fen ? 0.5 : at(2.5)))], fen, options)).toBeNull();
-    // A mate for him on the way: never that one.
-    expect((await fuseFrom([fakeEngine((f) => (f === fen ? 0.5 : at(1)), (f) => (f === options[0] ? 3 : undefined))], fen, options))!.fen).toBe(options[1]);
+    expect(await fuseFrom([engine], fen, options)).toEqual({ fen: options[1], gain: 2 });
+    // However much it gains him (Stockfish puts most fusions at a won game): still the best of them.
+    const won = fakeEngine((f) => (f === options[0] ? 0.999 : f === options[1] ? 0.98 : 0.5));
+    expect((await fuseFrom([won], fen, options))!.fen).toBe(options[0]);
+    // Equal: the first (the squares in order).
+    expect((await fuseFrom([fakeEngine((f) => (f === fen ? 0.5 : 1))], fen, options))!.fen).toBe(options[0]);
     expect(await fuseFrom([], fen, options)).toBeNull();
     // The second, as the host's answer:
     expect(alfilBattle.apply(b, options[1]!)).toBe("fuse");
@@ -342,21 +338,31 @@ describe("Tusks: the counter and the fusion", () => {
     expect(fusionOptions("7k/8/8/8/3r1p1N/8/p7/6K1 b - - 0 1", ["a2", "f4"], "b").map((o) => o.at)).toEqual(["f4"]);
   });
 
-  it("no engine answer, or one that isn't a way to go (an older app's move): no fusion, the pawns stay", () => {
+  it("never a square that gives him a mate in one (the crowd never saw the elephant coming)", () => {
+    // With a7 and c7 gone and the elephant on c7, Ra1 mates (h2 covered); on a7 it blocks the rook's way.
+    const fen = "r5k1/p1p5/8/8/8/8/6P1/7K b - - 0 1";
+    expect(mateInOne(fen)).toBeNull();
+    expect(mateInOne("r5k1/2b5/8/8/8/8/6P1/7K b - - 0 1")).toBe("a8a1");
+    expect(fusionOptions(fen, ["a7", "c7"], "b").map((o) => o.at)).toEqual(["a7"]);
+  });
+
+  it("no engine answer, or one that isn't a way to go (an older app's move): the fusion still comes, on the first square allowed", () => {
     const fen = "4k3/p6p/8/8/8/8/P7/4K3 b - - 0 1";
     for (const pick of [null, "", "8/8/8/8/8/8/8/K6k b - - 0 1", "e8e7"]) {
       const b = battleAt(fen, { tusks: { turn: 3, at: 4, pawns: ["a7", "h7"] } });
       alfilBattle.apply(b, pick);
-      expect(powersOf(b)).toMatchObject({ tusks: null, fusion: { to: null, why: "nowhere" } });
-      expect(b.board().fen).toBe(fen);
+      expect(powersOf(b)).toMatchObject({ tusks: null, fusion: { from: ["a7", "h7"], to: "a7" }, elephants: ["a7"], fused: 1 });
+      expect(powersOf(b).fusion!.why).toBeUndefined();
+      expect(pieceAt(b.board().fen, "a7")).toEqual({ color: "b", type: "b" });
+      expect(pieceAt(b.board().fen, "h7")).toBeNull();
     }
   });
 
-  it("one way allowed: still the engine's (the cap); none: it fails there (the pawns stay), its moment says so", () => {
+  it("one way allowed: no engine needed, that one; none: it fails there (the pawns stay), its moment says so", () => {
     const one = battleAt("4k3/p3p2p/8/8/8/8/8/4R2K b - - 0 1", { tusks: { turn: 3, at: 4, pawns: ["a7", "e7"] } });
     expect(alfilBattle.candidates(one)).toHaveLength(1);
-    expect(alfilBattle.needsEngine(one)).toBe(true);
-    alfilBattle.apply(one, alfilBattle.candidates(one)[0]!);
+    expect(alfilBattle.needsEngine(one)).toBe(false);
+    alfilBattle.apply(one, null);
     expect(powersOf(one).fusion!.to).toBe("e7");
     const none = battleAt("4k3/p3p3/8/2K5/8/8/8/4R3 b - - 0 1", { tusks: { turn: 3, at: 4, pawns: ["a7", "e7"] } });
     expect(alfilBattle.needsEngine(none)).toBe(false);

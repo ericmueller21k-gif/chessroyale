@@ -812,18 +812,15 @@ export const BOSS_POWERS = {
    * Alfil's Tusks (his passive; Eric, Oct 17): at the start of his turn tusksFirst (his 3rd), then every tusksEvery of
    * his turns, he marks two of his pawns, anywhere (they glow), then plays his move. At the start of his next turn,
    * before his move, both are lifted off and an elephant (a bishop in every way) lands on one of their two squares, the
-   * engine's pick (each position searched at tusksNodes, and the one before): what it gains him nearest tusksTarget
-   * pawns inside tusksGain (Eric: "he gains about 1 point"), else the nearest below; never past the cap (none: the
-   * fusion fails, the pawns stay). The crowd taking one on its turn between stops it too. At most tusksMax elephants a
-   * battle. Which two: the engine's pick the same way among tusksLooks pairs, as if they fused at once (tusksPairs).
+   * engine's pick (each position searched at tusksNodes: the one best for him). The crowd taking one on its turn
+   * between stops it. At most tusksMax elephants a battle. Which two: the engine's pick the same way among tusksLooks
+   * pairs, as if they fused at once (tusksPairs).
    */
   tusksFirst: 3,
   tusksEvery: 5,
   tusksMax: 2,
   tusksLooks: 5,
   tusksNodes: 30_000,
-  tusksGain: [0.5, 1.5] as readonly [number, number],
-  tusksTarget: 1,
   /**
    * Alfil's Mammoth Slam (his ultimate, at the start of his turn after its warning, from the rage meter): slamPawns of
    * the crowd's pawns and slamMinors of its knights or bishops (never a queen, rook or king; fewer if it has fewer) fly

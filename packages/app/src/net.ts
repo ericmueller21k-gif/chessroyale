@@ -896,8 +896,8 @@ export class NetMatch implements GameView {
 
   /**
    * Alfil's cast, fusion and Mammoth Slam, host only: the candidate positions weighed on this device's engines (fuseFrom:
-   * his gain within its cap; slamFrom: played out, within the cap), answered as the position picked, or "" (none within
-   * the cap: the cast's first pair, no fusion, nothing lifts).
+   * the one best for him; slamFrom: played out, within the cap), answered as the position picked, or "" (none: the
+   * cast's first pair, the fusion's first square; nothing lifts).
    */
   private async hostPick(key: string, pick: (engines: UciEngine[]) => Promise<string | null>) {
     try {

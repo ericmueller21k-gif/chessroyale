@@ -150,7 +150,8 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // Alfil, the woolly mammoth (Eric, Oct 17): Tusks (two of his pawns fuse into an elephant, a bishop) and the Mammoth
   // Slam (three of the crowd's pieces in the air for three turns). His rules are built before his art: `kit` stays null
   // (so he's never playable: no menu, no raid, never random) until his art ships; a test link meets him in Boss alone
-  // (`?boss=alfil&wip=1`). His offset from the boss sim (docs/decisions/2026-10-17-alfil-rules.md).
+  // (`?boss=alfil&wip=1`). His offset from the boss sim (docs/decisions/2026-10-17-alfil-rules.md). Not to be made
+  // playable as he is: with the sheet's Tusks he wins every battle in the sim (reports/alfil-sim.md); Eric's call first.
   { id: "alfil", name: "Alfil", icon: "🦣", kit: null, offset: -250, powers: { passive: "tusks", ultimate: "slam" } },
   // The Hidden Boss (working id "recluse"; Eric names him later: his name is this one string, wherever it shows). Hidden
   // from players (admins, Boss alone) except in the Crowd's boss final, which is always him (Eric, Oct 14). His strength

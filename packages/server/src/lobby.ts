@@ -1453,7 +1453,7 @@ export class LobbyCore {
    * runner's alfilStep): everyone sees him get ready (thinking) while the host's engine picks the cast's pair, the
    * fusion's square or the Slam's lift among the candidates (worked out here); a step with nothing to weigh needs no
    * engine and lands at once (after your queen banner, if it's up). Then the step plays for everyone, and the next
-   * (another step, or his move). No host engine anywhere: the cast's first pair, no fusion, nothing lifts.
+   * (another step, or his move). No host engine anywhere: the cast's first pair, the fusion's first square, nothing lifts.
    */
   private requestAlfil() {
     const runner = this.runner!;
@@ -1525,7 +1525,7 @@ export class LobbyCore {
       return this.setTimer("nextRound", until);
     }
     if (this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam") {
-      // Alfil's step (the host's pick, one of the candidates; else the cast's first pair, no fusion, or nothing lifts):
+      // Alfil's step (the host's pick, one of the candidates; else the cast's first pair, the fusion's first square, or nothing lifts):
       // it plays out, then the next step or his move.
       this.r.bossKind = undefined;
       const picked = this.r.bounceCandidates?.includes(move) ? move : null;

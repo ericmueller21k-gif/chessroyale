@@ -718,9 +718,9 @@ export type ServerMessage = { now: number } & (
       seed?: number;
       /**
        * Alfil's Tusks (his turn begins with it): positions with an elephant (him to move): for his fusion, the elephant on
-       * each square allowed; for his cast, each pair's ways to go as if it fused now. Answer the one picked (fuseFrom: his
-       * gain nearest about a pawn, never past the cap) as `move`, or "" when none is (no fusion; the cast's first pair).
-       * An older app ignores it and plays a move, which isn't one of these: the same as "".
+       * each square allowed; for his cast, each pair's ways to go as if it fused now. Answer the one picked (fuseFrom: the
+       * one best for him) as `move`, or "" (no engine: the fusion's first square, the cast's first pair). An older app
+       * ignores it and plays a move, which isn't one of these: the same as "".
        */
       fuse?: string[];
       /**

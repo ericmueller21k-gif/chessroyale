@@ -3,10 +3,10 @@
  * Persian and Arabic chess the bishop's square held an elephant, the alfil.
  *
  * His passive, Tusks: at the start of his turn (his tusksFirst-th, then every tusksEvery), before his move, he marks two
- * of his pawns anywhere on the board (they glow; the engine's pick, tusksPairs). On the crowd's turn, taking either one stops it. At the
- * start of his next turn, before his move, both are lifted off and an elephant (a bishop in every way) lands on one of
- * their two squares, the engine's pick (fuseFrom). At most tusksMax a battle. His elephants' squares are tracked as they
- * move, so the app can draw them with their own art.
+ * of his pawns anywhere on the board (they glow; the engine's pick, tusksPairs). On the crowd's turn, taking either one
+ * stops it. At the start of his next turn, before his move, both are lifted off and an elephant (a bishop in every way)
+ * lands on one of their two squares, the engine's pick (fuseFrom). At most tusksMax a battle. His elephants' squares
+ * are tracked as they move, so the app can draw them with their own art.
  *
  * His ultimate, the Mammoth Slam: his rage meter full (its warning as a crowd turn begins), at the start of his turn,
  * two of the crowd's pawns and one of its knights or bishops fly up (never a queen, rook or king; fewer if it has fewer)
@@ -97,13 +97,15 @@ function hangs(g: Grid, sq: string): boolean {
  * already there before it is fine, it's his move), the elephant gives check (the crowd's king attacked on his move:
  * no position), it leaves more of the crowd's material hanging than before (my call, Big Boy's bounce's rule, as
  * Sawyer's split never lands attacking a piece: a piece put on the board just before his move would otherwise win
- * material at once, far more than the fusion's point), he'd have no move, or the engine would refuse it.
+ * material at once, far more than the fusion's point), it gives him a mate in one (my call: the crowd never sees the
+ * elephant before it mates, as the Slam never leaves the crowd mated in one), he'd have no move, or the engine would
+ * refuse it.
  */
 export function fusedFen(fen: string, pawns: readonly string[], at: string, boss: Side): string | null {
   const g = fusedGrid(gridOf(fen), pawns, at, boss);
   if (!g) return null;
   const out = editedFen(fen, g);
-  return hasMove(out) && !stockfishRefuses(out) ? out : null;
+  return hasMove(out) && !stockfishRefuses(out) && !mateInOne(out) ? out : null;
 }
 
 /** fusedFen's board alone (the checks a board can answer by itself, without a chess.js board): null when not allowed. */
@@ -136,13 +138,12 @@ export interface TusksPair {
 }
 
 /**
- * The pairs his cast weighs (Eric: "the engine picks the pair that helps him most, as for the other bosses' powers"):
- * of his pawns' pairs whose fusion would be allowed now (fusedFen, on either square), those giving up neither a passed
- * pawn of his nor his king's shield first, seeded among equals; tusksLooks of them. The engine picks one by their ways
- * to go now, as for the fusion (fuseFrom: the gain nearest about a pawn, within its cap): a pair whose fusion will land
- * in the band, not one too strong to come. The crowd can take one on its turn: that isn't avoided (the counter is part
- * of the power). Pure: the server, the host and solo work out the same list. Empty: no cast (fewer than two pawns, or
- * no pair allowed).
+ * The pairs his cast weighs (Eric: "the engine picks the pair that helps him most"): of his pawns' pairs whose fusion
+ * would be allowed now (fusedFen, on either square), those giving up neither a passed pawn of his nor his king's shield
+ * first, seeded among equals; tusksLooks of them. The engine picks one by their ways to go now, as for the fusion
+ * (fuseFrom: the one best for him). The crowd can take one on its turn: that isn't avoided (the counter is part of the
+ * power). Pure: the server, the host and solo work out the same list. Empty: no cast (fewer than two pawns, or no pair
+ * allowed).
  */
 export function tusksPairs(fen: string, boss: Side, seed: number, turn: number, s: Pick<BossPowerSettings, "tusksLooks"> = BOSS_POWERS): TusksPair[] {
   const g = gridOf(fen);
@@ -163,7 +164,7 @@ export function tusksPairs(fen: string, boss: Side, seed: number, turn: number, 
   return out;
 }
 
-/** The pair a cast marks: the one with the engine's pick among its ways to go; no pick (or none within the cap), the first. */
+/** The pair a cast marks: the one with the engine's pick among its ways to go; no pick (no engine's answer), the first. */
 export const castPick = (pairs: readonly TusksPair[], pick: string | null): string[] | null =>
   (pairs.find((p) => p.options.some((o) => o.fen === pick)) ?? pairs[0])?.pawns ?? null;
 
@@ -190,48 +191,48 @@ export function fusionOptions(fen: string, pawns: readonly string[], boss: Side)
   });
 }
 
-/** A way to go as the engine scored it: what the fusion gains him in pawns (log-odds, bouncePawnLogit), and whether its line has a mate for him. */
+/**
+ * A way to go as the engine scored it: his expected score there (him to move), and what the fusion gains him in pawns
+ * (log-odds, bouncePawnLogit; for the sims: a measure that tops out, as Stockfish puts most fusions at a won game).
+ */
 export interface FusionScore {
   fen: string;
+  expected: number;
   gain: number;
-  mate?: true;
 }
 
 /**
- * The fusion's square (Eric: "whichever the engine prefers"; "2 pawns become a bishop, so he gains about 1 point"; the
- * pair "that helps him most, as for the other bosses' powers", which are all bounded): of the ways to go, the gain for
- * him nearest tusksTarget inside tusksGain; none inside, the nearest below it (an elephant that helps him less); never
- * past the cap, never a mate for him. Null: none (the fusion fails).
+ * The fusion's square, or the cast's pair (Eric: "whichever the engine prefers"; "the engine picks the pair that helps
+ * him most"): of the ways to go, the one best for him (his expected score; equals in the order given: the pairs' order,
+ * then the squares'). Null: none. Unbounded, as the sheet has it: the first build's cap ("about 1 point") read
+ * Stockfish's verdict, which puts nearly every fusion in a balanced game at a won one, so it stopped most fusions
+ * (docs/decisions/2026-10-17-alfil-rules.md). A fusion that gives him a mate in one is never a way to go (fusedFen).
  */
-export function pickFusion(scored: readonly FusionScore[], s: Pick<BossPowerSettings, "tusksGain" | "tusksTarget"> = BOSS_POWERS): { fen: string; gain: number } | null {
-  const [lo, hi] = s.tusksGain;
-  const ok = scored.filter((c) => !c.mate && c.gain <= hi + 1e-9);
-  const inBand = ok.filter((c) => c.gain >= lo - 1e-9);
-  const pick = inBand.length
-    ? [...inBand].sort((a, b) => Math.abs(a.gain - s.tusksTarget) - Math.abs(b.gain - s.tusksTarget) || (a.fen < b.fen ? -1 : 1))[0]
-    : [...ok].sort((a, b) => b.gain - a.gain || (a.fen < b.fen ? -1 : 1))[0];
+export function pickFusion(scored: readonly FusionScore[]): { fen: string; gain: number } | null {
+  let pick: FusionScore | null = null;
+  for (const c of scored) if (!pick || c.expected > pick.expected) pick = c;
   return pick ? { fen: pick.fen, gain: Math.round(pick.gain * 100) / 100 } : null;
 }
 
 /**
- * The engine's pick of the fusion's square, from this device's engines (the host's online, solo's): the position before
- * it and each way to go searched at tusksNodes (him to move), shared out over the engines, then pickFusion. Null (no
- * fusion): none within the cap, or no engine.
+ * The engine's pick of the fusion's square (or the cast's pair), from this device's engines (the host's online,
+ * solo's): the position before it and each way to go searched at tusksNodes (him to move), shared out over the engines,
+ * then pickFusion. Null: no engine (the fusion then takes the first way allowed; the cast, the first pair).
  */
 export async function fuseFrom(
   engines: readonly EngineLike[],
   fen: string,
   candidates: readonly string[],
-  s: Pick<BossPowerSettings, "tusksNodes" | "tusksGain" | "tusksTarget" | "bouncePawnLogit"> = BOSS_POWERS,
+  s: Pick<BossPowerSettings, "tusksNodes" | "bouncePawnLogit"> = BOSS_POWERS,
 ): Promise<{ fen: string; gain: number } | null> {
   if (!candidates.length || !engines.length) return null;
   const [before, ...after] = await topEach(engines, [fen, ...candidates], s.tusksNodes);
   if (!before) return null;
   const scored = candidates.flatMap((c, i) => {
     const m = after[i];
-    return m ? [{ fen: c, gain: (logit(m.expected) - logit(before.expected)) / s.bouncePawnLogit, ...(m.mate !== undefined && m.mate > 0 ? { mate: true as const } : {}) }] : [];
+    return m ? [{ fen: c, expected: m.expected, gain: (logit(m.expected) - logit(before.expected)) / s.bouncePawnLogit }] : [];
   });
-  return pickFusion(scored, s);
+  return pickFusion(scored);
 }
 
 // ---------------- The Mammoth Slam ----------------
@@ -567,11 +568,11 @@ export const alfilBattle = {
     return [];
   },
 
-  /** The step needs an engine: a cast with a choice, or a fusion or a Slam with a way to go to weigh (each within its cap). */
+  /** The step needs an engine: a cast or a fusion with a choice (more than one way to go), or a Slam with a lift to weigh (its cap). */
   needsEngine(b: Battle): boolean {
     const step = alfilBattle.step(b);
     const n = alfilBattle.candidates(b).length;
-    return step === "tusks" ? n > 1 : !!step && n > 0;
+    return step === "slam" ? n > 0 : n > 1;
   },
 
   /** The step, from this device's engines (solo, the sims): the fusion's square (fuseFrom), the Slam's lift (slamFrom). */
@@ -589,9 +590,9 @@ export const alfilBattle = {
 
   /**
    * The step lands (online with the host's pick: one of the candidates, else none): the cast (the picked pair marked;
-   * none: the first of them), the fusion (the elephant on the picked square; none: no square allowed or within the cap,
-   * or no engine's answer, and it fails, the pawns staying), or the Slam (the picked lift; none: nothing lifts, the meter
-   * is spent anyway). Not a move: nothing is scored, and he plays his move after it. Returns the step done.
+   * none: the first of them), the fusion (the elephant on the picked square; none, the first square allowed; no square
+   * allowed now, it fails, the pawns staying), or the Slam (the picked lift; none: nothing lifts, the meter is spent
+   * anyway). Not a move: nothing is scored, and he plays his move after it. Returns the step done.
    */
   apply(b: Battle, pick: string | null, loss: number | null = null, s: BossPowerSettings = BOSS_POWERS): AlfilStep | null {
     const step = alfilBattle.step(b, s);
@@ -605,7 +606,7 @@ export const alfilBattle = {
     } else if (step === "fuse") {
       const pawns = boss.powers!.tusks!.pawns;
       const options = fusionOptions(fen, pawns, other(crowd));
-      const chosen = options.find((o) => o.fen === pick) ?? null;
+      const chosen = options.find((o) => o.fen === pick) ?? options[0] ?? null;
       if (chosen) setBase(b, chosen.fen);
       setPowers(b, (p) => ({
         ...p,

@@ -264,7 +264,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       let struck = 0;
       let result: string | null = null;
       // (Alfil: his casts, the fusions they came to (or the crowd's counters), his slams: each lift's swing and the ones weighed.)
-      const alfil = { casts: 0, fused: 0, taken: 0, illegal: 0, gains: [] as number[], slams: [] as { at: number; n: number; loss: number | null; weighed: (number | "mate")[] }[], early: 0, counters: [] as number[] };
+      const alfil = { casts: 0, fused: 0, taken: 0, nowhere: 0, gains: [] as number[], slams: [] as { at: number; n: number; loss: number | null; weighed: (number | "mate")[] }[], early: 0, counters: [] as number[] };
       const t0 = Date.now();
       while (!runner.isOver()) {
         if (runner.stageComplete()) {
@@ -297,7 +297,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             const pick = await fuseFrom(engines, fen, runner.alfilCandidates());
             runner.applyAlfil(pick?.fen ?? null);
             const f = runner.boss!.powers!.fusion;
-            if (step === "fuse") f?.to ? alfil.fused++ : alfil.illegal++;
+            if (step === "fuse") f?.to ? alfil.fused++ : alfil.nowhere++;
             if (step === "fuse" && f?.to && pick) alfil.gains.push(pick.gain);
           }
           await runner.playBoss(engines[0]);
@@ -335,7 +335,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         if (runner.bossKillDue()) runner.bossKill();
       }
       const b = runner.boss!;
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }

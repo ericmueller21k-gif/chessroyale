@@ -1354,7 +1354,7 @@ export class MatchRunner {
     return alfilBattle.play(this.battle, engines);
   }
 
-  /** The step lands (from the host's engine online: one of the candidates, else the cast's first pair, no fusion or nothing; alfilBattle.apply). */
+  /** The step lands (from the host's engine online: one of the candidates, else the cast's first pair, the fusion's first square or nothing; alfilBattle.apply). */
   applyAlfil(pick: string | null, loss: number | null = null): AlfilStep | null {
     return alfilBattle.apply(this.battle, pick, loss);
   }
