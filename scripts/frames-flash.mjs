@@ -19,9 +19,9 @@ const ctx = await b.newContext({ ...devices["iPhone 13"], colorScheme: scheme })
 const p = await ctx.newPage();
 p.on("pageerror", (e) => console.log("pageerror", e.message));
 const modeQuery = mode === "boss" ? "" : mode === "crowd" ? "&mode=crowd&augments=0" : "&mode=classic";
-await p.goto(url + `?debug&clock=30&nolanding${modeQuery}${extra ? "&" + extra : ""}`);
+// (Boss: the hidden /bosses, the solo boss picker at once.)
+await p.goto(url + `${mode === "boss" ? "bosses" : ""}?debug&clock=30&nolanding${modeQuery}${extra ? "&" + extra : ""}`);
 if (mode === "boss") {
-  await p.getByRole("button", { name: "Boss alone" }).click();
   await p.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /Boingo/ }).click();
 } else {
   // Matchmaking: Solo, then PLAY (the seats fill with bots, then the match).

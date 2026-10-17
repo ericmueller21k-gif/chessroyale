@@ -331,10 +331,10 @@ test("the Hidden Boss's phase 2 on a slow phone: the phase change and four board
     }
   });
   const me = page.waitForResponse((r) => r.url().includes("/api/me") && r.request().method() === "GET");
-  await page.goto("/?debug&nolanding&phase=2");
+  // (The hidden /bosses: the solo boss picker, where an admin meets him; the Boss raid screen's tile is locked.)
+  await page.goto("/bosses?debug&nolanding&phase=2");
   await me;
   await page.waitForTimeout(500);
-  await bossAloneFromHome(page);
   await page.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /^Hidden Boss/ }).click();
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });

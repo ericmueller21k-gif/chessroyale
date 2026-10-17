@@ -883,6 +883,20 @@ export function warmSounds(names: readonly SoundName[]): void {
   }
 }
 
+/**
+ * Plays a sound a tap asked for (the Boss raid screen's boss stepping on), through the mute switch. On a visit's first
+ * tap the audio is still waking (its `resume` takes a moment), so the sound plays as soon as it's up rather than never.
+ */
+export function playOnTap(name: SoundName) {
+  unlockAudio();
+  const c = ctx;
+  if (!c || c.state === "running") return play(name);
+  void c
+    .resume()
+    .catch(() => undefined)
+    .then(() => ctx === c && play(name));
+}
+
 /** Plays a sound; `voice` previews a roulette voice without choosing it (Settings → Sound, "Reveal sound"). */
 export function play(name: SoundName, voice?: ReelVoice) {
   // Tests read this log (set window.__soundLog = [] to start one).

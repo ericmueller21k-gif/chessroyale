@@ -135,13 +135,13 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   test.setTimeout(8 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=6");
-  await bossAloneFromHome(page);
-  // First, the boss menu: a random boss, then every boss you can meet (a complete character and powers), each at
-  // your strength plus its own offset. Pick one and it starts.
-  const menu = page.getByRole("dialog", { name: "Choose your boss" });
+  // First, the Boss raid screen's tiles: every boss you can meet (a complete character and powers), the Hidden Boss's
+  // locked tile and a random one. Boss alone's menu then has that boss, at your strength plus its own offset.
+  await bossAloneFromHome(page, "Boingo the Clown");
+  await expect(page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio")).toHaveCount(9);
+  const menu = page.getByRole("dialog", { name: "Boss alone" });
   await expect(menu).toBeVisible();
-  await expect(menu.locator(".boss-row")).toHaveCount(8);
-  await expect(menu.getByRole("button", { name: /Random boss/ })).toBeVisible();
+  await expect(menu.locator(".boss-row")).toHaveCount(1);
   await expect(menu.getByRole("button", { name: /Match the group/ })).toHaveCount(0);
   // (The opening's name lands 1.8 s into the card, which goes at 2.6 s, after Maia's loading step of no set length:
   // watched from before it can appear, as a poll can look either side of that window.)

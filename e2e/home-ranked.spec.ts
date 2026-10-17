@@ -114,6 +114,7 @@ test("1 v 1's rank line at its widest (an apex rank with four-digit points) stay
 });
 
 test("the Boss raid card opens its screen; each choice reaches its flow (a raid's queue, people only, a Solo raid, Boss alone's menu, a raid with friends); Back is home", async ({ page }) => {
+  // (Its character select, the tiles and the stage: boss-select.spec.ts.)
   test.setTimeout(2 * 60_000);
   await named(page, "Raider");
   const home = `/?debug&pool=raidscreen-${test.info().project.name}-${run}`;
@@ -122,14 +123,14 @@ test("the Boss raid card opens its screen; each choice reaches its flow (a raid'
   const main = page.getByRole("main");
   // The choices, in order, every word.
   await expect(main.locator(".rd-option")).toHaveText([
-    /^Join a raidUp to 50 players · bots fill the crowd after \d+ s$/,
-    /^People onlyNo bots · starts at 50, or 10 after \d+ s$/,
+    /^Join a raidRandom boss · up to 50 players · bots after \d+ s$/,
+    /^People onlyRandom boss · no bots · starts at 50, or 10 after \d+ s$/,
     "Raid with botsYou and 49 bots · starts at once",
-    "Boss aloneJust you vs a boss you pick",
+    "Boss aloneJust you vs a random boss",
     "Play with friendsMake a raid and share its code, or join one",
   ]);
-  await expect(main.locator(".rd-hero .fd-sub")).toHaveText("Up to 50 of you pick the crowd's moves together against a boss. The most popular pick is played.");
-  await expect(main.locator(".rd-hero canvas.boss-portrait")).toBeVisible();
+  await expect(main.locator(".rd-about")).toHaveText("Up to 50 of you pick the crowd's moves together against a boss. The most popular pick is played.");
+  await expect(main.locator(".bs-tile canvas.boss-portrait").first()).toBeVisible();
   for (const b of await main.locator(".rd-option").all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await sideways(page)).toBe(0);
 
@@ -143,10 +144,11 @@ test("the Boss raid card opens its screen; each choice reaches its flow (a raid'
   await expect(page.locator(".fd-queue-mode")).toHaveText("Boss raid · up to 50 · Bots off");
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
-  // Boss alone: the boss menu (a random boss, then each boss you can meet).
+  // Boss alone: its menu, the difficulty and the boss picked on the tiles (here "?": a random one).
   await main.getByRole("button", { name: /^Boss alone/ }).click();
-  const menu = page.getByRole("dialog", { name: "Choose your boss" });
-  await expect(menu.locator(".boss-row")).toHaveCount(8);
+  const menu = page.getByRole("dialog", { name: "Boss alone" });
+  await expect(menu.locator(".boss-row")).toHaveCount(1);
+  await expect(menu.getByRole("button", { name: /Random boss/ })).toBeVisible();
   await expect(menu.getByText(/^Your rating/)).toBeVisible();
   await menu.getByRole("button", { name: "Close" }).click();
   // Play with friends: a raid's lobby (and joining one by code).

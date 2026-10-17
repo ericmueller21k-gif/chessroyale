@@ -331,8 +331,12 @@ export async function openBossRaid(page: Page) {
   await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
 }
 
-/** Home → Boss raid → Boss alone: the boss menu (with ?boss= in the address, the battle at once). */
-export async function bossAloneFromHome(page: Page) {
+/**
+ * Home → Boss raid → (the boss's tile, `boss`: its name, as its tile is named) → Boss alone: its menu, the difficulty and
+ * that boss, or a random one without `boss` (with ?boss= in the address, the battle at once).
+ */
+export async function bossAloneFromHome(page: Page, boss?: string) {
   await openBossRaid(page);
+  if (boss) await page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", { name: boss, exact: true }).click();
   await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
 }

@@ -25,8 +25,8 @@ async function run(name, context) {
   p.on("pageerror", (e) => console.log(name, "pageerror", e.message));
   const perf = every === "perf";
   if (perf) await p.addInitScript(instrument);
-  await p.goto(`${url}?debug&clock=90&nolanding&wip=1&kit=${encodeURIComponent(kit)}`);
-  await p.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  // (The hidden /bosses: the solo boss picker at once.)
+  await p.goto(`${url}bosses?debug&clock=90&nolanding&wip=1&kit=${encodeURIComponent(kit)}`);
   await p.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /Boingo/ }).click();
   for (let i = 0; i < 200; i++) {
     if ((await p.evaluate(() => window.match?.phase.kind)) === "play") break;

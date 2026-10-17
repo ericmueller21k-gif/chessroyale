@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, adminPlayable, bossDef, bossIdFromLink, bossStrength, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, raidBossElo, rankedMinHumans, pausedLine, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
+import { BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossStrength, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, raidBossElo, rankedMinHumans, pausedLine, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { chosenDifficulty, difficultyElo, rememberDifficulty } from "../boss-difficulty.ts";
 import { powersLine } from "../power-words.ts";
@@ -10,6 +10,7 @@ import { prefetchMaia } from "../maia.ts";
 import type { ComponentChildren } from "preact";
 import { AccountBar, BackButton, DressedPawn, FdButton, LiveLine, Logo, RankLine, wearingNames } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
+import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/BossSelect.tsx";
 import { BossFace } from "../components/BossCharacter.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
@@ -112,20 +113,22 @@ function versus(elo: number, you: number): { text: string; tone: "easy" | "even"
   return { text: `+${d} vs you`, tone: d >= 400 ? "brutal" : "hard" };
 }
 
-/** What each boss's powers do, in a few words (the menu's line under its name). */
 /**
- * Boss raid: the menu that opens when you start: a random boss (a different one from last time), or one of the
- * bosses you can meet (only the complete ones: a character and its powers), each at your strength plus its own
- * offset, with its threat and its strength against yours. A tap picks it and starts.
+ * Boss alone's menu: your difficulty (and, for admins, the boss's brain), and the boss to fight, each at your strength
+ * plus its own offset, with its threat and its strength against yours. A tap on a boss starts.
+ * - From the Boss raid screen (`only`: the boss picked there, or "" for a random one): that boss alone, under the title
+ *   "Boss alone" (the pick is made on the screen's tiles).
+ * - The hidden /bosses (no `only`): every boss you can meet and a random one, "Choose your boss"; for an admin the
+ *   bosses hidden from players too, after the rest (the Hidden Boss, for testing).
  */
 export function BossMenu({
-  forRaid,
+  only,
   value,
   rating,
   onPick,
   onClose,
 }: {
-  forRaid: boolean;
+  only?: string;
   value: string;
   rating: number | null;
   onPick: (id: string) => void;
@@ -136,15 +139,15 @@ export function BossMenu({
   // (Admins, Boss alone: the bosses hidden from players too, after the rest: the Hidden Boss, for testing.)
   // (Not the bosses resting: kill switches, status.ts.)
   useServerStatus();
-  const bosses = menuBosses({ admin: isAdmin(), raid: forRaid }).filter((b) => !isPaused(`boss:${b.id}`));
-  // Solo: a difficulty on top of the boss's strength (online, the lobby's strength stands).
+  const bosses = menuBosses({ admin: isAdmin(), raid: false }).filter((b) => !isPaused(`boss:${b.id}`) && (only === undefined || b.id === only));
+  // A difficulty on top of the boss's strength.
   const [difficulty, setDifficulty] = useState(chosenDifficulty);
-  const extra = forRaid ? 0 : difficultyElo(difficulty);
+  const extra = difficultyElo(difficulty);
   // Testing, admins (Boss alone): the boss's brain (Maia-3 or Stockfish). Maia's files are fetched ahead when it may
-  // play: Boss alone below Stockfish's strengths; a raid you make on a device that may run it (you're its host).
+  // play: Boss alone below Stockfish's strengths. (A raid you make fetches them as you make it: Play with friends.)
   const [brain, setBrain] = useState(pickedBrain);
   const picked = useRef<HTMLButtonElement>(null);
-  const maiaAhead = () => (forRaid ? maiaAllowed() : maiaLikely(bosses.map((b) => bossStrength(base, b, extra))));
+  const maiaAhead = () => maiaLikely(bosses.map((b) => bossStrength(base, b, extra)));
   useEffect(() => {
     if (maiaAhead()) prefetchMaia();
     picked.current?.scrollIntoView({ block: "nearest" });
@@ -157,9 +160,9 @@ export function BossMenu({
       <div class="boss-menu" role="dialog" aria-modal="true" aria-labelledby="boss-menu-title">
         <div class="boss-menu-head">
           <div>
-            <h2 id="boss-menu-title">Choose your boss</h2>
+            <h2 id="boss-menu-title">{only === undefined ? "Choose your boss" : "Boss alone"}</h2>
             <span class="muted small">
-              {forRaid ? "For your raid · " : ""}Your rating: {Math.round(you)}
+              Your rating: {Math.round(you)}
               {rating === null ? " (unrated)" : ""}
             </span>
           </div>
@@ -167,16 +170,14 @@ export function BossMenu({
             ✕
           </button>
         </div>
-        {!forRaid && (
-          <BossDifficulty
-            value={difficulty}
-            onChange={(d) => {
-              rememberDifficulty(d);
-              setDifficulty(d);
-            }}
-          />
-        )}
-        {!forRaid && isAdmin() && (
+        <BossDifficulty
+          value={difficulty}
+          onChange={(d) => {
+            rememberDifficulty(d);
+            setDifficulty(d);
+          }}
+        />
+        {isAdmin() && (
           <BossBrainPicker
             value={brain}
             onChange={(b) => {
@@ -187,15 +188,17 @@ export function BossMenu({
           />
         )}
         <div class="boss-menu-list">
-          <button type="button" class={`boss-row match${value === "" ? " on" : ""}`} ref={value === "" ? picked : undefined} onClick={() => onPick("")}>
-            <span class="br-icon" aria-hidden="true">
-              🎲
-            </span>
-            <span class="br-main">
-              <strong>Random boss</strong>
-              <span class="br-sub">{forRaid ? "a different one from the one most of you met last" : "a different one from last time"}</span>
-            </span>
-          </button>
+          {(only === undefined || only === "") && (
+            <button type="button" class={`boss-row match${value === "" ? " on" : ""}`} ref={value === "" ? picked : undefined} onClick={() => onPick("")}>
+              <span class="br-icon" aria-hidden="true">
+                🎲
+              </span>
+              <span class="br-main">
+                <strong>Random boss</strong>
+                <span class="br-sub">a different one from last time</span>
+              </span>
+            </button>
+          )}
           {bosses.map((b) => {
             const elo = bossStrength(base, b, extra);
             const vs = versus(elo, you);
@@ -416,14 +419,24 @@ function Notice({ notice }: { notice: HomeNotice }) {
   );
 }
 
-/** The boss on the Boss raid card and screen (his portrait: the roster's first boss with art; any would do). */
-const CARD_BOSS = bossDef("gingerbread") ?? { name: "Boss", icon: "👑" };
+/** The card's portrait moves on this often (a test link's `?cardMs=` for a quicker one: a test switch). */
+const cardEveryMs = () => Number(testParams().get("cardMs")) || FRONT_DOOR.bossCardMs;
 
-/** One of the Boss raid screen's ways to play: a big button with its line. */
-function RaidOption({ label, sub, disabled, onClick }: { label: string; sub: string; disabled?: boolean; onClick: () => void }) {
+/**
+ * One of the Boss raid screen's ways to play: a big button with its line. `locked`: the Hidden Boss is picked (grayed
+ * out, a small lock).
+ */
+function RaidOption({ label, sub, disabled, locked, onClick }: { label: string; sub: string; disabled?: boolean; locked?: boolean; onClick: () => void }) {
   return (
-    <button type="button" class="rd-option" disabled={disabled} onClick={onClick}>
-      <strong>{label}</strong>
+    <button type="button" class={`rd-option${locked ? " rd-locked" : ""}`} disabled={disabled || locked} onClick={onClick}>
+      <strong>
+        {label}
+        {locked && (
+          <span class="rd-lock" aria-label="locked">
+            🔒
+          </span>
+        )}
+      </strong>
       <span>{sub}</span>
     </button>
   );
@@ -544,19 +557,29 @@ export function HomeScreen({
   const [friends, setFriends] = useState(!!joinCode);
   // Play with friends: a lobby in the row's pick (1 v 1 has none: 50 v 50's), or a raid from the Boss raid screen.
   const lobbyMode: ModeChoiceId = raid ? "raid" : lobbyModeOf(mode);
-  // Boss raid: pick the boss first, for a raid alone or one you create (skipped with ?boss=N).
-  const [bossMenu, setBossMenu] = useState<null | "solo" | "raid">(null);
+  // The Boss raid screen's pick (its tiles): a boss you can meet, "" for a random one, or the Hidden Boss (dark and
+  // locked: never stored, so nothing starts against him). Kept for Boss alone, a Solo raid and a raid you make
+  // (rememberBossPick); the public queues are always a random boss. A resting boss reads as random.
+  const [pick, setPick] = useState(() => {
+    const id = chosenBoss();
+    return selectBosses().bosses.some((b) => b.id === id) ? id : RANDOM;
+  });
+  const hiddenPicked = selectBosses().hidden.some((b) => b.id === pick);
+  const pickTile = (id: string) => {
+    setPick(id);
+    if (!selectBosses().hidden.some((b) => b.id === id)) rememberBossPick(id);
+  };
+  // Boss alone's menu ("solo": the difficulty for the tiles' pick) or the full picker (/bosses: "pick").
+  const [bossMenu, setBossMenu] = useState<null | "solo" | "pick">(null);
   // (Not while Solo and Boss alone rest: the hidden /bosses lands here too, and the Boss raid screen says why.)
   const bossAlone = () => (rest("solo") ? undefined : bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
   const pickBoss = (id: string) => {
     rememberBossPick(id);
-    const forRaid = bossMenu === "raid";
     setBossMenu(null);
-    if (forRaid) onCreateLobby("raid");
-    else onSolo("raid");
+    onSolo("raid");
   };
   useEffect(() => {
-    if (intent?.kind === "boss") bossAlone();
+    if (intent?.kind === "boss" && !rest("solo")) setBossMenu("pick");
     if (intent?.kind === "friends") setFriends(true);
   }, [intent?.n]);
   // (An invite's code can arrive once its lobby is known to be open.)
@@ -651,10 +674,10 @@ export function HomeScreen({
           onlineLocked={onlineLocked}
           resting={rest(lobbyMode)}
           onCreate={() => {
-            if (lobbyMode === "raid" && !bossInUrl()) {
-              setFriends(false);
-              setBossMenu("raid");
-            } else onCreateLobby(lobbyMode);
+            // (A raid: the Boss raid screen's pick, or a random boss. Maia's files fetched ahead where this device may
+            // run the boss's brain: you're its host.)
+            if (lobbyMode === "raid" && maiaAllowed()) prefetchMaia();
+            onCreateLobby(lobbyMode);
           }}
           onJoin={onJoinLobby}
           onSignIn={onSignIn}
@@ -662,7 +685,7 @@ export function HomeScreen({
         />
       )}
       {bossMenu && (
-        <BossMenu forRaid={bossMenu === "raid"} value={chosenBoss(bossMenu === "solo" && isAdmin())} rating={profile?.rating ?? null} onPick={pickBoss} onClose={() => setBossMenu(null)} />
+        <BossMenu only={bossMenu === "solo" ? pick : undefined} value={bossMenu === "solo" ? pick : chosenBoss(isAdmin())} rating={profile?.rating ?? null} onPick={pickBoss} onClose={() => setBossMenu(null)} />
       )}
       {/* (A moderator's warning or chat ban, once: chat moderation's.) */}
       <ChatNotice />
@@ -688,6 +711,8 @@ export function HomeScreen({
     // can pick if you want to solo against bosses or play with bots or queue with other players").
     const raidResting = rest("raid");
     const online = (sub: string) => (onlineLocked ? "Online: sign in to play" : sub);
+    // (The Hidden Boss picked: every way to play locked.)
+    const locked = hiddenPicked;
     return (
       <div class="fd-page rd-page">
         <header class="fd-page-head">
@@ -697,29 +722,29 @@ export function HomeScreen({
         </header>
         {/* (Why you're here: a match that closed while this screen was where you'd come back to, as on home.) */}
         {notice && <Notice notice={notice} />}
-        <section class="rd-hero">
-          <span class="rd-face rd-face-big" aria-hidden="true">
-            <BossFace boss={CARD_BOSS} />
-          </span>
-          <p class="fd-sub">{`Up to ${RAID_SIZE} of you pick the crowd's moves together against a boss. The most popular pick is played.`}</p>
-        </section>
+        {/* The character select (Eric, Oct 16): the tiles, the stage; the ways to play under it. */}
+        <BossSelect value={pick} rating={profile?.rating ?? null} onPick={pickTile} />
         <div class="rd-options">
+          {/* (The public queues share their lobby: always a random boss.) */}
           <RaidOption
             label="Join a raid"
-            sub={online(`Up to ${RAID_SIZE} players · bots fill the crowd after ${fill} s`)}
+            sub={online(`Random boss · up to ${RAID_SIZE} players · bots after ${fill} s`)}
             disabled={loading || !!raidResting}
+            locked={locked}
             onClick={() => (onlineLocked ? onSignIn() : onPlay("raid", "default"))}
           />
           <RaidOption
             label="People only"
-            sub={online(`No bots · starts at ${RAID_SIZE}, or ${MATCHMAKING.raidBotsOffMinPlayers} after ${fill} s`)}
+            sub={online(`Random boss · no bots · starts at ${RAID_SIZE}, or ${MATCHMAKING.raidBotsOffMinPlayers} after ${fill} s`)}
             disabled={loading || !!raidResting}
+            locked={locked}
             onClick={() => (onlineLocked ? onSignIn() : onPlay("raid", "botsoff"))}
           />
-          <RaidOption label="Raid with bots" sub={`You and ${RAID_SIZE - 1} bots · starts at once`} disabled={loading || !!soloResting} onClick={() => onSolo("raid", { fill: true })} />
-          <RaidOption label="Boss alone" sub="Just you vs a boss you pick" disabled={loading || !!soloResting} onClick={bossAlone} />
-          <RaidOption label="Play with friends" sub="Make a raid and share its code, or join one" onClick={() => setFriends(true)} />
+          <RaidOption label="Raid with bots" sub={`You and ${RAID_SIZE - 1} bots · starts at once`} disabled={loading || !!soloResting} locked={locked} onClick={() => onSolo("raid", { fill: true })} />
+          <RaidOption label="Boss alone" sub={pick === RANDOM ? "Just you vs a random boss" : "Just you vs this boss"} disabled={loading || !!soloResting} locked={locked} onClick={bossAlone} />
+          <RaidOption label="Play with friends" sub="Make a raid and share its code, or join one" locked={locked} onClick={() => setFriends(true)} />
         </div>
+        <p class="fd-sub rd-about">{`Up to ${RAID_SIZE} of you pick the crowd's moves together against a boss. The most popular pick is played.`}</p>
         {raidResting && <p class="fd-rest">{raidResting}</p>}
         {soloResting && soloResting !== raidResting && <p class="fd-rest">{soloResting}</p>}
         {loading && <p class="fd-hint">Loading the engine…</p>}
@@ -814,7 +839,7 @@ export function HomeScreen({
   const bossCard = (
     <button type="button" class="rd-card" onClick={() => onRaid(true)}>
       <span class="rd-face" aria-hidden="true">
-        <BossFace boss={CARD_BOSS} />
+        <BossCardFace everyMs={cardEveryMs()} fadeMs={FRONT_DOOR.bossCardFadeMs} />
       </span>
       <span class="rd-card-text">
         <strong>Boss raid</strong>

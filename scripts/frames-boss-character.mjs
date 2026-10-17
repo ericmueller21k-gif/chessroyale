@@ -35,7 +35,8 @@ async function run(name, context) {
   const p = await browser.newPage(context);
   p.on("pageerror", (e) => console.log(name, "pageerror", e.message));
   if (fxPerf) await p.addInitScript(instrument);
-  await p.goto(url + "?debug&clock=30&nolanding");
+  // (The hidden /bosses: the solo boss picker at once, every boss by name.)
+  await p.goto(url + "bosses?debug&clock=30&nolanding");
   // The named kit in every boss's place: the same module the app uses, from the dev server.
   if (kitName)
     await p.evaluate(async (name) => {
@@ -46,9 +47,6 @@ async function run(name, context) {
         m.BOSS_KITS[k] = m.BOSS_KITS[name];
       }
     }, kitName);
-  // (Home → Boss raid → Boss alone, since Oct 16.)
-  await p.getByRole("main").getByRole("button", { name: /^Boss raid/ }).click();
-  await p.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
   await p.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: new RegExp(bossName) }).click();
   // The placement showing (the boss bar on a phone, by the board on a computer).
   const char = () => p.locator(".boss-char:visible").first();

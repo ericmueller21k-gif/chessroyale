@@ -16,7 +16,7 @@ test("a player's test switches are ignored: no menu skipped, no match on window,
   // A player. ?boss= would skip the boss menu: Boss alone opens it.
   await page.goto("/?debug&boss=pig&laststand=1");
   await bossAloneFromHome(page);
-  await expect(page.getByRole("dialog", { name: "Choose your boss" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Boss alone" })).toBeVisible();
   await page.goto("/?debug&boss=pig");
   // ?debug would put the match on `window`: a Solo match starts without it.
   await soloFromHome(page);

@@ -10,8 +10,8 @@ test("Boingo the Clown: a raid boss as a character, across the board from the Go
   test.setTimeout(6 * 60_000);
   const phone = info.project.name === "phone";
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3");
-  await bossAloneFromHome(page);
-  await page.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /Boingo the Clown/ }).click();
+  await bossAloneFromHome(page, "Boingo the Clown");
+  await page.getByRole("dialog", { name: "Boss alone" }).getByRole("button", { name: /Boingo the Clown/ }).click();
 
   // His entrance, with his portrait on the card instead of an emoji.
   await expect(page.locator(".boss-intro .boss-portrait")).toBeVisible({ timeout: 30_000 });

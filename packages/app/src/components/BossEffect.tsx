@@ -155,6 +155,8 @@ export interface SpriteAnimProps {
   look?: string;
   /** Told each frame as it's drawn (the Hidden Boss's half-engine overlay follows his head). Read when the animation starts. */
   onFrame?: (frame: Frame) => void;
+  /** Drawn once, at its first frame, and never again (reduced motion: a still). */
+  still?: boolean;
 }
 
 /** A frame of a sprite's animation as shown (spriteFrameAt): which animation, which frame, and its run's tag. */
@@ -173,7 +175,7 @@ export function framesSince(ch: Character, anim: string, prev: Shown | null, s: 
   return out;
 }
 
-export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class: cls = "", style, look, onFrame }: SpriteAnimProps) {
+export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class: cls = "", style, look, onFrame, still = false }: SpriteAnimProps) {
   const cv = useRef<HTMLCanvasElement>(null);
   // Drawn before the paint (no empty first frame), then on every animation frame that changes the picture.
   useLayoutEffect(() => {
@@ -208,8 +210,8 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
       }
     };
     draw();
-    return onEachFrame(draw);
-  }, [ch, anim, then, since, id, look]);
+    return still ? undefined : onEachFrame(draw);
+  }, [ch, anim, then, since, id, look, still]);
   return <canvas ref={cv} class={`fx-sprite ${cls}`} width={ch.w} height={ch.h} aria-hidden="true" style={style} data-fx={ch.id} />;
 }
 
