@@ -73,11 +73,13 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   - A power never leaves anyone without a legal move and never breaks check: a restriction that would leave no move
     (or no escape from check) lifts for that turn. The king is never frozen. The boss too (Eric, Oct 17: Sawyer's queen
     crossed his own board saw, his only way out of a knight's check): the move is marked (`lastMove.through`, a
-    `StopReason`, from `applyBossMove`) and your turn's dock says so ("His only move: the board saw let it through.").
+    `StopReason`, from `applyBossMove`) and your turn's dock says so in place of "Your move." ("His only move: across
+    the saw.").
   - **A move a power refuses says why** (Oct 17; docs/decisions/2026-10-17-power-limits-said-on-screen.md): a move
     legal in chess that the turn doesn't allow (across the saw, onto a pie, through a toy block, a frozen piece, the
-    move the God King took back) stays put, as before, and the dock says why beside "Your move." for 3 s
-    (`REFUSED_MS`) or until the position changes: the board's `onRefused`, the words in `packages/app/src/refused.ts`
+    move the God King took back) stays put, as before, and the dock says why in place of "Your move." for 3 s
+    (`REFUSED_MS`) or until the position changes (each is the dock's whole line, whole in its two lines at 320 px,
+    where its box is 112 px: measured in `e2e/sawyer.spec.ts`): the board's `onRefused`, the words in `packages/app/src/refused.ts`
     (`REFUSED`, `THROUGH`), which power by `BossRules.stopReason` (`stopReason` in `boss-powers.ts`: Sawyer, Boingo,
     Big Boy; it reads only fields the screens' view has too).
   - **Whichever brain picks it, the boss's move is one his powers allow:** every path picks from the allowed moves,

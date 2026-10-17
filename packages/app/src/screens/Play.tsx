@@ -143,9 +143,9 @@ export function PlayScreen({
   const dark = useMemo(() => (match.boss?.powers?.dark ?? []).map((d) => d.square), [match.boss?.powers?.dark?.map((d) => d.square).join()]);
   const note = match.darkNote;
   const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking && !note?.pending;
-  // A move a boss power refuses (legal in chess: across Sawyer's saw, onto a pie…) stays put: why, beside "Your
-  // move.", for a few seconds (refused.ts; Eric, Oct 17: it "glitched"). And the boss's last move, if it went through
-  // a power (his only move: the limit lifted for it), says so for your whole turn.
+  // A move a boss power refuses (legal in chess: across Sawyer's saw, onto a pie…) stays put: why, in the dock, for a
+  // few seconds (refused.ts; Eric, Oct 17: it "glitched"). And the boss's last move, if it went through a power (his
+  // only move: the limit lifted for it), says so through your turn.
   const [refused, setRefused] = useState<{ line: string; fen: string; at: number } | null>(null);
   const refusedNow = refused && refused.fen === board.fen && now - refused.at < REFUSED_MS ? refused.line : null;
   const through = match.boss ? throughLine(match.boss) : null;
@@ -295,6 +295,14 @@ export function PlayScreen({
               <span class="duel-note">
                 <strong>Take one of his {duelCount(match.boss) === 2 ? "two" : "three"} duels.</strong>
               </span>
+            ) : refusedNow ? (
+              // A move of yours a power refused: why, the dock's whole line for a moment (refused.ts; the box around
+              // it is the dock's live region, read out as it changes).
+              <span class="refused-note">{refusedNow}</span>
+            ) : through && hint === null && !barred ? (
+              // The boss's only move went through a power: said through your turn, in place of "Your move." (as the
+              // duel's line is), so it's whole on a narrow phone.
+              <span class="through-note">{through}</span>
             ) : (
               <span>
                 <strong>Your move.</strong>{" "}
@@ -305,15 +313,10 @@ export function PlayScreen({
                   </span>
                 ) : note?.pending ? (
                   <span class="muted">Into the dark…</span>
-                ) : refusedNow ? (
-                  // (The box around it is the dock's live region: read out as it changes.)
-                  <span class="refused-note">{refusedNow}</span>
                 ) : hint !== null ? (
                   <span class="muted">{hint.length ? "⚡ Top 3" : "⚡ Asking the engine…"}</span>
                 ) : barred ? (
                   <span class="muted barred-note">✕ {toSan(board.fen, barred)}</span>
-                ) : through ? (
-                  <span class="muted through-note">{through}</span>
                 ) : bulletOn(match.boss) ? (
                   // (The Hidden Boss's bullet clock, on every move to the end; once he has added time per move, the time
                   // control too: "Bullet 1+2". What's left in your bank is the dock's clock, at the box's right.)

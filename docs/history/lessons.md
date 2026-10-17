@@ -798,7 +798,7 @@ brain path was audited and tested (Stockfish, the slips, the strike, Maia with a
 fallback): each already picked from the moves the powers allow.
 
 **The fix:** the dock says why a move of yours is refused ("The board saw blocks that move."), and on your turn when
-the boss's only move went through a power ("His only move: the board saw let it through."). The boss's pick and the
+the boss's only move went through a power ("His only move: across the saw."). The boss's pick and the
 move played are checked once more and a wrong one is logged.
 
 **The rule:**

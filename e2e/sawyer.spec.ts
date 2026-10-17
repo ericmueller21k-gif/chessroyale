@@ -286,7 +286,7 @@ test("Sawyer's board saw on Maia (Eric, Oct 17): his moves never cross it while 
       if (crossesMiddle(his)) {
         expect(new Chess(before).moves({ verbose: true }).every((m) => crossesMiddle(m.from + m.to)), `${his} from ${before}`).toBe(true);
         expect(now.lastMove!.through).toBe("boardsaw");
-        await expect(page.locator(".through-note")).toHaveText("His only move: the board saw let it through.");
+        await expect(page.locator(".boss-dock .through-note")).toHaveText(THROUGH.boardsaw);
       } else expect(now.lastMove!.through, `${his} from ${before}`).toBeUndefined();
     }
     if (turn === 8) {
@@ -295,36 +295,44 @@ test("Sawyer's board saw on Maia (Eric, Oct 17): his moves never cross it while 
     }
     expect(now.powers.boardSaw).toEqual({ at: 3, until: 7 });
     if (!tried) {
-      // A move of yours across the saw (legal in chess): tapped, it stays put, and the dock says why, beside "Your move.".
+      // A move of yours across the saw (legal in chess): tapped, it stays put, and the dock says why for a moment.
       const across = new Chess(now.fen).moves({ verbose: true }).find((m) => crossesMiddle(m.from + m.to) && !m.promotion);
       if (across) {
         await tap(page, across.from);
         await tap(page, across.to);
-        await expect(page.locator(".boss-dock .dk-text")).toContainText("Your move.");
         await expect(page.locator(".boss-dock .refused-note")).toHaveText("The board saw blocks that move.");
         expect(await phase(page)).toBe("play");
         expect(await page.evaluate(() => (window as any).match.phase.board.fen)).toBe(now.fen);
-        // Every one of these lines fits the dock's two lines beside "Your move." (its box clamps and hides the rest), at
-        // this size and on the narrowest phone, measured in the real font and box.
-        const lines = [...Object.values(REFUSED), REFUSED_OTHER, ...Object.values(THROUGH)];
-        const fits = () =>
+        // Every one of these lines is whole in the dock's two lines (its box clamps and hides the rest), at this size
+        // and on narrow phones (112 px of room at 320), measured in the real font and box, each in its own element.
+        const lines = [...[...Object.values(REFUSED), REFUSED_OTHER].map((l) => ["refused-note", l]), ...Object.values(THROUGH).map((l) => ["through-note", l])];
+        const cut = () =>
           page.evaluate((all) => {
-            const box = document.querySelector(".boss-dock .dk-text > span") as HTMLElement;
-            const was = box.innerHTML;
-            const out = all.filter((l) => {
-              box.innerHTML = `<strong>Your move.</strong> <span class="refused-note">${l}</span>`;
-              return box.scrollHeight > box.clientHeight + 1;
+            // (A stand-in for the line, as the dock's only child, as Play.tsx draws it; the dock's own put back after.)
+            const dk = document.querySelector(".boss-dock .dk-text")!;
+            const kids = [...dk.childNodes];
+            const probe = document.createElement("span");
+            dk.replaceChildren(probe);
+            const out = all.filter(([cls, l]) => {
+              probe.className = cls!;
+              probe.textContent = l!;
+              return probe.scrollHeight > probe.clientHeight + 1;
             });
-            box.innerHTML = was;
-            return out;
+            dk.replaceChildren(...kids);
+            return out.map(([, l]) => l);
           }, lines);
-        expect(await fits()).toEqual([]);
+        expect(await cut()).toEqual([]);
         if (test.info().project.name === "phone") {
           const size = page.viewportSize()!;
-          await page.setViewportSize({ width: 320, height: 640 });
-          expect(await fits()).toEqual([]);
+          for (const width of [360, 320]) {
+            await page.setViewportSize({ width, height: 664 });
+            await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+            expect(await cut(), `${width} px`).toEqual([]);
+          }
           await page.setViewportSize(size);
         }
+        // Then "Your move." again.
+        await expect(page.locator(".boss-dock .dk-text")).toContainText("Your move.", { timeout: 5_000 });
         tried = true;
       }
     }

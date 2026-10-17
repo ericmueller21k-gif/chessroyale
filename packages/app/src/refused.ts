@@ -2,15 +2,17 @@
  * What the dock says when a power stops a move (Eric, Oct 17: his move across Sawyer's board saw went straight back
  * with nothing said, "like it glitched", and then the boss's queen crossed the saw: his only way out of check, which
  * every power lets through). docs/decisions/2026-10-17-power-limits-said-on-screen.md.
- * - A move of yours that a power refuses (legal in chess, not allowed this turn): why, beside "Your move." for
- *   REFUSED_MS or until the position changes (refusedLine).
+ * - A move of yours that a power refuses (legal in chess, not allowed this turn): why, in the dock in place of "Your
+ *   move." for REFUSED_MS or until the position changes (refusedLine).
  * - The boss's last move went through a power (it stopped every move he had, so the limit lifted for the turn): said
- *   on your turn after it (throughLine).
+ *   in the dock in place of "Your move." through your turn after it (throughLine).
+ * Each is the dock's whole line: whole in its two lines at 320 px (its box is 112 px wide there; e2e/sawyer.spec.ts
+ * measures every one), which "Your move." in front didn't leave room for.
  */
 import type { StopReason } from "@chessroyale/core";
 import { stopReason, type StopFields } from "@chessroyale/chess";
 
-/** How long a refused move's reason stays beside "Your move." (unless the position changes first). */
+/** How long a refused move's reason stays in the dock (unless the position changes first). */
 export const REFUSED_MS = 3000;
 
 /** Why a move of yours was refused: a power that stops it, your frozen piece, or the move the God King took back. */
@@ -28,10 +30,10 @@ export const REFUSED_OTHER = "That move isn't allowed this turn.";
 
 /** The boss's only move, through a power that stops it (the limit lifted for the turn). */
 export const THROUGH: Record<StopReason, string> = {
-  boardsaw: "His only move: the board saw let it through.",
-  cut: "His only move: the saw cut let it through.",
-  pie: "His only move: the pie let it through.",
-  block: "His only move: the toy block let it through.",
+  boardsaw: "His only move: across the saw.",
+  cut: "His only move: across the cut.",
+  pie: "His only move: onto the pie.",
+  block: "His only move: past the block.",
 };
 
 /** The boss as the screens see it, as far as these words need. */

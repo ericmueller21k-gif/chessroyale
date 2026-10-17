@@ -52,8 +52,8 @@ moves your piece), Hollow's dark (an attempt into it goes unchecked and costs a 
 
 ## What changed
 
-- **A move of yours a power refuses says why**, beside "Your move." in the dock, for 3 s (`REFUSED_MS`) or until the
-  position changes (the board's new `onRefused`: a tap or a drop that chess allows but the turn doesn't; words in
+- **A move of yours a power refuses says why**, in the dock in place of "Your move.", for 3 s (`REFUSED_MS`) or until
+  the position changes (the board's new `onRefused`: a tap or a drop that chess allows but the turn doesn't; words in
   `packages/app/src/refused.ts`):
   - the board saw: "The board saw blocks that move."
   - a saw cut: "The saw cut blocks that move."
@@ -62,9 +62,9 @@ moves your piece), Hollow's dark (an attempt into it goes unchecked and costs a 
   - a frozen piece (Ginger's freeze or blizzard): "That piece is frozen."
   - the move the God King took back: "The God King took that move back."
   - anything else (Wrangler's duels, whose dock line already says what to do): "That move isn't allowed this turn."
-- **The boss's only move through a power says so** on your turn after it (the dock's muted line beside "Your move."):
-  "His only move: the board saw let it through." (the saw cut, the pie, the toy block: "His only move: the saw cut let
-  it through.", "His only move: the pie let it through.", "His only move: the toy block let it through."). The runner
+- **The boss's only move through a power says so** through your turn after it, in the dock in place of "Your move."
+  (as Wrangler's duel line is): "His only move: across the saw." (the saw cut, the pie, the toy block: "His only move:
+  across the cut.", "His only move: onto the pie.", "His only move: past the block."). The runner
   marks it (`lastMove.through`) when the move played is one his own power stops, which only happens when it stopped
   every move he had.
 - **Which power stops a move:** `BossRules.stopReason` (Sawyer, Boingo, Big Boy), through `stopReason` in
@@ -82,10 +82,15 @@ moves your piece), Hollow's dark (an attempt into it goes unchecked and costs a 
 - **No Stockfish takeover while a move-limiting power is up.** Eric approved it as a fallback if Maia were hard to keep
   within the limits. It isn't needed: Maia is asked for the allowed moves only, its answer is filtered again, and both
   last checks stand behind it. Every path is tested. Taking Maia off would change how the boss plays for nothing.
-- **The words name the power, in the dock's status line, as Hollow's dark-try note does** (the pattern already there
+- **The words name the power, in the dock's status line** (where Hollow's dark-try note is: the pattern already there
   for a refused attempt). No flash on the board: less code, nothing to watch frame by frame, and the saw is already
   drawn. Three seconds, like Squads' block lines (2.6 s), rounded up for reading. The lift's note stays the whole
   turn: it explains the position on the board.
+- **Each is the dock's whole line, not a note after "Your move."** At 320 px the dock's text has 112 px; beside "Your
+  move." every line was cut by its two-line clamp (measured). Alone, each is whole at 320, 360 and 390 px, in normal
+  weight (in bold "The God King took that move back." took a third line). The lift's words are short for that ("His
+  only move: across the saw." rather than naming the board saw). "Your move." is back once the refusal's 3 s are up;
+  through a lifted turn the running clock says it's your move, as on the duel's turn.
 - **The server's last check plays the first allowed move,** as before, and logs it. The server has no engine; the best
   allowed move comes from `bossMoveFrom` on the device that picks. Only a host that's out of date or tampered with
   reaches it.

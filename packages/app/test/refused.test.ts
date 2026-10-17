@@ -46,19 +46,19 @@ describe("the dock's words", () => {
   });
 
   it("the boss's only move through a power says so on your turn; an ordinary move says nothing", () => {
-    expect(throughLine({ lastMove: { through: "boardsaw" } })).toBe("His only move: the board saw let it through.");
-    expect(throughLine({ lastMove: { through: "cut" } })).toBe("His only move: the saw cut let it through.");
-    expect(throughLine({ lastMove: { through: "pie" } })).toBe("His only move: the pie let it through.");
-    expect(throughLine({ lastMove: { through: "block" } })).toBe("His only move: the toy block let it through.");
+    expect(throughLine({ lastMove: { through: "boardsaw" } })).toBe("His only move: across the saw.");
+    expect(throughLine({ lastMove: { through: "cut" } })).toBe("His only move: across the cut.");
+    expect(throughLine({ lastMove: { through: "pie" } })).toBe("His only move: onto the pie.");
+    expect(throughLine({ lastMove: { through: "block" } })).toBe("His only move: past the block.");
     expect(throughLine({ lastMove: {} })).toBeNull();
     expect(throughLine({ lastMove: null })).toBeNull();
     expect(throughLine(null)).toBeNull();
   });
 
-  it("every line fits the dock: one short sentence each", () => {
+  it("each is one short sentence (each is the dock's whole line: e2e/sawyer.spec.ts measures them at 320 px)", () => {
     for (const line of [...Object.values(REFUSED), REFUSED_OTHER, ...Object.values(THROUGH)]) {
       expect(line).toMatch(/^[A-Z].*\.$/);
-      expect(line.length).toBeLessThanOrEqual(46);
+      expect(line.length).toBeLessThanOrEqual(34);
     }
   });
 });
