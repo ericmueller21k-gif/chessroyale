@@ -309,12 +309,14 @@ describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Bos
     expect(t).toContain(`every bank is ${BOSS_POWERS.bulletBankSeconds / 60} minute`);
     expect(t).toContain(`${RECLUSE_PHASE2.boards} boards of Chess960 at once`);
     expect(t).toContain(`against Stockfish at ${RECLUSE_PHASE2.elo}`);
+    expect(t).toContain(`A ${RECLUSE_PHASE2.change.countdownSeconds}-second countdown on every board, then`);
     expect(t).toContain("online, that's the crowd's victory");
     // "Still to come" lists only bosses without their art and powers.
     expect(t).toMatch(/Still to come/);
     expect(t.slice(t.indexOf("Still to come"))).not.toContain(him.name);
-    const moved = section("boss-powers", { ...FAQ_DEFAULTS, powers: { ...BOSS_POWERS, bulletTurn: 9 }, phase2: { ...RECLUSE_PHASE2, slowMovesForUlt: 6 } });
+    const moved = section("boss-powers", { ...FAQ_DEFAULTS, powers: { ...BOSS_POWERS, bulletTurn: 9 }, phase2: { ...RECLUSE_PHASE2, slowMovesForUlt: 6, change: { ...RECLUSE_PHASE2.change, countdownSeconds: 3 } } });
     expect(moved).toContain("full as turn 9 begins");
+    expect(moved).toContain("A 3-second countdown on every board");
     expect(moved).toContain("the team's 6th brings his last power");
   });
 

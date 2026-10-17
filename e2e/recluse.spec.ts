@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOSS_POWERS } from "@chessroyale/core";
-import { BOARD_SEL, test, watchFor, bossAloneFromHome } from "./helpers.ts";
+import { BOSS_POWERS, RECLUSE_PHASE2 } from "@chessroyale/core";
+import { BOARD_SEL, test, watchFor, watchSpans, bossAloneFromHome } from "./helpers.ts";
 import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
 
 /**
@@ -16,8 +16,16 @@ import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
  *   per move (his line, "+2 s a move from now on" across the board, "Bullet 1+2" in the dock, +2 s a move made in time);
  * - beaten (?win=1: you mate in one): he collapses and mumbles on the board, then (Boss alone) his phase change (it
  *   opens with the God King's absorption: triumphant, drained into the boss's raised hand, gone; the boss's half-engine
- *   look ignites) and phase 2's four boards, with no God King.
+ *   look ignites) and phase 2's four boards, with no God King; at its pace (Eric, Oct 17: "way too fast"): his words
+ *   before he seizes the power, a hold as it lands, a longer cast, then a 5-4-3-2-1 on every board before any clock runs
+ *   (each from RECLUSE_PHASE2.change).
  */
+/**
+ * What the phase change's pace added before phase 2's clocks (Eric, Oct 17): his words before the seize, the hold as the
+ * power lands, the longer cast and the countdown, from the settings; the waits for phase 2 allow for it.
+ */
+const P = RECLUSE_PHASE2.change;
+const ADDED_MS = P.talkMs + P.absorbHoldMs + P.castHoldMs + P.countdownSeconds * 1000;
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const bossNow = (p: Page) => p.evaluate(() => (window as any).match?.boss ?? null);
 /** His figure on this screen: the bust in a phone's boss bar, the whole figure by the board on a computer. */
@@ -401,7 +409,7 @@ test("his chatter all through phase 1 (Eric, Oct 15: he went quiet after move 10
   expect(errors).toEqual([]);
 });
 
-test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase change (he absorbs the God King, up in a rage, his leap onto the board, the book thrown down, the chant and its light, the split, the book back, the leap back, the shuffle) and four boards; all four won: Victory!", async ({ page }) => {
+test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase change (he says he'll take the God King's power and absorbs it, holds it, up in a rage, his leap onto the board, the book thrown down, the chant and its light held, the split, the book back, the leap back, the shuffle), a countdown on four boards, then their clocks; all four won: Victory!", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -450,11 +458,34 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     // (One book on screen: his own, in his frames; never a second one flying in.)
     book: { selector: ".rc-book" },
   });
+  // Its pace (Eric, Oct 17): every beat's first and last frame on screen, for their order and the time added between.
+  const esc = (l: string) => l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const count = (n: number) => ({ selector: ".rc-simul .cc-num", text: new RegExp(`^${n}$`) });
+  const pace = await watchSpans(page, {
+    triumph: { selector: ".gk-unit.gk-triumph .god-king" },
+    talk: { selector: ".bc-bubble", text: new RegExp(RECLUSE_LINES.seizeTalk.map(esc).join("|")) },
+    seize: { selector: `${figure()}[data-anim="seize"]` },
+    ignite: { selector: `${figure()} .bc-engine.on.fresh` },
+    held: { selector: `${figure()}[data-anim="seized"]` },
+    note: { selector: ".boss-dock-status", text: /The God King's power is his!/ },
+    rage: { selector: `${figure()}[data-anim="rage"]` },
+    chant: { selector: '.rc-fig[data-anim="chantRaise"], .rc-fig[data-anim="chant"]' },
+    crack: { selector: ".rc-crack canvas" },
+    banner: { selector: ".fight-banner", text: /PHASE 2/ },
+    c5: count(5),
+    c4: count(4),
+    c3: count(3),
+    c2: count(2),
+    c1: count(1),
+    ready: { selector: ".rc-simul .cc-banner", text: /^Get ready$/ },
+  });
   await play(page, "h5f7");
   // The board holds while he falls, then (no result screen) the phase change, then phase 2's four boards.
   await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.fall), { timeout: 60_000 }).toBe(true);
   expect((await bossNow(page)).result).toBe("crowd");
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("phaseChange");
+  // (No clock runs from here until the countdown is over: neither the dock's nor any board's.)
+  const clocks = await watchSpans(page, { running: { selector: ".dk-clock.running, .rc-tag.running" } });
   // Nothing said twice at once in the phase change (Eric, Oct 15): the dock never repeats his line or the banner, the
   // boss bar never repeats the title's "phase 2", and the subtitle never says he's beaten as he rises (it did during
   // his fall, on the boss screen, where it's true).
@@ -466,10 +497,37 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   });
   expect(await fall.seen()).toMatchObject({ collapse: true, dock: true });
   const at = Date.now();
+  // The boards set, a countdown on every one (a phone's three small ones too), its banner on yours; no clock yet.
+  await expect.poll(() => phase(page), { timeout: 30_000 + ADDED_MS }).toBe("simul");
+  await expect.poll(() => page.locator(".rc-simul .cc-num").count(), { timeout: P.countdownSeconds * 1000 }).toBe(4);
+  expect((await simulNow(page)).playing).toBe(false);
+  // (Reduced motion: the same countdown, its numbers still.)
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(await page.locator(".rc-simul .cc-num").first().evaluate((e) => getComputedStyle(e).animationName)).toBe("none");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 }).toBe(true);
-  // (About 15 s: PHASE_CHANGE.total.)
-  expect(Date.now() - at).toBeLessThan(20_000);
+  // (The phase change was about 15 s before Oct 17, under 20 s here.)
+  expect(Date.now() - at).toBeLessThan(20_000 + ADDED_MS);
   expect(await phase(page)).toBe("simul");
+  // The beats in order, each at least its added time: his words before the seize (the seize came 1.7 s into the change;
+  // now that and talkMs more, the God King gloating meanwhile, his line up through it), the fist held as the power
+  // lands, the cast before the crack, then 5, 4, 3, 2, 1, a second each; then the clocks.
+  const s = await pace.spans();
+  const c = await clocks.spans();
+  const order = ["triumph", "talk", "seize", "ignite", "note", "rage", "chant", "crack", "banner", "c5", "c4", "c3", "c2", "c1"] as const;
+  for (const k of [...order, "held", "ready"] as const) expect(s[k], k).not.toBeNull();
+  const first = (k: keyof typeof s) => s[k]!.first;
+  for (let i = 1; i < order.length; i++) expect(first(order[i]!), `${order[i - 1]} then ${order[i]}`).toBeGreaterThan(first(order[i - 1]!));
+  expect(first("seize") - first("triumph")).toBeGreaterThanOrEqual(P.talkMs);
+  expect(s.talk!.last).toBeGreaterThanOrEqual(first("seize"));
+  expect(first("rage") - first("ignite")).toBeGreaterThanOrEqual(P.absorbHoldMs);
+  expect(s.held!.last - s.held!.first).toBeGreaterThanOrEqual(P.absorbHoldMs);
+  expect(first("crack") - first("chant")).toBeGreaterThanOrEqual(P.castHoldMs);
+  // (A second each, less a frame either side.)
+  for (const [a, b] of [["c5", "c4"], ["c4", "c3"], ["c3", "c2"], ["c2", "c1"]] as const) expect(first(b) - first(a), `${a} to ${b}`).toBeGreaterThanOrEqual(1000 - 50);
+  expect(first("c5")).toBeGreaterThanOrEqual(s.banner!.last);
+  expect(c.running, "a clock running once play starts").not.toBeNull();
+  expect(c.running!.first).toBeGreaterThanOrEqual(first("c1") + 1000 - 50);
   expect(await change.seen()).toMatchObject({
     triumph: true,
     triumphLine: true,
@@ -533,7 +591,7 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
   page.on("pageerror", (e) => errors.push(e.message));
   await meetHim(page, "phase=2");
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("phaseChange");
-  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 }).toBe(true);
+  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 + ADDED_MS }).toBe(true);
   // The God King is gone (the boss absorbed him in the phase change): his place in the dock empty, nothing to tap, and
   // not a word from him all through phase 2.
   const king = await watchFor(page, { bubble: { selector: ".gk-bubble" }, figure: { selector: ".boss-dock .god-king" } });
@@ -599,7 +657,7 @@ test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defea
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await meetHim(page, "win=1&phase=2");
-  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 60_000 }).toBe(true);
+  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 60_000 + ADDED_MS }).toBe(true);
   await resignHere(page, /Your board is lost\. The other boards play on, but all four must be won\./);
   await expect.poll(async () => (await simulNow(page))?.boards[0].result?.how ?? null, { timeout: 10_000 }).toBe("resign");
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
@@ -614,7 +672,7 @@ test("phase 2's ultimate (the admins' trigger): \"5 SECONDS!\", his line and spe
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await meetHim(page, "phase=2");
-  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 60_000 }).toBe(true);
+  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 60_000 + ADDED_MS }).toBe(true);
   // Before it: your bank in the dock; the team's slow moves beside your board only (no longer in the dock).
   // (Your board's clock: bold at the box's right, the words beside it without the time.)
   await expect(page.locator(".boss-dock-status .dk-clock .dk-time")).toHaveText(/^\d:\d\d$/);
@@ -643,7 +701,7 @@ test("phase 2's slow moves (?phase=2): each marks a red X for the team in one co
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await meetHim(page, "phase=2");
-  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 60_000 }).toBe(true);
+  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 60_000 + ADDED_MS }).toBe(true);
   await page.evaluate(() => ((window as any).__soundLog = []));
   const phone = test.info().project.name === "phone";
   // Ten slots, all empty, once: a column beside your board (Eric, Oct 14: the count is the team's, so once is enough).
