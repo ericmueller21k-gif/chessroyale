@@ -7959,7 +7959,7 @@ button.fd-logo {
   display: none;
 }
 /*
- * A phone's top bar holds the logo, the sun, your coins and your pawn. When they don't all fit, the coins' word goes
+ * A phone's top bar holds the logo, your coins, your pawn and the gear (Settings). When they don't all fit, the coins' word goes
  * first (it wraps onto a second line the pill doesn't show: the gold dot is the coin), on narrow phones the logo steps
  * down a little, and below 360 px a big balance goes short ("12k"). Measured with six-digit balances from 320 px up.
  */
@@ -8097,6 +8097,10 @@ button.fd-logo {
 .fd-hero-name {
   font-size: 20px;
   font-weight: 800;
+  /* (A long name ellipsizes, as everywhere else: a 16-character one ran 100 px off a 320 px phone, Oct 17.) */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .fd-hero-sub {
   font-size: 14px;

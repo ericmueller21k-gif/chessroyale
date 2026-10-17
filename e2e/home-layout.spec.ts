@@ -370,3 +370,87 @@ test("phone: the top bar (logo, coins, pawn) fits from 320 px up, even with a si
     expect(await sideways(page), `${width} px`).toBe(0);
   }
 });
+
+/** A full-length name (the server keeps 16 characters) in the widest letters, and a five-digit balance. */
+const LONG_NAME = "MMMMMMMMMMMMMMMM";
+const bigBalance = (page: Page) =>
+  page.route("**/api/me*", async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    if (body?.shop) body.shop.coins = 99_999;
+    await route.fulfill({ response: res, json: body });
+  });
+
+test("phone: the top bar's gear opens Settings in one tap (Back is home); it fits beside the coins and your pawn from 320 px", async ({ page }) => {
+  test.skip(desktop(), "the phone's top bar (a computer has Settings in its side menu)");
+  await named(page, LONG_NAME);
+  await bigBalance(page);
+  for (const width of [320, 360, 390]) {
+    await page.setViewportSize({ width, height: 740 });
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+    const bar = page.locator(".fd-top");
+    await expect(bar.getByLabel("99999 coins")).toBeVisible();
+    // Logo, coins, pawn, gear: in order, apart, inside the bar; the gear a full 44 px.
+    const fits = await bar.evaluate((el) => {
+      const right = el.getBoundingClientRect().right - parseFloat(getComputedStyle(el).paddingRight);
+      const kids = [...el.querySelectorAll(".fd-logo, .fd-coins, .fd-ring, .fd-top-gear")].map((k) => k.getBoundingClientRect());
+      return { count: kids.length, inOrder: kids.every((k, i) => i === 0 || k.left >= kids[i - 1]!.right), inside: kids.every((k) => k.right <= right + 0.5), oneRow: kids.every((k) => k.top < kids[0]!.bottom && k.bottom > kids[0]!.top) };
+    });
+    expect(fits, `${width} px`).toEqual({ count: 4, inOrder: true, inside: true, oneRow: true });
+    const gear = (await bar.getByRole("button", { name: "Settings" }).boundingBox())!;
+    expect(Math.min(gear.width, gear.height), `the gear at ${width}`).toBeGreaterThanOrEqual(44);
+  }
+  // One tap: Settings, as Profile → Settings opens it; Back is home.
+  await page.locator(".fd-top").getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("radiogroup", { name: "Theme" })).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).first().click();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+});
+
+test("phone: no sideways scroll on home at 320, 360 and 390 px with a 16-character name and 99,999 coins; the name ellipsizes in its card", async ({ page }) => {
+  test.skip(desktop(), "a phone's widths");
+  await named(page, LONG_NAME);
+  await bigBalance(page);
+  for (const scheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    for (const width of [320, 360, 390]) {
+      await page.setViewportSize({ width, height: 740 });
+      await page.goto("/");
+      const name = page.locator(".fd-hero-name");
+      await expect(name).toHaveText(LONG_NAME);
+      expect(await sideways(page), `${width} px, ${scheme}`).toBe(0);
+      const cut = await name.evaluate((el) => {
+        const s = getComputedStyle(el);
+        const card = el.closest(".fd-hero")!.getBoundingClientRect();
+        const box = el.getBoundingClientRect();
+        return { ellipsis: s.textOverflow === "ellipsis" && s.whiteSpace === "nowrap", cut: el.scrollWidth > el.clientWidth, inCard: box.left >= card.left && box.right <= card.right };
+      });
+      expect(cut, `${width} px, ${scheme}`).toEqual({ ellipsis: true, cut: true, inCard: true });
+    }
+  }
+});
+
+test("computer at a laptop's window (1280×600, 1366×768): no gear on home (Settings is the side menu's), the name whole, nothing sideways", async ({ page }) => {
+  test.skip(!desktop(), "the computer's layout");
+  await named(page, "Columned");
+  for (const [w, h] of [
+    [1280, 600],
+    [1366, 768],
+  ] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/");
+    const play = page.getByRole("main").getByRole("button", { name: "PLAY", exact: true });
+    await expect(play).toBeVisible();
+    await expect(page.locator(".fd-top-gear")).toBeHidden();
+    await expect(page.locator(".fd-side").getByRole("button", { name: "Settings" })).toBeVisible();
+    await expect(page.locator(".fd-right > .fd-top-right .fd-ring")).toBeVisible();
+    const name = page.locator(".fd-hero-name");
+    await expect(name).toHaveText("Columned");
+    expect(await name.evaluate((el) => el.scrollWidth <= el.clientWidth), `${w}×${h}`).toBe(true);
+    // PLAY whole in the window, as before.
+    const p = (await play.boundingBox())!;
+    expect(p.y + p.height, `${w}×${h}`).toBeLessThanOrEqual(h);
+    expect(await sideways(page), `${w}×${h}`).toBe(0);
+  }
+});
