@@ -117,6 +117,19 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
     judgment (licenses, design); docs that must match the code exactly (the FAQ); crate item art Eric reviews.
   - `medium`: CSS, layout and stacking tweaks; text and copy; docs-only updates; small investigations; one obvious bug
     with a clear fix and a test.
+- **Working lean (Eric, Oct 17):** most of a helper's usage is re-reading its own history at every step (measured Oct
+  17: the costliest helpers re-read 300 to 500 million tokens each and wrote 7 to 40 thousand), so steps times
+  history is what to keep down. Never at the cost of a check: tests, reviews, the CI gate and effort stay as they are.
+  - A review round, or a fix round after a merge, goes to a fresh helper with a one-page handoff (the PR, the
+    findings, the files), not to a resumed one carrying hundreds of thousands of tokens. A helper mid-task keeps going.
+  - Waiting (CI, a deploy, a local run) is one background command that reports when it's done, never a loop of looks.
+  - Big output goes to a file: read its tail or grep it. Screenshots: look at the final ones, not every attempt.
+    Small checks go together in one command.
+  - After each batch of work the director runs `python3 .claude/tools/helper-usage.py <its task folder>` (one line per
+    helper: steps, peak history, re-read, hours, waits, big outputs, images). Only when a helper stands out or a new
+    waste pattern shows, it starts an audit helper (same model, `medium`, read-only) on those helpers. The audit only
+    proposes: the director weighs each proposal, and Eric approves any that touch a quality gate (tests, reviews, CI,
+    effort) or this file. Two audits in a row that change nothing retire it. `docs/decisions/2026-10-17-working-lean.md`.
 - **Any other window works only in its own lane** and doesn't act as the director.
 - **Before starting,** check `git log origin/main` and open PRs for work already in flight.
 - Each piece of work goes on its own branch and PR.
