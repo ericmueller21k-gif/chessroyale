@@ -65,22 +65,25 @@ test("an admin's Brain picker: Ginger on Maia with the full guard, on a phone; M
   expect(await page.evaluate(() => (window as any).match.boss.id)).toBe("gingerbread");
   const debug = page.locator(".brain-debug");
   await expect(debug).toContainText(/Maia \d+ · full guard/, { timeout: 30_000 });
+  // The line fits the phone's width.
+  const box = await debug.boundingBox();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   // (The model loads during the intro; it's ready before long.)
   await expect.poll(() => page.evaluate(() => (window as any).match.brainLine as string), { timeout: 60_000 }).toMatch(/· ready$|Maia's/);
   const lines: string[] = [];
   for (let i = 0; i < 4 && (await phase(page)) !== "results"; i++) {
     await play(page);
     await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/^(play|results)$/);
-    lines.push(await debug.innerText());
+    // (The match's own line, which the debug line shows: read from the match, since a battle the boss has just won is
+    // on its results, with no debug line to read. On CI, Oct 16, Ginger mated on the test's third move and the test
+    // waited out its time for a line no longer drawn.)
+    lines.push(await page.evaluate(() => (window as any).match.brainLine as string));
   }
   // Maia played the boss's moves (its own, or its next likely move where the guard turned one down), quickly.
   const maia = lines.filter((l) => /Maia \d+ · full guard · (guard → )?Maia's #\d+ · \d+ ms/.test(l));
   expect(maia.length, lines.join("\n")).toBeGreaterThanOrEqual(2);
   for (const l of maia) expect(Number(l.match(/(\d+) ms/)![1])).toBeLessThan(1500);
-  // The line fits the phone's width.
-  const box = await debug.boundingBox();
-  expect(box!.x).toBeGreaterThanOrEqual(0);
-  expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
 });
 
 test("every boss is on Maia, no guard, by default for an admin (Boss alone, a phone): its moves are Maia's", async ({ page }) => {

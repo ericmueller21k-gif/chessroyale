@@ -117,8 +117,9 @@ test("Boss raid: its screen has the three types too (and Boss alone); a Solo rai
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=1");
   await openBossRaid(page);
   // Each way of being matched is a choice of its own, with its line.
-  await expect(page.getByRole("button", { name: /^Join a raid/ })).toContainText(/Up to 50 players · bots fill the crowd after \d+ s/);
-  await expect(page.getByRole("button", { name: /^People only/ })).toContainText("No bots · starts at 50, or 10 after 8 s");
+  // (The public queues are always a random boss: the Boss raid screen's pick is for the rest. boss-select.spec.ts.)
+  await expect(page.getByRole("button", { name: /^Join a raid/ })).toContainText(/Random boss · up to 50 players · bots after \d+ s/);
+  await expect(page.getByRole("button", { name: /^People only/ })).toContainText("Random boss · no bots · starts at 50, or 10 after 8 s");
   await expect(page.getByRole("button", { name: /^Raid with bots/ })).toContainText("You and 49 bots · starts at once");
   // Boss alone is still here (you against a boss you pick).
   await expect(page.getByRole("main").getByRole("button", { name: /^Boss alone/ })).toBeVisible();
