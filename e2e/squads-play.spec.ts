@@ -291,3 +291,39 @@ async function newPlayer(browser: Browser, project: string) {
   const { devices } = await import("@playwright/test");
   return project === "desktop" ? browser.newContext({ viewport: { width: 1280, height: 800 } }) : browser.newContext({ ...devices["iPhone 13"], browserName: undefined } as never);
 }
+
+test("the party sheet: Escape closes it from its first frame, and leaves a party made while it was open", async ({ page }) => {
+  // (Its key listener waited for a paint, so an Escape pressed as it opened was lost: kill-switches.spec.ts, CI, Oct
+  // 16. And it kept the sheet's first close, from before the party was made, so it dropped the party without leaving
+  // it. docs/decisions/2026-10-16-flaky-e2e-batch-4.md)
+  test.setTimeout(90_000);
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  await named(page, "Esc");
+  await page.goto(`/?nolanding&debug&pool=sqesc-${run}`);
+  await page.getByRole("radio", { name: /Squads/ }).click();
+  const sheet = page.getByRole("dialog", { name: "Squads party" });
+  // Escape the moment the sheet is in the page (before it's painted): it closes.
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__sheetSeen = false;
+    const obs = new MutationObserver(() => {
+      if (!document.querySelector('[role="dialog"]')) return;
+      obs.disconnect();
+      w.__sheetSeen = true;
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+  });
+  await page.getByRole("button", { name: /^Party/ }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__sheetSeen)).toBe(true);
+  await expect(sheet).toHaveCount(0);
+  // A party made with the sheet open: Escape closes the sheet and leaves the party, as ✕ does.
+  await page.getByRole("button", { name: /^Party/ }).click();
+  await sheet.getByRole("button", { name: "Create a party" }).click();
+  const code = (await page.locator(".sq-invite-code").textContent({ timeout: 15_000 }))!.trim();
+  const members = () => page.evaluate((c) => fetch(`/api/squads/party/${c}`).then((r) => (r.ok ? r.json().then((s) => s.members as number) : 0)), code);
+  await expect.poll(members).toBe(1);
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expect.poll(members, { timeout: 10_000 }).toBe(0);
+});

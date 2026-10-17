@@ -4,7 +4,8 @@
  * middle, so where his belly was there is a band of violet-black darkness with a void at its heart, slowly swirling.
  * Torn seams across his shoulder, his cheek and his thigh are bound the same way. He carries a long strand of
  * Christmas lights held in the middle, its two halves hanging with five bulbs each (Eric's reference: red, gold,
- * blue in turn; since Oct 11 the battle's own colors, lights.ts), which count down to his next cover of the dark.
+ * blue in turn; since Oct 11 the battle's own colors, lights.ts), all ten lit in every pose (Eric, Oct 16: the countdown
+ * to his next cover of the dark is the strip of three by the boss bar alone).
  * Glowing gold eyes, a thin violet edge glow (his halo) so he never vanishes on the dark ground. Drawn facing front,
  * light from the top left.
  *
@@ -13,9 +14,10 @@
  * knee, an ankle) as shaggy strokes; the strand is painted from the hand that holds it. So a new pose is a few numbers.
  *
  * Each bulb has palette keys of its own (main, shade, glint, glow), drawn in its default color (lights.ts,
- * DEFAULT_LIGHTS: red, yellow, blue in turn): the battle's lights swap them (HOLLOW.swap), and a look (`bulbs2`,
- * `bulbs1`, `bulbs0`) puts a third of the strand out (bulbs 2, 5, 8 first, then 1, 4, 7, then the rest) without
- * redrawing anything. Their glints are specks in the same keys (an unlit bulb never glints).
+ * DEFAULT_LIGHTS: red, yellow, blue in turn): the battle's lights swap them (HOLLOW.swap), and a look or a frame's
+ * palette (`bulbs2`, `bulbs1`, `bulbs0`; `bulbsOff`) puts a third of the strand out (bulbs 2, 5, 8 first, then 1, 4, 7,
+ * then the rest) without redrawing anything: his entrance lights them a third at a time and his defeat puts them out.
+ * His figure in battle wears no look (kits.ts). Their glints are specks in the same keys (an unlit bulb never glints).
  */
 import type { LightsOutTarget } from "@chessroyale/core";
 import { KING_ATTACK } from "@chessroyale/chess";
@@ -69,8 +71,9 @@ export const HOLLOW_PALETTE: Record<string, string> = {
 
 /**
  * His bulbs put out a third of the strand at a time, from the last (`bulbs<n>`: n thirds still lit: bulbs 2, 5 and 8 go
- * out first, then 1, 4 and 7, then 0, 3, 6 and 9, as the strip by the board loses a bulb); the dark stance's look is a
- * frame palette (DARK).
+ * out first, then 1, 4 and 7, then 0, 3, 6 and 9): his entrance and defeat (`bulbsOff`), and a look for a preview. His
+ * figure in battle no longer counts down with the strip by the board (Eric, Oct 16); the dark stance's look is a frame
+ * palette (DARK).
  */
 const bulbsOff = (from: number): Record<string, string> => Object.fromEntries(BULB_KEYS.filter((_, b) => b % 3 >= from).flatMap((keys) => keys.map((k, i) => [k, BULB_OFF[i]!])));
 export const HOLLOW_LOOKS = { bulbs3: {}, bulbs2: bulbsOff(2), bulbs1: bulbsOff(1), bulbs0: bulbsOff(0) } as const;
@@ -454,16 +457,13 @@ export interface StrandSpec {
   bows?: readonly [number, number];
   /** Bulbs smashed (by number). */
   broken?: readonly number[];
-  /** Only this much of it is out (0-1): the fresh strand spilling out of the void. */
-  out?: number;
 }
 
 /** The strand's wire (with its bulbs on it, one part) and the glow round its lit bulbs (another, behind). */
 function strand(s: StrandSpec): { wire: { name: string; at: Pt }; glow: { name: string; at: Pt }; bulbs: Pt[] } {
   const ends = s.ends ?? [[-2, 23], [11, 20]];
   const bows = s.bows ?? [-2, 3];
-  const out = s.out ?? 1;
-  const key = `strand:${s.hand.join(",")}:${ends.map((e) => e.join(",")).join(";")}:${bows.join(",")}:${(s.broken ?? []).join(".")}:${out}`;
+  const key = `strand:${s.hand.join(",")}:${ends.map((e) => e.join(",")).join(";")}:${bows.join(",")}:${(s.broken ?? []).join(".")}`;
   const [hx, hy] = s.hand;
   // Each half a quadratic curve from the hand to its end, bowing sideways at its middle.
   const along = (h: 0 | 1, t: number): Pt => {
@@ -481,7 +481,6 @@ function strand(s: StrandSpec): { wire: { name: string; at: Pt }; glow: { name: 
   for (let i = 0; i < BULBS; i++) {
     const h = i < PER_HALF ? 0 : 1;
     const t = ALONG[h === 0 ? PER_HALF - 1 - i : i - PER_HALF]!;
-    if (t > out + 0.02) continue;
     const w = along(h, t);
     // (Either side of a steep half, a little either side of a shallow one.)
     const side = (i % 2 === 0 ? -1 : 1) * (Math.abs(ends[h][0]) < ends[h][1] / 2 ? 2 : 1);
@@ -496,7 +495,7 @@ function strand(s: StrandSpec): { wire: { name: string; at: Pt }; glow: { name: 
     const glow = canvas(cw, chh);
     for (const h of [0, 1] as const) {
       let prev: Pt | null = null;
-      for (let t = 0; t <= out + 1e-9; t += 0.02) {
+      for (let t = 0; t <= 1 + 1e-9; t += 0.02) {
         const p = along(h, t);
         const q: Pt = [Math.round(p[0] - x0), Math.round(p[1] - y0)];
         if (prev) line(cv, prev[0], prev[1], q[0], q[1], "w");
@@ -1081,8 +1080,9 @@ const lightsBack: Anim = {
   loop: false,
   frames: [
     f(140, DARK_P(0, 2), { pal: PULSE_PAL }),
-    ...[0.25, 0.5, 0.75, 1].map((out, i) =>
-      f(110, { mood: "dark", strand: { ...SPILL, out }, arm: "low", phase: 1 + i, size: 2 }, { cue: i === 0 ? "relight" : undefined, pal: { ...DARK_PAL, ...(i < 3 ? bulbsOff(i) : {}) }, specks: sparkle(OX + VOID[0], OY + VOID[1], i % 2 === 0) }),
+    // (The whole strand, every bulb on it, dropping out of the void, its halves lengthening as it falls: Oct 16.)
+    ...[0.55, 0.7, 0.85, 1].map((drop, i) =>
+      f(110, { mood: "dark", strand: { ...SPILL, ends: SPILL.ends!.map(([x, y]): Pt => [Math.round(x * drop), Math.round(y * drop)]) as [Pt, Pt] }, arm: "low", phase: 1 + i, size: 2 }, { cue: i === 0 ? "relight" : undefined, pal: { ...DARK_PAL, ...(i < 3 ? bulbsOff(i) : {}) }, specks: sparkle(OX + VOID[0], OY + VOID[1], i % 2 === 0) }),
     ),
     f(120, { mood: "roar", strand: SPILL, arm: "low", phase: 5, size: 1 }, { pal: { ...DUSK_PAL, ...EYES_HOT } }),
     f(120, { mood: "sneer", free: "grab", phase: 6, size: 1 }),

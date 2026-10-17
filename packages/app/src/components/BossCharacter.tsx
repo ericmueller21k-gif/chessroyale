@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
-import { bossKit, wipLook, type BossKit } from "../characters/kits.ts";
+import { bossKit, type BossKit } from "../characters/kits.ts";
 import { renderFrame, type Anim, type Character, type Frame } from "../characters/sprite.ts";
 import type { BossView, GameView, Phase } from "../game.ts";
 import { play, warmSounds } from "../sound.ts";
@@ -131,7 +131,7 @@ function inPlaceShowing(ch: Character, now: number): { anim: string; frame: numb
 }
 
 /**
- * Each frame's pixels, made once per look ("" its own colors; Hollow's `bulbs2` puts a bulb out) and per recolor
+ * Each frame's pixels, made once per look ("" its own colors; Big Boy's `blackPawn`) and per recolor
  * from the battle (Hollow's lights: `ch.swap`).
  */
 const images = new WeakMap<Frame, Map<string, ImageData>>();
@@ -240,9 +240,9 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     // (Its attack on a king too: the God King's Last Stand, or its mate.)
     prewarmKingAttack(kit.ch.name);
   }, [kit]);
-  // A recolor from the battle's state (Hollow's bulbs still lit), read as it's drawn.
+  // A recolor from the battle's state (Big Boy's black pawn), read as it's drawn.
   const lookRef = useRef<() => string>(() => "");
-  lookRef.current = () => (wipLook.now?.() ?? (kit?.lookOf ? kit.lookOf(boss) : undefined)) ?? "";
+  lookRef.current = () => (kit?.lookOf ? kit.lookOf(boss) : undefined) ?? "";
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
   // (The Hidden Boss's half-engine look over his drawing, placed on his head frame by frame: Recluse.tsx.)

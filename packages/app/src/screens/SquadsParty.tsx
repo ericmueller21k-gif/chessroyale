@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { SQUADS, pausedLine } from "@chessroyale/core";
 import { FdButton } from "../components/FrontDoor.tsx";
 import type { PartyClient } from "../squads.ts";
@@ -42,8 +42,12 @@ export function PartySheet({
   const [copied, setCopied] = useState(false);
   const [, redraw] = useState(0);
   useEffect(() => party?.subscribe(() => redraw((n) => n + 1)), [party]);
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+  // Escape closes it from its first frame (a layout effect: an effect waits for a paint, and an Escape pressed
+  // meanwhile was lost), and as the ✕ does now: the latest onClose, which leaves the party made since it opened.
+  const close = useRef(onClose);
+  close.current = onClose;
+  useLayoutEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && close.current();
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
   }, []);

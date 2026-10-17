@@ -423,7 +423,8 @@ door's look; every class is `sq-`.
   the Matchmaking row becomes **Party** (as does "Play with friends"): create a party (its code and invite link,
   `/squads/party/CODE`, copy or share), or join by code or link; the members (leader, connected); the leader presses
   PLAY for everyone. When the party is placed, everyone joins the lobby with its pass, the party's socket closes, and
-  after the lobby "Back to your party" reconnects (the leader queues again).
+  after the lobby "Back to your party" reconnects (the leader queues again). Escape closes the sheet as ✕ does, from
+  its first frame (leaving a party made while it was open; `2026-10-16-flaky-e2e-batch-4.md`).
 - **The waiting room** is the home screen's queue (as Crowd's), 32 seats: people as they join (your party's dashed),
   then the eight squads of four once bots fill. **The votes** use Crowd's vote board (`VoteScreen`, given Squads' own
   votes, no eval bar, no chimes or ticks): everyone's pawn on one side, three zones, three cards.
