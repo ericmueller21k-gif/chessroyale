@@ -144,7 +144,7 @@ export function BossMenu({
   const [difficulty, setDifficulty] = useState(chosenDifficulty);
   const extra = difficultyElo(difficulty);
   // Testing, admins (Boss alone): the boss's brain (Maia-3 or Stockfish). Maia's files are fetched ahead when it may
-  // play: Boss alone below Stockfish's strengths; a raid you make on a device that may run it (you're its host).
+  // play: Boss alone below Stockfish's strengths. (A raid you make fetches them as you make it: Play with friends.)
   const [brain, setBrain] = useState(pickedBrain);
   const picked = useRef<HTMLButtonElement>(null);
   const maiaAhead = () => maiaLikely(bosses.map((b) => bossStrength(base, b, extra)));
@@ -170,15 +170,13 @@ export function BossMenu({
             ✕
           </button>
         </div>
-        {(
-          <BossDifficulty
-            value={difficulty}
-            onChange={(d) => {
-              rememberDifficulty(d);
-              setDifficulty(d);
-            }}
-          />
-        )}
+        <BossDifficulty
+          value={difficulty}
+          onChange={(d) => {
+            rememberDifficulty(d);
+            setDifficulty(d);
+          }}
+        />
         {isAdmin() && (
           <BossBrainPicker
             value={brain}

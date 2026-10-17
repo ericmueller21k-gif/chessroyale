@@ -215,11 +215,11 @@ function modes(src: FaqSources): FaqSection {
 ### Boss raid and Boss alone {#mode-boss}
 
 - **Boss raid:** up to ${R.lobbySize} players pick the crowd's moves together against a [boss](#boss-brain); the most popular pick is played. Most bosses start from a named opening, ${n(R.openingMoves, "move")} in.
-- **Where:** tap **Boss raid** on the home screen. Its screen has every way to play one: **Join a raid** (bots fill any empty seats after a short wait), **People only** (no bots), **Raid with bots** (you and ${R.lobbySize - 1} bots, at once), **Boss alone** and **Play with friends** (make a raid and share its code).
+- **Where:** tap **Boss raid** on the home screen. The bosses are at the top: tap one to see it on the stage below (its name and strength), or **?** for a random one. Under them, every way to play: **Join a raid** (bots fill any empty seats after a short wait) and **People only** (no bots) always meet a random boss; **Raid with bots** (you and ${R.lobbySize - 1} bots, at once), **Boss alone** and **Play with friends** (make a raid and share its code) meet the one you picked.
 - **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} it knocks out the player who gave away the most points since its last strike (after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
 - **The God King** fights on your side, with ${n(S.kingChargesMax, "charge")} ([more on him](#god-king)).
 - The battle ends in checkmate or a draw, or after ${n(S.bossMaxMoves, "crowd move")}, when the engine judges the position.
-- **Boss alone** (on the Boss raid screen): just you against a boss you choose from the boss menu, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move.
+- **Boss alone** (on the Boss raid screen): just you against the boss you picked there, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move.
 - **The Crowd's boss final** is ${finalBoss ? `always ${finalFoe}, for` : "the same fight for"} the last ${left(src.crowdKnockouts.boss)} of a 50 v 50.${finalBoss ? " He's met nowhere else." : ""}
 
 ### Squads {#mode-squads}
@@ -528,7 +528,7 @@ ${offsets}
 
 **Worked example.** You're rated ${you}. The weakest tier above ${you} is ${tier}. ${ginger.name} at ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}: ${tier} ${term(ginger.offset)} = **${gingerElo}**. ${bigBoy.name} at ${hard.label}: ${tier} ${term(bigBoy.offset)} ${term(hard.elo)} = **${bigBoyElo}**.
 
-The boss menu shows each boss's strength and how far it is from yours ("+200 vs you"); in battle, 1 to 5 skulls show how dangerous it is.
+The Boss raid screen shows the boss you picked at its strength against you, and Boss alone's menu shows it with your difficulty and how far it is from yours ("+200 vs you"); 1 to 5 skulls show how dangerous it is.
 
 ### Brain 1: Stockfish at a set strength {#stockfish-brain}
 

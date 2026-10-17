@@ -12,8 +12,20 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **Where bosses are met:** the boss raid (up to 50 people, online; or a Solo raid with 49 bots), the Crowd 50 v 50's
   boss final (the top 4, always against the Hidden Boss since Oct 14), and solo's "Boss alone" (one of the Boss raid
   screen's choices, or `/bosses`; [hub.md](hub.md); you pick every move
-  against a boss you choose from the boss menu, at a difficulty from Easy to Hardest, `BOSS_DIFFICULTY`). The Hidden Boss
-  (below) is met by everyone in the Crowd's boss final, solo and online, and otherwise only by an admin, in Boss alone.
+  against a boss you choose on the Boss raid screen's tiles, at a difficulty from Easy to Hardest, `BOSS_DIFFICULTY`). The Hidden Boss
+  (below) is met by everyone in the Crowd's boss final, solo and online, and otherwise only by an admin, in Boss alone
+  from the `/bosses` picker (his tile on the Boss raid screen is dark and locked for everyone).
+- **The Boss raid screen's character select** (Eric, Oct 16; docs/decisions/2026-10-16-boss-character-select.md;
+  `components/BossSelect.tsx`, `characters/boss-select.ts`): a tile per boss you can meet, the picked one on a stage in
+  its idle (one sprite animating, on the shared loop; reduced motion: a still, no drop). A tap drops it on (the 1 v 1
+  stage's drop), plays its sound once (`SELECT_SOUND`: Ginger `gingerCrackle`, her freeze; Boingo `clownSplat`, his
+  pie; Jefferson `grexFizz`, his sparkler; Hollow `hollowCast`, his darkness; Big Boy `bigboyClack`, a toy block
+  landing; Sawyer `sawyerRev`, his saw; Wrangler `pigWhirl`, his lasso; the Hidden Boss `recluseHum`, his stare) and
+  says a line in its bubble (`SELECT_LINES`: its existing lines that read right outside a match, none twice running;
+  new ones from each boss's lore wait for Eric). The Hidden Boss: a silhouette (his sprite drawn black, edged in
+  violet), "???", never named, his ominous hum and Eric's two lines in turn ("Team up on me. It wouldn't be the first
+  time anyone did that.", "You're not ready to fight me yet."), every way to play locked. Its own voice
+  (`selectVoice`), the battle's speech rule.
 - **The roster is a template** (`BOSS_ROSTER` in `packages/core/src/boss.ts`): each boss has an id, a name, an icon,
   a character kit (its art, moments, lines and sounds, by name), an Elo `offset` (nastier powers play a little weaker
   underneath) and its powers: a **passive** and an **ultimate**. Only a **playable** boss (`isPlayable`: a complete
@@ -506,6 +518,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 - Unit, a boss's attack on a king: `packages/chess/test/king-attack.test.ts` (the beats, the Last Stand's fit, the
   mate's hold, the mate switch), `packages/app/test/king-attack.test.ts` (the kit, Hollow's frames on the beats, the God
   King's blows, the hits).
+- e2e, the Boss raid screen's select: `e2e/boss-select.spec.ts`; unit `packages/app/test/boss-select.test.ts` (every
+  boss's sound from its own pack, its own lines, none twice running, the Hidden Boss's in turn).
 - e2e: `e2e/pig.spec.ts` (Wrangler: the long pull, a drag, his meter's line and ready loop, a showdown with no warning,
   its forced duel and his reply (the engine's best), phone and computer, solo and online; the admins' trigger),
   `e2e/boss-powers.spec.ts` "Boingo's funhouse at every angle" (a move by tap and by drag, touch on the phone, at

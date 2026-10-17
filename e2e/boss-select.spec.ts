@@ -187,8 +187,9 @@ test("the layout: the tiles in rows, the stage under them, the ways to play unde
 });
 
 test("home's Boss raid card: a still portrait that moves on to the next boss you can meet, never the Hidden Boss, the card never changing size", async ({ page }) => {
-  // (?cardMs=: the turn quicker than its 30 s, a test switch.)
-  await page.goto("/?debug&cardMs=400");
+  // (?cardMs=: the turn quicker than its 30 s, a test switch: a second, so a busy machine's looks, about every 0.2 s,
+  // never miss one.)
+  await page.goto("/?debug&cardMs=1000");
   const card = page.getByRole("main").getByRole("button", { name: /^Boss raid/ });
   const face = card.locator(".rd-face-stack");
   await expect(face).toBeVisible();
@@ -197,7 +198,7 @@ test("home's Boss raid card: a still portrait that moves on to the next boss you
   const size = (await card.boundingBox())!;
   const seen: string[] = [];
   const t0 = Date.now();
-  while (Date.now() - t0 < 4_000) {
+  while (Date.now() - t0 < 5_500) {
     const id = (await face.getAttribute("data-boss"))!;
     if (seen.at(-1) !== id) seen.push(id);
     const b = (await card.boundingBox())!;
@@ -207,8 +208,9 @@ test("home's Boss raid card: a still portrait that moves on to the next boss you
   }
   expect(seen.length).toBeGreaterThanOrEqual(4);
   expect(seen).not.toContain("recluse");
-  // In roster order, each a different boss from the last.
-  expect(seen.slice(0, 3)).toEqual(["gingerbread", "clown", "grex"]);
+  // Each the next in roster order (wherever the first look found it: the first turn may come before it).
+  const order = ["gingerbread", "clown", "grex", "hollow", "bigboy", "sawyer", "pig"];
+  for (let i = 1; i < seen.length; i++) expect(order.indexOf(seen[i]!), seen.join(" ")).toBe((order.indexOf(seen[i - 1]!) + 1) % order.length);
   // Still portraits: one canvas each, no animation loop (no data-frame on them).
   await expect(card.locator("canvas[data-frame]")).toHaveCount(0);
 });

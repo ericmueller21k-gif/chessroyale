@@ -86,7 +86,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     `testSwitches` where the server has them on, `/api/me` says `admin`): all of the above, and `debug` (the match on
     `window`), `nolanding`, `boss=<id>` (skips the boss menu), `win`, `mate`, `phase`, `laststand`, `side`, `wip` and
     `kit`, a crate page's `fischer` and `shiny` and its "Testing:" boxes, and 1 v 1's `fewAfter=SECONDS` (the "Few players
-    online" choice sooner) and `clock` (the bot game's clock too).
+    online" choice sooner) and `clock` (the bot game's clock too), and `cardMs=MS` (home's Boss raid card turns to the
+  next boss this often instead of every 30 s).
   - **Kept for everyone** (the home screen's own choices): `mode` and a raid's boss picked from the menu; preferences
     and pages (`anim`, `trail`, `crates`). Gone on Oct 15: `turns` (Crowd is always team turns), `moves` (Classic plays
     its default opening moves) and `soundlab` (its choice is Settings' Reveal sound).
@@ -94,7 +95,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     (`practiceOn` and `evalBarOn` in `prefs.ts`); online the lobby takes a `hello`'s practice only from an admin's
     socket or where TEST_SWITCHES is "1" (`lobby-do.ts`; `lobby-do-practice.test.ts`).
   - **Admins only already:** "Trigger ultimate (testing)" (online the lobby checks too), "Engine move", the boss brain
-    picker (`brain`), the Hidden Boss in Boss alone. Squads' test lobbies and controls: admins or `SQUADS_TEST`.
+    picker (`brain`), the Hidden Boss in Boss alone (from the hidden `/bosses` picker since Oct 16: his tile on the Boss
+    raid screen is locked for everyone). Squads' test lobbies and controls: admins or `SQUADS_TEST`.
   - **No record from a switched game:** for a player the switches can't apply, so everything the server records
     (results, ranking, fair-play signals, Squads' coins and crates, crate items) comes from a game made without them.
     Solo results are posted by the browser and are never ranked and earn nothing.

@@ -4,7 +4,7 @@ import { bossKit } from "../characters/kits.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
 import { SELECT_SOUND, selectLine } from "../characters/boss-select.ts";
 import { isPaused, useServerStatus } from "../status.ts";
-import { play, unlockAudio, warmSounds } from "../sound.ts";
+import { playOnTap, warmSounds } from "../sound.ts";
 import { NORMAL, Voice, VoiceBubble } from "../speech.tsx";
 import { BossFace } from "./BossCharacter.tsx";
 import { SpriteAnim } from "./BossEffect.tsx";
@@ -75,13 +75,12 @@ export function BossSelect({ value, rating, onPick }: { value: string; rating: n
     return () => selectVoice.reset();
   }, []);
   const tap = (id: string) => {
-    unlockAudio();
     warmSounds(Object.values(SELECT_SOUND));
     onPick(id);
     setDrop((d) => ({ n: d.n + 1, at: Date.now() }));
     selectVoice.reset();
     const sound = SELECT_SOUND[id];
-    if (sound) play(sound);
+    if (sound) playOnTap(sound);
     const line = selectLine(id, lastLine.get(id) ?? null);
     if (line) {
       lastLine.set(id, line);
