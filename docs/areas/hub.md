@@ -52,8 +52,11 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     31 in queue") with the typical wait under PLAY.
   - A screen that replaces home (a phone's queue, the Boss raid screen, home again) starts at its top. A match's Home
     and a closed lobby's note land on home itself; Cancel in a raid's queue goes back to the Boss raid screen.
-  - **Phone:** one column: the RANKED row, PLAY, the Boss raid card, then the smaller buttons. Big tap targets, no
-    sideways scroll at 320–430 px.
+  - **Phone:** a top bar (the logo, your coins, your pawn, then a gear that opens Settings in one tap; a computer's
+    Settings is its side menu's, so no gear there;
+    [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md)), then one
+    column: the RANKED row, PLAY, the Boss raid card, then the smaller buttons. Big tap targets, no sideways scroll at
+    320–430 px; a long name on your home card ellipsizes.
   - **Computer** (1024 px+): a side menu, the play column in the center (the Boss raid card and Play with friends side
     by side, 2 : 1, then the RANKED row, PLAY at the bottom), a side panel (playing now, global chat).
     From 1280 px the play column starts with the **live window**: the featured real match (a matchmade one, most
