@@ -7,8 +7,8 @@ import { BOARD_SEL, asAdmin, engineTop, test, bossAloneFromHome } from "./helper
  * Alfil, the woolly mammoth, through his test link (?boss=alfil&wip=1: his rules are built before his art, so he's
  * hidden from players), played alone with real taps on a phone and a computer. Rules only: the app shows nothing new
  * for him yet (his art is a later build), so these read the battle's state (window.match) and the board's pieces.
- * - Tusks (?power=tusks: his cast from his first turn): two of his pawns marked before his move; at the start of his
- *   next turn, the elephant (a bishop) on one of their squares, the pawns gone.
+ * - Tusks (?power=tusks: his cast from his first turn): two of his pawns marked before his move; his next turn is the
+ *   fusion: the elephant (a bishop) on one of their squares, the pawns gone, and no move after it.
  * - The Mammoth Slam (?power=slam: warned as turn 2 begins, at the start of his turn after your move): up to three of
  *   your pieces off the board, their shadows' sizes 1, 2, 3 over your next turns, back down as the turn after begins.
  *   (A Slam whose every lift would swing the game past its cap lifts nothing, about one in six: then the admins'
@@ -59,7 +59,7 @@ const drawn = (page: Page, color: "white" | "black", kind: string) => page.locat
 /** The pieces a position has, by color and kind. */
 const counted = (fen: string, color: "w" | "b", type: string) => new Chess(fen).board().flat().filter((p) => p && p.color === color && p.type === type).length;
 
-test("Alfil's Tusks (the test switch): two of his pawns marked before his move, then the elephant on one of their squares", async ({ page }) => {
+test("Alfil's Tusks (the test switch): two of his pawns marked before his move, then the elephant on one of their squares as his move", async ({ page }) => {
   test.setTimeout(6 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -77,25 +77,33 @@ test("Alfil's Tusks (the test switch): two of his pawns marked before his move, 
   expect(cast.tusks.pawns).toHaveLength(2);
   const fen1 = await fenNow(page);
   for (const sq of cast.tusks.pawns) expect(new Chess(fen1).get(sq as never)).toMatchObject({ color: his, type: "p" });
-  // Your move takes nothing (no counter here, and his pieces as they were); his next turn begins with the fusion.
+  // Your move is quiet: it takes nothing (no counter here, and his pieces as they were) and gives no check (his move
+  // must answer a check, so no fusion would be allowed); his next turn is the fusion.
   const marked: string[] = cast.tusks.pawns;
   const bishops = counted(fen1, his, "b");
   const pawns = counted(fen1, his, "p");
-  await play(page, await goodMove(page, (fen, m) => !!new Chess(fen).get(m.slice(2, 4) as never)));
+  const plies = await page.evaluate(() => (window as any).match.phase.board.history.length as number);
+  const loud = (fen: string, m: string) => {
+    const after = new Chess(fen);
+    return !!after.move({ from: m.slice(0, 2), to: m.slice(2, 4) }).captured || after.inCheck();
+  };
+  await play(page, await goodMove(page, loud));
   await yourMove(page);
   const fused = await powers(page);
   const fen2 = await fenNow(page);
   expect(fused.tusks).toBeNull();
   expect([...fused.fusion.from].sort()).toEqual([...marked].sort());
   // The elephant (uncountered, it always comes: only a position where neither square is allowed stops it, not this
-  // quiet game): a bishop of his on one of the two squares, tracked where it stands now (his move may have moved it),
-  // two pawns fewer (fewer still if his move gave one up).
+  // quiet game): a bishop of his on one of the two squares, and that was his move: no move of his on the board since
+  // yours, none shown, exactly two pawns fewer and a bishop more.
   expect(fused.fusion.why).toBeUndefined();
   expect(fused.fusion.from).toContain(fused.fusion.to);
-  expect(fused.elephants).toHaveLength(1);
-  expect(new Chess(fen2).get(fused.elephants[0] as never)).toMatchObject({ color: his, type: "b" });
-  expect(counted(fen2, his, "b")).toBeGreaterThanOrEqual(bishops);
-  expect(counted(fen2, his, "p")).toBeLessThanOrEqual(pawns - 2);
+  expect(fused.elephants).toEqual([fused.fusion.to]);
+  expect(new Chess(fen2).get(fused.fusion.to as never)).toMatchObject({ color: his, type: "b" });
+  expect(await page.evaluate(() => (window as any).match.phase.board.history.length)).toBe(plies + 1);
+  expect(await page.evaluate(() => (window as any).match.boss.lastMove)).toBeNull();
+  expect(counted(fen2, his, "b")).toBe(bishops + 1);
+  expect(counted(fen2, his, "p")).toBe(pawns - 2);
   // The board draws the position: his bishops and pawns as the state has them.
   await expect.poll(() => drawn(page, his === "b" ? "black" : "white", "bishop")).toBe(counted(fen2, his, "b"));
   await expect.poll(() => drawn(page, his === "b" ? "black" : "white", "pawn")).toBe(counted(fen2, his, "p"));

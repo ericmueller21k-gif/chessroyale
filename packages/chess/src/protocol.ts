@@ -337,7 +337,8 @@ export interface NetBossPowers {
   /**
    * Alfil (missing for other bosses and from older servers; an older app ignores them): his Tusks cast under way (his
    * turn and the crowd move it came after, and the two marked pawns' squares now: they glow; null: none), his last
-   * fusion (the two pawns' squares and the elephant's; `to` null: it failed, a marked pawn taken or no square allowed),
+   * fusion (his move: the two pawns' squares and the elephant's; `to` null: it failed, a marked pawn taken or no square
+   * allowed, and he moved instead),
    * his elephants' squares now (bishops in the rules, drawn with their own art), his last Mammoth Slam (the pieces it
    * lifted from their squares, the crowd turn they land, the engine's measure of the swing when known here), the pieces
    * in the air now (each with its own square, where it lands: the shadow's square; the crowd turn it lands as it
@@ -717,10 +718,10 @@ export type ServerMessage = { now: number } & (
       showdown?: "try" | "test";
       seed?: number;
       /**
-       * Alfil's Tusks (his turn begins with it): positions with an elephant (him to move): for his fusion, the elephant on
-       * each square allowed; for his cast, each pair's ways to go as if it fused now. Answer the one picked (fuseFrom: the
-       * one best for him) as `move`, or "" (no engine: the fusion's first square, the cast's first pair). An older app
-       * ignores it and plays a move, which isn't one of these: the same as "".
+       * Alfil's Tusks: positions with an elephant, the crowd to move (the fusion is his move): for his fusion, the
+       * elephant on each square allowed; for his cast (before his move), each pair's ways to go as if it fused now.
+       * Answer the one picked (fuseFrom: the one best for him) as `move`, or "" (no engine: the fusion's first square,
+       * the cast's first pair). An older app ignores it and plays a move, which isn't one of these: the same as "".
        */
       fuse?: string[];
       /**

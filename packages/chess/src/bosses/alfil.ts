@@ -4,9 +4,9 @@
  *
  * His passive, Tusks: at the start of his turn (his tusksFirst-th, then every tusksEvery), before his move, he marks two
  * of his pawns anywhere on the board (they glow; the engine's pick, tusksPairs). On the crowd's turn, taking either one
- * stops it. At the start of his next turn, before his move, both are lifted off and an elephant (a bishop in every way)
- * lands on one of their two squares, the engine's pick (fuseFrom). At most tusksMax a battle. His elephants' squares
- * are tracked as they move, so the app can draw them with their own art.
+ * stops it. On his next turn, the fusion is his move: both are lifted off, an elephant (a bishop in every way) lands on
+ * one of their two squares, the engine's pick (fuseFrom), and the crowd's turn begins. At most tusksMax a battle. His
+ * elephants' squares are tracked as they move, so the app can draw them with their own art.
  *
  * His ultimate, the Mammoth Slam: his rage meter full (its warning as a crowd turn begins), at the start of his turn,
  * two of the crowd's pawns and one of its knights or bishops fly up (never a queen, rook or king; fewer if it has fewer)
@@ -16,14 +16,16 @@
  * out and puts them down), and they come down early, at the start of his turn, when he has a mate in one only because
  * they're up.
  *
- * Never an illegal position: the fusion never opens a check on his king or gives check (it's his move), the lift never
- * leaves the crowd's king in check, a landing never gives check or leaves the side to move without a move; and each is a
- * base on the board (the position changes outside a move). Numbers: BOSS_POWERS.tusks*, slam*. His art and moments are
- * the app's, a later build (components/Alfil.tsx holds their places for now).
+ * Never an illegal position: the fusion never leaves his king attacked (the crowd moves next), gives check or leaves the
+ * crowd without a move, the lift never leaves the crowd's king in check, a landing never gives check or leaves the side
+ * to move without a move; and each is a base on the board (the position changes outside a move). Numbers:
+ * BOSS_POWERS.tusks*, slam*. His art and moments are the app's, a later build (components/Alfil.tsx holds their places
+ * for now).
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type SlamLanding, type SlamPiece } from "@chessroyale/core";
 import { applyMove, gameEnd, legalMoves, mateInOne, sideToMove } from "../rules.ts";
 import { stockfishRefuses } from "../uci.ts";
+import { passTurn } from "./hollow.ts";
 import type { EngineLike } from "../runner.ts";
 import { bossPowers, eachOn, from, logit, meterFull, other, powerRoll, testSwitch, to, topEach, turnOf, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 import { PIECE_VALUE, gridAttackers, gridHanging, gridKing, gridKingAttacked, gridOf, isLight, placementOf, sideOf, type Grid } from "./grid.ts";
@@ -35,7 +37,7 @@ import { PIECE_VALUE, gridAttackers, gridHanging, gridKing, gridKingAttacked, gr
  */
 export const ALFIL_FX = { tusks: 2300, fuse: 2600, slam: 4200, land: 1600 } as const;
 
-/** What his turn begins with, before his move: the fusion of his last cast, a new cast, or the Mammoth Slam. */
+/** What his turn begins with: the Mammoth Slam, the fusion of his last cast (his move: his turn ends with it), or a new cast (then his move). */
 export type AlfilStep = "fuse" | "tusks" | "slam";
 
 const rank = (sq: string) => Number(sq[1]);
@@ -44,8 +46,9 @@ const square = (f: number, r: number) => `${"abcdefgh"[f]}${r}`;
 const letter = (side: Side, type: string) => (side === "w" ? type.toUpperCase() : type.toLowerCase());
 const SQUARES = [1, 2, 3, 4, 5, 6, 7, 8].flatMap((r) => [0, 1, 2, 3, 4, 5, 6, 7].map((f) => square(f, r)));
 
-/** His turn now (him to move): his moves so far in the battle, plus one. */
-export const hisTurn = (boss: Pick<BossState, "crowdMoves" | "startPly">, plies: number): number => plies - (boss.startPly ?? 0) - boss.crowdMoves + 1;
+/** His turn now (him to move): his turns so far in the battle (his moves, and his fusions: each was his move), plus one. */
+export const hisTurn = (boss: Pick<BossState, "crowdMoves" | "startPly"> & { powers?: Pick<BossPowerState, "fused"> | null }, plies: number): number =>
+  plies - (boss.startPly ?? 0) - boss.crowdMoves + 1 + (boss.powers?.fused ?? 0);
 
 /**
  * A position with pieces taken off or put on between moves (`g`, the side to move as in `fen`): castling rights only
@@ -92,31 +95,29 @@ function hangs(g: Grid, sq: string): boolean {
 // ---------------- Tusks: the cast ----------------
 
 /**
- * His position with the two pawns lifted off and the elephant on `at` (one of their squares), him to move, or null when
- * that isn't allowed: one isn't his pawn now, the lift opens a check on his king (a pawn that blocked one: a check
- * already there before it is fine, it's his move), the elephant gives check (the crowd's king attacked on his move:
- * no position), it leaves more of the crowd's material hanging than before (my call, Big Boy's bounce's rule, as
- * Sawyer's split never lands attacking a piece: a piece put on the board just before his move would otherwise win
- * material at once, far more than the fusion's point), it gives him a mate in one (my call: the crowd never sees the
- * elephant before it mates, as the Slam never leaves the crowd mated in one), he'd have no move, or the engine would
- * refuse it.
+ * His position with the two pawns lifted off and the elephant on `at` (one of their squares), the crowd to move (the
+ * fusion is his move), or null when that isn't allowed: one isn't his pawn now, his king is attacked after it (a pawn
+ * that blocked a check, or a check he was already in: a move must leave his king safe), the elephant gives check (as
+ * no power's piece ever lands giving one), it leaves more of the crowd's material hanging than before (my call, Big
+ * Boy's bounce's rule, as Sawyer's split never lands attacking a piece: the crowd sees the pawns glow but not the
+ * square, so a fork it couldn't see coming would win material at once, far more than the fusion's point), the crowd
+ * would have no move (mate or stalemate by a power), or the engine would refuse it.
  */
 export function fusedFen(fen: string, pawns: readonly string[], at: string, boss: Side): string | null {
   const g = fusedGrid(gridOf(fen), pawns, at, boss);
   if (!g) return null;
-  const out = editedFen(fen, g);
-  return hasMove(out) && !stockfishRefuses(out) && !mateInOne(out) ? out : null;
+  // (passTurn: null when his king is in check or the crowd has no move.)
+  const out = passTurn(editedFen(fen, g));
+  return out && !stockfishRefuses(out) ? out : null;
 }
 
 /** fusedFen's board alone (the checks a board can answer by itself, without a chess.js board): null when not allowed. */
 function fusedGrid(g0: Grid, pawns: readonly string[], at: string, boss: Side): Grid | null {
   if (pawns.length !== 2 || !pawns.includes(at) || pawns.some((sq) => g0.get(sq) !== letter(boss, "p"))) return null;
   const g = new Map(g0);
-  const king = gridKing(g, boss);
-  const before = new Set(king ? gridAttackers(g, king, other(boss)) : []);
   for (const sq of pawns) g.delete(sq);
   g.set(at, letter(boss, "b"));
-  if (!king || gridAttackers(g, king, other(boss)).some((a) => !before.has(a)) || gridKingAttacked(g, other(boss))) return null;
+  if (gridKingAttacked(g, boss) || gridKingAttacked(g, other(boss))) return null;
   if (gridHanging(g, other(boss)) > gridHanging(g0, other(boss))) return null;
   return g;
 }
@@ -183,7 +184,7 @@ export function followSquares(squares: readonly string[], move: string, fen: str
 
 // ---------------- Tusks: the fusion ----------------
 
-/** The fusion's ways to go now, him to move: the elephant on either pawn's square, where it's allowed (fusedFen). */
+/** The fusion's ways to go now, as his move: the elephant on either pawn's square, where it's allowed (fusedFen). */
 export function fusionOptions(fen: string, pawns: readonly string[], boss: Side): { at: string; fen: string }[] {
   return [...pawns].sort().flatMap((at) => {
     const f = fusedFen(fen, pawns, at, boss);
@@ -192,8 +193,8 @@ export function fusionOptions(fen: string, pawns: readonly string[], boss: Side)
 }
 
 /**
- * A way to go as the engine scored it: his expected score there (him to move), and what the fusion gains him in pawns
- * (log-odds, bouncePawnLogit; for the sims: a measure that tops out, as Stockfish puts most fusions at a won game).
+ * A way to go as the engine scored it: his expected score there (the crowd to move), and what the fusion gains him in
+ * pawns (log-odds, bouncePawnLogit; for the sims: a measure that tops out).
  */
 export interface FusionScore {
   fen: string;
@@ -206,7 +207,7 @@ export interface FusionScore {
  * him most"): of the ways to go, the one best for him (his expected score; equals in the order given: the pairs' order,
  * then the squares'). Null: none. Unbounded, as the sheet has it: the first build's cap ("about 1 point") read
  * Stockfish's verdict, which puts nearly every fusion in a balanced game at a won one, so it stopped most fusions
- * (docs/decisions/2026-10-17-alfil-rules.md). A fusion that gives him a mate in one is never a way to go (fusedFen).
+ * (docs/decisions/2026-10-17-alfil-rules.md). Only the ways fusedFen allows are weighed.
  */
 export function pickFusion(scored: readonly FusionScore[]): { fen: string; gain: number } | null {
   let pick: FusionScore | null = null;
@@ -216,8 +217,9 @@ export function pickFusion(scored: readonly FusionScore[]): { fen: string; gain:
 
 /**
  * The engine's pick of the fusion's square (or the cast's pair), from this device's engines (the host's online,
- * solo's): the position before it and each way to go searched at tusksNodes (him to move), shared out over the engines,
- * then pickFusion. Null: no engine (the fusion then takes the first way allowed; the cast, the first pair).
+ * solo's): the position before it (him to move) and each way to go (the crowd to move: his score is the rest) searched
+ * at tusksNodes, shared out over the engines, then pickFusion. Null: no engine (the fusion then takes the first way
+ * allowed; the cast, the first pair).
  */
 export async function fuseFrom(
   engines: readonly EngineLike[],
@@ -230,7 +232,7 @@ export async function fuseFrom(
   if (!before) return null;
   const scored = candidates.flatMap((c, i) => {
     const m = after[i];
-    return m ? [{ fen: c, expected: m.expected, gain: (logit(m.expected) - logit(before.expected)) / s.bouncePawnLogit }] : [];
+    return m ? [{ fen: c, expected: 1 - m.expected, gain: (logit(1 - m.expected) - logit(before.expected)) / s.bouncePawnLogit }] : [];
   });
   return pickFusion(scored);
 }
@@ -470,8 +472,11 @@ export const ALFIL: BossRules = {
   },
   // The Slam runs (the meter held empty, no other ultimate) while its pieces are up.
   ultimateRunning: (p) => !!p.airborne?.length,
-  // The landing as a crowd turn begins (after his move: alfilBattle.afterHisMove) plays as it begins.
+  // As a crowd turn begins: his fusion, when it was his move just now (alfilBattle.apply), and the landing (after his
+  // move or fusion: alfilBattle.landDue).
   everyTurn(next, t) {
+    const f = next.fusion;
+    if (f?.to && f.at + 1 === t.turn) t.events.push({ kind: "fuse", turn: t.turn, squares: [...f.from], square: f.to });
     if (next.landed && !next.landed.early && next.landed.turn === t.turn) t.events.push({ kind: "land", turn: t.turn, squares: next.landed.pieces.map((x) => x.to) });
   },
   // (Tusks comes at the start of his turn, before his move: alfilBattle.)
@@ -542,19 +547,20 @@ const tusksSchedule = (b: Battle, s: Pick<BossPowerSettings, "tusksFirst" | "tus
 
 export const alfilBattle = {
   /**
-   * What his turn begins with now, before his move, in this order: the fusion of his last cast, a new cast (his turn
-   * from tusksFirst, every tusksEvery, at most tusksMax elephants), the Mammoth Slam (slamDue). Null: nothing (or it
-   * isn't his turn). Each is done once (its state moves on), so his turn can begin with more than one.
+   * What his turn begins with now, in this order: the Mammoth Slam (slamDue: before anything else of his that turn),
+   * the fusion of his last cast (his move: his turn ends with it, unless it fails), a new cast (his turn from
+   * tusksFirst, every tusksEvery, at most tusksMax elephants; then his move). Null: nothing (or it isn't his turn).
+   * Each is done once (its state moves on), so his turn can begin with more than one.
    */
   step(b: Battle, s: BossPowerSettings = BOSS_POWERS): AlfilStep | null {
     const boss = b.state.boss;
     const p = boss?.powers;
     if (!boss || !p || boss.id !== "alfil" || boss.result || !b.bossToMove() || b.finalGameOver()) return null;
+    if (slamDue(boss)) return "slam";
     const turn = hisTurn(boss, boardOf(b).history.length);
     if (p.tusks && p.tusks.turn < turn) return "fuse";
     const { first } = tusksSchedule(b, s);
     if (!p.tusks && (p.fused ?? 0) < s.tusksMax && turn >= (p.tusksNext ?? first) && castPairs(b, turn).length) return "tusks";
-    if (slamDue(boss)) return "slam";
     return null;
   },
 
@@ -590,9 +596,12 @@ export const alfilBattle = {
 
   /**
    * The step lands (online with the host's pick: one of the candidates, else none): the cast (the picked pair marked;
-   * none: the first of them), the fusion (the elephant on the picked square; none, the first square allowed; no square
-   * allowed now, it fails, the pawns staying), or the Slam (the picked lift; none: nothing lifts, the meter is spent
-   * anyway). Not a move: nothing is scored, and he plays his move after it. Returns the step done.
+   * none: the first of them), the fusion (the elephant on the picked square; none, the first square allowed), or the
+   * Slam (the picked lift; none: nothing lifts, the meter is spent anyway). Nothing is scored. The cast and the Slam
+   * aren't moves: he plays his move after them. The fusion is his move: the crowd's turn begins (a base with the crowd
+   * to move, the crowd's turn set up as after a move: its moment plays as that turn begins, ALFIL.everyTurn); with no
+   * square allowed now it fails, the pawns staying, with no moment (as when the crowd takes one), and he plays his
+   * move. Returns the step done.
    */
   apply(b: Battle, pick: string | null, loss: number | null = null, s: BossPowerSettings = BOSS_POWERS): AlfilStep | null {
     const step = alfilBattle.step(b, s);
@@ -607,14 +616,19 @@ export const alfilBattle = {
       const pawns = boss.powers!.tusks!.pawns;
       const options = fusionOptions(fen, pawns, other(crowd));
       const chosen = options.find((o) => o.fen === pick) ?? options[0] ?? null;
-      if (chosen) setBase(b, chosen.fen);
-      setPowers(b, (p) => ({
-        ...p,
-        tusks: null,
-        fusion: { at: boss.crowdMoves, from: [...pawns], to: chosen?.at ?? null, ...(chosen ? {} : { why: "nowhere" as const }) },
-        ...(chosen ? { elephants: [...(p.elephants ?? []), chosen.at], fused: (p.fused ?? 0) + 1 } : {}),
-        events: [...p.events, { kind: "fuse", turn: p.turn, squares: [...pawns], ...(chosen ? { square: chosen.at } : {}) }],
-      }));
+      if (!chosen) {
+        // (Failed, as when the crowd takes one: no moment, and he plays his move.)
+        setPowers(b, (p) => ({ ...p, tusks: null, fusion: { at: boss.crowdMoves, from: [...pawns], to: null, why: "nowhere" } }));
+        return step;
+      }
+      // His move: the board passes to the crowd with no move played (no last move to show), then what follows his move.
+      const board = boardOf(b);
+      setBase(b, chosen.fen);
+      b.boards.set(b.state.boards[0]!, { ...boardOf(b), expected: 1 - board.expected, lastMove: null });
+      b.bossLast = null;
+      setPowers(b, (p) => ({ ...p, tusks: null, fusion: { at: boss.crowdMoves, from: [...pawns], to: chosen.at }, elephants: [...(p.elephants ?? []), chosen.at], fused: (p.fused ?? 0) + 1 }));
+      alfilBattle.landDue(b);
+      b.bossPassed();
     } else if (step === "slam") {
       const picked = (pick && slamList(b).find((c) => c.fen === pick)) || null;
       if (picked) setBase(b, picked.fen);
@@ -656,6 +670,11 @@ export const alfilBattle = {
   /** After his own move: his pieces follow it; and the Slam's pieces land as the crowd turn they're due begins. */
   afterHisMove(b: Battle, move: string): void {
     alfilBattle.follow(b, move);
+    alfilBattle.landDue(b);
+  },
+
+  /** His turn is over (his move, or his fusion): the Slam's pieces land as the crowd turn they're due begins. */
+  landDue(b: Battle): void {
     const boss = b.state.boss!;
     const p = boss.powers!;
     if (!p.airborne?.length || !p.slam || p.slam.lands > turnOf(boss) || b.finalGameOver()) return;

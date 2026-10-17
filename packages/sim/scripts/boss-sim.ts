@@ -300,7 +300,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             if (step === "fuse") f?.to ? alfil.fused++ : alfil.nowhere++;
             if (step === "fuse" && f?.to && pick) alfil.gains.push(pick.gain);
           }
-          await runner.playBoss(engines[0]);
+          // (Alfil's fusion is his move: then his turn is over.)
+          if (runner.bossToMove()) await runner.playBoss(engines[0]);
           look();
           continue;
         }

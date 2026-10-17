@@ -9,14 +9,18 @@ import type { BossUi, MomentUi } from "./PowerParts.tsx";
  * nothing (the board shows the position as it is) and only hold their time, so the server's timing is already his.
  */
 
-/** A step at the start of his turn plays on a screen of its own (as Big Boy's bounce): it's the last thing that happened. */
+/**
+ * A step at the start of his turn plays on a screen of its own (as Big Boy's bounce): it's the last thing that happened.
+ * His fusion is his move, not a step: it plays first among the moments of the crowd's turn it begins (one that fails
+ * has no moment).
+ */
 const latest = (boss: BossView, kind: string): boolean => boss.powers?.events.at(-1)?.kind === kind;
 
 const nothing = () => null;
 
 const MOMENTS: Record<"tusks" | "fuse" | "slam" | "land", MomentUi> = {
   tusks: { order: 0, kit: "power", own: (boss) => latest(boss, "tusks") && boss.powers?.tusks?.at === boss.crowdMoves, view: nothing },
-  fuse: { order: 0, kit: "power", own: (boss) => latest(boss, "fuse") && boss.powers?.fusion?.at === boss.crowdMoves, view: nothing },
+  fuse: { order: 0, kit: "power", view: nothing },
   slam: { order: 3, kit: "ultimate", own: (boss) => latest(boss, "slam") && boss.powers?.slam?.at === boss.crowdMoves, view: nothing },
   land: { order: 2, kit: "ultimateHit", view: nothing },
 };

@@ -114,12 +114,18 @@ export const BOSS_MOVE_ALONE_MS = 450;
 export interface QueenSlainView {
   crowdSide: "w" | "b";
   crowdMoves: number;
-  powers?: { bounce?: { at: number } | null; events?: readonly { kind: string }[] } | null;
+  powers?: { bounce?: { at: number } | null; events?: readonly { kind: string }[]; fusion?: { at: number; why?: string } | null } | null;
   board: { history: readonly string[]; bases?: readonly Base[] | null };
 }
 
-/** What a boss's turn can begin with before his move, each its own screen (Alfil's): once one has played, the turn's thinking is a second one. */
-const HIS_TURN_STEPS: readonly string[] = ["tusks", "fuse", "slam"];
+/**
+ * What a boss's turn can begin with before his move (Alfil's cast and Slam, each its own screen; his fusion that found
+ * no square, no screen): once one has played, the turn's thinking is a second one. (His fusion that landed was his
+ * move, as the crowd's turn began: not one of these.)
+ */
+const HIS_TURN_STEPS: readonly string[] = ["tusks", "slam"];
+const hisStepPlayed = (boss: { crowdMoves: number; powers?: { events?: readonly { kind: string }[]; fusion?: { at: number; why?: string } | null } | null }): boolean =>
+  !!boss.powers?.events?.some((e) => HIS_TURN_STEPS.includes(e.kind)) || (boss.powers?.fusion?.at === boss.crowdMoves && boss.powers.fusion.why === "nowhere");
 
 /**
  * The crowd's move has just taken the boss's queen: "QUEEN SLAIN!" plays while he thinks, and he thinks at least as
@@ -131,7 +137,7 @@ const HIS_TURN_STEPS: readonly string[] = ["tusks", "fuse", "slam"];
 export function queenSlain(boss: QueenSlainView): boolean {
   const { history, bases } = boss.board;
   const m = history[history.length - 1];
-  if (!m || boss.powers?.bounce?.at === boss.crowdMoves || boss.powers?.events?.some((e) => HIS_TURN_STEPS.includes(e.kind))) return false;
+  if (!m || boss.powers?.bounce?.at === boss.crowdMoves || hisStepPlayed(boss)) return false;
   const taken = pieceAt(fenAtPly(history, history.length - 1, bases), m.slice(2, 4));
   return taken?.type === "q" && taken.color !== boss.crowdSide;
 }
@@ -150,8 +156,8 @@ export function bossThinkMs(boss: QueenSlainView, burnt = false, afterMs = 0): n
  * were up): their landing plays before his turn goes on (the ms his first thinking waits for it; 0: none, or a step of
  * his has played since).
  */
-export const landedEarlyMs = (boss: { crowdMoves: number; powers?: { landed?: { early?: true; at: number } | null; events?: readonly { kind: string }[] } | null } | null | undefined): number =>
-  boss?.powers?.landed?.early && boss.powers.landed.at === boss.crowdMoves && !boss.powers.events?.some((e) => HIS_TURN_STEPS.includes(e.kind)) ? POWER_FX.land : 0;
+export const landedEarlyMs = (boss: { crowdMoves: number; powers?: { landed?: { early?: true; at: number } | null; events?: readonly { kind: string }[]; fusion?: { at: number; why?: string } | null } | null } | null | undefined): number =>
+  boss?.powers?.landed?.early && boss.powers.landed.at === boss.crowdMoves && !hisStepPlayed(boss) ? POWER_FX.land : 0;
 
 /**
  * The God King's Last Stand, beat by beat (ms after the crowd's disastrous move lands on the board). The reveal

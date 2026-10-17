@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BOSS_BANNER, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, type Settings } from "@chessroyale/core";
-import { FIRE_BURN_MS, POWER_FX, applyMove, bossMoveFrom, bossShowMs, dragOptions, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { FIRE_BURN_MS, POWER_FX, applyMove, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 afterEach(() => vi.restoreAllMocks());
@@ -839,9 +839,9 @@ describe("Alfil online", () => {
   };
   /** Alfil, met as the test link does (his art isn't built yet: he's hidden from players). */
   const alfil = (patch: Partial<Settings> = {}) => raid({ bossId: "alfil", bossUnfinished: true, ...patch });
-  /** Time passes until the host is asked for something (a step's pick or his move): one alarm at a time. */
+  /** Time passes until the host is asked for something (a step's pick or his move), one alarm at a time; none: his turn is over (his fusion was his move). */
   const asked = (L: ReturnType<typeof setup>) => {
-    for (let i = 0; i < 10 && !L.last("p1", "bossRequest"); i++) L.advance(5_000);
+    for (let i = 0; i < 10 && !L.last("p1", "bossRequest") && L.core.save().phase !== "play"; i++) L.advance(5_000);
     return L.last("p1", "bossRequest")!;
   };
   /** The host answers a step's pick (a position); the request is then off its list. */
@@ -849,10 +849,11 @@ describe("Alfil online", () => {
     L.inbox.set("p1", (L.inbox.get("p1") ?? []).filter((m) => m.t !== "bossRequest"));
     L.core.message("p1", { t: "bossMove", key, move });
   };
-  /** His turn: each step the host is asked to pick (the fusion, the Slam) answered with its first candidate, then his move. */
+  /** His turn: each step the host is asked to pick (the fusion, the Slam) answered with its first candidate, then his move (none after the fusion). */
   const hisTurn = (L: ReturnType<typeof setup>) => {
     for (let i = 0; i < 4; i++) {
       const req = asked(L);
+      if (!req) return;
       const pick = req.fuse ?? req.slam;
       if (!pick) return hostBoss(L);
       answer(L, req.key, pick[0] ?? "");
@@ -862,7 +863,7 @@ describe("Alfil online", () => {
   /** The boss messages a player got after the `from`-th message in its outbox. */
   const shown = (L: ReturnType<typeof setup>, id: string, from: number) => (L.inbox.get(id) ?? []).slice(from).filter((m): m is Extract<ServerMessage, { t: "boss" }> => m.t === "boss");
 
-  it("his cast at the start of his turn on the host's pick, everyone sees the marked pawns before his move; the fusion next turn the same way", () => {
+  it("his cast at the start of his turn on the host's pick, everyone sees the marked pawns before his move; next turn the fusion is his move", () => {
     const L = alfil({ bossPowerTest: "tusks" });
     expect(L.last("p1", "round")!.boss!.id).toBe("alfil");
     const from = (L.inbox.get("p2") ?? []).length;
@@ -887,22 +888,30 @@ describe("Alfil online", () => {
     expect(move.fen).toBe(ask.fen);
     hostBoss(L);
     toRound(L);
-    // Your move (the first allowed: here it takes neither), then the fusion at the start of his turn.
+    // Your move (the first allowed: here it takes neither), then the fusion: his turn.
+    const plies = toRound(L).board!.history.length;
     crowdMove(L);
     const req = asked(L);
-    if (req.fuse) {
-      // Two ways to go: the host's engine picks; everyone sees the elephant land, then his move from there.
+    // (Two ways to go: the host's engine picks. One: it lands at once, no host asked.)
+    if (req) {
       expect(req.fuse).toHaveLength(2);
       expect(req.allowed).toBeUndefined();
       expect(req.brain).toBeUndefined();
-      answer(L, req.key, req.fuse[1]!);
-      const fused = L.last("p2", "boss")!;
-      expect(fused.boss.board.fen).toBe(req.fuse[1]);
-      expect(fused.until - L.now).toBe(POWER_FX.fuse);
-      expect(fused.boss.powers!.events.at(-1)!.kind).toBe("fuse");
-      expect(asked(L).fen).toBe(req.fuse[1]);
+      answer(L, req.key, req.fuse![1]!);
     }
-    const after = L.last("p2", "boss")!.boss.powers!;
+    // Everyone sees the elephant land, and that's his move: no move after it; your turn once the turn's moments (the
+    // fusion's first) have played.
+    const fused = shown(L, "p2", from).find((m) => !m.thinking && m.boss.powers!.fusion?.to)!;
+    if (req) expect(fused.boss.board.fen).toBe(req.fuse![1]);
+    expect(fused.boss.lastMove).toBeNull();
+    expect(sideToMove(fused.boss.board.fen)).toBe("w");
+    expect(fused.until - (fused as unknown as { now: number }).now).toBe(bossTurnShowMs(fused.boss));
+    expect(fused.boss.powers!.events.find((e) => e.kind === "fuse")).toEqual({ kind: "fuse", turn: fused.boss.powers!.turn, squares: fused.boss.powers!.fusion!.from, square: fused.boss.powers!.fusion!.to });
+    expect(L.last("p1", "bossRequest")).toBeUndefined();
+    const next = toRound(L);
+    expect(next.board!.fen).toBe(fused.boss.board.fen);
+    expect(next.board!.history.length).toBe(plies + 1);
+    const after = next.boss!.powers!;
     expect(after.tusks).toBeNull();
     expect(after.elephants).toHaveLength(1);
     expect([...after.fusion!.from].sort()).toEqual([...marked].sort());

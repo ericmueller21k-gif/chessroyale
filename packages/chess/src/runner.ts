@@ -1332,8 +1332,9 @@ export class MatchRunner {
   }
 
   /**
-   * Alfil's turn begins with a step before his move (alfilBattle.step: the fusion of his last cast, a new cast, the
-   * Mammoth Slam), or null. Several can come one after another, each its own screen, then his move.
+   * Alfil's turn begins with a step (alfilBattle.step: the Mammoth Slam, the fusion of his last cast, a new cast), or
+   * null. Several can come one after another, each its own screen, then his move; the fusion is his move (his turn
+   * ends with it: bossToMove() is false after it, unless it failed).
    */
   alfilStep(): AlfilStep | null {
     return alfilBattle.step(this.battle);
@@ -1392,6 +1393,7 @@ export class MatchRunner {
       crowdAllowed: (boardId) => runner.crowdAllowed(boardId),
       boardOf: (playerId) => runner.boardOf(playerId),
       afterCrowdMove: (move) => runner.afterCrowdMove(move),
+      bossPassed: () => runner.preparePowers(),
       memo: runner.bossMemo,
     };
   }

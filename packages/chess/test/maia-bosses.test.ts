@@ -109,6 +109,8 @@ describe("every boss on the Maia path", () => {
             expect(await asksDuring(() => r.playAlfil())).toBe(0);
             played.special++;
           }
+          // (His fusion is his move: then his turn is over.)
+          if (!r.bossToMove()) continue;
           const fen = r.boards.get(0)!.fen;
           const allowed = r.bossAllowed();
           const staggered = !!r.boss!.staggerNext;

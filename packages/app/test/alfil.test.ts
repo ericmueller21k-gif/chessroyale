@@ -22,7 +22,7 @@ describe("Alfil before his art", () => {
     expect(powersLine(def)).toBe(`${POWER_WORDS.tusks} · ${POWER_WORDS.slam}`);
   });
 
-  it("each step at the start of his turn plays on a screen of its own, the last one only; the landing with the crowd turn's", () => {
+  it("each step at the start of his turn plays on a screen of its own, the last one only; the fusion and the landing with the crowd turn's", () => {
     const cast = momentsOf(view([{ kind: "warn", turn: 4 }, { kind: "tusks", turn: 4, squares: ["a7", "b7"] }], { tusks: { turn: 4, at: 4, pawns: ["a7", "b7"] } }), 10_000);
     expect(cast.map((m) => [m.kind, m.ms])).toEqual([["tusks", POWER_FX.tusks]]);
     // A cast, then the Slam on the same turn: the Slam's screen.
@@ -31,8 +31,10 @@ describe("Alfil before his art", () => {
       10_000,
     );
     expect(slam.map((m) => m.kind)).toEqual(["slam"]);
-    const fuse = momentsOf(view([{ kind: "fuse", turn: 4, squares: ["a7", "b7"], square: "b7" }], { fusion: { at: 4, from: ["a7", "b7"], to: "b7" } }), 10_000);
-    expect(fuse.map((m) => m.kind)).toEqual(["fuse"]);
+    // His fusion is his move: as your turn begins, its moment first, then the turn's own (the warning here).
+    const fuse = momentsOf(view([{ kind: "warn", turn: 5 }, { kind: "fuse", turn: 5, squares: ["a7", "b7"], square: "b7" }], { fusion: { at: 4, from: ["a7", "b7"], to: "b7" } }), 10_000);
+    expect(fuse.map((m) => [m.kind, m.ms])).toEqual([["fuse", POWER_FX.fuse], ["warn", POWER_FX.warn]]);
+    // (One that fails has no moment: the rules send no event for it.)
     // As your turn begins after his move: the landing plays with the rest of the turn's moments.
     const land = momentsOf(view([{ kind: "warn", turn: 5 }, { kind: "land", turn: 5, squares: ["a2"] }], {}, "alfil", 4), 10_000);
     expect(land.map((m) => m.kind).sort()).toEqual(["land", "warn"]);

@@ -810,11 +810,11 @@ export const BOSS_POWERS = {
   showdownConfirmNodes: 40_000,
   /**
    * Alfil's Tusks (his passive; Eric, Oct 17): at the start of his turn tusksFirst (his 3rd), then every tusksEvery of
-   * his turns, he marks two of his pawns, anywhere (they glow), then plays his move. At the start of his next turn,
-   * before his move, both are lifted off and an elephant (a bishop in every way) lands on one of their two squares, the
-   * engine's pick (each position searched at tusksNodes: the one best for him). The crowd taking one on its turn
-   * between stops it. At most tusksMax elephants a battle. Which two: the engine's pick the same way among tusksLooks
-   * pairs, as if they fused at once (tusksPairs).
+   * his turns, he marks two of his pawns, anywhere (they glow), then plays his move. His next turn, the fusion is his
+   * move: both are lifted off and an elephant (a bishop in every way) lands on one of their two squares, the engine's
+   * pick (each position searched at tusksNodes: the one best for him), and the crowd's turn begins. The crowd taking
+   * one on its turn between stops it. At most tusksMax elephants a battle. Which two: the engine's pick the same way
+   * among tusksLooks pairs, as if they fused at once (tusksPairs).
    */
   tusksFirst: 3,
   tusksEvery: 5,

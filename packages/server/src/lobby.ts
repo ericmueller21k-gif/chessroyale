@@ -1449,11 +1449,12 @@ export class LobbyCore {
   }
 
   /**
-   * Alfil's turn begins with a step before his move (the fusion of his last cast, a new cast, the Mammoth Slam: the
-   * runner's alfilStep): everyone sees him get ready (thinking) while the host's engine picks the cast's pair, the
-   * fusion's square or the Slam's lift among the candidates (worked out here); a step with nothing to weigh needs no
-   * engine and lands at once (after your queen banner, if it's up). Then the step plays for everyone, and the next
-   * (another step, or his move). No host engine anywhere: the cast's first pair, the fusion's first square, nothing lifts.
+   * Alfil's turn begins with a step (the Mammoth Slam, the fusion of his last cast, a new cast: the runner's
+   * alfilStep): everyone sees him get ready (thinking) while the host's engine picks the cast's pair, the fusion's
+   * square or the Slam's lift among the candidates (worked out here); a step with nothing to weigh needs no engine and
+   * lands at once (after your queen banner, if it's up). Then the step plays for everyone, and the next (another step,
+   * or his move; after the fusion, his move itself, the crowd's turn). No host engine anywhere: the cast's first pair,
+   * the fusion's first square, nothing lifts.
    */
   private requestAlfil() {
     const runner = this.runner!;
@@ -1526,12 +1527,14 @@ export class LobbyCore {
     }
     if (this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam") {
       // Alfil's step (the host's pick, one of the candidates; else the cast's first pair, the fusion's first square, or nothing lifts):
-      // it plays out, then the next step or his move.
+      // it plays out, then the next step or his move. His fusion is his move: the crowd's turn then begins as after
+      // his move (its moments, the fusion's first, play before the crowd's clock starts); one with no square fails
+      // with no moment, and he moves.
       this.r.bossKind = undefined;
       const picked = this.r.bounceCandidates?.includes(move) ? move : null;
       this.r.bounceCandidates = undefined;
       const step = this.runner!.applyAlfil(picked);
-      const until = this.io.now() + (step ? powerMomentMs([{ kind: step }]) : 0);
+      const until = this.io.now() + (!this.runner!.bossToMove() ? bossTurnShowMs(this.runner!.bossView()) : step && step !== "fuse" ? powerMomentMs([{ kind: step }]) : 0);
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }

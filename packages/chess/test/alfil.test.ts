@@ -44,11 +44,11 @@ import {
 } from "../src/index.ts";
 
 /**
- * Alfil, the woolly mammoth (Eric, Oct 17): Tusks (at the start of his turn he marks two of his pawns; unless the crowd
- * takes one, at the start of his next they fuse into an elephant, a bishop, on the engine's pick of their two squares; at
- * most two a battle) and the Mammoth Slam (two of the crowd's pawns and a knight or bishop up for three crowd turns, then
- * back on their own squares, the nearest allowed when taken; the engine keeps the swing capped; down early to stop a
- * mate in one). docs/decisions/2026-10-17-alfil-rules.md.
+ * Alfil, the woolly mammoth (Eric, Oct 17): Tusks (at the start of his turn he marks two of his pawns, then plays his
+ * move; unless the crowd takes one, on his next turn they fuse into an elephant, a bishop, on the engine's pick of their
+ * two squares, and that's his move; at most two a battle) and the Mammoth Slam (two of the crowd's pawns and a knight or
+ * bishop up for three crowd turns, then back on their own squares, the nearest allowed when taken; the engine keeps the
+ * swing capped; down early to stop a mate in one). docs/decisions/2026-10-17-alfil-rules.md.
  */
 
 const hash = (s: string) => {
@@ -79,7 +79,7 @@ function raid(opts: { patch?: Partial<Settings>; seed?: number; engine?: EngineL
 const fenOf = (r: MatchRunner) => r.boards.get(0)!.fen;
 /** What his steps did on one turn of his, in order. */
 type Done = string[];
-/** One crowd turn: you play `move` (or the first allowed move); then his steps, one after another, and his move. */
+/** One crowd turn: you play `move` (or the first allowed move); then his steps, one after another, and his move (unless the fusion was it). */
 async function turn(r: MatchRunner, move?: string): Promise<Done> {
   r.deal();
   const allowed = r.crowdAllowed() ?? legalMoves(fenOf(r));
@@ -91,7 +91,8 @@ async function turn(r: MatchRunner, move?: string): Promise<Done> {
     await r.playAlfil();
     expect(done.length).toBeLessThanOrEqual(3);
   }
-  await r.playBoss();
+  // (His fusion is his move: then his turn is over.)
+  if (r.bossToMove()) await r.playBoss();
   return done;
 }
 
@@ -118,6 +119,7 @@ function battleAt(fen: string, powers: Partial<BossPowerState> = {}, o: { crowd?
     crowdAllowed: () => null,
     boardOf: () => null,
     afterCrowdMove: () => {},
+    bossPassed: () => {},
     memo: new Map(),
     board: () => boards.get(0) as never,
   } as unknown as Battle & { board: () => { fen: string; history: string[]; bases?: { ply: number; fen: string }[] } };
@@ -189,9 +191,10 @@ describe("Tusks: the cast", () => {
     const pairs = tusksPairs(MID, "b", 4, 3);
     const ways = pairs.flatMap((p) => p.options.map((o) => o.fen));
     const at = (pawns: number) => 1 / (1 + Math.exp(-pawns * BOSS_POWERS.bouncePawnLogit));
-    // The engine: the third pair's way gains him two pawns, the rest one.
+    // The engine: the third pair's way gains him two pawns, the rest one. (Each way is the crowd's move: its score is
+    // the crowd's, his the rest.)
     const third = pairs[2]!.options[0]!.fen;
-    const pick = await fuseFrom([fakeEngine((f) => (f === MID ? 0.5 : f === third ? at(2) : at(1)))], MID, ways);
+    const pick = await fuseFrom([fakeEngine((f) => (f === MID ? 0.5 : f === third ? 1 - at(2) : 1 - at(1)))], MID, ways);
     expect(pick).toEqual({ fen: third, gain: 2 });
     expect(castPick(pairs, pick!.fen)).toEqual(pairs[2]!.pawns);
     expect(castPick(pairs, null)).toEqual(pairs[0]!.pawns);
@@ -199,7 +202,7 @@ describe("Tusks: the cast", () => {
     expect(castPick([], null)).toBeNull();
   });
 
-  it("never a fusion that opens a check on his king: a pawn that blocks one can only give way to the elephant on its own square", () => {
+  it("never a fusion that leaves his king attacked (it's his move): a pawn that blocks a check gives way only to the elephant on its own square", () => {
     // His e7 pawn blocks the crowd's rook on e1 from his king on e8.
     const fen = "4k3/p3p2p/8/8/8/8/8/4R2K b - - 0 1";
     expect(fusionOptions(fen, ["a7", "e7"], "b").map((o) => o.at)).toEqual(["e7"]);
@@ -208,13 +211,13 @@ describe("Tusks: the cast", () => {
     // A pin along a diagonal (the pinning bishop defended): the same.
     const pin = "4k3/3p3p/8/1B6/P7/8/8/6K1 b - - 0 1";
     expect(fusionOptions(pin, ["d7", "h7"], "b").map((o) => o.at)).toEqual(["d7"]);
-    // A check already there before it (the crowd's own move gave it) isn't the fusion's: allowed, and the elephant may block it.
+    // In check as his turn begins (the crowd's move gave it): no fusion answers it, so none (his move must; it fails).
     const checked = "4k3/p6p/8/8/8/8/8/4R2K b - - 0 1";
     expect(kingAttacked(checked, "b")).toBe(true);
-    expect(fusionOptions(checked, ["a7", "h7"], "b").map((o) => o.at)).toEqual(["a7", "h7"]);
+    expect(fusionOptions(checked, ["a7", "h7"], "b")).toEqual([]);
   });
 
-  it("never an elephant giving check (the crowd's king attacked on his move: no position); none allowed, no cast with that pair", () => {
+  it("never an elephant giving check (no power's piece ever lands giving one); none allowed, no cast with that pair", () => {
     // A bishop on e4 would check the king on d5; on a7 it doesn't.
     const fen = "7k/p7/8/3K4/4p3/8/8/8 b - - 0 1";
     expect(fusionOptions(fen, ["a7", "e4"], "b").map((o) => o.at)).toEqual(["a7"]);
@@ -224,21 +227,30 @@ describe("Tusks: the cast", () => {
     expect(tusksPairs(neither, "b", 1, 3)).toEqual([]);
   });
 
-  it("every fused position is one the engine plays (two pawns fewer, a bishop more: never past what promotions make)", () => {
+  it("every fused position is one the engine plays (two pawns fewer, a bishop more: never past what promotions make), the crowd to move", () => {
     // Already two bishops and seven pawns: a third bishop is one promotion, with two pawns missing.
     const fen = "r2qkb1r/pp1bpppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 5";
     for (const o of tusksPairs(fen, "b", 3, 3).flatMap((p) => p.options)) {
       expect(stockfishRefuses(o.fen)).toBeNull();
       expect(playable(o.fen)).toBe(true);
-      expect(sideToMove(o.fen)).toBe("b");
+      expect(sideToMove(o.fen)).toBe("w");
+      expect(kingAttacked(o.fen, "b")).toBe(false);
     }
   });
 
-  it("his turns: his moves so far, plus one, whoever moved first", () => {
+  it("never a fusion that leaves the crowd without a move: a stalemate by a power", () => {
+    // The elephant on e6 would take a2 from your king on a1 (b1 and b2 are his king's): stalemate. On h7, a2 is free.
+    const fen = "8/7p/4p3/8/8/8/2k5/K7 b - - 0 1";
+    expect(fusionOptions(fen, ["e6", "h7"], "b").map((o) => o.at)).toEqual(["h7"]);
+  });
+
+  it("his turns: his moves so far (each fusion was one), plus one, whoever moved first", () => {
     expect(hisTurn({ crowdMoves: 1, startPly: 10 }, 11)).toBe(1);
     expect(hisTurn({ crowdMoves: 3, startPly: 10 }, 15)).toBe(3);
     // He moved first (the crowd Black): after the crowd's 2nd move, his 3rd.
     expect(hisTurn({ crowdMoves: 2, startPly: 0 }, 4)).toBe(3);
+    // A fusion was his 3rd turn (no move on the board): after the crowd's 4th move, his 4th.
+    expect(hisTurn({ crowdMoves: 4, startPly: 0, powers: { fused: 1 } }, 6)).toBe(4);
   });
 
   it("from his 3rd turn, then every tusksEvery of his turns; at most tusksMax elephants; the test switch: from his first, every other", async () => {
@@ -296,39 +308,81 @@ describe("Tusks: the counter and the fusion", () => {
     expect(followSquares(["b2"], "b2b1q", "4k3/8/8/8/8/8/8/1q2K3 w - - 0 1", "p")).toEqual([]);
   });
 
-  it("at the start of his next turn, before his move: both lifted off, the elephant on the engine's pick of the two (a base on the board)", async () => {
+  it("his next turn: both lifted off, the elephant on the engine's pick of the two, and that's his move (a base, the crowd to move)", async () => {
     const fen = "4k3/p6p/8/8/8/8/P7/4K3 b - - 0 1";
     const b = battleAt(fen, { tusks: { turn: 3, at: 4, pawns: ["a7", "h7"] } });
+    const plies = b.board().history.length;
+    let passed = 0;
+    b.bossPassed = () => void passed++;
     expect(alfilBattle.step(b)).toBe("fuse");
     const options = alfilBattle.candidates(b);
     expect(options).toHaveLength(2);
     expect(alfilBattle.needsEngine(b)).toBe(true);
-    // The engine: the position before 0.5 for him; the elephant on a7 gains him a pawn, on h7 two: h7 (whichever the
-    // engine prefers, Eric; unbounded: docs/decisions/2026-10-17-alfil-rules.md).
+    // The engine (each way the crowd's move: its score is the crowd's): the position before 0.5 for him; the elephant on
+    // a7 gains him a pawn, on h7 two: h7 (whichever the engine prefers, Eric; unbounded: docs/decisions/2026-10-17-alfil-rules.md).
     const at = (pawns: number) => 1 / (1 + Math.exp(-pawns * BOSS_POWERS.bouncePawnLogit));
-    const engine = fakeEngine((f) => (f === options[0] ? at(1) : f === options[1] ? at(2) : 0.5));
+    const engine = fakeEngine((f) => (f === options[0] ? 1 - at(1) : f === options[1] ? 1 - at(2) : 0.5));
     expect(await fuseFrom([engine], fen, options)).toEqual({ fen: options[1], gain: 2 });
-    // However much it gains him (Stockfish puts most fusions at a won game): still the best of them.
-    const won = fakeEngine((f) => (f === options[0] ? 0.999 : f === options[1] ? 0.98 : 0.5));
+    // However much it gains him: still the best of them; and when it costs him (the crowd's tempo), the least bad.
+    const won = fakeEngine((f) => (f === options[0] ? 0.001 : f === options[1] ? 0.02 : 0.5));
     expect((await fuseFrom([won], fen, options))!.fen).toBe(options[0]);
+    const lost = fakeEngine((f) => (f === options[0] ? 0.9 : f === options[1] ? 0.95 : 0.5));
+    expect((await fuseFrom([lost], fen, options))!.fen).toBe(options[0]);
     // Equal: the first (the squares in order).
-    expect((await fuseFrom([fakeEngine((f) => (f === fen ? 0.5 : 1))], fen, options))!.fen).toBe(options[0]);
+    expect((await fuseFrom([fakeEngine((f) => (f === fen ? 0.5 : 0))], fen, options))!.fen).toBe(options[0]);
     expect(await fuseFrom([], fen, options)).toBeNull();
     // The second, as the host's answer:
     expect(alfilBattle.apply(b, options[1]!)).toBe("fuse");
     const p = powersOf(b);
     expect(b.board().fen).toBe(options[1]!);
+    expect(sideToMove(b.board().fen)).toBe("w");
     expect(pieceAt(b.board().fen, "h7")).toEqual({ color: "b", type: "b" });
     expect(pieceAt(b.board().fen, "a7")).toBeNull();
-    expect(b.board().bases!.at(-1)).toEqual({ ply: b.board().history.length, fen: options[1] });
-    expect(fenAtPly(b.board().history, b.board().history.length, b.board().bases)).toBe(options[1]);
+    // No move on the board: a base at the same ply, no last move to show; the crowd's turn set up as after his move.
+    expect(b.board().history.length).toBe(plies);
+    expect(b.board().bases!.at(-1)).toEqual({ ply: plies, fen: options[1] });
+    expect(fenAtPly(b.board().history, plies, b.board().bases)).toBe(options[1]);
+    expect((b.board() as unknown as { lastMove: string | null }).lastMove).toBeNull();
+    expect(b.bossLast).toBeNull();
+    expect(passed).toBe(1);
     expect(p).toMatchObject({ tusks: null, fusion: { at: 4, from: ["a7", "h7"], to: "h7" }, elephants: ["h7"], fused: 1 });
-    expect(p.events.at(-1)).toEqual({ kind: "fuse", turn: 4, squares: ["a7", "h7"], square: "h7" });
-    // Done: his turn goes on to his move.
+    // (Its moment comes with the crowd's turn: below.)
+    expect(p.events.some((e) => e.kind === "fuse")).toBe(false);
+    // Done: not his move any more.
     expect(alfilBattle.step(b)).toBeNull();
   });
 
-  it("never a square where it leaves your material hanging (Big Boy's rule: a piece put down just before his move)", () => {
+  it("in a battle: the fusion is his turn: no move after it, its moment first as the crowd's turn begins, his turns counted on", async () => {
+    const r = raid({ patch: { bossPowerTest: "tusks" } });
+    expect(await turn(r)).toEqual(["tusks"]);
+    const marked = r.boss!.powers!.tusks!.pawns;
+    // (Your move takes neither marked pawn.)
+    r.deal();
+    const move = [...(r.crowdAllowed() ?? legalMoves(fenOf(r)))].sort().find((m) => !marked.includes(m.slice(2, 4)))!;
+    await r.score(new Map([["h0", { move, thinkMs: 1000 }]]));
+    expect(r.alfilStep()).toBe("fuse");
+    const plies = r.boards.get(0)!.history.length;
+    const turnBefore = r.boss!.powers!.turn;
+    await r.playAlfil();
+    const v = r.bossView()!;
+    const p = r.boss!.powers!;
+    expect(p.fusion!.to).toBeTruthy();
+    expect(r.bossToMove()).toBe(false);
+    expect(r.alfilStep()).toBeNull();
+    expect(r.boards.get(0)!.history.length).toBe(plies);
+    expect(v.lastMove).toBeNull();
+    expect(v.board.lastMove ?? null).toBeNull();
+    // The crowd's turn has begun (its powers set), the fusion's moment first among its moments.
+    expect(p.turn).toBe(turnBefore + 1);
+    expect(p.events.find((e) => e.kind === "fuse")).toEqual({ kind: "fuse", turn: p.turn, squares: [...p.fusion!.from], square: p.fusion!.to });
+    // On: your move, then his next turn (his 3rd: from the first, every other, the next cast), a move after it.
+    const done = await turn(r);
+    expect(done).toEqual(["tusks"]);
+    expect(r.boss!.powers!.tusks!.turn).toBe(3);
+    expect(r.boards.get(0)!.history.length).toBe(plies + 2);
+  });
+
+  it("never a square where it leaves your material hanging (Big Boy's rule: the crowd sees the pawns glow, never the square)", () => {
     // d5 is attacked by the crowd's e4 pawn: an elephant there would just be taken, and it hits nothing; a6 is fine.
     expect(fusionOptions("7k/8/p7/3p4/4P3/8/8/6K1 b - - 0 1", ["a6", "d5"], "b").map((o) => o.at)).toEqual(["a6", "d5"]);
     // An elephant on b7 would hit the crowd's undefended knight on f3; on a6, nothing.
@@ -338,12 +392,12 @@ describe("Tusks: the counter and the fusion", () => {
     expect(fusionOptions("7k/8/8/8/3r1p1N/8/p7/6K1 b - - 0 1", ["a2", "f4"], "b").map((o) => o.at)).toEqual(["f4"]);
   });
 
-  it("never a square that gives him a mate in one (the crowd never saw the elephant coming)", () => {
-    // With a7 and c7 gone and the elephant on c7, Ra1 mates (h2 covered); on a7 it blocks the rook's way.
+  it("a square that would let him mate next is allowed: the fusion is his move, the crowd sees the elephant and answers it", () => {
+    // With a7 and c7 gone and the elephant on c7, Ra1 would mate (h2 covered): your move comes first.
     const fen = "r5k1/p1p5/8/8/8/8/6P1/7K b - - 0 1";
-    expect(mateInOne(fen)).toBeNull();
     expect(mateInOne("r5k1/2b5/8/8/8/8/6P1/7K b - - 0 1")).toBe("a8a1");
-    expect(fusionOptions(fen, ["a7", "c7"], "b").map((o) => o.at)).toEqual(["a7"]);
+    expect(fusionOptions(fen, ["a7", "c7"], "b").map((o) => o.at)).toEqual(["a7", "c7"]);
+    expect(legalMoves(fusionOptions(fen, ["a7", "c7"], "b")[1]!.fen)).toContain("g2g3");
   });
 
   it("no engine answer, or one that isn't a way to go (an older app's move): the fusion still comes, on the first square allowed", () => {
@@ -358,7 +412,7 @@ describe("Tusks: the counter and the fusion", () => {
     }
   });
 
-  it("one way allowed: no engine needed, that one; none: it fails there (the pawns stay), its moment says so", () => {
+  it("one way allowed: no engine needed, that one; none: it fails there (the pawns stay), with no moment, and he moves", () => {
     const one = battleAt("4k3/p3p2p/8/8/8/8/8/4R2K b - - 0 1", { tusks: { turn: 3, at: 4, pawns: ["a7", "e7"] } });
     expect(alfilBattle.candidates(one)).toHaveLength(1);
     expect(alfilBattle.needsEngine(one)).toBe(false);
@@ -369,8 +423,9 @@ describe("Tusks: the counter and the fusion", () => {
     alfilBattle.apply(none, null);
     expect(powersOf(none)).toMatchObject({ tusks: null, fusion: { to: null, why: "nowhere" } });
     expect(powersOf(none).elephants ?? []).toEqual([]);
-    expect(powersOf(none).events.at(-1)).toEqual({ kind: "fuse", turn: 4, squares: ["a7", "e7"] });
+    expect(powersOf(none).events.some((e) => e.kind === "fuse")).toBe(false);
     expect(none.board().fen).toBe("4k3/p3p3/8/2K5/8/8/8/4R3 b - - 0 1");
+    expect(none.bossToMove()).toBe(true);
   });
 
   it("in a battle: elephants tracked as they move and dropped when taken, never more than two; every position playable and replayable", async () => {
@@ -649,11 +704,18 @@ describe("Alfil's view and timing", () => {
     expect(queenSlain(view)).toBe(true);
     expect(queenSlain({ ...view, powers: { events: [{ kind: "tusks" }] } })).toBe(false);
     expect(queenSlain({ ...view, powers: { events: [{ kind: "slam" }] } })).toBe(false);
+    // His fusion that found no square after your move is a step (no screen); one that landed was his move, as your turn
+    // began, and the counter is your move: neither is.
+    expect(queenSlain({ ...view, powers: { events: [], fusion: { at: 5, why: "nowhere" } } })).toBe(false);
+    expect(queenSlain({ ...view, powers: { events: [{ kind: "fuse" }], fusion: { at: 4 } } })).toBe(true);
+    expect(queenSlain({ ...view, powers: { events: [], fusion: { at: 5, why: "taken" } } })).toBe(true);
     // His pieces came down early after your move: his first thinking waits for it.
     const early = { crowdMoves: 5, powers: { landed: { early: true as const, at: 5 }, events: [] } };
     expect(landedEarlyMs(early)).toBe(POWER_FX.land);
     expect(bossThinkMs({ ...view, powers: { events: [] } }, false, landedEarlyMs(early))).toBe(Math.max(POWER_FX.land, 1200 + 0, bossThinkMs(view)));
-    expect(landedEarlyMs({ ...early, powers: { ...early.powers, events: [{ kind: "fuse" }] } })).toBe(0);
+    expect(landedEarlyMs({ ...early, powers: { ...early.powers, events: [{ kind: "slam" }] } })).toBe(0);
+    expect(landedEarlyMs({ ...early, powers: { ...early.powers, fusion: { at: 5, why: "nowhere" } } })).toBe(0);
+    expect(landedEarlyMs({ ...early, powers: { ...early.powers, events: [{ kind: "fuse" }], fusion: { at: 4 } } })).toBe(POWER_FX.land);
     expect(landedEarlyMs({ ...early, crowdMoves: 6 })).toBe(0);
   });
 });
@@ -673,8 +735,10 @@ describe("Alfil: the ground rules, over many battles", () => {
           expect(legalMoves(board.fen).length).toBeGreaterThan(0);
           expect(fenAtPly(board.history, board.history.length, board.bases)).toBe(board.fen);
           expect(kingAttacked(board.fen, r.boss!.crowdSide)).toBe(false);
+          expect(kingAttacked(board.fen, r.boss!.crowdSide === "w" ? "b" : "w") && !r.bossToMove()).toBe(false);
         }
-        await r.playBoss();
+        // (His fusion is his move: then his turn is over.)
+        if (r.bossToMove()) await r.playBoss();
         const board = r.boards.get(0)!;
         expect(stockfishRefuses(board.fen)).toBeNull();
         expect(fenAtPly(board.history, board.history.length, board.bases)).toBe(board.fen);
