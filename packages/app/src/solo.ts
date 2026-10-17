@@ -816,7 +816,8 @@ export class SoloMatch implements GameView {
    * (thinking) while this device's engines pick the cast's pair, the fusion's square or the Slam's lift, then it plays
    * out (nobody's clock runs), then the next step or his move. His fusion is his move: then your turn, its moments (the
    * fusion's first) before your clock starts, as after his move (one with no square fails with no moment, and he moves).
-   * No engine answer: the cast's first pair, the fusion's first square, nothing lifts, as online.
+   * No engine answer: the cast's first pair, the fusion's first square, nothing lifts (the Slam again on his next turn),
+   * as online. A step nothing came of (a Slam that lifted nothing, a pick the admins' trigger overtook) shows nothing.
    * (Your move took his queen, or his pieces came down early: that plays in this thinking first; not again after it.)
    */
   private async alfilTurn() {

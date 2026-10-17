@@ -958,7 +958,7 @@ describe("Alfil online", () => {
     for (const x of landed.boss!.powers!.landed!.pieces) expect(pieceAt(landed.board!.fen, x.to)!.color).toBe("w");
   });
 
-  it("nothing within the cap (\"\"), anything that isn't a candidate (an older app's move), or no host at all: nothing lifts, the meter spent", () => {
+  it("nothing within the cap (\"\"), anything that isn't a candidate (an older app's move), or no answer: nothing lifts or shows, the meter kept; asked again on his next turn", () => {
     for (const reply of ["", "e7e5", null]) {
       const L = alfil({ bossPowerTest: "slam" });
       crowdMove(L);
@@ -967,16 +967,52 @@ describe("Alfil online", () => {
       crowdMove(L);
       const ask = asked(L);
       expect(ask.slam).toBeTruthy();
+      const from = (L.inbox.get("p1") ?? []).length;
+      // (No answer: the only other device gone, the host never answers; the timeout.)
       if (reply === null) {
         L.core.disconnect("p2");
-        for (let i = 0; i < 6 && !L.last("p1", "boss")?.boss.powers?.slam; i++) L.advance(15_000);
+        L.inbox.set("p1", (L.inbox.get("p1") ?? []).filter((m) => m.t !== "bossRequest"));
+        for (let i = 0; i < 6 && !L.last("p1", "bossRequest"); i++) L.advance(15_000);
       } else answer(L, ask.key, reply);
-      const b = L.last("p1", "boss")!;
-      expect(b.boss.powers!.slam!.pieces).toEqual([]);
-      expect(b.boss.powers!.airborne).toEqual([]);
-      expect(b.boss.board.fen).toBe(ask.fen);
-      expect(b.boss.powers!.ults).toBe(1);
+      // His turn goes on (his move here) on the same board, with no Slam's moment, and the meter still full.
+      const next = asked(L);
+      expect(next.slam).toBeUndefined();
+      expect(next.fen).toBe(ask.fen);
+      const seen = shown(L, "p1", from);
+      expect(seen.length).toBeGreaterThan(0);
+      for (const m of seen) {
+        expect(m.boss.powers!.events.some((e) => e.kind === "slam")).toBe(false);
+        expect(m.boss.powers!.slam).toBeNull();
+        expect(m.boss.powers!.airborne).toEqual([]);
+        expect(m.boss.powers!.ults).toBe(0);
+        expect(m.boss.powers!.warned).toBe(true);
+      }
+      hisTurn(L);
+      expect(toRound(L).boss!.powers!.warned).toBe(true);
+      // His next turn: the Slam is asked for again.
+      crowdMove(L, reply === null ? ["p1"] : ["p1", "p2"]);
+      expect(asked(L).slam).toBeTruthy();
     }
+  });
+
+  it("the admins' trigger while the host weighs his cast: that pick is dropped, the Slam is asked for and lands, then the cast", () => {
+    const L = alfil({ bossPowerTest: "tusks" });
+    crowdMove(L);
+    const cast = asked(L);
+    expect(cast.fuse).toBeTruthy();
+    expect(L.core.ultimateTrigger("p1", true)).toBe(true);
+    answer(L, cast.key, cast.fuse![0]!);
+    // Nothing of the cast: the Slam's lifts asked for, on the same board.
+    const slam = asked(L);
+    expect(slam.slam).toBeTruthy();
+    expect(slam.fen).toBe(cast.fen);
+    expect(L.last("p1", "boss")!.boss.powers!.tusks).toBeNull();
+    answer(L, slam.key, slam.slam![0]!);
+    const p = L.last("p2", "boss")!.boss.powers!;
+    expect(p.slam!.pieces.length).toBeGreaterThan(0);
+    expect(p.ults).toBe(1);
+    // Then the cast, asked anew.
+    expect(asked(L).fuse).toBeTruthy();
   });
 
   it("the admins' trigger: the Slam at the start of his next turn, without the warning", () => {

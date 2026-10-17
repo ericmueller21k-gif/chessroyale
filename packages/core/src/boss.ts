@@ -477,8 +477,13 @@ export interface BossPowerState {
   fused?: number;
   /** His turn (his turns so far + 1: a fusion was one) from which his next cast may come. */
   tusksNext?: number;
-  /** Alfil's last Mammoth Slam: what it lifted (none: nothing could go), when they land, and the engine's measure. */
+  /** Alfil's last Mammoth Slam that lifted something: what it lifted, when they land, and the engine's measure. */
   slam?: SlamResult | null;
+  /**
+   * Alfil's Mammoth Slam lifted nothing after this crowd move (no lift could go, none within the cap, or no engine's
+   * answer): the meter isn't spent and nothing shows; it comes again at the start of his next turn. Never sent to screens.
+   */
+  slamWait?: number;
   /** The crowd's pieces in the air after the Mammoth Slam (each with the square it lands on), until they land. */
   airborne?: SlamPiece[] | null;
   /** Their last landing: where each came down (its own square, or the nearest empty one that's allowed). */
@@ -618,9 +623,9 @@ export interface SlamPiece {
 }
 
 /**
- * Alfil's Mammoth Slam, after the crowd's move `at` (at the start of his turn): the crowd's pieces it lifted (none:
- * nothing could go within the cap), the crowd turn they land as it begins (`lands`), and the swing the engine put on
- * it (pawns; null when not known here: online the host's engine picked it).
+ * Alfil's Mammoth Slam, after the crowd's move `at` (at the start of his turn): the crowd's pieces it lifted (always
+ * some: a Slam that lifts nothing keeps the meter, BossPowerState.slamWait), the crowd turn they land as it begins
+ * (`lands`), and the swing the engine put on it (pawns; null when not known here: online the host's engine picked it).
  */
 export interface SlamResult {
   at: number;

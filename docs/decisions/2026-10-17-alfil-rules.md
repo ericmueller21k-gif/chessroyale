@@ -41,8 +41,10 @@ no other move that turn. The cast still comes with his normal move.
     cast at his 6th turn), V4 (the first cast at his 8th turn, the fusion as first built).
 - **The fusion stays forced when it's due:** once a cast stands uncountered and a square is allowed, his next turn is
   the fusion. He can't skip it to answer a threat the crowd made on the turn between, so that threat goes unanswered for
-  a turn. That's counterplay, and it's intended. (A check is the one exception: no fusion leaves his king attacked, so
-  it fails and he answers the check with a move.)
+  a turn. That's counterplay, and it's intended. (A check is the one exception: no fusion can answer it, so the fusion
+  waits. The marks stay, he answers the check with a move, and the fusion comes on his next turn that isn't in check.
+  The counter is unchanged: take a marked pawn. As first built, a check killed the fusion; the director's call in the
+  review round, below.)
 
 ### The tuning round (the raid sim, 26 battles each, seeds 1 to 13 and 31 to 43, `counter: 1`)
 
@@ -74,17 +76,20 @@ their totals and their standard errors (about ± 0.08 at 26 battles), never batt
 - **A turn's steps, in order:** the Mammoth Slam (at the start of his turn, before anything else of his), then the
   fusion (his turn ends with it) or a new cast (then his move). As first built, the fusion came before the Slam.
 - **The guards** (`fusedFen`) are those of a move: his king never left attacked (a pawn that blocks a check gives way
-  only to the elephant on its own square; in check as his turn begins, no fusion answers it, so it fails and he moves),
-  never a check given, never more of the crowd's material left hanging, never the crowd left without a move (no
-  stalemate by a power), and the engine plays the position. **The mate-in-one guard is gone:** the crowd now sees the
+  only to the elephant on its own square; in check as his turn begins, no fusion answers it, so it waits for his next
+  turn and he moves), never a check given, never more of the crowd's material left hanging, never the crowd left
+  without a move (no stalemate by a power), never a dead draw (review round), and the engine plays the position. **The mate-in-one guard is gone:** the crowd now sees the
   elephant and answers it before he moves again.
 - **The engine's pick** scores each way with the crowd to move, his score the rest (`fuseFrom`), for the cast's pairs
   too.
 - **On screen:** the fusion's moment plays first among the moments of the crowd's turn it begins (its event comes with
   that turn, `ALFIL.everyTurn`), before the crowd's clock starts, as after his move. A fusion that fails for lack of a
   square has no moment, as when the crowd takes a marked pawn, and he plays his move.
-- **The God King's strike** staggers the boss's next move on the board. A fusion isn't a move he picks, so a strike on
-  the turn before a fusion staggers his move after it ("Boss staggered." stays up meanwhile).
+- **The God King's strike** made just before a fusion hits the fusion (review round, the director's call): the elephant
+  lands on the worse of its two squares for him, in the engine's view (the square the engine didn't pick), and the strike
+  is spent there, as by a move. With one square allowed, or no engine's answer, it lands as usual, and the strike is
+  still spent. As first built, the strike waited for his next move on the board, so "Boss staggered." stayed up over
+  the crowd's next turn and the crowd couldn't call another strike then.
 
 ## My calls
 
@@ -133,7 +138,7 @@ their totals and their standard errors (about ± 0.08 at 26 battles), never batt
   seeded among equals. The counter isn't avoided: it's part of the power.
 - **Never an illegal position:** the fusion is his move, so it never leaves his king attacked (a pawn that blocks a
   check can give way only to the elephant on its own square: the block holds; in check as his turn begins, no fusion
-  answers it, so it fails and he moves), never gives check (no power's piece ever lands giving one), never leaves the
+  answers it, so it waits for his next turn, and he moves), never gives check (no power's piece ever lands giving one), never leaves the
   crowd without a move (no mate or stalemate by a power), and the engine plays it (two pawns fewer and a bishop more
   never passes what promotions make). Two bishops on one color can happen: the elephant is "a bishop in every way". As
   first built, a fusion that gave him a mate in one wasn't allowed (the crowd never saw the elephant before his move);
@@ -157,16 +162,20 @@ their totals and their standard errors (about ± 0.08 at 26 battles), never batt
   else the nearest below; never past the cap, never a mate against the crowd. Of the lifts leaving the least of the
   crowd's material hanging, seeded, `slamLooks` 4 are played out. The engine-boss, thinking he's five points up, often
   trades down and the returning pieces punish it: the crowd's gain then reads below the band, as Eric expected ("you
-  can plan around it, and he can't"). The measure is coarse (the line mostly reads no change or a big swing; the band
-  is hit about one lift in ten in the sims): what the cap does in practice is never turn a balanced game into a lost
-  one for the crowd. When every lift weighed would (about one Slam in six), nothing lifts and the meter is spent, as
-  with the bounce.
-- **Never a piece whose lift leaves the crowd's king in check**, nor one that opens a check on his; a lone minor that
-  blocks one: two pawns alone (fewer, as the sheet's "fewer if you have fewer").
+  can plan around it, and he can't"). The measure is coarse (the line mostly reads no change or a big swing; the lift
+  picked was in the band for 1 of V1's 43 lifts, 0 of 25 as first built, 5 of 36 for the Slam alone and 8 of 61 in the
+  capped runs: `reports/alfil-sim.md`): what
+  the cap does in practice is never turn a balanced game into a lost one for the crowd. When every lift weighed would,
+  nothing lifts. As first built the meter was spent then, as with the bounce; since the review round it isn't (below).
+- **Never a piece whose lift leaves the crowd's king in check**, nor one that opens a new check on his; a lone minor
+  that blocks one: two pawns alone (fewer, as the sheet's "fewer if you have fewer"). A check he's already in (the
+  crowd's last move gave it) doesn't stop the Slam: as first built it did, every lift refused, and the meter was spent
+  on nothing (review round).
 - **The landing:** own squares first (Eric's predictable option; the hanging rule only for a taken square, as the sheet
   says), then the nearest empty square allowed by king steps, then straight-line steps, then square order; never giving
   check (for an own square too: the crowd's move would start with his king in check); the side to move always has a
-  move; a piece with nowhere to go stays up one more turn.
+  move; a piece with nowhere to go stays up one more turn. A piece that lands on the en passant square takes it away
+  (review round: as first built, the stale square made a pawn's own square look unplayable, so it landed beside it).
 - **Never mated in one because they're up:** at the start of his turn, if he has a mate in one that he wouldn't have with
   them down, they land at once (`landed.early`), before his move.
 - **Near the end:** they land by the crowd's last turn at the latest (the battle's verdict counts them).
@@ -191,14 +200,62 @@ square, the turn it lands, turns left, shadow size), `landed` (each piece's own 
 `early`). Events: `tusks` and `slam` at the start of his turn, `fuse` with the crowd's turn his fusion begins (none for
 a fusion that failed), `land`. The boss request: `fuse` (positions with an elephant, the crowd to move: the cast's
 pairs or the fusion's squares) and `slam` (the lifts); the host answers a position or "". An older app as host ignores
-both and answers a move: the cast's first pair, the fusion's first square allowed, nothing lifts. The app's
+both and answers a move: the cast's first pair, the fusion's first square allowed, nothing lifts (since the review round
+the meter is kept, so with such a host the Slam is asked for each turn and never lifts). The app's
 `momentsOf` passes over a moment kind it doesn't know (an older app would have thrown on a newer server's), and his
 moments (`components/Alfil.tsx`) hold their time and draw nothing until his art comes.
+
+**Old apps (review round):** an app from before this PR still throws on his moments' kinds (its `momentsOf` reads
+every kind it's sent). It can't meet him through this PR: online he can't be picked until his art makes him playable
+(`lobby-options.ts` takes only a playable boss), and his test link is solo. Once he's playable, an app left open since
+before this deploy could meet him in an online raid before it updates: the main lobby has no version check (Squads and
+the duel have one), and the service worker fetches every page fresh, so any reload or new visit gets the new app. Eric's
+site is behind Cloudflare Access, so only Eric's devices could; no gate (the lobby's hello carries no version to check
+in one line).
+
+## The review round (Oct 17, after the independent review)
+
+The review found no blocker, and no illegal position in a 60-battle fuzz. Its items, with the director's calls and mine:
+
+- **A check no longer cancels the Slam** (the director's call). The lift's guard refused every lift while his own king
+  was attacked, so a check from the crowd's last move made the Slam lift nothing, and the meter was spent anyway. Now
+  only a lift that adds a check on him is refused (a line opened onto his king); a check he's already in stays, and his
+  move after the Slam answers it. Every other guard stays (never a blocker of a check on the crowd's king, the landing's
+  rules, the swing cap).
+- **A Slam that lifts nothing keeps the meter** (the director's call): no lift could go, every lift was past the cap, or
+  no engine answered. Nothing shows (no moment, no event), the meter stays full and warned, and the Slam comes again at
+  the start of his next turn (`slamWait` in the match's state, never sent to screens; the trigger's `ultNext` is kept
+  the same way). Online with no host, or an older app as host, that's one more host request (or its timeout) on each
+  of his turns until a lift goes.
+- **A check postpones the fusion** (the director's call): above, under "The fusion stays forced".
+- **The God King's strike applies to a fusion** (the director's call): above, under "What V1 changed". No protocol
+  change: the host is asked for its pick as ever, and the server takes the other square.
+- **The move number:** when Black passes (his fusion when he's Black), the position's move number goes up, as after
+  Black's move (`passTurn`). Hollow's pass is the crowd's, which is always White against him, so its number already
+  stayed, as it should; the rule is now the general one.
+- **The admins' trigger during a step** (the Slam then due at once) no longer wastes it: the host's pick comes back with
+  the step it was asked for (`applyAlfil(pick, loss, step)`), and a pick for a step that isn't his now is dropped. The
+  Slam is asked for next, then the step.
+- **The en passant square:** a piece the Slam puts back on it takes it away (above, the landing).
+- **Never a dead draw by a fusion (my call):** the cast never marks a pair whose fusion would leave too little material
+  to mate (a lone bishop against a lone king, or bishops all on one color: `fusedFen` asks the game's own rule). If a
+  marked pair comes to that by the fusion's turn (the crowd's last other piece taken in between), both squares are
+  refused and the fusion fails as any fusion with no square does ("nowhere": no moment, he moves). I chose this over
+  postponing it: it's one more guard on the list every square already passes, and a postponed fusion would mostly wait
+  for good (king and two pawns against a lone king stays a dead draw whichever square the elephant takes).
+- **Old apps:** the protocol section, below.
+- **Not re-simulated:** the sims here ran on the rules before this round. The kept meter makes his Slam come more often
+  (in V1, 10 of 53 Slams lifted nothing and spent the meter; each would now come again a turn later), and 2 of those
+  10 had no lift to weigh at all (the rows don't keep the position; a check on his king, which emptied the list before
+  this round, is the likely cause). The postponed fusion, the
+  strike's effect and the dead-draw guard touch few battles. My estimate: a little stronger for him, within V1's
+  standard error (± 0.08).
 
 ## The sim ([reports/alfil-sim.md](../../reports/alfil-sim.md))
 
 The raid sim, 26 paired battles a run, with a crowd that takes a marked pawn when it costs at most a pawn (the bots'
-judge doesn't know the rule). The pack: 0.04 (Jefferson) to 0.79 (Hollow) for the crowd on Oct 15; on today's code
+judge doesn't know the rule). The probes quoted in this file (21 balanced positions and 292 fusions; 39 positions and 16
+lifts; Stockfish's verdicts from the starting position) came from one-off scripts that aren't committed. The pack: 0.04 (Jefferson) to 0.79 (Hollow) for the crowd on Oct 15; on today's code
 Sawyer 0.15 and Big Boy 0.35.
 
 - **The fusion as his move (V1, adopted): 0.23** (± 0.08; 6 of 26 the crowd's, 32 crowd moves). In the pack.

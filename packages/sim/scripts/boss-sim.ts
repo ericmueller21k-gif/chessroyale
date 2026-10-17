@@ -283,19 +283,22 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           }
           for (let step = runner.alfilStep(); step; step = runner.alfilStep()) {
             if (step === "slam") {
-              ults.push({ kind: "slam", turn: runner.boss!.crowdMoves });
+              // (Every Slam tried is logged; one that lifts nothing keeps the meter and comes again on his next turn, so
+              // only one that lifts counts as an ultimate.)
+              const at = runner.boss!.crowdMoves;
               const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
               const scored = await slamScores(engines, fen, runner.alfilCandidates());
               const pick = scored ? pickSlam(scored.before, scored.outs) : null;
-              runner.applyAlfil(pick?.fen ?? null, pick?.loss ?? null);
+              const lifted = runner.applyAlfil(pick?.fen ?? null, pick?.loss ?? null, step);
               const p = runner.boss!.powers!;
-              alfil.slams.push({ at: p.slam!.at, n: p.slam!.pieces.length, loss: p.slam!.loss, weighed: (scored?.outs ?? []).map((o) => (o.mate ? "mate" : Math.round(slamPawnsLost(scored!.before, o.crowd) * 100) / 100)) });
+              if (lifted) ults.push({ kind: "slam", turn: at });
+              alfil.slams.push({ at, n: lifted ? p.slam!.pieces.length : 0, loss: lifted ? p.slam!.loss : null, weighed: (scored?.outs ?? []).map((o) => (o.mate ? "mate" : Math.round(slamPawnsLost(scored!.before, o.crowd) * 100) / 100)) });
               continue;
             }
             if (step === "tusks") alfil.casts++;
             const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
             const pick = await fuseFrom(engines, fen, runner.alfilCandidates());
-            runner.applyAlfil(pick?.fen ?? null);
+            runner.applyAlfil(pick?.fen ?? null, null, step);
             const f = runner.boss!.powers!.fusion;
             if (step === "fuse") f?.to ? alfil.fused++ : alfil.nowhere++;
             if (step === "fuse" && f?.to && pick) alfil.gains.push(pick.gain);
