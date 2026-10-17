@@ -12,7 +12,7 @@ import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { legalMoves, pieceAt, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
-import { bossPowers, crowdHalf, logit, meterFull, moveSquares, other, powerRoll, testSwitch, to, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { bossPowers, crowdHalf, logit, meterFull, moveSquares, other, powerRoll, testSwitch, to, topEach, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 import { gridHanging, gridKingAttacked, gridOf, isLight, placementOf, type Grid } from "./grid.ts";
 
 /**
@@ -332,21 +332,6 @@ export const BIGBOY: BossRules = {
 };
 
 // ---------------- The Big Bounce in a match ----------------
-
-/** Each position's top move at `nodes`, shared out over the engines (each takes the next position as it's free). */
-async function topEach(engines: readonly EngineLike[], fens: readonly string[], nodes: number): Promise<(MoveScore | undefined)[]> {
-  const best: (MoveScore | undefined)[] = new Array(fens.length);
-  let next = 0;
-  await Promise.all(
-    engines.map(async (e) => {
-      while (next < fens.length) {
-        const i = next++;
-        best[i] = (await (e.topMovesAt ? e.topMovesAt(fens[i]!, 1, nodes) : e.topMoves(fens[i]!, 1)))[0];
-      }
-    }),
-  );
-  return best;
-}
 
 /**
  * Big Boy's Big Bounce: the candidates (positions with him to move) scored by the engine path his moves use (each

@@ -96,6 +96,29 @@ export function moveSquares(move: string, fen?: string): string[] {
   return out;
 }
 
+/**
+ * Each position's top move at `nodes`, shared out over the engines (each takes the next position as it's free): Big
+ * Boy's bounce and Alfil's fusion and Slam weigh their candidates this way.
+ */
+export async function topEach(engines: readonly EngineLike[], fens: readonly string[], nodes: number): Promise<(MoveScore | undefined)[]> {
+  return eachOn(engines, fens, async (e, fen) => (await (e.topMovesAt ? e.topMovesAt(fen, 1, nodes) : e.topMoves(fen, 1)))[0]);
+}
+
+/** `work` on each item, shared out over the engines (each takes the next item as it's free); in the items' order. */
+export async function eachOn<T, R>(engines: readonly EngineLike[], items: readonly T[], work: (engine: EngineLike, item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(
+    engines.map(async (e) => {
+      while (next < items.length) {
+        const i = next++;
+        out[i] = await work(e, items[i]!);
+      }
+    }),
+  );
+  return out;
+}
+
 export const logit = (x: number) => {
   const q = Math.min(0.999, Math.max(0.001, x));
   return Math.log(q / (1 - q));

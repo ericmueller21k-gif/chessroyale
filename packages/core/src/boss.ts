@@ -76,9 +76,12 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet";
-/** Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual). */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet"];
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam";
+/**
+ * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
+ * drag and Alfil's Tusks, which come sooner and more often: their files).
+ */
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -144,6 +147,11 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // engine's measure (more if it picks the wrong duel), so he plays as far under the lobby's strength as Big Boy and
   // Sawyer (DECISIONS.md: "Wrangler, built": the estimate).
   { id: "pig", name: "Wrangler", icon: "🤠", kit: "Wrangler", offset: -250, powers: { passive: "drag", ultimate: "showdown" } },
+  // Alfil, the woolly mammoth (Eric, Oct 17): Tusks (two of his pawns fuse into an elephant, a bishop) and the Mammoth
+  // Slam (three of the crowd's pieces in the air for three turns). His rules are built before his art: `kit` stays null
+  // (so he's never playable: no menu, no raid, never random) until his art ships; a test link meets him in Boss alone
+  // (`?boss=alfil&wip=1`). His offset from the boss sim (docs/decisions/2026-10-17-alfil-rules.md).
+  { id: "alfil", name: "Alfil", icon: "🦣", kit: null, offset: -250, powers: { passive: "tusks", ultimate: "slam" } },
   // The Hidden Boss (working id "recluse"; Eric names him later: his name is this one string, wherever it shows). Hidden
   // from players (admins, Boss alone) except in the Crowd's boss final, which is always him (Eric, Oct 14). His strength
   // is fixed whatever the player's rating (BOSS_BRAIN.fixed: Maia at its top), so his offset is unused. The God King's
@@ -455,6 +463,25 @@ export interface BossPowerState {
   sdBase?: number;
   /** Wrangler's "I've got you in my sights.": the fill (its `sdBase`) he said it for, once a fill. */
   sdReady?: number;
+  /**
+   * Alfil's Tusks: the cast under way (two of his pawns marked, glowing: their squares now, as they move; the fusion
+   * comes at the start of his next turn unless the crowd takes one), null once it fused or failed.
+   */
+  tusks?: TusksCast | null;
+  /** Alfil's last fusion (or the one that failed: `to` null), for the screens' moment. */
+  fusion?: Fusion | null;
+  /** Alfil's elephants on the board (bishops in the rules, drawn with their own art): their squares now, as they move. */
+  elephants?: string[];
+  /** How many elephants Alfil has made this battle (at most BOSS_POWERS.tusksMax). */
+  fused?: number;
+  /** His turn (his moves so far + 1) from which his next cast may come. */
+  tusksNext?: number;
+  /** Alfil's last Mammoth Slam: what it lifted (none: nothing could go), when they land, and the engine's measure. */
+  slam?: SlamResult | null;
+  /** The crowd's pieces in the air after the Mammoth Slam (each with the square it lands on), until they land. */
+  airborne?: SlamPiece[] | null;
+  /** Their last landing: where each came down (its own square, or the nearest empty one that's allowed). */
+  landed?: SlamLanding | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -560,6 +587,59 @@ export interface ShowdownResult {
   outside?: true;
 }
 
+/**
+ * Alfil's Tusks cast: at the start of his turn `turn` (his moves so far + 1; after the crowd's move `at`) he marked two
+ * of his pawns (`pawns`: their squares now; they travel with the pieces). They fuse into an elephant at the start of his
+ * next turn, unless the crowd takes one first.
+ */
+export interface TusksCast {
+  turn: number;
+  at: number;
+  pawns: string[];
+}
+
+/**
+ * An Alfil fusion, after the crowd's move `at`: the two pawns (`from`, their squares then) became an elephant on `to`,
+ * one of the two (the engine's pick); `to` null: it failed (`why`: one was taken, or no longer a pawn; or neither square
+ * was allowed then: bosses/alfil.ts, fusedFen).
+ */
+export interface Fusion {
+  at: number;
+  from: string[];
+  to: string | null;
+  why?: "taken" | "nowhere";
+}
+
+/** A crowd piece in the air after Alfil's Mammoth Slam: its letter (lower case) and its own square, where it lands. */
+export interface SlamPiece {
+  piece: string;
+  square: string;
+}
+
+/**
+ * Alfil's Mammoth Slam, after the crowd's move `at` (at the start of his turn): the crowd's pieces it lifted (none:
+ * nothing could go within the cap), the crowd turn they land as it begins (`lands`), and the swing the engine put on
+ * it (pawns; null when not known here: online the host's engine picked it).
+ */
+export interface SlamResult {
+  at: number;
+  pieces: SlamPiece[];
+  lands: number;
+  loss: number | null;
+}
+
+/**
+ * Where the Slam's pieces came down: as crowd turn `turn` began (after his move), or (`early`) at the start of his turn
+ * after the crowd's move `at` (he had a mate in one only while they were up). Each piece's own square (`from`) and where
+ * it landed (`to`: the same, or the nearest empty square that's allowed).
+ */
+export interface SlamLanding {
+  turn: number;
+  at: number;
+  pieces: { piece: string; from: string; to: string }[];
+  early?: true;
+}
+
 /** One of Hollow's dark squares: the crowd turn it fell as, and the last crowd turn it covers (darkTurns in all). */
 export interface DarkSquare {
   square: string;
@@ -649,7 +729,10 @@ export interface BurnEvent {
  * square after his move; `ult`: standing in for the test trigger's showdown when the board can't hold one); `showdown`:
  * his showdown (pairs lined up, a forced duel). `bullet`: the Hidden Boss's ultimate (his clock speech and spellbook; the
  * crowd's clock is bullet from then on). `bulletPlus`: a few moves into it, he adds time per move from then on (his line,
- * the increment across the board; BOSS_POWERS.bulletPlainMoves, bulletIncrementSeconds).
+ * the increment across the board; BOSS_POWERS.bulletPlainMoves, bulletIncrementSeconds). Alfil's, at the start of his
+ * turn: `tusks`, his cast (two of his pawns marked: `squares`); `fuse`, their fusion (`squares` the two, `square` the
+ * elephant's); `slam`, his Mammoth Slam (`squares` the pieces lifted); `land`, the Slam's pieces back down (`squares`
+ * where they landed; as a crowd turn begins, or at the start of his turn when they come down early).
  */
 export type PowerEventKind =
   | "freeze"
@@ -674,7 +757,11 @@ export type PowerEventKind =
   | "drag"
   | "showdown"
   | "bullet"
-  | "bulletPlus";
+  | "bulletPlus"
+  | "tusks"
+  | "fuse"
+  | "slam"
+  | "land";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;

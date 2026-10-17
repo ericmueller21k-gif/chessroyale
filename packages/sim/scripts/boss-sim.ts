@@ -11,11 +11,19 @@
  * `split`: Sawyer's opening, his first move a pawn move and that pawn sawn in two (a second pawn beside it: splitSquare;
  *   from the starting position he has all 8, so it comes on his first pawn move once one of his pawns is gone).
  *   npx tsx packages/sim/scripts/boss-sim.ts summary
+ *   npx tsx packages/sim/scripts/boss-sim.ts raid <boss,ids|all> <games> <seed> <strikes> <tag> [patch]
+ *   npx tsx packages/sim/scripts/boss-sim.ts raid-summary <tags>
+ *
+ * `raid`'s `patch` (JSON, for tuning runs): `powers`, numbers put over BOSS_POWERS for the run (rageSpeed merged);
+ * `offset`, a boss's Elo offset by id; `counter`, the crowd takes one of Alfil's marked pawns when the best such capture
+ * costs at most that many pawns against its best move (the bots' own picks read the judge, which doesn't know about the
+ * fusion: a crowd that knows the rule plays the counter when it's cheaper than what the fusion gives him).
  *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
-import { MatchRunner, applyMove, bossMoveFrom, botRoster, chooseSplit, fenAfter, gameEndWith, legalMoves, pieceAt, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type Opening } from "@chessroyale/chess";
+import { BOSS_POWERS } from "@chessroyale/core";
+import { MatchRunner, applyMove, bossMoveFrom, botRoster, chooseSplit, fenAfter, fuseFrom, gameEndWith, legalMoves, pickSlam, pieceAt, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -201,7 +209,37 @@ const ULT_EVENTS = new Set(["blizzard", "candle", "boardsaw"]);
  * the ultimates are the game's own. `strikes`: the God King's strikes the crowd calls (at random crowd turns 6 to 30,
  * from a source of its own so the games stay paired across settings). Rows go to reports/boss-sim/raid-<tag>.jsonl.
  */
-async function raid(bosses: string[], games: number, seed: number, strikes: number, tag: string) {
+/** A raid run's tuning patch (see the top of this file). */
+interface RaidPatch {
+  powers?: Record<string, unknown>;
+  offset?: Record<string, number>;
+  counter?: number;
+}
+
+/**
+ * The crowd's counter to Alfil's cast (patch.counter): with two of his pawns marked, the captures that take one; the
+ * best of them by the engine, played by the whole crowd when it costs at most `max` pawns against the best move.
+ * Returns that cost (null: no capture there).
+ */
+async function counterTusks(runner: MatchRunner, engine: EngineLike, max: number): Promise<number | null> {
+  const p = runner.boss?.powers;
+  if (!p?.tusks) return null;
+  const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+  const his = runner.boss!.crowdSide === "w" ? "b" : "w";
+  const caps = legalMoves(fen).filter((m) => p.tusks!.pawns.some((sq) => pieceAt(applyMove(fen, m), sq)?.color !== his));
+  if (!caps.length) return null;
+  const [best] = await engine.topMoves(fen, 1);
+  const [top] = (await engine.scoreMoves(fen, caps)).sort((a, b) => b.expected - a.expected);
+  const cost = Math.max(0, slamPawnsLost(best!.expected, top!.expected));
+  // (Every bot's pick, as one crowd: the runner's planned picks.)
+  if (cost <= max) for (const pl of runner.alive()) (runner as unknown as { planned: Map<string, string> }).planned.set(pl.id, top!.move);
+  return Math.round(cost * 100) / 100;
+}
+
+async function raid(bosses: string[], games: number, seed: number, strikes: number, tag: string, patch: RaidPatch = {}) {
+  const { rageSpeed, ...powers } = (patch.powers ?? {}) as { rageSpeed?: Record<string, number> };
+  Object.assign(BOSS_POWERS as Record<string, unknown>, powers, rageSpeed ? { rageSpeed: { ...BOSS_POWERS.rageSpeed, ...rageSpeed } } : {});
+  for (const [id, offset] of Object.entries(patch.offset ?? {})) (BOSS_ROSTER.find((d) => d.id === id) as { offset: number }).offset = offset;
   const library = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8")) as Opening[];
   const engines = [await createNodeEngine({ nodes: RAID_NODES, hashMb: 16 })];
   mkdirSync(root + "reports/boss-sim", { recursive: true });
@@ -211,7 +249,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       const strikeRng = mulberry32(seed * 104729 + g);
       const strikeTurns = new Set<number>();
       while (strikeTurns.size < strikes) strikeTurns.add(6 + Math.floor(strikeRng() * 25));
-      const s = { ...settings, ...RAID_SETTINGS, bossId, engineNodes: RAID_NODES, bossNodes: RAID_NODES } as Settings;
+      // (A boss whose powers are built before its art, Alfil: met as the test link does, bossUnfinished.)
+      const s = { ...settings, ...RAID_SETTINGS, bossId, bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES } as Settings;
       const runner = new MatchRunner({ settings: s, rng, engines, library, entrants: botRoster(rng, s.lobbySize, s) });
       const ults: { kind: string; turn: number }[] = [];
       let seen = -1;
@@ -224,6 +263,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       look();
       let struck = 0;
       let result: string | null = null;
+      // (Alfil: his casts, the fusions they came to (or the crowd's counters), his slams: each lift's swing and the ones weighed.)
+      const alfil = { casts: 0, fused: 0, taken: 0, illegal: 0, gains: [] as number[], slams: [] as { at: number; n: number; loss: number | null; weighed: (number | "mate")[] }[], early: 0, counters: [] as number[] };
       const t0 = Date.now();
       while (!runner.isOver()) {
         if (runner.stageComplete()) {
@@ -240,6 +281,25 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             ults.push({ kind: "bounce", turn: runner.boss!.crowdMoves });
             await runner.playBounce(engines).catch(() => runner.applyBounce(null));
           }
+          for (let step = runner.alfilStep(); step; step = runner.alfilStep()) {
+            if (step === "slam") {
+              ults.push({ kind: "slam", turn: runner.boss!.crowdMoves });
+              const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+              const scored = await slamScores(engines, fen, runner.alfilCandidates());
+              const pick = scored ? pickSlam(scored.before, scored.outs) : null;
+              runner.applyAlfil(pick?.fen ?? null, pick?.loss ?? null);
+              const p = runner.boss!.powers!;
+              alfil.slams.push({ at: p.slam!.at, n: p.slam!.pieces.length, loss: p.slam!.loss, weighed: (scored?.outs ?? []).map((o) => (o.mate ? "mate" : Math.round(slamPawnsLost(scored!.before, o.crowd) * 100) / 100)) });
+              continue;
+            }
+            if (step === "tusks") alfil.casts++;
+            const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+            const pick = await fuseFrom(engines, fen, runner.alfilCandidates());
+            runner.applyAlfil(pick?.fen ?? null);
+            const f = runner.boss!.powers!.fusion;
+            if (step === "fuse") f?.to ? alfil.fused++ : alfil.illegal++;
+            if (step === "fuse" && f?.to && pick) alfil.gains.push(pick.gain);
+          }
           await runner.playBoss(engines[0]);
           look();
           continue;
@@ -254,6 +314,11 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           continue;
         }
         runner.deal();
+        // (Alfil's marked pawns: a crowd that knows the rule takes one when it's cheap enough: patch.counter.)
+        if (patch.counter !== undefined && bossId === "alfil") {
+          const cost = await counterTusks(runner, engines[0]!, patch.counter);
+          if (cost !== null) alfil.counters.push(cost);
+        }
         // (The crowd calls the God King's strike: bots call until more than half of the crowd has.)
         if (strikeTurns.has(runner.boss!.crowdMoves + 1) && (runner.boss!.kingCharges ?? 0) > 0) {
           for (const p of runner.alive()) {
@@ -263,11 +328,14 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             }
           }
         }
+        const tusksBefore = runner.boss!.powers?.tusks;
         await runner.score(new Map());
+        if (tusksBefore && runner.boss!.powers?.fusion?.why === "taken" && runner.boss!.powers.fusion.at === runner.boss!.crowdMoves) alfil.taken++;
+        if (runner.boss!.powers?.landed?.early && runner.boss!.powers.landed.at === runner.boss!.crowdMoves) alfil.early++;
         if (runner.bossKillDue()) runner.bossKill();
       }
       const b = runner.boss!;
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }
@@ -287,7 +355,7 @@ function raidSummary(tags: string[]): string[] {
     "|---|---|---|---|---|---|---|---|---|---|---|",
   ];
   const median = (xs: number[]) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]! : "-");
-  for (const def of BOSS_ROSTER.filter((d) => d.powers && d.kit)) {
+  for (const def of BOSS_ROSTER.filter((d) => d.powers)) {
     for (const tag of tags) {
       const rs = rows.filter((r) => r.boss === def.id && r.tag === tag);
       if (!rs.length) continue;
@@ -302,11 +370,11 @@ function raidSummary(tags: string[]): string[] {
   return out;
 }
 
-const [cmd, kind, offsets, games, seed, mode] = process.argv.slice(2);
+const [cmd, kind, offsets, games, seed, mode, patchArg] = process.argv.slice(2);
 if (cmd === "summary") summary();
 else if (cmd === "raid") {
   // npx tsx packages/sim/scripts/boss-sim.ts raid <boss,ids|all> <games> <seed> <strikes> <tag>
   const ids = !kind || kind === "all" ? BOSS_ROSTER.filter((d) => d.powers && d.kit).map((d) => d.id) : kind.split(",");
-  await raid(ids, Number(offsets ?? 4), Number(games ?? 1), Number(seed ?? 2), mode ?? "test");
+  await raid(ids, Number(offsets ?? 4), Number(games ?? 1), Number(seed ?? 2), mode ?? "test", patchArg ? (JSON.parse(patchArg) as RaidPatch) : {});
 } else if (cmd === "raid-summary") raidSummary((kind ?? "").split(","));
 else await run(kind ?? "club", (offsets ?? "0").split(",").map(Number), Number(games ?? 4), Number(seed ?? 1), !!mode?.split(",").includes("stumble"), !!mode?.split(",").includes("snack"), !!mode?.split(",").includes("split"));

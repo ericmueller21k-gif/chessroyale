@@ -8,6 +8,7 @@ import { BIGBOY_FX, SNACK_MS } from "./bosses/bigboy.ts";
 import { SAWYER_FX } from "./bosses/sawyer.ts";
 import { PIG_FX } from "./bosses/pig.ts";
 import { RECLUSE_FX } from "./bosses/recluse.ts";
+import { ALFIL_FX } from "./bosses/alfil.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -50,7 +51,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * step, `spin`: its banner, then the board turns again); the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX } as const;
+export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX } as const;
 
 /** How long one power's moment holds the screen (ms). */
 export const powerFxMs = (e: { kind: keyof typeof POWER_FX; first?: boolean }): number => (POWER_FX[e.kind] ?? 0) + (POWER_FX_EXTRA[e.kind]?.(e) ?? 0);
@@ -109,36 +110,48 @@ export const kingStrikeMs = (s: { kingOnBoard?: boolean; kingStrikeMs: number })
 /** Alone: how long the boss's move shows before your turn (the piece's slide, and a beat). */
 export const BOSS_MOVE_ALONE_MS = 450;
 
-/** What queenSlain reads: the sides, the crowd's turn, Big Boy's last bounce, and the board's moves (a boss's view). */
+/** What queenSlain reads: the sides, the crowd's turn, Big Boy's last bounce, the turn's events, and the board's moves (a boss's view). */
 export interface QueenSlainView {
   crowdSide: "w" | "b";
   crowdMoves: number;
-  powers?: { bounce?: { at: number } | null } | null;
+  powers?: { bounce?: { at: number } | null; events?: readonly { kind: string }[] } | null;
   board: { history: readonly string[]; bases?: readonly Base[] | null };
 }
+
+/** What a boss's turn can begin with before his move, each its own screen (Alfil's): once one has played, the turn's thinking is a second one. */
+const HIS_TURN_STEPS: readonly string[] = ["tusks", "fuse", "slam"];
 
 /**
  * The crowd's move has just taken the boss's queen: "QUEEN SLAIN!" plays while he thinks, and he thinks at least as
  * long (bossThinkMs). Only the crowd's own capture of his queen (never his capture of yours: Hollow thinks again after
- * his own move for his extra move), and only in the thinking straight after it: once Big Boy's Big Bounce has played
- * between that move and his (his turn's second thinking, the same last move), it's old news (Eric, Oct 16: the banner
- * flashed up again for a second after his bounce).
+ * his own move for his extra move), and only in the thinking straight after it: once Big Boy's Big Bounce, or one of
+ * Alfil's steps (his cast, the fusion, the Slam), has played between that move and his (his turn's second thinking,
+ * the same last move), it's old news (Eric, Oct 16: the banner flashed up again for a second after his bounce).
  */
 export function queenSlain(boss: QueenSlainView): boolean {
   const { history, bases } = boss.board;
   const m = history[history.length - 1];
-  if (!m || boss.powers?.bounce?.at === boss.crowdMoves) return false;
+  if (!m || boss.powers?.bounce?.at === boss.crowdMoves || boss.powers?.events?.some((e) => HIS_TURN_STEPS.includes(e.kind))) return false;
   const taken = pieceAt(fenAtPly(history, history.length - 1, bases), m.slice(2, 4));
   return taken?.type === "q" && taken.color !== boss.crowdSide;
 }
 
 /**
  * The boss thinks for at least this long; longer when the crowd has just taken its queen (queenSlain: your banner
- * plays first, and a beat after it), or when G-REX's fire has just burnt (`burnt`: it plays first).
+ * plays first, and a beat after it), when G-REX's fire has just burnt (`burnt`: it plays first), or when something of
+ * the boss's own played after the crowd's move (`afterMs`: Alfil's pieces coming down early, landedEarly).
  */
-export function bossThinkMs(boss: QueenSlainView, burnt = false): number {
-  return Math.max(queenSlain(boss) ? BOSS_BANNER.ms + 500 : 1200, burnt ? FIRE_BURN_MS : 0);
+export function bossThinkMs(boss: QueenSlainView, burnt = false, afterMs = 0): number {
+  return Math.max(queenSlain(boss) ? BOSS_BANNER.ms + 500 : 1200, burnt ? FIRE_BURN_MS : 0, afterMs);
 }
+
+/**
+ * Alfil's Slam: its pieces came down early after the crowd's move just played (he had a mate in one only while they
+ * were up): their landing plays before his turn goes on (the ms his first thinking waits for it; 0: none, or a step of
+ * his has played since).
+ */
+export const landedEarlyMs = (boss: { crowdMoves: number; powers?: { landed?: { early?: true; at: number } | null; events?: readonly { kind: string }[] } | null } | null | undefined): number =>
+  boss?.powers?.landed?.early && boss.powers.landed.at === boss.crowdMoves && !boss.powers.events?.some((e) => HIS_TURN_STEPS.includes(e.kind)) ? POWER_FX.land : 0;
 
 /**
  * The God King's Last Stand, beat by beat (ms after the crowd's disastrous move lands on the board). The reveal

@@ -564,7 +564,7 @@ export const BOSS_POWERS = {
    * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
    * fire most of the game.
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -808,6 +808,40 @@ export const BOSS_POWERS = {
   showdownSetups: 60,
   showdownNodes: 8_000,
   showdownConfirmNodes: 40_000,
+  /**
+   * Alfil's Tusks (his passive; Eric, Oct 17): at the start of his turn tusksFirst (his 3rd), then every tusksEvery of
+   * his turns, he marks two of his pawns, anywhere (they glow), then plays his move. At the start of his next turn,
+   * before his move, both are lifted off and an elephant (a bishop in every way) lands on one of their two squares, the
+   * engine's pick (each position searched at tusksNodes, and the one before): what it gains him nearest tusksTarget
+   * pawns inside tusksGain (Eric: "he gains about 1 point"), else the nearest below; never past the cap (none: the
+   * fusion fails, the pawns stay). The crowd taking one on its turn between stops it too. At most tusksMax elephants a
+   * battle. Which two: the engine's pick the same way among tusksLooks pairs, as if they fused at once (tusksPairs).
+   */
+  tusksFirst: 3,
+  tusksEvery: 5,
+  tusksMax: 2,
+  tusksLooks: 5,
+  tusksNodes: 30_000,
+  tusksGain: [0.5, 1.5] as readonly [number, number],
+  tusksTarget: 1,
+  /**
+   * Alfil's Mammoth Slam (his ultimate, at the start of his turn after its warning, from the rage meter): slamPawns of
+   * the crowd's pawns and slamMinors of its knights or bishops (never a queen, rook or king; fewer if it has fewer) fly
+   * up for slamTurns crowd turns and land as the next begins, each on its own square (taken: the nearest empty square
+   * allowed). Never a piece whose removal would leave the crowd's king in check. The swing cap: of the lifts that leave
+   * the least of the crowd's material hanging (seeded), slamLooks are played out by the engine (its best moves for both
+   * sides through the turns they're up, slamLineNodes a search), put down, and scored (slamNodes, as is the position
+   * before): the crowd's loss in pawns (bouncePawnLogit) nearest slamTarget inside slamLoss, else the nearest below it;
+   * never past the cap, never a line with a mate against the crowd. None: nothing lifts (the meter is spent anyway).
+   */
+  slamPawns: 2,
+  slamMinors: 1,
+  slamTurns: 3,
+  slamLooks: 4,
+  slamLineNodes: 15_000,
+  slamNodes: 60_000,
+  slamLoss: [0.25, 1.5] as readonly [number, number],
+  slamTarget: 0.75,
 } as const;
 
 /**

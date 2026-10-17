@@ -832,6 +832,156 @@ describe("Sawyer online", () => {
   });
 });
 
+describe("Alfil online", () => {
+  const toRound = (L: ReturnType<typeof setup>) => {
+    for (let i = 0; i < 10 && L.core.save().phase !== "play"; i++) L.advance(10_000);
+    return L.last("p1", "round")!;
+  };
+  /** Alfil, met as the test link does (his art isn't built yet: he's hidden from players). */
+  const alfil = (patch: Partial<Settings> = {}) => raid({ bossId: "alfil", bossUnfinished: true, ...patch });
+  /** Time passes until the host is asked for something (a step's pick or his move): one alarm at a time. */
+  const asked = (L: ReturnType<typeof setup>) => {
+    for (let i = 0; i < 10 && !L.last("p1", "bossRequest"); i++) L.advance(5_000);
+    return L.last("p1", "bossRequest")!;
+  };
+  /** The host answers a step's pick (a position); the request is then off its list. */
+  const answer = (L: ReturnType<typeof setup>, key: string, move: string) => {
+    L.inbox.set("p1", (L.inbox.get("p1") ?? []).filter((m) => m.t !== "bossRequest"));
+    L.core.message("p1", { t: "bossMove", key, move });
+  };
+  /** His turn: each step the host is asked to pick (the fusion, the Slam) answered with its first candidate, then his move. */
+  const hisTurn = (L: ReturnType<typeof setup>) => {
+    for (let i = 0; i < 4; i++) {
+      const req = asked(L);
+      const pick = req.fuse ?? req.slam;
+      if (!pick) return hostBoss(L);
+      answer(L, req.key, pick[0] ?? "");
+    }
+    throw new Error("his turn never came to his move");
+  };
+  /** The boss messages a player got after the `from`-th message in its outbox. */
+  const shown = (L: ReturnType<typeof setup>, id: string, from: number) => (L.inbox.get(id) ?? []).slice(from).filter((m): m is Extract<ServerMessage, { t: "boss" }> => m.t === "boss");
+
+  it("his cast at the start of his turn on the host's pick, everyone sees the marked pawns before his move; the fusion next turn the same way", () => {
+    const L = alfil({ bossPowerTest: "tusks" });
+    expect(L.last("p1", "round")!.boss!.id).toBe("alfil");
+    const from = (L.inbox.get("p2") ?? []).length;
+    crowdMove(L);
+    // The cast: the host weighs the pairs' fusions as if they came now (as the fusion's own pick), before his move.
+    const ask = asked(L);
+    expect(ask.fuse!.length).toBeGreaterThan(1);
+    expect(ask.allowed).toBeUndefined();
+    expect(ask.brain).toBeUndefined();
+    answer(L, ask.key, ask.fuse![ask.fuse!.length - 1]!);
+    const move = asked(L);
+    expect(move.fuse ?? move.slam).toBeUndefined();
+    const cast = shown(L, "p2", from).find((m) => !m.thinking && m.boss.powers!.events.at(-1)?.kind === "tusks")!;
+    expect(cast).toBeTruthy();
+    expect(cast.until - (cast as unknown as { now: number }).now).toBe(POWER_FX.tusks);
+    const marked = cast.boss.powers!.tusks!.pawns;
+    expect(marked).toHaveLength(2);
+    for (const sq of marked) expect(pieceAt(cast.boss.board.fen, sq)).toMatchObject({ color: "b", type: "p" });
+    // (The pair whose way the host picked: the board shows the pawns as they stand, not the fusion yet.)
+    expect(pieceAt(ask.fuse![ask.fuse!.length - 1]!, marked[0]!) === null || pieceAt(ask.fuse![ask.fuse!.length - 1]!, marked[1]!) === null).toBe(true);
+    expect(move.fen).toBe(cast.boss.board.fen);
+    expect(move.fen).toBe(ask.fen);
+    hostBoss(L);
+    toRound(L);
+    // Your move (the first allowed: here it takes neither), then the fusion at the start of his turn.
+    crowdMove(L);
+    const req = asked(L);
+    if (req.fuse) {
+      // Two ways to go: the host's engine picks; everyone sees the elephant land, then his move from there.
+      expect(req.fuse).toHaveLength(2);
+      expect(req.allowed).toBeUndefined();
+      expect(req.brain).toBeUndefined();
+      answer(L, req.key, req.fuse[1]!);
+      const fused = L.last("p2", "boss")!;
+      expect(fused.boss.board.fen).toBe(req.fuse[1]);
+      expect(fused.until - L.now).toBe(POWER_FX.fuse);
+      expect(fused.boss.powers!.events.at(-1)!.kind).toBe("fuse");
+      expect(asked(L).fen).toBe(req.fuse[1]);
+    }
+    const after = L.last("p2", "boss")!.boss.powers!;
+    expect(after.tusks).toBeNull();
+    expect(after.elephants).toHaveLength(1);
+    expect([...after.fusion!.from].sort()).toEqual([...marked].sort());
+    expect(after.fusion!.to).toBe(after.elephants![0]);
+  });
+
+  it("the Mammoth Slam: the host plays the candidates out and picks; the pieces' shadows grow; they land as their crowd turn begins", () => {
+    const L = alfil({ bossPowerTest: "slam" });
+    crowdMove(L);
+    hisTurn(L);
+    expect(toRound(L).boss!.powers!.warned).toBe(true);
+    crowdMove(L);
+    const ask = asked(L);
+    expect(ask.slam!.length).toBe(BOSS_POWERS.slamLooks);
+    expect(ask.allowed).toBeUndefined();
+    expect(L.last("p2", "boss")!.thinking).toBe(true);
+    answer(L, ask.key, ask.slam![1]!);
+    const slam = L.last("p2", "boss")!;
+    expect(slam.boss.board.fen).toBe(ask.slam![1]);
+    expect(slam.until - L.now).toBe(POWER_FX.slam);
+    const p = slam.boss.powers!;
+    expect(p.events.at(-1)!.kind).toBe("slam");
+    expect(p.slam!.pieces.length).toBeGreaterThan(0);
+    expect(p.slam!.loss).toBeNull();
+    expect(p.airborne!.map((x) => x.square)).toEqual(p.slam!.pieces.map((x) => x.square));
+    expect(slam.boss.board.bases).toContainEqual({ ply: slam.boss.board.history.length, fen: ask.slam![1] });
+    expect(slam.boss.powers).toEqual(L.last("p1", "boss")!.boss.powers);
+    expect(asked(L).fen).toBe(ask.slam![1]);
+    hostBoss(L);
+    // Three of your turns with them up, the shadows growing; they land as the next begins.
+    const stages: number[] = [];
+    for (let i = 0; i < BOSS_POWERS.slamTurns; i++) {
+      const r = toRound(L);
+      stages.push(r.boss!.powers!.airborne![0]!.stage);
+      expect(r.boss!.powers!.paused).toBe(true);
+      crowdMove(L);
+      hisTurn(L);
+    }
+    expect(stages).toEqual([1, 2, 3]);
+    const landed = toRound(L);
+    expect(landed.boss!.powers!.airborne).toEqual([]);
+    expect(landed.boss!.powers!.landed!.pieces.map((x) => x.from).sort()).toEqual(p.slam!.pieces.map((x) => x.square).sort());
+    expect(landed.boss!.powers!.events.some((e) => e.kind === "land")).toBe(true);
+    for (const x of landed.boss!.powers!.landed!.pieces) expect(pieceAt(landed.board!.fen, x.to)!.color).toBe("w");
+  });
+
+  it("nothing within the cap (\"\"), anything that isn't a candidate (an older app's move), or no host at all: nothing lifts, the meter spent", () => {
+    for (const reply of ["", "e7e5", null]) {
+      const L = alfil({ bossPowerTest: "slam" });
+      crowdMove(L);
+      hisTurn(L);
+      toRound(L);
+      crowdMove(L);
+      const ask = asked(L);
+      expect(ask.slam).toBeTruthy();
+      if (reply === null) {
+        L.core.disconnect("p2");
+        for (let i = 0; i < 6 && !L.last("p1", "boss")?.boss.powers?.slam; i++) L.advance(15_000);
+      } else answer(L, ask.key, reply);
+      const b = L.last("p1", "boss")!;
+      expect(b.boss.powers!.slam!.pieces).toEqual([]);
+      expect(b.boss.powers!.airborne).toEqual([]);
+      expect(b.boss.board.fen).toBe(ask.fen);
+      expect(b.boss.powers!.ults).toBe(1);
+    }
+  });
+
+  it("the admins' trigger: the Slam at the start of his next turn, without the warning", () => {
+    const L = alfil();
+    expect(L.core.ultimateTrigger("p1", true)).toBe(true);
+    crowdMove(L);
+    const ask = asked(L);
+    expect(ask.slam).toBeTruthy();
+    answer(L, ask.key, ask.slam![0]!);
+    expect(L.last("p2", "boss")!.boss.powers!.slam!.at).toBe(1);
+    expect(L.last("p2", "boss")!.boss.powers!.warned).toBe(false);
+  });
+});
+
 describe("the boss's brain online (BOSS_BRAIN: Maia while it's off for players only for a lobby of admins)", () => {
   /** A raid of people, each an admin or not (as the Durable Object found them), the Last Stand off. */
   function raidOf(patch: Partial<Settings>, admins: boolean[], rating = 1500) {

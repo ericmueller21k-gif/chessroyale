@@ -27,6 +27,8 @@ import {
   funhouseMoveFrom,
   extraMoveFrom,
   bounceFrom,
+  fuseFrom,
+  slamFrom,
   allowedSearch,
   fireRanked,
   jobEscapes,
@@ -697,6 +699,8 @@ export class NetMatch implements GameView {
       case "bossRequest":
         if (m.extra) return void this.hostExtra(m.key, m.fen);
         if (m.bounce) return void this.hostBounce(m.key, m.fen, m.bounce);
+        if (m.fuse) return void this.hostPick(m.key, async (engines) => (await fuseFrom(engines, m.fen, m.fuse!))?.fen ?? null);
+        if (m.slam) return void this.hostPick(m.key, async (engines) => (await slamFrom(engines, m.fen, m.slam!))?.fen ?? null);
         return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null);
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
@@ -887,6 +891,20 @@ export class NetMatch implements GameView {
       this.send({ t: "bossMove", key, move: (await bounceFrom(engines, fen, candidates))?.fen ?? "" });
     } catch {
       // No engine here: the server asks someone else, or nothing moves.
+    }
+  }
+
+  /**
+   * Alfil's cast, fusion and Mammoth Slam, host only: the candidate positions weighed on this device's engines (fuseFrom:
+   * his gain within its cap; slamFrom: played out, within the cap), answered as the position picked, or "" (none within
+   * the cap: the cast's first pair, no fusion, nothing lifts).
+   */
+  private async hostPick(key: string, pick: (engines: UciEngine[]) => Promise<string | null>) {
+    try {
+      const engines = await this.engines();
+      this.send({ t: "bossMove", key, move: (await pick(engines)) ?? "" });
+    } catch {
+      // No engine here: the server asks someone else, or decides without one.
     }
   }
 

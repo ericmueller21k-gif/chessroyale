@@ -103,6 +103,8 @@ import {
   bulletClock,
   bulletIncrement,
   stopReason,
+  alfilBattle,
+  type AlfilStep,
   type Battle,
   type BossAsks,
   type BossLastMove,
@@ -1327,6 +1329,34 @@ export class MatchRunner {
   /** The Big Bounce lands (from the host's engine online; see bigboyBattle.applyBounce). */
   applyBounce(pick: string | null, loss: number | null = null): BounceResult {
     return bigboyBattle.applyBounce(this.battle, pick, loss);
+  }
+
+  /**
+   * Alfil's turn begins with a step before his move (alfilBattle.step: the fusion of his last cast, a new cast, the
+   * Mammoth Slam), or null. Several can come one after another, each its own screen, then his move.
+   */
+  alfilStep(): AlfilStep | null {
+    return alfilBattle.step(this.battle);
+  }
+
+  /** The positions the step's engine pick weighs (the cast's pairs, the fusion's squares, the Slam's lifts): the same on the server, the host and in solo. */
+  alfilCandidates(): string[] {
+    return alfilBattle.candidates(this.battle);
+  }
+
+  /** The step needs an engine's pick: a cast with a choice, a fusion or a Slam with a way to go to weigh (else it lands at once). */
+  alfilNeedsEngine(): boolean {
+    return alfilBattle.needsEngine(this.battle);
+  }
+
+  /** The step, from this device's engines (the cast's pair and the fusion's square: fuseFrom; the Slam's lift: slamFrom). */
+  async playAlfil(engines: readonly EngineLike[] = this.opts.engines): Promise<AlfilStep | null> {
+    return alfilBattle.play(this.battle, engines);
+  }
+
+  /** The step lands (from the host's engine online: one of the candidates, else the cast's first pair, no fusion or nothing; alfilBattle.apply). */
+  applyAlfil(pick: string | null, loss: number | null = null): AlfilStep | null {
+    return alfilBattle.apply(this.battle, pick, loss);
   }
 
   /** The boss's last move, and the piece it took (if any). */

@@ -1,4 +1,4 @@
-import type { BossBrain, BounceResult, BurnEvent, LassoDrag, LightsOutTarget, LongPull, PowerEvent, PowerId, SawCut, ShowdownResult, SplitPawn, StopReason } from "@chessroyale/core";
+import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LightsOutTarget, LongPull, PowerEvent, PowerId, SawCut, ShowdownResult, SlamLanding, SlamResult, SplitPawn, StopReason, TusksCast } from "@chessroyale/core";
 import type { Base } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
@@ -334,6 +334,23 @@ export interface NetBossPowers {
   showdown?: ShowdownResult | null;
   ready?: number | null;
   scout?: boolean;
+  /**
+   * Alfil (missing for other bosses and from older servers; an older app ignores them): his Tusks cast under way (his
+   * turn and the crowd move it came after, and the two marked pawns' squares now: they glow; null: none), his last
+   * fusion (the two pawns' squares and the elephant's; `to` null: it failed, a marked pawn taken or no square allowed),
+   * his elephants' squares now (bishops in the rules, drawn with their own art), his last Mammoth Slam (the pieces it
+   * lifted from their squares, the crowd turn they land, the engine's measure of the swing when known here), the pieces
+   * in the air now (each with its own square, where it lands: the shadow's square; the crowd turn it lands as it
+   * begins; the crowd turns left, counting this one; the shadow's size, 1 to slamTurns), and their last landing (each
+   * piece's own square and where it came down: the nearest empty square allowed when its own was taken; `early`: at the
+   * start of his turn, a mate in one stopped).
+   */
+  tusks?: TusksCast | null;
+  fusion?: Fusion | null;
+  elephants?: string[];
+  slam?: SlamResult | null;
+  airborne?: { piece: string; square: string; lands: number; left: number; stage: number }[];
+  landed?: SlamLanding | null;
 }
 
 /**
@@ -699,6 +716,18 @@ export type ServerMessage = { now: number } & (
       drag?: true;
       showdown?: "try" | "test";
       seed?: number;
+      /**
+       * Alfil's Tusks (his turn begins with it): positions with an elephant (him to move): for his fusion, the elephant on
+       * each square allowed; for his cast, each pair's ways to go as if it fused now. Answer the one picked (fuseFrom: his
+       * gain nearest about a pawn, never past the cap) as `move`, or "" when none is (no fusion; the cast's first pair).
+       * An older app ignores it and plays a move, which isn't one of these: the same as "".
+       */
+      fuse?: string[];
+      /**
+       * Alfil's Mammoth Slam: the candidate lifts (him to move, the crowd's pieces up); answer the one picked (slamFrom:
+       * the turns played out, the swing within the cap) as `move`, or "" when none is (nothing lifts).
+       */
+      slam?: string[];
     }
   /**
    * The boss's brain for this battle, to the host as the battle begins (on the Maia brain only): it starts loading

@@ -15,6 +15,7 @@ import { HOLLOW_UI } from "./Hollow.tsx";
 import { SAWYER_UI } from "./Sawyer.tsx";
 import { PIG_UI } from "./Pig.tsx";
 import { RECLUSE_UI } from "./Recluse.tsx";
+import { ALFIL_UI } from "./Alfil.tsx";
 import { PowerBanner, kitLine, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 import { useFrameNow } from "./Countdown.tsx";
@@ -42,7 +43,7 @@ export { DARK, DarkCost, HOLLOW_CASTER, hollowCastFrom } from "./Hollow.tsx";
 export { PowerBanner, type Moment } from "./PowerParts.tsx";
 
 /** Every boss with powers on screen, by its BOSS_ROSTER id. */
-const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI] as BossUi[]).map((u) => [u.id, u]));
+const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI, ALFIL_UI] as BossUi[]).map((u) => [u.id, u]));
 const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
 
 /** The rage warning, the same for every boss: the meter full, its ultimate coming. */
@@ -72,6 +73,7 @@ const MOMENT_UI: Record<PowerEventKind, MomentUi> = {
   ...SAWYER_UI.moments,
   ...PIG_UI.moments,
   ...RECLUSE_UI.moments,
+  ...ALFIL_UI.moments,
 };
 
 /** The moments that play on a screen of their own, in the order they're looked for. */
@@ -86,7 +88,8 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   const p = boss.powers;
   if (!p || !until || !p.events.length) return [];
   const only = OWN.find((k) => MOMENT_UI[k].own!(boss)) ?? null;
-  const list = p.events.filter((e) => (only ? e.kind === only : !MOMENT_UI[e.kind].own)).sort((a, b) => MOMENT_UI[a.kind].order - MOMENT_UI[b.kind].order);
+  // (A moment this app doesn't know, from a newer server, is passed over rather than read: Oct 17, Alfil's.)
+  const list = p.events.filter((e) => MOMENT_UI[e.kind] && (only ? e.kind === only : !MOMENT_UI[e.kind].own)).sort((a, b) => MOMENT_UI[a.kind].order - MOMENT_UI[b.kind].order);
   let t = until - powerMomentMs(list);
   return list.map((e) => {
     const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}`, at: t, ms: powerFxMs(e), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}) };
