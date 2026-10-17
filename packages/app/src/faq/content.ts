@@ -71,6 +71,7 @@ import {
 import { clockLabel, defaultClock, minutesName } from "@chessroyale/chess/squads";
 import { anchorsOf, parse, plainText, type Block } from "./markdown.ts";
 import { JUMP_NEXT_LABEL } from "../squads-view.ts";
+import { REFUSED } from "../refused.ts";
 
 /** Everything the FAQ quotes. The defaults are the game's; tests pass changed ones. */
 export interface FaqSources {
@@ -723,7 +724,8 @@ function bossPowers(src: FaqSources): FaqSection {
 Every boss has a **passive** power that comes every few turns and an **ultimate** that comes whenever its rage meter is full, again and again. Turns count the crowd's moves: turn 1 is the crowd's first move of the battle. For every boss:
 
 - Every power is decided by the game from the battle's own random draw and the position, so everyone sees exactly the same thing.
-- A power never leaves anyone without a legal move and never stops you getting out of check: a limit that would lifts for that turn. Your king is never frozen.
+- A power never leaves anyone without a legal move and never stops you getting out of check: a limit that would lifts for that turn. Your king is never frozen. The boss is no different: when every move he has crosses Sawyer's saw (say, his only way out of check), he plays one anyway, and the line under the board says so.
+- A move of yours that a power stops stays where it was, and the line under the board says why ("${REFUSED.boardsaw}").
 - The judge plays by the same rules: while a power limits your moves, the best move is the best of the ones you're allowed.
 - The clock stands still while a power plays out: it never costs you thinking time.
 

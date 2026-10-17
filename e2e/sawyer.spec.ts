@@ -2,6 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { SAWYER_LOOKS } from "@chessroyale/core";
 import { BOARD_SEL, engineTop, test, watchFor, bossAloneFromHome } from "./helpers.ts";
+import { REFUSED, REFUSED_OTHER, THROUGH } from "../packages/app/src/refused.ts";
 
 /**
  * Sawyer, the raccoon with a saw, played alone on a phone and a computer with real taps: his first move a pawn's and
@@ -255,6 +256,91 @@ async function asAdmin(page: Page) {
     await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
   });
 }
+
+test("Sawyer's board saw on Maia (Eric, Oct 17): his moves never cross it while it's up; a move of yours across it stays put and the dock says why", async ({ page }) => {
+  test.setTimeout(8 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  // (An admin: the boss on Maia, no guard, as Eric played him, and the brain's debug line to read.)
+  await asAdmin(page);
+  await page.addInitScript(() => localStorage.setItem("brc.muted", "1"));
+  await page.goto("/?debug&clock=60&boss=sawyer&power=boardsaw&laststand=0");
+  await bossAloneFromHome(page);
+  // The test switch: warned as the 2nd turn begins, the saw as the 3rd, up to the 7th; it's gone as the 8th begins.
+  await play(page, await allowedMove(page, ["g1f3", "b1c3", "g8f6", "b8c6"]));
+  await play(page, await allowedMove(page, ["b1c3", "g1f3", "h2h3", "b8c6", "g8f6", "h7h6"]));
+  let before: string | null = null;
+  let tried = false;
+  const brains: string[] = [];
+  for (let turn = 3; turn <= 8; turn++) {
+    await yourMove(page);
+    const now = await page.evaluate(() => {
+      const m = (window as any).match;
+      return { fen: m.phase.board.fen as string, lastMove: m.boss.lastMove as { move: string; through?: string } | null, powers: m.boss.powers, brain: (m.brainLine as string | null) ?? "" };
+    });
+    if (before) {
+      // His reply from `before`, under the saw: never across it, unless every move he had crossed it (then the dock
+      // says so).
+      const his = now.lastMove!.move;
+      brains.push(now.brain);
+      if (crossesMiddle(his)) {
+        expect(new Chess(before).moves({ verbose: true }).every((m) => crossesMiddle(m.from + m.to)), `${his} from ${before}`).toBe(true);
+        expect(now.lastMove!.through).toBe("boardsaw");
+        await expect(page.locator(".through-note")).toHaveText("His only move: the board saw let it through.");
+      } else expect(now.lastMove!.through, `${his} from ${before}`).toBeUndefined();
+    }
+    if (turn === 8) {
+      expect(now.powers.boardSaw ?? null).toBeNull();
+      break;
+    }
+    expect(now.powers.boardSaw).toEqual({ at: 3, until: 7 });
+    if (!tried) {
+      // A move of yours across the saw (legal in chess): tapped, it stays put, and the dock says why, beside "Your move.".
+      const across = new Chess(now.fen).moves({ verbose: true }).find((m) => crossesMiddle(m.from + m.to) && !m.promotion);
+      if (across) {
+        await tap(page, across.from);
+        await tap(page, across.to);
+        await expect(page.locator(".boss-dock .dk-text")).toContainText("Your move.");
+        await expect(page.locator(".boss-dock .refused-note")).toHaveText("The board saw blocks that move.");
+        expect(await phase(page)).toBe("play");
+        expect(await page.evaluate(() => (window as any).match.phase.board.fen)).toBe(now.fen);
+        // Every one of these lines fits the dock's two lines beside "Your move." (its box clamps and hides the rest), at
+        // this size and on the narrowest phone, measured in the real font and box.
+        const lines = [...Object.values(REFUSED), REFUSED_OTHER, ...Object.values(THROUGH)];
+        const fits = () =>
+          page.evaluate((all) => {
+            const box = document.querySelector(".boss-dock .dk-text > span") as HTMLElement;
+            const was = box.innerHTML;
+            const out = all.filter((l) => {
+              box.innerHTML = `<strong>Your move.</strong> <span class="refused-note">${l}</span>`;
+              return box.scrollHeight > box.clientHeight + 1;
+            });
+            box.innerHTML = was;
+            return out;
+          }, lines);
+        expect(await fits()).toEqual([]);
+        if (test.info().project.name === "phone") {
+          const size = page.viewportSize()!;
+          await page.setViewportSize({ width: 320, height: 640 });
+          expect(await fits()).toEqual([]);
+          await page.setViewportSize(size);
+        }
+        tried = true;
+      }
+    }
+    const mine = await allowedMove(page, ["h2h3", "a2a3", "h7h6", "a7a6", "g2g3", "b2b3", "g7g6", "b7b6"]);
+    expect(crossesMiddle(mine)).toBe(false);
+    const after = new Chess(now.fen);
+    after.move({ from: mine.slice(0, 2), to: mine.slice(2, 4), promotion: mine[4] ?? "q" });
+    before = after.fen();
+    await play(page, mine);
+  }
+  // Five replies of his under the saw, at least one of them Maia's own (the path Eric met: Maia, no guard).
+  expect(brains.length).toBe(5);
+  expect(brains.filter((l) => /Maia \d+ · no guard · Maia's/.test(l)).length, brains.join(" | ")).toBeGreaterThanOrEqual(1);
+  expect(tried).toBe(true);
+  expect(errors).toEqual([]);
+});
 
 test("Sawyer: the board saw from the admins' trigger, a cut taped over and healing, the halves rejoining", async ({ page }) => {
   test.setTimeout(8 * 60_000);

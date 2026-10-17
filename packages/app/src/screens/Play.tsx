@@ -19,6 +19,7 @@ import { duelCount, duelTurn } from "../components/Pig.tsx";
 import { bulletControl, bulletIncrementOn, bulletOn, kingBlocked } from "../components/Recluse.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { useReplay } from "../hooks.ts";
+import { REFUSED_MS, refusedLine, throughLine } from "../refused.ts";
 import { Hud } from "./Hud.tsx";
 
 const HINT_BRUSHES = ["green", "blue", "yellow"] as const;
@@ -142,6 +143,12 @@ export function PlayScreen({
   const dark = useMemo(() => (match.boss?.powers?.dark ?? []).map((d) => d.square), [match.boss?.powers?.dark?.map((d) => d.square).join()]);
   const note = match.darkNote;
   const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking && !note?.pending;
+  // A move a boss power refuses (legal in chess: across Sawyer's saw, onto a pie…) stays put: why, beside "Your
+  // move.", for a few seconds (refused.ts; Eric, Oct 17: it "glitched"). And the boss's last move, if it went through
+  // a power (his only move: the limit lifted for it), says so for your whole turn.
+  const [refused, setRefused] = useState<{ line: string; fen: string; at: number } | null>(null);
+  const refusedNow = refused && refused.fen === board.fen && now - refused.at < REFUSED_MS ? refused.line : null;
+  const through = match.boss ? throughLine(match.boss) : null;
   // The God King strikes from his spot (or, the old way behind settings.kingOnBoard, summoned onto your king's square).
   const onBoardKing = !!match.settings.kingOnBoard;
   const command = useMemo(() => {
@@ -215,7 +222,7 @@ export function PlayScreen({
         <div class="board-row">
           {match.boss && <BossSide match={match} />}
           <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={fen} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)}>
+          <Board fen={fen} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} onRefused={match.boss ? (m) => setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)}>
             {/* (Stepping back through the game keeps the dark on its squares: it belongs to the square.) */}
             {match.boss?.powers && (!history.browsing || dark.length > 0) && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
             {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} />}
@@ -298,10 +305,15 @@ export function PlayScreen({
                   </span>
                 ) : note?.pending ? (
                   <span class="muted">Into the dark…</span>
+                ) : refusedNow ? (
+                  // (The box around it is the dock's live region: read out as it changes.)
+                  <span class="refused-note">{refusedNow}</span>
                 ) : hint !== null ? (
                   <span class="muted">{hint.length ? "⚡ Top 3" : "⚡ Asking the engine…"}</span>
                 ) : barred ? (
                   <span class="muted barred-note">✕ {toSan(board.fen, barred)}</span>
+                ) : through ? (
+                  <span class="muted through-note">{through}</span>
                 ) : bulletOn(match.boss) ? (
                   // (The Hidden Boss's bullet clock, on every move to the end; once he has added time per move, the time
                   // control too: "Bullet 1+2". What's left in your bank is the dock's clock, at the box's right.)

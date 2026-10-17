@@ -12584,6 +12584,11 @@ img.qicon {
   color: #fda4af;
   font-weight: 700;
 }
+/* Why a move of yours was refused (a boss power stops it: refused.ts), in the dock's status line beside "Your move.". */
+.refused-note {
+  color: var(--bad);
+  font-weight: 700;
+}
 /* His bulbs (the strip): one lit for each of his moves until he covers another square. Beside the rage meter. */
 .bulb-strip {
   display: inline-block;

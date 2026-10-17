@@ -19,7 +19,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/ho
 import { BOARD } from "@chessroyale/core";
 import { applyMove, inCheck, pieceAt, sideToMove, touchesDark } from "@chessroyale/chess";
 import { BoardTurn, coordLabel, type QuarterTurn } from "../board-view.ts";
-import { BRUSHES, FILES, SLIDE_MS, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, gestureMoves, pieceClass, pieceCloseTo, positionKey, pressDown, pressMove, pressUp, readPieces, slidePiece, squareAtPoint, stillRunning, type BoardPiece, type Box, type PieceCode, type Press, type PressBoard } from "./logic.ts";
+import { BRUSHES, FILES, SLIDE_MS, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, gestureMoves, pieceClass, pieceCloseTo, positionKey, pressDown, pressMove, pressUp, readPieces, refusedMove, slidePiece, squareAtPoint, stillRunning, type BoardPiece, type Box, type PieceCode, type Press, type PressBoard } from "./logic.ts";
 import type { BoardProps } from "./types.ts";
 
 let nextPieceId = 1;
@@ -57,6 +57,8 @@ type Promotion = { from: string; to: string; dark?: boolean };
 interface BoardActs {
   move(uci: string): void;
   darkTry(uci: string): void;
+  /** A legal move that `moves` doesn't allow, tried (onRefused). */
+  refused(uci: string): void;
   promote(p: Promotion): void;
   selectDark(sq: string | null): void;
   /** The move you made, while it's shown (OwnBoard clears it). */
@@ -75,6 +77,8 @@ export function OwnBoard(props: BoardProps) {
   onMoveRef.current = onMove;
   const onDarkRef = useRef(onDarkTry);
   onDarkRef.current = onDarkTry;
+  const onRefusedRef = useRef(props.onRefused);
+  onRefusedRef.current = props.onRefused;
   const [promotion, setPromotion] = useState<Promotion | null>(null);
   // Hollow's dark: a dark square tapped (selected without picking anything up).
   const [darkSel, setDarkSel] = useState<string | null>(null);
@@ -96,7 +100,7 @@ export function OwnBoard(props: BoardProps) {
   // A new position or the dark changing: no dark square stays selected.
   useLayoutEffect(() => setDarkSel(null), [fen, dark?.join(), interactive]);
 
-  const acts = useMemo<BoardActs>(() => ({ move: (uci) => onMoveRef.current?.(uci), darkTry: (uci) => onDarkRef.current?.(uci), promote: setPromotion, selectDark: setDarkSel, local }), []);
+  const acts = useMemo<BoardActs>(() => ({ move: (uci) => onMoveRef.current?.(uci), darkTry: (uci) => onDarkRef.current?.(uci), refused: (uci) => onRefusedRef.current?.(uci), promote: setPromotion, selectDark: setDarkSel, local }), []);
   // (The same element while nothing it shows has changed: Preact leaves it, and everything in it, alone.)
   const layer = useMemo(
     () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} acts={acts} />,
@@ -132,7 +136,7 @@ export function OwnBoard(props: BoardProps) {
   );
 }
 
-type LayerProps = Omit<BoardProps, "children" | "silent" | "onMove" | "onDarkTry"> & { darkOn: boolean; darkSel: string | null; acts: BoardActs };
+type LayerProps = Omit<BoardProps, "children" | "silent" | "onMove" | "onDarkTry" | "onRefused"> & { darkOn: boolean; darkSel: string | null; acts: BoardActs };
 
 /**
  * The board's drawing: the squares and their highlights, the pieces (sliding, fading, following a drag), the arrows and
@@ -270,6 +274,13 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     acts.move(legal[0]!);
   };
 
+  /** A move tried that chess allows but `moves` doesn't (a boss power stops it): it stays put, and the screen says why. */
+  const refusedTry = (from: string, to: string) => {
+    const s = live.current;
+    const move = canAct && !s.darkList.length ? refusedMove(s.fen, moves, from, to) : null;
+    if (move) acts.refused(move);
+  };
+
   const boxOf = (): Box => {
     const r = boardRef.current!.getBoundingClientRect();
     return { left: r.left, top: r.top, width: r.width, height: r.height };
@@ -334,7 +345,8 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
         }
       }
     }
-    const r = pressDown(s.board, selected.current, sq, e.clientX, e.clientY, dragged.current);
+    const before = selected.current;
+    const r = pressDown(s.board, before, sq, e.clientX, e.clientY, dragged.current);
     selected.current = r.selected;
     if (r.move) {
       dragged.current = false;
@@ -349,7 +361,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
         startDrag();
         dragTo(r.press);
       }
-    }
+    } else if (before && before !== sq) refusedTry(before, sq);
     redraw();
   };
 
@@ -374,6 +386,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     selected.current = r.selected;
     if (p.started) endDrag(p);
     if (r.move) userMove(r.move[0], r.move[1], true);
+    else if (p.started && to && to !== p.from) refusedTry(p.from, to);
     redraw();
   };
 

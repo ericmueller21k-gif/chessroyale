@@ -71,7 +71,20 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   - Every power comes from the battle's seed (drawn once, as it starts) and the position, so the server, the solo game
     and every screen work out the same thing (`powerRoll`).
   - A power never leaves anyone without a legal move and never breaks check: a restriction that would leave no move
-    (or no escape from check) lifts for that turn. The king is never frozen.
+    (or no escape from check) lifts for that turn. The king is never frozen. The boss too (Eric, Oct 17: Sawyer's queen
+    crossed his own board saw, his only way out of a knight's check): the move is marked (`lastMove.through`, a
+    `StopReason`, from `applyBossMove`) and your turn's dock says so ("His only move: the board saw let it through.").
+  - **A move a power refuses says why** (Oct 17; docs/decisions/2026-10-17-power-limits-said-on-screen.md): a move
+    legal in chess that the turn doesn't allow (across the saw, onto a pie, through a toy block, a frozen piece, the
+    move the God King took back) stays put, as before, and the dock says why beside "Your move." for 3 s
+    (`REFUSED_MS`) or until the position changes: the board's `onRefused`, the words in `packages/app/src/refused.ts`
+    (`REFUSED`, `THROUGH`), which power by `BossRules.stopReason` (`stopReason` in `boss-powers.ts`: Sawyer, Boingo,
+    Big Boy; it reads only fields the screens' view has too).
+  - **Whichever brain picks it, the boss's move is one his powers allow:** every path picks from the allowed moves,
+    `bossMoveFrom` checks its own pick (else his best allowed move, logged) and `applyBossMove` checks what's played
+    (else the first allowed, logged). Every power × brain path: `packages/chess/test/boss-power-legal.test.ts`.
+  - Looking back through the moves (the history view) draws no power's marks but Hollow's dark: a past move shows
+    without the saw, the pies or the ice it was played under (Oct 17: a gap, listed in the decision above).
   - The judge plays by the same rules: the best move is the best of the allowed ones.
   - **A power's follow-up move that the engine scored is played by the engine** (Eric, Oct 13: the crowd won
     Wrangler's queen in his showdown when his brain, Maia at 600, took another piece instead of taking back). When a
@@ -494,7 +507,9 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 ## Tests and tools
 
 - Unit, the brain: `packages/chess/test/boss-brain.test.ts` (the rule, the bridge, the guards, the fallbacks),
-  `maia-bosses.test.ts` (every boss's Maia path: its powers' limits kept, its special moves untouched), the online
+  `maia-bosses.test.ts` (every boss's Maia path: its powers' limits kept, its special moves untouched),
+  `boss-power-legal.test.ts` (Eric's Oct 17 position; every power that stops the boss × every brain path; the last
+  checks; `stopReason`), `packages/app/test/refused.test.ts` (the dock's words), the online
   brain in `packages/server/test/boss-powers-lobby.test.ts`; the Maia box's own tests in `packages/maia-worker/test/`.
   e2e: `e2e/maia.spec.ts` (every boss on Maia for an admin; an online raid on Maia; players never load it). Sims:
   `packages/sim/scripts/maia-calibration.ts` (`reports/maia-calibration.md`), `maia-sim.ts` (`reports/maia-boss.md`).
@@ -522,7 +537,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   boss's sound from its own pack, its own lines, none twice running, the Hidden Boss's in turn).
 - e2e: `e2e/pig.spec.ts` (Wrangler: the long pull, a drag, his meter's line and ready loop, a showdown with no warning,
   its forced duel and his reply (the engine's best), phone and computer, solo and online; the admins' trigger),
-  `e2e/boss-powers.spec.ts` "Boingo's funhouse at every angle" (a move by tap and by drag, touch on the phone, at
+  `e2e/sawyer.spec.ts` "Sawyer's board saw on Maia" (his five replies under the saw never across it, a move of yours
+  across it refused with the dock's words), `e2e/boss-powers.spec.ts` "Boingo's funhouse at every angle" (a move by tap and by drag, touch on the phone, at
   0°, 180°, 90° and 270°; the coordinates and pies on their squares at each), `e2e/king-attack.spec.ts` (Hollow's mate and his attack in the Last Stand, every frame), `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `sawyer.spec.ts`, `boss-character.spec.ts`,
   `boss-speech.spec.ts` (one moment of each boss: its line held whole and in view for its full time, every frame, and
   gone on time),
@@ -568,6 +584,9 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 - A search in rounds carries its source on from round to round, and a power that fires only when a search finds
   something is measured in real battles on a phone's budget before it ships (`showdown-sim.ts`; Oct 13, "A showdown
   that never came").
+- A limit that refuses a move, or lifts for one (the only way out of check), says so on screen in the power's words
+  (`refused.ts`; Oct 17, "A saw the boss crossed"): a piece that only goes back, or a boss crossing his own saw, reads
+  as a glitch. A new power that stops moves gives `BossRules.stopReason` and its words in `REFUSED` and `THROUGH`.
 - A power's follow-up move that the engine scored must be played by the engine (`BossRules.bestReply`): when a power's
   search scores an outcome on the boss's best reply, his brain (Maia, a slip) never plays that reply (Oct 13, "A queen
   won for free").

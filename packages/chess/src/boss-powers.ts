@@ -14,7 +14,7 @@
  *
  * Turns are the crowd's: turn N is the crowd's Nth move of the battle (crowdMoves + 1 while it's being picked).
  */
-import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent } from "@chessroyale/core";
+import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent, type StopReason } from "@chessroyale/core";
 import { legalMoves } from "./rules.ts";
 import type { EngineLike } from "./runner.ts";
 import type { MoveScore } from "./uci.ts";
@@ -38,13 +38,14 @@ import {
   type JudgedEvaluation,
   type RageRates,
   type Side,
+  type StopFields,
   type TurnContext,
 } from "./bosses/base.ts";
 import { bossRules } from "./bosses/index.ts";
 
 // Every boss's file, and the shared pieces of the base boss, for the whole package.
 export { bossPowers, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, unleashed };
-export type { Battle, BossAsks, BossLastMove, BossRules, JudgedEvaluation, RageRates, TurnContext };
+export type { Battle, BossAsks, BossLastMove, BossRules, JudgedEvaluation, RageRates, StopFields, TurnContext };
 export * from "./bosses/ginger.ts";
 export * from "./bosses/boingo.ts";
 export * from "./bosses/grex.ts";
@@ -181,6 +182,14 @@ export const crowdMayPlay = (boss: BossState | null | undefined, fen: string, mo
   const allowed = crowdAllowed(boss, fen);
   return allowed ? allowed.includes(move) : legalMoves(fen).includes(move);
 };
+
+/**
+ * Which power stops `move` now, either side (Sawyer's saw, a pie, a toy block: BossRules.stopReason), for the screens'
+ * words, or null. The match's state and the screens' view alike (the fields it reads are the same in both).
+ */
+export function stopReason(boss: { id?: string; powers?: StopFields | null } | null | undefined, fen: string, move: string): StopReason | null {
+  return boss?.powers ? (bossRules(boss)?.stopReason?.(boss, move, fen) ?? null) : null;
+}
 
 /**
  * A power touches this crowd turn (a frozen piece, a pie, a toy block, the blizzard, a flipped board, fire): its picks

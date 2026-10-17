@@ -91,7 +91,12 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     its moves allowed: today's Stockfish move. The King's strike, Boingo's funhouse move for the crowd, Hollow's extra
     move and Big Boy's bounce keep their own Stockfish picks; a reply its power's search scored (Wrangler's to the
     showdown's duel: `BossRules.bestReply`, `bossRequest.best`) is Stockfish's best at full strength, Maia not asked;
-    Maia's own mistakes replace the slips.
+    Maia's own mistakes replace the slips. **The last checks** (Oct 17; docs/decisions/2026-10-17-power-limits-said-on-screen.md):
+    whatever path picked it, `bossMoveFrom` checks its own pick against the allowed moves (any legal move when nothing
+    limits him): one that isn't (an engine's answer for another position, a Maia move not legal here) is logged and
+    his best allowed move played (`bestReplyFrom`); the runner's `applyBossMove` (solo and the server) plays the first
+    allowed move for anything else a host sends, and logs it. Every power × brain path is tested
+    (`packages/chess/test/boss-power-legal.test.ts`).
   - **Never waited on, move by move:** not ready, failed, or no answer in 1.5 s (`timeoutMs`): today's move. A slow
     or old device falls back to Stockfish this way. Only a solo battle's start waits for it (the loading step, below).
   - **Where:** every boss battle, solo (`startBrain` in `solo.ts`, the runner's `humanBrain`) and online (the lobby

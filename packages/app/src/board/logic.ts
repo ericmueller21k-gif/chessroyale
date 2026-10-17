@@ -139,6 +139,17 @@ export function gestureMoves(fen: string, only: readonly string[] | undefined, f
   return castle ? [castle] : [];
 }
 
+/**
+ * A piece taken from one square to another that chess allows but `moves` doesn't (a boss power stops it: Sawyer's saw,
+ * a pie, a toy block, a frozen piece): that move (a promotion's first), for the screen to say why; null for anything
+ * else (allowed, not a move at all, or nothing limits the moves).
+ */
+export function refusedMove(fen: string, moves: readonly string[] | undefined, from: string, to: string): string | null {
+  if (!moves) return null;
+  const legal = gestureMoves(fen, undefined, from, to);
+  return legal.length && !gestureMoves(fen, moves, from, to).length ? legal[0]! : null;
+}
+
 /** The position after a piece is moved from one square to another, nothing else changed (a promotion still to pick). */
 export function slidePiece(pieces: ReadonlyMap<string, PieceCode>, from: string, to: string): Map<string, PieceCode> {
   const out = new Map(pieces);

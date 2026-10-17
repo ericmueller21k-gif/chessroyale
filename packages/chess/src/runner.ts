@@ -102,6 +102,7 @@ import {
   pigTurn,
   bulletClock,
   bulletIncrement,
+  stopReason,
   type Battle,
   type BossAsks,
   type BossLastMove,
@@ -1213,8 +1214,11 @@ export class MatchRunner {
   }
 
   /**
-   * Plays the boss's move (from the host's engine online). An illegal move (or one onto a pie) is replaced by the
-   * first allowed one. Then the crowd's next turn begins: its powers are set (a freeze, a pie, the ultimate).
+   * Plays the boss's move (from the host's engine online). The last check, whoever picked it: an illegal move, or one a
+   * power stops (onto a pie, across Sawyer's saw), never lands; the first allowed one is played instead and the error
+   * is logged (every brain picks from the allowed moves and bossMoveFrom checks its own pick, so only a host that's out
+   * of date or tampered with gets here). Then the crowd's next turn begins: its powers are set (a freeze, a pie, the
+   * ultimate).
    */
   applyBossMove(move: string, staggered = !!this.state.boss?.staggerNext, extras: BossMoveExtras = {}): string {
     const id = this.state.boards[0]!;
@@ -1224,10 +1228,13 @@ export class MatchRunner {
     const boss = this.state.boss;
     const special = boss?.powers ? (bossRules(boss)?.specialMove?.(boss, board.fen, move) ?? null) : null;
     const m = special && legal.includes(special.play) ? special.play : legal.includes(move) ? move : legal[0]!;
+    if (m !== move && !(special && m === special.play)) console.error(`boss move refused: ${move} isn't one he may play in ${board.fen}; ${m} instead`);
     const shown = special && m === special.play ? move : m;
     this.boards.set(id, playOnBoard(board, m, 1 - board.expected));
     const captured = pieceAt(board.fen, m.slice(2, 4))?.type;
-    this.bossLast = { move: shown, san: special && m === special.play ? special.san : toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}) };
+    // (A power stops it: it stopped every move he had, so the limit lifted for the turn. The screens say which power.)
+    const through = boss?.powers && bossRules(boss)?.bossStops?.(boss)?.(m, board.fen) ? stopReason(boss, board.fen, m) : null;
+    this.bossLast = { move: shown, san: special && m === special.play ? special.san : toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}), ...(through ? { through } : {}) };
     if (this.state.boss?.staggerNext) this.state = { ...this.state, boss: { ...this.state.boss, staggerNext: false } };
     // (The boss's own after-move effect: Sawyer's split pawn after his first move; Wrangler's pull, drag or showdown.)
     if (this.state.boss?.powers) bossRules(this.state.boss)?.afterBossMove?.(this.battle, m, { ...extras, ...(shown !== m ? { special: shown } : {}) });
@@ -1830,6 +1837,9 @@ function pickByLoss(top: readonly MoveScore[], range: readonly [number, number],
  * take the slips' place), within what `allowed` leaves; the strike, the bridge band's share and every fallback are
  * Stockfish's, as above. "best" (a power's follow-up its engine search scored: Wrangler's reply to the showdown's
  * duel) is the engine's best move at full strength (bestReplyFrom): never the brain's, a slip or the guard's.
+ *
+ * Whichever of those picks it, the move is one of `allowed` (the moves the powers leave him; null: any legal move): a
+ * pick that isn't (an engine's answer for another position, say) is logged and his best allowed move played instead.
  */
 export async function bossMoveFrom(
   engine: EngineLike,
@@ -1841,6 +1851,26 @@ export async function bossMoveFrom(
   strikeLoss: readonly [number, number] = [5, 15],
   guard: BossGuard = DEFAULT_BOSS_GUARD,
   allowed: readonly string[] | null = null,
+  brain?: BossBrainCall,
+): Promise<string> {
+  const move = await pickBossMove(engine, fen, elo, nodes, kind, rng, strikeLoss, guard, allowed, brain);
+  const ok = allowed ?? legalMoves(fen);
+  if (ok.includes(move)) return move;
+  console.error(`boss move refused: ${move} isn't one he may play in ${fen}; his best allowed move instead`);
+  return bestReplyFrom(engine, fen, nodes, ok);
+}
+
+/** The boss's move as its brain, the slips, the strike or the engine's best pick it (bossMoveFrom checks it). */
+async function pickBossMove(
+  engine: EngineLike,
+  fen: string,
+  elo: number,
+  nodes: number,
+  kind: BossMoveKind | boolean,
+  rng: Rng,
+  strikeLoss: readonly [number, number],
+  guard: BossGuard,
+  allowed: readonly string[] | null,
   brain?: BossBrainCall,
 ): Promise<string> {
   const k: BossMoveKind = kind === true ? "stumble" : kind === false ? "elo" : kind;

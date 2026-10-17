@@ -22,6 +22,7 @@ import {
   type PowerEvent,
   type PowerId,
   type Settings,
+  type StopReason,
 } from "@chessroyale/core";
 import type { BoardState } from "../boards.ts";
 import type { NetBossPowers } from "../protocol.ts";
@@ -224,6 +225,11 @@ export interface BossRules {
   crowdFilter?(allowed: string[], boss: BossState, fen: string): string[];
   /** What stops the boss's own moves now (a pie, a toy block), or null: nothing does. */
   bossStops?(boss: BossState): ((move: string, fen: string) => boolean) | null;
+  /**
+   * Which of its powers stops `move` now, either side (for the screens' words: a refused move of yours, the boss's only
+   * move through it), or null. It reads only fields the screens' view carries too (`StopFields`), so the app asks it.
+   */
+  stopReason?(boss: { powers?: StopFields | null }, move: string, fen: string): StopReason | null;
   /** A power touches this crowd turn: its picks don't count as fair-play signals. */
   powerTurn?(boss: BossState): boolean;
   /** The squares that show ice (`crowdAllowed`: the dispatcher's). */
@@ -362,8 +368,14 @@ export function warnThenUnleash(next: BossPowerState, t: TurnContext): boolean {
 
 // ---------------- A boss's part in the match runner ----------------
 
-/** The boss's last move, as the screens show it (and the piece it took, if any). */
-export type BossLastMove = { move: string; san: string; staggered?: boolean; captured?: string };
+/**
+ * The boss's last move, as the screens show it (and the piece it took, if any). `through`: it was his only move and a
+ * power stops it (Sawyer's saw, a pie, a toy block), so the limit lifted for it (the dock says so on your turn).
+ */
+export type BossLastMove = { move: string; san: string; staggered?: boolean; captured?: string; through?: StopReason };
+
+/** The power fields `BossRules.stopReason` reads: the same in the match's state and in the screens' view. */
+export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block">>;
 
 /**
  * What a boss's battle code (its moments in a match: the funhouse, Lights out, the bounce…) may use of the match

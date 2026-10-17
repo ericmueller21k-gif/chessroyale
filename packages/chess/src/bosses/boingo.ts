@@ -152,6 +152,7 @@ export const BOINGO: BossRules = {
     const pied = piedSquares(boss);
     return pied.length ? (m) => pied.includes(to(m)) : null;
   },
+  stopReason: (boss, m) => ((boss.powers?.pies ?? []).some((x) => x.square === to(m)) ? "pie" : null),
   powerTurn: (boss) => piedSquares(boss).length > 0 || boardAngle(boss) !== 0,
 };
 

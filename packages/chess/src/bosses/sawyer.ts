@@ -312,6 +312,8 @@ export const SAWYER: BossRules = {
     if (!first && !p.cut && !p.boardSaw) return null;
     return (m, fen) => (first && pieceAt(fen, from(m))?.type !== "p") || sawStops(p, m, fen);
   },
+  // Which saw stops a move (the screens' words): the board saw's line, else the saw cut's edge.
+  stopReason: (boss, m, fen) => (boss.powers?.boardSaw && crossesMiddle(m) ? "boardsaw" : crossesCut(m, boss.powers?.cut, fen) ? "cut" : null),
   powerTurn: (boss) => !!boss.powers!.cut || !!boss.powers!.boardSaw,
   // After his move: the first one splits its pawn (a base on the board: the position changes outside a move); after
   // any other, the halves follow.

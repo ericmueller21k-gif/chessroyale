@@ -783,3 +783,26 @@ turn). The bounce now waits for the banner online as it did solo.
   stays true afterwards: a power that pauses the turn shows the same state again.
 - When a turn has more than one screen of the same kind (a thinking before a power and one after it), check everything
   drawn from that state on each of them.
+
+## A saw the boss crossed (Oct 17, 2026)
+
+**What Eric saw:** Boss alone against Sawyer, the board saw up: "I tried to take, it's like it glitched, and he just
+played his queen through the cut in the board and captured my piece." One move back in the history, the cut wasn't
+drawn: "the engine clearly didn't see it was there."
+
+**The cause:** no rule was broken. His knight's check from f6 left the boss one legal move, Qd8xf6, across the saw,
+and a power never blocks the only way out of check: the limit lifted for that move, as the ground rules say. The move
+before, Eric's Qg7xb7 (a queen for free) crossed the saw and was refused: the piece went straight back, with nothing
+said. And the history view draws no power's marks on past moves, so the saw seemed never to have been there. Every
+brain path was audited and tested (Stockfish, the slips, the strike, Maia with and without its guards, every
+fallback): each already picked from the moves the powers allow.
+
+**The fix:** the dock says why a move of yours is refused ("The board saw blocks that move."), and on your turn when
+the boss's only move went through a power ("His only move: the board saw let it through."). The boss's pick and the
+move played are checked once more and a wrong one is logged.
+
+**The rule:**
+- A limit that refuses a move, or lifts for one, says so on screen in the words of the power: a piece that only goes
+  back, or a boss crossing his own saw, reads as a glitch.
+- Before fixing "the boss broke the rule", rebuild the position from the screenshot and list its legal moves: the
+  rule's own exceptions (the only move, the only way out of check) come first.

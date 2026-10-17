@@ -19,6 +19,11 @@ export interface BoardProps {
   /** Only these moves may be played (default: every legal move). */
   moves?: readonly string[];
   onMove?: (uci: string) => void;
+  /**
+   * A move tried (a tap on a square, or a drop) that's legal in chess but not one of `moves` (a boss power stops it):
+   * the piece stays where it was, and the screen can say why.
+   */
+  onRefused?: (uci: string) => void;
   arrows?: Arrow[];
   small?: boolean;
   /** No move or capture sound, whatever the sound setting (the home's live window). Small boards are silent too. */

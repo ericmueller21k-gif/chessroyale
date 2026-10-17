@@ -201,4 +201,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - Before hunting a "fired early" bug, work out the player's own time on the path they really played (bank,
     increment, pace), check it against what they last saw, and test that path.
 
+- **A saw the boss crossed** (Oct 17, [story](../docs/history/lessons.md#a-saw-the-boss-crossed-oct-17-2026)):
+  - A limit that refuses a move, or lifts for one (the only way out of check), says so on screen in the power's words
+    (`refused.ts`): a piece that only goes back, or a boss crossing his own saw, reads as a glitch.
+  - Before fixing "the boss broke the rule", rebuild the position from the screenshot and list its legal moves: the
+    rule's own exceptions come first.
+
 - **The FAQ follows the rules** (Oct 11): a PR that changes a rule, a number's meaning or a boss updates its words in `packages/app/src/faq/content.ts` in the same PR; numbers there come from the settings objects, never typed in.

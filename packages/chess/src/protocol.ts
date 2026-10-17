@@ -1,4 +1,4 @@
-import type { BossBrain, BounceResult, BurnEvent, LassoDrag, LightsOutTarget, LongPull, PowerEvent, PowerId, SawCut, ShowdownResult, SplitPawn } from "@chessroyale/core";
+import type { BossBrain, BounceResult, BurnEvent, LassoDrag, LightsOutTarget, LongPull, PowerEvent, PowerId, SawCut, ShowdownResult, SplitPawn, StopReason } from "@chessroyale/core";
 import type { Base } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
@@ -195,8 +195,11 @@ export interface NetBoss {
   raid: boolean;
   openingName: string | null;
   /** The boss's last move, and who it struck down just now. */
-  /** `captured`: the piece it took ("q" for a queen: its banner). */
-  lastMove: null | { move: string; san: string; staggered?: boolean; captured?: string };
+  /**
+   * `captured`: the piece it took ("q" for a queen: its banner). `through`: a power stops it, but it stopped every move
+   * he had, so the limit lifted for the turn (the dock says so on the crowd's turn).
+   */
+  lastMove: null | { move: string; san: string; staggered?: boolean; captured?: string; through?: StopReason };
   justKilled?: string | null;
   /**
    * The God King's Last Stand, once it has happened (he has fallen): the crowd's move he took back, during which
