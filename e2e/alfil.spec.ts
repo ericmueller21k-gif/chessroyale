@@ -127,7 +127,8 @@ test("Alfil's Tusks (the test switch): two of his pawns marked before his move, 
   const eleph = page.locator(`${BOARD_SEL.piece}.elephant`);
   await expect(eleph).toHaveCount(1);
   await expect(eleph).toHaveAttribute("data-square", fused.fusion.to);
-  expect(await eleph.evaluate((e) => getComputedStyle(e).backgroundImage)).toMatch(/elephant/);
+  // (Its own drawing, inlined by the build: the elephant's head, a path no other piece has.)
+  expect(await eleph.evaluate((e) => getComputedStyle(e).backgroundImage)).toContain("M%2030.5,27");
   await expect(page.locator(".al-glow")).toHaveCount(0);
   // The board draws the position: his bishops and pawns as the state has them.
   await expect.poll(() => drawn(page, his === "b" ? "black" : "white", "bishop")).toBe(counted(fen2, his, "b"));
@@ -232,7 +233,7 @@ test("Alfil's tile and stage, and his figure by the board: whole on a phone (320
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   if (phone) await page.setViewportSize({ width: 320, height: 640 });
-  await page.goto("/?mode=raid");
+  await page.goto("/?debug&mode=raid");
   const tile = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", { name: "Alfil", exact: true });
   await expect(tile.locator("canvas.boss-portrait")).toBeVisible();
   await tile.click();
