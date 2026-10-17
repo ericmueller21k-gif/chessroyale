@@ -1,4 +1,4 @@
-import { useContext } from "preact/hooks";
+import { useContext, useLayoutEffect } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import type { ComponentChildren, JSX } from "preact";
 import type { PowerEventKind } from "@chessroyale/core";
@@ -9,6 +9,7 @@ import { BossEffect, type BoardItem } from "./BossEffect.tsx";
 import { bannerLength } from "./FightBanner.tsx";
 import { GodKingPortrait, squareXY } from "./GodKing.tsx";
 import type { Priority } from "../speech.tsx";
+import { play, type SoundName } from "../sound.ts";
 
 /**
  * The pieces every boss's powers on screen are built from, and the shape each boss's screen file fills in (BossUi):
@@ -35,7 +36,7 @@ export interface Moment {
 }
 
 /** Which of a boss kit's moments a power's moment is (its animation and lines: characters/power-art.ts). */
-export type KitMoment = "power" | "ultimateWarn" | "ultimate" | "ultimateHit";
+export type KitMoment = "power" | "powerHit" | "ultimateWarn" | "ultimate" | "ultimateHit";
 
 /** What a moment's view gets: the moment, the clock, and the helpers every moment uses. */
 export interface MomentProps {
@@ -109,6 +110,11 @@ export interface BossUi {
   ultimate: { name: string; when?: string };
   /** Its own piece by the boss bar's rage meter (Hollow's bulbs); `moments`: the boss screen's moments now. */
   bar?: (p: { boss: BossView; moments: () => Moment[] }) => ComponentChildren;
+  /**
+   * The dock's line for its turn when that turn brought no move to show (Alfil's fusion was his move: "Alfil spent his
+   * move on the fusion."); null or left out: none.
+   */
+  noMove?: (boss: BossView) => string | null;
   /** Its layer over the board (PowerBoard): `under` goes beneath the board's power layer, `over` inside it. */
   board?: (p: BoardLayerProps) => { under?: ComponentChildren; over: ComponentChildren };
 }
@@ -201,6 +207,23 @@ export function PowerBanner({ boss, side, text, sub, tone = "", ms }: { boss: Bo
       </div>
     </div>
   );
+}
+
+/**
+ * Plays a sound once per key when `now` reaches `at` (a layout effect: heard as it's seen, whatever the screen does
+ * next), through the mute switch: a beat of a power on the board that no sprite's cue plays (Wrangler's yanks, Alfil's
+ * pieces landing).
+ */
+const played = new Set<string>();
+export function SoundAt({ id, at, now, sound }: { id: string; at: number; now: number; sound: SoundName }) {
+  const due = now >= at && now < at + 1500;
+  useLayoutEffect(() => {
+    if (!due || played.has(id)) return;
+    played.add(id);
+    if (played.size > 200) played.delete(played.values().next().value!);
+    play(sound);
+  }, [due]);
+  return null;
 }
 
 export type { BoardItem };

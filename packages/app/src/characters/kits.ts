@@ -16,10 +16,11 @@ import { HOLLOW, HOLLOW_ATTACK, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT } f
 import { SAWYER, SAWYER_CHANCE, SAWYER_LINES, SAWYER_PORTRAIT } from "./sawyer.ts";
 import { PIG, PIG_CHANCE, PIG_LINES, PIG_PORTRAIT } from "./pig.ts";
 import { RECLUSE, RECLUSE_BUST, RECLUSE_PORTRAIT } from "./recluse.ts";
+import { ALFIL, ALFIL_ATTACK, ALFIL_CHANCE, ALFIL_LINES, ALFIL_PORTRAIT } from "./alfil.ts";
 import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
-import { lashItem, type SquareItem } from "./power-art.ts";
+import { ankusItem, lashItem, type SquareItem } from "./power-art.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
@@ -263,6 +264,50 @@ export const BOSS_KITS: Record<string, BossKit> = {
     portrait: { ...PIG_PORTRAIT, anim: "idle", frame: 0 },
     // His throw's room out to one side (the frame is 115 wide): a wider box on a phone, as Sawyer's.
     wide: true,
+  },
+  // Alfil, the woolly mammoth (Eric, Oct 17): docs/decisions/2026-10-17-alfil-wired.md.
+  "Alfil": {
+    ch: ALFIL,
+    anims: {
+      strike: "capture",
+      // Tusks: the cast (his trunk levels the ankus at the board), then the fusion as his next move.
+      power: "tusksCast",
+      powerHit: "tusksFuse",
+      ultimateWarn: "check",
+      ultimate: "mammothSlam",
+      // (The pieces landing: he stays where he is; the board shows them coming down.)
+      ultimateHit: "idle",
+    },
+    sounds: {
+      rumble: "alfilRumble",
+      thud: "alfilThud",
+      trumpet: "alfilTrumpet",
+      stomp: "alfilStomp",
+      oof: "alfilOof",
+      clatter: "alfilClatter",
+      swing: "alfilWhoosh",
+      cast: "alfilGlow",
+      snort: "alfilSnort",
+      rise: "alfilGlow",
+      flash: "alfilCrunch",
+      leap: "alfilLeap",
+      slam: "alfilThud",
+      fly: "alfilWhoosh",
+      // (The ground still rumbling as the shadows show where they'll land.)
+      shadows: "alfilRumble",
+      land: "alfilLand",
+      jab: "alfilJab",
+    },
+    lines: ALFIL_LINES,
+    chance: ALFIL_CHANCE,
+    portrait: { ...ALFIL_PORTRAIT, anim: "idle", frame: 0 },
+    // (His ankus out to his side and his frame 81 wide: the wider box on a phone, as Sawyer's and Wrangler's.)
+    wide: true,
+    // He hops in beside the king and jabs it with his ankus, high and low (alfil.ts: ALFIL_ATTACK), a gold spike and
+    // sparks on its square each hit.
+    // (His ankus reaches 2.2 squares from his feet at 36 frame pixels a square: he stands 1.9 off, its tip in the
+    // king's square.)
+    kingAttack: { ch: ALFIL_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.9, hit: ankusItem },
   },
   // The Hidden Boss (admins only, in Boss alone; DECISIONS.md, "The Hidden Boss, phase 1"). His lines are placeholders for
   // Eric's own, in one table (recluse-lines.ts).

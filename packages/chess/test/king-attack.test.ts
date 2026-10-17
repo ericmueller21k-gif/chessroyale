@@ -70,12 +70,14 @@ describe("how long the boss's move holds the screen (bossTurnShowMs)", () => {
     expect(crowdMated(notMated, "w")).toBe(false);
   });
 
-  it("holds for the attack at a mate by a boss that has one (Hollow), the same alone or in a raid", () => {
-    expect(KING_ATTACKERS).toEqual(["hollow"]);
-    expect(hasKingAttack("hollow")).toBe(true);
-    expect(mateAttackDue(view("hollow", MATED))).toBe(true);
-    expect(bossTurnShowMs(view("hollow", MATED))).toBe(KING_ATTACK.mateHoldMs);
-    expect(bossTurnShowMs(view("hollow", MATED), true)).toBe(KING_ATTACK.mateHoldMs);
+  it("holds for the attack at a mate by a boss that has one (Hollow, Alfil), the same alone or in a raid", () => {
+    expect(KING_ATTACKERS).toEqual(["hollow", "alfil"]);
+    for (const id of KING_ATTACKERS) {
+      expect(hasKingAttack(id)).toBe(true);
+      expect(mateAttackDue(view(id, MATED))).toBe(true);
+      expect(bossTurnShowMs(view(id, MATED))).toBe(KING_ATTACK.mateHoldMs);
+      expect(bossTurnShowMs(view(id, MATED), true)).toBe(KING_ATTACK.mateHoldMs);
+    }
   });
 
   it("keeps today's hold for every other boss, and for any move that isn't a mate", () => {

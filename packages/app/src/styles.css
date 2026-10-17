@@ -8373,8 +8373,8 @@ button.fd-logo {
 
 /*
  * -- The Boss raid screen's character select (Eric, Oct 16: SF2 / PlayStation era; bs- for boss select) --
- * Slanted tiles (parallelograms: clip-path, so nothing sticks out sideways), five to a row on a phone (the second row
- * centered under the first, staggered), all in one row from 600 px. The picked one gold.
+ * Slanted tiles (parallelograms: clip-path, so nothing sticks out sideways), five to a row on a phone (ten tiles since
+ * Alfil, Oct 17: two full rows), all in one row from 600 px. The picked one gold.
  */
 .bs-select {
   display: flex;
@@ -8391,7 +8391,7 @@ button.fd-logo {
 }
 @media (min-width: 600px) {
   .bs-tiles {
-    --bs-per: 9;
+    --bs-per: 10;
   }
 }
 .bs-tile {
@@ -13128,6 +13128,76 @@ img.qicon {
   width: 40%;
   left: -12%;
   top: -12%;
+}
+
+/* ---- Alfil, the woolly mammoth (components/Alfil.tsx; al- for Alfil) ---- */
+/* He casts from the board's top-left corner, in his own frame's shape (81 x 91). */
+.pm-caster.pm-by-alfil {
+  aspect-ratio: 81 / 91;
+  width: 29%;
+  left: -6%;
+  top: -16%;
+}
+/* His banners: the red, blue and gold of his caparison. */
+.fight-banner.power-cut.tusks .fb-band {
+  background: repeating-linear-gradient(115deg, #a3212a 0 6cqw, #f2c14e 6cqw 7cqw, #1f4fa3 7cqw 13cqw, #f2c14e 13cqw 14cqw);
+  border-color: #fde68a;
+}
+/* The glow under his marked pawns (from his cast until the fusion or the counter): gold light under the piece, on the
+   board's own squares (eighths of --board-size), under the pieces (z-index 1, the pieces 2, as the Slam's shadows). */
+.board-wrap > .al-glows {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+.al-glow {
+  position: absolute;
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
+  background: radial-gradient(circle at 50% 58%, rgba(255, 249, 220, 0.95) 0 16%, rgba(242, 193, 78, 0.8) 34%, rgba(242, 193, 78, 0.35) 52%, rgba(242, 193, 78, 0) 70%);
+  box-shadow: inset 0 0 0 max(1.5px, calc(var(--board-size, 100%) / 8 * 0.05)) rgba(242, 193, 78, 0.85);
+  pointer-events: none;
+}
+/* His moments' pieces on their way (rising, flying, dropping) and the fusion's flash: on the board's own squares, over
+   the pieces, never taking a tap. */
+.al-layer {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 8;
+  pointer-events: none;
+}
+.al-layer > * {
+  position: absolute;
+  pointer-events: none;
+}
+.al-layer piece.al-piece {
+  z-index: 2;
+  width: 12.5%;
+  height: 12.5%;
+  background-size: cover;
+  filter: drop-shadow(0 0.6cqw 0 rgba(0, 0, 0, 0.35));
+}
+.al-layer piece.al-piece.al-glowing {
+  filter: drop-shadow(0 0 0.8cqw rgba(255, 236, 160, 0.95)) drop-shadow(0 0 1.6cqw rgba(242, 193, 78, 0.8));
+}
+/* The fusion's ball of white light, at the board's middle: three squares across at its biggest. */
+.al-flash {
+  z-index: 3;
+  left: 31.25%;
+  top: 31.25%;
+  width: 37.5%;
+  height: 37.5%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0 30%, rgba(255, 255, 255, 0.85) 45%, rgba(255, 246, 214, 0.45) 60%, rgba(255, 246, 214, 0) 72%);
 }
 
 /* ---- A boss's attack on a king (KingAttack.tsx): the God King in his Last Stand, the crowd's king at the boss's mate ---- */

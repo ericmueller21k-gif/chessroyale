@@ -78,6 +78,15 @@ function tileItem(t: { square: string; lit: number; stage: number }, since: numb
 export const fireCountdown = (stage: number, stages = BOSS_POWERS.fireStages) => Math.max(0, stages - Math.max(1, stage) + 1);
 
 /**
+ * A shadow growing on a square, a size a turn (1 to 3) until what casts it comes down on the crowd turn `lands`: grown
+ * as first seen at its size. Jefferson's fireballs', and Alfil's Slam's pieces' (reused as is).
+ */
+export function fireShadowItem(square: string, lands: number, stage: number, now: number): BoardItem {
+  const size = Math.min(3, Math.max(1, stage));
+  return { square, name: "fireShadow", anim: `grow${size}`, then: `shadow${size}`, since: stageSince(`shadow:${square}:${lands}:${size}`, now), quiet: true };
+}
+
+/**
  * The fireballs' shadows on the board as `now`: each square still to be hit at its size (grown as first seen at it),
  * the wave landing this turn's at the biggest until its fireball lands, and the squares just picked (the smallest)
  * once the moment that picked them is over (the candle's as he jumps off; a wave's as its last fireball lands).
@@ -87,10 +96,7 @@ export function shadowItems(boss: Pick<BossView, "powers">, moments: readonly Mo
   const candle = moments.find((m) => m.kind === "candle");
   const wave = moments.find((m) => m.kind === "fireball");
   const fresh = candle ? candle.at + shadowsAt() : wave ? wave.at + fireballLandAt((wave.squares?.length ?? 1) - 1) + LAND_MS : 0;
-  const item = (square: string, lands: number, stage: number): BoardItem => {
-    const size = Math.min(3, Math.max(1, stage));
-    return { square, name: "fireShadow", anim: `grow${size}`, then: `shadow${size}`, since: stageSince(`shadow:${square}:${lands}:${size}`, now), quiet: true };
-  };
+  const item = (square: string, lands: number, stage: number) => fireShadowItem(square, lands, stage, now);
   const out = shadows.flatMap((sh) => (sh.stage <= 1 && now < fresh ? [] : [item(sh.square, sh.lands, sh.stage)]));
   // (This turn's wave: its shadows stay at their biggest until each fireball lands.)
   if (wave) (wave.squares ?? []).forEach((sq, i) => now < wave.at + fireballLandAt(i) && out.push(item(sq, boss.powers?.turn ?? 0, 3)));

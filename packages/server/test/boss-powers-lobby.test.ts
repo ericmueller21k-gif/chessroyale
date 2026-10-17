@@ -288,13 +288,13 @@ describe("boss powers online", () => {
       expect(L.core.save().runner!.state.boss!.id).not.toBe("clown");
     }
     const ids = new Set<string>();
-    for (let seed = 1; seed <= 80 && ids.size < 7; seed++) {
+    for (let seed = 1; seed <= 80 && ids.size < 8; seed++) {
       const L = setup({ ...RAID_SETTINGS }, {}, seed);
       L.core.connect(undefined, "A", "computer", false, 1500);
       L.core.message("p1", { t: "start" });
       ids.add(L.core.save().runner!.state.boss!.id!);
     }
-    expect([...ids].sort()).toEqual(["bigboy", "clown", "gingerbread", "grex", "hollow", "pig", "sawyer"]);
+    expect([...ids].sort()).toEqual(["alfil", "bigboy", "clown", "gingerbread", "grex", "hollow", "pig", "sawyer"]);
   });
 
   it("the test trigger: only an admin's is taken; it brings the ultimate as the next turn begins, once; switched off, nothing", () => {
@@ -837,8 +837,8 @@ describe("Alfil online", () => {
     for (let i = 0; i < 10 && L.core.save().phase !== "play"; i++) L.advance(10_000);
     return L.last("p1", "round")!;
   };
-  /** Alfil, met as the test link does (his art isn't built yet: he's hidden from players). */
-  const alfil = (patch: Partial<Settings> = {}) => raid({ bossId: "alfil", bossUnfinished: true, ...patch });
+  /** Alfil, picked by the lobby. */
+  const alfil = (patch: Partial<Settings> = {}) => raid({ bossId: "alfil", ...patch });
   /** Time passes until the host is asked for something (a step's pick or his move), one alarm at a time; none: his turn is over (his fusion was his move). */
   const asked = (L: ReturnType<typeof setup>) => {
     for (let i = 0; i < 10 && !L.last("p1", "bossRequest") && L.core.save().phase !== "play"; i++) L.advance(5_000);

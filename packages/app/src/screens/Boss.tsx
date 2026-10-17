@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, queenSlain, withPiece } from "@chessroyale/chess";
-import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, PowerBoard, PowerMoment, RageMeter, funhouseView, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
+import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackPawnShown } from "../components/BigBoy.tsx";
 import { boardSawJolt, splitFen, splitStill } from "../components/Sawyer.tsx";
 import { SHOWDOWN_KING_AT, pigBoard } from "../components/Pig.tsx";
+import { alfilFen, alfilJolt, earlyLanding } from "../components/Alfil.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
 import { rememberBoss } from "../boss-history.ts";
 import { bossKit } from "../characters/kits.ts";
@@ -208,7 +209,12 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const attackAt = until - KING_ATTACK.mateHoldMs + KING_ATTACK.mateAt;
   // Boss powers: the moments that come as the turn passes to the crowd (after the boss's move), or the funhouse's own.
   // (Beaten, the Hidden Boss's fall: the board holds while he collapses; no moment of the last turn plays again.)
-  const moments = useMemo(() => (intro || thinking || victim || mating || fall ? [] : momentsOf(boss, until)), [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating, fall]);
+  // (While he thinks, only Alfil's pieces coming down early, at the start of his turn: earlyLanding.)
+  const moments = useMemo(() => {
+    if (intro || victim || mating || fall) return [];
+    if (thinking) return lights ? [] : [earlyLanding(boss)].filter((m) => m !== null);
+    return momentsOf(boss, until);
+  }, [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating, fall]);
   const moment = momentAt(moments, now);
   // Each moment's line, into the boss's voice: its text box keeps it up for its time, into the crowd's turn.
   useMomentSpeech(boss, moments, now);
@@ -304,9 +310,12 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // Wrangler's long pull, lasso drag and showdown: the piece where it was until his tug, the line-up's pieces where they
   // stood until each pair is yanked in (the moment draws them on their way); the eval bar keeps the position before.
   const pig = bounceShown || splitShown ? null : pigBoard(boss, moments, now, fenShown);
-  const boardFen = bounceShown ?? splitShown ?? pig?.fen ?? fenShown;
+  // Alfil's moments: the fusion's pawns until they lift and its elephant once it lands, the Slam's pieces until they
+  // fly, the landing's once they're down (each moment draws its own on their way); the board doesn't animate those.
+  const alfil = bounceShown || splitShown || pig ? null : alfilFen(boss, moments, now, fenShown);
+  const boardFen = bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? fenShown;
   const evalFen = bounceShown && bounceShown !== boss.board.fen ? (boss.powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? fenShown);
-  const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now);
+  const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now) ?? alfilJolt(moment, now);
   // (One or two pieces by name; more, how many: the dock's line stays one line.)
   const burnNames = burning.length > 2 ? `${burning.length} pieces` : burning.map((b) => PIECE_NAME[b.piece!] ?? "piece").join(" and ");
   const fizzled = burnt.some((b) => b.fizzled);
@@ -323,6 +332,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // this list): it's drawn again when one of them changes, not every frame (Lights out's prompt, every frame).
   const snacking = !!snack && t >= tl.claimAt + SNACK.grabAt && t < tl.bannerAt;
   const momentLine = moment ? dockLine(moment) : null;
+  // (A turn of his with no move to show: Alfil's fusion was his move.)
+  const noMove = !intro && !thinking && !victim && !boss.lastMove ? noMoveLine(boss) : null;
   // (Lights out, before its first round, as the night falls: the dock as on every other screen, your clock held, what
   // it means for you; its rounds take the whole box, with the crowd's meter: LightsDock.)
   const lightsStart = !!lights && lightsStatus(lights, match.settings.lateGraceMs, now).key === "start";
@@ -381,6 +392,10 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 <>
                   {boss.icon} Boss plays <strong>{boss.lastMove.san}</strong>
                 </>
+              ) : noMove ? (
+                <>
+                  {boss.icon} <strong>{noMove}</strong>
+                </>
               ) : null}
             </span>
             <span class="dock-line muted">
@@ -410,7 +425,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         }
       />
     ),
-    [match, still, kingCues, lights, lights ? now : 0, snacking, funPlayed, momentLine, burnLine, left],
+    [match, still, kingCues, lights, lights ? now : 0, snacking, funPlayed, momentLine, burnLine, left, noMove],
   );
   return (
     <div class={`screen game boss-screen${victim ? " striking" : ""}`}>
@@ -422,7 +437,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           {bossSide}
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? lastShown} animate={!bounceShown && !splitStill(split, now) && !pig?.still}>
+          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? lastShown} animate={!bounceShown && !splitStill(split, now) && !pig?.still && !alfil} elephants={intro ? undefined : boss.powers?.elephants}>
             {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={boardFen} />}
             {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}
             {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}

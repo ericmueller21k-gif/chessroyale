@@ -16,6 +16,7 @@ import { bigBoySound, type BigBoySound } from "./characters/bigboy-sounds.ts";
 import { sawyerSound, type SawyerSound } from "./characters/sawyer-sounds.ts";
 import { pigSound, type PigSound } from "./characters/pig-sounds.ts";
 import { recluseSound, type RecluseSound } from "./characters/recluse-sounds.ts";
+import { alfilSound, type AlfilSound } from "./characters/alfil-sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
 import { captureWorkerError } from "./problems.ts";
 import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
@@ -236,6 +237,7 @@ const bigBoy = (name: BigBoySound) => (t: number) => buffer(bigBoySound(name, ct
 const sawyer = (name: SawyerSound) => (t: number) => buffer(sawyerSound(name, ctx!.sampleRate), t);
 const pig = (name: PigSound) => (t: number) => buffer(pigSound(name, ctx!.sampleRate), t);
 const recluse = (name: RecluseSound) => (t: number) => buffer(recluseSound(name, ctx!.sampleRate), t);
+const alfil = (name: AlfilSound) => (t: number) => buffer(alfilSound(name, ctx!.sampleRate), t);
 /** The God King tapped with no charges left: his soft "can't" (god-king-sounds.ts). */
 const kingCant = (t: number) => buffer(godKingSound("cant", ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
@@ -591,6 +593,21 @@ export type SoundName =
   | "recluseDrain"
   | "recluseSpark"
   | "recluseArc"
+  // Alfil (a raid boss, the woolly mammoth): synthesised, see characters/alfil-sounds.ts.
+  | "alfilTrumpet"
+  | "alfilLeap"
+  | "alfilThud"
+  | "alfilCrunch"
+  | "alfilWhoosh"
+  | "alfilSnort"
+  | "alfilRumble"
+  | "alfilStomp"
+  | "alfilClatter"
+  | "alfilOof"
+  | "alfilLand"
+  | "alfilGlow"
+  | "alfilJab"
+  | "alfilThump"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -725,6 +742,20 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   recluseDrain: recluse("drain"),
   recluseSpark: recluse("spark"),
   recluseArc: recluse("arc"),
+  alfilTrumpet: alfil("trumpet"),
+  alfilLeap: alfil("leap"),
+  alfilThud: alfil("thud"),
+  alfilCrunch: alfil("crunch"),
+  alfilWhoosh: alfil("whoosh"),
+  alfilSnort: alfil("snort"),
+  alfilRumble: alfil("rumble"),
+  alfilStomp: alfil("stomp"),
+  alfilClatter: alfil("clatter"),
+  alfilOof: alfil("oof"),
+  alfilLand: alfil("land"),
+  alfilGlow: alfil("glow"),
+  alfilJab: alfil("jab"),
+  alfilThump: alfil("thump"),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -737,7 +768,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
 /**
  * Synthesised sounds that can be made ahead (warmSounds), by name: Boingo's, Ginger's, Jefferson's (his three candle
  * whistles and the crackle took about 180 ms to make the first time a shot went up, on a computer: Oct 14), Hollow's
- * (his smash took 150 ms on a computer), Big Boy's, Sawyer's, Wrangler's. Each a list of its module and name (a few for one cue).
+ * (his smash took 150 ms on a computer), Big Boy's, Sawyer's, Wrangler's, Alfil's. Each a list of its module and name (a few for one cue).
  */
 const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   clownBoing: [["clown", "boing"]],
@@ -814,6 +845,20 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   recluseDrain: [["recluse", "drain"]],
   recluseSpark: [["recluse", "spark"]],
   recluseArc: [["recluse", "arc"]],
+  alfilTrumpet: [["alfil", "trumpet"]],
+  alfilLeap: [["alfil", "leap"]],
+  alfilThud: [["alfil", "thud"]],
+  alfilCrunch: [["alfil", "crunch"]],
+  alfilWhoosh: [["alfil", "whoosh"]],
+  alfilSnort: [["alfil", "snort"]],
+  alfilRumble: [["alfil", "rumble"]],
+  alfilStomp: [["alfil", "stomp"]],
+  alfilClatter: [["alfil", "clatter"]],
+  alfilOof: [["alfil", "oof"]],
+  alfilLand: [["alfil", "land"]],
+  alfilGlow: [["alfil", "glow"]],
+  alfilJab: [["alfil", "jab"]],
+  alfilThump: [["alfil", "thump"]],
   kingCant: [["godKing", "cant"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */

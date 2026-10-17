@@ -3,6 +3,7 @@ import { BOSS_ROSTER } from "@chessroyale/core";
 import { KING_ATTACK, KING_ATTACKERS, LAST_STAND, kingAttackHits, lastStandAttackHits } from "@chessroyale/chess";
 import { BOSS_KITS, bossKit } from "../src/characters/kits.ts";
 import { HOLLOW, HOLLOW_ATTACK, HOLLOW_LINES } from "../src/characters/hollow.ts";
+import { ALFIL_LINES } from "../src/characters/alfil.ts";
 import { GOD_KING } from "../src/characters/god-king.ts";
 import { EFFECTS, animLength, lashItem } from "../src/characters/power-art.ts";
 import { frameKeys, renderFrame, type Anim } from "../src/characters/sprite.ts";
@@ -23,12 +24,38 @@ const starts = (a: Anim) => {
 };
 
 describe("the kit's kingAttack", () => {
-  it("is Hollow's only, and the server's list (KING_ATTACKERS) says the same", () => {
+  it("is Hollow's and Alfil's, and the server's list (KING_ATTACKERS) says the same", () => {
     const withAttack = Object.entries(BOSS_KITS)
       .filter(([, k]) => k.kingAttack)
       .map(([name]) => BOSS_ROSTER.find((b) => b.kit === name)!.id);
     expect(withAttack).toEqual([...KING_ATTACKERS]);
-    expect(withAttack).toEqual(["hollow"]);
+    expect(withAttack).toEqual(["hollow", "alfil"]);
+  });
+
+  it("Alfil's: a `jab` cue on each of the shared hits, lasting the attack exactly, his ankus's tip in the king's square, a gold jab on it each hit", () => {
+    const ka = bossKit("Alfil")!.kingAttack!;
+    const a = ka.ch.anims[ka.anim]!;
+    expect(a.loop).toBe(false);
+    expect(animLength(a)).toBe(KING_ATTACK.ms);
+    const s = starts(a);
+    expect(a.frames.flatMap((f, i) => (f.cue === "jab" ? [s[i]] : []))).toEqual(kingAttackHits());
+    expect(bossKit("Alfil")!.sounds.jab).toBe("alfilJab");
+    const ch = ka.ch;
+    for (const f of a.frames.filter((fr) => fr.cue === "jab")) {
+      const img = renderFrame(ch, f);
+      let right = 0;
+      for (let y = 0; y < ch.h; y++) for (let x = 0; x < ch.w; x++) if (img.data[(y * ch.w + x) * 4 + 3]! > 0) right = Math.max(right, x);
+      const reach = (right - ch.foot[0]) / ka.perSquare;
+      expect(reach).toBeGreaterThan(ka.stand);
+      expect(reach).toBeLessThan(ka.stand + 0.5);
+    }
+    // Each hit: a jab high then low, from his side, on the king's square (ankusHit, about 200 ms).
+    const hits = [0, 1].map((i) => ka.hit("e1", i, "L", 1000));
+    expect(hits.map((h) => [h.name, h.anim, h.square])).toEqual([["ankusHit", "hitHL", "e1"], ["ankusHit", "hitLL", "e1"]]);
+    expect(ka.hit("e1", 0, "R", 0).anim).toBe("hitHR");
+    expect(animLength(EFFECTS.ankusHit.ch.anims.hitHL!)).toBeLessThanOrEqual(KING_ATTACK.lashEveryMs + 50);
+    expect(ALFIL_LINES.kingAttack?.length).toBeGreaterThan(0);
+    expect(bossKit("Alfil")!.chance.kingAttack).toBe(1);
   });
 
   it("names an animation that lands a `lash` cue on each of the shared hits, and lasts the attack exactly", () => {

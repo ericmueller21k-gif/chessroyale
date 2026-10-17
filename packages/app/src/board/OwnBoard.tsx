@@ -47,6 +47,8 @@ interface Track {
   sliding: Map<number, number>;
   orientation: string;
   turn: QuarterTurn;
+  /** Alfil's elephants among them (or fading), by piece id: drawn with their own art. */
+  elephants: Set<number>;
 }
 
 /** A move you made, shown until the game next tells the board anything new. */
@@ -72,7 +74,7 @@ interface BoardActs {
  * when what it shows changes (`boardInputs` in logic.ts), or by itself (a tap, a drag, a slide or a fade ending).
  */
 export function OwnBoard(props: BoardProps) {
-  const { fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry, turn = 0 } = props;
+  const { fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry, turn = 0, elephants } = props;
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
   const onDarkRef = useRef(onDarkTry);
@@ -103,7 +105,7 @@ export function OwnBoard(props: BoardProps) {
   const acts = useMemo<BoardActs>(() => ({ move: (uci) => onMoveRef.current?.(uci), darkTry: (uci) => onDarkRef.current?.(uci), refused: onRefusedRef, promote: setPromotion, selectDark: setDarkSel, local }), []);
   // (The same element while nothing it shows has changed: Preact leaves it, and everything in it, alone.)
   const layer = useMemo(
-    () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} acts={acts} />,
+    () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} elephants={elephants} acts={acts} />,
     [...boardInputs(props), darkOn, darkSel, cleared.current],
   );
   const promoWhite = sideToMove(fen) === "w";
@@ -142,7 +144,7 @@ type LayerProps = Omit<BoardProps, "children" | "silent" | "onMove" | "onDarkTry
  * The board's drawing: the squares and their highlights, the pieces (sliding, fading, following a drag), the arrows and
  * the coordinates, and the taps and drags on them. Drawn again only when what it shows changes (see OwnBoard).
  */
-function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, small, animate = true, marks, dark, darkOn, darkSel, turn = 0, acts }: LayerProps) {
+function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, small, animate = true, marks, dark, darkOn, darkSel, turn = 0, elephants, acts }: LayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -169,7 +171,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   const dests = useMemo(() => (interactive && !small ? destsFor(fen, moves, darkList) : new Map<string, string[]>()), [fen, interactive, small, moves?.join(), darkList.join()]);
 
   // ---------------- Which piece is which ----------------
-  const track = useRef<Track>({ key: null, pieces: [], fading: [], sliding: new Map(), orientation, turn });
+  const track = useRef<Track>({ key: null, pieces: [], fading: [], sliding: new Map(), orientation, turn, elephants: new Set() });
   const tr = track.current;
   // (A new way up or a new turn of the board: every piece jumps to its new square, never flies there.)
   const turned = tr.orientation !== orientation || tr.turn !== turn;
@@ -201,6 +203,14 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   tr.fading = run.fading;
   tr.sliding = run.sliding;
   const fading = run.fading;
+  // Alfil's elephants: the bishops on their squares now; one taken keeps its art as it fades.
+  if (elephants?.length || tr.elephants.size) {
+    const on = new Set(elephants ?? []);
+    for (const p of tr.pieces) if (p.code[1] === "b" && on.has(p.square)) tr.elephants.add(p.id);
+    else tr.elephants.delete(p.id);
+    for (const id of tr.elephants) if (!tr.pieces.some((p) => p.id === id) && !fading.some((f) => f.piece.id === id)) tr.elephants.delete(id);
+  }
+  const look = (p: BoardPiece) => `${pieceClass(p.code)}${tr.elephants.has(p.id) ? " elephant" : ""}`;
 
   // Captured pieces fade and sliding ones settle: drawn again once they're done.
   useEffect(() => {
@@ -483,7 +493,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
             <square key={sq} class={cls} style={{ transform: place(sq, orientation, turn) }} />
           ))}
           {fading.map(({ piece }) => (
-            <piece key={`f${piece.id}`} class={`${pieceClass(piece.code)} fading`} style={{ transform: place(piece.square, orientation, turn) }} />
+            <piece key={`f${piece.id}`} class={`${look(piece)} fading`} style={{ transform: place(piece.square, orientation, turn) }} />
           ))}
           {tr.pieces.map((p) => (
             <piece
@@ -493,7 +503,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
                 else pieceEls.current.delete(p.id);
               }}
               data-square={p.square}
-              class={`${pieceClass(p.code)}${tr.sliding.has(p.id) ? " anim" : ""}${p.id === dragId ? " dragging" : ""}`}
+              class={`${look(p)}${tr.sliding.has(p.id) ? " anim" : ""}${p.id === dragId ? " dragging" : ""}`}
               style={{ transform: place(p.square, orientation, turn) }}
             />
           ))}
@@ -551,7 +561,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
             ))}
           </div>
         )}
-        {ghost && <piece class={`ghost ${pieceClass(ghost.code)}`} style={{ transform: place(ghost.square, orientation, turn) }} />}
+        {ghost && <piece class={`ghost ${look(ghost)}`} style={{ transform: place(ghost.square, orientation, turn) }} />}
       </div>
     </div>
   );

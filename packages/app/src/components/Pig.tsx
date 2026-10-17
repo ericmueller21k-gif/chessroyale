@@ -1,14 +1,12 @@
-import { useLayoutEffect } from "preact/hooks";
 import { DRAG, PULL, SHOWDOWN, pieceAt, withPiece, withoutPiece } from "@chessroyale/chess";
 import type { LassoDrag, LongPull, ShowdownResult } from "@chessroyale/core";
 import { CATCH_AT, HAUL_FISTS, PIG, PIG_LEAP } from "../characters/pig.ts";
 import { bossKit } from "../characters/kits.ts";
 import { cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
-import { play } from "../sound.ts";
 import { BossMoment, prewarmSprite } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
-import { PIECE_WORD, hash, type BossUi, type KitMoment, type Moment, type MomentProps } from "./PowerParts.tsx";
+import { PIECE_WORD, SoundAt, hash, type BossUi, type KitMoment, type Moment, type MomentProps } from "./PowerParts.tsx";
 
 /**
  * Wrangler on the board (his rules: packages/chess/src/bosses/pig.ts):
@@ -101,18 +99,6 @@ function AirPiece({ code, at, square }: { code: string; at: Pt; square: string }
 const COLOUR = { w: "white", b: "black" } as const;
 const pieceCode = (color: "w" | "b", type: string) => `${COLOUR[color]} ${PIECE_WORD[type] ?? "pawn"}`;
 
-/** Plays a sound once per key when `now` reaches `at` (a layout effect: heard as it's seen, whatever the screen does next). */
-const played = new Set<string>();
-function SoundAt({ id, at, now, sound }: { id: string; at: number; now: number; sound: "pigDraw" | "pigYank" }) {
-  const due = now >= at && now < at + 1500;
-  useLayoutEffect(() => {
-    if (!due || played.has(id)) return;
-    played.add(id);
-    if (played.size > 200) played.delete(played.values().next().value!);
-    play(sound);
-  }, [due]);
-  return null;
-}
 
 // ---------------- The long pull and the lasso drag ----------------
 

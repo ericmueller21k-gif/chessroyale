@@ -8,8 +8,10 @@
  * three-quarters on, facing our left as in the reference, light from the top left.
  *
  * His still was approved (Oct 17) and is idle's first frame; his animation pack (the moments every boss has, his
- * entrance, his attack on a king, and his own: Tusks' cast and fusion, Mammoth Slam) is drawn from poses below, for
- * Eric's review as GIFs. Not in the roster or the game yet: no kit, sounds or lines (docs/decisions/2026-10-17-alfil-animations.md).
+ * entrance, his attack on a king, and his own: Tusks' cast and fusion, Mammoth Slam) is drawn from poses below
+ * (docs/decisions/2026-10-17-alfil-animations.md). In the game (Oct 17): his kit (kits.ts), his lines (ALFIL_LINES), his
+ * sounds (alfil-sounds.ts) and his powers on the board (components/Alfil.tsx), timed by ALFIL_BEATS
+ * (docs/decisions/2026-10-17-alfil-wired.md).
  *
  * Rigging, as the other bosses: the head (with its Nettipattam), the ears, the body, the caparison, the feet and the
  * shadow are painted once; the legs, the trunk, the tusks, the tail and the ankus from their points, so a new pose is a
@@ -898,7 +900,8 @@ const tusksCast: Anim = {
 /**
  * Tusks, the fusion: a short beat to go with the board's white flash. He crouches (the `rise` cue: the two pawns start
  * up to the middle of the board), lifts the ankus high over his head as they rise, and at the top it blazes white (the
- * `flash` cue: the board's white flash, the elephant appearing); then he lowers it.
+ * `flash` cue: the board's white flash, the elephant appearing; the crunch of the fusion), a short trumpet, then he
+ * lowers it.
  */
 const tusksFuse: Anim = {
   loop: false,
@@ -908,7 +911,8 @@ const tusksFuse: Anim = {
     f(140, { ...HIGH, ears: 1, trunk: "lift" }, { specks: sparkle(tipOf(HIGH)) }),
     f(140, { ...HIGH, ears: 2, bob: -1, trunk: "up" }, { specks: sparkle(tipOf({ ...HIGH, bob: -1 })) }),
     f(90, { ...HIGH, ears: 2, bob: -1, trunk: "up" }, { cue: "flash", pal: { ...GOLD_HOT, ...EYES_HOT }, specks: sparkle(tipOf({ ...HIGH, bob: -1 }), true) }),
-    f(140, { ...HIGH, ears: 1, bob: -1, trunk: "up", mood: "joy" }, { pal: GOLD_HOT, specks: sparkle(tipOf({ ...HIGH, bob: -1 })) }),
+    // (A short trumpet after the fusion's crunch: the sheet's "a grinding crunch, then a short trumpet".)
+    f(140, { ...HIGH, ears: 1, bob: -1, trunk: "up", mood: "joy" }, { cue: "trumpet", pal: GOLD_HOT, specks: sparkle(tipOf({ ...HIGH, bob: -1 })) }),
     f(120, { ...RAISED, mood: "smug" }),
     f(160, { mood: "smug" }),
   ],
@@ -1022,3 +1026,44 @@ export const ALFIL_ATTACK: Character = { ...ALFIL, id: "alfil-attack", name: "Al
 
 /** The part of him a portrait shows (his head, headpiece and tusks), in frame pixels. */
 export const ALFIL_PORTRAIT = { x: OX, y: OY - 3, w: 50, h: 38 } as const;
+
+/**
+ * His lines (Eric's sheet, Oct 17: "Before your bishops, there was me.", "Two little pawns make one big problem.", "Hold
+ * on to something.", "What goes up…" and the fusion's three; the rest in the same voice): short, said now and then
+ * (ALFIL_CHANCE); a power's moment always has its line. `power` is his cast (two pawns glowing), `powerHit` the fusion
+ * (it's his move: "Alfil spent his move on the fusion."), `ultimateWarn` the Slam coming, `ultimate` the Slam, and
+ * `ultimateHit` the pieces landing ("…must come down." answers "What goes up…").
+ */
+export const ALFIL_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
+  entrance: ["Before your bishops, there was me.", "The old piece is back.", "Make room. Big guy coming through."],
+  move: ["Stomp.", "Heavy step.", "Make way."],
+  capture: ["Trampled!", "Squashed flat.", "I never forget a piece."],
+  check: ["Check! Feel the ground shake?", "Check. Stampede!", "Small king. Big tusks."],
+  hurt: ["Hey! Mind the tusks!", "Ow! My trunk!", "That stung!"],
+  thinking: ["Elephants never rush.", "Slow and heavy…", "Let me chew on that…"],
+  smug: ["Old school wins.", "Ten thousand years of practice.", "Thick skin. Big plans."],
+  rattled: ["The ice age was easier…", "My tusks are shaking…", "Not my squares…"],
+  defeat: ["Back to the ice…", "Replaced… again…", "The bishops can have it…"],
+  victory: ["The board is mine again!", "Who needs bishops?", "Mammoth win!"],
+  strike: ["Trampled!", "Out of my way!"],
+  power: ["Two little pawns make one big problem.", "Glow, little ones.", "Pawns today. Elephant tomorrow."],
+  powerHit: ["Worth the wait.", "I'll skip my move. You'll wish I hadn't.", "Patience. Something old is coming back."],
+  ultimateWarn: ["Hold on to something.", "Feel that rumble?", "Brace yourselves…"],
+  ultimate: ["What goes up…", "Up you go!", "Fly, little pieces!"],
+  ultimateHit: ["…must come down.", "And down they come.", "Welcome back. Miss me?"],
+  kingAttack: ["Poke! Poke! Poke!", "Out of my way, little king!", "Remember me now?"],
+};
+export const ALFIL_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
+  entrance: 1,
+  move: 0.12,
+  capture: 0.6,
+  check: 0.75,
+  hurt: 0.6,
+  thinking: 0.08,
+  smug: 0.8,
+  rattled: 0.8,
+  defeat: 1,
+  victory: 1,
+  strike: 1,
+  kingAttack: 1,
+};

@@ -31,3 +31,20 @@ are byte for byte as downloaded. The SHA-1 below is of the file as downloaded.
 
 The author: Colin M.L. Burnett (https://commons.wikimedia.org/wiki/User:Cburnett), 2006 (each page dates its file Dec 27,
 2006). Checked Oct 12, 2026: no scripts or outside references in any file (plain paths and groups).
+
+## Alfil's elephant (Oct 17, 2026)
+
+Alfil's elephants (bishops in every way, drawn with their own art: `piece.bishop.elephant`, see `pieces.css`) are drawn
+for HunChess, not downloaded. Eric picked design A (Oct 17), without its forehead cap.
+
+| File | Piece | Made from | SHA-1 |
+| --- | --- | --- | --- |
+| `alfil/elephant-white.svg` | Alfil's elephant, white | the white bishop's base (`cburnett/Chess_blt45.svg`) | 86a09e5ad5df757cd212abc60d380c9c14d7824e |
+| `alfil/elephant-black.svg` | Alfil's elephant, black | the same, in the black pieces' colors | b2f167939475f486588aa27c592f4b7ec7a98771 |
+
+Each is a 45 x 45 SVG in the cburnett files' format (the same 1.5 outline, white `#ffffff` or black `#000000` fill,
+black outline, details black on white and `#ececec` on black), so it stands beside them. An elephant's (a mammoth's)
+head in profile: its base ribbon and collar are the cburnett bishop's own (Colin M.L. Burnett, under the BSD license
+above: `LICENSE.txt`), so it stands like the bishop it moves like; the head, ear, trunk and tusk are new, drawn for
+HunChess (not traced from any other icon). Checked Oct 17, 2026: no scripts or outside references (plain paths and
+groups).

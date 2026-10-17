@@ -42,6 +42,14 @@
 :is(.hb, .hb-pieces, .promo-piece) piece.bishop.black {
   background-image: url("./pieces/cburnett/Chess_bdt45.svg");
 }
+/* Alfil's elephants (bishops in every way, drawn with their own art; board/pieces/SOURCES.md): a bishop the board marks
+   as one (BoardProps.elephants), or a piece drawn over the board as one. */
+:is(.hb, .hb-pieces) piece.bishop.elephant.white {
+  background-image: url("./pieces/alfil/elephant-white.svg");
+}
+:is(.hb, .hb-pieces) piece.bishop.elephant.black {
+  background-image: url("./pieces/alfil/elephant-black.svg");
+}
 :is(.hb, .hb-pieces, .promo-piece) piece.rook.white {
   background-image: url("./pieces/cburnett/Chess_rlt45.svg");
 }

@@ -98,6 +98,9 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   });
 }
 
+/** The dock's line for the boss's turn when it brought no move to show (BossUi.noMove: Alfil's fusion); null otherwise. */
+export const noMoveLine = (boss: BossView): string | null => bossUi(boss)?.noMove?.(boss) ?? null;
+
 /** The moment playing at `now`, if any. */
 export const momentAt = (moments: readonly Moment[], now: number) => moments.find((m) => now >= m.at && now < m.at + m.ms) ?? null;
 
