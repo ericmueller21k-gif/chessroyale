@@ -473,12 +473,18 @@ export interface AlfilPose {
   /** His raised front feet (where each pad's top-left is), the far one (our left) and the near one. */
   foreF?: Pt;
   foreN?: Pt;
-  /** The trunk: hanging (its tip at `trunkTip`, curling), lifted and curled before his chest, or raised, trumpeting. */
-  trunk?: "hang" | "lift" | "up";
+  /**
+   * The trunk: hanging (its tip at `trunkTip`, curling), lifted and curled before his chest, raised, trumpeting, or
+   * coiled round the ankus's shaft `trunkGrip` pixels below its tip (Tusks' cast: it swings the ankus).
+   */
+  trunk?: "hang" | "lift" | "up" | "grip";
   trunkTip?: Pt;
   /** The ankus in his far fist: the end of its butt and the tip of its spike. */
   ankusButt?: Pt;
   ankusTip?: Pt;
+  trunkGrip?: number;
+  /** The ankus drawn in front of his arms (his trunk holds it out before him, his fist let go). */
+  ankusFront?: boolean;
   /** His near hind foot lifted or moved (a stomp), from where it stands. */
   step?: Pt;
   /** His tail's tuft swung this far sideways. */
@@ -490,7 +496,26 @@ export interface AlfilPose {
  * The ankus leans out a little so its tip stays level with his crown and its hook no further left than his reach: a
  * taller or wider figure would be drawn smaller on the select stage, or reach past his room beside the board.
  */
-const REST = { bob: 0, air: 0, dx: 0, nod: 0, mood: "glare", ears: 0, foreF: [4, 37], foreN: [34, 34], trunk: "hang", trunkTip: [23, 42], ankusButt: [11.4, 66.6], ankusTip: [7.6, 0], step: [0, 0], tail: 0 } as const satisfies Required<AlfilPose>;
+const REST = { bob: 0, air: 0, dx: 0, nod: 0, mood: "glare", ears: 0, foreF: [4, 37], foreN: [34, 34], trunk: "hang", trunkTip: [23, 42], ankusButt: [11.4, 66.6], ankusTip: [7.6, 0], trunkGrip: 47, ankusFront: false, step: [0, 0], tail: 0 } as const satisfies Required<AlfilPose>;
+/** Where the wraps on the ankus's staff are (the middle of his fist's place at rest), as a share of its length. */
+const WRAPS_AT = Math.hypot(REST.foreF[0] + 6 - REST.ankusTip[0], REST.foreF[1] + 5.5 - REST.ankusTip[1]) / Math.hypot(REST.ankusButt[0] - REST.ankusTip[0], REST.ankusButt[1] - REST.ankusTip[1]);
+
+/**
+ * The trunk coiled round the ankus's shaft at `g` (frame-free drawing space, as the ankus is drawn), the shaft running
+ * along `d` (a unit step from its tip toward its butt): down from between his eyes, swinging out (looping, when the
+ * shaft is up by his face) to come at the shaft from his side of it, over it, and its tip curled back under.
+ */
+function gripTrunk(root: Pt, g: Pt, d: Pt): Pt[] {
+  // Across the shaft, toward where the trunk comes from.
+  let n: Pt = [-d[1], d[0]];
+  if ((root[0] - g[0]) * n[0] + (root[1] - g[1]) * n[1] < 0) n = [-n[0], -n[1]];
+  const near: Pt = [g[0] + n[0] * 3.4, g[1] + n[1] * 3.4];
+  const p1: Pt = [root[0] - 0.6, root[1] + 7];
+  const reach = Math.hypot(near[0] - p1[0], near[1] - p1[1]);
+  const path = bezier(p1, [p1[0] - 0.4, p1[1] + Math.max(4, reach * 0.45)], [near[0] + n[0] * reach * 0.4, near[1] + n[1] * reach * 0.4], near, 10);
+  const far: Pt = [g[0] - n[0] * 2.4, g[1] - n[1] * 2.4];
+  return [root, ...path, far, [far[0] + d[0] * 2.4 - n[0] * 0.6, far[1] + d[1] * 2.4 - n[1] * 0.6], [g[0] + d[0] * 3.6 - n[0] * 0.4, g[1] + d[1] * 3.6 - n[1] * 0.4]];
+}
 
 /** The trunk's points for its shape (before his bob). */
 function trunkPoints(shape: "hang" | "lift" | "up", [tx, ty]: Pt): Pt[] {
@@ -519,7 +544,6 @@ export function alfilLayers(pose: AlfilPose = {}): Layer[] {
   const fistN: Pt = [fN[0] + 7, fN[1] + 5];
   const armF: Pt[] = [shoulderF, atRest(p.foreF, REST.foreF) ? [19, 37 + b] : mid(shoulderF, fistF, [-1.5, 2.5]), fistF];
   const armN: Pt[] = [shoulderN, atRest(p.foreN, REST.foreN) ? [47.5, 37 + b] : mid(shoulderN, fistN, [3.5, 2.5]), fistN];
-  const trunkPts = trunkPoints(p.trunk, p.trunkTip).map(([x, y]): Pt => [x, y + hb]);
   const tuskF = bezier([21, 23.5 + hb], [11.5, 37 + hb], [0.5, 31 + hb], [7.5, 18.5 + hb]);
   const tuskN = bezier([31.5, 23 + hb], [40.5, 25 + hb], [41, 33 + hb], [33.5, 36 + hb]);
   // The ankus rides his bob, except that its butt never goes into the ground (planted, his fist slides down it);
@@ -527,12 +551,18 @@ export function alfilLayers(pose: AlfilPose = {}): Layer[] {
   const lowest = Math.max(p.ankusButt[1], p.ankusTip[1]);
   const ab = b <= 0 ? b : Math.min(b, Math.max(0, Math.floor(REST.ankusButt[1] - lowest)));
   const [ux, uy] = p.ankusTip;
-  const grip = Math.hypot(p.foreF[0] + 6 - ux, p.foreF[1] + b - ab + 5.5 - uy);
+  const ankusLen = Math.hypot(p.ankusButt[0] - ux, p.ankusButt[1] - uy);
+  // Coiled in his trunk, the staff's wraps stay where they're sewn (his fist's place at rest), drawn shorter with it.
+  const grip = p.trunk === "grip" ? WRAPS_AT * ankusLen : Math.hypot(p.foreF[0] + 6 - ux, p.foreF[1] + b - ab + 5.5 - uy);
+  const shaft: Pt = [(p.ankusButt[0] - ux) / ankusLen, (p.ankusButt[1] - uy) / ankusLen];
+  const coil: Pt = [ux + shaft[0] * p.trunkGrip, uy + shaft[1] * p.trunkGrip + ab];
+  const trunkPts = p.trunk === "grip" ? gripTrunk([26.8, 17.5 + hb], coil, shaft) : trunkPoints(p.trunk, p.trunkTip).map(([x, y]): Pt => [x, y + hb]);
   const tailPts: Pt[] = [[61.5, 45 + b], [66 + p.tail / 2, 47.5 + b], [68 + p.tail, 52 + b]];
   // His shadow, smaller the higher he is.
   const sw = Math.max(26, 50 - 2 * p.air);
   const sh = `shadow:${sw}`;
   add(sh, () => shadow(sw));
+  const ankusLayer = L(placed(`ankus:${key([p.ankusButt, p.ankusTip, [grip, 0]])}`, () => ankus(p.ankusButt, p.ankusTip, grip)), ab);
   const layers: Layer[] = [
     L(placed(`tail:${key(tailPts)}`, () => tail(tailPts)), 0),
     L(placed(`leg:${key(hindF)}`, () => leg(hindF, 6, 5, 7)), 0),
@@ -543,13 +573,14 @@ export function alfilLayers(pose: AlfilPose = {}): Layer[] {
     at("hindFoot", 23 + sx, GROUND - 6 + sy),
     L(placed("earF", () => ear(13.5, 16, 6, 8.4, 4)), hb, -p.ears),
     L(placed("earN", () => ear(43, 13.5, 8.2, 10.6, 6)), hb, p.ears),
-    L(placed(`ankus:${key([p.ankusButt, p.ankusTip, [grip, 0]])}`, () => ankus(p.ankusButt, p.ankusTip, grip)), ab),
+    ...(p.ankusFront ? [] : [ankusLayer]),
     L(placed(`arm:${key(armF)}`, () => leg(armF, 4.4, 3.4, 13, 0.16)), 0),
     at("foreFootL", fF[0], fF[1]),
     L(placed(`head:${p.mood}`, () => head(p.mood)), hb),
     L(placed(`tusk:${key(tuskF)}`, () => tusk(tuskF, 2.6, 0.9)), 0),
     L(placed(`arm:${key(armN)}`, () => leg(armN, 4.4, 3.4, 17, 0.16)), 0),
     at("foreFootN", fN[0], fN[1]),
+    ...(p.ankusFront ? [ankusLayer] : []),
     L(placed(`trunk:${key(trunkPts)}`, () => trunk(trunkPts, 2.7, 1.6)), 0),
     L(placed(`tusk:${key(tuskN)}`, () => tusk(tuskN, 2.4, 0.9)), 0),
   ];
@@ -643,12 +674,6 @@ const GOLD_HOT: Record<string, string> = { P: "#b4840f", O: "#f2c14e", Y: "#ffe5
 const RAISED: AlfilPose = { foreF: [1, 20], ankusButt: [9.5, 62], ankusTip: [5.5, -6] };
 /** Higher still: his fist by his ear, the spike well over his head (the fusion). */
 const HIGH: AlfilPose = { foreF: [2, 8], ankusButt: [10.5, 57], ankusTip: [7, -9] };
-/**
- * Pointing it at the board: his fist up by his far ear, the ankus levelled to our right behind his head, its spike
- * and hook out past his near ear, aimed a little down (the boss casts from the board's top-left corner, so the board
- * is to his right and below).
- */
-const POINT: AlfilPose = { foreF: [0, 4], ankusButt: [1, 6.4], ankusTip: [71, 20] };
 
 // ---- His animations.
 
@@ -797,21 +822,76 @@ const victory: Anim = {
 };
 
 /**
- * Tusks, the cast: he raises the ankus, then levels it at the board and holds it there a beat, its spike flashing,
- * while he trumpets; then he lowers it. The `cast` cue (frame 3) is where the board's glow on the two pawns starts;
- * the `trumpet` cue (frame 4) is the short trumpet after the cast's crunch.
+ * The ankus held out by his trunk's coil at `g` (drawing space), its spike pointing `deg` round from straight up
+ * (counterclockwise as we see it: 90 to our left, 180 down, 270 to our right), drawn `k` of its length: as it swings
+ * down before him it comes toward us, so it's drawn shorter. His trunk holds it lower than his fist does, 47 pixels
+ * below the spike.
  */
+const swung = (g: Pt, deg: number, k = 1): AlfilPose => {
+  const a = (deg * Math.PI) / 180;
+  const u: Pt = [-Math.sin(a), -Math.cos(a)];
+  return { trunk: "grip", trunkGrip: 47 * k, ankusFront: true, ankusTip: [g[0] + u[0] * 47 * k, g[1] + u[1] * 47 * k], ankusButt: [g[0] - u[0] * 20 * k, g[1] - u[1] * 20 * k] };
+};
+type Swing = readonly [g: Pt, deg: number, k: number];
+/** The spike's trail through the air, from one swing pose to the next: a fading streak of gold behind it. */
+const trail = (from: Swing, to: Swing, p: AlfilPose = {}): Speck[] => {
+  const out: Speck[] = [];
+  for (let i = 3; i < 10; i++) {
+    const t = i / 10;
+    const q = swung([from[0][0] + (to[0][0] - from[0][0]) * t, from[0][1] + (to[0][1] - from[0][1]) * t], from[1] + (to[1] - from[1]) * t, from[2] + (to[2] - from[2]) * t);
+    const [x, y] = onFrame(q.ankusTip!, p);
+    // (A streak that would leave his frame is cut short inside it.)
+    if (x >= 2 && x <= W - 3 && y >= 2 && y <= H - 3) out.push([Math.round(x), Math.round(y), i < 6 ? "O" : i < 8 ? "Y" : "y"]);
+  }
+  return out;
+};
+/** Two puffs of breath snorted from his trunk's tip, blowing down and out, `t` frames after (then thinning). */
+const snort = (t: number, [x, y]: Pt): Speck[] =>
+  [[-2.4, 1.6], [1.6, 2.4]].flatMap(([vx, vy]): Speck[] => {
+    const X = Math.round(x + vx! * (t + 1.2));
+    const Y = Math.round(y + vy! * (t + 1.2));
+    const cloud = t === 0 ? [".Gq.", "Gqqq", "qqqG", ".GG."] : [".G.", "GqG", ".G."];
+    return cloud.flatMap((row, j) => [...row].flatMap((k, i): Speck[] => (k === "." ? [] : [[X + i - 1, Y + j - 1, k]])));
+  });
+
+/** Tusks' cast, the swing: his trunk's coil, the spike's angle and how much of its length shows, frame by frame. */
+const SWING: readonly Swing[] = [
+  [[25, 40], 26, 0.95], // tipped over to our left, his fist letting go
+  [[27, 37], 135, 0.6], // swinging down before him, coming toward us
+  [[28, 35], 205, 0.62], // past the bottom, rising to our right
+  [[26, 38], 245, 0.85],
+  [[24, 37], 266, 1], // levelled at the board (to our right, a little down)
+  [[18, 40], 320, 0.9], // back up over to his side
+];
+const sw = (i: number, p: AlfilPose = {}): AlfilPose => ({ foreF: [6, 29], ...p, ...swung(...SWING[i]!) });
+/** The far fist on the ankus again, upright at his side, his trunk still round it. */
+const RETAKE: AlfilPose = { trunk: "grip", trunkGrip: 51 };
+
+/**
+ * Tusks, the cast (Eric, Oct 17): his trunk curls round the ankus below his fist; his fist lets go and his trunk swings
+ * it down before him in an arc, from our left to our right, the spike leaving a gold streak, and levels it at the
+ * board (to our right, a little down) at his chest; he holds it there, eyes blazing, and snorts; then his trunk swings
+ * it back up to his side, his fist takes it, and he rests, smug. The `cast` cue (frame 6, the spike first pointing at
+ * the board) is where the board's glow on the two pawns starts; `swing` is the whoosh as it goes, `snort` his snort
+ * (his trunk is busy, so no trumpet).
+ */
+const POINTED = sw(4, { ears: 2 });
+/** Where his trunk's curled tip is, levelled: the snort comes out there. */
+const SNOUT = onFrame([SWING[4]![0][0] - 1, SWING[4]![0][1] + 3]);
 const tusksCast: Anim = {
   loop: false,
   frames: [
-    f(110, { bob: 1, foreF: [2, 30], ankusButt: [10, 66.6], ankusTip: [6, 1], trunk: "lift" }),
-    f(110, { ...RAISED, ears: 1, trunk: "lift" }, { specks: sparkle(tipOf(RAISED)) }),
-    f(90, { ...POINT, ears: 2, nod: -1 }, { cue: "cast", pal: EYES_HOT, shake: [1, 0], specks: sparkle(tipOf(POINT), true) }),
-    f(160, { ...POINT, ears: 2, nod: -1, trunk: "up" }, { cue: "trumpet", pal: EYES_HOT, specks: [...sparkle(tipOf(POINT)), ...blast({ nod: -1 }, 0)] }),
-    f(160, { ...POINT, ears: 1, trunk: "up" }, { specks: [...sparkle(tipOf(POINT), true), ...blast({}, 1)] }),
-    f(160, { ...POINT, ears: 1, trunk: "lift", mood: "smug" }, { specks: sparkle(tipOf(POINT)) }),
-    f(120, { ...RAISED, mood: "smug" }),
-    f(160, { mood: "smug" }),
+    f(100, { bob: 1, nod: 1, trunk: "grip", trunkGrip: 52, ears: 1 }),
+    f(80, sw(0, { ears: 1 }), { cue: "swing" }),
+    f(60, sw(1, { ears: 1 }), { specks: trail(SWING[0]!, SWING[1]!) }),
+    f(60, sw(2, { ears: 2 }), { specks: trail(SWING[1]!, SWING[2]!) }),
+    f(50, sw(3, { ears: 2 }), { specks: trail(SWING[2]!, SWING[3]!) }),
+    f(90, POINTED, { cue: "cast", pal: EYES_HOT, shake: [1, 0], specks: [...trail(SWING[3]!, SWING[4]!), ...sparkle(tipOf(POINTED), true)] }),
+    f(150, { ...POINTED, nod: -1 }, { cue: "snort", pal: EYES_HOT, specks: [...sparkle(tipOf(POINTED)), ...snort(0, SNOUT)] }),
+    f(130, { ...POINTED, ears: 1, mood: "smug" }, { specks: [...sparkle(tipOf(POINTED), true), ...snort(1, SNOUT)] }),
+    f(90, sw(5, { mood: "smug" }), { specks: trail(SWING[4]!, SWING[5]!) }),
+    f(90, { ...RETAKE, mood: "smug" }),
+    f(140, { mood: "smug" }),
   ],
 };
 

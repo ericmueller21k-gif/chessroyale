@@ -30,7 +30,7 @@ counts and timings follow Hollow's: idle 16 x 125 ms, thinking 16 x 130, smug 8 
 | rattled (loop) | 8, 640 | none |
 | defeat | 6, 1550 | oof 0, clatter 290 |
 | victory (loop) | 12, 1320 | trumpet 220, stomp 660 |
-| tusksCast | 8, 1070 | **cast 220** (the pawns' glow starts), trumpet 310 |
+| tusksCast | 11, 1040 | swing 100 (a whoosh), **cast 350** (the pawns' glow starts), snort 440 |
 | tusksFuse | 8, 1010 | **rise 0** (the pawns lift to the center), **flash 500** (the white flash, the elephant appears) |
 | mammothSlam | 12, 1360 | leap 230, **slam 590** (the thud, the board shakes), **fly 730** (the pieces fly up), **shadows 940** (their shadows appear on their squares) |
 | kingAttack (`ALFIL_ATTACK`) | 32, 2780 | rumble 0, land 360, jab 560 + 170 x i (ten, on `kingAttackHits()`), trumpet 2260, leap 2480 |
@@ -47,9 +47,21 @@ shadows); nothing on the board is drawn yet. The other cues are for his sounds, 
   It's also 2 px wider and 4 px deeper, room for a knock-back and a heavy landing's shake.
 - **The slam squashes and launches inside his box** rather than leaving it: 10 px up (with his shadow shrinking),
   then down onto his haunches with a 2 px shake and dust both sides. Leaving the box would cut him at its edge.
-- **The cast points to our right**, the ankus levelled behind his head with its spike and hook out past his near ear,
-  aimed a little down: the boss casts from the board's top-left corner, so the board is to his right and below. He
-  faces our left (the approved still), and pointing that way would need room past his reach beside the board.
+- **The cast points to our right**, aimed a little down: the boss casts from the board's top-left corner, so the board
+  is to his right and below. He faces our left (the approved still), and pointing that way would need room past his
+  reach beside the board.
+- **The cast, redone after Eric (Oct 17): his trunk swings it.** His trunk curls round the staff below his fist (a pose
+  of its own, `trunk: "grip"`: down from his face, looping when the staff is up by it, over the staff and its tip
+  curled back under), his fist lets go, and the trunk swings the ankus down before him in an arc from our left to our
+  right, the spike leaving a gold streak, to level it at his chest in front of him (drawn over his arms, `ankusFront`);
+  it holds there, then swings back up to his side and his fist takes it. Beat by beat: grab 0, tip left 100 (`swing`),
+  down-left 180, down-right 240, rising 300, levelled 350 (`cast`, eyes flaring, a shake), hold with a snort 440
+  (`snort`) and 590, back up 720, fist on it 810, smug at rest 900, 1040 in all. Calls: **a snort, not a trumpet**,
+  while it's levelled, as his trunk is busy holding it (two puffs of breath out of its tip, eyes blazing); **the fist
+  lets go** at the swing (the trunk alone reads clearer than both on a turning staff); **the ankus is drawn shorter
+  at the bottom of the arc** (60 to 85 % of its length), as it comes toward us there: at full length it can't turn
+  below his chest inside his frame (67 px long in a 78 px wide room). The frame is unchanged (81 x 91); the spike's
+  streak is cut short where it would leave it. The wraps on the staff stay where they're sewn when the trunk holds it.
 - **The fusion's flash lights all his gold** (the ankus, the headpiece's and the caparison's trim share the palette
   keys) for one 90 ms frame and a softer one after: it reads as the flash lighting him.
 - **The ankus stays planted** when he sinks (a squash, breathing): its butt never goes into the ground, his fist
