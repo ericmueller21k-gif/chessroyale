@@ -784,6 +784,26 @@ turn). The bounce now waits for the banner online as it did solo.
 - When a turn has more than one screen of the same kind (a thinking before a power and one after it), check everything
   drawn from that state on each of them.
 
+## A menu glued to a laptop's taskbar, and two numbers for one boss (Oct 17, 2026)
+
+**What Eric saw:** Chrome maximized on a Windows laptop, the Boss raid screen, Sawyer, then Boss alone: its menu "sitting
+at the bottom… there's no way I can drag it… literally attached to the bottom of the screen", its row cut off at the
+taskbar. In the same photo the stage said "💀 Rating 1350" and the menu's row for Sawyer "1600 ≈ your level".
+
+**The cause:** the menu sat in the middle only on windows at least 700 px tall; a maximized laptop browser has about
+550 to 650 px, so it got the phone's sheet, flush with the window's foot, where the taskbar is. The tests measured
+the computer at 1280×800, over that line. The stage worked out the boss's strength with no difficulty; the menu added
+the difficulty: two formulas for one number, each tested alone.
+
+**The fix:** from 600 px wide the menu is a dialog in the middle with room all round, at any height, scrolling inside
+(the in-game leaderboard sheet too); one function for Boss alone's strength, used by the stage and the menu, the stage
+following the menu's difficulty. docs/decisions/2026-10-17-boss-sheet-fit.md.
+
+**The rule:**
+- Test a computer's screens at a laptop's maximized window too (1280×600 and 1366×768), not only a tall test window:
+  a sheet on a computer sits in the middle with room all round, never on the window's edge.
+- A number shown in two places comes from one function, and a test reads both on the same screen (and the battle's own).
+
 ## A saw the boss crossed (Oct 17, 2026)
 
 **What Eric saw:** Boss alone against Sawyer, the board saw up: "I tried to take, it's like it glitched, and he just

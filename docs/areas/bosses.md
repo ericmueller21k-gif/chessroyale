@@ -47,7 +47,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **Strength:** a rating on Stockfish's scale from the crowd's ratings (people only; Eric, Oct 12), the raid's tiers (a
   step above the people's ratings as the server stores them, never the app's word: [matchmaking.md](matchmaking.md)) or
   solo's difficulty, plus the boss's offset. Stockfish plays it at that UCI_Elo with the blunder guard (see
-  [engine.md](engine.md)).
+  [engine.md](engine.md)). Before a battle a boss has one number on screen: Boss alone's at your difficulty, on the
+  Boss raid screen's stage and in Boss alone's menu alike (`bossAloneElo` in `boss-difficulty.ts`; the raids show none:
+  docs/decisions/2026-10-17-boss-sheet-fit.md).
 - **The brain (Oct 12: every boss on Maia; DECISIONS.md, "Every boss on Maia"):** every boss plays its normal moves
   with **Maia-3** (a human-like model, a separate AGPL program in its own worker: `packages/maia-worker/`), no guard,
   at a Maia rating for its level (its strength, plus a crowd's margin), clearly favored in plain chess (Eric, Oct 12:

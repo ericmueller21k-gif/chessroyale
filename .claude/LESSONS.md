@@ -87,6 +87,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A rule on a bare element under a box (`.box i`) styles every component nested in that box too: use a child
     selector or a class of its own, and check the computed style of what sits inside.
   - Look at a drawn number (a meter, a bar) in true color, alone and enlarged, not only in a frame of the whole screen.
+- **A menu glued to a laptop's taskbar, and two numbers for one boss** (Oct 17, [story](../docs/history/lessons.md#a-menu-glued-to-a-laptops-taskbar-and-two-numbers-for-one-boss-oct-17-2026)):
+  - Test a computer's screens at a laptop's maximized window too (1280×600 and 1366×768), not only a tall test
+    window. A sheet on a computer sits in the middle with room all round, never on the window's edge.
+  - A number shown in two places comes from one function, and a test reads both on the same screen.
 - **Names that looked short** (Oct 7, [story](../docs/history/lessons.md#tests-that-leaned-on-a-lucky-seed-and-names-that-looked-short-oct-7-2026)):
   check text that must fit by measuring it in the real font and box, with some room for other fonts (an iPhone's runs
   wider than headless Chrome's), not by counting characters. (The same lesson's rule about seeds is under "Tests".)

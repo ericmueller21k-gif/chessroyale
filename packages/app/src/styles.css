@@ -1374,9 +1374,21 @@ p {
   width: min(100vw, 480px);
   max-height: 88dvh;
   overflow: auto;
+  overscroll-behavior: contain;
   background: var(--bg);
   border-radius: 16px 16px 0 0;
   padding: 10px 10px calc(env(safe-area-inset-bottom) + 12px);
+}
+/* (From 600 px wide, a dialog in the middle with room all round, as Boss alone's menu: never glued to the window's foot.) */
+@media (min-width: 600px) {
+  .tower-overlay {
+    align-items: center;
+    padding: 16px;
+  }
+  .tower-sheet {
+    max-height: 100%;
+    border-radius: 16px;
+  }
 }
 .tower-sheet-head {
   display: flex;
@@ -5845,7 +5857,12 @@ button.history-label {
   gap: 8px;
 }
 
-/* Boss raid: the boss menu that opens when you start (one row per boss, weakest first). */
+/*
+ * Boss raid: Boss alone's menu and the /bosses picker (one row per boss, weakest first). A phone's sheet at the foot of
+ * the screen; from 600 px wide, at any height, a dialog in the middle of the window with room all round, as the front
+ * door's other sheets are on a computer (.fd-sheet). It always fits: the rows scroll inside it, and the whole menu does
+ * on a window too short for even one row (docs/decisions/2026-10-17-boss-sheet-fit.md).
+ */
 .boss-menu-overlay {
   position: fixed;
   inset: 0;
@@ -5856,22 +5873,26 @@ button.history-label {
   justify-content: center;
   animation: fade 160ms ease-out;
 }
-@media (min-height: 700px) and (min-width: 600px) {
-  .boss-menu-overlay {
-    align-items: center;
-  }
-  .boss-menu {
-    border-radius: 16px;
-  }
-}
 .boss-menu {
   width: min(100vw, 480px);
   max-height: 94dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   background: var(--bg);
   border-radius: 16px 16px 0 0;
   padding: 10px 10px calc(env(safe-area-inset-bottom) + 10px);
+}
+@media (min-width: 600px) {
+  .boss-menu-overlay {
+    align-items: center;
+    padding: 16px;
+  }
+  .boss-menu {
+    max-height: 100%;
+    border-radius: 16px;
+  }
 }
 .boss-menu-head {
   display: flex;
@@ -5886,6 +5907,8 @@ button.history-label {
 .boss-menu-list {
   display: grid;
   gap: 4px;
+  /* (Never squeezed below one row: a shorter window scrolls the whole menu instead.) */
+  min-height: 54px;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
