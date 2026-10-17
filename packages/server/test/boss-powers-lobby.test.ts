@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BOSS_BANNER, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, type Settings } from "@chessroyale/core";
 import { FIRE_BURN_MS, POWER_FX, applyMove, bossMoveFrom, bossShowMs, dragOptions, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
+
+afterEach(() => vi.restoreAllMocks());
 
 const hash = (s: string) => {
   let h = 2166136261;
@@ -792,6 +794,30 @@ describe("Sawyer online", () => {
     const cut = r4.boss!.powers!.cut!;
     expect(cut).toMatchObject({ at: 4, until: 4 + BOSS_POWERS.sawTurns - 1 });
     expect(r4.boss!.powers!.cut).toEqual(L.last("p2", "round")!.boss!.powers!.cut);
+  });
+
+  it("a host's move across the board saw never lands (Eric, Oct 17): the first allowed move is played, and the error logged", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const L = raid({ bossId: "sawyer", bossPowerTest: "boardsaw" });
+    crowdMove(L);
+    hostBoss(L);
+    toRound(L);
+    crowdMove(L);
+    hostBoss(L);
+    toRound(L);
+    crowdMove(L);
+    // (Past the boss's strike after the crowd's 3rd move.)
+    for (let i = 0; i < 10 && !L.last("p1", "bossRequest"); i++) L.advance(10_000);
+    const req = L.last("p1", "bossRequest")!;
+    expect(req.allowed!.length).toBeGreaterThan(0);
+    for (const m of req.allowed!) expect(middle(m)).toBe(false);
+    const across = legalMoves(req.fen).find(middle)!;
+    expect(across).toBeTruthy();
+    L.core.message("p1", { t: "bossMove", key: req.key, move: across });
+    const b = L.last("p1", "boss")!;
+    expect(b.boss.board.lastMove).toBe(req.allowed![0]);
+    expect(b.boss.lastMove!.through).toBeUndefined();
+    expect(error).toHaveBeenCalledWith(expect.stringContaining(`boss move refused: ${across}`));
   });
 
   it("the admins' trigger: the board saw as the next crowd turn begins, without the warning", () => {

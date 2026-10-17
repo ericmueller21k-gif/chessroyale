@@ -19,6 +19,7 @@ import { duelCount, duelTurn } from "../components/Pig.tsx";
 import { bulletControl, bulletIncrementOn, bulletOn, kingBlocked } from "../components/Recluse.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { useReplay } from "../hooks.ts";
+import { REFUSED_MS, refusedLine, throughLine } from "../refused.ts";
 import { Hud } from "./Hud.tsx";
 
 const HINT_BRUSHES = ["green", "blue", "yellow"] as const;
@@ -142,6 +143,12 @@ export function PlayScreen({
   const dark = useMemo(() => (match.boss?.powers?.dark ?? []).map((d) => d.square), [match.boss?.powers?.dark?.map((d) => d.square).join()]);
   const note = match.darkNote;
   const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking && !note?.pending;
+  // A move a boss power refuses (legal in chess: across Sawyer's saw, onto a pie…) stays put: why, in the dock, for a
+  // few seconds (refused.ts; Eric, Oct 17: it "glitched"). And the boss's last move, if it went through a power (his
+  // only move: the limit lifted for it), says so through your turn.
+  const [refused, setRefused] = useState<{ line: string; fen: string; at: number } | null>(null);
+  const refusedNow = refused && refused.fen === board.fen && now - refused.at < REFUSED_MS ? refused.line : null;
+  const through = match.boss ? throughLine(match.boss) : null;
   // The God King strikes from his spot (or, the old way behind settings.kingOnBoard, summoned onto your king's square).
   const onBoardKing = !!match.settings.kingOnBoard;
   const command = useMemo(() => {
@@ -215,7 +222,7 @@ export function PlayScreen({
         <div class="board-row">
           {match.boss && <BossSide match={match} />}
           <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={fen} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)}>
+          <Board fen={fen} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} onRefused={match.boss ? (m) => setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)}>
             {/* (Stepping back through the game keeps the dark on its squares: it belongs to the square.) */}
             {match.boss?.powers && (!history.browsing || dark.length > 0) && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
             {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} />}
@@ -288,6 +295,15 @@ export function PlayScreen({
               <span class="duel-note">
                 <strong>Take one of his {duelCount(match.boss) === 2 ? "two" : "three"} duels.</strong>
               </span>
+            ) : refusedNow ? (
+              // A move of yours a power refused: why, the dock's whole line for a moment (refused.ts; the box around
+              // it is the dock's live region, read out as it changes).
+              <span class="refused-note">{refusedNow}</span>
+            ) : through && hint === null && !barred && !match.boss.staggerNext ? (
+              // The boss's only move went through a power: said through your turn, in place of "Your move." (as the
+              // duel's line is), so it's whole on a narrow phone. Until the God King's strike lands: then "Your move.
+              // Boss staggered.", the newer news (there's no room for both at 320 px).
+              <span class="through-note">{through}</span>
             ) : (
               <span>
                 <strong>Your move.</strong>{" "}

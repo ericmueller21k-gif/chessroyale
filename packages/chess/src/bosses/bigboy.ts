@@ -314,6 +314,7 @@ export const BIGBOY: BossRules = {
     const block = boss.powers?.block?.square;
     return block ? (m, fen) => blockedBy(m, block, fen) : null;
   },
+  stopReason: (boss, fen, m) => (blockedBy(m, boss.powers?.block?.square, fen) ? "block" : null),
   powerTurn: (boss) => !!boss.powers!.block,
   // From the starting position (sides as usual), less the crowd's center pawn he eats before move 1: a base at ply 0
   // (the position changed outside a move: every replay plays from it).

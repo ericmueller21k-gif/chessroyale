@@ -2,6 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { SAWYER_LOOKS } from "@chessroyale/core";
 import { BOARD_SEL, engineTop, test, watchFor, bossAloneFromHome } from "./helpers.ts";
+import { REFUSED, REFUSED_MS, REFUSED_OTHER, THROUGH } from "../packages/app/src/refused.ts";
 
 /**
  * Sawyer, the raccoon with a saw, played alone on a phone and a computer with real taps: his first move a pawn's and
@@ -255,6 +256,201 @@ async function asAdmin(page: Page) {
     await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
   });
 }
+
+test("Sawyer's board saw on Maia (Eric, Oct 17): his moves never cross it while it's up; a move of yours across it stays put and the dock says why", async ({ page }) => {
+  test.setTimeout(8 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  // (An admin: the boss on Maia, no guard, as Eric played him, and the brain's debug line to read.)
+  await asAdmin(page);
+  await page.addInitScript(() => localStorage.setItem("brc.muted", "1"));
+  await page.goto("/?debug&clock=60&boss=sawyer&power=boardsaw&laststand=0");
+  await bossAloneFromHome(page);
+  // The test switch: warned as the 2nd turn begins, the saw as the 3rd, up to the 7th; it's gone as the 8th begins.
+  await play(page, await allowedMove(page, ["g1f3", "b1c3", "g8f6", "b8c6"]));
+  await play(page, await allowedMove(page, ["b1c3", "g1f3", "h2h3", "b8c6", "g8f6", "h7h6"]));
+  let before: string | null = null;
+  let tried = false;
+  const brains: string[] = [];
+  for (let turn = 3; turn <= 8; turn++) {
+    await yourMove(page);
+    const now = await page.evaluate(() => {
+      const m = (window as any).match;
+      return { fen: m.phase.board.fen as string, lastMove: m.boss.lastMove as { move: string; through?: string } | null, powers: m.boss.powers, brain: (m.brainLine as string | null) ?? "" };
+    });
+    if (before) {
+      // His reply from `before`, under the saw: never across it, unless every move he had crossed it (then the dock
+      // says so).
+      const his = now.lastMove!.move;
+      brains.push(now.brain);
+      if (crossesMiddle(his)) {
+        expect(new Chess(before).moves({ verbose: true }).every((m) => crossesMiddle(m.from + m.to)), `${his} from ${before}`).toBe(true);
+        expect(now.lastMove!.through).toBe("boardsaw");
+        await expect(page.locator(".boss-dock .through-note")).toHaveText(THROUGH.boardsaw);
+      } else expect(now.lastMove!.through, `${his} from ${before}`).toBeUndefined();
+    }
+    if (turn === 8) {
+      expect(now.powers.boardSaw ?? null).toBeNull();
+      break;
+    }
+    expect(now.powers.boardSaw).toEqual({ at: 3, until: 7 });
+    if (!tried) {
+      // A move of yours across the saw (legal in chess): tapped, it stays put, and the dock says why for a moment.
+      const across = new Chess(now.fen).moves({ verbose: true }).find((m) => crossesMiddle(m.from + m.to) && !m.promotion);
+      if (across) {
+        await tap(page, across.from);
+        await tap(page, across.to);
+        await expect(page.locator(".boss-dock .refused-note")).toHaveText("The board saw blocks that move.");
+        expect(await phase(page)).toBe("play");
+        expect(await page.evaluate(() => (window as any).match.phase.board.fen)).toBe(now.fen);
+        // Every one of these lines is whole in the dock's two lines (its box clamps and hides the rest), at this size
+        // and on narrow phones (112 px of room at 320), measured in the real font and box, each in its own element.
+        const lines = [...[...Object.values(REFUSED), REFUSED_OTHER].map((l) => ["refused-note", l]), ...Object.values(THROUGH).map((l) => ["through-note", l])];
+        const cut = () =>
+          page.evaluate((all) => {
+            // (A stand-in for the line, as the dock's only child, as Play.tsx draws it; the dock's own put back after.)
+            const dk = document.querySelector(".boss-dock .dk-text")!;
+            const kids = [...dk.childNodes];
+            const probe = document.createElement("span");
+            dk.replaceChildren(probe);
+            const out = all.filter(([cls, l]) => {
+              probe.className = cls!;
+              probe.textContent = l!;
+              return probe.scrollHeight > probe.clientHeight + 1;
+            });
+            dk.replaceChildren(...kids);
+            return out.map(([, l]) => l);
+          }, lines);
+        expect(await cut()).toEqual([]);
+        if (test.info().project.name === "phone") {
+          const size = page.viewportSize()!;
+          for (const width of [360, 320]) {
+            await page.setViewportSize({ width, height: 664 });
+            await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+            expect(await cut(), `${width} px`).toEqual([]);
+          }
+          await page.setViewportSize(size);
+        }
+        // Then "Your move." again.
+        await expect(page.locator(".boss-dock .dk-text")).toContainText("Your move.", { timeout: 5_000 });
+        tried = true;
+      }
+    }
+    const mine = await allowedMove(page, ["h2h3", "a2a3", "h7h6", "a7a6", "g2g3", "b2b3", "g7g6", "b7b6"]);
+    expect(crossesMiddle(mine)).toBe(false);
+    const after = new Chess(now.fen);
+    after.move({ from: mine.slice(0, 2), to: mine.slice(2, 4), promotion: mine[4] ?? "q" });
+    before = after.fen();
+    await play(page, mine);
+  }
+  // Five replies of his under the saw, at least one of them Maia's own (the path Eric met: Maia, no guard).
+  expect(brains.length).toBe(5);
+  expect(brains.filter((l) => /Maia \d+ · no guard · Maia's/.test(l)).length, brains.join(" | ")).toBeGreaterThanOrEqual(1);
+  expect(tried).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+/** Eric's position (Oct 17), the move before his Nh5-f6+: then the boss's only move is Qd8xf6, across the board saw. */
+const ERIC_BEFORE = "3qk2r/1q4Q1/1p1p4/3PpP1N/4PP2/8/1p3K2/7R w - - 0 35";
+/** A position with the colors swapped and the board turned top to bottom (the files, so the saw, stay put), and its moves. */
+const mirror = (fen: string) => {
+  const [rows, side, ...rest] = fen.split(" ");
+  const swap = (c: string) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase());
+  return [rows!.split("/").reverse().map((r) => [...r].map(swap).join("")).join("/"), side === "w" ? "b" : "w", ...rest].join(" ");
+};
+const mirrorMove = (m: string) => m[0]! + (9 - Number(m[1])) + m[2]! + (9 - Number(m[3])) + m.slice(4);
+
+test("Sawyer's board saw lifted for his only move (Eric's position, Oct 17): Qxf6 across it, and the dock says so through your whole turn, whole at 320 px", async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("console", (m) => m.type() === "error" && /boss move refused/.test(m.text()) && errors.push(m.text()));
+  await page.addInitScript(() => localStorage.setItem("brc.muted", "1"));
+  await page.goto("/?debug&clock=60&boss=sawyer&power=boardsaw&laststand=0");
+  await bossAloneFromHome(page);
+  // The test switch: the saw from the 3rd turn to the 7th.
+  await play(page, await allowedMove(page, ["g1f3", "b1c3", "g8f6", "b8c6"]));
+  await play(page, await allowedMove(page, ["b1c3", "g1f3", "h2h3", "b8c6", "g8f6", "h7h6"]));
+  await yourMove(page);
+  expect((await powers(page)).boardSaw).toEqual({ at: 3, until: 7 });
+  // On the phone, a narrow one from here on (the dock's text has 112 px at 320).
+  if (test.info().project.name === "phone") {
+    await page.setViewportSize({ width: 320, height: 664 });
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  }
+  // (First the turn's own searches on the old position: the round's plan reads the board again after its search, so
+  // a position changed under it would mix the two, which play never does: a move waits for the plan.)
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__planned = false;
+    void Promise.resolve(w.match.runner.planning).then(() => (w.__planned = true), () => (w.__planned = "failed"));
+  });
+  await expect.poll(() => page.evaluate(() => (window as any).__planned), { timeout: 30_000 }).toBe(true);
+  // Eric's position on the runner and the screen's board, as the unit test sets it (r.boards.set, r.state): his split
+  // done, no cut. You White, as Eric was; when this battle made you Black, the same position with the colors swapped.
+  const white = (await page.evaluate(() => (window as any).match.boss.crowdSide)) === "w";
+  const mv = (m: string) => (white ? m : mirrorMove(m));
+  const before = white ? ERIC_BEFORE : mirror(ERIC_BEFORE);
+  await page.evaluate((fen) => {
+    const m = (window as any).match;
+    const r = m.runner;
+    const id = r.state.boards[0];
+    const b = r.boards.get(id);
+    const ply = b.history.length;
+    const bases = [...(b.bases ?? []).filter((x: { ply: number }) => x.ply !== ply), { ply, fen }];
+    r.boards.set(id, { ...b, fen, bases, lastMove: null });
+    const boss = r.state.boss;
+    r.state = { ...r.state, boss: { ...boss, powers: { ...boss.powers, split: { turn: 2, pawn: null, square: null, halves: [] }, cut: null } } };
+    m.phase = { ...m.phase, board: { ...m.phase.board, fen, bases, lastMove: null } };
+    m.emit();
+  }, before);
+  // Your Qxb7 across the saw (the "glitch"): it stays put, and the dock says why.
+  await tap(page, mv("g7b7").slice(0, 2));
+  await tap(page, mv("g7b7").slice(2, 4));
+  await expect(page.locator(".boss-dock .refused-note")).toHaveText(REFUSED.boardsaw);
+  await expect(page.locator(".boss-dock .dk-text")).toContainText("Your move.", { timeout: 5_000 });
+  // Every frame from here to your next move: the phase, the board, the dock's line, and whether it's whole.
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__dock = [];
+    const step = () => {
+      const note = document.querySelector<HTMLElement>(".boss-dock .through-note");
+      w.__dock.push({ t: Date.now(), kind: w.match.phase.kind, fen: w.match.phase.board?.fen ?? "", text: document.querySelector(".boss-dock .dk-text")?.textContent ?? "", whole: note ? note.scrollHeight <= note.clientHeight + 1 : null });
+      if (!w.__dockDone) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+  // Nf6+: his only move is Qxf6, across the saw (the limit lifts for it).
+  await play(page, mv("h5f6"));
+  await yourMove(page);
+  const his = await page.evaluate(() => (window as any).match.boss.lastMove as { move: string; through?: string });
+  expect(his).toMatchObject({ move: mv("d8f6"), through: "boardsaw" });
+  const after = new Chess(before);
+  for (const m of [mv("h5f6"), mv("d8f6")]) after.move({ from: m.slice(0, 2), to: m.slice(2, 4) });
+  const rows = after.fen().split(" ")[0]!;
+  expect((await page.evaluate(() => (window as any).match.phase.board.fen as string)).split(" ")[0]).toBe(rows);
+  // Your turn: the line stays (past a refusal's few seconds too), then your move, picked and tapped.
+  await page.waitForTimeout(REFUSED_MS + 1000);
+  const mine = await allowedMove(page);
+  await play(page, mine);
+  const frames = (await page.evaluate(() => {
+    const w = window as any;
+    w.__dockDone = true;
+    return w.__dock;
+  })) as { t: number; kind: string; fen: string; text: string; whole: boolean | null }[];
+  const turn = frames.filter((f) => f.kind === "play" && f.fen.split(" ")[0] === rows);
+  expect(turn.length).toBeGreaterThan(0);
+  expect(turn.at(-1)!.t - turn[0]!.t).toBeGreaterThan(REFUSED_MS + 1000);
+  // (Only the line in the dock, whole in its two lines, on every frame of the turn.)
+  expect([...new Set(turn.map((f) => `${f.text} · ${f.whole}`))]).toEqual([`${THROUGH.boardsaw} · true`]);
+  // (And those frames are the whole turn, one run from the boss's move showing to your move going in.)
+  const first = frames.indexOf(turn[0]!);
+  const last = frames.indexOf(turn.at(-1)!);
+  expect(frames[first - 1]?.kind).toBe("boss");
+  expect(frames.slice(first, last + 1).every((f) => f.kind === "play")).toBe(true);
+  expect(frames[last + 1]?.kind ?? "none").not.toBe("play");
+  expect(errors).toEqual([]);
+});
 
 test("Sawyer: the board saw from the admins' trigger, a cut taped over and healing, the halves rejoining", async ({ page }) => {
   test.setTimeout(8 * 60_000);

@@ -505,6 +505,13 @@ export interface SawCut {
   until: number;
 }
 
+/**
+ * The power that stops a move that is otherwise legal, either side (Sawyer's board saw and saw cut, Boingo's pie, Big
+ * Boy's toy block): the screens say which when one of yours is refused, and when the boss's only move went through one
+ * (a limit that would leave no move lifts for that turn).
+ */
+export type StopReason = "boardsaw" | "cut" | "pie" | "block";
+
 /** Wrangler's long pull: his center pawn's double step (`from` to `via`), lassoed on to `to`, as crowd turn `turn` begins. */
 export interface LongPull {
   turn: number;

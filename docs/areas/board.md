@@ -14,12 +14,14 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   (`turn`, board-view.ts), the last move and (switched off, as always: `BOARD.checkHighlight`) the check glow, the
   selected square, the move dots and capture rings, tap-tap and drag (touch and mouse), view-only (`small`) and
   whose-turn locking (`interactive`, `moves`), the promotion picker, arrows with labels (power-up hints, the Last
-  Stand's, Squads' picks and blocks), square marks (`marks`), Hollow's dark (`dark`, `onDarkTry`), and a knock for
-  every move that appears (`components/Board.tsx` plays it).
+  Stand's, Squads' picks and blocks), square marks (`marks`), Hollow's dark (`dark`, `onDarkTry`), a move tried that
+  chess allows but `moves` doesn't (`onRefused`: a boss power stops it, so the screen can say why; `refusedMove` in
+  logic.ts, worked out only when the board has an `onRefused`; Oct 17), and a knock for every move that appears (`components/Board.tsx` plays it).
 - **How it behaves** (`board/OwnBoard.tsx`, its pure logic in `board/logic.ts`):
   - **Feel:** a move slides 220 ms on a cubic ease in and out (`SLIDE_MS`); a captured piece fades as the taker slides
     on; a press becomes a drag at 3 px (`DRAG_DISTANCE_PX`), and after a dragged move the next drag starts at once;
-    a dragged piece's center follows the finger; a drop lands at once; a drop where it can't go goes straight back.
+    a dragged piece's center follows the finger; a drop lands at once; a drop where it can't go goes straight back
+    (a legal one a power stops, by a drop or a tap-tap, tells the screen: `onRefused`).
     A tap-tap move is made as the second press goes down. A touch on a piece, near one or with one selected doesn't
     scroll the page; one on an empty stretch with nothing selected still can.
   - **A move you make** stays on the board until the game next tells the board anything (as the old board's did): a
@@ -91,7 +93,8 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   what each lets go of; the move dots, a power's moves and Hollow's dark; which piece slides where, a capture's fade,
   castling, a promotion; Chess960's castling: the dots, both gestures, a swap, the king or rook already on its square,
   a screen's limited moves, tap and drag, both pieces sliding, normal castling untouched; arrows), `board-view.test.ts`,
-  `pieces.test.ts` (the pieces' files, sources and license).
+  `pieces.test.ts` (the pieces' files, sources and license), `refused.test.ts` (a legal move a power refuses: found
+  for a capture or a promotion, never for an allowed one or a turn nothing limits; the dock's words for it).
 - e2e: every test that touches the board finds its parts through `BOARD_SEL` in `e2e/helpers.ts`. `e2e/perf.spec.ts`
   checks the board isn't drawn every frame while Jefferson's Roman candle plays over it (`hbDraws`).
   `e2e/castling.spec.ts` castles by tap-tap and drag, normal chess and Chess960 (both gestures).
