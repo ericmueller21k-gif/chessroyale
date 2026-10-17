@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CRATES_FREE } from "@chessroyale/core";
 import { SQUADS_PROTOCOL, type PartyServerMessage } from "@chessroyale/chess/squads";
 import { Matchmaker, type PlayAnswer } from "../src/matchmaker.ts";
@@ -17,13 +17,18 @@ import { library } from "./squads-fixture.ts";
  * placements and rewards land in the database.
  */
 
-/** Squads lobbies by code, each the real lobby logic (no Durable Object), as the matchmaker sees them. */
+/**
+ * Squads lobbies by code, each the real lobby logic (no Durable Object), as the matchmaker sees them. `throwNext`: how
+ * many of the next creates throw instead, as a call to an object that's being reset does.
+ */
 function squadsLobbies() {
   const lobbies = new Map<string, SquadsCore>();
-  const ns = {
+  const L = { lobbies, ns: {} as unknown, throwNext: 0 };
+  L.ns = {
     idFromName: (name: string) => name,
     get: (code: string) => ({
       async create(c: string, opts: { fillAt: number | null; reserve?: { size: number; pass: string }[]; reserveMs?: number }) {
+        if (L.throwNext > 0 && L.throwNext--) throw new Error("Network connection lost.");
         if (lobbies.has(c)) return false;
         const core = new SquadsCore(newSquadsRecord(c, Date.now(), 1, { auto: true, fillAt: opts.fillAt }), {}, { now: () => Date.now(), send: () => undefined }, library);
         lobbies.set(c, core);
@@ -34,7 +39,7 @@ function squadsLobbies() {
       },
     }),
   };
-  return { lobbies, ns };
+  return L;
 }
 
 class TestMatchmaker extends Matchmaker {
@@ -76,6 +81,29 @@ describe("the Squads queue", () => {
     expect(inFirst).toBe(6);
     expect(elsewhere).toHaveLength(1);
     expect(L.lobbies.size).toBe(2);
+  });
+
+  it("a new lobby that throws after the filling one took what fits: those keep their seats, the rest go back in line and are seated next, each party once", async () => {
+    const L = squadsLobbies();
+    const mm = matchmaker(L.ns);
+    const code = codeOf(await squadPlay(mm, 4, "p0"))!;
+    // Eight parties of 4: the filling lobby has 7 squads left; the eighth needs a new lobby, whose create throws.
+    L.throwNext = 1;
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const answers = await Promise.all(Array.from({ length: 8 }, (_, i) => squadPlay(mm, 4, `x${i}`)));
+    logged.mockRestore();
+    expect(answers.slice(0, 7).every((a) => codeOf(a) === code)).toBe(true);
+    const last = answers[7]!;
+    expect(last).toMatchObject({ busy: true, position: 1 });
+    expect(L.lobbies.size).toBe(1);
+    // Asking again: a lobby of its own; the first still holds its 8 parties, each party in one lobby.
+    const again = await mm.next({}, 60_000, { squads: true }, last.ticket, { size: 4, pass: "x7" });
+    expect(again.ticket).toBe(last.ticket);
+    const other = codeOf(again)!;
+    expect(other).not.toBe(code);
+    const passes = (c: string) => Object.values(L.lobbies.get(c)!.record.parties).map((x) => x.pass).sort();
+    expect(passes(code)).toEqual(["p0", "x0", "x1", "x2", "x3", "x4", "x5", "x6"]);
+    expect(passes(other)).toEqual(["x7"]);
   });
 
   it("a party's members join with its pass and play in one squad", async () => {

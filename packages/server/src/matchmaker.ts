@@ -137,7 +137,11 @@ export class Matchmaker extends DurableObject<Env> {
     let held = false;
     this.forming = this.form()
       .then((h) => void (held = h))
-      .catch((e: unknown) => serverError(this.env, { kind: "Matchmaker.form", route: "Matchmaker.form" }, e, (p) => this.ctx.waitUntil(p)))
+      .catch((e: unknown) => {
+        // (Anything that escapes a batch waits like one held back, never a retry at once: it can't spin.)
+        held = true;
+        this.formFailed(e);
+      })
       .finally(() => {
         this.forming = null;
         if (!this.q.waiting) return;
@@ -160,18 +164,40 @@ export class Matchmaker extends DurableObject<Env> {
     return this.players.n;
   }
 
-  /** Seats everyone admissible, in batches, until the line is empty (false) or held back (true). */
+  /**
+   * Seats everyone admissible, in batches, until the line is empty (false) or held back (true). A seating that fails
+   * (a lobby or game that couldn't be opened, or a call that threw) stops the batch: everyone in it still being seated
+   * goes back to the front of the line, in order (anyone placed already keeps their seat), and the next batch tries
+   * again after formEveryMs, or sooner if someone asks (docs/decisions/2026-10-17-seating-throw-puts-back.md).
+   */
   private async form(): Promise<boolean> {
     for (;;) {
       const now = Date.now();
       const groups = this.q.admit(now, await this.playersNow(now), this.lobbyOptions.duel ? PAIR_BY_RATING : this.rules);
       if (!groups.length) return this.q.waiting > 0;
       countCall("mm.batch");
-      for (const g of groups) if (!(await this.seat(g.key, g.tickets))) return true;
+      for (const g of groups) {
+        const seated = await this.seat(g.key, g.tickets).catch((e: unknown) => {
+          countCall("mm.seatThrew");
+          this.formFailed(e);
+          return false;
+        });
+        if (!seated) {
+          this.q.putBack(groups.flatMap((x) => x.tickets));
+          return true;
+        }
+      }
     }
   }
 
-  /** Seats a group: the seats left in its filling lobby first, then new lobbies. */
+  private formFailed(e: unknown) {
+    serverError(this.env, { kind: "Matchmaker.form", route: "Matchmaker.form" }, e, (p) => this.ctx.waitUntil(p));
+  }
+
+  /**
+   * Seats a group: the seats left in its filling lobby first, then new lobbies. False: not all of them (form puts the
+   * rest back).
+   */
   private async seat(key: string, tickets: Ticket[]): Promise<boolean> {
     if (this.lobbyOptions.squads) return this.seatSquads(key, tickets);
     if (this.lobbyOptions.duel) return this.seatDuel(tickets);
@@ -215,7 +241,6 @@ export class Matchmaker extends DurableObject<Env> {
       if (!fresh || !granted) {
         // Couldn't open one: they wait in line for the next batch.
         countCall("mm.createFailed");
-        this.q.putBack(rest);
         return false;
       }
       this.current.set(key, fresh);
@@ -254,7 +279,6 @@ export class Matchmaker extends DurableObject<Env> {
       const placed = fresh && took ? rest.filter((_, i) => (took as number[]).includes(i)) : [];
       if (!fresh || !placed.length) {
         countCall("mm.createFailed");
-        this.q.putBack(rest);
         return false;
       }
       this.current.set(key, fresh);
@@ -267,7 +291,7 @@ export class Matchmaker extends DurableObject<Env> {
 
   /**
    * Ranked 1 v 1: a pair gets a game of its own, colors drawn at random. A game that couldn't be opened puts them back
-   * in line for the next batch.
+   * in line for the next batch (form does).
    */
   private async seatDuel(tickets: Ticket[]): Promise<boolean> {
     // (Never a game with a seat nobody can take: a ticket without its player is dropped, its partner back in line.)
@@ -277,10 +301,7 @@ export class Matchmaker extends DurableObject<Env> {
       this.q.putBack(whole);
       return true;
     }
-    if (tickets.length !== 2) {
-      this.q.putBack(tickets);
-      return false;
-    }
+    if (tickets.length !== 2) return false;
     const view = (t: Ticket): DuelPlayerView => t.info?.player as DuelPlayerView;
     const [w, b] = crypto.getRandomValues(new Uint8Array(1))[0]! & 1 ? [tickets[1]!, tickets[0]!] : [tickets[0]!, tickets[1]!];
     const testSeconds = [w, b].map((t) => Number(t.info?.testSeconds)).find((x) => Number.isFinite(x) && x > 0) ?? null;
@@ -288,7 +309,6 @@ export class Matchmaker extends DurableObject<Env> {
     const code = await openLobbyCode(async (c) => this.env.DUELS.get(this.env.DUELS.idFromName(c)).create(c, { w: view(w), b: view(b) }, { testSeconds }));
     if (!code) {
       countCall("mm.createFailed");
-      this.q.putBack(tickets);
       return false;
     }
     this.placeAll(tickets, code);
