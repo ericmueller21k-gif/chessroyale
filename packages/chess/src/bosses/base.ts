@@ -229,7 +229,7 @@ export interface BossRules {
    * Which of its powers stops `move` now, either side (for the screens' words: a refused move of yours, the boss's only
    * move through it), or null. It reads only fields the screens' view carries too (`StopFields`), so the app asks it.
    */
-  stopReason?(boss: { powers?: StopFields | null }, move: string, fen: string): StopReason | null;
+  stopReason?(boss: { powers?: StopFields | null }, fen: string, move: string): StopReason | null;
   /** A power touches this crowd turn: its picks don't count as fair-play signals. */
   powerTurn?(boss: BossState): boolean;
   /** The squares that show ice (`crowdAllowed`: the dispatcher's). */

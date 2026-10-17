@@ -27,8 +27,9 @@ function fakeEngine(): EngineLike {
         .sort((a, b) => b.expected - a.expected)
         .slice(0, n),
     scoreMoves: async (fen, moves) => [...new Set(moves)].sort().map((move) => ({ move, expected: score(fen, move) })),
-    // (A position's worth at a budget, as the bounce and Wrangler's searches ask: quick, a hash of the position.)
-    topMovesAt: async (fen) => [{ move: "0000", expected: 0.3 + 0.4 * hash(fen) }],
+    // (A position's worth at a budget, as the bounce and Wrangler's searches ask: quick, a hash of the position. Its
+    // move, a legal one, is Wrangler's reply after his duel: bossMoveFrom checks it.)
+    topMovesAt: async (fen) => [{ move: legalMoves(fen)[0] ?? "0000", expected: 0.3 + 0.4 * hash(fen) }],
     playAtElo: async (fen) => {
       const all = legalMoves(fen).sort();
       return all.find((m) => isKnight(fen, m) && empty(fen, m)) ?? all[0]!;

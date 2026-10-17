@@ -6,6 +6,7 @@ import {
   applyMove,
   bossAllowed,
   bossMoveFrom,
+  brainLine,
   crossesMiddle,
   crowdAllowed,
   initPowers,
@@ -13,6 +14,7 @@ import {
   sanLineToUci,
   stopReason,
   type BossMoveKind,
+  type BrainNote,
   type EngineLike,
   type HumanAnswer,
   type HumanEngineLike,
@@ -199,11 +201,40 @@ describe("the last checks: a wrong pick never lands", () => {
     expect(error).toHaveBeenCalledWith(expect.stringContaining("boss move refused: e2e4"));
     // Maia, no guard, naming a move that isn't legal here.
     error.mockClear();
-    const maia = await bossMoveFrom(lovingEngine([]), AFTER_E4, 1500, 1000, "elo", mulberry32(1), [5, 15], DEFAULT_BOSS_GUARD, null, { brain: "maia-raw", rating: 1500, engine: stubbornMaia(["e1g1"]) });
+    const notes: BrainNote[] = [];
+    const maia = await bossMoveFrom(lovingEngine([]), AFTER_E4, 1500, 1000, "elo", mulberry32(1), [5, 15], DEFAULT_BOSS_GUARD, null, { brain: "maia-raw", rating: 1500, engine: stubbornMaia(["e1g1"]), onNote: (n) => notes.push(n) });
     expect(legalMoves(AFTER_E4)).toContain(maia);
     expect(error).toHaveBeenCalledWith(expect.stringContaining("boss move refused: e1g1"));
     // The best legal one: the engine's top move.
     expect(maia).toBe((await lovingEngine([]).topMoves(AFTER_E4, 1))[0]!.move);
+    // The admins' debug line says the pick was replaced, not that Maia's move was played.
+    expect(notes.map((n) => n.by)).toEqual(["maia", "stockfish"]);
+    expect(brainLine(notes.at(-1)!)).toBe("Maia 1500 · no guard · pick replaced (not allowed)");
+  });
+
+  /** A stand-in Stockfish whose limited-strength answer is for another position (e2e4, Black to move), and then: */
+  const staleEngine = (then: "throws" | "names it again"): EngineLike => {
+    const base = lovingEngine([], { eloMove: "e2e4" });
+    return {
+      ...base,
+      // (bossMoveFrom's own fallback, his best allowed move, asks for one line: that fails too.)
+      topMovesAt: async (fen, n) => {
+        if (then === "throws") throw new Error("engine gone");
+        return [{ move: "e2e4", expected: 0.99 }, ...(await base.topMoves(fen, n))];
+      },
+      // (It scores a move it wasn't asked about, the stale one, above the rest.)
+      scoreMoves: async (fen, moves) => [{ move: "e2e4", expected: 0.99 }, ...(await base.scoreMoves(fen, moves)).filter((m) => m.move !== "e2e4")],
+    };
+  };
+
+  it("bossMoveFrom: its fallback failing too (the engine throws, or names a move he may not play) still ends on one he may: the first", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const then of ["throws", "names it again"] as const) {
+      error.mockClear();
+      const move = await bossMoveFrom(staleEngine(then), AFTER_E4, 1500, 1000, "elo", mulberry32(1), [5, 15], DEFAULT_BOSS_GUARD, null);
+      expect(move, then).toBe(legalMoves(AFTER_E4)[0]);
+      expect(error, then).toHaveBeenCalledWith(expect.stringContaining("boss move refused: e2e4"));
+    }
   });
 
   it("the runner's applyBossMove: a move across the saw (a host out of date, or tampered with) is logged and the first allowed one played", () => {

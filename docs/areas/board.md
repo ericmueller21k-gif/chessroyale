@@ -16,7 +16,7 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   whose-turn locking (`interactive`, `moves`), the promotion picker, arrows with labels (power-up hints, the Last
   Stand's, Squads' picks and blocks), square marks (`marks`), Hollow's dark (`dark`, `onDarkTry`), a move tried that
   chess allows but `moves` doesn't (`onRefused`: a boss power stops it, so the screen can say why; `refusedMove` in
-  logic.ts; Oct 17), and a knock for every move that appears (`components/Board.tsx` plays it).
+  logic.ts, worked out only when the board has an `onRefused`; Oct 17), and a knock for every move that appears (`components/Board.tsx` plays it).
 - **How it behaves** (`board/OwnBoard.tsx`, its pure logic in `board/logic.ts`):
   - **Feel:** a move slides 220 ms on a cubic ease in and out (`SLIDE_MS`); a captured piece fades as the taker slides
     on; a press becomes a drag at 3 px (`DRAG_DISTANCE_PX`), and after a dragged move the next drag starts at once;

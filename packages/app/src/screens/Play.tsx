@@ -299,9 +299,10 @@ export function PlayScreen({
               // A move of yours a power refused: why, the dock's whole line for a moment (refused.ts; the box around
               // it is the dock's live region, read out as it changes).
               <span class="refused-note">{refusedNow}</span>
-            ) : through && hint === null && !barred ? (
+            ) : through && hint === null && !barred && !match.boss.staggerNext ? (
               // The boss's only move went through a power: said through your turn, in place of "Your move." (as the
-              // duel's line is), so it's whole on a narrow phone.
+              // duel's line is), so it's whole on a narrow phone. Until the God King's strike lands: then "Your move.
+              // Boss staggered.", the newer news (there's no room for both at 320 px).
               <span class="through-note">{through}</span>
             ) : (
               <span>

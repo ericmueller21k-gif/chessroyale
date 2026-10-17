@@ -1839,7 +1839,8 @@ function pickByLoss(top: readonly MoveScore[], range: readonly [number, number],
  * duel) is the engine's best move at full strength (bestReplyFrom): never the brain's, a slip or the guard's.
  *
  * Whichever of those picks it, the move is one of `allowed` (the moves the powers leave him; null: any legal move): a
- * pick that isn't (an engine's answer for another position, say) is logged and his best allowed move played instead.
+ * pick that isn't (an engine's answer for another position, say) is logged and his best allowed move played instead
+ * (the first allowed one if that search fails too), and the admins' debug line says it was replaced.
  */
 export async function bossMoveFrom(
   engine: EngineLike,
@@ -1857,7 +1858,15 @@ export async function bossMoveFrom(
   const ok = allowed ?? legalMoves(fen);
   if (ok.includes(move)) return move;
   console.error(`boss move refused: ${move} isn't one he may play in ${fen}; his best allowed move instead`);
-  return bestReplyFrom(engine, fen, nodes, ok);
+  // (The admins' debug line: the pick it named was replaced, whoever's it was.)
+  brain?.onNote?.({ brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { share: brain.stockfishShare } : {}), by: "stockfish", why: "replaced" });
+  // (The engine that gave the wrong pick may fail again: if it throws, or names a move outside them, the first allowed.)
+  try {
+    const best = await bestReplyFrom(engine, fen, nodes, ok);
+    return ok.includes(best) ? best : ok[0]!;
+  } catch {
+    return ok[0]!;
+  }
 }
 
 /** The boss's move as its brain, the slips, the strike or the engine's best pick it (bossMoveFrom checks it). */

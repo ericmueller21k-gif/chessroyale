@@ -76,7 +76,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
     (or no escape from check) lifts for that turn. The king is never frozen. The boss too (Eric, Oct 17: Sawyer's queen
     crossed his own board saw, his only way out of a knight's check): the move is marked (`lastMove.through`, a
     `StopReason`, from `applyBossMove`) and your turn's dock says so in place of "Your move." ("His only move: across
-    the saw.").
+    the saw."), until the God King's strike lands that turn: then "Your move. Boss staggered." (no room for both).
   - **A move a power refuses says why** (Oct 17; docs/decisions/2026-10-17-power-limits-said-on-screen.md): a move
     legal in chess that the turn doesn't allow (across the saw, onto a pie, through a toy block, a frozen piece, the
     move the God King took back) stays put, as before, and the dock says why in place of "Your move." for 3 s
@@ -85,8 +85,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
     (`REFUSED`, `THROUGH`), which power by `BossRules.stopReason` (`stopReason` in `boss-powers.ts`: Sawyer, Boingo,
     Big Boy; it reads only fields the screens' view has too).
   - **Whichever brain picks it, the boss's move is one his powers allow:** every path picks from the allowed moves,
-    `bossMoveFrom` checks its own pick (else his best allowed move, logged) and `applyBossMove` checks what's played
-    (else the first allowed, logged). Every power × brain path: `packages/chess/test/boss-power-legal.test.ts`.
+    `bossMoveFrom` checks its own pick (else his best allowed move, logged; the first allowed if that search fails
+    too) and `applyBossMove` checks what's played (else the first allowed, logged). Every power × brain path: `packages/chess/test/boss-power-legal.test.ts`.
   - Looking back through the moves (the history view) draws no power's marks but Hollow's dark: a past move shows
     without the saw, the pies or the ice it was played under (Oct 17: a gap, listed in the decision above).
   - The judge plays by the same rules: the best move is the best of the allowed ones.
@@ -542,7 +542,9 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 - e2e: `e2e/pig.spec.ts` (Wrangler: the long pull, a drag, his meter's line and ready loop, a showdown with no warning,
   its forced duel and his reply (the engine's best), phone and computer, solo and online; the admins' trigger),
   `e2e/sawyer.spec.ts` "Sawyer's board saw on Maia" (his five replies under the saw never across it, a move of yours
-  across it refused with the dock's words), `e2e/boss-powers.spec.ts` "Boingo's funhouse at every angle" (a move by tap and by drag, touch on the phone, at
+  across it refused with the dock's words) and "Sawyer's board saw lifted for his only move" (Eric's position set on
+  the runner: Qxb7 refused, Nf6+, his Qxf6 across the saw, and "His only move: across the saw." on every frame of your
+  turn, whole at 320 px), `e2e/boss-powers.spec.ts` "Boingo's funhouse at every angle" (a move by tap and by drag, touch on the phone, at
   0°, 180°, 90° and 270°; the coordinates and pies on their squares at each), `e2e/king-attack.spec.ts` (Hollow's mate and his attack in the Last Stand, every frame), `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `sawyer.spec.ts`, `boss-character.spec.ts`,
   `boss-speech.spec.ts` (one moment of each boss: its line held whole and in view for its full time, every frame, and
   gone on time),

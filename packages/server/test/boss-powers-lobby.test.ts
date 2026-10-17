@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BOSS_BANNER, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, type Settings } from "@chessroyale/core";
 import { FIRE_BURN_MS, POWER_FX, applyMove, bossMoveFrom, bossShowMs, dragOptions, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
+
+afterEach(() => vi.restoreAllMocks());
 
 const hash = (s: string) => {
   let h = 2166136261;
@@ -816,7 +818,6 @@ describe("Sawyer online", () => {
     expect(b.boss.board.lastMove).toBe(req.allowed![0]);
     expect(b.boss.lastMove!.through).toBeUndefined();
     expect(error).toHaveBeenCalledWith(expect.stringContaining(`boss move refused: ${across}`));
-    error.mockRestore();
   });
 
   it("the admins' trigger: the board saw as the next crowd turn begins, without the warning", () => {

@@ -57,8 +57,8 @@ type Promotion = { from: string; to: string; dark?: boolean };
 interface BoardActs {
   move(uci: string): void;
   darkTry(uci: string): void;
-  /** A legal move that `moves` doesn't allow, tried (onRefused). */
-  refused(uci: string): void;
+  /** A legal move that `moves` doesn't allow, tried: the board's onRefused (none: nothing to work out). */
+  refused: { current?: (uci: string) => void };
   promote(p: Promotion): void;
   selectDark(sq: string | null): void;
   /** The move you made, while it's shown (OwnBoard clears it). */
@@ -100,7 +100,7 @@ export function OwnBoard(props: BoardProps) {
   // A new position or the dark changing: no dark square stays selected.
   useLayoutEffect(() => setDarkSel(null), [fen, dark?.join(), interactive]);
 
-  const acts = useMemo<BoardActs>(() => ({ move: (uci) => onMoveRef.current?.(uci), darkTry: (uci) => onDarkRef.current?.(uci), refused: (uci) => onRefusedRef.current?.(uci), promote: setPromotion, selectDark: setDarkSel, local }), []);
+  const acts = useMemo<BoardActs>(() => ({ move: (uci) => onMoveRef.current?.(uci), darkTry: (uci) => onDarkRef.current?.(uci), refused: onRefusedRef, promote: setPromotion, selectDark: setDarkSel, local }), []);
   // (The same element while nothing it shows has changed: Preact leaves it, and everything in it, alone.)
   const layer = useMemo(
     () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} acts={acts} />,
@@ -277,8 +277,10 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   /** A move tried that chess allows but `moves` doesn't (a boss power stops it): it stays put, and the screen says why. */
   const refusedTry = (from: string, to: string) => {
     const s = live.current;
-    const move = canAct && !s.darkList.length ? refusedMove(s.fen, moves, from, to) : null;
-    if (move) acts.refused(move);
+    const onRefused = acts.refused.current;
+    if (!onRefused || !canAct || s.darkList.length) return;
+    const move = refusedMove(s.fen, moves, from, to);
+    if (move) onRefused(move);
   };
 
   const boxOf = (): Box => {

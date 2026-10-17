@@ -85,7 +85,7 @@ moves your piece), Hollow's dark (an attempt into it goes unchecked and costs a 
 - **The words name the power, in the dock's status line** (where Hollow's dark-try note is: the pattern already there
   for a refused attempt). No flash on the board: less code, nothing to watch frame by frame, and the saw is already
   drawn. Three seconds, like Squads' block lines (2.6 s), rounded up for reading. The lift's note stays the whole
-  turn: it explains the position on the board.
+  turn (it explains the position on the board), unless the God King's strike lands in it (below).
 - **Each is the dock's whole line, not a note after "Your move."** At 320 px the dock's text has 112 px; beside "Your
   move." every line was cut by its two-line clamp (measured). Alone, each is whole at 320, 360 and 390 px, in normal
   weight (in bold "The God King took that move back." took a third line). The lift's words are short for that ("His
@@ -98,3 +98,38 @@ moves your piece), Hollow's dark (an attempt into it goes unchecked and costs a 
   board's history (only the current ones are known now), across every boss's layer. That's a change of its own.
   Proposal: keep a small record per crowd turn (the cut, the saw, pies, blocks, ice) beside the board's bases, and draw
   it while browsing.
+
+## After the review (Oct 17)
+
+The independent review found the cause sound and no blockers. Its smaller points, and what each became:
+
+- **"Boss staggered." wins over the lift's note.** The note replaced "Your move." and so hid "Boss staggered." on a
+  turn with both. There's no room for both at 320 px (the note alone fills the dock's two lines), so one shows: the lift's
+  note until the God King's strike lands, then "Your move. Boss staggered." (`!staggerNext` on the note in Play.tsx).
+  Simplest, and nothing is lost: a strike is called only during your turn (solo's and the lobby's `callStrike` take it
+  only in the crowd's play phase), so the note has been on screen since the turn began, and the stagger is the newer news.
+- **The last check's own fallback can't fail.** `bossMoveFrom` asks the same engine for his best allowed move after a
+  wrong pick; if that throws, or names a move outside them, the first allowed move is played (the same as
+  `applyBossMove`). Tested with an engine that throws, and one that scores a move it wasn't asked about.
+- **The admins' debug line says when the last check replaced the pick.** It credited Maia (her note came before the
+  check). Now a second note follows: "Maia 600 · no guard · pick replaced (not allowed)" (`why: "replaced"`). The sims
+  count that move as Stockfish's, which it is.
+- **One argument order for `stopReason`:** `(boss, fen, move)` for `BossRules.stopReason` too, as the dispatcher's
+  `stopReason` and `crowdMayPlay` have it.
+- **The FAQ names every power the lift covers:** "when Sawyer's saw or cut, a pie or a toy block stops every move he has".
+- **The board looks for a refused move only when its screen listens** (`onRefused` set: boss battles).
+- **Tests:** a deterministic e2e of the lift ("Sawyer's board saw lifted for his only move", `e2e/sawyer.spec.ts`):
+  Eric's position (the move before his Nf6+) set on the solo runner through `window.match` (`?debug`, an existing
+  test switch: no new one), as the unit test sets it; the crowd Black, the same position with the colors swapped.
+  Qxb7 refused with its words; Nf6+ by taps; his Qxf6; then every frame of your turn shows "His only move: across the
+  saw." alone and whole, at 320 px on the phone. Until now the Maia test met the lift only if a random reply did.
+  The rage test's stand-in engine names a legal move, so Wrangler's reply after his duel is played as on main and
+  nothing is logged; the lobby test restores its spies after each test.
+
+## Follow-ups
+
+- **Your own lifted move isn't said.** A power lifts for you too when it stops every move you have (say, your only
+  way out of check), and nothing on screen says so: a move across the saw simply goes. Proposal: the same words for
+  your side in the dock as your move lands ("Your only move: across the saw."), from the crowd move's `through` the
+  way `applyBossMove` marks his. Not built in this PR.
+- **The history view's gap** (above): a past move's powers aren't drawn.

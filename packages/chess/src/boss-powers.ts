@@ -188,7 +188,7 @@ export const crowdMayPlay = (boss: BossState | null | undefined, fen: string, mo
  * words, or null. The match's state and the screens' view alike (the fields it reads are the same in both).
  */
 export function stopReason(boss: { id?: string; powers?: StopFields | null } | null | undefined, fen: string, move: string): StopReason | null {
-  return boss?.powers ? (bossRules(boss)?.stopReason?.(boss, move, fen) ?? null) : null;
+  return boss?.powers ? (bossRules(boss)?.stopReason?.(boss, fen, move) ?? null) : null;
 }
 
 /**
