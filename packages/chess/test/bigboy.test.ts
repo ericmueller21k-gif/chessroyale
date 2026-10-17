@@ -142,8 +142,9 @@ describe("Big Boy: who he is", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "bigboy")!;
     expect(def).toMatchObject({ name: "Big Boy", icon: "🍭", kit: "Big Boy", powers: { passive: "blocks", ultimate: "bounce" } });
     expect(isPlayable(def)).toBe(true);
-    // (Sawyer has a pawn's head start too: his split pawn; Wrangler's drags and showdown cost the crowd about as much.)
-    const others = BOSS_ROSTER.filter((b) => isPlayable(b) && b.id !== "bigboy" && b.id !== "sawyer" && b.id !== "pig");
+    // (Sawyer has a pawn's head start too: his split pawn; Wrangler's drags and showdown cost the crowd about as much;
+    // Alfil's elephants and Slam move material too, at the same offset: docs/decisions/2026-10-17-alfil-rules.md.)
+    const others = BOSS_ROSTER.filter((b) => isPlayable(b) && b.id !== "bigboy" && b.id !== "sawyer" && b.id !== "pig" && b.id !== "alfil");
     for (const o of others) expect(def.offset).toBeLessThan(o.offset);
   });
 });

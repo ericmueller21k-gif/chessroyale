@@ -191,8 +191,11 @@ describe("resigning online: Crowd 50 v 50 and raids", () => {
   });
 
   it("Bots off (a private raid, people only): a seat goes out, no bot; the crowd's last seat is the exception, so the battle goes on for whoever watches", () => {
-    // Three people; the boss strikes after every crowd move (down to half the crowd: one strike).
-    const L = setup({ ...RAID_SETTINGS, bossKillEvery: 1, lastStandFrom: 999 });
+    // Three people; the boss strikes after every crowd move (down to half the crowd: one strike). Big Boy, picked (it was
+    // the seed's random boss until Alfil joined the roster, Oct 17, and moved the pick): from the starting position, so
+    // the first move's miss is struck at once (from the game so far, the opening allowance covers it, and after it every
+    // seat here misses: a tie, no strike).
+    const L = setup({ ...RAID_SETTINGS, bossId: "bigboy", bossKillEvery: 1, lastStandFrom: 999 });
     join(L, 3);
     L.core.message("p1", { t: "start" });
     L.until(() => L.core.record.phase === "play");
