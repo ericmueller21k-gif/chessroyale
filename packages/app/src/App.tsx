@@ -62,8 +62,8 @@ import { isPaused, pausedBosses } from "./status.ts";
 /**
  * A match's settings: the mode and the choices made on the home screen, plus playtest overrides from the URL, e.g.
  * ?rounds=4&clock=15&draw=weighted (test switches: only for those allowed them, test-switches.ts; else ignored).
- * `matchBoss`: a raid's boss is matched to you (a Solo raid, like an online one), not the one last picked from the boss
- * menu (Boss alone).
+ * `matchBoss`: a Solo raid (you and bots): its strength is matched to you, with no difficulty on top; its boss is the
+ * Boss raid screen's pick, as Boss alone's is.
  */
 function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Settings> {
   const q = testParams();
@@ -87,8 +87,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
           ...RAID_SETTINGS,
           // A step above your rating (a test link's ?boss=<tier> fixes it), plus the boss's own offset.
           bossFixedElo: bossTierFromUrl() || raidBossElo([account().profile?.rating ?? null]),
-          // Boss alone: the boss picked from the menu ("" random); a Solo raid's is random. Random avoids your last.
-          bossId: matchBoss && !bossInUrl() ? "" : chosenBoss(hidden),
+          // Boss alone and a Solo raid: the boss picked on the Boss raid screen ("" random). Random avoids your last.
+          bossId: chosenBoss(hidden),
           ...(hidden ? { bossHidden: true } : {}),
           // Boss alone: the difficulty chosen next to the boss picker (Easy to Hardest) on top of that strength.
           bossDifficulty: matchBoss || bossTierFromUrl() ? 0 : difficultyElo(),

@@ -328,7 +328,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
 }
 
 /** A boss's portrait (head and shoulders, from its drawing), for banners and its entrance card; else its emoji. */
-export function BossFace({ boss, class: cls = "" }: { boss: Pick<BossView, "name" | "icon">; class?: string }) {
+export function BossFace({ boss, class: cls = "", label }: { boss: Pick<BossView, "name" | "icon">; class?: string; /** Its name for a screen reader (the boss's own unless given; "": none, its button names it). */ label?: string }) {
   const kit = bossKit(boss.name);
   const cv = useRef<HTMLCanvasElement>(null);
   useLayoutEffect(() => {
@@ -338,7 +338,7 @@ export function BossFace({ boss, class: cls = "" }: { boss: Pick<BossView, "name
     cv.current.getContext("2d")?.putImageData(frameImage(kit.ch, frame), -p.x, -p.y, p.x, p.y, p.w, p.h);
   }, [kit]);
   if (!kit) return <>{boss.icon}</>;
-  return <canvas ref={cv} class={`boss-portrait ${cls}`} width={kit.portrait.w} height={kit.portrait.h} role="img" aria-label={boss.name} />;
+  return <canvas ref={cv} class={`boss-portrait ${cls}`} width={kit.portrait.w} height={kit.portrait.h} {...(label === "" ? { "aria-hidden": "true" } : { role: "img", "aria-label": label ?? boss.name })} />;
 }
 
 /**

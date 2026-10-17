@@ -1206,6 +1206,13 @@ export const FRONT_DOOR = {
   percentileMinPlayers: 10,
   /** The rank ladder (RATING_RANKS) a rating is named by. */
   ratingRanks: RATING_RANKS,
+  /**
+   * Home's Boss raid card (Eric, Oct 16): its still portrait moves on to the next playable boss this often (never the
+   * Hidden Boss), with a fade of `bossCardFadeMs` (none under reduced motion). Test switch `?cardMs=` (ms) for a quicker
+   * one.
+   */
+  bossCardMs: 30_000,
+  bossCardFadeMs: 600,
 } as const;
 
 /**

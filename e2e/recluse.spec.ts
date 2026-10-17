@@ -75,10 +75,10 @@ async function meetHim(page: Page, query = "laststand=0&clock=60") {
   await asAdmin(page);
   // (The menu lists him once your profile says you're an admin: wait for it.)
   const me = page.waitForResponse((r) => r.url().includes("/api/me") && r.request().method() === "GET");
-  await page.goto(`/?debug&${query}`);
+  // (The hidden /bosses: the solo boss picker, where an admin meets him; the Boss raid screen's tile is locked.)
+  await page.goto(`/bosses?debug&${query}`);
   await me;
   await page.waitForTimeout(500);
-  await bossAloneFromHome(page);
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
   await expect(menu).toBeVisible();
   // (After the rest, for an admin.)
@@ -90,8 +90,7 @@ async function meetHim(page: Page, query = "laststand=0&clock=60") {
 test("a player never sees him: not in the boss menu, and ?boss=recluse meets another boss", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
   test.setTimeout(3 * 60_000);
-  await page.goto("/?debug");
-  await bossAloneFromHome(page);
+  await page.goto("/bosses?debug");
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
   await expect(menu).toBeVisible();
   await expect(menu.locator(".boss-row .br-main strong").first()).toBeVisible();
@@ -315,7 +314,7 @@ test("a player in Boss alone never sees Engine move", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   await page.goto("/?debug&laststand=0");
   await bossAloneFromHome(page);
-  await page.getByRole("dialog", { name: "Choose your boss" }).locator(".boss-row").first().click();
+  await page.getByRole("dialog", { name: "Boss alone" }).locator(".boss-row").first().click();
   await yourMove(page);
   await expect(page.locator(".ult-test, .engine-move")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Engine move" })).toHaveCount(0);

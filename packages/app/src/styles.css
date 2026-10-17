@@ -8281,12 +8281,26 @@ button.fd-logo {
 .rd-face .boss-portrait {
   width: 56px;
 }
-.rd-face-big {
-  width: 88px;
-  height: 88px;
+/* The card's portrait: a still that moves on to the next boss (BossCardFace), the new one fading in over the last. */
+.rd-face-stack,
+.rd-face-one {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
 }
-.rd-face-big .boss-portrait {
-  width: 78px;
+.rd-face-one + .rd-face-one {
+  position: absolute;
+  inset: 0;
+}
+.rd-face-in {
+  animation: rd-face-in var(--rd-fade, 600ms) ease-in-out both;
+}
+@keyframes rd-face-in {
+  from {
+    opacity: 0;
+  }
 }
 .rd-card-text {
   display: flex;
@@ -8316,13 +8330,188 @@ button.fd-logo {
   max-width: 560px;
   margin: 0 auto;
 }
-.rd-hero {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.rd-hero .fd-sub {
+.rd-about {
   line-height: 1.4;
+  text-align: center;
+}
+/* The Hidden Boss picked: every way to play grayed out, a small lock by its name. */
+.rd-option.rd-locked:disabled {
+  opacity: 0.4;
+}
+.rd-lock {
+  margin-left: 6px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+/*
+ * -- The Boss raid screen's character select (Eric, Oct 16: SF2 / PlayStation era; bs- for boss select) --
+ * Slanted tiles (parallelograms: clip-path, so nothing sticks out sideways), five to a row on a phone (the second row
+ * centered under the first, staggered), all in one row from 600 px. The picked one gold.
+ */
+.bs-select {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bs-tiles {
+  --bs-gap: 6px;
+  --bs-per: 5;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px var(--bs-gap);
+}
+@media (min-width: 600px) {
+  .bs-tiles {
+    --bs-per: 9;
+  }
+}
+.bs-tile {
+  --bs-slant: 16%;
+  --bs-shape: polygon(var(--bs-slant) 0, 100% 0, calc(100% - var(--bs-slant)) 100%, 0 100%);
+  position: relative;
+  flex: 0 0 calc((100% - (var(--bs-per) - 1) * var(--bs-gap)) / var(--bs-per));
+  max-width: 76px;
+  aspect-ratio: 1 / 0.9;
+  padding: 0;
+  border: 0;
+  background: var(--bs-edge);
+  clip-path: var(--bs-shape);
+  cursor: pointer;
+  transition: transform 80ms;
+}
+.bs-tile-in {
+  position: absolute;
+  inset: 3px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  clip-path: var(--bs-shape);
+  background: linear-gradient(160deg, var(--bs-fill-hi), var(--bs-fill));
+}
+.bs-tile .boss-portrait {
+  width: 66%;
+}
+.bs-tile.on {
+  background: var(--fd-gold);
+}
+.bs-tile.on .bs-tile-in {
+  background: linear-gradient(160deg, var(--fd-gold-soft), var(--bs-fill));
+}
+.bs-tile:active {
+  transform: scale(0.95);
+}
+/* The Hidden Boss's tile: dark, his portrait a silhouette edged in violet. */
+.bs-tile.bs-locked .bs-tile-in {
+  background: #0b0a10;
+}
+.bs-shadow {
+  filter: brightness(0) drop-shadow(0 0 1px #6a46c4);
+}
+.bs-q {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--fd-gold-text);
+}
+:root {
+  --bs-edge: #3d4453;
+  --bs-fill: #1b1e25;
+  --bs-fill-hi: #2a2f3a;
+}
+:root[data-theme="light"] {
+  --bs-edge: #c9c3b7;
+  --bs-fill: #e3dfd6;
+  --bs-fill-hi: #f6f3ee;
+}
+/* The stage: the picked boss on the 1 v 1 stage's platform (dv-st-plat), in his idle; his name and strength under it. */
+.bs-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.bs-spot {
+  position: relative;
+  width: min(100%, 280px);
+  aspect-ratio: 124 / 96;
+  container-type: inline-size;
+}
+.bs-spot::before {
+  content: "";
+  position: absolute;
+  inset: -4% 10% 4%;
+  border-radius: 50% 50% 46% 46%;
+  background: radial-gradient(ellipse 50% 58% at 50% 72%, var(--dv-light), transparent 72%);
+}
+.bs-stage .dv-st-plat::after {
+  opacity: var(--fd-shadow, 0.35);
+}
+.bs-spot .bs-fig {
+  bottom: 12%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  pointer-events: none;
+}
+/* (Its place and size from BossSelect's placeOnStage: one pixel size for all, its foot on the platform's middle.) */
+.bs-sprite {
+  position: absolute;
+  bottom: 0;
+  display: block;
+  height: auto;
+  max-width: none;
+  image-rendering: pixelated;
+}
+.bs-q-big {
+  font-size: 120px;
+  color: var(--fd-sub);
+  opacity: 0.5;
+}
+/* The Hidden Boss on the stage: a silhouette, all dark, edged in violet. */
+.bs-dark .bs-sprite {
+  filter: brightness(0) drop-shadow(0 0 3px rgba(122, 79, 208, 0.9));
+}
+/* Its words: a room over the stage (three lines of the bubble), the bubble at its foot, centered, over the stage's empty
+   top a little. */
+.bs-say {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 62px;
+  margin-bottom: -26px;
+}
+.bs-say .bs-bubble {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  max-width: min(100%, 300px);
+}
+.bs-id {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 48px;
+}
+.bs-name {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.15;
+}
+.bs-rating {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fd-sub);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bs-fig,
+  .rd-face-in {
+    animation: none;
+  }
 }
 .rd-options {
   display: flex;

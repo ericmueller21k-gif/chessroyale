@@ -17,8 +17,8 @@ const b = await chromium.launch();
 const w = Number(widthArg);
 const p = await b.newPage(w ? { viewport: { width: w, height: w < 800 ? 760 : 800 }, deviceScaleFactor: w < 800 ? 2 : 1, isMobile: w < 800, hasTouch: w < 800 } : { ...devices["iPhone 13"] });
 p.on("pageerror", (e) => console.log("pageerror", e.message));
-await p.goto(url + "?debug&clock=30&nolanding");
-await p.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+// (The hidden /bosses: the solo boss picker at once, every boss by name.)
+await p.goto(url + "bosses?debug&clock=30&nolanding");
 await p.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: new RegExp(bossName) }).click();
 for (let i = 0; i < 200; i++) {
   if ((await p.evaluate(() => window.match?.phase.kind)) === "play") break;

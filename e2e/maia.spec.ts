@@ -51,8 +51,8 @@ test("an admin's Brain picker: Ginger on Maia with the full guard, on a phone; M
   const maiaFiles: string[] = [];
   page.on("request", (r) => r.url().includes("/engine/maia/") && maiaFiles.push(new URL(r.url()).pathname));
   await page.goto("/?debug&clock=40&bossMoves=6&laststand=0");
-  await bossAloneFromHome(page);
-  const menu = page.getByRole("dialog", { name: "Choose your boss" });
+  await bossAloneFromHome(page, "Ginger");
+  const menu = page.getByRole("dialog", { name: "Boss alone" });
   const brain = menu.getByRole("combobox", { name: "Boss brain (testing)" });
   await expect(brain).toBeVisible();
   // (Each boss's own is the default: Ginger's is Maia, no guard.)
@@ -284,8 +284,8 @@ test("players meet Maia too (forPlayers on): no Brain picker and no debug line; 
   const maiaFiles: string[] = [];
   page.on("request", (r) => r.url().includes("/engine/maia/") && maiaFiles.push(r.url()));
   await page.goto("/?debug&clock=40&bossMoves=6&laststand=0");
-  await bossAloneFromHome(page);
-  const menu = page.getByRole("dialog", { name: "Choose your boss" });
+  await bossAloneFromHome(page, "Ginger");
+  const menu = page.getByRole("dialog", { name: "Boss alone" });
   await expect(menu.getByRole("button", { name: /Ginger/ })).toBeVisible();
   await expect(menu.getByRole("combobox", { name: "Boss brain (testing)" })).toHaveCount(0);
   await menu.getByRole("button", { name: /Ginger/ }).click();
