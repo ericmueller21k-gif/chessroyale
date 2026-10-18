@@ -1,7 +1,7 @@
 /**
- * The hopper (a working name: the boss's name isn't decided yet): a brown rabbit riding a grasshopper, two friends
- * drawn as one figure (Eric, Oct 18: "a cute rabbit and grasshopper, they are friends. Just one sprite"). After Eric's
- * simple reference for the shapes: the rabbit, cream chest and cotton tail, sits up on the grasshopper's back holding
+ * Chub & Chirp (`hopper` in code): Chub, a brown rabbit, riding Chirp, a grasshopper, two friends drawn as one figure
+ * (Eric, Oct 18: "a cute rabbit and grasshopper, they are friends. Just one sprite"). After Eric's simple reference
+ * for the shapes: the rabbit, cream chest and cotton tail, sits up on the grasshopper's back holding
  * brown reins tied to a gold ring at its cheek; the grasshopper has a big black eye, long antennae and jointed legs.
  * From his detailed reference, flavor only: the rabbit's green scarf blowing back (a gold clasp) and a small brown
  * satchel, and a small brown saddle. Drawn side on, facing our left (as Alfil and Sawyer), light from the top left.
@@ -53,7 +53,8 @@ export const HOPPER_PALETTE: Record<string, string> = {
 
 type Pt = readonly [number, number];
 type Inside = (x: number, y: number) => boolean;
-type Key = (x: number, y: number) => string;
+/** A pixel's color from its drawing point (x, y) and its scene pixel (X, Y), for patterns kept even in the scene. */
+type Key = (x: number, y: number, X: number, Y: number) => string;
 const GREEN = "abcde";
 const LEGS = "lmno";
 const FUR = "FGHI";
@@ -63,22 +64,76 @@ const SCARF = "STUV";
 
 const ramp = (r: string, l: number) => r[Math.max(0, Math.min(r.length - 1, Math.floor(l * r.length)))]!;
 
-/** A part painted in drawing space: its canvas covers (x0, y0) to (x0 + w, y0 + h). */
-function painted(x0: number, y0: number, w: number, h: number, draw: (F: (inside: Inside, key: Key) => void, S: (rows: readonly string[], x: number, y: number) => void) => void): { part: Part; at: Pt } {
-  const cv: Canvas = canvas(w, h);
+/**
+ * A scale from a figure's own drawing space into the scene's (the ground at y 66, his feet about x 40; the frame adds
+ * OX, OY): scene = o + s * drawing. The grasshopper and the rabbit keep the numbers they were first drawn with, each
+ * in a space of their own, and are scaled into the scene (`BUG`, `RIDER`): Eric's edit (Oct 18), the grasshopper
+ * smaller and the rabbit bigger.
+ */
+type Xf = { s: number; ox: number; oy: number };
+const ONE: Xf = { s: 1, ox: 0, oy: 0 };
+const toScene = (xf: Xf, p: Pt): Pt => [xf.ox + xf.s * p[0], xf.oy + xf.s * p[1]];
+
+/** The ground, and the point between his feet, in the scene. */
+const GROUND = 66;
+const FOOT_X = 40;
+/** The line his toes stand on (the ground's top pixel row is under it). */
+const TOES = 64.5;
+/** The grasshopper: 0.75 of his first size, scaled about his toes between his feet. */
+const BUG: Xf = { s: 0.75, ox: FOOT_X * 0.25, oy: TOES * 0.25 };
+/**
+ * The rabbit, saddle and all: 1.18 of his first size, the point under his seat (41, 36) on the grasshopper's back
+ * (46, 35.6), a little behind his hips, so the bigger rabbit sits clear of the antennae.
+ */
+const RIDER: Xf = (() => {
+  const k = 1.18;
+  const [sx, sy] = toScene(BUG, [46, 35.6]);
+  return { s: k, ox: sx - 41 * k, oy: sy - 36 * k };
+})();
+/** A one-pixel line's half width in the grasshopper's drawing space, so it stays one pixel in the scene. */
+const LINE = 0.5 / BUG.s;
+
+/**
+ * A part painted in a drawing space (`xf` scales it into the scene's): it covers (x0, y0) to (x0 + w, y0 + h) there.
+ * `F` fills where `inside` (in drawing space) with `key`'s colors (given the drawing point and the scene pixel); `S`
+ * stamps pixel rows (unscaled) at a drawing point.
+ */
+function painted(
+  x0: number,
+  y0: number,
+  w: number,
+  h: number,
+  draw: (F: (inside: Inside, key: Key) => void, S: (rows: readonly string[], x: number, y: number) => void) => void,
+  xf: Xf = ONE,
+): { part: Part; at: Pt } {
+  const [fx0, fy0] = toScene(xf, [x0, y0]);
+  const [fx1, fy1] = toScene(xf, [x0 + w, y0 + h]);
+  const X0 = xf.s === 1 ? fx0 : Math.floor(fx0) - 1;
+  const Y0 = xf.s === 1 ? fy0 : Math.floor(fy0) - 1;
+  const cw = xf.s === 1 ? w : Math.ceil(fx1) + 1 - X0;
+  const ch = xf.s === 1 ? h : Math.ceil(fy1) + 1 - Y0;
+  const cv: Canvas = canvas(cw, ch);
+  // A scene pixel's point in drawing space (its center maps to the drawing point's center).
+  const back = (X: number, Y: number): Pt => [(X + 0.5 - xf.ox) / xf.s - 0.5, (Y + 0.5 - xf.oy) / xf.s - 0.5];
   const F = (inside: Inside, key: Key) => {
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (inside(x + x0, y + y0)) cv[y]![x] = key(x + x0, y + y0);
+    for (let y = 0; y < ch; y++)
+      for (let x = 0; x < cw; x++) {
+        const [dx, dy] = back(x + X0, y + Y0);
+        if (inside(dx, dy)) cv[y]![x] = key(dx, dy, x + X0, y + Y0);
+      }
   };
-  const S = (rows: readonly string[], sx: number, sy: number) =>
+  const S = (rows: readonly string[], sx: number, sy: number) => {
+    const [fx, fy] = toScene(xf, [sx, sy]);
     rows.forEach((row, j) =>
       [...row].forEach((k, i) => {
-        const X = sx + i - x0;
-        const Y = sy + j - y0;
+        const X = Math.round(fx) + i - X0;
+        const Y = Math.round(fy) + j - Y0;
         if (k !== "." && cv[Y]?.[X] !== undefined) cv[Y]![X] = k;
       }),
     );
+  };
   draw(F, S);
-  return { part: { grid: toGrid(cv) }, at: [x0, y0] };
+  return { part: { grid: toGrid(cv) }, at: [X0, Y0] };
 }
 
 // ---- Strokes: legs, antennae, ears, arms, reins, painted along a few points and shaded like a cylinder.
@@ -155,7 +210,7 @@ function hopperHead(): { part: Part; at: Pt } {
     // The eye: big and black, a glint at its top left.
     F(inEllipse(9.2, 37, 3.7, 4.3), () => "x");
     S(["ww", "w."], 7, 34);
-  });
+  }, BUG);
 }
 
 /** The shield behind his head (the pronotum): a ridge along its side, lighter below it. */
@@ -164,10 +219,10 @@ function pronotum(): { part: Part; at: Pt } {
     const shield = inPoly([[17, 33], [31, 32], [34.5, 38], [34, 49], [18.5, 50], [20.2, 42]]);
     const light = roundLight(20, 32, 14, 16, 0.05);
     F(shield, (x, y) => {
-      const ridge = Math.abs(y - (38.4 + (x - 18) * 0.05)) < 0.55 && x > 19 && x < 34;
+      const ridge = Math.abs(y - (38.4 + (x - 18) * 0.05)) < LINE && x > 19 && x < 34;
       return ridge ? "b" : ramp(GREEN, light(x, y) + (y > 39 ? 0.12 : 0));
     });
-  });
+  }, BUG);
 }
 
 /** His abdomen: green above, the yellow-green belly below it ringed with segments. */
@@ -175,13 +230,13 @@ function abdomen(): { part: Part; at: Pt } {
   return painted(26, 33, 52, 24, (F) => {
     const body = inPoly([[28, 37], [50, 35.5], [66, 38.5], [75.8, 43.4], [70.5, 48.5], [57, 53], [41, 55.2], [30.5, 53.8], [27, 46]]);
     const light = roundLight(40, 38, 30, 17, 0.02);
-    F(body, (x, y) => {
+    F(body, (x, y, X) => {
       const belly = y > 48.4 - (x - 30) * 0.08;
       if (!belly) return ramp(GREEN, light(x, y));
-      // A segment line every three pixels.
-      return x % 3 === 0 ? "m" : ramp("mno", light(x, y) + 0.25);
+      // A segment line every three pixels (the scene's, so they stay even).
+      return X % 3 === 0 ? "m" : ramp("mno", light(x, y) + 0.25);
     });
-  });
+  }, BUG);
 }
 
 /** His wings folded along his back: a long leaf, a vein down its middle and a few slanting back from it. */
@@ -189,10 +244,11 @@ function wings(): { part: Part; at: Pt } {
   return painted(28, 32, 51, 16, (F) => {
     const wing = inPoly([[29.5, 35.4], [47, 33.6], [63, 36], [77.6, 42.4], [72, 45.2], [57, 45.4], [42, 46.2], [31, 44.4]]);
     const light = roundLight(40, 33, 34, 12, 0.08);
-    const vein = (x: number, y: number) => Math.abs(y - (39.6 + (x - 31) * 0.085)) < 0.5;
-    const ribs = (x: number, y: number) => y < 39.6 + (x - 31) * 0.085 && x > 36 && x < 70 && (x - y * 1.1 + 200) % 6 < 0.9;
-    F(wing, (x, y) => (vein(x, y) ? "b" : ribs(x, y) ? ramp(GREEN, light(x, y) - 0.2) : ramp(GREEN, light(x, y))));
-  });
+    const vein = (x: number, y: number) => Math.abs(y - (39.6 + (x - 31) * 0.085)) < LINE;
+    // A rib every five pixels (the scene's).
+    const ribs = (x: number, y: number, X: number, Y: number) => y < 39.6 + (x - 31) * 0.085 && x > 36 && x < 70 && (X - Y * 1.1 + 200) % 5 < 0.9;
+    F(wing, (x, y, X, Y) => (vein(x, y) ? "b" : ribs(x, y, X, Y) ? ramp(GREEN, light(x, y) - 0.2) : ramp(GREEN, light(x, y))));
+  }, BUG);
 }
 
 /** A thin jointed leg: hip, knee, foot and the foot's last joint lying on the ground. */
@@ -205,7 +261,7 @@ const insectLeg = (pts: readonly Pt[], r: readonly number[], far: boolean) =>
  */
 function hindLeg(hip: Pt, knee: Pt, ankle: Pt, toe: Pt, far: boolean): { part: Part; at: Pt } {
   const thigh = [hip, [hip[0] + (knee[0] - hip[0]) * 0.45, hip[1] + (knee[1] - hip[1]) * 0.45 - 0.6] as Pt, knee];
-  const t = strokePart(thigh, [3.5, 2.9, 1.3], (l, _s, across) => (across > 0.35 ? ramp("mn", l) : ramp(GREEN, l - (far ? 0.35 : 0))));
+  const t = strokePart(thigh, [3.5, 2.9, 1.3].map((v) => Math.max(1, v * BUG.s)), (l, _s, across) => (across > 0.35 ? ramp("mn", l) : ramp(GREEN, l - (far ? 0.35 : 0))));
   const shin = strokePart([knee, ankle, toe], [1, 0.9, 0.8], (l) => ramp(LEGS, l - (far ? 0.3 : 0)));
   // One part: the thigh over the shin at the knee.
   const x0 = Math.min(t.at[0], shin.at[0]);
@@ -233,14 +289,14 @@ function saddle(): { part: Part; at: Pt } {
     const pad = inPoly([[31.6, 35.2], [47, 34], [51.6, 31.8], [52.6, 34.6], [49.4, 38.4], [44, 40.2], [35, 40.6], [31.2, 38.4]]);
     F(pad, (x, y) => (y < 35.6 && x < 49 ? "Q" : ramp(LEATHER, 0.78 - (x - 32) * 0.012 - (y - 35) * 0.12)));
     S(["y", "O"], 35, 36);
-  });
+  }, RIDER);
 }
 
 /** The girth: a strap from the saddle round his belly, lying on him (no outline of its own). */
 function girth(): { part: Part; at: Pt } {
-  const g = painted(39, 39, 6, 17, (F) => {
-    F(inPoly([[40, 40], [42.6, 39.8], [44.2, 54.8], [41.8, 55.2]]), (x) => (x < 42 ? "N" : "M"));
-  });
+  const g = painted(38, 35, 7, 21, (F) => {
+    F(inPoly([[39.6, 36], [42.2, 35.8], [44.2, 54.8], [41.8, 55.2]]), (x) => (x < 41.6 ? "N" : "M"));
+  }, BUG);
   return { part: { ...g.part, outline: false }, at: g.at };
 }
 
@@ -258,7 +314,7 @@ function rabbitHead(): { part: Part; at: Pt } {
     // The eye: big and dark, a glint at its top left; the nose a pink dot at the muzzle's tip.
     S([".xx", "wxx", "xxx", ".x."], 26, 9);
     S(["p", "q"], 20, 13);
-  });
+ }, RIDER);
 }
 
 /** His body: a round sitting back, the big haunch, a cream chest. */
@@ -272,7 +328,7 @@ function rabbitBody(): { part: Part; at: Pt } {
     // The haunch's front edge, a shade darker where it turns from the light.
     const thigh = (x: number, y: number) => haunch(x, y) && !inEllipse(45.4, 29.4, 6.6, 5.6)(x, y) && y < 30 && x < 45;
     F(body, (x, y) => (chest(x, y) ? ramp(CREAM, light(x, y) + 0.1) : thigh(x, y) ? "G" : ramp(FUR, light(x, y))));
-  });
+ }, RIDER);
 }
 
 /** His hind foot, long along the saddle, its cream sole to us. */
@@ -280,22 +336,22 @@ function rabbitFoot(): { part: Part; at: Pt } {
   return painted(29, 32, 17, 6, (F) => {
     const foot = inPoly([[31, 33.2], [44, 32.8], [44.2, 36.4], [30.4, 36.4]]);
     F(foot, (x, y) => (y >= 35.4 ? "C" : x < 34 ? "D" : ramp(FUR, 0.68 - (x - 34) * 0.03)));
-  });
+ }, RIDER);
 }
 
 /** An ear: long, wide in the middle, rounded at its tip; the near one pink inside. */
 const ear = (pts: readonly Pt[], far: boolean) =>
-  strokePart(pts, [2, 2.6, 1.4], (l, s, across) => (!far && s > 0.14 && s < 0.84 && Math.abs(across) < 0.42 ? (l > 0.55 ? "p" : "q") : ramp(FUR, l - (far ? 0.3 : 0))));
+  strokePart(pts, [2, 2.6, 1.4].map((v) => v * RIDER.s), (l, s, across) => (!far && s > 0.14 && s < 0.84 && Math.abs(across) < 0.42 ? (l > 0.55 ? "p" : "q") : ramp(FUR, l - (far ? 0.3 : 0))));
 
 /** An arm, reaching forward to the reins, its paw a lighter knob. */
-const arm = (pts: readonly Pt[], far: boolean) => strokePart(pts, [2.2, 1.8, 2], (l, s) => (s > 0.8 ? ramp(CREAM, l - (far ? 0.4 : 0)) : ramp(FUR, l - (far ? 0.3 : 0))));
+const arm = (pts: readonly Pt[], far: boolean) => strokePart(pts, [2.2, 1.8, 2].map((v) => v * RIDER.s), (l, s) => (s > 0.8 ? ramp(CREAM, l - (far ? 0.4 : 0)) : ramp(FUR, l - (far ? 0.3 : 0))));
 
 /** His cotton tail. */
 function cottonTail(): { part: Part; at: Pt } {
   return painted(49, 27, 9, 9, (F) => {
     const t = inEllipse(53.4, 31, 2.9, 2.8);
     F(t, (x, y) => ramp(CREAM, roundLight(52.4, 29.8, 3.2, 3.2, 0.1)(x, y)));
-  });
+ }, RIDER);
 }
 
 /** The satchel on his hip: a leather bag, its flap darker, a gold buckle. */
@@ -304,7 +360,7 @@ function satchel(): { part: Part; at: Pt } {
     const bag = inPoly([[45.4, 22.4], [52.2, 22.2], [52.6, 29.2], [45.8, 29.4]]);
     F(bag, (x, y) => (y < 25 ? ramp(LEATHER, 0.55 - (x - 45) * 0.04) : ramp(LEATHER, 0.85 - (x - 45) * 0.05 - (y - 25) * 0.06)));
     S(["Y", "O"], 48, 24);
-  });
+ }, RIDER);
 }
 
 /** The scarf knotted round his neck, a gold clasp at its front. */
@@ -313,34 +369,16 @@ function scarfKnot(): { part: Part; at: Pt } {
     const band = inPoly([[29.6, 17.6], [38.6, 16.4], [39.8, 19.8], [30.2, 22]]);
     F(band, (x, y) => ramp(SCARF, 0.85 - (x - 30) * 0.04 - (y - 16) * 0.1));
     S([".y", "YO"], 30, 18);
-  });
+ }, RIDER);
 }
 
 /**
- * The scarf's tail, blowing back: a ribbon from his neck along `pts`, flaring a little toward its end, which is cut in
- * a notch; folds across it every few pixels, so it reads as cloth.
+ * The scarf's tail, blowing back from the knot: a thin band along `pts` (in the scene), tapering from `r0` to a point,
+ * lit along its top edge and darker toward its tip, so it reads as cloth in the wind rather than a tube.
  */
-function scarfTail(pts: readonly Pt[]): { part: Part; at: Pt } {
-  const end = pts[pts.length - 1]!;
-  const b = boxOf(pts, 3);
-  const total = pts.slice(1).reduce((a, q, i) => a + Math.hypot(q[0] - pts[i]![0], q[1] - pts[i]![1]), 0);
-  return painted(b.x0, b.y0, b.w, b.h, (F) => {
-    const r = pts.map((_, i) => 1.6 + (0.6 * i) / (pts.length - 1));
-    const at = (x: number, y: number) => along(pts, r, [x + 0.5, y + 0.5]);
-    // The notch: a little V cut into its end.
-    const notch = (x: number, y: number) => Math.abs(y + 0.5 - end[1]) < 0.7 && x + 0.5 > end[0] - 1.6;
-    F(
-      (x, y) => {
-        const s = at(x, y);
-        return s.d <= s.rr && !notch(x, y);
-      },
-      (x, y) => {
-        const s = at(x, y);
-        const fold = Math.floor((s.s * total + 1) / 3.5) % 2 === 1 ? 0.22 : 0;
-        return ramp(SCARF, 0.62 - 0.5 * (s.ny / s.rr) - 0.15 * s.s - fold);
-      },
-    );
-  });
+function scarfTail(pts: readonly Pt[], r0: number, r1: number): { part: Part; at: Pt } {
+  const r = pts.map((_, i) => r0 + ((r1 - r0) * i) / (pts.length - 1));
+  return strokePart(pts, r, (l, s) => ramp(SCARF, l + 0.05 - 0.3 * s));
 }
 
 /** His shadow on the ground, `w` wide. */
@@ -370,18 +408,19 @@ function placed(name: string, make: () => { part: Part; at: Pt }): Placed {
 const r2 = (v: number) => Math.round(v * 2) / 2;
 const key = (pts: readonly Pt[]) => pts.map((p) => `${r2(p[0])},${r2(p[1])}`).join(";");
 
-/** Where his drawing space (the ground at y 66) sits on the frame, and the frame's size (headroom for his hop). */
+/** Where the scene (the ground at y 66) sits on the frame, and the frame's size (headroom for his hop). */
 const OX = 4;
 const OY = 14;
-const GROUND = 66;
 const W = OX + 80;
 const H = OY + GROUND + 4;
-/** The ground between his feet, in drawing space. */
-const FOOT_X = 40;
 
 /** A leg's hip, knee, ankle and toe. */
 type Leg = readonly [hip: Pt, knee: Pt, ankle: Pt, toe: Pt];
 
+/**
+ * A pose. The legs, antennae and the ring are in the grasshopper's drawing space and the ears, paws and scarf in the
+ * rabbit's (each scaled into the scene: `BUG`, `RIDER`); `bob`, `air`, `dx`, `ride` and `sag` are scene pixels.
+ */
 export interface HopperPose {
   /** The grasshopper crouched (his body this many pixels lower, the rabbit with him; negative: stretched up). */
   bob?: number;
@@ -409,7 +448,10 @@ export interface HopperPose {
   pawF?: Pt;
   /** How far the reins sag between his paws and the ring (0: taut). */
   sag?: number;
-  /** The scarf's tail: its end (blowing back), and how far its middle billows up (negative) or down. */
+  /**
+   * The scarf's tail: its tip (blowing back), and its wave: how far it rises (negative) and then dips the other way, as
+   * cloth in the wind (0: straight). Flutter is these two moving.
+   */
   scarfEnd?: Pt;
   billow?: number;
 }
@@ -426,70 +468,80 @@ const REST = {
   midF: [[33, 52], [40.5, 57], [40.5, 63], [37.5, 64.5]],
   hindN: [[43, 47.5], [64, 33.5], [70, 62], [74.5, 64.5]],
   hindF: [[47, 46.5], [61, 35.5], [62.5, 62], [66.5, 64.5]],
-  antN: [-1, 11],
-  antF: [4, 7.5],
+  antN: [-4, 13],
+  antF: [1, 9.5],
   earN: [39, -0.5],
   earF: [44, 1],
   pawN: [25.6, 25.6],
   pawF: [24, 24.4],
   sag: 1.5,
-  scarfEnd: [55, 15.5],
-  billow: -2,
+  scarfEnd: [61, 19],
+  billow: -2.6,
 } as const satisfies Required<HopperPose>;
 
 export function hopperLayers(pose: HopperPose = {}): Layer[] {
   const p = { ...REST, ...pose };
   const b = p.bob;
   const rb = b + p.ride;
+  const k = RIDER.s;
   const at = (part: string, x: number, y: number): Layer => ({ part, x: OX + x, y: OY + y });
   const L = (l: Placed, dy = b, dx = 0) => at(l.name, l.at[0] + dx, l.at[1] + dy);
   const up = (q: Pt, dy: number): Pt => [q[0], q[1] + dy];
+  /** Points of the grasshopper's and the rabbit's, in the scene. */
+  const g = (q: Pt, dy = 0): Pt => up(toScene(BUG, q), dy);
+  const r = (q: Pt, dy = rb): Pt => up(toScene(RIDER, q), dy);
   /** A leg: its hip rides his bob, its knee half of it, its foot stays on the ground. */
-  const legPts = ([hip, knee, ankle, toe]: Leg): Leg => [up(hip, b), up(knee, b / 2), ankle, toe];
-  const leg = (name: string, l: Leg, r: readonly number[], far: boolean) => {
+  const legPts = ([hip, knee, ankle, toe]: Leg): Leg => [g(hip, b), g(knee, b / 2), g(ankle), g(toe)];
+  const leg = (name: string, l: Leg, rr: readonly number[], far: boolean) => {
     const pts = legPts(l);
-    return L(placed(`${name}:${key(pts)}`, () => insectLeg(pts, r, far)), 0);
+    return L(placed(`${name}:${key(pts)}`, () => insectLeg(pts, rr, far)), 0);
   };
   const hind = (name: string, l: Leg, far: boolean) => {
     const [hip, knee, ankle, toe] = legPts(l);
     return L(placed(`${name}:${key([hip, knee, ankle, toe])}`, () => hindLeg(hip, knee, ankle, toe, far)), 0);
   };
-  // The antennae, from the top of his head, curving forward.
+  // The antennae, from the top of his head, curving forward: a gentle arc, bowed up and back.
   const antPts = (root: Pt, tip: Pt): Pt[] => {
-    const r = up(root, b);
-    // A gentle arc, bowed up and back.
-    const bow = (t: number): Pt => [r[0] + (tip[0] - r[0]) * t + 1.6, r[1] + (tip[1] - r[1]) * t - 1.2];
-    return bezier(r, bow(0.33), bow(0.66), tip, 10);
+    const bow = (t: number): Pt => [root[0] + (tip[0] - root[0]) * t + 1.6, root[1] + (tip[1] - root[1]) * t - 1.2];
+    return bezier(g(root, b), g(bow(0.33), b * 0.67), g(bow(0.66), b * 0.33), g(tip), 10);
   };
   const antN = antPts([11, 31.5], p.antN);
   const antF = antPts([13.5, 32], p.antF);
   // The rabbit's ears, from the top of his head (they ride his bounce), a little curved.
-  const earPts = (root: Pt, tip: Pt): Pt[] => [up(root, rb), [(root[0] + tip[0]) / 2 - 0.6, (root[1] + tip[1]) / 2 + rb], up(tip, rb)];
+  const earPts = (root: Pt, tip: Pt): Pt[] => [r(root), r([(root[0] + tip[0]) / 2 - 0.6, (root[1] + tip[1]) / 2]), r(tip)];
   const earN = earPts([33, 6.5], p.earN);
   const earF = earPts([36.5, 6], p.earF);
   // Arms from his shoulders to his paws; the reins from his paws to the ring, sagging between.
-  const armN: Pt[] = [[34, 21 + rb], [30, 24.6 + rb], up(p.pawN, rb)];
-  const armF: Pt[] = [[32.6, 20.6 + rb], [28.4, 23.6 + rb], up(p.pawF, rb)];
-  const ringAt: Pt = [14, 43 + b];
+  const armN: Pt[] = [r([34, 21]), r([30, 24.6]), r(p.pawN)];
+  const armF: Pt[] = [r([32.6, 20.6]), r([28.4, 23.6]), r(p.pawF)];
+  const ringAt = g([14.4, 43.6], b).map(Math.round) as unknown as Pt;
   const rein = (paw: Pt): Pt[] => {
-    const a = up(paw, rb + 0.5);
+    const a = r(paw, rb + 0.5);
     const z: Pt = [ringAt[0] + 1.5, ringAt[1] + 1.5];
-    return bezier(a, [a[0] - 2, a[1] + 4 + p.sag], [z[0] + 3, z[1] - 5 + p.sag], z, 24);
+    return bezier(a, [a[0] - 2, a[1] + 3 + p.sag], [z[0] + 3, z[1] - 4 + p.sag], z, 24);
   };
   const reinN = rein([p.pawN[0] - 1, p.pawN[1]]);
   const reinF = rein([p.pawF[0] - 1, p.pawF[1]]);
-  // The scarf's tail: from the back of his neck, billowing up, then dipping to its end (an S, as cloth in the wind).
-  const neck: Pt = [38, 18.8 + rb];
-  const sEnd = up(p.scarfEnd, rb);
-  const scarf = bezier(neck, [neck[0] + (sEnd[0] - neck[0]) * 0.35, neck[1] + 2 * p.billow], [neck[0] + (sEnd[0] - neck[0]) * 0.65, sEnd[1] - p.billow], sEnd, 12);
-  const sw = Math.max(30, 58 - 2 * p.air);
+  // The scarf's tail: from the back of his neck to its tip, rising and then dipping (an S, as cloth in the wind),
+  // the wave growing toward the tip.
+  const neck: Pt = [39.5, 18];
+  const sEnd: Pt = p.scarfEnd;
+  const len = Math.hypot(sEnd[0] - neck[0], sEnd[1] - neck[1]) || 1;
+  const nx = (sEnd[1] - neck[1]) / len;
+  const ny = -(sEnd[0] - neck[0]) / len;
+  const scarf = Array.from({ length: 17 }, (_, i): Pt => {
+    const t = i / 16;
+    const w = -p.billow * Math.sin(2 * Math.PI * t) * (0.5 + 0.5 * t);
+    return r([neck[0] + (sEnd[0] - neck[0]) * t + nx * w, neck[1] + (sEnd[1] - neck[1]) * t + ny * w]);
+  });
+  const sw = Math.max(26, 42 - 2 * p.air);
   const sh = `shadow:${sw}`;
   add(sh, () => shadow(sw));
   // The reins: one-pixel leather lines with no outline of their own (an outlined one read as a pole).
-  const reinPart = (pts: readonly Pt[], k: string): { part: Part; at: Pt } => {
+  const reinPart = (pts: readonly Pt[], c: string): { part: Part; at: Pt } => {
     const bx = boxOf(pts, 0);
     const cv = canvas(bx.w, bx.h);
-    for (const [x, y] of pts) cv[Math.floor(y) - bx.y0]![Math.floor(x) - bx.x0] = k;
+    for (const [x, y] of pts) cv[Math.floor(y) - bx.y0]![Math.floor(x) - bx.x0] = c;
     return { part: { grid: toGrid(cv), outline: false }, at: [bx.x0, bx.y0] };
   };
   const layers: Layer[] = [
@@ -498,7 +550,6 @@ export function hopperLayers(pose: HopperPose = {}): Layer[] {
     hind("hindF", p.hindF, true),
     leg("midF", p.midF, [1.2, 0.9, 0.8, 0.7], true),
     leg("frontF", p.frontF, [1.1, 0.9, 0.8, 0.7], true),
-    // The far rein, behind his head.
     L(placed("abdomen", abdomen)),
     L(placed("wings", wings)),
     L(placed("pronotum", pronotum)),
@@ -509,14 +560,15 @@ export function hopperLayers(pose: HopperPose = {}): Layer[] {
     hind("hindN", p.hindN, false),
     L(placed("girth", girth)),
     L(placed("saddle", saddle)),
-    // The rabbit: far ear and arm, tail, body, foot, satchel, head, near ear, scarf, near arm.
+    // The rabbit: far ear and arm, tail, body, foot, satchel, the scarf's tail over his back, head, near ear, the
+    // scarf's knot, near arm.
     L(placed(`earF:${key(earF)}`, () => ear(earF, true)), 0),
-    L(placed(`scarf:${key(scarf)}`, () => scarfTail(scarf)), 0),
     L(placed(`armF:${key(armF)}`, () => arm(armF, true)), 0),
     L(placed("cottonTail", cottonTail), rb),
     L(placed("rabbitBody", rabbitBody), rb),
     L(placed("rabbitFoot", rabbitFoot), rb),
     L(placed("satchel", satchel), rb),
+    L(placed(`scarf:${key(scarf)}`, () => scarfTail(scarf, 1.2 * k, 0.4 * k)), 0),
     L(placed("rabbitHead", rabbitHead), rb),
     L(placed(`earN:${key(earN)}`, () => ear(earN, false)), 0),
     L(placed("scarfKnot", scarfKnot), rb),
@@ -525,7 +577,7 @@ export function hopperLayers(pose: HopperPose = {}): Layer[] {
     L(placed(`reinF:${key(reinF)}`, () => reinPart(reinF, "M")), 0),
     L(placed(`reinN:${key(reinN)}`, () => reinPart(reinN, "N")), 0),
   ];
-  return [at(sh, FOOT_X - sw / 2 + p.dx, GROUND - 2), ...layers.map((l) => ({ ...l, x: l.x + p.dx, y: l.y - p.air }))];
+  return [at(sh, Math.round(FOOT_X - sw / 2 + p.dx), GROUND - 2), ...layers.map((l) => ({ ...l, x: l.x + p.dx, y: l.y - p.air }))];
 }
 
 const frame = (ms: number, pose: HopperPose = {}): Frame => ({ ms, layers: hopperLayers(pose) });
@@ -535,7 +587,7 @@ const idle: Anim = { loop: true, frames: [frame(1000)] };
 
 export const HOPPER: Character = {
   id: "hopper",
-  name: "Hopper",
+  name: "Chub & Chirp",
   w: W,
   h: H,
   foot: [OX + FOOT_X, OY + GROUND],
@@ -546,4 +598,4 @@ export const HOPPER: Character = {
 };
 
 /** The part of them a portrait shows (the rabbit's head and the grasshopper's), in frame pixels. */
-export const HOPPER_PORTRAIT = { x: OX, y: OY - 3, w: 46, h: 55 } as const;
+export const HOPPER_PORTRAIT = { x: OX + 4, y: OY - 3, w: 48, h: 60 } as const;
