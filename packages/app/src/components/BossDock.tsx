@@ -17,6 +17,7 @@ import { useMedia } from "./QuickChat.tsx";
 import { VoiceBubble } from "../speech.tsx";
 import { clockShown } from "../clock-text.ts";
 import { bulletIncrementOn, kingBlocked, mockKingHelp } from "./Recluse.tsx";
+import { RaceBadge } from "./Hopper.tsx";
 
 /**
  * Boss battle: everything below the board, the same on every screen (your move,
@@ -25,7 +26,8 @@ import { bulletIncrementOn, kingBlocked, mockKingHelp } from "./Recluse.tsx";
  * - one row, the board's width and lined up with its edges: the arrows for
  *   stepping through the game either side of a status box. In the box, centered,
  *   what's happening right now (two lines at most), or which move you're looking
- *   at while you step back; at its right, your clock, always there (DockClock);
+ *   at while you step back; at its right, your clock, always there (DockClock); during Chub & Chirp's carrot race,
+ *   the race's count (RaceBadge): at the box's left where it has the room, else at the left of the God King's line;
  * - the God King himself, standing by and breathing, with his charges at his
  *   feet: on a phone, on a line of his own under the row (beside it where the
  *   screen has room right of the board). He says a few words now and then (`cues`). Tap him
@@ -117,6 +119,11 @@ export function BossDock({
   }, [menu]);
   // (A computer has the admins' testing items in the title line instead: Hud.tsx, .match-tools.)
   const computer = useMedia(COMPUTER_LAYOUT);
+  // (The God King beside the row, not under it: lineUpWithBoard measures the room.)
+  const [beside, setBeside] = useState(false);
+  // Chub & Chirp's carrot race count: in the status box where it has the room (a computer, or the God King beside the
+  // row), else at the left of the God King's line under the row (a phone: the box keeps the room for its words).
+  const raceInBox = computer || beside;
   const view = nav?.view;
   const moveNo = (p: number) => `${Math.ceil(p / 2)}${p % 2 === 1 ? "" : "…"}`;
   const ready = canCall && charges > 0 && !match.kingCalled && !fallen && !king;
@@ -131,7 +138,7 @@ export function BossDock({
     if (!ready) setMenu(false);
   }, [ready]);
   const dockRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => lineUpWithBoard(dockRef.current!), []);
+  useLayoutEffect(() => lineUpWithBoard(dockRef.current!, setBeside), []);
   // (His "can't" made ahead in the sound worker, so its first tap never stalls a slow phone.)
   useEffect(() => warmSounds(["kingCant"]), []);
   return (
@@ -144,6 +151,8 @@ export function BossDock({
           </button>
         )}
         <div class="boss-dock-status">
+          {/* (Chub & Chirp's carrot race: the count and your moves left, at the box's left, for as long as it's on.) */}
+          {!wide && raceInBox && <RaceBadge boss={boss} />}
           <div class="dk-text" role="status" aria-live="polite">
             {view?.browsing ? (
               <button type="button" class="history-label" onClick={() => view.live()} aria-label="Back to the live position">
@@ -162,6 +171,7 @@ export function BossDock({
           </button>
         )}
       </div>
+      {!wide && !raceInBox && <RaceBadge boss={boss} below />}
       <GodKingUnit
         show={king}
         side={side}
@@ -218,7 +228,7 @@ function pageLeft(el: HTMLElement): number {
  * has KING_BESIDE_PX right of the board, the God King stands beside the row (`dk-beside`); otherwise under it (Eric,
  * Oct 15: decided by the room there is, not the device).
  */
-function lineUpWithBoard(dock: HTMLElement): (() => void) | void {
+function lineUpWithBoard(dock: HTMLElement, onBeside?: (beside: boolean) => void): (() => void) | void {
   const wrap = dock.parentElement?.querySelector<HTMLElement>(".board-area .board-row > .board-wrap");
   if (!wrap) return;
   const board = wrap.querySelector<HTMLElement>(":scope > .hb > .hb-container") ?? wrap;
@@ -228,7 +238,9 @@ function lineUpWithBoard(dock: HTMLElement): (() => void) | void {
     dock.style.setProperty("--dk-left", `${left}px`);
     dock.style.setProperty("--dk-w", `${width}px`);
     // (Room in the screen's column right of the board for the God King: he stands beside the row, not under it.)
-    dock.classList.toggle("dk-beside", dock.clientWidth - left - width >= KING_BESIDE_PX);
+    const beside = dock.clientWidth - left - width >= KING_BESIDE_PX;
+    dock.classList.toggle("dk-beside", beside);
+    onBeside?.(beside);
   };
   place();
   const watch = new ResizeObserver(place);

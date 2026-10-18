@@ -35,24 +35,29 @@ import { gridKingAttacked, gridOf, type Grid } from "./grid.ts";
 import { passTurn } from "./hollow.ts";
 
 /**
- * His moments, beat by beat (ms into each; nobody's clock runs), for the art to match (a later build: the animations' cues):
- *   hop         his line as it begins; at `liftAt` his pawn leaves its square, at `overAt` it's over the crowd's pawn, at
- *               `landAt` it lands on the square beyond; the screen holds to `total`, then he thinks and plays his move.
- *   carrots     the cast (his whole turn: as the crowd's turn after it begins): Chirp bounds five times while Chub tosses
- *               a carrot each bound (`bounds`: each toss; each carrot thumps into its square `landsAfter` later, in the
- *               order planted), about 1.5 s; then his ladder shows from `ladderAt` (his tiers and their prizes: every
- *               carrot you pull lowers it); the screen holds to `total`.
- *   carrot      a carrot pulled: it pops at `popAt`, the puller's token goes in the square's corner at `tokenAt`.
- *   carrotSpin  his spin (as the crowd's turn after his move begins): the reel of prize cards starts at `reelAt`, slides
- *               past the line in the board's center and stops at `stopAt` (about 3 s), the prize pieces drop onto their
- *               squares from `prizeAt` (tier 0: the blank card, Chub's ears droop).
+ * His moments, beat by beat (ms into each; nobody's clock runs), on his animations' cues (the app's characters/hopper.ts:
+ * a unit test there keeps them the same; docs/decisions/2026-10-18-hopper-wired.md):
+ *   hop         "LEAPFROG!" and his line as it begins; his `leapfrog` animation from `liftAt` less its takeoff (210 ms):
+ *               at `liftAt` (its `takeoff`) his pawn leaves its square, at `overAt` it's over the crowd's pawn, at `landAt`
+ *               (its `land`, 330 ms on) it lands on the square beyond; the screen holds to `total`, then he thinks and
+ *               plays his move.
+ *   carrots     the cast (his whole turn: as the crowd's turn after it begins): "CARROT PATCH!", then his `carrotPatch`
+ *               animation from `castAt`: Chirp bounds five times while Chub tosses a carrot each bound (`tosses`: each
+ *               leaves his paw, its `toss<n>`), each thunking into its square `flightMs` later (its `plant<n>`), in the
+ *               order planted; then his ladder (his count and its prize: every carrot you pull lowers it) from `ladderAt`
+ *               to `total`.
+ *   carrot      a carrot pulled: it pops at `popAt`, the puller's token is in the square's corner from `tokenAt`.
+ *   carrotSpin  his spin (as the crowd's turn after his move begins): the race won or lost (his `raceWon` or `raceLost`,
+ *               1 s), the reel of prize cards from `reelAt`, sliding past the line in the board's center and stopping at
+ *               `stopAt` (3 s) on what he rolled, the prize pieces dropping onto their squares from `prizeAt` (tier 0: all
+ *               blank cards, Chub's ears droop).
  *   carrotWin   his last carrot pulled: the battle is his (`cheerAt`), then the result.
  */
 export const HOPPER_BEATS = {
-  hop: { liftAt: 300, overAt: 600, landAt: 900, total: 1600 },
-  carrots: { bounds: [150, 420, 690, 960, 1230], landsAfter: 220, ladderAt: 1600, total: 2800 },
-  carrot: { popAt: 0, tokenAt: 250, total: 600 },
-  carrotSpin: { reelAt: 300, stopAt: 3300, prizeAt: 3600, total: 4400 },
+  hop: { liftAt: 720, overAt: 885, landAt: 1050, total: 1600 },
+  carrots: { castAt: 900, tosses: [1100, 1310, 1520, 1730, 1940], flightMs: 300, ladderAt: 2400, total: 4900 },
+  carrot: { popAt: 0, tokenAt: 60, total: 600 },
+  carrotSpin: { reelAt: 1000, stopAt: 4000, prizeAt: 4200, total: 5000 },
   carrotWin: { cheerAt: 300, total: 2500 },
 } as const;
 
@@ -380,6 +385,37 @@ function setBase(b: Battle, fen: string): void {
 const setCarrots = (b: Battle, change: (c: CarrotPatch) => CarrotPatch, events: readonly PowerEvent[] = []): void =>
   setPowers(b, (p) => ({ ...p, carrots: change(p.carrots!), events: [...p.events, ...events] }));
 
+/**
+ * Test switch only (settings.bossCarrotTest, ?carrots=N): `his` carrots on empty squares one of his pieces can step to
+ * and none of the crowd's can reach in one move, then the rest (to carrotCount) on empty squares one of the crowd's can
+ * step to and none of his can; a different piece for each when it can, in square order; `fen` the crowd to move. Each
+ * side pulling its own, his spin comes on `his` carrots (all of them: his last wins the battle).
+ */
+export function carrotsWithinReach(fen: string, crowd: Side, his: number, count: number = BOSS_POWERS.carrotCount): string[] {
+  const parts = fen.split(" ");
+  const hisFen = [parts[0], other(crowd), ...parts.slice(2)].join(" ").replace(/ [a-h][36] /, " - ");
+  const grid = gridOf(fen);
+  const reach = (f: string) => legalMoves(f).filter((m) => !grid.has(m.slice(2, 4)));
+  const mine = reach(hisFen);
+  const theirs = reach(fen);
+  const out: string[] = [];
+  const pick = (moves: string[], other: string[], n: number) => {
+    const blocked = new Set(other.map((m) => m.slice(2, 4)));
+    const used = new Set<string>();
+    for (const pass of [true, false])
+      for (const m of [...moves].sort()) {
+        const to = m.slice(2, 4);
+        if (n <= 0 || out.includes(to) || blocked.has(to) || (pass && used.has(m.slice(0, 2)))) continue;
+        out.push(to);
+        used.add(m.slice(0, 2));
+        n--;
+      }
+  };
+  pick(mine, legalMoves(fen), Math.max(0, Math.min(count, his)));
+  pick(theirs, legalMoves(hisFen), count - out.length);
+  return out;
+}
+
 export const hopperBattle = {
   /**
    * A hop is due: his turn (the crowd has moved), the battle on, fewer than hopMax hops so far, none yet this turn, no
@@ -464,7 +500,9 @@ export const carrotBattle = {
     const boss = b.state.boss!;
     const board = boardOf(b);
     const passed = passTurn(board.fen)!;
-    const patch: CarrotPatch = { at: boss.crowdMoves, squares: plantCarrots(passed, boss.crowdSide, boss.powers!.seed, boss.crowdMoves), pulls: [], crowdMoves: 0, bossMoves: 0 };
+    const test = b.settings.bossCarrotTest;
+    const squares = test !== undefined ? carrotsWithinReach(passed, boss.crowdSide, test) : plantCarrots(passed, boss.crowdSide, boss.powers!.seed, boss.crowdMoves);
+    const patch: CarrotPatch = { at: boss.crowdMoves, squares, pulls: [], crowdMoves: 0, bossMoves: 0 };
     setBase(b, passed);
     b.boards.set(b.state.boards[0]!, { ...boardOf(b), expected: 1 - board.expected, lastMove: null });
     b.bossLast = null;

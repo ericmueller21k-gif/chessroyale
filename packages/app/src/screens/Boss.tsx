@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, queenSlain, withPiece } from "@chessroyale/chess";
-import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
+import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackPawnShown } from "../components/BigBoy.tsx";
 import { boardSawJolt, splitFen, splitStill } from "../components/Sawyer.tsx";
 import { SHOWDOWN_KING_AT, pigBoard } from "../components/Pig.tsx";
 import { alfilFen, alfilJolt, earlyLanding } from "../components/Alfil.tsx";
+import { hopperFen, yourPulls } from "../components/Hopper.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
 import { rememberBoss } from "../boss-history.ts";
 import { bossKit } from "../characters/kits.ts";
@@ -202,25 +203,29 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // the boss, so the next random one is another.
   useState(() => intro && !loading && (resetKingSpeech(), bossVoice.reset(), resetBeats()));
   useState(() => intro && !loading && rememberBoss(boss.id, `${boss.id}:${history.join("")}`));
-  // The boss's mate: its attack on the crowd's king (its kit has one), from KING_ATTACK.mateAt after its move shows;
-  // the result waits for it (bossTurnShowMs). No power's moment comes with a mate.
+  // The boss's mate: its attack on the crowd's king (its kit has one), from KING_ATTACK.mateAt into the screen's last
+  // KING_ATTACK.mateHoldMs; the result waits for it (bossTurnShowMs). No power's moment comes with a mate, but Chub &
+  // Chirp's fifth carrot's (mateMoments): the pull and his win play first, ending as that last stretch begins.
   const mating = !intro && !thinking && !victim && mateAttack(boss);
   const mateKing = mating ? kingSquare(boss.board.fen, boss.crowdSide) : null;
   const attackAt = until - KING_ATTACK.mateHoldMs + KING_ATTACK.mateAt;
   // Boss powers: the moments that come as the turn passes to the crowd (after the boss's move), or the funhouse's own.
   // (Beaten, the Hidden Boss's fall: the board holds while he collapses; no moment of the last turn plays again.)
-  // (While he thinks, only Alfil's pieces coming down early, at the start of his turn: earlyLanding.)
+  // (While he thinks, only Alfil's pieces coming down early, at the start of his turn: earlyLanding; and a carrot of Chub &
+  // Chirp's your move just pulled: yourPulls.)
   const moments = useMemo(() => {
-    if (intro || victim || mating || fall) return [];
-    if (thinking) return lights ? [] : [earlyLanding(boss)].filter((m) => m !== null);
+    if (intro || victim || fall) return [];
+    if (mating) return mateMomentsOf(boss, until);
+    if (thinking) return lights ? [] : [earlyLanding(boss), ...yourPulls(boss)].filter((m) => m !== null);
     return momentsOf(boss, until);
   }, [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating, fall]);
   const moment = momentAt(moments, now);
   // Each moment's line, into the boss's voice: its text box keeps it up for its time, into the crowd's turn.
   useMomentSpeech(boss, moments, now);
   const funhouse = moments.find((m) => m.kind === "funhouse") ?? null;
-  // (Big Boy's Big Bounce, before his move: as far as the rest of the screen goes, his last move isn't news.)
-  const bounce = moments.find((m) => m.kind === "bounce") ?? null;
+  // (Big Boy's Big Bounce and Chub & Chirp's hop, before his move: as far as the rest of the screen goes, his last move
+  // isn't news.)
+  const bounce = moments.find((m) => m.kind === "bounce" || m.kind === "hop") ?? null;
   // Boingo's funhouse and its later steps: the board as it was until its spin, the spin, then the new angle. In the
   // funhouse's own screen, the crowd's move he plays for it lands at its beat (FUNHOUSE.moveAt).
   const fun = funhouseView(moments, now, boss.powers, bossKit(boss.name));
@@ -313,7 +318,10 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // Alfil's moments: the fusion's pawns until they lift and its elephant once it lands, the Slam's pieces until they
   // fly, the landing's once they're down (each moment draws its own on their way); the board doesn't animate those.
   const alfil = bounceShown || splitShown || pig ? null : alfilFen(boss, moments, now, fenShown);
-  const boardFen = bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? fenShown;
+  // Chub & Chirp's: the hop's pawn on its square until it takes off and on the next once it has landed, the spin's prize
+  // pieces once they've dropped (each moment draws its own on their way); the board doesn't animate those.
+  const hopper = bounceShown || splitShown || pig || alfil ? null : hopperFen(boss, moments, now, fenShown);
+  const boardFen = bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? fenShown;
   const evalFen = bounceShown && bounceShown !== boss.board.fen ? (boss.powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? fenShown);
   const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now) ?? alfilJolt(moment, now);
   // (One or two pieces by name; more, how many: the dock's line stays one line.)
@@ -437,7 +445,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           {bossSide}
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? lastShown} animate={!bounceShown && !splitStill(split, now) && !pig?.still && !alfil} elephants={intro ? undefined : boss.powers?.elephants}>
+          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? lastShown} animate={!bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper} elephants={intro ? undefined : boss.powers?.elephants}>
             {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={boardFen} />}
             {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}
             {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}

@@ -5,7 +5,7 @@ import { BOSS_KITS, bossKit } from "../src/characters/kits.ts";
 import { HOLLOW, HOLLOW_ATTACK, HOLLOW_LINES } from "../src/characters/hollow.ts";
 import { ALFIL_LINES } from "../src/characters/alfil.ts";
 import { GOD_KING } from "../src/characters/god-king.ts";
-import { EFFECTS, animLength, bonkItem, frostItem, lashItem, lassoItem, pieItem, popItem, sawItem } from "../src/characters/power-art.ts";
+import { EFFECTS, animLength, bonkItem, carrotItem, frostItem, lashItem, lassoItem, pieItem, popItem, sawItem } from "../src/characters/power-art.ts";
 import { CLOWN_LINES } from "../src/characters/clown.ts";
 import { SAWYER_LINES } from "../src/characters/sawyer.ts";
 import { PIG_LINES } from "../src/characters/pig.ts";
@@ -18,6 +18,8 @@ import { GREX_LINES } from "../src/characters/grex.ts";
 import { bigBoySound, type BigBoySound } from "../src/characters/bigboy-sounds.ts";
 import { gingerSound, type GingerSound } from "../src/characters/gingerbread-sounds.ts";
 import { grexSound, type GrexSound } from "../src/characters/grex-sounds.ts";
+import { HOPPER_LINES } from "../src/characters/hopper.ts";
+import { hopperSound, type HopperSound } from "../src/characters/hopper-sounds.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import type { KingAttackKit } from "../src/characters/kits.ts";
 import { frameKeys, renderFrame, type Anim } from "../src/characters/sprite.ts";
@@ -43,7 +45,7 @@ describe("the kit's kingAttack", () => {
       .filter(([, k]) => k.kingAttack)
       .map(([name]) => BOSS_ROSTER.find((b) => b.kit === name)!.id);
     expect(withAttack).toEqual([...KING_ATTACKERS]);
-    expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil"]);
+    expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper"]);
   });
 
   it("Alfil's: a `jab` cue on each of the shared hits, lasting the attack exactly, his ankus's tip in the king's square, a gold jab on it each hit", () => {
@@ -142,7 +144,7 @@ describe("the kit's kingAttack", () => {
 const ASSAULTS: {
   kit: string;
   item: KingAttackKit["hit"];
-  effect: "sawHit" | "lassoHit" | "pieHit" | "bonkHit" | "frostHit" | "popHit";
+  effect: "sawHit" | "lassoHit" | "pieHit" | "bonkHit" | "frostHit" | "popHit" | "carrotHit";
   anims: [string, string];
   /** The cues on its hits, in turn, and their sounds. */
   cues: [string, string];
@@ -157,6 +159,7 @@ const ASSAULTS: {
   { kit: "Big Boy", item: bonkItem, effect: "bonkHit", anims: ["hitH", "hitL"], cues: ["bonk", "swing"], sounds: ["bigboyBonk", "bigboySwish"], prop: "123456vVF", lines: BIGBOY_LINES.kingAttack, wave: (n) => bigBoySound({ bigboyBonk: "bonk", bigboySwish: "swish" }[n] as BigBoySound, 44100) },
   { kit: "Ginger", item: frostItem, effect: "frostHit", anims: ["hitH", "hitL"], cues: ["crackle", "crunch"], sounds: ["gingerCrackle", "gingerCrunch"], prop: "sSvViIJfF", lines: GINGER_LINES.kingAttack, wave: (n) => gingerSound(n.replace(/^ginger/, "").replace(/^./, (c) => c.toLowerCase()) as GingerSound, 44100) },
   { kit: "Jefferson", item: popItem, effect: "popHit", anims: ["hitH", "hitL"], cues: ["pop", "sparkle"], sounds: ["grexPop", "grexSparkle"], prop: "qmtUvVwWBxyYfFR", lines: GREX_LINES.kingAttack, wave: (n) => grexSound(n.replace(/^grex/, "").replace(/^./, (c) => c.toLowerCase()) as GrexSound, 44100) },
+  { kit: "Chub & Chirp", item: carrotItem, effect: "carrotHit", anims: ["hitH", "hitL"], cues: ["toss", "bonk"], sounds: ["hopperToss", "hopperBonk"], prop: "RKJPwbcd" /* (the carrot, its leaves in the grasshopper's greens, its speed lines) */, lines: HOPPER_LINES.kingAttack, wave: (n) => hopperSound(n.replace(/^hopper/, "").replace(/^./, (c) => c.toLowerCase()) as HopperSound, 44100) },
   { kit: "Boingo the Clown", item: pieItem, effect: "pieHit", anims: ["hitH", "hitL"], cues: ["splat", "squeak"], sounds: ["clownSplat", "clownSqueak"], prop: "wWXoOrSsE", lines: CLOWN_LINES.kingAttack, wave: (n) => clownSound(n.replace(/^clown/, "").replace(/^./, (c) => c.toLowerCase()) as ClownSound, 44100) },
 ];
 
@@ -173,7 +176,7 @@ function reach(ka: KingAttackKit, f: Anim["frames"][number], keep: (k: string) =
   return most;
 }
 
-describe("the relentless assaults: Sawyer saws, Wrangler cracks his lasso, Boingo pies, Big Boy bonks, Ginger jabs, Jefferson fires (Eric, Oct 18)", () => {
+describe("the relentless assaults: Sawyer saws, Wrangler cracks his lasso, Boingo pies, Big Boy bonks, Ginger jabs, Jefferson fires, Chub pelts carrots (Eric, Oct 18)", () => {
   for (const a of ASSAULTS)
     describe(a.kit, () => {
       const kit = bossKit(a.kit)!;
@@ -277,7 +280,7 @@ describe("the relentless assaults: Sawyer saws, Wrangler cracks his lasso, Boing
  * Hollow, Alfil, as all their art) must be front on, so it can't be turned away either. Then, on the board, for a king
  * on every file: his drawing is mirrored exactly when that keeps his face and his prop toward the king.
  */
-const FACES: Record<string, { keys: string; front?: boolean }> = {
+const FACES: Record<string, { keys: string; front?: boolean; head?: string }> = {
   "Boingo the Clown": { keys: "eE", front: true },
   Ginger: { keys: "e" },
   Jefferson: { keys: "u" },
@@ -286,10 +289,12 @@ const FACES: Record<string, { keys: string; front?: boolean }> = {
   Sawyer: { keys: "wx" },
   Wrangler: { keys: "we" },
   Alfil: { keys: "wx", front: true },
+  // (Chub's eye, in his own head: the rabbit's, not Chirp's.)
+  "Chub & Chirp": { keys: "xw", head: "rabbitHead" },
 };
 /** His face's features' middle less his head's middle (head pixels; + to our right) in a frame. */
-function faceTurn(ka: KingAttackKit, f: Anim["frames"][number], keys: string): number {
-  const layer = f.layers.find((l) => l.part.startsWith("head"));
+function faceTurn(ka: KingAttackKit, f: Anim["frames"][number], keys: string, head = "head"): number {
+  const layer = f.layers.find((l) => l.part.startsWith(head));
   expect(layer, "a head").toBeTruthy();
   let grid = ka.ch.parts[layer!.part]!.grid.map((r) => [...r]);
   if (layer!.flipX) grid = grid.map((r) => r.reverse());
@@ -321,7 +326,7 @@ describe("each attacker looks at the king he hits (Eric, Oct 18)", () => {
       expect(hits).toHaveLength(KING_ATTACK.lashes);
       const toward = ka.facesLeft ? -1 : 1;
       for (const f of hits) {
-        const d = faceTurn(ka, f, face.keys);
+        const d = faceTurn(ka, f, face.keys, face.head);
         if (face.front) expect(Math.abs(d), `${name} front on`).toBeLessThan(0.75);
         else expect(d * toward, `${name} turned toward the king`).toBeGreaterThanOrEqual(0.75);
       }

@@ -141,6 +141,19 @@
  *                               shadow at its biggest until then, a soft thump each (a piece whose square was taken
  *                               slides on to the nearest one allowed). Lines: `kit.lines.ultimateHit`.
  *
+ *   "Chub & Chirp"
+ *     power        "leapfrog"   Leapfrog: Chirp crouches and hops; at `takeoff` his pawn leaves its square, arcs over
+ *                               yours and lands beyond it at `land` (components/Hopper.tsx).
+ *     powerHit     "idle"       A carrot pulled (his, or yours): it pops out of the soil and the puller's token goes in
+ *                               the square's corner (`carrotPatch`'s pull<W|B>). Lines: `carrotHis`, `carrotYours`.
+ *     ultimateWarn "check"      Chirp's chirp, for the warning.
+ *     ultimate     "carrotPatch" The cast: Chirp bounds five times while Chub tosses a carrot each bound; at each
+ *                               `toss<n>` one leaves his paw (`carrotFly`), at `plant<n>` it lands on its square
+ *                               (`carrotPatch`'s plant, then planted); then his ladder.
+ *     ultimateHit  "raceWon" / "raceLost"  His spin: the race won (3 or more carrots; 2 when he pulled as many as you)
+ *                               or lost, then the reel; the prize pieces drop onto their squares. Lines: `spinBig`,
+ *                               `spinSmall`, `spinEmpty`; his fifth carrot (no spin): `carrotsAll`.
+ *
  *   Each moment's animation is in the kit (`BOSS_KITS[name].anims[power | ultimateWarn | ultimate]`), its lines
  *   are `kit.lines.power / ultimateWarn / ultimate` (pick with `pickLine(kit, "power", key)` from boss-beats.ts,
  *   keyed by the moment so every player gets the same line), and its sounds fire from its frames' cues.
@@ -181,6 +194,11 @@
  *                          (loop), close<t>, dawn<t> (ends empty), found, shown (loop), answer, answered (loop),
  *                          where <t> is the square's tile (16 by where it is, light or dark). Use nightItems().
  *   nightLabel     square  a … h, 1 … 8: the night's coordinates, over the tiles (nightItems() places them).
+ *   carrotPatch    square  plant (`thunk`; then planted), planted (loop), pull<W|B> (`pop`; ends on claimed<W|B>),
+ *                          claimed<W|B> (loop: the dug hole and the side's token in the corner). Under the piece.
+ *   carrotFly      square  fly (loop): a carrot tumbling, moved from Chub's paw to its square.
+ *   carrotHit      square  hit<H|L><L|R> (ends empty, about 200 ms): a carrot bonking a king (Chub's attack on a king).
+ *   carrotIcon     14 x 14 icon, slot: the dock's carrot count.
  *   ankusHit       square  hit<H|L><L|R> (ends empty, about 200 ms): a jab of Alfil's ankus landing on a king, high
  *                          or low, from the left or right edge: a gold spike and a burst of gold sparks.
  *   sawHit         square  hit<A|B><L|R> (ends empty, about 200 ms): a bite of Sawyer's saw on a king, high or a little
@@ -242,6 +260,10 @@ export const POWER_ANIMS = [
   "tusksCast",
   "tusksFuse",
   "mammothSlam",
+  "leapfrog",
+  "carrotPatch",
+  "raceWon",
+  "raceLost",
 ] as const;
 export type PowerAnim = (typeof POWER_ANIMS)[number];
 
@@ -330,6 +352,16 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
       leap: { anim: "leap", hit: "hop", onBoard: true },
     },
   },
+  "Chub & Chirp": {
+    power: { anim: "leapfrog", hit: "takeoff" },
+    // (A carrot pulled: the board pops it; he says his line where he stands.)
+    powerHit: { anim: "idle", effects: ["carrotPatch"] },
+    ultimateWarn: { anim: "check" },
+    ultimate: { anim: "carrotPatch", hit: "toss1", effects: ["carrotFly", "carrotPatch"] },
+    // (His spin: the race won or lost, then the reel; the prize pieces drop onto their squares.)
+    ultimateHit: { anim: "raceWon" },
+    more: { raceLost: { anim: "raceLost" } },
+  },
   "Alfil": {
     power: { anim: "tusksCast", hit: "cast" },
     powerHit: { anim: "tusksFuse", hit: "flash" },
@@ -407,6 +439,11 @@ export const EFFECTS: Record<EffectName, Effect> = {
   bonkHit: { ch: EFFECT_SPRITES.bonkHit, covers: "square", start: "hitHL", sounds: {} },
   frostHit: { ch: EFFECT_SPRITES.frostHit, covers: "square", start: "hitHL", sounds: {} },
   popHit: { ch: EFFECT_SPRITES.popHit, covers: "square", start: "hitHL", sounds: {} },
+  // (In the cast its planting is quiet on the board, `quiet`: the thunk is his `plant<n>` cue's, so one plays, not two.)
+  carrotPatch: { ch: EFFECT_SPRITES.carrotPatch, covers: "square", start: "plant", loop: "planted", sounds: { thunk: "hopperThunk", pop: "hopperPop" } },
+  carrotFly: { ch: EFFECT_SPRITES.carrotFly, covers: "square", loop: "fly", sounds: {} },
+  carrotHit: { ch: EFFECT_SPRITES.carrotHit, covers: "square", start: "hitHL", sounds: {} },
+  carrotIcon: { ch: EFFECT_SPRITES.carrotIcon, covers: "strip", loop: "icon", sounds: {} },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------
@@ -592,4 +629,9 @@ export function frostItem(square: string, i: number, from: "L" | "R", since: num
 /** Jefferson's i-th fireball popping on the king's square (at its head, then its chest, in turn), from his side. */
 export function popItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   return { square, name: "popHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
+}
+
+/** Chub's i-th carrot bonking the king (high, then a little lower, in turn), from his side. */
+export function carrotItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "carrotHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }

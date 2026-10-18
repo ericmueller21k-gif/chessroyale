@@ -57,7 +57,7 @@ function fakeEngine(score: (fen: string, m: string) => number = (fen, m) => 0.3 
 }
 const LINE = sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1", "b5"]);
 const opening = (moves: string[]): Opening => ({ id: "o", eco: "", name: "Test", family: "Test", unusual: false, moves, namedPlies: moves.length, expected: { 10: 0.52, 11: 0.48, 12: 0.52 } });
-const SETTINGS = (patch: Partial<Settings> = {}) => ({ ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "hopper", bossUnfinished: true, lastStandFrom: 999, ...patch }) as Settings;
+const SETTINGS = (patch: Partial<Settings> = {}) => ({ ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "hopper", lastStandFrom: 999, ...patch }) as Settings;
 
 /** A Boss alone against him (met as the test link does: his art isn't built yet). */
 function raid(o: { patch?: Partial<Settings>; seed?: number; engine?: EngineLike; side?: "w" | "b"; moves?: string[] } = {}) {
@@ -98,22 +98,20 @@ describe("Chub & Chirp: who they are", () => {
   it("are on the roster as hopper (🐇), named in one constant, with Leapfrog and the Carrot Patch, an offset in the others' range", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "hopper")!;
     expect(HOPPER_NAME).toBe("Chub & Chirp");
-    expect(def).toMatchObject({ name: HOPPER_NAME, icon: "🐇", kit: null, powers: { passive: "leapfrog", ultimate: "carrotpatch" } });
+    expect(def).toMatchObject({ name: HOPPER_NAME, icon: "🐇", kit: HOPPER_NAME, powers: { passive: "leapfrog", ultimate: "carrotpatch" } });
     const others = BOSS_ROSTER.filter(isPlayable).map((b) => b.offset);
     expect(def.offset).toBeGreaterThanOrEqual(Math.min(...others));
     expect(def.offset).toBeLessThanOrEqual(Math.max(...others));
   });
 
-  it("are hidden from players until their art is wired in: never at random, never on a menu, never picked by name; the test link meets them", () => {
+  it("are live with their art (Oct 18): met at random, on every menu, picked by name", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "hopper")!;
-    expect(isPlayable(def)).toBe(false);
+    expect(isPlayable(def)).toBe(true);
     const met = new Set<string>();
     for (let roll = 0; roll < 1; roll += 0.01) met.add(chooseBoss(roll).id);
-    expect(met).not.toContain("hopper");
-    expect(chooseBoss(0.5, "hopper").id).not.toBe("hopper");
-    for (const admin of [false, true]) for (const r of [false, true]) expect(menuBosses({ admin, raid: r }).map((b) => b.id)).not.toContain("hopper");
-    // (?boss=hopper&wip=1: bossUnfinished.)
-    expect(chooseBoss(0.5, "hopper", null, BOSS_ROSTER, true).id).toBe("hopper");
+    expect(met).toContain("hopper");
+    expect(chooseBoss(0.5, "hopper").id).toBe("hopper");
+    for (const admin of [false, true]) for (const r of [false, true]) expect(menuBosses({ admin, raid: r }).map((b) => b.id)).toContain("hopper");
     expect(raid().boss!.id).toBe("hopper");
   });
 });

@@ -45,7 +45,8 @@ Not yours:
   - A lobby test for relaying (team only, all-chat phrases, rejection of unknown or locked phrases).
   - An e2e case in a 50 v 50 match on phone and desktop.
   - Run `npm test`, `npm run typecheck` and, locally, the e2e specs you touched (under the shared e2e lock).
-    CI runs the whole e2e suite on the PR (`.github/workflows/e2e.yml`): read its `result` before merging.
+    CI runs the e2e fast check on the PR (the touched areas' specs plus the smoke set, `e2e/areas.json`; the whole
+    suite on main after the merge): read its `result` before merging.
 - **Record it** in a new file in `docs/decisions/` and keep `docs/areas/chat.md` true, and **ship it** per `CLAUDE.md`.
 
 ## Reporting back

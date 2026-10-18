@@ -2,7 +2,7 @@ import type { ComponentChildren } from "preact";
 import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import { BOSS_BANNER, BOSS_POWERS, type PowerEventKind } from "@chessroyale/core";
-import { powerFxMs, powerMomentMs } from "@chessroyale/chess";
+import { KING_ATTACK, mateMoments, powerFxMs, powerMomentMs } from "@chessroyale/chess";
 import { bossKit, type BossKit } from "../characters/kits.ts";
 import { cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
@@ -101,6 +101,13 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   });
 }
 
+/**
+ * At the boss's mate (its attack on the crowd's king to come): the moments that still play, ending as the screen's last
+ * KING_ATTACK.mateHoldMs begins (the attack from KING_ATTACK.mateAt into it): only Chub & Chirp's fifth carrot's, the
+ * pull and his win (mateMoments); none for any other mate.
+ */
+export const mateMomentsOf = (boss: BossView, until: number): Moment[] => (mateMoments(boss.powers?.events).length ? momentsOf(boss, until - KING_ATTACK.mateHoldMs) : []);
+
 /** The dock's line for the boss's turn when it brought no move to show (BossUi.noMove: Alfil's fusion); null otherwise. */
 export const noMoveLine = (boss: BossView): string | null => bossUi(boss)?.noMove?.(boss) ?? null;
 
@@ -159,7 +166,7 @@ export function BossBarExtra({ boss, until = 0 }: { boss: BossView; until?: numb
 // ---------------- The moments ----------------
 
 /** The boss's line for a power's moment (its kit's), the same on every screen; null without one. */
-export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick" | "ult">): string | null {
+export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick" | "ult" | "by" | "tier">): string | null {
   const ui = MOMENT_UI[m.kind];
   return ui.line ? ui.line(kit, m) : kitLine(kit, ui.kit, m.key);
 }
