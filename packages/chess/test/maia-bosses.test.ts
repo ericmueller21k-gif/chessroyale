@@ -92,8 +92,11 @@ describe("every boss on the Maia path", () => {
       let struck = false;
       for (let i = 0; i < 400 && !r.stageComplete(); i++) {
         // (Wrangler's showdown searches its line-ups for real, up to seconds a turn while his meter is full and none
-        // qualifies on this test's engine: his trigger once, mid-battle, and his showdowns spent after it.)
-        if (id !== "pig" || r.boss!.crowdMoves === 6) r.triggerUltimate();
+        // qualifies on this test's engine: his trigger once, mid-battle, and his showdowns spent after it. Chub & Chirp's
+        // Carrot Patch, once a battle: after twenty moves, as this test's crowd doesn't race and his fifth carrot would
+        // end the battle before Maia had played enough.)
+        const at = id === "pig" ? 6 : id === "hopper" ? 20 : null;
+        if (at === null || r.boss!.crowdMoves === at) r.triggerUltimate();
         if (id === "pig" && r.boss!.powers!.ults) r.boss!.powers!.ults = BOSS_POWERS.showdownMax;
         if (r.bossToMove()) {
           if (r.lightsOutDue()) {
