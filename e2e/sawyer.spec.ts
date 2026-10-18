@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { SAWYER_LOOKS } from "@chessroyale/core";
+import { BOSS_POWERS, SAWYER_LOOKS } from "@chessroyale/core";
+import { chooseCut } from "@chessroyale/chess";
 import { BOARD_SEL, engineTop, test, watchFor, bossAloneFromHome } from "./helpers.ts";
 import { REFUSED, REFUSED_MS, REFUSED_OTHER, THROUGH } from "../packages/app/src/refused.ts";
 
@@ -221,25 +222,43 @@ test("Sawyer's board saw (?power=boardsaw): he saws up the middle, the board spl
   const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
   expect(Math.abs(gap.x + gap.width / 2 - (board.x + board.width / 2))).toBeLessThanOrEqual(1.5);
   expect(gap.height).toBeGreaterThan(board.height - 2);
-  // Nothing crosses it: not in the allowed moves, no move dots across it.
+  // Nothing crosses it: not in the allowed moves, no move dots across it. When it stops none of the crowd's legal moves
+  // (his move gave check and every answer stays on its half: "Check! Shield the king." on CI, Oct 18) there are no
+  // allowed moves (null: every legal move is); likewise when it would stop them all (a limit never leaves none).
   const fen3 = await page.evaluate(() => (window as any).match.phase.board.fen as string);
-  expect(p3.allowed?.length).toBeGreaterThan(0);
-  for (const m of p3.allowed) expect(crossesMiddle(m)).toBe(false);
+  const legal3 = new Chess(fen3).moves({ verbose: true }).map((m) => m.from + m.to);
+  if (p3.allowed) {
+    expect(p3.allowed.length).toBeGreaterThan(0);
+    for (const m of p3.allowed) expect(crossesMiddle(m)).toBe(false);
+  } else expect([0, legal3.length], fen3).toContain(legal3.filter(crossesMiddle).length);
   // (A piece with moves both across and not: its dots stay on its half. Now and then the position has none.)
-  const across = new Chess(fen3).moves({ verbose: true }).find((m) => crossesMiddle(m.from + m.to) && p3.allowed.some((a: string) => a.startsWith(m.from)));
+  const across = new Chess(fen3).moves({ verbose: true }).find((m) => crossesMiddle(m.from + m.to) && (p3.allowed ?? []).some((a: string) => a.startsWith(m.from)));
   if (across) {
     await tap(page, across.from);
     await expect(page.locator(`${BOARD_SEL.square}.move-dest`).first()).toBeVisible();
     for (const sq of await dotSquares(page)) expect(file(sq) <= 3, `${across.from} → ${sq}`).toBe(file(across.from) <= 3);
     await tap(page, across.from);
   }
-  // The cut due on the 3rd turn waited for the saw: it comes on the 4th.
+  // The cut due on the 3rd turn waited for the saw: it comes on the next turn with an edge for it (between two squares
+  // of the crowd's half, crossed by one of its legal moves: chooseCut), the 4th, unless his move left none (a check
+  // answered only diagonally, by a knight or outside the crowd's half: "Your king's in check!" at move 4 on CI, Oct 18).
+  // Then it waits a turn more.
   expect(p3.cut ?? null).toBeNull();
   const cutSeen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /SAW CUT!/ }, caster: { selector: ".pm-cut .pm-caster" } });
-  await play(page, await allowedMove(page, ["h2h3", "a2a3", "h7h6", "a7a6"]));
-  await yourMove(page);
+  const crowd = await page.evaluate(() => (window as any).match.boss.crowdSide as "w" | "b");
+  for (;;) {
+    await play(page, await allowedMove(page, ["h2h3", "a2a3", "h7h6", "a7a6"]));
+    await yourMove(page);
+    const now = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, p: (window as any).match.boss.powers }));
+    // (Whether there's an edge for it, not which: the seed only picks among them.)
+    if (chooseCut(now.fen, crowd, 0, now.p.turn)) {
+      expect(now.p.cut).toMatchObject({ at: now.p.turn, until: now.p.turn + BOSS_POWERS.sawTurns - 1 });
+      break;
+    }
+    expect(now.p.cut ?? null, `turn ${now.p.turn}: no edge for a cut in ${now.fen}`).toBeNull();
+    expect(now.p.turn, "a cut within three turns of the saw's").toBeLessThan(6);
+  }
   expect(await cutSeen.seen()).toEqual({ banner: true, caster: true });
-  expect((await powers(page)).cut).toMatchObject({ at: 4, until: 6 });
   // His sounds came, and through the mute switch, silent.
   const heard = (await soundsHeard(page)).filter((x) => x.startsWith("sawyer"));
   expect(heard.map((x) => x.split(":")[0])).toEqual(expect.arrayContaining(["sawyerHop", "sawyerRev", "sawyerBigSaw", "sawyerCut"]));

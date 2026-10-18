@@ -183,6 +183,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   a test that needs a particular random outcome looks for a seed that gives it (and says what it needs), rather than
   trusting that a fixed seed always will. Anything new that draws from the match's random source moves everything
   drawn after it.
+- **A saw cut that waited for a check** (Oct 18, `docs/decisions/2026-10-18-flaky-e2e-batch-5.md`): a test that
+  expects a power on a set turn checks the power's own condition in the position the game reached (`chooseCut`, the
+  allowed moves) and expects what the rule says there. A boss's reply can give check, and a check leaves the crowd
+  only a few moves, so a limit can stop none of them and a passive can find nothing to act on.
 - **One lucky pass taken for a cause** (Oct 8, [story](../docs/history/lessons.md#one-lucky-pass-taken-for-a-cause-oct-8-2026)):
   - One passing run doesn't confirm a cause. Before changing anything for a suspected cause, log what the test sees at
     each step on both branches (the phase, times, boxes) and find the step where they differ.
@@ -191,8 +195,9 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 - **A navigation that never happened** (Oct 9, [story](../docs/history/lessons.md#a-navigation-that-never-happened-oct-9-2026)):
   - Never await long app work (an engine search, a server round trip) inside `page.evaluate`. Start it in the page,
     keep the answer on `window`, and poll for it from the test (`engineTop` in `e2e/helpers.ts`). ("Execution context
-    was destroyed" without a navigation is this.) `crowd.spec.ts`, `formats.spec.ts` and `boss-character.spec.ts`
-    still await `topMovesFor` inside an evaluate: move them to `engineTop` when they're next touched.
+    was destroyed" without a navigation is this.) `formats.spec.ts` and `boss-character.spec.ts` still await
+    `topMovesFor` inside an evaluate: move them to `engineTop` when they're next touched (`crowd.spec.ts` moved Oct 18,
+    after it hit CI 4 times in 59 runs).
   - Something on screen for a moment is checked by watching for it from before it can appear (`watchFor`), not by
     looking for it after a wait for something else.
 - **A melt the test blinked through** (Oct 12, [story](../docs/history/lessons.md#a-melt-the-test-blinked-through-oct-12-2026)):
