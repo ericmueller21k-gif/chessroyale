@@ -5,17 +5,23 @@ import { BOSS_KITS, bossKit } from "../src/characters/kits.ts";
 import { HOLLOW, HOLLOW_ATTACK, HOLLOW_LINES } from "../src/characters/hollow.ts";
 import { ALFIL_LINES } from "../src/characters/alfil.ts";
 import { GOD_KING } from "../src/characters/god-king.ts";
-import { EFFECTS, animLength, lashItem, lassoItem, pieItem, sawItem } from "../src/characters/power-art.ts";
+import { EFFECTS, animLength, bonkItem, frostItem, lashItem, lassoItem, pieItem, popItem, sawItem } from "../src/characters/power-art.ts";
 import { CLOWN_LINES } from "../src/characters/clown.ts";
 import { SAWYER_LINES } from "../src/characters/sawyer.ts";
 import { PIG_LINES } from "../src/characters/pig.ts";
 import { clownSound, type ClownSound } from "../src/characters/clown-sounds.ts";
 import { sawyerSound, type SawyerSound } from "../src/characters/sawyer-sounds.ts";
 import { pigSound, type PigSound } from "../src/characters/pig-sounds.ts";
+import { BIGBOY_LINES } from "../src/characters/bigboy.ts";
+import { GINGER_LINES } from "../src/characters/gingerbread.ts";
+import { GREX_LINES } from "../src/characters/grex.ts";
+import { bigBoySound, type BigBoySound } from "../src/characters/bigboy-sounds.ts";
+import { gingerSound, type GingerSound } from "../src/characters/gingerbread-sounds.ts";
+import { grexSound, type GrexSound } from "../src/characters/grex-sounds.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import type { KingAttackKit } from "../src/characters/kits.ts";
 import { frameKeys, renderFrame, type Anim } from "../src/characters/sprite.ts";
-import { kingAttackBeat } from "../src/components/KingAttack.tsx";
+import { ATTACK_ROOM_ABOVE, KING_MIDDLE, attackTop, kingAttackBeat, kingAttackPlace } from "../src/components/KingAttack.tsx";
 import { evalBarOn, onPrefsChange, setEvalBarOn } from "../src/prefs.ts";
 
 // A boss's attack on a king (Eric, Oct 10: Hollow first): the kit's `kingAttack`, his frames on the shared beats, the
@@ -32,12 +38,12 @@ const starts = (a: Anim) => {
 };
 
 describe("the kit's kingAttack", () => {
-  it("is Boingo's, Hollow's, Sawyer's, Wrangler's and Alfil's, and the server's list (KING_ATTACKERS) says the same", () => {
+  it("is every playable boss's but the Hidden Boss's, and the server's list (KING_ATTACKERS) says the same", () => {
     const withAttack = Object.entries(BOSS_KITS)
       .filter(([, k]) => k.kingAttack)
       .map(([name]) => BOSS_ROSTER.find((b) => b.kit === name)!.id);
     expect(withAttack).toEqual([...KING_ATTACKERS]);
-    expect(withAttack).toEqual(["clown", "hollow", "sawyer", "pig", "alfil"]);
+    expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil"]);
   });
 
   it("Alfil's: a `jab` cue on each of the shared hits, lasting the attack exactly, his ankus's tip in the king's square, a gold jab on it each hit", () => {
@@ -136,7 +142,7 @@ describe("the kit's kingAttack", () => {
 const ASSAULTS: {
   kit: string;
   item: KingAttackKit["hit"];
-  effect: "sawHit" | "lassoHit" | "pieHit";
+  effect: "sawHit" | "lassoHit" | "pieHit" | "bonkHit" | "frostHit" | "popHit";
   anims: [string, string];
   /** The cues on its hits, in turn, and their sounds. */
   cues: [string, string];
@@ -148,6 +154,9 @@ const ASSAULTS: {
 }[] = [
   { kit: "Sawyer", item: sawItem, effect: "sawHit", anims: ["hitA", "hitB"], cues: ["cut", "swing"], sounds: ["sawyerCut", "sawyerSwing"], prop: "RrQBCDSsTUV", lines: SAWYER_LINES.kingAttack, wave: (n) => sawyerSound(n.replace(/^sawyer/, "").replace(/^./, (c) => c.toLowerCase()) as SawyerSound, 44100) },
   { kit: "Wrangler", item: lassoItem, effect: "lassoHit", anims: ["hitH", "hitL"], cues: ["crack", "lash"], sounds: ["pigYank", "pigCatch"], prop: "rRt", lines: PIG_LINES.kingAttack, wave: (n) => pigSound(n.replace(/^pig/, "").replace(/^./, (c) => c.toLowerCase()) as PigSound, 44100) },
+  { kit: "Big Boy", item: bonkItem, effect: "bonkHit", anims: ["hitH", "hitL"], cues: ["bonk", "swing"], sounds: ["bigboyBonk", "bigboySwish"], prop: "123456vVF", lines: BIGBOY_LINES.kingAttack, wave: (n) => bigBoySound({ bigboyBonk: "bonk", bigboySwish: "swish" }[n] as BigBoySound, 44100) },
+  { kit: "Ginger", item: frostItem, effect: "frostHit", anims: ["hitH", "hitL"], cues: ["crackle", "crunch"], sounds: ["gingerCrackle", "gingerCrunch"], prop: "sSvViIJfF", lines: GINGER_LINES.kingAttack, wave: (n) => gingerSound(n.replace(/^ginger/, "").replace(/^./, (c) => c.toLowerCase()) as GingerSound, 44100) },
+  { kit: "Jefferson", item: popItem, effect: "popHit", anims: ["hitH", "hitL"], cues: ["pop", "sparkle"], sounds: ["grexPop", "grexSparkle"], prop: "qmtUvVwWBxyYfFR", lines: GREX_LINES.kingAttack, wave: (n) => grexSound(n.replace(/^grex/, "").replace(/^./, (c) => c.toLowerCase()) as GrexSound, 44100) },
   { kit: "Boingo the Clown", item: pieItem, effect: "pieHit", anims: ["hitH", "hitL"], cues: ["splat", "squeak"], sounds: ["clownSplat", "clownSqueak"], prop: "wWXoOrSsE", lines: CLOWN_LINES.kingAttack, wave: (n) => clownSound(n.replace(/^clown/, "").replace(/^./, (c) => c.toLowerCase()) as ClownSound, 44100) },
 ];
 
@@ -164,7 +173,7 @@ function reach(ka: KingAttackKit, f: Anim["frames"][number], keep: (k: string) =
   return most;
 }
 
-describe("the relentless assaults: Sawyer saws, Wrangler cracks his lasso, Boingo pies (Eric, Oct 18)", () => {
+describe("the relentless assaults: Sawyer saws, Wrangler cracks his lasso, Boingo pies, Big Boy bonks, Ginger jabs, Jefferson fires (Eric, Oct 18)", () => {
   for (const a of ASSAULTS)
     describe(a.kit, () => {
       const kit = bossKit(a.kit)!;
@@ -258,6 +267,121 @@ describe("the relentless assaults: Sawyer saws, Wrangler cracks his lasso, Boing
         expect(kit.chance.kingAttack).toBe(1);
       });
     });
+});
+
+/**
+ * Where each attacker looks (Eric, Oct 18: Wrangler "looks like he's hitting him without looking"): in every hit frame,
+ * the features of his face (the keys below, in his head part as drawn: flipped if its layer is) against the middle of
+ * the whole head. A head turned to one side (Sawyer, Wrangler, Jefferson) or eyes glancing (Big Boy, Ginger) must point
+ * the way his prop goes, toward the king (`facesLeft`: our left), by most of a pixel; a face drawn front on (Boingo,
+ * Hollow, Alfil, as all their art) must be front on, so it can't be turned away either. Then, on the board, for a king
+ * on every file: his drawing is mirrored exactly when that keeps his face and his prop toward the king.
+ */
+const FACES: Record<string, { keys: string; front?: boolean }> = {
+  "Boingo the Clown": { keys: "eE", front: true },
+  Ginger: { keys: "e" },
+  Jefferson: { keys: "u" },
+  Hollow: { keys: "eE", front: true },
+  "Big Boy": { keys: "e" },
+  Sawyer: { keys: "wx" },
+  Wrangler: { keys: "we" },
+  Alfil: { keys: "wx", front: true },
+};
+/** His face's features' middle less his head's middle (head pixels; + to our right) in a frame. */
+function faceTurn(ka: KingAttackKit, f: Anim["frames"][number], keys: string): number {
+  const layer = f.layers.find((l) => l.part.startsWith("head"));
+  expect(layer, "a head").toBeTruthy();
+  let grid = ka.ch.parts[layer!.part]!.grid.map((r) => [...r]);
+  if (layer!.flipX) grid = grid.map((r) => r.reverse());
+  let all = 0, n = 0, feat = 0, m = 0;
+  grid.forEach((row) =>
+    row.forEach((k, x) => {
+      if (k === "." || k === " ") return;
+      all += x;
+      n++;
+      if (keys.includes(k)) {
+        feat += x;
+        m++;
+      }
+    }),
+  );
+  expect(m).toBeGreaterThan(0);
+  return feat / m - all / n;
+}
+
+describe("each attacker looks at the king he hits (Eric, Oct 18)", () => {
+  for (const [name, kit] of Object.entries(BOSS_KITS)) {
+    const ka = kit.kingAttack;
+    if (!ka) continue;
+    it(`${name}: his face toward the king in every hit, on either side of the board`, () => {
+      const face = FACES[name]!;
+      const anim = ka.ch.anims[ka.anim]!;
+      const s = starts(anim);
+      const hits = anim.frames.filter((_, i) => kingAttackHits().includes(s[i]!));
+      expect(hits).toHaveLength(KING_ATTACK.lashes);
+      const toward = ka.facesLeft ? -1 : 1;
+      for (const f of hits) {
+        const d = faceTurn(ka, f, face.keys);
+        if (face.front) expect(Math.abs(d), `${name} front on`).toBeLessThan(0.75);
+        else expect(d * toward, `${name} turned toward the king`).toBeGreaterThanOrEqual(0.75);
+      }
+      for (let col = 0; col < 8; col++) {
+        const p = kingAttackPlace(ka, col, 4);
+        // On screen: his drawing's way, mirrored or not, is the way to the king from where he stands.
+        expect(toward * (p.mirrored ? -1 : 1)).toBe(p.left ? 1 : -1);
+        expect(p.from).toBe(p.left ? "L" : "R");
+      }
+    });
+  }
+});
+
+/**
+ * Where an attack goes for a king on any square (Eric, Oct 18: "nothing gets smushed on a phone"), either way up: on
+ * the side toward the board's middle, his prop on the king, his feet on the king's row, never rising more than
+ * ATTACK_ROOM_ABOVE over the board's top (a phone's boss bar is above it), drawn smaller only near the top, and then
+ * shrunk toward the edge of the king's middle (KING_MIDDLE): his body, outside it at full size (the test above), stays
+ * outside it, and his prop still reaches the king (within a fifth of a square of his middle, or past it).
+ */
+describe("an attack's place on the board, at every square", () => {
+  for (const [name, kit] of Object.entries(BOSS_KITS)) {
+    const ka = kit.kingAttack;
+    if (!ka) continue;
+    it(`${name}: on the board at all 64 squares, both ways up`, () => {
+      const rise = (ka.ch.foot[1] - attackTop(ka)) / ka.perSquare;
+      // His prop's reach past the king's middle (squares, at full size), from the reach test above.
+      const anim = ka.ch.anims[ka.anim]!;
+      const s = starts(anim);
+      const hitFrame = anim.frames.find((_, i) => s[i] === KING_ATTACK.lashAt)!;
+      const past = reach(ka, hitFrame) - ka.stand;
+      expect(past).toBeGreaterThan(0);
+      for (const orientation of ["white", "black"] as const)
+        for (let f = 0; f < 8; f++)
+          for (let r = 0; r < 8; r++) {
+            const col = orientation === "white" ? f : 7 - f;
+            const row = orientation === "white" ? 7 - r : r;
+            const p = kingAttackPlace(ka, col, row);
+            const at = `${"abcdefgh"[f]}${r + 1} ${orientation}`;
+            expect(p.left, at).toBe(col >= 4);
+            // Never more than the room above the board, landed (his drop-in and leap above it are clipped).
+            const top = row + 0.96 - rise * p.scale;
+            expect(top, at).toBeGreaterThanOrEqual(-ATTACK_ROOM_ABOVE - 1e-9);
+            expect(p.clipTop, at).toBeGreaterThanOrEqual(0);
+            expect(p.box.y + p.box.h * p.clipTop, at).toBeGreaterThanOrEqual(-ATTACK_ROOM_ABOVE - 1e-9);
+            // Full size from the third row from the top down (a phone's bar is above the top two); never below half.
+            if (row >= 2) expect(p.scale, at).toBe(1);
+            expect(p.scale, at).toBeGreaterThanOrEqual(0.5);
+            // Shrunk toward the edge of the king's middle: his feet on its row, his prop still on the king.
+            const footX = p.box.x + p.box.w * (p.mirrored ? 1 - ka.ch.foot[0] / ka.ch.w : ka.ch.foot[0] / ka.ch.w);
+            const footY = p.box.y + p.box.h * (ka.ch.foot[1] / ka.ch.h);
+            expect(footY, at).toBeCloseTo(row + 0.96, 6);
+            expect(Math.abs(footX - (col + 0.5)), at).toBeCloseTo(KING_MIDDLE + (ka.stand - KING_MIDDLE) * p.scale, 6);
+            expect((past + KING_MIDDLE) * p.scale - KING_MIDDLE, at).toBeGreaterThan(-0.2);
+            // Within the board's width, give or take half a square at its sides.
+            expect(p.box.x, at).toBeGreaterThanOrEqual(-0.5);
+            expect(p.box.x + p.box.w, at).toBeLessThanOrEqual(8.5);
+          }
+    });
+  }
 });
 
 describe("the God King's Last Stand against a boss's attack", () => {

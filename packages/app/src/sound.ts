@@ -531,6 +531,7 @@ export type SoundName =
   | "grexFizz"
   | "grexPoof"
   | "grexPop"
+  | "grexSparkle"
   | "grexRoar"
   | "grexSmack"
   | "grexWhistle"
@@ -685,6 +686,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   grexFizz: grex("fizz"),
   grexPoof: grex("poof"),
   grexPop: grex("pop"),
+  grexSparkle: grex("sparkle"),
   grexRoar: grex("roar"),
   grexSmack: grex("smack"),
   grexWhistle,
@@ -788,6 +790,7 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   grexFizz: [["grex", "fizz"]],
   grexPoof: [["grex", "poof"]],
   grexPop: [["grex", "pop"]],
+  grexSparkle: [["grex", "sparkle"]],
   grexRoar: [["grex", "roar"]],
   grexSmack: [["grex", "smack"]],
   grexWhistle: [...WHISTLES, "sparkle" as const].map((w): BossSound => ["grex", w]),

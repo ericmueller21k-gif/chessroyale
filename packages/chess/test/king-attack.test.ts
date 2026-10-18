@@ -70,8 +70,8 @@ describe("how long the boss's move holds the screen (bossTurnShowMs)", () => {
     expect(crowdMated(notMated, "w")).toBe(false);
   });
 
-  it("holds for the attack at a mate by a boss that has one (Boingo, Hollow, Sawyer, Wrangler, Alfil), the same alone or in a raid", () => {
-    expect(KING_ATTACKERS).toEqual(["clown", "hollow", "sawyer", "pig", "alfil"]);
+  it("holds for the attack at a mate by a boss that has one (every playable boss but the Hidden Boss), the same alone or in a raid", () => {
+    expect(KING_ATTACKERS).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil"]);
     for (const id of KING_ATTACKERS) {
       expect(hasKingAttack(id)).toBe(true);
       expect(mateAttackDue(view(id, MATED))).toBe(true);
@@ -81,7 +81,7 @@ describe("how long the boss's move holds the screen (bossTurnShowMs)", () => {
   });
 
   it("keeps today's hold for every other boss, and for any move that isn't a mate", () => {
-    for (const id of ["gingerbread", "grex", "bigboy", "recluse"]) {
+    for (const id of ["recluse", "golem", "dragon"]) {
       expect(hasKingAttack(id)).toBe(false);
       expect(bossTurnShowMs(view(id, MATED))).toBe(bossShowMs({}));
       expect(bossTurnShowMs(view(id, MATED), true)).toBe(bossShowMs({}, true));
@@ -123,7 +123,8 @@ describe("the mate test switch (settings.bossMateTest, ?mate=1 in solo)", () => 
       expect(await r.playBoss()).toBe("d8h4");
       const view = r.bossView()!;
       expect(crowdMated(view.board.fen, "w")).toBe(true);
-      expect(mateAttackDue(view)).toBe(id === "hollow");
+      // (Every one of them attacks the mated king now: Big Boy and Ginger too, Oct 18.)
+      expect(mateAttackDue(view)).toBe(true);
       expect(r.stageComplete() || r.isOver()).toBe(true);
     }
   });

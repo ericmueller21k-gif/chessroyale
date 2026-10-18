@@ -17,6 +17,8 @@
  */
 import { canvas, ellipse, flame as flameGrid, inEllipse, inPoly, roundLight, shade, toGrid, type Canvas } from "./paint.ts";
 import type { Beat } from "./boss-beats.ts";
+import { KING_ATTACK } from "@chessroyale/chess";
+import { moved } from "./attack-frame.ts";
 import { lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 export const GREX_PALETTE = {
@@ -1162,6 +1164,7 @@ export const GREX_LINES: Partial<Record<Beat, readonly string[]>> = {
   ultimateWarn: ["Got a big one for you…", "Wanna see a trick?", "Lighting the fuse…", "Big bang coming…"],
   ultimate: ["Fireworks time!", "Ooh! Aah! Ha!", "Look up! Way up!"],
   ultimateHit: ["Incoming!", "It's raining fire!", "Hot rain! Ha!", "Here they come!"],
+  kingAttack: ["Fireworks, your majesty!", "Ooh! Aah! Ouch!", "Let's light up the king!"],
 };
 export const GREX_CHANCE: Partial<Record<Beat, number>> = {
   entrance: 1,
@@ -1180,4 +1183,123 @@ export const GREX_CHANCE: Partial<Record<Beat, number>> = {
   ultimateWarn: 1,
   ultimate: 1,
   ultimateHit: 0.6,
+  kingAttack: 1,
+};
+
+// ---- His attack on a king (kits.ts: his kit's `kingAttack`; Eric, Oct 18: "a relentless assault"): the Roman
+// candle, planted in front of him and tilted at the king, one fireball a beat, each popping on the king in sparks.
+
+/** Room to our right (the king's side) for the fireballs' flight to the king. */
+const ATTACK_REACH = 24;
+const AW = GREX.w + ATTACK_REACH;
+const AH = GREX.h;
+/** Where the fireballs land, in his drawing space: at the king's head, then its chest, in turn (1.8 squares off). */
+const KING_AT: Pt = [28 + 1.8 * 36 + 4, 0];
+const ballY = (i: number) => GROUND - (i % 2 ? 18 : 28);
+/** The candle's tilt for shot `i`: steeper for the head, flatter for the chest. */
+const shotDeg = (i: number) => (i % 2 ? 20 : 26);
+/** A frame of his (his drawing space) in the attack's wider frame. */
+const fa = (ms: number, p: GrexPose, extra: Partial<Frame> = {}, seed = 0): Frame => moved(f(ms, p, extra, seed), 0, 0, AW, AH);
+/** A fireball's arc from the muzzle (frame pixels) to the king: on along the candle's tilt, over and down. */
+function arc(m: Pt, deg: number, i: number, t: number): Pt {
+  const a = (deg * Math.PI) / 180;
+  const to: Pt = [OX + KING_AT[0], OY + ballY(i)];
+  const c: Pt = [m[0] + Math.sin(a) * 16, m[1] - Math.cos(a) * 16];
+  return [(1 - t) ** 2 * m[0] + 2 * (1 - t) * t * c[0] + t * t * to[0], (1 - t) ** 2 * m[1] + 2 * (1 - t) * t * c[1] + t * t * to[1]];
+}
+/** A fireball at (x, y): a white-hot core, gold, an orange rim, red at its edge. */
+function ball(x: number, y: number): Speck[] {
+  const out: Speck[] = [];
+  for (let dy = -4; dy <= 4; dy++)
+    for (let dx = -4; dx <= 4; dx++) {
+      const d = Math.hypot(dx, dy);
+      if (d <= 3.4) out.push([x + dx, y + dy, d < 1.2 ? "x" : d < 2 ? "y" : d < 2.7 ? "Y" : dx + dy > 1 ? "F" : "f"]);
+    }
+  return out;
+}
+/**
+ * Fireball `i` arriving at the king: a flaming tail behind it, thick and hot near the ball, and a trail of sparks back
+ * along its arc to the muzzle, cooling as it goes.
+ */
+function shotIn(m: Pt, i: number): Speck[] {
+  const deg = shotDeg(i);
+  const out: Speck[] = [];
+  for (let n = 4; n <= 36; n++) {
+    const t = n / 40;
+    if (t < 0.6 && n % 3) continue;
+    const [x, y] = arc(m, deg, i, t);
+    const X = Math.round(x);
+    const Y = Math.round(y);
+    out.push([X, Y, t > 0.8 ? "Y" : t > 0.62 ? "f" : t > 0.35 ? "F" : "R"]);
+    if (t > 0.62) out.push([X, Y - 1, t > 0.8 ? "f" : "F"], [X, Y + 1, "F"]);
+  }
+  const [bx, by] = arc(m, deg, i, 0.97);
+  return [...out, ...ball(Math.round(bx), Math.round(by))];
+}
+const SHOT = (i: number): GrexPose => ({ ...AIM(shotDeg(i)), crouch: 0, bob: 1, mood: i % 3 === 2 ? "roar" : "grin" });
+const KICK = (i: number): GrexPose => ({ ...AIM(shotDeg(i)), crouch: 1, bob: 0, mood: i % 4 === 3 ? "shout" : "grin" });
+
+/**
+ * His attack on a king, the king to our right (the board mirrors him when it's to his left), on the shared beats
+ * (KING_ATTACK, boss-timing.ts): his shadow grows, he drops in with the Roman candle in his hoof (`whoosh`), lands and
+ * slams it down in front of him (`slam`), lights the fuse (`fizz`), then fires at the king: ten fireballs, one a beat,
+ * each arcing over and popping on the king (cues `pop` and `sparkle` in turn: the pop, the crackle of its sparks), the candle tilted for its head and its
+ * chest in turn, its muzzle flashing as the next one leaves; he laughs and leaps off. The last frame is empty. Every
+ * pose is one of his Roman candle's, so nothing new is painted; the frames are built the first time they're read.
+ */
+function buildKingAttack(): Anim {
+  const A = KING_ATTACK;
+  const P: Pt = [OX + PLANT[0], OY + PLANT[1]];
+  const empty = (ms: number, specks: Speck[]): Frame => moved({ ms, layers: [], specks }, 0, 0, AW, AH);
+  const frames: Frame[] = [
+    empty(100, dropShadow(4)),
+    empty(100, dropShadow(9)),
+    fa(80, { air: 22, candle: "show", mood: "laugh", feet: "wide", big: true, flick: 0 }, { cue: "whoosh" }, 1),
+    fa(80, { air: 12, candle: "show", mood: "laugh", feet: "wide", big: true, flick: 1 }, {}, 2),
+    fa(A.landAt - 360, { crouch: 4, ...AIM(0), a: "pump", mood: "roar", flick: 8 }, { cue: "slam", shake: [1, 2], specks: [...impact(P), ...dust(P, 0)], pal: EYES_HOT }, 9),
+    // The fuse lit, fizzing; the first shot leaves.
+    fa(50, { crouch: 1, ...AIM(0), mood: "grin", flick: 10 }, { cue: "fizz", specks: [...dust(P, 2), ...sparkSpray(muzzle(AIM(0)), 6, 0.6)] }, 11),
+    fa(A.lashAt - A.landAt - 50, KICK(0), { specks: [...streak(muzzle(KICK(0)), shotDeg(0)), ...muzzleFlash(muzzle(KICK(0)), true)] }, 12),
+  ];
+  for (let i = 0; i < A.lashes; i++) {
+    const p = SHOT(i);
+    frames.push(fa(90, p, { cue: i % 2 ? "sparkle" : "pop", specks: [...shotIn(muzzle(KICK(i)), i), ...wisps(muzzle(p), i, 2)], pal: i % 4 === 0 ? EYES_HOT : undefined }, 20 + i * 2));
+    const next = KICK(i + 1);
+    const last = i === A.lashes - 1;
+    frames.push(fa(A.lashEveryMs - 90, last ? { ...SHOT(i), mood: "laugh" } : next, { specks: last ? wisps(muzzle(p), i + 1, 3) : [...streak(muzzle(next), shotDeg(i + 1)), ...muzzleFlash(muzzle(next), i % 3 === 0)] }, 21 + i * 2));
+  }
+  const laugh = A.leaveAt - (A.lashAt + A.lashes * A.lashEveryMs);
+  frames.push(fa(laugh, { ...AIM(0), mood: "laugh", flick: 60 }, { specks: wisps(muzzle(AIM(0)), 1) }, 70));
+  const leave = A.ms - A.leaveAt;
+  frames.push(
+    fa(leave - 300, { crouch: 2, ...AIM(0), flick: 9 }, {}, 71),
+    fa(80, { air: 12, candle: "show", mood: "laugh", feet: "wide", big: true, flick: 1 }, { cue: "whoosh" }, 72),
+    fa(80, { air: 22, candle: "show", mood: "laugh", feet: "wide", big: true, flick: 0 }, {}, 73),
+    empty(80, dropShadow(6)),
+    { ms: 60, layers: [] },
+  );
+  return { loop: false, frames };
+}
+let attack: Anim | undefined;
+let still: Anim | undefined;
+
+/**
+ * Jefferson for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, in a frame
+ * `ATTACK_REACH` wider on the right (the fireballs' flight). Its animations are built the first time they're read
+ * (his battle's warm-up, KingAttack.tsx). Its `idle`, one still, is for the preview.
+ */
+export const GREX_ATTACK: Character = {
+  ...GREX,
+  id: "grex-attack",
+  name: "Jefferson (his attack)",
+  w: AW,
+  h: AH,
+  anims: {
+    get idle() {
+      return (still ??= { loop: true, frames: [fa(1000, { ...AIM(0) })] });
+    },
+    get kingAttack() {
+      return (attack ??= buildKingAttack());
+    },
+  },
 };

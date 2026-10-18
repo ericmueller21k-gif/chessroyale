@@ -1,7 +1,7 @@
 /** Ginger's effects: the ice over a frozen piece, the ice bolt in flight, the blizzard. See ../effects.ts. */
 import { canvas, ellipse, inEllipse, line, roundLight, shade, toGrid } from "../paint.ts";
 import type { Character, Frame, Layer, Part, Speck } from "../sprite.ts";
-import { BOARD, sparkle, SQUARE, type Pt } from "./common.ts";
+import { BOARD, hitAnims, sparkle, SQUARE, type Pt } from "./common.ts";
 
 // ---- The ice over a frozen piece.
 
@@ -384,4 +384,48 @@ export const BLIZZARD_SWEEP: Character = {
       ],
     },
   },
+};
+
+// ---- Her attack on a king: a jab of the frosted cane.
+
+const FROST_PALETTE = { k: "#1d4e7a", F: "#ffffff", w: "#e8f8ff", W: "#bfe3f5", i: "#d6f6ff", I: "#7fd3ff", J: "#3a8fd8", f: "#a8e8ff" } as const;
+/**
+ * The jab's frost at (12, y), the cane coming in from the left: a white puff where the tip lands with ice shards
+ * flicking out of it; the puff spreading thin as the shards fly on; the last flecks drifting down.
+ */
+function frostSpecks(y: number, step: 0 | 1 | 2): Speck[] {
+  const x = 12;
+  const out: Speck[] = [];
+  const r = [2.2, 3.4, 4][step]!;
+  for (let dy = -3; dy <= 3; dy++)
+    for (let dx = -4; dx <= 4; dx++) {
+      const d = (dx / r) ** 2 + (dy / (r * 0.8)) ** 2;
+      if (d > 1) continue;
+      if (step === 2 && (dx + dy) % 2) continue;
+      out.push([x + dx, y + dy, step === 0 ? (d < 0.4 ? "F" : "w") : d < 0.3 ? "w" : "W"]);
+    }
+  // Ice shards: short slivers out of the puff, away from her (up, on, down).
+  for (const [ux, uy] of [[1, -0.7], [1, 0], [0.8, 0.8], [0.2, -1], [0.3, 1]] as const) {
+    const from = [3, 5, 8][step]!;
+    const len = step === 2 ? 1 : 3;
+    for (let d = from; d < from + len; d++) out.push([Math.round(x + ux * d), Math.round(y + uy * d + (step === 2 ? 2 : 0)), d === from ? "i" : step ? "I" : "J"]);
+  }
+  if (step > 0) out.push(...sparkle(x + 2 + step * 3, y - 3 - step, "F", "f"));
+  return out;
+}
+
+/**
+ * A jab of Ginger's frosted cane on a king (her attack on a king): `hit<H|L><L|R>`, at its head or its chest, from the
+ * left or right edge: a white puff and ice shards flicking out, the puff thinning away. About 200 ms; ends empty. Her
+ * cold, not her freeze: small and gone at once, it never covers or changes the king.
+ */
+export const FROST_HIT: Character = {
+  id: "frost-hit",
+  name: "A jab of Ginger's frosted cane",
+  w: SQUARE,
+  h: SQUARE,
+  foot: [16, 31],
+  palette: FROST_PALETTE,
+  parts: {},
+  anims: hitAnims([["H", 9], ["L", 15]], frostSpecks),
 };

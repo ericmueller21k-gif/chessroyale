@@ -38,9 +38,11 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 - **The Last Stand on screen** (`LAST_STAND` in `boss-timing.ts`, `LastStand.tsx`): the warning, the freeze, his dive
   onto the piece's square, his cut-in, the piece sliding back, the blow meant for it, his stagger, collapse and fade.
   The blow is 25 red slashes with red numbers; against a boss whose kit has a `kingAttack` (Hollow, Eric, Oct 10;
-  Alfil, Oct 17; Boingo, Sawyer and Wrangler, Oct 18: `KING_ATTACKERS`) it is the boss's attack instead: from
+  Alfil, Oct 17; Boingo, Sawyer and Wrangler, then Big Boy, Ginger and Jefferson, Oct 18: `KING_ATTACKERS`, every
+  playable boss but the Hidden Boss) it is the boss's attack instead: from
   `LAST_STAND.attackAt` (as the piece slides back) the boss drops in beside him and hits him ten times (`KingAttack.tsx`, on the shared `KING_ATTACK` beats), a gold "−N" off him each lash in his own
-  strike style (`ks-hp`), his blows on its lashes (his `lastStandAttacked` frames), then it leaps off as he staggers.
+  strike style (`ks-hp`), his blows on its lashes (his `lastStandAttacked` frames), then it leaps off as he staggers (facing him from the side toward the board's middle; drawn smaller on the
+  board's top rows, so it never rises over the boss bar: `kingAttackPlace`).
   It fits between the slide and the stagger, so the Last Stand takes no longer and nothing changed on the server. See
   [bosses.md](bosses.md), "A boss's attack on a king".
 - **Fair.** A power never changes how a player's own pick was judged, and a move he plays never earns brilliant credit.

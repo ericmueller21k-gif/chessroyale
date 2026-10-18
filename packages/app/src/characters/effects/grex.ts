@@ -1,7 +1,7 @@
 /** G-REX's effects: his fire tiles, a piece burning, the sparkler, the Roman candle's rockets and fireballs, their shadows. See ../effects.ts. */
 import { canvas, ellipse, flame, line, poly, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
-import { SQUARE, type Pt } from "./common.ts";
+import { hitAnims, SQUARE, type Pt } from "./common.ts";
 
 // ---- G-REX's fire: a tile that burns up in three stages, a piece burnt to ash, his thrown sparkler, the Roman
 // candle's rockets, the fireballs that fall from them, and the count of shots still up there.
@@ -564,4 +564,52 @@ export const FIRE_SHADOW: Character = {
     shadow2: shadowLoop(2),
     shadow3: shadowLoop(3),
   },
+};
+
+// ---- His attack on a king: a fireball popping on the king.
+
+const POP_PALETTE = { k: "#2a0d05", x: "#ffffff", y: "#fff7b8", Y: "#ffd23a", f: "#ff9a1f", F: "#f2541b", R: "#b3270f" } as const;
+/**
+ * A fireball popping at (13, y), come in from the left: a white flash in a gold ring; eight sparks bursting out, gold
+ * at their heads; the sparks flying on, falling and cooling.
+ */
+function popSpecks(y: number, step: 0 | 1 | 2): Speck[] {
+  const x = 13;
+  const out: Speck[] = [];
+  if (step === 0) {
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        const d = Math.hypot(dx, dy);
+        if (d <= 2.3) out.push([x + dx, y + dy, d < 1.2 ? "x" : "y"]);
+      }
+    return out;
+  }
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * 2 * Math.PI + (step === 2 ? 0.2 : 0);
+    const [ux, uy] = [Math.cos(a), Math.sin(a)];
+    const head = step === 1 ? 5 : 8;
+    const fall = step === 2 ? 2 : 0;
+    for (let d = head - (step === 1 ? 3 : 1); d <= head; d++) {
+      const k = d === head ? (step === 1 ? "Y" : i % 2 ? "f" : "F") : step === 1 ? "f" : "R";
+      out.push([Math.round(x + ux * d), Math.round(y + uy * d * 0.9 + fall), k]);
+    }
+  }
+  if (step === 1) out.push([x, y, "y"], [x + 1, y, "Y"], [x, y + 1, "Y"]);
+  return out;
+}
+
+/**
+ * A fireball of Jefferson's Roman candle popping on a king (his attack on a king): `hit<H|L><L|R>`, at its head or its
+ * chest, from the left or right: a white flash, eight sparks bursting out, then falling and cooling. About 200 ms; ends
+ * empty. Over the piece (or the God King standing there).
+ */
+export const POP_HIT: Character = {
+  id: "pop-hit",
+  name: "A fireball popping on a king",
+  w: SQUARE,
+  h: SQUARE,
+  foot: [16, 31],
+  palette: POP_PALETTE,
+  parts: {},
+  anims: hitAnims([["H", 8], ["L", 15]], popSpecks),
 };

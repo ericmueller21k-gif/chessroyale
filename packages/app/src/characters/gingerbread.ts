@@ -10,6 +10,8 @@
  */
 import { canvas, ellipse, inEllipse, roundLight, shade, toGrid, type Canvas } from "./paint.ts";
 import { lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { KING_ATTACK } from "@chessroyale/chess";
+import { groundShadow, moved } from "./attack-frame.ts";
 
 export const GINGER_PALETTE = {
   k: "#1c0d07", // outline
@@ -43,7 +45,7 @@ type Pt = readonly [number, number];
 
 // ---- Head: one face per mood.
 
-export type Mood = "angry" | "laugh" | "shout" | "hurt" | "smug" | "rattled" | "think" | "out";
+export type Mood = "angry" | "laugh" | "shout" | "hurt" | "smug" | "rattled" | "think" | "out" | "jab";
 
 /** Left-side features (the right side is their mirror), in the head's 22 x 20 grid. */
 const BROWS: Record<string, readonly string[]> = {
@@ -59,6 +61,9 @@ const EYES: Record<string, readonly string[]> = {
   x: ["k.k.", ".k..", "k.k."],
   half: ["....", "kkkk", "keek"],
   look: ["kkkk", "k.ee", ".kkk"],
+  /** Both eyes glaring to our right (her attack on a king): the left eye, and the right one, stamped as they are. */
+  glance: ["kk..", "kkee", ".kkk"],
+  glanceR: ["..kk", "kkee", "kkk."],
 };
 const MOUTHS: Record<string, readonly string[]> = {
   frown: ["..www..", ".w...w.", "w.....w"],
@@ -69,7 +74,7 @@ const MOUTHS: Record<string, readonly string[]> = {
   wavy: ["ww..ww.", "..ww..w"],
   flat: ["wwwww"],
 };
-const FACES: Record<Mood, { brows: string; right?: string; eyes: string; mouth: string }> = {
+const FACES: Record<Mood, { brows: string; right?: string; eyes: string; eyesR?: string; mouth: string }> = {
   angry: { brows: "angry", eyes: "angry", mouth: "frown" },
   laugh: { brows: "angry", eyes: "squint", mouth: "laugh" },
   shout: { brows: "angry", eyes: "angry", mouth: "shout" },
@@ -78,6 +83,8 @@ const FACES: Record<Mood, { brows: string; right?: string; eyes: string; mouth: 
   rattled: { brows: "worried", eyes: "wide", mouth: "wavy" },
   think: { brows: "flat", eyes: "look", mouth: "flat" },
   out: { brows: "flat", eyes: "x", mouth: "wavy" },
+  /** Jabbing: shouting, glaring to our right at what she jabs (her attack on a king). */
+  jab: { brows: "angry", eyes: "glance", eyesR: "glanceR", mouth: "shout" },
 };
 
 function stamp(cv: Canvas, rows: readonly string[], x0: number, y0: number, mirror = false): void {
@@ -122,7 +129,8 @@ function head(mood: Mood, cracks = 0): Part {
   stamp(cv, BROWS[f.brows]!, 4, 6);
   stamp(cv, BROWS[f.right ?? f.brows]!, 13, 6, true);
   stamp(cv, EYES[f.eyes]!, 5, 9);
-  stamp(cv, EYES[f.eyes]!, 13, 9, true);
+  if (f.eyesR) stamp(cv, EYES[f.eyesR]!, 13, 9);
+  else stamp(cv, EYES[f.eyes]!, 13, 9, true);
   const mouth = MOUTHS[f.mouth]!;
   stamp(cv, mouth, 11 - Math.floor(mouth[0]!.length / 2), 14);
   for (const crack of HEAD_CRACKS.slice(0, cracks)) for (const [x, y] of crack) cv[y]![x] = "k";
@@ -287,7 +295,7 @@ function paintCane(grip: Pt, dir: Pt, up: number, down: number, curl: 1 | -1 = 1
 // ---- Parts and poses.
 
 const PARTS: Record<string, Part> = { torso, bowTie, shadow };
-const MOODS: readonly Mood[] = ["angry", "laugh", "shout", "hurt", "smug", "rattled", "think", "out"];
+const MOODS: readonly Mood[] = ["angry", "laugh", "shout", "hurt", "smug", "rattled", "think", "out", "jab"];
 for (const m of MOODS) for (const c of [0, 1, 2]) PARTS[`head:${m}:${c}`] = head(m, c);
 
 const LIMBS = new Map<string, Painted>();
@@ -327,7 +335,7 @@ interface CaneSpec {
 }
 
 /** Where he holds the cane, in his drawing space (50 x 58, the ground at y 58). */
-export type CanePose = "rest" | "lift" | "raise" | "overhead" | "aim" | "thrust";
+export type CanePose = "rest" | "lift" | "raise" | "overhead" | "aim" | "thrust" | "jabHigh" | "jabLow" | "cockHigh" | "cockLow";
 const CANE: Record<CanePose, CaneSpec> = {
   rest: { grip: [11, 37], dir: [-0.12, -1], up: 30, down: 20 },
   lift: { grip: [11, 34], dir: [-0.12, -1], up: 30, down: 20 },
@@ -335,6 +343,12 @@ const CANE: Record<CanePose, CaneSpec> = {
   overhead: { grip: [13, 7], dir: [0.06, -1], up: 15, down: 10, elbow: [15, 18] },
   aim: { grip: [14, 36], dir: [-1, -0.28], up: 6, down: 30, curl: -1, front: true },
   thrust: { grip: [18, 35], dir: [-1, -0.28], up: 6, down: 30, curl: -1, front: true },
+  // Her attack on a king (to our right): held by the hook, its whole length out (50, as it stands), jabbed at its head or
+  // its chest (its tip just past the king's middle), and drawn back up between jabs behind her, its tip over the king.
+  jabHigh: { grip: [24, 32], dir: [-1, 0.05], up: 6, down: 44, curl: -1, elbow: [20, 34], front: true },
+  jabLow: { grip: [24, 38], dir: [-1, -0.1], up: 6, down: 44, curl: -1, elbow: [20, 36], front: true },
+  cockHigh: { grip: [15, 33], dir: [-1, 0.6], up: 6, down: 44, curl: -1, elbow: [16, 32] },
+  cockLow: { grip: [16, 35], dir: [-1, 0.42], up: 6, down: 44, curl: -1, elbow: [17, 33] },
 };
 const SHOULDER_L: Pt = [21, 26];
 const SHOULDER_R: Pt = [37, 26];
@@ -775,6 +789,7 @@ export const GINGER_LINES: Partial<Record<import("./boss-beats.ts").Beat, readon
   power: ["Chill out!", "Stay frosty!", "On ice you go!", "Cold feet?"],
   ultimateWarn: ["A storm is brewing…", "Feel that chill?", "Wrap up warm…", "The frost is coming…"],
   ultimate: ["Let it snow!", "Freeze, all of you!", "Snow day! Ha!"],
+  kingAttack: ["Frostbite, your majesty!", "Snap! Snap! Snap!", "Feeling a chill yet?"],
   ultimateHit: ["Melting? Already?!", "Hmph. Don't get comfy.", "My lovely ice!", "Drip, drip… bah!"],
 };
 export const GINGER_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
@@ -793,4 +808,84 @@ export const GINGER_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, numbe
   ultimateWarn: 1,
   ultimate: 1,
   ultimateHit: 1,
+  kingAttack: 1,
+};
+
+// ---- Her attack on a king (kits.ts: her kit's `kingAttack`; Eric, Oct 18: "a relentless assault"): the candy cane,
+// frosted, jabbed at the king on every beat, high and low in turn. Her cold, not a freeze: nothing covers the king.
+
+/** Room to our right (the king's side) for the cane, and headroom to drop in from. */
+const ATTACK_REACH = 12;
+const ATTACK_TOP = 0;
+const AW = GINGERBREAD.w + ATTACK_REACH;
+const AH = GINGERBREAD.h + ATTACK_TOP;
+/** A frame of hers in the attack's bigger frame, `lift` pixels up in the air. */
+const fa = (ms: number, p: GingerPose, extra: Partial<Frame> = {}, lift = 0, ground: readonly Speck[] = []): Frame => moved(f(ms, p, extra), 0, ATTACK_TOP, AW, AH, lift, ground);
+const landShadow = (r: number): Speck[] => groundShadow(OX + 29, OY + GROUND + ATTACK_TOP - 1, r);
+/** Her frost on the cane's tip as it lands: a big sparkle and shards flicking off it, away from her. */
+const frostTip = ([x, y]: Pt, i: number): Speck[] => [
+  ...sparkle(x + 1, y, true),
+  ...[[3, -3], [4, 2], [2, 4], [5, -1]].flatMap(([dx, dy], k): Speck[] => [[x + dx! + (i % 2), y + dy!, k % 2 ? "I" : "i"], [x + dx! + 1 + (i % 2), y + dy! + (dy! < 0 ? -1 : 1), "f"]]),
+];
+const JAB_HIGH: GingerPose = { mood: "jab", cane: "jabHigh", glow: true, free: "up", feet: "wide", crouch: 1 };
+const JAB_LOW: GingerPose = { mood: "jab", cane: "jabLow", glow: true, free: "up", feet: "wide", crouch: 2 };
+
+/**
+ * Her attack on a king, the king to our right (the board mirrors her when it's to her left), on the shared beats
+ * (KING_ATTACK, boss-timing.ts): snow whirls where she'll land, she drops into it (`jingle`) and lands in a burst of
+ * frost, her cane glowing ice-blue; then jabs the king with it ten times, at its head and its chest in turn (cues
+ * `crackle` and `crunch`: a crackle of frost, a crunch of ice), frost flying off the tip, glaring at it, the cane drawn back up between; she cackles, crouches
+ * and leaps off. The last frame is empty. Built when first played (her parts are painted as they're made).
+ */
+function buildKingAttack(): Anim {
+  const A = KING_ATTACK;
+  const empty = (ms: number, specks: Speck[]): Frame => moved({ ms, layers: [], specks }, 0, ATTACK_TOP, AW, AH);
+  const frames: Frame[] = [
+    empty(100, [...swirl(0, 8, 8, GROUND - 6), ...landShadow(4)]),
+    empty(100, [...swirl(0.15, 12, 10, GROUND - 10), ...landShadow(9)]),
+    fa(80, { feet: "wide", free: "up", cane: "raise", glow: true, mood: "shout" }, { cue: "jingle", pal: GLOW_HALF, specks: swirl(0.3, 18, 10) }, 16, landShadow(13)),
+    fa(80, { feet: "wide", free: "up", cane: "raise", glow: true, mood: "shout" }, { pal: GLOW_HALF, specks: swirl(0.45, 22, 10) }, 7, landShadow(14)),
+    fa(A.landAt - 360, { crouch: 3, feet: "wide", free: "out", cane: "cockHigh", mood: "jab" }, { shake: [0, 1], specks: frostBurst([OX + 29, OY + GROUND - 1], 6) }),
+    fa(A.lashAt - A.landAt, { crouch: 1, feet: "wide", free: "hip", cane: "cockHigh", glow: true, mood: "jab" }, { pal: { ...GLOW_PULSE, ...ICY_EYES }, specks: frostBurst([OX + 29, OY + GROUND - 1], 9).filter((_, k) => k % 2 === 0) }),
+  ];
+  for (let i = 0; i < A.lashes; i++) {
+    const p = i % 2 ? JAB_LOW : JAB_HIGH;
+    frames.push(fa(90, p, { cue: i % 2 ? "crunch" : "crackle", pal: i % 2 ? { ...GLOW_PULSE, ...ICY_EYES } : { ...GLOW_BRIGHT, ...ICY_EYES }, shake: [i % 2 ? -1 : 1, 0], specks: frostTip(caneTip(p), i) }));
+    frames.push(fa(A.lashEveryMs - 90, { mood: "jab", cane: i % 2 ? "cockHigh" : "cockLow", glow: true, free: "hip", feet: "wide", crouch: 1, headDx: i % 2 }, { pal: GLOW_HALF }));
+  }
+  const laugh = A.leaveAt - (A.lashAt + A.lashes * A.lashEveryMs);
+  frames.push(fa(laugh, { mood: "laugh", cane: "overhead", free: "up", feet: "wide", glow: true }, { pal: GLOW_HALF, specks: snow(3, 8) }));
+  const leave = A.ms - A.leaveAt;
+  frames.push(
+    fa(leave - 300, { mood: "smug", crouch: 3, feet: "wide", cane: "raise" }),
+    fa(80, { feet: "wide", free: "up", cane: "raise", mood: "laugh" }, {}, 7, landShadow(12)),
+    fa(80, { feet: "wide", free: "up", cane: "raise", mood: "laugh" }, {}, 16, landShadow(8)),
+    empty(80, landShadow(5)),
+    { ms: 60, layers: [] },
+  );
+  return { loop: false, frames };
+}
+let attack: Anim | undefined;
+let still: Anim | undefined;
+
+/**
+ * Ginger for her attack on a king (her kit's `kingAttack`): her own drawing, parts and palette, in a frame
+ * `ATTACK_REACH` wider on the right (the cane jabbed at the king). Its animations are built the first time they're
+ * read (her battle's warm-up, KingAttack.tsx), so they cost nothing at load. Its `idle`, one still, is for the preview.
+ */
+export const GINGER_ATTACK: Character = {
+  ...GINGERBREAD,
+  id: "gingerbread-attack",
+  name: "Ginger (her attack)",
+  w: AW,
+  h: AH,
+  foot: [GINGERBREAD.foot[0], GINGERBREAD.foot[1] + ATTACK_TOP],
+  anims: {
+    get idle() {
+      return (still ??= { loop: true, frames: [fa(1000, {})] });
+    },
+    get kingAttack() {
+      return (attack ??= buildKingAttack());
+    },
+  },
 };
