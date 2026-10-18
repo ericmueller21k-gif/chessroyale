@@ -154,9 +154,19 @@ tuning: [reports/hopper-carrots-sim.md](../../reports/hopper-carrots-sim.md).
   and the prize's drop, his win). The rage warning names it "Carrot Patch"; the dock's line for the cast's turn (his
   whole turn, no move to show): "Chub & Chirp spent their turn planting carrots."
 
-## The tuning
+## The tuning: placement only, the odds as the sheet has them
 
-(See the report, below: filled in from the runs.)
+[reports/hopper-carrots-sim.md](../../reports/hopper-carrots-sim.md): the raid sim with everything the game does, #273's
+seeds with the meter on, and forced casts from varied middlegames for the distribution (649 races in all).
+
+- **`carrotLeads` = [3, 1, 0, 0, −2]** (moves: his lead on each carrot). Over 167 races his count is **0-1 18%, 2-3
+  68%, 4 11%, 5 3%** against the target's 15, 70, 12 and 3, each within about a standard error. The first aims
+  ([2, 1, 0, −1, −2]) gave 25, 65, 9, 1; four more were tried (the table in the report).
+- **The crowd's score stays in the pack** with the meter on: 0.48 (± 0.09) in 44 crowd moves with these leads, 0.27
+  (± 0.08) in 46 with the first (26 battles each; within two standard errors of each other and of Leapfrog's 0.31
+  without it). The prize decides most battles where it's big: the crowd lost all 18 where his tier was 3 or more.
+- **The odds aren't changed** (the brief: only if placement can't get there): placement got there.
+- **His offset stays −250.**
 
 ## The protocol (optional fields only; an older app or host ignores them)
 

@@ -258,8 +258,11 @@ describe("the Carrot Patch: where the carrots go (the math)", () => {
     const spots = carrotSpots(fen, "w");
     const squares = plantCarrots(fen, "w", 7, 8);
     const leads = squares.map((sq) => spots.find((x) => x.square === sq)!.lead);
-    // (Each nearest its aim the board allows: here exactly.)
-    expect(leads).toEqual([...BOSS_POWERS.carrotLeads]);
+    // (Each nearest its aim the board allows: here exactly, but for the first: no square within reach gives him a lead of
+    // 3, so the nearest, 2.)
+    expect(BOSS_POWERS.carrotLeads).toEqual([3, 1, 0, 0, -2]);
+    expect(spots.some((x) => x.lead === 3 && Math.min(x.his, x.crowd) <= BOSS_POWERS.carrotReach)).toBe(false);
+    expect(leads).toEqual([2, 1, 0, 0, -2]);
     for (const sq of squares) {
       const x = spots.find((y) => y.square === sq)!;
       expect(Math.min(x.his, x.crowd)).toBeLessThanOrEqual(BOSS_POWERS.carrotReach);

@@ -884,7 +884,7 @@ export const BOSS_POWERS = {
    */
   carrotCount: 5,
   carrotMoves: 12,
-  carrotLeads: [2, 1, 0, -1, -2] as readonly number[],
+  carrotLeads: [3, 1, 0, 0, -2] as readonly number[],
   carrotReach: 4,
   carrotSharp: 1.2,
   carrotHurry: 0.85,
