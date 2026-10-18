@@ -115,13 +115,15 @@ jobs:
           [ -n "$files" ] || { echo "No spec files for this shard"; exit 1; }
           npx playwright test $files --grep-invert @perf --forbid-only --retries 1 --trace on-first-retry \
             --reporter=list,github,html,./e2e/ci-summary.ts
+      # (Kept 90 days, the most GitHub keeps: each run's failed and flaky tests, for a look at which tests catch real bugs
+      # and which only flake (Eric, Oct 18). Under a kilobyte a shard.)
       - name: Keep the summary
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: e2e-summary-${{ matrix.shard }}
           path: e2e-summary/
-          retention-days: 1
+          retention-days: 90
           if-no-files-found: ignore
           overwrite: true
       # (On a failure, or when a test only passed on its retry: e2e/ci-summary.ts leaves shard-N.flaky.)
