@@ -17,6 +17,19 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   Stand's, Squads' picks and blocks), square marks (`marks`), Hollow's dark (`dark`, `onDarkTry`), a move tried that
   chess allows but `moves` doesn't (`onRefused`: a boss power stops it, so the screen can say why; `refusedMove` in
   logic.ts, worked out only when the board has an `onRefused`; Oct 17), and a knock for every move that appears (`components/Board.tsx` plays it).
+- **Board colors** (Settings → Board, Oct 18; docs/decisions/2026-10-18-board-colors.md): Classic (the board as it always
+  was), Green or Gold for the dark squares, picked per device (`brc.boardColors`; `boardColors()` in `prefs.ts`, never
+  sent anywhere, other players see their own). `<html data-board-colors>` carries it (set at start-up, `main.tsx`, and by
+  every pick), and `styles.css`, "Board colors", turns it into `--sq-*` variables: the squares (`--sq-dark` is the
+  `.hb-board`'s ground, `--sq-light` its `::before` layer, masked to the 32 light squares: both plain CSS colors, so a
+  pick shows at once on every board with nothing redrawn), the last move, the picked square, the move dots and capture
+  rings, and the coordinates' two inks. **Every board that goes through `OwnBoard` follows it** (Crowd, raids, Boss alone,
+  Squads, Classic, 1 v 1, votes, replays, history, the finals, the God King's moments, the mini boards, the home's live
+  window); the Settings choice's three previews (`.bc-opt`, each carrying its own `data-board-colors`) are drawn from the
+  same variables. Not covered: `TinyBoard`'s pixel boards (Classic's boards strip, Squads' thumbnails), which have
+  always been their own muted blue-gray. **A new thing drawn over the squares is checked on all three** (in light and dark
+  themes: the board's squares don't change with the theme, only what's around it); one that can't read on a scheme gets
+  its own rule under that scheme (Alfil's gold glow is blue on Gold).
 - **How it behaves** (`board/OwnBoard.tsx`, its pure logic in `board/logic.ts`):
   - **Feel:** a move slides 220 ms on a cubic ease in and out (`SLIDE_MS`); a captured piece fades as the taker slides
     on; a press becomes a drag at 3 px (`DRAG_DISTANCE_PX`), and after a dragged move the next drag starts at once;
@@ -78,12 +91,13 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
 | Its logic (squares, the size, taps and drags, which piece slides where, the dots, arrows) | `packages/app/src/board/logic.ts`; props `board/types.ts` |
 | The pieces, and the base for anything drawn with them | `packages/app/src/board/pieces/` (files, license, sources), `board/pieces.css` |
 | Its styles | `styles.css`, "The board" (after `.board-wrap`) |
+| Its colors (Classic, Green, Gold) and the Settings choice | `styles.css`, "Board colors" (before `.hb-board`); `prefs.ts` (`boardColors`, `setBoardColors`, `applyBoardColors`); `screens/Settings.tsx` (`BoardColorsChoice`) |
 | A turned board's squares and coordinates | `packages/app/src/board-view.ts` |
 | What overlays look up | `packages/app/src/board/dom.ts` |
 
 ## Settings
 
-`BOARD` (`checkHighlight`) in settings.ts.
+`BOARD` (`checkHighlight`) in settings.ts. The board colors are per-device prefs, not game settings (`prefs.ts`).
 
 ## Tests and tools
 
@@ -95,6 +109,9 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   a screen's limited moves, tap and drag, both pieces sliding, normal castling untouched; arrows), `board-view.test.ts`,
   `pieces.test.ts` (the pieces' files, sources and license), `refused.test.ts` (a legal move a power refuses: found
   for a capture or a promotion, never for an allowed one or a turn nothing limits; the dock's words for it).
+- Board colors: `packages/app/test/board-colors.test.ts` (Classic by default, remembered, unknown values ignored, on `<html>`,
+  nothing sent); `e2e/board-colors.spec.ts` (pick Green: a match's dark squares are green, computed and painted; a reload keeps
+  it; Classic gives today's colors back).
 - e2e: every test that touches the board finds its parts through `BOARD_SEL` in `e2e/helpers.ts`. `e2e/perf.spec.ts`
   checks the board isn't drawn every frame while Jefferson's Roman candle plays over it (`hbDraws`).
   `e2e/castling.spec.ts` castles by tap-tap and drag, normal chess and Chess960 (both gestures).

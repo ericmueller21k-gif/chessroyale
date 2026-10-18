@@ -85,6 +85,53 @@ export function setCrowdTrail(on: boolean) {
   listeners.forEach((l) => l());
 }
 
+/**
+ * Settings → Board, "Board colors" (Eric, Oct 18): the dark squares of every board this device draws. Only this device:
+ * it's never sent anywhere, and other players see their own. Remembered in localStorage; the page carries it as
+ * `<html data-board-colors>`, and the stylesheet's colors hang off that (styles.css, "Board colors"), so a pick shows at
+ * once on every board with nothing redrawn.
+ */
+export const BOARD_COLORS = ["classic", "green", "gold"] as const;
+export type BoardColors = (typeof BOARD_COLORS)[number];
+
+const BOARD_COLORS_KEY = "brc.boardColors";
+
+/** What a stored value means: one of the three; anything else (nothing, junk, a newer build's name) is Classic. */
+export function parseBoardColors(stored: unknown): BoardColors {
+  return BOARD_COLORS.find((c) => c === stored) ?? "classic";
+}
+
+/** (Without storage, a pick lasts as long as the page.) */
+let boardColorsMemory: BoardColors | null = null;
+
+export function boardColors(): BoardColors {
+  if (boardColorsMemory) return boardColorsMemory;
+  try {
+    return parseBoardColors(localStorage.getItem(BOARD_COLORS_KEY));
+  } catch {
+    return "classic";
+  }
+}
+
+/** Puts the pick on the page (`<html data-board-colors>`). Called once at start-up (main.tsx) and by every pick. */
+export function applyBoardColors() {
+  if (typeof document === "undefined") return;
+  const c = boardColors();
+  if (document.documentElement.getAttribute("data-board-colors") !== c) document.documentElement.setAttribute("data-board-colors", c);
+}
+
+export function setBoardColors(c: BoardColors) {
+  const pick = parseBoardColors(c);
+  try {
+    localStorage.setItem(BOARD_COLORS_KEY, pick);
+    boardColorsMemory = null;
+  } catch {
+    boardColorsMemory = pick;
+  }
+  applyBoardColors();
+  listeners.forEach((l) => l());
+}
+
 const EVAL_BAR_KEY = "brc.evalBar";
 const PRACTICE_KEY = "brc.practice";
 

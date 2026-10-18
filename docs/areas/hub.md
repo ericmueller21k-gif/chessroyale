@@ -127,10 +127,14 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   `brc.crowdTurns`) are no longer read.
 - **Settings, in order** (the overhaul, Eric, Oct 15: "smoothness, quickness, with some variety offered";
   [docs/decisions/2026-10-15-settings-overhaul.md](../decisions/2026-10-15-settings-overhaul.md)): THEME · SOUND
-  (sound on or off, Move, Capture and Reveal sound) · BOARD (Animations, Motion trail) · QUICK CHAT · FRIENDS · HOW TO
+  (sound on or off, Move, Capture and Reveal sound) · BOARD (Board colors, Animations, Motion trail) · QUICK CHAT · FRIENDS · HOW TO
   PLAY · ACCOUNT · PRIVACY AND TERMS · **TESTING**, shown only to admins (`profile.admin`, ADMIN_EMAILS). Gone the same
   day: the pre-game votes' switch (always on; `?augments=0` is a test switch), Classic's
   opening moves stepper (Classic plays its default), the sound lab (`?soundlab`: its choice is the Reveal sound).
+- **Board colors** (Oct 18): three small boards side by side, Classic, Green and Gold, each a few squares in its own colors
+  with the last move, a piece, its move dots and a capture ring; the picked one is gold, as the other choices are. A tap
+  changes every board on this device at once; only this device (`brc.boardColors`): other players see their own. How it
+  works: [board.md](board.md).
 - **Board** (Animations: picks as ghost pieces, or just names; Motion trail: each pick flies to its square): wherever
   picks show, Crowd and raids (`CrowdGhosts`) and Classic's and Squads' reveals (`ShadeMoves`: without the trail the
   see-through pieces appear on their squares, without animations only the names, which then carry the reel). Kept on

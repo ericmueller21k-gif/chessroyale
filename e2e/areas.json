@@ -439,6 +439,7 @@
         "packages/app/public/manifest.webmanifest"
       ],
       "specs": [
+        "e2e/board-colors.spec.ts",
         "e2e/eval-bar.spec.ts",
         "e2e/faq.spec.ts",
         "e2e/home-layout.spec.ts",

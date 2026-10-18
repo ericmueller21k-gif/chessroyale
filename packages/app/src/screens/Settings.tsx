@@ -7,7 +7,7 @@ import { SignIn } from "../components/SignIn.tsx";
 import { AccountData } from "../components/AccountData.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut, tooYoung } from "../account.ts";
-import { chatBubbles, chatOff, crowdAnimations, crowdTrail, evalBarOn, onPrefsChange, practiceOn, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail, setEvalBarOn, setPracticeOn } from "../prefs.ts";
+import { BOARD_COLORS, boardColors, chatBubbles, chatOff, crowdAnimations, crowdTrail, evalBarOn, onPrefsChange, practiceOn, setBoardColors, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail, setEvalBarOn, setPracticeOn, type BoardColors } from "../prefs.ts";
 import { REEL_VOICES, getReelVoice, isMuted, onMuteChange, previewPieceSound, previewReel, setMuted, setReelVoice, unlockAudio, type ReelVoice } from "../sound.ts";
 import { PIECE_SOUNDS, pieceSound, setPieceSound } from "../piece-sounds.ts";
 import { useAccount } from "./Profile.tsx";
@@ -93,6 +93,61 @@ function ThemeChoice() {
   );
 }
 
+/** The board colors, as the choice names them (Eric, Oct 18): the dark squares; Classic is the board as it always was. */
+const BOARD_COLOR_LABELS: Record<BoardColors, string> = { classic: "Classic", green: "Green", gold: "Gold" };
+
+/** A square of a preview's four by four, by column and row from its top left. */
+const at = (col: number, row: number) => ({ transform: `translate(${col * 100}%, ${row * 100}%)` });
+
+/**
+ * Board colors: three small boards side by side, each a few squares in its own colors (the stylesheet colors them from
+ * `data-board-colors`, as it does the real boards) with the last move, a piece, a move dot and a capture ring on them,
+ * so you see how it will look. Tap one and every board on this device changes at once. Only this device: other
+ * players see their own.
+ */
+function BoardColorsChoice() {
+  const [chosen, setChosen] = useState(boardColors);
+  return (
+    <div class="ps-picker">
+      <span class="fd-toggle-text">
+        <strong>Board colors</strong>
+        <span>The dark squares, on every board you see. Only you see them: other players keep their own.</span>
+      </span>
+      <div class="bc-list" role="radiogroup" aria-label="Board colors">
+        {BOARD_COLORS.map((id) => (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={chosen === id}
+            aria-label={BOARD_COLOR_LABELS[id]}
+            data-board-colors={id}
+            class={`bc-opt${chosen === id ? " on" : ""}`}
+            onClick={() => {
+              setChosen(id);
+              setBoardColors(id);
+            }}
+          >
+            <span class="bc-preview hb-pieces" aria-hidden="true">
+              <i class="bc-sq bc-last" style={at(2, 3)} />
+              <i class="bc-sq bc-last" style={at(2, 2)} />
+              <i class="bc-sq bc-sel" style={at(1, 2)} />
+              <i class="bc-sq bc-dot" style={at(0, 0)} />
+              <i class="bc-sq bc-dot" style={at(2, 0)} />
+              <i class="bc-sq bc-dot" style={at(3, 1)} />
+              <i class="bc-sq bc-ring" style={at(3, 3)} />
+              <piece class="pawn black" style={at(3, 3)} />
+              <piece class="pawn white" style={at(2, 2)} />
+              <piece class="knight white" style={at(1, 2)} />
+            </span>
+            <strong>{BOARD_COLOR_LABELS[id]}</strong>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Settings (Eric, Oct 15: "smoothness, quickness, with some variety offered"): the theme, sound (the move, capture and
  * reveal sounds), the board (animations, motion trail), quick chat, friends, how to play (and the FAQ), help (the
@@ -158,6 +213,7 @@ export function SettingsScreen({ onBack, onFaq }: { onBack: () => void; onFaq?: 
 
       <section class="fd-section">
         <h2 class="fd-label">BOARD</h2>
+        <BoardColorsChoice />
         <Toggle
           title="Animations"
           checked={anim}

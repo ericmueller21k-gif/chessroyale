@@ -10,6 +10,7 @@ import { setUpInstall } from "./install.ts";
 import { watchErrors } from "./problems.ts";
 import { audioUnlocked, prepareAudio, unlockAudio } from "./sound.ts";
 import { watchTheme } from "./theme.ts";
+import { applyBoardColors } from "./prefs.ts";
 import "./styles.css";
 
 // Errors on this device are reported (problems.ts), from the start.
@@ -18,6 +19,8 @@ setUpInstall();
 // Light or dark: the page already shows the right one (index.html's script); from here on it follows the device
 // while nothing is picked.
 watchTheme();
+// The board colors picked on this device (Settings → Board): on the page before any board is drawn.
+applyBoardColors();
 // Browsers allow sound only after a tap. iPhones don't count every event as one (a pointerdown alone isn't
 // enough), so every tap tries until sound is on (cheap once it is). The audio graph is made beforehand, while the page
 // is idle, so the first tap (often a game's first move) only switches it on and starts the samples loading after its
