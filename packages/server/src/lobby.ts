@@ -2842,7 +2842,8 @@ export class LobbyCore {
    * Fair play: each person's pick this round, with what the round's judged numbers say about it (core/fairplay.ts):
    * its loss, the share of the other people in that position who found the best move, how many moves were close to
    * the best, think time, look-aways. Practice players (unlimited hints) aren't recorded, and neither they nor anyone
-   * who used a power-up counts in anyone's crowd.
+   * who used a power-up counts in anyone's crowd. On a counted turn where a boss's judge changed the numbers (Chub &
+   * Chirp's race), the engine's own numbers instead (the runner's `fairScored`).
    */
   private noteFair(report: RoundReport, lastMoves: Map<number, string | null>) {
     const round = this.r.round;
@@ -2852,9 +2853,13 @@ export class LobbyCore {
     let added = false;
     for (const b of report.boards) {
       const picked = b.result.players.filter((p) => people.has(p.playerId) && p.move && p.loss !== null);
-      if (!picked.length || !b.scored.length) continue;
-      const best = b.scored[0]!;
-      const near = b.scored.filter((x) => x.loss <= sig.nearPoints).length;
+      // (The round's numbers, or the engine's own where a boss's judge changed them: `fairScored`.)
+      const scored = b.fairScored ?? b.scored;
+      const fairLoss = b.fairScored ? new Map(b.fairScored.map((x) => [x.move, x.loss])) : null;
+      const lossOf = (p: { move: string | null; loss: number | null }) => fairLoss?.get(p.move!) ?? p.loss!;
+      if (!picked.length || !scored.length) continue;
+      const best = scored[0]!;
+      const near = scored.filter((x) => x.loss <= sig.nearPoints).length;
       const last = lastMoves.get(b.boardId) ?? null;
       const legal = legalMoves(b.fenBefore).length;
       const [, side, , , , full] = b.fenBefore.split(" ");
@@ -2879,17 +2884,17 @@ export class LobbyCore {
           fen: b.fenBefore,
           move: p.move!,
           best: best.move,
-          loss: Math.round(p.loss! * 100) / 100,
+          loss: Math.round(lossOf(p) * 100) / 100,
           bestExp: Math.round(best.expected * 1000) / 1000,
           near,
-          gap: b.scored.length > 1 ? Math.round(b.scored[1]!.loss * 100) / 100 : null,
+          gap: scored.length > 1 ? Math.round(scored[1]!.loss * 100) / 100 : null,
           crowd: others.length,
-          crowdFound: others.filter((o) => o.loss! <= sig.foundLoss).length,
+          crowdFound: others.filter((o) => lossOf(o) <= sig.foundLoss).length,
           picks,
           thinkMs: pick?.thinkMs ?? 0,
           away: pick?.away ?? 0,
           legal,
-          top: b.scored.slice(0, FAIRPLAY.deep.candidates).map((x) => x.move),
+          top: scored.slice(0, FAIRPLAY.deep.candidates).map((x) => x.move),
           ...(p.usedPowerUp ? { powerUp: true } : {}),
           ...(b.power ? { power: true } : {}),
           ...(last && best.move.slice(2, 4) === last.slice(2, 4) ? { recapture: true } : {}),

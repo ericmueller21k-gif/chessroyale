@@ -9,8 +9,11 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   never numbers a browser makes up: strength, hard finds measured against the crowd, timing. The one exception is the
   look-away count (only the browser can see the page hidden), weak evidence that can add a few points, never ban.
 - **Recording.** During a match the lobby records each human pick's signals (`noteFair`, the `fair` record). Turns a
-  boss power touches (`powerTurn`) don't count, nor turns where a boss's judge made another move the best than the
-  engine's (Chub & Chirp's carrot race: that best is the game's own weighing, `resolveBoard`), nor picks made with the
+  boss power touches (`powerTurn`) don't count. Where a boss's judge changes the numbers (Chub & Chirp's carrot race),
+  a turn counts only when the engine's best move is also the race's best move, and is then recorded with the engine's
+  own numbers, as any turn without the race (the runner's `resolveBoard` and its `fairScored`); the other race turns
+  don't count (about 4 in 5 of those not already decided, in the review's sample:
+  [docs/decisions/2026-10-18-carrot-patch.md](../decisions/2026-10-18-carrot-patch.md)). Nor do picks made with the
   engine's moves on screen that the game showed: a power-up (`powerUp`), or Squads Mercenary's Stockfish token
   (`engineToken`: sanctioned help, skip reason "engineToken"). Squads isn't recorded yet; its matches log which
   choices had a token's lines on screen (`assists`, `isAssisted`), so when it is, they go in with `engineToken`.

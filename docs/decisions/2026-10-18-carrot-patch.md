@@ -57,8 +57,10 @@ tuning: [reports/hopper-carrots-sim.md](../../reports/hopper-carrots-sim.md).
   results carry `carrots: true` (the results screen: "Chub & Chirp won with their fifth carrot."). It wins even when the
   same move draws on the board (a stalemate, the fifty-move rule, a repetition: the sheet's "he wins on the spot";
   `bossCarrotWin` reads only a mate as the board's own result). A mate is his either way and keeps the mate's line.
-  Given the choice, his brain takes a fifth carrot that doesn't also draw on the board, so the board never shows a
-  stalemate as he wins (review of #275, S1).
+  Either way its moments, the pull and his win, play before the result, as after any fifth carrot: the runner's
+  `preparePowers` lets them through once the board's game is over (delta review of #275, N-a). Given the choice, his
+  brain takes a fifth carrot that doesn't stalemate, reach the fifty-move count or leave a dead draw (review of #275,
+  S1). It looks at the position alone, so it can't see a repetition; the result is his either way.
 - **The spin** (`carrotBattle.spin`): after his move, once the race is over (whoever pulled the last carrot), the battle
   still on: his tier is his count; the roll is `spinRoll` (`powerRoll(seed, "carrotSpin", crowd move)` over the sheet's
   table, `carrotOdds`): the battle's seed in the state, so the server rolls it online (one result for every screen),
@@ -117,7 +119,8 @@ tuning: [reports/hopper-carrots-sim.md](../../reports/hopper-carrots-sim.md).
   pawn) or a swap between moves the engine scored the same in a lost position; the next gain up was 0.32, a real race
   trade (2 points worse at chess). 0.25 sits in that gap; a quarter pawn is also about the race's own precision (a
   carrot's odds move by more than that with a single ply of margin). A move that pulls **his fifth carrot** is always
-  played, as a mate would be (one that doesn't also draw on the board first, when he has the choice).
+  played, as a mate would be (first one that doesn't stalemate, reach the fifty-move count or leave a dead draw, when he
+  has the choice; a repetition he can't see).
   The budget: at most 9 × 30,000 nodes on a race move, about his move's own search again, 12 moves a battle.
 - **He races as he plays.** Three ways his difficulty shows in the race: on a slip (a weak boss's stumble, up to 25% of
   his moves) the race brain is off; under the God King's strike it's off (a dazed move, the strike's own step back); and
@@ -133,44 +136,53 @@ tuning: [reports/hopper-carrots-sim.md](../../reports/hopper-carrots-sim.md).
   sim's bots are the game's bots. The bots pick from the engine's top moves and the pulls (`judge.offer`, new: scored
   first, as his brain's), so they weigh the same moves he does. Online the score jobs carry `race`; the lobby's runner
   counts the race on the host's raw numbers, once, for everyone; two judges' jobs give the same bots' picks (tested).
-- **Fair play: a race turn counts, unless the race made another move the best than the engine's.** Revised after the
-  review (S5). The first version left out every race turn, 12 to 14 of a battle's 44 or so crowd turns, for a reason
-  that was too broad: on most race turns the race's best move is the engine's own best, and finding it is as telling as
-  on any turn.
-  - **Weighed first: record race turns against the engine's raw numbers, carrots ignored.** An honest racer would only
-    match the engine less. Turned down, because matching less isn't harmless in fair play's numbers. A turn's recorded
-    losses make the match's strength (`perf`), and that strength is (1) what the same match's hard finds are measured
-    against (`matchSignals` takes the higher of the player's reference and this match's strength), and (2) one of the
-    recent strengths whose median is the player's reference for later matches (`referenceStrength`), which sets the
-    strength jump (`jump`) and the floor for the find evidence. A race move the game itself scores as the best would be
-    recorded as a mistake, so the player's strength would read low and their real finds elsewhere would weigh more. The
-    effect is small, but it is a legitimate carrot move counting against a player. The other readers of the record
-    were checked and are fine either way: the deep re-check searches the recorded candidates on the engine server
-    (carrot-blind by nature: a racer's pick only ranks lower, which lowers suspicion); the review page is for admins;
-    and what players see of their moves (their score, their match rating, brilliant moves) comes from the round's own
-    judged losses, never from fair play's record (players see only reports, notices and appeals from fair play).
-  - **So only the turns where the race changed the best move are left out** (the runner's `resolveBoard`: the best of
-    the judge's numbers, the race counted, against the best of the raw numbers it was given; the turn's `power` flag,
-    skip reason `bossPower`). On those turns the recorded best is our own weighing of the carrots, which no engine of a
-    player's own sees (the sheet: "an outside engine can't see the carrots"): finding it says nothing about an engine,
-    and honest racers would look like engine users. On every other race turn the best is the engine's own, and the turn
-    is recorded as any turn, with the round's judged numbers: the same losses as the player's score, so a carrot move is
-    never charged more than the game itself charges it. A cheater copying a carrot-blind engine plays its best, which on
-    those turns is the recorded best, so it shows as on any turn. On the turns left out its best isn't the recorded
-    one, so leaving them out hides little.
-  - **What this doesn't claim:** a race move's judged loss can be a little smaller than its raw loss (the race's worth
-    counted), so on the counted race turns a racer's match strength reads the game's verdict, not the bare engine's. And
-    the turns where the race changed the best are lost to fair play; how many depends on the battle (the crowd's judge
-    weighs the race in full).
+- **Fair play: a race turn counts only when the engine's best move is also the race's best move, and then it's
+  recorded with the engine's own numbers.** The director's call after the delta review of #275 (S5, its option b). The
+  rule held to: a legitimate carrot move must never count against a player.
+  - **The rule** (the runner's `resolveBoard`, for any boss whose judge changes the numbers): a race turn counts when the
+    engine's best keeps its own score under the race's judge. That happens exactly when it is the race's best too:
+    `raceAdjust` never raises a score, and leaves one as it is only for the race's best. Every other race turn is left
+    out (the turn's `power` flag, skip reason `bossPower`).
+  - **A counted turn is recorded as any turn without the race:** the runner hands fair play the engine's own numbers
+    (`fairScored`, which the lobby's `noteFair` reads instead of the round's). Fair play then reads exactly what it would
+    from a carrot-blind engine: the same best, finds, near moves, only moves, decided positions, crowd finds, and the
+    same losses for the match's strength. And no move is charged more there than the game charges it: the race leaves the
+    engine's best as it is and never raises another move, so each move's loss by the engine's numbers is at most its
+    loss in the round's score. A cheater copying a carrot-blind engine plays its best, the recorded best, as on any
+    turn.
+  - **Not the round's numbers on those turns** (my call within option b, which the review wrote with them): the race
+    lowers the other moves, so its numbers can still read differently from the engine's. A move within a point of the
+    best by the engine's numbers can be a miss by the race's, the near moves fewer, the gap past the only-move line, the
+    crowd's finds fewer (which makes another player's find of the best look harder), and the match's strength lower. In
+    the review's sample, 3 of the 34 such turns that weren't already decided had a move that was a find by the engine's
+    numbers and a miss by the race's, and 5 a different count of near moves. A case from a re-run of its script is a
+    test now (Nh7-f6, 0.9 points behind the best: a find, not a miss).
+  - **Why every other race turn is left out:** there the race lowered the engine's best (whether or not it stays the
+    best), and neither set of numbers is safe. The race's numbers create finds and remove only-move and decided skips:
+    in the delta review's sample they changed fair play's reading toward suspicion on 25 of the 100 such turns that
+    counted under the previous version (and on none of the other 34), among them a carrot pull 8.15 points worse at
+    chess recorded as a find. The engine's
+    numbers would charge the race's own move more than the game does (it keeps its score while the best loses some).
+    Where the race made another move the best, that best is our own weighing of the carrots, which no engine of a
+    player's own sees.
+  - **The coverage it keeps:** in the delta review's real-Stockfish sample (64 battles, 646 race turns, 161 of them not
+    already decided), 34 of the 161 count: about 1 in 5. The rest are lost to fair play: only race turns, only this
+    boss, once a battle. Accepted: the rule above comes first, and this one is provably clean and the simplest to reason
+    about.
+  - **The earlier versions:** every race turn left out (too broad: on many race turns the race's best is the engine's
+    own); then only the turns where the race made another move the best, the rest on the round's numbers (the delta
+    review's S5: those numbers still changed fair play's reading on about 1 counted turn in 5). Weighed and turned down
+    in the first round: every race turn on the engine's numbers, as on the turns the race lowered above.
+  - The other readers of the record (checked in the first round) are fine: the deep re-check searches the recorded
+    candidates on the engine server (carrot-blind, and on counted race turns the candidates are the engine's own top
+    moves); the review page is for admins; and what players see of their moves (their score, their match rating,
+    brilliant moves) comes from the round's own numbers, never from fair play's record.
   - The rule lives in the runner, for any boss whose judge changes the numbers: today only G-REX's fire, whose turns are
     power turns already, and the race. Nothing else changes.
-  - **The turn right after his spin still doesn't count** (`powerTurn`, with the turn after a hop). Its numbers are the
-    engine's own (the race is over), so the reason isn't the race; it's the clock. The spin's moment holds the screen
-    4.4 s after his move's 1.8 s, with the board in view (the prize drops at 3.6 s), before the crowd's clock starts:
-    6.2 s of looking that the think time doesn't see. That's more than the 5 s under which fair play calls a hard find
-    fast (`fastHardMs`), so one quick pick there would read as a fast hard find. The race's first turn, after the
-    cast's moment, holds 4.6 s, about what a rage warning after a queen capture holds before an ordinary counted turn
-    (4.8 s), and counts.
+  - **The turn right after his spin still doesn't count** (`powerTurn`, with the turn after a hop), as for every power
+    that changes the board (#273's reason for the hop): his prize goes on the board just before it. (The first round
+    gave a timing reason, the spin's moment against fair play's 5-s line for a fast hard find; the review found that
+    line isn't applied to other bosses' moments of about that length, so the reason is the board change.)
 - **The God King's strike** called on the crowd's turn just before the cast waits for his next move (the cast isn't a
   move, as with the hop; Alfil's fusion *was* his move, so it took the strike there). That move is staggered and his race
   brain is off for it: the crowd's strike is also a race tool.
@@ -256,3 +268,5 @@ the reel (every card as often as its odds, no rigged near-misses), the dock's co
 already has the prize on the board when his move's screen comes (a base at his move's ply), so until the art comes the
 prize simply appears with his move (checked frame by frame on a phone: no piece moves twice or jumps); the spin's
 moment should show the board without it until `prizeAt` (as Alfil's moments show the board before the fusion).
+A fifth carrot that also mates now carries its `carrot` and `carrotWin` events (delta review, N-a); once his king attack
+is in `KING_ATTACKERS`, `bossTurnShowMs` holds a mate for the attack alone, so the wiring decides how the two play.

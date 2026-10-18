@@ -1313,17 +1313,17 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
     expect(b1.until - L.now).toBe(bossTurnShowMs(b1.boss));
   });
 
-  it("fair play: a race turn counts as any turn, unless the race made another move the best than the engine's", () => {
+  it("fair play: a race turn counts only when the engine's best is the race's too, recorded with the engine's own numbers; any other doesn't", () => {
     // (Your rook on b1 and his knight on d6 each a move from b5: the race's own move is b1b5.)
     const L = hopper({}, "4k3/8/3n4/8/8/8/8/1R5K w - - 0 30");
     race(L, ["b5", "h8", "a3", "h4", "e5"]);
-    /** Both pick `move`; the host's engine scores every move 0.5 but `best`, 0.52. */
+    /** Both pick `move`; the host's engine scores every move 0.505 but `best`, 0.52. */
     const turn = (move: string, best: string) => {
       for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move });
       const req = L.last("p1", "scoreRequest")!;
       const boards: BoardScore[] = req.jobs.map((j) => {
         const legal = legalMoves(j.fen);
-        const exp = Object.fromEntries(legal.map((m) => [m, m === best ? 0.52 : 0.5]));
+        const exp = Object.fromEntries(legal.map((m) => [m, m === best ? 0.52 : 0.505]));
         return { boardId: j.boardId, bestMove: best, bestExpected: 0.52, expectedAfter: exp, botPicks: Object.fromEntries(j.bots.map((b) => [b.id, move])), botThinkMs: Object.fromEntries(j.bots.map((b) => [b.id, 4000])) };
       });
       L.core.message("p1", { t: "scores", key: req.key, boards });
@@ -1333,12 +1333,15 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
     turn("h1g1", "h1g1");
     L.core.message("p1", { t: "bossMove", key: asked(L).key, move: "e8e7" });
     L.advance(30_000);
-    // The engine's best is the race's own, b1b5: it counts, as any turn.
+    // The engine's best is the race's own, b1b5: it counts, as any turn, on the engine's numbers. Your g1g2 is 1.5
+    // points behind, as every move but b1b5 is (all of them near the best), not the more the race costs it in the
+    // round's score; your partner's g1g2 isn't a find either way.
+    const fen = runnerOf(L).boards.get(0)!.fen;
     turn("g1g2", "b1b5");
-    expect(L.core.fairMoves("p1").map((m) => [m.best, !!m.power])).toEqual([
-      ["b1b5", true],
-      ["b1b5", false],
-    ]);
+    const [left, counted] = L.core.fairMoves("p1");
+    expect([left!.best, !!left!.power]).toEqual(["b1b5", true]);
+    expect(counted).toMatchObject({ best: "b1b5", loss: 1.5, bestExp: 0.52, gap: 1.5, near: legalMoves(fen).length, crowd: 1, crowdFound: 0 });
+    expect(counted!.power).toBeUndefined();
   });
 
   it("his last carrot wins the battle: the results say so (`carrots`), a boss win", () => {
@@ -1353,6 +1356,22 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
     expect(res.bossResult).toBe("boss");
     expect(res.carrots).toBe(true);
     expect(res.timeout).toBeUndefined();
+  });
+
+  it("his fifth carrot that also stalemates: its pull and his win play before the results, as any fifth's do", () => {
+    // (Your king on h2, his queen on d3 and king on f2: your only move is Kh1; Qd3-g3 pulls his last carrot and
+    // stalemates you.)
+    const L = hopper({}, "8/8/8/8/8/3q4/5k1K/8 w - - 0 60");
+    race(L, ["g3", "a1", "a8", "h8", "c6"], { his: ["a1", "a8", "h8", "c6"] });
+    crowdPlays(L, "h2h1");
+    L.core.message("p1", { t: "bossMove", key: asked(L).key, move: "d3g3" });
+    const b = L.last("p1", "boss")!;
+    expect(b.boss.powers!.events.map((e) => e.kind)).toEqual(["carrot", "carrotWin"]);
+    expect(b.until - L.now).toBe(bossTurnShowMs(b.boss));
+    L.advance(b.until - L.now - 1);
+    expect(L.last("p1", "results")).toBeUndefined();
+    for (let i = 0; i < 10 && !L.last("p1", "results"); i++) L.advance(10_000);
+    expect(L.last("p1", "results")).toMatchObject({ bossResult: "boss", carrots: true });
   });
 });
 
