@@ -544,6 +544,34 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
 
 ### Adding a boss
 
+**What the shared test kit gives for free** (Oct 18; docs/decisions/2026-10-18-boss-test-kit.md). A boss on
+`BOSS_ROSTER` with powers is covered with no edit, hidden or not:
+
+- `packages/chess/test/boss-kit.test.ts` (driver and checks: `boss-kit-lib.ts`): three short seeded battles (his passive
+  switched on early; his ultimate switched on early and the admins' trigger pulled again and again; a stress start with
+  his pawn nose to nose with yours on your third rank), and after every step: a position Stockfish 19 plays (no pawn on
+  rank 1 or 8, at most 8 pawns and 16 pieces a side, the side not to move never in check, the en passant square only
+  where Stockfish keeps it); chess.js's legal moves equal Stockfish's wherever a power made the position; a round's
+  scored moves legal and listed once; a move for whoever is to move, and a power's limit leaving one; the replay from
+  the base reproducing the position; no step at the start of his turn handing him a promotion for his very next move;
+  a power's declared win beating a draw on the same move; its moments coming before the result.
+- `packages/server/test/boss-kit-parity.test.ts`: the same battle solo and online (the lobby, a host answering as the
+  app's does): the same positions, power events and result.
+- `e2e/boss-smoke.spec.ts` (once he's playable): his tile, a battle through the test switches, his passive and his
+  ultimate (the admins' trigger), no page errors, on a phone.
+
+**What a new boss must still add:** his own rule tests (`packages/chess/test/<boss>.test.ts`: his rules' numbers from
+his sheet, his guards, the judge's view, his moments), a lobby test only for a request or message of his own, app tests
+for his character and moments, and `e2e/<boss>.spec.ts` for what his powers show. Three things the kit needs from him:
+
+- a power that decides the battle names its event `<something>Win` (as `carrotWin`): the kit's result checks key on it;
+- a new kind of step at the start of his turn (a runner method `…Due` or `…Step`) goes into the kit's driver
+  (`KNOWN_STEPS` and `runBattle` in `boss-kit-lib.ts`, the parity test's `solo` and its host): the kit fails until it does;
+- his passive's event in `PASSIVE_EVENTS` (`e2e/boss-smoke.spec.ts`): the smoke test fails with what to add.
+
+**An opt-out:** only where his sheet says a power may hand him a promotion for his very next move: his id and the
+sheet's words in `PROMOTION_OPT_OUT` (`boss-kit-lib.ts`), with the decision file. It's empty.
+
 1. **Design it** with Eric (opening, passive, ultimate) and record it in `DECISIONS.md`.
 2. **Template** (`packages/core/src/boss.ts`): its line in `BOSS_ROSTER` (id, name, icon, kit name, offset, powers); new power ids in `PowerId` and `POWER_IDS`, new moment kinds in `PowerEventKind`, its state's fields in `BossPowerState`.
 3. **Numbers** in `BOSS_POWERS` (`packages/core/src/settings.ts`): every tunable stays there.
@@ -557,7 +585,7 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
    - anything that changes the position outside a move leaves a base (`afterCrowdMove`, `afterBossMove`, or the boss's own moment), and never a position the engine refuses (`stockfishRefuses`: a ninth pawn of one side, more pieces than promotions could make, the side not to move in check, …).
 8. **Its attack on a king** (optional; the boss keeps today's Last Stand and mate without one): see "A boss's attack on
    a king" above.
-9. **Tests**: `packages/chess/test/<boss>.test.ts` (rules: never no legal move, never breaks check, deterministic from the seed, the judge's view), a lobby test in `packages/server/test/boss-powers-lobby.test.ts`, app tests for its character and moments, `e2e/<boss>.spec.ts`. Watch it frame by frame (`npm run frames:powers`, or a `frames-<boss>.mjs`), run `npm run perf:boss -- <dir> <boss id> both 25`, and give Eric the test links (`?boss=<id>`, `?power=<ultimate>`).
+9. **Tests**: the shared kit covers the ground rules (above); add `packages/chess/test/<boss>.test.ts` (his rules and his sheet's numbers, the judge's view), a lobby test in `packages/server/test/boss-powers-lobby.test.ts` for any request of his own, app tests for its character and moments, `e2e/<boss>.spec.ts`. Watch it frame by frame (`npm run frames:powers`, or a `frames-<boss>.mjs`), run `npm run perf:boss -- <dir> <boss id> both 25`, and give Eric the test links (`?boss=<id>`, `?power=<ultimate>`).
 10. **Docs**: its row in the table above, its block in the FAQ (`BOSS_BLOCKS` in `packages/app/src/faq/content.ts`:
     its opening, passive and ultimate in a player's words; `faq.test.ts` fails without it), and this checklist if the
     shape changed. A change to any boss's rules changes its FAQ block in the same PR.
@@ -572,6 +600,10 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 
 ## Tests and tools
 
+- The shared boss test kit (every boss in the roster, no edit per boss): `packages/chess/test/boss-kit.test.ts` (with
+  `boss-kit-lib.ts`; `KIT_SEEDS=<n>` for more seeds by hand), `packages/server/test/boss-kit-parity.test.ts` (solo and
+  online agree), `e2e/boss-smoke.spec.ts` (every playable boss on a phone, the first on a computer). What each checks:
+  "Adding a boss" above.
 - Unit, the brain: `packages/chess/test/boss-brain.test.ts` (the rule, the bridge, the guards, the fallbacks),
   `maia-bosses.test.ts` (every boss's Maia path: its powers' limits kept, its special moves untouched),
   `boss-power-legal.test.ts` (Eric's Oct 17 position; every power that stops the boss × every brain path; the last

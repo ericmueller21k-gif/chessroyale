@@ -8,6 +8,7 @@
   "e2e/boss-dock.spec.ts": 142,
   "e2e/boss-powers.spec.ts": 345,
   "e2e/boss-select.spec.ts": 83,
+  "e2e/boss-smoke.spec.ts": 210,
   "e2e/boss-speech.spec.ts": 235,
   "e2e/busy.spec.ts": 18,
   "e2e/castling.spec.ts": 61,
