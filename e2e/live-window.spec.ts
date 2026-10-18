@@ -59,8 +59,8 @@ test("computer: a bot match plays in the live window above the buttons, labeled 
     await expect(win.locator(".fd-livewin-tag")).toHaveText(/Bot match/i);
     await expect(win.locator(".fd-livewin-mode")).toHaveText("Crowd · 50 v 50");
     await expect(win.locator(".fd-livewin-line")).toHaveText(/crowd: |Final · .+ plays |wins · 1st |A draw|A new match is starting/);
-    // A square board, as big as the room allows, inside the window; the window above Play with friends and Boss alone,
-    // level with the top of your card; PLAY still at the bottom.
+    // A square board, as big as the room allows, inside the window; the window above the RANKED row, level with the
+    // top of your card; the column's foot (Play with friends) level with the card's.
     const box = (await win.boundingBox())!;
     const board = (await win.locator(".board-wrap").boundingBox())!;
     expect(Math.abs(board.width - board.height), `${w}x${h}`).toBeLessThan(2);
@@ -69,10 +69,10 @@ test("computer: a bot match plays in the live window above the buttons, labeled 
     expect(board.x + board.width).toBeLessThanOrEqual(box.x + box.width + 0.5);
     const card = (await page.locator(".fd-hero").boundingBox())!;
     expect(Math.abs(box.y - card.y)).toBeLessThan(2);
+    const ranked = (await page.getByRole("radiogroup", { name: "RANKED" }).boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(ranked.y);
     const friends = (await page.getByRole("main").getByRole("button", { name: "Play with friends" }).boundingBox())!;
-    expect(box.y + box.height).toBeLessThanOrEqual(friends.y);
-    const hint = (await page.locator(".fd-hint").boundingBox())!;
-    expect(Math.abs(hint.y + hint.height - (card.y + card.height)), `${w}x${h}: PLAY at the bottom`).toBeLessThan(12);
+    expect(Math.abs(friends.y + friends.height - (card.y + card.height)), `${w}x${h}: the column's foot`).toBeLessThan(12);
     // Its words fit on their lines (cut short with "…" at worst, never spilling out).
     for (const sel of [".fd-livewin-head", ".fd-livewin-line"]) {
       const over = await win.locator(sel).evaluate((el) => el.getBoundingClientRect().right - el.parentElement!.getBoundingClientRect().right);

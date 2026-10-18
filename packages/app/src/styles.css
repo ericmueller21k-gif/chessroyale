@@ -8147,6 +8147,36 @@ button.fd-logo {
  * Matchmaking (Default, Bots off, Solo): the mode picker's shape, quieter when picked (a gold edge, not a gold fill),
  * so the mode stays the main choice. The ⓘ beside it says what each does.
  */
+/*
+ * The panel under the RANKED row (Eric, Oct 18: "it should never change size"): one fixed box for every mode, holding
+ * the pick's options (Matchmaking, Squads' Solo queue or Party) or its words (1 v 1: your rank and what it is).
+ */
+.fd-panel {
+  position: relative;
+  height: 58px;
+  flex: none;
+}
+.fd-panel > :not(.fd-types-info) {
+  box-sizing: border-box;
+  height: 100%;
+}
+.fd-squad-pick {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.fd-panel-words {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: var(--fd-panel);
+  text-align: center;
+  font-size: 13px;
+  color: var(--fd-sub);
+  line-height: 1.25;
+}
 .fd-types-row {
   display: flex;
   align-items: stretch;
@@ -8185,17 +8215,23 @@ button.fd-logo {
   border-color: var(--fd-gold);
   color: var(--fd-gold-text);
 }
+/* (The ⓘ's words float over the RANKED row, so opening them moves nothing: Eric, Oct 18.) */
 .fd-types-info {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 5;
   background: var(--fd-panel);
   border: 1px solid var(--fd-line);
   border-radius: 14px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
   padding: 10px 14px;
   font-size: 14px;
   color: var(--fd-sub);
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: -8px;
 }
 .fd-types-info p {
   margin: 0;
@@ -8206,19 +8242,6 @@ button.fd-logo {
 .fd-types-info .fd-types-rank {
   color: var(--fd-muted);
   font-size: 13px;
-}
-.fd-warn {
-  margin: -8px 0 0;
-  padding: 10px 14px;
-  border-radius: 14px;
-  background: var(--fd-gold-soft);
-  color: var(--fd-text);
-  font-size: 14px;
-  line-height: 1.35;
-}
-.fd-warn span {
-  color: var(--fd-gold-text);
-  font-weight: 800;
 }
 .fd-play {
   display: flex;
@@ -8246,12 +8269,22 @@ button.fd-logo {
   flex-direction: column;
   gap: 16px;
 }
+/*
+ * A fixed height whatever it says, so a longer line never moves what's under it (Eric, Oct 18): two lines' room on a
+ * phone, one line on a computer (every line fits its 320 px column: e2e/home-ranked.spec.ts).
+ */
 .fd-hint {
   text-align: center;
   font-size: 13px;
+  line-height: 1.3;
   color: var(--fd-muted);
   margin-top: -8px;
-  min-height: 16px;
+  height: 2.6em;
+}
+@media (min-width: 1024px) {
+  .fd-root.framed .fd-hint {
+    height: 1.3em;
+  }
 }
 .fd-actions {
   display: grid;
@@ -8273,13 +8306,12 @@ button.fd-logo {
   padding-left: 4px;
 }
 
-/* Home, 1 v 1 picked: your rank in it, under the row (in the Matchmaking row's place). */
+/* Home, 1 v 1 picked: your rank in it, in the panel. */
 .fd-rank1v1 {
-  margin: -6px 0 -4px;
-  text-align: center;
   font-size: 14px;
   font-weight: 700;
-  color: var(--fd-sub);
+  color: var(--fd-text);
+  white-space: nowrap;
 }
 /* -- Boss raid: its card on home and its screen (Eric, Oct 16; rd- for raid) -- */
 .rd-card {
@@ -8584,32 +8616,23 @@ button.fd-logo {
 .rd-option:active:not(:disabled) {
   transform: scale(0.98);
 }
-/* A computer: the card and Play with friends in one row (2 : 1), the card a little shorter. */
-.fd-door-row {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: 10px;
-}
-.fd-door-row .fd-actions {
-  display: flex;
-}
-.fd-door-row .fd-actions > * {
-  flex: 1 1 auto;
-}
-.fd-door-row .rd-card {
-  min-height: 64px;
-  padding: 8px 12px 8px 8px;
-}
-.fd-door-row .rd-face {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-}
-.fd-door-row .rd-face .boss-portrait {
-  width: 42px;
-}
-.fd-door-row .rd-card-text strong {
-  font-size: 18px;
+/* A computer: the Boss raid card a little shorter (the live window above keeps its room). */
+@media (min-width: 1024px) {
+  .fd-root.framed .fd-play-col .rd-card {
+    min-height: 64px;
+    padding: 8px 12px 8px 8px;
+  }
+  .fd-root.framed .fd-play-col .rd-face {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+  }
+  .fd-root.framed .fd-play-col .rd-face .boss-portrait {
+    width: 42px;
+  }
+  .fd-root.framed .fd-play-col .rd-card-text strong {
+    font-size: 18px;
+  }
 }
 
 /* -- Sheets (Play with friends) -- */
@@ -9992,7 +10015,7 @@ button.fd-seat {
     flex: none;
     display: grid;
     grid-template-columns: minmax(0, 540px) minmax(300px, 320px);
-    grid-template-rows: minmax(min(720px, calc(var(--app-h) - 52px)), auto);
+    grid-template-rows: minmax(min(760px, calc(var(--app-h) - 52px)), auto);
     justify-content: center;
     gap: 24px;
   }
@@ -10011,16 +10034,27 @@ button.fd-seat {
     font-size: 26px;
   }
   /*
-   * The play column: Play with friends and Boss alone, the mode picker, PLAY at the bottom, level with the bottom of
-   * your card (Eric, Oct 9). The room above is the live game's.
+   * The play column, the phone's order (Eric, Oct 18): the RANKED row, its panel, PLAY, the Boss raid card, Play with
+   * friends, its foot level with the bottom of your card. The room above is the live game's.
    */
   .fd-root.framed .fd-play-col {
     min-width: 0;
     justify-content: flex-end;
+    gap: 12px;
   }
   .fd-root.framed .fd-play {
     height: 88px;
     font-size: 32px;
+  }
+  /* (A short window, a laptop's: the column closer, so the live window keeps a board worth seeing.) */
+  @media (max-height: 760px) {
+    .fd-root.framed .fd-play-col {
+      gap: 8px;
+    }
+    .fd-root.framed .fd-play {
+      height: 64px;
+      font-size: 26px;
+    }
   }
   /* The queue: your card and the chat on the left, the lobby (the green area) on the right. */
   .fd-root.framed .fd-home.queueing .fd-home-main {

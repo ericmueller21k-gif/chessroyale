@@ -28,11 +28,12 @@ test("home: the live line comes from the server, the RANKED row changes the line
   await expect(line).toContainText(/[1-9]\d* in queue/, { timeout: 10_000 });
   await other.close();
   // The line under PLAY follows the RANKED row's pick (50 v 50 · 1 v 1 · Squads; Eric, Oct 16). Squads: PLAY is its
-  // solo queue, with Party in the Matchmaking row's place.
+  // solo queue or a party, picked in the panel in the Matchmaking row's place.
   await expect(page.getByRole("radiogroup", { name: "RANKED" }).getByRole("radio")).toHaveText([/^50 v 50/, /^1 v 1/, /^Squads/]);
   await page.getByRole("radio", { name: /Squads/ }).click();
-  await expect(page.locator(".fd-hint")).toHaveText(/^Solo queue: you join a squad of 4 · bots fill any empty seat after \d+ s$/);
-  await expect(page.getByRole("button", { name: /^Party/ })).toBeVisible();
+  await expect(page.locator(".fd-hint")).toHaveText(/^Solo queue: bots fill any empty seat after \d+ s$/);
+  await expect(page.getByRole("radiogroup", { name: "Squads" }).getByRole("radio")).toHaveText(["Solo queueyou join a squad", "Partywith up to 3 friends"]);
+  await expect(page.getByRole("radio", { name: /^Solo queue/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("radiogroup", { name: "Matchmaking" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeEnabled();
   await page.getByRole("radio", { name: /^50 v 50/ }).click();
