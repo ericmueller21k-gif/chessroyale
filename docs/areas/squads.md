@@ -451,6 +451,8 @@ door's look; every class is `sq-`.
     finished (you'd scout it): the first board after it still going; none but yours: you stay (`studyBoard`). The line
     above the board says "Watching Board 3 · your next board"; "Back to my board" works as before, and the jump comes
     once a half. Off: you stay on your board until the game moves you. Pairs and the final have no next board.
+    The half ending at once with your move (you were the last to move) doesn't call the jump off (Eric, Oct 18: it
+    waited for the other half instead; `squads-watch.spec.ts` covers it).
   - **Who's watching** (Oct 14; `Watchers` in SquadsParts.tsx): right after the line above the board, a small pixel eye
     and the profile pawns (`Avatar`, with their items) of the other people showing that board full size, overlapping,
     up to `watching.shown` (4), then "+N"; their names on hover. Not you, not the board's own players this turn
@@ -492,7 +494,8 @@ door's look; every class is `sq-`.
   match, "Skip votes" in the votes. A test lobby: an admin's Party sheet has Start · Relay · Pairs · Final, and the link
   `/squads/test[/start|relay|pairs|final][?clock=bullet|blitz|rapid or BANK,TOPUP,FREE,INC[,CAP]]` opens one (admins on hunchess.com; anyone
   locally with `SQUADS_TEST`); `/squads/test` alone (or `/start`) is the whole tournament from the first vote.
-- **Cheat lines** (test controls only, Eric Oct 12): a switch in the panel wherever you choose (`cheatLinesAt`: your
+- **Cheat lines** (test controls only, Eric Oct 12; known, left as is, Oct 18: on a phone the Cheat lines button pushes
+  the "Jump to my next board" switch below the screen's fold; fine, as the test controls go once testing is done): a switch in the panel wherever you choose (`cheatLinesAt`: your
   Relay move, a Pairs or final pick, a block, Armageddon's colors). On, it draws the engine's top 3 in the position
   (`SQUADS_LOBBY.cheatLines`: moves, nodes) as arrows colored by rank (green, blue, yellow, as the power-up hints),
   each labeled with its evaluation for the side to move (`cheatEval`: pawns turned back from the expected score, or

@@ -106,6 +106,32 @@ test("Jump to my next board, on by default: once you've moved, the big board goe
   await expect(page.locator(".sq-status")).toContainText(/^Moved · Board \d|^Their move|is over|landing/);
 });
 
+test("Jump to my next board when you're the last to move: the half ends at once, and the big board still goes to your next board", async ({ page }) => {
+  test.setTimeout(240_000);
+  await relayLobby(page);
+  const s = await nextDuty(page);
+  expect(s.duty!.role).toBe("move");
+  // (Eric, Oct 18: it waited for the other half instead.) Everyone else with a move this half has made it first.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const sq = (window as any).squads;
+          const m = [...sq.matches.values()].find((x: any) => x.state === "half" && x.sides.some((sd: any) => sd.seats.includes(sq.myId)));
+          const others = m.current.duties.flatMap((d: any) => d.players).filter((id: string) => id !== sq.myId);
+          return others.length > 0 && others.every((id: string) => m.locked.includes(id));
+        }),
+      { timeout: 90_000, intervals: [250] },
+    )
+    .toBe(true);
+  // (Your move, tap, tap: the half ends with it, so it isn't waited for among the choices.)
+  const mv = new Chess(s.fen!).moves({ verbose: true }).find((m) => !m.captured && !m.promotion)!;
+  await tapSquare(page, mv.from);
+  await tapSquare(page, mv.to);
+  await expect(page.locator(".sq-status")).toHaveText(/^Watching Board \d · your next board$/, { timeout: 4_000 });
+  await expect(page.locator(".sq-tiny.on .sq-mark.next")).toHaveCount(1);
+});
+
 test("Jump to my next board, switched off: you stay on your board after moving; the device remembers it", async ({ page }) => {
   test.setTimeout(240_000);
   await relayLobby(page);
