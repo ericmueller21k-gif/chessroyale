@@ -26,7 +26,7 @@ the art ("gifs are perfect"): [2026-10-18-hopper-still.md](2026-10-18-hopper-sti
 | The cast (his whole turn; as your turn begins) | banner to the first toss 1100; `castAt` 900, tosses 1100 to 1940 (210 apart), each carrot 300 in flight; the ladder 2400 to 4900 (was 2800 in all) | "CARROT PATCH!" ("5 carrots, 12 moves each"); five bounds, a carrot tossed each, tumbling from Chub's paw to its square, thunking into the soil; then his ladder for 2.5 s |
 | A pull (his: as your turn begins; yours: as your move lands, while he thinks) | the pop at 0, the token from 60 (the art's second frame); 600 | it pops out of the soil, wobbles, goes in a sparkle; the puller's token (a disc of its color with a carrot) in the square's corner by the dug hole |
 | His spin (the race over; as your turn begins after his move) | the race won or lost 0 to 1000; the reel 1000 to 4000 (3 s); the prize drops from 4200, 160 apart, 450 each; 5000 (was 4400) | `raceWon` (a carrot held up) or `raceLost` (ears droop) at the corner; a row of prize cards slides past the gold line in the board's middle and stops on what he rolled (the card glows gold); the prize pieces drop onto their squares (a soft land each); the board shows them only once down |
-| His fifth carrot (no spin) | `cheerAt` 300; 2500 (unchanged) | "FIVE CARROTS!" ("Chub & Chirp win the battle"), his cheer, then the result |
+| His fifth carrot (no spin) | `cheerAt` 300; 2500 (unchanged) | "FIVE CARROTS!" ("Chub & Chirp win the battle"), his cheer, then the result (when it also mates, his attack on your king first: below) |
 
 - **The board under them** (`hopperFen`, Boss.tsx): on the hop's screen his pawn is on its own square until it takes
   off and on the square beyond once it has landed (the moment draws it in the air between); on the spin's screen each
@@ -57,7 +57,7 @@ the art ("gifs are perfect"): [2026-10-18-hopper-still.md](2026-10-18-hopper-sti
   Cues: the art's names; `takeoff` the hop, `toss<n>` the toss, `plant<n>` the thunk. Their select sound: the chirp.
 - **Lines** (`HOPPER_LINES`): all 60 of the draft's `CHC-*` lines as written (no flags from Eric yet), at most 42
   characters each; the three select lines in `SELECT_LINES`. The race's own keys, new `Beat`s: `carrotHis` and
-  `carrotYours` on each pull, `spinBig` (3 or 4), `spinSmall` (1 or 2), `spinEmpty` (0) as the reel stops, `carrotsAll`
+  `carrotYours` on each pull, `spinBig` (3 or 4), `spinSmall` (1 or 2), `spinEmpty` (0) as the reel starts, `carrotsAll`
   on his fifth. `power` is Leapfrog's (as the hop begins), `ultimateWarn` and `ultimate` the cast's.
 - **The FAQ:** their block (Leapfrog's rule; the Carrot Patch with its ladder as a table: each count's prizes and odds
   and the average in pawns, every number from `BOSS_POWERS`), the RAGE! line (their cast comes at the start of their turn,
@@ -102,15 +102,30 @@ the art ("gifs are perfect"): [2026-10-18-hopper-still.md](2026-10-18-hopper-sti
   over that line (no new row: a new row would shrink the board for the race, .claude/LESSONS.md, "A board that shrank
   as the boss fell"); a computer's status box has the room, so there it's at the box's left.
 
+- **His fifth carrot that also mates: the pull and his win, then his attack, then the result** (the director's call
+  after #275 merged). #275 plays the fifth's moments when the same move mates (`preparePowers`), and with them in
+  `KING_ATTACKERS` a mate held the screen for the attack alone and dropped every moment. Now `bossTurnShowMs` holds
+  his move, the moments (`mateMoments`: only when `carrotWin` is among the turn's events; any other mate keeps no
+  moments, as before), then the attack's whole hold (`mateHoldMs`), and the boss screen ends the moments as that hold
+  begins (`mateMomentsOf`), so the attack's start (`until - mateHoldMs + mateAt`) is the same formula as for every mate.
+  The order reads as it happens: the carrot is pulled by the mating move, so it pops first; "FIVE CARROTS!" says why the
+  battle is over; the attack is the finish; the result keeps the mate's line. One hold on the server and in solo (both
+  read `bossTurnShowMs`): 4.9 s plus 3.88 s, then one results message. The other order (the attack, then the moments)
+  would play a cheer over a king already gone, and need a second timer.
+- **The spin's line as the reel starts** (was: as it stops). His pull just before the spin ("Pulled one!") was still up
+  while the reel spun, and the spin's line waited behind it. The spin's line (`spinBig`, `spinSmall`, `spinEmpty`) now
+  comes at `reelAt` and cuts in (`CRITICAL`). It reads his count, known already, never the prize, so it gives nothing
+  away.
+
 ## Tests
 
 Unit: `packages/app/test/hopper.test.ts` (rewritten: live, the kit, the 60 lines and their caps, the sounds' levels,
-the select screen, the FAQ block, every beat against its cue, the moments and their lines, your pull, the board under the
+the select screen, the FAQ block, every beat against its cue, the moments and their lines (the spin's cutting in over the pull's as the reel starts), a mating fifth's moments before the attack, your pull, the board under the
 moments, the carrots on the board), `carrot-race.test.ts` (new: the ladder's words, the reel's strip at its odds, blank
 and two-queens strips, spread out, the stop on the rolled prize, no near-miss bias over 2,000 spins), `hopper-art.test.ts`
 (the art lane's, kept), `king-attack.test.ts` (him in the list, his assault, his face toward the king, 64 squares),
 `boss-kits.test.ts`, `boss-select.test.ts`, `packages/core/test/boss.test.ts`, `packages/chess/test/hopper.test.ts`
-(live), `king-attack.test.ts`, `bigboy.test.ts`, the lobby's `boss-powers-lobby.test.ts`. E2E: `e2e/hopper.spec.ts`
+(live), `king-attack.test.ts` (a mating fifth's hold; no new turn's powers after a game-ending move), `carrots.test.ts` (a mating fifth's hold; a mate or stalemate on his 3rd or 4th carrot plays nothing), `bigboy.test.ts`, the lobby's `boss-powers-lobby.test.ts` (a mating fifth online: the moments, the attack, one results message). E2E: `e2e/hopper.spec.ts`
 (rewritten: the hop's pawn frame by frame, the cast through planting with its ladder, the dock's count, pulls, the reel
 stopping on the rolled prize and the prize on the board, the fifth carrot's path; his tile, stage and figure at 320 px
 and 1280 px), the tile counts in `boss-select.spec.ts`, `formats.spec.ts`, `home-ranked.spec.ts`. Frame by frame:

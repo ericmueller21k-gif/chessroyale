@@ -7,6 +7,7 @@ import {
   CARROT_TEST_MOVES,
   DEFAULT_BOSS_GUARD,
   HOPPER_FX,
+  KING_ATTACK,
   MatchRunner,
   POWER_FX,
   applyMove,
@@ -471,6 +472,28 @@ describe("the Carrot Patch: the race", () => {
     expect(m.boss!.powers!.events.map((e) => e.kind)).toEqual(["carrot", "carrotWin"]);
     expect(m.bossCarrotWin).toBe(false);
     expect(m.finishBossBattle()).toBe("boss");
+    // Then his attack on your king, then the result: the plain fifth's hold, then the attack's whole hold.
+    expect(bossTurnShowMs(m.bossView())).toBe(bossTurnShowMs(plain.bossView()) + KING_ATTACK.mateHoldMs);
+  });
+
+  it("a mate or stalemate that pulls only his 3rd or 4th carrot: no moments at all, the board's own result (review of #275, N-2)", async () => {
+    // (As above, but his count 2 or 3 before the move: Qd3-g3 stalemates, Qd3-h3 mates, each pulling a carrot.)
+    const fen = "8/8/8/8/8/3q4/5k1K/8 w - - 0 60";
+    for (const his of [["a1", "a8", "h8"], ["a1", "a8"]]) {
+      for (const [move, end] of [["d3g3", "stalemate"], ["d3h3", "checkmate"]] as const) {
+        const r = racing(fen, ["g3", "h3", "c6", "b8", "e8"].slice(0, 5 - his.length).concat(his), { his });
+        await crowd(r, "h2h1");
+        const p = r.boss!.powers!;
+        r.applyBossMove(move);
+        const board = r.boards.get(0)!;
+        expect(gameEndWith(board.history, board.bases)).toBe(end);
+        expect(carrots(r).pulls.filter((x) => x.by === "boss")).toHaveLength(his.length + 1);
+        expect(carrots(r).over).toBeUndefined();
+        expect(r.boss!.powers!.turn).toBe(p.turn);
+        expect(r.boss!.powers!.events).toEqual(p.events);
+        expect(r.bossCarrotWin).toBe(false);
+      }
+    }
   });
 
   it("the battle ending first: no spin (his move mates as the race ends)", async () => {

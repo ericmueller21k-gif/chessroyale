@@ -377,12 +377,14 @@ const MOMENTS: Record<"hop" | "carrots" | "carrot" | "carrotSpin" | "carrotWin",
   hop: { order: 0, kit: "power", own: (boss: BossView) => boss.powers?.events.at(-1)?.kind === "hop" && boss.powers?.hop?.at === boss.crowdMoves, view: hopMoment },
   carrot: { order: 0, kit: "powerHit", line: (kit, m) => raceLine(m.by === "crowd" ? "carrotYours" : "carrotHis", kit, m.key), view: pullMoment },
   carrots: { order: 2, kit: "ultimate", view: castMoment },
-  // (His line as the reel stops: on 3 or 4 carrots, on 1 or 2, on none.)
+  // (His line as the reel starts: on 3 or 4 carrots, on 1 or 2, on none (his count, known already: never the prize). It
+  // cuts in over a line still up, the pull's that came just before ("Pulled one!"), so the reel spins under its own.)
   carrotSpin: {
     order: 3,
     kit: "ultimateHit",
     line: (kit, m) => raceLine((m.tier ?? 0) >= 3 ? "spinBig" : (m.tier ?? 0) >= 1 ? "spinSmall" : "spinEmpty", kit, m.key),
-    lineAt: B.carrotSpin.stopAt,
+    lineAt: B.carrotSpin.reelAt,
+    priority: () => CRITICAL,
     view: spinMoment,
   },
   carrotWin: { order: 4, kit: "ultimateHit", line: (kit, m) => raceLine("carrotsAll", kit, m.key), priority: () => CRITICAL, view: winMoment },

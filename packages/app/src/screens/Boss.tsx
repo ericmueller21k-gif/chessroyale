@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, queenSlain, withPiece } from "@chessroyale/chess";
-import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
+import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackPawnShown } from "../components/BigBoy.tsx";
 import { boardSawJolt, splitFen, splitStill } from "../components/Sawyer.tsx";
@@ -203,8 +203,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // the boss, so the next random one is another.
   useState(() => intro && !loading && (resetKingSpeech(), bossVoice.reset(), resetBeats()));
   useState(() => intro && !loading && rememberBoss(boss.id, `${boss.id}:${history.join("")}`));
-  // The boss's mate: its attack on the crowd's king (its kit has one), from KING_ATTACK.mateAt after its move shows;
-  // the result waits for it (bossTurnShowMs). No power's moment comes with a mate.
+  // The boss's mate: its attack on the crowd's king (its kit has one), from KING_ATTACK.mateAt into the screen's last
+  // KING_ATTACK.mateHoldMs; the result waits for it (bossTurnShowMs). No power's moment comes with a mate, but Chub &
+  // Chirp's fifth carrot's (mateMoments): the pull and his win play first, ending as that last stretch begins.
   const mating = !intro && !thinking && !victim && mateAttack(boss);
   const mateKing = mating ? kingSquare(boss.board.fen, boss.crowdSide) : null;
   const attackAt = until - KING_ATTACK.mateHoldMs + KING_ATTACK.mateAt;
@@ -213,7 +214,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // (While he thinks, only Alfil's pieces coming down early, at the start of his turn: earlyLanding; and a carrot of Chub &
   // Chirp's your move just pulled: yourPulls.)
   const moments = useMemo(() => {
-    if (intro || victim || mating || fall) return [];
+    if (intro || victim || fall) return [];
+    if (mating) return mateMomentsOf(boss, until);
     if (thinking) return lights ? [] : [earlyLanding(boss), ...yourPulls(boss)].filter((m) => m !== null);
     return momentsOf(boss, until);
   }, [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating, fall]);

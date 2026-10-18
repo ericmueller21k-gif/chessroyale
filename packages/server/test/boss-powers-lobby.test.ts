@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BOSS_BANNER, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, type Settings } from "@chessroyale/core";
-import { FIRE_BURN_MS, POWER_FX, applyMove, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { FIRE_BURN_MS, KING_ATTACK, POWER_FX, applyMove, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, powerMomentMs, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 afterEach(() => vi.restoreAllMocks());
@@ -1338,6 +1338,7 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
     // round's score; your partner's g1g2 isn't a find either way.
     const fen = runnerOf(L).boards.get(0)!.fen;
     turn("g1g2", "b1b5");
+    expect(L.core.fairMoves("p1")).toHaveLength(2);
     const [left, counted] = L.core.fairMoves("p1");
     expect([left!.best, !!left!.power]).toEqual(["b1b5", true]);
     expect(counted).toMatchObject({ best: "b1b5", loss: 1.5, bestExp: 0.52, gap: 1.5, near: legalMoves(fen).length, crowd: 1, crowdFound: 0 });
@@ -1372,6 +1373,28 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
     expect(L.last("p1", "results")).toBeUndefined();
     for (let i = 0; i < 10 && !L.last("p1", "results"); i++) L.advance(10_000);
     expect(L.last("p1", "results")).toMatchObject({ bossResult: "boss", carrots: true });
+  });
+
+  it("his fifth carrot that also mates: its pull and his win, then his attack on your king, then the results, once", () => {
+    // (As above, the last carrot on h3: Qd3-h3 pulls it and mates.)
+    const L = hopper({}, "8/8/8/8/8/3q4/5k1K/8 w - - 0 60");
+    race(L, ["h3", "a1", "a8", "h8", "c6"], { his: ["a1", "a8", "h8", "c6"] });
+    crowdPlays(L, "h2h1");
+    L.core.message("p1", { t: "bossMove", key: asked(L).key, move: "d3h3" });
+    const b = L.last("p1", "boss")!;
+    expect(b.boss.powers!.events.map((e) => e.kind)).toEqual(["carrot", "carrotWin"]);
+    // The move, the moments, then the attack's whole hold: the same on every screen.
+    expect(b.until - L.now).toBe(bossShowMs(b.boss.lastMove) + powerMomentMs(b.boss.powers!.events) + KING_ATTACK.mateHoldMs);
+    expect(L.last("p2", "boss")!.until).toBe(b.until);
+    L.advance(b.until - L.now - 1);
+    expect(L.last("p1", "results")).toBeUndefined();
+    for (let i = 0; i < 10 && !L.last("p1", "results"); i++) L.advance(10_000);
+    const all = L.inbox.get("p1")!;
+    const at = all.findIndex((m) => m.t === "results");
+    expect(all[at]).toMatchObject({ bossResult: "boss" });
+    expect((all[at] as Extract<ServerMessage, { t: "results" }>).carrots).toBeUndefined();
+    expect(all.slice(at + 1)).toEqual([]);
+    expect(all.filter((m) => m.t === "boss" && m.until === b.until)).toHaveLength(1);
   });
 });
 

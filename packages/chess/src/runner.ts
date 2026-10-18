@@ -884,9 +884,10 @@ export class MatchRunner {
     if (king.plays) result.playedMove = evaluation.bestMove;
     const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, rawEvaluation);
     // Fair play where the boss's judge changed the numbers (Chub & Chirp's race): the turn counts only when the engine's
-    // best keeps its own score, i.e. it is the race's best too (the race never raises a score, and keeps only the race's
-    // best's). Fair play then records the engine's own numbers (`fairScored`), as on a turn without the race: each move's
-    // loss is at most the round's. Any other such turn doesn't count (`power`): there the engine's numbers can charge a
+    // best keeps its own score, i.e. it is the race's best too (the race keeps only the race's best's score, and raises
+    // none above 0.1%: below that the logit's clamp can lift one, by under 0.001). Fair play then records the engine's own
+    // numbers (`fairScored`), as on a turn without the race: each move's loss is at most the round's, or within 0.1 point
+    // of it for a move already lost (expected under 0.1%). Any other such turn doesn't count (`power`): there the engine's numbers can charge a
     // carrot move more than the game does, and the race's read differently from any engine's (another best, other finds,
     // only moves, decided).
     const power = powerTurn(this.state.boss);

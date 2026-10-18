@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_POWERS, BOSS_ROSTER, HOPPER_NAME, isPlayable, playableBosses, type PowerEvent } from "@chessroyale/core";
-import { HOPPER_BEATS, HOPPER_FX, KING_ATTACKERS, POWER_FX, START_FEN, pieceAt, withPiece } from "@chessroyale/chess";
-import { momentsOf, noMoveLine, powerLine, momentLineAt } from "../src/components/BossPowers.tsx";
+import { HOPPER_BEATS, HOPPER_FX, KING_ATTACK, KING_ATTACKERS, POWER_FX, START_FEN, bossShowMs, bossTurnShowMs, mateAttackDue, pieceAt, withPiece } from "@chessroyale/chess";
+import { mateMomentsOf, momentsOf, noMoveLine, powerLine, momentLineAt, momentPriority } from "../src/components/BossPowers.tsx";
+import { Voice, holdMs } from "../src/speech.tsx";
 import { CAST_LINE, HOPPER_UI, PRIZE_DROP, carrotItems, hopperFen, raceWon, yourPulls } from "../src/components/Hopper.tsx";
 import { HOPPER, HOPPER_LINES } from "../src/characters/hopper.ts";
 import { HOPPER_SOUNDS, hopperSound } from "../src/characters/hopper-sounds.ts";
@@ -185,7 +186,17 @@ describe("their moments on screen", () => {
     expect(list.at(-1)!.at + list.at(-1)!.ms).toBe(20_000);
     expect(HOPPER_LINES.carrotHis).toContain(powerLine(kit, list[0]!));
     expect(HOPPER_LINES.spinBig).toContain(powerLine(kit, list[1]!));
-    expect(momentLineAt(list[1]!)).toBe(B.carrotSpin.stopAt);
+    expect(momentLineAt(list[1]!)).toBe(B.carrotSpin.reelAt);
+    // (As the reel starts, the spin's line is up, not the pull's said just before it, which it cuts short.)
+    const voice = new Voice();
+    const sayAt = (m: Moment) => voice.say(powerLine(kit, m), m.key, momentPriority(m), m.at + momentLineAt(m));
+    sayAt(list[0]!);
+    const reel = list[1]!.at + B.carrotSpin.reelAt;
+    expect(voice.line(list[0]!.at + 1)?.text).toBe(powerLine(kit, list[0]!));
+    expect(voice.line(reel - 1)?.text).toBe(powerLine(kit, list[0]!));
+    expect(holdMs(powerLine(kit, list[0]!)!)).toBeGreaterThan(reel - list[0]!.at);
+    sayAt(list[1]!);
+    expect(voice.line(reel)?.text).toBe(powerLine(kit, list[1]!));
     expect(HOPPER_LINES.carrotsAll).toContain(powerLine(kit, list[2]!));
     expect(HOPPER_LINES.spinSmall).toContain(powerLine(kit, { ...list[1]!, tier: 2 }));
     expect(HOPPER_LINES.spinEmpty).toContain(powerLine(kit, { ...list[1]!, tier: 0 }));
@@ -193,6 +204,29 @@ describe("their moments on screen", () => {
     // (A carrot each side pulled in one turn: two moments, two keys.)
     const two = momentsOf(view([{ kind: "carrot", turn: 9, square: "e6", by: "crowd" }, { kind: "carrot", turn: 9, square: "a5", by: "boss" }], { carrots: c }, 8), 20_000);
     expect(new Set(two.map((m) => m.key)).size).toBe(2);
+  });
+
+  it("his fifth carrot that also mates: the pull and his win play first, then his attack on your king, then the result", () => {
+    // (Your king on h1, his queen on h3 and king on f2: mated.)
+    const mated = "8/8/8/8/8/7q/5k2/7K w - - 1 61";
+    const fifth: PowerEvent[] = [
+      { kind: "carrot", turn: 9, square: "h3", by: "boss" },
+      { kind: "carrotWin", turn: 9, square: "h3" },
+    ];
+    const v = { ...view(fifth, { carrots: carrots() }, 8, mated), lastMove: { from: "d3", to: "h3" } } as unknown as BossView;
+    expect(mateAttackDue(v)).toBe(true);
+    const until = 50_000;
+    const shownAt = until - bossTurnShowMs(v, true);
+    const list = mateMomentsOf(v, until);
+    expect(list.map((m) => m.kind)).toEqual(["carrot", "carrotWin"]);
+    // After his move has shown, one after another, ending as the attack's hold begins; the attack from mateAt into it.
+    expect(list[0]!.at).toBe(shownAt + bossShowMs(v.lastMove, true));
+    expect(list[1]!.at).toBe(list[0]!.at + list[0]!.ms);
+    expect(list[1]!.at + list[1]!.ms).toBe(until - KING_ATTACK.mateHoldMs);
+    expect(until - KING_ATTACK.mateHoldMs + KING_ATTACK.mateAt).toBeGreaterThan(list[1]!.at + list[1]!.ms);
+    // (Any other mate: no moments, the attack alone.)
+    expect(mateMomentsOf(view([{ kind: "carrot", turn: 9, square: "h3", by: "boss" }], { carrots: carrots() }, 8, mated), until)).toEqual([]);
+    expect(mateMomentsOf(view([], {}, 8, mated), until)).toEqual([]);
   });
 
   it("the dock's line for the cast (his whole turn: no move to show), only on that turn; the warning says when it comes", () => {
