@@ -249,7 +249,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       const strikeRng = mulberry32(seed * 104729 + g);
       const strikeTurns = new Set<number>();
       while (strikeTurns.size < strikes) strikeTurns.add(6 + Math.floor(strikeRng() * 25));
-      // (A boss whose powers are built before its art, Alfil: met as the test link does, bossUnfinished.)
+      // (A boss whose powers are built before its art: met as the test link does, bossUnfinished.)
       const s = { ...settings, ...RAID_SETTINGS, bossId, bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES } as Settings;
       const runner = new MatchRunner({ settings: s, rng, engines, library, entrants: botRoster(rng, s.lobbySize, s) });
       const ults: { kind: string; turn: number }[] = [];

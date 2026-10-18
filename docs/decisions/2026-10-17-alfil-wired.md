@@ -49,6 +49,10 @@ Boss raid screen, the random pick, raids and lobbies, Boss alone's menu, and hom
 - **The select screen:** ten tiles, two full rows of five on a phone; one row of ten from 600 px (was nine). He's drawn
   full size on the stage (70 px tall at its 0.8 a pixel).
 
+- **After #267's review round** (merged with it): an empty Slam has no event and no moment (it comes again next turn),
+  so the Slam's moment always has pieces to fly; a fusion postponed by a check keeps the pawns glowing until it lands;
+  a strike before a fusion only changes its square. The FAQ says all three.
+
 ## My calls
 
 - **Banners for the cast and the Slam, none for the fusion and the landing.** Every boss's passive and ultimate open

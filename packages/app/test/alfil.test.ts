@@ -222,5 +222,10 @@ describe("his FAQ block", () => {
     expect(words).toContain(`about ${p.slamTarget} of a pawn (from ${p.slamLoss[0]} to ${p.slamLoss[1]})`);
     expect(words).toContain(`plays ${Math.abs(def.offset)} under the usual strength`);
     expect(words).toContain("the fusion is his whole move that turn");
+    // (The review round, #267: a fusion due in check waits; a strike before it puts the elephant on the worse square; a
+    // Slam that lifts nothing comes again.)
+    expect(words).toContain("If he's in check when it's due, it waits until he isn't");
+    expect(words).toContain("the elephant lands on the worse of the two squares for him");
+    expect(words).toContain("he tries again at the start of his next turn");
   });
 });
