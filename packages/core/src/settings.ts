@@ -954,6 +954,25 @@ export const RECLUSE_PHASE2 = {
   botSlowMs: [5400, 7000] as readonly [number, number],
   /** Once every board is decided: how long his reaction holds the boards before the result screen (ms). */
   endMs: 3200,
+  /**
+   * The phase change's pace (Eric, Oct 17, after playing it: "everything's perfect, but it happens way too fast"): about
+   * 10 s more from the mate to the split, the animations themselves unchanged, then a countdown before the clocks
+   * (packages/app/src/recluse-phase2.ts, PHASE_CHANGE; docs/decisions/2026-10-17-phase-change-pace.md).
+   */
+  change: {
+    /**
+     * After the mate, more of his words before he seizes the God King's power (ms added before the seize): his
+     * mumbling, then his new lines (RECLUSE_LINES.seizeTalk), the last about taking that power, while the God King
+     * gloats over him.
+     */
+    talkMs: 4500,
+    /** The power landed: he holds his closed fist, his engine eye newly lit, before he rises (ms). */
+    absorbHoldMs: 1500,
+    /** His cast on the board: the chant over the open book held this much longer before the board cracks (ms). */
+    castHoldMs: 4000,
+    /** The boards split and set: a big 5, 4, 3, 2, 1 on every board before phase 2's clocks run (s). */
+    countdownSeconds: 5,
+  },
 };
 
 /** BOSS_POWERS with room for other numbers (tests, and the switch turned off). */

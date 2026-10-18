@@ -147,31 +147,42 @@ solo Crowd's boss final you reached, where the other three finalists take the ot
 `phase2Mates`). **Not online yet** (four boards online, his server-side Stockfish and its fair-play hooks are a separate
 build): online, phase 1 won is the crowd's victory):
 - **The phase change** (Eric, Oct 14, reworked, then opened with the God King's absorption; `PHASE_CHANGE` in
-  `packages/app/src/recluse-phase2.ts`, about 14.8 s after a 1.8 s fall (its "PHASE 2" banner 1.4 s, `BOSS_BANNER.phase2Ms`, Oct 16), one timeline, not skippable like a boss's
-  intro; drawn by `screens/Recluse2.tsx`, `PhaseChangeScreen`):
+  `packages/app/src/recluse-phase2.ts`, about 24.8 s after a 1.8 s fall (its "PHASE 2" banner 1.4 s, `BOSS_BANNER.phase2Ms`, Oct 16), one timeline, not skippable like a boss's
+  intro; drawn by `screens/Recluse2.tsx`, `PhaseChangeScreen`). **Its pace** (Eric, Oct 17, after playing it: "everything's
+  perfect, but it happens way too fast"; docs/decisions/2026-10-17-phase-change-pace.md): about 10 s more from the mate
+  to the split, the animations unchanged, every added time a setting (`RECLUSE_PHASE2.change`): his words before the
+  seize (`talkMs`, 4.5 s), a hold as the power lands (`absorbHoldMs`, 1.5 s), a longer cast (`castHoldMs`, 4 s); then
+  a 5-4-3-2-1 on every board before phase 2's clocks run (`countdownSeconds`):
   - **The absorption** (Eric, Oct 14: he plays with an engine in phase 2, so he takes the God King's; DECISIONS.md, "The
     Hidden Boss absorbs the God King"): in his place in the dock (BossDock's `king`, from `absorbKing`) the God King
-    raises his sword, his golden aura swelling (`.gk-aura`), and gloats (`KING_VS_RECLUSE.triumph`, a `lead` cue: his
-    cry cuts in on it); still kneeling, the boss's head snaps up and he raises his open hand to him (`seize`, then
+    raises his sword, his golden aura swelling (`.gk-aura`), and gloats (`KING_VS_RECLUSE.triumph`, a `lead` cue: whole
+    since Oct 17, before his cry); the boss, kneeling, mumbles on (his fall's first line), then says he'll take that
+    power (`RECLUSE_LINES.seizeTalk`, `talkAt`: as his mumbling ends; typed out before his hand goes up); his head snaps up and he raises his open hand to him (`seize`, then
     `seizeLoop`, a figure run step held for the drain, `phaseChangeRun`); a golden stream runs from the God King into
     that hand (`AbsorbStream`: a beam of two strokes and motes moved by transform, over the page, measured from both
     drawings) while he's drained through his Last Stand's blows, flashing and cracking (his own frames, `lastStand`
     from its blows, drawn ahead by `prewarmKing`), flickering, his aura shrinking, and cries out
     (`KING_VS_RECLUSE.drained`); as it lands the boss's fist closes (`seized`, its spark `recluseSpark`), his half-engine
-    look ignites (`setEngineAt`) and he says so (`RECLUSE_LINES.absorb`), and the God King fades up and away in light
-    (`gkLeave`). Sounds: `gkHyuah`, `recluseDrain`, `gkLastGrunt2`, `recluseSpark`, `gkLeave`.
+    look ignites (`setEngineAt`) and he says so (`RECLUSE_LINES.absorb`, CRITICAL: it cuts in on his word before the
+    seize), and the God King fades up and away in light (`gkLeave`); he holds his fist, its last frame (a one-shot given
+    a time in a figure run holds its last frame), the dock saying "The God King's power is his!". Sounds: `gkHyuah`, `recluseDrain`, `gkLastGrunt2`, `recluseSpark`, `gkLeave`.
   - **Then**, where he stands, he gets up in a rage (`rage`, both drawings); then the board draws his whole figure (a
     phone too; `.rc-fig`, his place empty meanwhile: `.rc-away`) for his leap onto the middle (`leap`: a thud, dust, the
     board jolts), the book brandished and thrown down open at his feet (`drop`), his chant over it (`chantRaise`,
     `chant`: arms raised, his hair lifting into phase 2's) as light pours up out of it (CSS only: `.rc-light`, a pulsing
     cone behind him, and `.rc-glow` on the pages; only opacity and transform move) and one chant line
-    (`RECLUSE_LINES.chant`); Sawyer's board-saw gap runs down and across the middle, the quarters part and each grows
+    (`RECLUSE_LINES.chant`; it waits up to about a second for his absorb line to end), for `castMs` (5.7 s) before the crack; Sawyer's board-saw gap runs down and across the middle, the quarters part and each grows
     into a whole board (a transform and a clip only) as the light dies, while blue arcs strike the cracks from his
     raised hands (`Arcs`, `ARC_STRIKES`: a thin bright core in two soft glows, smooth paths redrawn every 70 ms, gone in
     260 ms, two big ones as the board cracks and as it parts, a blue flash where each lands and a blue pulse on the
     board; one SVG, no filter; `recluseArc`); the book snaps shut and flies up into his hands (`pickup`, his revive's
     frames) while every board's pieces fly to their Chess960 squares; he leaps back to his place (`leap2`) and rests in
     `idle2`; "PHASE 2".
+  - **Then the countdown** (Oct 17): phase 2's screen (`SimulScreen`, the boards where you'll play them: a phone's big
+    board and three small ones) with no clock running and no move possible: the round's countdown (`CenterCount`) on
+    every board, 5 to 1 a second each with a tick, "Get ready" over yours, the dock saying "2:00 on your clock" "No added
+    time."; the phase's `at` is when the clocks start (solo's `startSimul`, then `startClocks`), and his phase 2 line
+    comes with them. Reduced motion: the same times, the numbers without their pop.
   - One book on screen throughout, in his frames (`RECLUSE_BOOK` isn't shown). His frames and the God King's are drawn
     ahead from his battle's start (`prewarmRecluse`), its sounds made ahead in the sound worker. Other sounds: his
     rustle, `recluseThump` (landing), `recluseShut` (the book), `recluseGlow` (the light), the saw's crack.

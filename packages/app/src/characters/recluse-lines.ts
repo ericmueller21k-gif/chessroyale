@@ -60,6 +60,13 @@ export const RECLUSE_LINES = {
   ],
   // ---- Phase 2 (DECISIONS.md, "The Hidden Boss, phase 2"): four boards of Chess960. ----
   /**
+   * The phase change's opening (Eric, Oct 17: "more talking after the mate", so a first-time player sees what comes):
+   * still on his knees, his mumbling over and the God King gloating over him, he says he'll take the God King's power;
+   * then he seizes it. One, picked per phase change (NEW, Oct 17: drafts for Eric, ours, not his words). Short enough to
+   * be typed out before his hand goes up (a unit test checks).
+   */
+  seizeTalk: ["An engine in a golden crown... Give me that power!", "So he's your engine. I'll take his power myself."],
+  /**
    * The phase change's start: he absorbs the God King (Eric, Oct 14: "brain and engine combined"), said as the power
    * lands in his fist; one, picked per phase change (placeholders: ours, not his words).
    */

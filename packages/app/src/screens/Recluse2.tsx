@@ -14,7 +14,7 @@ import { Board } from "../components/Board.tsx";
 import { SpriteAnim } from "../components/BossEffect.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
 import { BossDock, clockLeft, type DockClockRun } from "../components/BossDock.tsx";
-import { useFrameNow } from "../components/Countdown.tsx";
+import { CenterCount, useFrameNow, useTicks } from "../components/Countdown.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
@@ -267,14 +267,17 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   const cue = (on: boolean, name: string, fn: () => void) => useCue(on, `${at}:${name}`, fn);
   cue(t >= C.kingAt + 80, "hyuah", () => play("gkHyuah"));
   cue(t >= C.kingAt + 150, "triumph", () => kingSay("foeTriumph", `recluse:absorb:${at}`));
+  // (Before he seizes it, on his knees: he'll take that power. NORMAL: it waits for his mumbling to end.)
+  cue(t >= C.talkAt, "talk", () => bossVoice.say(RECLUSE_LINES.seizeTalk[at % RECLUSE_LINES.seizeTalk.length]!, `recluse:talk:${at}`, NORMAL));
   cue(t >= C.drainAt, "drain", () => {
     play("recluseDrain");
     play("gkLastGrunt2");
     kingSay("foeDrained", `recluse:drained:${at}`);
   });
   cue(t >= C.igniteAt + 80, "leave", () => play("gkLeave"));
-  // (NORMAL: his chant, three and a half seconds on, cuts in on it, so the chant's words come as he chants.)
-  cue(t >= C.absorbLineAt, "absorb", () => bossVoice.say(RECLUSE_LINES.absorb[at % RECLUSE_LINES.absorb.length]!, `recluse:absorb:${at}`, NORMAL));
+  // (CRITICAL, Oct 17: it cuts in on his word before the seize, so it comes as the power lands; since the hold and the
+  // longer cast it has its whole time before his chant, or nearly: the chant's line waits for it, a second at most.)
+  cue(t >= C.absorbLineAt, "absorb", () => bossVoice.say(RECLUSE_LINES.absorb[at % RECLUSE_LINES.absorb.length]!, `recluse:absorb:${at}`, CRITICAL));
   cue(t >= C.arcAt, "arcs", () => play("recluseArc"));
   // His look over his figure on the board, placed on his head frame by frame.
   const figEngine = useRef<HTMLSpanElement>(null);
@@ -391,7 +394,9 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
                   ? "The God King triumphs!"
                   : t < C.goneAt
                     ? "He's draining the God King!"
-                    : t < C.chantAt
+                    : t < C.riseAt
+                      ? "The God King's power is his!"
+                      : t < C.chantAt
                       ? "The boss rises!"
                       : t < C.bannerAt
                         ? "One board becomes four…"
@@ -475,7 +480,7 @@ function SlowMarks({ n, flash }: { n: number; flash: boolean }) {
  * One phase 2 board: yours takes moves on your turn. `marks`: the team's slow moves beside it (one board shows them).
  * `big`: a phone's big board.
  */
-function SimulBoard({ match, v, b, now, small, big, marks: withMarks, children }: { match: GameView; v: SimulView; b: SimulBoardView; now: number; small?: boolean; big?: boolean; marks?: boolean; children?: ComponentChildren }) {
+function SimulBoard({ match, v, b, now, small, big, marks: withMarks, count, children }: { match: GameView; v: SimulView; b: SimulBoardView; now: number; small?: boolean; big?: boolean; marks?: boolean; count?: number | null; children?: ComponentChildren }) {
   const mine = b.you && v.playing && b.toMove === "crowd";
   const recent = !!v.lastSlow && now - v.lastSlow.at < SLOW_NOTE_MS;
   // (The note marks the board the slow move was on; the marks flash at any slow move.)
@@ -490,6 +495,8 @@ function SimulBoard({ match, v, b, now, small, big, marks: withMarks, children }
       {v.playing && withMarks && marks}
       {/* (Which board the last slow move was on: a small note over its top-right corner, for a moment.) */}
       {flash && <span class="rc-slow-note">slow move</span>}
+      {/* (Before the clocks run: the countdown, big on every board; "Get ready" over yours.) */}
+      {count != null && count > 0 && <CenterCount label={b.you ? "Get ready" : null} n={count} />}
       {children}
     </Board>
   );
@@ -507,6 +514,12 @@ export function SimulScreen({ match }: { match: GameView }) {
   const bossSide = useMemo(() => <BossSide match={match} />, [match, still]);
   // (Back to your board, the first: the same callback every frame, so the dock isn't drawn again for it.)
   const back = useCallback(() => setWatch(match.simul?.boards[0]?.id ?? 0), [match]);
+  // The boards set, before the clocks run (Eric, Oct 17: a player who's never seen the split needs a moment): a big 5, 4,
+  // 3, 2, 1 on every board, a tick each second, as a round's 3-2-1 (`at`: when the clocks start).
+  const clocksAt = match.phase.kind === "simul" ? match.phase.at : 0;
+  const counting = !!v && !v.playing && !v.decided && now < clocksAt;
+  const count = counting ? Math.ceil((clocksAt - now) / 1000) : null;
+  useTicks(count ?? 0, RECLUSE_PHASE2.change.countdownSeconds, counting);
   if (!v) return null;
   const mine = v.boards[0]!;
   const big = v.boards.find((b) => b.id === watch) ?? mine;
@@ -529,7 +542,10 @@ export function SimulScreen({ match }: { match: GameView }) {
       : "The boss wins."
     : mine.result
       ? `Your board: ${RESULT_WORD(mine).toLowerCase()}. The others play on.`
-      : yourTurn
+      : !v.playing
+        ? // (Before the clocks run: the clock you'll have, as "PHASE 2" said it.)
+          `${clockShown(RECLUSE_PHASE2.bankSeconds * 1000)} on your clock`
+        : yourTurn
         ? "Your move"
         : "The boss is thinking…";
   return (
@@ -540,7 +556,7 @@ export function SimulScreen({ match }: { match: GameView }) {
         <div class="rc-minis" role="list" aria-label="The other boards">
           {others.map((b) => (
             <button type="button" key={b.id} role="listitem" class={`rc-mini${b.you ? " you" : ""}`} aria-label={b.you ? "Back to your board" : `Watch ${b.name}'s board`} onClick={() => setWatch(b.id)}>
-              <SimulBoard match={match} v={v} b={b} now={now} small />
+              <SimulBoard match={match} v={v} b={b} now={now} small count={count} />
             </button>
           ))}
         </div>
@@ -557,13 +573,13 @@ export function SimulScreen({ match }: { match: GameView }) {
             <div class="board-wrap rc-stage" style={{ "--rc-cell": `${DESK.cell * 100}%`, "--rc-tagrow": `${DESK.tag}%` }}>
               {QUARTER_BOARD.map((id, q) => (
                 <div key={q} class={`rc-cell rc-q${q} rc-played`}>
-                  <SimulBoard match={match} v={v} b={v.boards[id]!} now={now} marks={v.boards[id]!.you} />
+                  <SimulBoard match={match} v={v} b={v.boards[id]!} now={now} marks={v.boards[id]!.you} count={count} />
                 </div>
               ))}
               {ultBanner}
             </div>
           ) : (
-            <SimulBoard key={big.id} match={match} v={v} b={big} now={now} big marks>
+            <SimulBoard key={big.id} match={match} v={v} b={big} now={now} big marks count={count}>
               {ultBanner}
             </SimulBoard>
           )}
@@ -574,7 +590,7 @@ export function SimulScreen({ match }: { match: GameView }) {
         still={still}
         secs={run ? Math.ceil(clockLeft(run, now) / 1000) : null}
         status={status}
-        line={!computer && big.id !== mine.id ? "back" : mine.result ? "" : v.ultAt !== null ? "ult" : ""}
+        line={!computer && big.id !== mine.id ? "back" : mine.result ? "" : !v.playing && !v.decided ? "ready" : v.ultAt !== null ? "ult" : ""}
         onBack={back}
         runFrom={run ? run.startsAt : null}
         runTo={run ? run.deadline : null}
@@ -603,7 +619,7 @@ const SimulDock = memo(function SimulDock({
   still: string;
   secs: number | null;
   status: string;
-  line: "back" | "ult" | "";
+  line: "back" | "ult" | "ready" | "";
   onBack: () => void;
   runFrom: number | null;
   runTo: number | null;
@@ -627,6 +643,8 @@ const SimulDock = memo(function SimulDock({
               <button type="button" class="rc-back" onClick={onBack}>
                 Back to my board
               </button>
+            ) : line === "ready" ? (
+              "No added time."
             ) : line === "ult" ? (
               // (His ultimate: a few seconds a move, then a random one is played for you; the seconds are your clock.)
               `${RECLUSE_PHASE2.ultMoveSeconds} s a move, or a random one`

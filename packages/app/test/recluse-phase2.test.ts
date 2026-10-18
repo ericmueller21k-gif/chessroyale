@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2 } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2, SPEECH } from "@chessroyale/core";
 import { LAST_STAND, legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
 import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, absorbKing, arcPoints, phase2Follows, phase2Mates, phaseChangeRun, smoothPath } from "../src/recluse-phase2.ts";
 import { ON_BOARD_ANIMS, RECLUSE, RECLUSE_BUST } from "../src/characters/recluse.ts";
-import { CRITICAL, NORMAL, Voice, bossVoice, typeMs } from "../src/speech.tsx";
+import { CRITICAL, NORMAL, Voice, bossVoice, holdMs, typeMs } from "../src/speech.tsx";
 import { SoloMatch } from "../src/solo.ts";
 import { KING_LINES, kingLine, kingSay, resetKingSpeech } from "../src/godKing.ts";
 import { KING_VS_RECLUSE, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
@@ -39,13 +39,13 @@ describe("when phase 2 follows, and who plays it beside you", () => {
 });
 
 describe("the phase change", () => {
-  it("is 15 to 20 s with its short fall (Eric: \"this epic thing\"), its beats in order: the God King's absorption, rage, leap, the book thrown down, the chant, the split, the book back, the leap back", () => {
+  it("is 25 to 30 s with its short fall (Eric: \"this epic thing\"; Oct 17: about 10 s slower), its beats in order: the God King's absorption, rage, leap, the book thrown down, the chant, the split, the book back, the leap back", () => {
     const C = PHASE_CHANGE;
     expect(C.fallMs).toBeGreaterThanOrEqual(1500);
     expect(C.fallMs).toBeLessThanOrEqual(2000);
-    expect(C.fallMs + C.total).toBeGreaterThanOrEqual(15_000);
-    expect(C.fallMs + C.total).toBeLessThanOrEqual(20_000);
-    const order = [0, C.kingAt, C.seizeAt, C.drainAt, C.igniteAt, C.riseAt, C.leapAt, C.upAt, C.landAt, C.dropAt, C.thudAt, C.chantAt, C.arcAt, C.crackAt, C.partAt, C.growAt, C.growAt + C.growMs, C.pickupAt, C.catchAt, C.backAt, C.homeAt, C.bannerAt, C.total];
+    expect(C.fallMs + C.total).toBeGreaterThanOrEqual(25_000);
+    expect(C.fallMs + C.total).toBeLessThanOrEqual(30_000);
+    const order = [0, C.kingAt, C.talkAt, C.seizeAt, C.drainAt, C.igniteAt, C.riseAt, C.leapAt, C.upAt, C.landAt, C.dropAt, C.thudAt, C.chantAt, C.arcAt, C.crackAt, C.partAt, C.growAt, C.growAt + C.growMs, C.pickupAt, C.catchAt, C.backAt, C.homeAt, C.bannerAt, C.total];
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     // The absorption first (about 5 s): the God King triumphant, then drained into the boss's raised hand for as long as
     // his Last Stand's blows run to his stagger, gone just after the power lands, before the boss is on his feet.
@@ -55,16 +55,59 @@ describe("the phase change", () => {
     expect(RECLUSE.anims.seize!.frames[3]!.cue).toBe("reach");
     expect(C.goneAt).toBeGreaterThan(C.igniteAt);
     expect(C.goneAt).toBeLessThanOrEqual(C.riseAt + C.rageMs);
-    expect(C.riseAt).toBeGreaterThanOrEqual(4000);
-    expect(C.riseAt).toBeLessThanOrEqual(6000);
+    expect(C.riseAt).toBeGreaterThanOrEqual(10_000);
+    expect(C.riseAt).toBeLessThanOrEqual(12_000);
     // He gets up where he stands, then the board takes him over; the light is up through the cracks and the split.
     expect(C.leapAt).toBe(C.riseAt + animLength(RECLUSE.anims.rage!));
     expect(C.chantAt + C.lightMs).toBeLessThanOrEqual(C.crackAt);
     // (The pieces fly to their Chess960 squares as the book comes back to him, and land before "PHASE 2".)
     expect(C.shuffleAt).toBeGreaterThanOrEqual(C.pickupAt);
     expect(C.shuffleAt + C.shuffleMs).toBeLessThanOrEqual(C.bannerAt);
+    // (Then the countdown on phase 2's boards before the clocks: a setting.)
+    expect(C.countdownMs).toBe(RECLUSE_PHASE2.change.countdownSeconds * 1000);
     // (Phase 2's frames, all drawn: his idle, his slam and laugh, the placeholder's glow.)
     for (const a of ["idle2", "slam2", "laugh2", "spellbook2", "spellLoop2", "collapseLoop"]) expect(RECLUSE.anims[a], a).toBeDefined();
+  });
+
+  it("Eric, Oct 17 (\"way too fast\"): about 10 s more from the mate to the split, every added time a setting, the animations unchanged", () => {
+    const C = PHASE_CHANGE;
+    const P = RECLUSE_PHASE2.change;
+    // His words before the seize, a hold as the power lands, a longer cast: about 10 s in all, the talk 4 to 5 s of it and
+    // the cast 3 to 5 s longer.
+    expect(P.talkMs + P.absorbHoldMs + P.castHoldMs).toBeGreaterThanOrEqual(9_000);
+    expect(P.talkMs + P.absorbHoldMs + P.castHoldMs).toBeLessThanOrEqual(11_000);
+    expect(P.talkMs).toBeGreaterThanOrEqual(4_000);
+    expect(P.talkMs).toBeLessThanOrEqual(5_000);
+    expect(P.castHoldMs).toBeGreaterThanOrEqual(3_000);
+    expect(P.castHoldMs).toBeLessThanOrEqual(5_000);
+    expect(P.countdownSeconds).toBe(5);
+    // Where each lands: the seize after the talk, the rise after the hold, the crack after the cast.
+    expect(C.seizeAt).toBe(1700 + P.talkMs);
+    expect(C.riseAt).toBe(C.igniteAt + animLength(RECLUSE.anims.seized!) + P.absorbHoldMs);
+    expect(C.crackAt - C.chantAt).toBe(1700 + P.castHoldMs);
+    // (The beats themselves keep their lengths: the drain, the rage, the split, the shuffle, the leap back.)
+    expect(C.drainMs).toBe(LAST_STAND.staggerAt - LAST_STAND.slashAt);
+    expect([C.partAt - C.crackAt, C.growAt - C.partAt, C.growMs, C.shuffleMs]).toEqual([750, 400, 900, 900]);
+  });
+
+  it("before the seize he says he'll take the God King's power: after his mumbling, typed out before his hand goes up, and read before the power lands", () => {
+    const C = PHASE_CHANGE;
+    // (His mumbling is his fall's first line, from the end of his collapse in the fall: it's over as his new line comes.)
+    const mumbleEnd = -C.fallMs + animLength(RECLUSE.anims.collapse!) + holdMs(RECLUSE_LINES.fall[0]);
+    expect(C.talkAt).toBeGreaterThanOrEqual(mumbleEnd);
+    expect(RECLUSE_LINES.seizeTalk.length).toBeGreaterThanOrEqual(1);
+    for (const line of RECLUSE_LINES.seizeTalk) {
+      // (The last words before he seizes it are about taking its power.)
+      expect(line, line).toMatch(/power/i);
+      expect(C.talkAt + typeMs(line), line).toBeLessThanOrEqual(C.seizeAt);
+      // Up from when it's said, whole for at least two and a half seconds before his word as the power lands cuts in.
+      const v = new Voice();
+      v.say(RECLUSE_LINES.fall[0], "mumble", NORMAL, mumbleEnd - holdMs(RECLUSE_LINES.fall[0]));
+      v.say(line, "talk", NORMAL, C.talkAt);
+      expect(v.line(C.talkAt)?.text).toBe(line);
+      expect(v.line(C.absorbLineAt - 1)?.text).toBe(line);
+      expect(C.absorbLineAt - C.talkAt - typeMs(line), line).toBeGreaterThanOrEqual(2500);
+    }
   });
 
   it("where he stands: slumped while the God King gloats, his hand up through the drain, his fist as it lands, up in a rage at riseAt", () => {
@@ -74,6 +117,8 @@ describe("the phase change", () => {
     const len = (n: string) => animLength(RECLUSE.anims[n]!);
     const steps = run.anims.map((a) => (typeof a === "string" ? [a, len(a)] : [a.anim, a.ms]) as const);
     expect(steps.map(([n]) => n)).toEqual(["seize", "seizeLoop", "seized", "rage"]);
+    // (His fist closed held a moment as the power sinks in: `seized` once, then its last frame.)
+    expect(steps[2]![1]).toBe(len("seized") + C.absorbHoldMs);
     // (Each step where the timeline says: the fist closes as the power lands, he's up as the leap begins.)
     expect(C.seizeAt + steps[0]![1] + steps[1]![1]).toBe(C.igniteAt);
     expect(C.seizeAt + steps[0]![1] + steps[1]![1] + steps[2]![1]).toBe(C.riseAt);
@@ -150,21 +195,25 @@ describe("his phase 2 lines", () => {
     expect(RECLUSE_LINES.engine).toEqual(expect.arrayContaining(["Fun, isn't it?", "Look how much fun we're having.", "Not so nice when the engine's on my side, is it?"]));
   });
 
-  it("the boss's word as the power lands stays up until his chant cuts in on it, whole for a while first", () => {
+  it("the boss's word as the power lands comes as it lands (cutting in on his word before the seize), whole until his chant, whose line waits a second at most", () => {
     const C = PHASE_CHANGE;
     expect(C.absorbLineAt).toBeGreaterThanOrEqual(C.igniteAt);
     for (const line of RECLUSE_LINES.absorb) {
       const v = new Voice();
-      v.say(line, "absorb", NORMAL, C.absorbLineAt);
-      expect(v.line(C.chantAt - 1)?.text).toBe(line);
+      v.say(RECLUSE_LINES.seizeTalk[0], "talk", NORMAL, C.talkAt);
+      v.say(line, "absorb", CRITICAL, C.absorbLineAt);
+      expect(v.line(C.absorbLineAt)?.text).toBe(line);
+      // (Its whole time, up to the chant at most.)
+      expect(v.line(Math.min(C.chantAt, C.absorbLineAt + holdMs(line)) - 1)?.text).toBe(line);
       v.say(RECLUSE_LINES.chant[0], "chant", CRITICAL, C.chantAt);
-      expect(v.line(C.chantAt)?.text).toBe(RECLUSE_LINES.chant[0]);
-      // (Typed out, and on screen whole for at least a second and a half before the chant.)
-      expect(C.chantAt - C.absorbLineAt - typeMs(line), line).toBeGreaterThanOrEqual(1500);
+      // (The chant's line as soon as it's over: within about a second of the chant.)
+      expect(v.line(C.chantAt + 1200)?.text, line).toBe(RECLUSE_LINES.chant[0]);
+      // (Typed out, and on screen whole for at least two seconds and a half.)
+      expect(C.absorbLineAt + holdMs(line) - SPEECH.fadeMs - (C.absorbLineAt + typeMs(line)), line).toBeGreaterThanOrEqual(2500);
     }
   });
 
-  it("the God King's triumph gives way to his cry as he's drained (two seconds on), each in his own voice", () => {
+  it("the God King's triumph gives way to his cry as he's drained, each in his own voice; since Oct 17 the triumph has its whole time first", () => {
     resetKingSpeech();
     expect(KING_VS_RECLUSE.triumph).toContain(kingSay("foeTriumph", "t", 1000));
     expect(KING_VS_RECLUSE.triumph).toContain(kingLine(1500)?.text);
@@ -172,6 +221,7 @@ describe("his phase 2 lines", () => {
     expect(KING_VS_RECLUSE.drained).toContain(kingLine(1100 + PHASE_CHANGE.drainAt)?.text);
     // (Short enough to read before it's cut: typed out in about a second.)
     for (const l of KING_VS_RECLUSE.triumph) expect(l.length).toBeLessThanOrEqual(30);
+    for (const l of KING_VS_RECLUSE.triumph) expect(150 + holdMs(l), l).toBeLessThanOrEqual(PHASE_CHANGE.drainAt);
     resetKingSpeech();
   });
 
@@ -331,6 +381,26 @@ describe("phase 2 without the God King (Eric, Oct 14: absorbed in the phase chan
     vi.unstubAllGlobals();
   });
 
+  it("the boards set, a countdown before the clocks (Eric, Oct 17): nothing runs, nobody can move or resign, then every clock starts", () => {
+    const m = new SoloMatch([], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS }) as unknown as Record<string, (...a: unknown[]) => unknown> & { phase2: unknown; phase: { kind: string; at: number }; exit: unknown; simul: unknown };
+    let started = 0;
+    let moved = 0;
+    m.phase2 = { start: () => started++, stop() {}, move: () => moved++, outcome: { beaten: false, won: 0, of: 4, decided: false }, state: { boards: [], slow: 0, ultAt: null } };
+    const t0 = Date.now();
+    m.startSimul!();
+    expect(m.phase).toEqual({ kind: "simul", at: t0 + PHASE_CHANGE.countdownMs });
+    expect(m.exit).toBeNull();
+    m.simulMove!(0, "e2e4");
+    vi.advanceTimersByTime(PHASE_CHANGE.countdownMs - 1);
+    expect([started, moved]).toEqual([0, 0]);
+    vi.advanceTimersByTime(1);
+    expect(started).toBe(1);
+    expect(m.phase).toEqual({ kind: "simul", at: t0 + PHASE_CHANGE.countdownMs });
+    m.simulMove!(0, "e2e4");
+    expect(moved).toBe(1);
+    (m as unknown as { stop(): void }).stop?.();
+  });
+
   it("says nothing as phase 2 begins, as a board is won or lost, or as all four are won; the boss still has his words", () => {
     // (White-box: the moments of SoloMatch's phase 2 that had the God King speak, driven with a pretend Phase2Game.)
     const m = new SoloMatch([], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS }) as unknown as Record<string, (...a: unknown[]) => unknown> & { phase2: unknown };
@@ -339,6 +409,8 @@ describe("phase 2 without the God King (Eric, Oct 14: absorbed in the phase chan
     resetKingSpeech();
     bossVoice.reset();
     m.startSimul!();
+    // (The countdown first: then the clocks, and his line.)
+    vi.advanceTimersByTime(PHASE_CHANGE.countdownMs);
     m.phase2Result!("crowd");
     m.phase2Result!("boss");
     Object.assign(outcome, { beaten: true, won: 4, decided: true });

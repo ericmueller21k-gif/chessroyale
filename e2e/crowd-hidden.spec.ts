@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { bossInText, crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
+import { RECLUSE_PHASE2, bossInText, crowdFinalBoss, crowdFinalists } from "@chessroyale/core";
 import { createLobbyFromHome, engineTop, soloFromHome, submitMove, test, watchFor } from "./helpers.ts";
 import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
 
@@ -89,7 +89,9 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("phaseChange");
   expect(await fall.seen()).toEqual({ dock: true });
   expect((await bossNow(page)).result).toBe("crowd");
-  await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("simul");
+  // (The phase change is about 25 s since Oct 17: its added beats are settings.)
+  const added = RECLUSE_PHASE2.change.talkMs + RECLUSE_PHASE2.change.absorbHoldMs + RECLUSE_PHASE2.change.castHoldMs;
+  await expect.poll(() => phase(page), { timeout: 30_000 + added }).toBe("simul");
   const v = await page.evaluate(() => (window as any).match.simul);
   expect(v.boards).toHaveLength(4);
   expect(v.boards[0].you).toBe(true);

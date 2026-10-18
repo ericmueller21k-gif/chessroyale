@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
+import { RECLUSE_PHASE2 } from "@chessroyale/core";
 import { BOARD_SEL, test, bossAloneFromHome } from "./helpers.ts";
 import { counts, frameStats, instrument } from "./perf-probe.js";
 
@@ -340,7 +341,9 @@ test("the Hidden Boss's phase 2 on a slow phone: the phase change and four board
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("phaseChange");
   await page.evaluate(() => ((window as any).__perf.frames = []));
-  await expect.poll(() => page.evaluate(() => !!(window as any).match.simul?.playing), { timeout: 30_000 }).toBe(true);
+  // (The phase change and the countdown after it: about 30 s since Oct 17, its added beats settings.)
+  const P = RECLUSE_PHASE2.change;
+  await expect.poll(() => page.evaluate(() => !!(window as any).match.simul?.playing), { timeout: 30_000 + P.talkMs + P.absorbHoldMs + P.castHoldMs + P.countdownSeconds * 1000 }).toBe(true);
   const change = frameStats((await page.evaluate(() => (window as any).__perf.frames.splice(0))).map((f: [number, number]) => f[0]));
   // Four boards in play: the bots and he move on theirs (you don't), for eight seconds.
   await page.waitForTimeout(8000);
