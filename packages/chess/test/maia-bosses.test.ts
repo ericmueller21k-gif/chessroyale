@@ -63,7 +63,7 @@ function adversarialMaia(): HumanEngineLike & { asks: { fen: string; rating: num
 const RUY = sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7"]);
 const opening = (moves: string[]): Opening => ({ id: "o", eco: "", name: "Test", family: "Test", unusual: false, moves, namedPlies: moves.length, expected: { [moves.length]: 0.52 } });
 const PLAYABLE = BOSS_ROSTER.filter(isPlayable).map((b) => b.id);
-/** Bosses whose powers are built before their art (none since Alfil went live, Oct 17): met as the test link does (bossUnfinished). */
+/** Bosses whose powers are built before their art (Chub & Chirp, Oct 18): met as the test link does (bossUnfinished). */
 const UNFINISHED = BOSS_ROSTER.filter((b) => b.powers && !b.kit && !b.adminOnly).map((b) => b.id);
 
 describe("every boss on the Maia path", () => {
@@ -73,7 +73,7 @@ describe("every boss on the Maia path", () => {
 
   for (const id of [...PLAYABLE, ...UNFINISHED]) {
     it(`${id}: Maia plays its normal moves within every power's limits; its special moves keep their own picks`, async () => {
-      const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1800, bossId: id, bossUnfinished: UNFINISHED.includes(id), lastStandFrom: 999, bossMaxMoves: 60, ...(id === "alfil" ? { bossPowerTest: "tusks" } : {}) } as Settings;
+      const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1800, bossId: id, bossUnfinished: UNFINISHED.includes(id), lastStandFrom: 999, bossMaxMoves: 60, ...(id === "alfil" ? { bossPowerTest: "tusks" } : id === "hopper" ? { bossPowerTest: "leapfrog" } : {}) } as Settings;
       const engine = fakeEngine();
       const r = new MatchRunner({ settings, rng: mulberry32(11), engines: [engine], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
       expect(r.boss!.id).toBe(id);
@@ -107,6 +107,11 @@ describe("every boss on the Maia path", () => {
           // (Alfil's steps before his move: the engine's picks, Maia not asked.)
           for (let s = r.alfilStep(); s; s = r.alfilStep()) {
             expect(await asksDuring(() => r.playAlfil())).toBe(0);
+            played.special++;
+          }
+          // (Chub & Chirp's hop before his move: the engine's pick, Maia not asked.)
+          if (r.hopDue()) {
+            expect(await asksDuring(() => r.playHop())).toBe(0);
             played.special++;
           }
           // (His fusion is his move: then his turn is over.)
@@ -168,7 +173,7 @@ describe("every boss on the Maia path", () => {
       // Today's Stockfish move (its limited-strength search) was never needed: Maia always had an allowed move.
       expect(engine.elo).toBe(0);
       // Each boss's own special moment came and kept its own pick.
-      if (id === "clown" || id === "hollow" || id === "bigboy" || id === "pig" || id === "alfil") expect(played.special).toBeGreaterThan(0);
+      if (id === "clown" || id === "hollow" || id === "bigboy" || id === "pig" || id === "alfil" || id === "hopper") expect(played.special).toBeGreaterThan(0);
       // Powers that limit the boss's moves did, and Maia stayed within them.
       if (id === "clown" || id === "bigboy" || id === "sawyer") expect(played.limited).toBeGreaterThan(0);
       // Sawyer's first move is a pawn's: Maia was asked for pawn moves only.

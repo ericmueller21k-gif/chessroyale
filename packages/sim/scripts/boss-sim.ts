@@ -18,8 +18,9 @@
  * `offset`, a boss's Elo offset by id; `counter`, the crowd takes one of Alfil's marked pawns when the best such capture
  * costs at most that many pawns against its best move (the bots' own picks read the judge, which doesn't know about the
  * fusion: a crowd that knows the rule plays the counter when it's cheaper than what the fusion gives him).
- * The hopper's Leapfrog: `powers` `{"hopIsMove": true, "hopMax": 3}` for the hop as his move (variant B); each row logs
- * his hops and, for every turn of his with a pawn nose to nose that couldn't hop, why (hopOptions; `cap`: out of hops).
+ * Chub & Chirp's Leapfrog (id hopper): each row logs the hops and, for every turn of his with a pawn nose to nose that
+ * couldn't hop, why (hopOptions; `cap`: out of hops). (The hop as his move, the variant the sim turned down, ran at
+ * eb678d7 with `{"powers": {"hopIsMove": true, "hopMax": 3}}`: reports/hopper-sim.md.)
  *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
@@ -271,7 +272,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       // (The hopper: his hops (after which crowd move, the pawn's squares, how many he could choose from), his turns with
       // a pawn of his nose to nose with one of the crowd's, and each such pawn that couldn't hop, by why: hopOptions's
       // reasons, and `cap` once his hops are spent.)
-      const hopper = { isMove: BOSS_POWERS.hopIsMove, max: BOSS_POWERS.hopMax, hops: [] as { at: number; from: string; over: string; to: string; of: number }[], noseTurns: 0, refused: {} as Record<string, number> };
+      const hopper = { max: BOSS_POWERS.hopMax, hops: [] as { at: number; from: string; over: string; to: string; of: number }[], noseTurns: 0, refused: {} as Record<string, number> };
       const t0 = Date.now();
       while (!runner.isOver()) {
         if (runner.stageComplete()) {
@@ -315,7 +316,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           if (bossId === "hopper") {
             const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
             const his = runner.boss!.crowdSide === "w" ? "b" : "w";
-            const { options, refused } = hopOptions(fen, his, BOSS_POWERS.hopIsMove);
+            const { options, refused } = hopOptions(fen, his);
             if (options.length || refused.length) hopper.noseTurns++;
             const spent = (runner.boss!.powers!.hops ?? 0) >= BOSS_POWERS.hopMax;
             for (const r of refused) hopper.refused[r.why] = (hopper.refused[r.why] ?? 0) + 1;
@@ -327,7 +328,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
               hopper.hops.push({ at: h.at, from: h.from, over: h.over, to: h.to, of: candidates.length });
             }
           }
-          // (Alfil's fusion and the hopper's hop as his move: then his turn is over.)
+          // (Alfil's fusion is his move: then his turn is over.)
           if (runner.bossToMove()) {
             const at = runner.boss!.crowdMoves;
             await runner.playBoss(engines[0]);

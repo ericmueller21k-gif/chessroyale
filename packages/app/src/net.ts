@@ -902,7 +902,7 @@ export class NetMatch implements GameView {
   }
 
   /**
-   * Alfil's cast, fusion and Mammoth Slam, and the hopper's hop, host only: the candidate positions weighed on this
+   * Alfil's cast, fusion and Mammoth Slam, and Chub & Chirp's hop, host only: the candidate positions weighed on this
    * device's engines (fuseFrom and hopFrom: the one best for him; slamFrom: played out, within the cap), answered as the
    * position picked, or "" (none: the cast's first pair, the fusion's first square, the first hop; nothing lifts).
    */

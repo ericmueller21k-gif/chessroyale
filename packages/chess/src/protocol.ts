@@ -353,8 +353,9 @@ export interface NetBossPowers {
   airborne?: { piece: string; square: string; lands: number; left: number; stage: number }[];
   landed?: SlamLanding | null;
   /**
-   * The hopper (missing for other bosses and from older servers; an older app ignores it): his last Leapfrog hop, after
-   * the crowd's move `at`: his pawn from `from`, over the crowd's pawn on `over`, to `to` (null: none yet).
+   * Chub & Chirp (id hopper; missing for other bosses and from older servers; an older app ignores it): their last
+   * Leapfrog hop, after the crowd's move `at` (at the start of his turn, before his move): his pawn from `from`, over the
+   * crowd's pawn on `over`, to `to` (null: none yet).
    */
   hop?: LeapfrogHop | null;
 }
@@ -742,10 +743,10 @@ export type ServerMessage = { now: number } & (
        */
       land?: SlamPiece[];
       /**
-       * The hopper's Leapfrog: the positions after each hop he could make now (his pawn over the crowd's, him still to
-       * move when the hop comes before his move, the crowd to move when it's his move). Answer the one picked (hopFrom:
-       * the one best for him) as `move`, or "" (no engine: the first). An older app ignores it and plays a move, which
-       * isn't one of these: the same as "".
+       * Chub & Chirp's Leapfrog (id hopper): the positions after each hop he could make now (his pawn over the crowd's,
+       * him still to move: the hop comes before his move). Answer the one picked (hopFrom: the one best for him) as
+       * `move`, or "" (no engine: the first). An older app ignores it and plays a move, which isn't one of these: the
+       * same as "".
        */
       hop?: string[];
     }

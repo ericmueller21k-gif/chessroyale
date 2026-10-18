@@ -291,7 +291,7 @@ export interface LobbyRecord {
    * How the boss's own move is played (the runner's bossMoveKind: "best" is a power's follow-up its engine search
    * scored, Wrangler's reply to the showdown's duel). "funhouse": the host plays the crowd's move for Boingo (his
    * ultimate); "extra": it plays Hollow's extra move; "bounce": it picks Big Boy's Big Bounce; "tusks", "fuse" and
-   * "slam": it picks Alfil's cast (the pair), his fusion's square and his Slam's lift; "hop": the hopper's Leapfrog hop.
+   * "slam": it picks Alfil's cast (the pair), his fusion's square and his Slam's lift; "hop": which pawn of Chub & Chirp's hops.
    */
   bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop";
   /** Big Boy's Big Bounce, Alfil's fusion and Slam, the hopper's hop: the candidates the host was sent (the answer must be one of them). */
@@ -1478,10 +1478,10 @@ export class LobbyCore {
   }
 
   /**
-   * The hopper's Leapfrog (at the start of his turn, after the crowd's move: the runner's hopDue): everyone sees him get
+   * Chub & Chirp's Leapfrog (at the start of his turn, after the crowd's move: the runner's hopDue): everyone sees him get
    * ready (thinking) while the host's engine picks which pawn hops among the candidates (worked out here); one pawn
    * alone needs no engine and hops at once (after your queen banner, if it's up). Then the hop plays for everyone, and
-   * his move (or, when the hop is his move, the crowd's turn). No host engine anywhere: the first pawn that can hops.
+   * his move. No host engine anywhere: the first pawn that can hops.
    */
   private requestHop() {
     const runner = this.runner!;
@@ -1568,14 +1568,13 @@ export class LobbyCore {
       return this.setTimer("nextRound", until);
     }
     if (this.r.bossKind === "hop") {
-      // The hopper's hop (the host's pick, one of the candidates; else the first): it plays out, then his move. When the
-      // hop is his move, the crowd's turn begins as after his move (its moments, the hop's first, before the crowd's
-      // clock starts). None due any more (nothing came of it): straight on.
+      // Chub & Chirp's hop (the host's pick, one of the candidates; else the first): it plays out, then his move. None
+      // due any more (nothing came of it): straight on to his move.
       this.r.bossKind = undefined;
       const picked = this.r.bounceCandidates?.includes(move) ? move : null;
       this.r.bounceCandidates = undefined;
       const hop = this.runner!.applyHop(picked);
-      const until = this.io.now() + (!this.runner!.bossToMove() ? bossTurnShowMs(this.runner!.bossView()) : hop ? powerMomentMs([{ kind: "hop" }]) : 0);
+      const until = this.io.now() + (hop ? powerMomentMs([{ kind: "hop" }]) : 0);
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
@@ -1660,7 +1659,7 @@ export class LobbyCore {
         }
         return this.finishMatch();
       }
-      // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps and the hopper's hop come at the start of his turn, before his move.)
+      // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps and Chub & Chirp's hop come at the start of his turn, before his move.)
       if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.hopDue() ? this.requestHop() : this.requestBoss();
       // (A failed Lights out: his extra move, after his own and before the crowd's turn.)
       if (runner.extraMoveDue()) return this.requestExtra();

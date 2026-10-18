@@ -1391,9 +1391,8 @@ export class MatchRunner {
   }
 
   /**
-   * The hopper's Leapfrog is due: his turn begins and a pawn of his can hop over one of the crowd's (hopperBattle.due).
-   * The hop comes before his move (he then moves) or is his move (his turn ends with it: bossToMove() is false after
-   * it), as BOSS_POWERS.hopIsMove says.
+   * Chub & Chirp's Leapfrog is due: his turn begins and a pawn of his can hop over one of the crowd's (hopperBattle.due).
+   * The hop comes before his move: he moves after it.
    */
   hopDue(): boolean {
     return hopperBattle.due(this.battle);
