@@ -315,10 +315,9 @@ export const HOPPER: BossRules = {
   },
   // (Leapfrog comes at the start of his turn: hopperBattle.)
   passive() {},
-  // The crowd's turn right after a hop, and the one right after his spin: its picks don't count for fair play. (The
-  // spin's moment is the longest look at the board before any clock starts, 6.8 s with his move's, more than the 5 s
-  // under which fair play calls a hard find fast.) The race's turns count, but for those where the judge made another
-  // move the best than the engine's (the runner's resolveBoard: that best is our own weighing, not an engine's).
+  // The crowd's turn right after a hop, and the one right after his spin (its prize put on the board): its picks don't
+  // count for fair play, as for every power that changes the board. A race turn counts only where the engine's best is
+  // the race's best too (the runner's resolveBoard, which then records the engine's own numbers).
   powerTurn: (boss) => {
     const p = boss.powers!;
     return (!!p.hop && p.hop.at === boss.crowdMoves) || p.carrots?.spin?.at === boss.crowdMoves;

@@ -259,9 +259,14 @@ export interface BoardRound {
   lastStand?: LastStandRound;
   /**
    * Boss battle: a boss power touched this turn (a frozen piece, a pie, the blizzard, a flipped board), or the boss's
-   * judge made another move the best (Chub & Chirp's race): no fair-play signal.
+   * judge changed the engine's best move's score (Chub & Chirp's race): no fair-play signal.
    */
   power?: boolean;
+  /**
+   * Boss battle, a turn that counts where the boss's judge changed the numbers (Chub & Chirp's race, the engine's best
+   * also the race's): the engine's own numbers, as `scored`, for fair play to record instead of the round's.
+   */
+  fairScored?: { move: string; expected: number; loss: number }[];
 }
 
 /**
@@ -450,10 +455,14 @@ export class MatchRunner {
     this.preparePowers();
   }
 
-  /** Boss battle: the powers for the crowd turn about to begin (once per turn; see prepareTurn). */
+  /**
+   * Boss battle: the powers for the crowd turn about to begin (once per turn; see prepareTurn). None once the board's
+   * game is over, but for his fifth carrot's moments (the pull and his win) when the same move stalemates or mates: they
+   * play before the result, as after any fifth carrot.
+   */
   private preparePowers() {
     const b = this.state.boss;
-    if (!b?.powers || this.finalGameOver()) return;
+    if (!b?.powers || (this.finalGameOver() && !carrotBattle.won(b))) return;
     const board = this.boards.get(this.state.boards[0]!)!;
     if (sideToMove(board.fen) !== b.crowdSide) return;
     // (The boss's move just played: Hollow covers its piece's square after his first.)
@@ -653,14 +662,20 @@ export class MatchRunner {
     this.top.prefetch(this.opts.engines, [...this.groups.keys()].map((id) => this.boards.get(id)!.fen));
   }
 
+  /** The engine's own top moves in a position (the same cached search as topMovesFor's), no boss rule applied. */
+  engineTop(fen: string): Promise<MoveScore[]> {
+    return this.top.get(this.opts.engines[0]!, fen);
+  }
+
   /**
    * The engine's top moves in a position (shared with scoring, so a prefetched search is reused). Boss battle, the
    * crowd's turn: only the moves allowed this turn (a power's limits; the Last Stand's barred move), as the judge
-   * sees them, so a power-up's hints and the eval bar follow the crowd's rules too.
+   * sees them, so a power-up's hints and the eval bar follow the crowd's rules too (but for Chub & Chirp's race, where
+   * solo's bar reads engineTop).
    */
   async topMovesFor(fen: string): Promise<MoveScore[]> {
     const engine = this.opts.engines[0]!;
-    const all = await this.top.get(engine, fen);
+    const all = await this.engineTop(fen);
     const id = this.state.boards[0];
     const crowdTurn = !!this.state.boss && id !== undefined && this.boards.get(id)?.fen === fen;
     const allowed = crowdTurn ? (this.crowdAllowed(id) ?? undefined) : undefined;
@@ -840,7 +855,9 @@ export class MatchRunner {
     // The boss's rules for the judge, e.g. G-REX's fire: a piece left on a tile ablaze counts as already gone (every
     // path's numbers come in raw). Then the best move is the highest-scored of the judge's best and the picks (bestOf:
     // after any re-check, which weighed a pick above the first line against it like for like), on every path.
-    const evaluation = bestOf(judgeEvaluation(this.state.boss, limited.evaluation, board.fen), playerIds.map((id) => picks[id] ?? null));
+    const pickList = playerIds.map((id) => picks[id] ?? null);
+    const judged = judgeEvaluation(this.state.boss, limited.evaluation, board.fen);
+    const evaluation = bestOf(judged, pickList);
     // Boss battle: humans who called the King instead of picking abstain: no score, not a miss.
     const abstained = new Set(this.state.boss ? playerIds.filter((id) => !picks[id] && !this.player(id).isBot && this.kingCallers.has(id)) : []);
     const result = scoreGroup(
@@ -849,26 +866,37 @@ export class MatchRunner {
       this.opts.rng,
       this.settings,
       drawRuleFor(this.state.stage, this.settings),
-      this.allowanceFor(board.fen, evaluation.bestMove, playerIds.map((id) => picks[id] ?? null)),
+      this.allowanceFor(board.fen, evaluation.bestMove, pickList),
     );
-    const pickedExpected = playerIds.flatMap((id) => {
-      const m = picks[id];
-      return m && evaluation.expectedAfter[m] !== undefined ? [evaluation.expectedAfter[m]!] : [];
-    });
-    const best = Math.max(evaluation.bestExpected, ...pickedExpected);
-    const scored = Object.entries(evaluation.expectedAfter)
-      .map(([move, expected]) => ({ move, expected, loss: Math.max(0, (best - expected) * 100) }))
-      .sort((a, b) => b.expected - a.expected);
+    // Every scored move, best first, with its loss in points from the highest of the best and the picks (as moveLosses).
+    const scoredFrom = (e: BoardEvaluation) => {
+      const high = Math.max(e.bestExpected, ...pickList.flatMap((m) => (m && e.expectedAfter[m] !== undefined ? [e.expectedAfter[m]!] : [])));
+      const list = Object.entries(e.expectedAfter)
+        .map(([move, expected]) => ({ move, expected, loss: Math.max(0, (high - expected) * 100) }))
+        .sort((a, b) => b.expected - a.expected);
+      return { high, list };
+    };
+    const { high: best, list: scored } = scoredFrom(evaluation);
     for (const id of abstained) result.players.push({ playerId: id, move: null, loss: null, roundScore: 0, abstained: true });
     // The boss's own costs on the round (Hollow's wrong attempts into the dark).
     if (this.state.boss) bossRules(this.state.boss)?.scoreRound?.(this.battle, result.players);
     const king = this.kingDecision(playerIds, result);
     if (king.plays) result.playedMove = evaluation.bestMove;
     const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, rawEvaluation);
-    // Fair play: a turn where the boss's judge made another move the best (Chub & Chirp's race) doesn't count either.
-    // That best is our own weighing, not an engine's: finding it says nothing about a player's engine.
-    const rawBest = Object.entries(limited.evaluation.expectedAfter).sort((a, b) => b[1] - a[1])[0]?.[0];
-    const judgeChose = scored[0]?.move !== rawBest;
+    // Fair play where the boss's judge changed the numbers (Chub & Chirp's race): the turn counts only when the engine's
+    // best keeps its own score, i.e. it is the race's best too (the race never raises a score, and keeps only the race's
+    // best's). Fair play then records the engine's own numbers (`fairScored`), as on a turn without the race: each move's
+    // loss is at most the round's. Any other such turn doesn't count (`power`): there the engine's numbers can charge a
+    // carrot move more than the game does, and the race's read differently from any engine's (another best, other finds,
+    // only moves, decided).
+    const power = powerTurn(this.state.boss);
+    let fairScored: BoardRound["fairScored"];
+    let raceOff = false;
+    if (!power && judged !== limited.evaluation) {
+      const raw = scoredFrom(bestOf(limited.evaluation, pickList)).list;
+      if (raw[0] && evaluation.expectedAfter[raw[0].move] === raw[0].expected) fairScored = raw;
+      else raceOff = true;
+    }
     return {
       boardId,
       fenBefore: board.fen,
@@ -878,7 +906,8 @@ export class MatchRunner {
       bestMove: evaluation.bestMove,
       ...(this.state.boss ? { king: king.plays, kingCalls: king.calls } : {}),
       ...(lastStand ? { lastStand } : {}),
-      ...(powerTurn(this.state.boss) || judgeChose ? { power: true } : {}),
+      ...(power || raceOff ? { power: true } : {}),
+      ...(fairScored ? { fairScored } : {}),
     };
   }
 
@@ -2071,16 +2100,17 @@ export interface RaceCheck {
 /**
  * His race brain (Eric's sheet: "Stockfish's top few safe moves are re-scored by the race: his distance to the open
  * carrots and yours, so he also blocks or takes your runners"), as the landing guard looks ahead. A move that pulls his
- * last carrot wins the battle: it's played, as a mate would be (his pick if it's one, else the first such in his
- * search's order, then square order; one that doesn't also draw on the board first). Else his pick, his search's
- * `looks` best moves within the blunder guard of his best, and the moves that pull a carrot (as many again, his
- * search's order first: a short list of his top moves leaves out moves within the guard, and a pull is the race's
- * move), each one he may play here, are played and searched at `nodes` (the crowd to move: his score the rest; a move
- * that ends the game, its ending's), and scored with the race (raceWorth: what his chances of each carrot make his prize
- * worth; raceAdjust: against the best of them for the race, weighed by `race.weight`). The best so scored replaces his
- * pick only for the race: its race worth at least carrotMinGain pawns above his pick's (so a tiny race gain never lets
- * a stronger chess move in), its own score within the guard of the best searched; equals: his pick. Any unscored is
- * left out; his pick unscored, and it stands.
+ * last carrot wins the battle: it's played, as a mate would be (the first such of his pick, his search's order and
+ * square order that doesn't stalemate, reach the fifty-move count or leave a dead draw, else the first such: he looks at
+ * the position alone, so he can't see a repetition). Else his pick, his search's `looks` best moves within the
+ * blunder guard of his best, and the moves that pull a carrot (as many again, his search's order first: a short list of
+ * his top moves leaves out moves within the guard, and a pull is the race's move), each one he may play here, are
+ * played and searched at `nodes` (the crowd to move: his score the rest; a move that ends the game, its ending's), and
+ * scored with the race (raceWorth: what his chances of each carrot make his prize worth; raceAdjust: against the best
+ * of them for the race, weighed by `race.weight`). The best so scored replaces his pick only for the race: its race
+ * worth at least carrotMinGain pawns above his pick's (so a tiny race gain never lets a stronger chess move in), its own
+ * score within the guard of the best searched; equals: his pick. Any unscored is left out; his pick unscored, and it
+ * stands.
  */
 export async function raceGuard(
   engine: EngineLike,
@@ -2101,7 +2131,8 @@ export async function raceGuard(
   const order = [...new Set([pick, ...sorted.map((m) => m.move), ...[...ok].sort()])];
   const pulls = order.filter((m) => pullsOf(fen, m, r.open).length > 0);
   // (His last carrot: the battle, even when the same move draws on the board (bossCarrotWin). Given the choice, one that
-  // doesn't, so the board never shows a stalemate as he wins; a mate is his either way.)
+  // doesn't stalemate, reach the fifty-move count or leave a dead draw, so the board rarely shows a draw as he wins (a
+  // repetition isn't seen: the position alone, no history); a mate is his either way.)
   const wins = pulls.filter((m) => r.his + pullsOf(fen, m, r.open).length >= s.carrotCount);
   const win = wins.find((m) => [null, "checkmate"].includes(gameEnd(applyMove(fen, m), []))) ?? wins[0];
   if (win) return done(win, 0, true);
