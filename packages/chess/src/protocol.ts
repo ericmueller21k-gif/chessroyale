@@ -1,4 +1,4 @@
-import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LightsOutTarget, LongPull, PowerEvent, PowerId, SawCut, ShowdownResult, SlamLanding, SlamResult, SplitPawn, StopReason, TusksCast } from "@chessroyale/core";
+import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LightsOutTarget, LongPull, PowerEvent, PowerId, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplitPawn, StopReason, TusksCast } from "@chessroyale/core";
 import type { Base } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
@@ -729,6 +729,13 @@ export type ServerMessage = { now: number } & (
        * the turns played out, the swing within the cap) as `move`, or "" when none is (nothing lifts).
        */
       slam?: string[];
+      /**
+       * Alfil's Slam's pieces in the air (each one's letter and own square) land as the crowd's turn after this move, or
+       * this fusion, begins: judge it with them down (the landing guard: bossMoveFrom's `ahead`, fuseFrom's, from
+       * slamAhead; the moves still come from `fen`). Sent with his move and his fusion only. An older app ignores it and
+       * judges on `fen` alone, as before.
+       */
+      land?: SlamPiece[];
     }
   /**
    * The boss's brain for this battle, to the host as the battle begins (on the Maia brain only): it starts loading

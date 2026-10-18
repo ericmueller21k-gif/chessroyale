@@ -958,6 +958,49 @@ describe("Alfil online", () => {
     for (const x of landed.boss!.powers!.landed!.pieces) expect(pieceAt(landed.board!.fen, x.to)!.color).toBe("w");
   });
 
+  it("the landing guard: the host gets the pieces in the air with his move just before they land (`land`), and with no other", () => {
+    const L = alfil({ bossPowerTest: "slam" });
+    crowdMove(L);
+    hisTurn(L);
+    toRound(L);
+    crowdMove(L);
+    const ask = asked(L);
+    expect(ask.land).toBeUndefined();
+    answer(L, ask.key, ask.slam![1]!);
+    const pieces = L.last("p2", "boss")!.boss.powers!.slam!.pieces;
+    // His move after the Slam, then his turn after each of yours with them up: every request the host gets, turn by turn.
+    const turns: { what: "move" | "pick"; land: unknown }[][] = [];
+    const turn = () => {
+      const sent: { what: "move" | "pick"; land: unknown }[] = [];
+      turns.push(sent);
+      for (let i = 0; i < 4; i++) {
+        const req = asked(L);
+        if (!req) return;
+        if (req.fuse || req.slam) {
+          sent.push({ what: "pick", land: req.land });
+          answer(L, req.key, (req.fuse ?? req.slam)![0] ?? "");
+          continue;
+        }
+        sent.push({ what: "move", land: req.land });
+        return void hostBoss(L);
+      }
+    };
+    turn();
+    for (let i = 0; i < BOSS_POWERS.slamTurns; i++) {
+      toRound(L);
+      crowdMove(L);
+      turn();
+    }
+    // (This seed: his cast, then his move, on the second of these turns; on the third his fusion, with one square
+    // allowed, so the host isn't asked; on the last, his move just before they land.)
+    expect(turns.map((t) => t.map((x) => x.what))).toEqual([["move"], ["pick", "move"], [], ["move"]]);
+    // Only that last one carries them: not the cast (his move follows it), nor the moves before.
+    expect(turns.slice(0, -1).flat().map((x) => x.land)).toEqual([undefined, undefined, undefined]);
+    expect(turns.at(-1)!.map((x) => x.land)).toEqual([pieces]);
+    // They land as your next turn begins, as ever.
+    expect(toRound(L).boss!.powers!.landed!.pieces.map((x) => x.from).sort()).toEqual(pieces.map((x) => x.square).sort());
+  });
+
   it("nothing within the cap (\"\"), anything that isn't a candidate (an older app's move), or no answer: nothing lifts or shows, the meter kept; asked again on his next turn", () => {
     for (const reply of ["", "e7e5", null]) {
       const L = alfil({ bossPowerTest: "slam" });

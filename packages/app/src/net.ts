@@ -2,7 +2,7 @@ import { LookAways } from "./lookaway.ts";
 import { engineSpeed, ownEngine } from "./engine.ts";
 import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, LEAVING, PREGAME_VOTES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, LEAVING, PREGAME_VOTES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings, type SlamPiece } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -28,6 +28,7 @@ import {
   extraMoveFrom,
   bounceFrom,
   fuseFrom,
+  slamAhead,
   slamFrom,
   allowedSearch,
   fireRanked,
@@ -699,9 +700,10 @@ export class NetMatch implements GameView {
       case "bossRequest":
         if (m.extra) return void this.hostExtra(m.key, m.fen);
         if (m.bounce) return void this.hostBounce(m.key, m.fen, m.bounce);
-        if (m.fuse) return void this.hostPick(m.key, async (engines) => (await fuseFrom(engines, m.fen, m.fuse!))?.fen ?? null);
+        // (Alfil's fusion with the Slam's pieces landing right after it: its squares weighed with them down.)
+        if (m.fuse) return void this.hostPick(m.key, async (engines) => (await fuseFrom(engines, m.fen, m.fuse!, undefined, m.land?.length ? slamAhead(m.land).after : null))?.fen ?? null);
         if (m.slam) return void this.hostPick(m.key, async (engines) => (await slamFrom(engines, m.fen, m.slam!))?.fen ?? null);
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null);
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
         return void this.useBrain(m.brain);
@@ -788,8 +790,10 @@ export class NetMatch implements GameView {
    * Boss battle, host only: play the boss's move with this device's engine at the boss's strength, or on the Maia
    * brain (`brain`, the lobby's plan for the battle) with Maia, never waiting for it (Stockfish's move meanwhile).
    * "best" (Wrangler's reply to the showdown's duel): the engine's best at full strength, sent without a brain.
+   * `land`: Alfil's Slam's pieces land as the crowd's turn after this move begins, so it's judged with them down too
+   * (the landing guard; the move still comes from `fen`).
    */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null) {
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null) {
     try {
       const engines = await this.engines();
       const [engine] = engines;
@@ -797,7 +801,8 @@ export class NetMatch implements GameView {
       const maia = brain && this.maia ? { brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { stockfishShare: brain.stockfishShare } : {}), engine: this.maia, onNote: (n: BrainNote) => (this.brainNote = n) } : undefined;
       // (The admins' debug line: the battle is on Maia, but this move is the engine's.)
       if (kind === "best" && this.bossPlan) this.brainNote = { brain: this.bossPlan.brain, rating: this.bossPlan.rating, ...(this.bossPlan.stockfishShare ? { share: this.bossPlan.stockfishShare } : {}), by: "stockfish", why: "power" };
-      const ordinary = () => bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia);
+      const ahead = land?.length && !funhouse ? slamAhead(land) : null;
+      const ordinary = () => bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia, ahead);
       if (asks && !funhouse) {
         // Wrangler's turn: his long pull (his first move) or his move, then his drag or his showdown's line-up after it,
         // on this device's engines (the scout's line-ups first). The server checks them against his rules.

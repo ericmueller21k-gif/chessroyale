@@ -98,6 +98,18 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     them), and the admins' debug line says "pick replaced (not allowed)"; the runner's `applyBossMove` (solo and the
     server) plays the first allowed move for anything else a host sends, and logs it. Every power × brain path is tested
     (`packages/chess/test/boss-power-legal.test.ts`).
+  - **The landing guard** (Oct 17; docs/decisions/2026-10-17-alfil-sees-the-landing.md; Eric: "can we make the engine
+    think, the turn before the pieces land, that they're there?"): on Alfil's move just before his Mammoth Slam's pieces
+    land (`landsAfterHisMove`), his moves still come from the board as it is, but `bossMoveFrom`'s `ahead` judges them
+    with the pieces down (`landingGuard`): his pick, whichever brain or path picked it but "best", and the
+    `slamGuardLooks` (4) highest scored of his own top-8 search are each played, the pieces put down as the rules will
+    (`slamAhead`: `landing`, own square or the rules' fallback), and searched at `slamGuardNodes` (30,000), the crowd to
+    move; a pick that gives away more than the blunder guard allows there (the King's strike: its own wider guard) gives
+    way to the best of them (the admins' line: "landing guard → Stockfish"). A move that ends the game is scored by its
+    ending. At most 150,000 nodes on that one move a Slam; no look ahead, no search more. His fusion on that turn is
+    weighed the same way (`fuseFrom`'s `ahead`, `alfilBattle.fusionAhead`). Online the boss request carries the pieces
+    (`land`, with his move and his fusion only) and the host's device judges; an older app ignores it. The last checks
+    above follow it. `packages/chess/test/alfil-landing.test.ts`.
   - **Never waited on, move by move:** not ready, failed, or no answer in 1.5 s (`timeoutMs`): today's move. A slow
     or old device falls back to Stockfish this way. Only a solo battle's start waits for it (the loading step, below).
   - **Where:** every boss battle, solo (`startBrain` in `solo.ts`, the runner's `humanBrain`) and online (the lobby
@@ -151,6 +163,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 | UCI, top moves, scoring moves | `packages/chess/src/uci.ts`, `node.ts` |
 | The judging job, the board's numbers | `packages/chess/src/judge.ts` |
 | Re-checks, the boss's moves, bot picks | `packages/chess/src/runner.ts` |
+| The landing guard (Alfil's Slam) | `landingGuard`, `BossAhead` in `runner.ts`; `landsAfterHisMove`, `slamAhead`, `alfilBattle.fusionAhead` in `packages/chess/src/bosses/alfil.ts`; the request's `land` in `lobby.ts` and `net.ts` (`hostBoss`) |
 | The browser's engine pool | `packages/app/src/engine.ts` |
 | Many judges (lobby side) | `packages/server/src/judges.ts` (pure helpers), the flow in `lobby.ts` ("Many judges") |
 | The engine server | `engine/`, `packages/server/src/engine.ts` (`containerScore`: the one way in); routes `/api/engine/ping`, `/api/engine/score`; its CI check `.github/workflows/engine-container.yml` (`packages/chess/test/engine-container.test.ts`) |
@@ -166,7 +179,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 
 ## Settings
 
-`engineNodes`, `recheck*`, `boss*` (strength, stumble, slip, blunder guard), `BOSS_BRAIN` (Maia; its loading step:
+`engineNodes`, `recheck*`, `boss*` (strength, stumble, slip, blunder guard), `BOSS_POWERS.slamGuardLooks` and
+`slamGuardNodes` (the landing guard), `BOSS_BRAIN` (Maia; its loading step:
 `loadGateMs`, `stockfishBackMs`, `downloadMb`), `BOSS_TIERS`,
 `BOSS_DIFFICULTY`, `JUDGES` in settings.ts; Worker variables `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`.
 
@@ -206,6 +220,12 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   model: the step gives up, Stockfish plays, the line says why);
   `npx tsx packages/sim/scripts/maia-calibration.ts` (`reports/maia-calibration.md`), `maia-sim.ts`
   (`reports/maia-boss.md`).
+- The landing guard: `packages/chess/test/alfil-landing.test.ts` (Eric's position on the real engine: the queen
+  capture a landing pawn punishes, played before, not with the guard, Maia's pick too, and in a battle; the rule and its
+  margin, the strike's wider one, a game's end; never a move illegal on the board as it is, a capture of a piece in the
+  air never weighed; no search more with nothing due, and only on the move before they land in a battle; the fusion
+  weighed with them down), `packages/server/test/boss-powers-lobby.test.ts` ("Alfil online": `land` with that move
+  only). Its numbers: `reports/alfil-sim.md` ("The landing guard").
 - Sims (`packages/sim/scripts/`, write to `reports/`): `judge-accuracy.ts`, `judge-cuts.ts`, `judge-determinism.ts`,
   `best-move-gap.ts` (how often a pick scores above the first line, and what a like-for-like search says),
   `many-judges.ts`, `deep-accuracy.ts`, `container-accuracy.ts` (Docker), `deep-timing.ts`, `boss-blunders.ts`,
