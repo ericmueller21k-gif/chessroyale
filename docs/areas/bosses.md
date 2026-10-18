@@ -416,7 +416,8 @@ build): online, phase 1 won is the crowd's victory):
   the board's own square (eighths of `--board-size`); her thin ice (due to thaw) is the same block, clearer and cracked
   (Oct 12). QUEEN DOWN! and QUEEN SLAIN! play no sound for now (the gasp is
   kept, unused: `queenGasp`).
-- **A boss's attack on a king** (Eric, Oct 10; Hollow's first, the others keep today's behavior until they get one):
+- **A boss's attack on a king** (Eric, Oct 10; Hollow's first, Alfil's Oct 17, Boingo's, Sawyer's and Wrangler's Oct 18;
+  Ginger, Jefferson, Big Boy and the Hidden Boss keep today's behavior until they get one):
   purely cosmetic, no rule changes. Its kit's `kingAttack` (`KingAttackKit` in `kits.ts`: the character it's drawn
   from, its animation, its size in frame pixels a square, where it stands, its hit on the king's square) plays on the
   board beside a king, on the beats every boss shares (`KING_ATTACK` in `boss-timing.ts`: it drops in, lashes or
@@ -437,6 +438,18 @@ build): online, phase 1 won is the crowd's victory):
     (`hollowLash`: a low whoosh and a dull snap, quieter than a move); `lashHit` on the king's square (forehand or
     backhand, from his side, in a bulb's color); he cackles and leaps off. 36 frame pixels a square (about 1.8 squares
     tall), 1.8 squares from the king. Drawn ahead as his battle starts (`prewarmKingAttack`).
+  - **Sawyer's, Wrangler's and Boingo's** (Eric, Oct 18: "a relentless assault", a hit on every beat; nothing
+    touches the king's sprite): `SAWYER_ATTACK`, `PIG_ATTACK`, `CLOWN_ATTACK` (their own parts and palettes in a bigger
+    frame: room for the prop toward the king and headroom to drop in, `characters/attack-frame.ts`). Sawyer drops in,
+    revs and saws at the king ten times, sawdust bursting (`sawHit`; cues `cut` and `swing` in turn), standing 1.45
+    squares off (his saw is short; he faces our left as always: `facesLeft`, the board mirrors him the other way).
+    Wrangler drops in with the loop whirling and cracks his lasso at the king ten times, its end snapping in the king's
+    square high and low, whipped back overhead between (`lassoHit`; `pigYank` and `pigCatch` in turn), 1.8 off.
+    Boingo bounces in on his pogo and flings ten pies, one per bounce, each landing on the king (`pieHit`; `clownSplat`
+    and `clownSqueak` in turn), 1.8 off. A unit test keeps each prop's end past the king's middle, his body out of the
+    middle of the king's square, and the ten hits' sounds together under a move. On a board Boingo's funhouse has turned
+    a quarter round, the attack goes on the square the board shows the king on (`viewSquare`, KingAttack.tsx).
+    docs/decisions/2026-10-17-king-attacks-sawyer-wrangler-boingo.md.
   - **Adding one for another boss:** its kit's `kingAttack` (an animation whose hits land on `kingAttackHits()`, cued,
     lasting `KING_ATTACK.ms`), its hit effect, its `kingAttack` lines, and its id in `KING_ATTACKERS` (a unit test keeps
     the two lists the same).
@@ -461,7 +474,7 @@ Each boss lives in its own files, one per layer, on a shared base. The shared fi
 | The boss's brain (Maia-3 or Stockfish) | `bossBrainFor` (core `boss.ts`), `packages/chess/src/boss-brain.ts`, `human-uci.ts`, `bossMoveFrom` and `bossBrainPlan` (`runner.ts`); online the lobby's `bossBrainNow` and the host's `hostBoss` (`net.ts`); solo `startBrain` (`solo.ts`); `packages/app/src/maia.ts`, `boss-brain.ts`, `components/BossBrain.tsx` (the picker), `BrainDebug` (`BossDock.tsx`); the Maia box `packages/maia-worker/` | none (every boss: `BOSS_BRAIN.brain`; an exception would go in `BOSS_BRAIN.byBoss`) |
 | The boss screen | `packages/app/src/screens/Boss.tsx` (still names a few bosses: see below; Sawyer's split hides the new half until the crack, and his board saw jolts the board; Wrangler's lasso and showdown keep pieces where they were until they're hauled: `pigBoard`; what it draws each frame and what it keeps: `useStillKey` in `hooks.ts`); `screens/Play.tsx` (Wrangler's duel prompt in the dock) | |
 | The boss menu's power words | `packages/app/src/power-words.ts` (`Record<PowerId, …>`) | |
-| A boss's attack on a king (the Last Stand, its mate) | `components/KingAttack.tsx`, `KING_ATTACK`, `KING_ATTACKERS`, `bossTurnShowMs` (`boss-timing.ts`), `KingAttackKit` (`kits.ts`), `LastStand.tsx`, `screens/Boss.tsx` | its kit's `kingAttack` (Hollow: `HOLLOW_ATTACK` in `hollow.ts`, `lashHit` in `effects/hollow.ts`, `hollowLash`) |
+| A boss's attack on a king (the Last Stand, its mate) | `components/KingAttack.tsx`, `KING_ATTACK`, `KING_ATTACKERS`, `bossTurnShowMs` (`boss-timing.ts`), `KingAttackKit` (`kits.ts`), `LastStand.tsx`, `screens/Boss.tsx` | its kit's `kingAttack` (Hollow: `HOLLOW_ATTACK` in `hollow.ts`, `lashHit` in `effects/hollow.ts`, `hollowLash`; Alfil: `ALFIL_ATTACK`, `ankusHit`; Sawyer: `SAWYER_ATTACK`, `sawHit` in `effects/sawyer.ts`; Wrangler: `PIG_ATTACK`, `lassoHit` in `effects/pig.ts`; Boingo: `CLOWN_ATTACK`, `pieHit` in `effects/boingo.ts`; their frames: `attack-frame.ts`) |
 
 ### The base boss (`packages/chess/src/bosses/base.ts`)
 
@@ -567,7 +580,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   Frame by frame: `npm run frames:alfil -- <dir> [tusks|slam|both] [phone|desktop] [light|dark]`.
 - Unit, a boss's attack on a king: `packages/chess/test/king-attack.test.ts` (the beats, the Last Stand's fit, the
   mate's hold, the mate switch), `packages/app/test/king-attack.test.ts` (the kit, Hollow's frames on the beats, the God
-  King's blows, the hits).
+  King's blows, the hits; Sawyer's, Wrangler's and Boingo's: cues on the hits, reach, body clear, frame edges and
+  palette, hit effects, the hits' sounds together).
 - e2e, the Boss raid screen's select: `e2e/boss-select.spec.ts`; unit `packages/app/test/boss-select.test.ts` (every
   boss's sound from its own pack, its own lines, none twice running, the Hidden Boss's in turn).
 - e2e: `e2e/pig.spec.ts` (Wrangler: the long pull, a drag, his meter's line and ready loop, a showdown with no warning,
@@ -576,11 +590,11 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   across it refused with the dock's words) and "Sawyer's board saw lifted for his only move" (Eric's position set on
   the runner: Qxb7 refused, Nf6+, his Qxf6 across the saw, and "His only move: across the saw." on every frame of your
   turn, whole at 320 px), `e2e/boss-powers.spec.ts` "Boingo's funhouse at every angle" (a move by tap and by drag, touch on the phone, at
-  0°, 180°, 90° and 270°; the coordinates and pies on their squares at each), `e2e/king-attack.spec.ts` (Hollow's mate and his attack in the Last Stand, every frame), `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `sawyer.spec.ts`, `boss-character.spec.ts`,
+  0°, 180°, 90° and 270°; the coordinates and pies on their squares at each), `e2e/king-attack.spec.ts` (Hollow's mate and his attack in the Last Stand, every frame; Sawyer's, Wrangler's and Boingo's in the Last Stand: every hit, his frame on screen, his sounds, no page errors), `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `sawyer.spec.ts`, `boss-character.spec.ts`,
   `boss-speech.spec.ts` (one moment of each boss: its line held whole and in view for its full time, every frame, and
   gone on time),
   `perf.spec.ts`. Unit: `packages/app/test/speech.test.ts` (the speech rule).
-- Frames: `npm run frames:king-attack -- <dir> hollow [phone|desktop|both] [laststand|mate|both] [light|dark] [gif]`
+- Frames: `npm run frames:king-attack -- <dir> [hollow|alfil|sawyer|pig|clown] [phone|desktop|both] [laststand|mate|both] [light|dark] [gif] [width]`
   (the page's clock paused and stepped 40 ms at a time: every frame of the attack),
   `npm run frames:powers -- <dir> [gingerbread|clown|grex|all|both] [phone|desktop|both] [light|dark] [moves] [desktop
   width]` (Ginger: the blizzard, both thaws and the boss's turns between them, six moves by default), `frames:hollow`,

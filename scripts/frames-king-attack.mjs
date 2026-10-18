@@ -3,7 +3,8 @@
 // 2.g4, the boss mates; its attack on your king, then the result). The page's clock is paused as the attack is about to
 // start and stepped 40 ms at a time, a frame of the board at each step (exact times, every frame), with full stills at
 // its beats; prints what's on screen as it changes. `gif` makes a GIF of each strip at its real speed (ffmpeg).
-//   npm run frames:king-attack -- <out-dir> [hollow] [phone|desktop|both] [laststand|mate|both] [light|dark] [gif]
+//   npm run frames:king-attack -- <out-dir> [hollow|alfil|sawyer|pig|clown] [phone|desktop|both] [laststand|mate|both] [light|dark] [gif] [width]
+// `width` sets the phone's (or the computer's) window width in px (320, 360; 1280), the rest of the device unchanged.
 // Read the frames before calling it done (.claude/LESSONS.md: watch it frame by frame).
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -12,7 +13,7 @@ import { chromium, devices } from "@playwright/test";
 import { createServer } from "vite";
 import { Chess } from "chess.js";
 
-const [out = "king-attack-frames", boss = "hollow", which = "both", what = "both", scheme = "dark", gif = ""] = process.argv.slice(2);
+const [out = "king-attack-frames", boss = "hollow", which = "both", what = "both", scheme = "dark", gif = "", width = ""] = process.argv.slice(2);
 const outDir = resolve(out);
 mkdirSync(outDir, { recursive: true });
 const server = await createServer({ root: "packages/app", configFile: "packages/app/vite.config.ts", server: { port: 5199, strictPort: false }, logLevel: "error" });
@@ -20,7 +21,7 @@ await server.listen();
 const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch();
 // The attack's beats (boss-timing.ts: LAST_STAND.attackAt, KING_ATTACK.mateHoldMs and mateAt).
-const ATTACK_AT = 5550;
+const ATTACK_AT = 6550;
 const MATE_HOLD = 3880;
 const MATE_AT = 600;
 const STEP = 40;
@@ -108,8 +109,9 @@ async function run(name, context) {
   }
 }
 
-if (which !== "desktop") await run("phone", { ...devices["iPhone 13"] });
-if (which !== "phone") await run("desktop", { viewport: { width: 1440, height: 900 } });
+const w = Number(width) || 0;
+if (which !== "desktop") await run(w ? `phone${w}` : "phone", { ...devices["iPhone 13"], ...(w ? { viewport: { width: w, height: devices["iPhone 13"].viewport.height } } : {}) });
+if (which !== "phone") await run(w ? `desktop${w}` : "desktop", { viewport: { width: w || 1440, height: w ? 800 : 900 } });
 await browser.close();
 await server.close();
 console.log(`wrote ${outDir}/`);

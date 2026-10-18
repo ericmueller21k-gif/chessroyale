@@ -19,6 +19,8 @@
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { KING_ATTACK } from "@chessroyale/chess";
+import { groundShadow, moved } from "./attack-frame.ts";
 
 export const PIG_PALETTE: Record<string, string> = {
   k: "#2b1411", // outline
@@ -916,6 +918,7 @@ export const PIG_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly 
   tug: ["Fine. Just a tug, then.", "Yoink, anyhow.", "A tug'll do."],
   ready: ["I've got you in my sights."],
   ultimate: ["This board ain't big enough for the six of us.", "It's high noon!"],
+  kingAttack: ["Dance, little king!", "Crack! Crack! Yee-haw!", "Git along, your majesty!"],
 };
 export const PIG_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
   entrance: 1,
@@ -932,7 +935,84 @@ export const PIG_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>>
   power: 1,
   ready: 1,
   ultimate: 1,
+  kingAttack: 1,
 };
 
 /** The part of him a portrait shows (his hat and face), in frame pixels. */
 export const PIG_PORTRAIT = { x: OX + 17, y: OY + 6, w: 46, h: 40 } as const;
+
+// ---- His attack on a king (kits.ts: his kit's `kingAttack`; Eric, Oct 18: "a relentless assault", the lasso swung
+// and cracked at the king over and over, never wrapped round him).
+
+/** Room beyond his throw (to our right, the king's side) for the rope cracked at the king, and headroom to drop in from. */
+const ATTACK_REACH = 12;
+const ATTACK_TOP = 16;
+const AW = W + ATTACK_REACH;
+const AH = H + ATTACK_TOP;
+/** Where the rope's end cracks, as far as the king's square's middle and a little past (drawing space). */
+const KING_X = 40 + 1.95 * 36;
+/** A frame of his in the attack's bigger frame, `lift` pixels up in the air. */
+const fa = (ms: number, p: PigPose, extra: Partial<Frame> = {}, lift = 0, ground: readonly Speck[] = []): Frame => moved({ ms, layers: pigLayers(p), ...extra }, 0, ATTACK_TOP, AW, AH, lift, ground);
+const landShadow = (r: number): Speck[] => groundShadow(OX + 40, OY + GROUND + ATTACK_TOP - 1, r);
+
+/**
+ * A crack of the lasso at the king: his arm flung out and the rope straight out to our right, its loop snapped shut
+ * at the end, high (at the king's chest) or low in turn; or, between cracks, the rope whipped back up, spinning over
+ * his head.
+ */
+const crack = (i: number): PigPose => {
+  const low = i % 2 === 1;
+  const y = low ? 55 : 47;
+  return { mood: i % 3 === 2 ? "laugh" : i % 2 ? "grit" : "wild", lean: 1, bob: low ? 1 : 0, fistL: low ? [46, 54] : [45, 49], elbowL: low ? [35, 53] : [34, 50], front: true, loop: { c: [KING_X - 3, y], rx: 3.5, ry: 2, tilt: low ? -8 : 6 }, bow: [(46 + KING_X) / 2, (49 + y) / 2 - 0.5], coil: low ? 1 : -1 };
+};
+const whipBack = (i: number): PigPose => ({ mood: i % 4 === 3 ? "laugh" : "fierce", spin: (i * 3 + 2) % 8, grow: 1, lean: -1, coil: i % 2 ? -1 : 1 });
+
+/**
+ * His attack on a king, the king to our right (the board mirrors him when it's to his left), on the shared beats
+ * (KING_ATTACK, boss-timing.ts): his shadow spreads, he drops in with the lasso whirling overhead and lands, swings it
+ * wider, then cracks it at the king ten times, one on each hit, its end snapping in the king's square high and low in
+ * turn and whipping back overhead between (cues `crack` and `lash` in turn, so the repeats don't pile up); he snorts
+ * with laughter and leaps off. The last frame is empty.
+ */
+const kingAttack: Anim = (() => {
+  const A = KING_ATTACK;
+  const frames: Frame[] = [
+    { ms: 100, layers: [], specks: landShadow(6) },
+    { ms: 100, layers: [], specks: landShadow(14) },
+    fa(80, { mood: "wild", spin: 0, grow: 1, feet: { l: [1, -4], r: [-1, -4] } }, { cue: "whirl" }, 16, landShadow(20)),
+    fa(80, { mood: "wild", spin: 2, grow: 1, feet: { l: [1, -3], r: [-1, -3] } }, {}, 7, landShadow(22)),
+    fa(A.landAt - 360, { mood: "grit", bob: 2, spin: 4, grow: 1 }, { cue: "hop", shake: [0, 1], specks: stompDust(0) }),
+    fa(A.lashAt - A.landAt, { mood: "fierce", spin: 6, grow: 2, lean: -1 }, { specks: stompDust(1) }),
+  ];
+  const crackMs = 90;
+  for (let i = 0; i < A.lashes; i++) {
+    frames.push(fa(crackMs, crack(i), { cue: i % 2 ? "lash" : "crack", shake: [i % 2 ? -1 : 1, 0] }));
+    frames.push(fa(A.lashEveryMs - crackMs, whipBack(i)));
+  }
+  const laugh = A.leaveAt - (A.lashAt + A.lashes * A.lashEveryMs);
+  frames.push(fa(laugh, { mood: "laugh", headDy: -1, spin: 1, grow: 1, hat: { tilt: -6, dy: -2 } }, { cue: "laugh" }));
+  const leave = A.ms - A.leaveAt;
+  frames.push(
+    fa(leave - 300, { mood: "smug", bob: 2, spin: 3 }),
+    fa(80, { mood: "wild", spin: 5, feet: { l: [1, -4], r: [-1, -4] } }, {}, 7, landShadow(18)),
+    fa(80, { mood: "wild", spin: 7, feet: { l: [1, -4], r: [-1, -4] } }, {}, 16, landShadow(12)),
+    { ms: 80, layers: [], specks: landShadow(8) },
+    { ms: 60, layers: [] },
+  );
+  return { loop: false, frames };
+})();
+
+/**
+ * Wrangler for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, in a frame
+ * `ATTACK_REACH` wider on the right (the rope cracked at the king) and `ATTACK_TOP` taller (he drops in). Its `idle`,
+ * one still, is for the preview, which starts every reel from one.
+ */
+export const PIG_ATTACK: Character = {
+  ...PIG,
+  id: "pig-attack",
+  name: "Wrangler (his attack)",
+  w: AW,
+  h: AH,
+  foot: [PIG.foot[0], PIG.foot[1] + ATTACK_TOP],
+  anims: { idle: { loop: true, frames: [fa(1000, {})] }, kingAttack },
+};

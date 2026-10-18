@@ -11,6 +11,7 @@ import { BOARD_SEL, test, bossAloneFromHome } from "./helpers.ts";
  *   line said; the result only after the whole attack;
  * - in the God King's Last Stand (?laststand=1): the blow meant for the piece is Hollow's attack on the God King (his
  *   gold hits, none of the red slashes), and the Last Stand carries on as before (he falls; you pick again).
+ * - in the Last Stand against Sawyer, Wrangler and Boingo (Oct 18): each one's assault, a hit on every beat.
  * The beats are KING_ATTACK's and LAST_STAND's (packages/chess/src/boss-timing.ts).
  */
 const ATTACK_MS = KING_ATTACK.ms;
@@ -45,6 +46,11 @@ async function sample(page: Page) {
         corner: corner ? getComputedStyle(corner).visibility : null,
         god: document.querySelector(".ls-god .god-king")?.getAttribute("data-anim") ?? null,
         said: document.querySelector(".bc-bubble")?.textContent ?? "",
+        box: (() => {
+          const b = document.querySelector(".ka-boss")?.getBoundingClientRect();
+          return b ? { left: b.left, right: b.right, top: b.top, bottom: b.bottom } : null;
+        })(),
+        vw: document.documentElement.clientWidth,
       });
       if (w.__ka.length < 20000) requestAnimationFrame(tick);
     };
@@ -135,3 +141,58 @@ test("the God King's Last Stand against Hollow: Hollow lashes him, then he falls
   expect(s.filter((x) => x.now > standAt + ATTACK_AT + ATTACK_MS + 100).every((x) => !x.on)).toBe(true);
   await expect(page.getByRole("img", { name: "The God King has fallen" })).toBeVisible();
 });
+
+/**
+ * Sawyer's saw, Wrangler's lasso and Boingo's pies on the God King in his Last Stand (Eric, Oct 18: "a relentless
+ * assault"), with real taps on a phone and a computer, watched every frame: the boss drops in beside him as the piece
+ * slides back, on the side toward the board's middle (his drawing mirrored to face him), a hit on every beat with its
+ * gold "−N", his own sounds, his figure wholly on screen; then the Last Stand ends as always. No page errors.
+ */
+for (const b of [
+  { id: "sawyer", name: "Sawyer", facesLeft: true, sounds: ["sawyerCut", "sawyerSwing"] },
+  { id: "pig", name: "Wrangler", facesLeft: false, sounds: ["pigYank", "pigCatch"] },
+  { id: "clown", name: "Boingo", facesLeft: false, sounds: ["clownSplat", "clownSqueak"] },
+])
+  test(`the God King's Last Stand against ${b.name}: ${b.name} assaults him, then he falls and you pick again`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.goto(`/?debug&clock=60&boss=${b.id}&laststand=1`);
+    await page.evaluate(() => ((window as any).__soundLog = []));
+    await bossAloneFromHome(page);
+    await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
+    await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 10_000 }).toBe(true);
+    const samples = await sample(page);
+    const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
+    const mv = new Chess(fen).moves({ verbose: true }).find((m) => m.piece === "n")!;
+    const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
+    const at = (sq: string) => ({ x: board.x + (sq.charCodeAt(0) - 97 + 0.5) * (board.width / 8), y: board.y + (8 - Number(sq[1]) + 0.5) * (board.height / 8) });
+    await page.mouse.click(at(mv.from).x, at(mv.from).y);
+    await page.mouse.click(at(mv.to).x, at(mv.to).y);
+    await expect(page.locator(".last-stand")).toBeVisible({ timeout: 30_000 });
+    const standAt = Number(await page.locator(".last-stand").getAttribute("data-start"));
+    await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
+    const s = await samples();
+    const during = s.filter((x) => x.start && x.now >= x.start && x.now < x.start + ATTACK_MS);
+    expect(during.length).toBeGreaterThan(20);
+    expect(Math.abs(during[0].start - (standAt + ATTACK_AT))).toBeLessThanOrEqual(1);
+    expectEveryLash(during);
+    expect(Math.max(...during.map((x) => x.hp.length))).toBeGreaterThanOrEqual(3);
+    expect(s.every((x) => x.red === 0)).toBe(true);
+    expect(during.filter((x) => x.god).every((x) => x.god === "lastStandAttacked")).toBe(true);
+    // Drawn beside him toward the board's middle (the God King on a3, c3, f3 or h3), facing him; his corner empty.
+    const kingLeftOfMiddle = mv.to.charCodeAt(0) - 97 < 4;
+    expect(during.every((x) => x.boss && x.flip === (b.facesLeft ? !kingLeftOfMiddle : kingLeftOfMiddle))).toBe(true);
+    expect(during.filter((x) => x.on).every((x) => x.corner === "hidden")).toBe(true);
+    // His whole frame on screen, every frame.
+    for (const x of during.filter((d) => d.box)) {
+      expect(x.box.left).toBeGreaterThanOrEqual(0);
+      expect(x.box.right).toBeLessThanOrEqual(x.vw);
+      expect(x.box.top).toBeGreaterThanOrEqual(0);
+    }
+    // His sounds on the hits, in turn.
+    const heard = await page.evaluate(() => ((window as any).__soundLog as string[]).map((n) => n.split(":")[0]));
+    for (const name of b.sounds) expect(heard.filter((n) => n === name).length, name).toBeGreaterThanOrEqual(LASHES / 2 - 1);
+    expect(s.filter((x) => x.now > standAt + ATTACK_AT + ATTACK_MS + 100).every((x) => !x.on)).toBe(true);
+    await expect(page.getByRole("img", { name: "The God King has fallen" })).toBeVisible();
+    expect(errors).toEqual([]);
+  });

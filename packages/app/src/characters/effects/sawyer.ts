@@ -4,7 +4,7 @@
  */
 import { BOARD_SAW } from "@chessroyale/chess";
 import { toGrid } from "../paint.ts";
-import { lazyParts, type Anim, type Character, type Frame } from "../sprite.ts";
+import { lazyParts, type Anim, type Character, type Frame, type Speck } from "../sprite.ts";
 import { SQUARE } from "./common.ts";
 
 const SAW_PALETTE = {
@@ -271,4 +271,58 @@ export const BOARD_GAP: Character = {
     gap: { loop: true, frames: [cutFrame(`part${GAP_W}`, 1000)] },
     close: { loop: false, frames: [cutFrame("close10", 110, "rejoin"), cutFrame("close6", 110), cutFrame("close2", 140), cutFrame("empty", 30)] },
   },
+};
+
+// ---------------- His attack on a king: a bite of the saw on the king's square ----------------
+
+/**
+ * Sawdust bursting out of the bite, `step` 0 to 2 (a spark and the first puff, the burst, the dust falling), the blade
+ * coming in from the left edge at height `y`: it flies up and on, away from him, and falls.
+ */
+const biteSpecks = (y: number, step: 0 | 1 | 2, seed: number): Speck[] => {
+  const bx = 14;
+  const out: Speck[] = [];
+  if (step === 0) out.push([bx, y, "c"], [bx - 1, y, "c"], [bx + 1, y, "c"], [bx, y - 1, "c"], [bx, y + 1, "c"], [bx - 2, y, "w"], [bx + 2, y, "w"], [bx, y - 2, "w"], [bx, y + 2, "D"], [bx + 1, y + 1, "D"]);
+  const n = step === 0 ? 6 : step === 1 ? 16 : 12;
+  for (let i = 0; i < n; i++) {
+    const a = ((-150 + (i * 170) / n + bit(i, seed) * 3) * Math.PI) / 180;
+    const d = [2, 5, 8][step]! + (bit(i, seed + 1) % 3);
+    const x = Math.round(bx + Math.cos(a) * d * 1.2);
+    const yy = Math.round(y + Math.sin(a) * d * 0.8 + (step === 2 ? 3 : 0));
+    if (x < 1 || yy < 1 || x > SQUARE - 2 || yy > SQUARE - 2) continue;
+    // Each chip: a light speck with a dark one under it, so it reads on a light square as on a dark one.
+    out.push([x, yy, step === 2 ? (i % 2 ? "S" : "s") : i % 3 ? "s" : i % 2 ? "w" : "S"], [x, yy + 1, "D"]);
+    if (step < 2 && i % 2 === 0) out.push([x + 1, yy, "w"], [x + 1, yy + 1, "D"]);
+  }
+  return out;
+};
+const sawHitAnims: Record<string, Anim> = {};
+for (const [kind, y, seed] of [["A", 11, 3], ["B", 13, 5]] as const)
+  for (const side of ["L", "R"] as const) {
+    const sp = (step: 0 | 1 | 2): Speck[] => biteSpecks(y, step, seed).map(([x, yy, k]): Speck => [side === "L" ? x : SQUARE - 1 - x, yy, k]);
+    sawHitAnims[`hit${kind}${side}`] = {
+      loop: false,
+      frames: [
+        { ms: 50, layers: [], specks: sp(0) },
+        { ms: 70, layers: [], specks: sp(1) },
+        { ms: 60, layers: [], specks: sp(2) },
+        { ms: 20, layers: [] },
+      ],
+    };
+  }
+
+/**
+ * A bite of Sawyer's saw on a king's square (his attack on a king): `hit<A|B><L|R>`, high or a little lower, his blade
+ * coming in from the left or the right edge: a spark where the teeth bite and a burst of sawdust flying up and away,
+ * then falling. About 200 ms; ends empty. Over the piece (or the God King standing there).
+ */
+export const SAW_HIT: Character = {
+  id: "saw-hit",
+  name: "A bite of Sawyer's saw",
+  w: SQUARE,
+  h: SQUARE,
+  foot: [16, 31],
+  palette: SAW_PALETTE,
+  parts: {},
+  anims: sawHitAnims,
 };

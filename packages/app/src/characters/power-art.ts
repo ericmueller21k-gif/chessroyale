@@ -183,6 +183,12 @@
  *   nightLabel     square  a … h, 1 … 8: the night's coordinates, over the tiles (nightItems() places them).
  *   ankusHit       square  hit<H|L><L|R> (ends empty, about 200 ms): a jab of Alfil's ankus landing on a king, high
  *                          or low, from the left or right edge: a gold spike and a burst of gold sparks.
+ *   sawHit         square  hit<A|B><L|R> (ends empty, about 200 ms): a bite of Sawyer's saw on a king, high or a little
+ *                          lower, from the left or right edge: a spark and a burst of sawdust flying up and away.
+ *   lassoHit       square  hit<H|L><L|R> (ends empty, about 200 ms): the crack of Wrangler's lasso's end on a king's
+ *                          square, high or low, from the left or right edge: a white snap, gold rays, rope fibers.
+ *   pieHit         square  hit<H|L><L|R> (ends empty, about 200 ms): a pie in a king's face, side on, at his head or a
+ *                          little lower, from the left or right edge: it splats wide, cream flies on, then slides down.
  *   lashHit        square  hit<F|B><L|R><c> (ends empty, about 200 ms): a lash of Hollow's strand landing on a king,
  *                          a forehand (high) or backhand (low, rising), from the left or right edge, in bulb color c.
  *
@@ -389,6 +395,9 @@ export const EFFECTS: Record<EffectName, Effect> = {
   sawCrack: { ch: EFFECT_SPRITES.sawCrack, covers: "square", start: "crack", sounds: { crack: "sawyerCrack" } },
   boardGap: { ch: EFFECT_SPRITES.boardGap, covers: "strip", start: "run", loop: "gap", end: "close", sounds: { split: "sawyerCrack", rejoin: "sawyerRejoin" } },
   ankusHit: { ch: EFFECT_SPRITES.ankusHit, covers: "square", start: "hitHL", sounds: {} },
+  sawHit: { ch: EFFECT_SPRITES.sawHit, covers: "square", start: "hitAL", sounds: {} },
+  lassoHit: { ch: EFFECT_SPRITES.lassoHit, covers: "square", start: "hitHL", sounds: {} },
+  pieHit: { ch: EFFECT_SPRITES.pieHit, covers: "square", start: "hitHL", sounds: {} },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------
@@ -544,4 +553,19 @@ export function lashItem(square: string, i: number, from: "L" | "R", since: numb
 /** Alfil's i-th jab of his ankus landing on the king's square (high, then low, in turn), from his side. */
 export function ankusItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   return { square, name: "ankusHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
+}
+
+/** Sawyer's i-th bite of his saw on the king's square (high, then a little lower, in turn), from his side. */
+export function sawItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "sawHit", anim: `hit${i % 2 ? "B" : "A"}${from}`, since };
+}
+
+/** Wrangler's i-th crack of his lasso on the king's square (high, then low, in turn), from his side. */
+export function lassoItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "lassoHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
+}
+
+/** Boingo's i-th pie in the king's face (at his head, then a little lower, in turn), from his side. */
+export function pieItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "pieHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }
