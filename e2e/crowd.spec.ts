@@ -192,16 +192,18 @@ test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives
     if (p === "play") {
       // The game starts from the initial position, with no other boards beside it.
       await expect(page.locator(".boards-strip")).toHaveCount(0);
-      const pick = await page.evaluate(async () => {
-        const m = (window as any).match;
-        if (m.phase.kind !== "play") return null;
-        // The best move if the engine answers quickly; any legal move otherwise (a busy test machine mustn't miss the clock).
-        const fen = m.phase.board.fen;
-        const top = await Promise.race([m.runner.topMovesFor(fen), new Promise((r) => setTimeout(() => r(null), 12000))]);
-        // (A teammate bot's planned pick is a legal move in the same position.)
-        const fallback = [...(m.runner.planned?.values() ?? [])][0];
-        return { fen, move: (top ? (top as any)[0].move : fallback) as string };
-      });
+      // The best move if the engine answers within 12 s, searched in the page and polled for (engineTop: no evaluate
+      // held open over a search, .claude/LESSONS.md "A navigation that never happened"); any legal move otherwise (a
+      // busy test machine mustn't miss the clock).
+      const best = await engineTop(page, "judged", 12_000).catch(() => null);
+      const pick = best?.top[0]
+        ? { fen: best.fen, move: best.top[0].move }
+        : await page.evaluate(() => {
+            const m = (window as any).match;
+            if (m.phase.kind !== "play") return null;
+            // (A teammate bot's planned pick is a legal move in the same position.)
+            return { fen: m.phase.board.fen as string, move: [...(m.runner.planned?.values() ?? [])][0] as string };
+          });
       await submitMove(page, pick?.move, pick?.fen);
     } else if (p === "reveal") {
       // The live poll shows (unless the short quick-pace reveal has already moved on).
