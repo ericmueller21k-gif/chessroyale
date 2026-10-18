@@ -32,8 +32,7 @@ import {
  * Chub & Chirp (the hopper; Eric, Oct 18): Leapfrog. At the start of his turn, a pawn of his nose to nose with one of
  * the crowd's hops over it to the empty square beyond, never onto the crowd's last two ranks (no instant queen), never
  * one that leaves his king attacked or gives check; then he plays his move. The engine picks when several can. At most
- * hopMax (2) a battle. His ultimate isn't decided: none comes, and his meter is off.
- * docs/decisions/2026-10-18-hopper-leapfrog.md.
+ * hopMax (2) a battle. docs/decisions/2026-10-18-hopper-leapfrog.md. Their ultimate, the Carrot Patch: carrots.test.ts.
  */
 
 const hash = (s: string) => {
@@ -71,10 +70,14 @@ async function crowd(r: MatchRunner, move?: string) {
   const allowed = r.crowdAllowed() ?? legalMoves(fenOf(r));
   await r.score(new Map([["h0", { move: move ?? [...allowed].sort()[0]!, thinkMs: 1000 }]]));
 }
-/** One crowd turn, then his: the hop if one is due, then his move. Returns the hop. */
+/** One crowd turn, then his: his Carrot Patch's cast (his whole turn) if it's due, else the hop if one is due, then his move. Returns the hop. */
 async function turn(r: MatchRunner, move?: string) {
   await crowd(r, move);
   if (r.isOver() || r.stageComplete()) return null;
+  if (r.carrotDue()) {
+    r.applyCarrots();
+    return null;
+  }
   const hop = r.hopDue() ? await r.playHop() : null;
   if (r.bossToMove()) await r.playBoss();
   return hop;
@@ -92,10 +95,10 @@ const promotions = (fen: string) => legalMoves(fen).filter((m) => m.length === 5
 const after = (san: string[]) => sanLineToUci(san).reduce((f, m) => applyMove(f, m), START_FEN);
 
 describe("Chub & Chirp: who they are", () => {
-  it("are on the roster as hopper (🐇), named in one constant, with Leapfrog and a place held for the ultimate, an offset in the others' range", () => {
+  it("are on the roster as hopper (🐇), named in one constant, with Leapfrog and the Carrot Patch, an offset in the others' range", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "hopper")!;
     expect(HOPPER_NAME).toBe("Chub & Chirp");
-    expect(def).toMatchObject({ name: HOPPER_NAME, icon: "🐇", kit: null, powers: { passive: "leapfrog", ultimate: "hopperult" } });
+    expect(def).toMatchObject({ name: HOPPER_NAME, icon: "🐇", kit: null, powers: { passive: "leapfrog", ultimate: "carrotpatch" } });
     const others = BOSS_ROSTER.filter(isPlayable).map((b) => b.offset);
     expect(def.offset).toBeGreaterThanOrEqual(Math.min(...others));
     expect(def.offset).toBeLessThanOrEqual(Math.max(...others));
@@ -112,28 +115,6 @@ describe("Chub & Chirp: who they are", () => {
     // (?boss=hopper&wip=1: bossUnfinished.)
     expect(chooseBoss(0.5, "hopper", null, BOSS_ROSTER, true).id).toBe("hopper");
     expect(raid().boss!.id).toBe("hopper");
-  });
-
-  it("their meter is off and no ultimate comes (it isn't decided yet): not from the meter, the test trigger or the test switch", async () => {
-    const r = raid({ patch: { bossPowerTest: "hopperult" } });
-    expect(rageOf(r.boss)).toBeNull();
-    for (let t = 0; t < 12 && !r.isOver() && !r.stageComplete(); t++) {
-      // (The admins' trigger refuses, so their button never waits for an ultimate that can't come.)
-      expect(r.triggerUltimate()).toBe(false);
-      expect(r.boss!.powers!.ultNext).toBeUndefined();
-      await turn(r);
-      const p = r.boss!.powers!;
-      expect(p.warnAt).toBeUndefined();
-      expect(p.ultAt).toBeUndefined();
-      expect(p.events.some((e) => e.kind === "warn")).toBe(false);
-      expect(rageOf(r.boss)).toBeNull();
-    }
-    expect(triggerUltimate(r.boss)).toEqual({ boss: r.boss, ok: false });
-  });
-
-  it("only they have no ultimate (noUltimate: the trigger refuses and the admins' button isn't shown): every playable boss keeps its trigger", () => {
-    expect(bossRules({ id: "hopper" })?.noUltimate).toBe(true);
-    for (const def of BOSS_ROSTER.filter(isPlayable)) expect(bossRules(def)?.noUltimate, def.id).toBeUndefined();
   });
 });
 
@@ -226,7 +207,7 @@ describe("Leapfrog: which pawns hop (hopOptions)", () => {
     expect(hopOptions("k7/2Q5/8/4p3/4P3/8/4N3/4K3 b - - 0 1", B)).toEqual({ options: [], refused: [{ from: "e5", why: "noMove" }] });
   });
 
-  it("never one that gives him a mate in one he didn't have (you never see the hop before his move)", () => {
+  it("never one that gives him a mate in one he didn't have (nothing decisive he gets that the crowd can't answer)", () => {
     // (The hop opens b8-h2 for his queen: Qh2 mates, the knight on g4 guarding it, the bishop on c4 taking f1.)
     const fen = "kq6/1p6/3p4/3P4/2b3n1/8/5PP1/6K1 b - - 0 1";
     expect(mateInOne(fen)).toBeNull();
@@ -366,6 +347,11 @@ describe("Leapfrog in a battle", () => {
       // (Your rook or king only: your pawns stay where they are.)
       await crowd(r, legalMoves(fenOf(r)).filter((m) => pieceAt(fenOf(r), m.slice(0, 2))?.type !== "p").sort()[0]);
       if (r.isOver() || r.stageComplete()) break;
+      // (His Carrot Patch, if his meter fills meanwhile: the cast is his whole turn.)
+      if (r.carrotDue()) {
+        r.applyCarrots();
+        continue;
+      }
       const could = hopOptions(fenOf(r), "b").options.length > 0;
       if (r.hopDue()) {
         await r.playHop();
@@ -421,6 +407,11 @@ describe("Leapfrog: the ground rules, over many battles (a fuzz, as #267's revie
         const pool = pawns.length && rng() < 0.6 ? pawns : allowed;
         await r.score(new Map([["h0", { move: [...pool].sort()[Math.floor(rng() * pool.length)]!, thinkMs: 1000 }]]));
         if (r.isOver() || r.stageComplete()) break;
+        // (His Carrot Patch, if his meter fills: the cast is his whole turn.)
+        if (r.carrotDue()) {
+          r.applyCarrots();
+          continue;
+        }
         if (r.hopDue()) {
           const before = fenOf(r);
           const hop = (await r.playHop())!;

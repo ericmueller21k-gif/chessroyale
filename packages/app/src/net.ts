@@ -32,7 +32,8 @@ import {
   slamFrom,
   hopFrom,
   allowedSearch,
-  fireRanked,
+  jobRanked,
+  jobOffers,
   jobEscapes,
   sideToMove,
   judgeCandidates,
@@ -52,6 +53,7 @@ import {
   type NetBoss,
   type BossAsks,
   type BossMoveKind,
+  type CarrotRace,
   pigTurn,
   ShowdownScout,
   kingHelpBlocked,
@@ -705,7 +707,7 @@ export class NetMatch implements GameView {
         if (m.fuse) return void this.hostPick(m.key, async (engines) => (await fuseFrom(engines, m.fen, m.fuse!, undefined, m.land?.length ? slamAhead(m.land).after : null))?.fen ?? null);
         if (m.slam) return void this.hostPick(m.key, async (engines) => (await slamFrom(engines, m.fen, m.slam!))?.fen ?? null);
         if (m.hop) return void this.hostPick(m.key, async (engines) => (await hopFrom(engines, m.fen, m.hop!))?.fen ?? null);
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null);
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
         return void this.useBrain(m.brain);
@@ -741,6 +743,7 @@ export class NetMatch implements GameView {
       ...(m.bossResult ? { bossResult: m.bossResult } : {}),
       // (The Hidden Boss's bullet clock ran out: he won on time.)
       ...(m.timeout ? { timeout: true } : {}),
+      ...(m.carrots ? { carrots: true } : {}),
     });
   }
 
@@ -795,7 +798,7 @@ export class NetMatch implements GameView {
    * `land`: Alfil's Slam's pieces land as the crowd's turn after this move begins, so it's judged with them down too
    * (the landing guard; the move still comes from `fen`).
    */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null) {
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null) {
     try {
       const engines = await this.engines();
       const [engine] = engines;
@@ -804,7 +807,9 @@ export class NetMatch implements GameView {
       // (The admins' debug line: the battle is on Maia, but this move is the engine's.)
       if (kind === "best" && this.bossPlan) this.brainNote = { brain: this.bossPlan.brain, rating: this.bossPlan.rating, ...(this.bossPlan.stockfishShare ? { share: this.bossPlan.stockfishShare } : {}), by: "stockfish", why: "power" };
       const ahead = land?.length && !funhouse ? slamAhead(land) : null;
-      const ordinary = () => bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia, ahead);
+      // (Chub & Chirp's Carrot Patch: his race brain on this device's engine, with the race the server sent.)
+      const look = race && !funhouse ? { race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;
+      const ordinary = () => bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia, ahead, look);
       if (asks && !funhouse) {
         // Wrangler's turn: his long pull (his first move) or his move, then his drag or his showdown's line-up after it,
         // on this device's engines (the scout's line-ups first). The server checks them against his rules.
@@ -974,10 +979,12 @@ export class NetMatch implements GameView {
         // Many judges: the bots pick from the lobby's seed, exactly as the scoring job will (it checks this plan).
         const top = await this.top.get(engines[0]!, plan.fen);
         const bots = plan.bots.map((b) => ({ skill: b.skill, powerUps: b.powerUps ?? 0 }));
-        const job = { fen: plan.fen, picks: [], bots, seed: plan.seed, rules: plan.rules, ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}), ...(plan.burn ? { burn: plan.burn } : {}) } as unknown as JudgeJob;
-        // (A boss power left none of the top moves open: the bots pick from a search over the allowed ones, as the job will.)
+        const job = { fen: plan.fen, picks: [], bots, seed: plan.seed, rules: plan.rules, ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}), ...(plan.burn ? { burn: plan.burn } : {}), ...(plan.race ? { race: plan.race } : {}) } as unknown as JudgeJob;
+        // (A boss power left none of the top moves open: the bots pick from a search over the allowed ones, as the job will.
+        // The Carrot Patch's pulls: scored first, the bots' to pick too, as the job's.)
         const open = await allowedSearch(engines[0]!, job, top);
-        const chosen = judgeBotPicks(job, top, open ?? []);
+        const offers = open ? [] : jobOffers(job).filter((mv) => !top.some((t) => t.move === mv));
+        const chosen = judgeBotPicks(job, top, open ?? (offers.length ? await engines[0]!.scoreMoves(plan.fen, offers) : []));
         const picks = Object.fromEntries(plan.bots.map((b, i) => [b.id, chosen.picks[i]!]));
         if (this.key === plan.key) this.send({ t: "botPlan", key: plan.key, picks, powerUps: chosen.powerUps.map((i) => plan.bots[i]!.id) });
         return;
@@ -985,8 +992,10 @@ export class NetMatch implements GameView {
       // (Boss battle: only the moves allowed this turn; the move the God King took back is off the table.)
       const all = await this.top.get(engines[0]!, plan.fen);
       const limits = { ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}) };
-      // (G-REX's fire: the bots count a piece left on a tile ablaze as gone.)
-      const top = fireRanked(judgeCandidates(limits, all, (await allowedSearch(engines[0]!, { ...limits, fen: plan.fen }, all)) ?? []), plan.fen, plan.burn ?? [], sideToMove(plan.fen));
+      // (G-REX's fire: the bots count a piece left on a tile ablaze as gone. The Carrot Patch: the race counted.)
+      const base = judgeCandidates(limits, all, (await allowedSearch(engines[0]!, { ...limits, fen: plan.fen }, all)) ?? []);
+      const offers = jobOffers({ fen: plan.fen, race: plan.race, ...limits }).filter((mv) => !base.some((t) => t.move === mv));
+      const top = jobRanked({ fen: plan.fen, burn: plan.burn, race: plan.race }, [...base, ...(offers.length ? await engines[0]!.scoreMoves(plan.fen, offers) : [])]);
       const best = top[0]?.expected ?? 0.5;
       const candidates = top.map((mv) => ({ move: mv.move, loss: Math.max(0, (best - mv.expected) * 100) }));
       const legal = plan.allowed ?? legalMoves(plan.fen).filter((mv) => mv !== plan.barred);
@@ -1021,8 +1030,12 @@ export class NetMatch implements GameView {
           const open = (await allowedSearch(engine, { ...limits, fen: job.fen, picks: humanMoves }, all)) ?? [];
           const top = judgeCandidates(limits, all, open);
           const best = top[0]!.expected;
-          // (G-REX's fire: the bots count a piece left on a tile ablaze as gone; the scores stay the engine's.)
-          const ranked = fireRanked(top, job.fen, job.burn ?? [], sideToMove(job.fen));
+          // (The Carrot Patch's pulls: scored first, the bots' to pick too.)
+          const offers = jobOffers({ fen: job.fen, race: job.race, ...limits }).filter((mv) => !top.some((t) => t.move === mv));
+          const offered = offers.length ? await engine.scoreMoves(job.fen, offers) : [];
+          // (G-REX's fire: the bots count a piece left on a tile ablaze as gone; the Carrot Patch: the race counted. The
+          // scores stay the engine's.)
+          const ranked = jobRanked(job, [...top, ...offered]);
           const candidates = ranked.map((mv) => ({ move: mv.move, loss: Math.max(0, (ranked[0]!.expected - mv.expected) * 100) }));
           const legal = job.allowed ?? legalMoves(job.fen).filter((mv) => mv !== job.barred);
           const botPicks: Record<string, string> = {};
@@ -1044,12 +1057,14 @@ export class NetMatch implements GameView {
           }
           const expectedAfter: Record<string, number> = Object.fromEntries(top.map((mv) => [mv.move, mv.expected]));
           for (const mv of open) expectedAfter[mv.move] = mv.expected;
-          // (G-REX's fire: every move that saves a piece from a tile ablaze is scored too.)
-          const escapes = jobEscapes({ fen: job.fen, burn: job.burn, allowed: job.allowed, barred: job.barred });
+          for (const mv of offered) expectedAfter[mv.move] = mv.expected;
+          // (G-REX's fire: every move that saves a piece from a tile ablaze is scored too; the Carrot Patch: every move
+          // that pulls a carrot.)
+          const escapes = jobEscapes({ fen: job.fen, burn: job.burn, race: job.race, allowed: job.allowed, barred: job.barred });
           const missing = [...new Set([...Object.values(job.humanPicks), ...Object.values(botPicks), ...escapes])].filter(
             (mv): mv is string => !!mv && expectedAfter[mv] === undefined,
           );
-          const extra = [...open, ...(missing.length ? await engine.scoreMoves(job.fen, missing) : [])];
+          const extra = [...open, ...offered, ...(missing.length ? await engine.scoreMoves(job.fen, missing) : [])];
           for (const s of extra) expectedAfter[s.move] = s.expected;
           // Each move's best reply and mate score from the same searches (what a blunder loses, for the Last Stand).
           const { replies, mates } = repliesFrom([top, extra]);
