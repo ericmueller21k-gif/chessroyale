@@ -95,10 +95,10 @@ test("Chub & Chirp's Leapfrog (the test switch): his pawn hops over yours at the
 
 /**
  * Their Carrot Patch, through the test switch (?power=carrotpatch: the battle starts from 1.e4 e5 2.Nf3 Nc6, your move,
- * the warning as the first turn begins): your first move, then the cast at the start of his turn (his whole turn: the
- * turn passes to you, the carrots planted, a base on the board), the race (you play the judge's best, which weighs the
- * carrots, so you pull them), the race over, and his spin with the prize on his side. Rules only: the art is a later
- * build, so this reads the battle's state (window.match), with real taps.
+ * the warning as the first turn begins): your first move (a quiet one), then the cast at the start of his turn (his
+ * whole turn: the turn passes to you, the carrots planted, a base on the board), the race (you play the judge's best,
+ * which weighs the carrots, so you pull them), the race over, and his spin with the prize on his side. Rules only: the
+ * art is a later build, so this reads the battle's state (window.match), with real taps.
  */
 test("Chub & Chirp's Carrot Patch (the test switch): the cast, the race's pulls, its end and his spin", async ({ page }) => {
   test.setTimeout(5 * 60_000);
@@ -126,8 +126,10 @@ test("Chub & Chirp's Carrot Patch (the test switch): the cast, the race's pulls,
     };
     requestAnimationFrame(look);
   });
-  const first = await engineTop(page);
-  await play(page, first.top[0]!.move);
+  // (A quiet first move: passing after it costs him nothing, so the pass guard lets the cast come at once. After a move
+  // like 3.d4, passing would lose real material, and it waits: docs/decisions/2026-10-18-turn-passing-guard.md.)
+  await yourMove(page);
+  await play(page, crowd === "w" ? "d2d3" : "d7d6");
   await yourMove(page);
   const seen = await page.evaluate(() => (window as any).__castSeen);
   // The cast was his whole turn: no move of his, the turn passed to you (the cast's moment on that screen), a base at its ply.

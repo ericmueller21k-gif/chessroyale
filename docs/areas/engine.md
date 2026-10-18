@@ -110,6 +110,15 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     weighed the same way (`fuseFrom`'s `ahead`, `alfilBattle.fusionAhead`). Online the boss request carries the pieces
     (`land`, with his move and his fusion only) and the host's device judges; an older app ignores it. The last checks
     above follow it. `packages/chess/test/alfil-landing.test.ts`.
+  - **The pass guard** (Oct 18; docs/decisions/2026-10-18-turn-passing-guard.md; Eric: Alfil fused with his queen
+    hanging): a power that spends the boss's whole turn (Alfil's fusion, Chub & Chirp's Carrot Patch cast) waits a turn,
+    and he plays his move, when passing would lose real material: his evaluation after it (the crowd to move) at least
+    `passGuardPawns` (2) below his before it (him to move), in pawns of log-odds (`passScores`, `passLoses` in
+    `bosses/base.ts`). On this device's engines (the host's online: the request's `pass`, answered `PASS_WAIT`); the
+    server never searches, and with no engine the power comes as ever. The fusion reads the searches its square's pick
+    already makes (`fuseFrom`, `tusksNodes`; with the Slam's pieces landing right after it, the position before is
+    weighed with them down too: `landingAhead`); the cast searches the position before and after the pass at
+    `passGuardNodes` (30,000) each (`castAnswer`). `packages/chess/test/pass-guard.test.ts`.
   - **Never waited on, move by move:** not ready, failed, or no answer in 1.5 s (`timeoutMs`): today's move. A slow
     or old device falls back to Stockfish this way. Only a solo battle's start waits for it (the loading step, below).
   - **Where:** every boss battle, solo (`startBrain` in `solo.ts`, the runner's `humanBrain`) and online (the lobby
@@ -163,6 +172,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 | UCI, top moves, scoring moves | `packages/chess/src/uci.ts`, `node.ts` |
 | The judging job, the board's numbers | `packages/chess/src/judge.ts` |
 | Re-checks, the boss's moves, bot picks | `packages/chess/src/runner.ts` |
+| The pass guard (a power that spends his whole turn) | `PASS_WAIT`, `passScores`, `passLoses`, `passAnswer` in `packages/chess/src/bosses/base.ts`; `fuseFrom`, `landingAhead` in `alfil.ts`; `castAnswer` in `hopper.ts`; the request's `pass` in `lobby.ts` and `net.ts` (`hostPick`) |
 | The landing guard (Alfil's Slam) | `landingGuard`, `BossAhead` in `runner.ts`; `landsAfterHisMove`, `slamAhead`, `alfilBattle.fusionAhead` in `packages/chess/src/bosses/alfil.ts`; the request's `land` in `lobby.ts` and `net.ts` (`hostBoss`) |
 | The browser's engine pool | `packages/app/src/engine.ts` |
 | Many judges (lobby side) | `packages/server/src/judges.ts` (pure helpers), the flow in `lobby.ts` ("Many judges") |

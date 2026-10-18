@@ -756,8 +756,8 @@ export type ServerMessage = { now: number } & (
       /**
        * Alfil's Slam's pieces in the air (each one's letter and own square) land as the crowd's turn after this move, or
        * this fusion, begins: judge it with them down (the landing guard: bossMoveFrom's `ahead`, fuseFrom's, from
-       * slamAhead; the moves still come from `fen`). Sent with his move and his fusion only. An older app ignores it and
-       * judges on `fen` alone, as before.
+       * slamAhead; for the fusion landingAhead, on the position before it too; the moves still come from `fen`). Sent
+       * with his move and his fusion only. An older app ignores it and judges on `fen` alone, as before.
        */
       land?: SlamPiece[];
       /**
@@ -767,6 +767,14 @@ export type ServerMessage = { now: number } & (
        * same as "".
        */
       hop?: string[];
+      /**
+       * The step spends his whole turn: Alfil's fusion (with `fuse`, its squares) or Chub & Chirp's Carrot Patch cast
+       * (alone: the turn passed, passTurn of `fen`). The pass guard (passLoses; docs/decisions/2026-10-18-turn-passing-guard.md):
+       * answer PASS_WAIT ("wait") when even the best way it can go loses real material against his move; then it waits
+       * and he plays his move (asked for anew). Else the fusion's square as ever, or for the cast anything else ("": it
+       * comes). An older app ignores it: the fusion as before, and for the cast a move of his, which isn't "wait": it comes.
+       */
+      pass?: true;
       /**
        * Chub & Chirp's Carrot Patch (id hopper), his ordinary move in the race: the race as his brain weighs it (the
        * carrots still in the ground, his count, the moves left, how much the race weighs at his strength). Play his move

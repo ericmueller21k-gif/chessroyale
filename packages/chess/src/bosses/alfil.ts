@@ -28,7 +28,7 @@ import { applyMove, gameEnd, legalMoves, mateInOne, sideToMove } from "../rules.
 import { stockfishRefuses } from "../uci.ts";
 import { passTurn } from "./hollow.ts";
 import type { BossAhead, EngineLike } from "../runner.ts";
-import { bossPowers, eachOn, from, logit, meterFull, other, powerRoll, testSwitch, to, topEach, turnOf, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { PASS_WAIT, bossPowers, eachOn, from, logit, meterFull, other, passAnswer, passScores, powerRoll, testSwitch, to, topEach, turnOf, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 import { PIECE_VALUE, gridAttackers, gridHanging, gridKing, gridKingAttacked, gridOf, isLight, placementOf, sideOf, type Grid } from "./grid.ts";
 
 /**
@@ -247,7 +247,8 @@ export function pickFusion(scored: readonly FusionScore[]): { fen: string; gain:
  * solo's): the position before it (him to move) and each way to go (the crowd to move: his score is the rest) searched
  * at tusksNodes, shared out over the engines, then pickFusion. Null: no engine (the fusion then takes the first way
  * allowed; the cast, the first pair). `ahead` (the fusion only: the Slam's pieces land as the crowd's turn after it
- * begins, slamAhead): each way to go is searched with them down, as for his move (the landing guard); the pick is still
+ * begins, landingAhead): each way to go is searched with them down, as for his move (the landing guard), and the
+ * position before too, so the gain (the pass guard's measure: passScores) compares like with like; the pick is still
  * one of `candidates`.
  */
 export async function fuseFrom(
@@ -257,14 +258,8 @@ export async function fuseFrom(
   s: Pick<BossPowerSettings, "tusksNodes" | "bouncePawnLogit"> = BOSS_POWERS,
   ahead: ((fen: string) => string) | null = null,
 ): Promise<{ fen: string; gain: number } | null> {
-  if (!candidates.length || !engines.length) return null;
-  const [before, ...after] = await topEach(engines, [fen, ...candidates.map((c) => (ahead ? ahead(c) : c))], s.tusksNodes);
-  if (!before) return null;
-  const scored = candidates.flatMap((c, i) => {
-    const m = after[i];
-    return m ? [{ fen: c, expected: 1 - m.expected, gain: (logit(1 - m.expected) - logit(before.expected)) / s.bouncePawnLogit }] : [];
-  });
-  return pickFusion(scored);
+  const scored = await passScores(engines, fen, candidates, s.tusksNodes, s, ahead);
+  return scored ? pickFusion(scored) : null;
 }
 
 // ---------------- The Mammoth Slam ----------------
@@ -526,6 +521,17 @@ export function slamAhead(pieces: readonly SlamPiece[], s: Pick<BossPowerSetting
   return { after: (fen) => landing(fen, pieces, sideToMove(fen)).fen, looks: s.slamGuardLooks, nodes: s.slamGuardNodes };
 }
 
+/**
+ * The fusion's look ahead (fuseFrom's `ahead`) for pieces that land as the crowd's turn after it begins: any position,
+ * whoever is to move, with them down where the rules will put them (landing). Put on each of its ways to go (the crowd
+ * to move, as slamAhead's) and on the position before it (him to move), so the pass guard's gain compares the fusion
+ * with his move on the same board.
+ */
+export const landingAhead =
+  (pieces: readonly SlamPiece[], crowd: Side) =>
+  (fen: string): string =>
+    landing(fen, pieces, crowd).fen;
+
 /** The pieces in the air as the screens show them: each with the crowd turn it lands, the turns left, and its shadow's size (1 to slamTurns). */
 export function airborneView(p: Pick<BossPowerState, "airborne" | "slam" | "turn">, s: Pick<BossPowerSettings, "slamTurns"> = BOSS_POWERS): { piece: string; square: string; lands: number; left: number; stage: number }[] {
   if (!p.airborne?.length || !p.slam) return [];
@@ -630,9 +636,10 @@ export const alfilBattle = {
   /**
    * What his turn begins with now, in this order: the Mammoth Slam (slamDue: before anything else of his that turn),
    * the fusion of his last cast (his move: his turn ends with it, unless it fails; in check, it waits, the marks staying,
-   * and he answers the check with a move: no fusion can), a new cast (his turn from tusksFirst, every tusksEvery, at
-   * most tusksMax elephants; then his move). Null: nothing (or it isn't his turn). Each is done once (its state moves
-   * on), so his turn can begin with more than one.
+   * and he answers the check with a move: no fusion can; and when passing would lose real material, the pass guard, it
+   * waits the same way: `passWait`), a new cast (his turn from tusksFirst, every tusksEvery, at most tusksMax
+   * elephants; then his move). Null: nothing (or it isn't his turn). Each is done once (its state moves on), so his turn
+   * can begin with more than one.
    */
   step(b: Battle, s: BossPowerSettings = BOSS_POWERS): AlfilStep | null {
     const boss = b.state.boss;
@@ -642,7 +649,7 @@ export const alfilBattle = {
     const turn = hisTurn(boss, boardOf(b).history.length);
     // (In check, no fusion can answer it: neither the fusion nor a cast, which weighs fusions as if they came now.)
     const checked = gridKingAttacked(gridOf(boardOf(b).fen), other(boss.crowdSide));
-    if (p.tusks) return p.tusks.turn < turn && !checked ? "fuse" : null;
+    if (p.tusks) return p.tusks.turn < turn && !checked && p.passWait !== boss.crowdMoves ? "fuse" : null;
     const { first } = tusksSchedule(b, s);
     if (!checked && (p.fused ?? 0) < s.tusksMax && turn >= (p.tusksNext ?? first) && castPairs(b, turn).length) return "tusks";
     return null;
@@ -658,17 +665,22 @@ export const alfilBattle = {
     return [];
   },
 
-  /** The step needs an engine: a cast or a fusion with a choice (more than one way to go), or a Slam with a lift to weigh (its cap). */
+  /**
+   * The step needs an engine: a cast with a choice (more than one pair's way to go), a fusion with a square allowed (its
+   * pick, and the pass guard: even with one square, passing may lose real material), or a Slam with a lift to weigh (its
+   * cap).
+   */
   needsEngine(b: Battle): boolean {
     const step = alfilBattle.step(b);
     const n = alfilBattle.candidates(b).length;
-    return step === "slam" ? n > 0 : n > 1;
+    return step === "tusks" ? n > 1 : n > 0;
   },
 
   /**
-   * The step, from this device's engines (solo, the sims): the fusion's square (fuseFrom; with the Slam's pieces down
-   * when they land as the crowd's turn after it begins: fusionAhead), the Slam's lift (slamFrom). Returns what apply
-   * returns: the step done, or null when nothing came of it.
+   * The step, from this device's engines (solo, the sims): the cast's pair (fuseFrom), the fusion's square (fuseFrom;
+   * with the Slam's pieces down when they land as the crowd's turn after it begins: fusionAhead) or its wait (the pass
+   * guard: passAnswer), the Slam's lift (slamFrom). Returns what apply returns: the step done, or null when nothing
+   * came of it (a fusion that waits among them).
    */
   async play(b: Battle, engines: readonly EngineLike[]): Promise<AlfilStep | null> {
     const step = alfilBattle.step(b);
@@ -678,18 +690,20 @@ export const alfilBattle = {
       const pick = await slamFrom(engines, boardOf(b).fen, candidates);
       return alfilBattle.apply(b, pick?.fen ?? null, pick?.loss ?? null, step);
     }
-    return alfilBattle.apply(b, (await fuseFrom(engines, boardOf(b).fen, candidates, undefined, alfilBattle.fusionAhead(b)))?.fen ?? null, null, step);
+    const pick = await fuseFrom(engines, boardOf(b).fen, candidates, undefined, alfilBattle.fusionAhead(b));
+    return alfilBattle.apply(b, step === "fuse" ? passAnswer(pick) : (pick?.fen ?? null), null, step);
   },
 
   /**
    * The fusion's look ahead (fuseFrom's `ahead`): his fusion now is his move, and the Slam's pieces land as the crowd's
-   * turn after it begins (landsAfterHisMove), so its squares are weighed with them down. Null: not the fusion's step, or
-   * nothing lands then. (A cast isn't his move: his move follows it, and is judged on its own.)
+   * turn after it begins (landsAfterHisMove), so its squares are weighed with them down, and the position before it too
+   * (landingAhead: the pass guard compares like with like). Null: not the fusion's step, or nothing lands then. (A cast
+   * isn't his move: his move follows it, and is judged on its own.)
    */
   fusionAhead(b: Battle): ((fen: string) => string) | null {
     const boss = b.state.boss;
     const pieces = alfilBattle.step(b) === "fuse" ? landsAfterHisMove(boss) : null;
-    return pieces ? slamAhead(pieces).after : null;
+    return pieces ? landingAhead(pieces, boss!.crowdSide) : null;
   },
 
   /**
@@ -699,6 +713,9 @@ export const alfilBattle = {
    * fusion is his move: the crowd's turn begins (a base with the crowd to move, the crowd's turn set up as after a move:
    * its moment plays as that turn begins, ALFIL.everyTurn); with no square allowed now it fails, the pawns staying,
    * with no moment (as when the crowd takes one), and he plays his move.
+   * - **The pass guard** (`PASS_WAIT`, the fusion's answer when passing would lose real material: passAnswer): the
+   *   fusion waits, the marks staying, and he plays his move (as in check); it's due again at the start of his next turn
+   *   (`passWait`), the counter open meanwhile. No cap. A square that isn't allowed now still fails first.
    * - **The God King's strike** (`staggerNext`) just before a fusion hits the fusion: the elephant lands on the worse of
    *   its two squares for him (the engine's view: the square it didn't pick; one allowed, or no engine's answer: as
    *   usual), and the strike is spent there, as by a move.
@@ -706,7 +723,7 @@ export const alfilBattle = {
    *   and shows nothing: it comes again at the start of his next turn (`slamWait`).
    * - **`requested`**: the step the pick was asked for. If the step is another now (the admins' trigger brought the Slam
    *   while the host weighed his fusion), the pick is dropped and nothing changes: the step now is asked for anew.
-   * Returns the step done; null when nothing came of it (a pick dropped, a Slam that lifted nothing).
+   * Returns the step done; null when nothing came of it (a pick dropped, a fusion that waits, a Slam that lifted nothing).
    */
   apply(b: Battle, pick: string | null, loss: number | null = null, requested: AlfilStep | null = null, s: BossPowerSettings = BOSS_POWERS): AlfilStep | null {
     const step = alfilBattle.step(b, s);
@@ -728,6 +745,11 @@ export const alfilBattle = {
         // (Failed, as when the crowd takes one: no moment, and he plays his move.)
         setPowers(b, (p) => ({ ...p, tusks: null, fusion: { at: boss.crowdMoves, from: [...pawns], to: null, why: "nowhere" } }));
         return step;
+      }
+      if (pick === PASS_WAIT) {
+        // (The pass guard: his move instead; the marks stay, and it's due again on his next turn.)
+        setPowers(b, (p) => ({ ...p, passWait: boss.crowdMoves }));
+        return null;
       }
       // His move: the board passes to the crowd with no move played (no last move to show), then what follows his move.
       const board = boardOf(b);

@@ -426,10 +426,10 @@ describe("Tusks: the counter and the fusion", () => {
     }
   });
 
-  it("one way allowed: no engine needed, that one; none: it fails there (the pawns stay), with no moment, and he moves", () => {
+  it("one way allowed: the engine still asked (the pass guard), no answer: that one; none: it fails there (the pawns stay), with no moment, and he moves", () => {
     const one = battleAt("4k3/p3p2p/8/8/8/8/8/4R2K b - - 0 1", { tusks: { turn: 3, at: 4, pawns: ["a7", "e7"] } });
     expect(alfilBattle.candidates(one)).toHaveLength(1);
-    expect(alfilBattle.needsEngine(one)).toBe(false);
+    expect(alfilBattle.needsEngine(one)).toBe(true);
     alfilBattle.apply(one, null);
     expect(powersOf(one).fusion!.to).toBe("e7");
     const none = battleAt("4k3/p3p3/8/2K5/8/8/8/4R3 b - - 0 1", { tusks: { turn: 3, at: 4, pawns: ["a7", "e7"] } });
