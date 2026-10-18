@@ -21,7 +21,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     `e2e/areas.json`: path globs (`*` within a folder, `**` across folders) to spec files, area by area. The PR runs
     the specs of every area it touches, plus any spec it changes, plus the smoke set; on as few shards as those need
     (about 600 s of test time each, both projects; at most 5), so the whole run takes about 4 minutes for a docs-only
-    PR and about 6 to 8 on the usual one (a boss's art, a screen). The plan's summary on the run's page lists each
+    PR (3 m 44 s measured: the smoke set on 1 shard) and about 5 to 8 on the usual one (5 m 28 s measured for one of
+    Sawyer's files: his spec, the king attacks and the speech spec plus the smoke set, on 3 shards). The plan's summary on the run's page lists each
     changed path and what it ran.
   - **The smoke set** (every PR): `e2e/boss-smoke.spec.ts` once the boss kit lands (every boss's tile, battle, passive
     and ult, no page errors), plus the three cheapest specs that between them prove the app boots, a solo battle plays

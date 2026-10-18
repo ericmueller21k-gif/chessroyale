@@ -96,6 +96,19 @@ everything; boss *art and wiring* PRs (#271, #274, #276) and screen, chat, ranke
 about 2 to 5 minutes on the clock per shard, plus a minute of setup. #271 and #274 also changed `boss-timing.ts`, a
 rule every boss shares, so they'd run every boss's specs on 5 shards, about 9 minutes each.
 
+## Measured (probe PRs #279 and #280, closed unmerged)
+
+- **One area's file** (a comment in `packages/app/src/components/Sawyer.tsx`): the plan picked Sawyer's spec, the king
+  attacks and the speech spec plus the smoke set, 6 of 66 spec files on 3 shards. The whole run took **5 m 28 s**
+  (plan 7 s, shards 4 m 13 s to 5 m 06 s, each about a minute of setup, `result` 4 s); 57 tests passed.
+- **The smoke set alone** (the same PR with its change undone, so nothing changed): 1 shard, **3 m 44 s** in all
+  (1.9 minutes of tests, 18 passed). A docs-only PR gets this.
+- **A shared foundation** (a comment in `packages/chess/src/runner.ts`): the plan said "Every spec file (66) on 5
+  shards: `packages/chess/src/runner.ts` is a shared foundation" and started 5 shards with no file list (then stopped by
+  hand: the same path as main's run).
+- **The `full-e2e` label** added to the first probe: a new run started at once and planned every spec on 5 shards
+  ("the pull request has the full-e2e label"; then stopped by hand).
+
 ## Not done: a cheap win in `check.yml`
 
 `check` takes about 5.5 minutes (npm ci 10 s, typecheck 45 s, unit tests 4 m 40 s), now as long as a small PR's e2e

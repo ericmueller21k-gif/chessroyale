@@ -20,7 +20,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 export const MAX_SHARDS = 5;
 /**
  * The test time a pull request's shard aims at: seconds, summed over both projects (ci-timings.json's unit), so about
- * half of it on the clock with 2 workers. With setup, a shard then takes about 6 minutes.
+ * half of it on the clock with 2 workers. With setup, a shard then takes about 5 minutes.
  */
 export const SHARD_SECONDS = 600;
 

@@ -65,7 +65,8 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
     back to the previous rules: they're kept word for word in `docs/decisions/2026-10-18-faster-pipeline.md`.
   - **CI: the fast check on PRs, the full suite on main** (Oct 18). On a PR the `e2e` workflow runs the specs of the
     areas the PR changes plus a smoke set (the app boots, a solo battle plays, a lobby works, and every boss's smoke
-    once the boss kit lands): about 6 to 8 minutes on the usual PR. `e2e/areas.json` maps paths to specs; a shared
+    once the boss kit lands): about 4 to 8 minutes in all (measured Oct 18: 3 m 44 s for the smoke set alone, 5 m 28 s
+    for one boss's file). `e2e/areas.json` maps paths to specs; a shared
     foundation (package.json, the lockfile, the Playwright config, `packages/core`, the runner, the protocol, the board,
     …) or a path it doesn't know runs the whole suite, and so does the `full-e2e` label. Every push to `main` runs the
     whole suite, both projects, on 5 runners (about 17 minutes). `docs/areas/ops.md`, "CI e2e". A new boss (or any new
