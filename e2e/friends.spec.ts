@@ -55,9 +55,9 @@ test("two players: a request accepted, online in each other's list, the invites 
   await ann.page.emulateMedia({ colorScheme: "light" });
 
   // Bo, on his home: "1 new" within seconds; his list has the request; he accepts.
-  // (A phone: a count on your pawn in the top bar.)
+  // (A phone: a count on Friends in the top bar.)
   if (isComputer()) await expect(bo.page.locator(".fr-panel .fr-badge")).toHaveText("1 new", NEWS);
-  else await expect(bo.page.locator(".fd-top .fd-ring-news")).toHaveText("1", NEWS);
+  else await expect(bo.page.locator(".fd-top .fd-top-friends .fd-news")).toHaveText("1", NEWS);
   await openFriends(bo.page);
   const request = bo.page.locator(".fr-page .fr-row", { hasText: "Ann Friend" });
   await expect(request).toContainText("wants to be friends");

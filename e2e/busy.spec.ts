@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { named, test } from "./helpers.ts";
+import { named, test, pickMode } from "./helpers.ts";
 
 /**
  * Servers busy (DECISIONS.md, "Capacity: built"): past the matchmaker's admission rate or the overload limit, PLAY
@@ -26,6 +26,7 @@ test("servers busy: you're told you're in line and about how long, then the queu
     return route.continue();
   });
   await page.goto(`/?pool=busy-${test.info().project.name}`);
+  await pickMode(page);
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   const line = page.locator(".fd-queue-busy");
   await expect(line).toHaveText("Servers are busy, you're in line: about 20 s");
@@ -52,6 +53,7 @@ test("servers busy: Cancel while in line goes home and stops asking", async ({ p
     return route.fulfill({ json: busyAnswer(45) });
   });
   await page.goto(`/?pool=busy2-${test.info().project.name}`);
+  await pickMode(page);
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(page.locator(".fd-queue-busy")).toHaveText("Servers are busy, you're in line: about 45 s");
   // On a narrow phone (360 px) the whole line shows, with nothing off the side.

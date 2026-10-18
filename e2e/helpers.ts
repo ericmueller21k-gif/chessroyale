@@ -86,17 +86,40 @@ export async function soundOff(page: Page) {
   await sheet.waitFor({ state: "detached" });
 }
 
-/** Home → Matchmaking: Solo → PLAY (in the mode the URL or the picker chose): you and bots, after the seats fill. */
+/**
+ * Home's RANKED row: tap `mode` ("50 v 50", "1 v 1", "Squads", "Classic"), or with none, 50 v 50 unless a mode is
+ * picked already (by ?mode= or an earlier tap). Home opens with nothing picked and PLAY dimmed (Eric, Oct 18).
+ */
+export async function pickMode(page: Page, mode?: string) {
+  const row = page.getByRole("radiogroup", { name: "RANKED" });
+  await row.getByRole("radio").first().waitFor();
+  if (mode) return row.getByRole("radio", { name: new RegExp(`^${mode}`) }).click();
+  // (Nothing picked is the panel's "Tap a mode…": ?mode=classic picks Classic, which has no button in the row.)
+  if (await page.locator(".fd-mode-panel").getByText("Tap a mode above to play").count()) await row.getByRole("radio", { name: /^50 v 50/ }).click();
+}
+
+/** Home → Matchmaking: Solo → PLAY (in the mode the URL or the picker chose, else 50 v 50): you and bots, after the seats fill. */
 export async function soloFromHome(page: Page) {
+  await pickMode(page);
   await page.getByRole("radio", { name: /^Solo/ }).click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
 }
 
-/** Home → Play with friends → Create a lobby (or a raid). */
+/** Play with friends' sheet: a phone's Friends in home's top bar, a computer's side menu (Eric, Oct 18). */
+export async function openPlayWithFriends(page: Page) {
+  // (A computer's frame from 1024 px: phones and tablets have home's top bar.)
+  if ((page.viewportSize()?.width ?? 0) < 1024) await page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
+  else await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Play with friends" }).click();
+  await page.getByRole("dialog", { name: /Play with friends|Join lobby/ }).waitFor();
+}
+
+/** Home → Play with friends → Get friend code (a lobby, its link copied), or Create a raid on the Boss raid screen. */
 export async function createLobbyFromHome(page: Page) {
-  // (The home screen's button: on a computer the side menu has one too.)
-  await page.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
-  await page.getByRole("button", { name: /^Create a (lobby|raid|Classic lobby)$/ }).click();
+  const raidScreen = page.getByRole("heading", { name: "Boss raid", exact: true });
+  await page.getByRole("button", { name: "PLAY", exact: true }).or(raidScreen).first().waitFor();
+  if (await raidScreen.isVisible()) await page.getByRole("main").getByRole("button", { name: /^Play with friends/ }).click();
+  else await openPlayWithFriends(page);
+  await page.getByRole("button", { name: /^(Get friend code|Get a Classic friend code|Create a raid)$/ }).click();
 }
 
 /** An invite link opens the join form with the code filled in. */

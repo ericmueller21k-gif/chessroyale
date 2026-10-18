@@ -13,9 +13,11 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   even to a guest. `?nolanding` skips it (tests). Guests play Solo, a Solo raid and Boss alone.
 - **Home** (built from the approved mockups in `docs/mockups/front-door/`; the RANKED row and the Boss raid card, Eric,
   Oct 16, [docs/decisions/2026-10-16-home-ranked-row-and-boss-raid.md](../decisions/2026-10-16-home-ranked-row-and-boss-raid.md)):
-  - **The RANKED row:** a small "RANKED" label over three buttons, one picked (a radio group, remembered on the device,
-    `brc.mode`): **50 v 50** ("Crowd chess"), **1 v 1** ("Classic chess") and **Squads** ("8 squads of 4"). Classic
-    still plays with `?mode=classic`. Under the row, **the panel**: one box of one fixed size for every mode (Eric, Oct 18:
+  - **The RANKED row:** a small "RANKED" label over three buttons, a radio group: **50 v 50** ("Crowd chess"), **1 v 1**
+    ("Classic chess") and **Squads** ("8 squads of 4"). Home opens with **none picked** and PLAY dimmed: you tap the mode
+    you want, then PLAY (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)). The pick holds until the app is opened again
+    (a reload), and `?mode=` picks one from a link. Classic still plays with `?mode=classic`. With none picked the panel
+    says "Tap a mode above to play". Under the row, **the panel**: one box of one fixed size for every mode (Eric, Oct 18:
     "it should never change size";
     [docs/decisions/2026-10-18-home-steady-layout.md](../decisions/2026-10-18-home-steady-layout.md)), holding the
     pick's options or words: 50 v 50's Matchmaking (Default, Bots off, Solo) with its ⓘ (its words float over the RANKED
@@ -53,22 +55,26 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     While a 1 v 1 search runs, a choice asks "Leave the 1 v 1 queue?" first (App's `leavingDuelFirst`).
   - **`/bosses`** (unlisted, not admin-gated; Eric's shortcut): opens the solo boss picker at once ("Choose your boss":
     every boss you can meet and a random one, and for an admin the Hidden Boss after them; the difficulty), over home.
-  - Then (after the Boss raid card) "Play with friends" (a lobby in the row's pick; with 1 v 1 picked, a 50 v 50 lobby: 1 v 1 has none),
-    the coin pill, your icon, and the live line ("214 online · 9 matches running · 31 in queue") with the typical
-    wait under PLAY. The shop and your profile are in a phone's top bar and a computer's side menu, not on home's
-    column (Eric, Oct 18; [docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)).
+  - Your icon (no coins at the top: the shop and your own profile show them, Eric, Oct 18), and the live line ("214 online · 9 matches running · 31 in queue") with the typical
+    wait under PLAY. The shop, your profile and Play with friends are in a phone's top bar and a computer's side menu,
+    not on home's column (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)).
+  - **Play with friends** (a phone's **Friends** in the top bar, a computer's side menu): **Get friend code** makes a
+    lobby in the row's pick (50 v 50 if none, or with 1 v 1 or Squads picked) and copies its invite link as it opens
+    (the lobby screen says "Invite link copied: paste it to your friends"); join one by its code; **Your friends ›**
+    (with "N new") opens the friends list. The Boss raid screen's Play with friends makes a raid, as before.
   - A screen that replaces home (a phone's queue, the Boss raid screen, home again) starts at its top. A match's Home
     and a closed lobby's note land on home itself; Cancel in a raid's queue goes back to the Boss raid screen.
-  - **Phone:** a top bar (the logo, your coins, your pawn, a shop bag, then a gear that opens Settings in one tap; a
-    computer's shop and Settings are its side menu's, so neither is there;
-    [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md)), then one
-    column: the RANKED row, its panel, PLAY, the Boss raid card, then Play with friends. It fits the screen with no
+  - **Phone:** a top bar (the logo, your pawn (your profile), the shop, **Friends** (with a count
+    of requests and invites), then a gear that opens Settings in one tap; a computer's are its side menu's, so none is
+    there; [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md),
+    [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the Boss raid card, the RANKED row, its panel, then PLAY
+    and its line at the bottom. It fits the screen with no
     scrolling from 360×640 up: your pawn's card takes the room left and its pawn is sized to it (beside your name
     when the room is short); below that the card stops shrinking and the page scrolls
     ([docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)). Big tap targets, no
     sideways scroll at 320–430 px; a long name on your home card ellipsizes.
-  - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the RANKED
-    row, its panel, PLAY and its line, the Boss raid card (full width, a little shorter), Play with friends; a side
+  - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the Boss
+    raid card (full width, a little shorter), the RANKED row, its panel, then PLAY and its line at the bottom; a side
     panel (playing now, global chat).
     From 1280 px the play column starts with the **live window**: the featured real match (a matchmade one, most
     people, then newest) or, when none runs, bot-match replays played on a shared clock cycle so everyone sees the same
@@ -93,9 +99,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   the rank's label from the profile, null until it loads). The first-time pawn-vote hint is `VoteHint`
   (`components/VoteHint.tsx`, once per device: `brc.voteHintSeen`), for every pawn vote to use.
 - **Friends** (Oct 15; [docs/decisions/2026-10-15-friends-and-invites.md](../decisions/2026-10-15-friends-and-invites.md); the rules and data on [accounts.md](accounts.md)):
-  - **Where:** a phone's way in is **Friends** on your own profile (the count of requests and invites on it, and on
-    your pawn in home's top bar; Eric, Oct 18: home's line above the live line is gone,
-    [docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)); a computer's live panel has a FRIENDS section above the live line (friends online, each with Invite,
+  - **Where:** a phone's way in is **Friends** in home's top bar (its sheet's "Your friends ›"), or Friends on your own
+    profile, each with the count of requests and invites (Eric, Oct 18: home's line above the live line is gone,
+    [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)); a computer's live panel has a FRIENDS section above the live line (friends online, each with Invite,
     at most `FRIENDS.panelMax`, and "All friends ›"). Both open the friends list (`/friends`): invites to you (Join,
     ✕), friend requests (Accept, Decline), your friends online first (In a match next, then the rest; Invite on each),
     the requests you sent (Cancel) and who you've blocked (Unblock).

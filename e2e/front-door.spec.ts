@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { asAdmin, named, openBossRaid, switchesOff, test } from "./helpers.ts";
+import { asAdmin, named, openBossRaid, switchesOff, test, openPlayWithFriends, pickMode } from "./helpers.ts";
 
 const live = (p: import("@playwright/test").Page) => p.evaluate(() => fetch("/api/live").then((r) => r.json()));
 
@@ -23,6 +23,7 @@ test("home: the live line comes from the server, the RANKED row changes the line
   const other = await (await browser.newContext()).newPage();
   await other.addInitScript(() => localStorage.setItem("brc.matchmaking", "botsoff"));
   await other.goto(`/?pool=home-${test.info().project.name}`);
+  await pickMode(other);
   await other.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(async () => (await live(page)).queue, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
   await expect(line).toContainText(/[1-9]\d* in queue/, { timeout: 10_000 });
@@ -41,19 +42,17 @@ test("home: the live line comes from the server, the RANKED row changes the line
   // No sideways scrolling, and big tap targets. (Boss alone isn't on home any more: the Boss raid screen has it.)
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
   await expect(page.getByRole("main").getByRole("button", { name: /^Boss alone/ })).toHaveCount(0);
-  // (Home has the card and one button: the shop and your profile are in a phone's top bar and a computer's side menu.)
-  for (const name of ["Play with friends"]) {
-    const box = (await page.getByRole("main").getByRole("button", { name, exact: true }).boundingBox())!;
-    expect(box.height).toBeGreaterThanOrEqual(44);
-  }
+  // (No buttons under PLAY: the shop, your profile and Play with friends are in a phone's top bar and a computer's side
+  // menu, Eric, Oct 18.)
+  await expect(page.getByRole("main").getByRole("button", { name: "Play with friends", exact: true })).toHaveCount(0);
   expect((await page.getByRole("main").getByRole("button", { name: /^Boss raid/ }).boundingBox())!.height).toBeGreaterThanOrEqual(64);
 });
 
 test("home: Play with friends offers lobbies (practice is Solo, on the home screen)", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
+  await openPlayWithFriends(page);
   const sheet = page.getByRole("dialog", { name: "Play with friends" });
-  await expect(sheet.getByRole("button", { name: "Create a lobby" })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Get friend code" })).toBeVisible();
   await expect(sheet.getByRole("button", { name: "Join lobby" })).toBeDisabled();
   await sheet.getByLabel("Lobby code").fill("abcde");
   await expect(sheet.getByLabel("Lobby code")).toHaveValue("ABCDE");
@@ -107,12 +106,14 @@ test("the queue: your pawn first and ringed, others pop in, Cancel frees the sea
   await ann.addInitScript(() => ((window as any).__soundLog = []));
   // A queue of its own, so other tests' players don't land in it.
   for (const p of [ann, bo]) await p.goto(`/?debug&pool=queue-${test.info().project.name}`);
+  await pickMode(ann);
   await ann.getByRole("button", { name: "PLAY", exact: true }).click();
   // The queue screen, not a lobby: the count, the line, the grid.
   await expect(ann.locator(".fd-seats .fd-seat")).toHaveCount(100);
   await expect(ann.locator(".fd-queue-line")).toContainText(/Finding players · \d+ s, then bots fill the rest/);
   await expect(ann.getByText("You're in · seat 1")).toBeVisible();
   await expect(ann.locator(".fd-seat").first()).toHaveClass(/you/);
+  await pickMode(bo);
   await bo.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(ann.locator(".fd-count-n")).toHaveText("2");
   await expect(ann.locator(".fd-seat:not(.empty)")).toHaveCount(2);
@@ -180,6 +181,7 @@ test("computer: a side menu, the center and a live panel; the phone keeps one co
   // A match being played shows on the panel's list (no names, just the mode and who's left).
   const other = await (await browser.newContext()).newPage();
   await other.goto("/?pool=panel");
+  await pickMode(other);
   await other.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(panel.locator(".fd-playing").filter({ hasText: "Crowd · 50 v 50" }).first()).toBeVisible({ timeout: 40_000 });
   await other.close();

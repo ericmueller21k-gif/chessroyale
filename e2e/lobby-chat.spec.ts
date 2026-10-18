@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { createLobbyFromHome, named, soloFromHome, test } from "./helpers.ts";
+import { createLobbyFromHome, named, pickMode, soloFromHome, test } from "./helpers.ts";
 
 /**
  * Quick chat in the lobby, before the match (DECISIONS.md, "Lobby chat"): one channel for everyone waiting, the same
@@ -35,6 +35,7 @@ test("two players in a Default queue chat before the match starts: each sees the
   await named(bo, "Bo Lobby");
   for (const p of [ann, bo]) await p.goto(`/?debug&pool=${pool}`);
   // Both PLAY at once: the same queue (8 s locally before the bots fill in).
+  for (const p of [ann, bo]) await pickMode(p);
   await Promise.all([ann, bo].map((p) => p.getByRole("button", { name: "PLAY", exact: true }).click()));
   for (const p of [ann, bo]) {
     await expect(p.locator(".fd-count-n")).toHaveText("2", { timeout: 6_000 });

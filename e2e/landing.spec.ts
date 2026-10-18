@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openPlayWithFriends, pickMode } from "./helpers.ts";
 
 // The landing page shows only where sign-in is set up; locally there are no Google or Resend secrets, so the config is faked.
 const signInOn = { accounts: true, google: true, email: true, onlineNeedsSignIn: true };
@@ -37,17 +38,20 @@ test("landing: demo loop, sign-in, guests play bots only, FAQ and legal pages, i
   await expect(page.getByRole("heading", { name: "DRAFT — not yet reviewed" })).toBeVisible();
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Sign in to play online" })).toBeVisible();
-  // A guest gets solo play against bots; online asks you to sign in. Crowd is the default mode.
+  // A guest gets solo play against bots; online asks you to sign in. No mode is picked until you tap one (Eric, Oct 18).
   await page.getByRole("button", { name: "Play vs 99 bots as a guest" }).click();
-  await expect(page.getByRole("radio", { name: /^50 v 50/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radiogroup", { name: "RANKED" }).locator('[aria-checked="true"]')).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeDisabled();
+  await pickMode(page, "50 v 50");
   // PLAY plays 99 bots; lobbies ask you to sign in.
   await expect(page.locator(".fd-hint")).toContainText("Solo vs 99 bots");
-  await page.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
-  await expect(page.getByRole("button", { name: "Create a lobby" })).toHaveCount(0);
+  await openPlayWithFriends(page);
+  await expect(page.getByRole("button", { name: "Get friend code" })).toHaveCount(0);
   await expect(page.getByRole("dialog").getByRole("button", { name: "Sign in to play online" })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
   // Remembered on this device.
   await page.reload();
+  await pickMode(page);
   await expect(page.locator(".fd-hint")).toContainText("Solo vs 99 bots");
   await page.getByRole("button", { name: "Sign in to play online" }).click();
   await expect(page.getByRole("heading", { name: "Sign in to play online" })).toBeVisible();

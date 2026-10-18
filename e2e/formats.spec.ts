@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { crowdFinalBoss } from "@chessroyale/core";
-import { BOARD_SEL, createLobbyFromHome, engineTop, named, soloFromHome, submitMove, test, watchFor, bossAloneFromHome } from "./helpers.ts";
+import { BOARD_SEL, createLobbyFromHome, engineTop, named, soloFromHome, submitMove, test, watchFor, bossAloneFromHome, pickMode } from "./helpers.ts";
 
 /** The boss final's boss (Eric, Oct 14: always the Hidden Boss), by his roster name. */
 const finalBoss = crowdFinalBoss()!;
@@ -325,6 +325,7 @@ test("Play now: players land in the same lobby, the count climbs, bots fill it a
   for (const [i, p] of pages.entries()) {
     await named(p, `P${i}`);
     await p.goto("/?debug&pool=formats");
+    await pickMode(p);
     await p.getByRole("button", { name: "PLAY", exact: true }).click();
     await expect(p.locator(".fd-seats")).toBeVisible();
   }
@@ -351,6 +352,7 @@ test("Play now: players land in the same lobby, the count climbs, bots fill it a
   // A new player now gets a new lobby.
   const late = await (await browser.newContext()).newPage();
   await late.goto("/?debug&pool=formats");
+  await pickMode(late);
   await late.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(late.locator(".fd-seats")).toBeVisible();
   expect(await late.evaluate(() => (window as any).match.code)).not.toBe(codes[0]);

@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { named, test, watchFor, openBossRaid } from "./helpers.ts";
+import { named, test, watchFor, openBossRaid, openPlayWithFriends, pickMode } from "./helpers.ts";
 
 /**
  * Matchmaking types (DECISIONS.md, "Matchmaking types"): Default (bots after the fill time; 8 s locally), Bots off
@@ -22,6 +22,7 @@ const pool = (name: string) => `${name}-${test.info().project.name[0]}${run}`;
 test("home: Default, Bots off and Solo; the ⓘ says what they do; Bots off warns; Solo fills its seats fast and starts", async ({ page }) => {
   await named(page, "Typer");
   await page.goto("/?debug");
+  await pickMode(page, "50 v 50");
   const types = page.getByRole("radiogroup", { name: "Matchmaking" });
   await expect(types.getByRole("radio")).toHaveCount(3);
   await expect(types.getByRole("radio", { name: /^Default/ })).toHaveAttribute("aria-checked", "true");
@@ -35,11 +36,12 @@ test("home: Default, Bots off and Solo; the ⓘ says what they do; Bots off warn
   await types.getByRole("radio", { name: /^Bots off/ }).click();
   await expect(page.getByRole("note")).toHaveCount(0);
   await expect(page.locator(".fd-hint")).toHaveText("People only: starts when 100 have joined");
-  // Remembered on this device.
+  // Remembered on this device (the way of being matched; the mode is picked again after a reload, Eric, Oct 18).
   await page.reload();
+  await pickMode(page, "50 v 50");
   await expect(page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots off/ })).toHaveAttribute("aria-checked", "true");
   // Play with friends: lobbies only now (Solo is here).
-  await page.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
+  await openPlayWithFriends(page);
   await expect(page.getByRole("dialog", { name: "Play with friends" }).getByRole("button", { name: /Solo vs/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Close" }).click();
   // Big enough to tap, and nothing wider than the screen.
@@ -48,9 +50,11 @@ test("home: Default, Bots off and Solo; the ⓘ says what they do; Bots off warn
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
 
   // Solo: the queue screen, your bots fill the 100 seats in a couple of seconds, then the match begins.
+  await pickMode(page);
   await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();
   await expect(page.locator(".fd-hint")).toContainText("Solo vs 99 bots · starts at once");
   const t0 = Date.now();
+  await pickMode(page);
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(page.locator(".fd-seats")).toBeVisible();
   await expect(page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Solo");
@@ -72,6 +76,7 @@ test("Bots off: people only, it waits; one tap switches to Default, keeping your
   await named(page, "Patient");
   const q = pool("mm-off");
   await page.goto(`/?debug&pool=${q}`);
+  await pickMode(page);
   await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots off/ }).click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Bots off");
@@ -81,6 +86,7 @@ test("Bots off: people only, it waits; one tap switches to Default, keeping your
   const other = await (await browser.newContext()).newPage();
   await named(other, "Also patient");
   await other.goto(`/?debug&pool=${q}`);
+  await pickMode(other);
   await other.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots off/ }).click();
   await other.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => code(other)).toBe(first);
@@ -92,6 +98,7 @@ test("Bots off: people only, it waits; one tap switches to Default, keeping your
   // Someone with Default meanwhile gets a lobby of their own (never this one).
   const def = await (await browser.newContext()).newPage();
   await def.goto(`/?debug&pool=${q}`);
+  await pickMode(def);
   await def.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => code(def)).toBeTruthy();
   expect(await code(def)).not.toBe(first);
@@ -163,6 +170,7 @@ test("opening the app from scratch during a live match puts you back in it; leav
   const first = await ctx.newPage();
   await named(first, "Comeback");
   await first.goto(`/?debug&pool=${q}`);
+  await pickMode(first);
   await first.getByRole("button", { name: "PLAY", exact: true }).click();
   // Bots fill at 8 s here, then the votes begin: a live match.
   await expect.poll(() => phase(first), { timeout: 30_000 }).toBe("vote");
@@ -179,6 +187,7 @@ test("opening the app from scratch during a live match puts you back in it; leav
   const ctx2 = await browser.newContext(test.info().project.name === "phone" ? ({ ...devices["iPhone 13"], browserName: undefined } as any) : {});
   const third = await ctx2.newPage();
   await third.goto(`/?debug&pool=${q}-2`);
+  await pickMode(third);
   await third.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(third.locator(".fd-seats")).toBeVisible();
   await third.getByRole("button", { name: "Cancel" }).click();

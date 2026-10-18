@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { TOO_YOUNG_LINE } from "@chessroyale/core";
+import { pickMode } from "./helpers.ts";
 
 /**
  * The age gate (docs/decisions/2026-10-16-age-gate-and-real-money.md), on a phone: before signing in, a neutral
@@ -130,6 +131,7 @@ test("under 13: a neutral question, a friendly line, guest play, and no sign-in 
 
   // Guest play: solo against bots, under the default name, nothing to type to anyone.
   await page.getByRole("button", { name: "Play vs 99 bots as a guest" }).click();
+  await pickMode(page);
   await expect(page.locator(".fd-hint")).toContainText("Solo vs 99 bots");
   await page.goto("/profile");
   await expect(page.getByRole("heading", { name: "Player", exact: true })).toBeVisible();

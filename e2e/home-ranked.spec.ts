@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { named, openBossRaid, test, watchFor } from "./helpers.ts";
+import { named, openBossRaid, test, watchFor, pickMode } from "./helpers.ts";
 
 /**
  * Home's RANKED row and the Boss raid's own card and screen (Eric, Oct 16;
@@ -51,17 +51,14 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
     expect(Math.abs(c.width - r.width), `${w}: full width`).toBeLessThan(2);
     expect(await card.evaluate((e) => [...e.querySelectorAll(".rd-card-text > *")].every((x) => x.scrollWidth <= x.clientWidth + 0.5)), `${w}`).toBe(true);
     const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
-    // The row, PLAY, then the card, then Play with friends on its own row (Eric, Oct 16: "under the RANKED row"; on a
-    // computer too, Oct 18: "like the phone").
+    // The card, then the row, then PLAY at the bottom (Eric, Oct 18), on a phone and a computer alike.
+    expect(c.y + c.height, `${w}`).toBeLessThanOrEqual(r.y);
     expect(play.y, `${w}`).toBeGreaterThan(r.y + r.height);
-    expect(c.y, `${w}`).toBeGreaterThanOrEqual(play.y + play.height);
-    const friends = (await page.getByRole("main").getByRole("button", { name: "Play with friends" }).boundingBox())!;
-    expect(friends.y, `${w}`).toBeGreaterThanOrEqual(c.y + c.height);
     expect(await sideways(page), `${w}`).toBe(0);
   }
 });
 
-test("1 v 1: picked, your rank and what it is in the panel under the row, remembered; PLAY queues at once (/1v1)", async ({ page }) => {
+test("1 v 1: picked, your rank and what it is in the panel under the row, kept until the app reloads; PLAY queues at once (/1v1)", async ({ page }) => {
   await named(page, "Duel");
   await page.goto(`/?pool=home1v1-${test.info().project.name}-${run}`);
   await page.getByRole("radio", { name: /^1 v 1/ }).click();
@@ -76,8 +73,10 @@ test("1 v 1: picked, your rank and what it is in the panel under the row, rememb
   const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
   expect(rank.y).toBeGreaterThanOrEqual(row.y + row.height);
   expect(rank.y + rank.height).toBeLessThanOrEqual(play.y);
+  // (A reload is the app opening again: nothing picked, Eric, Oct 18.)
   await page.reload();
-  await expect(page.getByRole("radio", { name: /^1 v 1/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radio", { name: /^1 v 1/ })).toHaveAttribute("aria-checked", "false");
+  await pickMode(page, "1 v 1");
   expect(await sideways(page)).toBe(0);
   // PLAY: the 1 v 1 queue at once (startRanked1v1), its address /1v1; Cancel is home.
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
@@ -90,7 +89,6 @@ test("1 v 1: picked, your rank and what it is in the panel under the row, rememb
 test("1 v 1's rank line at its widest (an apex rank with four-digit points) stays one whole line from 320 px", async ({ page }) => {
   test.skip(desktop(), "the phone's widths");
   await named(page, "Apex");
-  await page.addInitScript(() => localStorage.setItem("brc.mode", "1v1"));
   await page.route("**/api/me*", async (route) => {
     const res = await route.fetch();
     const body = await res.json();
@@ -100,7 +98,7 @@ test("1 v 1's rank line at its widest (an apex rank with four-digit points) stay
   });
   for (const width of [320, 360, 390]) {
     await page.setViewportSize({ width, height: 740 });
-    await page.goto("/");
+    await page.goto("/?mode=1v1");
     const line = page.locator(".fd-rank1v1");
     await expect(line).toHaveText("Your rank: Grandmaster · 1234 RP");
     expect(await line.evaluate((e) => e.scrollWidth - e.clientWidth), `${width}`).toBeLessThanOrEqual(0);
@@ -188,6 +186,8 @@ test("home keeps still: no click on a mode, an option or the ⓘ moves or resize
   const sizes = desktop() ? [[1280, 800], [1440, 900], [1920, 1080]] : [[390, 844], [320, 640]];
   const radio = (name: RegExp) => page.getByRole("radio", { name });
   const steps: [string, () => Promise<unknown>][] = [
+    // (Home opens with nothing picked, Eric, Oct 18: the first tap is a mode.)
+    ["50 v 50 first", () => radio(/^50 v 50/).click()],
     ["Default", () => radio(/^Default/).click()],
     ["Bots off", () => radio(/^Bots off/).click()],
     ["Solo", () => radio(/^Solo you/).click()],
@@ -214,9 +214,8 @@ test("home keeps still: no click on a mode, an option or the ⓘ moves or resize
   };
   for (const [w, h] of sizes) {
     await page.setViewportSize({ width: w!, height: h! });
-    await page.addInitScript(() => localStorage.setItem("brc.mode", "crowd"));
     await page.goto("/");
-    await expect(radio(/^50 v 50/)).toHaveAttribute("aria-checked", "true");
+    await expect(radio(/^50 v 50/)).toHaveAttribute("aria-checked", "false");
     // (The live window's board: on screen at these computer sizes, a real square.)
     if (desktop()) expect((await box(page, ".fd-livewin-sq")).width, `${w}`).toBeGreaterThan(150);
     const first = await measure();

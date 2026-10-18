@@ -71,8 +71,8 @@ test("Squads resting: PLAY is closed with its line, a party can be joined but no
   await expect(page.getByRole("radio", { name: /^Squads/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeDisabled();
   await expect(page.locator(".fd-hint")).toHaveText(line);
-  // The panel's Party (and Play with friends, the same sheet): no new party, joining one by code as the server allows.
-  for (const open of [page.getByRole("radio", { name: /^Party/ }), page.getByRole("main").getByRole("button", { name: "Play with friends" })]) {
+  // The panel's Party: no new party, joining one by code as the server allows.
+  for (const open of [page.getByRole("radio", { name: /^Party/ })]) {
     await open.click();
     const sheet = page.getByRole("dialog");
     await expect(sheet.getByText(line)).toBeVisible();
