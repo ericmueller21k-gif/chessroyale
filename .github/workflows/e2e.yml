@@ -1,7 +1,15 @@
-# The whole Playwright e2e suite (both projects, phone and desktop) on every pull request to main and every push to
-# main, on 5 runners at once (about 17 minutes). Each shard runs whole spec files, spread by their measured time
-# (e2e/ci-shard.mjs, e2e/ci-timings.json). The `result` job puts one summary on the run's page (flaky tests first, then
-# failed ones, each with its shard and error; e2e/ci-summary.ts, ci-summary-merge.mjs) and is red if any shard is.
+# The Playwright e2e suite (both projects, phone and desktop). Docs: docs/areas/ops.md, "CI e2e"; CLAUDE.md, "Test lanes".
+#
+# - A pull request runs a fast check: the specs of the areas it changes plus a small smoke set, on as few shards as they
+#   need (about 6 to 8 minutes on the usual one). The `plan` job picks them (e2e/ci-select.mjs, from e2e/areas.json: path
+#   globs to spec files) and says why on the run's page. A shared foundation (package.json, the lockfile, the
+#   Playwright config, packages/core, the runner, the protocol, …) or a path the table doesn't know runs every spec, as
+#   does the `full-e2e` label (adding it starts a new run).
+# - A push to main (and a manual run) runs every spec on 5 shards, about 17 minutes: the full run after each merge.
+#
+# Each shard runs whole spec files, spread by their measured time (e2e/ci-shard.mjs, e2e/ci-timings.json). The `result`
+# job puts one summary on the run's page (flaky tests first, then failed ones, each with its shard and error;
+# e2e/ci-summary.ts, ci-summary-merge.mjs) and is red if the plan or any shard is.
 #
 # Retries: 1 here until the flaky-test batch lands (the goal is 0, as playwright.config.ts has it). A test that passes
 # on the retry is "flaky": listed at the top of the summary, never hidden. Traces only on that retry (recording every
@@ -11,12 +19,13 @@
 # Left out here: the @perf specs (e2e/perf.spec.ts), whose frame budgets depend on the machine's speed. Run them
 # locally, or from Actions → e2e → Run workflow with "perf" ticked (instead of the suite).
 #
-# Not a required check yet: Eric decides once it has proven itself over a few PRs (then require `result`). Docs:
-# CLAUDE.md "Test lanes" and docs/areas/ops.md.
+# Not a required check yet: Eric decides once it has proven itself over a few PRs (then require `result`).
 name: e2e
 on:
   pull_request:
     branches: [main]
+    # (`labeled`: adding the full-e2e label starts a full run at once. Any other label restarts the run as it was.)
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: [main]
   workflow_dispatch:
@@ -36,22 +45,48 @@ env:
   E2E_PREBUILT: "1"
   PLAYWRIGHT_HTML_OPEN: never
   WRANGLER_SEND_METRICS: "false"
-  # (Keep in step with the matrix below.)
-  SHARDS: 5
 
 jobs:
-  shard:
+  # Which spec files this run tests and on how many shards (e2e/ci-select.mjs: plain Node, so no install). A pull
+  # request's checkout is its merge commit; its first parent is main as it is now, so the diff is what the PR changes.
+  plan:
     if: ${{ !inputs.perf }}
-    name: shard ${{ matrix.shard }} of 5
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      specs: ${{ steps.plan.outputs.specs }}
+      total: ${{ steps.plan.outputs.total }}
+      shards: ${{ steps.plan.outputs.shards }}
+      note: ${{ steps.plan.outputs.note }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'full-e2e') }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then node e2e/ci-select.mjs full "this is a $EVENT run, which tests everything"
+          elif [ "$FULL_LABEL" = true ]; then node e2e/ci-select.mjs full "the pull request has the full-e2e label"
+          else node e2e/ci-select.mjs diff HEAD^1
+          fi
+
+  shard:
+    needs: plan
+    name: shard ${{ matrix.shard }} of ${{ needs.plan.outputs.total }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
     env:
-      E2E_SHARD_LABEL: Shard ${{ matrix.shard }} of 5
+      E2E_SHARD_LABEL: Shard ${{ matrix.shard }} of ${{ needs.plan.outputs.total }}
       E2E_SUMMARY_FILE: ${{ github.workspace }}/e2e-summary/shard-${{ matrix.shard }}.json
+      # The plan's spec files (empty: every spec file).
+      SPECS: ${{ needs.plan.outputs.specs }}
+      TOTAL: ${{ needs.plan.outputs.total }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -72,10 +107,12 @@ jobs:
         run: npx playwright install --with-deps --only-shell chromium
       - name: Build the app
         run: npm run build
-      - name: Run shard ${{ matrix.shard }} of 5
+      - name: Run shard ${{ matrix.shard }} of ${{ needs.plan.outputs.total }}
         run: |
-          files=$(node e2e/ci-shard.mjs ${{ matrix.shard }} "$SHARDS")
+          files=$(node e2e/ci-shard.mjs ${{ matrix.shard }} "$TOTAL" $SPECS)
           echo "Files: $files"
+          # (No files would run the whole suite here: never expected, as the plan has a file for every shard.)
+          [ -n "$files" ] || { echo "No spec files for this shard"; exit 1; }
           npx playwright test $files --grep-invert @perf --forbid-only --retries 1 --trace on-first-retry \
             --reporter=list,github,html,./e2e/ci-summary.ts
       - name: Keep the summary
@@ -100,9 +137,12 @@ jobs:
 
   result:
     if: ${{ !cancelled() && !inputs.perf }}
-    needs: shard
+    needs: [plan, shard]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      NOTE: ${{ needs.plan.outputs.note }}
+      TOTAL: ${{ needs.plan.outputs.total }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -114,9 +154,10 @@ jobs:
           path: e2e-summary
           merge-multiple: true
       - name: Summary
-        run: node e2e/ci-summary-merge.mjs "$SHARDS" e2e-summary >> "$GITHUB_STEP_SUMMARY"
-      - name: Every shard green
-        if: ${{ needs.shard.result != 'success' }}
+        if: ${{ needs.plan.result == 'success' }}
+        run: node e2e/ci-summary-merge.mjs "$TOTAL" e2e-summary "$NOTE" >> "$GITHUB_STEP_SUMMARY"
+      - name: The plan and every shard green
+        if: ${{ needs.plan.result != 'success' || needs.shard.result != 'success' }}
         run: exit 1
 
   perf:

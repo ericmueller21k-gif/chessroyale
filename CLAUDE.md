@@ -53,35 +53,51 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
   3. **Use our servers when they're truly needed:** too few capable devices, devices disagreeing, or a check that
      must be beyond any player's reach. Never skimp on the server when it's needed; never use it when a device would
      do.
-- Never merge red: every PR runs the typecheck and unit tests on GitHub (`.github/workflows/check.yml`) and the whole
-  e2e suite (`.github/workflows/e2e.yml`); wait for `check` to pass and read the e2e run's result before merging
-  anything that changes gameplay or screens.
-- **Test lanes** (Eric, Oct 13: "why are we going through so many checks for changing numbers?"):
-  - **CI runs the full e2e on every PR; local runs are for targeted checks and perf** (Oct 15). The `e2e` workflow
-    runs the whole suite, both projects, on every PR to `main` and every push to `main`: 5 runners, about 17 minutes
-    (docs/areas/ops.md). CI retries a failed test once until the flaky-test batch lands (the goal is no retries);
-    its `result` job lists flaky tests (passed only on the retry) first, then failed ones, each with its shard,
-    `file:line`, project and error. Not a required check yet (the director decides when). Flakes only: "Re-run
-    failed jobs" once; a test that fails again is real. Locally, run just the specs you're working on, and the
-    `@perf` specs (frame budgets, which CI leaves out: `npx playwright test --grep @perf --project phone`), under the
-    shared e2e lock. The lanes below say which specs a change must have passed; CI runs them all on the PR anyway.
-  - **Light lane** (numbers or data in settings or vote data, copy, CSS-only, docs): `check`, plus the e2e specs for
-    the screens touched, plus the live check after the deploy. No sims: estimate instead.
-  - **Targeted lane** (pre-launch default for logic: rules, the board, shared components, screens, boss powers):
-    `check`, plus the e2e specs of every area the change touches (the PR lists them and why), plus the live check.
-    Eric, Oct 14: "if an agent is confident in its code we can reduce token usage and testing to a minimum". What a
-    change touches decides its lane, never how confident its author is: the misses (the resign confirm over the
-    board, Wrangler's showdown never firing, Oct 13-14) were all confident code.
-  - **Batch full run:** CI's run on each push to `main` is the full run (until Oct 15 the director ran `npm run e2e`
-    locally); the director checks those runs after a batch of targeted-lane merges, at least once a day and before
-    Eric playtests a big feature. A red spec: re-run it once; if it's real, find the PR that caused it and fix it
-    forward (or revert) before the next batch.
-  - **Full lane per PR** (the whole suite green before merging: the PR's own e2e run) stays for the riskiest: stored
-    data (D1 schema, migrations), money, odds and wallets, sign-in and security, the client-server protocol, and
-    anything the director marks.
+- Never merge red: every PR runs the typecheck and unit tests on GitHub (`.github/workflows/check.yml`) and the e2e
+  fast check (`.github/workflows/e2e.yml`: the specs of the areas it changes plus a smoke set); wait for `check` to pass
+  and read the e2e run's result before merging anything that changes gameplay or screens.
+- **Test lanes** (Eric, Oct 13: "why are we going through so many checks for changing numbers?"; Oct 18: "This game
+  will never finish unless we work together to figure out a way to stop all these tests for every tiny thing taking an
+  entire day. I should be able to tell you to add a boss and it should take an hour of a few agents running in
+  parallel to finish and push, the testing is getting out of hand."):
+  - **A trial** (Eric, Oct 18: "make a note that it's a test still and we may revert to our ways if quality
+    degrades"). If quality drops, meaning bugs reach Eric's playtests that the old process would have caught, we go
+    back to the previous rules: they're kept word for word in `docs/decisions/2026-10-18-faster-pipeline.md`.
+  - **CI: the fast check on PRs, the full suite on main** (Oct 18). On a PR the `e2e` workflow runs the specs of the
+    areas the PR changes plus a smoke set (the app boots, a solo battle plays, a lobby works, and every boss's smoke
+    once the boss kit lands): about 6 to 8 minutes on the usual PR. `e2e/areas.json` maps paths to specs; a shared
+    foundation (package.json, the lockfile, the Playwright config, `packages/core`, the runner, the protocol, the board,
+    …) or a path it doesn't know runs the whole suite, and so does the `full-e2e` label. Every push to `main` runs the
+    whole suite, both projects, on 5 runners (about 17 minutes). `docs/areas/ops.md`, "CI e2e". A new boss (or any new
+    area) adds its paths and spec to `e2e/areas.json`, or its PRs keep running everything. CI retries a failed test
+    once until the flaky-test batch lands (the goal is no retries); its `result` job lists flaky tests (passed only on
+    the retry) first, then failed ones, each with its shard, `file:line`, project and error. Not a required check yet
+    (the director decides when). Flakes only: "Re-run failed jobs" once; a test that fails again is real. Locally, run
+    just the specs you're working on, and the `@perf` specs (frame budgets, which CI leaves out:
+    `npx playwright test --grep @perf --project phone`), under the shared e2e lock.
+  - **The director checks main's full run after every merge** and fixes red forward right away, before the next merge
+    (or reverts). A red spec: re-run it once; if it's real, find the PR that caused it and fix it forward.
+  - **Light lane** (numbers or data in settings or vote data, copy, CSS-only, docs): `check` and the PR's e2e run, plus
+    the live check after the deploy. No sims: estimate instead.
+  - **Targeted lane** (pre-launch default for logic: rules, the board, shared components, screens): `check` and the
+    PR's e2e run (the touched areas' specs: the PR lists them and why), plus the live check. Eric, Oct 14: "if an agent
+    is confident in its code we can reduce token usage and testing to a minimum". What a change touches decides its
+    lane, never how confident its author is: the misses (the resign confirm over the board, Wrangler's showdown never
+    firing, Oct 13-14) were all confident code.
+  - **Boss lane** (boss content: powers, ults, art, wiring; Eric, Oct 18): targeted, plus the shared boss test kit
+    (`packages/chess/test/boss-kit.test.ts`, `e2e/boss-smoke.spec.ts`), plus one quick review pass by a fresh helper
+    (about 30 minutes, read-only, no fuzz marathons). No fix/re-review loops: its findings go into the same PR or a
+    follow-up, and the author doesn't wait for a second review.
+  - **Full lane** (the whole suite on the PR: add the `full-e2e` label; plus an independent review and delta
+    re-reviews) stays for: stored data (D1 schema, migrations), money, odds and wallets, sign-in and security, fair
+    play, changes to the shared client-server protocol's core (not a boss's optional fields), and anything the
+    director marks.
+  - **Helper testing budget** (Eric, Oct 18): prove a change with the fast checks (typecheck, the unit tests of the
+    packages you touched), the touched area's e2e and the boss kit. No fuzz marathons or mutation runs unless the lane
+    asks for them. One sim run at one setting. One set of visuals at the end. Aim for about an hour per helper.
   - When unsure, the targeted lane, and say so in the PR: the director decides.
   - **Pre-launch only.** `main` deploys to Eric alone (Zero Trust), so a slip costs a playtest, not players. At
-    launch every logic change goes back to the full lane per PR.
+    launch every logic change goes back to the full lane per PR, and PRs go back to the full suite.
 - Classic (8 boards) will be reworked (Eric, Oct 5, 2026): don't invest in it until he decides the new design.
 - Merge PRs with a **merge commit**, not squash: the working branch then stays part of `main`'s history, so the next
   push is a plain fast-forward (squash merges left the branch diverged, needing a force-push). After merging, bring
@@ -119,7 +135,10 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
     with a clear fix and a test.
 - **Working lean (Eric, Oct 17):** most of a helper's usage is re-reading its own history at every step (measured Oct
   17: the costliest helpers re-read 300 to 500 million tokens each and wrote 7 to 40 thousand), so steps times
-  history is what to keep down. Never at the cost of a check: tests, reviews, the CI gate and effort stay as they are.
+  history is what to keep down. Checks are sized to the risk, not maxed out (Eric, Oct 18: "the testing is getting
+  out of hand"; "I should be able to tell you to add a boss and it should take an hour of a few agents running in
+  parallel to finish and push"): each change gets exactly what its lane and the helper testing budget under "Test
+  lanes" ask for, no more and no less, at the effort its task calls for. A trial: see "Test lanes".
   - A review round, or a fix round after a merge, goes to a fresh helper with a one-page handoff (the PR, the
     findings, the files), not to a resumed one carrying hundreds of thousands of tokens. A helper mid-task keeps going.
   - Waiting (CI, a deploy, a local run) is one background command that reports when it's done, never a loop of looks.
@@ -190,7 +209,8 @@ npm test                                       # vitest (engine tests run real S
 npm run typecheck
 npm run dev                                    # app dev server (solo only; no API)
 npx wrangler dev                               # app + API + Durable Objects at http://localhost:8787
-npm run e2e                                    # Playwright, the whole suite (CI runs it on every PR)
+npm run e2e                                    # Playwright, the whole suite (CI runs it on every push to main)
+node e2e/ci-select.mjs files <path>...         # which e2e specs a PR changing these paths runs (e2e/areas.json)
 npx playwright test e2e/solo.spec.ts           # one spec (locally: under the shared e2e lock)
 npx playwright test --grep @perf --project phone   # the perf specs (frame budgets; CI leaves them out)
 npm run simulate                               # bot simulation -> reports/playtest.md (about 1–2 hours)

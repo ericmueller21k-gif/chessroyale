@@ -65,8 +65,9 @@ If you need one of those changed, say what and why, and stop.
   boss is in the game, watch it frame by frame on a phone viewport with Playwright (`npm run frames:boss`).
 - **Test it.** The character tests check palettes, cues and that nothing is cut off at a frame's edge. Add a unit test
   for each event-to-animation rule, and an e2e case once a boss is on screen. Run `npm test` and `npm run typecheck`,
-  and locally only the e2e specs you touched (under the shared e2e lock). CI runs the whole e2e suite on the PR
-  (`.github/workflows/e2e.yml`): read its `result` before merging anything that changes a screen.
+  and locally only the e2e specs you touched (under the shared e2e lock). CI runs the e2e fast check on the PR (the
+  touched areas' specs plus the smoke set; the whole suite on main after the merge): read its `result` before merging
+  anything that changes a screen. A new boss adds its own area (its files and spec) to `e2e/areas.json`.
 - **Record it** in a new file in `docs/decisions/`: what you built and any call you made, with the reason. Keep
   `docs/areas/bosses.md` true.
 - **Ship it** per `CLAUDE.md`: PR, wait for `check`, merge with a merge commit.
