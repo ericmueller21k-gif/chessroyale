@@ -1,11 +1,30 @@
+import { useEffect, useState } from "preact/hooks";
 import type { NetMatch } from "../net.ts";
 import { QueueScreen } from "./Queue.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { LobbyChat } from "../components/LobbyChat.tsx";
 import { InviteFriends } from "../components/Friends.tsx";
 
+/** The lobby whose invite link home's Get friend code copied (its code), for the note under the code. */
+let copiedFor: string | null = null;
+const copiedListeners = new Set<() => void>();
+export function noteLinkCopied(code: string) {
+  copiedFor = code;
+  for (const fn of copiedListeners) fn();
+}
+function useLinkCopied(code: string) {
+  const [, set] = useState(0);
+  useEffect(() => {
+    const fn = () => set((n) => n + 1);
+    copiedListeners.add(fn);
+    return () => void copiedListeners.delete(fn);
+  }, []);
+  return copiedFor === code;
+}
+
 export function LobbyScreen({ match, onLeave, onLetBotsFill }: { match: NetMatch; onLeave: () => void; onLetBotsFill?: () => void }) {
   // Matchmade (PLAY): the queue, not a lobby.
+  const copied = useLinkCopied(match.code);
   if (match.auto) return <QueueScreen match={match} onCancel={onLeave} onLetBotsFill={onLetBotsFill} />;
   const humans = match.players.filter((p) => !p.isBot);
   const share = async () => {
@@ -22,6 +41,11 @@ export function LobbyScreen({ match, onLeave, onLetBotsFill }: { match: NetMatch
       <div class="invite">
         <div class="muted small">Invite friends with the link or the code</div>
         <div class="invite-code">{match.code}</div>
+        {copied && (
+          <div class="muted small" role="status">
+            Invite link copied: paste it to your friends
+          </div>
+        )}
         <button type="button" class="btn btn-secondary btn-wide" onClick={share}>
           Share invite link
         </button>

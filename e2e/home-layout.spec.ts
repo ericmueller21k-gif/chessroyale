@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { named, test } from "./helpers.ts";
+import { named, test, pickMode } from "./helpers.ts";
 
 /**
  * Light or dark, and the computer's home with its queue in place (DECISIONS.md, "Light and dark, a switch", "A cleaner
@@ -83,7 +83,7 @@ test("light or dark lives in Settings (Match device / Light / Dark), not on home
   expect(await sideways(page)).toBe(0);
 });
 
-test("computer: the play column in the phone's order (the RANKED row, PLAY, the Boss raid card, Play with friends); no Shop or Profile buttons", async ({ page }) => {
+test("computer: the play column in the phone's order (the Boss raid card, the RANKED row, its panel, PLAY at the bottom); PLAY dimmed until a mode is picked; no Shop, Profile or Play with friends buttons", async ({ page }) => {
   test.skip(!desktop(), "the computer's layout");
   await named(page, "Columned");
   const main = page.getByRole("main");
@@ -96,37 +96,41 @@ test("computer: the play column in the phone's order (the RANKED row, PLAY, the 
     await page.goto("/");
     const play = main.getByRole("button", { name: "PLAY", exact: true });
     await expect(play).toBeVisible();
-    // The shop and your profile: the side menu's, not repeated on home.
+    // Nothing picked yet: PLAY dimmed, the panel says to pick a mode (Eric, Oct 18).
+    await expect(play).toBeDisabled();
+    await expect(page.locator(".fd-mode-panel")).toHaveText("Tap a mode above to play");
+    await pickMode(page, "50 v 50");
+    await expect(play).toBeEnabled();
+    // The shop, your profile and Play with friends: the side menu's, not repeated on home.
     await expect(main.getByRole("button", { name: "Shop & crates" })).toHaveCount(0);
     await expect(main.getByRole("button", { name: "Profile", exact: true })).toHaveCount(0);
+    await expect(main.getByRole("button", { name: "Play with friends" })).toHaveCount(0);
     const menu = page.getByRole("navigation", { name: "Menu" });
     await expect(menu.getByRole("button", { name: "Shop & crates" })).toBeVisible();
     await expect(menu.getByRole("button", { name: "Profile" })).toBeVisible();
-    // Top to bottom, as on a phone (Eric, Oct 18): the RANKED row, its panel (matchmaking), PLAY, its line, the Boss
-    // raid card (full width), Play with friends.
+    await expect(menu.getByRole("button", { name: "Play with friends" })).toBeVisible();
+    // Top to bottom, as on a phone (Eric, Oct 18): the Boss raid card (full width), the RANKED row, its panel
+    // (matchmaking), PLAY and its line at the bottom.
     const box = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!;
-    const friends = await box(main.getByRole("button", { name: "Play with friends" }));
     const boss = await box(main.getByRole("button", { name: /^Boss raid/ }));
     const modes = await box(main.getByRole("radiogroup", { name: "RANKED" }));
     const types = await box(main.getByRole("radiogroup", { name: "Matchmaking" }));
     const p = await box(play);
     const hint = await box(page.locator(".fd-hint"));
-    expect(friends.height).toBeGreaterThanOrEqual(44);
     expect(boss.height).toBeGreaterThanOrEqual(60);
     expect(Math.abs(boss.width - modes.width), `${w}: the card full width`).toBeLessThan(2);
+    expect(boss.y + boss.height, `${w}: the card above the modes`).toBeLessThanOrEqual(modes.y);
     expect(modes.y + modes.height).toBeLessThanOrEqual(types.y);
     expect(types.y + types.height, `${w}: the modes right above PLAY`).toBeLessThanOrEqual(p.y);
     expect(p.y - (types.y + types.height)).toBeLessThan(30);
     expect(hint.y).toBeGreaterThanOrEqual(p.y + p.height);
-    expect(boss.y, `${w}`).toBeGreaterThanOrEqual(hint.y + hint.height);
-    expect(friends.y, `${w}`).toBeGreaterThanOrEqual(boss.y + boss.height);
     await expect(page.locator(".fd-hint")).toHaveText(/Starts within|Usually about|Solo vs/);
     if (w >= 1280) {
-      // Beside your card: Play with friends ends level with the card's bottom, and the room above is free (for a live game).
+      // Beside your card: PLAY's line ends level with the card's bottom, and the room above is free (for a live game).
       const card = await box(page.locator(".fd-hero"));
-      expect(Math.abs(friends.y + friends.height - (card.y + card.height)), `${w}: the column's foot level with the card's`).toBeLessThan(12);
-      expect(modes.y - card.y, `${w}: room above`).toBeGreaterThan(200);
-      expect(friends.x).toBeGreaterThanOrEqual(card.x + card.width);
+      expect(Math.abs(hint.y + hint.height - (card.y + card.height)), `${w}: the column's foot level with the card's`).toBeLessThan(12);
+      expect(boss.y - card.y, `${w}: room above`).toBeGreaterThan(200);
+      expect(p.x).toBeGreaterThanOrEqual(card.x + card.width);
     }
     expect(await sideways(page), `${w}`).toBe(0);
   }
@@ -191,6 +195,7 @@ test("computer: PLAY fills the queue in place (the menu, the live panel and your
     expect(hero.y).toBeLessThan(40);
     expect(await sideways(page), `home ${w}`).toBe(0);
 
+    await pickMode(page);
     await page.getByRole("button", { name: "PLAY", exact: true }).click();
     await expect(page.locator(".fd-seats .fd-seat")).toHaveCount(100);
     await expect(page.getByText("You're in · seat 1")).toBeVisible();
@@ -248,6 +253,7 @@ test("computer: PLAY fills the queue in place (the menu, the live panel and your
 
   // Into a match from the lobby in place: the bots fill (8 s here), then the match's own screen.
   await page.goto(`/?debug&pool=inplace-go-${run}`);
+  await pickMode(page);
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(page.locator(".fd-seats")).toBeVisible();
   await expect(page.locator(".fd-count-n")).toHaveText("100", { timeout: 20_000 });
@@ -261,6 +267,7 @@ test("computer: in the queue, your profile opens over it; another menu item leav
   await named(page, "Wanderer");
   const menu = page.getByRole("navigation", { name: "Menu" });
   await page.goto(`/?debug&pool=inplace-menu-${run}`);
+  await pickMode(page);
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(page.locator(".fd-seats")).toBeVisible();
   // Your profile: over the queue, which carries on underneath.
@@ -286,6 +293,7 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   ] as const) {
     await page.setViewportSize({ width: w, height: h });
     await page.goto(`/?debug&pool=phonefit-${w}-${run}`);
+    await pickMode(page);
     await page.getByRole("button", { name: "PLAY", exact: true }).click();
     await expect(page.locator(".fd-seats .fd-seat")).toHaveCount(100);
     const chat = page.locator(".fd-queue .qchat-lobby");
@@ -314,6 +322,7 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto(`/?debug&pool=phonequeue-${run}`);
   await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile" })).toBeVisible();
+  await pickMode(page);
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(page.locator(".fd-seats .fd-seat")).toHaveCount(100);
   const vw = page.viewportSize()!.width;
@@ -339,27 +348,30 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   expect(await sideways(page)).toBe(0);
 });
 
-test("phone: home fits the screen with no scrolling from 360×640 up, in every mode; the shop and your profile are in the top bar, not under PLAY", async ({ page }) => {
+test("phone: home fits the screen with no scrolling from 360×640 up, in every mode, PLAY at the bottom; the shop, your profile and Friends are in the top bar", async ({ page }) => {
   test.skip(desktop(), "a phone's screen (Eric, Oct 18: \"should never have to be scrolling down on the phone\")");
   await named(page, LONG_NAME);
   for (const [width, height] of [[360, 640], [375, 667], [390, 664], [390, 844], [430, 932]] as const) {
     await page.setViewportSize({ width, height });
     await page.goto("/");
     await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
-    for (const mode of ["50 v 50", "1 v 1", "Squads"]) {
-      await page.getByRole("radio", { name: new RegExp(`^${mode}`) }).click();
+    for (const mode of ["", "50 v 50", "1 v 1", "Squads"]) {
+      if (mode) await pickMode(page, mode);
       const fit = await page.evaluate(() => ({
         scroll: document.documentElement.scrollHeight - innerHeight,
-        foot: document.querySelector(".fd-actions")!.getBoundingClientRect().bottom <= innerHeight,
+        // (PLAY's line, home's last box, on screen; the Boss raid card above the RANKED row.)
+        foot: document.querySelector(".fd-hint")!.getBoundingClientRect().bottom <= innerHeight,
+        order: document.querySelector(".rd-card")!.getBoundingClientRect().bottom <= document.querySelector(".fd-ranked")!.getBoundingClientRect().top,
         pawn: document.querySelector(".fd-hero .fd-pawn")!.getBoundingClientRect().height,
       }));
-      expect(fit.scroll, `${width}×${height}, ${mode}: scrolling`).toBeLessThanOrEqual(0);
-      expect(fit.foot, `${width}×${height}, ${mode}: Play with friends on screen`).toBe(true);
-      expect(fit.pawn, `${width}×${height}, ${mode}: your pawn`).toBeGreaterThanOrEqual(48);
+      expect(fit.scroll, `${width}×${height}, ${mode || "no mode"}: scrolling`).toBeLessThanOrEqual(0);
+      expect(fit.foot, `${width}×${height}, ${mode || "no mode"}: PLAY's line on screen`).toBe(true);
+      expect(fit.order, `${width}×${height}: the Boss raid card above the modes`).toBe(true);
+      expect(fit.pawn, `${width}×${height}, ${mode || "no mode"}: your pawn`).toBeGreaterThanOrEqual(48);
     }
-    // (Under the Boss raid card: Play with friends alone.)
-    await expect(page.locator(".fd-actions").getByRole("button")).toHaveText(["Play with friends"]);
-    await expect(page.locator(".fd-top").getByRole("button", { name: "Shop & crates" })).toBeVisible();
+    await expect(page.getByRole("main").getByRole("button", { name: "Play with friends" })).toHaveCount(0);
+    await expect(page.locator(".fd-top").getByRole("button", { name: /^Shop & crates/ })).toBeVisible();
+    await expect(page.locator(".fd-top").getByRole("button", { name: /^Friends/ })).toBeVisible();
   }
 });
 
@@ -404,7 +416,7 @@ const bigBalance = (page: Page) =>
     await route.fulfill({ response: res, json: body });
   });
 
-test("phone: the top bar's shop and gear open the shop and Settings in one tap (Back is home); they fit beside the coins and your pawn from 320 px", async ({ page }) => {
+test("phone: the top bar's coins and gear open the shop and Settings in one tap (Back is home); Friends and the gear fit beside the coins and your pawn from 320 px", async ({ page }) => {
   test.skip(desktop(), "the phone's top bar (a computer has Settings in its side menu)");
   await named(page, LONG_NAME);
   await bigBalance(page);
@@ -414,20 +426,20 @@ test("phone: the top bar's shop and gear open the shop and Settings in one tap (
     await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
     const bar = page.locator(".fd-top");
     await expect(bar.getByLabel("99999 coins")).toBeVisible();
-    // Logo, coins, pawn, shop, gear: in order, apart, inside the bar; the shop and the gear a full 44 px (40 below 360 px).
+    // Logo, coins (the shop), pawn, Friends, gear: in order, apart, inside the bar; Friends and the gear a full 44 px (40 below 360 px).
     const fits = await bar.evaluate((el) => {
       const right = el.getBoundingClientRect().right - parseFloat(getComputedStyle(el).paddingRight);
-      const kids = [...el.querySelectorAll(".fd-logo, .fd-coins, .fd-ring, .fd-top-shop, .fd-top-gear")].map((k) => k.getBoundingClientRect());
+      const kids = [...el.querySelectorAll(".fd-logo, .fd-coins, .fd-ring, .fd-top-friends, .fd-top-gear")].map((k) => k.getBoundingClientRect());
       return { count: kids.length, inOrder: kids.every((k, i) => i === 0 || k.left >= kids[i - 1]!.right), inside: kids.every((k) => k.right <= right + 0.5), oneRow: kids.every((k) => k.top < kids[0]!.bottom && k.bottom > kids[0]!.top) };
     });
     expect(fits, `${width} px`).toEqual({ count: 5, inOrder: true, inside: true, oneRow: true });
     const gear = (await bar.getByRole("button", { name: "Settings" }).boundingBox())!;
     expect(Math.min(gear.width, gear.height), `the gear at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
-    const shop = (await bar.getByRole("button", { name: "Shop & crates" }).boundingBox())!;
-    expect(Math.min(shop.width, shop.height), `the shop at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
+    const friends = (await bar.getByRole("button", { name: /^Friends/ }).boundingBox())!;
+    expect(Math.min(friends.width, friends.height), `Friends at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
   }
-  // One tap: the shop; Back is home.
-  await page.locator(".fd-top").getByRole("button", { name: "Shop & crates" }).click();
+  // One tap on your coins: the shop (Eric, Oct 18: "coins and shop are one button"); Back is home.
+  await page.locator(".fd-top").getByRole("button", { name: /^Shop & crates/ }).click();
   await expect(page.getByRole("heading", { name: "Shop" })).toBeVisible();
   await page.getByRole("button", { name: "Back" }).first().click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();

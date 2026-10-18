@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, named, test } from "./helpers.ts";
+import { BOARD_SEL, named, test, pickMode } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 const team = (p: Page) => p.evaluate(() => (window as any).match.standings().find((s: any) => s.isYou)?.team as "w" | "b");
@@ -140,6 +140,7 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   // Into a match (a fresh load: the picks come from the account).
   for (const p of [desk, phone]) {
     await p.goto("/?debug&pool=chat");
+    await pickMode(p);
     await p.getByRole("button", { name: "PLAY", exact: true }).click();
     await expect(p.locator(".fd-seats")).toBeVisible();
   }
@@ -278,6 +279,7 @@ test("a name's menu and the chat options stay open when the round moves on (each
   const desk = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   await named(desk, "Menus");
   await desk.goto("/?debug&pool=chatmenu");
+  await pickMode(desk);
   await desk.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => phase(desk), { timeout: 90_000 }).toMatch(/play|watching/);
   const name = desk.locator(".qchat-side .qline .qline-name").first();

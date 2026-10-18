@@ -38,17 +38,27 @@ export function shortCoins(n: number): string {
  * goes when there isn't room for it, and below 430 px a balance of 10,000 or more shows short ("12k"), so the bar
  * never runs off the screen.
  */
-export function Coins({ coins }: { coins: number | null }) {
+export function Coins({ coins, onShop }: { coins: number | null; onShop?: () => void }) {
   if (coins === null) return null;
   const full = coins.toLocaleString("en-US");
   const short = shortCoins(coins);
-  return (
-    <div class="fd-coins" aria-label={`${coins} coins`}>
+  const inner = (
+    <>
       <span class="fd-coins-n">
         <span aria-hidden="true">●</span> <span class={short !== full ? "fd-coins-full" : undefined}>{full}</span>
         {short !== full && <span class="fd-coins-short">{short}</span>}
       </span>
       <span class="fd-coins-word"> coins</span>
+    </>
+  );
+  // (A phone's top bar: your coins and the shop are one button, Eric, Oct 18.)
+  return onShop ? (
+    <button type="button" class="fd-coins fd-coins-shop" aria-label={`Shop & crates, ${coins} coins`} onClick={onShop}>
+      {inner}
+    </button>
+  ) : (
+    <div class="fd-coins" aria-label={`${coins} coins`}>
+      {inner}
     </div>
   );
 }
@@ -78,27 +88,22 @@ export function DressedPawn({
 }
 
 /** Your pawn in a gold ring: it opens your profile. */
-export function MyPawnButton({ onClick, news = 0 }: { onClick: () => void; news?: number }) {
+export function MyPawnButton({ onClick }: { onClick: () => void }) {
   const p = account().profile;
   return (
-    <button type="button" class="fd-ring" aria-label={news ? `Your profile, ${news} new` : "Your profile"} onClick={onClick}>
+    <button type="button" class="fd-ring" aria-label="Your profile" onClick={onClick}>
       <DressedPawn look={p?.locker?.look} size="ring" />
-      {news > 0 && (
-        <span class="fd-ring-news" aria-hidden="true">
-          {news}
-        </span>
-      )}
     </button>
   );
 }
 
 /** Your coins and your pawn in its ring (the home's top bar on a phone; the top right of the page on a computer). */
-export function AccountBar({ onProfile, news }: { onProfile: () => void; news?: number }) {
+export function AccountBar({ onProfile, onShop }: { onProfile: () => void; onShop?: () => void }) {
   const p = account().profile;
   return (
     <div class="fd-top-right">
-      <Coins coins={p?.shop?.coins ?? null} />
-      <MyPawnButton onClick={onProfile} news={news} />
+      <Coins coins={p?.shop?.coins ?? null} onShop={onShop} />
+      <MyPawnButton onClick={onProfile} />
     </div>
   );
 }
@@ -111,11 +116,13 @@ export const GearIcon = () => (
   </svg>
 );
 
-/** The shop: a bag, drawn as the gear is (the phone's top bar). */
-export const ShopIcon = () => (
+/** Friends: two people, drawn as the gear is (the phone's top bar). */
+export const FriendsIcon = () => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M5 8h14l-1 12.2a1 1 0 0 1-1 .8H7a1 1 0 0 1-1-.8z" />
-    <path d="M9 10V7a3 3 0 0 1 6 0v3" />
+    <circle cx="9" cy="8" r="3.2" />
+    <path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
+    <circle cx="17" cy="9" r="2.6" />
+    <path d="M16 13.6c2.8.2 5 2.2 5 5" />
   </svg>
 );
 

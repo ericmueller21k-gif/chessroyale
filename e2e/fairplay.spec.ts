@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { createLobbyFromHome, joinFromInvite, named, test } from "./helpers.ts";
+import { createLobbyFromHome, joinFromInvite, named, test, pickMode } from "./helpers.ts";
 
 /** The automated reviewer's token in the local Worker (playwright.config.ts). */
 const REVIEW = { authorization: "Bearer e2e-review-token-0123456789" };
@@ -25,6 +25,7 @@ test("a banned account: PLAY, a new lobby and an invite show the ban notice with
   expect(await admin.text()).toBe("Not found");
 
   // PLAY (Default): the ban notice, not a queue.
+  await pickMode(page);
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   const notice = page.getByRole("dialog", { name: "Your account can't play online" });
   await expect(notice).toBeVisible();
@@ -43,6 +44,7 @@ test("a banned account: PLAY, a new lobby and an invite show the ban notice with
   await expect(notice).toHaveCount(0);
 
   // Again: the notice remembers the appeal.
+  await pickMode(page);
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(notice).toContainText("Your appeal is with us");
   await notice.getByRole("button", { name: "Close" }).click();
@@ -73,6 +75,7 @@ test("a banned account: PLAY, a new lobby and an invite show the ban notice with
 
   // Solo stays open: the queue fills with bots and the match begins.
   await page.goto("/?debug&pool=fairplay");
+  await pickMode(page);
   await page.getByRole("radio", { name: /^Solo/ }).click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(page.locator(".fd-seats")).toBeVisible();

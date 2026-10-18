@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { createLobbyFromHome, named, test } from "./helpers.ts";
+import { createLobbyFromHome, named, test, openPlayWithFriends } from "./helpers.ts";
 
 /**
  * Closing finished lobbies (DECISIONS.md, "Closing finished lobbies"): results stay up for a while (here `keep`
@@ -120,7 +120,7 @@ test("Home or Play again from results: the address is / again, so reopening the 
 
 test("a code typed into Join that leads nowhere: \"Can't join\", not an endless \"Connecting…\"", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
+  await openPlayWithFriends(page);
   await page.getByRole("textbox", { name: "Lobby code" }).fill("ZZZZZ");
   await page.getByRole("button", { name: "Join lobby" }).click();
   await expect(page.getByRole("heading", { name: "Can't join" })).toBeVisible({ timeout: 15_000 });

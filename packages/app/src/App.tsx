@@ -1019,7 +1019,7 @@ export function App() {
     canCreate: () => !match && !squads,
     create: async () => {
       // (The Boss raid screen: a raid. 1 v 1 has no lobbies: 50 v 50's.)
-      const picked = chosenHomeMode();
+      const picked = chosenHomeMode() ?? "crowd";
       const mode = raidOpen ? "raid" : picked === "squads" ? "squads" : lobbyModeOf(picked);
       goHome();
       if (mode !== "squads") {
@@ -1310,10 +1310,11 @@ export function App() {
         onlineLocked={mustSignInToPlayOnline()}
         onPlay={(mode, type) => leavingDuelFirst(() => void playNow(mode, type))}
         onSolo={(mode, opts) => leavingDuelFirst(() => void startSolo(mode, opts))}
-        onCreateLobby={(mode) => leavingDuelFirst(() => void createLobby(mode))}
+        onCreateLobby={(mode, made) => leavingDuelFirst(() => void createLobby(mode).then((code) => made?.(code ?? null)))}
         onJoinLobby={(code) => leavingDuelFirst(() => joinLobby(code, { typed: code !== inviteCode }))}
         onSquads={() => leavingDuelFirst(() => void squadsPlay())}
         onParty={openParty}
+        onFriends={nav.friendsList}
         onSignIn={() => chooseGuest(false)}
         onProfile={() => openProfile({ you: true, name: account().profile?.user.name ?? "" })}
         onSettings={() => setShowSettings(true)}

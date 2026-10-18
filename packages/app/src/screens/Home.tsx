@@ -8,7 +8,7 @@ import { BossBrainPicker } from "../components/BossBrain.tsx";
 import { isAdmin, maiaAllowed, maiaLikely, pickedBrain, rememberBrain } from "../boss-brain.ts";
 import { prefetchMaia } from "../maia.ts";
 import type { ComponentChildren } from "preact";
-import { AccountBar, BackButton, DressedPawn, FdButton, GearIcon, LiveLine, Logo, RankLine, ShopIcon, wearingNames } from "../components/FrontDoor.tsx";
+import { AccountBar, BackButton, DressedPawn, FdButton, FriendsIcon, GearIcon, LiveLine, Logo, RankLine, wearingNames } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
 import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/BossSelect.tsx";
 import { BossFace } from "../components/BossCharacter.tsx";
@@ -17,6 +17,8 @@ import { useMedia } from "../components/QuickChat.tsx";
 import { LiveWindow } from "../components/LiveWindow.tsx";
 import { LIVE_WINDOW_MEDIA } from "../bot-replays.ts";
 import { friendsBadge, useFriends } from "../friends.ts";
+import { FriendsBadge } from "../components/Friends.tsx";
+import { noteLinkCopied } from "./Lobby.tsx";
 import { testParams } from "../test-switches.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
@@ -256,18 +258,15 @@ function homeModeOf(v: string | null): HomeMode | null {
   return v === "squads" || v === "1v1" || v === "classic" || v === "crowd" ? v : null;
 }
 
+/** The mode picked on home since the app opened (none when it opens: Eric, Oct 18, "the way you actually queue is by having to tap the mode"). */
+let sessionPick: HomeMode | null = null;
+
 /**
- * The pick the home screen shows: the address's ?mode=, else this device's last pick, else 50 v 50. (?mode=raid opens
- * the Boss raid screen instead: `raidInUrl`; the row then shows the device's pick.)
+ * The pick the home screen shows: the address's ?mode=, else the pick made since the app opened, else none (PLAY waits
+ * for one). (?mode=raid opens the Boss raid screen instead: `raidInUrl`.)
  */
-export function chosenHomeMode(): HomeMode {
-  const linked = homeModeOf(new URLSearchParams(location.search).get("mode"));
-  if (linked) return linked;
-  try {
-    return homeModeOf(localStorage.getItem(MODE_KEY)) ?? "crowd";
-  } catch {
-    return "crowd";
-  }
+export function chosenHomeMode(): HomeMode | null {
+  return homeModeOf(new URLSearchParams(location.search).get("mode")) ?? sessionPick;
 }
 
 /** ?mode=raid (old links, tests): home opens on the Boss raid screen. */
@@ -275,6 +274,27 @@ export const raidInUrl = () => new URLSearchParams(location.search).get("mode") 
 
 /** The mode a lobby made from home is in: the pick's, 1 v 1's being 50 v 50's (1 v 1 has no lobbies). */
 export const lobbyModeOf = (m: HomeMode): ModeChoiceId => (m === "classic" ? "classic" : "crowd");
+
+/**
+ * Copies a new lobby's invite link (`code`: its code, once the server has made it). A phone's browser copies only during
+ * the tap, so the copy starts now with the link to come (a ClipboardItem holding a promise); where that isn't supported,
+ * it copies when the code arrives. The lobby screen then says it's copied (`noteLinkCopied`).
+ */
+function copyInviteLink(code: Promise<string>) {
+  const link = code.then((c) => `${location.origin}/lobby/${c}`);
+  const done = () => void code.then(noteLinkCopied);
+  const later = () => link.then((l) => navigator.clipboard.writeText(l)).then(done, () => {});
+  try {
+    if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+      const item = new ClipboardItem({ "text/plain": link.then((l) => new Blob([l], { type: "text/plain" })) });
+      navigator.clipboard.write([item]).then(done, later);
+      return;
+    }
+  } catch {
+    // (A browser without promised clipboard items: copy when the code arrives.)
+  }
+  void later();
+}
 
 /**
  * Play with friends: a lobby with a code (in the mode picked on the home screen), joining one, and practice
@@ -289,6 +309,7 @@ function FriendsSheet({
   onCreate,
   onJoin,
   onSignIn,
+  onFriends,
   onClose,
 }: {
   mode: ModeChoiceId;
@@ -300,15 +321,20 @@ function FriendsSheet({
   onCreate: () => void;
   onJoin: (code: string) => void;
   onSignIn: () => void;
+  /** Your friends list (a phone's way there: Eric, Oct 18). */
+  onFriends: () => void;
   onClose: () => void;
 }) {
   const [code, setCode] = useState(initialCode ?? "");
+  const { status } = useFriends();
+  const news = friendsBadge();
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
   }, []);
-  const label = mode === "raid" ? "Create a raid" : mode === "classic" ? "Create a Classic lobby" : "Create a lobby";
+  // (A friend code: a lobby made for you and your friends, its link copied to share: Eric, Oct 18.)
+  const label = mode === "raid" ? "Create a raid" : mode === "classic" ? "Get a Classic friend code" : "Get friend code";
   return (
     <div class="fd-sheet-scrim" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div class="fd-sheet" role="dialog" aria-modal="true" aria-labelledby="friends-title">
@@ -329,7 +355,7 @@ function FriendsSheet({
           <>
             {!initialCode && (
               <>
-                <p class="fd-sub">{resting ?? "Make a lobby and share its code. Empty seats fill with bots when you start."}</p>
+                <p class="fd-sub">{resting ?? (mode === "raid" ? "Make a lobby and share its code. Empty seats fill with bots when you start." : "Makes a lobby and copies its link: send it to your friends. Empty seats fill with bots when you start.")}</p>
                 <FdButton primary disabled={loading || !!resting} onClick={onCreate}>
                   {label}
                 </FdButton>
@@ -350,6 +376,12 @@ function FriendsSheet({
               </FdButton>
             </div>
           </>
+        )}
+        {/* (Your friends list: requests, who's online, inviting one. Not for guests who can't have friends.) */}
+        {!initialCode && status !== "off" && status !== "signIn" && (
+          <button type="button" class="fd-row-link fd-sheet-friends" onClick={onFriends}>
+            Your friends <FriendsBadge n={news} /> ›
+          </button>
         )}
         {/* (Practicing against bots is Solo now, on the home screen.) */}
       </div>
@@ -470,6 +502,7 @@ export function HomeScreen({
   onPlay,
   onSolo,
   onCreateLobby,
+  onFriends,
   onJoinLobby,
   onRanked1v1,
   onSquads,
@@ -502,7 +535,10 @@ export function HomeScreen({
   onPlay: (mode: "crowd" | "raid", type: Exclude<MatchmakingType, "solo">) => void;
   /** PLAY, Solo, or a Solo raid: you and bots, in your browser (`fill`: the queue screen first). Boss alone: you against a boss you pick. */
   onSolo: (mode: ModeChoiceId, opts?: { fill?: boolean }) => void;
-  onCreateLobby: (mode: ModeChoiceId) => void;
+  /** Make a lobby; `made` hears its code once it's open (null if it couldn't be made). */
+  onCreateLobby: (mode: ModeChoiceId, made?: (code: string | null) => void) => void;
+  /** Your friends list. */
+  onFriends: () => void;
   onJoinLobby: (code: string) => void;
   /** 1 v 1's PLAY: its queue. */
   onRanked1v1: () => void;
@@ -529,9 +565,10 @@ export function HomeScreen({
   const wide = useMedia(LIVE_WINDOW_MEDIA);
   useFriends();
   const friendsNews = friendsBadge();
-  const [mode, setModeState] = useState<HomeMode>(chosenHomeMode);
-  const squads = mode === "squads";
+  // The RANKED row's pick: none until you tap one, and PLAY waits for it (dimmed).
+  const [mode, setModeState] = useState<HomeMode | null>(chosenHomeMode);
   const pickMode = (m: HomeMode) => {
+    sessionPick = m;
     setModeState(m);
     setInfo(false);
     if (m === "squads" || m === "1v1") {
@@ -556,7 +593,7 @@ export function HomeScreen({
   const [party, setParty] = useState(false);
   const [friends, setFriends] = useState(!!joinCode);
   // Play with friends: a lobby in the row's pick (1 v 1 has none: 50 v 50's), or a raid from the Boss raid screen.
-  const lobbyMode: ModeChoiceId = raid ? "raid" : lobbyModeOf(mode);
+  const lobbyMode: ModeChoiceId = raid ? "raid" : lobbyModeOf(mode ?? "crowd");
   // The Boss raid screen's pick (its tiles): a boss you can meet, "" for a random one, or the Hidden Boss (dark and
   // locked: never stored, so nothing starts against him). Kept for Boss alone, a Solo raid and a raid you make
   // (rememberBossPick); the public queues are always a random boss. A resting boss reads as random.
@@ -593,10 +630,10 @@ export function HomeScreen({
     if (joinCode) setFriends(true);
   }, [joinCode]);
   // What PLAY would start, if it's resting: Squads, 1 v 1 (PAUSE_RANKED1V1), Solo (you and bots), or 50 v 50 online.
-  const resting = mode === "squads" ? rest("squads") : mode === "1v1" ? rest("ranked1v1") : type === "solo" ? rest("solo") : mode === "crowd" ? rest("crowd") : null;
+  const resting = !mode ? null : mode === "squads" ? rest("squads") : mode === "1v1" ? rest("ranked1v1") : type === "solo" ? rest("solo") : mode === "crowd" ? rest("crowd") : null;
   const soloResting = rest("solo");
   const play = () => {
-    if (resting) return;
+    if (!mode || resting) return;
     if (mode === "squads") return onlineLocked ? onSignIn() : party ? onParty() : onSquads();
     if (mode === "1v1") return onlineLocked ? onSignIn() : onRanked1v1();
     if (type === "solo") return onSolo(mode, { fill: true });
@@ -615,7 +652,10 @@ export function HomeScreen({
       </button>
     </>
   );
-  const hint = resting ? (
+  const hint = !mode ? (
+    // (Nothing picked yet: the panel says to pick one.)
+    ""
+  ) : resting ? (
     resting
   ) : mode === "squads" ? (
     onlineLocked ? (
@@ -682,7 +722,7 @@ export function HomeScreen({
   // The sheets and menus either view can open (and chat moderation's notice).
   const overlays = (
     <>
-      {friends && (raid || mode !== "squads") && (
+      {friends && (
         <FriendsSheet
           mode={lobbyMode}
           code={joinCode}
@@ -693,10 +733,16 @@ export function HomeScreen({
             // (A raid: the Boss raid screen's pick, or a random boss. Maia's files fetched ahead where this device may
             // run the boss's brain: you're its host.)
             if (lobbyMode === "raid" && maiaAllowed()) prefetchMaia();
-            onCreateLobby(lobbyMode);
+            if (lobbyMode === "raid") return onCreateLobby(lobbyMode);
+            // (A friend code: its link copied as the lobby opens. Asked for in this tap, as a phone's browser wants.)
+            copyInviteLink(new Promise((resolve, reject) => onCreateLobby(lobbyMode, (code) => (code ? resolve(code) : reject(new Error("no lobby"))))));
           }}
           onJoin={onJoinLobby}
           onSignIn={onSignIn}
+          onFriends={() => {
+            setFriends(false);
+            onFriends();
+          }}
           onClose={() => setFriends(false)}
         />
       )}
@@ -794,7 +840,11 @@ export function HomeScreen({
   const rank1v1 = mode === "1v1" ? ranked1v1Label() : null;
   const panel = (
     <div class="fd-mode-panel">
-      {mode === "squads" ? (
+      {!mode ? (
+        <div class="fd-panel-words">
+          <span>Tap a mode above to play</span>
+        </div>
+      ) : mode === "squads" ? (
         <div class="fd-modes fd-types fd-squad-pick" role="radiogroup" aria-label="Squads">
           {(
             [
@@ -860,13 +910,14 @@ export function HomeScreen({
           </button>
         </div>
       )}
-      {info && mode !== "squads" && mode !== "1v1" && <TypesInfo fill={fill} />}
+      {info && (mode === "crowd" || mode === "classic") && <TypesInfo fill={fill} />}
     </div>
   );
   // PLAY and the line under it (and an error, if any).
   const go = (
     <div class="fd-go">
-      <button type="button" class="fd-play" disabled={loading || !!resting || (mode === "classic" && type !== "solo")} onClick={play}>
+      {/* (Dimmed until a mode is picked: Eric, Oct 18.) */}
+      <button type="button" class="fd-play" disabled={!mode || loading || !!resting || (mode === "classic" && type !== "solo")} onClick={play}>
         PLAY
       </button>
       <div class="fd-hint" aria-live="polite">
@@ -890,51 +941,51 @@ export function HomeScreen({
       </span>
     </button>
   );
-  // Play with friends. (The shop and your profile are in a phone's top bar and a computer's side menu: Eric, Oct 18.)
-  const actions = (
-    <div class="fd-actions">
-      <FdButton class="fd-wide" onClick={() => (squads ? onParty() : setFriends(true))}>
-        Play with friends
-      </FdButton>
-    </div>
-  );
   return (
     <div class="fd-home">
       {/*
-       * (A phone's top bar: the logo, your coins and pawn, the shop (Eric, Oct 18) and a gear for Settings (Eric, Oct 17:
-       * one tap, not two through Profile). A computer has the logo, the shop and Settings in its side menu, your coins
-       * and pawn top right.)
+       * (A phone's top bar (Eric, Oct 18): the logo, your coins (they open the shop), your pawn (your profile), Friends
+       * (play with friends: a code to share, or join one; and your friends list) and a gear for Settings (Eric, Oct 17:
+       * one tap, not two through Profile). A computer has the logo, the shop, Play with friends and Settings in its side
+       * menu, your coins and pawn top right, and friends in its live panel.)
        */}
       <header class="fd-top">
         <Logo />
         <div class="fd-top-end">
-          {/* (What's new for you with friends, a request or an invite: on your pawn, as your profile has Friends.) */}
-          <AccountBar onProfile={onProfile} news={friendsNews} />
-          <button type="button" class="fd-icon-btn fd-top-shop" aria-label="Shop & crates" onClick={onShop}>
-            <ShopIcon />
+          <AccountBar onProfile={onProfile} onShop={onShop} />
+          <button
+            type="button"
+            class="fd-icon-btn fd-top-friends"
+            aria-label={friendsNews ? `Friends, ${friendsNews} new` : "Friends"}
+            onClick={() => setFriends(true)}
+          >
+            <FriendsIcon />
+            {friendsNews > 0 && (
+              <span class="fd-news" aria-hidden="true">
+                {friendsNews}
+              </span>
+            )}
           </button>
           <button type="button" class="fd-icon-btn fd-top-gear" aria-label="Settings" onClick={onSettings}>
             <GearIcon />
           </button>
         </div>
       </header>
-      {/* (Friends: a phone's are on your profile (Eric, Oct 18: off home); a computer's in its live panel.) */}
       <LiveLine live={live} />
       {notice && <Notice notice={notice} />}
       <div class="fd-home-main">
         {hero}
         <div class="fd-play-col">
           {/*
-           * The same order on a phone and a computer (Eric, Oct 18: "like the phone"): the RANKED row, its panel, PLAY
-           * and its line, the Boss raid card (full width), then the smaller buttons. A computer has the live window
-           * above (from 1280 px). Every box keeps its size whatever is picked, so nothing moves on a click.
+           * The same order on a phone and a computer (Eric, Oct 18): the Boss raid card (full width), the RANKED row, its
+           * panel, then PLAY and its line at the bottom. A computer has the live window above (from 1280 px). Every box
+           * keeps its size whatever is picked, so nothing moves on a click.
            */}
           {wide && <LiveWindow />}
+          {bossCard}
           {ranked}
           {panel}
           {go}
-          {bossCard}
-          {actions}
         </div>
       </div>
       {overlays}

@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { named, soloFromHome, test } from "./helpers.ts";
+import { named, soloFromHome, test, pickMode } from "./helpers.ts";
 
 /**
  * The space under the board on a phone: the scoreboard and quick chat, side by side (split) or one of them full
@@ -82,6 +82,7 @@ test("the panel under the board is never empty: every tap, every remembered layo
   const p = await (await browser.newContext({ ...devices["iPhone 13"], browserName: undefined, colorScheme: "light" } as any)).newPage();
   await named(p, "Folder");
   await p.goto("/?debug&pool=panel");
+  await pickMode(p);
   await p.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => p.evaluate(() => (window as any).match?.chat?.enabled ?? false), { timeout: 90_000 }).toBe(true);
   await expect.poll(() => phase(p), { timeout: 90_000 }).toMatch(/play|watching/);
@@ -201,6 +202,7 @@ test("the split chat's Team / All switch: both labels whole at 320, 360 and 390 
   const p = await (await browser.newContext({ ...devices["iPhone 13"], browserName: undefined } as any)).newPage();
   await named(p, "Switcher");
   await p.goto("/?debug&pool=switch");
+  await pickMode(p);
   await p.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => p.evaluate(() => (window as any).match?.chat?.enabled ?? false), { timeout: 90_000 }).toBe(true);
   await expect.poll(() => phase(p), { timeout: 90_000 }).toMatch(/play|watching/);

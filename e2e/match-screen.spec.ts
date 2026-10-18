@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, soloFromHome, submitMove, test } from "./helpers.ts";
+import { BOARD_SEL, soloFromHome, submitMove, test, pickMode } from "./helpers.ts";
 
 /**
  * The match screen's board furniture (Eric, Oct 9, 2026): the green ring on the move the crowd played sits exactly on
@@ -108,6 +108,7 @@ test("on a computer, chat under the vote results stays put from your move to the
   test.skip(info.project.name !== "desktop", "a computer's layout");
   const page = await (await browser.newContext({ viewport: { width: 1396, height: 800 } })).newPage();
   await page.goto("/?debug&mode=crowd&pool=match-screen-chat");
+  await pickMode(page);
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match?.chat?.enabled ?? false), { timeout: 90_000 }).toBe(true);
   await expect

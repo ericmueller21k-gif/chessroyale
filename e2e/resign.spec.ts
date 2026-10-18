@@ -1,5 +1,5 @@
 import { devices, expect, type Browser, type Page } from "@playwright/test";
-import { BOARD_SEL, named, test, bossAloneFromHome, openBossRaid } from "./helpers.ts";
+import { BOARD_SEL, named, test, bossAloneFromHome, openBossRaid, pickMode } from "./helpers.ts";
 
 /**
  * Resign in every mode (Eric, Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): a phone's "⋯" in the top
@@ -114,6 +114,7 @@ test("solo 50 v 50: Leave in the votes goes home with nothing recorded; Resign m
   await named(page, "Quitter");
   // The votes (before move 1): Leave.
   await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=30");
+  await pickMode(page);
   await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("vote");
@@ -124,6 +125,7 @@ test("solo 50 v 50: Leave in the votes goes home with nothing recorded; Resign m
 
   // Again, past the votes: Resign.
   await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=30&augments=0");
+  await pickMode(page);
   await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/^(play|watching)$/);

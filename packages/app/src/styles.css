@@ -7770,8 +7770,17 @@ button.fd-logo {
   padding: 0;
   cursor: pointer;
 }
-/* What's new for you with friends (a request, an invite): a count on your pawn in a phone's top bar. */
-.fd-ring-news {
+/* Your coins in a phone's top bar are the shop's button too (Eric, Oct 18). */
+.fd-coins-shop {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+/* What's new for you with friends (a request, an invite): a count on Friends in a phone's top bar. */
+.fd-top-friends {
+  position: relative;
+}
+.fd-news {
   position: absolute;
   top: -5px;
   right: -5px;
@@ -8310,14 +8319,6 @@ button.fd-logo {
   .fd-root.framed .fd-hint {
     height: 1.3em;
   }
-}
-.fd-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-.fd-actions .fd-wide {
-  grid-column: 1 / -1;
 }
 /*
  * A phone's home fits its screen, with no scrolling (Eric, Oct 18): the gaps are tighter, and your pawn's card takes the
