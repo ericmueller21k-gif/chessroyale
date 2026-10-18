@@ -944,32 +944,38 @@ export const PIG_PORTRAIT = { x: OX + 17, y: OY + 6, w: 46, h: 40 } as const;
 // ---- His attack on a king (kits.ts: his kit's `kingAttack`; Eric, Oct 18: "a relentless assault", the lasso swung
 // and cracked at the king over and over, never wrapped round him).
 
-/** Room beyond his throw (to our right, the king's side) for the rope cracked at the king, and headroom to drop in from. */
-const ATTACK_REACH = 12;
+/**
+ * Room ahead of him (to our left, where his snout points: his art faces our left, as Sawyer's does) for the rope cracked
+ * at the king, and headroom to drop in from. (Oct 18: it first went out to our right, so on the board, mirrored to reach
+ * the king, he looked away from it.) His throws to our right need none of his frame's room on that side.
+ */
+const ATTACK_REACH = 38;
 const ATTACK_TOP = 16;
-const AW = W + ATTACK_REACH;
+const AW = ATTACK_REACH + 88;
 const AH = H + ATTACK_TOP;
 /** Where the rope's end cracks, as far as the king's square's middle and a little past (drawing space). */
-const KING_X = 40 + 1.95 * 36;
+const KING_X = 40 - 1.95 * 36;
 /** A frame of his in the attack's bigger frame, `lift` pixels up in the air. */
-const fa = (ms: number, p: PigPose, extra: Partial<Frame> = {}, lift = 0, ground: readonly Speck[] = []): Frame => moved({ ms, layers: pigLayers(p), ...extra }, 0, ATTACK_TOP, AW, AH, lift, ground);
-const landShadow = (r: number): Speck[] => groundShadow(OX + 40, OY + GROUND + ATTACK_TOP - 1, r);
+const fa = (ms: number, p: PigPose, extra: Partial<Frame> = {}, lift = 0, ground: readonly Speck[] = []): Frame => moved({ ms, layers: pigLayers(p), ...extra }, ATTACK_REACH, ATTACK_TOP, AW, AH, lift, ground);
+const landShadow = (r: number): Speck[] => groundShadow(OX + 40 + ATTACK_REACH, OY + GROUND + ATTACK_TOP - 1, r);
 
 /**
- * A crack of the lasso at the king: his arm flung out and the rope straight out to our right, its loop snapped shut
- * at the end, high (at the king's chest) or low in turn; or, between cracks, the rope whipped back up, spinning over
- * his head.
+ * A crack of the lasso at the king: his lasso arm (on our left) flung out and the rope straight out to our left, where
+ * he faces, its loop snapped shut at the end, high (at the king's chest) or low in turn; or, between cracks, the rope
+ * whipped back up, spinning over his head.
  */
 const crack = (i: number): PigPose => {
   const low = i % 2 === 1;
   const y = low ? 55 : 47;
-  return { mood: i % 3 === 2 ? "laugh" : i % 2 ? "grit" : "wild", lean: 1, bob: low ? 1 : 0, fistL: low ? [46, 54] : [45, 49], elbowL: low ? [35, 53] : [34, 50], front: true, loop: { c: [KING_X - 3, y], rx: 3.5, ry: 2, tilt: low ? -8 : 6 }, bow: [(46 + KING_X) / 2, (49 + y) / 2 - 0.5], coil: low ? 1 : -1 };
+  const fist: Pt = low ? [13, 54] : [14, 49];
+  // (Eyes open on every crack, on the king: his laugh squeezes them shut, so he laughs as he whips it back.)
+  return { mood: i % 2 ? "grit" : "wild", lean: -1, bob: low ? 1 : 0, fistL: fist, elbowL: low ? [21, 53] : [21, 50], front: true, loop: { c: [KING_X + 3, y], rx: 3.5, ry: 2, tilt: low ? 8 : -6 }, bow: [(fist[0] + KING_X) / 2, (fist[1] + y) / 2 - 0.5], coil: low ? 1 : -1 };
 };
-const whipBack = (i: number): PigPose => ({ mood: i % 4 === 3 ? "laugh" : "fierce", spin: (i * 3 + 2) % 8, grow: 1, lean: -1, coil: i % 2 ? -1 : 1 });
+const whipBack = (i: number): PigPose => ({ mood: i % 4 === 3 ? "laugh" : "fierce", spin: (i * 3 + 2) % 8, grow: 1, lean: 1, coil: i % 2 ? -1 : 1 });
 
 /**
- * His attack on a king, the king to our right (the board mirrors him when it's to his left), on the shared beats
- * (KING_ATTACK, boss-timing.ts): his shadow spreads, he drops in with the lasso whirling overhead and lands, swings it
+ * His attack on a king, the king to our left, where he faces (the board mirrors him when it's to his right), on the
+ * shared beats (KING_ATTACK, boss-timing.ts): his shadow spreads, he drops in with the lasso whirling overhead and lands, swings it
  * wider, then cracks it at the king ten times, one on each hit, its end snapping in the king's square high and low in
  * turn and whipping back overhead between (cues `crack` and `lash` in turn, so the repeats don't pile up); he snorts
  * with laughter and leaps off. The last frame is empty.
@@ -982,7 +988,7 @@ const kingAttack: Anim = (() => {
     fa(80, { mood: "wild", spin: 0, grow: 1, feet: { l: [1, -4], r: [-1, -4] } }, { cue: "whirl" }, 16, landShadow(20)),
     fa(80, { mood: "wild", spin: 2, grow: 1, feet: { l: [1, -3], r: [-1, -3] } }, {}, 7, landShadow(22)),
     fa(A.landAt - 360, { mood: "grit", bob: 2, spin: 4, grow: 1 }, { cue: "hop", shake: [0, 1], specks: stompDust(0) }),
-    fa(A.lashAt - A.landAt, { mood: "fierce", spin: 6, grow: 2, lean: -1 }, { specks: stompDust(1) }),
+    fa(A.lashAt - A.landAt, { mood: "fierce", spin: 6, grow: 2, lean: 1 }, { specks: stompDust(1) }),
   ];
   const crackMs = 90;
   for (let i = 0; i < A.lashes; i++) {
@@ -1003,8 +1009,9 @@ const kingAttack: Anim = (() => {
 })();
 
 /**
- * Wrangler for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, in a frame
- * `ATTACK_REACH` wider on the right (the rope cracked at the king) and `ATTACK_TOP` taller (he drops in). Its `idle`,
+ * Wrangler for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, facing our left as
+ * always, in a frame with `ATTACK_REACH` of room on the left (the rope cracked at the king) and `ATTACK_TOP` taller (he
+ * drops in). Its `idle`,
  * one still, is for the preview, which starts every reel from one.
  */
 export const PIG_ATTACK: Character = {
@@ -1013,6 +1020,6 @@ export const PIG_ATTACK: Character = {
   name: "Wrangler (his attack)",
   w: AW,
   h: AH,
-  foot: [PIG.foot[0], PIG.foot[1] + ATTACK_TOP],
+  foot: [PIG.foot[0] + ATTACK_REACH, PIG.foot[1] + ATTACK_TOP],
   anims: { idle: { loop: true, frames: [fa(1000, {})] }, kingAttack },
 };

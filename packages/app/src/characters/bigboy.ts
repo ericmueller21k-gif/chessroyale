@@ -13,7 +13,8 @@
  * (a slurp of the lollipop), `giggle` and `wail` (the tantrum with its wail). Idle, swing and tantrum are as approved.
  */
 import { canvas, ellipse, inEllipse, inPoly, roundLight, shade, toGrid, type Canvas } from "./paint.ts";
-import { BOUNCE, SNACK } from "@chessroyale/chess";
+import { BOUNCE, KING_ATTACK, SNACK } from "@chessroyale/chess";
+import { groundShadow, moved } from "./attack-frame.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 export const BIGBOY_PALETTE: Record<string, string> = {
@@ -72,7 +73,7 @@ const SKIN = "dcCh";
 
 // ---- Head: one face per mood.
 
-export type Mood = "blank" | "blink" | "lick" | "yum" | "fierce" | "grin" | "pout" | "tantrum" | "chew" | "nom" | "ooh" | "squish" | "dazed" | "giggle";
+export type Mood = "blank" | "blink" | "lick" | "yum" | "fierce" | "grin" | "pout" | "tantrum" | "chew" | "nom" | "ooh" | "squish" | "dazed" | "giggle" | "mad";
 
 /** The head's grid: 35 x 25, its middle column 17. */
 const HEAD_W = 35;
@@ -108,6 +109,8 @@ const EYES: Record<string, readonly string[]> = {
   wide: ["kkkkkk", "kweewk", "kwwwwk"],
   /** Dazed after the crash: little crosses. */
   dazed: ["kk..kk", "..kk..", "kk..kk"],
+  /** Glaring at what he hits, both pupils to our left (his attack on a king; the right eye isn't mirrored). */
+  glare: ["......", "kkkkkk", "keewwk"],
 };
 const MOUTHS: Record<string, { rows: readonly string[]; y: number }> = {
   // Big pink lips, a little open: the reference.
@@ -125,7 +128,7 @@ const MOUTHS: Record<string, { rows: readonly string[]; y: number }> = {
   /** A small round "oh". */
   o: { y: 17, rows: ["...MMM...", "..MLNLM..", ".MLmmmLM.", "..MLLLM..", "...MMM..."] },
 };
-const FACES: Record<Mood, { brows: string; eyes: string; mouth: string }> = {
+const FACES: Record<Mood, { brows: string; eyes: string; mouth: string; glance?: boolean }> = {
   blank: { brows: "arch", eyes: "blank", mouth: "pucker" },
   blink: { brows: "arch", eyes: "shut", mouth: "pucker" },
   lick: { brows: "arch", eyes: "happy", mouth: "lick" },
@@ -140,6 +143,8 @@ const FACES: Record<Mood, { brows: string; eyes: string; mouth: string }> = {
   squish: { brows: "arch", eyes: "squeeze", mouth: "smile" },
   dazed: { brows: "worried", eyes: "dazed", mouth: "o" },
   giggle: { brows: "arch", eyes: "happy", mouth: "smile" },
+  /** A tantrum with his eyes open, glaring to our left at what he bonks (his attack on a king). */
+  mad: { brows: "angry", eyes: "glare", mouth: "wail", glance: true },
 };
 
 function head(mood: Mood): Part {
@@ -159,7 +164,7 @@ function head(mood: Mood): Part {
   stamp(cv, BROWS[f.brows]!, 9, 7);
   stamp(cv, BROWS[f.brows]!, 21, 7, true);
   stamp(cv, EYES[f.eyes]!, 9, 9);
-  stamp(cv, EYES[f.eyes]!, 20, 9, true);
+  stamp(cv, EYES[f.eyes]!, 20, 9, !f.glance);
   // A small round nose with its nostrils.
   stamp(cv, [".cCh.", "dc.cd"], 15, 13);
   const mouth = MOUTHS[f.mouth]!;
@@ -362,7 +367,7 @@ add("diaper", diaper);
 add("shadow", shadow);
 add("footL", () => foot(-1));
 add("footR", () => foot(1));
-const MOODS: readonly Mood[] = ["blank", "blink", "lick", "yum", "fierce", "grin", "pout", "tantrum", "chew", "nom", "ooh", "squish", "dazed", "giggle"];
+const MOODS: readonly Mood[] = ["blank", "blink", "lick", "yum", "fierce", "grin", "pout", "tantrum", "chew", "nom", "ooh", "squish", "dazed", "giggle", "mad"];
 for (const m of MOODS) add(`head:${m}`, () => head(m));
 for (let s = 0; s < 12; s++) add(`candy:${s}`, () => candy(s / 2));
 /** His snack: a little pawn of the crowd's (white; his look `blackPawn` makes it the crowd's black), whole, then bitten. */
@@ -394,7 +399,7 @@ const SHOULDER_L: Pt = [23.5, 30];
 const SHOULDER_R: Pt = [44.5, 30];
 
 /** Where the lollipop arm (his right, on our left) holds it: its elbow and fist, and the candy's middle. */
-export type Lolly = "hold" | "toward" | "lick" | "lickUp" | "up" | "waveL" | "waveR" | "windup" | "swing" | "smash" | "shakeUp" | "shakeDown" | "splat";
+export type Lolly = "hold" | "toward" | "lick" | "lickUp" | "up" | "waveL" | "waveR" | "windup" | "swing" | "smash" | "shakeUp" | "shakeDown" | "splat" | "bonkHigh" | "bonkLow" | "back";
 const LOLLY: Record<Lolly, { elbow: Pt; fist: Pt; candy: Pt; behind?: boolean }> = {
   hold: { elbow: [17, 37], fist: [11.5, 34.5], candy: [10, 21] },
   toward: { elbow: [16, 39], fist: [15.5, 35], candy: [16.5, 22.5] },
@@ -411,6 +416,11 @@ const LOLLY: Record<Lolly, { elbow: Pt; fist: Pt; candy: Pt; behind?: boolean }>
   shakeDown: { elbow: [17, 39], fist: [12, 38], candy: [10.5, 25] },
   /** Flung out low to his side as he crashes down (squashed: kept inside his frame). */
   splat: { elbow: [16, 37], fist: [11, 41], candy: [5.5, 49.5] },
+  /** His attack on a king (to our left): brought down overhead onto its head, or swung sideways at its chest. */
+  bonkHigh: { elbow: [16, 24], fist: [9, 24], candy: [-4, 33] },
+  bonkLow: { elbow: [16, 36], fist: [9, 38], candy: [-4, 46] },
+  /** Pulled back across him, the candy out past his other shoulder (wound up for a sideways swing). */
+  back: { elbow: [28, 36], fist: [36, 33], candy: [46, 26] },
 };
 
 /** His free arm (his left, on our right). */
@@ -853,6 +863,7 @@ export const BIGBOY_LINES: Partial<Record<import("./boss-beats.ts").Beat, readon
   power: ["Catch!", "Blocky!", "My toy!", "Stack it!"],
   ultimateWarn: ["Big boy mad!", "Waaaah!"],
   ultimate: ["Big boy BOUNCE!", "Boing boing!", "Bouncy bouncy!"],
+  kingAttack: ["Bonk, bonk, BONK!", "Bad king! Time out!", "Waaah! Mine! Mine!"],
 };
 export const BIGBOY_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
   entrance: 1,
@@ -870,4 +881,96 @@ export const BIGBOY_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, numbe
   power: 0.5,
   ultimateWarn: 1,
   ultimate: 1,
+  kingAttack: 1,
+};
+
+// ---- His attack on a king (kits.ts: his kit's `kingAttack`; Eric, Oct 18: "a relentless assault"): a toddler's
+// tantrum, the giant lollipop bonked on the king on every beat, overhead then sideways.
+
+/** Room to our left (the king's side: his lollipop hand) for the swings, and headroom to drop in from. */
+const ATTACK_REACH = 8;
+const ATTACK_TOP = 10;
+const AW = BIGBOY.w + ATTACK_REACH;
+const AH = BIGBOY.h + ATTACK_TOP;
+/** A frame of his in the attack's bigger frame, `lift` pixels up in the air. */
+const fa = (ms: number, p: BigBoyPose, extra: Partial<Frame> = {}, lift = 0, ground: readonly Speck[] = []): Frame => moved(f(ms, p, extra), ATTACK_REACH, ATTACK_TOP, AW, AH, lift, ground);
+/** His shadow on the ground where he lands (between his feet), `r` across each way. */
+const landShadow = (r: number): Speck[] => groundShadow(OX + 34 + ATTACK_REACH, OY + GROUND + ATTACK_TOP - 1, r);
+/** Specks drawn in his own drawing space, moved with him into the attack's frame (moved() moves a frame's specks). */
+const D = (x: number, y: number): [number, number] => [OX + x, OY + y];
+/**
+ * The sideways swing's trail: six rainbow bands streaming back from the candy toward him (drawing space), solid near
+ * the candy, then dotted.
+ */
+const sideTrail = ([cx, cy]: Pt): Speck[] => {
+  const out: Speck[] = [];
+  for (let band = 0; band < 6; band++)
+    for (let d = 9; d <= 22; d++) {
+      if (d > 14 && (d + band) % 3) continue;
+      const [x, y] = D(cx + d, cy - 3 + band);
+      out.push([x, y, "123456"[band]!]);
+    }
+  return out;
+};
+/**
+ * A bonk: the overhead one brought down on the king's head (a rainbow arc over him behind the candy) or the sideways
+ * swat at its chest (the rainbow streaming back), his face red, glaring at it, tears flying, the lollipop's swirl
+ * spinning. High (even) and sideways (odd) in turn; cues `bonk` and `swing` in turn.
+ */
+const bonk = (i: number): Frame => {
+  const high = i % 2 === 0;
+  const lo = high ? "bonkHigh" : "bonkLow";
+  const trail = high ? rainbowArc([SHOULDER_L[0] - 1, SHOULDER_L[1]], 26, -96, -176) : sideTrail([-4, 46]);
+  return fa(90, { mood: "mad", lolly: lo, free: "fist", headDx: -1, bob: high ? 1 : 0, spin: (i * 3) % 12, feet: "stand" }, { pal: RED, cue: high ? "bonk" : "swing", shake: [high ? 0 : -1, high ? 1 : 0], specks: [...trail, ...tears(i, -2, high ? 1 : 0)] });
+};
+/** Between bonks: wound up again for the next one (behind his head for an overhead, across him for a sideways), a foot stamped. */
+const windUp = (i: number): Frame => {
+  const nextHigh = (i + 1) % 2 === 0;
+  return fa(KING_ATTACK.lashEveryMs - 90, { mood: "mad", lolly: nextHigh ? "windup" : "back", free: nextHigh ? "out" : "pump", sway: nextHigh ? 1 : 0, headDx: -1, spin: (i * 3 + 2) % 12, feet: i % 2 ? "liftL" : "liftR" }, { pal: RED, specks: tears(i + 2, -2) });
+};
+
+/**
+ * His attack on a king, the king to our left (his lollipop hand's side; the board mirrors him when it's to his right),
+ * on the shared beats (KING_ATTACK, boss-timing.ts): his shadow spreads, he drops in, lollipop up (`whoosh`), lands
+ * with a `boing`, stamps into a tantrum (`stomp`, his face red), then bonks the king with the lollipop ten times,
+ * overhead and sideways in turn (cues `bonk` and `swing`), glaring at it, winding up between; then a giggle behind his
+ * hand (`giggle`), a crouch and a spring off (`boing`). The last frame is empty.
+ */
+const kingAttack: Anim = (() => {
+  const A = KING_ATTACK;
+  const frames: Frame[] = [
+    { ms: 100, layers: [], specks: landShadow(5) },
+    { ms: 100, layers: [], specks: landShadow(10) },
+    fa(80, { ...AIR, mood: "ooh" }, { cue: "whoosh" }, 16, landShadow(14)),
+    fa(80, { ...STRETCH, mood: "mad" }, {}, 7, landShadow(15)),
+    fa(A.landAt - 360, { ...SQUASH, lolly: "hold", mood: "squish", noShadow: false }, { cue: "boing", shake: [0, 1], specks: [...dust(FOOT_L, 0), ...dust(FOOT_R, 0)] }),
+    fa(A.lashAt - A.landAt, { mood: "mad", lolly: "windup", free: "out", sway: 1, headDx: -1, bob: 1, feet: "stand" }, { pal: RED, cue: "stomp", shake: [0, 1], specks: [...dust(FOOT_L, 1), ...dust(FOOT_R, 1)] }),
+  ];
+  for (let i = 0; i < A.lashes; i++) frames.push(bonk(i), windUp(i));
+  const giggle = A.leaveAt - (A.lashAt + A.lashes * A.lashEveryMs);
+  frames.push(fa(giggle, { mood: "giggle", free: "mouth", lolly: "up", spin: 4, bob: 1 }, { cue: "giggle" }));
+  const leave = A.ms - A.leaveAt;
+  frames.push(
+    fa(leave - 300, { ...CROUCH, mood: "giggle", noShadow: false }),
+    fa(80, STRETCH, { cue: "boing" }, 7, landShadow(14)),
+    fa(80, AIR, {}, 16, landShadow(10)),
+    { ms: 80, layers: [], specks: landShadow(6) },
+    { ms: 60, layers: [] },
+  );
+  return { loop: false, frames };
+})();
+
+/**
+ * Big Boy for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, in a frame
+ * `ATTACK_REACH` wider on the left (his lollipop's side, toward the king) and `ATTACK_TOP` taller (he drops in). Its
+ * `idle`, one still, is for the preview.
+ */
+export const BIGBOY_ATTACK: Character = {
+  ...BIGBOY,
+  id: "bigboy-attack",
+  name: "Big Boy (his attack)",
+  w: AW,
+  h: AH,
+  foot: [BIGBOY.foot[0] + ATTACK_REACH, BIGBOY.foot[1] + ATTACK_TOP],
+  anims: { idle: { loop: true, frames: [fa(1000, {})] }, kingAttack },
 };

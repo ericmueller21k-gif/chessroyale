@@ -8,10 +8,10 @@
 import { BOSS_ROSTER, type BossDef } from "@chessroyale/core";
 import type { SoundName } from "../sound.ts";
 import type { Beat, BeatLines, Loop } from "./boss-beats.ts";
-import { BIGBOY, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT } from "./bigboy.ts";
+import { BIGBOY, BIGBOY_ATTACK, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT } from "./bigboy.ts";
 import { CLOWN, CLOWN_ATTACK, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
-import { GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
-import { GREX, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
+import { GINGER_ATTACK, GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
+import { GREX, GREX_ATTACK, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
 import { HOLLOW, HOLLOW_ATTACK, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT } from "./hollow.ts";
 import { SAWYER, SAWYER_ATTACK, SAWYER_CHANCE, SAWYER_LINES, SAWYER_PORTRAIT } from "./sawyer.ts";
 import { PIG, PIG_ATTACK, PIG_CHANCE, PIG_LINES, PIG_PORTRAIT } from "./pig.ts";
@@ -20,7 +20,7 @@ import { ALFIL, ALFIL_ATTACK, ALFIL_CHANCE, ALFIL_LINES, ALFIL_PORTRAIT } from "
 import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
-import { ankusItem, lashItem, lassoItem, pieItem, sawItem, type SquareItem } from "./power-art.ts";
+import { ankusItem, bonkItem, frostItem, lashItem, lassoItem, pieItem, popItem, sawItem, type SquareItem } from "./power-art.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
@@ -115,6 +115,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
     lines: GINGER_LINES,
     chance: GINGER_CHANCE,
     portrait: { ...GINGER_PORTRAIT, anim: "idle", frame: 0 },
+    // She drops in and jabs the king with her frosted cane, high and low (gingerbread.ts: GINGER_ATTACK; Eric, Oct 18),
+    // a frost burst on its square each hit. (Her cane reaches 1 square from her feet, her body 0.46: she stands 0.85 off.)
+    kingAttack: { ch: GINGER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 0.85, hit: frostItem },
   },
   "Jefferson": {
     ch: GREX,
@@ -129,11 +132,17 @@ export const BOSS_KITS: Record<string, BossKit> = {
       slam: "grexSmack",
       launch: "grexWhistle",
       shot: "grexWhistle",
+      // (His attack on a king: each fireball popping on the king, a pop and its sparks' crackle in turn.)
+      pop: "grexPop",
+      sparkle: "grexSparkle",
     },
     lines: GREX_LINES,
     chance: GREX_CHANCE,
     portrait: { ...GREX_PORTRAIT, anim: "idle", frame: 0 },
     tall: true,
+    // He drops in, plants his Roman candle and fires at the king, a fireball a beat (grex.ts: GREX_ATTACK; Eric,
+    // Oct 18), a firework pop on its square each hit.
+    kingAttack: { ch: GREX_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: popItem },
   },
   "Hollow": {
     ch: HOLLOW,
@@ -197,6 +206,11 @@ export const BOSS_KITS: Record<string, BossKit> = {
     portrait: { ...BIGBOY_PORTRAIT, anim: "idle", frame: 0 },
     // His snack is the crowd's pawn: white, or black when the crowd plays Black.
     lookOf: (boss) => (boss.crowdSide === "b" ? "blackPawn" : undefined),
+    // A tantrum: he drops in and bonks the king with his giant lollipop, overhead and sideways (bigboy.ts:
+    // BIGBOY_ATTACK; Eric, Oct 18), a candy-colored bonk on its square each hit. His lollipop is in his hand on our
+    // left, so his attack faces our left (`facesLeft`); it reaches 1.13 squares from his feet, his fist 0.62: he
+    // stands 1 off.
+    kingAttack: { ch: BIGBOY_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1, facesLeft: true, hit: bonkItem },
   },
   "Sawyer": {
     ch: SAWYER,
@@ -278,8 +292,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // His throw's room out to one side (the frame is 115 wide): a wider box on a phone, as Sawyer's.
     wide: true,
     // He drops in and cracks his lasso at the king over and over, its end snapping in the king's square, never
-    // wrapping round him (pig.ts: PIG_ATTACK; Eric, Oct 18), a snap on the square each hit.
-    kingAttack: { ch: PIG_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: lassoItem },
+    // wrapping round him (pig.ts: PIG_ATTACK; Eric, Oct 18), a snap on the square each hit. He faces our left, as
+    // always, so he throws it that way (`facesLeft`), looking at the king (Eric, Oct 18).
+    kingAttack: { ch: PIG_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, facesLeft: true, hit: lassoItem },
   },
   // Alfil, the woolly mammoth (Eric, Oct 17): docs/decisions/2026-10-17-alfil-wired.md.
   "Alfil": {
