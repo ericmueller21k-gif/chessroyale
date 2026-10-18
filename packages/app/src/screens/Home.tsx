@@ -441,13 +441,13 @@ function RaidOption({ label, sub, disabled, locked, onClick }: { label: string; 
 /**
  * Home (the approved mockup, docs/mockups/front-door/Main.dc.html; the RANKED row and the Boss raid card, Eric, Oct 16):
  * the top bar (logo, coins, your pawn), the live line, your dressed pawn with your icon, name and rating, the RANKED row
- * (50 v 50, 1 v 1, Squads), what's under it for the pick (Matchmaking, or Squads' Party), PLAY and the line under it, the
+ * (50 v 50, 1 v 1, Squads), the panel under it for the pick (one size for every mode), PLAY and the line under it, the
  * Boss raid card, and the smaller buttons. A note goes under the live line when a lobby you opened has closed. Light or
  * dark is in Settings.
  *
- * On a computer (1024 px and wider, the side menu's frame) the play column is the Boss raid card and Play with friends
- * side by side (so the live window above keeps its room), then the RANKED row, then PLAY at the bottom (Eric, Oct 9: PLAY at the bottom): the shop and your profile are in the
- * side menu. From 1280 px the live window fills the room above (LiveWindow: a real match, or a bot match played back).
+ * On a computer (1024 px and wider, the side menu's frame) the play column has the phone's order (Eric, Oct 18): the
+ * shop and your profile are in the side menu. From 1280 px the live window fills the room above (LiveWindow: a real
+ * match, or a bot match played back).
  *
  * With `raid`, the Boss raid screen (a simple one for now; Eric, Oct 16): each way to play a raid, through the flows
  * that were on home before (a raid's queue, people only, a Solo raid, Boss alone's boss menu, a raid with friends).
@@ -535,6 +535,7 @@ export function HomeScreen({
   const squads = mode === "squads";
   const pickMode = (m: HomeMode) => {
     setModeState(m);
+    setInfo(false);
     if (m === "squads" || m === "1v1") {
       try {
         localStorage.setItem(MODE_KEY, m);
@@ -553,6 +554,8 @@ export function HomeScreen({
     saveMatchmaking(t);
   };
   const [info, setInfo] = useState(false);
+  // Squads: Solo queue (false) or Party (true), the panel's pick; PLAY then queues alone or opens the party.
+  const [party, setParty] = useState(false);
   const [friends, setFriends] = useState(!!joinCode);
   // Play with friends: a lobby in the row's pick (1 v 1 has none: 50 v 50's), or a raid from the Boss raid screen.
   const lobbyMode: ModeChoiceId = raid ? "raid" : lobbyModeOf(mode);
@@ -596,7 +599,7 @@ export function HomeScreen({
   const soloResting = rest("solo");
   const play = () => {
     if (resting) return;
-    if (mode === "squads") return onlineLocked ? onSignIn() : onSquads();
+    if (mode === "squads") return onlineLocked ? onSignIn() : party ? onParty() : onSquads();
     if (mode === "1v1") return onlineLocked ? onSignIn() : onRanked1v1();
     if (type === "solo") return onSolo(mode, { fill: true });
     if (mode === "crowd") onPlay("crowd", type);
@@ -617,9 +620,16 @@ export function HomeScreen({
   const hint = resting ? (
     resting
   ) : mode === "squads" ? (
-    onlineLocked ? signIn("Squads") : `Solo queue: you join a squad of ${SQUADS.squadSize} · bots fill any empty seat after ${fill} s`
+    onlineLocked ? (
+      signIn("Squads")
+    ) : party ? (
+      "Party: create one or join by code"
+    ) : (
+      `Solo queue: bots fill any empty seat after ${fill} s`
+    )
   ) : mode === "1v1" ? (
-    onlineLocked ? signIn("1 v 1") : "Ranked chess vs one player near your level"
+    // (What 1 v 1 is: in the panel, with your rank.)
+    onlineLocked ? signIn("1 v 1") : ""
   ) : mode === "classic" && type !== "solo" ? (
     "Classic is being reworked"
   ) : onlineLocked ? (
@@ -775,18 +785,46 @@ export function HomeScreen({
       </div>
     </div>
   );
-  // Under the row: Squads' Party, 50 v 50's Matchmaking; for 1 v 1 (always people, one tap to queue) your rank in it.
+  // The panel under the row (Eric, Oct 18: "it should never change size, and it should be dedicated to whatever text we
+  // need there to explain what that is, or if there needs to be options for it"): one box, the same size for every
+  // mode, holding the pick's options or words. 50 v 50: Matchmaking (Default, Bots off, Solo) and its ⓘ. 1 v 1 (always
+  // people, one tap to queue): your rank in it and what it is. Squads: Solo queue or Party. Nothing in it changes the
+  // page's layout: the ⓘ's words float over it.
   const rank1v1 = mode === "1v1" ? ranked1v1Label() : null;
-  const under =
-    mode === "squads" ? (
-      <button type="button" class="fd-btn sq-party-btn" onClick={onParty}>
-        Party
-        <span>{resting ?? `Play with up to ${SQUADS.partyMax - 1} friends in one squad · create one or join by code`}</span>
-      </button>
-    ) : mode === "1v1" ? (
-      rank1v1 && <p class="fd-rank1v1">Your rank: {rank1v1}</p>
-    ) : (
-      <>
+  const panel = (
+    <div class="fd-panel">
+      {mode === "squads" ? (
+        <div class="fd-modes fd-types fd-squad-pick" role="radiogroup" aria-label="Squads">
+          {(
+            [
+              { id: false, label: "Solo queue", sub: "you join a squad" },
+              { id: true, label: "Party", sub: `with up to ${SQUADS.partyMax - 1} friends` },
+            ] as const
+          ).map((c) => (
+            <button
+              type="button"
+              role="radio"
+              key={c.label}
+              aria-checked={party === c.id}
+              class={party === c.id ? "on" : ""}
+              onClick={() => {
+                setParty(c.id);
+                // (Party opens its sheet at once, as its button did: make one or join by code.)
+                if (c.id) onParty();
+              }}
+            >
+              {c.label}
+              <br />
+              <span>{c.sub}</span>
+            </button>
+          ))}
+        </div>
+      ) : mode === "1v1" ? (
+        <div class="fd-panel-words">
+          {rank1v1 && <strong class="fd-rank1v1">Your rank: {rank1v1}</strong>}
+          <span>Ranked chess vs one player near your level</span>
+        </div>
+      ) : (
         <div class="fd-types-row">
           <div class="fd-modes fd-types" role="radiogroup" aria-label="Matchmaking">
             {types(fill).map((t) => {
@@ -820,14 +858,10 @@ export function HomeScreen({
             i
           </button>
         </div>
-        {info && <TypesInfo fill={fill} />}
-        {type === "botsoff" && (
-          <p class="fd-warn" role="note">
-            <span aria-hidden="true">⚠</span> No bots can mean a much longer wait: the match starts only when {CROWD_SIZE} people have joined. You can switch to Default from the queue.
-          </p>
-        )}
-      </>
-    );
+      )}
+      {info && mode !== "squads" && mode !== "1v1" && <TypesInfo fill={fill} />}
+    </div>
+  );
   // PLAY and the line under it (and an error, if any).
   const go = (
     <div class="fd-go">
@@ -892,23 +926,16 @@ export function HomeScreen({
         {hero}
         <div class="fd-play-col">
           {/*
-           * A computer: the live window (from 1280 px), the Boss raid card and Play with friends, then the RANKED row
-           * right above PLAY (it sets up what PLAY does), PLAY at the bottom (Eric, Oct 9). A phone: the RANKED row, PLAY,
-           * the Boss raid card under them (Eric, Oct 16), then the smaller buttons.
+           * The same order on a phone and a computer (Eric, Oct 18: "like the phone"): the RANKED row, its panel, PLAY
+           * and its line, the Boss raid card (full width), then the smaller buttons. A computer has the live window
+           * above (from 1280 px). Every box keeps its size whatever is picked, so nothing moves on a click.
            */}
           {wide && <LiveWindow />}
-          {computer && (
-            // (Side by side, as Play with friends and Boss alone were: the live window above keeps its room.)
-            <div class="fd-door-row">
-              {bossCard}
-              {actions}
-            </div>
-          )}
           {ranked}
-          {under}
+          {panel}
           {go}
-          {!computer && bossCard}
-          {!computer && actions}
+          {bossCard}
+          {actions}
         </div>
       </div>
       {overlays}

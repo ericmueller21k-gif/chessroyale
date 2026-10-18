@@ -419,8 +419,9 @@ The calls are in `DECISIONS.md`, "Squads, phase 3: the screens". Phone and compu
 door's look; every class is `sq-`.
 
 - **The menu.** Squads takes Classic's spot: Crowd · Squads · Boss raid (Classic still plays with `?mode=classic`).
-  With Squads picked, PLAY is the solo queue (`POST /api/squads/play`; busy: the queue's "you're in line" screen) and
-  the Matchmaking row becomes **Party** (as does "Play with friends"): create a party (its code and invite link,
+  With Squads picked, the home panel (in the Matchmaking row's place; Oct 18) has **Solo queue** (picked at first:
+  PLAY is the solo queue, `POST /api/squads/play`; busy: the queue's "you're in line" screen) and **Party** (it opens
+  the party sheet at once, as does "Play with friends", and PLAY opens it while picked): create a party (its code and invite link,
   `/squads/party/CODE`, copy or share), or join by code or link; the members (leader, connected); the leader presses
   PLAY for everyone. When the party is placed, everyone joins the lobby with its pass, the party's socket closes, and
   after the lobby "Back to your party" reconnects (the leader queues again). Escape closes the sheet as ✕ does, from

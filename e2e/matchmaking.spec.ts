@@ -31,9 +31,9 @@ test("home: Default, Bots off and Solo; the ⓘ says what they do; Bots off warn
   await expect(page.locator(".fd-types-info")).toContainText("Your ranking changes only in a match with at least 30 real players (15 in a raid).");
   await page.getByRole("button", { name: "About matchmaking" }).click();
   await expect(page.locator(".fd-types-info")).toHaveCount(0);
-  // Bots off: a warning that the wait may be much longer.
+  // Bots off: no warning box (Eric, Oct 18: the ⓘ explains it, and the box moved the page), the line under PLAY says it.
   await types.getByRole("radio", { name: /^Bots off/ }).click();
-  await expect(page.getByRole("note")).toContainText("much longer wait");
+  await expect(page.getByRole("note")).toHaveCount(0);
   await expect(page.locator(".fd-hint")).toHaveText("People only: starts when 100 have joined");
   // Remembered on this device.
   await page.reload();

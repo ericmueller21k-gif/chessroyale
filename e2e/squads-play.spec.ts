@@ -229,8 +229,8 @@ test("the party: one makes it, a friend joins by link, the leader presses PLAY, 
   await named(page, "Ann");
   await page.goto(`/?nolanding&debug&pool=${pool}`);
   await page.getByRole("radio", { name: /Squads/ }).click();
-  await expect(page.locator(".fd-hint")).toHaveText(/^Solo queue: you join a squad of 4/);
-  await page.getByRole("button", { name: /^Party/ }).click();
+  await expect(page.locator(".fd-hint")).toHaveText(/^Solo queue: bots fill any empty seat/);
+  await page.getByRole("radio", { name: /^Party/ }).click();
   const sheet = page.getByRole("dialog", { name: "Squads party" });
   await sheet.getByRole("button", { name: "Create a party" }).click();
   const code = (await page.locator(".sq-invite-code").textContent({ timeout: 15_000 }))!.trim();
@@ -314,11 +314,11 @@ test("the party sheet: Escape closes it from its first frame, and leaves a party
     });
     obs.observe(document.body, { childList: true, subtree: true });
   });
-  await page.getByRole("button", { name: /^Party/ }).click();
+  await page.getByRole("radio", { name: /^Party/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__sheetSeen)).toBe(true);
   await expect(sheet).toHaveCount(0);
   // A party made with the sheet open: Escape closes the sheet and leaves the party, as ✕ does.
-  await page.getByRole("button", { name: /^Party/ }).click();
+  await page.getByRole("radio", { name: /^Party/ }).click();
   await sheet.getByRole("button", { name: "Create a party" }).click();
   const code = (await page.locator(".sq-invite-code").textContent({ timeout: 15_000 }))!.trim();
   const members = () => page.evaluate((c) => fetch(`/api/squads/party/${c}`).then((r) => (r.ok ? r.json().then((s) => s.members as number) : 0)), code);

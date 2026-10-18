@@ -12,7 +12,7 @@ const run = Date.now().toString(36).slice(-5);
 const sideways = (p: Page) => p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const box = async (p: Page, sel: string) => (await p.locator(sel).first().boundingBox())!;
 
-test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal buttons whole at every width; the Boss raid card under it (above it on a computer, beside Play with friends; PLAY last)", async ({ page }) => {
+test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal buttons whole at every width; PLAY under it, then the Boss raid card, full width (a phone and a computer alike)", async ({ page }) => {
   await named(page, "Ranked");
   const widths = desktop() ? [[1280, 800], [1024, 768]] : [[320, 640], [360, 740], [390, 844]];
   for (const [w, h] of widths) {
@@ -45,36 +45,34 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
       expect(b.font).toBeGreaterThanOrEqual(11);
     }
     expect(buttons.map((b) => b.x)).toEqual([...buttons.map((b) => b.x)].sort((a, b) => a - b));
-    // The card's words whole too, and it's prominent: the column's full width on a phone (two thirds of it on a
-    // computer, beside Play with friends), as tall as a big button.
+    // The card's words whole too, and it's prominent: the column's full width, as tall as a big button.
     const c = (await card.boundingBox())!;
     expect(c.height).toBeGreaterThanOrEqual(desktop() ? 60 : 64);
-    if (desktop()) expect(c.width, `${w}`).toBeGreaterThan(r.width * 0.6);
-    else expect(Math.abs(c.width - r.width), `${w}: full width`).toBeLessThan(2);
+    expect(Math.abs(c.width - r.width), `${w}: full width`).toBeLessThan(2);
     expect(await card.evaluate((e) => [...e.querySelectorAll(".rd-card-text > *")].every((x) => x.scrollWidth <= x.clientWidth + 0.5)), `${w}`).toBe(true);
     const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
-    if (desktop()) {
-      // A computer: the card above the row, which stays right above PLAY, PLAY at the bottom (Eric, Oct 9).
-      expect(c.y + c.height, `${w}`).toBeLessThanOrEqual(label.y);
-      expect(play.y).toBeGreaterThan(r.y + r.height);
-    } else {
-      // A phone: the row, PLAY, then the card (Eric, Oct 16: "under the RANKED row").
-      expect(c.y, `${w}`).toBeGreaterThanOrEqual(play.y + play.height);
-    }
+    // The row, PLAY, then the card, then Play with friends on its own row (Eric, Oct 16: "under the RANKED row"; on a
+    // computer too, Oct 18: "like the phone").
+    expect(play.y, `${w}`).toBeGreaterThan(r.y + r.height);
+    expect(c.y, `${w}`).toBeGreaterThanOrEqual(play.y + play.height);
+    const friends = (await page.getByRole("main").getByRole("button", { name: "Play with friends" }).boundingBox())!;
+    expect(friends.y, `${w}`).toBeGreaterThanOrEqual(c.y + c.height);
+    // (The panel: there all along.)
+    expect(Object.keys(first), `${w}`).toContain("panel");
     expect(await sideways(page), `${w}`).toBe(0);
   }
 });
 
-test("1 v 1: picked, your rank under the row (whole at 320 px, even the longest), its line under PLAY, remembered; PLAY queues at once (/1v1)", async ({ page }) => {
+test("1 v 1: picked, your rank and what it is in the panel under the row, remembered; PLAY queues at once (/1v1)", async ({ page }) => {
   await named(page, "Duel");
   await page.goto(`/?pool=home1v1-${test.info().project.name}-${run}`);
   await page.getByRole("radio", { name: /^1 v 1/ }).click();
   await expect(page.getByRole("radio", { name: /^1 v 1/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("radiogroup", { name: "Matchmaking" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Party/ })).toHaveCount(0);
-  await expect(page.locator(".fd-hint")).toHaveText("Ranked chess vs one player near your level");
-  // Your rank (the server's: a new account is in its placements), under the row.
-  await expect(page.locator(".fd-rank1v1")).toHaveText(/^Your rank: Placement 0\/5$/);
+  // Your rank (the server's: a new account is in its placements) and what 1 v 1 is, in the panel under the row.
+  await expect(page.locator(".fd-panel")).toHaveText(/^Your rank: Placement 0\/5Ranked chess vs one player near your level$/);
+  await expect(page.locator(".fd-hint")).toHaveText("");
   const row = (await page.getByRole("radiogroup", { name: "RANKED" }).boundingBox())!;
   const rank = (await page.locator(".fd-rank1v1").boundingBox())!;
   const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
@@ -183,4 +181,68 @@ test("the hidden /bosses opens the solo boss picker straight away (a player too)
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("radiogroup", { name: "RANKED" })).toBeVisible();
   expect(new URL(page.url()).search).toBe("");
+});
+
+test("home keeps still: no click on a mode, an option or the ⓘ moves or resizes the board preview, PLAY or the Boss raid card (phone and computer)", async ({ page }) => {
+  // (Eric, Oct 18: "nothing should actually be forced moving around the size of the board or where the play button
+  // is"; docs/decisions/2026-10-18-home-steady-layout.md.)
+  await named(page, "Still");
+  const sizes = desktop() ? [[1280, 800], [1440, 900], [1920, 1080]] : [[390, 844], [320, 640]];
+  const radio = (name: RegExp) => page.getByRole("radio", { name });
+  const steps: [string, () => Promise<unknown>][] = [
+    ["Default", () => radio(/^Default/).click()],
+    ["Bots off", () => radio(/^Bots off/).click()],
+    ["Solo", () => radio(/^Solo you/).click()],
+    ["ⓘ open", () => page.getByRole("button", { name: "About matchmaking" }).click()],
+    ["ⓘ closed", () => page.getByRole("button", { name: "About matchmaking" }).click()],
+    ["Default again", () => radio(/^Default/).click()],
+    ["1 v 1", () => radio(/^1 v 1/).click()],
+    ["Squads", () => radio(/^Squads/).click()],
+    ["Party", async () => {
+      await radio(/^Party/).click();
+      await expect(page.getByRole("dialog", { name: "Squads party" })).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+    }],
+    ["Solo queue", () => radio(/^Solo queue/).click()],
+    ["50 v 50", () => radio(/^50 v 50/).click()],
+  ];
+  // (The panel last: what moves is checked before what's new.)
+  const parts = { board: ".fd-livewin", play: ".fd-play", boss: ".rd-card", panel: ".fd-panel" };
+  const measure = async () => {
+    const out: Record<string, { x: number; y: number; width: number; height: number }> = {};
+    for (const [k, s] of Object.entries(parts)) if ((k !== "board" || desktop()) && (await page.locator(s).count())) out[k] = await box(page, s);
+    return out;
+  };
+  for (const [w, h] of sizes) {
+    await page.setViewportSize({ width: w!, height: h! });
+    await page.addInitScript(() => localStorage.setItem("brc.mode", "crowd"));
+    await page.goto("/");
+    await expect(radio(/^50 v 50/)).toHaveAttribute("aria-checked", "true");
+    // (The live window's board: on screen at these computer sizes, a real square.)
+    if (desktop()) expect((await box(page, ".fd-livewin-sq")).width, `${w}`).toBeGreaterThan(150);
+    const first = await measure();
+    for (const [step, act] of steps) {
+      await act();
+      const now: Awaited<ReturnType<typeof measure>> = {};
+      for (const [k, sel] of Object.entries(parts)) {
+        if (!(k in first)) continue;
+        now[k] = await box(page, sel);
+        for (const d of ["x", "y", "width", "height"] as const) expect(Math.abs(now[k]![d] - first[k]![d]), `${w}×${h}, after ${step}: ${k}'s ${d}`).toBeLessThanOrEqual(1);
+      }
+      // What the panel holds fits inside it (the ⓘ's words float above it).
+      const spill = await page.evaluate(() => {
+        const e = document.querySelector(".fd-panel");
+        if (!e) return 0;
+        const p = e.getBoundingClientRect();
+        return Math.max(...[...e.children].filter((c) => !c.classList.contains("fd-types-info")).map((c) => c.getBoundingClientRect().bottom - p.bottom));
+      });
+      expect(spill, `${w}×${h}, after ${step}: inside the panel`).toBeLessThanOrEqual(0.5);
+      // The line under PLAY fits its fixed room (one line on a computer, two on a phone), whatever it says.
+      expect(await page.locator(".fd-hint").evaluate((e) => e.scrollHeight - e.clientHeight), `${w}×${h}, after ${step}: the line under PLAY`).toBeLessThanOrEqual(1);
+    }
+    // (The panel: there all along.)
+    expect(Object.keys(first), `${w}`).toContain("panel");
+    expect(await sideways(page), `${w}`).toBe(0);
+  }
 });

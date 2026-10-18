@@ -83,7 +83,7 @@ test("light or dark lives in Settings (Match device / Light / Dark), not on home
   expect(await sideways(page)).toBe(0);
 });
 
-test("computer: the play column is the Boss raid card | Play with friends, the RANKED row, then PLAY at the bottom; no Shop or Profile buttons", async ({ page }) => {
+test("computer: the play column in the phone's order (the RANKED row, PLAY, the Boss raid card, Play with friends); no Shop or Profile buttons", async ({ page }) => {
   test.skip(!desktop(), "the computer's layout");
   await named(page, "Columned");
   const main = page.getByRole("main");
@@ -102,8 +102,8 @@ test("computer: the play column is the Boss raid card | Play with friends, the R
     const menu = page.getByRole("navigation", { name: "Menu" });
     await expect(menu.getByRole("button", { name: "Shop & crates" })).toBeVisible();
     await expect(menu.getByRole("button", { name: "Profile" })).toBeVisible();
-    // Top to bottom: the Boss raid card and Play with friends (side by side, the card wider), the RANKED row and
-    // matchmaking, PLAY, its line.
+    // Top to bottom, as on a phone (Eric, Oct 18): the RANKED row, its panel (matchmaking), PLAY, its line, the Boss
+    // raid card (full width), Play with friends.
     const box = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!;
     const friends = await box(main.getByRole("button", { name: "Play with friends" }));
     const boss = await box(main.getByRole("button", { name: /^Boss raid/ }));
@@ -111,22 +111,21 @@ test("computer: the play column is the Boss raid card | Play with friends, the R
     const types = await box(main.getByRole("radiogroup", { name: "Matchmaking" }));
     const p = await box(play);
     const hint = await box(page.locator(".fd-hint"));
-    expect(Math.abs(friends.y - boss.y), `${w}`).toBeLessThan(1);
-    expect(boss.x + boss.width, `${w}: the card left of Play with friends`).toBeLessThanOrEqual(friends.x);
-    expect(boss.width, `${w}: the card the wider`).toBeGreaterThan(friends.width * 1.5);
     expect(friends.height).toBeGreaterThanOrEqual(44);
     expect(boss.height).toBeGreaterThanOrEqual(60);
-    expect(Math.max(friends.y + friends.height, boss.y + boss.height), `${w}: the buttons above the modes`).toBeLessThanOrEqual(modes.y);
+    expect(Math.abs(boss.width - modes.width), `${w}: the card full width`).toBeLessThan(2);
     expect(modes.y + modes.height).toBeLessThanOrEqual(types.y);
     expect(types.y + types.height, `${w}: the modes right above PLAY`).toBeLessThanOrEqual(p.y);
     expect(p.y - (types.y + types.height)).toBeLessThan(30);
     expect(hint.y).toBeGreaterThanOrEqual(p.y + p.height);
+    expect(boss.y, `${w}`).toBeGreaterThanOrEqual(hint.y + hint.height);
+    expect(friends.y, `${w}`).toBeGreaterThanOrEqual(boss.y + boss.height);
     await expect(page.locator(".fd-hint")).toHaveText(/Starts within|Usually about|Solo vs/);
     if (w >= 1280) {
-      // Beside your card: PLAY's line ends level with the card's bottom, and the room above is free (for a live game).
+      // Beside your card: Play with friends ends level with the card's bottom, and the room above is free (for a live game).
       const card = await box(page.locator(".fd-hero"));
-      expect(Math.abs(hint.y + hint.height - (card.y + card.height)), `${w}: PLAY at the bottom`).toBeLessThan(12);
-      expect(boss.y - card.y, `${w}: room above`).toBeGreaterThan(200);
+      expect(Math.abs(friends.y + friends.height - (card.y + card.height)), `${w}: the column's foot level with the card's`).toBeLessThan(12);
+      expect(modes.y - card.y, `${w}: room above`).toBeGreaterThan(200);
       expect(friends.x).toBeGreaterThanOrEqual(card.x + card.width);
     }
     expect(await sideways(page), `${w}`).toBe(0);

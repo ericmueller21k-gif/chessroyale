@@ -6,7 +6,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 - **Kill switches and the maintenance banner** ([ops.md](ops.md) "Kill switches"): a mode, Solo and Boss alone, or
   Squads resting disables its way in on the home screen with its line ("Squads is resting for a bit. Back soon.": under
-  PLAY, on the Party button, in Play with friends, on the Boss raid screen under its choices); the boss menu hides a resting
+  PLAY, in the Party sheet, in Play with friends, on the Boss raid screen under its choices); the boss menu hides a resting
   boss. `MAINTENANCE_BANNER` shows as a slim band over the top of every screen (✕ hides it until the message changes).
 - **The landing page** shows where online play needs signing in (`onlineNeedsSignIn` from `/api/auth/config`) and
   you aren't signed in: sign in, or play against bots as a guest (remembered on the device). An invite link shows it
@@ -15,10 +15,16 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   Oct 16, [docs/decisions/2026-10-16-home-ranked-row-and-boss-raid.md](../decisions/2026-10-16-home-ranked-row-and-boss-raid.md)):
   - **The RANKED row:** a small "RANKED" label over three buttons, one picked (a radio group, remembered on the device,
     `brc.mode`): **50 v 50** ("Crowd chess"), **1 v 1** ("Classic chess") and **Squads** ("8 squads of 4"). Classic
-    still plays with `?mode=classic`. Under the row, for the pick: 50 v 50's Matchmaking row (Default, Bots off, Solo)
-    with its ⓘ; Squads' Party button ([squads.md](squads.md)); for 1 v 1 (always people) your rank in it, "Your rank:
-    Gold 2 · 45 RP" or "Your rank: Placement 2/5" (`ranked1v1Label`, from your profile; whole on one line at 320 px at
-    its widest). Then PLAY and its line (1 v 1: "Ranked chess vs one player near your level"). 1 v 1's PLAY is
+    still plays with `?mode=classic`. Under the row, **the panel**: one box of one fixed size for every mode (Eric, Oct 18:
+    "it should never change size";
+    [docs/decisions/2026-10-18-home-steady-layout.md](../decisions/2026-10-18-home-steady-layout.md)), holding the
+    pick's options or words: 50 v 50's Matchmaking (Default, Bots off, Solo) with its ⓘ (its words float over the RANKED
+    row, moving nothing); Squads' **Solo queue** or **Party** ([squads.md](squads.md); Party opens the party sheet at
+    once, and PLAY opens it again while Party is picked); for 1 v 1 (always people) your rank in it, "Your rank: Gold 2 ·
+    45 RP" or "Your rank: Placement 2/5" (`ranked1v1Label`, from your profile; whole on one line at 320 px at its
+    widest), over "Ranked chess vs one player near your level". Then PLAY and its line, a fixed height whatever it says
+    (two lines' room on a phone, one line on a computer). No click on home moves or resizes anything (a mode, an option,
+    the ⓘ). 1 v 1's PLAY is
     `startRanked1v1()`: its queue at once, at `/1v1` ([ranked.md](ranked.md)); resting (`PAUSE_RANKED1V1`), PLAY is
     off with its line, as the other modes.
   - **The Boss raid card** (full width, "Boss raid", "Team up vs a boss · up to 50") opens the **Boss raid screen**
@@ -47,7 +53,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     While a 1 v 1 search runs, a choice asks "Leave the 1 v 1 queue?" first (App's `leavingDuelFirst`).
   - **`/bosses`** (unlisted, not admin-gated; Eric's shortcut): opens the solo boss picker at once ("Choose your boss":
     every boss you can meet and a random one, and for an admin the Hidden Boss after them; the difficulty), over home.
-  - Then "Play with friends" (a lobby in the row's pick; with 1 v 1 picked, a 50 v 50 lobby: 1 v 1 has none), "Shop &
+  - Then (after the Boss raid card) "Play with friends" (a lobby in the row's pick; with 1 v 1 picked, a 50 v 50 lobby: 1 v 1 has none), "Shop &
     crates" and "Profile" (a phone's), the coin pill, your icon, and the live line ("214 online · 9 matches running ·
     31 in queue") with the typical wait under PLAY.
   - A screen that replaces home (a phone's queue, the Boss raid screen, home again) starts at its top. A match's Home
@@ -57,8 +63,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md)), then one
     column: the RANKED row, PLAY, the Boss raid card, then the smaller buttons. Big tap targets, no sideways scroll at
     320–430 px; a long name on your home card ellipsizes.
-  - **Computer** (1024 px+): a side menu, the play column in the center (the Boss raid card and Play with friends side
-    by side, 2 : 1, then the RANKED row, PLAY at the bottom), a side panel (playing now, global chat).
+  - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the RANKED
+    row, its panel, PLAY and its line, the Boss raid card (full width, a little shorter), Play with friends; a side
+    panel (playing now, global chat).
     From 1280 px the play column starts with the **live window**: the featured real match (a matchmade one, most
     people, then newest) or, when none runs, bot-match replays played on a shared clock cycle so everyone sees the same
     moment (`LIVE_WINDOW`; replays in `packages/app/public/replays/crowd-bots.json`, never fetched on phones).
@@ -200,7 +207,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   `piece-sounds.test.ts` (the piece-sound picks: storage, fallback, files), `testers.test.ts` (practice mode and the
   eval bar: testers only), `faq.test.ts` (the FAQ: contents against sections, links, every boss, numbers following the
   settings); `packages/server/test/lobby-do-practice.test.ts` (online practice: testers only).
-- e2e: `e2e/front-door.spec.ts`, `home-ranked.spec.ts` (the RANKED row at 320-390 px and on a computer, 1 v 1's PLAY,
+- e2e: `e2e/front-door.spec.ts`, `home-ranked.spec.ts` (the RANKED row at 320-390 px and on a computer, home keeping still through every click
+  (PLAY, the board preview, the Boss raid card and the panel within 1 px, at 320 and 390 px and 1280-1920 px), 1 v 1's PLAY,
   the Boss raid card and screen and each of its choices, `/bosses`), `boss-select.spec.ts` (the character select: a
   tap's drop, sound and line, "?", the Hidden Boss dark and locked and never named, the pick reaching Boss alone, a Solo
   raid and a raid you make, resting bosses, the layout at 320-1280 px, the card turning; Boss alone's menu and
