@@ -231,6 +231,11 @@ test("his fifth carrot (?carrots=5): you leave them, he pulls them one by one, c
       his = c.boss;
       if (his >= 3 && !winSeen) winSeen = await watchFor(page, { banner: { selector: ".fight-banner", text: /FIVE CARROTS!/ } });
     }
+    if (turn === 0) {
+      // (A quiet first move: passing after it costs him nothing, so the pass guard lets the cast come at once.)
+      await play(page, (await bossNow(page)).crowdSide === "w" ? "d2d3" : "d7d6");
+      continue;
+    }
     const fen = await fenNow(page);
     const open = c ? openCarrots(c) : [];
     const quiet = moves(fen, (m, after) => !open.includes(m.to) && !m.captured && !after.inCheck());
