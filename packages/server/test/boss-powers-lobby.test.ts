@@ -1313,6 +1313,34 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
     expect(b1.until - L.now).toBe(bossTurnShowMs(b1.boss));
   });
 
+  it("fair play: a race turn counts as any turn, unless the race made another move the best than the engine's", () => {
+    // (Your rook on b1 and his knight on d6 each a move from b5: the race's own move is b1b5.)
+    const L = hopper({}, "4k3/8/3n4/8/8/8/8/1R5K w - - 0 30");
+    race(L, ["b5", "h8", "a3", "h4", "e5"]);
+    /** Both pick `move`; the host's engine scores every move 0.5 but `best`, 0.52. */
+    const turn = (move: string, best: string) => {
+      for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move });
+      const req = L.last("p1", "scoreRequest")!;
+      const boards: BoardScore[] = req.jobs.map((j) => {
+        const legal = legalMoves(j.fen);
+        const exp = Object.fromEntries(legal.map((m) => [m, m === best ? 0.52 : 0.5]));
+        return { boardId: j.boardId, bestMove: best, bestExpected: 0.52, expectedAfter: exp, botPicks: Object.fromEntries(j.bots.map((b) => [b.id, move])), botThinkMs: Object.fromEntries(j.bots.map((b) => [b.id, 4000])) };
+      });
+      L.core.message("p1", { t: "scores", key: req.key, boards });
+      L.advance(30_000);
+    };
+    // The engine's best is h1g1, the race's b1b5: that turn doesn't count.
+    turn("h1g1", "h1g1");
+    L.core.message("p1", { t: "bossMove", key: asked(L).key, move: "e8e7" });
+    L.advance(30_000);
+    // The engine's best is the race's own, b1b5: it counts, as any turn.
+    turn("g1g2", "b1b5");
+    expect(L.core.fairMoves("p1").map((m) => [m.best, !!m.power])).toEqual([
+      ["b1b5", true],
+      ["b1b5", false],
+    ]);
+  });
+
   it("his last carrot wins the battle: the results say so (`carrots`), a boss win", () => {
     const L = hopper({}, ROOK);
     race(L, ["d7", "c3", "h5", "e6", "g2"], { his: ["c3", "h5", "e6", "g2"] });

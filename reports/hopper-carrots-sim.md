@@ -28,8 +28,11 @@ choices), the spin and the prize. Rows in `reports/boss-sim/raid-<tag>.jsonl`.
 - **Not repeatable seed for seed** (Stockfish draws its limited-strength moves from the clock), so runs compare by their
   totals; ± is one standard error.
 - **His count** is the carrots he holds when the race ends (all pulled, both sides' 12 moves, or his fifth). Races the
-  battle ended first (no spin) are left out of the distribution: 21 of 649 races (and 9 battles ended before a forced
-  cast).
+  battle ended before they were over are left out of the distribution: 21 of 649. A race that was over counts even if
+  the battle then ended before his spin: one did (c3d, all five pulled, his 3 to the crowd's 2, then his next move
+  mated), so the chosen leads' 167 races hold 166 spins or wins. Nine battles never had a cast: 8 ended before their
+  forced turn, and one with the meter on ended before it filled. (Corrected after the review: this said races without
+  a spin were left out.)
 
 ## The placement's target
 

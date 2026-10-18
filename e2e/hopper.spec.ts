@@ -152,6 +152,15 @@ test("Chub & Chirp's Carrot Patch (the test switch): the cast, the race's pulls,
   const c = end.powers.carrots;
   // A pull (yours or his), the race over, his spin rolled on his tier, the prize on his side of the board.
   expect(c.by.filter((x: string | null) => x).length).toBeGreaterThan(0);
+  if (c.over === "won") {
+    // (Rare: his race brain pulled all five before your judge's moves stopped him. The battle is his at once, with its
+    // own line, and no spin.)
+    expect(c.boss).toBe(5);
+    expect(c.spin).toBeNull();
+    await expect(page.locator(".team-result")).toHaveText(/won with their fifth carrot\./, { timeout: 30_000 });
+    expect(errors).toEqual([]);
+    return;
+  }
   expect(c.over).toMatch(/^(pulled|moves)$/);
   expect(c.spin).toBeTruthy();
   expect(c.spin.tier).toBe(c.boss);

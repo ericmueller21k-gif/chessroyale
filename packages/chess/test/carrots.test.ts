@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { gridOf } from "../src/bosses/grid.ts";
-import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type CarrotPatch, type CarrotPull, type Settings } from "@chessroyale/core";
+import { editedFen } from "../src/bosses/alfil.ts";
+import { nodeTransport } from "../src/node.ts";
+import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type CarrotPatch, type CarrotPull, type Settings } from "@chessroyale/core";
 import {
   CARROT_TEST_MOVES,
   DEFAULT_BOSS_GUARD,
@@ -118,6 +120,23 @@ const sound = (fen: string) => {
   expect(kingAttacked(fen, sideToMove(fen) === "w" ? "b" : "w")).toBe(false);
 };
 const carrots = (r: MatchRunner) => r.boss!.powers!.carrots!;
+/** Stockfish's own legal moves in a position (`go perft 1`, the game's engine): what it plays from it, sorted. */
+async function stockfishMoves(fen: string): Promise<string[]> {
+  const t = nodeTransport();
+  const moves: string[] = [];
+  const done = new Promise<void>((resolve) =>
+    t.onLine((l) => {
+      if (/^[a-h][1-8][a-h][1-8][qrbn]?:/.test(l)) moves.push(l.split(":")[0]!);
+      else if (l.startsWith("Nodes searched")) resolve();
+    }),
+  );
+  t.send("uci");
+  t.send(`position fen ${fen}`);
+  t.send("go perft 1");
+  await done;
+  t.close();
+  return moves.sort();
+}
 /** Your rook on b1 and his knight on d6 each one move from b5; the kings far off (h1, e8). */
 const RACE_FEN = "4k3/8/3n4/8/8/8/8/1R5K w - - 0 30";
 const touching = (a: string, b: string) => Math.max(Math.abs(a.charCodeAt(0) - b.charCodeAt(0)), Math.abs(Number(a[1]) - Number(b[1]))) <= 1;
@@ -141,6 +160,10 @@ describe("the Carrot Patch: its trigger, once a battle", () => {
     expect(plain.boss!.powers!.warnAt).toBeUndefined();
     await crowd(plain);
     expect(plain.carrotDue()).toBe(false);
+  });
+
+  it("only Chub & Chirp's ultimate is once a battle", () => {
+    expect(BOSS_ROSTER.filter((d) => bossRules({ id: d.id })?.ultimateOnce).map((d) => d.id)).toEqual(["hopper"]);
   });
 
   it("the admins' trigger: the cast at the start of his next turn, without the warning; once it's come, the trigger refuses and the meter is off", async () => {
@@ -193,6 +216,12 @@ describe("the Carrot Patch: its trigger, once a battle", () => {
     expect(p.turn).toBe(r.boss!.crowdMoves + 1);
     expect(r.bossView()!.lastMove).toBeNull();
     expect(POWER_FX.carrots).toBe(HOPPER_FX.carrots);
+    // (The fifty-move count kept, from above 0: your king move makes it 8, and the cast leaves it 8.)
+    const quiet = from("4k3/8/8/8/2p5/8/3P4/4K3 w - - 7 30", { patch: { bossPowerTest: "carrotpatch" } });
+    await crowd(quiet, "e1f1");
+    expect(fenOf(quiet).split(" ")[4]).toBe("8");
+    quiet.applyCarrots();
+    expect(fenOf(quiet).split(" ").slice(4)).toEqual(["8", "31"]);
   });
 
   it("in check as his turn begins, it waits (he answers the check with his move); the warning stays, and it comes at the start of his next turn", async () => {
@@ -360,12 +389,16 @@ describe("the Carrot Patch: the race", () => {
     const spin = carrots(r).spin!;
     expect(spin).toMatchObject({ at: 1, tier: 2 });
     expect(r.boss!.powers!.events.find((e) => e.kind === "carrotSpin")).toEqual({ kind: "carrotSpin", turn: 2, tier: 2, prize: spin.prize, squares: spin.squares });
-    // By moves: the crowd's 12th, then his 12th.
-    const m = racing("4k3/8/8/8/8/8/8/R3K3 w - - 0 30", ["a5", "c3", "h5", "e6", "g2"], { crowdMoves: 11, bossMoves: 11 });
-    await crowd(m, "e1d1");
+    // By moves: still on after 11 each; over after the crowd's 12th, then his 12th.
+    const m = racing("4k3/8/8/8/8/8/8/R3K3 w - - 0 30", ["a5", "c3", "h5", "e6", "g2"], { crowdMoves: 10, bossMoves: 10 });
+    await crowd(m, "e1e2");
+    m.applyBossMove("e8d8");
+    expect(carrots(m)).toMatchObject({ crowdMoves: 11, bossMoves: 11 });
+    expect(carrots(m).over).toBeUndefined();
+    await crowd(m, "e2d1");
     expect(carrots(m).crowdMoves).toBe(12);
     expect(carrots(m).over).toBeUndefined();
-    m.applyBossMove("e8f8");
+    m.applyBossMove("d8e8");
     expect(carrots(m).over).toBe("moves");
     expect(carrots(m).spin).toMatchObject({ tier: 0, rolled: [], prize: [], squares: [] });
     // (Unpulled carrots count for nobody: nothing changes after.)
@@ -390,6 +423,34 @@ describe("the Carrot Patch: the race", () => {
     await b.playBoss();
     expect(b.raceCheck).toMatchObject({ won: true, move: "e8d7" });
     expect(b.stageComplete()).toBe(true);
+  });
+
+  it("his fifth carrot wins even when the same move draws on the board (a stalemate here), and his brain takes a fifth that doesn't when it can; a mate is his with the mate's own line", async () => {
+    // (Your king on h2, his queen on d3 and king on f2: your only move is Kh1. His count is 4, the last carrot on g3:
+    // Qd3-g3 pulls it and stalemates you; Kf2-g3 pulls it too, and doesn't.)
+    const fen = "8/8/8/8/8/3q4/5k1K/8 w - - 0 60";
+    const his = ["a1", "a8", "h8", "c6"];
+    const r = racing(fen, ["g3", ...his], { his });
+    await crowd(r, "h2h1");
+    r.applyBossMove("d3g3");
+    const board = r.boards.get(0)!;
+    expect(gameEndWith(board.history, board.bases)).toBe("stalemate");
+    expect(carrots(r).over).toBe("won");
+    expect(r.stageComplete()).toBe(true);
+    expect(r.bossCarrotWin).toBe(true);
+    expect(r.finishBossBattle()).toBe("boss");
+    // His brain, his pick the stalemating pull: it plays the other.
+    const race: CarrotRace = { boss: "b", open: ["g3"], his: 4, crowdLeft: 11, bossLeft: 12, weight: 1 };
+    const top: MoveScore[] = [{ move: "d3g3", expected: 0.99 }];
+    expect(await raceGuard(fakeEngine(), applyMove(fen, "h2h1"), "d3g3", top, { race, looks: 4, nodes: 1 }, DEFAULT_BOSS_GUARD)).toMatchObject({ move: "f2g3", won: true });
+    // (The last carrot on h3: Qd3-h3 pulls it and mates. His either way; the results keep the mate's line.)
+    const m = racing(fen, ["h3", ...his], { his });
+    await crowd(m, "h2h1");
+    m.applyBossMove("d3h3");
+    expect(gameEndWith(m.boards.get(0)!.history, m.boards.get(0)!.bases)).toBe("checkmate");
+    expect(carrots(m).over).toBe("won");
+    expect(m.bossCarrotWin).toBe(false);
+    expect(m.finishBossBattle()).toBe("boss");
   });
 
   it("the battle ending first: no spin (his move mates as the race ends)", async () => {
@@ -425,6 +486,23 @@ describe("the Carrot Patch: the spin", () => {
     }
     // The same seed and turn, the same roll (host, server and replays agree); another turn, another draw.
     expect(spinRoll(42, 9, 3)).toEqual(spinRoll(42, 9, 3));
+  });
+
+  it("a battle's spin rolls from that battle's seed and turn: each roll spinRoll's for them, and battles with other seeds roll differently", async () => {
+    const rolls = new Set<string>();
+    for (let seed = 1; seed <= 8; seed++) {
+      // (Tier 3, five prizes: the race over when you pull a5, then his move.)
+      const r = racing("4k3/8/8/8/8/8/8/R3K3 w - - 0 30", ["a5", "c3", "h5", "e6", "g2"], { his: ["c3", "e6", "h5"], crowd: ["g2"] });
+      r.state = { ...r.state, boss: { ...r.state.boss!, powers: { ...r.state.boss!.powers!, seed } } };
+      await crowd(r, "a1a5");
+      r.applyBossMove("e8d7");
+      const spin = carrots(r).spin!;
+      expect(spin.tier).toBe(3);
+      expect(spin.rolled).toEqual(spinRoll(seed, spin.at, 3));
+      rolls.add(spin.rolled.join("+"));
+    }
+    // (Eight seeds: not one prize for every battle, which a roll that ignored the seed would give.)
+    expect(rolls.size).toBeGreaterThan(1);
   });
 
   it("prize pieces on his side (Alfil's landing code): pawns on his 2nd row then 3rd, pieces on his back row then 2nd, nearest the middle first, never giving check", () => {
@@ -464,13 +542,45 @@ describe("the Carrot Patch: the spin", () => {
     expect(prizeFits(seven, ["q", "r"], "b").prize).toEqual(["q"]);
     // (Seven pawns: one more fits, two don't: the two pawns step down to one.)
     expect(prizeFits(seven, ["p", "p"], "b").prize).toEqual(["p"]);
-    // (Never up: a knight that can't fit doesn't become a pawn's prize above it; it steps down the ladder.)
+    // (A third knight is a promoted piece: it fits where a pawn is missing, one promotion's room.)
     const twoKnights = "r1bqkbnr/ppppppp1/2n5/8/8/8/8/4K3 w - - 0 30";
     expect(prizeFits(twoKnights, ["n"], "b").prize).toEqual(["n"]);
+    // (Never up: with his whole army a knight doesn't fit, nor anything below it: a blank, never a better prize.)
+    expect(prizeFits(army, ["n"], "b").prize).toEqual([]);
     for (const p of [["q", "q"], ["q", "r"], ["q"], ["r"], ["b"], ["n"], ["p", "p"], ["p"]]) {
       const got = prizeFits(seven, p, "b");
       expect(stockfishRefuses(got.fen)).toBeNull();
     }
+  });
+
+  it("a prize bishop goes on the color his bishops lack first, then the other (middle out as ever); with none or both, as any piece", () => {
+    // (His king on e8: d8 is dark, c8 light.)
+    expect(placePrize("4k3/8/8/8/8/8/8/4K3 w - - 0 30", ["b"], "b")!.squares).toEqual(["d8"]);
+    // (His one bishop dark-squared, on b6: the light c8 first. Light-squared, on c6: the dark d8, first as ever. Both: d8.)
+    expect(placePrize("4k3/8/1b6/8/8/8/8/4K3 w - - 0 30", ["b"], "b")!.squares).toEqual(["c8"]);
+    expect(placePrize("4k3/8/2b5/8/8/8/8/4K3 w - - 0 30", ["b"], "b")!.squares).toEqual(["d8"]);
+    expect(placePrize("4k3/8/1bb5/8/8/8/8/4K3 w - - 0 30", ["b"], "b")!.squares).toEqual(["d8"]);
+    // (His back row's light squares all taken: his 2nd row's light d7, before the dark d8.)
+    expect(placePrize("n1n1k1n1/8/1b6/8/8/8/8/4K3 w - - 0 30", ["b"], "b")!.squares).toEqual(["d7"]);
+    // (Any other piece on the same board: no color rule, d8.)
+    expect(placePrize("n1n1k1n1/8/1b6/8/8/8/8/4K3 w - - 0 30", ["r"], "b")!.squares).toEqual(["d8"]);
+  });
+
+  it("never an en passant square chess.js honors and Stockfish drops (a piece on the square behind it): the prize, and Alfil's landing, leave both seeing the same moves", async () => {
+    // (His d7-d5 just past your c5 pawn: en passant on d6. His prize, a pawn, goes on d7 first: behind it.)
+    const before = "r1bqk1nr/pp2p1bp/n4pp1/2Pp4/7P/B4P2/P1PPP1P1/RNQ1KBNR w KQkq d6 0 7";
+    expect(legalMoves(before)).toContain("c5d6");
+    const got = prizeFits(before, ["p"], "b");
+    expect(got.squares).toEqual(["d7"]);
+    expect(got.fen.split(" ")[3]).toBe("-");
+    expect(legalMoves(got.fen)).not.toContain("c5d6");
+    expect(await stockfishMoves(got.fen)).toEqual([...legalMoves(got.fen)].sort());
+    // (Alfil's landing, the same code: a piece landing behind the square drops it; with nothing there it stays.)
+    const g = gridOf(before);
+    g.set("d7", "N");
+    expect(editedFen(before, g).split(" ")[3]).toBe("-");
+    expect(editedFen(before, gridOf(before)).split(" ")[3]).toBe("d6");
+    expect(await stockfishMoves(before)).toEqual([...legalMoves(before)].sort());
   });
 });
 
@@ -535,6 +645,23 @@ describe("the Carrot Patch: what the race is worth (his brain, the crowd's judge
     ];
     const chessOnly = fakeEngine((f) => (pieceAt(f, "d7")?.type === "k" ? 0.2 : 0.6));
     expect((await raceGuard(chessOnly, fen, "e8e7", better, { race: { ...race, open: ["h8", "a1", "h1", "e5", "b5"] }, looks: 4, nodes: 1 }, DEFAULT_BOSS_GUARD)).move).not.toBe("e8d7");
+  });
+
+  it("a switch needs a real race gain (carrotMinGain): a move a hair better for the race and stronger at chess doesn't replace his pick", async () => {
+    const fen = RACE_FEN.replace(" w ", " b ");
+    const race: CarrotRace = { boss: "b", open: ["b5", "h8", "a3", "h4", "e5"], his: 0, crowdLeft: 12, bossLeft: 12, weight: 0.25 };
+    // (His knight to c4 is 0.009 pawn better for the race than his pick, the knight to f5, and 8 points better at chess;
+    // the pull to b5 a blunder.)
+    const engine = fakeEngine((f) => (pieceAt(f, "c4")?.type === "n" ? 0.42 : pieceAt(f, "b5")?.type === "n" ? 0.95 : 0.5));
+    const top: MoveScore[] = [
+      { move: "d6c4", expected: 0.58 },
+      { move: "d6f5", expected: 0.5 },
+    ];
+    const look = { race, looks: 4, nodes: 1 };
+    expect(BOSS_POWERS.carrotMinGain).toBe(0.25);
+    expect((await raceGuard(engine, fen, "d6f5", top, look, DEFAULT_BOSS_GUARD)).move).toBe("d6f5");
+    // (With any race gain enough, as before: the chess carried it in.)
+    expect((await raceGuard(engine, fen, "d6f5", top, look, DEFAULT_BOSS_GUARD, null, { ...BOSS_POWERS, carrotMinGain: 1e-9 })).move).toBe("d6c4");
   });
 
   it("he races as he plays: the race weighs less the weaker he is (Easy races worse), and not at all on a slip or under the King's strike", () => {
@@ -603,9 +730,24 @@ describe("the Carrot Patch with the other rules", () => {
     expect(queenSlain(r.bossView()!)).toBe(false);
   });
 
-  it("fair play: every crowd turn of the race, and the one right after his spin, doesn't count; before and after, they do", async () => {
+  it("fair play: a race turn counts unless the race made another move the best than the engine's; the turn right after his spin doesn't; before and after, they do", async () => {
+    // (Every engine score the same, so the race alone tells the moves apart.)
+    const flat = (top: string) => fakeEngine((f, m) => (m === top ? 0.52 : 0.5));
+    // Your rook on b1 and his knight on d6 each a move from b5: the race makes b1b5 the best, over the engine's h1g1.
+    const raced = racing(RACE_FEN, ["b5", "h8", "a3", "h4", "e5"], { engine: flat("h1g1") });
+    expect(powerTurn(raced.boss)).toBe(false);
+    raced.deal();
+    const changed = (await raced.evaluate(new Map([["h0", { move: "h1g1", thinkMs: 1000 }]]))).results[0]!;
+    expect(changed.scored[0]!.move).toBe("b1b5");
+    expect(changed.power).toBe(true);
+    // The engine's best is the race's too: the turn counts, with the judge's numbers (a found best is an engine's).
+    const same = racing(RACE_FEN, ["b5", "h8", "a3", "h4", "e5"], { engine: flat("b1b5") });
+    same.deal();
+    const kept = (await same.evaluate(new Map([["h0", { move: "h1g1", thinkMs: 1000 }]]))).results[0]!;
+    expect(kept.scored[0]!.move).toBe("b1b5");
+    expect(kept.power).toBeUndefined();
+    // The turn right after his spin doesn't count (the spin's moment: the longest look at the board before the clock).
     const r = racing("4k3/8/8/8/8/8/8/R3K3 w - - 0 30", ["a5", "c3", "h5", "e6", "g2"], { his: ["c3", "e6"], crowd: ["h5", "g2"] });
-    expect(powerTurn(r.boss)).toBe(true);
     await crowd(r, "a1a5");
     r.applyBossMove("e8d7");
     expect(carrots(r).spin).toBeTruthy();

@@ -75,8 +75,9 @@ export const hisTurn = (boss: Pick<BossState, "crowdMoves" | "startPly"> & { pow
 /**
  * A position with pieces taken off or put on between moves (`g`, the side to move as in `fen`): castling rights only
  * while their king and rook stand (these powers never move either, but it costs nothing), the en passant square only
- * while it's empty (a piece landed there: no capture onto it), the pawn that made its double step is there and one of
- * the side to move's pawns can take it, and the fifty-move count from zero (as after a capture).
+ * while it and the square behind it are empty (a piece landed on either: Stockfish drops the square then, chess.js
+ * doesn't, and the two must agree on the moves), the pawn that made its double step is there and one of the side to
+ * move's pawns can take it, and the fifty-move count from zero (as after a capture).
  */
 export function editedFen(fen: string, g: Grid): string {
   const parts = fen.split(" ");
@@ -87,8 +88,10 @@ export function editedFen(fen: string, g: Grid): string {
   if (ep !== "-") {
     const mover: Side = sideToMove(fen);
     const pawn = square(file(ep), mover === "w" ? 5 : 4);
+    // (Behind it: the square the pawn's double step started from.)
+    const behind = square(file(ep), mover === "w" ? 7 : 2);
     const takers = [file(ep) - 1, file(ep) + 1].filter((f) => f >= 0 && f < 8).map((f) => square(f, mover === "w" ? 5 : 4));
-    if (g.has(ep) || g.get(pawn) !== letter(other(mover), "p") || !takers.some((sq) => g.get(sq) === letter(mover, "p"))) parts[3] = "-";
+    if (g.has(ep) || g.has(behind) || g.get(pawn) !== letter(other(mover), "p") || !takers.some((sq) => g.get(sq) === letter(mover, "p"))) parts[3] = "-";
   }
   if (parts[4]) parts[4] = "0";
   return parts.join(" ");

@@ -879,8 +879,11 @@ export const BOSS_POWERS = {
    * carrotLooks best moves within the blunder guard and as many moves that pull a carrot are searched at carrotNodes (at
    * most 9 × 30,000 nodes a move, about the move's own search again) and re-scored with the race (what his chances of
    * each carrot make his prize worth), weighed by his strength: from carrotWeightMin at carrotSkill[0] Elo to all of it
-   * at carrotSkill[1]; a move that pulls his last carrot is always played. The crowd's judge weighs the race in full (the
-   * bots pick by it, the pulls among their choices).
+   * at carrotSkill[1]; a move that pulls his last carrot is always played. A move replaces his pick only for the race:
+   * at least carrotMinGain pawns of the race's worth above it (so a tiny race gain can't let a stronger chess move in:
+   * the review's 29 switches on real Stockfish had race gains of 0.01 to 0.24 pawn on the six that smuggled chess or
+   * swapped equals in a lost position, 0.32 and up on the rest). The crowd's judge weighs the race in full (the bots
+   * pick by it, the pulls among their choices).
    */
   carrotCount: 5,
   carrotMoves: 12,
@@ -914,6 +917,7 @@ export const BOSS_POWERS = {
   carrotNodes: 30_000,
   carrotSkill: [1000, 2000] as readonly [number, number],
   carrotWeightMin: 0.25,
+  carrotMinGain: 0.25,
 } as const;
 
 /**

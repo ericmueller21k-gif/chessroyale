@@ -9,10 +9,11 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   never numbers a browser makes up: strength, hard finds measured against the crowd, timing. The one exception is the
   look-away count (only the browser can see the page hidden), weak evidence that can add a few points, never ban.
 - **Recording.** During a match the lobby records each human pick's signals (`noteFair`, the `fair` record). Turns a
-  boss power touches (`powerTurn`) don't count, nor picks made with the engine's moves on screen that the game showed:
-  a power-up (`powerUp`), or Squads Mercenary's Stockfish token (`engineToken`: sanctioned help, skip reason
-  "engineToken"). Squads isn't recorded yet; its matches log which choices had a token's lines on screen
-  (`assists`, `isAssisted`), so when it is, they go in with `engineToken`.
+  boss power touches (`powerTurn`) don't count, nor turns where a boss's judge made another move the best than the
+  engine's (Chub & Chirp's carrot race: that best is the game's own weighing, `resolveBoard`), nor picks made with the
+  engine's moves on screen that the game showed: a power-up (`powerUp`), or Squads Mercenary's Stockfish token
+  (`engineToken`: sanctioned help, skip reason "engineToken"). Squads isn't recorded yet; its matches log which
+  choices had a token's lines on screen (`assists`, `isAssisted`), so when it is, they go in with `engineToken`.
 - **Someone who resigns mid-match** (or is gone too long) has their match's signals recorded with their result as
   they leave (`takeLeftResults`, the Durable Object's `saveResults`), as everyone's are at the end.
 - **The suspicion score** turns a player's evidence into a level; every threshold is in `FAIRPLAY`.

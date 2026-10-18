@@ -257,7 +257,10 @@ export interface BoardRound {
    * The round's scores stand.
    */
   lastStand?: LastStandRound;
-  /** Boss battle: a boss power touched this turn (a frozen piece, a pie, the blizzard, a flipped board): no fair-play signal. */
+  /**
+   * Boss battle: a boss power touched this turn (a frozen piece, a pie, the blizzard, a flipped board), or the boss's
+   * judge made another move the best (Chub & Chirp's race): no fair-play signal.
+   */
   power?: boolean;
 }
 
@@ -862,6 +865,10 @@ export class MatchRunner {
     const king = this.kingDecision(playerIds, result);
     if (king.plays) result.playedMove = evaluation.bestMove;
     const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, rawEvaluation);
+    // Fair play: a turn where the boss's judge made another move the best (Chub & Chirp's race) doesn't count either.
+    // That best is our own weighing, not an engine's: finding it says nothing about a player's engine.
+    const rawBest = Object.entries(limited.evaluation.expectedAfter).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const judgeChose = scored[0]?.move !== rawBest;
     return {
       boardId,
       fenBefore: board.fen,
@@ -871,7 +878,7 @@ export class MatchRunner {
       bestMove: evaluation.bestMove,
       ...(this.state.boss ? { king: king.plays, kingCalls: king.calls } : {}),
       ...(lastStand ? { lastStand } : {}),
-      ...(powerTurn(this.state.boss) ? { power: true } : {}),
+      ...(powerTurn(this.state.boss) || judgeChose ? { power: true } : {}),
     };
   }
 
@@ -1467,9 +1474,13 @@ export class MatchRunner {
     return race ? { race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;
   }
 
-  /** The battle was his by his last carrot (the Carrot Patch): for the result screen (the results' `carrots`). */
+  /**
+   * The battle was his by his last carrot (the Carrot Patch): for the result screen (the results' `carrots`). It wins
+   * over a draw the same move makes on the board (a stalemate, the fifty-move rule, a repetition: Eric's sheet, "he wins
+   * on the spot"); a mate is his anyway, with the mate's own line.
+   */
   get bossCarrotWin(): boolean {
-    return carrotBattle.won(this.state.boss) && !this.finalGameOver();
+    return carrotBattle.won(this.state.boss) && boardEnd(this.boards.get(this.state.boards[0]!)!) !== "checkmate";
   }
 
   /** The boss's last move, and the piece it took (if any). */
@@ -2059,13 +2070,15 @@ export interface RaceCheck {
  * His race brain (Eric's sheet: "Stockfish's top few safe moves are re-scored by the race: his distance to the open
  * carrots and yours, so he also blocks or takes your runners"), as the landing guard looks ahead. A move that pulls his
  * last carrot wins the battle: it's played, as a mate would be (his pick if it's one, else the first such in his
- * search's order, then square order). Else his pick, his search's `looks` best moves within the blunder guard of his
- * best, and the moves that pull a carrot (as many again, his search's order first: a short list of his top moves leaves
- * out moves within the guard, and a pull is the race's move), each one he may play here, are played and searched at
- * `nodes` (the crowd to move: his score the rest; a move that ends the game, its ending's), and scored with the race (raceWorth: what his chances of each carrot make his prize
+ * search's order, then square order; one that doesn't also draw on the board first). Else his pick, his search's
+ * `looks` best moves within the blunder guard of his best, and the moves that pull a carrot (as many again, his
+ * search's order first: a short list of his top moves leaves out moves within the guard, and a pull is the race's
+ * move), each one he may play here, are played and searched at `nodes` (the crowd to move: his score the rest; a move
+ * that ends the game, its ending's), and scored with the race (raceWorth: what his chances of each carrot make his prize
  * worth; raceAdjust: against the best of them for the race, weighed by `race.weight`). The best so scored replaces his
- * pick only for the race: its race worth above his pick's (never a stronger chess move in disguise), its own score
- * within the guard of the best searched; equals: his pick. Any unscored is left out; his pick unscored, and it stands.
+ * pick only for the race: its race worth at least carrotMinGain pawns above his pick's (so a tiny race gain never lets
+ * a stronger chess move in), its own score within the guard of the best searched; equals: his pick. Any unscored is
+ * left out; his pick unscored, and it stands.
  */
 export async function raceGuard(
   engine: EngineLike,
@@ -2075,7 +2088,7 @@ export async function raceGuard(
   look: BossRace,
   guard: BossGuard,
   allowed: readonly string[] | null = null,
-  s: Pick<BossPowerSettings, "carrotCount" | "carrotSharp" | "carrotHurry" | "carrotOdds" | "carrotWinWorth" | "bouncePawnLogit"> = BOSS_POWERS,
+  s: Pick<BossPowerSettings, "carrotCount" | "carrotSharp" | "carrotHurry" | "carrotOdds" | "carrotWinWorth" | "carrotMinGain" | "bouncePawnLogit"> = BOSS_POWERS,
 ): Promise<RaceCheck> {
   const t0 = performance.now();
   const r = look.race;
@@ -2085,8 +2098,10 @@ export async function raceGuard(
   const sorted = [...top].sort((a, b) => b.expected - a.expected).filter((m) => ok.has(m.move));
   const order = [...new Set([pick, ...sorted.map((m) => m.move), ...[...ok].sort()])];
   const pulls = order.filter((m) => pullsOf(fen, m, r.open).length > 0);
-  // (His last carrot: the battle.)
-  const win = pulls.find((m) => r.his + pullsOf(fen, m, r.open).length >= s.carrotCount);
+  // (His last carrot: the battle, even when the same move draws on the board (bossCarrotWin). Given the choice, one that
+  // doesn't, so the board never shows a stalemate as he wins; a mate is his either way.)
+  const wins = pulls.filter((m) => r.his + pullsOf(fen, m, r.open).length >= s.carrotCount);
+  const win = wins.find((m) => [null, "checkmate"].includes(gameEnd(applyMove(fen, m), []))) ?? wins[0];
   if (win) return done(win, 0, true);
   const best = sorted[0]?.expected;
   const safe = best === undefined ? [] : sorted.filter((m) => withinGuard(moveLoss(best, m.expected), guard)).map((m) => m.move);
@@ -2117,7 +2132,7 @@ export async function raceGuard(
   let at = total(mine);
   for (const m of moves) {
     const x = scored.get(m);
-    if (!x || m === pick || x.race <= mine.race + 1e-9 || !withinGuard(moveLoss(top1, x.chess), guard)) continue;
+    if (!x || m === pick || x.race < mine.race + s.carrotMinGain || !withinGuard(moveLoss(top1, x.chess), guard)) continue;
     if (total(x) > at + 1e-9) [move, at] = [m, total(x)];
   }
   return done(move, search.length);

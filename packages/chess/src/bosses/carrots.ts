@@ -22,7 +22,7 @@ import { applyMove, legalMoves, sideToMove } from "../rules.ts";
 import { stockfishRefuses, type MoveScore } from "../uci.ts";
 import { editedFen, putDown } from "./alfil.ts";
 import { logit, other, powerRoll, VALUE, type Side } from "./base.ts";
-import { gridOf, sideOf, type Grid } from "./grid.ts";
+import { gridOf, isLight, sideOf, type Grid } from "./grid.ts";
 
 type CarrotSettings = Pick<BossPowerSettings, "carrotCount" | "carrotMoves" | "carrotLeads" | "carrotReach">;
 
@@ -392,6 +392,8 @@ function worthAfter(fen: string, moves: readonly string[], r: CarrotRace): Map<s
 export function raceJudged<E extends { bestMove: string; bestExpected: number; expectedAfter: Record<string, number> }>(evaluation: E, fen: string, r: CarrotRace | null): E {
   if (!r || !r.open.length) return evaluation;
   const worth = worthAfter(fen, [...new Set([evaluation.bestMove, ...Object.keys(evaluation.expectedAfter)])], r);
+  // (No move here could be played: nothing to weigh, the engine's numbers stand.)
+  if (!worth.size) return evaluation;
   const ref = Math.min(...worth.values());
   const adjust = (m: string, e: number) => raceAdjust(e, (worth.get(m) ?? ref) - ref, 1);
   const expectedAfter = Object.fromEntries(Object.entries(evaluation.expectedAfter).map(([m, e]) => [m, adjust(m, e)]));
@@ -405,6 +407,7 @@ export function raceJudged<E extends { bestMove: string; bestExpected: number; e
 export function raceRanked(top: readonly MoveScore[], fen: string, r: CarrotRace | null): MoveScore[] {
   if (!r || !r.open.length || !top.length) return [...top];
   const worth = worthAfter(fen, top.map((m) => m.move), r);
+  if (!worth.size) return [...top];
   const ref = Math.min(...worth.values());
   return top.map((m) => ({ ...m, expected: raceAdjust(m.expected, (worth.get(m.move) ?? ref) - ref, 1) })).sort((a, b) => b.expected - a.expected || (a.move < b.move ? -1 : 1));
 }
@@ -450,20 +453,27 @@ export function prizeSquares(piece: string, boss: Side): string[] {
  * His prize put on the board (`fen`: after his move, the crowd to move): each piece, most valuable first, on the first of
  * its squares (prizeSquares) that's empty and allowed (Alfil's landing code, putDown: never giving check, a pawn never on
  * the first or last rank, the crowd still with a move, a square where it isn't left hanging first); none of those, the
- * nearest empty square allowed. Null when a piece has nowhere, or the position is one the engines refuse (more than 8
- * pawns, more pieces than promotions could make: stockfishRefuses; chess.js and Maia take any).
+ * nearest empty square allowed. A bishop tries the squares of the color his bishops lack first, then the other (the
+ * bishop color where it matters, as Alfil's landing keeps it: a second bishop on one color is worth well under the 3
+ * pawns the odds count it at); with none or both, as any piece. Null when a piece has nowhere, or the position is one
+ * the engines refuse (more than 8 pawns, more pieces than promotions could make: stockfishRefuses; chess.js and Maia
+ * take any).
  */
 export function placePrize(fen: string, prize: readonly string[], boss: Side): { fen: string; squares: string[] } | null {
   if (!prize.length) return { fen, squares: [] };
   const g = gridOf(fen);
   const squares: string[] = [];
   for (const piece of [...prize].sort((a, b) => VALUE[b]! - VALUE[a]!)) {
-    const first = prizeSquares(piece, boss);
-    const anchor = first[0]!;
+    const order = prizeSquares(piece, boss);
+    const anchor = order[0]!;
     const near = (x: string) => Math.max(Math.abs(file(x) - file(anchor)), Math.abs(rank(x) - rank(anchor))) * 16 + Math.abs(file(x) - file(anchor)) + Math.abs(rank(x) - rank(anchor));
-    const rest = SQUARES.filter((x) => !first.includes(x)).sort((a, b) => near(a) - near(b) || (a < b ? -1 : 1));
+    const rest = SQUARES.filter((x) => !order.includes(x)).sort((a, b) => near(a) - near(b) || (a < b ? -1 : 1));
+    // (A bishop: the color his bishops lack first, each list keeping its order.)
+    const colors = new Set([...g].filter(([, c]) => c === letter(boss, "b")).map(([x]) => isLight(x)));
+    const lacked = piece === "b" && colors.size === 1 ? !colors.has(true) : null;
+    const byColor = (xs: string[]) => (lacked === null ? xs : [...xs.filter((x) => isLight(x) === lacked), ...xs.filter((x) => isLight(x) !== lacked)]);
     // (His rows first, safe or not, in order; only then the nearest anywhere.)
-    const at = putDown(g, fen, letter(boss, piece), first) ?? putDown(g, fen, letter(boss, piece), rest);
+    const at = putDown(g, fen, letter(boss, piece), byColor(order)) ?? putDown(g, fen, letter(boss, piece), byColor(rest));
     if (!at) return null;
     squares.push(at);
   }

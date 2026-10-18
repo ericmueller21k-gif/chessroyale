@@ -25,6 +25,8 @@
  * cast saw it), every pull, how the race ended, his spin, and what his race brain did. `cast` ([from, to]): a forced cast
  * (the admins' trigger) at a crowd turn drawn from that range, the battle stopped once the race and the spin are over
  * (the carrot counts' extra samples: reports/hopper-carrots-sim.md). Tuning the placement: `{"powers": {"carrotLeads": [...]}}`.
+ * `tier` and `difficulty`: the boss's strength as a player rated under that tier meets him on Solo's Hard (250) or
+ * Hardest (500); the bots stay the raid's own. Leapfrog alone (the meter never filling): `{"powers": {"rageSpeed": {"hopper": 0.0001}}}`.
  *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
@@ -225,6 +227,9 @@ interface RaidPatch {
   cast?: [number, number];
   /** Start at this game (a run picked up where it stopped: the games before it are already in its rows). */
   skip?: number;
+  /** The boss's tier (bossFixedElo: a player rated just under it; the usual is 1600) and Solo's difficulty (bossDifficulty: Hard 250, Hardest 500). */
+  tier?: number;
+  difficulty?: number;
 }
 
 /**
@@ -261,7 +266,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       const strikeTurns = new Set<number>();
       while (strikeTurns.size < strikes) strikeTurns.add(6 + Math.floor(strikeRng() * 25));
       // (A boss whose powers are built before its art: met as the test link does, bossUnfinished.)
-      const s = { ...settings, ...RAID_SETTINGS, bossId, bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES } as Settings;
+      const s = { ...settings, ...RAID_SETTINGS, bossId, bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES, ...(patch.tier ? { bossFixedElo: patch.tier } : {}), ...(patch.difficulty ? { bossDifficulty: patch.difficulty } : {}) } as Settings;
       const runner = new MatchRunner({ settings: s, rng, engines, library, entrants: botRoster(rng, s.lobbySize, s) });
       const ults: { kind: string; turn: number }[] = [];
       let seen = -1;

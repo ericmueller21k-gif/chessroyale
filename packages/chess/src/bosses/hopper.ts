@@ -310,13 +310,13 @@ export const HOPPER: BossRules = {
   },
   // (Leapfrog comes at the start of his turn: hopperBattle.)
   passive() {},
-  // The crowd's turn right after a hop, every turn of the race, and the turn right after his spin (the prize just put
-  // on): its picks don't count for fair play. In the race the judge's best move is the race's own weighing, not an
-  // engine's verdict a player could copy, and an engine of the player's own can't see the carrots.
+  // The crowd's turn right after a hop, and the one right after his spin: its picks don't count for fair play. (The
+  // spin's moment is the longest look at the board before any clock starts, 6.2 s with his move's, more than the 5 s
+  // under which fair play calls a hard find fast.) The race's turns count, but for those where the judge made another
+  // move the best than the engine's (the runner's resolveBoard: that best is our own weighing, not an engine's).
   powerTurn: (boss) => {
     const p = boss.powers!;
-    const c = p.carrots;
-    return (!!p.hop && p.hop.at === boss.crowdMoves) || (!!c && (!c.over || c.spin?.at === boss.crowdMoves));
+    return (!!p.hop && p.hop.at === boss.crowdMoves) || p.carrots?.spin?.at === boss.crowdMoves;
   },
   // The judge weighs the race (as G-REX's fire): every move's score with what it does to his chances of each carrot,
   // and the moves that pull one always scored (carrots.ts). The bots pick by it too, the pulls among their choices (as
