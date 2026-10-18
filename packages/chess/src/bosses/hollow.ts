@@ -315,13 +315,16 @@ export const HOLLOW: BossRules = {
 // ---------------- The extra move (a failed Lights out) ----------------
 
 /**
- * The position with him to move again after his own move (the crowd's turn passed: the side to move swapped, no en
- * passant), or null when it can't be: the crowd is in check or has no move (the game is over).
+ * The position with the side to move's turn passed (the other side to move, no en passant; when Black passes, the move
+ * number goes up, as after Black's move): Hollow's extra move (the crowd's turn passed after his move) and Alfil's
+ * fusion (his move). Null when it can't be: the side to move is in check or has no move (the game is over), or the
+ * other side would have none.
  */
 export function passTurn(fen: string): string | null {
   try {
     if (inCheck(fen) || !legalMoves(fen).length) return null;
     const f = fen.split(" ");
+    if (f[1] === "b" && f[5]) f[5] = String(Number(f[5]) + 1);
     f[1] = f[1] === "w" ? "b" : "w";
     f[3] = "-";
     const passed = f.join(" ");

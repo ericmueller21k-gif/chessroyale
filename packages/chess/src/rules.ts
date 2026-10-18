@@ -460,6 +460,21 @@ export function kingAttacked(fen: string, color: "w" | "b"): boolean {
   }
 }
 
+/**
+ * The side to move has a mate in one here: a legal move that checkmates (the first found), or null (Alfil's Slam asks it
+ * at the start of his turn while the crowd's pieces are in the air; his fusion, of each square it could take).
+ */
+export function mateInOne(fen: string): string | null {
+  try {
+    if (isChess960Fen(fen)) return null;
+    // (chess.js marks a mating move's SAN with "#".)
+    const m = new Chess(fen).moves({ verbose: true }).find((x) => x.san.endsWith("#"));
+    return m ? m.from + m.to + (m.promotion ?? "") : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The game is over in this position (mate or stalemate), with nothing else to go on. */
 export function positionOver(fen: string): boolean {
   try {

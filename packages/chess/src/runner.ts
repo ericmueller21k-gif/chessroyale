@@ -103,6 +103,8 @@ import {
   bulletClock,
   bulletIncrement,
   stopReason,
+  alfilBattle,
+  type AlfilStep,
   type Battle,
   type BossAsks,
   type BossLastMove,
@@ -1329,6 +1331,39 @@ export class MatchRunner {
     return bigboyBattle.applyBounce(this.battle, pick, loss);
   }
 
+  /**
+   * Alfil's turn begins with a step (alfilBattle.step: the Mammoth Slam, the fusion of his last cast, a new cast), or
+   * null. Several can come one after another, each its own screen, then his move; the fusion is his move (his turn
+   * ends with it: bossToMove() is false after it, unless it failed).
+   */
+  alfilStep(): AlfilStep | null {
+    return alfilBattle.step(this.battle);
+  }
+
+  /** The positions the step's engine pick weighs (the cast's pairs, the fusion's squares, the Slam's lifts): the same on the server, the host and in solo. */
+  alfilCandidates(): string[] {
+    return alfilBattle.candidates(this.battle);
+  }
+
+  /** The step needs an engine's pick: a cast with a choice, a fusion or a Slam with a way to go to weigh (else it lands at once). */
+  alfilNeedsEngine(): boolean {
+    return alfilBattle.needsEngine(this.battle);
+  }
+
+  /** The step, from this device's engines (the cast's pair and the fusion's square: fuseFrom; the Slam's lift: slamFrom); null: nothing came of it. */
+  async playAlfil(engines: readonly EngineLike[] = this.opts.engines): Promise<AlfilStep | null> {
+    return alfilBattle.play(this.battle, engines);
+  }
+
+  /**
+   * The step lands (from the host's engine online: one of the candidates, else the cast's first pair, the fusion's first
+   * square or nothing; alfilBattle.apply). `step`: the one the pick was asked for (another now: the pick is dropped).
+   * Null: nothing came of it.
+   */
+  applyAlfil(pick: string | null, loss: number | null = null, step: AlfilStep | null = null): AlfilStep | null {
+    return alfilBattle.apply(this.battle, pick, loss, step);
+  }
+
   /** The boss's last move, and the piece it took (if any). */
   private bossLast: BossLastMove | null = null;
   /** The bosses' battle code's own store (Battle's memo). */
@@ -1362,6 +1397,7 @@ export class MatchRunner {
       crowdAllowed: (boardId) => runner.crowdAllowed(boardId),
       boardOf: (playerId) => runner.boardOf(playerId),
       afterCrowdMove: (move) => runner.afterCrowdMove(move),
+      bossPassed: () => runner.preparePowers(),
       memo: runner.bossMemo,
     };
   }

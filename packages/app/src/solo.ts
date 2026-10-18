@@ -1,7 +1,7 @@
 import { RECLUSE_PHASE2, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
-import { phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
+import { phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -749,9 +749,10 @@ export class SoloMatch implements GameView {
     const snap = this.bossSnapshot();
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
     // (Alone, it has been "thinking" since your move went in: scoring your move counts toward it.)
-    // (G-REX's fire has just burnt something: it plays out before the boss's move.)
+    // (G-REX's fire has just burnt something, or Alfil's pieces came down early: it plays out before the boss's move.)
     const burnt = !!snap.powers?.burnt?.some((b) => b.turn === snap.crowdMoves && (b.piece || b.fizzled));
-    const minThink = bossThinkMs(snap, burnt) - (this.alone && !burnt ? Date.now() - this.movedAt : 0);
+    const landed = landedEarlyMs(snap);
+    const minThink = bossThinkMs(snap, burnt, landed) - (this.alone && !burnt && !landed ? Date.now() - this.movedAt : 0);
     await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
     if (this.stopped) return;
     // As the turn passes to you, any power that comes with it (a freeze, a pie, the warning, the blizzard) plays out
@@ -806,6 +807,26 @@ export class SoloMatch implements GameView {
     await Promise.all([bounce, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
     if (this.stopped) return;
     const showMs = powerMomentMs([{ kind: "bounce" }]);
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
+    this.timer = setTimeout(() => this.nextRound(), showMs);
+  }
+
+  /**
+   * Alfil's turn begins with a step (the Mammoth Slam, the fusion of his last cast, a new cast): he gets ready
+   * (thinking) while this device's engines pick the cast's pair, the fusion's square or the Slam's lift, then it plays
+   * out (nobody's clock runs), then the next step or his move. His fusion is his move: then your turn, its moments (the
+   * fusion's first) before your clock starts, as after his move (one with no square fails with no moment, and he moves).
+   * No engine answer: the cast's first pair, the fusion's first square, nothing lifts (the Slam again on his next turn),
+   * as online. A step nothing came of (a Slam that lifted nothing, a pick the admins' trigger overtook) shows nothing.
+   * (Your move took his queen, or his pieces came down early: that plays in this thinking first; not again after it.)
+   */
+  private async alfilTurn() {
+    const snap = this.bossSnapshot();
+    this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
+    const step = this.runner.playAlfil(this.engines).catch(() => this.runner.applyAlfil(null));
+    const [done] = await Promise.all([step, new Promise((r) => setTimeout(r, bossThinkMs(snap, false, landedEarlyMs(snap))))]);
+    if (this.stopped) return;
+    const showMs = !this.runner.bossToMove() ? bossTurnShowMs(this.runner.bossView(), this.alone) : done && done !== "fuse" ? powerMomentMs([{ kind: done }]) : 0;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
     this.timer = setTimeout(() => this.nextRound(), showMs);
   }
@@ -1069,8 +1090,8 @@ export class SoloMatch implements GameView {
         }
         return this.finish();
       }
-      // (Hollow's Lights out and Big Boy's Big Bounce come at the start of his turn, before his move.)
-      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.bossTurn());
+      // (Hollow's Lights out, Big Boy's Big Bounce and Alfil's steps come at the start of his turn, before his move.)
+      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.bossTurn());
       // (A failed Lights out: his extra move, after his own and before your turn.)
       if (this.runner.extraMoveDue()) return void this.extraTurn();
       // (Boingo's funhouse: his move for you, as your turn begins.)
@@ -1304,7 +1325,10 @@ export class SoloMatch implements GameView {
             this.runner.finishLightsOut({});
           }
           if (this.runner.bounceDue()) await this.runner.playBounce(this.engines).catch(() => this.runner.applyBounce(null));
-          await this.runner.playBoss(this.engines[0]);
+          // (Alfil's steps, one after another: no engine answer, the cast's first pair, the fusion's first square or nothing
+          // lifts. His fusion is his move: then his turn is over.)
+          for (let i = 0; i < 3 && this.runner.alfilStep(); i++) await this.runner.playAlfil(this.engines).catch(() => this.runner.applyAlfil(null));
+          if (this.runner.bossToMove()) await this.runner.playBoss(this.engines[0]);
           continue;
         }
         if (this.runner.extraMoveDue()) {

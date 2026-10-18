@@ -11,6 +11,7 @@ import {
   bossIntroTimeline,
   bossTurnShowMs,
   bossThinkMs,
+  landedEarlyMs,
   powerMomentMs,
   LAST_STAND_MS,
   queenSlain,
@@ -288,10 +289,11 @@ export interface LobbyRecord {
   /**
    * How the boss's own move is played (the runner's bossMoveKind: "best" is a power's follow-up its engine search
    * scored, Wrangler's reply to the showdown's duel). "funhouse": the host plays the crowd's move for Boingo (his
-   * ultimate); "extra": it plays Hollow's extra move; "bounce": it picks Big Boy's Big Bounce.
+   * ultimate); "extra": it plays Hollow's extra move; "bounce": it picks Big Boy's Big Bounce; "tusks", "fuse" and
+   * "slam": it picks Alfil's cast (the pair), his fusion's square and his Slam's lift.
    */
-  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce";
-  /** Big Boy's Big Bounce: the candidates the host was sent (the answer must be one of them). */
+  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam";
+  /** Big Boy's Big Bounce, Alfil's fusion and Slam: the candidates the host was sent (the answer must be one of them). */
   bounceCandidates?: string[];
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
   bossPending?: string;
@@ -1372,7 +1374,9 @@ export class LobbyCore {
     const view = this.runner!.bossView()!;
     const b = this.runner!.state.boss;
     const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves && (x.piece || x.fizzled));
-    return queenSlain(view) || burnt ? this.io.now() + bossThinkMs(view, burnt) : undefined;
+    // (Alfil's pieces came down early after your move: their landing plays first too.)
+    const landed = landedEarlyMs(b);
+    return queenSlain(view) || burnt || landed ? this.io.now() + bossThinkMs(view, burnt, landed) : undefined;
   }
 
   /** What the boss's own turn asks the host for besides its move (Wrangler's long pull, drag or showdown), or null. */
@@ -1385,6 +1389,9 @@ export class LobbyCore {
     const runner = this.runner!;
     const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
     const funhouse = this.r.bossKind === "funhouse";
+    // (A pick among candidate positions, not a move: Big Boy's bounce, Alfil's cast, fusion and Slam.)
+    const kind = this.r.bossKind;
+    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam";
     // A power limits the moves: the boss's (a pie), or the crowd's for the move Boingo plays for it.
     const allowed = funhouse ? runner.crowdAllowed() : runner.bossAllowed();
     // (Wrangler's turn: his long pulls, a drag or the showdown to work out too, ordered by a seed of the turn's own.)
@@ -1398,11 +1405,14 @@ export class LobbyCore {
       ...(this.r.bossKind === "stumble" ? { stumble: true } : this.r.bossKind === "stagger" ? { stagger: true } : this.r.bossKind === "best" ? { best: true } : {}),
       ...(funhouse ? { funhouse: true } : {}),
       ...(this.r.bossKind === "extra" ? { extra: true } : {}),
-      ...(this.r.bossKind === "bounce" ? { bounce: this.r.bounceCandidates ?? [] } : {}),
-      ...(allowed && this.r.bossKind !== "bounce" ? { allowed } : {}),
+      ...(kind === "bounce" ? { bounce: this.r.bounceCandidates ?? [] } : {}),
+      // (His cast weighs its pairs' fusions as if they came now: the same pick as the fusion's.)
+      ...(kind === "tusks" || kind === "fuse" ? { fuse: this.r.bounceCandidates ?? [] } : {}),
+      ...(kind === "slam" ? { slam: this.r.bounceCandidates ?? [] } : {}),
+      ...(allowed && !pick ? { allowed } : {}),
       // (Only the boss's own moves are Maia's: the funhouse's move for the crowd, Hollow's extra move and Big Boy's
       // bounce keep their own engine picks, and so does Wrangler's reply to the showdown's duel: the engine's best.)
-      ...(this.r.bossBrain && !funhouse && this.r.bossKind !== "extra" && this.r.bossKind !== "bounce" && this.r.bossKind !== "best" ? { brain: this.r.bossBrain } : {}),
+      ...(this.r.bossBrain && !funhouse && !pick && this.r.bossKind !== "extra" && this.r.bossKind !== "best" ? { brain: this.r.bossBrain } : {}),
       ...(asks ? { ...(asks.pull ? { pull: asks.pull } : {}), ...(asks.drag ? { drag: true as const } : {}), ...(asks.showdown ? { showdown: asks.showdown } : {}), seed: asks.seed } : {}),
     });
   }
@@ -1432,6 +1442,29 @@ export class LobbyCore {
     this.r.bossMinAt = this.thinkMinAt();
     this.r.bounceCandidates = this.runner!.bounceCandidates();
     this.broadcast(this.bossMessage(0, { thinking: true }));
+    const host = this.hostNow();
+    this.r.hostId = host;
+    if (host) this.sendBossRequest(host);
+    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
+  }
+
+  /**
+   * Alfil's turn begins with a step (the Mammoth Slam, the fusion of his last cast, a new cast: the runner's
+   * alfilStep): everyone sees him get ready (thinking) while the host's engine picks the cast's pair, the fusion's
+   * square or the Slam's lift among the candidates (worked out here); a step with nothing to weigh needs no engine and
+   * lands at once (after your queen banner, if it's up). Then the step plays for everyone, and the next (another step,
+   * or his move; after the fusion, his move itself, the crowd's turn). No host engine anywhere: the cast's first pair,
+   * the fusion's first square, nothing lifts (the meter kept: the Slam comes again on his next turn).
+   */
+  private requestAlfil() {
+    const runner = this.runner!;
+    this.r.phase = "boss";
+    this.r.bossKey = `a-${++this.r.counter}`;
+    this.r.bossKind = runner.alfilStep()!;
+    this.r.bossMinAt = this.thinkMinAt();
+    this.r.bounceCandidates = runner.alfilCandidates();
+    this.broadcast(this.bossMessage(0, { thinking: true }));
+    if (!runner.alfilNeedsEngine()) return this.playBoss("");
     const host = this.hostNow();
     this.r.hostId = host;
     if (host) this.sendBossRequest(host);
@@ -1492,6 +1525,21 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
+    if (this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam") {
+      // Alfil's step (the host's pick, one of the candidates; else the cast's first pair, the fusion's first square, or nothing lifts):
+      // it plays out, then the next step or his move. His fusion is his move: the crowd's turn then begins as after
+      // his move (its moments, the fusion's first, play before the crowd's clock starts); one with no square fails
+      // with no moment, and he moves. Nothing came of it (a Slam that lifted nothing keeps the meter; a pick for a step
+      // that isn't his now, the admins' trigger having brought the Slam meanwhile, is dropped): no moment, straight on.
+      const asked = this.r.bossKind;
+      this.r.bossKind = undefined;
+      const picked = this.r.bounceCandidates?.includes(move) ? move : null;
+      this.r.bounceCandidates = undefined;
+      const step = this.runner!.applyAlfil(picked, null, asked);
+      const until = this.io.now() + (!this.runner!.bossToMove() ? bossTurnShowMs(this.runner!.bossView()) : step && step !== "fuse" ? powerMomentMs([{ kind: step }]) : 0);
+      this.broadcast(this.bossMessage(until));
+      return this.setTimer("nextRound", until);
+    }
     if (this.r.bossKind === "extra") {
       // His extra move: not the crowd's, so nothing is scored; its banner plays out, then the crowd's turn.
       this.r.bossKind = undefined;
@@ -1531,7 +1579,7 @@ export class LobbyCore {
     // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in his funhouse, the
     // crowd's: a random allowed one too). His extra move needs the engine to stay small: without one, he skips it.
     const runner = this.runner!;
-    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce") return this.playBoss("");
+    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam") return this.playBoss("");
     const legal = (this.r.bossKind === "funhouse" ? runner.crowdAllowed() : runner.bossAllowed()) ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
     this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
   }
@@ -1573,8 +1621,8 @@ export class LobbyCore {
         }
         return this.finishMatch();
       }
-      // (Hollow's Lights out and Big Boy's Big Bounce come at the start of his turn, before his move.)
-      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : this.requestBoss();
+      // (Hollow's Lights out, Big Boy's Big Bounce and Alfil's steps come at the start of his turn, before his move.)
+      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : this.requestBoss();
       // (A failed Lights out: his extra move, after his own and before the crowd's turn.)
       if (runner.extraMoveDue()) return this.requestExtra();
       // (Boingo's funhouse: his move for the crowd, as its turn begins.)
