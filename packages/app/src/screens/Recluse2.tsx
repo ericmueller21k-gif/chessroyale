@@ -26,6 +26,7 @@ import { Hud } from "./Hud.tsx";
 import { BossHeading } from "./Play.tsx";
 import { useStillKey } from "../hooks.ts";
 import { clockShown } from "../clock-text.ts";
+import { underBoardView } from "../prefs.ts";
 
 /**
  * The Hidden Boss's phase change and his phase 2 (rules: packages/chess/src/bosses/recluse-phase2.ts; the driver:
@@ -320,8 +321,11 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   const flying = fig?.anim === "leap" && t >= C.upAt && t < C.landAt;
   const light = lightAt(t);
   const cracking = t >= C.crackAt && t < C.growAt;
+  // (No scoreboard here: phase 1's, minimized, gave the board more of a phone's height, so its size is kept until the
+  // split by the same rule: styles.css, rc-folded.)
+  const folded = !underBoardView().open;
   return (
-    <div class={`screen game boss-screen rc-change${away ? " rc-away" : ""}`}>
+    <div class={`screen game boss-screen rc-change${away ? " rc-away" : ""}${folded ? " rc-folded" : ""}`}>
       {hud}
       <div class={`board-area${jolt ? " pw-crash" : ""}`}>
         <div class="opening-name">

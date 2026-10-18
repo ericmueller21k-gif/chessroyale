@@ -68,6 +68,11 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - Don't transition or animate between colors made with `color-mix(…, transparent)`. Switch them, or fade a layer's
     opacity, or animate a shadow.
   - An emoji or symbol in a line above the board gets `line-height: 1` (its font is taller than the text's).
+- **A board that shrank as the boss fell** (Oct 18, [story](../docs/history/lessons.md#a-board-that-shrank-as-the-boss-fell-oct-18-2026)):
+  - A rule that sizes the board from something on the screen (`:has(.mini-tower.closed)`) must hold on every screen
+    that hands the board on: when the next screen lacks that thing, it carries the state itself (`rc-folded`).
+  - Measure a board handed between screens with each setting that changes its size (the scoreboard minimized), in a
+    window short enough that the height sizes it (390 × 600), not only at the test phone's size.
 - **A top bar that only fit a new player** (Oct 8, [story](../docs/history/lessons.md#a-top-bar-that-only-fit-a-new-player-oct-8-2026)):
   - A number on screen that grows (coins, ratings, counts, scores) is tested at its widest realistic value, not the
     value a fresh test account has. Fake the server's answer in the test (`page.route`) if that's the only way to get

@@ -189,6 +189,11 @@ build): online, phase 1 won is the crowd's victory):
   - One book on screen throughout, in his frames (`RECLUSE_BOOK` isn't shown). His frames and the God King's are drawn
     ahead from his battle's start (`prewarmRecluse`), its sounds made ahead in the sound worker. Other sounds: his
     rustle, `recluseThump` (landing), `recluseShut` (the book), `recluseGlow` (the light), the saw's crack.
+  - **The board keeps phase 1's size until the split** (Eric, Oct 18: it shrank on his phone as the boss fell;
+    docs/decisions/2026-10-18-phase-change-board-size.md): the phase change has no scoreboard, so on a phone where
+    phase 1's was minimized (`underBoardView().open` false) its screen carries `rc-folded`, which gives the board the
+    same height budget as `:has(.mini-tower.closed)` (styles.css). Test: `e2e/recluse.spec.ts`, "the board keeps its
+    size from the mate until the split" (every frame, within 1 px, 390 × 600 with the scoreboard minimized; 1280 × 600).
 - **Its words, never twice at once** (Eric, Oct 15; DECISIONS.md, "Every banner a second longer; nothing said twice
   on the Hidden Boss's screens"): the subtitle adds nothing before the split (the title says "phase 2"), then
   "Chess960"; the boss bar's right side is empty (in phase 2, "N of 4 won": `bossNote`, `""` in the phase change, null
