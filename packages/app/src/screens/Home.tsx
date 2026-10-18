@@ -8,7 +8,7 @@ import { BossBrainPicker } from "../components/BossBrain.tsx";
 import { isAdmin, maiaAllowed, maiaLikely, pickedBrain, rememberBrain } from "../boss-brain.ts";
 import { prefetchMaia } from "../maia.ts";
 import type { ComponentChildren } from "preact";
-import { AccountBar, BackButton, DressedPawn, FdButton, GearIcon, LiveLine, Logo, RankLine, wearingNames } from "../components/FrontDoor.tsx";
+import { AccountBar, BackButton, DressedPawn, FdButton, GearIcon, LiveLine, Logo, RankLine, ShopIcon, wearingNames } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
 import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/BossSelect.tsx";
 import { BossFace } from "../components/BossCharacter.tsx";
@@ -16,7 +16,7 @@ import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { LiveWindow } from "../components/LiveWindow.tsx";
 import { LIVE_WINDOW_MEDIA } from "../bot-replays.ts";
-import { FriendsLine } from "../components/Friends.tsx";
+import { friendsBadge, useFriends } from "../friends.ts";
 import { testParams } from "../test-switches.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
@@ -475,7 +475,6 @@ export function HomeScreen({
   onSquads,
   onParty,
   onRaid,
-  onFriends,
   onProfile,
   onSettings,
   onShop,
@@ -513,11 +512,10 @@ export function HomeScreen({
   onParty: () => void;
   /** Open (true) or close the Boss raid screen. */
   onRaid: (open: boolean) => void;
-  /** Your friends list. */
-  onFriends: () => void;
   onProfile: () => void;
   /** The phone's gear in the top bar: Settings, as Profile → Settings opens it. */
   onSettings: () => void;
+  /** The phone's shop icon in the top bar. */
   onShop: () => void;
   onSignIn: () => void;
 }) {
@@ -526,11 +524,11 @@ export function HomeScreen({
   // A part resting (a kill switch, status.ts): its way in is disabled, with its line.
   useServerStatus();
   const rest = (what: Pausable) => (isPaused(what) ? pausedLine(what) : null);
-  // (The same line as the stylesheet's frame: from 1024 px the side menu has the shop and your profile.)
-  const computer = useMedia("(min-width: 1024px)");
   // (From 1280 px the play column sits beside your card, with room at its top for the live window: a computer's only,
   // never a phone's or a tablet's, LIVE_WINDOW_MEDIA.)
   const wide = useMedia(LIVE_WINDOW_MEDIA);
+  useFriends();
+  const friendsNews = friendsBadge();
   const [mode, setModeState] = useState<HomeMode>(chosenHomeMode);
   const squads = mode === "squads";
   const pickMode = (m: HomeMode) => {
@@ -662,6 +660,8 @@ export function HomeScreen({
   }, [view]);
   const hero = (
     <section class="fd-hero" aria-label="You">
+      {/* (A phone sizes your pawn to the room the card has, and sets it beside your name when that room is short.) */}
+      <div class="fd-hero-in">
       <DressedPawn look={look} size="hero" shadow />
       {/* (Your icon to the left of your name and rating, as beside your name in chat.) */}
       <div class="fd-hero-id">
@@ -675,6 +675,7 @@ export function HomeScreen({
             {wearing && ` · ${wearing}`}
           </div>
         </div>
+      </div>
       </div>
     </section>
   );
@@ -792,7 +793,7 @@ export function HomeScreen({
   // page's layout: the ⓘ's words float over it.
   const rank1v1 = mode === "1v1" ? ranked1v1Label() : null;
   const panel = (
-    <div class="fd-panel">
+    <div class="fd-mode-panel">
       {mode === "squads" ? (
         <div class="fd-modes fd-types fd-squad-pick" role="radiogroup" aria-label="Squads">
           {(
@@ -889,37 +890,35 @@ export function HomeScreen({
       </span>
     </button>
   );
-  // The smaller buttons. (A computer's side menu has the shop and your profile, so its home doesn't repeat them.)
+  // Play with friends. (The shop and your profile are in a phone's top bar and a computer's side menu: Eric, Oct 18.)
   const actions = (
     <div class="fd-actions">
       <FdButton class="fd-wide" onClick={() => (squads ? onParty() : setFriends(true))}>
         Play with friends
       </FdButton>
-      {!computer && (
-        <>
-          <FdButton onClick={onShop}>Shop &amp; crates</FdButton>
-          <FdButton onClick={onProfile}>Profile</FdButton>
-        </>
-      )}
     </div>
   );
   return (
     <div class="fd-home">
       {/*
-       * (A phone's top bar: the logo, your coins and pawn, and a gear for Settings (Eric, Oct 17: one tap, not two
-       * through Profile). A computer has the logo and Settings in its side menu, your coins and pawn top right.)
+       * (A phone's top bar: the logo, your coins and pawn, the shop (Eric, Oct 18) and a gear for Settings (Eric, Oct 17:
+       * one tap, not two through Profile). A computer has the logo, the shop and Settings in its side menu, your coins
+       * and pawn top right.)
        */}
       <header class="fd-top">
         <Logo />
         <div class="fd-top-end">
-          <AccountBar onProfile={onProfile} />
+          {/* (What's new for you with friends, a request or an invite: on your pawn, as your profile has Friends.) */}
+          <AccountBar onProfile={onProfile} news={friendsNews} />
+          <button type="button" class="fd-icon-btn fd-top-shop" aria-label="Shop & crates" onClick={onShop}>
+            <ShopIcon />
+          </button>
           <button type="button" class="fd-icon-btn fd-top-gear" aria-label="Settings" onClick={onSettings}>
             <GearIcon />
           </button>
         </div>
       </header>
-      {/* (A phone's: friends above the players online. A computer has them in its live panel.) */}
-      <FriendsLine onOpen={onFriends} />
+      {/* (Friends: a phone's are on your profile (Eric, Oct 18: off home); a computer's in its live panel.) */}
       <LiveLine live={live} />
       {notice && <Notice notice={notice} />}
       <div class="fd-home-main">

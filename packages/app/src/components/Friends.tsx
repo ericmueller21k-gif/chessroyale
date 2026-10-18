@@ -91,42 +91,6 @@ export function FriendsBadge({ n }: { n: number }) {
   ) : null;
 }
 
-/**
- * The phone home's line above the live line ("Friends · 2 online", and what's new for you): it opens the friends
- * list. Shown for anyone who can have friends, so it never pops in late; a computer has the live panel's section.
- */
-export function FriendsLine({ onOpen }: { onOpen: () => void }) {
-  // (Its count of who's online refreshes while it's on screen; a computer's live panel does that instead.)
-  const phone = !useMedia("(min-width: 1024px)");
-  const { state, status } = useFriends(phone);
-  if (status === "off" || status === "signIn") return null;
-  const online = state?.friends.filter((f) => f.online).length ?? 0;
-  const n = friendsBadge();
-  const sub = !state ? "" : !state.friends.length ? "tap a player's name to add them" : `${online} online`;
-  return (
-    <button type="button" class="fr-line" onClick={onOpen} aria-label={`Friends${sub ? `, ${sub}` : ""}${n ? `, ${n} new` : ""}`}>
-      <FriendsIcon />
-      <span class="fr-line-text">
-        <strong>Friends</strong>
-        {sub && <span> · {sub}</span>}
-      </span>
-      <FriendsBadge n={n} />
-      <span class="fr-chevron" aria-hidden="true">
-        ›
-      </span>
-    </button>
-  );
-}
-
-export const FriendsIcon = () => (
-  <svg class="fr-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <circle cx="9" cy="8" r="3.2" />
-    <path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
-    <circle cx="17" cy="9" r="2.6" />
-    <path d="M16 13.6c2.8.2 5 2.2 5 5" />
-  </svg>
-);
-
 /** The computer's live panel: friends who are online (with Invite), above the players online. */
 export function FriendsPanel({ onOpen }: { onOpen: () => void }) {
   // (The live panel is a computer's: a phone never draws or refreshes it.)

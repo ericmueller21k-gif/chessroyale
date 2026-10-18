@@ -35,7 +35,7 @@ export function shortCoins(n: number): string {
 
 /**
  * Your coin balance, as the server has it (hidden without an account): "● 1,250 coins". In a phone's top bar the word
- * goes when there isn't room for it, and below 360 px a balance of 10,000 or more shows short ("12k"), so the bar
+ * goes when there isn't room for it, and below 430 px a balance of 10,000 or more shows short ("12k"), so the bar
  * never runs off the screen.
  */
 export function Coins({ coins }: { coins: number | null }) {
@@ -78,22 +78,27 @@ export function DressedPawn({
 }
 
 /** Your pawn in a gold ring: it opens your profile. */
-export function MyPawnButton({ onClick }: { onClick: () => void }) {
+export function MyPawnButton({ onClick, news = 0 }: { onClick: () => void; news?: number }) {
   const p = account().profile;
   return (
-    <button type="button" class="fd-ring" aria-label="Your profile" onClick={onClick}>
+    <button type="button" class="fd-ring" aria-label={news ? `Your profile, ${news} new` : "Your profile"} onClick={onClick}>
       <DressedPawn look={p?.locker?.look} size="ring" />
+      {news > 0 && (
+        <span class="fd-ring-news" aria-hidden="true">
+          {news}
+        </span>
+      )}
     </button>
   );
 }
 
 /** Your coins and your pawn in its ring (the home's top bar on a phone; the top right of the page on a computer). */
-export function AccountBar({ onProfile }: { onProfile: () => void }) {
+export function AccountBar({ onProfile, news }: { onProfile: () => void; news?: number }) {
   const p = account().profile;
   return (
     <div class="fd-top-right">
       <Coins coins={p?.shop?.coins ?? null} />
-      <MyPawnButton onClick={onProfile} />
+      <MyPawnButton onClick={onProfile} news={news} />
     </div>
   );
 }
@@ -103,6 +108,14 @@ export const GearIcon = () => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <circle cx="12" cy="12" r="3.2" />
     <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+  </svg>
+);
+
+/** The shop: a bag, drawn as the gear is (the phone's top bar). */
+export const ShopIcon = () => (
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M5 8h14l-1 12.2a1 1 0 0 1-1 .8H7a1 1 0 0 1-1-.8z" />
+    <path d="M9 10V7a3 3 0 0 1 6 0v3" />
   </svg>
 );
 

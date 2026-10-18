@@ -7,7 +7,8 @@ import { DuelRankPill } from "../components/DuelRankPill.tsx";
 import { IconEditor, UserIcon } from "../components/PixelIcon.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { QuickChatPicks } from "../components/ChatPicks.tsx";
-import { ProfileFriendActions } from "../components/Friends.tsx";
+import { FriendsBadge, ProfileFriendActions } from "../components/Friends.tsx";
+import { friendsBadge, useFriends } from "../friends.ts";
 import { account, fetchProfile, onAccountChange, reportPlayer, tooYoung, updateProfile, youngGuest, type PublicProfile } from "../account.ts";
 import type { ProfileTarget } from "../profile-nav.ts";
 import { ordinal } from "./StageBreak.tsx";
@@ -361,6 +362,7 @@ export function PlayerProfileScreen({
   onLocker,
   onSettings,
   onShop,
+  onFriends,
   match,
 }: {
   target: ProfileTarget;
@@ -371,11 +373,14 @@ export function PlayerProfileScreen({
   onSettings?: () => void;
   /** The shop's chat packs (a locked line in Quick chat and emoji). */
   onShop?: () => void;
+  /** Your friends list (a phone's way there: Eric, Oct 18, off home). */
+  onFriends?: () => void;
 }) {
   const [, rerender] = useState(0);
   useEffect(() => onAccountChange(() => rerender((n) => n + 1)), []);
   const { config, profile: me } = account();
   const own = !!target.you || (!!me && target.uid === me.user.id);
+  const friends = useFriends();
   const uid = own ? me?.user.id : target.uid;
   const [p, setP] = useState<PublicProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -467,6 +472,11 @@ export function PlayerProfileScreen({
             {onLocker && (
               <FdButton class="small" onClick={onLocker}>
                 Open locker
+              </FdButton>
+            )}
+            {onFriends && friends.status !== "off" && friends.status !== "signIn" && (
+              <FdButton class="small" onClick={onFriends}>
+                Friends <FriendsBadge n={friendsBadge()} />
               </FdButton>
             )}
           </div>

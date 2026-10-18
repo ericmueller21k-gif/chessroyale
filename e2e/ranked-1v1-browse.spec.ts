@@ -42,7 +42,7 @@ const goHome = (page: Page) => page.locator(".dv-search").getByRole("button", { 
 /** The shop: the phone's home button, or the computer's side menu. */
 async function openShop(page: Page) {
   if (isComputer()) await page.locator(".fd-side").getByRole("button", { name: "Shop & crates" }).click();
-  else await page.getByRole("main").getByRole("button", { name: "Shop & crates" }).click();
+  else await page.locator(".fd-top").getByRole("button", { name: "Shop & crates" }).click();
   await expect(page.getByRole("heading", { name: "Shop", exact: true })).toBeVisible();
 }
 

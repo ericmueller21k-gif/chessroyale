@@ -41,9 +41,8 @@ test("home: the live line comes from the server, the RANKED row changes the line
   // No sideways scrolling, and big tap targets. (Boss alone isn't on home any more: the Boss raid screen has it.)
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
   await expect(page.getByRole("main").getByRole("button", { name: /^Boss alone/ })).toHaveCount(0);
-  // (A computer's home has the card and one button: the shop and your profile are in its side menu.)
-  const buttons = test.info().project.name === "desktop" ? ["Play with friends"] : ["Play with friends", "Shop & crates", "Profile"];
-  for (const name of buttons) {
+  // (Home has the card and one button: the shop and your profile are in a phone's top bar and a computer's side menu.)
+  for (const name of ["Play with friends"]) {
     const box = (await page.getByRole("main").getByRole("button", { name, exact: true }).boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(44);
   }

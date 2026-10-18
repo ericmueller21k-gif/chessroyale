@@ -69,7 +69,7 @@ test("1 v 1: picked, your rank and what it is in the panel under the row, rememb
   await expect(page.getByRole("radiogroup", { name: "Matchmaking" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Party/ })).toHaveCount(0);
   // Your rank (the server's: a new account is in its placements) and what 1 v 1 is, in the panel under the row.
-  await expect(page.locator(".fd-panel")).toHaveText(/^Your rank: Placement 0\/5Ranked chess vs one player near your level$/);
+  await expect(page.locator(".fd-mode-panel")).toHaveText(/^Your rank: Placement 0\/5Ranked chess vs one player near your level$/);
   await expect(page.locator(".fd-hint")).toHaveText("");
   const row = (await page.getByRole("radiogroup", { name: "RANKED" }).boundingBox())!;
   const rank = (await page.locator(".fd-rank1v1").boundingBox())!;
@@ -206,7 +206,7 @@ test("home keeps still: no click on a mode, an option or the ⓘ moves or resize
     ["50 v 50", () => radio(/^50 v 50/).click()],
   ];
   // (The panel last: what moves is checked before what's new.)
-  const parts = { board: ".fd-livewin", play: ".fd-play", boss: ".rd-card", panel: ".fd-panel" };
+  const parts = { board: ".fd-livewin", play: ".fd-play", boss: ".rd-card", panel: ".fd-mode-panel" };
   const measure = async () => {
     const out: Record<string, { x: number; y: number; width: number; height: number }> = {};
     for (const [k, s] of Object.entries(parts)) if ((k !== "board" || desktop()) && (await page.locator(s).count())) out[k] = await box(page, s);
@@ -228,12 +228,14 @@ test("home keeps still: no click on a mode, an option or the ⓘ moves or resize
         now[k] = await box(page, sel);
         for (const d of ["x", "y", "width", "height"] as const) expect(Math.abs(now[k]![d] - first[k]![d]), `${w}×${h}, after ${step}: ${k}'s ${d}`).toBeLessThanOrEqual(1);
       }
-      // What the panel holds fits inside it (the ⓘ's words float above it).
+      // What the panel holds, every box in it, fits inside it (the ⓘ's words float above it). (Squads' choices once hung
+      // out of its foot while their own box fitted: Eric's phone, Oct 18.)
       const spill = await page.evaluate(() => {
-        const e = document.querySelector(".fd-panel");
+        const e = document.querySelector(".fd-mode-panel");
         if (!e) return 0;
         const p = e.getBoundingClientRect();
-        return Math.max(...[...e.children].filter((c) => !c.classList.contains("fd-types-info")).map((c) => c.getBoundingClientRect().bottom - p.bottom));
+        const boxes = [...e.querySelectorAll("*")].filter((c) => !c.closest(".fd-types-info")).map((c) => c.getBoundingClientRect());
+        return Math.max(0, ...boxes.map((c) => Math.max(c.bottom - p.bottom, p.top - c.top, c.right - p.right, p.left - c.left)));
       });
       expect(spill, `${w}×${h}, after ${step}: inside the panel`).toBeLessThanOrEqual(0.5);
       // The line under PLAY fits its fixed room (one line on a computer, two on a phone), whatever it says.

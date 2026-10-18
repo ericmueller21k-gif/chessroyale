@@ -339,6 +339,30 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   expect(await sideways(page)).toBe(0);
 });
 
+test("phone: home fits the screen with no scrolling from 360×640 up, in every mode; the shop and your profile are in the top bar, not under PLAY", async ({ page }) => {
+  test.skip(desktop(), "a phone's screen (Eric, Oct 18: \"should never have to be scrolling down on the phone\")");
+  await named(page, LONG_NAME);
+  for (const [width, height] of [[360, 640], [375, 667], [390, 664], [390, 844], [430, 932]] as const) {
+    await page.setViewportSize({ width, height });
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+    for (const mode of ["50 v 50", "1 v 1", "Squads"]) {
+      await page.getByRole("radio", { name: new RegExp(`^${mode}`) }).click();
+      const fit = await page.evaluate(() => ({
+        scroll: document.documentElement.scrollHeight - innerHeight,
+        foot: document.querySelector(".fd-actions")!.getBoundingClientRect().bottom <= innerHeight,
+        pawn: document.querySelector(".fd-hero .fd-pawn")!.getBoundingClientRect().height,
+      }));
+      expect(fit.scroll, `${width}×${height}, ${mode}: scrolling`).toBeLessThanOrEqual(0);
+      expect(fit.foot, `${width}×${height}, ${mode}: Play with friends on screen`).toBe(true);
+      expect(fit.pawn, `${width}×${height}, ${mode}: your pawn`).toBeGreaterThanOrEqual(48);
+    }
+    // (Under the Boss raid card: Play with friends alone.)
+    await expect(page.locator(".fd-actions").getByRole("button")).toHaveText(["Play with friends"]);
+    await expect(page.locator(".fd-top").getByRole("button", { name: "Shop & crates" })).toBeVisible();
+  }
+});
+
 test("phone: the top bar (logo, coins, pawn) fits from 320 px up, even with a six-digit balance", async ({ page }) => {
   test.skip(desktop(), "the phone's top bar");
   // A big balance (the server's answer, with more coins in it).
@@ -354,7 +378,7 @@ test("phone: the top bar (logo, coins, pawn) fits from 320 px up, even with a si
     await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
     const bar = page.locator(".fd-top");
     await expect(bar.getByLabel("123456 coins")).toBeVisible();
-    // Nothing runs off the bar or the screen; the number shows whole; every button is a full 44 px.
+    // Nothing runs off the bar or the screen; the number shows whole; every button is a full 44 px (40 below 360 px).
     const fits = await bar.evaluate((el) => {
       const right = el.getBoundingClientRect().right - parseFloat(getComputedStyle(el).paddingRight);
       const kids = [...el.querySelectorAll(".fd-logo, .fd-coins, .fd-ring")].map((k) => k.getBoundingClientRect());
@@ -365,7 +389,7 @@ test("phone: the top bar (logo, coins, pawn) fits from 320 px up, even with a si
     });
     expect(fits, `${width} px`).toEqual({ inOrder: true, inside: true, number: true });
     const ring = (await bar.getByRole("button", { name: "Your profile" }).boundingBox())!;
-    expect(ring.width, `Your profile at ${width}`).toBeGreaterThanOrEqual(44);
+    expect(ring.width, `Your profile at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
     expect(await sideways(page), `${width} px`).toBe(0);
   }
 });
@@ -380,7 +404,7 @@ const bigBalance = (page: Page) =>
     await route.fulfill({ response: res, json: body });
   });
 
-test("phone: the top bar's gear opens Settings in one tap (Back is home); it fits beside the coins and your pawn from 320 px", async ({ page }) => {
+test("phone: the top bar's shop and gear open the shop and Settings in one tap (Back is home); they fit beside the coins and your pawn from 320 px", async ({ page }) => {
   test.skip(desktop(), "the phone's top bar (a computer has Settings in its side menu)");
   await named(page, LONG_NAME);
   await bigBalance(page);
@@ -390,16 +414,23 @@ test("phone: the top bar's gear opens Settings in one tap (Back is home); it fit
     await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
     const bar = page.locator(".fd-top");
     await expect(bar.getByLabel("99999 coins")).toBeVisible();
-    // Logo, coins, pawn, gear: in order, apart, inside the bar; the gear a full 44 px.
+    // Logo, coins, pawn, shop, gear: in order, apart, inside the bar; the shop and the gear a full 44 px (40 below 360 px).
     const fits = await bar.evaluate((el) => {
       const right = el.getBoundingClientRect().right - parseFloat(getComputedStyle(el).paddingRight);
-      const kids = [...el.querySelectorAll(".fd-logo, .fd-coins, .fd-ring, .fd-top-gear")].map((k) => k.getBoundingClientRect());
+      const kids = [...el.querySelectorAll(".fd-logo, .fd-coins, .fd-ring, .fd-top-shop, .fd-top-gear")].map((k) => k.getBoundingClientRect());
       return { count: kids.length, inOrder: kids.every((k, i) => i === 0 || k.left >= kids[i - 1]!.right), inside: kids.every((k) => k.right <= right + 0.5), oneRow: kids.every((k) => k.top < kids[0]!.bottom && k.bottom > kids[0]!.top) };
     });
-    expect(fits, `${width} px`).toEqual({ count: 4, inOrder: true, inside: true, oneRow: true });
+    expect(fits, `${width} px`).toEqual({ count: 5, inOrder: true, inside: true, oneRow: true });
     const gear = (await bar.getByRole("button", { name: "Settings" }).boundingBox())!;
-    expect(Math.min(gear.width, gear.height), `the gear at ${width}`).toBeGreaterThanOrEqual(44);
+    expect(Math.min(gear.width, gear.height), `the gear at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
+    const shop = (await bar.getByRole("button", { name: "Shop & crates" }).boundingBox())!;
+    expect(Math.min(shop.width, shop.height), `the shop at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
   }
+  // One tap: the shop; Back is home.
+  await page.locator(".fd-top").getByRole("button", { name: "Shop & crates" }).click();
+  await expect(page.getByRole("heading", { name: "Shop" })).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).first().click();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   // One tap: Settings, as Profile → Settings opens it; Back is home.
   await page.locator(".fd-top").getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("radiogroup", { name: "Theme" })).toBeVisible();

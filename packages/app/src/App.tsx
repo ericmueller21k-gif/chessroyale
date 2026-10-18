@@ -1198,6 +1198,10 @@ export function App() {
             closeProfile();
             setShowShop("chat");
           }}
+          onFriends={() => {
+            closeProfile();
+            nav.friendsList();
+          }}
         />
       </FrontFrame>
     );
@@ -1310,7 +1314,6 @@ export function App() {
         onJoinLobby={(code) => leavingDuelFirst(() => joinLobby(code, { typed: code !== inviteCode }))}
         onSquads={() => leavingDuelFirst(() => void squadsPlay())}
         onParty={openParty}
-        onFriends={nav.friendsList}
         onSignIn={() => chooseGuest(false)}
         onProfile={() => openProfile({ you: true, name: account().profile?.user.name ?? "" })}
         onSettings={() => setShowSettings(true)}
@@ -1521,7 +1524,19 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
 }
 
 /** A profile as a page (outside a match): its address, and back to where you were. */
-function ProfilePage({ target, onLocker, onSettings, onShop }: { target: ProfileTarget; onLocker: () => void; onSettings: () => void; onShop: () => void }) {
+function ProfilePage({
+  target,
+  onLocker,
+  onSettings,
+  onShop,
+  onFriends,
+}: {
+  target: ProfileTarget;
+  onLocker: () => void;
+  onSettings: () => void;
+  onShop: () => void;
+  onFriends: () => void;
+}) {
   useEffect(() => {
     const path = target.you ? "/profile" : target.uid ? `/profile/${target.uid}` : null;
     if (path && location.pathname !== path) history.replaceState(null, "", path);
@@ -1536,6 +1551,7 @@ function ProfilePage({ target, onLocker, onSettings, onShop }: { target: Profile
       onLocker={onLocker}
       onSettings={onSettings}
       onShop={onShop}
+      onFriends={onFriends}
     />
   );
 }

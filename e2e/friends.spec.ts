@@ -22,10 +22,13 @@ async function player(browser: Browser, name: string): Promise<{ page: Page; id:
   return { page, id };
 }
 
-/** The friends list: the live panel's "All friends" on a computer, the line above the live line on a phone. */
+/** The friends list: the live panel's "All friends" on a computer, your profile's Friends on a phone (Eric, Oct 18). */
 async function openFriends(page: Page) {
   if (isComputer()) await page.locator(".fr-panel").getByRole("button", { name: "All friends ›" }).click();
-  else await page.locator(".fr-line").click();
+  else {
+    await page.locator(".fd-top .fd-ring").click();
+    await page.getByRole("button", { name: /^Friends/ }).click();
+  }
   await expect(page.getByRole("heading", { name: "Friends", exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/friends$/);
 }
@@ -52,7 +55,9 @@ test("two players: a request accepted, online in each other's list, the invites 
   await ann.page.emulateMedia({ colorScheme: "light" });
 
   // Bo, on his home: "1 new" within seconds; his list has the request; he accepts.
-  await expect(bo.page.locator(isComputer() ? ".fr-panel .fr-badge" : ".fr-line .fr-badge")).toHaveText("1 new", NEWS);
+  // (A phone: a count on your pawn in the top bar.)
+  if (isComputer()) await expect(bo.page.locator(".fr-panel .fr-badge")).toHaveText("1 new", NEWS);
+  else await expect(bo.page.locator(".fd-top .fd-ring-news")).toHaveText("1", NEWS);
   await openFriends(bo.page);
   const request = bo.page.locator(".fr-page .fr-row", { hasText: "Ann Friend" });
   await expect(request).toContainText("wants to be friends");
@@ -61,10 +66,9 @@ test("two players: a request accepted, online in each other's list, the invites 
   await expect(bo.page.locator("#fr-requests")).toHaveCount(0);
   await expect(bo.page.locator(".fr-page .fr-row", { hasText: "Ann Friend" })).toContainText("Online");
 
-  // Ann sees Bo online: in the live panel on a computer, on the line above the live line on a phone.
+  // Ann sees Bo online: in the live panel on a computer, in her friends list on a phone.
   await ann.page.goto("/?nolanding");
   if (isComputer()) await expect(ann.page.locator(".fr-panel .fr-row", { hasText: "Bo Friend" })).toContainText("Online", NEWS);
-  else await expect(ann.page.locator(".fr-line")).toContainText("Friends · 1 online", NEWS);
   await openFriends(ann.page);
   const boRow = ann.page.locator(".fr-page .fr-row", { hasText: "Bo Friend" });
   await expect(boRow).toContainText("Online");
@@ -123,18 +127,3 @@ test("two players: a request accepted, online in each other's list, the invites 
   await expect(bo.page.locator("#fr-friends")).toHaveText("FRIENDS · 0");
 });
 
-test("phone: the friends line fits from 320 px on one line, a big tap target, and with no friends yet says how to add one", async ({ page }) => {
-  test.skip(isComputer(), "the phone home's line");
-  for (const width of [320, 390]) {
-    await page.setViewportSize({ width, height: 740 });
-    await page.goto("/?nolanding");
-    const line = page.locator(".fr-line");
-    await expect(line).toContainText("Friends · tap a player's name to add them");
-    const box = (await line.boundingBox())!;
-    expect(box.height).toBeGreaterThanOrEqual(44);
-    expect(box.height).toBeLessThan(56);
-    // Above the live line, and nothing sideways.
-    expect(box.y).toBeLessThan((await page.locator(".fd-home > .fd-live").boundingBox())!.y);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
-  }
-});
