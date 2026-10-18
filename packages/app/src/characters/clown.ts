@@ -8,6 +8,8 @@
  */
 import { canvas, ellipse, inEllipse, inPoly, roundLight, shade, toGrid, type Canvas } from "./paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "./sprite.ts";
+import { KING_ATTACK } from "@chessroyale/chess";
+import { groundShadow, moved } from "./attack-frame.ts";
 
 export const CLOWN_PALETTE = {
   k: "#150c11", // outline, seams
@@ -664,6 +666,7 @@ export const CLOWN_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonl
   power: ["Pie time!", "Special delivery!", "Extra cream for you!", "Splat! Hee hee!"],
   ultimateWarn: ["Something funny's coming…", "Get ready to laugh…", "Boingo's big finale…"],
   ultimate: ["Welcome to the funhouse!", "Topsy-turvy!", "Round and round we go!"],
+  kingAttack: ["Pie, pie, and more pie!", "Honk! Extra cream!", "Say cheese… cake!"],
 };
 export const CLOWN_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
   entrance: 1,
@@ -680,4 +683,94 @@ export const CLOWN_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number
   power: 0.5,
   ultimateWarn: 1,
   ultimate: 1,
+  kingAttack: 1,
 };
+
+// ---- His attack on a king (kits.ts: his kit's `kingAttack`; Eric, Oct 18: "a relentless assault", pie after pie).
+
+/** Room to our right (the king's side) for the pies' flight to the king; his frame's headroom is room enough to drop in. */
+type Pt = readonly [number, number];
+const ATTACK_REACH = 40;
+const AW = 72 + ATTACK_REACH;
+const AH = 94;
+/** Where each pie lands, at the king's head or a little lower in turn (drawing space): past his square's middle. */
+const PIE_X = 24 + 1.92 * 36;
+const pieY = (i: number) => GROUND - 1 - (i % 2 ? 21 : 27);
+const fa = (fr: Frame): Frame => moved(fr, 0, 0, AW, AH);
+const landShadow = (r: number): Speck[] => groundShadow(OX + 24, OY + GROUND - 1, r);
+
+/** A pie's flight from his glove to the king (drawing space): a short lob, the point `t` (0 to 1) along it. */
+function lob(from: Pt, i: number, t: number): Pt {
+  const to: Pt = [PIE_X, pieY(i)];
+  const c: Pt = [(from[0] + to[0]) / 2, Math.min(from[1], to[1]) - 7];
+  return [(1 - t) ** 2 * from[0] + 2 * (1 - t) * t * c[0] + t * t * to[0], (1 - t) ** 2 * from[1] + 2 * (1 - t) * t * c[1] + t * t * to[1]];
+}
+/** The pie's trail of speed lines (frame pixels) from his glove to the pie, thicker and brighter toward it. */
+function pieTrail(from: Pt, i: number): Speck[] {
+  const out: Speck[] = [];
+  for (let n = 3; n <= 22; n++) {
+    const t = n / 30;
+    if (t < 0.45 && n % 2) continue;
+    const [x, y] = lob(from, i, t);
+    const X = Math.round(OX + x);
+    const Y = Math.round(OY + y);
+    out.push([X, Y, t > 0.55 ? "w" : t > 0.35 ? "W" : "X"]);
+    if (t > 0.3) out.push([X, Y + 1, t > 0.55 ? "W" : "X"]);
+  }
+  return out;
+}
+
+/**
+ * Pie after pie at the king: on each hit he lands a bounce and flings one, his arm out, the pie just reaching the
+ * king at the end of a lob of speed lines (the board splats it on his square); between, he springs up with the next pie already up behind
+ * his head.
+ */
+const fling = (i: number): Frame => {
+  const p: ClownPose = { squeeze: 1, crouch: 1, right: "point", mood: i % 3 === 2 ? "laugh" : "grin", headDx: i % 2 };
+  // (The glove pointing, as clownLayers places it: [39, 23 + b], b the body's offset.)
+  const glove: Pt = [45, 23 + 2 + 2];
+  // The pie itself arriving at the king, flat as a frisbee (the board splats it on his square).
+  const [px, py] = lob(glove, i, 0.86);
+  const fr = f(90, p, { cue: i % 2 ? "squeak" : "splat", specks: pieTrail(glove, i), shake: [i % 2 ? -1 : 1, 0] });
+  return fa({ ...fr, layers: [...fr.layers, at("pie", Math.round(px - 5), Math.round(py - 2))] });
+};
+const reload = (i: number): Frame => {
+  const air = 4 + (i % 2) * 2;
+  return fa(withPie(80, { air, crouch: -1, right: "back", mood: i % 3 === 1 ? "laugh" : "grin" }, 38, -air - 1));
+};
+
+/**
+ * His attack on a king, the king to our right (the board mirrors him when it's to his left), on the shared beats
+ * (KING_ATTACK, boss-timing.ts): his shadow grows, he bounces in from above on his pogo stick and lands with a boing,
+ * a pie already in his hand, then pies the king nonstop: ten pies, one on each hit (cues `splat` and `squeak` in turn,
+ * so the repeats don't pile up), bouncing between; he laughs, arms up, and bounces off. The last frame is empty.
+ */
+const kingAttack: Anim = (() => {
+  const A = KING_ATTACK;
+  const frames: Frame[] = [
+    { ms: 100, layers: [], specks: landShadow(4) },
+    { ms: 100, layers: [], specks: landShadow(8) },
+    fa(f(80, { air: 23, kick: 2, left: "up", right: "up", mood: "laugh" }, { cue: "slideDown" })),
+    fa(f(80, { air: 12, kick: 1 })),
+    fa(f(A.landAt - 360, { squeeze: 4, crouch: 4 }, { cue: "boing", shake: [0, 1], specks: dust(5) })),
+    fa(withPie(A.lashAt - A.landAt, { right: "up", mood: "grin", squeeze: 1 }, 34, 2, { specks: dust(8) })),
+  ];
+  for (let i = 0; i < A.lashes; i++) frames.push(fling(i), reload(i));
+  const laugh = A.leaveAt - (A.lashAt + A.lashes * A.lashEveryMs);
+  frames.push(fa(f(laugh, { mood: "laugh", left: "up", right: "up", headDy: -1, air: 2 }, { cue: "laugh" })));
+  const leave = A.ms - A.leaveAt;
+  frames.push(
+    fa(f(leave - 300, { squeeze: 4, crouch: 3, mood: "laugh" })),
+    fa(f(80, { air: 10, crouch: -2, mood: "laugh" }, { cue: "boing" })),
+    fa(f(80, { air: 22, kick: 2, left: "up", right: "up", mood: "laugh" })),
+    { ms: 80, layers: [], specks: landShadow(5) },
+    { ms: 60, layers: [] },
+  );
+  return { loop: false, frames };
+})();
+
+/**
+ * Boingo for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, in a frame
+ * `ATTACK_REACH` wider on the right for his pies' flight. Its `idle`, one still, is for the preview.
+ */
+export const CLOWN_ATTACK: Character = { ...CLOWN, id: "clown-attack", name: "Boingo (his attack)", w: AW, h: AH, anims: { idle: { loop: true, frames: [fa(f(1000, {}))] }, kingAttack } };
