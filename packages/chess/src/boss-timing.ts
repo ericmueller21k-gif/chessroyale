@@ -266,9 +266,9 @@ export const lastStandAttackHits = (): number[] => kingAttackHits().map((t) => L
  * The bosses whose character has a `kingAttack` (the app's BOSS_KITS: a unit test keeps the two the same), by
  * BOSS_ROSTER id, in the kits' order. Hollow first (Eric, Oct 10: to try it before the others get theirs); Alfil's ankus
  * jabs (Oct 17); Boingo's pies, Sawyer's saw and Wrangler's lasso (Eric, Oct 18); Ginger's cane, Jefferson's Roman
- * candle and Big Boy's lollipop (Eric, Oct 18): every playable boss but the Hidden Boss.
+ * candle and Big Boy's lollipop (Eric, Oct 18); Chub & Chirp's carrots (Oct 18): every playable boss but the Hidden Boss.
  */
-export const KING_ATTACKERS: readonly string[] = ["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil"];
+export const KING_ATTACKERS: readonly string[] = ["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper"];
 export const hasKingAttack = (bossId: string | null | undefined): boolean => !!bossId && KING_ATTACKERS.includes(bossId);
 
 /** The crowd is checkmated on this board (the boss's move mated it). */
@@ -279,11 +279,22 @@ export const mateAttackDue = (boss: { id?: string; crowdSide: "w" | "b"; board: 
   !!boss && hasKingAttack(boss.id) && crowdMated(boss.board.fen, boss.crowdSide);
 
 /**
+ * At a mate, the moments that still play, before the boss's attack on the king: only Chub & Chirp's fifth carrot's (the
+ * pull and his win: the runner sets up no other power once the board's game is over, and his win's events are that
+ * turn's alone). Any other events then are left out, as before.
+ */
+export const mateMoments = <E extends { kind: string }>(events: readonly E[] | null | undefined): readonly E[] => (events?.some((e) => e.kind === "carrotWin") ? events : []);
+
+/**
  * How long the boss's move holds the screen before the crowd's turn (or the result), solo and online: its move (and its
  * banner if it took the queen), then its powers' moments; at a mate, its attack on the crowd's king if it has one, which
- * the result waits for (no powers come with a mate).
+ * the result waits for. No power's moment comes with a mate, but for his fifth carrot's (`mateMoments`): the move, the
+ * pull and his win, then the attack (`mateHoldMs` after the moments), then the result.
  */
 export function bossTurnShowMs(view: { id?: string; crowdSide: "w" | "b"; board: { fen: string }; lastMove?: { captured?: string } | null; powers?: { events: readonly { kind: keyof typeof POWER_FX; first?: boolean }[] } } | null | undefined, alone = false): number {
-  if (mateAttackDue(view)) return KING_ATTACK.mateHoldMs;
+  if (mateAttackDue(view)) {
+    const first = mateMoments(view?.powers?.events);
+    return (first.length ? bossShowMs(view?.lastMove, alone) + powerMomentMs(first) : 0) + KING_ATTACK.mateHoldMs;
+  }
   return bossShowMs(view?.lastMove, alone) + powerMomentMs(view?.powers?.events);
 }

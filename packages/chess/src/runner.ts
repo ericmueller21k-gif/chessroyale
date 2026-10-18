@@ -884,9 +884,10 @@ export class MatchRunner {
     if (king.plays) result.playedMove = evaluation.bestMove;
     const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, rawEvaluation);
     // Fair play where the boss's judge changed the numbers (Chub & Chirp's race): the turn counts only when the engine's
-    // best keeps its own score, i.e. it is the race's best too (the race never raises a score, and keeps only the race's
-    // best's). Fair play then records the engine's own numbers (`fairScored`), as on a turn without the race: each move's
-    // loss is at most the round's. Any other such turn doesn't count (`power`): there the engine's numbers can charge a
+    // best keeps its own score, i.e. it is the race's best too (the race keeps only the race's best's score, and raises
+    // none above 0.1%: below that the logit's clamp can lift one, by under 0.001). Fair play then records the engine's own
+    // numbers (`fairScored`), as on a turn without the race: each move's loss is at most the round's, or within 0.1 point
+    // of it for a move already lost (expected under 0.1%). Any other such turn doesn't count (`power`): there the engine's numbers can charge a
     // carrot move more than the game does, and the race's read differently from any engine's (another best, other finds,
     // only moves, decided).
     const power = powerTurn(this.state.boss);
@@ -1500,7 +1501,7 @@ export class MatchRunner {
   bossRace(kind: BossMoveKind = this.state.boss?.staggerNext ? "stagger" : "elo"): BossRace | null {
     if (kind !== "elo") return null;
     const race = bossRace(this.state.boss, this.boards.get(this.state.boards[0]!)!.fen);
-    return race ? { race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;
+    return race ? { race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes, ...(this.settings.bossCarrotTest !== undefined ? { eager: true } : {}) } : null;
   }
 
   /**
@@ -2083,6 +2084,8 @@ export interface BossRace {
   race: CarrotRace;
   looks: number;
   nodes: number;
+  /** Test switch only (settings.bossCarrotTest, ?carrots=N): he takes a carrot whenever a move of his pulls one. */
+  eager?: boolean;
   onCheck?(check: RaceCheck): void;
 }
 
@@ -2134,6 +2137,7 @@ export async function raceGuard(
   const wins = pulls.filter((m) => r.his + pullsOf(fen, m, r.open).length >= s.carrotCount);
   const win = wins.find((m) => [null, "checkmate"].includes(gameEnd(applyMove(fen, m), []))) ?? wins[0];
   if (win) return done(win, 0, true);
+  if (look.eager && pulls.length) return done(pulls[0]!, 0);
   const best = sorted[0]?.expected;
   const safe = best === undefined ? [] : sorted.filter((m) => withinGuard(moveLoss(best, m.expected), guard)).map((m) => m.move);
   const moves = [...new Set([pick, ...safe.slice(0, look.looks), ...pulls.slice(0, look.looks)])];

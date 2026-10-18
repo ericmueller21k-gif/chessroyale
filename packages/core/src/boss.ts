@@ -158,9 +158,9 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "alfil", name: "Alfil", icon: "🦣", kit: "Alfil", offset: -250, powers: { passive: "tusks", ultimate: "slam" } },
   // Chub & Chirp (HOPPER_NAME; id "hopper"): Chub the rabbit riding Chirp the grasshopper (Eric, Oct 18). Leapfrog: his
   // pawn hops over one of the crowd's that stands nose to nose with it (bosses/hopper.ts). Carrot Patch, once a battle:
-  // five carrots planted, a race to pull them, then his spin (bosses/carrots.ts). Hidden from players until his art is
-  // wired in (`kit: null`; the test link `?boss=hopper&wip=1`). His offset from the boss sim (reports/hopper-sim.md).
-  { id: "hopper", name: HOPPER_NAME, icon: "🐇", kit: null, offset: -250, powers: { passive: "leapfrog", ultimate: "carrotpatch" } },
+  // five carrots planted, a race to pull them, then his spin (bosses/carrots.ts). Live with their art (Eric, Oct 18:
+  // docs/decisions/2026-10-18-hopper-wired.md). His offset from the boss sim (reports/hopper-sim.md).
+  { id: "hopper", name: HOPPER_NAME, icon: "🐇", kit: HOPPER_NAME, offset: -250, powers: { passive: "leapfrog", ultimate: "carrotpatch" } },
   // The Hidden Boss (working id "recluse"; Eric names him later: his name is this one string, wherever it shows). Hidden
   // from players (admins, Boss alone) except in the Crowd's boss final, which is always him (Eric, Oct 14). His strength
   // is fixed whatever the player's rating (BOSS_BRAIN.fixed: Maia at its top), so his offset is unused. The God King's

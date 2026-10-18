@@ -17,10 +17,11 @@ import { SAWYER, SAWYER_ATTACK, SAWYER_CHANCE, SAWYER_LINES, SAWYER_PORTRAIT } f
 import { PIG, PIG_ATTACK, PIG_CHANCE, PIG_LINES, PIG_PORTRAIT } from "./pig.ts";
 import { RECLUSE, RECLUSE_BUST, RECLUSE_PORTRAIT } from "./recluse.ts";
 import { ALFIL, ALFIL_ATTACK, ALFIL_CHANCE, ALFIL_LINES, ALFIL_PORTRAIT } from "./alfil.ts";
+import { HOPPER, HOPPER_ATTACK, HOPPER_CHANCE, HOPPER_LINES, HOPPER_PORTRAIT } from "./hopper.ts";
 import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
-import { ankusItem, bonkItem, frostItem, lashItem, lassoItem, pieItem, popItem, sawItem, type SquareItem } from "./power-art.ts";
+import { ankusItem, bonkItem, carrotItem, frostItem, lashItem, lassoItem, pieItem, popItem, sawItem, type SquareItem } from "./power-art.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
@@ -342,6 +343,56 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // The Hidden Boss (admins only, in Boss alone; DECISIONS.md, "The Hidden Boss, phase 1"). His lines are placeholders for
   // Eric's own, in one table (recluse-lines.ts).
+  // Chub & Chirp, a rabbit riding a grasshopper (Eric, Oct 18): docs/decisions/2026-10-18-hopper-wired.md.
+  "Chub & Chirp": {
+    ch: HOPPER,
+    anims: {
+      strike: "capture",
+      // Leapfrog: the hop (its pawn leaves its square at `takeoff` and lands beyond yours at `land`).
+      power: "leapfrog",
+      // (A carrot pulled: the board pops it; he stays where he is.)
+      powerHit: "idle",
+      ultimateWarn: "check",
+      // The Carrot Patch: five bounds, a carrot tossed each (`toss1` to `toss5`), each planted (`plant1` to `plant5`).
+      ultimate: "carrotPatch",
+      // His spin: the race won (Hopper.tsx picks raceLost when it wasn't).
+      ultimateHit: "raceWon",
+    },
+    sounds: {
+      chirp: "hopperChirp",
+      thump: "hopperThump",
+      squeak: "hopperSqueak",
+      oof: "hopperOof",
+      flop: "hopperFlop",
+      cheer: "hopperCheer",
+      sigh: "hopperSigh",
+      toss: "hopperToss",
+      bonk: "hopperBonk",
+      hop: "hopperHop",
+      land: "hopperLand",
+      takeoff: "hopperHop",
+      // (Each carrot tossed, and thunking into its square as it's planted.)
+      toss1: "hopperToss",
+      toss2: "hopperToss",
+      toss3: "hopperToss",
+      toss4: "hopperToss",
+      toss5: "hopperToss",
+      plant1: "hopperThunk",
+      plant2: "hopperThunk",
+      plant3: "hopperThunk",
+      plant4: "hopperThunk",
+      plant5: "hopperThunk",
+    },
+    lines: HOPPER_LINES,
+    chance: HOPPER_CHANCE,
+    portrait: { ...HOPPER_PORTRAIT, anim: "idle", frame: 0 },
+    // (Measured on a phone's bar at 320, 360 and 390 px: in the usual box his scarf and wing tip came within 2 px of his
+    // name at rest, and over it in his entrance, move, hurt and victory: the wider box, as Sawyer's, Wrangler's and Alfil's.)
+    wide: true,
+    // He hops in and Chub pelts the king with carrots from his satchel, one on each hit (hopper.ts: HOPPER_ATTACK), a
+    // bonk on its square each hit. (Facing our left, as Sawyer; 36 frame pixels a square, 1.8 off, as Boingo's throw.)
+    kingAttack: { ch: HOPPER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, facesLeft: true, hit: carrotItem },
+  },
   "Hidden Boss": {
     ch: RECLUSE,
     // (A phone's boss bar: his bust, head and shoulders, the same animations.)

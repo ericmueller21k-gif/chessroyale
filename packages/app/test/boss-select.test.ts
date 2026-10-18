@@ -19,12 +19,15 @@ describe("the boss select", () => {
     for (const id of [...Object.keys(SELECT_SOUND), ...Object.keys(SELECT_LINES)]) expect(BOSS_ROSTER.some((b) => b.id === id), id).toBe(true);
   });
 
-  it("uses each boss's own lines (until Eric approves new ones), except the Hidden Boss's two, Eric's", () => {
+  it("uses each boss's own lines (until Eric approves new ones), except the Hidden Boss's two, Eric's, and Chub & Chirp's, from their lines' draft", () => {
     for (const b of menuBosses({ admin: false, raid: true })) {
+      // (Chub & Chirp's are the draft's `CHC-select` lines, as written: docs/decisions/2026-10-18-hopper-wired.md.)
+      if (b.id === "hopper") continue;
       const own = new Set(Object.values(bossKit(b.name)!.lines).flat());
       for (const l of SELECT_LINES[b.id]!) expect(own.has(l), `${b.id}: "${l}"`).toBe(true);
     }
     expect(SELECT_LINES.recluse).toEqual(["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."]);
+    expect(SELECT_LINES.hopper).toEqual(["Chub and Chirp! Best friends!", "He's Chirp. I'm Chub. We hop.", "Got any carrots?"]);
   });
 
   it("never says the same line twice running; the Hidden Boss's two go in turn", () => {

@@ -15,6 +15,7 @@ import { BLOCK_FLY, BONK_HIT, BOUNCE_CRASH, BOUNCE_PUFF, TOY_BLOCK } from "./eff
 import { BOARD_GAP, SAW_CRACK, SAW_CUT, SAW_HIT } from "./effects/sawyer.ts";
 import { LASSO_HIT } from "./effects/pig.ts";
 import { ANKUS_HIT } from "./effects/alfil.ts";
+import { CARROT_FLY, CARROT_HIT, CARROT_ICON, CARROT_PATCH } from "./effects/hopper.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
 export { BOARD_CELL, SQUARE } from "./effects/common.ts";
@@ -58,4 +59,8 @@ export const EFFECT_SPRITES = {
   bonkHit: BONK_HIT,
   frostHit: FROST_HIT,
   popHit: POP_HIT,
+  carrotPatch: CARROT_PATCH,
+  carrotFly: CARROT_FLY,
+  carrotHit: CARROT_HIT,
+  carrotIcon: CARROT_ICON,
 } as const satisfies Record<string, Character>;
