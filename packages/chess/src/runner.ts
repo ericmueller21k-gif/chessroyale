@@ -1,4 +1,3 @@
-// (Probe for the e2e fast check, claude/fast-ci: never merged.)
 import {
   alivePlayers,
   isTeamMatch,
