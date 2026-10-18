@@ -48,17 +48,22 @@ async function watchPowers(page: Page) {
 }
 const seen = (page: Page) => page.evaluate(() => (window as any).__smoke as { kinds: string[]; ults: number; phases: string[] });
 
-/** Your move: a knight to an empty square when it may (the battle lasts), else the first move allowed. */
-async function playOne(page: Page) {
+/**
+ * Your move: a knight to an empty square when it may (the battle lasts), else the first move allowed. Once a position
+ * (`done`: the positions already played from). Returns the position played from, or null.
+ */
+async function playOne(page: Page, done: Set<string>): Promise<string | null> {
   const s = await page.evaluate(() => {
     const m = (window as any).match;
     return m.phase.kind === "play" && Date.now() >= m.phase.startsAt + 300 ? { fen: m.phase.board.fen as string, allowed: (m.boss?.powers?.allowed ?? null) as string[] | null } : null;
   });
-  if (!s) return;
+  if (!s || done.has(s.fen)) return null;
   const chess = new Chess(s.fen);
   const legal = chess.moves({ verbose: true }).map((m) => ({ uci: m.from + m.to + (m.promotion ?? ""), knight: m.piece === "n" && !m.captured }));
   const ok = legal.filter((m) => !s.allowed || s.allowed.includes(m.uci)).sort((a, b) => (a.uci < b.uci ? -1 : 1));
   await submitMove(page, (ok.find((m) => m.knight) ?? ok[0])?.uci, s.fen);
+  done.add(s.fen);
+  return s.fen;
 }
 
 PLAYABLE.forEach((def, i) => {
@@ -80,25 +85,29 @@ PLAYABLE.forEach((def, i) => {
     await expect.poll(() => phase(page), { timeout: 45_000 }).toBe("play");
     await watchPowers(page);
     expect(await page.evaluate(() => (window as any).match.boss.id)).toBe(def.id);
-    // His ultimate: the admins' trigger (it comes as the next turn begins, or at the start of his turn).
+    // Play on until both have shown: his passive first (switched on early), then his ultimate by the admins' trigger (it
+    // comes as the next turn begins, or at the start of his turn). An ultimate under way can hold a passive back (his
+    // barrage, Jefferson's sparkler), so the trigger waits for the passive, or for four moves of yours.
     const trigger = page.locator(".ult-test");
-    await expect(trigger).toBeEnabled();
-    await trigger.click();
-    // Play on until both have shown.
-    const done = async () => {
-      const s = await seen(page);
-      return s.ults >= 1 && s.kinds.some((k) => passive!.includes(k as PowerEventKind));
-    };
+    const passiveSeen = (s: { kinds: string[] }) => s.kinds.some((k) => passive!.includes(k as PowerEventKind));
+    let pressed = false;
+    const played = new Set<string>();
     const deadline = Date.now() + 70_000;
-    while (!(await done()) && Date.now() < deadline) {
-      if ((await phase(page)) === "play") await playOne(page);
+    for (let s = await seen(page); !(s.ults >= 1 && passiveSeen(s)) && Date.now() < deadline; s = await seen(page)) {
+      if ((await phase(page)) === "play") {
+        if (!pressed && (passiveSeen(s) || played.size >= 4) && (await trigger.isEnabled().catch(() => false))) {
+          await trigger.click();
+          pressed = true;
+        }
+        await playOne(page, played);
+      }
       await page.waitForTimeout(250);
     }
     const s = await seen(page);
     if (process.env.SMOKE_DEBUG) console.log(def.id, JSON.stringify(s));
     expect({ passive: s.kinds.some((k) => passive!.includes(k as PowerEventKind)), ultimate: s.ults >= 1, kinds: s.kinds, phases: s.phases }).toMatchObject({ passive: true, ultimate: true });
     // (A moment for anything the last power's moment would throw.)
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(500);
     expect(errors).toEqual([]);
   });
 });

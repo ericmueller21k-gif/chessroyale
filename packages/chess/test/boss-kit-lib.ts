@@ -28,6 +28,7 @@
  *     would set up (prepareTurn) declares nothing the view leaves out; a battle the boss won with no mate, no time-out
  *     and before the move cap carries its declaring event in the last view before the result.
  */
+import { vi } from "vitest";
 import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type BossDef, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
@@ -63,13 +64,15 @@ export function unknownSteps(): string[] {
   return names.filter((n) => !(KNOWN_STEPS as readonly string[]).includes(n));
 }
 
-/** A device's search budget in the kit (ms): a power that searches against the clock (Wrangler's showdown) gets this. */
+/** A device's search budget in the kit (ms of the kit's clock): a power that searches against the clock gets this. */
 export const KIT_SEARCH_MS = 200;
 
 /**
  * Every power's search that runs against the clock (a `…SearchMs`, `…TurnMs` or `…TestMs` in BOSS_POWERS: Wrangler's
- * showdown, 3 to 10 s a turn) cut to KIT_SEARCH_MS, as on a slow phone: the stand-in engine answers at once, so a full
- * budget is only time spent. The rules and their guards don't change. Returns the undo.
+ * showdown, 3 to 10 s a turn) cut to KIT_SEARCH_MS, on a clock that steps 1 ms each time it's read (`performance.now`):
+ * a search's length is then a count of its own steps, not the machine's speed, so a battle is the same on every run and
+ * on both paths of the parity test (on the real clock, a busy machine found other line-ups). The stand-in engine answers
+ * at once, so a full budget would only be waiting. The rules and their guards don't change. Returns the undo.
  */
 export function quickSearches(): () => void {
   const powers = BOSS_POWERS as unknown as Record<string, unknown>;
@@ -80,7 +83,12 @@ export function quickSearches(): () => void {
       powers[k] = KIT_SEARCH_MS;
     }
   }
-  return () => Object.assign(powers, old);
+  let t = 0;
+  const clock = vi.spyOn(performance, "now").mockImplementation(() => (t += 1));
+  return () => {
+    clock.mockRestore();
+    Object.assign(powers, old);
+  };
 }
 
 export const hash = (s: string) => {

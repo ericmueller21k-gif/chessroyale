@@ -53,9 +53,14 @@ a snapshot at every event; solo plays from a copy).
 - **The stand-in engine, not Stockfish, plays.** Real searches would cost minutes; the invariants are about the rules,
   which never depend on how strong the numbers are. The stand-in is a pure function of the position, so the two paths
   in the parity test get the same answers.
-- **Searches against the clock are cut to 200 ms** (`quickSearches`: every `…SearchMs`, `…TurnMs`, `…TestMs` in
-  BOSS_POWERS; today Wrangler's showdown, 3 to 10 s a turn). The stand-in answers at once, so a full budget is only
-  waiting; the rules and guards don't change. Wrangler still fires showdowns in the kit.
+- **Searches against the clock are cut to 200 ms, on a stepped clock** (`quickSearches`: every `…SearchMs`, `…TurnMs`,
+  `…TestMs` in BOSS_POWERS, today Wrangler's showdown at 3 to 10 s a turn; `performance.now` stepping 1 ms each read).
+  The stand-in answers at once, so a full budget is only waiting; the rules and guards don't change, and Wrangler still
+  fires showdowns in the kit. The stepped clock came from a parity run that failed once under load: on the real clock
+  the lobby's host and solo searched different numbers of line-ups in the same 200 ms, found different ones, and the
+  battles parted at turn 5. That's by design between two devices (the host decides, the server checks), so it isn't a
+  disagreement; on the stepped clock a search's length is a count of its own steps, the same on both paths and on every
+  run, so a kit failure in Wrangler's battles replays exactly.
 - **The stress start** (1.d3 d5 2.Nf3 d4 … his d4 pawn nose to nose with your d3, d2 open) is where a power can hand him
   a promotion for his very next move. Without it a reverted #273 slipped through the fuzz (the hop never came there);
   with it the kit catches it.
@@ -86,8 +91,17 @@ Each bug put back on a copy of the code (`git checkout` afterwards), only the ki
 | a move scored twice | a round's `scored` listing its best move twice | the fuzz: "moves scored twice: h2h4" |
 | host and server disagreeing | the lobby ignoring the host's bounce pick; the lobby dropping the race from Chub & Chirp's boss request | the parity test (turn 3 differs) for both; a third (the lobby dropping Alfil's landing pieces, `land`) isn't caught: the stand-in engine's landing guard kept his move |
 
+## Found on the way (not fixed here: listed for the director)
+
+- **The app's host never sends `outside`.** When the admins' trigger fires Wrangler's showdown outside the band, solo
+  marks it (`showdown.outside`, and the admins' dock line "Showdown (test: outside the band)"), but online the host's
+  reply (`hostBoss` in `packages/app/src/net.ts`) passes on `drag` and `showdown` only, though `pigTurn`'s answer has
+  `outside` and the lobby accepts it. Admins only, testing only; the fix is one spread in that reply. The showdown's
+  `edge` likewise never travels (no field for it in `bossMove`), so online it's null; nothing on screen reads it.
+
 ## What it costs
 
-Measured on this machine (CI's runners are about the same speed): `boss-kit.test.ts` about 35 to 40 s,
-`boss-kit-parity.test.ts` about 13 s (vitest runs files in parallel, so the check job grows by less than that), and
-`boss-smoke.spec.ts` (see the PR for its measured time) on one shard.
+Measured on this machine (CI's runners are about the same speed): `boss-kit.test.ts` about 35 s and
+`boss-kit-parity.test.ts` about 10 s, run side by side (vitest runs files in parallel, so the check job grows by less
+than their sum); `boss-smoke.spec.ts` about 3 minutes on the phone (eight bosses, 17 to 30 s each, in order on one
+worker) beside 24 s on the computer, on one e2e shard (`e2e/ci-timings.json`: 210 s).

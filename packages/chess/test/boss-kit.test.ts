@@ -5,10 +5,11 @@ import { KNOWN_STEPS, PROMOTION_OPT_OUT, StockfishMoves, epKept, kitBattles, kit
 
 /**
  * The shared boss test kit (Oct 18; docs/decisions/2026-10-18-boss-test-kit.md): every boss in BOSS_ROSTER, hidden
- * ones included, read from the roster so a new boss is covered with no edit here. Two short seeded battles each (his
+ * ones included, read from the roster so a new boss is covered with no edit here. Three short seeded battles each (his
  * passive switched on early, crowd White; his ultimate switched on early and the admins' trigger pulled again and
- * again, crowd Black; the God King's strike called now and then), cheap legal moves for the crowd, a stand-in engine
- * for the boss, and Stockfish 19's own move list as the referee. After every step, the invariants in
+ * again, crowd Black; the stress start, the trigger from the first turn, crowd White; the God King's strike called now
+ * and then), cheap legal moves for the crowd, a stand-in engine for the boss, and Stockfish 19's own move list as the
+ * referee. After every step, the invariants in
  * `boss-kit-lib.ts` (a position Stockfish plays, chess.js's moves equal Stockfish's, a move for whoever is to move,
  * the replay, no instant queen from a power, a power's win over a draw, its moments before the result).
  */
