@@ -1433,7 +1433,7 @@ export class MatchRunner {
     return alfilBattle.needsEngine(this.battle);
   }
 
-  /** The step, from this device's engines (the cast's pair and the fusion's square: fuseFrom; the Slam's lift: slamFrom); null: nothing came of it. */
+  /** The step, from this device's engines (the cast's pair and the fusion's square: fuseFrom; the fusion's wait: the pass guard; the Slam's lift: slamFrom); null: nothing came of it. */
   async playAlfil(engines: readonly EngineLike[] = this.opts.engines): Promise<AlfilStep | null> {
     return alfilBattle.play(this.battle, engines);
   }
@@ -1477,15 +1477,24 @@ export class MatchRunner {
 
   /**
    * Chub & Chirp's Carrot Patch is due: the start of his turn after its warning (or the test trigger), once a battle
-   * (carrotBattle.due). The cast is his whole turn: no move of his follows it.
+   * (carrotBattle.due). The cast is his whole turn: no move of his follows it. Not when it waited this turn (the pass
+   * guard): then his move.
    */
   carrotDue(): boolean {
     return carrotBattle.due(this.battle);
   }
 
-  /** The Carrot Patch's cast (no engine: the same on the server, the host and in solo); null: none was due. */
-  applyCarrots(): CarrotPatch | null {
-    return carrotBattle.apply(this.battle);
+  /** The cast from this device's engines (solo, the sims: castAnswer, the pass guard); null: none was due, or it waits. */
+  async playCarrots(engines: readonly EngineLike[] = this.opts.engines): Promise<CarrotPatch | null> {
+    return carrotBattle.play(this.battle, engines);
+  }
+
+  /**
+   * The Carrot Patch's cast (the placement the same on the server, the host and in solo): `answer` PASS_WAIT (the host's
+   * pass guard) waits a turn, anything else or none casts; null: none was due, or it waits.
+   */
+  applyCarrots(answer: string | null = null): CarrotPatch | null {
+    return carrotBattle.apply(this.battle, answer);
   }
 
   /** The Carrot Patch's race as the crowd's judge weighs its move now (the score jobs' `race`), or null. */

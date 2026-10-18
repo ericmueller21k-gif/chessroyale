@@ -825,7 +825,7 @@ export const BOSS_POWERS = {
    * among tusksLooks pairs, as if they fused at once (tusksPairs).
    */
   tusksFirst: 3,
-  tusksEvery: 5,
+  tusksEvery: 8,
   tusksMax: 2,
   tusksLooks: 5,
   tusksNodes: 30_000,
@@ -859,6 +859,22 @@ export const BOSS_POWERS = {
    */
   slamGuardLooks: 4,
   slamGuardNodes: 30_000,
+  /**
+   * The pass guard (Eric, Oct 18: Alfil fused while his queen hung, and lost it for free;
+   * docs/decisions/2026-10-18-turn-passing-guard.md): one rule for every power that spends a boss's whole turn (Alfil's
+   * fusion, Chub & Chirp's Carrot Patch cast). When it's due and passing would lose real material, it waits a turn and
+   * he plays his move instead; it's checked again on his next turn, with no cap. "Real material": the engine's
+   * evaluation after the power (the crowd to move) at least passGuardPawns below his evaluation before it (him to move,
+   * so his best move's), in pawns of log-odds (bouncePawnLogit), on the host's engine (the server never searches; no
+   * engine anywhere: it comes as ever). The fusion reads the searches its square's pick already makes (tusksNodes); the
+   * cast, with none of its own, searches the position before and after the pass at passGuardNodes each (60,000 nodes in
+   * all: about 0.2 s on a phone). 2: the fusion itself gains him about a pawn (two pawns become a bishop) and a pass
+   * costs a tempo, so a pawn left hanging nets out near zero and doesn't stop it, while a piece left hanging (a minor
+   * nets about -2) or anything bigger does. In the sims before this guard, 25 of 153 fusions lost 2 pawns or more by
+   * this measure (most of them 4 to 8) and one lost between 1 and 2 (1.76).
+   */
+  passGuardPawns: 2,
+  passGuardNodes: 30_000,
   /**
    * Chub & Chirp's Leapfrog (their passive; Eric, Oct 18): at the start of his turn, when one of his pawns stands nose
    * to nose with one of the crowd's (the crowd's pawn on the square in front of his) and the square beyond is empty, his

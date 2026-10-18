@@ -152,7 +152,9 @@ test("Chub & Chirp's Carrot Patch (the test switches): the cast and its ladder, 
     };
     requestAnimationFrame(look);
   });
-  await play(page, (await engineTop(page)).top[0]!.move);
+  // (A quiet first move: passing after it costs him nothing, so the pass guard lets the cast come at once. After a
+  // move like 3.d4, passing would lose real material and it waits: docs/decisions/2026-10-18-turn-passing-guard.md.)
+  await play(page, crowd === "w" ? "d2d3" : "d7d6");
   await yourMove(page);
   expect(await castSeen.seen()).toEqual({ banner: true, fly: true, ladder: true, top: true, canvas: true, dock: true });
   let c = (await bossNow(page)).powers.carrots;
@@ -229,6 +231,11 @@ test("his fifth carrot (?carrots=5): you leave them, he pulls them one by one, c
       his = c.boss;
       if (his >= 3 && !winSeen) winSeen = await watchFor(page, { banner: { selector: ".fight-banner", text: /FIVE CARROTS!/ } });
     }
+    if (turn === 0) {
+      // (A quiet first move: passing after it costs him nothing, so the pass guard lets the cast come at once.)
+      await play(page, (await bossNow(page)).crowdSide === "w" ? "d2d3" : "d7d6");
+      continue;
+    }
     const fen = await fenNow(page);
     const open = c ? openCarrots(c) : [];
     const quiet = moves(fen, (m, after) => !open.includes(m.to) && !m.captured && !after.inCheck());
@@ -285,7 +292,9 @@ test("their tile and stage, their figure by the board and the dock's count: whol
   else expect((await char.boundingBox())!.x + (await char.boundingBox())!.width).toBeLessThanOrEqual(board.x);
   // The cast, then the dock's count: a computer's in the status box beside your move's line and your clock; a phone's at
   // the left of the God King's line under it (the box keeps its room for the words), clear of him.
-  await play(page, (await engineTop(page)).top[0]!.move);
+  // (A quiet first move: passing after it costs him nothing, so the pass guard lets the cast come at once. After a
+  // move like 3.d4, passing would lose real material and it waits: docs/decisions/2026-10-18-turn-passing-guard.md.)
+  await play(page, (await bossNow(page)).crowdSide === "w" ? "d2d3" : "d7d6");
   await yourMove(page);
   await expect(page.locator(".dk-race")).toHaveCount(1);
   const status = (await page.locator(".boss-dock-status").boundingBox())!;

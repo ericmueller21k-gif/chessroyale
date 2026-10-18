@@ -134,6 +134,59 @@ export function moveLoss(best: number, got: number): { points: number; logit: nu
   return { points: (best - g) * 100, logit: logit(best) - logit(g) };
 }
 
+// ---------------- The pass guard ----------------
+
+/**
+ * The host's answer that a power spending his whole turn waits (the pass guard): he plays his move instead. Asked for
+ * only by a request marked `pass`, and taken by the server for that step only.
+ */
+export const PASS_WAIT = "wait";
+
+/** One position a power that spends his whole turn can leave (the crowd to move), as the engine scored it. */
+export interface PassScore {
+  fen: string;
+  /** His expected score there. */
+  expected: number;
+  /** What it gains him against his evaluation before it (him to move: his best move's), in pawns (log-odds, bouncePawnLogit). */
+  gain: number;
+}
+
+/**
+ * Each position a power that spends his whole turn can leave (`after`, the crowd to move: Alfil's fusion's squares, the
+ * Carrot Patch's pass), scored against the position before (`fen`, him to move), each searched at `nodes` on this
+ * device's engines (the host's online, solo's, the sims'). `ahead`: put on every position before it's searched, the one
+ * before too, so both sides of the comparison see the same board (Alfil's Slam's pieces down when they land right
+ * after). Null: no engine, or no answer for the position before.
+ */
+export async function passScores(
+  engines: readonly EngineLike[],
+  fen: string,
+  after: readonly string[],
+  nodes: number,
+  s: Pick<BossPowerSettings, "bouncePawnLogit"> = BOSS_POWERS,
+  ahead: ((fen: string) => string) | null = null,
+): Promise<PassScore[] | null> {
+  if (!after.length || !engines.length) return null;
+  const [before, ...scored] = await topEach(engines, [fen, ...after].map((f) => (ahead ? ahead(f) : f)), nodes);
+  if (!before) return null;
+  return after.flatMap((f, i) => {
+    const m = scored[i];
+    return m ? [{ fen: f, expected: 1 - m.expected, gain: (logit(1 - m.expected) - logit(before.expected)) / s.bouncePawnLogit }] : [];
+  });
+}
+
+/**
+ * The pass guard (Eric, Oct 18; docs/decisions/2026-10-18-turn-passing-guard.md), one rule for every power that spends
+ * his whole turn (Alfil's fusion, Chub & Chirp's Carrot Patch cast): passing loses real material when what the power
+ * gains him (PassScore.gain, for the way it would go) is passGuardPawns or more below zero, a piece of his left hanging
+ * or worse. Then the power waits a turn and he plays his move; it's checked again on his next turn, with no cap.
+ */
+export const passLoses = (gain: number, s: Pick<BossPowerSettings, "passGuardPawns"> = BOSS_POWERS): boolean => gain <= -s.passGuardPawns;
+
+/** The host's answer for such a power: PASS_WAIT when passing loses real material (passLoses), else the position picked; null: no pick (it comes as ever). */
+export const passAnswer = (pick: { fen: string; gain: number } | null, s: Pick<BossPowerSettings, "passGuardPawns"> = BOSS_POWERS): string | null =>
+  pick ? (passLoses(pick.gain, s) ? PASS_WAIT : pick.fen) : null;
+
 // ---------------- The ultimate's meter ----------------
 
 /** The rates the meter fills at (BOSS_POWERS). */

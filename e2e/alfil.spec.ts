@@ -97,11 +97,13 @@ test("Alfil's Tusks (the test switch): two of his pawns marked before his move, 
   const fen1 = await fenNow(page);
   for (const sq of cast.tusks.pawns) expect(new Chess(fen1).get(sq as never)).toMatchObject({ color: his, type: "p" });
   // Your move is quiet: it takes nothing (no counter here, and his pieces as they were), gives no check (in check, the
-  // fusion waits a turn) and leaves the fusion a square (fusionOptions: the rules' own list); his next turn is the fusion.
-  const marked: string[] = cast.tusks.pawns;
-  const bishops = counted(fen1, his, "b");
-  const pawns = counted(fen1, his, "p");
-  const plies = await page.evaluate(() => (window as any).match.phase.board.history.length as number);
+  // fusion waits a turn) and leaves the fusion a square (fusionOptions: the rules' own list); his next turn is the fusion,
+  // unless passing would lose him real material (the pass guard: he moves instead, the marks staying, and it's due again
+  // on his next turn), so another quiet move then, a few at most.
+  let marked: string[] = cast.tusks.pawns;
+  let bishops = 0;
+  let pawns = 0;
+  let plies = 0;
   const loud = (fen: string, m: string) => {
     const after = new Chess(fen);
     return !!after.move({ from: m.slice(0, 2), to: m.slice(2, 4) }).captured || after.inCheck() || !fusionOptions(after.fen(), marked, his).length;
@@ -113,9 +115,17 @@ test("Alfil's Tusks (the test switch): two of his pawns marked before his move, 
     drop: { selector: ".al-layer piece.elephant" },
     dock: { selector: ".dock-line", text: /Alfil spent his move on the fusion\./ },
   });
-  await play(page, await goodMove(page, loud));
-  await yourMove(page);
-  const fused = await powers(page);
+  let fused = cast;
+  for (let tries = 0; tries < 4 && fused.tusks; tries++) {
+    marked = fused.tusks.pawns;
+    const fen = await fenNow(page);
+    bishops = counted(fen, his, "b");
+    pawns = counted(fen, his, "p");
+    plies = await page.evaluate(() => (window as any).match.phase.board.history.length as number);
+    await play(page, await goodMove(page, loud));
+    await yourMove(page);
+    fused = await powers(page);
+  }
   expect(await fuseSeen.seen()).toEqual({ rise: true, flash: true, drop: true, dock: true });
   const fen2 = await fenNow(page);
   expect(fused.tusks).toBeNull();

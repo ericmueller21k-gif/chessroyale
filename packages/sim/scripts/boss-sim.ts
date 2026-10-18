@@ -32,7 +32,7 @@
  */
 import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, applyMove, bossMoveFrom, botRoster, carrotSpots, carrotsOf, carrotsOpen, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, PASS_WAIT, applyMove, bossMoveFrom, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -281,7 +281,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       let result: string | null = null;
       // (Alfil: his casts, the fusions they came to (or the crowd's counters), his slams: each lift's swing and the ones weighed.)
       // (And the landing guard: each move of his it judged with the Slam's pieces down, and each fusion weighed that way.)
-      const alfil = { casts: 0, fused: 0, taken: 0, nowhere: 0, gains: [] as number[], slams: [] as { at: number; n: number; loss: number | null; weighed: (number | "mate")[] }[], early: 0, counters: [] as number[], landing: [] as { at: number; pick: string; move: string; searched: number; ms: number }[], fuseLanding: 0 };
+      const alfil = { casts: 0, fused: 0, taken: 0, nowhere: 0, gains: [] as number[], slams: [] as { at: number; n: number; loss: number | null; weighed: (number | "mate")[] }[], early: 0, counters: [] as number[], landing: [] as { at: number; pick: string; move: string; searched: number; ms: number }[], fuseLanding: 0, waits: [] as { at: number; gain: number }[] };
       // (The hopper: his hops (after which crowd move, the pawn's squares, how many he could choose from), his turns with
       // a pawn of his nose to nose with one of the crowd's, and each such pawn that couldn't hop, by why: hopOptions's
       // reasons, and `cap` once his hops are spent.)
@@ -298,6 +298,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         crowd: 0,
         spin: null as unknown,
         brain: { looks: 0, changed: 0, won: 0, ms: 0 },
+        // (The pass guard: each turn the cast waited, after which crowd move.)
+        waits: [] as number[],
       };
       const t0 = Date.now();
       while (!runner.isOver()) {
@@ -334,18 +336,27 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             const ahead = runner.alfilFusionAhead();
             if (ahead) alfil.fuseLanding++;
             const pick = await fuseFrom(engines, fen, runner.alfilCandidates(), undefined, ahead);
-            runner.applyAlfil(pick?.fen ?? null, null, step);
+            // (His fusion spends his whole turn: the pass guard may have it wait, logged with what it would have cost.)
+            const answer = step === "fuse" ? passAnswer(pick) : (pick?.fen ?? null);
+            if (answer === PASS_WAIT) alfil.waits.push({ at: runner.boss!.crowdMoves, gain: pick!.gain });
+            runner.applyAlfil(answer, null, step);
             const f = runner.boss!.powers!.fusion;
-            if (step === "fuse") f?.to ? alfil.fused++ : alfil.nowhere++;
-            if (step === "fuse" && f?.to && pick) alfil.gains.push(pick.gain);
+            if (step === "fuse" && answer !== PASS_WAIT) f?.to ? alfil.fused++ : alfil.nowhere++;
+            if (step === "fuse" && answer !== PASS_WAIT && f?.to && pick) alfil.gains.push(pick.gain);
           }
           if (bossId === "hopper" && runner.carrotDue()) {
-            // (The Carrot Patch's cast: his whole turn.)
+            // (The Carrot Patch's cast: his whole turn, unless the pass guard has it wait: then his turn goes on.)
             const at = runner.boss!.crowdMoves;
-            const passed = passTurn(runner.boards.get(runner.state.boards[0]!)!.fen)!;
+            const before = runner.boards.get(runner.state.boards[0]!)!.fen;
+            const passed = passTurn(before)!;
             const spots = carrotSpots(passed, runner.boss!.crowdSide);
-            runner.applyCarrots();
-            const c = runner.boss!.powers!.carrots!;
+            const answer = await castAnswer(engines, before);
+            runner.applyCarrots(answer);
+            const c = runner.boss!.powers!.carrots;
+            if (!c) {
+              carrots.waits.push(at);
+              continue;
+            }
             const spot = (sq: string) => spots.find((x) => x.square === sq)!;
             const round = (x: number) => (Number.isFinite(x) ? Math.round(x * 1000) / 1000 : -1);
             carrots.cast = { at, squares: c.squares, leads: c.squares.map((sq) => spot(sq).lead), his: c.squares.map((sq) => round(spot(sq).his)), crowd: c.squares.map((sq) => round(spot(sq).crowd)) };

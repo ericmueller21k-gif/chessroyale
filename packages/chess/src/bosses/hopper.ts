@@ -29,7 +29,7 @@ import { gameEnd, legalMoves, mateInOne, sideToMove } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { stockfishRefuses } from "../uci.ts";
 import { editedFen } from "./alfil.ts";
-import { meterFull, other, topEach, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { PASS_WAIT, meterFull, other, passAnswer, passScores, topEach, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 import { carrotsOf, carrotsOpen, plantCarrots, prizeFits, pullsOf, raceJudged, raceLeft, raceOn, racePulls, raceRanked, raceWeight, spinRoll, standingOn, type CarrotRace } from "./carrots.ts";
 import { gridKingAttacked, gridOf, type Grid } from "./grid.ts";
 import { passTurn } from "./hollow.ts";
@@ -209,6 +209,19 @@ export async function hopFrom(engines: readonly EngineLike[], fen: string, candi
     if (m && (!pick || m.expected > pick.his)) pick = { fen: candidates[i]!, his: m.expected };
   }
   return pick ? { fen: pick.fen } : null;
+}
+
+/**
+ * The Carrot Patch cast's answer under the pass guard (passAnswer; docs/decisions/2026-10-18-turn-passing-guard.md),
+ * from this device's engines (the host's online, solo's, the sims'): the position before it (`fen`, him to move) and the
+ * turn passed (passTurn: the crowd to move; the carrots don't change the engine's evaluation) searched at
+ * passGuardNodes each; PASS_WAIT when passing loses real material, else the passed position (the cast comes). Null: no
+ * pass (in check), no engine or no answer (it comes, as ever).
+ */
+export async function castAnswer(engines: readonly EngineLike[], fen: string, s: Pick<BossPowerSettings, "passGuardNodes" | "passGuardPawns" | "bouncePawnLogit"> = BOSS_POWERS): Promise<string | null> {
+  const passed = passTurn(fen);
+  if (!passed) return null;
+  return passAnswer((await passScores(engines, fen, [passed], s.passGuardNodes, s))?.[0] ?? null, s);
 }
 
 /**
@@ -476,7 +489,9 @@ export const carrotBattle = {
   /**
    * The cast is due: the start of his turn (the crowd has just moved) from the turn the meter warned, or after the test
    * trigger; once a battle. In check, or with the crowd left no move once the turn passes, it waits for his next turn
-   * (he answers the check with his move: passTurn), the warning staying.
+   * (he answers the check with his move: passTurn), the warning staying; and so it does when passing would lose real
+   * material (the pass guard, Oct 18: `passWait`, the host's PASS_WAIT): he plays his move, the warning and the
+   * trigger staying, so "next turn" stays true, and it's checked again on his next turn.
    */
   due(b: Battle): boolean {
     const boss = b.state.boss;
@@ -484,20 +499,35 @@ export const carrotBattle = {
     if (!boss || !p || boss.id !== "hopper" || boss.result || !b.bossToMove() || b.finalGameOver()) return false;
     if (p.carrots || p.ultAt !== undefined || p.ults) return false;
     if (!p.ultNext && !(p.warnAt !== undefined && p.warnAt <= boss.crowdMoves)) return false;
+    if (p.passWait === boss.crowdMoves) return false;
     return passTurn(boardOf(b).fen) !== null;
   },
 
   /**
-   * The cast (no engine: the placement is the position's and the seed's, the same on the server, the host and in solo):
-   * his whole turn. The turn passes to the crowd (passTurn: the en passant square cleared, the fifty-move count as it was,
+   * The cast from this device's engines (solo, the sims; online the host's, castAnswer): it comes, or it waits when
+   * passing would lose real material (the pass guard). Returns what apply returns.
+   */
+  async play(b: Battle, engines: readonly EngineLike[]): Promise<CarrotPatch | null> {
+    if (!carrotBattle.due(b)) return null;
+    return carrotBattle.apply(b, await castAnswer(engines, boardOf(b).fen));
+  },
+
+  /**
+   * The cast (the placement is the position's and the seed's, the same on the server, the host and in solo; an engine only
+   * for the pass guard: `answer` PASS_WAIT, it waits a turn, the warning staying, and he plays his move; anything else, or
+   * none, it comes): his whole turn. The turn passes to the crowd (passTurn: the en passant square cleared, the fifty-move count as it was,
    * a base at its ply so a repetition counts from it, no move played), the carrots planted on the position it leaves
    * (plantCarrots: the crowd moves first), the meter spent (once a battle: off from now on), and the crowd's turn set up
    * as after his move (its moment, the cast's, plays as it begins: HOPPER.everyTurn). The God King's strike, if called,
-   * waits for his next move. Returns the patch; null when none was due.
+   * waits for his next move. Returns the patch; null when none was due, or it waits.
    */
-  apply(b: Battle): CarrotPatch | null {
+  apply(b: Battle, answer: string | null = null): CarrotPatch | null {
     if (!carrotBattle.due(b)) return null;
     const boss = b.state.boss!;
+    if (answer === PASS_WAIT) {
+      setPowers(b, (p) => ({ ...p, passWait: boss.crowdMoves }));
+      return null;
+    }
     const board = boardOf(b);
     const passed = passTurn(board.fen)!;
     const test = b.settings.bossCarrotTest;

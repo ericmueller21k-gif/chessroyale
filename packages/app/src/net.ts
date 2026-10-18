@@ -28,6 +28,9 @@ import {
   extraMoveFrom,
   bounceFrom,
   fuseFrom,
+  landingAhead,
+  passAnswer,
+  castAnswer,
   slamAhead,
   slamFrom,
   hopFrom,
@@ -703,10 +706,17 @@ export class NetMatch implements GameView {
       case "bossRequest":
         if (m.extra) return void this.hostExtra(m.key, m.fen);
         if (m.bounce) return void this.hostBounce(m.key, m.fen, m.bounce);
-        // (Alfil's fusion with the Slam's pieces landing right after it: its squares weighed with them down.)
-        if (m.fuse) return void this.hostPick(m.key, async (engines) => (await fuseFrom(engines, m.fen, m.fuse!, undefined, m.land?.length ? slamAhead(m.land).after : null))?.fen ?? null);
+        // (Alfil's fusion with the Slam's pieces landing right after it: its squares weighed with them down, and the
+        // position before it too. The fusion spends his whole turn, `pass`: the pass guard may have it wait.)
+        if (m.fuse)
+          return void this.hostPick(m.key, async (engines) => {
+            const pick = await fuseFrom(engines, m.fen, m.fuse!, undefined, m.land?.length ? landingAhead(m.land, sideToMove(m.fen) === "w" ? "b" : "w") : null);
+            return m.pass ? passAnswer(pick) : (pick?.fen ?? null);
+          });
         if (m.slam) return void this.hostPick(m.key, async (engines) => (await slamFrom(engines, m.fen, m.slam!))?.fen ?? null);
         if (m.hop) return void this.hostPick(m.key, async (engines) => (await hopFrom(engines, m.fen, m.hop!))?.fen ?? null);
+        // (Chub & Chirp's Carrot Patch cast spends his whole turn: only the pass guard to ask.)
+        if (m.pass) return void this.hostPick(m.key, (engines) => castAnswer(engines, m.fen));
         return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null);
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
@@ -909,7 +919,9 @@ export class NetMatch implements GameView {
   /**
    * Alfil's cast, fusion and Mammoth Slam, and Chub & Chirp's hop, host only: the candidate positions weighed on this
    * device's engines (fuseFrom and hopFrom: the one best for him; slamFrom: played out, within the cap), answered as the
-   * position picked, or "" (none: the cast's first pair, the fusion's first square, the first hop; nothing lifts).
+   * position picked, or "" (none: the cast's first pair, the fusion's first square, the first hop; nothing lifts). A
+   * step that spends his whole turn (the fusion; Chub & Chirp's Carrot Patch cast, which asks only this): PASS_WAIT when
+   * passing would lose real material (the pass guard: passAnswer, castAnswer).
    */
   private async hostPick(key: string, pick: (engines: UciEngine[]) => Promise<string | null>) {
     try {

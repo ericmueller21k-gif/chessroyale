@@ -492,6 +492,12 @@ export interface BossPowerState {
    * answer): the meter isn't spent and nothing shows; it comes again at the start of his next turn. Never sent to screens.
    */
   slamWait?: number;
+  /**
+   * A power that spends his whole turn (Alfil's fusion) waited after this crowd move: passing would have lost real
+   * material (the pass guard, BOSS_POWERS.passGuardPawns), so he plays his move instead, and it's due again at the start
+   * of his next turn. Never sent to screens.
+   */
+  passWait?: number;
   /** The crowd's pieces in the air after the Mammoth Slam (each with the square it lands on), until they land. */
   airborne?: SlamPiece[] | null;
   /** Their last landing: where each came down (its own square, or the nearest empty one that's allowed). */

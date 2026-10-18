@@ -13,6 +13,7 @@ import {
   bossThinkMs,
   landedEarlyMs,
   landsAfterHisMove,
+  PASS_WAIT,
   powerMomentMs,
   LAST_STAND_MS,
   queenSlain,
@@ -1391,9 +1392,10 @@ export class LobbyCore {
     const runner = this.runner!;
     const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
     const funhouse = this.r.bossKind === "funhouse";
-    // (A pick among candidate positions, not a move: Big Boy's bounce, Alfil's cast, fusion and Slam, the hopper's hop.)
+    // (A pick among candidate positions, not a move: Big Boy's bounce, Alfil's cast, fusion and Slam, the hopper's hop;
+    // and the Carrot Patch's cast, which only asks the pass guard.)
     const kind = this.r.bossKind;
-    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam" || kind === "hop";
+    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam" || kind === "hop" || kind === "carrots";
     // A power limits the moves: the boss's (a pie), or the crowd's for the move Boingo plays for it.
     const allowed = funhouse ? runner.crowdAllowed() : runner.bossAllowed();
     // (Wrangler's turn: his long pulls, a drag or the showdown to work out too, ordered by a seed of the turn's own.)
@@ -1417,6 +1419,8 @@ export class LobbyCore {
       ...(kind === "tusks" || kind === "fuse" ? { fuse: this.r.bounceCandidates ?? [] } : {}),
       ...(kind === "slam" ? { slam: this.r.bounceCandidates ?? [] } : {}),
       ...(kind === "hop" ? { hop: this.r.bounceCandidates ?? [] } : {}),
+      // (A step that spends his whole turn: the pass guard, on the host's engine. The server never searches.)
+      ...(kind === "fuse" || kind === "carrots" ? { pass: true as const } : {}),
       ...(allowed && !pick ? { allowed } : {}),
       // (Only the boss's own moves are Maia's: the funhouse's move for the crowd, Hollow's extra move and Big Boy's
       // bounce keep their own engine picks, and so does Wrangler's reply to the showdown's duel: the engine's best.)
@@ -1504,9 +1508,11 @@ export class LobbyCore {
 
   /**
    * Chub & Chirp's Carrot Patch (at the start of his turn after its warning, or the admins' trigger: the runner's
-   * carrotDue): everyone sees him get ready (thinking; your queen banner first, if it's up), then the cast, his whole
-   * turn, worked out here (no host: the placement is the position's and the seed's); then the crowd's turn, its moments
-   * (the cast's first) before the crowd's clock starts.
+   * carrotDue): everyone sees him get ready (thinking; your queen banner first, if it's up) while the host's engine checks
+   * the pass guard (the request's `pass`: PASS_WAIT when passing would lose real material); then the cast, his whole
+   * turn, worked out here (the placement is the position's and the seed's); then the crowd's turn, its moments (the
+   * cast's first) before the crowd's clock starts. The host's PASS_WAIT: no cast, the warning staying, and his move is
+   * asked for. Any other answer, or no host engine anywhere: the cast.
    */
   private requestCarrots() {
     this.r.phase = "boss";
@@ -1514,7 +1520,10 @@ export class LobbyCore {
     this.r.bossKind = "carrots";
     this.r.bossMinAt = this.thinkMinAt();
     this.broadcast(this.bossMessage(0, { thinking: true }));
-    return this.playBoss("");
+    const host = this.hostNow();
+    this.r.hostId = host;
+    if (host) this.sendBossRequest(host);
+    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
   }
 
   /**
@@ -1579,7 +1588,8 @@ export class LobbyCore {
       // that isn't his now, the admins' trigger having brought the Slam meanwhile, is dropped): no moment, straight on.
       const asked = this.r.bossKind;
       this.r.bossKind = undefined;
-      const picked = this.r.bounceCandidates?.includes(move) ? move : null;
+      // (The fusion spends his whole turn: the host's PASS_WAIT, the pass guard, has it wait, and he moves.)
+      const picked = this.r.bounceCandidates?.includes(move) || (asked === "fuse" && move === PASS_WAIT) ? move : null;
       this.r.bounceCandidates = undefined;
       const step = this.runner!.applyAlfil(picked, null, asked);
       const until = this.io.now() + (!this.runner!.bossToMove() ? bossTurnShowMs(this.runner!.bossView()) : step && step !== "fuse" ? powerMomentMs([{ kind: step }]) : 0);
@@ -1588,9 +1598,10 @@ export class LobbyCore {
     }
     if (this.r.bossKind === "carrots") {
       // Chub & Chirp's cast: his whole turn (the crowd's turn begins as after his move: its moments, the cast's first).
-      // None due any more (nothing came of it): straight on.
+      // None due any more (nothing came of it), or the host's PASS_WAIT (the pass guard: it waits, and he moves):
+      // straight on.
       this.r.bossKind = undefined;
-      this.runner!.applyCarrots();
+      this.runner!.applyCarrots(move === PASS_WAIT ? PASS_WAIT : null);
       const until = this.io.now() + (!this.runner!.bossToMove() ? bossTurnShowMs(this.runner!.bossView()) : 0);
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);

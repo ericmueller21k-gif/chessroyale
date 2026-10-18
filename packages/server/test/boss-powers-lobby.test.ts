@@ -873,6 +873,8 @@ describe("Alfil online", () => {
     expect(ask.fuse!.length).toBeGreaterThan(1);
     expect(ask.allowed).toBeUndefined();
     expect(ask.brain).toBeUndefined();
+    // (Not a step that spends his turn: his move follows it, so no pass guard.)
+    expect(ask.pass).toBeUndefined();
     answer(L, ask.key, ask.fuse![ask.fuse!.length - 1]!);
     const move = asked(L);
     expect(move.fuse ?? move.slam).toBeUndefined();
@@ -892,17 +894,16 @@ describe("Alfil online", () => {
     const plies = toRound(L).board!.history.length;
     crowdMove(L);
     const req = asked(L);
-    // (Two ways to go: the host's engine picks. One: it lands at once, no host asked.)
-    if (req) {
-      expect(req.fuse).toHaveLength(2);
-      expect(req.allowed).toBeUndefined();
-      expect(req.brain).toBeUndefined();
-      answer(L, req.key, req.fuse![1]!);
-    }
+    // (The host's engine picks the square, and checks the pass guard: the fusion spends his whole turn.)
+    expect(req.fuse).toHaveLength(2);
+    expect(req.pass).toBe(true);
+    expect(req.allowed).toBeUndefined();
+    expect(req.brain).toBeUndefined();
+    answer(L, req.key, req.fuse![1]!);
     // Everyone sees the elephant land, and that's his move: no move after it; your turn once the turn's moments (the
     // fusion's first) have played.
     const fused = shown(L, "p2", from).find((m) => !m.thinking && m.boss.powers!.fusion?.to)!;
-    if (req) expect(fused.boss.board.fen).toBe(req.fuse![1]);
+    expect(fused.boss.board.fen).toBe(req.fuse![1]);
     expect(fused.boss.lastMove).toBeNull();
     expect(sideToMove(fused.boss.board.fen)).toBe("w");
     expect(fused.until - (fused as unknown as { now: number }).now).toBe(bossTurnShowMs(fused.boss));
@@ -916,6 +917,60 @@ describe("Alfil online", () => {
     expect(after.elephants).toHaveLength(1);
     expect([...after.fusion!.from].sort()).toEqual([...marked].sort());
     expect(after.fusion!.to).toBe(after.elephants![0]);
+  });
+
+  it("the pass guard (Eric, Oct 18): the host's \"wait\" for his fusion holds it, the marks staying, and his move is asked for; next turn the fusion is asked again; \"wait\" for his cast is no answer", () => {
+    const runnerOf = (l: ReturnType<typeof setup>) => (l.core as unknown as { runner: MatchRunner }).runner;
+    /** Everyone picks the first allowed move that takes neither marked pawn and gives no check (in check, it waits anyway). */
+    const sparing = (l: ReturnType<typeof setup>, marks: string[]) => {
+      for (const id of ["p1", "p2"]) {
+        const r = l.last(id, "round")!;
+        const ok = r.boss?.powers?.allowed ?? legalMoves(r.board!.fen);
+        l.core.message(id, { t: "pick", key: r.key, move: ok.find((m) => !marks.includes(m.slice(2, 4)) && !inCheck(applyMove(r.board!.fen, m)))! });
+      }
+      expect(l.hostScores("p1")).toBe(true);
+      l.advance(30_000);
+    };
+    // His cast isn't a pass (his move follows it): "wait" there is no answer, the first pair, then his move.
+    const other = alfil({ bossPowerTest: "tusks" });
+    crowdMove(other);
+    const first = asked(other);
+    answer(other, first.key, "wait");
+    const after = asked(other);
+    expect(after.fuse ?? after.slam).toBeUndefined();
+    for (const sq of runnerOf(other).boss!.powers!.tusks!.pawns) expect(pieceAt(first.fuse![0]!, sq)?.type ?? "b").toBe("b");
+    // The fusion: "wait".
+    const L = alfil({ bossPowerTest: "tusks" });
+    crowdMove(L);
+    const cast = asked(L);
+    answer(L, cast.key, cast.fuse![0]!);
+    expect(asked(L).fuse).toBeUndefined();
+    hostBoss(L);
+    const marked = runnerOf(L).boss!.powers!.tusks!.pawns;
+    toRound(L);
+    sparing(L, marked);
+    const fuse = asked(L);
+    expect(fuse.pass).toBe(true);
+    const from = (L.inbox.get("p2") ?? []).length;
+    answer(L, fuse.key, "wait");
+    // No fusion: the board as it was, the pawns still marked, and his move asked for on it (a move, not a pick).
+    const instead = asked(L);
+    expect(instead.fuse ?? instead.slam ?? instead.pass).toBeUndefined();
+    expect(instead.fen).toBe(fuse.fen);
+    const p = runnerOf(L).boss!.powers!;
+    expect(p.tusks!.pawns).toEqual(marked);
+    expect(p.fusion ?? null).toBeNull();
+    expect(p.fused ?? 0).toBe(0);
+    expect(shown(L, "p2", from).some((m) => m.boss.powers!.events.some((e) => e.kind === "fuse"))).toBe(false);
+    hostBoss(L);
+    // Your move (taking neither), then his turn: the fusion is due again, and on the host's square it comes.
+    toRound(L);
+    sparing(L, runnerOf(L).boss!.powers!.tusks!.pawns);
+    const again = asked(L);
+    expect(again.pass).toBe(true);
+    answer(L, again.key, again.fuse![0]!);
+    expect(runnerOf(L).boss!.powers!.fused).toBe(1);
+    expect(L.last("p1", "bossRequest")).toBeUndefined();
   });
 
   it("the Mammoth Slam: the host plays the candidates out and picks; the pieces' shadows grow; they land as their crowd turn begins", () => {
@@ -992,10 +1047,10 @@ describe("Alfil online", () => {
       turn();
     }
     // (This seed: his cast, then his move, on the second of these turns; on the third his fusion, with one square
-    // allowed, so the host isn't asked; on the last, his move just before they land.)
-    expect(turns.map((t) => t.map((x) => x.what))).toEqual([["move"], ["pick", "move"], [], ["move"]]);
-    // Only that last one carries them: not the cast (his move follows it), nor the moves before.
-    expect(turns.slice(0, -1).flat().map((x) => x.land)).toEqual([undefined, undefined, undefined]);
+    // allowed (the host asked all the same: the pass guard); on the last, his move just before they land.)
+    expect(turns.map((t) => t.map((x) => x.what))).toEqual([["move"], ["pick", "move"], ["pick"], ["move"]]);
+    // Only that last one carries them: not the cast (his move follows it), nor the fusion or the moves before.
+    expect(turns.slice(0, -1).flat().map((x) => x.land)).toEqual([undefined, undefined, undefined, undefined]);
     expect(turns.at(-1)!.map((x) => x.land)).toEqual([pieces]);
     // They land as your next turn begins, as ever.
     expect(toRound(L).boss!.powers!.landed!.pieces.map((x) => x.from).sort()).toEqual(pieces.map((x) => x.square).sort());
@@ -1173,6 +1228,10 @@ describe("Chub & Chirp online (Leapfrog)", () => {
     expect(L.core.ultimateTrigger("p1", true)).toBe(true);
     expect((L.core as unknown as { runner: MatchRunner }).runner.boss!.powers!.ultNext).toBe(true);
     crowdPlays(L, "g1f3");
+    // (The host checks the pass guard first: "", it comes.)
+    const req = asked(L);
+    expect(req.pass).toBe(true);
+    L.core.message("p1", { t: "bossMove", key: req.key, move: "" });
     const next = toRound(L);
     expect(next.boss!.powers!.carrots!.at).toBe(1);
     expect(next.boss!.powers!.hop).toBeNull();
@@ -1219,7 +1278,7 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
   }
   const ROOK = "4k3/8/8/8/8/8/8/R3K3 w - - 0 30";
 
-  it("the cast (the test switch: at the start of his first turn): no host asked, everyone sees the same carrots, his whole turn, its moment before the crowd's clock", () => {
+  it("the cast (the test switch: at the start of his first turn): the host asked only the pass guard, then everyone sees the same carrots, his whole turn, its moment before the crowd's clock", () => {
     const L = hopper({ bossPowerTest: "carrotpatch" });
     const r0 = L.last("p1", "round")!;
     expect(r0.boss!.powers!.warned).toBe(true);
@@ -1228,7 +1287,13 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
     expect(L.hostScores("p1")).toBe(true);
     L.inbox.set("p1", []);
     L.advance(5_000);
-    expect(L.last("p1", "bossRequest")).toBeUndefined();
+    // (The pass guard on the host's engine: no candidates, no move asked for; the placement is the server's own.)
+    const req = asked(L);
+    expect(req.pass).toBe(true);
+    expect(sideToMove(req.fen)).toBe("b");
+    expect(req.fuse ?? req.slam ?? req.hop ?? req.allowed ?? req.brain ?? req.race).toBeUndefined();
+    expect(runnerOf(L).boss!.powers!.carrots ?? null).toBeNull();
+    L.core.message("p1", { t: "bossMove", key: req.key, move: "" });
     const cast = shown(L, "p2", from).find((m) => !m.thinking && m.boss.powers!.carrots)!;
     expect(cast).toBeTruthy();
     const c = cast.boss.powers!.carrots!;
@@ -1247,6 +1312,37 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
     expect(sideToMove(next.board!.fen)).toBe("w");
     // The admins' trigger refuses once it's come.
     expect(L.core.ultimateTrigger("p1", true)).toBe(false);
+  });
+
+  it("the pass guard (Oct 18): the host's \"wait\" holds the cast, the warning staying, and his move is asked for; next turn the cast is asked again", () => {
+    const L = hopper({ bossPowerTest: "carrotpatch" });
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move: "d2d4" });
+    expect(L.hostScores("p1")).toBe(true);
+    L.inbox.set("p1", []);
+    const req = asked(L);
+    expect(req.pass).toBe(true);
+    L.inbox.set("p1", []);
+    L.core.message("p1", { t: "bossMove", key: req.key, move: "wait" });
+    // No cast: his move is asked for on the same board, the race not begun, the warning and its turn kept.
+    // (His turn goes on as any other: here Leapfrog's hop first, nose to nose on the e-file, then his move.)
+    const move = asked(L);
+    expect(move.pass ?? move.hop).toBeUndefined();
+    const p = runnerOf(L).boss!.powers!;
+    expect(p.carrots ?? null).toBeNull();
+    expect(p.ultAt).toBeUndefined();
+    expect(p.warnAt).toBeDefined();
+    expect(L.last("p2", "boss")!.boss.powers!.warned).toBe(true);
+    L.core.message("p1", { t: "bossMove", key: move.key, move: legalMoves(move.fen)[0]! });
+    L.inbox.set("p1", []);
+    const r1 = toRound(L);
+    expect(r1.boss!.powers!.warned).toBe(true);
+    expect(r1.boss!.powers!.carrots ?? null).toBeNull();
+    // His next turn: asked again; "" (the guard happy), it comes.
+    crowdPlays(L, legalMoves(r1.board!.fen)[0]!);
+    const again = asked(L);
+    expect(again.pass).toBe(true);
+    L.core.message("p1", { t: "bossMove", key: again.key, move: "" });
+    expect(toRound(L).boss!.powers!.carrots!.squares).toHaveLength(5);
   });
 
   it("in the race the score jobs carry the race (the judge and the bots weigh it), and the host's boss request carries it for his race brain; the host and the server agree on what his move pulls", () => {

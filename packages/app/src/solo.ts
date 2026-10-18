@@ -820,7 +820,8 @@ export class SoloMatch implements GameView {
    * out (nobody's clock runs), then the next step or his move. His fusion is his move: then your turn, its moments (the
    * fusion's first) before your clock starts, as after his move (one with no square fails with no moment, and he moves).
    * No engine answer: the cast's first pair, the fusion's first square, nothing lifts (the Slam again on his next turn),
-   * as online. A step nothing came of (a Slam that lifted nothing, a pick the admins' trigger overtook) shows nothing.
+   * as online. A step nothing came of (a Slam that lifted nothing, a fusion the pass guard has wait, a pick the admins'
+   * trigger overtook) shows nothing.
    * (Your move took his queen, or his pieces came down early: that plays in this thinking first; not again after it.)
    */
   private async alfilTurn() {
@@ -852,16 +853,17 @@ export class SoloMatch implements GameView {
 
   /**
    * Chub & Chirp's Carrot Patch (at the start of his turn after its warning, or the admins' trigger): he gets ready
-   * (thinking; your queen banner first, if your move took his queen), then the cast, his whole turn (no engine: the
-   * placement is the position's and the seed's, as online); then your turn, its moments (the cast's first) before your
-   * clock starts, as after his move.
+   * (thinking; your queen banner first, if your move took his queen) while this device's engines check the pass guard,
+   * then the cast, his whole turn (the placement is the position's and the seed's, as online); then your turn, its
+   * moments (the cast's first) before your clock starts, as after his move. When passing would lose real material it
+   * waits, the warning staying, and he plays his move (as online). No engine answer: the cast.
    */
   private async carrotTurn() {
     const snap = this.bossSnapshot();
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
-    await new Promise((r) => setTimeout(r, bossThinkMs(snap)));
+    const cast = this.runner.playCarrots(this.engines).catch(() => this.runner.applyCarrots(null));
+    await Promise.all([cast, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
     if (this.stopped) return;
-    this.runner.applyCarrots();
     const showMs = !this.runner.bossToMove() ? bossTurnShowMs(this.runner.bossView(), this.alone) : 0;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
     this.timer = setTimeout(() => this.nextRound(), showMs);
@@ -1365,12 +1367,9 @@ export class SoloMatch implements GameView {
           // (Alfil's steps, one after another: no engine answer, the cast's first pair, the fusion's first square or nothing
           // lifts. His fusion is his move: then his turn is over.)
           for (let i = 0; i < 3 && this.runner.alfilStep(); i++) await this.runner.playAlfil(this.engines).catch(() => this.runner.applyAlfil(null));
-          // (Chub & Chirp's hop: no engine answer, the first pawn that can.)
-          // (Chub & Chirp's Carrot Patch cast: his whole turn. Else his hop: no engine answer, the first pawn that can.)
-          if (this.runner.carrotDue()) {
-            this.runner.applyCarrots();
-            continue;
-          }
+          // (Chub & Chirp's Carrot Patch cast: his whole turn, unless the pass guard has it wait. Else his hop: no engine
+          // answer, the first pawn that can.)
+          if (this.runner.carrotDue()) await this.runner.playCarrots(this.engines).catch(() => this.runner.applyCarrots(null));
           if (this.runner.hopDue()) await this.runner.playHop(this.engines).catch(() => this.runner.applyHop(null));
           if (this.runner.bossToMove()) await this.runner.playBoss(this.engines[0]);
           continue;

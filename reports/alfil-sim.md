@@ -139,3 +139,23 @@ raid sim, V1's seeds, `counter: 1`; "before" is today's main (the review round's
   book with a Slam's lift taken off, the guard 357 ms median (424 ms at most), about 386,000 nodes a second in the lite
   build the browser loads; his whole move 1.74 s without it, 2.21 s with it (median). At a phone's 350,000 nodes a second
   about 0.45 s, at an old phone's 90,000 about 1.7 s (`reports/many-judges.md`'s speeds), once a Slam.
+
+## The pass guard (Oct 18, after Eric played him)
+
+When the fusion (his whole turn) is due and passing would lose real material (the engine's evaluation after it, the
+crowd to move, at least 2 pawns of log-odds below his before it), it waits a turn and he moves
+(docs/decisions/2026-10-18-turn-passing-guard.md). The same raid sim, V1's seeds, `counter: 1`, one run.
+
+| Run | Battles | Crowd wins | Draws | Boss wins | Crowd score (± 1 s.e.) | Seeds 1-13 / 31-43 | Moves (range) | Fusions (countered, nowhere) | Waits |
+|---|---|---|---|---|---|---|---|---|---|
+| l1a, l1b: the landing guard | 26 | 3 | 2 | 21 | 0.15 (± 0.07) | 0.31 / 0.00 | 35 (16-60) | | |
+| pg1a, pg1b: the pass guard | 26 | 0 | 0 | 26 | **0.00** | 0.00 / 0.00 | 26.5 (17-40) | 51 (12, 4) | 9 |
+| pgT8a, pgT8b: the pass guard, tusksEvery 8 (chosen) | 26 | 3 | 0 | 23 | **0.12** | | 31 | | |
+| pgR8a, pgR8b: the pass guard, Slam meter ×0.8 | 26 | 1 | 0 | 25 | 0.04 | | 29 | | |
+
+- **Out of the pack:** 0.00, below the 0.08 line. One run, no sweep (the brief): for the director's call.
+- **The director's call (Oct 18):** his offset is already at Stockfish's floor at this tier (no lever), so two levers were tried, one run each: a fusion every 8 of his turns instead of 5 (0.12, in the pack, 31 moves) and his Slam meter at ×0.8 (0.04, out). `tusksEvery` is now 8; the two-elephant cap and the fusion as his whole turn (Eric's) are unchanged.
+- **The guard waited 9 times in 7 battles**, eight of them passes that would have cost him 6 pawns or more (his queen),
+  one 2.6; each of those fusions came later (two turns in a row at most). In the six runs above (78 battles), 10 of the
+  crowd's 13 wins came in a battle with a fusion that lost 2 pawns or more by this measure (nearly all a free queen), 3
+  without one: the crowd's wins here were mostly this bug.
