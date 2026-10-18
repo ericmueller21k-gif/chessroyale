@@ -308,19 +308,28 @@ export function bandBrain(bossId: string, strength: number, level: number = stre
  * A boss with a fixed brain (BOSS_BRAIN.fixed: the Hidden Boss) plays it at Maia's top rating, with no guard and no
  * Stockfish share, whatever the strength, the crowd, the difficulty or an admin's pick; Stockfish only where Maia isn't
  * on offer (and while Maia loads, as every boss).
+ *
+ * Boss alone (`alone`: its difficulty's Maia rating, BOSS_DIFFICULTY's `maia`) plays the boss's own brain, or an
+ * admin's pick, at that rating whatever the strength, with no bridge share.
  */
 export function bossBrainFor(
   bossId: string,
   strength: number,
   picked: BossBrain | "",
   maia: boolean,
-  opts: { crowd?: boolean } = {},
+  opts: { crowd?: boolean; alone?: number } = {},
   s: BossBrainSettings = BOSS_BRAIN,
 ): BossBrainPlan {
   const stockfish: BossBrainPlan = { brain: "stockfish", rating: null, stockfishShare: 0 };
   const fixed = s.fixed[bossId];
   if (fixed) return !maia || fixed === "stockfish" ? stockfish : { brain: fixed, rating: maiaTopRating(s), stockfishShare: 0 };
-  if (!maia || strength >= s.stockfishFrom) return stockfish;
+  if (!maia) return stockfish;
+  // (Boss alone: its difficulty's Maia rating, whatever the strength; no bridge (BOSS_DIFFICULTY's `maia`, Oct 18).)
+  if (opts.alone && !opts.crowd) {
+    const brain = picked || (s.byBoss[bossId] ?? s.brain);
+    return brain === "stockfish" ? stockfish : { brain, rating: opts.alone, stockfishShare: 0 };
+  }
+  if (strength >= s.stockfishFrom) return stockfish;
   const level = strength + (opts.crowd ? s.crowdMargin : 0);
   const { brain, stockfishShare } = picked ? { brain: picked, stockfishShare: 0 } : bandBrain(bossId, strength, level, s);
   if (brain === "stockfish") return stockfish;

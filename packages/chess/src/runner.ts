@@ -1285,7 +1285,7 @@ export class MatchRunner {
   bossBrainPlan(picked: BossBrain | "", maia: boolean): BossBrainPlan | null {
     const b = this.state.boss;
     if (!b) return null;
-    return bossBrainFor(b.id ?? "", b.elo, picked, maia, { crowd: this.alive().length > 1 });
+    return bossBrainFor(b.id ?? "", b.elo, picked, maia, { crowd: this.alive().length > 1, alone: this.settings.bossAloneMaia || undefined });
   }
 
   /** The moves the boss may play now (a pie stops it too), or null: any legal move. */

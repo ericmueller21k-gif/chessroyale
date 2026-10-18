@@ -127,12 +127,12 @@ test("the pick reaches Boss alone, a Solo raid and a raid you make; the public q
   await openBossRaid(page);
   await expect(tile(page, "Jefferson")).toHaveAttribute("aria-checked", "true");
   await tile(page, "Sawyer").click();
-  // (Its strength: the stage's at Normal, a fresh device's difficulty: a Solo raid has no difficulty on top.)
-  await expect(page.locator(".bs-rating")).toHaveText(/^💀+ Rating \d{3,4}$/u);
-  const raidElo = Number((await page.locator(".bs-rating").textContent())!.match(/\d+/)![0]);
+  // (The stage shows Boss alone's level, Normal's 1400 on a fresh device. A Solo raid's strength is the usual one, a
+  // step above your rating plus Sawyer's offset: 1350 unrated, as it was; its brain plays it with the bots as a crowd.)
+  await expect(page.locator(".bs-rating")).toHaveText(/^💀+ Rating 1400$/u);
   await main.getByRole("button", { name: /^Raid with bots/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match?.boss?.id ?? null), { timeout: 60_000 }).toBe("sawyer");
-  expect(await page.evaluate(() => (window as any).match.runner.state.boss.elo)).toBe(raidElo);
+  expect(await page.evaluate(() => (window as any).match.runner.state.boss.elo)).toBe(1350);
 
   // Boss alone: the difficulty, and the boss picked (no list to pick from again).
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3");
@@ -141,13 +141,14 @@ test("the pick reaches Boss alone, a Solo raid and a raid you make; the public q
   await main.getByRole("button", { name: /^Boss alone/ }).click();
   const menu = page.getByRole("dialog", { name: "Boss alone" });
   await expect(menu.locator(".boss-row")).toHaveCount(1);
-  // (Hard: the battle's strength is the number the menu and the stage show.)
+  // (Hard: the level the menu and the stage show, 1800, is the rating its brain picks its moves at, Oct 18.)
   await menu.getByRole("radio", { name: "Hard", exact: true }).click();
   const aloneElo = Number(await menu.locator(".boss-row .br-elo strong").textContent());
+  expect(aloneElo).toBe(1800);
   await expect(page.locator(".bs-rating")).toHaveText(new RegExp(`^💀+ Rating ${aloneElo} · Hard$`, "u"));
   await menu.getByRole("button", { name: /^Wrangler/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match?.boss?.id ?? null), { timeout: 60_000 }).toBe("pig");
-  expect(await page.evaluate(() => (window as any).match.runner.state.boss.elo)).toBe(aloneElo);
+  expect(await page.evaluate(() => (window as any).match.runner.bossBrainPlan("", true).rating)).toBe(aloneElo);
 });
 
 test("a resting boss has no tile, and a pick of it reads as a random boss", async ({ page }) => {
@@ -301,12 +302,13 @@ test("one number per boss: the stage shows Boss alone's strength at your difficu
   const main = page.getByRole("main");
   const stage = page.locator(".bs-rating");
   const menu = page.getByRole("dialog", { name: "Boss alone" });
+  // (Boss alone's level: the difficulty's Maia rating, whatever the boss or your rating, Oct 18.)
   const cases: [string, string, number][] = [
-    ["Sawyer", "Hard", 1600],
-    ["Sawyer", "Normal", 1350],
-    ["Ginger", "Easy", 1200],
-    ["Ginger", "Hardest", 2000],
-    ["Big Boy", "Hard", 1600],
+    ["Sawyer", "Hard", 1800],
+    ["Sawyer", "Normal", 1400],
+    ["Ginger", "Easy", 1000],
+    ["Ginger", "Hardest", 2200],
+    ["Big Boy", "Hard", 1800],
   ];
   for (const [boss, level, elo] of cases) {
     await tile(page, boss).click();
@@ -322,9 +324,9 @@ test("one number per boss: the stage shows Boss alone's strength at your difficu
   // Remembered on this device: the stage after a reload, before the menu opens.
   await page.reload();
   await expect(page.locator(".bs-name")).toHaveText("Big Boy");
-  await expect(stage).toHaveText(/^💀+ Rating 1600 · Hard$/u);
+  await expect(stage).toHaveText(/^💀+ Rating 1800 · Hard$/u);
 
-  // The widest line (five skulls, four digits, Hardest) on one line at 320 px, inside the window.
+  // The widest line (the most skulls, four digits, Hardest) on one line at 320 px, inside the window.
   await rated(page, 2950);
   await page.setViewportSize({ width: 320, height: 568 });
   await page.reload();
@@ -332,7 +334,7 @@ test("one number per boss: the stage shows Boss alone's strength at your difficu
   await main.getByRole("button", { name: /^Boss alone/ }).click();
   await menu.getByRole("radio", { name: "Hardest", exact: true }).click();
   await menu.getByRole("button", { name: "Close" }).click();
-  await expect(stage).toHaveText(/^💀{5} Rating \d{4} · Hardest$/u);
+  await expect(stage).toHaveText(/^💀+ Rating 2200 · Hardest$/u);
   const line = (await stage.boundingBox())!;
   expect(line.x).toBeGreaterThanOrEqual(0);
   expect(line.x + line.width).toBeLessThanOrEqual(320);

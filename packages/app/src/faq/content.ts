@@ -82,7 +82,7 @@ export interface FaqSources {
   crowdKnockouts: Readonly<Record<FinalFormat, readonly number[]>>;
   powers: BossPowerSettings;
   brain: BossBrainSettings;
-  difficulty: readonly { id: string; label: string; elo: number }[];
+  difficulty: readonly { id: string; label: string; elo: number; maia: number }[];
   tiers: readonly number[];
   roster: readonly BossDef[];
   engineMinElo: number;
@@ -519,7 +519,7 @@ ${
     : `- **The Crowd's boss final** comes from how the people among the last ${finalists} played that match (bots count only if no person is left among them): a weighted average of their ratings (the best counts ${finalists} times, the next ${finalists - 1}, down to the weakest once), ${S.bossEloOffset < 0 ? "minus" : "plus"} ${Math.abs(S.bossEloOffset)} (a crowd picking together plays better than its average member), kept within ${range(S.bossEloRange)}. The weighting makes it a real fight for the best players.`
 }
 - Then each boss's **offset** is added: bosses with nastier powers play a little weaker underneath.
-- **Boss alone** adds your difficulty too: ${diffs}.
+- **Boss alone** adds your difficulty too: ${diffs}. In Boss alone the difficulty also sets how well the boss plays its moves, whatever your rating: Maia at a human's rating, ${src.difficulty.map((d) => `${d.label} ${d.maia}`).join(", ")} (its powers on top; [Brain 2](#maia-brain)).
 - The result always stays between ${floor} and ${ceiling}.
 
 $ strength = tier + the boss's offset + your difficulty
@@ -530,7 +530,7 @@ ${offsets}
 
 **Worked example.** You're rated ${you}. The weakest tier above ${you} is ${tier}. ${ginger.name} at ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}: ${tier} ${term(ginger.offset)} = **${gingerElo}**. ${bigBoy.name} at ${hard.label}: ${tier} ${term(bigBoy.offset)} ${term(hard.elo)} = **${bigBoyElo}**.
 
-The Boss raid screen shows the boss you picked at Boss alone's strength against you, with your difficulty (named unless it's ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}), and Boss alone's menu shows the same number and how far it is from yours ("+200 vs you"); 1 to 5 skulls show how dangerous it is. A Solo raid (Raid with bots) has no difficulty on top: the stage's number at ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}.
+The Boss raid screen shows the boss you picked at Boss alone's level, your difficulty's Maia rating (named unless it's ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}), and Boss alone's menu shows the same number and how far it is from yours ("+200 vs you"); 1 to 5 skulls show how dangerous it is. A Solo raid (Raid with bots) has no difficulty on top.
 
 ### Brain 1: Stockfish at a set strength {#stockfish-brain}
 
