@@ -465,7 +465,7 @@ build): online, phase 1 won is the crowd's victory):
     candy-colored bonk; `bigboyBonk` and `bigboySwish` in turn), 1 square off, facing our left (his lollipop hand).
     Ginger drops into a whirl of snow and jabs the king with her frosted, glowing cane ten times, high and low, glaring
     at it (`frostHit`, a frost burst: ice shards and a white puff, never over or on the king's sprite;
-    `gingerCrackle` and `gingerCrunch`), 0.85 off (her cane is short). Jefferson drops in with his Roman candle, plants
+    `gingerCrackle` and `gingerCrunch`), 1 square off. Jefferson drops in with his Roman candle, plants
     it, lights the fuse at 470 ms and fires one fireball a beat, each arcing over and popping on the king (`popHit`, a
     small firework pop; `grexPop` and `grexSparkle`), 1.8 off. Ginger's and Jefferson's frames are built when first
     read (their parts are painted as they're made). docs/decisions/2026-10-18-king-attacks-bigboy-ginger-jefferson.md.

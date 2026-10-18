@@ -343,12 +343,12 @@ const CANE: Record<CanePose, CaneSpec> = {
   overhead: { grip: [13, 7], dir: [0.06, -1], up: 15, down: 10, elbow: [15, 18] },
   aim: { grip: [14, 36], dir: [-1, -0.28], up: 6, down: 30, curl: -1, front: true },
   thrust: { grip: [18, 35], dir: [-1, -0.28], up: 6, down: 30, curl: -1, front: true },
-  // Her attack on a king (to our right): held near the hook, most of its length out, jabbed at its head or its chest
-  // (its tip just past the king's middle), and drawn back up between jabs behind her, its tip clear over the king.
-  jabHigh: { grip: [24, 32], dir: [-1, 0.05], up: 6, down: 38, curl: -1, elbow: [20, 34], front: true },
-  jabLow: { grip: [24, 38], dir: [-1, -0.1], up: 6, down: 38, curl: -1, elbow: [20, 36], front: true },
-  cockHigh: { grip: [15, 33], dir: [-1, 0.6], up: 6, down: 38, curl: -1, elbow: [16, 32] },
-  cockLow: { grip: [16, 35], dir: [-1, 0.42], up: 6, down: 38, curl: -1, elbow: [17, 33] },
+  // Her attack on a king (to our right): held by the hook, its whole length out (50, as it stands), jabbed at its head or
+  // its chest (its tip just past the king's middle), and drawn back up between jabs behind her, its tip over the king.
+  jabHigh: { grip: [24, 32], dir: [-1, 0.05], up: 6, down: 44, curl: -1, elbow: [20, 34], front: true },
+  jabLow: { grip: [24, 38], dir: [-1, -0.1], up: 6, down: 44, curl: -1, elbow: [20, 36], front: true },
+  cockHigh: { grip: [15, 33], dir: [-1, 0.6], up: 6, down: 44, curl: -1, elbow: [16, 32] },
+  cockLow: { grip: [16, 35], dir: [-1, 0.42], up: 6, down: 44, curl: -1, elbow: [17, 33] },
 };
 const SHOULDER_L: Pt = [21, 26];
 const SHOULDER_R: Pt = [37, 26];
@@ -815,7 +815,7 @@ export const GINGER_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, numbe
 // frosted, jabbed at the king on every beat, high and low in turn. Her cold, not a freeze: nothing covers the king.
 
 /** Room to our right (the king's side) for the cane, and headroom to drop in from. */
-const ATTACK_REACH = 8;
+const ATTACK_REACH = 12;
 const ATTACK_TOP = 0;
 const AW = GINGERBREAD.w + ATTACK_REACH;
 const AH = GINGERBREAD.h + ATTACK_TOP;

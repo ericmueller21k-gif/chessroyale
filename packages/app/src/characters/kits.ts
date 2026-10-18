@@ -116,8 +116,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
     chance: GINGER_CHANCE,
     portrait: { ...GINGER_PORTRAIT, anim: "idle", frame: 0 },
     // She drops in and jabs the king with her frosted cane, high and low (gingerbread.ts: GINGER_ATTACK; Eric, Oct 18),
-    // a frost burst on its square each hit. (Her cane reaches 1 square from her feet, her body 0.46: she stands 0.85 off.)
-    kingAttack: { ch: GINGER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 0.85, hit: frostItem },
+    // a frost burst on its square each hit. (Her cane reaches 1.08 squares from her feet, her body 0.46: she stands 1 off.)
+    kingAttack: { ch: GINGER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1, hit: frostItem },
   },
   "Jefferson": {
     ch: GREX,

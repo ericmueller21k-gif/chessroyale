@@ -46,9 +46,9 @@ Lines (new, said as he lands, every time):
   both pupils to the king), and his face goes red as in his tantrum. He stands 1 square off: the candy reaches 1.13
   squares from his feet, his fist 0.62. The stick is a little longer than when he holds it (16 pixels to the candy, not
   12 to 14): his "giant lollipop" reaching the king from beside it.
-- **Ginger stands 0.85 squares off.** Her candy cane is held by its hook end and jabbed out (38 pixels: a little shorter
-  than it stands, 50 with the hook), so its tip is just past the king's middle and her body (0.46 squares from her feet)
-  stays out of the middle of its square. Between jabs it's drawn back up behind her, its tip over the king, so the jabs
+- **Ginger stands 1 square off.** Her candy cane is held by its hook end and jabbed out, its whole length (50 pixels with
+  the hook, as it stands), so its tip is just past the king's middle (1.08 squares from her feet) and her body (0.46
+  squares from her feet) stays well clear of the God King. (At 0.85 off, the first try, her front foot touched his cape.) Between jabs it's drawn back up behind her, its tip over the king, so the jabs
   read as jabs, not a cane left in him. Her eyes glance at the king (a new face, `jab`). Her cold is the glowing cane,
   icy eyes and a small puff of frost on each jab, gone in 200 ms; nothing covers or recolors the God King.
 - **Jefferson's candle is planted, not held level.** Every pose is one his Roman candle already has (planted in front
