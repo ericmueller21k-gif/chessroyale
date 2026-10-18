@@ -1167,6 +1167,12 @@ describe("Chub & Chirp online (Leapfrog)", () => {
       expect(L.last("p1", "boss")!.boss.powers!.hop, String(answer)).toMatchObject({ from: "a5", over: "a4", to: "a3" });
     }
   });
+
+  it("the admins' test trigger refuses (no ultimate yet), so nothing is left waiting for one", () => {
+    const L = hopper({ bossPowerTest: "leapfrog" });
+    expect(L.core.ultimateTrigger("p1", true)).toBe(false);
+    expect((L.core as unknown as { runner: MatchRunner }).runner.boss!.powers!.ultNext).toBeUndefined();
+  });
 });
 
 describe("the boss's brain online (BOSS_BRAIN: Maia while it's off for players only for a lobby of admins)", () => {

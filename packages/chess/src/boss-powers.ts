@@ -132,13 +132,13 @@ export function strikeRage(boss: BossState, s: Pick<BossPowerSettings, "rageStri
 
 /**
  * An admin's test trigger: the boss's ultimate comes as the next crowd turn begins, without the warning. Safe at any
- * moment: nothing happens if the boss has no ultimate, one is already under way (it never overlaps another) or on its
- * way, or the battle is over; it only takes effect as a turn begins (prepareTurn), never in the middle of one or of a
+ * moment: nothing happens if the boss has no ultimate (none at all, or none built yet: `noUltimate`), one is already
+ * under way (it never overlaps another) or on its way, or the battle is over; it only takes effect as a turn begins (prepareTurn), never in the middle of one or of a
  * moment. Once that ultimate's effect is over, it can be pulled again.
  */
 export function triggerUltimate(boss: BossState | null | undefined): { boss: BossState | null | undefined; ok: boolean } {
   const p = boss?.powers;
-  if (!boss || !p || !bossPowers(boss) || boss.result || p.ultAt !== undefined) return { boss, ok: false };
+  if (!boss || !p || !bossPowers(boss) || bossRules(boss)?.noUltimate || boss.result || p.ultAt !== undefined) return { boss, ok: false };
   if (p.ultNext) return { boss, ok: true };
   return { boss: { ...boss, powers: { ...p, ultNext: true } }, ok: true };
 }

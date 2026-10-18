@@ -19,8 +19,8 @@
  * costs at most that many pawns against its best move (the bots' own picks read the judge, which doesn't know about the
  * fusion: a crowd that knows the rule plays the counter when it's cheaper than what the fusion gives him).
  * Chub & Chirp's Leapfrog (id hopper): each row logs the hops and, for every turn of his with a pawn nose to nose that
- * couldn't hop, why (hopOptions; `cap`: out of hops). (The hop as his move, the variant the sim turned down, ran at
- * eb678d7 with `{"powers": {"hopIsMove": true, "hopMax": 3}}`: reports/hopper-sim.md.)
+ * couldn't hop, why (hopOptions; `cap`: out of hops). (The hop as his move, the variant the sim turned down, can't be
+ * run from here: its switch went with it. It ran on commit eb678d7 only, checked out: reports/hopper-sim.md.)
  *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */

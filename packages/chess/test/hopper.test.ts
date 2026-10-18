@@ -5,7 +5,9 @@ import {
   LEAPFROG_TEST_MOVES,
   MatchRunner,
   POWER_FX,
+  START_FEN,
   applyMove,
+  bossRules,
   fenAtPly,
   gameEndWith,
   hopFrom,
@@ -28,9 +30,10 @@ import {
 
 /**
  * Chub & Chirp (the hopper; Eric, Oct 18): Leapfrog. At the start of his turn, a pawn of his nose to nose with one of
- * the crowd's hops over it to the empty square beyond, never onto the crowd's back rank, never one that leaves his king
- * attacked or gives check; then he plays his move. The engine picks when several can. At most hopMax (2) a battle. His
- * ultimate isn't decided: none comes, and his meter is off. docs/decisions/2026-10-18-hopper-leapfrog.md.
+ * the crowd's hops over it to the empty square beyond, never onto the crowd's last two ranks (no instant queen), never
+ * one that leaves his king attacked or gives check; then he plays his move. The engine picks when several can. At most
+ * hopMax (2) a battle. His ultimate isn't decided: none comes, and his meter is off.
+ * docs/decisions/2026-10-18-hopper-leapfrog.md.
  */
 
 const hash = (s: string) => {
@@ -83,6 +86,10 @@ const sound = (fen: string) => {
 };
 const B = "b" as const;
 const W = "w" as const;
+/** His promotions in a position (him to move). */
+const promotions = (fen: string) => legalMoves(fen).filter((m) => m.length === 5);
+/** The position after these moves (SAN) from the start. */
+const after = (san: string[]) => sanLineToUci(san).reduce((f, m) => applyMove(f, m), START_FEN);
 
 describe("Chub & Chirp: who they are", () => {
   it("are on the roster as hopper (🐇), named in one constant, with Leapfrog and a place held for the ultimate, an offset in the others' range", () => {
@@ -111,7 +118,9 @@ describe("Chub & Chirp: who they are", () => {
     const r = raid({ patch: { bossPowerTest: "hopperult" } });
     expect(rageOf(r.boss)).toBeNull();
     for (let t = 0; t < 12 && !r.isOver() && !r.stageComplete(); t++) {
-      r.triggerUltimate();
+      // (The admins' trigger refuses, so their button never waits for an ultimate that can't come.)
+      expect(r.triggerUltimate()).toBe(false);
+      expect(r.boss!.powers!.ultNext).toBeUndefined();
       await turn(r);
       const p = r.boss!.powers!;
       expect(p.warnAt).toBeUndefined();
@@ -119,7 +128,12 @@ describe("Chub & Chirp: who they are", () => {
       expect(p.events.some((e) => e.kind === "warn")).toBe(false);
       expect(rageOf(r.boss)).toBeNull();
     }
-    expect(triggerUltimate(r.boss).boss!.powers!.ultAt).toBeUndefined();
+    expect(triggerUltimate(r.boss)).toEqual({ boss: r.boss, ok: false });
+  });
+
+  it("only they have no ultimate (noUltimate: the trigger refuses and the admins' button isn't shown): every playable boss keeps its trigger", () => {
+    expect(bossRules({ id: "hopper" })?.noUltimate).toBe(true);
+    for (const def of BOSS_ROSTER.filter(isPlayable)) expect(bossRules(def)?.noUltimate, def.id).toBeUndefined();
   });
 });
 
@@ -154,6 +168,31 @@ describe("Leapfrog: which pawns hop (hopOptions)", () => {
   it("never onto your back rank (Eric: no instant queen), either way up", () => {
     expect(hopOptions("4k3/8/8/8/8/4p3/4P3/K7 b - - 0 1", B)).toEqual({ options: [], refused: [{ from: "e3", why: "lastRank" }] });
     expect(hopOptions("k7/4p3/4P3/8/8/8/8/4K3 w - - 0 1", W)).toEqual({ options: [], refused: [{ from: "e6", why: "lastRank" }] });
+  });
+
+  it("never onto the rank before it either: his move comes straight after the hop, so from there he'd queen before you move (either way up)", () => {
+    // (The review's line, the crowd White: 1.e3 e5 2.a3 e4 3.a4. A hop to e2, then exd1=Q or exf1=Q.)
+    const white = after(["e3", "e5", "a3", "e4", "a4"]);
+    expect(hopOptions(white, B)).toEqual({ options: [], refused: [{ from: "e4", why: "nextToLast" }] });
+    // (The crowd Black, a French: 1.e4 e6 2.e5 a6. A hop to e7, then exd8=Q or exf8=Q.)
+    const black = after(["e4", "e6", "e5", "a6"]);
+    expect(hopOptions(black, W)).toEqual({ options: [], refused: [{ from: "e5", why: "nextToLast" }] });
+    // (Bare: nothing to take, the square ahead free; the hop would still put his pawn one push from queening.)
+    expect(hopOptions("4k3/8/8/K7/4p3/4P3/8/8 b - - 0 1", B).refused).toEqual([{ from: "e4", why: "nextToLast" }]);
+    expect(hopOptions("8/8/4p3/4P3/k7/8/8/4K3 w - - 0 1", W).refused).toEqual([{ from: "e5", why: "nextToLast" }]);
+  });
+
+  it("never one that frees another pawn of his to promote (it blocks a pin on it): he'd queen before you move; a promotion he already had doesn't stop it", () => {
+    // (Your bishop on h8 pins his b2 pawn to his king on a1; a hop to d4 would block the diagonal: b1=Q.)
+    const pinned = "7B/8/3p4/3P4/6K1/8/1p6/k7 b - - 0 1";
+    expect(promotions(pinned)).toEqual([]);
+    expect(hopOptions(pinned, B)).toEqual({ options: [], refused: [{ from: "d6", why: "promote" }] });
+    // (The other way up: your bishop on h1 pins his b7 pawn to his king on a8; a hop to d5 would block it.)
+    expect(hopOptions("K7/1P6/8/6k1/3p4/3P4/8/7b w - - 0 1", W)).toEqual({ options: [], refused: [{ from: "d3", why: "promote" }] });
+    // (No bishop: b1=Q was his already; the hop didn't make it.)
+    const had = "8/8/3p4/3P4/6K1/8/1p6/k7 b - - 0 1";
+    expect(promotions(had)).toHaveLength(4);
+    expect(hopOptions(had, B).options.map((o) => o.to)).toEqual(["d4"]);
   });
 
   it("never a pinned pawn: his king left attacked", () => {
@@ -222,6 +261,16 @@ describe("Leapfrog: the engine's pick (hopFrom)", () => {
 });
 
 describe("Leapfrog in a battle", () => {
+  /** A battle from a position of our own (the crowd to move: a base on the board at its ply). */
+  const from = (fen: string, o: Parameters<typeof raid>[0] = {}) => {
+    const r = raid(o);
+    const board = r.boards.get(0)!;
+    r.boards.set(0, { ...board, fen, bases: [...(board.bases ?? []), { ply: board.history.length, fen }] });
+    return r;
+  };
+  /** Pawns nose to nose on the a, d, e and h files, nothing in the way: four hops to choose from after your rook's move. */
+  const FOUR = "r3k3/8/8/p2pp2p/P2PP2P/8/8/R3K3 w - - 0 20";
+
   it("the test switch (?power=leapfrog): from 1.e4 e5, the crowd to move: whatever you play first, his e5 pawn hops over your e4 (and the other way up)", async () => {
     for (const side of [W, B]) {
       const r = raid({ patch: { bossPowerTest: "leapfrog" }, side });
@@ -263,6 +312,14 @@ describe("Leapfrog in a battle", () => {
     expect(r.hopDue()).toBe(false);
     expect(r.applyHop(null)).toBeNull();
     expect(r.bossToMove()).toBe(true);
+    // (Even when others could still hop: after one of four, three still could, and none comes before his move.)
+    const four = from(FOUR);
+    await crowd(four, "a1b1");
+    expect(four.applyHop(null)!.from).toBe("a5");
+    expect(hopOptions(fenOf(four), B).options.map((o) => o.from)).toEqual(["d5", "e5", "h5"]);
+    expect(four.hopDue()).toBe(false);
+    expect(four.applyHop(null)).toBeNull();
+    expect(four.boss!.powers!.hops).toBe(1);
     const move = await r.playBoss();
     expect(legalMoves(board.fen)).toContain(move);
     expect(r.boards.get(0)!.history).toHaveLength(plies + 1);
@@ -272,15 +329,15 @@ describe("Leapfrog in a battle", () => {
     expect(powerTurn(r.boss)).toBe(r.boss!.powers!.hop!.at === r.boss!.crowdMoves);
   });
 
-  /** A battle from a position of our own (the crowd to move: a base on the board at its ply). */
-  const from = (fen: string, o: Parameters<typeof raid>[0] = {}) => {
-    const r = raid(o);
-    const board = r.boards.get(0)!;
-    r.boards.set(0, { ...board, fen, bases: [...(board.bases ?? []), { ply: board.history.length, fen }] });
-    return r;
-  };
-  /** Pawns nose to nose on the a, d, e and h files, nothing in the way: four hops to choose from after your rook's move. */
-  const FOUR = "r3k3/8/8/p2pp2p/P2PP2P/8/8/R3K3 w - - 0 20";
+  it("the review's line in a battle (the crowd White: 1.e3 e5 2.a3 e4 3.a4): no hop to e2, and his move can't queen", async () => {
+    const r = from(after(["e3", "e5", "a3", "e4"]));
+    await crowd(r, "a3a4");
+    expect(r.bossToMove()).toBe(true);
+    expect(r.hopDue()).toBe(false);
+    expect(pieceAt(fenOf(r), "e4")).toEqual({ color: "b", type: "p" });
+    expect(promotions(fenOf(r))).toEqual([]);
+    expect((await r.playBoss()).length).toBe(4);
+  });
 
   it("several can: the host's (or this device's) engine picks; anything that isn't one of them (an older app's move, none), the first", async () => {
     const r = from(FOUR);
@@ -350,7 +407,7 @@ describe("Leapfrog in a battle", () => {
 
 // (A bigger run of the same, 120 battles with strikes: reports/hopper-sim.md, "The fuzz".)
 describe("Leapfrog: the ground rules, over many battles (a fuzz, as #267's review)", () => {
-  it("every hop and move leaves a legal position the engine plays, with a move or a real ending; replays match; never the back rank; never past the cap", async () => {
+  it("every hop and move leaves a legal position the engine plays, with a move or a real ending; replays match; never the last two ranks or a new promotion; never past the cap", async () => {
     const counts: Record<string, number> = {};
     for (let seed = 1; seed <= 10; seed++) {
       const r = raid({ seed, side: seed % 2 ? W : B, patch: seed % 3 ? { bossPowerTest: "leapfrog" } : {} });
@@ -376,6 +433,9 @@ describe("Leapfrog: the ground rules, over many battles (a fuzz, as #267's revie
           expect(board.fen.split(" ")[3]).toBe("-");
           expect(board.fen.split(" ")[5]).toBe(before.split(" ")[5]);
           expect(Number(hop.to[1])).not.toBe(his === "b" ? 1 : 8);
+          expect(Number(hop.to[1])).not.toBe(his === "b" ? 2 : 7);
+          // (No instant queen: every promotion his move has now, he had before the hop.)
+          for (const m of promotions(board.fen)) expect(promotions(before)).toContain(m);
           expect(Math.abs(Number(hop.to[1]) - Number(hop.from[1]))).toBe(2);
           expect(pieceAt(board.fen, hop.to)).toEqual({ color: his, type: "p" });
           expect(pieceAt(board.fen, hop.over)?.type).toBe("p");

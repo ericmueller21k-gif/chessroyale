@@ -10,7 +10,9 @@ the calibration: [reports/hopper-sim.md](../../reports/hopper-sim.md).
 
 - **Leapfrog:** "the first 2 times one of his pawns stands nose to nose with one of yours, his pawn hops over it to the
   empty square beyond, with a line."
-- **Agreed (Eric):** "a hop never lands on the last rank (no instant queen)."
+- **Agreed (Eric):** "a hop never lands on the last rank (no instant queen)." Under A his move follows the hop at once,
+  so the review found a hop onto the rank before it was an instant queen too; the rule now keeps the hop off both (and
+  off freeing a pinned pawn to promote): Eric's rule enforced, not changed.
 - **Left to the sim (Eric, Oct 18):** "He still makes his move, unless it's too strong. Let the sim figure it out. Likely
   could be 3 hops in total if it uses a turn." The director's rule: variant A (the hop at the start of his turn, then
   his move; at most 2) if he lands in the pack, else B (the hop is his move that turn, as Alfil's fusion; at most 3).
@@ -20,7 +22,8 @@ the calibration: [reports/hopper-sim.md](../../reports/hopper-sim.md).
 ## The hop comes first, then his move (variant A)
 
 - **Why:** A lands in the pack: the crowd scores **0.31** (± 0.08, 26 battles) in **40** crowd moves, inside the band
-  (about 0.08 to 0.55, battles of 33 to 57 moves). B is far out the other way: the crowd scores **0.77** (± 0.07), 18 of
+  (about 0.08 to 0.55, battles of 33 to 57 moves), re-run with the review's fix (no hop onto the crowd's 2nd rank; the
+  same 0.31 before it). B is far out the other way: the crowd scores **0.77** (± 0.07), 18 of
   26 battles theirs, in 49 moves: a hop that's his whole turn, forced whenever a pawn can hop, costs him more than it
   gains. The table, the refusals and the runs: [reports/hopper-sim.md](../../reports/hopper-sim.md).
 - **At most 2 a battle** (`hopMax`), Eric's number for A; one a turn.
@@ -34,7 +37,11 @@ the calibration: [reports/hopper-sim.md](../../reports/hopper-sim.md).
 - **Nose to nose:** the crowd's pawn on the square directly in front of his pawn (in his pawn's direction). Another
   piece in front, or a pawn of his own, isn't. The square beyond must be empty.
 - **Never an illegal position** (`hopOptions`, each checked on the board, a reason for each refusal):
-  - never onto the crowd's back rank (`lastRank`);
+  - **no instant queen** (Eric's rule; his move comes straight after the hop, with no crowd turn between them): never
+    onto the crowd's back rank (`lastRank`, Eric's words), nor the rank before it (`nextToLast`: from there his move
+    would queen before the crowd moves; the review's line, 1.e3 e5 2.a3 e4 3.a4, a hop to e2, then exd1=Q or exf1=Q),
+    nor one that frees another pawn of his to promote (`promote`: its landing square blocks a pin on a pawn of his on the
+    7th, a promotion his move didn't have before the hop);
   - never with his king attacked after it: a pinned pawn (`pinned`); **in check as his turn begins, no hop** (`inCheck`:
     it waits, and he answers the check with his move), as Alfil's fusion waits;
   - never giving check, by the pawn or by a line it opens (`check`): he moves next, and the side not to move can't be in
@@ -47,7 +54,7 @@ the calibration: [reports/hopper-sim.md](../../reports/hopper-sim.md).
     repetition counts from it (`gameEndWith`).
 - **Several can: the engine's pick** (`hopFrom`): each position after a hop (him to move) searched at `hopNodes`
   (30,000), the one with his best expected score, equals in square order. One alone: no engine needed, it hops at once.
-  No engine's answer (no host, an older app's move, ""): the first. In the sim, 1 hop in 40 had a choice.
+  No engine's answer (no host, an older app's move, ""): the first. In the sim, 1 hop in 39 had a choice.
 - **The God King's strike** isn't touched: the hop isn't his move, so a strike staggers the move after it, as ever.
 - **Fair play:** the crowd's turn right after a hop doesn't count (`powerTurn`), as for every power that changes the
   board.
@@ -55,23 +62,34 @@ the calibration: [reports/hopper-sim.md](../../reports/hopper-sim.md).
 
 ## My calls
 
-- **Never a hop that gives him a mate in one he didn't have** (`mate`). The crowd never sees the hop before his move
-  (it's a free move before his own), so a hop that opens a line for a mate would end the battle with no answer; Eric's
-  rule for the Slam is the same idea ("It never leaves you mated in one because a piece is airborne"), and Alfil's first
-  build had it while the crowd couldn't see the fusion coming. A mate he already had doesn't stop the hop (the hop didn't
-  make it). It stopped a hop 3 times (pawn-turns) in 26 battles.
-- **Not added: a rule against a hop that forks or attacks your pieces** (Big Boy's and Alfil's "never more left
-  hanging"). Unlike Alfil's fusion square, the hop is predictable: you see which of your pawns are nose to nose with his
-  and the empty square beyond, so the threat is in plain view on your turn. The sim measured the rule as the brief has
-  it.
-- **His offset: −250**, in the pack's range (−100 to −250). Both ends land (0.31 at −250, 0.23 at −100, within one
-  standard error: at the sim's tier both slip 25% and differ only by UCI_Elo 1350 against 1500). −250 sits nearest the
-  middle of the band in score and battle length, and with the bosses whose powers gain them something outside their
-  moves (Big Boy, Sawyer, Wrangler, Alfil).
+- **One principle for what a hop may give him.** The crowd gets no turn between the hop and his move, so the two act
+  as one. **No hop gives him something decisive the crowd can't answer:** a mate in one (`mate`) or a promotion
+  (`lastRank`, `nextToLast`, `promote`). **Ordinary tactics are allowed** (a pawn that hits a piece, a fork, a line it
+  opens): his move right after can cash in one thing at most, as any move of his can, and the crowd moves before he can
+  cash in the rest. The test switch's own start is the ordinary case: the hop e5-e3, then exd2+ or exf2+, a pawn for a
+  pawn with check. The same line as Eric's two rules on it: "no instant queen", and the Slam's "It never leaves you
+  mated in one because a piece is airborne". A mate or a promotion he already had doesn't stop a hop (the hop didn't
+  make it). It doesn't rest on the crowd seeing the hop coming: the rule can be known (a pawn of yours nose to nose with
+  his, the square beyond empty), but nothing on screen marks such a pawn yet (the art lane's hint), and the judge doesn't
+  know the rule (below). In the sim (A with the fix, 52 battles) these guards stopped hops (pawn-turns): the rank before
+  the back rank 189, the mate in one 3, freeing a pinned pawn none (a unit test builds one).
+- **Known: the judge doesn't know Leapfrog**, as it doesn't know Alfil's marks. The crowd's move that makes or keeps a
+  nose-to-nose pair is scored as if no hop will follow, so the judge's best move can walk into one. The crowd's turn
+  right after a hop already doesn't count for fair play (`powerTurn`); the move before it counts, judged without the
+  hop. Not changed here (as for Alfil's marks); worth keeping in mind for the art PR's hint and the FAQ.
+- **His offset: −250**, in the pack's range (−100 to −250), re-checked after the review's fix on the same seeds. Both
+  ends land: 0.31 at −250 and 0.37 at −100 (40 and 41 crowd moves), within one standard error, and their order flipped
+  from the first round (0.31 and 0.23 before the fix): at the sim's tier both slip 25% and differ only by UCI_Elo 1350
+  against 1500, so the sim can't tell them apart. −250's score is the middle of the band (0.31; the middle is 0.315)
+  and the fix didn't move it; its battles are inside the band, as −100's; and it's where the bosses whose powers gain
+  them something outside their moves sit (Big Boy, Sawyer, Wrangler, Alfil).
 - **His ultimate holds a place:** the roster needs one, so `hopperult` stands in (power words "ultimate to come"); his
-  rules have no ultimate (it never comes, the test trigger and `?power=hopperult` included) and his meter is off
-  (`BossRules.meter` gives none: the screens show no meter, nothing fills, no "RAGE!"). The ultimate's hooks go in
-  `hopper.ts` when Eric decides (he likes "Grasshopper Stampede": every nose-to-nose pawn hops at once, up to 3).
+  rules have no ultimate (it never comes, `?power=hopperult` included) and his meter is off (`BossRules.meter` gives
+  none: the screens show no meter, nothing fills, no "RAGE!"). The admins' test trigger refuses (`BossRules.noUltimate`)
+  and their "Trigger ultimate (testing)" button isn't shown for them: a press used to read "Ultimate next turn
+  (testing)" and stay grayed out for the rest of the battle, waiting for an ultimate that can't come. The ultimate's
+  hooks go in `hopper.ts` when Eric decides (he likes "Grasshopper Stampede": every nose-to-nose pawn hops at once, up
+  to 3); `noUltimate` goes then.
 - **The test switch** (`?boss=hopper&wip=1&power=leapfrog`, solo, Boss alone, as Alfil's was): the battle starts from
   1.e4 e5 (crowd White; 1.e4 e5 2.Nf3 when the crowd is Black, `?side=b`), the crowd to move. Whatever the crowd plays
   first, his pawn stands nose to nose with an empty square beyond as his first turn begins (no first move fills it, pins

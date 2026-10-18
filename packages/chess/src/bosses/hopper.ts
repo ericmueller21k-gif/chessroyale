@@ -4,12 +4,13 @@
  *
  * Their passive, Leapfrog: at the start of his turn, when one of his pawns stands nose to nose with one of the crowd's
  * (the crowd's pawn on the square in front of his), his pawn hops over it to the square beyond, if that square is
- * empty: automatically (he says a line: the app's), and then he plays his move. Never onto the crowd's back rank (Eric:
- * no instant queen), never one that leaves his king attacked (a pinned pawn; in check, it waits), never one that gives
- * check; the en passant square goes with it. When several can, the engine's pick: the one best for him (hopFrom), as
- * the other bosses' powers pick. At most hopMax a battle, one a turn. (Eric left open whether the hop is free or his
- * move that turn: "let the sim figure it out". Free, he lands in the pack; as his move, the crowd scored 0.77:
- * reports/hopper-sim.md, docs/decisions/2026-10-18-hopper-leapfrog.md.)
+ * empty: automatically (he says a line: the app's), and then he plays his move. No instant queen (Eric): never onto
+ * the crowd's last two ranks (his move comes next: from their 2nd rank it would queen before they move), never one that
+ * frees a pawn of his to promote; never one that leaves his king attacked (a pinned pawn; in check, it waits), never
+ * one that gives check; the en passant square goes with it. When several can, the engine's pick: the one best for him
+ * (hopFrom), as the other bosses' powers pick. At most hopMax a battle, one a turn. (Eric left open whether the hop is
+ * free or his move that turn: "let the sim figure it out". Free, he lands in the pack; as his move, the crowd scored
+ * 0.77: reports/hopper-sim.md, docs/decisions/2026-10-18-hopper-leapfrog.md.)
  *
  * Their ultimate isn't decided yet (Eric, Oct 18): `hopperult` holds its place in the roster, these rules have none (it
  * never comes) and the meter is off (`meter`: none shown). Its hooks go here when it's built.
@@ -52,17 +53,20 @@ export interface HopOption {
 
 /**
  * Why a pawn of his nose to nose with one of the crowd's can't hop now (the sims count them): the square beyond isn't
- * empty (`blocked`), it's the crowd's back rank (`lastRank`), he's in check (`inCheck`: it waits), his king would be
- * attacked after it (`pinned`), it would give check (`check`), he'd have no move after it or the game would end
- * (`noMove`), or it would give him a mate in one he didn't have (`mate`: the crowd never sees the hop before his move).
+ * empty (`blocked`), it's the crowd's back rank (`lastRank`) or the rank before it (`nextToLast`: his move, which comes
+ * straight after the hop, would queen), he's in check (`inCheck`: it waits), his king would be attacked after it
+ * (`pinned`), it would give check (`check`), he'd have no move after it or the game would end (`noMove`), or it would
+ * give his move a promotion (`promote`: a pin on a pawn of his it blocks) or a mate in one (`mate`) he didn't have. The
+ * crowd gets no turn between the hop and his move, so nothing the hop gives him may be decisive at once.
  */
-export type HopRefused = "blocked" | "lastRank" | "inCheck" | "pinned" | "check" | "noMove" | "mate";
+export type HopRefused = "blocked" | "lastRank" | "nextToLast" | "inCheck" | "pinned" | "check" | "noMove" | "promote" | "mate";
 
 /**
  * The hops he could make now (him to move in `fen`; `boss` his side), in his pawns' square order, and why each other
  * pawn of his that stands nose to nose with one of the crowd's can't. A hop takes his pawn two squares forward, over the
- * crowd's pawn, onto the empty square beyond: never the crowd's back rank, never with his king attacked before or after
- * it (in check; a pinned pawn), never giving check, never leaving him without a move, never making him a mate in one.
+ * crowd's pawn, onto the empty square beyond: never the crowd's last two ranks, never with his king attacked before or
+ * after it (in check; a pinned pawn), never giving check, never leaving him without a move, never making him a promotion
+ * or a mate in one.
  * The position after it: him still to move, the en passant square cleared, the fifty-move count from zero (a pawn
  * moved), castling and the move number as they were; one the engine plays.
  */
@@ -73,26 +77,37 @@ export function hopOptions(fen: string, boss: Side): { options: HopOption[]; ref
   const g0 = gridOf(fen);
   const dir = boss === "w" ? 1 : -1;
   const checked = gridKingAttacked(g0, boss);
-  // (His mate in one before the hop, asked only once a hop gets that far.)
-  let before: string | null | undefined;
-  const mateBefore = () => (before === undefined ? (before = mateInOne(fen)) : before);
+  // (His promotions and his mate in one before the hop, asked only once a hop gets that far.)
+  let promotions: Set<string> | undefined;
+  let mate: string | null | undefined;
+  const before: Before = {
+    promotions: () => (promotions ??= new Set(movesOf(fen).filter(isPromotion))),
+    mate: () => (mate === undefined ? (mate = mateInOne(fen)) : mate),
+  };
   const pawns = [...g0].filter(([, c]) => c === letter(boss, "p")).map(([sq]) => sq).sort();
   for (const from of pawns) {
     const f = from.charCodeAt(0) - 97;
     const over = square(f, rank(from) + dir);
     if (g0.get(over) !== letter(other(boss), "p")) continue;
     const to = square(f, rank(from) + 2 * dir);
-    const why = hopRefused(g0, fen, from, to, boss, checked, mateBefore);
+    const why = hopRefused(g0, fen, from, to, boss, checked, before);
     if (typeof why === "string") refused.push({ from, why });
     else options.push({ from, over, to, fen: why.fen });
   }
   return { options, refused };
 }
 
+/** What he could do before the hop (hopOptions works each out once, when a hop first needs it). */
+interface Before {
+  promotions(): Set<string>;
+  mate(): string | null;
+}
+
 /** One hop checked (hopOptions): why it can't go, or the position after it. */
-function hopRefused(g0: Grid, fen: string, from: string, to: string, boss: Side, checked: boolean, mateBefore: () => string | null): HopRefused | { fen: string } {
+function hopRefused(g0: Grid, fen: string, from: string, to: string, boss: Side, checked: boolean, before: Before): HopRefused | { fen: string } {
   if (g0.has(to)) return "blocked";
   if (rank(to) === (boss === "w" ? 8 : 1)) return "lastRank";
+  if (rank(to) === (boss === "w" ? 7 : 2)) return "nextToLast";
   if (checked) return "inCheck";
   const g: Grid = new Map(g0);
   g.delete(from);
@@ -102,19 +117,26 @@ function hopRefused(g0: Grid, fen: string, from: string, to: string, boss: Side,
   const parts = editedFen(fen, g).split(" ");
   parts[3] = "-";
   const out = parts.join(" ");
-  if (gameEnd(out, []) || stockfishRefuses(out) || !hasMove(out)) return "noMove";
-  if (mateInOne(out) && !mateBefore()) return "mate";
+  const moves = movesOf(out);
+  if (gameEnd(out, []) || stockfishRefuses(out) || !moves.length) return "noMove";
+  // (The hopped pawn can't promote from where it lands, so only a pawn of his the hop unpins: its landing square blocks
+  // the line from your piece. Rare, but his move would queen before you move.)
+  if (moves.some((m) => isPromotion(m) && !before.promotions().has(m))) return "promote";
+  if (mateInOne(out) && !before.mate()) return "mate";
   return { fen: out };
 }
 
-/** The side to move has a legal move. */
-function hasMove(fen: string): boolean {
+/** The legal moves of the side to move (none: a position chess.js can't read). */
+function movesOf(fen: string): string[] {
   try {
-    return legalMoves(fen).length > 0;
+    return legalMoves(fen);
   } catch {
-    return false;
+    return [];
   }
 }
+
+/** A promotion (UCI: the piece it becomes, a fifth letter). */
+const isPromotion = (m: string) => m.length === 5;
 
 /**
  * The engine's pick of a hop, from this device's engines (the host's online, solo's): each way to go (him to move)
@@ -145,7 +167,9 @@ export const LEAPFROG_TEST_MOVES: Record<Side, readonly string[]> = { w: ["e2e4"
 /** Chub & Chirp: Leapfrog (his pawns hop over the crowd's). The ultimate isn't built: it never comes, and the meter is off. */
 export const HOPPER: BossRules = {
   id: "hopper",
-  // (No ultimate yet: none comes, the test trigger and the test switch included; no meter shown.)
+  // (No ultimate yet: none comes, the test switch included; the test trigger refuses, and the admins' button isn't shown;
+  // no meter shown.)
+  noUltimate: true,
   ultimate: () => false,
   meter: () => null,
   // (Leapfrog comes at the start of his turn: hopperBattle.)
