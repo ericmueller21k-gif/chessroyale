@@ -666,6 +666,16 @@ test("the board keeps its size from the mate until the split (Eric, Oct 18: it s
     await page.getByRole("button", { name: "Minimize the leaderboard" }).click();
     await expect(page.locator(".mini-tower.closed")).toHaveCount(1);
   }
+  // (The board resized for the minimized scoreboard before the watch starts: its squares are drawn by a ResizeObserver,
+  // which runs after an animation frame's callbacks, so a frame read just after the fold sees the wrap's new size and
+  // the squares' old one. Drawn: the squares fill the wrap, less up to 8 device pixels.)
+  await expect
+    .poll(() => page.evaluate(() => {
+      const wrap = document.querySelector(".board-row > .board-wrap")!.getBoundingClientRect().width;
+      const squares = document.querySelector(".board-row > .board-wrap .hb-board")!.getBoundingClientRect().width;
+      return wrap - squares >= 0 && wrap - squares < 8 / devicePixelRatio + 0.5;
+    }), { timeout: 10_000 })
+    .toBe(true);
   // Every frame from your mating move until the split begins: the board's box (its wrap, and the squares drawn in it),
   // what's on screen (phase 1's move, his fall, the phase change's step).
   await page.evaluate(() => {
