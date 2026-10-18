@@ -225,6 +225,13 @@ seeds with the meter on, and forced casts from varied middlegames for the distri
   without it). The prize decides most battles where it's big: the crowd lost all 18 where his tier was 3 or more.
 - **The odds aren't changed** (the brief: only if placement can't get there): placement got there.
 - **His offset stays −250.**
+- **At the top strengths, before he goes live** (after the review, S6): tier 1800 on Hard and Hardest (Elo 1800 and
+  2050, the race weighing 0.8 and all of it), 150 forced casts and 26 battles with the meter on each, and the same 26
+  battles with Leapfrog alone as the reference. Five carrots: 2% at both (7 of 329 races, ± 0.8; the line for a change
+  was about 5%). His count 0-1 25% and 22%, 2-3 61% and 63%, 4 13% at both. The crowd: 0.19 (± 0.07) and 0.27 (±
+  0.08), against 0.33 and 0.29 with Leapfrog alone: in the pack, within one and a half standard errors of the boss
+  without his ultimate. **No change to the tuning.** The race brain's minimum gain (above) re-checked at his usual
+  strength: 21, 68, 9 and 2% over 92 races, within the errors of the chosen leads' 18, 68, 11 and 3.
 
 ## The protocol (optional fields only; an older app or host ignores them)
 

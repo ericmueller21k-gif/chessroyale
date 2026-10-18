@@ -9,7 +9,9 @@ spin's odds only if placement can't get there.
 **The result: `carrotLeads` = [3, 1, 0, 0, −2]:** his count **0-1 18%, 2-3 68%, 4 11%, 5 3%** over 167 races (each
 within about one standard error of the target), and the crowd scores **0.48** (± 0.09) in **44** crowd moves over 26
 battles with the meter on (0.27 ± 0.08, 46 moves, with the first leads): in the pack. **The odds are unchanged** (the
-sheet's).
+sheet's). **At the top strengths** (Hard and Hardest, Elo 1800 and 2050, the race weighing 0.8 and all of it), five
+carrots stay at 2% (7 of 329 races) and the crowd scores 0.19 and 0.27, as the same boss without his ultimate does
+there (0.33 and 0.29): no change needed (the last section).
 
 ## How it was run
 
@@ -94,6 +96,58 @@ every carrot was a move from one side or the other: 834 of 835), none touching, 
   left); once two queens to nothing (his whole army). The prizes given: bishop 35, two pawns 33, knight 28, a pawn 20,
   two queens 14, rook 11, queen 10, queen and rook 2, blank 8.
 - **Leapfrog in the race:** a hop pulled a carrot once in 167 races; he hops 1.4 to 1.7 times a battle, as before.
+
+## At the top strengths, and the race brain's new rule (after the review, Oct 18)
+
+The runs above are all at his usual strength: Elo 1350 against the raid's bots (tier 1600, his offset −250), where the
+race weighs 0.35 in his pick (`raceWeight`). Harder settings weigh it more, up to all of it from Elo 2000, and five
+carrots is an instant loss. So, before the wiring PR puts him live, the same sim at the top: **tier 1800** (a player
+rated just under 1800) on Solo's **Hard** (+250: Elo 1800, a race weight of 0.8) and **Hardest** (+500: Elo 2050, all
+of it), the raid's own bots as the crowd (the same as at 1600, so the crowd is if anything weaker for him than a real
+lobby of 1800 players). Patch `{"tier": 1800, "difficulty": 250 or 500}`; 150 forced casts each (seeds 801-803 and
+811-813, tags `t8HF*`, `t8XF*`), 26 battles each with the meter on (#273's seeds, `t8HN*`, `t8XN*`), and, as the
+reference the pack is measured against at this strength, the same 26 battles with Leapfrog alone (the meter never
+filling: `{"powers": {"rageSpeed": {"hopper": 0.0001}}}`, `t8HL*`, `t8XL*`). All with this round's code, including the
+race brain's minimum gain (below). Four sim processes ran at once on a 4-core machine, so the brain's times are high.
+
+| Strength | Boss Elo (race weight) | Races | His 0-1 | 2-3 | 4 | 5 | His mean | Crowd's mean | Unpulled | Ended: all pulled / moves / his 5th | Prizes stepped down | Race brain: looks, changed |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Hard | 1800 (0.8) | 163 | 25% (± 3) | 61% (± 4) | 13% (± 3) | 2% (± 1) | 2.20 | 1.67 | 1.12 | 49 / 111 / 3 | 8 of 158 | 1,337, 28% |
+| Hardest | 2050 (1) | 166 | 22% (± 3) | 63% (± 4) | 13% (± 3) | 2% (± 1) | 2.33 | 1.66 | 1.01 | 58 / 104 / 4 | 2 of 162 | 1,664, 27% |
+| Normal, the new rule (`c5F501`, `c5F502`) | 1350 (0.35) | 92 | 21% (± 4) | 68% (± 5) | 9% (± 3) | 2% (± 2) | 2.26 | 1.71 | 1.03 | 30 / 60 / 2 | 7 of 89 | 742, 29% |
+| Normal, the chosen leads (above) | 1350 (0.35) | 167 | 18% (± 3) | 68% (± 4) | 11% (± 2) | 3% (± 1) | 2.38 | 1.72 | 0.90 | 68 / 94 / 5 | 9 of 161 | 1,225, 37% |
+| Target | | | about 15% | about 70% | about 12% | about 3% | | | | | | |
+
+(Each strength's row includes its 26 battles with the meter on. Races left out because the battle ended first: 11 at
+Hard, 3 at Hardest; casts that never came: 2 and 7.) The counts: Hard 0: 5, 1: 35, 2: 72, 3: 27, 4: 21, 5: 3; Hardest
+0: 4, 1: 33, 2: 63, 3: 41, 4: 21, 5: 4.
+
+**The crowd's score, with the meter on and with Leapfrog alone, at the same strength (26 battles each):**
+
+| Strength | Carrot Patch (meter on) | Leapfrog alone | Crowd moves (on / alone) | Meter on: tier 3+ / tier 0-2 |
+|---|---|---|---|---|
+| Hard (1800) | 0.19 (± 0.07; 3, 4, 19) | 0.33 (± 0.08; 6, 5, 15) | 44 / 40 | 7 battles, all his / 17, the crowd 0.29 |
+| Hardest (2050) | 0.27 (± 0.08; 5, 4, 17) | 0.29 (± 0.08; 5, 5, 16) | 43 / 41 | 9, 8 his and a draw / 14, the crowd 0.46 |
+
+(Wins, draws, losses for the crowd. With the meter on, the cast came in 26 and 23 of the 26 battles, a median of the
+crowd's 14th and 13th move.)
+
+- **Five carrots stay rare at the top:** 2% at Hard and at Hardest (7 of 329 races, ± 0.8), the same as at Normal.
+  Racing harder doesn't win him more carrots here. A likely reason: the crowd's bots race by the judge at full weight at
+  every strength, so his extra effort meets theirs. The whole curve is close to Normal's: a few more 0-1s (22 to 25%
+  against 18 to 21%), 4s at 13% (target 12%).
+- **The crowd stays in the pack:** 0.19 and 0.27, inside the band (0.08 to 0.55), and within one and a half standard
+  errors of the same boss without his ultimate at the same strength (0.33 and 0.29; at Hard the Carrot Patch is −0.14 ±
+  0.11, at Hardest −0.02 ± 0.11). At Normal it went the other way (0.48 against 0.31): none of the three differences is
+  more than about one and a half standard errors, so the Carrot Patch doesn't move the crowd's score at any strength we
+  can tell. Battles stay inside 33 to 57 crowd moves on average.
+- **So no change to the tuning:** the leads stay [3, 1, 0, 0, −2] at every strength, the odds the sheet's.
+
+**The race brain's minimum gain** (`carrotMinGain`, 0.25 pawn; docs/decisions/2026-10-18-carrot-patch.md): a move
+replaces his pick only for at least a quarter pawn of the race's worth, so a tiny race gain can't let a stronger chess
+move in. It changes his move less often (29% of his looks at Normal, against 37% before), as it should: the switches it
+drops are the ones the race barely cared about. The distribution at Normal holds within its errors (21, 68, 9, 2
+against the chosen 18, 68, 11, 3), so the leads chosen above stand.
 
 ## The engines' limits (checked Oct 18)
 
