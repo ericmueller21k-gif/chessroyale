@@ -1,4 +1,4 @@
-import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LightsOutTarget, LongPull, PowerEvent, PowerId, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplitPawn, StopReason, TusksCast } from "@chessroyale/core";
+import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, LongPull, PowerEvent, PowerId, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplitPawn, StopReason, TusksCast } from "@chessroyale/core";
 import type { Base } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
@@ -352,6 +352,12 @@ export interface NetBossPowers {
   slam?: SlamResult | null;
   airborne?: { piece: string; square: string; lands: number; left: number; stage: number }[];
   landed?: SlamLanding | null;
+  /**
+   * Chub & Chirp (id hopper; missing for other bosses and from older servers; an older app ignores it): their last
+   * Leapfrog hop, after the crowd's move `at` (at the start of his turn, before his move): his pawn from `from`, over the
+   * crowd's pawn on `over`, to `to` (null: none yet).
+   */
+  hop?: LeapfrogHop | null;
 }
 
 /**
@@ -736,6 +742,13 @@ export type ServerMessage = { now: number } & (
        * judges on `fen` alone, as before.
        */
       land?: SlamPiece[];
+      /**
+       * Chub & Chirp's Leapfrog (id hopper): the positions after each hop he could make now (his pawn over the crowd's,
+       * him still to move: the hop comes before his move). Answer the one picked (hopFrom: the one best for him) as
+       * `move`, or "" (no engine: the first). An older app ignores it and plays a move, which isn't one of these: the
+       * same as "".
+       */
+      hop?: string[];
     }
   /**
    * The boss's brain for this battle, to the host as the battle begins (on the Maia brain only): it starts loading

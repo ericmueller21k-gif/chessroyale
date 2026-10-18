@@ -832,6 +832,22 @@ export class SoloMatch implements GameView {
   }
 
   /**
+   * Chub & Chirp's Leapfrog (at the start of his turn, after your move): he gets ready (thinking) while this device's
+   * engines pick which pawn hops (one alone hops at once), then it plays out (nobody's clock runs), then his move. No
+   * engine answer: the first pawn that can, as online. (Your move took his queen: that plays in this thinking first.)
+   */
+  private async hopTurn() {
+    const snap = this.bossSnapshot();
+    this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
+    const hop = this.runner.playHop(this.engines).catch(() => this.runner.applyHop(null));
+    const [done] = await Promise.all([hop, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
+    if (this.stopped) return;
+    const showMs = done ? powerMomentMs([{ kind: "hop" }]) : 0;
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
+    this.timer = setTimeout(() => this.nextRound(), showMs);
+  }
+
+  /**
    * As your turn begins: if Wrangler's showdown may follow before long (the rules' `scout`: from his move showdownFrom
    * while he has one left; or the test trigger), his scout searches line-ups of three pairs and two on this position (an
    * engine of its own) until his turn; else it stops.
@@ -1090,8 +1106,8 @@ export class SoloMatch implements GameView {
         }
         return this.finish();
       }
-      // (Hollow's Lights out, Big Boy's Big Bounce and Alfil's steps come at the start of his turn, before his move.)
-      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.bossTurn());
+      // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps and Chub & Chirp's hop come at the start of his turn, before his move.)
+      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.hopDue() ? this.hopTurn() : this.bossTurn());
       // (A failed Lights out: his extra move, after his own and before your turn.)
       if (this.runner.extraMoveDue()) return void this.extraTurn();
       // (Boingo's funhouse: his move for you, as your turn begins.)
@@ -1328,6 +1344,8 @@ export class SoloMatch implements GameView {
           // (Alfil's steps, one after another: no engine answer, the cast's first pair, the fusion's first square or nothing
           // lifts. His fusion is his move: then his turn is over.)
           for (let i = 0; i < 3 && this.runner.alfilStep(); i++) await this.runner.playAlfil(this.engines).catch(() => this.runner.applyAlfil(null));
+          // (Chub & Chirp's hop: no engine answer, the first pawn that can.)
+          if (this.runner.hopDue()) await this.runner.playHop(this.engines).catch(() => this.runner.applyHop(null));
           if (this.runner.bossToMove()) await this.runner.playBoss(this.engines[0]);
           continue;
         }

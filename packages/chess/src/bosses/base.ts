@@ -207,6 +207,11 @@ export interface BossRules {
   /** The test trigger is worked out at his turn, after his move (Wrangler's line-up): kept until its ultimate comes. */
   triggerAtHisTurn?: boolean;
   /**
+   * It has no ultimate yet (Chub & Chirp, until Eric decides theirs): the admins' test trigger refuses
+   * (triggerUltimate) and their button isn't shown, so it never waits for one that can't come.
+   */
+  noUltimate?: boolean;
+  /**
    * The God King's help doesn't work against this boss (the Hidden Boss's passive): his move, his strike and his Last
    * Stand never come (the runner's kingDecision, callStrike, lastStandFor). A player's try at his move or strike spends a
    * charge as if it had worked (the runner's kingTried; Eric, Oct 14); the Last Stand, which nobody calls, spends nothing.

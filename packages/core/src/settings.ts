@@ -851,6 +851,15 @@ export const BOSS_POWERS = {
    */
   slamGuardLooks: 4,
   slamGuardNodes: 30_000,
+  /**
+   * Chub & Chirp's Leapfrog (their passive; Eric, Oct 18): at the start of his turn, when one of his pawns stands nose
+   * to nose with one of the crowd's (the crowd's pawn on the square in front of his) and the square beyond is empty, his
+   * pawn hops over it to that square (never onto the crowd's back rank), automatically, and he still plays his move
+   * (the sim's variant A: reports/hopper-sim.md); several can: the engine's pick (each position searched at hopNodes:
+   * the one best for him). At most hopMax a battle.
+   */
+  hopMax: 2,
+  hopNodes: 30_000,
 } as const;
 
 /**

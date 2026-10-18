@@ -13,9 +13,10 @@ import { SAWYER } from "./sawyer.ts";
 import { PIG } from "./pig.ts";
 import { RECLUSE } from "./recluse.ts";
 import { ALFIL } from "./alfil.ts";
+import { HOPPER } from "./hopper.ts";
 
 /** Every boss with powers, by its BOSS_ROSTER id. */
-const BOSS_RULES: ReadonlyMap<string, BossRules> = new Map([GINGER, BOINGO, GREX, HOLLOW, BIGBOY, SAWYER, PIG, RECLUSE, ALFIL].map((r) => [r.id, r]));
+const BOSS_RULES: ReadonlyMap<string, BossRules> = new Map([GINGER, BOINGO, GREX, HOLLOW, BIGBOY, SAWYER, PIG, RECLUSE, ALFIL, HOPPER].map((r) => [r.id, r]));
 
 /** A boss's rules (null: a boss without powers). */
 export const bossRules = (boss: Pick<BossState, "id"> | null | undefined): BossRules | null => (boss?.id ? (BOSS_RULES.get(boss.id) ?? null) : null);

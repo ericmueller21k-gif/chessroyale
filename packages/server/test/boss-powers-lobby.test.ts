@@ -1070,6 +1070,111 @@ describe("Alfil online", () => {
   });
 });
 
+describe("Chub & Chirp online (Leapfrog)", () => {
+  const toRound = (L: ReturnType<typeof setup>) => {
+    for (let i = 0; i < 10 && L.core.save().phase !== "play"; i++) L.advance(10_000);
+    return L.last("p1", "round")!;
+  };
+  /** Time passes until the host is asked for something (the hop's pick or his move), one alarm at a time. */
+  const asked = (L: ReturnType<typeof setup>) => {
+    for (let i = 0; i < 10 && !L.last("p1", "bossRequest") && L.core.save().phase !== "play"; i++) L.advance(5_000);
+    return L.last("p1", "bossRequest")!;
+  };
+  const shown = (L: ReturnType<typeof setup>, id: string, from: number) => (L.inbox.get(id) ?? []).slice(from).filter((m): m is Extract<ServerMessage, { t: "boss" }> => m.t === "boss");
+  /** Chub & Chirp (hidden: met as the test link does), picked by the lobby; `fen`: the battle from a position of our own, the crowd to move. */
+  function hopper(patch: Partial<Settings> = {}, fen?: string) {
+    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "hopper", bossUnfinished: true, ...patch });
+    for (const i of [0, 1]) L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, 1500);
+    L.core.message("p1", { t: "start" });
+    L.advance(1000);
+    if (fen) {
+      // (During the intro, before the first turn is dealt.)
+      const runner = (L.core as unknown as { runner: MatchRunner }).runner;
+      const board = runner.boards.get(0)!;
+      runner.boards.set(0, { ...board, fen, bases: [...(board.bases ?? []), { ply: board.history.length, fen }] });
+    }
+    L.advance(60_000);
+    return L;
+  }
+  /** Everyone picks `move`; the host scores; time passes to the boss's turn. */
+  function crowdPlays(L: ReturnType<typeof setup>, move: string) {
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move });
+    expect(L.hostScores("p1")).toBe(true);
+    L.advance(30_000);
+  }
+  /** Pawns nose to nose on the a, d, e and h files: after your rook's move, four hops to choose from. */
+  const FOUR = "r3k3/8/8/p2pp2p/P2PP2P/8/8/R3K3 w - - 0 20";
+
+  it("one pawn can (the test switch): it hops at once (no host asked), everyone sees it before his move, and his move is asked on the new position", () => {
+    const L = hopper({ bossPowerTest: "leapfrog" });
+    const r0 = L.last("p1", "round")!;
+    expect(r0.boss!.id).toBe("hopper");
+    expect(r0.boss!.name).toBe("Chub & Chirp");
+    expect(r0.board!.fen.split(" ")[0]).toBe("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR");
+    const from = (L.inbox.get("p2") ?? []).length;
+    crowdPlays(L, "g1f3");
+    const req = asked(L);
+    // (The hop needed no pick: the host is asked for his move straight after it, on the position with his pawn on e3.)
+    expect(req.hop).toBeUndefined();
+    expect(pieceAt(req.fen, "e3")).toMatchObject({ color: "b", type: "p" });
+    expect(pieceAt(req.fen, "e5")).toBeNull();
+    expect(sideToMove(req.fen)).toBe("b");
+    const hop = shown(L, "p2", from).find((m) => !m.thinking && m.boss.powers!.events.at(-1)?.kind === "hop")!;
+    expect(hop).toBeTruthy();
+    expect(hop.until - (hop as unknown as { now: number }).now).toBe(POWER_FX.hop);
+    expect(hop.boss.powers!.hop).toEqual({ at: 1, from: "e5", over: "e4", to: "e3" });
+    expect(hop.boss.powers!.events.at(-1)).toEqual({ kind: "hop", turn: hop.boss.powers!.turn, square: "e3", squares: ["e5", "e4", "e3"] });
+    expect(hop.boss.board.fen).toBe(req.fen);
+    expect(hop.boss.board.bases).toContainEqual({ ply: hop.boss.board.history.length, fen: req.fen });
+    expect(hop.boss.powers).toEqual(L.last("p1", "boss")!.boss.powers);
+    // Then his move, as ever (Maia or Stockfish: the brain's), and your turn on the board after both.
+    hostBoss(L);
+    const next = toRound(L);
+    expect(next.board!.history).toHaveLength(r0.board!.history.length + 2);
+    expect(next.boss!.powers!.hop!.to).toBe("e3");
+  });
+
+  it("several can: the host's engine picks among them (no move list, no brain); its pick plays for everyone, then his move", () => {
+    const L = hopper({}, FOUR);
+    crowdPlays(L, "a1b1");
+    const req = asked(L);
+    expect(req.hop).toHaveLength(4);
+    expect(req.allowed).toBeUndefined();
+    expect(req.brain).toBeUndefined();
+    expect(L.last("p2", "boss")!.thinking).toBe(true);
+    L.inbox.set("p1", []);
+    L.core.message("p1", { t: "bossMove", key: req.key, move: req.hop![2]! });
+    const hop = L.last("p2", "boss")!;
+    expect(hop.boss.board.fen).toBe(req.hop![2]);
+    expect(hop.boss.powers!.hop).toMatchObject({ from: "e5", over: "e4", to: "e3" });
+    expect(hop.until - L.now).toBe(POWER_FX.hop);
+    const move = asked(L);
+    expect(move.hop).toBeUndefined();
+    expect(move.fen).toBe(req.hop![2]);
+  });
+
+  it("an answer that isn't one of them (an older app's move, \"\"), or no host at all: the first pawn that can hops", () => {
+    for (const answer of ["e2e4", "", null]) {
+      const L = hopper({}, FOUR);
+      crowdPlays(L, "a1b1");
+      const req = asked(L);
+      expect(req.hop).toHaveLength(4);
+      if (answer === null) {
+        // (No answer: the only other device gone, the host never answers; the timeout.)
+        L.core.disconnect("p2");
+        for (let i = 0; i < 6 && !L.last("p1", "boss")?.boss.powers?.hop; i++) L.advance(15_000);
+      } else L.core.message("p1", { t: "bossMove", key: req.key, move: answer });
+      expect(L.last("p1", "boss")!.boss.powers!.hop, String(answer)).toMatchObject({ from: "a5", over: "a4", to: "a3" });
+    }
+  });
+
+  it("the admins' test trigger refuses (no ultimate yet), so nothing is left waiting for one", () => {
+    const L = hopper({ bossPowerTest: "leapfrog" });
+    expect(L.core.ultimateTrigger("p1", true)).toBe(false);
+    expect((L.core as unknown as { runner: MatchRunner }).runner.boss!.powers!.ultNext).toBeUndefined();
+  });
+});
+
 describe("the boss's brain online (BOSS_BRAIN: Maia while it's off for players only for a lobby of admins)", () => {
   /** A raid of people, each an admin or not (as the Durable Object found them), the Last Stand off. */
   function raidOf(patch: Partial<Settings>, admins: boolean[], rating = 1500) {
