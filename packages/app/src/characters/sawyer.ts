@@ -15,6 +15,8 @@
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { KING_ATTACK } from "@chessroyale/chess";
+import { groundShadow, moved } from "./attack-frame.ts";
 
 export const SAWYER_PALETTE: Record<string, string> = {
   k: "#1c1413", // outline
@@ -652,6 +654,7 @@ export const SAWYER_LINES: Partial<Record<import("./boss-beats.ts").Beat, readon
   power: ["Mind the gap.", "Keep off the cut!", "Snip snip.", "Clean cut."],
   ultimateWarn: ["This board's getting renovated.", "Stand back…", "Revving up…"],
   ultimate: ["Timber!", "Renovation time!", "Down the middle!"],
+  kingAttack: ["Demolition time!", "Cut it out? Never!", "Timber, your majesty!"],
 };
 export const SAWYER_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
   entrance: 1,
@@ -668,6 +671,7 @@ export const SAWYER_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, numbe
   power: 0.5,
   ultimateWarn: 1,
   ultimate: 1,
+  kingAttack: 1,
 };
 
 export const SAWYER: Character = {
@@ -684,3 +688,77 @@ export const SAWYER: Character = {
 
 /** The part of him a portrait shows (his head and hat), in frame pixels. */
 export const SAWYER_PORTRAIT = { x: OX + 12, y: OY - 2, w: 44, h: 36 } as const;
+
+// ---- His attack on a king (kits.ts: his kit's `kingAttack`; Eric, Oct 18: "a relentless assault").
+
+/** Room ahead of him (to our left, where he faces) for the saw he thrusts at the king, and headroom to drop in from. */
+const ATTACK_REACH = 30;
+const ATTACK_TOP = 18;
+const AW = W + ATTACK_REACH;
+const AH = H + ATTACK_TOP;
+/** A frame of his in the attack's bigger frame, `lift` pixels up in the air. */
+const fa = (ms: number, p: SawyerPose, extra: Partial<Frame> = {}, lift = 0, ground: readonly Speck[] = []): Frame => moved({ ms, layers: sawyerLayers(p), ...extra }, ATTACK_REACH, ATTACK_TOP, AW, AH, lift, ground);
+/** His shadow on the ground where he lands, `r` across each way. */
+const landShadow = (r: number): Speck[] => groundShadow(OX + 38 + ATTACK_REACH, OY + GROUND + ATTACK_TOP - 1, r);
+
+/**
+ * Sawing at the king: lunged in, the saw thrust out level at its middle, the blade buzzing in (`bite`, the hit) or
+ * drawn back between bites. High and a little lower in turn, so the strokes read as sawing.
+ */
+const sawAt = (i: number, bite: boolean): SawyerPose =>
+  bite
+    ? { mood: i % 4 === 3 ? "glee" : "fierce", lean: -4, bob: 1, headDx: -1, hatDrop: i % 2, feet: { l: [-2, 0] }, swish: i % 2 ? -1 : 0, saw: { at: [10, 40 + (i % 2) * 2], tilt: i % 2 ? -6 : -1, stroke: 2 } }
+    : { mood: i % 4 === 3 ? "glee" : "squint", lean: -2, bob: 1, feet: { l: [-2, 0] }, swish: i % 2 ? 0 : -1, saw: { at: [15, 40 + (i % 2)], tilt: 1, stroke: 0 } };
+
+/**
+ * His attack on a king, the king to our left (where he faces; the board mirrors him when it's to his right), on the
+ * shared beats (KING_ATTACK, boss-timing.ts): his shadow spreads, he drops in with the saw raised and lands, revs it,
+ * then saws at the king nonstop: ten bites, one on each hit (cues `cut` and `swing` in turn, so the repeats don't pile
+ * up), sawdust bursting out of the cut each time; a gleeful rev of the arms, and he leaps off. The last frame is empty.
+ */
+const kingAttack: Anim = (() => {
+  const A = KING_ATTACK;
+  const tuck = { l: [2, -5] as Pt, r: [-2, -5] as Pt };
+  const frames: Frame[] = [
+    { ms: 100, layers: [], specks: landShadow(6) },
+    { ms: 100, layers: [], specks: landShadow(14) },
+    fa(80, { mood: "glee", air: true, feet: tuck, saw: { tilt: 24 }, swish: 1 }, { cue: "swing" }, 16, landShadow(20)),
+    fa(80, { mood: "glee", air: true, feet: { l: [1, -3], r: [-1, -3] }, saw: { tilt: 20 } }, {}, 7, landShadow(22)),
+    fa(A.landAt - 360, { mood: "fierce", bob: 2, saw: { tilt: 10 } }, { cue: "hop", shake: [0, 1], specks: burst([30, GROUND - 1], 0, 10) }),
+    // The trigger squeezed: the motor screams up into the first bite.
+    fa(A.lashAt - A.landAt, { mood: "glee", lean: -1, hatDrop: 1, saw: { at: [18, 39], tilt: 6, stroke: 2 } }, { cue: "rev", shake: [1, 0], specks: spray({ saw: { at: [18, 39], tilt: 6, stroke: 2 } }, 1, 6) }),
+  ];
+  const biteMs = 90;
+  for (let i = 0; i < A.lashes; i++) {
+    const p = sawAt(i, true);
+    frames.push(fa(biteMs, p, { cue: i % 2 ? "swing" : "cut", shake: [i % 2 ? 1 : -1, 0], specks: burst(tipOf(p), 0, 14) }));
+    frames.push(fa(A.lashEveryMs - biteMs, sawAt(i, false), { specks: burst(tipOf(p), 2, 10) }));
+  }
+  // Done: a gleeful rev of the saw held up, then a crouch and a leap off.
+  const cheer = A.leaveAt - (A.lashAt + A.lashes * A.lashEveryMs);
+  frames.push(fa(cheer, { mood: "glee", hatDrop: 1, swish: 1, saw: { at: [25, 35], tilt: 22, stroke: 2 } }));
+  const leave = A.ms - A.leaveAt;
+  frames.push(
+    fa(leave - 300, { mood: "smirk", bob: 2, saw: { tilt: 16 } }),
+    fa(80, { mood: "glee", air: true, feet: tuck, saw: { tilt: 22 } }, { cue: "hop" }, 7, landShadow(18)),
+    fa(80, { mood: "glee", air: true, feet: tuck, saw: { tilt: 24 } }, {}, 16, landShadow(12)),
+    { ms: 80, layers: [], specks: landShadow(8) },
+    { ms: 60, layers: [] },
+  );
+  return { loop: false, frames };
+})();
+
+/**
+ * Sawyer for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, facing our left as
+ * always, in a frame `ATTACK_REACH` wider on the left (the saw thrust at the king) and `ATTACK_TOP` taller (he drops
+ * in). Its `idle`, one still, is for the preview, which starts every reel from one.
+ */
+export const SAWYER_ATTACK: Character = {
+  ...SAWYER,
+  id: "sawyer-attack",
+  name: "Sawyer (his attack)",
+  w: AW,
+  h: AH,
+  foot: [SAWYER.foot[0] + ATTACK_REACH, SAWYER.foot[1] + ATTACK_TOP],
+  anims: { idle: { loop: true, frames: [fa(1000, {})] }, kingAttack },
+};

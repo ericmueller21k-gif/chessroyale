@@ -1,4 +1,5 @@
-import { useLayoutEffect, useMemo } from "preact/hooks";
+import { useContext, useLayoutEffect, useMemo } from "preact/hooks";
+import { BoardTurn, viewSquare } from "../board-view.ts";
 import { KING_ATTACK, kingAttackHits, lastStandHits, mateAttackDue } from "@chessroyale/chess";
 import { bossKit } from "../characters/kits.ts";
 import { EFFECTS, darkItem, type SquareItem } from "../characters/power-art.ts";
@@ -102,6 +103,8 @@ export function KingAttack({
   // (The battle's lights: his bulbs and his lashes in its colors.)
   syncLights(boss);
   const hp = useMemo(() => lastStandHits(`attack:${seed}`, KING_ATTACK.lashes), [seed]);
+  // (Boingo's funhouse turns the board a quarter round: everything here goes on the square the board shows the king on.)
+  const turn = useContext(BoardTurn);
   // His line, as he lands: into his voice (his text box, for its time).
   const landed = t >= KING_ATTACK.landAt;
   useLayoutEffect(() => {
@@ -112,37 +115,39 @@ export function KingAttack({
   if (!kit || !ka || t < 0) return null;
   // (At a mate the king stays gone, in the dark, until the result; in the Last Stand it's over when he's gone.)
   if (!king && t > KING_ATTACK.ms) return null;
-  const f = square.charCodeAt(0) - 97;
-  const r = Number(square[1]) - 1;
+  const shown = viewSquare(square, turn);
+  const f = shown.charCodeAt(0) - 97;
+  const r = Number(shown[1]) - 1;
   const col = orientation === "white" ? f : 7 - f;
   const row = orientation === "white" ? 7 - r : r;
   // He stands on the side toward the board's middle: to the king's left (as drawn) on the right half, else to its
-  // right, mirrored.
+  // right; his drawing mirrored when it faces away from the king (it faces our right unless `facesLeft`).
   const left = col >= 4;
   const from = left ? "L" : "R";
   const { ch } = ka;
+  const mirrored = left === !!ka.facesLeft;
   const w = ch.w / ka.perSquare;
   const h = (w * ch.h) / ch.w;
   const footX = col + 0.5 + (left ? -ka.stand : ka.stand);
   const footY = row + 1 - 0.04;
-  const footFrac = left ? ch.foot[0] / ch.w : 1 - ch.foot[0] / ch.w;
+  const footFrac = mirrored ? 1 - ch.foot[0] / ch.w : ch.foot[0] / ch.w;
   const box = { x: footX - w * footFrac, y: footY - h * (ch.foot[1] / ch.h) };
   const sq = (v: number) => `calc(var(--board-size, 100%) * ${v.toFixed(4)} / 8)`;
   const hits = kingAttackHits();
   const beat = kingAttackBeat(t);
   const items: SquareItem[] = [];
   hits.forEach((at, i) => {
-    if (t >= at && t < at + 220) items.push(ka.hit(square, i, from, startAt + at));
+    if (t >= at && t < at + 220) items.push(ka.hit(shown, i, from, startAt + at));
   });
   // At a mate the king fades into the dark: the dark gathers on its square as it goes, and stays.
   const darkAt = startAt + KING_ATTACK.toppleAt + KING_ATTACK.toppleMs * 0.5;
-  if (king && now >= darkAt) items.push(darkItem(square, "new", darkAt));
+  if (king && now >= darkAt) items.push(darkItem(shown, "new", darkAt));
   const him = t <= KING_ATTACK.ms;
   // The king: a flash at each lash, a jolt, darker each time; then it topples away from him and goes.
   const jolt = beat.lit ? (beat.hit % 2 ? -1 : 1) * 4 : 0;
   const kingStyle = king
     ? {
-        ...onSquare(square, orientation),
+        ...onSquare(shown, orientation),
         translate: `${(left ? 1 : -1) * Math.abs(jolt) * 0.6 + beat.topple * (left ? 8 : -8)}% ${beat.topple * 4}%`,
         rotate: `${(left ? 1 : -1) * 84 * beat.topple * beat.topple}deg`,
         transformOrigin: left ? "80% 92%" : "20% 92%",
@@ -159,7 +164,7 @@ export function KingAttack({
         </span>
       )}
       {him && (
-        <span class={`ka-boss${left ? "" : " flip"}`} style={{ left: sq(box.x), top: sq(box.y), width: sq(w), aspectRatio: `${ch.w} / ${ch.h}` }}>
+        <span class={`ka-boss${mirrored ? " flip" : ""}`} style={{ left: sq(box.x), top: sq(box.y), width: sq(w), aspectRatio: `${ch.w} / ${ch.h}` }}>
           <SpriteAnim ch={ch} anim={ka.anim} since={startAt} sounds={kit.sounds} id={`attack-${seed}`} />
         </span>
       )}

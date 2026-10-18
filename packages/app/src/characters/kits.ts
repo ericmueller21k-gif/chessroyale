@@ -9,18 +9,18 @@ import { BOSS_ROSTER, type BossDef } from "@chessroyale/core";
 import type { SoundName } from "../sound.ts";
 import type { Beat, BeatLines, Loop } from "./boss-beats.ts";
 import { BIGBOY, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT } from "./bigboy.ts";
-import { CLOWN, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
+import { CLOWN, CLOWN_ATTACK, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
 import { GREX, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
 import { HOLLOW, HOLLOW_ATTACK, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT } from "./hollow.ts";
-import { SAWYER, SAWYER_CHANCE, SAWYER_LINES, SAWYER_PORTRAIT } from "./sawyer.ts";
-import { PIG, PIG_CHANCE, PIG_LINES, PIG_PORTRAIT } from "./pig.ts";
+import { SAWYER, SAWYER_ATTACK, SAWYER_CHANCE, SAWYER_LINES, SAWYER_PORTRAIT } from "./sawyer.ts";
+import { PIG, PIG_ATTACK, PIG_CHANCE, PIG_LINES, PIG_PORTRAIT } from "./pig.ts";
 import { RECLUSE, RECLUSE_BUST, RECLUSE_PORTRAIT } from "./recluse.ts";
 import { ALFIL, ALFIL_ATTACK, ALFIL_CHANCE, ALFIL_LINES, ALFIL_PORTRAIT } from "./alfil.ts";
 import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
-import { ankusItem, lashItem, type SquareItem } from "./power-art.ts";
+import { ankusItem, lashItem, lassoItem, pieItem, sawItem, type SquareItem } from "./power-art.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
@@ -33,8 +33,10 @@ import { testSwitchesAllowed } from "../test-switches.ts";
 export interface KingAttackKit {
   /** The character it's drawn from (the boss's own parts; its frame may be wider than its usual one). */
   ch: Character;
-  /** Its animation, the king to our right; mirrored when the king is to its left. */
+  /** Its animation, the king to our right (or to our left, `facesLeft`); mirrored when the king is on its other side. */
   anim: string;
+  /** Drawn facing our left, the king on that side (Sawyer, as he always is); else facing our right. */
+  facesLeft?: boolean;
   /** Its size on the board: frame pixels to a square. */
   perSquare: number;
   /** Where its feet go: this many squares to the king's side of the king's square's middle. */
@@ -97,10 +99,14 @@ export const BOSS_KITS: Record<string, BossKit> = {
       laugh: "clownLaugh",
       throw: "clownSlideUp",
       flip: "clownFlip",
+      splat: "clownSplat",
     },
     lines: CLOWN_LINES,
     chance: CLOWN_CHANCE,
     portrait: { ...CLOWN_PORTRAIT, anim: "idle", frame: 4 },
+    // He bounces in on his pogo stick and pies the king, pie after pie (clown.ts: CLOWN_ATTACK), a splat on its square
+    // each hit (Eric, Oct 18).
+    kingAttack: { ch: CLOWN_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: pieItem },
   },
   "Ginger": {
     ch: GINGERBREAD,
@@ -222,6 +228,10 @@ export const BOSS_KITS: Record<string, BossKit> = {
     chance: SAWYER_CHANCE,
     portrait: { ...SAWYER_PORTRAIT, anim: "idle", frame: 0 },
     wide: true,
+    // He drops in and saws at the king nonstop (sawyer.ts: SAWYER_ATTACK), sawdust bursting off its square each hit
+    // (Eric, Oct 18). He faces our left, as always. (His saw reaches 1.6 squares from his feet at 36 frame pixels a
+    // square, his gloves 1.1: he stands 1.45 off, the blade past the king's middle, his body clear of it.)
+    kingAttack: { ch: SAWYER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.45, facesLeft: true, hit: sawItem },
   },
   "Wrangler": {
     ch: PIG,
@@ -258,12 +268,18 @@ export const BOSS_KITS: Record<string, BossKit> = {
       // (Played by his showdown on the board: the quick-draw sting and each pair yanked in.)
       draw: "pigDraw",
       yank: "pigYank",
+      // (His attack on a king: the lasso cracked at the king, a sharp crack and a softer one in turn.)
+      crack: "pigYank",
+      lash: "pigCatch",
     },
     lines: PIG_LINES,
     chance: PIG_CHANCE,
     portrait: { ...PIG_PORTRAIT, anim: "idle", frame: 0 },
     // His throw's room out to one side (the frame is 115 wide): a wider box on a phone, as Sawyer's.
     wide: true,
+    // He drops in and cracks his lasso at the king over and over, its end snapping in the king's square, never
+    // wrapping round him (pig.ts: PIG_ATTACK; Eric, Oct 18), a snap on the square each hit.
+    kingAttack: { ch: PIG_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: lassoItem },
   },
   // Alfil, the woolly mammoth (Eric, Oct 17): docs/decisions/2026-10-17-alfil-wired.md.
   "Alfil": {
