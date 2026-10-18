@@ -113,7 +113,7 @@ function BoardColorsChoice() {
         <strong>Board colors</strong>
         <span>The dark squares, on every board you see. Only you see them: other players keep their own.</span>
       </span>
-      <div class="bc-list" role="radiogroup" aria-label="Board colors">
+      <div class="bcol-list" role="radiogroup" aria-label="Board colors">
         {BOARD_COLORS.map((id) => (
           <button
             key={id}
@@ -122,20 +122,20 @@ function BoardColorsChoice() {
             aria-checked={chosen === id}
             aria-label={BOARD_COLOR_LABELS[id]}
             data-board-colors={id}
-            class={`bc-opt${chosen === id ? " on" : ""}`}
+            class={`bcol-opt${chosen === id ? " on" : ""}`}
             onClick={() => {
               setChosen(id);
               setBoardColors(id);
             }}
           >
-            <span class="bc-preview hb-pieces" aria-hidden="true">
-              <i class="bc-sq bc-last" style={at(2, 3)} />
-              <i class="bc-sq bc-last" style={at(2, 2)} />
-              <i class="bc-sq bc-sel" style={at(1, 2)} />
-              <i class="bc-sq bc-dot" style={at(0, 0)} />
-              <i class="bc-sq bc-dot" style={at(2, 0)} />
-              <i class="bc-sq bc-dot" style={at(3, 1)} />
-              <i class="bc-sq bc-ring" style={at(3, 3)} />
+            <span class="bcol-preview hb-pieces" aria-hidden="true">
+              <i class="bcol-sq bcol-last" style={at(2, 3)} />
+              <i class="bcol-sq bcol-last" style={at(2, 2)} />
+              <i class="bcol-sq bcol-sel" style={at(1, 2)} />
+              <i class="bcol-sq bcol-dot" style={at(0, 0)} />
+              <i class="bcol-sq bcol-dot" style={at(2, 0)} />
+              <i class="bcol-sq bcol-dot" style={at(3, 1)} />
+              <i class="bcol-sq bcol-ring" style={at(3, 3)} />
               <piece class="pawn black" style={at(3, 3)} />
               <piece class="pawn white" style={at(2, 2)} />
               <piece class="knight white" style={at(1, 2)} />

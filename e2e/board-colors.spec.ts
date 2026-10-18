@@ -59,7 +59,7 @@ test("board colors: pick Green and a match's dark squares are green, a reload ke
   await page.goto("/settings?debug");
   await expect(choice(page).getByRole("radio")).toHaveText(["Classic", "Green", "Gold"]);
   await expect(choice(page).getByRole("radio", { checked: true })).toHaveAccessibleName("Classic");
-  const previews = choice(page).locator(".bc-preview");
+  const previews = choice(page).locator(".bcol-preview");
   expect(await previews.evaluateAll((els) => els.map((e) => ({ dark: getComputedStyle(e).backgroundColor, light: getComputedStyle(e, "::before").backgroundColor })))).toEqual([CLASSIC, GREEN, GOLD]);
   // (Side by side, on a phone too: one row.)
   const tops = await choice(page).getByRole("radio").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));

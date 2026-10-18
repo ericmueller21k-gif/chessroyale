@@ -25,7 +25,7 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   pick shows at once on every board with nothing redrawn), the last move, the picked square, the move dots and capture
   rings, and the coordinates' two inks. **Every board that goes through `OwnBoard` follows it** (Crowd, raids, Boss alone,
   Squads, Classic, 1 v 1, votes, replays, history, the finals, the God King's moments, the mini boards, the home's live
-  window); the Settings choice's three previews (`.bc-opt`, each carrying its own `data-board-colors`) are drawn from the
+  window); the Settings choice's three previews (`.bcol-opt`, each carrying its own `data-board-colors`) are drawn from the
   same variables. Not covered: `TinyBoard`'s pixel boards (Classic's boards strip, Squads' thumbnails), which have
   always been their own muted blue-gray. **A new thing drawn over the squares is checked on all three** (in light and dark
   themes: the board's squares don't change with the theme, only what's around it); one that can't read on a scheme gets
