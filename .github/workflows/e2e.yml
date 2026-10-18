@@ -23,7 +23,7 @@
 name: e2e
 on:
   pull_request:
-    branches: [main]
+    branches: [main, claude/fast-ci]
     # (`labeled`: adding the full-e2e label starts a full run at once. Any other label restarts the run as it was.)
     types: [opened, synchronize, reopened, labeled]
   push:
