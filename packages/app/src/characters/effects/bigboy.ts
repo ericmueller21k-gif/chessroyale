@@ -1,7 +1,7 @@
 /** Big Boy's effects: the toy block and its flight, the Big Bounce's dust and crash. See ../effects.ts. */
 import { canvas, ellipse, inEllipse, shade, toGrid } from "../paint.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
-import { BOARD, SQUARE } from "./common.ts";
+import { BOARD, SQUARE, hitAnims } from "./common.ts";
 
 // ---- Big Boy's toys: the toy block (an ABC block on an empty square), its flight, his bounce's dust and crash.
 
@@ -253,4 +253,54 @@ export const BOUNCE_CRASH: Character = {
       })),
     },
   },
+};
+
+// ---- His attack on a king: the lollipop's bonk.
+
+const BONK_PALETTE = { k: "#2a1712", F: "#ffffff", "1": "#ff3349", "2": "#ff8a1a", "3": "#ffe23b", "4": "#35c94b", "5": "#2e86ff", "6": "#a24cf5" } as const;
+const RAINBOW = "123456";
+/** A little star: a core and four one-pixel rays. */
+const tinyStar = (x: number, y: number, core: string, ray: string): Speck[] => [[x, y, core], [x - 1, y, ray], [x + 1, y, ray], [x, y - 1, ray], [x, y + 1, ray]];
+/**
+ * The bonk at (12, y), the candy coming in from the left: a big white star with rainbow rays; then little stars in the
+ * candy's colors bursting out round it; then the last of them flying on, dotted.
+ */
+function bonkSpecks(y: number, step: 0 | 1 | 2): Speck[] {
+  const x = 12;
+  const out: Speck[] = [];
+  if (step === 0) {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (Math.abs(dx) + Math.abs(dy) < 2) out.push([x + dx, y + dy, "F"]);
+    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([ux, uy], i) => {
+      for (let d = 2; d <= 5; d++) out.push([x + ux! * d, y + uy! * d, RAINBOW[(i + d) % 6]!]);
+    });
+    for (const [ux, uy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) out.push([x + ux! * 2, y + uy! * 2, "3"]);
+    return out;
+  }
+  const n = 8;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * 2 * Math.PI + 0.3;
+    const d = step === 1 ? 6 : 9.5;
+    const sx = Math.round(x + Math.cos(a) * d * 1.15);
+    const sy = Math.round(y + Math.sin(a) * d * 0.85 + (step === 2 ? 1 : 0));
+    const k = RAINBOW[i % 6]!;
+    if (step === 1) out.push(...tinyStar(sx, sy, i % 2 ? "F" : k, k));
+    else if (i % 2 === 0) out.push([sx, sy, k], [sx + 1, sy, "F"]);
+  }
+  return out;
+}
+
+/**
+ * A bonk of Big Boy's lollipop on a king (his attack on a king): `hit<H|L><L|R>`, on its head (the overhead bonk) or
+ * its chest (sideways), from the left or right edge: a white star with rainbow rays, then candy-colored stars bursting
+ * out. About 200 ms; ends empty. Over the piece (or the God King standing there), never covering it.
+ */
+export const BONK_HIT: Character = {
+  id: "bonk-hit",
+  name: "A bonk of Big Boy's lollipop",
+  w: SQUARE,
+  h: SQUARE,
+  foot: [16, 31],
+  palette: BONK_PALETTE,
+  parts: {},
+  anims: hitAnims([["H", 7], ["L", 15]], bonkSpecks),
 };

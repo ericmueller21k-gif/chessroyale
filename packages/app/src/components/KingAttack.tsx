@@ -1,7 +1,8 @@
 import { useContext, useLayoutEffect, useMemo } from "preact/hooks";
 import { BoardTurn, viewSquare } from "../board-view.ts";
 import { KING_ATTACK, kingAttackHits, lastStandHits, mateAttackDue } from "@chessroyale/chess";
-import { bossKit } from "../characters/kits.ts";
+import { bossKit, type KingAttackKit } from "../characters/kits.ts";
+import { partSize } from "../characters/sprite.ts";
 import { EFFECTS, darkItem, type SquareItem } from "../characters/power-art.ts";
 import { pickLine } from "../characters/boss-beats.ts";
 import type { BossView } from "../game.ts";
@@ -47,9 +48,75 @@ export function prewarmKingAttack(name: string): void {
   if (!ka || warmed.has(key)) return;
   warmed.add(key);
   prewarmSprite(ka.ch, ka.ch.anims[ka.anim]?.frames ?? []);
+  attackTop(ka);
   // (Its hits' effect: Hollow's lash, Alfil's jab.)
   const fx = ka.hit("a1", 0, "L", 0).name;
   prewarm(fx, Object.entries(EFFECTS[fx].ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
+}
+
+/**
+ * How high a boss's attack rises above his feet once he's landed (frame pixels from his frame's top to his highest
+ * pixel, over his frames from the landing to the crouch before he leaps off: his drop-in and leap are clipped instead).
+ * From the boxes of its layers and its specks, so it paints nothing new; worked out once per attack.
+ */
+const tops = new WeakMap<KingAttackKit, number>();
+export function attackTop(ka: KingAttackKit): number {
+  let top = tops.get(ka);
+  if (top !== undefined) return top;
+  top = ka.ch.h;
+  let t = 0;
+  for (const f of ka.ch.anims[ka.anim]?.frames ?? []) {
+    if (t >= KING_ATTACK.landAt - 110 && t < KING_ATTACK.leaveAt + 100) {
+      for (const l of f.layers) {
+        const part = ka.ch.parts[l.part];
+        // (An outlined part grows a pixel all round.)
+        if (part && partSize(part, l.rot ?? 0)[1] > 0) top = Math.min(top, l.y - (part.outline === false ? 0 : 1));
+      }
+      for (const [, y] of f.specks ?? []) top = Math.min(top, y);
+    }
+    t += f.ms;
+  }
+  tops.set(ka, top);
+  return top;
+}
+
+/** How far above the board's top edge (squares) a boss's attack may rise: never as far as what's above it (a phone's boss bar). */
+export const ATTACK_ROOM_ABOVE = 0.4;
+/**
+ * The edge of the king's middle, where the king is drawn (squares from the middle of his square; the attacks keep their
+ * bodies outside it: king-attack.test.ts). A smaller attack shrinks toward that edge on the attacker's side, so his body
+ * never comes into it, and his prop, which reaches past it, still reaches the king.
+ */
+export const KING_MIDDLE = 0.35;
+
+/**
+ * Where a boss's attack goes on the board for a king on the square shown at (`col`, `row`) (squares from the board's
+ * top left, as the board shows it), pure: he stands on the side toward the board's middle (to the king's left on the
+ * right half, `left`), his hits come in from that side (`from`), and his drawing is mirrored (`mirrored`) when it faces
+ * away from the king (it faces our right unless `facesLeft`), so his face and his prop both point at the king. Near the
+ * top of the board, where his frame would rise more than ATTACK_ROOM_ABOVE above it (over a phone's boss bar), he's
+ * drawn smaller (`scale`), shrunk toward the edge of the king's middle on his side (KING_MIDDLE) at the bottom of the
+ * king's square, so his body stays clear of the king and his prop still lands on him;
+ * his drop-in and leap off are clipped there (`clipTop`, the share of his box from its top that isn't drawn). `box` is
+ * in squares from the board's top left.
+ */
+export function kingAttackPlace(ka: KingAttackKit, col: number, row: number): { left: boolean; from: "L" | "R"; mirrored: boolean; scale: number; box: { x: number; y: number; w: number; h: number }; clipTop: number } {
+  const left = col >= 4;
+  const mirrored = left === !!ka.facesLeft;
+  const { ch } = ka;
+  const w = ch.w / ka.perSquare;
+  const h = ch.h / ka.perSquare;
+  const cx = col + 0.5;
+  const footX = cx + (left ? -ka.stand : ka.stand);
+  const footY = row + 1 - 0.04;
+  const footFrac = mirrored ? 1 - ch.foot[0] / ch.w : ch.foot[0] / ch.w;
+  const x = footX - w * footFrac;
+  const y = footY - h * (ch.foot[1] / ch.h);
+  const rise = (ch.foot[1] - attackTop(ka)) / ka.perSquare;
+  const scale = Math.min(1, (footY + ATTACK_ROOM_ABOVE) / rise);
+  const ox = cx + (left ? -KING_MIDDLE : KING_MIDDLE);
+  const box = { x: ox + (x - ox) * scale, y: footY + (y - footY) * scale, w: w * scale, h: h * scale };
+  return { left, from: left ? "L" : "R", mirrored, scale, box, clipTop: Math.max(0, (-ATTACK_ROOM_ABOVE - box.y) / box.h) };
 }
 
 /**
@@ -120,18 +187,9 @@ export function KingAttack({
   const r = Number(shown[1]) - 1;
   const col = orientation === "white" ? f : 7 - f;
   const row = orientation === "white" ? 7 - r : r;
-  // He stands on the side toward the board's middle: to the king's left (as drawn) on the right half, else to its
-  // right; his drawing mirrored when it faces away from the king (it faces our right unless `facesLeft`).
-  const left = col >= 4;
-  const from = left ? "L" : "R";
+  // He stands on the side toward the board's middle, facing the king; smaller near the board's top (kingAttackPlace).
+  const { left, from, mirrored, box, clipTop } = kingAttackPlace(ka, col, row);
   const { ch } = ka;
-  const mirrored = left === !!ka.facesLeft;
-  const w = ch.w / ka.perSquare;
-  const h = (w * ch.h) / ch.w;
-  const footX = col + 0.5 + (left ? -ka.stand : ka.stand);
-  const footY = row + 1 - 0.04;
-  const footFrac = mirrored ? 1 - ch.foot[0] / ch.w : ch.foot[0] / ch.w;
-  const box = { x: footX - w * footFrac, y: footY - h * (ch.foot[1] / ch.h) };
   const sq = (v: number) => `calc(var(--board-size, 100%) * ${v.toFixed(4)} / 8)`;
   const hits = kingAttackHits();
   const beat = kingAttackBeat(t);
@@ -164,7 +222,7 @@ export function KingAttack({
         </span>
       )}
       {him && (
-        <span class={`ka-boss${mirrored ? " flip" : ""}`} style={{ left: sq(box.x), top: sq(box.y), width: sq(w), aspectRatio: `${ch.w} / ${ch.h}` }}>
+        <span class={`ka-boss${mirrored ? " flip" : ""}`} style={{ left: sq(box.x), top: sq(box.y), width: sq(box.w), aspectRatio: `${ch.w} / ${ch.h}`, ...(clipTop > 0 ? { clipPath: `inset(${(clipTop * 100).toFixed(2)}% 0 0 0)` } : {}) }}>
           <SpriteAnim ch={ch} anim={ka.anim} since={startAt} sounds={kit.sounds} id={`attack-${seed}`} />
         </span>
       )}

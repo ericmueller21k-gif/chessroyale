@@ -189,6 +189,12 @@
  *                          square, high or low, from the left or right edge: a white snap, gold rays, rope fibers.
  *   pieHit         square  hit<H|L><L|R> (ends empty, about 200 ms): a pie in a king's face, side on, at his head or a
  *                          little lower, from the left or right edge: it splats wide, cream flies on, then slides down.
+ *   bonkHit        square  hit<H|L><L|R> (ends empty, about 200 ms): a bonk of Big Boy's lollipop on a king, on its head or
+ *                          its chest, from the left or right edge: a white star with rainbow rays, candy-colored stars.
+ *   frostHit       square  hit<H|L><L|R> (ends empty, about 200 ms): a jab of Ginger's frosted cane on a king, high or
+ *                          low, from the left or right edge: a white puff and ice shards; it never covers the king.
+ *   popHit         square  hit<H|L><L|R> (ends empty, about 200 ms): a fireball of Jefferson's Roman candle popping on a
+ *                          king, high or low, from the left or right: a white flash and eight sparks bursting out.
  *   lashHit        square  hit<F|B><L|R><c> (ends empty, about 200 ms): a lash of Hollow's strand landing on a king,
  *                          a forehand (high) or backhand (low, rising), from the left or right edge, in bulb color c.
  *
@@ -398,6 +404,9 @@ export const EFFECTS: Record<EffectName, Effect> = {
   sawHit: { ch: EFFECT_SPRITES.sawHit, covers: "square", start: "hitAL", sounds: {} },
   lassoHit: { ch: EFFECT_SPRITES.lassoHit, covers: "square", start: "hitHL", sounds: {} },
   pieHit: { ch: EFFECT_SPRITES.pieHit, covers: "square", start: "hitHL", sounds: {} },
+  bonkHit: { ch: EFFECT_SPRITES.bonkHit, covers: "square", start: "hitHL", sounds: {} },
+  frostHit: { ch: EFFECT_SPRITES.frostHit, covers: "square", start: "hitHL", sounds: {} },
+  popHit: { ch: EFFECT_SPRITES.popHit, covers: "square", start: "hitHL", sounds: {} },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------
@@ -568,4 +577,19 @@ export function lassoItem(square: string, i: number, from: "L" | "R", since: num
 /** Boingo's i-th pie in the king's face (at his head, then a little lower, in turn), from his side. */
 export function pieItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   return { square, name: "pieHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
+}
+
+/** Big Boy's i-th bonk of his lollipop on the king's square (overhead on its head, then sideways at its chest, in turn), from his side. */
+export function bonkItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "bonkHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
+}
+
+/** Ginger's i-th jab of her frosted cane on the king's square (high, then low, in turn), from her side. */
+export function frostItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "frostHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
+}
+
+/** Jefferson's i-th fireball popping on the king's square (at its head, then its chest, in turn), from his side. */
+export function popItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "popHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }
