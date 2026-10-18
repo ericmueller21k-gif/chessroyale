@@ -20,10 +20,14 @@ On what the code makes: "Friend lobby is a great idea… the code is good too, w
   - **My call:** the pick holds while the app is open (after a match, home shows it again) and is gone when the app
     opens again (a reload or a new launch). It is not saved on the device, since a saved pick would mean a mode is
     picked when the app opens. `?mode=` in a link still picks one.
-- **The phone's top bar:** logo, coins, your pawn, Friends, gear.
-  - **Your coins open the shop** (the bag icon from #285 is gone).
+- **The phone's top bar:** logo, your pawn, the shop bag, Friends, gear. **No coins at the top**, on a phone or a
+  computer (Eric, later the same day: "We don't need the coins showing at the top… You can go to your profile to see
+  your coins. You can go to the shop to see your coins."). With the coins gone there is room for the bag again, so the
+  "coins are the shop's button" step is undone before it shipped.
   - **Friends** opens Play with friends (the same sheet a computer's side menu opens). A count shows on it when you
     have friend requests or invites, instead of on your pawn.
+  - **Your coins on your profile:** the shop already showed your balance; your own profile didn't, so it now has a
+    gold "● N coins" pill beside your rank (my call, so what Eric expects is true).
 - **Play with friends is no longer a button on home** (phone or computer). On a computer it stays in the side menu.
 - **Get friend code** (my call: the "friend lobby"). Play with friends already made a private lobby with a code and an
   invite link, so this reuses it:
@@ -46,5 +50,6 @@ On what the code makes: "Friend lobby is a great idea… the code is good too, w
 - New on the lobby screen: "Invite link copied: paste it to your friends".
 - New in the sheet: "Your friends ›".
 - "Play with friends" button under the Boss raid card: removed (phone and computer).
-- The shop bag in a phone's top bar: replaced by Friends (label "Friends"); your coins' label for screen readers is
-  "Shop & crates, N coins".
+- The coins pill at the top ("● N coins"): removed from a phone's top bar and a computer's top right.
+- New in a phone's top bar: Friends (label "Friends", "Friends, N new" with news).
+- New on your own profile: "● N coins".

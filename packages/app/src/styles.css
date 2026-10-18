@@ -7747,15 +7747,6 @@ button.fd-logo {
 .fd-logo span {
   color: var(--fd-gold-text);
 }
-.fd-coins {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--fd-gold-text);
-  background: var(--fd-panel-2);
-  border-radius: 999px;
-  padding: 8px 12px;
-  white-space: nowrap;
-}
 .fd-ring {
   position: relative;
   width: 44px;
@@ -7768,12 +7759,6 @@ button.fd-logo {
   justify-content: center;
   border: 2px solid var(--fd-gold);
   padding: 0;
-  cursor: pointer;
-}
-/* Your coins in a phone's top bar are the shop's button too (Eric, Oct 18). */
-.fd-coins-shop {
-  border: 0;
-  font-family: inherit;
   cursor: pointer;
 }
 /* What's new for you with friends (a request, an invite): a count on Friends in a phone's top bar. */
@@ -7984,43 +7969,16 @@ button.fd-logo {
   gap: 10px;
   min-width: 0;
 }
-.fd-coins-short {
-  display: none;
-}
 /*
- * A phone's top bar holds the logo, your coins, your pawn, the shop and the gear (Settings). When they don't all fit, the
- * coins' word goes first (it wraps onto a second line the pill doesn't show: the gold dot is the coin); below 430 px the
- * gaps tighten and a big balance goes short ("12k"); on narrow phones the logo steps down; below 360 px the round
- * buttons are 40 px. Measured with six-digit balances from 320 px up.
+ * A phone's top bar holds the logo, your pawn, the shop, Friends and the gear (Settings); no coins (Eric, Oct 18: the
+ * shop shows them). Below 430 px the gaps tighten, on narrow phones the logo steps down, and below 360 px the round
+ * buttons are 40 px. Measured from 320 px up.
  */
-.fd-top .fd-coins {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-content: flex-start;
-  min-width: 0;
-  height: 33px;
-  padding-block: 0;
-  line-height: 33px;
-  overflow: hidden;
-}
-.fd-top .fd-coins-word {
-  white-space: pre;
-}
 @media (max-width: 429px) {
   .fd-top,
   .fd-top .fd-top-end,
   .fd-top .fd-top-right {
     gap: 6px;
-  }
-  .fd-top .fd-coins {
-    padding-inline: 9px;
-  }
-  .fd-top .fd-coins-full {
-    display: none;
-  }
-  .fd-top .fd-coins-short {
-    display: inline;
   }
 }
 @media (max-width: 399px) {
@@ -8036,9 +7994,6 @@ button.fd-logo {
   .fd-top .fd-icon-btn {
     width: 40px;
     height: 40px;
-  }
-  .fd-top .fd-coins {
-    padding-inline: 7px;
   }
 }
 .fd-home-main {
@@ -9509,6 +9464,10 @@ a.fd-row-link {
   padding: 6px 12px;
   font-weight: 600;
   font-size: 14px;
+}
+/* Your coins on your own profile: gold, as the coin. */
+.fd-pill.fp-coins {
+  color: var(--fd-gold-text);
 }
 /* A rank: its color on a tint of it (dark), or darkened on a tint of white (light). core's profile test checks each
    rank's color stays 4.5:1 through these mixes, so change them together. */

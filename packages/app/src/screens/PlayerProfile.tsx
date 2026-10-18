@@ -460,6 +460,8 @@ export function PlayerProfileScreen({
         <div class="fd-pills">
           {p.banned ? <span class="fd-pill fp-banned">Banned</span> : <RankPill tier={p.tier} rating={p.rating} />}
           {p.topPercent !== null && <span class="fd-pill">Top {p.topPercent}%</span>}
+          {/* (Your coins: on your profile and in the shop, not in home's top bar, Eric, Oct 18.) */}
+          {own && me?.shop && <span class="fd-pill fp-coins">● {me.shop.coins.toLocaleString("en-US")} coins</span>}
         </div>
         {own && (
           <div class="fd-card-actions">

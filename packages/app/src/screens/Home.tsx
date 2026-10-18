@@ -8,7 +8,7 @@ import { BossBrainPicker } from "../components/BossBrain.tsx";
 import { isAdmin, maiaAllowed, maiaLikely, pickedBrain, rememberBrain } from "../boss-brain.ts";
 import { prefetchMaia } from "../maia.ts";
 import type { ComponentChildren } from "preact";
-import { AccountBar, BackButton, DressedPawn, FdButton, FriendsIcon, GearIcon, LiveLine, Logo, RankLine, wearingNames } from "../components/FrontDoor.tsx";
+import { AccountBar, BackButton, DressedPawn, FdButton, FriendsIcon, GearIcon, LiveLine, Logo, RankLine, ShopIcon, wearingNames } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
 import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/BossSelect.tsx";
 import { BossFace } from "../components/BossCharacter.tsx";
@@ -944,15 +944,18 @@ export function HomeScreen({
   return (
     <div class="fd-home">
       {/*
-       * (A phone's top bar (Eric, Oct 18): the logo, your coins (they open the shop), your pawn (your profile), Friends
-       * (play with friends: a code to share, or join one; and your friends list) and a gear for Settings (Eric, Oct 17:
-       * one tap, not two through Profile). A computer has the logo, the shop, Play with friends and Settings in its side
-       * menu, your coins and pawn top right, and friends in its live panel.)
+       * (A phone's top bar (Eric, Oct 18): the logo, your pawn (your profile), the shop, Friends (play with friends: a
+       * code to share, or join one; and your friends list) and a gear for Settings (Eric, Oct 17: one tap, not two
+       * through Profile). No coins: the shop and your profile show them. A computer has the logo, the shop, Play with
+       * friends and Settings in its side menu, your pawn top right, and friends in its live panel.)
        */}
       <header class="fd-top">
         <Logo />
         <div class="fd-top-end">
-          <AccountBar onProfile={onProfile} onShop={onShop} />
+          <AccountBar onProfile={onProfile} />
+          <button type="button" class="fd-icon-btn fd-top-shop" aria-label="Shop & crates" onClick={onShop}>
+            <ShopIcon />
+          </button>
           <button
             type="button"
             class="fd-icon-btn fd-top-friends"

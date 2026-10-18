@@ -55,7 +55,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     While a 1 v 1 search runs, a choice asks "Leave the 1 v 1 queue?" first (App's `leavingDuelFirst`).
   - **`/bosses`** (unlisted, not admin-gated; Eric's shortcut): opens the solo boss picker at once ("Choose your boss":
     every boss you can meet and a random one, and for an admin the Hidden Boss after them; the difficulty), over home.
-  - The coin pill, your icon, and the live line ("214 online · 9 matches running · 31 in queue") with the typical
+  - Your icon (no coins at the top: the shop and your own profile show them, Eric, Oct 18), and the live line ("214 online · 9 matches running · 31 in queue") with the typical
     wait under PLAY. The shop, your profile and Play with friends are in a phone's top bar and a computer's side menu,
     not on home's column (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)).
   - **Play with friends** (a phone's **Friends** in the top bar, a computer's side menu): **Get friend code** makes a
@@ -64,7 +64,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     (with "N new") opens the friends list. The Boss raid screen's Play with friends makes a raid, as before.
   - A screen that replaces home (a phone's queue, the Boss raid screen, home again) starts at its top. A match's Home
     and a closed lobby's note land on home itself; Cancel in a raid's queue goes back to the Boss raid screen.
-  - **Phone:** a top bar (the logo, your coins (they open the shop), your pawn (your profile), **Friends** (with a count
+  - **Phone:** a top bar (the logo, your pawn (your profile), the shop, **Friends** (with a count
     of requests and invites), then a gear that opens Settings in one tap; a computer's are its side menu's, so none is
     there; [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md),
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the Boss raid card, the RANKED row, its panel, then PLAY

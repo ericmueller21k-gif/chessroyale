@@ -370,76 +370,45 @@ test("phone: home fits the screen with no scrolling from 360×640 up, in every m
       expect(fit.pawn, `${width}×${height}, ${mode || "no mode"}: your pawn`).toBeGreaterThanOrEqual(48);
     }
     await expect(page.getByRole("main").getByRole("button", { name: "Play with friends" })).toHaveCount(0);
-    await expect(page.locator(".fd-top").getByRole("button", { name: /^Shop & crates/ })).toBeVisible();
+    await expect(page.locator(".fd-top").getByRole("button", { name: "Shop & crates" })).toBeVisible();
     await expect(page.locator(".fd-top").getByRole("button", { name: /^Friends/ })).toBeVisible();
   }
 });
 
-test("phone: the top bar (logo, coins, pawn) fits from 320 px up, even with a six-digit balance", async ({ page }) => {
+test("phone: the top bar (logo, your pawn, the shop, Friends, the gear) fits from 320 px up, with no coins in it", async ({ page }) => {
   test.skip(desktop(), "the phone's top bar");
-  // A big balance (the server's answer, with more coins in it).
-  await page.route("**/api/me*", async (route) => {
-    const res = await route.fetch();
-    const body = await res.json();
-    if (body?.shop) body.shop.coins = 123_456;
-    await route.fulfill({ response: res, json: body });
-  });
   for (const width of [320, 360, 375, 390, 430]) {
     await page.setViewportSize({ width, height: 740 });
     await page.goto("/");
     await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
     const bar = page.locator(".fd-top");
-    await expect(bar.getByLabel("123456 coins")).toBeVisible();
-    // Nothing runs off the bar or the screen; the number shows whole; every button is a full 44 px (40 below 360 px).
+    // No coins up here (Eric, Oct 18): the shop and your profile show them.
+    await expect(bar.getByText(/coins/)).toHaveCount(0);
+    // In order, apart, on one row, inside the bar; every button a full 44 px (40 below 360 px).
     const fits = await bar.evaluate((el) => {
       const right = el.getBoundingClientRect().right - parseFloat(getComputedStyle(el).paddingRight);
-      const kids = [...el.querySelectorAll(".fd-logo, .fd-coins, .fd-ring")].map((k) => k.getBoundingClientRect());
-      const pill = el.querySelector(".fd-coins")!.getBoundingClientRect();
-      const n = el.querySelector(".fd-coins-n")!.getBoundingClientRect();
-      const inOrder = kids.every((k, i) => i === 0 || k.left >= kids[i - 1]!.right);
-      return { inOrder, inside: kids.every((k) => k.right <= right + 0.5), number: n.left >= pill.left && n.right <= pill.right + 0.5 && n.bottom <= pill.bottom + 0.5 };
+      const kids = [...el.querySelectorAll(".fd-logo, .fd-ring, .fd-top-shop, .fd-top-friends, .fd-top-gear")].map((k) => k.getBoundingClientRect());
+      return { count: kids.length, inOrder: kids.every((k, i) => i === 0 || k.left >= kids[i - 1]!.right), inside: kids.every((k) => k.right <= right + 0.5), oneRow: kids.every((k) => k.top < kids[0]!.bottom && k.bottom > kids[0]!.top) };
     });
-    expect(fits, `${width} px`).toEqual({ inOrder: true, inside: true, number: true });
-    const ring = (await bar.getByRole("button", { name: "Your profile" }).boundingBox())!;
-    expect(ring.width, `Your profile at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
+    expect(fits, `${width} px`).toEqual({ count: 5, inOrder: true, inside: true, oneRow: true });
+    for (const name of ["Your profile", "Shop & crates", "Friends", "Settings"]) {
+      const b = (await bar.getByRole("button", { name, exact: true }).boundingBox())!;
+      expect(Math.min(b.width, b.height), `${name} at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
+    }
     expect(await sideways(page), `${width} px`).toBe(0);
   }
 });
 
-/** A full-length name (the server keeps 16 characters) in the widest letters, and a five-digit balance. */
+/** A full-length name (the server keeps 16 characters) in the widest letters. */
 const LONG_NAME = "MMMMMMMMMMMMMMMM";
-const bigBalance = (page: Page) =>
-  page.route("**/api/me*", async (route) => {
-    const res = await route.fetch();
-    const body = await res.json();
-    if (body?.shop) body.shop.coins = 99_999;
-    await route.fulfill({ response: res, json: body });
-  });
 
-test("phone: the top bar's coins and gear open the shop and Settings in one tap (Back is home); Friends and the gear fit beside the coins and your pawn from 320 px", async ({ page }) => {
-  test.skip(desktop(), "the phone's top bar (a computer has Settings in its side menu)");
+test("phone: the top bar's shop and gear open the shop and Settings in one tap (Back is home)", async ({ page }) => {
+  test.skip(desktop(), "the phone's top bar (a computer has them in its side menu)");
   await named(page, LONG_NAME);
-  await bigBalance(page);
-  for (const width of [320, 360, 390]) {
-    await page.setViewportSize({ width, height: 740 });
-    await page.goto("/");
-    await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
-    const bar = page.locator(".fd-top");
-    await expect(bar.getByLabel("99999 coins")).toBeVisible();
-    // Logo, coins (the shop), pawn, Friends, gear: in order, apart, inside the bar; Friends and the gear a full 44 px (40 below 360 px).
-    const fits = await bar.evaluate((el) => {
-      const right = el.getBoundingClientRect().right - parseFloat(getComputedStyle(el).paddingRight);
-      const kids = [...el.querySelectorAll(".fd-logo, .fd-coins, .fd-ring, .fd-top-friends, .fd-top-gear")].map((k) => k.getBoundingClientRect());
-      return { count: kids.length, inOrder: kids.every((k, i) => i === 0 || k.left >= kids[i - 1]!.right), inside: kids.every((k) => k.right <= right + 0.5), oneRow: kids.every((k) => k.top < kids[0]!.bottom && k.bottom > kids[0]!.top) };
-    });
-    expect(fits, `${width} px`).toEqual({ count: 5, inOrder: true, inside: true, oneRow: true });
-    const gear = (await bar.getByRole("button", { name: "Settings" }).boundingBox())!;
-    expect(Math.min(gear.width, gear.height), `the gear at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
-    const friends = (await bar.getByRole("button", { name: /^Friends/ }).boundingBox())!;
-    expect(Math.min(friends.width, friends.height), `Friends at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
-  }
-  // One tap on your coins: the shop (Eric, Oct 18: "coins and shop are one button"); Back is home.
-  await page.locator(".fd-top").getByRole("button", { name: /^Shop & crates/ }).click();
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  // One tap: the shop (its balance at the top); Back is home.
+  await page.locator(".fd-top").getByRole("button", { name: "Shop & crates" }).click();
   await expect(page.getByRole("heading", { name: "Shop" })).toBeVisible();
   await page.getByRole("button", { name: "Back" }).first().click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
@@ -450,10 +419,9 @@ test("phone: the top bar's coins and gear open the shop and Settings in one tap 
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
 });
 
-test("phone: no sideways scroll on home at 320, 360 and 390 px with a 16-character name and 99,999 coins; the name ellipsizes in its card", async ({ page }) => {
+test("phone: no sideways scroll on home at 320, 360 and 390 px with a 16-character name; the name ellipsizes in its card", async ({ page }) => {
   test.skip(desktop(), "a phone's widths");
   await named(page, LONG_NAME);
-  await bigBalance(page);
   for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     for (const width of [320, 360, 390]) {
