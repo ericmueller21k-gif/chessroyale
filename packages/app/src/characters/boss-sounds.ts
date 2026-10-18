@@ -5,6 +5,7 @@ import { gingerSound } from "./gingerbread-sounds.ts";
 import { godKingSound } from "./god-king-sounds.ts";
 import { grexSound } from "./grex-sounds.ts";
 import { hollowSound } from "./hollow-sounds.ts";
+import { hopperSound } from "./hopper-sounds.ts";
 import { pigSound } from "./pig-sounds.ts";
 import { recluseSound } from "./recluse-sounds.ts";
 import { sawyerSound } from "./sawyer-sounds.ts";
@@ -22,6 +23,7 @@ const MAKERS = {
   godKing: godKingSound,
   grex: grexSound,
   hollow: hollowSound,
+  hopper: hopperSound,
   pig: pigSound,
   recluse: recluseSound,
   sawyer: sawyerSound,

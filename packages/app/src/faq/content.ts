@@ -72,6 +72,7 @@ import { clockLabel, defaultClock, minutesName } from "@chessroyale/chess/squads
 import { anchorsOf, parse, plainText, type Block } from "./markdown.ts";
 import { JUMP_NEXT_LABEL } from "../squads-view.ts";
 import { REFUSED } from "../refused.ts";
+import { averageWorth, oddsWords } from "../carrot-race.ts";
 
 /** Everything the FAQ quotes. The defaults are the game's; tests pass changed ones. */
 export interface FaqSources {
@@ -681,6 +682,21 @@ Plays from the game so far. A woolly mammoth, the bishop's ancestor: in old Pers
 
 - **Tusks** (passive): on his ${ordinal(p.tusksFirst)} turn, then every ${n(p.tusksEvery, "turn")}, he points his ankus at two of his pawns, anywhere on the board, and they glow; then he plays his move. Take either glowing pawn on your turn and the fusion fails. If you don't, his next turn is the fusion: both pawns lift off, meet in a white flash, and an **elephant** lands on one of their two squares (the one the engine likes best for him). It's a bishop in every way, drawn as an elephant, and the fusion is his whole move that turn. If he's in check when it's due, it waits until he isn't, the pawns still glowing. It waits the same way when spending his turn on it would cost him ${n(p.passGuardPawns, "pawn")}' worth or more (a piece of his left hanging, say): he moves instead, and it comes on a later turn. If the God King strikes him just before a fusion, the elephant lands on the worse of the two squares for him. At most ${n(p.tusksMax, "elephant")} a battle.
 - **Mammoth Slam** (ultimate): at the start of his turn, after the warning, he slams the board and ${n(p.slamPawns, "of your pawns", "of your pawns")} and ${n(p.slamMinors, "of your knights or bishops", "of your knights or bishops")} fly up (never your queen, a rook or your king; fewer if you have fewer). They're gone for ${n(p.slamTurns, "of your turns", "of your turns")}, then land back on their own squares as the next one begins; a growing shadow on each square shows where and when. If its square is taken by then, a piece lands on the nearest empty square: a bishop on its own color, a pawn never on the first or last rank, never giving check, and never where it would just be taken when another square avoids that. The engine picks the pieces so the hit is real but capped: about ${num(p.slamTarget)} of a pawn (from ${range(p.slamLoss)}), the turns they're up played out; if nothing fits, nothing flies, and he tries again at the start of his next turn. They never leave you mated in one: if he could mate only because they're up, they land at once. He sees them coming, though: on his move just before they land (his fusion too), his move still comes from the board as it is, but it's weighed with them back down, and a move that would give away more than [the blunder guard](#stockfish-brain) allows once they land gives way to his best one there, whichever brain picked it. The judge scores your moves on the board as it stands (it doesn't know they're coming back).`,
+  hopper: (p, b) => {
+    const tiers = Array.from({ length: p.carrotCount + 1 }, (_, k) => k);
+    const rows = tiers.map((k) => `| ${k} | ${oddsWords(k, p)} | ${k >= p.carrotCount ? "" : num(Math.round(averageWorth(k, p) * 100) / 100)} |`).join("\n");
+    return `
+Plays from the game so far. Chub, a rabbit, riding his best friend Chirp, a grasshopper; Chub does the talking. Their powers are why they play ${Math.abs(b.offset)} under the usual strength.
+
+- **Leapfrog** (passive): at the start of their turn, when one of their pawns stands nose to nose with one of yours (yours on the square in front of it) and the square beyond yours is empty, Chirp hops their pawn over yours onto it, and then they play their move as usual. Never onto your last two ranks, never with a pinned pawn, never while they're in check (it waits), and never a hop that gives check, frees a pawn of theirs to promote, leaves them without a move or hands them a mate in one they didn't already have. When more than one pawn can, the engine picks the hop best for them. At most ${n(p.hopMax, "hop")} a battle, one a turn. A hop clears the en passant square and starts the fifty-move count again.
+- **Carrot Patch** (ultimate, **once a battle**): at the start of their turn, after the warning, Chub plants ${n(p.carrotCount, "carrot")} on empty squares (at least one on each half of the board, no two touching), and that's their whole turn, so you move first in the race. A piece pulls a carrot by ending its move on it: any piece, a capture there and a castling rook count, and so does their hop landing on one (but a hop never pulls their last carrot, nor brings one into reach of the move that follows). A pulled carrot stays pulled, and the dock counts them. Each side has ${n(p.carrotMoves, "move")}; the race ends when every carrot is pulled or both sides' moves are done, and carrots still in the ground count for nobody. **Their ${["first", "second", "third", "fourth", "fifth", "sixth", "seventh"][p.carrotCount - 1] ?? ordinal(p.carrotCount)} carrot wins them the battle on the spot.** Otherwise, after their move, they spin a reel for a prize by how many carrots they pulled (you get no prize: every carrot you pull lowers theirs):
+
+| Their carrots | Their spin | Average (pawns) |
+|---|---|---|
+${rows}
+
+The reel shows each prize as often as its odds and stops where the roll says (the server rolls it online, so everyone sees the same spin); it only ever comes from this power and has nothing to do with coins or anything you can buy. The prize pieces go on their side: pawns on their second row, then their third; other pieces on their back row, then their second, nearest the middle first; never giving check, a bishop on the color their bishops lack first. If the engines can't take a prize (more than 8 pawns a side, or more pieces than promotions could make), it steps down to the next one that fits. If the battle ends before the race does, there's no spin. The judge weighs the race too: a move that pulls a carrot, or gets to one first, can be your best move. After the Carrot Patch, their meter is gone for the rest of the battle.`;
+  },
 };
 
 /**
@@ -750,9 +766,9 @@ In a level game (at ×1) it's full after about ${n(level, "crowd move")}; with t
 `
     : ""
 }
-When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Hollow's, Big Boy's and Alfil's ultimates come at the start of their own turn instead (Lights Out's only warning is the full meter), Sawyer's needs more than a full meter, and Wrangler has a meter of his own with no warning (below).
+When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Hollow's, Big Boy's, Alfil's and Chub & Chirp's ultimates come at the start of their own turn instead (Lights Out's only warning is the full meter), Sawyer's needs more than a full meter, and Wrangler has a meter of his own with no warning (below).
 
-Then the meter empties and fills again for the next one. While an ultimate is still under way (the Blizzard's ${n(Math.max(2, Math.round(p.blizzardTurns)), "turn")}, the Roman Candle's fireballs still falling or burning, the board flipped or sawn in two, Lights Out and the extra move after it, Alfil's Slam while your pieces are up) the meter stays empty, dimmed, and nothing adds to it, so two ultimates never overlap.
+Then the meter empties and fills again for the next one. While an ultimate is still under way (the Blizzard's ${n(Math.max(2, Math.round(p.blizzardTurns)), "turn")}, the Roman Candle's fireballs still falling or burning, the board flipped or sawn in two, Lights Out and the extra move after it, Alfil's Slam while your pieces are up) the meter stays empty, dimmed, and nothing adds to it, so two ultimates never overlap. Chub & Chirp's Carrot Patch comes once a battle: after it, their meter is gone.
 
 ${blocks}
 ${later.length ? `\n### Still to come {#bosses-later}\n\n${n(later.length, "more boss", "more bosses")} are waiting for their art and powers: ${later.join(", ")}.` : ""}

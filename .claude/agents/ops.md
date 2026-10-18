@@ -19,7 +19,7 @@ engine server's sections (indexed in `DECISIONS.md`, in `docs/history/ops.md` an
 | Scaling fixes: the matchmaker's throughput, database write load, live counts | `packages/server/src/matchmaker.ts` (plumbing, not the matching rules, which are `ranked`'s), `live.ts`, `accounts.ts` (write patterns), `index.ts` |
 | Rate limits, overload handling | `packages/server/src/index.ts`, `api.ts` |
 | Deploy config, monitoring, alerts | `wrangler.jsonc`, `DEPLOY.md` |
-| CI: typecheck and unit tests, the e2e suite on 5 runners (`docs/areas/ops.md`, "CI e2e") | `.github/workflows/`, `e2e/ci-shard.mjs`, `ci-timings.json`, `ci-summary.ts`, `ci-summary-merge.mjs` |
+| CI: typecheck and unit tests, the e2e fast check on PRs and the whole suite on main (`docs/areas/ops.md`, "CI e2e") | `.github/workflows/`, `e2e/areas.json`, `ci-select.mjs`, `ci-shard.mjs`, `ci-timings.json`, `ci-summary.ts`, `ci-summary-merge.mjs` |
 
 Not yours:
 - game rules, screens and rating math

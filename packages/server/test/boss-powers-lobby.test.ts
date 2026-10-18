@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BOSS_BANNER, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, type Settings } from "@chessroyale/core";
-import { FIRE_BURN_MS, POWER_FX, applyMove, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { FIRE_BURN_MS, KING_ATTACK, POWER_FX, applyMove, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, powerMomentMs, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 afterEach(() => vi.restoreAllMocks());
@@ -288,13 +288,13 @@ describe("boss powers online", () => {
       expect(L.core.save().runner!.state.boss!.id).not.toBe("clown");
     }
     const ids = new Set<string>();
-    for (let seed = 1; seed <= 80 && ids.size < 8; seed++) {
+    for (let seed = 1; seed <= 80 && ids.size < 9; seed++) {
       const L = setup({ ...RAID_SETTINGS }, {}, seed);
       L.core.connect(undefined, "A", "computer", false, 1500);
       L.core.message("p1", { t: "start" });
       ids.add(L.core.save().runner!.state.boss!.id!);
     }
-    expect([...ids].sort()).toEqual(["alfil", "bigboy", "clown", "gingerbread", "grex", "hollow", "pig", "sawyer"]);
+    expect([...ids].sort()).toEqual(["alfil", "bigboy", "clown", "gingerbread", "grex", "hollow", "hopper", "pig", "sawyer"]);
   });
 
   it("the test trigger: only an admin's is taken; it brings the ultimate as the next turn begins, once; switched off, nothing", () => {
@@ -1136,9 +1136,9 @@ describe("Chub & Chirp online (Leapfrog)", () => {
     return L.last("p1", "bossRequest")!;
   };
   const shown = (L: ReturnType<typeof setup>, id: string, from: number) => (L.inbox.get(id) ?? []).slice(from).filter((m): m is Extract<ServerMessage, { t: "boss" }> => m.t === "boss");
-  /** Chub & Chirp (hidden: met as the test link does), picked by the lobby; `fen`: the battle from a position of our own, the crowd to move. */
+  /** Chub & Chirp, picked by the lobby; `fen`: the battle from a position of our own, the crowd to move. */
   function hopper(patch: Partial<Settings> = {}, fen?: string) {
-    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "hopper", bossUnfinished: true, ...patch });
+    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "hopper", ...patch });
     for (const i of [0, 1]) L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, 1500);
     L.core.message("p1", { t: "start" });
     L.advance(1000);
@@ -1250,9 +1250,9 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
   };
   const shown = (L: ReturnType<typeof setup>, id: string, from: number) => (L.inbox.get(id) ?? []).slice(from).filter((m): m is Extract<ServerMessage, { t: "boss" }> => m.t === "boss");
   const runnerOf = (L: ReturnType<typeof setup>) => (L.core as unknown as { runner: MatchRunner }).runner;
-  /** Chub & Chirp (hidden: met as the test link does), no slips (his race brain on every ordinary move); `fen`: the battle from a position of our own. */
+  /** Chub & Chirp, picked by the lobby, no slips (his race brain on every ordinary move); `fen`: the battle from a position of our own. */
   function hopper(patch: Partial<Settings> = {}, fen?: string) {
-    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "hopper", bossUnfinished: true, bossStumbleBelow: 0, ...patch });
+    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "hopper", bossStumbleBelow: 0, ...patch });
     for (const i of [0, 1]) L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, 1500);
     L.core.message("p1", { t: "start" });
     L.advance(1000);
@@ -1434,6 +1434,7 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
     // round's score; your partner's g1g2 isn't a find either way.
     const fen = runnerOf(L).boards.get(0)!.fen;
     turn("g1g2", "b1b5");
+    expect(L.core.fairMoves("p1")).toHaveLength(2);
     const [left, counted] = L.core.fairMoves("p1");
     expect([left!.best, !!left!.power]).toEqual(["b1b5", true]);
     expect(counted).toMatchObject({ best: "b1b5", loss: 1.5, bestExp: 0.52, gap: 1.5, near: legalMoves(fen).length, crowd: 1, crowdFound: 0 });
@@ -1468,6 +1469,28 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
     expect(L.last("p1", "results")).toBeUndefined();
     for (let i = 0; i < 10 && !L.last("p1", "results"); i++) L.advance(10_000);
     expect(L.last("p1", "results")).toMatchObject({ bossResult: "boss", carrots: true });
+  });
+
+  it("his fifth carrot that also mates: its pull and his win, then his attack on your king, then the results, once", () => {
+    // (As above, the last carrot on h3: Qd3-h3 pulls it and mates.)
+    const L = hopper({}, "8/8/8/8/8/3q4/5k1K/8 w - - 0 60");
+    race(L, ["h3", "a1", "a8", "h8", "c6"], { his: ["a1", "a8", "h8", "c6"] });
+    crowdPlays(L, "h2h1");
+    L.core.message("p1", { t: "bossMove", key: asked(L).key, move: "d3h3" });
+    const b = L.last("p1", "boss")!;
+    expect(b.boss.powers!.events.map((e) => e.kind)).toEqual(["carrot", "carrotWin"]);
+    // The move, the moments, then the attack's whole hold: the same on every screen.
+    expect(b.until - L.now).toBe(bossShowMs(b.boss.lastMove) + powerMomentMs(b.boss.powers!.events) + KING_ATTACK.mateHoldMs);
+    expect(L.last("p2", "boss")!.until).toBe(b.until);
+    L.advance(b.until - L.now - 1);
+    expect(L.last("p1", "results")).toBeUndefined();
+    for (let i = 0; i < 10 && !L.last("p1", "results"); i++) L.advance(10_000);
+    const all = L.inbox.get("p1")!;
+    const at = all.findIndex((m) => m.t === "results");
+    expect(all[at]).toMatchObject({ bossResult: "boss" });
+    expect((all[at] as Extract<ServerMessage, { t: "results" }>).carrots).toBeUndefined();
+    expect(all.slice(at + 1)).toEqual([]);
+    expect(all.filter((m) => m.t === "boss" && m.until === b.until)).toHaveLength(1);
   });
 });
 

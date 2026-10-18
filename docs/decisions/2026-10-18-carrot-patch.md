@@ -57,7 +57,8 @@ tuning: [reports/hopper-carrots-sim.md](../../reports/hopper-carrots-sim.md).
   results carry `carrots: true` (the results screen: "Chub & Chirp won with their fifth carrot."). It wins even when the
   same move draws on the board (a stalemate, the fifty-move rule, a repetition: the sheet's "he wins on the spot";
   `bossCarrotWin` reads only a mate as the board's own result). A mate is his either way and keeps the mate's line.
-  Either way its moments, the pull and his win, play before the result, as after any fifth carrot: the runner's
+  Either way its moments, the pull and his win, play before the result, as after any fifth carrot (at a mate his
+  attack on the crowd's king comes after them, then the result: the wiring's `mateMoments`): the runner's
   `preparePowers` lets them through once the board's game is over (delta review of #275, N-a). Given the choice, his
   brain takes a fifth carrot that doesn't stalemate, reach the fifty-move count or leave a dead draw (review of #275,
   S1). It looks at the position alone, so it can't see a repetition; the result is his either way.
@@ -140,7 +141,8 @@ tuning: [reports/hopper-carrots-sim.md](../../reports/hopper-carrots-sim.md).
   as it does around every other power online: the race's weighing values moves by what the carrots are worth, which
   isn't the position's value (it could read 0% for a side that is fine on the board). Online the bar always read the
   app's own search; solo's read `topMovesFor`, the judge's ranking, so during the race it now reads `engineTop`, the
-  same search with no boss rule. The hints and the bots keep the judge's ranking. (The 100% the wiring screenshot
+  same search with no boss rule. Solo's hints and the bots keep the judge's ranking (online hints have always read the raw search with the
+  allowed moves, never the race or G-REX's fire). (The 100% the wiring screenshot
   showed right after the cast in the test switch's opening is the engine's own: his cast passes his turn, and after
   1.e4 e5 2.Nf3 Nc6 3.d4 the crowd moving again is 99.5% for White by Stockfish at 500,000 nodes.)
 - **Fair play: a race turn counts only when the engine's best move is also the race's best move, and then it's
@@ -148,14 +150,17 @@ tuning: [reports/hopper-carrots-sim.md](../../reports/hopper-carrots-sim.md).
   rule held to: a legitimate carrot move must never count against a player.
   - **The rule** (the runner's `resolveBoard`, for any boss whose judge changes the numbers): a race turn counts when the
     engine's best keeps its own score under the race's judge. That happens exactly when it is the race's best too:
-    `raceAdjust` never raises a score, and leaves one as it is only for the race's best. Every other race turn is left
+    `raceAdjust` raises no score above 0.1% (below it the logit's clamp at 0.001 can lift one, by under 0.001), and
+    leaves one as it is only for the race's best. Every other race turn is left
     out (the turn's `power` flag, skip reason `bossPower`).
   - **A counted turn is recorded as any turn without the race:** the runner hands fair play the engine's own numbers
     (`fairScored`, which the lobby's `noteFair` reads instead of the round's). Fair play then reads exactly what it would
     from a carrot-blind engine: the same best, finds, near moves, only moves, decided positions, crowd finds, and the
-    same losses for the match's strength. And no move is charged more there than the game charges it: the race leaves the
-    engine's best as it is and never raises another move, so each move's loss by the engine's numbers is at most its
-    loss in the round's score. A cheater copying a carrot-blind engine plays its best, the recorded best, as on any
+    same losses for the match's strength. And no move is charged more there than the game charges it, within 0.1 point: the race
+    leaves the engine's best as it is and raises no other move above 0.1%, so each move's loss by the engine's numbers
+    is at most its loss in the round's score, or up to 0.1 point more for a move the engine already scores under 0.1%
+    (#275's last review measured at most 0.096 point, only on moves at least 12.3 points behind: no find, near move,
+    only move or decided position changes). A cheater copying a carrot-blind engine plays its best, the recorded best, as on any
     turn.
   - **Not the round's numbers on those turns** (my call within option b, which the review wrote with them): the race
     lowers the other moves, so its numbers can still read differently from the engine's. A move within a point of the
@@ -277,3 +282,5 @@ prize simply appears with his move (checked frame by frame on a phone: no piece 
 moment should show the board without it until `prizeAt` (as Alfil's moments show the board before the fusion).
 A fifth carrot that also mates now carries its `carrot` and `carrotWin` events (delta review, N-a); once his king attack
 is in `KING_ATTACKERS`, `bossTurnShowMs` holds a mate for the attack alone, so the wiring decides how the two play.
+Settled in the wiring (docs/decisions/2026-10-18-hopper-wired.md): the pull and his win, then his attack, then the
+result.

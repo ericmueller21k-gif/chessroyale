@@ -50,6 +50,14 @@ export type Beat =
   | "pull"
   | "tug"
   | "ready"
+  // Chub & Chirp's Carrot Patch race: a carrot he pulls, one you pull, his spin on 3 or 4 carrots, on 1 or 2, on none,
+  // and his fifth carrot (the battle is his).
+  | "carrotHis"
+  | "carrotYours"
+  | "spinBig"
+  | "spinSmall"
+  | "spinEmpty"
+  | "carrotsAll"
   // A boss's attack on a king (its kit's `kingAttack`): the God King in his Last Stand, the crowd's king at its mate.
   | "kingAttack";
 /** The loops it rests in between moments (`ready`: Wrangler's, his meter full). */

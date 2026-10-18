@@ -77,7 +77,8 @@ changes beyond the engine's own messages, write up the proposal and stop; that's
   - Run `npm test` and `npm run typecheck`.
   - For anything gameplay touches: locally, the e2e specs you touched (under the shared e2e lock), and the `@perf`
     specs if it could slow a phone (`npx playwright test --grep @perf --project phone`: CI leaves them out). CI
-    runs the whole e2e suite on the PR (`.github/workflows/e2e.yml`): read its `result` before merging.
+    runs the e2e fast check on the PR (the touched areas' specs plus the smoke set, `e2e/areas.json`; the whole
+    suite on main after the merge): read its `result` before merging.
   - e2e runs with containers off. Test the container itself with Docker locally, or live via `/api/engine/ping`
     and `/api/engine/score`, with the Access service-token headers described in `CLAUDE.md`. Never print their values.
 - **Shipping:** per `CLAUDE.md`: PR, wait for `check`, merge with a merge commit, verify live.

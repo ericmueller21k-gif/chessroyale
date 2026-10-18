@@ -17,6 +17,7 @@ import {
   lastStandAttackHits,
   legalMoves,
   mateAttackDue,
+  mateMoments,
   powerMomentMs,
   sanLineToUci,
   type EngineLike,
@@ -71,7 +72,7 @@ describe("how long the boss's move holds the screen (bossTurnShowMs)", () => {
   });
 
   it("holds for the attack at a mate by a boss that has one (every playable boss but the Hidden Boss), the same alone or in a raid", () => {
-    expect(KING_ATTACKERS).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil"]);
+    expect(KING_ATTACKERS).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper"]);
     for (const id of KING_ATTACKERS) {
       expect(hasKingAttack(id)).toBe(true);
       expect(mateAttackDue(view(id, MATED))).toBe(true);
@@ -90,6 +91,27 @@ describe("how long the boss's move holds the screen (bossTurnShowMs)", () => {
     const events = [{ kind: "dark" as const, turn: 3 }];
     expect(bossTurnShowMs(view("hollow", notMated, { powers: { events } }))).toBe(bossShowMs({}) + powerMomentMs(events));
     expect(bossTurnShowMs(view("hollow", notMated, { lastMove: { captured: "q" } }))).toBe(bossShowMs({ captured: "q" }));
+  });
+
+  it("at a mate, his fifth carrot's moments first (the pull and his win), then the attack; any other power's moments never", () => {
+    const fifth = [
+      { kind: "carrot" as const, turn: 9 },
+      { kind: "carrotWin" as const, turn: 9 },
+    ];
+    expect(mateMoments(fifth)).toEqual(fifth);
+    for (const alone of [false, true]) {
+      expect(bossTurnShowMs(view("hopper", MATED, { powers: { events: fifth } }), alone)).toBe(bossShowMs({}, alone) + powerMomentMs(fifth) + KING_ATTACK.mateHoldMs);
+      expect(bossTurnShowMs(view("hopper", MATED, { lastMove: { captured: "q" }, powers: { events: fifth } }), alone)).toBe(bossShowMs({ captured: "q" }, alone) + powerMomentMs(fifth) + KING_ATTACK.mateHoldMs);
+    }
+    // (A pull with no win, or another boss's events: left out at a mate, as before.)
+    const others: { kind: "carrot" | "dark" | "warn"; turn: number }[][] = [[{ kind: "carrot", turn: 9 }], [{ kind: "dark", turn: 3 }], [{ kind: "warn", turn: 3 }]];
+    for (const events of others) {
+      expect(mateMoments(events)).toEqual([]);
+      expect(bossTurnShowMs(view("hopper", MATED, { powers: { events } }))).toBe(KING_ATTACK.mateHoldMs);
+      expect(bossTurnShowMs(view("hollow", MATED, { powers: { events } }))).toBe(KING_ATTACK.mateHoldMs);
+    }
+    // (Not a mate: the fifth's usual hold.)
+    expect(bossTurnShowMs(view("hopper", notMated, { powers: { events: fifth } }))).toBe(bossShowMs({}) + powerMomentMs(fifth));
   });
 });
 
@@ -126,6 +148,18 @@ describe("the mate test switch (settings.bossMateTest, ?mate=1 in solo)", () => 
       // (Every one of them attacks the mated king now: Big Boy and Ginger too, Oct 18.)
       expect(mateAttackDue(view)).toBe(true);
       expect(r.stageComplete() || r.isOver()).toBe(true);
+    }
+  });
+
+  it("a move that ends the board's game sets up no new turn's powers, even with one due (review of #275, N-2)", async () => {
+    for (const id of ["gingerbread", "hollow", "grex"]) {
+      const r = raid(id);
+      const p = r.boss!.powers!;
+      // (A power due as the crowd's turn would begin, and the warning too.)
+      r.state = { ...r.state, boss: { ...r.state.boss!, powers: { ...p, nextPassive: 0, charge: 1e9 } } };
+      expect(await r.playBoss()).toBe("d8h4");
+      expect(r.boss!.powers!.turn).toBe(p.turn);
+      expect(r.boss!.powers!.events).toEqual(p.events);
     }
   });
 

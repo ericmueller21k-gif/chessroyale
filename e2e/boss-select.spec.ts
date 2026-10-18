@@ -24,10 +24,10 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await page.goto("/?mode=raid");
   await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
   const tiles = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio");
-  // Eight bosses you can meet, the Hidden Boss's tile, then "?".
-  await expect(tiles).toHaveCount(10);
+  // Nine bosses you can meet, the Hidden Boss's tile, then "?".
+  await expect(tiles).toHaveCount(11);
   await expect(tiles.last()).toHaveAccessibleName("Random boss");
-  await expect(tiles.nth(8)).toHaveAccessibleName("Locked boss");
+  await expect(tiles.nth(9)).toHaveAccessibleName("Locked boss");
 
   // Boingo: his idle on the stage, his name and strength, his pie's splat once, one of his lines in his bubble.
   await tile(page, "Boingo the Clown").click();
@@ -156,7 +156,7 @@ test("a resting boss has no tile, and a pick of it reads as a random boss", asyn
   await page.addInitScript(() => localStorage.setItem("brc.bossId", "clown"));
   await page.goto("/?mode=raid");
   const tiles = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio");
-  await expect(tiles).toHaveCount(9);
+  await expect(tiles).toHaveCount(10);
   await expect(tile(page, "Boingo the Clown")).toHaveCount(0);
   await expect(tile(page, "Random boss")).toHaveAttribute("aria-checked", "true");
   await expect(page.locator(".bs-name")).toHaveText("Random boss");
@@ -174,16 +174,16 @@ test("the layout: the tiles in rows, the stage under them, the ways to play unde
       expect(b.right, `${w}`).toBeLessThanOrEqual(w!);
       expect(b.width, `${w}: a tile big enough to tap`).toBeGreaterThanOrEqual(44);
     }
-    // Phones: two full rows of five (ten tiles since Alfil); a computer: all in one row.
+    // A row of six and one of five (eleven tiles since Chub & Chirp), a phone and a computer.
     const rows = new Set(boxes.map((b) => Math.round(b.top)));
-    expect(rows.size, `${w}`).toBe(w! >= 600 ? 1 : 2);
+    expect(rows.size, `${w}`).toBe(2);
     const tilesBottom = Math.max(...boxes.map((b) => b.bottom));
     const stage = (await page.locator(".bs-spot").boundingBox())!;
     const first = (await page.locator(".rd-option").first().boundingBox())!;
     expect(stage.y, `${w}`).toBeGreaterThan(tilesBottom);
     expect(first.y, `${w}`).toBeGreaterThan(stage.y + stage.height);
     // Every boss whole inside the stage's width (Wrangler's lasso out to one side, the tallest the Hidden Boss).
-    for (const name of ["Ginger", "Boingo the Clown", "Jefferson", "Hollow", "Big Boy", "Sawyer", "Wrangler", "Alfil", "Locked boss"]) {
+    for (const name of ["Ginger", "Boingo the Clown", "Jefferson", "Hollow", "Big Boy", "Sawyer", "Wrangler", "Alfil", "Chub & Chirp", "Locked boss"]) {
       await tile(page, name).click();
       // (After its drop, which squashes it a little wider for a moment.)
       await page.waitForTimeout(500);
@@ -285,7 +285,7 @@ test("Boss alone's menu and the /bosses picker fit any window: whole, or their r
     // The full picker (/bosses): every boss and a random one, for an admin the Hidden Boss too: the longest list.
     await page.goto("/bosses");
     const all = page.getByRole("dialog", { name: "Choose your boss" });
-    await expect(all.locator(".boss-row")).toHaveCount(10);
+    await expect(all.locator(".boss-row")).toHaveCount(11);
     await expectMenuFits(page, all, `${w}x${h} /bosses`);
     expect(await sideways(page), `${w}x${h}`).toBe(0);
   }
