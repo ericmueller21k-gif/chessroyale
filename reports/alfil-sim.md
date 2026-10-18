@@ -74,6 +74,8 @@ rules as first built (aff97c6) with `tusksFirst: 8`.)
 - **As first built, he was out of the pack:** every battle his (26 of 26), in 25 crowd moves, the shortest of any
   boss. The Slam alone puts him mid-pack (0.50, 48 moves): Tusks is the whole difference.
 - **Why one fusion decided it, as first built:** each is a bishop for two pawns, and Stockfish calls that a won game.
+  (The probes in this paragraph and the Slam's, 39 positions and 16 lifts in the decision file, came from one-off
+  scripts that aren't committed.)
   Its verdict (200,000 nodes) from the starting position with the side ahead to move: one pawn up (White's a2 gone),
   0.79; two pawns up (a2 and b2 gone), 1.000; Black's a7 and b7 made a bishop on a7, 1.000 for Black, and 0 for White
   with White to move. A probe on positions from engine play (seeds of the opening book, his side to move every third
@@ -100,11 +102,18 @@ rules as first built (aff97c6) with `tusksFirst: 8`.)
 | e2 (alone) | 42 | 36 | 30 | 5 | 18 | 9 | 0 |
 | s1a, s1b | 70 | 61 | 55 | 8 | 23 | 20 | 0 |
 
-- **About one Slam in six lifts nothing:** every lift weighed would swing the game past the cap (the engine's played-out
-  line has the crowd lost once they land), so none goes and the meter is spent, as Big Boy's bounce moves nothing then.
+- **About one Slam in six lifts nothing** (V1: 10 of 53), and not always because of the cap. In 8 of V1's 10, every
+  lift weighed would swing the game past the cap or had a mate against the crowd on the way (the engine's played-out
+  line has the crowd lost once they land), so none went. In the other 2, no lift was weighed at all (the rows don't keep
+  the position; a check on his king, which emptied the list until the review round, is the likely cause). Across the
+  four runs above, 10 of the 31 Slams that lifted nothing had nothing to weigh: 2 of 10 in V1, 0 of 6 in u5, 4 of 6 in
+  e2 and 4 of 9 in s1. In these runs the meter was spent anyway, as Big Boy's bounce's is when it moves nothing. Since
+  the review round, a Slam that lifts nothing keeps the meter and comes again on his next turn, and a check no longer
+  empties the list (not re-simulated: the decision file's estimate).
 - **The measure is coarse, as the fusion's:** the played-out line mostly reads 0 (the game's verdict unchanged, often
-  already decided) or a big swing either way; the band (0.25 to 1.5 pawns) is hit about one lift in ten. What the cap
-  does in practice: never a lift that turns a balanced game into a lost one for the crowd. The engine, thinking he's
+  already decided) or a big swing either way. The lift picked was in the band (0.25 to 1.5 pawns) for 1 of 43 lifts in
+  V1, 0 of 25 in u5, 5 of 36 in e2 and 8 of 61 in s1; of every lift weighed, 1 of 182, 0 of 119, 7 of 136 and 9 of 236.
+  What the cap does in practice: never a lift that turns a balanced game into a lost one for the crowd. The engine, thinking he's
   five points up, often plays into the pieces' return: lifts that leave the crowd better off (9 of 36 alone) are
   allowed, as Eric expected ("you can plan around it, and he can't").
 - **Down early** (he'd have a mate in one only because they're up): 2 of 25 lifts as first built, none of 43 in V1.

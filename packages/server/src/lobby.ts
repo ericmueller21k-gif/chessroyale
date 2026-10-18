@@ -1454,7 +1454,7 @@ export class LobbyCore {
    * square or the Slam's lift among the candidates (worked out here); a step with nothing to weigh needs no engine and
    * lands at once (after your queen banner, if it's up). Then the step plays for everyone, and the next (another step,
    * or his move; after the fusion, his move itself, the crowd's turn). No host engine anywhere: the cast's first pair,
-   * the fusion's first square, nothing lifts.
+   * the fusion's first square, nothing lifts (the meter kept: the Slam comes again on his next turn).
    */
   private requestAlfil() {
     const runner = this.runner!;
@@ -1529,11 +1529,13 @@ export class LobbyCore {
       // Alfil's step (the host's pick, one of the candidates; else the cast's first pair, the fusion's first square, or nothing lifts):
       // it plays out, then the next step or his move. His fusion is his move: the crowd's turn then begins as after
       // his move (its moments, the fusion's first, play before the crowd's clock starts); one with no square fails
-      // with no moment, and he moves.
+      // with no moment, and he moves. Nothing came of it (a Slam that lifted nothing keeps the meter; a pick for a step
+      // that isn't his now, the admins' trigger having brought the Slam meanwhile, is dropped): no moment, straight on.
+      const asked = this.r.bossKind;
       this.r.bossKind = undefined;
       const picked = this.r.bounceCandidates?.includes(move) ? move : null;
       this.r.bounceCandidates = undefined;
-      const step = this.runner!.applyAlfil(picked);
+      const step = this.runner!.applyAlfil(picked, null, asked);
       const until = this.io.now() + (!this.runner!.bossToMove() ? bossTurnShowMs(this.runner!.bossView()) : step && step !== "fuse" ? powerMomentMs([{ kind: step }]) : 0);
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);

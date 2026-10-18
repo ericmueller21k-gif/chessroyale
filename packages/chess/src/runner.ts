@@ -1350,14 +1350,18 @@ export class MatchRunner {
     return alfilBattle.needsEngine(this.battle);
   }
 
-  /** The step, from this device's engines (the cast's pair and the fusion's square: fuseFrom; the Slam's lift: slamFrom). */
+  /** The step, from this device's engines (the cast's pair and the fusion's square: fuseFrom; the Slam's lift: slamFrom); null: nothing came of it. */
   async playAlfil(engines: readonly EngineLike[] = this.opts.engines): Promise<AlfilStep | null> {
     return alfilBattle.play(this.battle, engines);
   }
 
-  /** The step lands (from the host's engine online: one of the candidates, else the cast's first pair, the fusion's first square or nothing; alfilBattle.apply). */
-  applyAlfil(pick: string | null, loss: number | null = null): AlfilStep | null {
-    return alfilBattle.apply(this.battle, pick, loss);
+  /**
+   * The step lands (from the host's engine online: one of the candidates, else the cast's first pair, the fusion's first
+   * square or nothing; alfilBattle.apply). `step`: the one the pick was asked for (another now: the pick is dropped).
+   * Null: nothing came of it.
+   */
+  applyAlfil(pick: string | null, loss: number | null = null, step: AlfilStep | null = null): AlfilStep | null {
+    return alfilBattle.apply(this.battle, pick, loss, step);
   }
 
   /** The boss's last move, and the piece it took (if any). */

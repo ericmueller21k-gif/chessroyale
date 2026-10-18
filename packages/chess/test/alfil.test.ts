@@ -26,6 +26,7 @@ import {
   legalMoves,
   liftedPieces,
   mateInOne,
+  passTurn,
   pickSlam,
   pieceAt,
   powerTurn,
@@ -210,15 +211,16 @@ describe("Tusks: the cast", () => {
     // A pin along a diagonal (the pinning bishop defended): the same.
     const pin = "4k3/3p3p/8/1B6/P7/8/8/6K1 b - - 0 1";
     expect(fusionOptions(pin, ["d7", "h7"], "b").map((o) => o.at)).toEqual(["d7"]);
-    // In check as his turn begins (the crowd's move gave it): no fusion answers it, so none (his move must; it fails).
+    // In check as his turn begins (the crowd's move gave it): no fusion answers it, so none (his move must; the fusion
+    // waits for his next turn: "Tusks: the counter and the fusion").
     const checked = "4k3/p6p/8/8/8/8/8/4R2K b - - 0 1";
     expect(kingAttacked(checked, "b")).toBe(true);
     expect(fusionOptions(checked, ["a7", "h7"], "b")).toEqual([]);
   });
 
   it("never an elephant giving check (no power's piece ever lands giving one); none allowed, no cast with that pair", () => {
-    // A bishop on e4 would check the king on d5; on a7 it doesn't.
-    const fen = "7k/p7/8/3K4/4p3/8/8/8 b - - 0 1";
+    // A bishop on e4 would check the king on d5; on a7 it doesn't. (Your h2 pawn: not a dead draw after it.)
+    const fen = "7k/p7/8/3K4/4p3/8/7P/8 b - - 0 1";
     expect(fusionOptions(fen, ["a7", "e4"], "b").map((o) => o.at)).toEqual(["a7"]);
     // On e7 it checks c5; without e7 the rook checks his king: neither.
     const neither = "4k3/p3p3/8/2K5/8/8/8/4R3 b - - 0 1";
@@ -238,9 +240,22 @@ describe("Tusks: the cast", () => {
   });
 
   it("never a fusion that leaves the crowd without a move: a stalemate by a power", () => {
-    // The elephant on e6 would take a2 from your king on a1 (b1 and b2 are his king's): stalemate. On h7, a2 is free.
-    const fen = "8/7p/4p3/8/8/8/2k5/K7 b - - 0 1";
+    // The elephant on e6 would take a2 from your king on a1 (b1 and b2 are his king's; your g5 pawn is blocked):
+    // stalemate. On h7, a2 is free.
+    const fen = "8/7p/4p1p1/6P1/8/8/2k5/K7 b - - 0 1";
     expect(fusionOptions(fen, ["e6", "h7"], "b").map((o) => o.at)).toEqual(["h7"]);
+  });
+
+  it("never a fusion that ends the game in a dead draw: a lone bishop against a lone king, or bishops all on one color; no cast with that pair", () => {
+    // Two pawns and his king against your lone king: the elephant would leave king and bishop against king.
+    const lone = "4k3/p6p/8/8/8/8/8/4K3 b - - 0 1";
+    expect(fusionOptions(lone, ["a7", "h7"], "b")).toEqual([]);
+    expect(tusksPairs(lone, "b", 1, 3)).toEqual([]);
+    // Your light-squared bishop: an elephant on light h7 is bishops all on one color; on dark a7 the game goes on.
+    const bishops = "4k3/p6p/8/8/8/8/8/4KB2 b - - 0 1";
+    expect(fusionOptions(bishops, ["a7", "h7"], "b").map((o) => o.at)).toEqual(["a7"]);
+    // Any other piece of yours, or a pawn: the game goes on, either square.
+    expect(fusionOptions("4k3/p6p/8/8/8/8/8/4KN2 b - - 0 1", ["a7", "h7"], "b").map((o) => o.at)).toEqual(["a7", "h7"]);
   });
 
   it("his turns: his moves so far (each fusion was one), plus one, whoever moved first", () => {
@@ -427,6 +442,81 @@ describe("Tusks: the counter and the fusion", () => {
     expect(none.bossToMove()).toBe(true);
   });
 
+  it("the fusion is a full move passed when he's Black: the move number goes up, as after Black's move; as White it stays", () => {
+    // (Hollow's pass is the crowd's, White's: its number stays, as before.)
+    expect(passTurn("4k3/p6p/8/8/8/8/P7/4K3 b - - 0 7")).toBe("4k3/p6p/8/8/8/8/P7/4K3 w - - 0 8");
+    expect(passTurn("4k3/p6p/8/8/8/8/P7/4K3 w - - 0 7")).toBe("4k3/p6p/8/8/8/8/P7/4K3 b - - 0 7");
+    expect(fusedFen("4k3/p6p/8/8/8/8/P7/4K3 b - - 3 7", ["a7", "h7"], "a7", "b")).toBe("4k3/b7/8/8/8/8/P7/4K3 w - - 0 8");
+    expect(fusedFen("4k3/p7/8/8/8/8/P6P/4K3 w - - 3 7", ["a2", "h2"], "a2", "w")).toBe("4k3/p7/8/8/8/8/B7/4K3 b - - 0 7");
+  });
+
+  it("in check as his turn begins: the fusion waits, the marks staying; he answers the check with a move, and it comes on his next turn", () => {
+    // Your rook on e1 checks his king on e8; his a7 and h7 are marked.
+    const fen = "4k3/p6p/8/8/8/8/8/4R2K b - - 0 1";
+    const b = battleAt(fen, { tusks: { turn: 3, at: 4, pawns: ["a7", "h7"] } });
+    expect(alfilBattle.step(b)).toBeNull();
+    expect(powersOf(b).tusks).toEqual({ turn: 3, at: 4, pawns: ["a7", "h7"] });
+    expect(powersOf(b).fusion ?? null).toBeNull();
+    // His move out of check, then yours (it takes neither: the counter is as ever), then his turn: the fusion.
+    const board = b.board();
+    b.boards.set(0, { ...(board as never as object), fen: applyMove(fen, "e8d8"), history: [...board.history, "e8d8"] } as never);
+    alfilBattle.afterHisMove(b, "e8d8");
+    crowdMoves(b, "h1h2");
+    expect(powersOf(b).tusks!.pawns).toEqual(["a7", "h7"]);
+    expect(alfilBattle.step(b)).toBe("fuse");
+    expect(alfilBattle.apply(b, null)).toBe("fuse");
+    expect(powersOf(b)).toMatchObject({ tusks: null, fusion: { from: ["a7", "h7"], to: "a7" }, elephants: ["a7"], fused: 1 });
+  });
+
+  it("the God King's strike just before a fusion hits it: the worse of the two squares for him, the strike spent on it", async () => {
+    const fen = "4k3/p6p/8/8/8/8/P7/4K3 b - - 0 1";
+    const staggered = () => {
+      const b = battleAt(fen, { tusks: { turn: 3, at: 4, pawns: ["a7", "h7"] } });
+      b.state = { ...b.state, boss: { ...b.state.boss!, staggerNext: true } };
+      return b;
+    };
+    // The engine's pick is h7 (the host's answer): staggered, the elephant lands on a7, the square it didn't pick.
+    const b = staggered();
+    const options = alfilBattle.candidates(b);
+    expect(alfilBattle.apply(b, options[1]!)).toBe("fuse");
+    expect(powersOf(b).fusion!.to).toBe("a7");
+    expect(b.state.boss!.staggerNext).toBe(false);
+    // Picked a7: h7.
+    const c = staggered();
+    alfilBattle.apply(c, options[0]!);
+    expect(powersOf(c).fusion!.to).toBe("h7");
+    // Not staggered: the pick.
+    const plain = battleAt(fen, { tusks: { turn: 3, at: 4, pawns: ["a7", "h7"] } });
+    alfilBattle.apply(plain, options[1]!);
+    expect(powersOf(plain).fusion!.to).toBe("h7");
+    // One square allowed: that one, as ever, and the strike is spent; no engine's answer: the first, spent too.
+    const one = battleAt("4k3/p3p2p/8/8/8/8/8/4R2K b - - 0 1", { tusks: { turn: 3, at: 4, pawns: ["a7", "e7"] } });
+    one.state = { ...one.state, boss: { ...one.state.boss!, staggerNext: true } };
+    alfilBattle.apply(one, null);
+    expect(powersOf(one).fusion!.to).toBe("e7");
+    expect(one.state.boss!.staggerNext).toBe(false);
+    const none = staggered();
+    alfilBattle.apply(none, null);
+    expect(powersOf(none).fusion!.to).toBe("a7");
+    expect(none.state.boss!.staggerNext).toBe(false);
+    // In a battle: no "Boss staggered." over your next turn, and the crowd can call the strike again.
+    const r = raid({ patch: { bossPowerTest: "tusks" } });
+    await turn(r);
+    const marked = r.boss!.powers!.tusks!.pawns;
+    r.deal();
+    expect(r.callStrike("h0").struck).toBe(true);
+    const move = [...(r.crowdAllowed() ?? legalMoves(fenOf(r)))].sort().find((m) => !marked.includes(m.slice(2, 4)) && !kingAttacked(applyMove(fenOf(r), m), r.boss!.crowdSide === "w" ? "b" : "w"))!;
+    await r.score(new Map([["h0", { move, thinkMs: 1000 }]]));
+    expect(r.boss!.staggerNext).toBe(true);
+    expect(r.alfilStep()).toBe("fuse");
+    await r.playAlfil();
+    expect(r.boss!.powers!.fusion!.to).toBeTruthy();
+    expect(r.bossToMove()).toBe(false);
+    expect(r.bossView()!.staggerNext).toBe(false);
+    r.deal();
+    expect(r.callStrike("h0").struck).toBe(true);
+  });
+
   it("in a battle: elephants tracked as they move and dropped when taken, never more than two; every position playable and replayable", async () => {
     for (const seed of [1, 2, 3, 4]) {
       const r = raid({ seed, patch: { bossPowerTest: "tusks" } });
@@ -493,6 +583,30 @@ describe("the Mammoth Slam: what flies", () => {
     const list = slamCandidates(lone, "w", 3, 9);
     expect(list.length).toBeGreaterThan(0);
     for (const c of list) expect(c.pieces.map((x) => x.piece)).toEqual(["p", "p"]);
+  });
+
+  it("a check on his king (your last move gave it) doesn't stop the Slam; a lift never adds a check on him", () => {
+    // Your queen on e2 checks his king on e8 (the review's position): lifts are weighed as ever.
+    const checked = "rnb1kbnr/pppp1ppp/8/8/8/2N2N2/PPPPQPPP/R1B1KB1R b KQkq - 0 5";
+    expect(kingAttacked(checked, "b")).toBe(true);
+    const list = slamCandidates(checked, "w", 1, 4);
+    expect(list).toHaveLength(BOSS_POWERS.slamLooks);
+    for (const c of list) {
+      expect(playable(c.fen)).toBe(true);
+      expect(kingAttacked(c.fen, "w")).toBe(false);
+    }
+    // In check from your queen, with your b5 pawn between your a4 bishop and his king: a lift with that pawn but not
+    // the bishop would add the bishop's check, so never; with both, or without the pawn, it's weighed.
+    const two = "4k3/8/8/1P6/B7/8/PPPPQPPP/4K3 b - - 0 1";
+    let seen = 0;
+    for (let seed = 0; seed < 20; seed++)
+      for (const c of slamCandidates(two, "w", seed, 4)) {
+        const up = c.pieces.map((x) => x.square);
+        if (up.includes("b5")) expect(up).toContain("a4");
+        expect(playable(c.fen)).toBe(true);
+        seen++;
+      }
+    expect(seen).toBeGreaterThan(0);
   });
 
   it("a crowd pawn that has just made its double step takes its en passant square up with it", () => {
@@ -573,6 +687,16 @@ describe("the Mammoth Slam: the landing", () => {
     for (const m of legalMoves(after.replace(" w ", " b "))) c.set(m.slice(2, 4), m);
     expect(c.has(to)).toBe(false);
     expect(playable(after)).toBe(true);
+  });
+
+  it("a piece landing on the en passant square takes it away (no capture onto a piece): your pawn lands on its own square", () => {
+    // His e-pawn has just made its double step past e6, your airborne pawn's own square.
+    const fen = "4k3/8/8/3Pp3/8/8/8/4K3 w - e6 0 2";
+    const down = landing(fen, [{ piece: "p", square: "e6" }], "w");
+    expect(down.landed).toEqual([{ piece: "p", from: "e6", to: "e6" }]);
+    expect(down.fen).toBe("4k3/8/4P3/3Pp3/8/8/8/4K3 w - - 0 2");
+    expect(playable(down.fen)).toBe(true);
+    expect(editedFen(fen, new Map(Object.entries({ e8: "k", e6: "P", d5: "P", e5: "p", e1: "K" })))).toContain(" w - - ");
   });
 
   it("as the crowd turn they're due begins (after his move): an event, the landing's squares, the meter free to fill again", async () => {
@@ -658,6 +782,65 @@ describe("the Mammoth Slam: when", () => {
     expect(r.boss!.powers!.events.at(-1)!.kind).toBe("slam");
     await r.playBoss();
     expect(r.boards.get(0)!.history.length).toBe(plies + 1);
+  });
+
+  it("a Slam that lifts nothing keeps the meter and shows nothing: it comes again at the start of his next turn", async () => {
+    // Every lift weighed has a mate against you on the way: none can go.
+    const mates = fakeEngine(undefined, () => 1);
+    const even = fakeEngine(() => 0.5);
+    const r = raid({ patch: { bossPowerTest: "slam" } });
+    await turn(r);
+    r.deal();
+    await r.score(new Map([["h0", { move: [...(r.crowdAllowed() ?? legalMoves(fenOf(r)))].sort()[0]!, thinkMs: 1000 }]]));
+    expect(r.alfilStep()).toBe("slam");
+    const fen = fenOf(r);
+    const events = r.boss!.powers!.events.length;
+    expect(await r.playAlfil([mates])).toBeNull();
+    const p = r.boss!.powers!;
+    expect(fenOf(r)).toBe(fen);
+    expect(p.ultAt).toBeUndefined();
+    expect(p.ults ?? 0).toBe(0);
+    expect(p.slam ?? null).toBeNull();
+    expect(p.airborne ?? null).toBeNull();
+    expect(p.events).toHaveLength(events);
+    expect(r.bossView()!.powers!.warned).toBe(true);
+    // Not again this turn: his move.
+    expect(r.alfilStep()).not.toBe("slam");
+    expect(r.bossToMove()).toBe(true);
+    await r.playBoss();
+    expect(r.bossView()!.powers!.warned).toBe(true);
+    // Your move, then his turn: the Slam again, and this time it lifts; the meter spent then.
+    r.deal();
+    await r.score(new Map([["h0", { move: [...(r.crowdAllowed() ?? legalMoves(fenOf(r)))].sort()[0]!, thinkMs: 1000 }]]));
+    expect(r.alfilStep()).toBe("slam");
+    expect(await r.playAlfil([even])).toBe("slam");
+    expect(r.boss!.powers!.airborne!.length).toBeGreaterThan(0);
+    expect(r.boss!.powers!).toMatchObject({ ultAt: r.boss!.crowdMoves, ults: 1 });
+    expect(r.boss!.powers!.events.at(-1)!.kind).toBe("slam");
+    // The admins' trigger the same: kept for his next turn. (Both elephants made: no cast after it.)
+    const b = battleAt("r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R b KQkq - 0 5", { ultNext: true, fused: 2 });
+    expect(alfilBattle.step(b)).toBe("slam");
+    expect(alfilBattle.apply(b, null)).toBeNull();
+    expect(powersOf(b)).toMatchObject({ ultNext: true, slamWait: 4 });
+    expect(alfilBattle.step(b)).toBeNull();
+    expect(slamDue({ ...b.state.boss!, crowdMoves: 5 })).toBe(true);
+  });
+
+  it("the admins' trigger while the host weighs another step: that pick is dropped, nothing changes, and the Slam is asked for", () => {
+    const fen = "4k3/p6p/8/8/8/8/P7/4K3 b - - 0 1";
+    const b = battleAt(fen, { tusks: { turn: 3, at: 4, pawns: ["a7", "h7"] } });
+    expect(alfilBattle.step(b)).toBe("fuse");
+    const pick = alfilBattle.candidates(b)[1]!;
+    // (The trigger, pulled while the host's engine works.)
+    b.state = { ...b.state, boss: { ...b.state.boss!, powers: { ...powersOf(b), ultNext: true } } };
+    expect(alfilBattle.step(b)).toBe("slam");
+    expect(alfilBattle.apply(b, pick, null, "fuse")).toBeNull();
+    expect(b.board().fen).toBe(fen);
+    expect(powersOf(b)).toMatchObject({ tusks: { pawns: ["a7", "h7"] }, ultNext: true });
+    expect(powersOf(b).ultAt).toBeUndefined();
+    expect(powersOf(b).ults ?? 0).toBe(0);
+    expect(powersOf(b).slamWait).toBeUndefined();
+    expect(alfilBattle.step(b)).toBe("slam");
   });
 
   it("the admins' trigger: at the start of his next turn, without the warning; never while pieces are up", async () => {
