@@ -1,6 +1,8 @@
 import { BOSS_BANNER, RECLUSE_PHASE2 } from "@chessroyale/core";
 import { RECLUSE, RECLUSE_JUMP } from "./characters/recluse.ts";
 import { animLength, cueAt } from "./characters/power-art.ts";
+import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
+import { holdMs } from "./speech.tsx";
 import {
   LAST_STAND,
   legalMoves,
@@ -21,35 +23,46 @@ import {
 } from "@chessroyale/chess";
 
 /**
- * The phase change (Eric, Oct 14), ms from its start (screens/Recluse2.tsx draws it), about 15 s after a short fall
+ * The phase change (Eric, Oct 14), ms from its start (screens/Recluse2.tsx draws it), about 25 s after a short fall
  * (`fallMs`: phase 1 beaten, the board holds while he collapses and starts to mumble), all on one square stage:
  * - **the God King's absorption** (Eric, Oct 14: he plays with an engine now, so he takes the God King's): the God King
- *   stands over him in his place, his sword raised and his aura swelling, and gloats (`kingAt`); still on his knees, the
+ *   stands over him in his place, his sword raised and his aura swelling, and gloats (`kingAt`); the boss, on his knees,
+ *   mumbles on, then says he'll take that power (`talkAt`, Eric, Oct 17: so a first-time player sees it coming); the
  *   boss's head snaps up and he raises his hand to the God King (`seizeAt`); the God King's golden power streams out of
  *   him into that hand while he flickers and cracks (`drainAt`: his Last Stand's blows, its flashes and cracks, are his
  *   frames); as it lands the boss's fist closes, his half-engine look ignites and he says so (`igniteAt`), and the God
- *   King fades away (`goneAt`: absorbed; he is gone for the rest of the fight);
+ *   King fades away (`goneAt`: absorbed; he is gone for the rest of the fight); he holds his fist a moment
+ *   (`absorbHoldMs`);
  * - he gets up in a rage where he stands (`rage`: the book flies back into his hand);
  * - he leaps from there onto the middle of the board (the board draws his whole figure, on a phone too), landing with a
  *   thud and a burst of dust (the board jolts);
  * - he brandishes the book over his head and throws it down at his feet, where it lands open;
  * - light pours up out of it while he chants over it, arms raised, his hair lifting (phase 2's face from here), his
- *   chant in his bubble;
+ *   chant in his bubble, for `castMs` (Eric, Oct 17: a few seconds longer);
  * - the boards crack (Sawyer's board-saw gap, down and across the middle) and the quarters part, each growing into a
  *   whole board at its corner, as the light dies; blue arcs strike the board from his hands meanwhile (`arcAt` to
  *   `arcEnd`: the engine's power splits it);
  * - the book snaps shut and flies up into his hands (his revive's own frames) while every board's pieces fly to their
  *   Chess960 squares; he leaps back to his place, in phase 2's idle from then on;
- * - "PHASE 2", and the clocks start.
- * One book on screen throughout: his own, in his frames.
+ * - "PHASE 2"; then phase 2's boards, still, with a big 5, 4, 3, 2, 1 on every one (`countdownMs`, Eric, Oct 17: so
+ *   players can get ready), and the clocks start.
+ * One book on screen throughout: his own, in his frames. Every added duration is a setting (RECLUSE_PHASE2.change).
+ * (Until Oct 17 it was about 15 s after the fall, and the clocks ran as "PHASE 2" ended.)
  */
 export const PHASE_CHANGE = (() => {
   const a = RECLUSE.anims;
   const len = (n: string) => animLength(a[n]!);
   const fallMs = 1800;
+  // (Eric, Oct 17: "it happens way too fast". About 10 s more from the mate to the split, the animations unchanged: his
+  // words before he seizes the power, a hold as it lands, a longer cast; then a countdown before the clocks.)
+  const pace = RECLUSE_PHASE2.change;
   // The absorption. (His drain lasts the God King's Last Stand blows to his stagger: its flashes and cracks, his frames.)
   const kingAt = 0;
-  const seizeAt = 1700;
+  // His words first, still on his knees while the God King gloats: his fall's mumbling (its first line, from the end of
+  // his collapse), then his new line about taking that power (`seizeTalk`), said as the mumbling ends; then he seizes it.
+  const mumbleEnd = -fallMs + len("collapse") + holdMs(RECLUSE_LINES.fall[0]);
+  const talkAt = Math.max(kingAt, mumbleEnd + 150);
+  const seizeAt = 1700 + pace.talkMs;
   const drainAt = seizeAt + (cueAt(a.seize!, "reach") ?? 0);
   const drainMs = LAST_STAND.staggerAt - LAST_STAND.slashAt;
   const igniteAt = drainAt + drainMs;
@@ -57,7 +70,9 @@ export const PHASE_CHANGE = (() => {
   const absorbLineAt = igniteAt + 120;
   const fadeMs = 700;
   const goneAt = igniteAt + fadeMs;
-  const riseAt = igniteAt + len("seized");
+  // (He holds his closed fist a moment as it sinks in, his engine eye newly lit, the God King fading: Eric, Oct 17.)
+  const absorbHoldMs = pace.absorbHoldMs;
+  const riseAt = igniteAt + len("seized") + absorbHoldMs;
   const rageMs = len("rage");
   // (The board's figure takes over where he stood as the leap's crouch begins: his place is empty until he's back.)
   const leapAt = riseAt + rageMs;
@@ -67,7 +82,9 @@ export const PHASE_CHANGE = (() => {
   const thudAt = dropAt + (cueAt(a.drop!, "thud") ?? 0);
   const chantAt = dropAt + len("drop");
   const lightMs = 500;
-  const crackAt = chantAt + 1700;
+  // (His cast held longer before the board cracks: the chant loops on, the light pouring up: Eric, Oct 17.)
+  const castMs = 1700 + pace.castHoldMs;
+  const crackAt = chantAt + castMs;
   const partAt = crackAt + 750;
   const growAt = partAt + 400;
   const growMs = 900;
@@ -83,9 +100,12 @@ export const PHASE_CHANGE = (() => {
   const bannerAt = Math.max(homeAt, shuffleAt + shuffleMs) + 100;
   // ("PHASE 2": a boss's banner, 1.4 s; Eric, Oct 16, a second shorter again. The clocks start after it.)
   const bannerMs = BOSS_BANNER.phase2Ms;
+  // (Then phase 2's boards, still: a big 5, 4, 3, 2, 1 on every one before the clocks run. SimulScreen draws it.)
+  const countdownMs = pace.countdownSeconds * 1000;
   return {
     fallMs,
     kingAt,
+    talkAt,
     seizeAt,
     drainAt,
     drainMs,
@@ -93,6 +113,7 @@ export const PHASE_CHANGE = (() => {
     absorbLineAt,
     fadeMs,
     goneAt,
+    absorbHoldMs,
     riseAt,
     rageMs,
     leapAt,
@@ -102,6 +123,7 @@ export const PHASE_CHANGE = (() => {
     thudAt,
     chantAt,
     lightMs,
+    castMs,
     crackAt,
     partAt,
     growAt,
@@ -117,6 +139,7 @@ export const PHASE_CHANGE = (() => {
     bannerAt,
     bannerMs,
     total: bannerAt + bannerMs,
+    countdownMs,
   };
 })();
 
@@ -128,7 +151,9 @@ export const PHASE_CHANGE = (() => {
 export function phaseChangeRun(at: number) {
   const C = PHASE_CHANGE;
   const seize = animLength(RECLUSE.anims.seize!);
-  return { since: at + C.seizeAt, anims: ["seize", { anim: "seizeLoop", ms: C.igniteAt - C.seizeAt - seize }, "seized", "rage"], loop: "idle2", before: "collapseLoop" } as const;
+  // (`seized` held on its last frame, his fist closed, for the absorb's hold.)
+  const seized = animLength(RECLUSE.anims.seized!) + C.absorbHoldMs;
+  return { since: at + C.seizeAt, anims: ["seize", { anim: "seizeLoop", ms: C.igniteAt - C.seizeAt - seize }, { anim: "seized", ms: seized }, "rage"], loop: "idle2", before: "collapseLoop" } as const;
 }
 
 /** What the God King shows in his place at `t` ms into the phase change, or "gone" (absorbed: from then on, phase 2 too). */

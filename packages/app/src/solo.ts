@@ -856,11 +856,11 @@ export class SoloMatch implements GameView {
   }
 
   /**
-   * His phase change (PHASE_CHANGE, about 15 s; not skippable, like a boss's intro): he absorbs the God King (who's gone
+   * His phase change (PHASE_CHANGE, about 25 s; not skippable, like a boss's intro): he absorbs the God King (who's gone
    * from then on: he says nothing in phase 2, and can't be called), his half-engine look igniting; up in a rage, his leap
    * onto the board, the book thrown down, the chant and its light, the split and its arcs, the book back in his hands, the
    * shuffle, his leap back. Phase 2's boards are set up now (each its own Chess960 start, from the battle's seed), so the
-   * shuffle shows where they go; their clocks start as it ends. `fromFall`: after phase 1's fall, whose mumbling carries
+   * shuffle shows where they go; their clocks start after it, and a countdown on them (startSimul). `fromFall`: after phase 1's fall, whose mumbling carries
    * on into it.
    * `mates`: who fought phase 1 beside you (a solo Crowd's finalists), on the other boards; fresh bots for the rest.
    */
@@ -906,8 +906,18 @@ export class SoloMatch implements GameView {
   }
   private phase2Names = new Map<string, string>();
 
-  /** Phase 2's play: every clock starts. His line (the God King is gone: absorbed in the phase change). */
+  /**
+   * Phase 2's boards, set: a countdown on every one first (PHASE_CHANGE.countdownMs; Eric, Oct 17: "you're going to be so
+   * confused what's going on"), nothing running, nobody moving; then play.
+   */
   private startSimul() {
+    if (!this.phase2 || this.stopped) return;
+    this.set({ kind: "simul", at: Date.now() + PHASE_CHANGE.countdownMs });
+    this.timer = setTimeout(() => this.startClocks(), PHASE_CHANGE.countdownMs);
+  }
+
+  /** Phase 2's play: every clock starts. His line (the God King is gone: absorbed in the phase change). */
+  private startClocks() {
     if (!this.phase2 || this.stopped) return;
     this.phase2Playing = true;
     this.set({ kind: "simul", at: Date.now() });
