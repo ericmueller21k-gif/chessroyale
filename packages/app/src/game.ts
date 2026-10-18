@@ -188,6 +188,7 @@ export type Phase =
    * split into four, his revive, the Chess960 shuffle. Then `simul`: his phase 2, four boards at once (GameView.simul).
    */
   | { kind: "phaseChange"; at: number }
+  /** (`at`: when its clocks start: a countdown on the boards until then, Oct 17.) */
   | { kind: "simul"; at: number }
   /**
    * `gameWinner`: Crowd, who won the game on the board (null for a draw). `bossResult`: who won a boss battle. `left`:

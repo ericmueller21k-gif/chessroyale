@@ -60,7 +60,8 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   lines for this fight are in the Hidden Boss's table, `characters/recluse-lines.ts`.
 - **The Hidden Boss absorbs him** (Eric, Oct 14; DECISIONS.md, "The Hidden Boss absorbs the God King"): his phase
   change opens with it. In his place in the dock (BossDock's `king`) he raises his sword over the beaten boss, his aura
-  swelling, and gloats (`foeTriumph`, a `lead` cue: always said, but a critical line cuts in); then the boss drains his
+  swelling, and gloats (`foeTriumph`, a `lead` cue: always said, but a critical line cuts in; since Oct 17 it has its
+  whole time, the boss saying he'll take his power meanwhile: docs/decisions/2026-10-17-phase-change-pace.md); then the boss drains his
   power into a raised hand: his Last Stand's blows flash and crack him (his own frames), he flickers and cries out
   (`foeDrained`); and as it lands he fades up and away in light. No new frames of his: the aura, the flicker and the fade
   are CSS over his figure (`.gk-aura`, `.gk-unit.gk-drained`, `.gk-fading`). From then on he's gone: his place in the

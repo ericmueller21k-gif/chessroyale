@@ -15778,6 +15778,13 @@ button.sq-tiny {
   background: none;
   cursor: pointer;
 }
+/* Before phase 2's clocks run, the round's countdown (CenterCount) on every board, 5 to 1 (Oct 17); under reduced
+   motion each number just shows for its second, the same timing, no pop. */
+@media (prefers-reduced-motion: reduce) {
+  .rc-simul .cc-num {
+    animation: none;
+  }
+}
 /* His ultimate, on a phone's small boards too: "5 s!" across each as the banner shows over yours (the seconds from the
    setting: --rc-ult-note, set by the screen). */
 .rc-ult .rc-mini::after {

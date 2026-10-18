@@ -89,11 +89,13 @@ export function TimerBar({
  * The same overlay for the start and the end of a round: a "Round start" or
  * "Round end" banner in one place, and a big 3, 2, 1 in the middle of the
  * board that grows, shrinks and fades. `n` is null while only the banner shows.
+ * (The Hidden Boss's phase 2 counts 5 to 1 on all four boards with it, the banner on yours only: `label` null.)
  */
-export function CenterCount({ label, n, note }: { label: string; n: number | null; note?: string | null }) {
+export function CenterCount({ label, n, note }: { label: string | null; n: number | null; note?: string | null }) {
   return (
-    <div class="center-count" role="status" aria-live="polite">
-      <div class="cc-banner">{label}</div>
+    // (Without a banner it's one of several counting at once: only the one with it is read out.)
+    <div class="center-count" role={label ? "status" : undefined} aria-live={label ? "polite" : undefined} aria-hidden={label ? undefined : "true"}>
+      {label && <div class="cc-banner">{label}</div>}
       {note && <div class="cc-note">{note}</div>}
       {n !== null && n > 0 && (
         <div class="cc-num" key={n}>

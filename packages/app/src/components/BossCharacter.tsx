@@ -55,7 +55,8 @@ export function resetBeats() {
 
 /**
  * What the boss's figure shows instead of its beat, for as long as it's set (the Hidden Boss's phase 2): `before` (a loop)
- * until `since`, then `anims` in turn (a loop given with `ms` plays that long), then `loop` for good. Its beat's lines and
+ * until `since`, then `anims` in turn (a loop given with `ms` plays that long; a one-shot given with `ms` plays once and
+ * holds its last frame for the rest), then `loop` for good. Its beat's lines and
  * fall lines are quiet meanwhile (his phase 2 says its own). Runs in place (playInPlace) still play over it. Cleared by a
  * new battle (resetBeats).
  */
@@ -94,11 +95,13 @@ function figureShowing(ch: Character, now: number): { anim: string; frame: numbe
     const name = typeof step === "string" ? step : step.anim;
     const a = ch.anims[name];
     if (!a) continue;
-    // (A loop for a set time: its frames by the time into it.)
+    // (A loop for a set time: its frames by the time into it. A one-shot for a set time: played once, then held on its
+    // last frame, its cues once.)
     const ms = typeof step === "string" ? length(a) : step.ms;
     if (t < ms) {
-      const frame = frameAt(a, typeof step === "string" ? t : t % length(a));
-      return { anim: name, frame, tag: `fig:${run.since}:${i}:${typeof step === "string" ? 0 : Math.floor(t / length(a))}:${frame}` };
+      const loops = typeof step !== "string" && a.loop;
+      const frame = frameAt(a, loops ? t % length(a) : t);
+      return { anim: name, frame, tag: `fig:${run.since}:${i}:${loops ? Math.floor(t / length(a)) : 0}:${frame}` };
     }
     t -= ms;
   }
