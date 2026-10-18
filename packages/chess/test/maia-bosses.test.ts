@@ -112,11 +112,12 @@ describe("every boss on the Maia path", () => {
             expect(await asksDuring(() => r.playAlfil())).toBe(0);
             played.special++;
           }
-          // (Chub & Chirp's Carrot Patch: the cast is his whole turn, worked out without an engine; Maia not asked.)
+          // (Chub & Chirp's Carrot Patch: the cast is his whole turn, its pass guard the engine's, Maia not asked; when the
+          // guard has it wait, his turn goes on.)
           if (r.carrotDue()) {
-            expect(await asksDuring(async () => void r.applyCarrots())).toBe(0);
+            expect(await asksDuring(() => r.playCarrots())).toBe(0);
             played.special++;
-            continue;
+            if (!r.bossToMove()) continue;
           }
           // (Chub & Chirp's hop before his move: the engine's pick, Maia not asked.)
           if (r.hopDue()) {
