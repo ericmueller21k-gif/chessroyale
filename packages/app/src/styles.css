@@ -2612,11 +2612,15 @@ button.history-label {
   .screen.game .board-row .eval-bar ~ .board-wrap {
     width: min(calc(100% - 48px), calc(var(--app-h) - 330px));
   }
-  /* With the scoreboard minimized, the board takes the room. */
-  .screen.game:has(.mini-tower.closed) .board-area .board-wrap {
+  /* With the scoreboard minimized, the board takes the room. The Hidden Boss's phase change has no scoreboard, so it
+     says (rc-folded) whether phase 1's was minimized and keeps that board's size until the split (Oct 18,
+     docs/decisions/2026-10-18-phase-change-board-size.md). */
+  .screen.game:has(.mini-tower.closed) .board-area .board-wrap,
+  .screen.game.rc-folded .board-area .board-wrap {
     width: min(100%, calc(var(--app-h) - 255px));
   }
-  .screen.game:has(.mini-tower.closed) .board-row .eval-bar ~ .board-wrap {
+  .screen.game:has(.mini-tower.closed) .board-row .eval-bar ~ .board-wrap,
+  .screen.game.rc-folded .board-row .eval-bar ~ .board-wrap {
     width: min(calc(100% - 48px), calc(var(--app-h) - 255px));
   }
   .screen.game .mini-tower {

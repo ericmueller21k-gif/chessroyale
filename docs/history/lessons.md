@@ -826,3 +826,24 @@ move played are checked once more and a wrong one is logged.
   back, or a boss crossing his own saw, reads as a glitch.
 - Before fixing "the boss broke the rule", rebuild the position from the screenshot and list its legal moves: the
   rule's own exceptions (the only move, the only way out of check) come first.
+
+## A board that shrank as the boss fell (Oct 18, 2026)
+
+**What Eric saw:** on his phone, beating the Hidden Boss with `?win=1`: "the board shrinks right after … putting him in
+checkmate", and stays smaller through his rant until the boards split. He thought the slower phase change (#269) did it.
+
+**The cause:** a phone's board is sized by the window's height less a budget for the rest of the screen: 330 px, or
+255 px when the scoreboard is minimized (`:has(.mini-tower.closed)`). Phase 1's screens have the scoreboard; the phase
+change's screen has none, so the minimized rule stopped matching as it began and the board fell back to the smaller
+budget (390 × 600: 314 to 270 px). It was there before #269, which only made it last twice as long. No test saw it:
+the phone tests run at 390 × 664, where the board is sized by the width, with the scoreboard open.
+
+**The fix:** the phase change says whether phase 1's scoreboard was minimized (`rc-folded`) and the same rule applies.
+A test measures the board every frame from the mate to the split, on a short phone window with the scoreboard
+minimized. docs/decisions/2026-10-18-phase-change-board-size.md.
+
+**The rule:**
+- A rule that sizes the board from something on the screen (`:has(...)`) must hold on every screen that hands the board
+  on: when the next screen lacks that thing, it carries the state itself.
+- Measure a board handed between screens with each setting that changes its size (the scoreboard minimized), in a
+  window short enough that the height sizes it.

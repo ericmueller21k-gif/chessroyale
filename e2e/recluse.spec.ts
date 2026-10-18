@@ -652,6 +652,66 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
   expect(errors).toEqual([]);
 });
 
+test("the board keeps its size from the mate until the split (Eric, Oct 18: it shrank on a phone as he fell), the scoreboard minimized, in a short window", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const phone = test.info().project.name === "phone";
+  // (A window short enough that a phone's board is sized by its height, where the minimized scoreboard's room counts;
+  // a laptop's maximized window on a computer.)
+  await page.setViewportSize(phone ? { width: 390, height: 600 } : { width: 1280, height: 600 });
+  await meetHim(page, "win=1");
+  await yourMove(page);
+  // A phone: the scoreboard minimized, as a player may keep it (the board takes its room). (A computer's is beside the
+  // board, its size the board's own.)
+  if (phone) {
+    await page.getByRole("button", { name: "Minimize the leaderboard" }).click();
+    await expect(page.locator(".mini-tower.closed")).toHaveCount(1);
+  }
+  // (The board resized for the minimized scoreboard before the watch starts: its squares are drawn by a ResizeObserver,
+  // which runs after an animation frame's callbacks, so a frame read just after the fold sees the wrap's new size and
+  // the squares' old one. Drawn: the squares fill the wrap, less up to 8 device pixels.)
+  await expect
+    .poll(() => page.evaluate(() => {
+      const wrap = document.querySelector(".board-row > .board-wrap")!.getBoundingClientRect().width;
+      const squares = document.querySelector(".board-row > .board-wrap .hb-board")!.getBoundingClientRect().width;
+      return wrap - squares >= 0 && wrap - squares < 8 / devicePixelRatio + 0.5;
+    }), { timeout: 10_000 })
+    .toBe(true);
+  // Every frame from your mating move until the split begins: the board's box (its wrap, and the squares drawn in it),
+  // what's on screen (phase 1's move, his fall, the phase change's step).
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__boardSizes = [];
+    w.__boardDone = false;
+    const box = (sel: string) => {
+      const r = document.querySelector(sel)?.getBoundingClientRect();
+      return r ? [r.width, r.height] : null;
+    };
+    const tick = () => {
+      const step = document.querySelector(".rc-stage")?.getAttribute("data-step") ?? null;
+      if (step === "split" || step === "shuffle") {
+        w.__boardDone = true;
+        return;
+      }
+      w.__boardSizes.push({ kind: w.match?.phase?.kind ?? null, step, wrap: box(".board-row > .board-wrap"), squares: box(".board-row > .board-wrap .hb-board") });
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  await play(page, "h5f7");
+  await expect.poll(() => page.evaluate(() => (window as any).__boardDone), { timeout: 90_000 }).toBe(true);
+  const frames: { kind: string | null; step: string | null; wrap: number[] | null; squares: number[] | null }[] = await page.evaluate(() => (window as any).__boardSizes);
+  // (The whole stretch was watched: your move, his fall, every step of the phase change before the split.)
+  expect(frames[0]!.kind).toBe("play");
+  // (Your move may be scored for a moment before his fall: phase 1's own screen.)
+  const kinds = new Set(frames.map((f) => f.kind));
+  expect([...kinds].filter((k) => k !== "scoring").sort()).toEqual(["boss", "phaseChange", "play"]);
+  expect(new Set(frames.map((f) => f.step).filter(Boolean))).toEqual(new Set(["king", "drain", "rage", "leap", "drop", "chant", "crack"]));
+  const [w0, h0] = frames[0]!.wrap!;
+  const [s0] = frames[0]!.squares!;
+  const off = frames.filter((f) => !f.wrap || !f.squares || Math.abs(f.wrap[0]! - w0!) > 1 || Math.abs(f.wrap[1]! - h0!) > 1 || Math.abs(f.squares[0]! - s0!) > 1);
+  expect(off.slice(0, 3), `the board's size (${w0} x ${h0}, squares ${s0}) changed in ${off.length} of ${frames.length} frames`).toEqual([]);
+});
+
 test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defeated, 3 of 4 won", async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors: string[] = [];
