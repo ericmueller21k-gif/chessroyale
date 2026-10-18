@@ -63,13 +63,14 @@ async function strip(p, tag, startAt, from, to) {
   const clip = { x, y, width: Math.min(vw.width - x, board.width + 80), height: Math.min(vw.height - y, board.height + 140) };
   const frames = [];
   let last = "";
-  const stills = new Set(STILLS);
+  // (A still at the step nearest each beat: the mate's strip steps from a different start.)
+  const still = (ms) => STILLS.some((x) => x <= ms && ms < x + STEP);
   for (let t = from; t <= to; t += STEP) {
     await p.clock.runFor(STEP);
-    if (stillsOnly && !stills.has(t + STEP)) continue;
+    if (stillsOnly && !still(t + STEP)) continue;
     const file = `${outDir}/${tag}-${String(frames.length).padStart(3, "0")}-${String(t + STEP).padStart(5, "0")}ms.png`;
     await p.screenshot({ path: file, clip, scale: "css" });
-    if (stills.has(t + STEP)) await p.screenshot({ path: `${outDir}/${tag}-still-${t + STEP}ms.png` });
+    if (still(t + STEP)) await p.screenshot({ path: `${outDir}/${tag}-still-${t + STEP}ms.png` });
     frames.push(file);
     const state = await p.evaluate(() => {
       const a = document.querySelector(".king-attack");
