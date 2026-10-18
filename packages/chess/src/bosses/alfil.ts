@@ -27,7 +27,7 @@ import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossStat
 import { applyMove, gameEnd, legalMoves, mateInOne, sideToMove } from "../rules.ts";
 import { stockfishRefuses } from "../uci.ts";
 import { passTurn } from "./hollow.ts";
-import type { EngineLike } from "../runner.ts";
+import type { BossAhead, EngineLike } from "../runner.ts";
 import { bossPowers, eachOn, from, logit, meterFull, other, powerRoll, testSwitch, to, topEach, turnOf, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 import { PIECE_VALUE, gridAttackers, gridHanging, gridKing, gridKingAttacked, gridOf, isLight, placementOf, sideOf, type Grid } from "./grid.ts";
 
@@ -243,16 +243,19 @@ export function pickFusion(scored: readonly FusionScore[]): { fen: string; gain:
  * The engine's pick of the fusion's square (or the cast's pair), from this device's engines (the host's online,
  * solo's): the position before it (him to move) and each way to go (the crowd to move: his score is the rest) searched
  * at tusksNodes, shared out over the engines, then pickFusion. Null: no engine (the fusion then takes the first way
- * allowed; the cast, the first pair).
+ * allowed; the cast, the first pair). `ahead` (the fusion only: the Slam's pieces land as the crowd's turn after it
+ * begins, slamAhead): each way to go is searched with them down, as for his move (the landing guard); the pick is still
+ * one of `candidates`.
  */
 export async function fuseFrom(
   engines: readonly EngineLike[],
   fen: string,
   candidates: readonly string[],
   s: Pick<BossPowerSettings, "tusksNodes" | "bouncePawnLogit"> = BOSS_POWERS,
+  ahead: ((fen: string) => string) | null = null,
 ): Promise<{ fen: string; gain: number } | null> {
   if (!candidates.length || !engines.length) return null;
-  const [before, ...after] = await topEach(engines, [fen, ...candidates], s.tusksNodes);
+  const [before, ...after] = await topEach(engines, [fen, ...candidates.map((c) => (ahead ? ahead(c) : c))], s.tusksNodes);
   if (!before) return null;
   const scored = candidates.flatMap((c, i) => {
     const m = after[i];
@@ -483,6 +486,28 @@ export const slamDue = (boss: BossState | null | undefined): boolean => {
   );
 };
 
+/**
+ * The Slam's pieces that land as the crowd's turn after his move now (or his fusion) begins: it's the turn they're due
+ * (landDue), so his move is judged with them down (the landing guard: slamAhead). Null: none up, or not due yet. On the
+ * turn of the Slam itself they're three turns off, so only his move just before they land is judged this way: before
+ * that he moves again first, and judging those moves as if they were down would throw away what the Slam gave him.
+ */
+export function landsAfterHisMove(boss: BossState | null | undefined): SlamPiece[] | null {
+  const p = boss?.powers;
+  if (!boss || boss.result || !p?.airborne?.length || !p.slam) return null;
+  return p.slam.lands <= turnOf(boss) ? p.airborne : null;
+}
+
+/**
+ * The landing guard's look ahead (BossAhead, bossMoveFrom's) for pieces that land as the crowd's turn after his move
+ * begins: the position after his move (the crowd to move), with them down where the rules will put them (landing: each
+ * on its own square, or the nearest allowed when it's taken, which can depend on his move), slamGuardLooks of his top
+ * moves weighed with his pick, each searched at slamGuardNodes.
+ */
+export function slamAhead(pieces: readonly SlamPiece[], s: Pick<BossPowerSettings, "slamGuardLooks" | "slamGuardNodes"> = BOSS_POWERS): BossAhead {
+  return { after: (fen) => landing(fen, pieces, sideToMove(fen)).fen, looks: s.slamGuardLooks, nodes: s.slamGuardNodes };
+}
+
 /** The pieces in the air as the screens show them: each with the crowd turn it lands, the turns left, and its shadow's size (1 to slamTurns). */
 export function airborneView(p: Pick<BossPowerState, "airborne" | "slam" | "turn">, s: Pick<BossPowerSettings, "slamTurns"> = BOSS_POWERS): { piece: string; square: string; lands: number; left: number; stage: number }[] {
   if (!p.airborne?.length || !p.slam) return [];
@@ -623,8 +648,9 @@ export const alfilBattle = {
   },
 
   /**
-   * The step, from this device's engines (solo, the sims): the fusion's square (fuseFrom), the Slam's lift (slamFrom).
-   * Returns what apply returns: the step done, or null when nothing came of it.
+   * The step, from this device's engines (solo, the sims): the fusion's square (fuseFrom; with the Slam's pieces down
+   * when they land as the crowd's turn after it begins: fusionAhead), the Slam's lift (slamFrom). Returns what apply
+   * returns: the step done, or null when nothing came of it.
    */
   async play(b: Battle, engines: readonly EngineLike[]): Promise<AlfilStep | null> {
     const step = alfilBattle.step(b);
@@ -634,7 +660,18 @@ export const alfilBattle = {
       const pick = await slamFrom(engines, boardOf(b).fen, candidates);
       return alfilBattle.apply(b, pick?.fen ?? null, pick?.loss ?? null, step);
     }
-    return alfilBattle.apply(b, (await fuseFrom(engines, boardOf(b).fen, candidates))?.fen ?? null, null, step);
+    return alfilBattle.apply(b, (await fuseFrom(engines, boardOf(b).fen, candidates, undefined, alfilBattle.fusionAhead(b)))?.fen ?? null, null, step);
+  },
+
+  /**
+   * The fusion's look ahead (fuseFrom's `ahead`): his fusion now is his move, and the Slam's pieces land as the crowd's
+   * turn after it begins (landsAfterHisMove), so its squares are weighed with them down. Null: not the fusion's step, or
+   * nothing lands then. (A cast isn't his move: his move follows it, and is judged on its own.)
+   */
+  fusionAhead(b: Battle): ((fen: string) => string) | null {
+    const boss = b.state.boss;
+    const pieces = alfilBattle.step(b) === "fuse" ? landsAfterHisMove(boss) : null;
+    return pieces ? slamAhead(pieces).after : null;
   },
 
   /**

@@ -227,5 +227,8 @@ describe("his FAQ block", () => {
     expect(words).toContain("If he's in check when it's due, it waits until he isn't");
     expect(words).toContain("the elephant lands on the worse of the two squares for him");
     expect(words).toContain("he tries again at the start of his next turn");
+    // (The landing guard: his move just before they land is weighed with them down; the judge doesn't know.)
+    expect(words).toContain("on his move just before they land (his fusion too), his move still comes from the board as it is, but it's weighed with them back down");
+    expect(words).toContain("The judge scores your moves on the board as it stands");
   });
 });

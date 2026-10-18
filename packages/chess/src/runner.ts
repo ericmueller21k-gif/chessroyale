@@ -104,6 +104,9 @@ import {
   bulletIncrement,
   stopReason,
   alfilBattle,
+  landsAfterHisMove,
+  slamAhead,
+  topEach,
   type AlfilStep,
   type Battle,
   type BossAsks,
@@ -1103,6 +1106,7 @@ export class MatchRunner {
       bossTimedOut: false,
       humanBrain: null,
       brainNote: null,
+      landingCheck: null,
       bossLast: null,
       bossMemo: new Map(),
       bossViewMemo: null,
@@ -1166,9 +1170,13 @@ export class MatchRunner {
     // (Test switch: a mate in one whenever there is one.)
     const mate = this.settings.bossMateTest ? (this.bossAllowed() ?? legalMoves(fen)).find((m) => gameEnd(applyMove(fen, m), []) === "checkmate") : undefined;
     const brain = this.humanBrain;
+    // (Alfil's Slam's pieces land as the crowd's turn after this move begins: his move is judged with them down.)
+    const look = this.bossAhead();
+    this.landingCheck = null;
+    const ahead = look && { ...look, onCheck: (c: LandingCheck) => (this.landingCheck = c) };
     const ordinary = async () =>
       mate ??
-      (await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined));
+      (await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined, ahead));
     const asks = this.bossAsks();
     if (asks) {
       // (His long pull, drag or showdown on every engine of this device; his ordinary move on `engine`, as ever.)
@@ -1199,6 +1207,18 @@ export class MatchRunner {
   humanBrain: { brain: BossBrain; rating: number; stockfishShare?: number; engine: HumanEngineLike } | null = null;
   /** What the brain did with the boss's last move (the admins' debug line). */
   brainNote: BrainNote | null = null;
+  /** What the landing guard did with the boss's last move (null: it didn't look); the sims count it. */
+  landingCheck: LandingCheck | null = null;
+
+  /**
+   * The landing guard's look ahead for the boss's move now, or null: Alfil's Slam's pieces land as the crowd's turn
+   * after his move begins (landsAfterHisMove), so it's judged with them down as the rules will put them (slamAhead).
+   * Moves still come from the board as it is.
+   */
+  bossAhead(): BossAhead | null {
+    const pieces = landsAfterHisMove(this.state.boss);
+    return pieces ? slamAhead(pieces) : null;
+  }
 
   /**
    * How the boss plays this battle (bossBrainFor): an admin's pick (`picked`, "" for the boss's own), and whether Maia
@@ -1343,6 +1363,11 @@ export class MatchRunner {
   /** The positions the step's engine pick weighs (the cast's pairs, the fusion's squares, the Slam's lifts): the same on the server, the host and in solo. */
   alfilCandidates(): string[] {
     return alfilBattle.candidates(this.battle);
+  }
+
+  /** His fusion's look ahead: its squares weighed with the Slam's pieces down when they land right after it (alfilBattle.fusionAhead); null: none. */
+  alfilFusionAhead(): ((fen: string) => string) | null {
+    return alfilBattle.fusionAhead(this.battle);
   }
 
   /** The step needs an engine's pick: a cast with a choice, a fusion or a Slam with a way to go to weigh (else it lands at once). */
@@ -1852,6 +1877,78 @@ export function withinGuard(loss: { points: number; logit: number }, guard: Boss
   return loss.points <= guard.maxLoss && (loss.logit <= guard.maxLogitLoss || loss.points <= 2);
 }
 
+/** The King's strike's guard: wider, up to its own range of points given away (still never a piece for nothing). */
+const strikeGuard = (guard: BossGuard, strikeLoss: readonly [number, number]): BossGuard => ({ ...guard, maxLoss: Math.max(guard.maxLoss, strikeLoss[1]), maxLogitLoss: Math.max(guard.maxLogitLoss, 1.5) });
+
+/**
+ * The landing guard's look ahead (Alfil's Slam: its pieces land as the crowd's turn after his move begins;
+ * docs/decisions/2026-10-17-alfil-sees-the-landing.md): `after` takes the position after his move to the one the crowd
+ * will move in (the pieces down, as the rules put them); his pick and `looks` of his search's best moves are judged
+ * there, each searched at `nodes`. `onCheck` hears what the guard did (the sims count it).
+ */
+export interface BossAhead {
+  after(fen: string): string;
+  looks: number;
+  nodes: number;
+  onCheck?(check: LandingCheck): void;
+}
+
+/** What the landing guard did: his pick, the move played (the same unless it gave way), the positions searched and the time it took. */
+export interface LandingCheck {
+  pick: string;
+  move: string;
+  searched: number;
+  ms: number;
+}
+
+/**
+ * The landing guard (Eric, after playing him: "can we make the engine think, the turn before the pieces land, that
+ * they're there?"). His moves always come from the board as it is (`fen`): only their judging looks ahead. His pick and
+ * the `ahead.looks` highest scored of `top` (his own search of this board), each one he may play here (`allowed`, else
+ * legal; his pick among them is searched once), are played, put through `ahead.after` and searched at `ahead.nodes`
+ * with the crowd to move (his score is the rest; a move that ends the game is scored by its ending, as nothing lands
+ * then). If his pick gives away more than `guard` allows against the best of them (the blunder guard's measure, after
+ * the landing), the best is played; equals go in that order, his pick first. Any of them unscored is left out; his pick
+ * unscored, or nothing to weigh it against, and it stands.
+ */
+export async function landingGuard(
+  engine: EngineLike,
+  fen: string,
+  pick: string,
+  top: readonly MoveScore[],
+  ahead: BossAhead,
+  guard: BossGuard,
+  allowed: readonly string[] | null = null,
+): Promise<LandingCheck> {
+  const t0 = performance.now();
+  const ok = new Set(allowed ?? legalMoves(fen));
+  const others = [...top].sort((a, b) => b.expected - a.expected).map((m) => m.move).filter((m) => ok.has(m)).slice(0, ahead.looks).filter((m) => m !== pick);
+  const moves = ok.has(pick) ? [pick, ...others] : [];
+  if (moves.length < 2) return { pick, move: pick, searched: 0, ms: performance.now() - t0 };
+  const score = new Map<string, number>();
+  const search: { move: string; fen: string }[] = [];
+  for (const m of moves) {
+    const played = applyMove(fen, m);
+    const crowd = sideToMove(played);
+    // (The game over after it, or with them down: its ending's score. Nothing lands on a game that's over.)
+    const end = gameEnd(played, []);
+    const down = end ? played : ahead.after(played);
+    const over = end ?? gameEnd(down, []);
+    if (over) score.set(m, over === "checkmate" ? (sideToMove(down) === crowd ? 1 : 0) : 0.5);
+    else search.push({ move: m, fen: down });
+  }
+  const tops = await topEach([engine], search.map((x) => x.fen), ahead.nodes);
+  search.forEach((x, i) => {
+    const t = tops[i];
+    if (t) score.set(x.move, 1 - t.expected);
+  });
+  const mine = score.get(pick);
+  let best = pick;
+  for (const m of moves) if ((score.get(m) ?? -1) > (score.get(best) ?? -1)) best = m;
+  const move = mine === undefined || withinGuard(moveLoss(score.get(best)!, mine), guard) ? pick : best;
+  return { pick, move, searched: search.length, ms: performance.now() - t0 };
+}
+
 /** From the top moves, the one nearest the middle of `range` (points lost) that the guard allows; the best if none is in range. */
 function pickByLoss(top: readonly MoveScore[], range: readonly [number, number], guard: BossGuard): string {
   const best = top[0]!.expected;
@@ -1874,6 +1971,12 @@ function pickByLoss(top: readonly MoveScore[], range: readonly [number, number],
  * Stockfish's, as above. "best" (a power's follow-up its engine search scored: Wrangler's reply to the showdown's
  * duel) is the engine's best move at full strength (bestReplyFrom): never the brain's, a slip or the guard's.
  *
+ * `ahead` (Alfil's Slam: its pieces land as the crowd's turn after this move begins): whichever of those picked it
+ * (but "best"), the pick is judged with them down too (landingGuard, at the guard of its kind: the strike's own wider
+ * one for "stagger"), and gives way to the best of his top moves there if it gives away more than that guard allows.
+ * The moves weighed are his on this board, never one that needs a piece still in the air. Null: no look ahead, and no
+ * search more than before.
+ *
  * Whichever of those picks it, the move is one of `allowed` (the moves the powers leave him; null: any legal move): a
  * pick that isn't (an engine's answer for another position, say) is logged and his best allowed move played instead
  * (the first allowed one if that search fails too), and the admins' debug line says it was replaced.
@@ -1889,8 +1992,25 @@ export async function bossMoveFrom(
   guard: BossGuard = DEFAULT_BOSS_GUARD,
   allowed: readonly string[] | null = null,
   brain?: BossBrainCall,
+  ahead: BossAhead | null = null,
 ): Promise<string> {
-  const move = await pickBossMove(engine, fen, elo, nodes, kind, rng, strikeLoss, guard, allowed, brain);
+  const searched: { top: readonly MoveScore[] } = { top: [] };
+  let move = await pickBossMove(engine, fen, elo, nodes, kind, rng, strikeLoss, guard, allowed, brain, searched);
+  const k: BossMoveKind = kind === true ? "stumble" : kind === false ? "elo" : kind;
+  if (ahead && k !== "best" && searched.top.length) {
+    try {
+      const check = await landingGuard(engine, fen, move, searched.top, ahead, k === "stagger" ? strikeGuard(guard, strikeLoss) : guard, allowed);
+      ahead.onCheck?.(check);
+      if (check.move !== move) {
+        // (The admins' debug line: the brain's pick gave way to the landing guard's.)
+        if (brain && brain.brain !== "stockfish") brain.onNote?.({ brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { share: brain.stockfishShare } : {}), by: "stockfish", why: "landing" });
+        move = check.move;
+      }
+    } catch (e) {
+      // (The look ahead never costs him his move: the pick stands, and the last check below still applies.)
+      console.error(`landing guard failed in ${fen}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
   const ok = allowed ?? legalMoves(fen);
   if (ok.includes(move)) return move;
   console.error(`boss move refused: ${move} isn't one he may play in ${fen}; his best allowed move instead`);
@@ -1905,7 +2025,10 @@ export async function bossMoveFrom(
   }
 }
 
-/** The boss's move as its brain, the slips, the strike or the engine's best pick it (bossMoveFrom checks it). */
+/**
+ * The boss's move as its brain, the slips, the strike or the engine's best pick it (bossMoveFrom checks it). `searched`
+ * gets the top moves it searched on this board, scored (none for "best"), for the landing guard.
+ */
 async function pickBossMove(
   engine: EngineLike,
   fen: string,
@@ -1916,7 +2039,8 @@ async function pickBossMove(
   strikeLoss: readonly [number, number],
   guard: BossGuard,
   allowed: readonly string[] | null,
-  brain?: BossBrainCall,
+  brain: BossBrainCall | undefined,
+  searched: { top: readonly MoveScore[] },
 ): Promise<string> {
   const k: BossMoveKind = kind === true ? "stumble" : kind === false ? "elo" : kind;
   if (k === "best") {
@@ -1937,6 +2061,7 @@ async function pickBossMove(
   let top = ok ? all.filter((m) => ok.has(m.move)) : all;
   if (ok && !top.length) top = await engine.scoreMoves(fen, [...ok]);
   if (!top.length) return allowed?.[0] ?? legalMoves(fen)[0]!;
+  searched.top = top;
   if (human) {
     const note = { brain: human.brain, rating: human.rating, ...(human.stockfishShare ? { share: human.stockfishShare } : {}) } as const;
     if (k === "stagger") human.onNote?.({ ...note, by: "stockfish", why: "strike" });
@@ -1973,7 +2098,7 @@ async function pickBossMove(
   if (k === "stumble") return confirm(pickByLoss(top, guard.slipLoss, guard), guard);
   // The King's strike may give away more than a slip, up to its own range (still never a piece for nothing).
   if (k === "stagger") {
-    const g = { ...guard, maxLoss: Math.max(guard.maxLoss, strikeLoss[1]), maxLogitLoss: Math.max(guard.maxLogitLoss, 1.5) };
+    const g = strikeGuard(guard, strikeLoss);
     return confirm(pickByLoss(top, strikeLoss, g), g);
   }
   if (!engine.playAtElo) return bestMove;

@@ -29,6 +29,7 @@ import {
   ragePoints,
   rageSpeedOf,
   rageTick,
+  topEach,
   turnOf,
   unleashed,
   type Battle,
@@ -44,7 +45,7 @@ import {
 import { bossRules } from "./bosses/index.ts";
 
 // Every boss's file, and the shared pieces of the base boss, for the whole package.
-export { bossPowers, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, unleashed };
+export { bossPowers, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, topEach, unleashed };
 export type { Battle, BossAsks, BossLastMove, BossRules, JudgedEvaluation, RageRates, StopFields, TurnContext };
 export * from "./bosses/ginger.ts";
 export * from "./bosses/boingo.ts";

@@ -12,6 +12,7 @@ import {
   bossTurnShowMs,
   bossThinkMs,
   landedEarlyMs,
+  landsAfterHisMove,
   powerMomentMs,
   LAST_STAND_MS,
   queenSlain,
@@ -1396,6 +1397,9 @@ export class LobbyCore {
     const allowed = funhouse ? runner.crowdAllowed() : runner.bossAllowed();
     // (Wrangler's turn: his long pulls, a drag or the showdown to work out too, ordered by a seed of the turn's own.)
     const asks = this.bossAsks();
+    // (Alfil's Slam's pieces land as the crowd's turn after his move or his fusion begins: the host judges it with them
+    // down, the landing guard. Not with his cast: his move follows it, and is asked for on its own.)
+    const land = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "fuse" ? landsAfterHisMove(runner.state.boss) : null;
     this.io.send(host, {
       t: "bossRequest",
       key: this.r.bossKey!,
@@ -1414,6 +1418,7 @@ export class LobbyCore {
       // bounce keep their own engine picks, and so does Wrangler's reply to the showdown's duel: the engine's best.)
       ...(this.r.bossBrain && !funhouse && !pick && this.r.bossKind !== "extra" && this.r.bossKind !== "best" ? { brain: this.r.bossBrain } : {}),
       ...(asks ? { ...(asks.pull ? { pull: asks.pull } : {}), ...(asks.drag ? { drag: true as const } : {}), ...(asks.showdown ? { showdown: asks.showdown } : {}), seed: asks.seed } : {}),
+      ...(land ? { land: land.map((x) => ({ ...x })) } : {}),
     });
   }
 

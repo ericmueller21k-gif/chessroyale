@@ -264,7 +264,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       let struck = 0;
       let result: string | null = null;
       // (Alfil: his casts, the fusions they came to (or the crowd's counters), his slams: each lift's swing and the ones weighed.)
-      const alfil = { casts: 0, fused: 0, taken: 0, nowhere: 0, gains: [] as number[], slams: [] as { at: number; n: number; loss: number | null; weighed: (number | "mate")[] }[], early: 0, counters: [] as number[] };
+      // (And the landing guard: each move of his it judged with the Slam's pieces down, and each fusion weighed that way.)
+      const alfil = { casts: 0, fused: 0, taken: 0, nowhere: 0, gains: [] as number[], slams: [] as { at: number; n: number; loss: number | null; weighed: (number | "mate")[] }[], early: 0, counters: [] as number[], landing: [] as { at: number; pick: string; move: string; searched: number; ms: number }[], fuseLanding: 0 };
       const t0 = Date.now();
       while (!runner.isOver()) {
         if (runner.stageComplete()) {
@@ -297,14 +298,21 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             }
             if (step === "tusks") alfil.casts++;
             const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
-            const pick = await fuseFrom(engines, fen, runner.alfilCandidates());
+            const ahead = runner.alfilFusionAhead();
+            if (ahead) alfil.fuseLanding++;
+            const pick = await fuseFrom(engines, fen, runner.alfilCandidates(), undefined, ahead);
             runner.applyAlfil(pick?.fen ?? null, null, step);
             const f = runner.boss!.powers!.fusion;
             if (step === "fuse") f?.to ? alfil.fused++ : alfil.nowhere++;
             if (step === "fuse" && f?.to && pick) alfil.gains.push(pick.gain);
           }
           // (Alfil's fusion is his move: then his turn is over.)
-          if (runner.bossToMove()) await runner.playBoss(engines[0]);
+          if (runner.bossToMove()) {
+            const at = runner.boss!.crowdMoves;
+            await runner.playBoss(engines[0]);
+            const c = runner.landingCheck;
+            if (c) alfil.landing.push({ at, pick: c.pick, move: c.move, searched: c.searched, ms: Math.round(c.ms) });
+          }
           look();
           continue;
         }

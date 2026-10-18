@@ -117,3 +117,25 @@ rules as first built (aff97c6) with `tusksFirst: 8`.)
   five points up, often plays into the pieces' return: lifts that leave the crowd better off (9 of 36 alone) are
   allowed, as Eric expected ("you can plan around it, and he can't").
 - **Down early** (he'd have a mate in one only because they're up): 2 of 25 lifts as first built, none of 43 in V1.
+
+## The landing guard (Oct 17, after Eric played him)
+
+On his move just before the Slam's pieces land, his pick and his four best moves are judged with them down, and a pick
+past the blunder guard there gives way to the best (docs/decisions/2026-10-17-alfil-sees-the-landing.md). The same
+raid sim, V1's seeds, `counter: 1`; "before" is today's main (the review round's rules, not re-simulated until now).
+
+| Run | Battles | Crowd wins | Draws | Boss wins | Crowd score (± 1 s.e.) | Seeds 1-13 / 31-43 | Moves (range) | Slams tried / lifted | Landings judged | Picks swapped |
+|---|---|---|---|---|---|---|---|---|---|---|
+| l0a, l0b: before (main) | 26 | 4 | 1 | 21 | **0.17** (± 0.07) | 0.12 / 0.23 | 33 (16-60) | 75 / 39 | | |
+| l1a, l1b: the landing guard | 26 | 3 | 2 | 21 | **0.15** (± 0.07) | 0.31 / 0.00 | 35 (16-60) | 76 / 42 | 41 | 10 |
+
+- **No change beyond the noise:** 0.15 against 0.17, both inside the pack (V1 read 0.23 on the rules before the review
+  round, whose kept meter brings the Slam back after one that lifts nothing: 75 tried for 39 lifts here, 53 for 43 in
+  V1). Above the 0.08 line for leaving the pack.
+- **The guard judged 41 moves** (every lift's landing but one, in a battle that ended first) and swapped 10; it searched
+  4.1 positions on average (5 at most), 358 ms median and 574 ms at most with two sims sharing four cores. No fusion fell
+  on a landing turn.
+- **Its cost on a quiet machine** (`slamGuardNodes` 30,000 a position, 150,000 at most): 16 positions from the opening
+  book with a Slam's lift taken off, the guard 357 ms median (424 ms at most), about 386,000 nodes a second in the lite
+  build the browser loads; his whole move 1.74 s without it, 2.21 s with it (median). At a phone's 350,000 nodes a second
+  about 0.45 s, at an old phone's 90,000 about 1.7 s (`reports/many-judges.md`'s speeds), once a Slam.

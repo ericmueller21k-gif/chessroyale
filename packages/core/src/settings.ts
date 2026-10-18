@@ -829,7 +829,8 @@ export const BOSS_POWERS = {
    * the least of the crowd's material hanging (seeded), slamLooks are played out by the engine (its best moves for both
    * sides through the turns they're up, slamLineNodes a search), put down, and scored (slamNodes, as is the position
    * before): the crowd's loss in pawns (bouncePawnLogit) nearest slamTarget inside slamLoss, else the nearest below it;
-   * never past the cap, never a line with a mate against the crowd. None: nothing lifts (the meter is spent anyway).
+   * never past the cap, never a line with a mate against the crowd. None: nothing lifts (the meter is kept, and the
+   * Slam comes again on his next turn).
    */
   slamPawns: 2,
   slamMinors: 1,
@@ -839,6 +840,17 @@ export const BOSS_POWERS = {
   slamNodes: 60_000,
   slamLoss: [0.25, 1.5] as readonly [number, number],
   slamTarget: 0.75,
+  /**
+   * The landing guard (Eric, after playing him: "can we make the engine think, the turn before the pieces land, that
+   * they're there?"; docs/decisions/2026-10-17-alfil-sees-the-landing.md): on his move just before the Slam's pieces
+   * land (his fusion too), his move still comes from the board as it is, but it's judged with them down. His pick and
+   * the slamGuardLooks best moves of his own search are each played, the pieces put down as the rules will (landing),
+   * and searched at slamGuardNodes, the crowd to move; a pick that gives away more than the blunder guard allows against
+   * the best of them gives way to it. At most (slamGuardLooks + 1) × slamGuardNodes on that one move: 150,000 nodes,
+   * under a third of the move's own searches (bossNodes for its top moves, and again for its pick).
+   */
+  slamGuardLooks: 4,
+  slamGuardNodes: 30_000,
 } as const;
 
 /**
