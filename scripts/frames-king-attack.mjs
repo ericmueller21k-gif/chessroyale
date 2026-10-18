@@ -2,7 +2,7 @@
 // (?laststand=1: the blow meant for the piece is the boss's attack on him) and at the boss's mate (?mate=1: 1.f3 e5
 // 2.g4, the boss mates; its attack on your king, then the result). The page's clock is paused as the attack is about to
 // start and stepped 40 ms at a time, a frame of the board at each step (exact times, every frame), with full stills at
-// its beats; prints what's on screen as it changes. `gif` makes a GIF of each strip at its real speed (ffmpeg).
+// its beats; prints what's on screen as it changes. `gif` makes a GIF of each strip at its real speed (ffmpeg; any other word there, e.g. `-`, makes none).
 //   npm run frames:king-attack -- <out-dir> [hollow|alfil|sawyer|pig|clown] [phone|desktop|both] [laststand|mate|both] [light|dark] [gif] [width]
 // `width` sets the phone's (or the computer's) window width in px (320, 360; 1280), the rest of the device unchanged.
 // Read the frames before calling it done (.claude/LESSONS.md: watch it frame by frame).
@@ -32,7 +32,9 @@ async function open(context, extra) {
   p.on("pageerror", (e) => console.log("pageerror", e.message));
   await p.clock.install();
   await p.goto(`${url}?debug&clock=60&nolanding&boss=${boss}${extra}`);
-  await p.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  // Home → Boss raid → Boss alone (with ?boss= in the address, the battle at once).
+  await p.getByRole("main").getByRole("button", { name: /^Boss raid/ }).click();
+  await p.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
   return p;
 }
 
@@ -61,7 +63,7 @@ async function strip(p, tag, startAt, from, to) {
     if (state !== last) console.log(`${tag} +${t + STEP}ms ${state}`);
     last = state;
   }
-  if (gif) {
+  if (gif === "gif") {
     writeFileSync(`${outDir}/${tag}.txt`, frames.map((f) => `file '${f}'\nduration ${STEP / 1000}`).join("\n") + `\nfile '${frames.at(-1)}'\n`);
     execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", `${outDir}/${tag}.txt`, "-vf", "fps=25,split[a][b];[a]palettegen=max_colors=192[p];[b][p]paletteuse=dither=bayer", `${outDir}/${tag}.gif`]);
     console.log(`wrote ${outDir}/${tag}.gif`);
