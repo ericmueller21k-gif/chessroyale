@@ -118,11 +118,16 @@ const swayFrom = (square: string) => (hash(square) % 8) * 160;
 /**
  * Every carrot on the board as `now` (under the pieces, on the board's canvas): none until the cast plants it (its
  * flight lands), then planted (its leaves swaying) until a piece pulls it; then it pops out as its moment plays (his
- * pull, his hop's landing, yours) and the puller's token stays in the square's corner by the dug hole.
+ * pull, his hop's landing, yours) and the puller's token stays in the square's corner by the dug hole. Once the race is
+ * over and its last moments have played, none: the board is clear again.
  */
 export function carrotItems(boss: BossView, moments: readonly Moment[], now: number): BoardItem[] {
   const c = boss.powers?.carrots;
   if (!c) return [];
+  // (The race over, its last pull and his spin played: the patch is cleared, every carrot and token with it. Eric,
+  // Oct 18: a carrot left in the ground after his spin looked like a bug.)
+  const playing = (kind: Moment["kind"]) => moments.some((m) => m.kind === kind && now < m.at + m.ms);
+  if (c.over && !playing("carrot") && !playing("carrotSpin") && !playing("hop")) return [];
   const cast = find(moments, "carrots");
   const hop = find(moments, "hop");
   const hopTo = boss.powers?.hop?.to;

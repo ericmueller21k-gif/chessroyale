@@ -300,4 +300,16 @@ describe("the board under their moments", () => {
     expect(items(pulled, [pull], 20_000).find(([sq]) => sq === "e6")).toEqual(["e6", "pullB", "claimedB", 20_000]);
     expect(items(pulled, [pull], 20_000).find(([sq]) => sq === "a5")).toEqual(["a5", "claimedW", null, 0]);
   });
+
+  it("the race over: the carrots left in the ground and the tokens go once its last moments have played (Eric, Oct 18)", () => {
+    const over = view([], { carrots: carrots({ by: ["crowd", "boss", null, "crowd", "crowd"], over: "moves", spin: { at: 9 } }) }, 30);
+    const spin: Moment = { kind: "carrotSpin", key: "hopper:carrotSpin:30", at: 50_000, ms: 4_000 };
+    // (While his spin plays: still there; after it, or with nothing playing (a reload): none.)
+    expect(carrotItems(over, [spin], 51_000).map((i) => i.square)).toEqual(["a5", "c3", "h5", "e6", "g2"]);
+    expect(carrotItems(over, [spin], 54_000)).toEqual([]);
+    expect(carrotItems(over, [], 99_000)).toEqual([]);
+    // (The race on: the one still in the ground stays planted.)
+    const on = view([], { carrots: carrots({ by: ["crowd", "boss", null, "crowd", "crowd"] }) }, 30);
+    expect(carrotItems(on, [], 99_000).find((i) => i.square === "h5")!.anim).toBe("planted");
+  });
 });
