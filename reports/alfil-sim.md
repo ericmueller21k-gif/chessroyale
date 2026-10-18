@@ -150,8 +150,11 @@ crowd to move, at least 2 pawns of log-odds below his before it), it waits a tur
 |---|---|---|---|---|---|---|---|---|---|
 | l1a, l1b: the landing guard | 26 | 3 | 2 | 21 | 0.15 (± 0.07) | 0.31 / 0.00 | 35 (16-60) | | |
 | pg1a, pg1b: the pass guard | 26 | 0 | 0 | 26 | **0.00** | 0.00 / 0.00 | 26.5 (17-40) | 51 (12, 4) | 9 |
+| pgT8a, pgT8b: the pass guard, tusksEvery 8 (chosen) | 26 | 3 | 0 | 23 | **0.12** | | 31 | | |
+| pgR8a, pgR8b: the pass guard, Slam meter ×0.8 | 26 | 1 | 0 | 25 | 0.04 | | 29 | | |
 
 - **Out of the pack:** 0.00, below the 0.08 line. One run, no sweep (the brief): for the director's call.
+- **The director's call (Oct 18):** his offset is already at Stockfish's floor at this tier (no lever), so two levers were tried, one run each: a fusion every 8 of his turns instead of 5 (0.12, in the pack, 31 moves) and his Slam meter at ×0.8 (0.04, out). `tusksEvery` is now 8; the two-elephant cap and the fusion as his whole turn (Eric's) are unchanged.
 - **The guard waited 9 times in 7 battles**, eight of them passes that would have cost him 6 pawns or more (his queen),
   one 2.6; each of those fusions came later (two turns in a row at most). In the six runs above (78 battles), 10 of the
   crowd's 13 wins came in a battle with a fusion that lost 2 pawns or more by this measure (nearly all a free queen), 3

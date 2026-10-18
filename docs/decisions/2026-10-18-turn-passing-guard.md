@@ -101,3 +101,7 @@ and 31 to 43), 50 bots at the Solo raid's tier (1600); he plays at 1350 on Stock
 - **Player-visible:** Alfil's FAQ says the fusion waits the same way when it would cost him 2 pawns' worth or more.
   Chub & Chirp have no FAQ words yet (their wiring PR adds them): those should say the cast waits too. No new line on
   screen: as with the check wait, the marks keep glowing (and the warning stays up) and he moves.
+
+## Alfil's tuning after the guard (director, Oct 18)
+
+With the guard, the sim's crowd won 0 of 26 (its wins had mostly been free queens). His offset is already at Stockfish's floor at the sim's tier, so the lever was his powers: a fusion every 8 of his turns instead of 5 gave 0.12 (in the pack); his Slam meter at ×0.8 gave 0.04. `tusksEvery` is now 8. Eric's two-elephant cap and the fusion as his whole turn are unchanged. Rows: `reports/boss-sim/raid-pgT8*.jsonl`, `raid-pgR8*.jsonl`.

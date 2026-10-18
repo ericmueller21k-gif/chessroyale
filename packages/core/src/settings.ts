@@ -817,7 +817,7 @@ export const BOSS_POWERS = {
    * among tusksLooks pairs, as if they fused at once (tusksPairs).
    */
   tusksFirst: 3,
-  tusksEvery: 5,
+  tusksEvery: 8,
   tusksMax: 2,
   tusksLooks: 5,
   tusksNodes: 30_000,
