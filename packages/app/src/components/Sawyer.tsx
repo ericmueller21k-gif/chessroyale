@@ -1,4 +1,3 @@
-// (Probe for the e2e fast check, claude/fast-ci: never merged.)
 import { useLayoutEffect, useRef } from "preact/hooks";
 import { BOARD_SAW, SAW_CUT, SPLIT, withoutPiece } from "@chessroyale/chess";
 import { BOSS_POWERS, SAWYER_LOOKS, type SawCut, type SplitPawn } from "@chessroyale/core";
