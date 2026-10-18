@@ -7757,6 +7757,7 @@ button.fd-logo {
   white-space: nowrap;
 }
 .fd-ring {
+  position: relative;
   width: 44px;
   height: 44px;
   flex: none;
@@ -7768,6 +7769,21 @@ button.fd-logo {
   border: 2px solid var(--fd-gold);
   padding: 0;
   cursor: pointer;
+}
+/* What's new for you with friends (a request, an invite): a count on your pawn in a phone's top bar. */
+.fd-ring-news {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font: 800 11px/18px Archivo, system-ui, sans-serif;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--fd-bg);
 }
 .fd-back,
 .fd-icon-btn {
@@ -7963,9 +7979,10 @@ button.fd-logo {
   display: none;
 }
 /*
- * A phone's top bar holds the logo, your coins, your pawn and the gear (Settings). When they don't all fit, the coins' word goes
- * first (it wraps onto a second line the pill doesn't show: the gold dot is the coin), on narrow phones the logo steps
- * down a little, and below 360 px a big balance goes short ("12k"). Measured with six-digit balances from 320 px up.
+ * A phone's top bar holds the logo, your coins, your pawn, the shop and the gear (Settings). When they don't all fit, the
+ * coins' word goes first (it wraps onto a second line the pill doesn't show: the gold dot is the coin); below 430 px the
+ * gaps tighten and a big balance goes short ("12k"); on narrow phones the logo steps down; below 360 px the round
+ * buttons are 40 px. Measured with six-digit balances from 320 px up.
  */
 .fd-top .fd-coins {
   display: flex;
@@ -7981,34 +7998,38 @@ button.fd-logo {
 .fd-top .fd-coins-word {
   white-space: pre;
 }
-@media (max-width: 399px) {
-  .fd-top {
-    gap: 8px;
-  }
-  .fd-top .fd-logo {
-    font-size: clamp(20px, 6.1vw, 24px);
-  }
-  .fd-top .fd-top-end,
-  .fd-top .fd-top-right {
-    gap: 8px;
-  }
-  .fd-top .fd-coins {
-    padding-inline: 10px;
-  }
-}
-@media (max-width: 359px) {
-  .fd-top .fd-logo {
-    font-size: clamp(17px, 5.5vw, 20px);
-  }
+@media (max-width: 429px) {
+  .fd-top,
   .fd-top .fd-top-end,
   .fd-top .fd-top-right {
     gap: 6px;
+  }
+  .fd-top .fd-coins {
+    padding-inline: 9px;
   }
   .fd-top .fd-coins-full {
     display: none;
   }
   .fd-top .fd-coins-short {
     display: inline;
+  }
+}
+@media (max-width: 399px) {
+  .fd-top .fd-logo {
+    font-size: clamp(18px, 5.2vw, 20px);
+  }
+}
+@media (max-width: 359px) {
+  .fd-top .fd-logo {
+    font-size: 15px;
+  }
+  .fd-top .fd-ring,
+  .fd-top .fd-icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+  .fd-top .fd-coins {
+    padding-inline: 7px;
   }
 }
 .fd-home-main {
@@ -8069,6 +8090,10 @@ button.fd-logo {
   background: var(--fd-panel);
   border-radius: 22px;
   padding: 18px;
+}
+/* (Its inner box is a phone's: elsewhere it adds nothing.) */
+.fd-hero-in {
+  display: contents;
 }
 /* Your icon to the left of your name and rating: the pair centered under your pawn, the words ranged left. */
 .fd-hero-id {
@@ -8151,12 +8176,12 @@ button.fd-logo {
  * The panel under the RANKED row (Eric, Oct 18: "it should never change size"): one fixed box for every mode, holding
  * the pick's options (Matchmaking, Squads' Solo queue or Party) or its words (1 v 1: your rank and what it is).
  */
-.fd-panel {
+.fd-mode-panel {
   position: relative;
   height: 58px;
   flex: none;
 }
-.fd-panel > :not(.fd-types-info) {
+.fd-mode-panel > :not(.fd-types-info) {
   box-sizing: border-box;
   height: 100%;
 }
@@ -8291,9 +8316,65 @@ button.fd-logo {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
-/* (Play with friends on a row of its own: the shop and your profile share the next.) */
 .fd-actions .fd-wide {
   grid-column: 1 / -1;
+}
+/*
+ * A phone's home fits its screen, with no scrolling (Eric, Oct 18): the gaps are tighter, and your pawn's card takes the
+ * room the rest leaves, its pawn sized to it. When that room is short, your pawn stands beside your name instead of
+ * above it. On a very small screen the card stops shrinking and the page scrolls.
+ */
+@media (max-width: 1023px) {
+  .fd-home:not(.queueing) {
+    gap: 10px;
+    padding-top: calc(env(safe-area-inset-top) + 12px);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 14px);
+  }
+  .fd-home-main,
+  .fd-play-col,
+  .fd-go {
+    gap: 10px;
+  }
+  .fd-hint {
+    margin-top: -4px;
+  }
+  .fd-hero {
+    flex: 1 1 0;
+    min-height: 100px;
+    align-items: stretch;
+    padding: 0;
+    container: fd-hero / size;
+  }
+  .fd-hero-in {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    min-height: 0;
+  }
+  .fd-hero .fd-pawn-hero {
+    width: auto;
+    height: clamp(48px, calc(100cqh - 84px), 154px);
+    aspect-ratio: 170 / 154;
+  }
+  @container fd-hero (max-height: 189px) {
+    .fd-hero-in {
+      flex-direction: row;
+      gap: 14px;
+    }
+    .fd-hero .fd-pawn-hero {
+      height: clamp(48px, calc(100cqh - 24px), 130px);
+    }
+    .fd-hero-sub {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+    }
+  }
 }
 /* The RANKED row (Eric, Oct 16): its small label right above the three ranked modes. */
 .fd-ranked {
@@ -9897,7 +9978,6 @@ button.fd-seat {
     min-height: var(--app-h);
   }
   .fd-root.framed .fd-home > .fd-top,
-  .fd-root.framed .fd-home > .fr-line,
   .fd-root.framed .fd-home > .fd-live {
     display: none;
   }
@@ -16328,43 +16408,6 @@ button.sq-tiny {
   color: var(--fd-gold-ink);
   font: 800 12px/1.4 Archivo, system-ui, sans-serif;
   white-space: nowrap;
-}
-/* The phone home's line, above the live line. */
-.fr-line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 44px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 14px;
-  background: var(--fd-panel);
-  color: var(--fd-text);
-  font: 600 14px Archivo, system-ui, sans-serif;
-  text-align: left;
-  cursor: pointer;
-}
-.fr-icon {
-  flex: none;
-  color: var(--fd-gold-text);
-}
-.fr-line-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.fr-line-text span {
-  color: var(--fd-sub);
-  font-weight: 500;
-}
-.fr-chevron {
-  flex: none;
-  color: var(--fd-muted);
-  font-size: 20px;
-  line-height: 1;
 }
 /* The computer's live panel: friends online, above the live line. */
 .fr-panel-head {

@@ -53,16 +53,20 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     While a 1 v 1 search runs, a choice asks "Leave the 1 v 1 queue?" first (App's `leavingDuelFirst`).
   - **`/bosses`** (unlisted, not admin-gated; Eric's shortcut): opens the solo boss picker at once ("Choose your boss":
     every boss you can meet and a random one, and for an admin the Hidden Boss after them; the difficulty), over home.
-  - Then (after the Boss raid card) "Play with friends" (a lobby in the row's pick; with 1 v 1 picked, a 50 v 50 lobby: 1 v 1 has none), "Shop &
-    crates" and "Profile" (a phone's), the coin pill, your icon, and the live line ("214 online · 9 matches running ·
-    31 in queue") with the typical wait under PLAY.
+  - Then (after the Boss raid card) "Play with friends" (a lobby in the row's pick; with 1 v 1 picked, a 50 v 50 lobby: 1 v 1 has none),
+    the coin pill, your icon, and the live line ("214 online · 9 matches running · 31 in queue") with the typical
+    wait under PLAY. The shop and your profile are in a phone's top bar and a computer's side menu, not on home's
+    column (Eric, Oct 18; [docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)).
   - A screen that replaces home (a phone's queue, the Boss raid screen, home again) starts at its top. A match's Home
     and a closed lobby's note land on home itself; Cancel in a raid's queue goes back to the Boss raid screen.
-  - **Phone:** a top bar (the logo, your coins, your pawn, then a gear that opens Settings in one tap; a computer's
-    Settings is its side menu's, so no gear there;
+  - **Phone:** a top bar (the logo, your coins, your pawn, a shop bag, then a gear that opens Settings in one tap; a
+    computer's shop and Settings are its side menu's, so neither is there;
     [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md)), then one
-    column: the RANKED row, PLAY, the Boss raid card, then the smaller buttons. Big tap targets, no sideways scroll at
-    320–430 px; a long name on your home card ellipsizes.
+    column: the RANKED row, its panel, PLAY, the Boss raid card, then Play with friends. It fits the screen with no
+    scrolling from 360×640 up: your pawn's card takes the room left and its pawn is sized to it (beside your name
+    when the room is short); below that the card stops shrinking and the page scrolls
+    ([docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)). Big tap targets, no
+    sideways scroll at 320–430 px; a long name on your home card ellipsizes.
   - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the RANKED
     row, its panel, PLAY and its line, the Boss raid card (full width, a little shorter), Play with friends; a side
     panel (playing now, global chat).
@@ -89,8 +93,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   the rank's label from the profile, null until it loads). The first-time pawn-vote hint is `VoteHint`
   (`components/VoteHint.tsx`, once per device: `brc.voteHintSeen`), for every pawn vote to use.
 - **Friends** (Oct 15; [docs/decisions/2026-10-15-friends-and-invites.md](../decisions/2026-10-15-friends-and-invites.md); the rules and data on [accounts.md](accounts.md)):
-  - **Where:** a phone's home has a line above the live line ("Friends · 2 online", "N new" for requests and
-    invites); a computer's live panel has a FRIENDS section above the live line (friends online, each with Invite,
+  - **Where:** a phone's way in is **Friends** on your own profile (the count of requests and invites on it, and on
+    your pawn in home's top bar; Eric, Oct 18: home's line above the live line is gone,
+    [docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)); a computer's live panel has a FRIENDS section above the live line (friends online, each with Invite,
     at most `FRIENDS.panelMax`, and "All friends ›"). Both open the friends list (`/friends`): invites to you (Join,
     ✕), friend requests (Accept, Decline), your friends online first (In a match next, then the rest; Invite on each),
     the requests you sent (Cancel) and who you've blocked (Unblock).
@@ -183,7 +188,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 | What | Where |
 | --- | --- |
 | Screens | `packages/app/src/screens/Home.tsx` (home, the RANKED row, the Boss raid card and screen), `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx`, `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
-| Friends' pieces (rows, the home line, the live panel's section, the toast, Invite friends, the settings, a profile's buttons) | `packages/app/src/components/Friends.tsx`; the list and actions `friends.ts` |
+| Friends' pieces (rows, the live panel's section, the toast, Invite friends, the settings, a profile's buttons) | `packages/app/src/components/Friends.tsx`; the list and actions `friends.ts` |
 | The computer's frame and menus | `components/FrontDoor.tsx`, `FrontMenu.tsx`, `LiveWindow.tsx`, `LiveNumber.tsx`, `MiniBoard.tsx`, `TinyBoard.tsx`, `LeaderboardSheet.tsx` |
 | Names and icons everywhere | `components/PlayerName.tsx`, `PixelIcon.tsx` (`UserIcon`), `profile-nav.ts` |
 | The live line, app side | `packages/app/src/live.ts` |
