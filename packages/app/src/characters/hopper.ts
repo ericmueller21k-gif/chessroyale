@@ -6,14 +6,19 @@
  * From his detailed reference, flavor only: the rabbit's green scarf blowing back (a gold clasp) and a small brown
  * satchel, and a small brown saddle. Drawn side on, facing our left (as Alfil and Sawyer), light from the top left.
  *
- * A still for Eric's review: one pose, `idle` frame 0, and the portrait (both heads). Not in the game yet.
+ * His animation pack (Oct 18: docs/decisions/2026-10-18-hopper-animations.md): every animation the other bosses have,
+ * his Leapfrog hop, his Carrot Patch cast, the carrot race won and lost, and his attack on a king (`HOPPER_ATTACK`:
+ * carrots pelted at the king). `idle` frame 1 is the approved still. Not in the game yet; his board art (the carrots)
+ * is in effects/hopper.ts.
  *
  * Rigging, as the other bosses: the grasshopper's body, wings, thorax and head and the rabbit's body and head are
- * painted once; the legs (all six, from hip, knee and foot), the antennae, the rabbit's ears and arms, the reins and the
- * scarf's tail from their points, so the poses that follow (his hop) are numbers.
+ * painted once; the legs (all six, from hip, knee and foot), the antennae, the rabbit's ears and arms, the reins, the
+ * scarf's tail and a carrot from their points, so his poses are numbers.
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part } from "./sprite.ts";
+import { KING_ATTACK } from "@chessroyale/chess";
+import { moved } from "./attack-frame.ts";
+import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 export const HOPPER_PALETTE: Record<string, string> = {
   k: "#1b150e", // outline
@@ -49,6 +54,13 @@ export const HOPPER_PALETTE: Record<string, string> = {
   y: "#ffe58a",
   O: "#b4840f",
   z: "#0d0e12", // ground shadow
+  R: "#e8732a", // a carrot: orange, dark to light (and his leaves are the grasshopper's greens)
+  K: "#a8471a",
+  J: "#f79a3d",
+  P: "#ffc97e",
+  j: "#9fd8ff", // sweat
+  g: "#4d4538", // dust, dark and light
+  h: "#7d705a",
 };
 
 type Pt = readonly [number, number];
@@ -197,8 +209,11 @@ function strokePart(pts: readonly Pt[], r: readonly number[], key: (light: numbe
 
 // ---- The grasshopper. Drawing space: the ground at y 66; he faces our left.
 
+/** The grasshopper's big eye: open (the still), shut (a hit, a wince), or glinting with glee. */
+export type BugEye = "open" | "shut" | "joy";
+
 /** His head: round, a big black eye at its front, his face sloping in to the mouth, two little palps under it. */
-function hopperHead(): { part: Part; at: Pt } {
+function hopperHead(eye: BugEye = "open"): { part: Part; at: Pt } {
   return painted(1, 28, 22, 26, (F, S) => {
     const skull = inEllipse(12.2, 39, 8.4, 8.8);
     const jaw = inPoly([[4.4, 41], [12, 42], [13.4, 50], [8.6, 52], [4.8, 48.8]]);
@@ -208,8 +223,15 @@ function hopperHead(): { part: Part; at: Pt } {
     // The mouth: a dark notch, the yellow-green mandible over it.
     S(["mmn", "kmm"], 5, 49);
     // The eye: big and black, a glint at its top left.
-    F(inEllipse(9.2, 37, 3.7, 4.3), () => "x");
-    S(["ww", "w."], 7, 34);
+    const ball = inEllipse(9.2, 37, 3.7, 4.3);
+    if (eye === "shut") {
+      // Shut: the lid (his green) over it, a dark crease across.
+      F(ball, (x, y) => (Math.abs(y - 37.6) < 0.7 ? "x" : y < 37.6 ? "c" : "b"));
+      return;
+    }
+    F(ball, () => "x");
+    if (eye === "joy") S(["w.", ".w", "w."], 7, 34);
+    else S(["ww", "w."], 7, 34);
   }, BUG);
 }
 
@@ -264,14 +286,7 @@ function hindLeg(hip: Pt, knee: Pt, ankle: Pt, toe: Pt, far: boolean): { part: P
   const t = strokePart(thigh, [3.5, 2.9, 1.3].map((v) => Math.max(1, v * BUG.s)), (l, _s, across) => (across > 0.35 ? ramp("mn", l) : ramp(GREEN, l - (far ? 0.35 : 0))));
   const shin = strokePart([knee, ankle, toe], [1, 0.9, 0.8], (l) => ramp(LEGS, l - (far ? 0.3 : 0)));
   // One part: the thigh over the shin at the knee.
-  const x0 = Math.min(t.at[0], shin.at[0]);
-  const y0 = Math.min(t.at[1], shin.at[1]);
-  const w = Math.max(t.at[0] + t.part.grid[0]!.length, shin.at[0] + shin.part.grid[0]!.length) - x0;
-  const h = Math.max(t.at[1] + t.part.grid.length, shin.at[1] + shin.part.grid.length) - y0;
-  return painted(x0, y0, w, h, (_F, S) => {
-    S(shin.part.grid, shin.at[0], shin.at[1]);
-    S(t.part.grid, t.at[0], t.at[1]);
-  });
+  return merged([shin, t]);
 }
 
 /** An antenna: long and thin, yellow-green. */
@@ -302,8 +317,35 @@ function girth(): { part: Part; at: Pt } {
 
 // ---- The rabbit, sitting up on the saddle, facing our left.
 
+/**
+ * The rabbit's eye for each mood, stamped at (26, 9) in his drawing space (`at` moves it): `x` dark, `w` its glint, a
+ * `.` leaves the fur showing. He faces our left, so his front is the left of each row.
+ */
+export type Mood = "open" | "blink" | "joy" | "shut" | "wide" | "smug" | "up" | "aim" | "out" | "sad";
+const RABBIT_EYES: Record<Mood, { rows: readonly string[]; at?: Pt }> = {
+  // The still: big and dark, a glint at its top left.
+  open: { rows: [".xx", "wxx", "xxx", ".x."] },
+  blink: { rows: ["...", "...", "xxx", ".x."] },
+  // Happy: shut in an arc (a capture, a cheer).
+  joy: { rows: [".x.", "x.x"], at: [26, 10] },
+  // Squeezed shut (a hit).
+  shut: { rows: ["x..", ".xx", "x.."], at: [26, 10] },
+  // Rattled: the white showing round a small pupil.
+  wide: { rows: [".xx.", "xwwx", "xwxx", "xwwx", ".xx."], at: [25, 8] },
+  // Smug: the lid down over the top of it.
+  smug: { rows: ["xxx", "wxx", ".x."], at: [26, 10] },
+  // Thinking: looking up, the glint at its top.
+  up: { rows: [".wx", "xxx", "xxx", ".x."] },
+  // Looking forward and down at a target (the God King, the square), a brow set over it.
+  aim: { rows: ["..xx", "xx..", ".xxx", "xxxw", "xxww", ".xx."], at: [25, 7] },
+  // Beaten: shut and drooping.
+  out: { rows: ["...", "xx.", "..x"], at: [26, 10] },
+  // Sad (the race lost): looking down, a brow up over it.
+  sad: { rows: ["xx..", "..x.", ".xx.", "xxx.", "xwx.", ".x.."], at: [25, 7] },
+};
+
 /** His head: round and big (a big head reads small), a cream muzzle and cheek, a pink nose, a big dark eye. */
-function rabbitHead(): { part: Part; at: Pt } {
+function rabbitHead(mood: Mood = "open"): { part: Part; at: Pt } {
   return painted(19, 3, 21, 18, (F, S) => {
     const skull = inEllipse(30.6, 12, 8, 7.2);
     const muzzle = inEllipse(24.4, 14.4, 3.9, 3.2);
@@ -312,7 +354,8 @@ function rabbitHead(): { part: Part; at: Pt } {
     const cheek = inEllipse(25.2, 16, 5, 3);
     F(head, (x, y) => (cheek(x, y) ? ramp(CREAM, light(x, y) + 0.15) : ramp(FUR, light(x, y))));
     // The eye: big and dark, a glint at its top left; the nose a pink dot at the muzzle's tip.
-    S([".xx", "wxx", "xxx", ".x."], 26, 9);
+    const eye = RABBIT_EYES[mood];
+    S(eye.rows, eye.at?.[0] ?? 26, eye.at?.[1] ?? 9);
     S(["p", "q"], 20, 13);
  }, RIDER);
 }
@@ -379,6 +422,33 @@ function scarfKnot(): { part: Part; at: Pt } {
 function scarfTail(pts: readonly Pt[], r0: number, r1: number): { part: Part; at: Pt } {
   const r = pts.map((_, i) => r0 + ((r1 - r0) * i) / (pts.length - 1));
   return strokePart(pts, r, (l, s) => ramp(SCARF, l + 0.05 - 0.3 * s));
+}
+
+/**
+ * A carrot (scene pixels): its body from `top` (its shoulder, where the leaves sprout) tapering to `tip`, ridged across
+ * and lit from the top left, and three leaves (the grasshopper's greens) fanning out of its top, away from the tip.
+ */
+function carrotPart(top: Pt, tip: Pt): { part: Part; at: Pt } {
+  const len = Math.hypot(tip[0] - top[0], tip[1] - top[1]) || 1;
+  const back = Math.atan2(top[1] - tip[1], top[0] - tip[0]);
+  const body = strokePart([top, [top[0] + (tip[0] - top[0]) * 0.45, top[1] + (tip[1] - top[1]) * 0.45], tip], [1.6, 1.25, 0.45], (l, s) =>
+    Math.round(s * len) % 3 === 2 && l < 0.85 ? "K" : ramp("KRJP", l + 0.05),
+  );
+  const leaves = [-0.55, 0, 0.55].map((turn, i) => {
+    const a = back + turn;
+    const l = i === 1 ? 4.6 : 3.6;
+    return strokePart([top, [top[0] + Math.cos(a) * l * 0.5, top[1] + Math.sin(a) * l * 0.5], [top[0] + Math.cos(a) * l, top[1] + Math.sin(a) * l]], [0.75, 0.7, 0.5], (lt) => ramp("bcd", lt + (i === 1 ? 0.1 : -0.05)));
+  });
+  return merged([...leaves, body]);
+}
+
+/** Parts painted in the same space, as one part: each over the ones before it. */
+function merged(ps: readonly { part: Part; at: Pt }[]): { part: Part; at: Pt } {
+  const x0 = Math.min(...ps.map((q) => q.at[0]));
+  const y0 = Math.min(...ps.map((q) => q.at[1]));
+  const w = Math.max(...ps.map((q) => q.at[0] + q.part.grid[0]!.length)) - x0;
+  const h = Math.max(...ps.map((q) => q.at[1] + q.part.grid.length)) - y0;
+  return painted(x0, y0, w, h, (_F, S) => ps.forEach((q) => S(q.part.grid, q.at[0], q.at[1])));
 }
 
 /** His shadow on the ground, `w` wide. */
@@ -454,6 +524,20 @@ export interface HopperPose {
    */
   scarfEnd?: Pt;
   billow?: number;
+  /** The rabbit's eye, and the grasshopper's. */
+  mood?: Mood;
+  bugEye?: BugEye;
+  /** The rabbit's head (and his ears with it) nodded down this many pixels (scene), and leaning sideways. */
+  nod?: number;
+  lean?: number;
+  /** His near elbow (the rabbit's space); left out, it bends by itself between his shoulder and paw. */
+  elbowN?: Pt;
+  /**
+   * A carrot in his near paw: pointing `deg` from it (0 down, 90 to our left, 180 up, 270 to our right), held near its
+   * top (its shoulder and leaves showing past his paw) or by its tip (`byTip`: the leaves out at the far end, held up
+   * to show).
+   */
+  carrot?: { deg: number; byTip?: boolean } | null;
 }
 
 /** At rest: standing on all six, the rabbit sitting up, reins in both paws, his scarf out behind him. */
@@ -477,7 +561,18 @@ const REST = {
   sag: 1.5,
   scarfEnd: [61, 19],
   billow: -2.6,
+  mood: "open",
+  bugEye: "open",
+  nod: 0,
+  lean: 0,
+  elbowN: [30, 24.6],
+  carrot: null,
 } as const satisfies Required<HopperPose>;
+
+/** Where a point of the rabbit's (his drawing space) is in the scene. */
+const riderPt = (q: Pt): Pt => toScene(RIDER, q);
+/** His near shoulder (the rabbit's space). */
+const SHOULDER_N: Pt = [34, 21];
 
 export function hopperLayers(pose: HopperPose = {}): Layer[] {
   const p = { ...REST, ...pose };
@@ -490,6 +585,11 @@ export function hopperLayers(pose: HopperPose = {}): Layer[] {
   /** Points of the grasshopper's and the rabbit's, in the scene. */
   const g = (q: Pt, dy = 0): Pt => up(toScene(BUG, q), dy);
   const r = (q: Pt, dy = rb): Pt => up(toScene(RIDER, q), dy);
+  /** A point on the rabbit's head (it nods and leans). */
+  const hd = (q: Pt): Pt => {
+    const [x, y] = r(q);
+    return [x + p.lean, y + p.nod];
+  };
   /** A leg: its hip rides his bob, its knee half of it, its foot stays on the ground. */
   const legPts = ([hip, knee, ankle, toe]: Leg): Leg => [g(hip, b), g(knee, b / 2), g(ankle), g(toe)];
   const leg = (name: string, l: Leg, rr: readonly number[], far: boolean) => {
@@ -507,12 +607,27 @@ export function hopperLayers(pose: HopperPose = {}): Layer[] {
   };
   const antN = antPts([11, 31.5], p.antN);
   const antF = antPts([13.5, 32], p.antF);
-  // The rabbit's ears, from the top of his head (they ride his bounce), a little curved.
-  const earPts = (root: Pt, tip: Pt): Pt[] => [r(root), r([(root[0] + tip[0]) / 2 - 0.6, (root[1] + tip[1]) / 2]), r(tip)];
+  // The rabbit's ears, from the top of his head (they ride his bounce and his nod), a little curved.
+  const earPts = (root: Pt, tip: Pt): Pt[] => [hd(root), hd([(root[0] + tip[0]) / 2 - 0.6, (root[1] + tip[1]) / 2]), hd(tip)];
   const earN = earPts([33, 6.5], p.earN);
   const earF = earPts([36.5, 6], p.earF);
-  // Arms from his shoulders to his paws; the reins from his paws to the ring, sagging between.
-  const armN: Pt[] = [r([34, 21]), r([30, 24.6]), r(p.pawN)];
+  // Arms from his shoulders to his paws; the reins from his paws to the ring, sagging between. The near elbow, unless
+  // given, bends down between his shoulder and paw (straight when he reaches far).
+  const elbowN: Pt =
+    pose.elbowN ??
+    (pose.pawN
+      ? (() => {
+          const [sx, sy] = SHOULDER_N;
+          const [px, py] = p.pawN;
+          const d = Math.hypot(px - sx, py - sy) || 1;
+          const bend = Math.sqrt(Math.max(0, 5.5 ** 2 - (d / 2) ** 2));
+          let nx = -(py - sy) / d;
+          let ny = (px - sx) / d;
+          if (ny < 0) [nx, ny] = [-nx, -ny];
+          return [(sx + px) / 2 + nx * bend, (sy + py) / 2 + ny * bend];
+        })()
+      : REST.elbowN);
+  const armN: Pt[] = [r(SHOULDER_N), r(elbowN), r(p.pawN)];
   const armF: Pt[] = [r([32.6, 20.6]), r([28.4, 23.6]), r(p.pawF)];
   const ringAt = g([14.4, 43.6], b).map(Math.round) as unknown as Pt;
   const rein = (paw: Pt): Pt[] => {
@@ -520,7 +635,9 @@ export function hopperLayers(pose: HopperPose = {}): Layer[] {
     const z: Pt = [ringAt[0] + 1.5, ringAt[1] + 1.5];
     return bezier(a, [a[0] - 2, a[1] + 3 + p.sag], [z[0] + 3, z[1] - 4 + p.sag], z, 24);
   };
-  const reinN = rein([p.pawN[0] - 1, p.pawN[1]]);
+  // His near paw away from the reins (reaching, throwing, cheering): both reins are in his far paw.
+  const oneHand = Math.hypot(p.pawN[0] - REST.pawN[0], p.pawN[1] - REST.pawN[1]) > 3;
+  const reinN = rein(oneHand ? [p.pawF[0] - 0.5, p.pawF[1] + 0.6] : [p.pawN[0] - 1, p.pawN[1]]);
   const reinF = rein([p.pawF[0] - 1, p.pawF[1]]);
   // The scarf's tail: from the back of his neck to its tip, rising and then dipping (an S, as cloth in the wind),
   // the wave growing toward the tip.
@@ -534,6 +651,17 @@ export function hopperLayers(pose: HopperPose = {}): Layer[] {
     const w = -p.billow * Math.sin(2 * Math.PI * t) * (0.5 + 0.5 * t);
     return r([neck[0] + (sEnd[0] - neck[0]) * t + nx * w, neck[1] + (sEnd[1] - neck[1]) * t + ny * w]);
   });
+  // A carrot in his near paw.
+  const carrot: Layer[] = [];
+  if (p.carrot) {
+    const a = (p.carrot.deg * Math.PI) / 180;
+    const u: Pt = [-Math.sin(a), Math.cos(a)];
+    const paw = r(p.pawN);
+    const [top, tip]: [Pt, Pt] = p.carrot.byTip
+      ? [[paw[0] + u[0] * 9.5, paw[1] + u[1] * 9.5], [paw[0] - u[0] * 0.5, paw[1] - u[1] * 0.5]]
+      : [[paw[0] - u[0] * 2.5, paw[1] - u[1] * 2.5], [paw[0] + u[0] * 6.5, paw[1] + u[1] * 6.5]];
+    carrot.push(L(placed(`carrot:${key([top, tip])}`, () => carrotPart(top, tip)), 0));
+  }
   const sw = Math.max(26, 42 - 2 * p.air);
   const sh = `shadow:${sw}`;
   add(sh, () => shadow(sw));
@@ -555,13 +683,13 @@ export function hopperLayers(pose: HopperPose = {}): Layer[] {
     L(placed("pronotum", pronotum)),
     leg("midN", p.midN, [1.3, 1, 0.9, 0.8], false),
     leg("frontN", p.frontN, [1.2, 1, 0.9, 0.8], false),
-    L(placed("hopperHead", hopperHead)),
+    L(placed(`hopperHead:${p.bugEye}`, () => hopperHead(p.bugEye))),
     L(placed(`antN:${key(antN)}`, () => antenna(antN, false)), 0),
     hind("hindN", p.hindN, false),
     L(placed("girth", girth)),
     L(placed("saddle", saddle)),
     // The rabbit: far ear and arm, tail, body, foot, satchel, the scarf's tail over his back, head, near ear, the
-    // scarf's knot, near arm.
+    // scarf's knot, a carrot, near arm.
     L(placed(`earF:${key(earF)}`, () => ear(earF, true)), 0),
     L(placed(`armF:${key(armF)}`, () => arm(armF, true)), 0),
     L(placed("cottonTail", cottonTail), rb),
@@ -569,10 +697,11 @@ export function hopperLayers(pose: HopperPose = {}): Layer[] {
     L(placed("rabbitFoot", rabbitFoot), rb),
     L(placed("satchel", satchel), rb),
     L(placed(`scarf:${key(scarf)}`, () => scarfTail(scarf, 1.2 * k, 0.4 * k)), 0),
-    L(placed("rabbitHead", rabbitHead), rb),
+    L(placed(`rabbitHead:${p.mood}`, () => rabbitHead(p.mood)), rb + p.nod, p.lean),
     L(placed(`earN:${key(earN)}`, () => ear(earN, false)), 0),
     L(placed("scarfKnot", scarfKnot), rb),
     at("ring", ringAt[0], ringAt[1]),
+    ...carrot,
     L(placed(`armN:${key(armN)}`, () => arm(armN, false)), 0),
     L(placed(`reinF:${key(reinF)}`, () => reinPart(reinF, "M")), 0),
     L(placed(`reinN:${key(reinN)}`, () => reinPart(reinN, "N")), 0),
@@ -580,10 +709,402 @@ export function hopperLayers(pose: HopperPose = {}): Layer[] {
   return [at(sh, Math.round(FOOT_X - sw / 2 + p.dx), GROUND - 2), ...layers.map((l) => ({ ...l, x: l.x + p.dx, y: l.y - p.air }))];
 }
 
-const frame = (ms: number, pose: HopperPose = {}): Frame => ({ ms, layers: hopperLayers(pose) });
+/** A loose carrot (in flight), its middle at `c` on the frame, pointing `deg` (as a held one's). */
+function carrotAt(c: Pt, deg: number): Layer {
+  const a = (deg * Math.PI) / 180;
+  const u: Pt = [-Math.sin(a), Math.cos(a)];
+  const top: Pt = [-u[0] * 3.5, -u[1] * 3.5];
+  const tip: Pt = [u[0] * 3.5, u[1] * 3.5];
+  const pl = placed(`flyCarrot:${key([top, tip])}`, () => carrotPart(top, tip));
+  return { part: pl.name, x: Math.round(c[0] + pl.at[0]), y: Math.round(c[1] + pl.at[1]) };
+}
 
-/** Idle: for now one still (frame 0), for Eric's review; his breathing, blinks and hops come with the animations. */
-const idle: Anim = { loop: true, frames: [frame(1000)] };
+const f = (ms: number, pose: HopperPose = {}, extra: Partial<Frame> = {}): Frame => ({ ms, layers: hopperLayers(pose), ...extra });
+
+/** Where a point of the rabbit's (his drawing space) is on the frame, in a pose. */
+const riderOnFrame = (q: Pt, p: HopperPose = {}, head = false): Pt => {
+  const [x, y] = riderPt(q);
+  return [OX + x + (p.dx ?? 0) + (head ? (p.lean ?? 0) : 0), OY + y + (p.bob ?? 0) + (p.ride ?? 0) + (head ? (p.nod ?? 0) : 0) - (p.air ?? 0)];
+};
+
+// ---- Things drawn on his frames: dust, sparkles, thoughts, sweat, fur.
+
+/** Dust kicked up either side of his feet (`t` frames after he lands): `n` puffs a side rolling outward and up. */
+const dust = (t: number, n = 3, cx = OX + FOOT_X, spread = 36): Speck[] => {
+  const out: Speck[] = [];
+  for (let side = -1; side <= 1; side += 2)
+    for (let i = 0; i < n; i++) {
+      const x = Math.round(cx + side * (spread * 0.5 + i * 3.5 + t * (2 + (i % 2))));
+      const y = OY + GROUND - 1 - Math.round(t * (0.6 + (i % 3) * 0.5) + (i % 2));
+      const cloud: [number, number, string][] = t < 2 ? [[0, 0, "g"], [side, 0, "g"], [0, -1, "h"], [side, -1, "h"]] : [[0, 0, "h"], [side, -1, "g"]];
+      for (const [ox, oy, k] of cloud) if (x + ox >= 3 && x + ox <= W - 4) out.push([x + ox, y + oy, k]);
+    }
+  return out;
+};
+/** A gold four-point sparkle, white at its heart. */
+const sparkle = ([x, y]: Pt, big = false): Speck[] => {
+  const X = Math.round(x);
+  const Y = Math.round(y);
+  return [[X, Y, "w"], [X - 1, Y, "y"], [X + 1, Y, "y"], [X, Y - 1, "y"], [X, Y + 1, "y"], ...(big ? ([[X - 2, Y, "Y"], [X + 2, Y, "Y"], [X, Y - 2, "Y"], [X, Y + 2, "Y"]] as Speck[]) : [])];
+};
+/** Thoughts: gold dots rising off the rabbit's head, ahead of his ears, one more each beat (the third a spark). */
+const thoughts = (n: number): Speck[] =>
+  ([[OX + 22, OY - 1], [OX + 18, OY - 5], [OX + 13, OY - 9]] as Pt[]).slice(0, n).flatMap((q, i): Speck[] => (i === 2 ? sparkle(q) : [[q[0], q[1], "Y"], [q[0] + 1, q[1], "O"], [q[0], q[1] - 1, "y"]]));
+/** Sweat flying off the rabbit's brow, both ways. */
+const sweat = (i: number, p: HopperPose): Speck[] => {
+  const t = i % 4;
+  const [x, y] = riderOnFrame([24, 6], p, true);
+  const [x2, y2] = riderOnFrame([38, 5], p, true);
+  return [[Math.round(x - t), Math.round(y + t * 2), "j"], [Math.round(x2 + t), Math.round(y2 + t * 2), "j"]];
+};
+/** Tufts of fur knocked off the rabbit (`t` frames after a hit). */
+const tufts = (t: number, p: HopperPose = {}): Speck[] => {
+  const [x, y] = riderOnFrame([38, 18], p);
+  return [[-1, -1.2], [1.2, -1.4], [1.6, -0.4], [-1.7, -0.3]].flatMap(([vx, vy], i): Speck[] => {
+    const px = Math.round(x + vx! * t * 2.4);
+    const py = Math.round(y + vy! * t * 2.4 + 0.5 * t * t);
+    return [[px, py, i % 2 ? "H" : "I"], [px + 1, py, "E"]];
+  });
+};
+/** His shadow alone on the ground (he's above the frame, or about to come down), `r` its half-width. */
+const groundShadow = (r: number, cx = OX + FOOT_X): Speck[] => {
+  const out: Speck[] = [];
+  for (let x = -r; x <= r; x++) for (let y = -1; y <= 0; y++) if (Math.abs(x) < r - (y === -1 ? 2 : 0)) out.push([cx + x, OY + GROUND - 1 + y, "z"]);
+  return out;
+};
+
+/** A hit: both flash pale. */
+const FLASH: Record<string, string> = {
+  F: "#8d6f5d", G: "#b4917a", H: "#d6b596", I: "#efd6b6", C: "#efe3cc", D: "#fbf4e6", E: "#ffffff",
+  a: "#557a3c", b: "#79a457", c: "#9cc76d", d: "#c0e38f", e: "#e4f7bd",
+};
+
+// ---- His poses: the grasshopper's legs (his drawing space), the rabbit's ears, paws and scarf (the rabbit's).
+
+/** A leg with its foot (ankle and toe) lowered by `air` scene pixels: it stays on the ground as he lifts. */
+const grounded = ([hip, knee, ankle, toe]: Leg, air: number): Leg => [hip, knee, [ankle[0], ankle[1] + air / BUG.s], [toe[0], toe[1] + air / BUG.s]];
+const legsAt = (air: number, l: Partial<HopperPose>): HopperPose => {
+  const out: HopperPose = {};
+  for (const n of ["frontN", "frontF", "midN", "midF", "hindN", "hindF"] as const) out[n] = grounded((l[n] ?? REST[n]) as Leg, air);
+  return out;
+};
+/** Pushing off: the hind legs straightening behind him, the front ones lifting off and reaching forward. */
+const LAUNCH: HopperPose = {
+  hindN: [[43, 47.5], [58, 43], [71, 60], [77, 64.5]],
+  hindF: [[47, 46.5], [57, 44.5], [64, 60], [70, 64.5]],
+  midN: [[31, 52], [37, 57.5], [37, 62.5], [34, 64]],
+  midF: [[33, 52], [40, 57.5], [41, 62.5], [38, 64]],
+  frontN: [[21, 49], [14, 53], [9, 57.5], [5, 58.5]],
+  frontF: [[23, 49.5], [17, 54], [13, 58.5], [9, 59.5]],
+};
+/** In the air: the hind legs stretched out behind, the others reaching forward. */
+const FLY: HopperPose = {
+  hindN: [[43, 47.5], [59, 42], [75, 53], [80, 56]],
+  hindF: [[47, 46.5], [58, 43], [69, 54], [74, 57]],
+  midN: [[31, 52], [36, 57], [37, 61.5], [34, 63]],
+  midF: [[33, 52], [39, 57], [41, 61.5], [38, 63]],
+  frontN: [[21, 49], [13, 52], [8, 56.5], [4, 57]],
+  frontF: [[23, 49.5], [16, 53], [12, 57], [8, 58]],
+};
+/** Coming down: the front legs reaching for the ground ahead, the hind ones folding under. */
+const TOUCH: HopperPose = {
+  frontN: [[21, 49], [14, 55], [10, 61.5], [6, 64.5]],
+  frontF: [[23, 49.5], [18, 55.5], [16, 62], [12, 64.5]],
+  midN: [[31, 52], [36, 57], [34, 62], [30, 63.5]],
+  midF: [[33, 52], [40, 57], [40, 62], [37, 63.5]],
+  hindN: [[43, 47.5], [62, 36], [70, 59], [75, 62]],
+  hindF: [[47, 46.5], [60, 38], [63, 59], [67, 62]],
+};
+/** Reared up on his hind legs and middle ones, his front legs pawing the air. */
+const REAR: HopperPose = {
+  bob: -3,
+  frontN: [[21, 49], [15, 51], [11, 53.5], [8, 52]],
+  frontF: [[23, 49.5], [18, 52], [15, 54.5], [12, 53.5]],
+};
+/** Slumped flat, legs splayed. */
+const SPLAY: HopperPose = {
+  frontN: [[21, 49], [12, 56], [6, 61.5], [2, 64.5]],
+  frontF: [[23, 49.5], [17, 57], [14, 62], [11, 64.5]],
+  midN: [[31, 52], [38, 58], [40, 63], [38, 64.5]],
+  midF: [[33, 52], [41, 58], [44, 63], [43, 64.5]],
+  hindN: [[43, 47.5], [62, 41], [72, 61], [77, 64.5]],
+  hindF: [[47, 46.5], [59, 42], [64, 61], [69, 64.5]],
+};
+/** The rabbit's ears: flopped back in the wind, perked up, drooping, one bent. */
+const EARS_BACK: HopperPose = { earN: [48.5, 4], earF: [52, 6.5] };
+const EARS_UP: HopperPose = { earN: [36.5, -2], earF: [41.5, -1.5] };
+const EARS_DROOP: HopperPose = { earN: [42, 13.5], earF: [45.5, 13.5] };
+const EARS_BENT: HopperPose = { earN: [37, -1], earF: [47, 3.5] };
+/** The scarf streaming out behind (in the wind of a hop), and hanging limp. */
+const STREAM: HopperPose = { scarfEnd: [64, 15], billow: -3.4 };
+const LIMP: HopperPose = { scarfEnd: [51, 28], billow: -0.8 };
+/** His near paw: in the satchel, behind his head with a carrot, thrown forward, held up high, at his chin. */
+const IN_SATCHEL: HopperPose = { pawN: [47, 22.5], elbowN: [41, 17.5], carrot: { deg: 15 } };
+const WOUND: HopperPose = { pawN: [37, 5], elbowN: [39.5, 13], carrot: { deg: 188 } };
+const THROWN: HopperPose = { pawN: [18, 18.5], elbowN: [26, 21] };
+const HELD_UP: HopperPose = { pawN: [29, 3.5], elbowN: [33, 12], carrot: { deg: 180, byTip: true } };
+const AT_CHIN: HopperPose = { pawN: [25.5, 19.5], elbowN: [31, 25] };
+const POINTING: HopperPose = { pawN: [15.5, 21], elbowN: [25, 22] };
+
+// ---- His animations. Frame counts and timings follow Alfil's and Hollow's.
+
+/** Breathing: [bob] per frame. */
+const BREATH = [0, 0, 0, 0, 1, 1, 1, 1] as const;
+
+/**
+ * Idle: they breathe (the grasshopper settling a pixel, the rabbit with him), the scarf flutters, the antennae sway,
+ * the rabbit's near ear twitches and he blinks; the grasshopper rubs a hind leg (his chirp, silent here). Frame 1 is
+ * the approved still.
+ */
+const idle: Anim = {
+  loop: true,
+  frames: Array.from({ length: 16 }, (_, i) => {
+    const sway = [0, 0, 0, 1, 1, 1, 0, 0, 0, 0, -1, -1, -1, 0, 0, 0][i]!;
+    const flutter = [0, 0, 1, 1, 0, 0, -1, -1][i % 8]!;
+    const p: HopperPose = {
+      bob: BREATH[i % 8]!,
+      antN: [-4 + sway, 13 - sway * 0.5],
+      antF: [1 + sway, 9.5 - sway * 0.5],
+      scarfEnd: [61, 19 + flutter],
+      billow: -2.6 - flutter * 0.5,
+      mood: i === 13 ? "blink" : "open",
+      earN: i === 8 || i === 9 ? [37.5, 0.5] : REST.earN,
+      hindF: i === 5 || i === 6 ? [[47, 46.5], [61, 34], [62.5, 62], [66.5, 64.5]] : REST.hindF,
+    };
+    return f(125, p);
+  }),
+};
+
+/**
+ * Entrance: his shadow spreads, they drop in from above in one long hop and land (a thump, dust), the rabbit bounced on
+ * the saddle; then the rabbit tips a wave and the grasshopper chirps.
+ */
+const entrance: Anim = {
+  loop: false,
+  frames: [
+    { ms: 100, layers: [], specks: groundShadow(8), cue: "chirp" },
+    { ms: 100, layers: [], specks: groundShadow(16) },
+    f(70, { air: 14, ...FLY, ...EARS_BACK, ...STREAM, mood: "joy" }),
+    f(70, { air: 6, ...TOUCH, ...EARS_BACK, ...STREAM, ...legsAt(2, TOUCH) }),
+    f(130, { bob: 3, ride: 1, ...EARS_UP, mood: "shut", bugEye: "shut" }, { cue: "thump", shake: [0, 2], specks: dust(0) }),
+    f(110, { bob: 1, ride: -2, ...EARS_BACK }, { specks: dust(1) }),
+    f(110, { bob: 0, ride: 0 }, { specks: dust(2) }),
+    f(160, { pawN: [27, 7], elbowN: [32, 15], ...EARS_UP, mood: "joy", bugEye: "joy" }, { cue: "squeak" }),
+    f(160, { pawN: [24, 8.5], elbowN: [31, 15], ...EARS_UP, mood: "joy", bugEye: "joy", antN: [-5, 11], antF: [0, 8] }, { cue: "chirp" }),
+    f(300, {}),
+  ],
+};
+
+/** Thinking: the rabbit's paw to his chin, his eye rolled up, an ear bent; the grasshopper's antennae tapping; gold dots. */
+const thinking: Anim = {
+  loop: true,
+  frames: [0, 1, 2, 3].flatMap((n) =>
+    [0, 1, 2, 3].map((i) =>
+      f(130, { ...AT_CHIN, ...EARS_BENT, mood: "up", antN: i % 2 ? [-3, 15] : [-4, 13], antF: i % 2 ? [1, 9.5] : [2, 11], bob: i === 2 ? 1 : 0 }, { specks: thoughts(n) }),
+    ),
+  ),
+};
+
+/** His move: a small hop, the grasshopper crouching and springing, the rabbit bounced, then they settle. */
+const move: Anim = {
+  loop: false,
+  frames: [
+    f(100, { bob: 2, ride: 1 }),
+    f(90, { air: 2, ...LAUNCH, ...legsAt(2, LAUNCH), ...EARS_BACK }),
+    f(110, { air: 5, ...FLY, ...EARS_BACK, ...STREAM, ride: -1 }),
+    f(130, { bob: 2, ride: 1, ...TOUCH, ...legsAt(0, TOUCH) }, { cue: "thump", shake: [0, 1], specks: dust(0, 2) }),
+    f(120, { bob: 1 }, { specks: dust(1, 2) }),
+    f(160, {}),
+  ],
+};
+
+/** A capture: the rabbit pumps his fist and cheers, the grasshopper bouncing and chirping. */
+const capture: Anim = {
+  loop: false,
+  frames: [
+    f(90, { bob: 1, ride: 1 }),
+    ...Array.from({ length: 10 }, (_, i) => {
+      const p: HopperPose = { mood: "joy", bugEye: "joy", ...EARS_UP, pawN: i % 2 ? [28, 5] : [27, 9], elbowN: [32, 14], air: i % 2 ? 0 : 2, ride: i % 2 ? 0 : -1, antN: i % 2 ? [-5, 11] : [-4, 13], ...(i % 2 ? {} : legsAt(2, {})) };
+      return f(85, p, { cue: i === 0 ? "squeak" : i === 4 ? "chirp" : undefined, specks: i < 6 && i % 2 === 0 ? sparkle(riderOnFrame([27, 2], p)) : [] });
+    }),
+    f(160, { mood: "smug" }),
+  ],
+};
+
+/** Hurt: a flash, fur flies, both knocked back a step, eyes squeezed shut, ears flung back; then the rabbit glares. */
+const hurt: Anim = {
+  loop: false,
+  frames: [
+    f(70, { bob: 2, dx: 1, ...EARS_BACK, mood: "shut", bugEye: "shut" }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: tufts(0) }),
+    f(80, { bob: 2, dx: 1, ...EARS_BACK, mood: "shut", bugEye: "shut" }, { shake: [-1, 0], specks: tufts(1) }),
+    f(90, { bob: 1, dx: 2, ...EARS_BACK, mood: "wide" }, { specks: tufts(2) }),
+    f(90, { bob: 1, dx: 1, mood: "wide" }, { specks: tufts(3) }),
+    f(110, { mood: "aim", nod: 1 }),
+    f(120, { mood: "aim", ...EARS_UP, antN: [-5, 11], antF: [0, 8] }),
+    f(160, {}),
+  ],
+};
+
+/** Check: the grasshopper rears up, the rabbit points ahead (at the king), ears up, his look set; twice. */
+const LOOM: HopperPose = { ...REAR, ...POINTING, ...EARS_UP, mood: "aim", antN: [-6, 10], antF: [-1, 7] };
+const check: Anim = {
+  loop: false,
+  frames: [
+    f(100, { bob: 2, ride: 1 }),
+    f(120, LOOM, { cue: "chirp", specks: sparkle(riderOnFrame([13, 20], LOOM)) }),
+    f(100, { ...LOOM, ride: 1 }),
+    f(100, { ...POINTING, mood: "aim" }),
+    f(120, LOOM, { specks: sparkle(riderOnFrame([13, 20], LOOM), true) }),
+    f(100, { ...LOOM, ride: 1 }),
+    f(150, { mood: "smug" }),
+    f(160, { mood: "smug" }),
+  ],
+};
+
+/** Smug: the rabbit leaning back, heavy-lidded, ears laid back; the grasshopper rubbing a hind leg (a lazy chirp). */
+const smug: Anim = {
+  loop: true,
+  frames: Array.from({ length: 8 }, (_, i) => {
+    const rub = i % 4 === 1 || i % 4 === 2;
+    return f(150, {
+      mood: "smug",
+      lean: 1,
+      earN: [44, 0.5],
+      earF: [48, 3],
+      hindF: rub ? [[47, 46.5], [61, 33.5], [62.5, 62], [66.5, 64.5]] : REST.hindF,
+      scarfEnd: [61, 19 + (i % 4 < 2 ? 0 : 1)],
+      antN: [-4 + (i < 4 ? 0 : 1), 13],
+    });
+  }),
+};
+
+/** Rattled: shaking, the rabbit's eye wide and ears stiff, sweat flying; the grasshopper's antennae quivering. */
+const rattled: Anim = {
+  loop: true,
+  frames: Array.from({ length: 8 }, (_, i) => {
+    const p: HopperPose = { mood: "wide", dx: i % 2 ? 1 : -1, bob: i % 4 === 2 ? 1 : 0, earN: [37 + (i % 2), -2], earF: [42 - (i % 2), -1.5], antN: [-4 + (i % 2 ? 1 : -1), 13], antF: [1 + (i % 2 ? -1 : 1), 9.5] };
+    return f(80, p, { specks: sweat(i, p) });
+  }),
+};
+
+/**
+ * Defeat: a flash; the grasshopper's legs give way and he sinks flat, antennae drooping; the rabbit slumps over the
+ * saddle, ears hanging, the scarf limp.
+ */
+const SLUMP: HopperPose = { bob: 6, ...SPLAY, ...EARS_DROOP, ...LIMP, mood: "out", bugEye: "shut", nod: 2, lean: -1, ride: 1, antN: [-6, 26], antF: [-2, 24], pawN: [26, 28], pawF: [24.5, 27], sag: 3 };
+const defeat: Anim = {
+  loop: false,
+  frames: [
+    f(80, { bob: 2, dx: 1, ...EARS_BACK, mood: "shut", bugEye: "shut" }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: tufts(0) }),
+    f(100, { bob: 2, dx: 2, mood: "wide", ...EARS_UP }, { specks: tufts(1) }),
+    f(110, { bob: 4, dx: 1, mood: "wide", ...EARS_BACK, antN: [-5, 18], antF: [-1, 16], ...SPLAY }, { specks: tufts(2) }),
+    f(120, { ...SLUMP, bob: 5 }, { cue: "flop", shake: [0, 1], specks: dust(0) }),
+    f(140, SLUMP, { specks: dust(1) }),
+    f(1000, SLUMP),
+  ],
+};
+
+/** Victory: the grasshopper hops in place, the rabbit waving a carrot over his head, ears flapping, the scarf streaming. */
+const victory: Anim = {
+  loop: true,
+  frames: Array.from({ length: 12 }, (_, i) => {
+    const air = [0, 2, 5, 6, 5, 2, 0, 0, 0, 0, 0, 0][i]!;
+    const up = air > 0;
+    const p: HopperPose = {
+      ...HELD_UP,
+      // (Up in the air, his paw comes down to his ear, so the carrot stays inside the frame.)
+      pawN: up ? [28, 8.5] : [29 + (i % 2 ? -1.5 : 0), 3.5 + (i % 2)],
+      ...(up ? { elbowN: [32.5, 15] } : {}),
+      mood: "joy",
+      bugEye: "joy",
+      air,
+      bob: i === 0 || i === 6 ? 2 : 0,
+      ...(up ? { ...FLY, ...EARS_BACK, ...STREAM } : { ...EARS_UP, earN: [36.5 + (i % 2), -2], scarfEnd: [61, 19 + (i % 2)] }),
+      ride: i === 6 ? 1 : 0,
+    };
+    return f(110, p, { cue: i === 2 ? "chirp" : i === 6 ? "thump" : undefined, specks: [...(i === 6 ? dust(0, 2) : i === 7 ? dust(1, 2) : []), ...(i % 3 === 0 ? sparkle(riderOnFrame([p.pawN![0] + 1, p.pawN![1] - 7.5], p)) : [])] });
+  }),
+};
+
+/**
+ * Leapfrog, his passive (the pawn hopping over yours on the board is the board's): the grasshopper crouches back on his
+ * haunches, springs (`takeoff`: the pawn leaves its square) in a short arc forward, the rabbit hanging on to the reins,
+ * ears flopped back and the scarf streaming, and lands (`land`: the pawn comes down beyond yours), dust; then they
+ * step back to their place.
+ */
+const leapfrog: Anim = {
+  loop: false,
+  frames: [
+    f(120, { bob: 3, dx: 2, ride: 1, mood: "aim", sag: 0.5 }),
+    f(90, { bob: 4, dx: 2, ride: 1, mood: "aim", sag: 0, ...EARS_UP }),
+    f(60, { air: 3, dx: 0, ...LAUNCH, ...legsAt(3, LAUNCH), ...EARS_BACK, mood: "wide", sag: 0 }, { cue: "takeoff", specks: dust(0, 2, OX + FOOT_X + 6) }),
+    f(70, { air: 7, dx: -2, ...FLY, ...EARS_BACK, ...STREAM, mood: "wide", ride: 1, sag: 0 }, { specks: dust(1, 2, OX + FOOT_X + 6) }),
+    f(80, { air: 9, dx: -3, ...FLY, ...EARS_BACK, ...STREAM, mood: "joy", ride: -1, sag: 0.5 }),
+    f(70, { air: 6, dx: -4, ...FLY, ...EARS_BACK, ...STREAM, mood: "joy", ride: -2 }),
+    f(50, { air: 2, dx: -5, ...TOUCH, ...legsAt(2, TOUCH), ...EARS_BACK, scarfEnd: [63, 16], billow: -3, ride: -2 }),
+    f(130, { bob: 3, dx: -5, ride: 1, ...EARS_UP, mood: "shut" }, { cue: "land", shake: [0, 1], specks: dust(0, 3, OX + FOOT_X - 5) }),
+    f(110, { bob: 1, dx: -3, mood: "joy" }, { specks: dust(1, 3, OX + FOOT_X - 5) }),
+    f(140, { dx: -1, mood: "smug" }),
+    f(160, { mood: "smug" }),
+  ],
+};
+
+/**
+ * Carrot Patch, his ultimate (the carrots flying to their squares and landing are the board's): the grasshopper bounds
+ * in place five times; on each, the rabbit pulls a carrot from his satchel as they come down, winds it up over his head
+ * as they rise, and tosses it at the top (`toss1` ... `toss5`: the carrot leaves his paw; the board flies it to its
+ * square, carrotFly); each lands on its square 300 ms later (`plant1` ... `plant5`: the board plays carrotPatch's
+ * `plant` there), two bounds on, while he keeps tossing. Then they settle, smug.
+ */
+const bound = (n: number): Frame[] => {
+  const crouch: HopperPose = { bob: 3, ride: 1, ...IN_SATCHEL, mood: "aim", ...EARS_UP };
+  const rise: HopperPose = { air: 4, ...LAUNCH, ...legsAt(4, LAUNCH), ...WOUND, ...EARS_BACK, ...STREAM, mood: "aim", ride: -1 };
+  const top: HopperPose = { air: 6, ...FLY, ...THROWN, ...EARS_BACK, ...STREAM, mood: "joy", bugEye: "joy", ride: -1 };
+  // The carrot just out of his paw, on its way (the board flies it from here).
+  const [hx, hy] = riderOnFrame([12, 13], top);
+  return [
+    // (The carrot tossed two bounds ago lands as they come down.)
+    f(60, crouch, { cue: n > 2 ? `plant${n - 2}` : undefined, specks: n > 1 ? dust(0, 2) : [] }),
+    f(60, rise),
+    { ...f(90, top, { cue: `toss${n}`, specks: [[Math.round(hx + 5), Math.round(hy + 2), "P"], [Math.round(hx + 7), Math.round(hy + 3), "J"], [Math.round(hx + 9), Math.round(hy + 3), "R"]] }), layers: [...hopperLayers(top), carrotAt([hx, hy], 120)] },
+  ];
+};
+const carrotPatch: Anim = {
+  loop: false,
+  frames: [
+    f(80, { bob: 2, ride: 1, ...IN_SATCHEL, mood: "aim" }),
+    ...[1, 2, 3, 4, 5].flatMap(bound),
+    f(100, { bob: 3, ride: 1, ...TOUCH, ...legsAt(0, TOUCH), ...EARS_UP, mood: "joy" }, { cue: "plant4", shake: [0, 1], specks: dust(0, 3) }),
+    f(110, { bob: 1, mood: "joy", ...EARS_UP }, { specks: dust(1, 3) }),
+    f(130, { mood: "smug" }, { cue: "plant5" }),
+  ],
+};
+
+/** He wins the carrot race (before the spin): the rabbit holds a carrot high, cheering, the grasshopper bouncing. */
+const raceWon: Anim = {
+  loop: false,
+  frames: [
+    f(90, { bob: 2, ride: 1, ...IN_SATCHEL, mood: "joy" }),
+    f(90, { ...HELD_UP, pawN: [30, 8], elbowN: [33, 15], mood: "joy", ...EARS_UP }),
+    ...Array.from({ length: 6 }, (_, i) => {
+      const p: HopperPose = { ...HELD_UP, pawN: [29 - (i % 2), 3.5 + (i % 2)], mood: "joy", bugEye: "joy", ...EARS_UP, bob: i % 2 ? 2 : 0, ride: i % 2 ? 1 : -1 };
+      return f(110, p, { cue: i === 0 ? "cheer" : i === 3 ? "chirp" : undefined, specks: i % 2 === 0 ? sparkle(riderOnFrame([29, -6], p), i === 0) : [] });
+    }),
+    f(160, { ...HELD_UP, mood: "joy" }),
+  ],
+};
+
+/** He loses the race: the rabbit's ears droop, a sigh, the scarf going limp; the grasshopper's antennae sag. */
+const raceLost: Anim = {
+  loop: false,
+  frames: [
+    f(120, { mood: "wide", ...EARS_UP }, { cue: "sigh" }),
+    f(140, { mood: "sad", earN: [40, 4], earF: [45, 6], scarfEnd: [58, 22], billow: -2 }),
+    f(160, { mood: "sad", nod: 1, earN: [41.5, 10], earF: [45.5, 11], scarfEnd: [55, 25], billow: -1.4, antN: [-5, 18], antF: [0, 15] }),
+    f(180, { mood: "sad", nod: 1, bob: 1, ...EARS_DROOP, ...LIMP, antN: [-6, 22], antF: [-1, 20] }),
+    f(400, { mood: "out", nod: 1, bob: 1, ...EARS_DROOP, ...LIMP, antN: [-6, 22], antF: [-1, 20] }),
+  ],
+};
 
 export const HOPPER: Character = {
   id: "hopper",
@@ -594,8 +1115,102 @@ export const HOPPER: Character = {
   palette: HOPPER_PALETTE,
   halo: "#2a2a20",
   parts: PARTS,
-  anims: { idle },
+  anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory, leapfrog, carrotPatch, raceWon, raceLost },
 };
 
 /** The part of them a portrait shows (the rabbit's head and the grasshopper's), in frame pixels. */
 export const HOPPER_PORTRAIT = { x: OX + 4, y: OY - 3, w: 48, h: 60 } as const;
+
+// ---- His attack on a king (for his kit's `kingAttack` once he's wired in: perSquare 36, stand 1.8, facesLeft).
+
+/** Room ahead of him (to our left, where he faces) for the carrots' flight to the king, and headroom to drop in from. */
+const ATTACK_REACH = 34;
+const ATTACK_TOP = 18;
+const AW = W + ATTACK_REACH;
+const AH = H + ATTACK_TOP;
+/** Where each carrot reaches the king (frame pixels): at his head, or a little lower, in turn, past his square's middle. */
+const STAND = 1.8 * 36;
+const KING_X = OX + FOOT_X + ATTACK_REACH - STAND - 4;
+const kingY = (i: number) => OY + GROUND + ATTACK_TOP - 1 - (i % 2 ? 21 : 27);
+/** A frame of his in the attack's bigger frame. */
+const fa = (fr: Frame): Frame => moved(fr, ATTACK_REACH, ATTACK_TOP, AW, AH);
+const landShadow = (r: number): Speck[] => groundShadow(r, OX + FOOT_X + ATTACK_REACH).map(([x, y, k]): Speck => [x, y + ATTACK_TOP, k]);
+
+/** A carrot's flight from his paw to the king (attack frame pixels): a short lob, the point `t` (0 to 1) along it. */
+function lob(from: Pt, i: number, t: number): Pt {
+  const to: Pt = [KING_X, kingY(i)];
+  const c: Pt = [(from[0] + to[0]) / 2, Math.min(from[1], to[1]) - 8];
+  return [(1 - t) ** 2 * from[0] + 2 * (1 - t) * t * c[0] + t * t * to[0], (1 - t) ** 2 * from[1] + 2 * (1 - t) * t * c[1] + t * t * to[1]];
+}
+/** Speed lines behind the carrot, from his paw, brighter toward it. */
+function trail(from: Pt, i: number): Speck[] {
+  const out: Speck[] = [];
+  for (let n = 4; n <= 22; n++) {
+    const t = n / 30;
+    if (t < 0.45 && n % 2) continue;
+    const [x, y] = lob(from, i, t);
+    out.push([Math.round(x), Math.round(y), t > 0.55 ? "w" : t > 0.35 ? "P" : "J"]);
+  }
+  return out;
+}
+
+/**
+ * A throw: the grasshopper braced, the rabbit's arm flung out at the king, his eye on the king (forward and down, his
+ * head nodded toward him), the carrot just reaching the king at the end of a lob of speed lines (the board bonks it on
+ * his square).
+ */
+const throwAt = (i: number): Frame => {
+  const p: HopperPose = { ...THROWN, mood: "aim", nod: 2, lean: -1, ...EARS_UP, bob: 1, ride: i % 2 ? 0 : 1, earN: [36 + (i % 2), -2], antN: [-5, 13], antF: [0, 9.5] };
+  const fr = fa(f(90, p, { cue: i % 2 ? "bonk" : "toss", shake: [i % 2 ? -1 : 1, 0] }));
+  const [hx, hy] = riderOnFrame(THROWN.pawN!, p).map((v, j) => v + (j ? ATTACK_TOP : ATTACK_REACH)) as unknown as Pt;
+  const [cx, cy] = lob([hx, hy], i, 0.86);
+  return { ...fr, specks: [...(fr.specks ?? []), ...trail([hx, hy], i)], layers: [...fr.layers, carrotAt([cx, cy], 70 + (i % 3) * 25)] };
+};
+/** Between throws: his paw back in the satchel for the next carrot, his eye still on the king. */
+const reload = (i: number): Frame => fa(f(80, { ...IN_SATCHEL, mood: "aim", nod: 2, lean: -1, ...EARS_UP, earN: [36.5, -2 + (i % 2)], ride: 0, bob: 0, antN: [-4, 13], antF: [1, 9.5] }));
+
+/**
+ * His attack on a king, the king to our left (where he faces; the board mirrors him when it's to his right), on the
+ * shared beats (KING_ATTACK, boss-timing.ts): his shadow spreads, the grasshopper drops in from above in a long hop
+ * and lands (`land`); the rabbit's paw goes to the satchel, then he pelts the king nonstop: ten carrots, one on each hit
+ * (cues `toss` and `bonk` in turn, so the repeats don't pile up), each landing on the king's head (the board's carrot
+ * bonk), his eye on the king throughout; he cheers, a carrot held up, and they hop off. The last frame is empty.
+ */
+const kingAttack: Anim = (() => {
+  const A = KING_ATTACK;
+  const frames: Frame[] = [
+    { ms: 100, layers: [], specks: landShadow(8) },
+    { ms: 100, layers: [], specks: landShadow(16) },
+    fa(f(80, { air: 24, ...FLY, ...EARS_BACK, ...STREAM, mood: "joy" }, { cue: "hop" })),
+    fa(f(80, { air: 9, ...TOUCH, ...EARS_BACK, ...STREAM, mood: "aim" })),
+    fa(f(A.landAt - 360, { bob: 3, ride: 1, ...EARS_UP, mood: "aim", nod: 1 }, { cue: "land", shake: [0, 1], specks: dust(0) })),
+    fa(f(A.lashAt - A.landAt, { ...IN_SATCHEL, mood: "aim", nod: 1, ...EARS_UP }, { specks: dust(1) })),
+  ];
+  for (let i = 0; i < A.lashes; i++) frames.push(throwAt(i), reload(i));
+  const cheer = A.leaveAt - (A.lashAt + A.lashes * A.lashEveryMs);
+  frames.push(fa(f(cheer, { ...HELD_UP, mood: "joy", bugEye: "joy", ...EARS_UP }, { cue: "cheer" })));
+  const leave = A.ms - A.leaveAt;
+  frames.push(
+    fa(f(leave - 300, { bob: 3, ride: 1, mood: "smug" })),
+    fa(f(80, { air: 8, ...LAUNCH, ...legsAt(2, LAUNCH), ...EARS_BACK, ...STREAM, mood: "joy" }, { cue: "hop" })),
+    fa(f(80, { air: 24, ...FLY, ...EARS_BACK, ...STREAM, mood: "joy" })),
+    { ms: 80, layers: [], specks: landShadow(10) },
+    { ms: 60, layers: [] },
+  );
+  return { loop: false, frames };
+})();
+
+/**
+ * Chub & Chirp for their attack on a king: the same drawing, parts and palette, facing our left as always (as Sawyer),
+ * in a frame `ATTACK_REACH` wider on the left (the carrots' flight) and `ATTACK_TOP` taller (they drop in). Its `idle`,
+ * one still, is for the preview, which starts every reel from one.
+ */
+export const HOPPER_ATTACK: Character = {
+  ...HOPPER,
+  id: "hopper-attack",
+  name: "Chub & Chirp (their attack)",
+  w: AW,
+  h: AH,
+  foot: [HOPPER.foot[0] + ATTACK_REACH, HOPPER.foot[1] + ATTACK_TOP],
+  anims: { idle: { loop: true, frames: [fa(f(1000))] }, kingAttack },
+};
