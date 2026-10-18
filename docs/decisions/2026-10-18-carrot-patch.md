@@ -136,6 +136,13 @@ tuning: [reports/hopper-carrots-sim.md](../../reports/hopper-carrots-sim.md).
   sim's bots are the game's bots. The bots pick from the engine's top moves and the pulls (`judge.offer`, new: scored
   first, as his brain's), so they weigh the same moves he does. Online the score jobs carry `race`; the lobby's runner
   counts the race on the host's raw numbers, once, for everyone; two judges' jobs give the same bots' picks (tested).
+- **The eval bar reads the engine's own evaluation during the race, carrots ignored** (the director's call, Oct 18),
+  as it does around every other power online: the race's weighing values moves by what the carrots are worth, which
+  isn't the position's value (it could read 0% for a side that is fine on the board). Online the bar always read the
+  app's own search; solo's read `topMovesFor`, the judge's ranking, so during the race it now reads `engineTop`, the
+  same search with no boss rule. The hints and the bots keep the judge's ranking. (The 100% the wiring screenshot
+  showed right after the cast in the test switch's opening is the engine's own: his cast passes his turn, and after
+  1.e4 e5 2.Nf3 Nc6 3.d4 the crowd moving again is 99.5% for White by Stockfish at 500,000 nodes.)
 - **Fair play: a race turn counts only when the engine's best move is also the race's best move, and then it's
   recorded with the engine's own numbers.** The director's call after the delta review of #275 (S5, its option b). The
   rule held to: a legitimate carrot move must never count against a player.
