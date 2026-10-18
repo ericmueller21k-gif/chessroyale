@@ -94,7 +94,8 @@ export async function pickMode(page: Page, mode?: string) {
   const row = page.getByRole("radiogroup", { name: "RANKED" });
   await row.getByRole("radio").first().waitFor();
   if (mode) return row.getByRole("radio", { name: new RegExp(`^${mode}`) }).click();
-  if (!(await row.locator('[aria-checked="true"]').count())) await row.getByRole("radio", { name: /^50 v 50/ }).click();
+  // (Nothing picked is the panel's "Tap a mode…": ?mode=classic picks Classic, which has no button in the row.)
+  if (await page.locator(".fd-mode-panel").getByText("Tap a mode above to play").count()) await row.getByRole("radio", { name: /^50 v 50/ }).click();
 }
 
 /** Home → Matchmaking: Solo → PLAY (in the mode the URL or the picker chose, else 50 v 50): you and bots, after the seats fill. */
