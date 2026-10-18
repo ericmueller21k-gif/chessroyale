@@ -395,5 +395,6 @@ export function boardInputs(p: Omit<BoardProps, "children" | "silent" | "onMove"
     p.dark ? p.dark.join() : null,
     !!p.onDarkTry,
     p.turn ?? 0,
+    p.elephants?.length ? p.elephants.join() : null,
   ];
 }

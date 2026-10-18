@@ -20,9 +20,8 @@
  * Never an illegal position: the fusion never leaves his king attacked (the crowd moves next), gives check, leaves the
  * crowd without a move or ends the game (a dead draw), the lift never leaves the crowd's king in check or adds a check on
  * his, a landing never gives check or leaves the side to move without a move; and each is a base on the board (the
- * position changes outside a move). Numbers:
- * BOSS_POWERS.tusks*, slam*. His art and moments are the app's, a later build (components/Alfil.tsx holds their places
- * for now).
+ * position changes outside a move). Numbers: BOSS_POWERS.tusks*, slam*. His art and moments are the app's
+ * (characters/alfil.ts, components/Alfil.tsx), timed by ALFIL_BEATS.
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type SlamLanding, type SlamPiece } from "@chessroyale/core";
 import { applyMove, gameEnd, legalMoves, mateInOne, sideToMove } from "../rules.ts";
@@ -33,11 +32,32 @@ import { bossPowers, eachOn, from, logit, meterFull, other, powerRoll, testSwitc
 import { PIECE_VALUE, gridAttackers, gridHanging, gridKing, gridKingAttacked, gridOf, isLight, placementOf, sideOf, type Grid } from "./grid.ts";
 
 /**
- * How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts): the cast, the fusion and the Slam at
- * the start of his turn (each its own screen, then his move), the landing as a crowd turn begins (or at the start of his
- * turn, early). Estimates until his art and its beats are built (they're the screens' to time).
+ * His moments, beat by beat (ms into each; nobody's clock runs), timed by his animations' cues (the app's alfil.ts:
+ * its tests check each cue against these):
+ *   tusks  the banner until `castAt`, when his trunk levels the ankus (his tusksCast's `cast`) and his two pawns start
+ *          to glow; then his move.
+ *   fuse   his two pawns glow; at `riseAt` they lift off toward the board's center (his tusksFuse's `rise`), at
+ *          `flashAt` they meet in a ball of white light (its `flash`), and the elephant drops onto its square by
+ *          `landAt`; then the crowd's turn.
+ *   slam   the banner until `leapAt` (his mammothSlam's `leap`); at `slamAt` he crashes down and the board shakes (its
+ *          `slam`); at `flyAt` the pieces fly up off their squares (its `fly`), gone by `goneAt`; at `shadowsAt` each
+ *          square they'll land on shows its shadow (its `shadows`); then his move.
+ *   land   the pieces drop out of the sky one after another, `stagger` apart, each `fallMs` onto its own square (a
+ *          piece whose own square was taken then slides `slideMs` onto the square it landed on).
  */
-export const ALFIL_FX = { tusks: 2300, fuse: 2600, slam: 4200, land: 1600 } as const;
+export const ALFIL_BEATS = {
+  tusks: { castAt: 1500, total: 2300 },
+  fuse: { riseAt: 400, flashAt: 900, landAt: 1400, total: 2100 },
+  slam: { leapAt: 1500, slamAt: 1860, flyAt: 2000, goneAt: 2600, shadowsAt: 2210, total: 3000 },
+  land: { stagger: 200, fallMs: 450, slideMs: 300, total: 1500 },
+} as const;
+
+/**
+ * How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts): the cast and the Slam at the start
+ * of his turn (each its own screen, then his move), the fusion (his move) and the landing as a crowd turn begins (or
+ * the landing at the start of his turn, early).
+ */
+export const ALFIL_FX = { tusks: ALFIL_BEATS.tusks.total, fuse: ALFIL_BEATS.fuse.total, slam: ALFIL_BEATS.slam.total, land: ALFIL_BEATS.land.total } as const;
 
 /** What his turn begins with: the Mammoth Slam, the fusion of his last cast (his move: his turn ends with it), or a new cast (then his move). */
 export type AlfilStep = "fuse" | "tusks" | "slam";

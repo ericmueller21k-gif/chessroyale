@@ -1,3 +1,4 @@
+import { alfilSound } from "./alfil-sounds.ts";
 import { bigBoySound } from "./bigboy-sounds.ts";
 import { clownSound } from "./clown-sounds.ts";
 import { gingerSound } from "./gingerbread-sounds.ts";
@@ -14,6 +15,7 @@ import { sawyerSound } from "./sawyer-sounds.ts";
  * synthesized ones too: `godKing`.)
  */
 const MAKERS = {
+  alfil: alfilSound,
   bigBoy: bigBoySound,
   clown: clownSound,
   ginger: gingerSound,

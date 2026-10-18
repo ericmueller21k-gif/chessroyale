@@ -262,9 +262,9 @@ export const lastStandAttackHits = (): number[] => kingAttackHits().map((t) => L
 
 /**
  * The bosses whose character has a `kingAttack` (the app's BOSS_KITS: a unit test keeps the two the same), by
- * BOSS_ROSTER id. Hollow first (Eric, Oct 10: to try it before the others get theirs).
+ * BOSS_ROSTER id. Hollow first (Eric, Oct 10: to try it before the others get theirs); Alfil's ankus jabs (Oct 17).
  */
-export const KING_ATTACKERS: readonly string[] = ["hollow"];
+export const KING_ATTACKERS: readonly string[] = ["hollow", "alfil"];
 export const hasKingAttack = (bossId: string | null | undefined): boolean => !!bossId && KING_ATTACKERS.includes(bossId);
 
 /** The crowd is checkmated on this board (the boss's move mated it). */

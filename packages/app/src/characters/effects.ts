@@ -13,6 +13,7 @@ import { CANDLE_SHOT, CANDLE_SHOTS, FIREBALL_FALL, FIRE_SHADOW, FIRE_TILE, PIECE
 import { BULB_STRAND, DARK_MISS, DARK_POUR, DARK_SQUARE, LASH_HIT, NIGHT_LABEL, NIGHT_SQUARE } from "./effects/hollow.ts";
 import { BLOCK_FLY, BOUNCE_CRASH, BOUNCE_PUFF, TOY_BLOCK } from "./effects/bigboy.ts";
 import { BOARD_GAP, SAW_CRACK, SAW_CUT } from "./effects/sawyer.ts";
+import { ANKUS_HIT } from "./effects/alfil.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
 export { BOARD_CELL, SQUARE } from "./effects/common.ts";
@@ -49,4 +50,5 @@ export const EFFECT_SPRITES = {
   sawCut: SAW_CUT,
   sawCrack: SAW_CRACK,
   boardGap: BOARD_GAP,
+  ankusHit: ANKUS_HIT,
 } as const satisfies Record<string, Character>;

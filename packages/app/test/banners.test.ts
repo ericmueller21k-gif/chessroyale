@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BOSS_BANNER, DEFAULT_SETTINGS, SQUADS, type PowerEventKind } from "@chessroyale/core";
-import { BLOCK, BOARD_SAW, BOSS_INTRO, BOUNCE, KING_COMMAND, KING_SUMMON, LAST_STAND, LIGHTS_OUT, POWER_FX, PULL, RECLUSE_FX, SAW_CUT, SHOWDOWN, SPLIT, START_FEN, bossShowMs, bossThinkMs } from "@chessroyale/chess";
+import { ALFIL_BEATS, BLOCK, BOARD_SAW, BOSS_INTRO, BOUNCE, KING_COMMAND, KING_SUMMON, LAST_STAND, LIGHTS_OUT, POWER_FX, PULL, RECLUSE_FX, SAW_CUT, SHOWDOWN, SPLIT, START_FEN, bossShowMs, bossThinkMs } from "@chessroyale/chess";
 import { WARN } from "../src/components/BossPowers.tsx";
 import { BIGBOY_UI } from "../src/components/BigBoy.tsx";
 import { BOINGO_UI, FUNHOUSE, PIE, SPIN, funhouseFlipAt } from "../src/components/Boingo.tsx";
@@ -11,6 +11,7 @@ import { DARK, HOLLOW_UI } from "../src/components/Hollow.tsx";
 import { PIG_UI } from "../src/components/Pig.tsx";
 import { BULLET, RECLUSE_UI } from "../src/components/Recluse.tsx";
 import { SAWYER_UI } from "../src/components/Sawyer.tsx";
+import { ALFIL_UI } from "../src/components/Alfil.tsx";
 import { LIGHTS_BANNER_MS } from "../src/components/LightsOut.tsx";
 import { bannerLength } from "../src/components/FightBanner.tsx";
 import type { MomentProps, MomentUi } from "../src/components/PowerParts.tsx";
@@ -29,7 +30,7 @@ const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 
 /** Every power moment's view, by kind (the rage warning and each boss's). */
 const VIEWS: Partial<Record<PowerEventKind, { ui: MomentUi; boss: string; name: string }>> = {};
-for (const [ui, name] of [[GINGER_UI, "Ginger"], [BOINGO_UI, "Boingo"], [GREX_UI, "Jefferson"], [HOLLOW_UI, "Hollow"], [BIGBOY_UI, "Big Boy"], [SAWYER_UI, "Sawyer"], [PIG_UI, "Wrangler"], [RECLUSE_UI, "Hidden Boss"]] as const) {
+for (const [ui, name] of [[GINGER_UI, "Ginger"], [BOINGO_UI, "Boingo"], [GREX_UI, "Jefferson"], [HOLLOW_UI, "Hollow"], [BIGBOY_UI, "Big Boy"], [SAWYER_UI, "Sawyer"], [PIG_UI, "Wrangler"], [RECLUSE_UI, "Hidden Boss"], [ALFIL_UI, "Alfil"]] as const) {
   for (const [kind, m] of Object.entries(ui.moments)) VIEWS[kind as PowerEventKind] = { ui: m as MomentUi, boss: ui.id, name };
 }
 VIEWS.warn = { ui: WARN, boss: "bigboy", name: "Big Boy" };
@@ -77,6 +78,8 @@ const POWER_AT: Partial<Record<PowerEventKind, number>> = {
   pull: PULL.catchAt,
   drag: PULL.catchAt,
   showdown: SHOWDOWN.throwAt,
+  tusks: ALFIL_BEATS.tusks.castAt,
+  slam: ALFIL_BEATS.slam.leapAt,
 };
 
 /** Each power's banner on screen on Oct 15, ms (its window, at most the 2.5 s it slid off by then). */

@@ -46,7 +46,9 @@ export function prewarmKingAttack(name: string): void {
   if (!ka || warmed.has(key)) return;
   warmed.add(key);
   prewarmSprite(ka.ch, ka.ch.anims[ka.anim]?.frames ?? []);
-  prewarm("lashHit", Object.entries(EFFECTS.lashHit.ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
+  // (Its hits' effect: Hollow's lash, Alfil's jab.)
+  const fx = ka.hit("a1", 0, "L", 0).name;
+  prewarm(fx, Object.entries(EFFECTS[fx].ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
 }
 
 /**

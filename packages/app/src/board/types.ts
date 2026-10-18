@@ -46,6 +46,11 @@ export interface BoardProps {
    * board shows it, and taps, drags and moves are turned back (board-view.ts). The coordinates name the real squares.
    */
   turn?: QuarterTurn;
+  /**
+   * Alfil's elephants: the squares of the bishops drawn with their own art (bishops in every way; the boss view's
+   * `elephants`). A piece that was one keeps its art as it fades.
+   */
+  elephants?: readonly string[];
 }
 
 // The board's own elements: a piece (also drawn over the board, and in the promotion picker) and a square's highlight.

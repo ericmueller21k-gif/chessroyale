@@ -126,6 +126,21 @@
  *                               windup to its `throw`), a leap back to his corner, then `haul` while the board's ropes
  *                               yank each pair into the line-up (a `yank` each), and "DRAW!" (the `draw` sting).
  *
+ *   "Alfil"
+ *     power        "tusksCast"  Tusks' cast: his trunk takes the ankus and swings it down before him; at `cast` it's
+ *                               levelled at the board and his two marked pawns start to glow (components/Alfil.tsx), a
+ *                               glow they keep until the fusion or the counter.
+ *     powerHit     "tusksFuse"  The fusion (his move): at `rise` the two pawns lift off toward the board's center; at
+ *                               `flash` they meet in a ball of white light and the elephant (a bishop drawn with its
+ *                               own piece art) drops onto its square. Lines: `kit.lines.powerHit` (the fusion's).
+ *     ultimateWarn "check"      His trumpet, for the warning.
+ *     ultimate     "mammothSlam" He leaps (`leap`, the big trumpet) and crashes down (`slam`: the board shakes); at `fly`
+ *                               your three pieces fly up off their squares; at `shadows` each square they'll land on
+ *                               shows Jefferson's `fireShadow` (reused as is), a size bigger each turn until they land.
+ *     ultimateHit  "idle"       They land (he stays where he is): each drops out of the sky onto its own square, the
+ *                               shadow at its biggest until then, a soft thump each (a piece whose square was taken
+ *                               slides on to the nearest one allowed). Lines: `kit.lines.ultimateHit`.
+ *
  *   Each moment's animation is in the kit (`BOSS_KITS[name].anims[power | ultimateWarn | ultimate]`), its lines
  *   are `kit.lines.power / ultimateWarn / ultimate` (pick with `pickLine(kit, "power", key)` from boss-beats.ts,
  *   keyed by the moment so every player gets the same line), and its sounds fire from its frames' cues.
@@ -166,6 +181,8 @@
  *                          (loop), close<t>, dawn<t> (ends empty), found, shown (loop), answer, answered (loop),
  *                          where <t> is the square's tile (16 by where it is, light or dark). Use nightItems().
  *   nightLabel     square  a … h, 1 … 8: the night's coordinates, over the tiles (nightItems() places them).
+ *   ankusHit       square  hit<H|L><L|R> (ends empty, about 200 ms): a jab of Alfil's ankus landing on a king, high
+ *                          or low, from the left or right edge: a gold spike and a burst of gold sparks.
  *   lashHit        square  hit<F|B><L|R><c> (ends empty, about 200 ms): a lash of Hollow's strand landing on a king,
  *                          a forehand (high) or backhand (low, rising), from the left or right edge, in bulb color c.
  *
@@ -210,6 +227,9 @@ export const POWER_ANIMS = [
   "taunt",
   "windup",
   "haul",
+  "tusksCast",
+  "tusksFuse",
+  "mammothSlam",
 ] as const;
 export type PowerAnim = (typeof POWER_ANIMS)[number];
 
@@ -298,6 +318,13 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
       leap: { anim: "leap", hit: "hop", onBoard: true },
     },
   },
+  "Alfil": {
+    power: { anim: "tusksCast", hit: "cast" },
+    powerHit: { anim: "tusksFuse", hit: "flash" },
+    ultimateWarn: { anim: "check" },
+    ultimate: { anim: "mammothSlam", hit: "slam", effects: ["fireShadow"] },
+    ultimateHit: { anim: "idle", effects: ["fireShadow"] },
+  },
 };
 
 export type EffectName = keyof typeof EFFECT_SPRITES;
@@ -361,6 +388,7 @@ export const EFFECTS: Record<EffectName, Effect> = {
   sawCut: { ch: EFFECT_SPRITES.sawCut, covers: "square", start: "openN", loop: "rawN", end: "healN", stages: [{ loop: "rawN" }, { into: "tape1N", loop: "taped1N" }, { into: "tape2N", loop: "taped2N" }], sounds: { tape: "sawyerTape" } },
   sawCrack: { ch: EFFECT_SPRITES.sawCrack, covers: "square", start: "crack", sounds: { crack: "sawyerCrack" } },
   boardGap: { ch: EFFECT_SPRITES.boardGap, covers: "strip", start: "run", loop: "gap", end: "close", sounds: { split: "sawyerCrack", rejoin: "sawyerRejoin" } },
+  ankusHit: { ch: EFFECT_SPRITES.ankusHit, covers: "square", start: "hitHL", sounds: {} },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------
@@ -511,4 +539,9 @@ export function lightsOutSpot(ch: Character, width = 30): { left: number; top: n
 /** Hollow's i-th lash landing on the king's square, from his side (`from`: he stands to its left or right). */
 export function lashItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   return { square, name: "lashHit", anim: `hit${i % 2 ? "B" : "F"}${from}${i % 3}`, since };
+}
+
+/** Alfil's i-th jab of his ankus landing on the king's square (high, then low, in turn), from his side. */
+export function ankusItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "ankusHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }

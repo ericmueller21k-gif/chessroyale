@@ -222,7 +222,7 @@ export function PlayScreen({
         <div class="board-row">
           {match.boss && <BossSide match={match} />}
           <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={fen} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} onRefused={match.boss ? (m) => setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)}>
+          <Board fen={fen} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} onRefused={match.boss ? (m) => setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing ? undefined : match.boss?.powers?.elephants}>
             {/* (Stepping back through the game keeps the dark on its squares: it belongs to the square.) */}
             {match.boss?.powers && (!history.browsing || dark.length > 0) && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
             {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} />}

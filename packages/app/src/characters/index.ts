@@ -1,3 +1,4 @@
+import { ALFIL } from "./alfil.ts";
 import { BIGBOY } from "./bigboy.ts";
 import { BLACK_KNIGHT } from "./black-knight.ts";
 import { CLOWN } from "./clown.ts";
@@ -17,7 +18,7 @@ export type { Character } from "./sprite.ts";
  * Every character drawn so far: the bosses, and the God King (the crowd's champion). (The Hidden Boss's bust, his phone
  * crop, is cut at its foot on purpose, so it isn't here: recluse.test.ts checks it.)
  */
-export const CHARACTERS: readonly Character[] = [BLACK_KNIGHT, PAWN_GOLEM, CLOWN, GINGERBREAD, GREX, HOLLOW, BIGBOY, SAWYER, PIG, RECLUSE, GOD_KING];
+export const CHARACTERS: readonly Character[] = [BLACK_KNIGHT, PAWN_GOLEM, CLOWN, GINGERBREAD, GREX, HOLLOW, BIGBOY, SAWYER, PIG, RECLUSE, ALFIL, GOD_KING];
 
 // The bosses' powers: the moments their characters play and the effect sprites for the board (see power-art.ts).
 export { EFFECT_NAMES, EFFECTS, POWER_ANIMS, POWER_MOMENTS, animLength, cueAt, type BossPowerMoments, type Effect, type EffectName, type PowerAnim, type PowerMoment } from "./power-art.ts";

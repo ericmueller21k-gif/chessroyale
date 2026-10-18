@@ -10,6 +10,7 @@ import { prewarmGinger } from "./Ginger.tsx";
 import { prewarmGrex } from "./Grex.tsx";
 import { prewarmSawyer } from "./Sawyer.tsx";
 import { prewarmPig } from "./Pig.tsx";
+import { prewarmAlfil } from "./Alfil.tsx";
 import { EngineOverlay, placeEngine, prewarmRecluse } from "./Recluse.tsx";
 import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
@@ -238,6 +239,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     if (kit.ch.id === "gingerbread") prewarmGinger();
     // (Jefferson's Roman candle: him, its shots and fireballs.)
     if (kit.ch.id === "grex") prewarmGrex(kit.ch.name);
+    // (Alfil's cast, fusion and Slam, and the shadows his pieces cast while they're up.)
+    if (kit.ch.id === "alfil") prewarmAlfil(kit.ch.name);
     // (The Hidden Boss's phase change: his rage, his leap onto the board, the book thrown down, the chant.)
     if (kit.ch.id === "recluse") prewarmRecluse(boss.crowdSide);
     // (Its attack on a king too: the God King's Last Stand, or its mate.)

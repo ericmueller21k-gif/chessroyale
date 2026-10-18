@@ -74,7 +74,7 @@ const opening = (moves: string[]): Opening => ({ id: "o", eco: "", name: "Test",
 
 /** A Boss alone against Alfil (met as the test link does: his art isn't built yet). */
 function raid(opts: { patch?: Partial<Settings>; seed?: number; engine?: EngineLike } = {}) {
-  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "alfil", bossUnfinished: true, lastStandFrom: 999, ...opts.patch } as Settings;
+  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "alfil", lastStandFrom: 999, ...opts.patch } as Settings;
   return new MatchRunner({ settings, rng: mulberry32(opts.seed ?? 5), engines: [opts.engine ?? fakeEngine()], library: [opening(LINE)], entrants: [{ id: "h0", name: "H", isBot: false }] });
 }
 const fenOf = (r: MatchRunner) => r.boards.get(0)!.fen;
@@ -141,22 +141,21 @@ const playable = (fen: string) => stockfishRefuses(fen) === null && legalMoves(f
 describe("Alfil: who he is", () => {
   it("is on the roster as alfil (🦣) with Tusks and the Mammoth Slam, and an offset in the others' range", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "alfil")!;
-    expect(def).toMatchObject({ name: "Alfil", icon: "🦣", kit: null, powers: { passive: "tusks", ultimate: "slam" } });
+    expect(def).toMatchObject({ name: "Alfil", icon: "🦣", kit: "Alfil", powers: { passive: "tusks", ultimate: "slam" } });
     const others = BOSS_ROSTER.filter(isPlayable).map((b) => b.offset);
     expect(def.offset).toBeGreaterThanOrEqual(Math.min(...others));
     expect(def.offset).toBeLessThanOrEqual(Math.max(...others));
   });
 
-  it("is hidden from players until his art ships: never playable, never random, on no menu; the test link's switch meets him", () => {
+  it("is live (Eric, Oct 17): playable, met at random, picked by name, on every menu", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "alfil")!;
-    expect(isPlayable(def)).toBe(false);
-    for (let roll = 0; roll < 1; roll += 0.01) expect(chooseBoss(roll).id).not.toBe("alfil");
-    // Picked by name (a raid lobby's creator, Boss alone, a queue): someone else.
-    expect(chooseBoss(0.5, "alfil").id).not.toBe("alfil");
-    expect(chooseBoss(0.5, "alfil", null, undefined, false, true).id).not.toBe("alfil");
-    for (const admin of [false, true]) for (const raid of [false, true]) expect(menuBosses({ admin, raid }).map((b) => b.id)).not.toContain("alfil");
-    // ?boss=alfil&wip=1 (a test switch: admins, test servers, dev): him.
-    expect(chooseBoss(0.5, "alfil", null, undefined, true).id).toBe("alfil");
+    expect(isPlayable(def)).toBe(true);
+    const met = new Set<string>();
+    for (let roll = 0; roll < 1; roll += 0.01) met.add(chooseBoss(roll).id);
+    expect(met).toContain("alfil");
+    // Picked by name (a raid lobby's creator, Boss alone, a queue): him.
+    expect(chooseBoss(0.5, "alfil").id).toBe("alfil");
+    for (const admin of [false, true]) for (const raid of [false, true]) expect(menuBosses({ admin, raid }).map((b) => b.id)).toContain("alfil");
     expect(raid().boss!.id).toBe("alfil");
   });
 });
@@ -937,7 +936,7 @@ describe("Alfil: the ground rules, over many battles", () => {
     r.deal();
     await r.score(new Map([["h0", { move: [...(r.crowdAllowed() ?? legalMoves(fenOf(r)))].sort()[0]!, thinkMs: 1000 }]]));
     expect(r.alfilStep()).toBe("slam");
-    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "alfil", bossUnfinished: true, lastStandFrom: 999, bossPowerTest: "slam" } as Settings;
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "alfil", lastStandFrom: 999, bossPowerTest: "slam" } as Settings;
     const restored = MatchRunner.restore(structuredClone(r.snapshot()), { settings, rng: mulberry32(5), engines: [fakeEngine()], library: [opening(LINE)] });
     expect(restored.alfilStep()).toBe("slam");
     expect(restored.alfilCandidates()).toEqual(r.alfilCandidates());

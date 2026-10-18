@@ -148,11 +148,10 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // Sawyer (DECISIONS.md: "Wrangler, built": the estimate).
   { id: "pig", name: "Wrangler", icon: "🤠", kit: "Wrangler", offset: -250, powers: { passive: "drag", ultimate: "showdown" } },
   // Alfil, the woolly mammoth (Eric, Oct 17): Tusks (two of his pawns fuse into an elephant, a bishop, and that's his
-  // move) and the Mammoth Slam (three of the crowd's pieces in the air for three turns). His rules are built before his
-  // art: `kit` stays null (so he's never playable: no menu, no raid, never random) until his art ships; a test link meets
-  // him in Boss alone (`?boss=alfil&wip=1`). His offset from the boss sim (docs/decisions/2026-10-17-alfil-rules.md).
-  // Tuned (V1: the fusion is his move; reports/alfil-sim.md), hidden until his art is wired in.
-  { id: "alfil", name: "Alfil", icon: "🦣", kit: null, offset: -250, powers: { passive: "tusks", ultimate: "slam" } },
+  // move) and the Mammoth Slam (three of the crowd's pieces in the air for three turns). Live with his art (Eric, Oct 17:
+  // "you can just push it"). His offset from the boss sim (docs/decisions/2026-10-17-alfil-rules.md; V1, the fusion is
+  // his move: reports/alfil-sim.md).
+  { id: "alfil", name: "Alfil", icon: "🦣", kit: "Alfil", offset: -250, powers: { passive: "tusks", ultimate: "slam" } },
   // The Hidden Boss (working id "recluse"; Eric names him later: his name is this one string, wherever it shows). Hidden
   // from players (admins, Boss alone) except in the Crowd's boss final, which is always him (Eric, Oct 14). His strength
   // is fixed whatever the player's rating (BOSS_BRAIN.fixed: Maia at its top), so his offset is unused. The God King's
