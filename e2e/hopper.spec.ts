@@ -13,8 +13,8 @@ import { BOARD_SEL, test, bossAloneFromHome, engineTop, watchFor } from "./helpe
  *   planted, his ladder; the dock's count; you pull yours (each popping as your move lands, counted), he pulls his; all
  *   pulled, his spin: the reel stops on what he rolled, its cards only his count's prizes, and the prize pieces are on
  *   his side.
- * - His fifth carrot (?carrots=5: each carrot a step from one of his pieces, out of your reach): you leave them, he
- *   pulls them, counted in the dock; the fifth wins the battle, no spin.
+ * - His fifth carrot (?carrots=5: each carrot a step from one of his pieces, out of your reach, and he takes one whenever
+ *   he can): you leave them, he pulls them, counted in the dock; the fifth wins the battle, no spin.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const bossNow = (p: Page) => p.evaluate(() => (window as any).match?.boss ?? null).catch(() => null);
@@ -232,8 +232,9 @@ test("his fifth carrot (?carrots=5): you leave them, he pulls them one by one, c
     const fen = await fenNow(page);
     const open = c ? openCarrots(c) : [];
     const quiet = moves(fen, (m, after) => !open.includes(m.to) && !m.captured && !after.inCheck());
+    const off = moves(fen, (m) => !open.includes(m.to));
     const top = (await engineTop(page)).top.map((m) => m.move);
-    await play(page, top.find((m) => quiet.includes(m)) ?? quiet[0]!);
+    await play(page, top.find((m) => quiet.includes(m)) ?? quiet[0] ?? top.find((m) => off.includes(m)) ?? off[0] ?? top[0]!);
   }
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("results");
   expect((await bossNow(page)).powers.carrots).toMatchObject({ boss: 5, over: "won", spin: null });
@@ -282,22 +283,36 @@ test("their tile and stage, their figure by the board and the dock's count: whol
   expect(sprite.y).toBeGreaterThanOrEqual(0);
   if (phone) expect((await char.boundingBox())!.y + (await char.boundingBox())!.height).toBeLessThanOrEqual(board.y);
   else expect((await char.boundingBox())!.x + (await char.boundingBox())!.width).toBeLessThanOrEqual(board.x);
-  // The cast, then the dock's count, whole in the status box beside your move's line and your clock.
+  // The cast, then the dock's count: a computer's in the status box beside your move's line and your clock; a phone's at
+  // the left of the God King's line under it (the box keeps its room for the words), clear of him.
   await play(page, (await engineTop(page)).top[0]!.move);
   await yourMove(page);
+  await expect(page.locator(".dk-race")).toHaveCount(1);
   const status = (await page.locator(".boss-dock-status").boundingBox())!;
   const badge = (await page.locator(".dk-race").boundingBox())!;
   const text = (await page.locator(".boss-dock-status .dk-text").boundingBox())!;
   const clock = (await page.locator(".boss-dock-status .dk-clock").boundingBox())!;
-  expect(badge.x).toBeGreaterThanOrEqual(status.x);
-  expect(badge.x + badge.width).toBeLessThanOrEqual(text.x + 1);
+  if (phone) {
+    const king = (await page.locator(".boss-dock > .gk-unit").boundingBox())!;
+    expect(await page.locator(".dk-race").evaluate((e) => e.classList.contains("dk-race-below"))).toBe(true);
+    expect(badge.x).toBeGreaterThanOrEqual(status.x - 50);
+    expect(badge.x).toBeGreaterThanOrEqual(0);
+    expect(badge.x + badge.width).toBeLessThanOrEqual(king.x);
+    expect(badge.y).toBeGreaterThanOrEqual(status.y + status.height);
+    expect(badge.y).toBeGreaterThanOrEqual(king.y - 1);
+    expect(badge.y + badge.height).toBeLessThanOrEqual(king.y + king.height + 1);
+  } else {
+    expect(badge.x).toBeGreaterThanOrEqual(status.x);
+    expect(badge.x + badge.width).toBeLessThanOrEqual(text.x + 1);
+    expect(badge.y).toBeGreaterThanOrEqual(status.y);
+    expect(badge.y + badge.height).toBeLessThanOrEqual(status.y + status.height);
+  }
   expect(text.x + text.width).toBeLessThanOrEqual(clock.x + 1);
   expect(clock.x + clock.width).toBeLessThanOrEqual(status.x + status.width);
-  expect(badge.y).toBeGreaterThanOrEqual(status.y);
-  expect(badge.y + badge.height).toBeLessThanOrEqual(status.y + status.height);
-  expect(text.width).toBeGreaterThanOrEqual(60);
+  expect(text.width).toBeGreaterThanOrEqual(90);
   // ("Your move." whole, on one line.)
-  expect(await page.locator(".boss-dock-status .dk-text").evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  await expect(page.locator(".boss-dock-status .dk-text")).toHaveText(/^Your move\./);
+  expect((await page.locator(".boss-dock-status .dk-text strong").first().boundingBox())!.height).toBeLessThanOrEqual(20);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   await page.screenshot({ path: info.outputPath(`hopper-race-${info.project.name}.png`) });
   expect(errors).toEqual([]);

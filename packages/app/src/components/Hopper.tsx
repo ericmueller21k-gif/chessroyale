@@ -401,15 +401,16 @@ export function prewarmHopper(name: string): void {
 
 /**
  * The dock's race count while the race is on, and through the turn of his spin: the pixel carrot, his count and yours
- * (each on a disc of its side's color, as the tokens on the board), and your moves left. Null otherwise.
+ * (each on a disc of its side's color, as the tokens on the board), and your moves left. Null otherwise. In the status
+ * box, or `below` it, at the left of the God King's line (BossDock decides by the room).
  */
-export function RaceBadge({ boss }: { boss: BossView | null | undefined }) {
+export function RaceBadge({ boss, below = false }: { boss: BossView | null | undefined; below?: boolean }) {
   const c = boss?.powers?.carrots;
   if (!boss || boss.id !== "hopper" || !c || (c.spin && c.spin.at < boss.crowdMoves)) return null;
   const his = other(boss.crowdSide);
   const said = `Carrots: ${HOPPER_NAME} ${c.boss}, you ${c.crowd}. ${c.over ? "The race is over." : `${c.crowdLeft} ${c.crowdLeft === 1 ? "move" : "moves"} left.`}`;
   return (
-    <span class="dk-race" role="status" aria-label={said} title={said} data-his={c.boss} data-yours={c.crowd} data-left={c.over ? "over" : c.crowdLeft}>
+    <span class={`dk-race${below ? " dk-race-below" : ""}`} role="status" aria-label={said} title={said} data-his={c.boss} data-yours={c.crowd} data-left={c.over ? "over" : c.crowdLeft}>
       <span class="dk-race-counts" aria-hidden="true">
         <CarrotIcon cls="dk-race-icon" />
         <b class={`dk-race-n ${his}`}>{c.boss}</b>

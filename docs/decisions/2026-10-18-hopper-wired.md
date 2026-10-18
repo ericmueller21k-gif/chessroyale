@@ -35,9 +35,10 @@ the art ("gifs are perfect"): [2026-10-18-hopper-still.md](2026-10-18-hopper-sti
 - **The carrots on the board** (`carrotItems`, one canvas under the pieces, the art's `carrotPatch`): none until its
   flight lands in the cast, then planted (leaves swaying, each a little out of step), popping out as its pull plays, the
   token after. A pull with no moment on this screen (an older one, or yours seen on another screen) is simply claimed.
-- **The dock's count** (`RaceBadge`, at the left of the dock's status box on every boss screen while the race is on,
-  through the turn of his spin): the pixel carrot, his count on a disc of his color and yours on yours (as the tokens),
-  and your moves left ("7 left", "over"); its label reads it out ("Carrots: Chub & Chirp 2, you 1. 7 moves left.").
+- **The dock's count** (`RaceBadge`, on every boss screen while the race is on, through the turn of his spin): the
+  pixel carrot, his count on a disc of his color and yours on yours (as the tokens), and your moves left ("7 left",
+  "over"); its label reads it out ("Carrots: Chub & Chirp 2, you 1. 7 moves left."). On a computer (or with the God
+  King beside the row) at the status box's left; on a phone at the left of the God King's line under the row.
 - **The ladder and the reel read the settings** (`carrot-race.ts`): the ladder's words from `carrotOdds` (one prize,
   its name; one kind of piece, "a pawn or two"; else "up to" the best), the FAQ's odds and averages too.
 - **The reel** (Eric: "just an overlay in the center of the board like a shuffler, nothing super fancy, just clean"):
@@ -92,11 +93,14 @@ the art ("gifs are perfect"): [2026-10-18-hopper-still.md](2026-10-18-hopper-sti
 - **Select lines are the draft's** (`CHC-select`), not lines from his kit as for the others: they had none before.
 - **A test switch for a given count** (`?carrots=N`, solo, with `?power=carrotpatch`; `bossCarrotTest`,
   `carrotsWithinReach` in the rules): N carrots each a step from one of his pieces and out of your reach, the rest a step
-  from yours and out of his. The fifth carrot comes in about 3% of real races, so without it neither the e2e nor the
-  previews could reach his win (`?carrots=5`), an empty spin (`?carrots=0`) or a big one (`?carrots=3`) on demand.
-  Test-only: the normal placement is untouched.
-- **The dock's count sits in the status box** (left of the line, a divider between), not a row of its own: a new row
-  would shrink the board for the race (.claude/LESSONS.md, "A board that shrank as the boss fell").
+  from yours and out of his, and his race brain takes a carrot whenever a move of his pulls one (`BossRace.eager`; with
+  the normal brain he left some, weighing them against his chess). The fifth carrot comes in about 3% of real races,
+  so without it neither the e2e nor the previews could reach his win (`?carrots=5`), an empty spin (`?carrots=0`) or a
+  big one (`?carrots=3`) on demand. Test-only: the normal placement and brain are untouched.
+- **Where the dock's count sits:** in the status box it squeezed the words to 45 px at 320 ("Your move." on two lines,
+  the cast's line cut), so on a phone it sits at the left of the God King's line under the row, a box of its own laid
+  over that line (no new row: a new row would shrink the board for the race, .claude/LESSONS.md, "A board that shrank
+  as the boss fell"); a computer's status box has the room, so there it's at the box's left.
 
 ## Tests
 

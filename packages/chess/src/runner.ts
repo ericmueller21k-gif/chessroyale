@@ -1471,7 +1471,7 @@ export class MatchRunner {
   bossRace(kind: BossMoveKind = this.state.boss?.staggerNext ? "stagger" : "elo"): BossRace | null {
     if (kind !== "elo") return null;
     const race = bossRace(this.state.boss, this.boards.get(this.state.boards[0]!)!.fen);
-    return race ? { race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;
+    return race ? { race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes, ...(this.settings.bossCarrotTest !== undefined ? { eager: true } : {}) } : null;
   }
 
   /**
@@ -2054,6 +2054,8 @@ export interface BossRace {
   race: CarrotRace;
   looks: number;
   nodes: number;
+  /** Test switch only (settings.bossCarrotTest, ?carrots=N): he takes a carrot whenever a move of his pulls one. */
+  eager?: boolean;
   onCheck?(check: RaceCheck): void;
 }
 
@@ -2103,6 +2105,7 @@ export async function raceGuard(
   const wins = pulls.filter((m) => r.his + pullsOf(fen, m, r.open).length >= s.carrotCount);
   const win = wins.find((m) => [null, "checkmate"].includes(gameEnd(applyMove(fen, m), []))) ?? wins[0];
   if (win) return done(win, 0, true);
+  if (look.eager && pulls.length) return done(pulls[0]!, 0);
   const best = sorted[0]?.expected;
   const safe = best === undefined ? [] : sorted.filter((m) => withinGuard(moveLoss(best, m.expected), guard)).map((m) => m.move);
   const moves = [...new Set([pick, ...safe.slice(0, look.looks), ...pulls.slice(0, look.looks)])];

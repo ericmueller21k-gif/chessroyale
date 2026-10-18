@@ -13459,8 +13459,10 @@ img.qicon {
   text-align: center;
   pointer-events: none;
 }
-/* The dock's race count (RaceBadge), at the status box's left: the pixel carrot, his count and yours, each on a disc of
-   its side's color (as the tokens on the board), your moves left under them. */
+/* The dock's race count (RaceBadge): the pixel carrot, his count and yours, each on a disc of its side's color (as the
+   tokens on the board), your moves left under them. In the status box at its left where the box has the room (a
+   computer, or the God King beside the row); else (`dk-race-below`) at the left of the God King's line under the row,
+   a box of its own, placed over that line so nothing moves (the row is 62 px, the gap 6). */
 .boss-dock-status:has(> .dk-race) {
   grid-template-columns: auto minmax(0, 1fr);
   padding-left: 8px;
@@ -13505,6 +13507,15 @@ img.qicon {
   background: #2a2521;
   color: #f7f3ea;
   border: 1px solid #5e564d;
+}
+.boss-dock > .dk-race-below {
+  position: absolute;
+  top: 82px;
+  left: var(--dk-left, 0px);
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
 }
 .dk-race-left {
   font-size: 10px;

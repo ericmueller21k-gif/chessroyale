@@ -850,4 +850,15 @@ describe("the carrots' test switch (?carrots=N: settings.bossCarrotTest)", () =>
       });
     }
   });
+
+  it("and his race brain takes a carrot whenever a move of his pulls one (eager: the switch only; else his pick stands)", async () => {
+    const { raceGuard, DEFAULT_BOSS_GUARD } = await import("../src/index.ts");
+    // (Him to move, Black: his knight on c6 can step onto the carrot on b4; his pick is a quiet pawn move.)
+    const fen = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/3P1N2/PPP2PPP/RNBQKB1R b KQkq - 0 3";
+    const race = { boss: "b" as const, open: ["b4"], his: 0, crowdLeft: 12, bossLeft: 12 };
+    const engine = { scoreMoves: async () => [], topMoves: async () => [] } as never;
+    const eager = await raceGuard(engine, fen, "a7a6", [{ move: "a7a6", expected: 0.5 }] as never, { race, looks: 4, nodes: 1, eager: true }, DEFAULT_BOSS_GUARD);
+    expect(eager.move).toBe("c6b4");
+    expect(eager.searched).toBe(0);
+  });
 });
