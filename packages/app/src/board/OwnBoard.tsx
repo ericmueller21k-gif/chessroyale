@@ -32,13 +32,6 @@ const place = (square: string, orientation: "white" | "black", turn: QuarterTurn
   return `translate(${col * 100}%, ${row * 100}%)`;
 };
 
-/** The squares' colors: light ones as the board's ground, dark ones 20 % black over it (crisp edges, any size). */
-const SQUARES_SVG = (() => {
-  let d = "";
-  for (let row = 0; row < 8; row++) for (let col = 0; col < 8; col++) if ((row + col) % 2) d += `M${col} ${row}h1v1h-1z`;
-  return `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" shape-rendering="crispEdges"><path d="${d}" fill-opacity="0.2"/></svg>`)}")`;
-})();
-
 interface Track {
   key: string | null;
   pieces: BoardPiece[];
@@ -488,7 +481,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   return (
     <div ref={rootRef} class={`board hb orientation-${orientation}${small ? "" : " hb-manipulable"}${jump ? " hb-jump" : ""}`} data-board="own">
       <div ref={containerRef} class="hb-container">
-        <div ref={boardRef} class="hb-board" style={{ backgroundImage: SQUARES_SVG }} onPointerDown={onDown} onPointerMove={onMovePointer} onPointerUp={onUp} onPointerCancel={onUp}>
+        <div ref={boardRef} class="hb-board" onPointerDown={onDown} onPointerMove={onMovePointer} onPointerUp={onUp} onPointerCancel={onUp}>
           {[...squares].map(([sq, cls]) => (
             <square key={sq} class={cls} style={{ transform: place(sq, orientation, turn) }} />
           ))}

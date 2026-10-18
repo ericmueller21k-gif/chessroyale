@@ -425,6 +425,46 @@ p {
   height: 100%;
   display: block;
 }
+/* Board colors (Settings → Board, "Board colors"; prefs.ts puts the pick on <html data-board-colors>, per device): every
+   board colors itself from these. A scheme sets the squares and what's drawn on them (the last move, the picked square,
+   the dots, the coordinates) so each reads on its own squares. The Settings choice's previews carry the attribute too
+   (.bcol-opt), so each shows its own colors whatever is picked. Classic is the board as it always was. */
+:root,
+[data-board-colors="classic"] {
+  --sq-light: #f0d9b5;
+  --sq-dark: #c0ad90;
+  --sq-last: rgba(155, 199, 0, 0.41);
+  --sq-select: rgba(20, 85, 30, 0.5);
+  --sq-dot: rgba(20, 85, 30, 0.5);
+  --sq-ring: rgba(20, 85, 0, 0.3);
+  --sq-hover: rgba(20, 85, 30, 0.3);
+  --sq-coord-on-dark: rgba(255, 255, 255, 0.92);
+  --sq-coord-on-light: rgba(72, 58, 40, 0.8);
+  /* The 32 light squares (a8 first), as a mask for the board's light layer. */
+  --sq-light-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath d='M0 0h1v1h-1zM2 0h1v1h-1zM4 0h1v1h-1zM6 0h1v1h-1zM1 1h1v1h-1zM3 1h1v1h-1zM5 1h1v1h-1zM7 1h1v1h-1zM0 2h1v1h-1zM2 2h1v1h-1zM4 2h1v1h-1zM6 2h1v1h-1zM1 3h1v1h-1zM3 3h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM4 4h1v1h-1zM6 4h1v1h-1zM1 5h1v1h-1zM3 5h1v1h-1zM5 5h1v1h-1zM7 5h1v1h-1zM0 6h1v1h-1zM2 6h1v1h-1zM4 6h1v1h-1zM6 6h1v1h-1zM1 7h1v1h-1zM3 7h1v1h-1zM5 7h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E");
+}
+[data-board-colors="green"] {
+  --sq-light: #f0d9b5;
+  --sq-dark: #8fb36b;
+  --sq-last: rgba(255, 221, 0, 0.45);
+  --sq-select: rgba(20, 60, 20, 0.5);
+  --sq-dot: rgba(20, 60, 20, 0.5);
+  --sq-ring: rgba(20, 60, 20, 0.35);
+  --sq-hover: rgba(20, 60, 20, 0.3);
+  --sq-coord-on-dark: rgba(28, 48, 18, 0.9);
+  --sq-coord-on-light: rgba(72, 58, 40, 0.8);
+}
+[data-board-colors="gold"] {
+  --sq-light: #f0d9b5;
+  --sq-dark: #e8b640;
+  --sq-last: rgba(34, 140, 90, 0.42);
+  --sq-select: rgba(20, 85, 30, 0.5);
+  --sq-dot: rgba(20, 85, 30, 0.5);
+  --sq-ring: rgba(20, 85, 0, 0.3);
+  --sq-hover: rgba(20, 85, 30, 0.3);
+  --sq-coord-on-dark: rgba(72, 58, 40, 0.9);
+  --sq-coord-on-light: rgba(72, 58, 40, 0.8);
+}
 .hb-board {
   position: absolute;
   top: 0;
@@ -435,9 +475,18 @@ p {
   user-select: none;
   -webkit-touch-callout: none;
   line-height: 0;
-  /* The light squares; the dark ones are 20 % black over them (OwnBoard's SQUARES_SVG), as the brown board's are. */
-  background-color: #f0d9b5;
-  background-size: cover;
+  /* The dark squares are the ground; the light ones are drawn over it (below), through a mask of the 32 light squares, so
+     both colors are plain CSS colors (crisp edges, any size). */
+  background-color: var(--sq-dark);
+}
+.hb-board::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--sq-light);
+  -webkit-mask: var(--sq-light-mask) 0 0 / 100% 100% no-repeat;
+  mask: var(--sq-light-mask) 0 0 / 100% 100% no-repeat;
 }
 .hb-manipulable .hb-board {
   cursor: pointer;
@@ -454,20 +503,27 @@ p {
   pointer-events: auto;
 }
 .hb square.last-move {
-  background-color: rgba(155, 199, 0, 0.41);
   will-change: transform;
 }
-.hb square.selected {
-  background-color: rgba(20, 85, 30, 0.5);
+/* (The Settings choice's previews, .bcol-*, are drawn from the same colors.) */
+.hb square.last-move,
+.bcol-last {
+  background-color: var(--sq-last);
 }
-.hb square.move-dest {
-  background: radial-gradient(rgba(20, 85, 30, 0.5) 22%, #208530 0, rgba(0, 0, 0, 0.3) 0, rgba(0, 0, 0, 0) 0);
+.hb square.selected,
+.bcol-sel {
+  background-color: var(--sq-select);
 }
-.hb square.oc.move-dest {
-  background: radial-gradient(transparent 0%, transparent 80%, rgba(20, 85, 0, 0.3) 80%);
+.hb square.move-dest,
+.bcol-dot {
+  background: radial-gradient(var(--sq-dot) 22%, #208530 0, rgba(0, 0, 0, 0.3) 0, rgba(0, 0, 0, 0) 0);
+}
+.hb square.oc.move-dest,
+.bcol-ring {
+  background: radial-gradient(transparent 0%, transparent 80%, var(--sq-ring) 80%);
 }
 .hb square.move-dest:hover {
-  background: rgba(20, 85, 30, 0.3);
+  background: var(--sq-hover);
 }
 .hb square.check {
   background: radial-gradient(ellipse at center, rgba(255, 0, 0, 1) 0%, rgba(231, 0, 0, 1) 25%, rgba(169, 0, 0, 0) 89%, rgba(158, 0, 0, 0) 100%);
@@ -572,10 +628,10 @@ p {
   padding: 0 0.15em 0.04em 0;
 }
 .hb-coord.hb-on-dark {
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--sq-coord-on-dark);
 }
 .hb-coord.hb-on-light {
-  color: rgba(72, 58, 40, 0.8);
+  color: var(--sq-coord-on-light);
 }
 
 .play-footer {
@@ -8972,6 +9028,68 @@ a.fd-row-link {
   color: var(--fd-gold-ink);
   opacity: 0.8;
 }
+/* Settings → Board → Board colors (BoardColorsChoice): three small boards side by side, each its own colors (it carries
+   data-board-colors, so the board colors above apply to it); the picked one is marked gold, as the other choices are.
+   A preview is the board's top left four by four squares, drawn the board's way (the dark squares as the ground, the light
+   ones masked over it) with the last move, a picked piece, its move dots and a capture ring. */
+.bcol-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.bcol-opt {
+  min-width: 0;
+  min-height: 48px;
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 8px 6px;
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+  font: 700 14px Archivo, system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.bcol-opt.on {
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font-weight: 800;
+}
+.bcol-opt:active {
+  filter: brightness(1.15);
+}
+.bcol-preview {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 6px;
+  background-color: var(--sq-dark);
+  /* (A hairline round it, so a gold board shows against the gold of its picked frame.) */
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+.bcol-preview::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: var(--sq-light);
+  -webkit-mask: var(--sq-light-mask) 0 0 / 200% 200% no-repeat;
+  mask: var(--sq-light-mask) 0 0 / 200% 200% no-repeat;
+}
+.bcol-sq {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 25%;
+  height: 25%;
+}
+.bcol-preview piece {
+  width: 25%;
+  height: 25%;
+}
 .ps-play {
   flex: none;
   width: 48px;
@@ -13242,6 +13360,11 @@ img.qicon {
   background: radial-gradient(circle at 50% 58%, rgba(255, 249, 220, 0.95) 0 16%, rgba(242, 193, 78, 0.8) 34%, rgba(242, 193, 78, 0.35) 52%, rgba(242, 193, 78, 0) 70%);
   box-shadow: inset 0 0 0 max(1.5px, calc(var(--board-size, 100%) / 8 * 0.05)) rgba(242, 193, 78, 0.85);
   pointer-events: none;
+}
+/* On the Gold board (Settings → Board colors) a gold glow would melt into the gold squares: blue, from his caparison. */
+[data-board-colors="gold"] .al-glow {
+  background: radial-gradient(circle at 50% 58%, rgba(255, 249, 220, 0.95) 0 16%, rgba(52, 104, 214, 0.75) 34%, rgba(52, 104, 214, 0.35) 52%, rgba(52, 104, 214, 0) 70%);
+  box-shadow: inset 0 0 0 max(1.5px, calc(var(--board-size, 100%) / 8 * 0.05)) rgba(31, 79, 163, 0.9);
 }
 /* His moments' pieces on their way (rising, flying, dropping) and the fusion's flash: on the board's own squares, over
    the pieces, never taking a tap. */
