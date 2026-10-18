@@ -95,6 +95,11 @@ export interface Settings {
   bossMateTest?: boolean;
   /** Solo's difficulty (BOSS_DIFFICULTY): Elo on top of the boss's strength, within what the engine plays (0 online). */
   bossDifficulty: number;
+  /**
+   * Boss alone's difficulty as Maia's rating (BOSS_DIFFICULTY's `maia`): the boss picks its moves at it, whatever the
+   * strength (bossBrainFor's `alone`). 0: none (every other battle, a test link's fixed tier).
+   */
+  bossAloneMaia: number;
   /** Testing, solo only (?wip=1): `bossId` may be a boss whose powers are built but whose art isn't yet (placeholders). */
   bossUnfinished: boolean;
   /**
@@ -329,6 +334,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bossAvoid: "",
   bossPowerTest: "",
   bossDifficulty: 0,
+  bossAloneMaia: 0,
   bossUnfinished: false,
   kingStrikeLoss: [5, 15],
   // (4.7 s: his cut-in a second longer, and his slashes after it, Oct 15; was 3.7 s. The move clock stands still.)
@@ -1149,12 +1155,20 @@ export const KING_SPEECH = {
   } as Record<string, number>,
 } as const;
 
-/** Solo's difficulty: Elo on top of the boss's usual strength (yours), capped at what the engine plays. */
+/**
+ * Solo's difficulty:
+ * - `elo`: Elo on top of the boss's usual strength (yours), capped at what the engine plays (its powers' own brains
+ *   read that strength).
+ * - `maia`: in Boss alone, the rating Maia picks the boss's moves at, whatever your rating (a human's rating, Maia's
+ *   scale). Eric, Oct 18: Hardest was "way too easy"; the strength's Maia curve, tuned against bots, put every
+ *   difficulty at or near Maia's floor (600) for a 1580 player, and it gave up its queen. The harder of two ladders
+ *   offered ("better they are a bit harder rn"); a too easy / too hard button on the results screen will tune it.
+ */
 export const BOSS_DIFFICULTY = [
-  { id: "easy", label: "Easy", elo: -300 },
-  { id: "normal", label: "Normal", elo: 0 },
-  { id: "hard", label: "Hard", elo: 250 },
-  { id: "hardest", label: "Hardest", elo: 500 },
+  { id: "easy", label: "Easy", elo: -300, maia: 1000 },
+  { id: "normal", label: "Normal", elo: 0, maia: 1400 },
+  { id: "hard", label: "Hard", elo: 250, maia: 1800 },
+  { id: "hardest", label: "Hardest", elo: 500, maia: 2200 },
 ] as const;
 export type BossDifficultyId = (typeof BOSS_DIFFICULTY)[number]["id"];
 

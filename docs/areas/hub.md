@@ -39,8 +39,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     [docs/decisions/2026-10-16-boss-character-select.md](../decisions/2026-10-16-boss-character-select.md);
     `BossSelect`): slanted tiles at the top, one per boss you can meet (five to a row on a phone, all nine in one row
     from 600 px), the Hidden Boss's dark and locked, and "?" for a random boss; under them a stage (the 1 v 1 stage's
-    platform) with the picked boss in its idle, its name and its strength against you: skulls and Boss alone's rating at
-    your difficulty ("💀 Rating 1600 · Hard"; the difficulty named unless it's Normal), the same number Boss alone's menu
+    platform) with the picked boss in its idle, its name and its strength against you: skulls and Boss alone's level at
+    your difficulty ("💀 Rating 1800 · Hard": the Maia rating it plays at, Oct 18; the difficulty named unless it's Normal), the same number Boss alone's menu
     shows, worked out by one function (`bossAloneElo`) and following the menu's difficulty as it changes. One number per
     boss: the raids show none
     ([docs/decisions/2026-10-17-boss-sheet-fit.md](../decisions/2026-10-17-boss-sheet-fit.md)). A tap drops the boss on,

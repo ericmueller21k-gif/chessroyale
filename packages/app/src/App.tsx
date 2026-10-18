@@ -29,7 +29,7 @@ import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from 
 import { ShopScreen } from "./screens/Shop.tsx";
 import { account, askAgeAgain, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult } from "./account.ts";
 import { isAdmin } from "./boss-brain.ts";
-import { difficultyElo } from "./boss-difficulty.ts";
+import { difficultyElo, difficultyMaia } from "./boss-difficulty.ts";
 import { setLiveBusy, startLive } from "./live.ts";
 import { setInviteHost } from "./friends.ts";
 import { FriendsScreen } from "./screens/Friends.tsx";
@@ -92,6 +92,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
           ...(hidden ? { bossHidden: true } : {}),
           // Boss alone: the difficulty chosen next to the boss picker (Easy to Hardest) on top of that strength.
           bossDifficulty: matchBoss || bossTierFromUrl() ? 0 : difficultyElo(),
+          // Boss alone: the difficulty's Maia rating, the boss's moves picked at it (BOSS_DIFFICULTY's `maia`).
+          bossAloneMaia: matchBoss || bossTierFromUrl() ? 0 : difficultyMaia(),
         }
       : // Testing: ?augments=0, no pre-game votes (a team final at the default clock).
         modeSettings(mode === "classic" ? "classic" : "crowd", { augments: q.get("augments") !== "0" })),

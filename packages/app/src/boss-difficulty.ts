@@ -1,9 +1,9 @@
-import { BOSS_DIFFICULTY, bossStrength, raidBossElo, type BossDef, type BossDifficultyId } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, bossStrength, raidBossElo, type BossDef, type BossDifficultyId } from "@chessroyale/core";
 
 /**
- * Solo's difficulty against a boss (next to the boss picker): Easy, Normal (your strength), Hard or Hardest, Elo on
- * top of the boss's usual strength (BOSS_DIFFICULTY), capped at the engine's strongest. Which boss you meet doesn't
- * change. Remembered on this device.
+ * Solo's difficulty against a boss (next to the boss picker): Easy, Normal, Hard or Hardest. In Boss alone it sets the
+ * rating the boss picks its moves at (BOSS_DIFFICULTY's `maia`, whatever your rating), and Elo on top of the boss's
+ * usual strength for its powers' own brains. Which boss you meet doesn't change. Remembered on this device.
  */
 const KEY = "brc.bossDifficulty";
 let picked: BossDifficultyId | null = null;
@@ -37,16 +37,22 @@ export function difficultyElo(id: BossDifficultyId = chosenDifficulty()): number
   return BOSS_DIFFICULTY.find((d) => d.id === id)?.elo ?? 0;
 }
 
+/** Boss alone's Maia rating for a difficulty (Easy 1000 … Hardest 2200): the boss picks its moves at it. */
+export function difficultyMaia(id: BossDifficultyId = chosenDifficulty()): number {
+  return BOSS_DIFFICULTY.find((d) => d.id === id)?.maia ?? 1400;
+}
+
 /** A difficulty's name on screen ("Hard"). */
 export function difficultyLabel(id: BossDifficultyId): string {
   return BOSS_DIFFICULTY.find((d) => d.id === id)?.label ?? "Normal";
 }
 
 /**
- * Boss alone's strength for a boss, as the battle gets it (App's `overridesFromUrl`): a step above your rating, plus
- * the boss's offset, plus your difficulty. The one number shown for a boss before Boss alone, on the Boss raid screen's
- * stage and in Boss alone's menu alike, so the two never disagree (docs/decisions/2026-10-17-boss-sheet-fit.md).
+ * Boss alone's level for a boss: the rating it picks its moves at, your difficulty's (difficultyMaia, Oct 18: whatever
+ * your rating); a boss whose brain is fixed (the Hidden Boss) its fixed strength. The one number shown for a boss
+ * before Boss alone, on the Boss raid screen's stage and in Boss alone's menu alike, so the two never disagree
+ * (docs/decisions/2026-10-17-boss-sheet-fit.md, docs/decisions/2026-10-18-boss-alone-difficulty.md).
  */
 export function bossAloneElo(rating: number | null, def: Pick<BossDef, "offset" | "id">, id: BossDifficultyId = chosenDifficulty()): number {
-  return bossStrength(raidBossElo([rating]), def, difficultyElo(id));
+  return def.id && BOSS_BRAIN.fixed[def.id] ? bossStrength(raidBossElo([rating]), def, difficultyElo(id)) : difficultyMaia(id);
 }
