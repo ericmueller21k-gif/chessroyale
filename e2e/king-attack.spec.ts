@@ -162,10 +162,17 @@ for (const b of [
     await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
     await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 10_000 }).toBe(true);
     const samples = await sample(page);
+    // Your move, whatever it is, calls the Last Stand. (These bosses' battles start on a named opening: you may be
+    // Black, the board turned your way; and in 7 of the library's 970 openings the side to move has no knight move,
+    // mostly in check after a knight's check: then any move.)
     const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
-    const mv = new Chess(fen).moves({ verbose: true }).find((m) => m.piece === "n")!;
+    const moves = new Chess(fen).moves({ verbose: true });
+    const mv = moves.find((m) => m.piece === "n") ?? moves[0]!;
+    const white = fen.split(" ")[1] === "w";
+    const col = (sq: string) => (white ? sq.charCodeAt(0) - 97 : 104 - sq.charCodeAt(0));
+    const row = (sq: string) => (white ? 8 - Number(sq[1]) : Number(sq[1]) - 1);
     const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
-    const at = (sq: string) => ({ x: board.x + (sq.charCodeAt(0) - 97 + 0.5) * (board.width / 8), y: board.y + (8 - Number(sq[1]) + 0.5) * (board.height / 8) });
+    const at = (sq: string) => ({ x: board.x + (col(sq) + 0.5) * (board.width / 8), y: board.y + (row(sq) + 0.5) * (board.height / 8) });
     await page.mouse.click(at(mv.from).x, at(mv.from).y);
     await page.mouse.click(at(mv.to).x, at(mv.to).y);
     await expect(page.locator(".last-stand")).toBeVisible({ timeout: 30_000 });
@@ -179,8 +186,8 @@ for (const b of [
     expect(Math.max(...during.map((x) => x.hp.length))).toBeGreaterThanOrEqual(3);
     expect(s.every((x) => x.red === 0)).toBe(true);
     expect(during.filter((x) => x.god).every((x) => x.god === "lastStandAttacked")).toBe(true);
-    // Drawn beside him toward the board's middle (the God King on a3, c3, f3 or h3), facing him; his corner empty.
-    const kingLeftOfMiddle = mv.to.charCodeAt(0) - 97 < 4;
+    // Drawn beside him toward the board's middle (the God King where your move went), facing him; his corner empty.
+    const kingLeftOfMiddle = col(mv.to) < 4;
     expect(during.every((x) => x.boss && x.flip === (b.facesLeft ? !kingLeftOfMiddle : kingLeftOfMiddle))).toBe(true);
     expect(during.filter((x) => x.on).every((x) => x.corner === "hidden")).toBe(true);
     // His whole frame on screen, every frame.
