@@ -49,9 +49,10 @@ export interface BrainNote {
    * allowed, the bridge band's share, the King's strike, or a power's follow-up its engine search scored (its best:
    * Wrangler's reply to the showdown's duel); or the last check replaced the pick (bossMoveFrom: a move he may not
    * play, whoever named it, swapped for his best allowed move); or the landing guard did (Alfil's Slam: the pick gave
-   * away too much with the pieces down, swapped for the best of his top moves there).
+   * away too much with the pieces down, swapped for the best of his top moves there); or his race brain did (Chub &
+   * Chirp's Carrot Patch: a move better for the race, raceGuard).
    */
-  why?: "not ready" | "failed" | "no answer" | "guard" | "none allowed" | "share" | "strike" | "power" | "replaced" | "landing";
+  why?: "not ready" | "failed" | "no answer" | "guard" | "none allowed" | "share" | "strike" | "power" | "replaced" | "landing" | "race";
 }
 
 /** Within a guard: never more than maxLoss points, nor more than maxLogitLoss log-odds (a couple of points is always fine). */
@@ -163,6 +164,7 @@ export function brainLine(n: BrainNote): string {
     "no answer": "Stockfish (Maia too slow)",
     replaced: "pick replaced (not allowed)",
     landing: "landing guard → Stockfish",
+    race: "race brain → Stockfish",
   };
   return `${head} · ${why[n.why ?? "no answer"]}${ms}`;
 }

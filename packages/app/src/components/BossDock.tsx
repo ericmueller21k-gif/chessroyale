@@ -295,8 +295,9 @@ export function DockClock({ match, boss, run }: { match: GameView; boss: GameVie
 /**
  * Testing, admins only (ADMIN_EMAILS, as for the fair-play review; online the server checks too): a small plain button
  * that brings the boss's ultimate as the next crowd turn begins, without the warning. Grayed out while one is on its
- * way or under way (its effect still running); ready again once it's over, as the meter fills again. None for a boss
- * with no ultimate yet (`noUltimate`: Chub & Chirp), whose trigger refuses: a press would wait for nothing.
+ * way or under way (its effect still running); ready again once it's over, as the meter fills again. Gone once a
+ * once-a-battle ultimate has come (`ultimateOnce`: Chub & Chirp's Carrot Patch), whose trigger then refuses: a press
+ * would wait for nothing.
  * BOSS_POWERS.ultimateTestButton false removes it. A phone: under the dock; a computer: in the title line (Hud.tsx).
  */
 export function UltimateTest({ match }: { match: GameView }) {
@@ -315,7 +316,7 @@ export function UltimateTest({ match }: { match: GameView }) {
       </button>
     );
   }
-  if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result || match.bossNote != null || bossRules(boss)?.noUltimate) return null;
+  if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result || match.bossNote != null || (bossRules(boss)?.ultimateOnce && p.ults)) return null;
   // (Hollow's Lights out: the full meter has it on its way until the test has begun.)
   const lights = p.ultimate === "lightsout";
   const underWay = p.ultAt !== null && (!lights || (p.lightsAt != null && p.lightsAt >= p.ultAt));

@@ -33,6 +33,10 @@ export interface Moment {
   pick?: number;
   /** Wrangler's drag standing in for his showdown (none could be lined up). */
   ult?: true;
+  /** Chub & Chirp's carrot pulled: by whom; his spin: his tier and the prize he got. */
+  by?: "crowd" | "boss";
+  tier?: number;
+  prize?: string[];
 }
 
 /** Which of a boss kit's moments a power's moment is (its animation and lines: characters/power-art.ts). */

@@ -207,10 +207,10 @@ export interface BossRules {
   /** The test trigger is worked out at his turn, after his move (Wrangler's line-up): kept until its ultimate comes. */
   triggerAtHisTurn?: boolean;
   /**
-   * It has no ultimate yet (Chub & Chirp, until Eric decides theirs): the admins' test trigger refuses
-   * (triggerUltimate) and their button isn't shown, so it never waits for one that can't come.
+   * Its ultimate comes once a battle (Chub & Chirp's Carrot Patch): once it has come, the meter is off (none shown,
+   * nothing gathers: its ultimateRunning holds for the rest of the battle) and the test trigger refuses.
    */
-  noUltimate?: boolean;
+  ultimateOnce?: boolean;
   /**
    * The God King's help doesn't work against this boss (the Hidden Boss's passive): his move, his strike and his Last
    * Stand never come (the runner's kingDecision, callStrike, lastStandFor). A player's try at his move or strike spends a
@@ -268,6 +268,11 @@ export interface BossRules {
    */
   judge?: {
     mustScore(boss: BossState, fen: string): string[];
+    /**
+     * Of those, the moves the bots may pick too (scored before they pick, beside the engine's top moves): Chub & Chirp's
+     * race, the moves that pull a carrot. Without it, the bots pick from the top moves only (G-REX's fire).
+     */
+    offer?(boss: BossState, fen: string): string[];
     rank(boss: BossState, top: readonly MoveScore[], fen: string): MoveScore[];
     evaluation<E extends JudgedEvaluation>(boss: BossState, evaluation: E, fen: string): E;
   };

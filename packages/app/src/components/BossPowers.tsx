@@ -94,7 +94,8 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   const list = p.events.filter((e) => MOMENT_UI[e.kind] && (only ? e.kind === only : !MOMENT_UI[e.kind].own)).sort((a, b) => MOMENT_UI[a.kind].order - MOMENT_UI[b.kind].order);
   let t = until - powerMomentMs(list);
   return list.map((e) => {
-    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}`, at: t, ms: powerFxMs(e), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}) };
+    // (Chub & Chirp's carrots: one pulled by each side in one turn, two moments.)
+    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}${e.by ? `:${e.by}` : ""}`, at: t, ms: powerFxMs(e), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}) };
     t += m.ms;
     return m;
   });

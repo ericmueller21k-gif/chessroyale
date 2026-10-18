@@ -76,14 +76,13 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "hopperult";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
- * drag and Alfil's Tusks, which come sooner and more often, and the hopper's Leapfrog, whose battle starts with a hop
- * due on his first turn: their files). `hopperult` holds the place of the hopper's ultimate, which isn't decided yet
- * (Eric, Oct 18): it never comes (his rules have none, and his meter is off).
+ * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
+ * on his first turn, and his Carrot Patch, which comes at the start of his first turn: their files).
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "hopperult"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -158,10 +157,10 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // his move: reports/alfil-sim.md).
   { id: "alfil", name: "Alfil", icon: "🦣", kit: "Alfil", offset: -250, powers: { passive: "tusks", ultimate: "slam" } },
   // Chub & Chirp (HOPPER_NAME; id "hopper"): Chub the rabbit riding Chirp the grasshopper (Eric, Oct 18). Leapfrog: his
-  // pawn hops over one of the crowd's that stands nose to nose with it (bosses/hopper.ts). His ultimate isn't decided yet
-  // (`hopperult` holds its place: it never comes, and his meter is off). Hidden from players until his art is wired in
-  // (`kit: null`; the test link `?boss=hopper&wip=1`). His offset from the boss sim (reports/hopper-sim.md).
-  { id: "hopper", name: HOPPER_NAME, icon: "🐇", kit: null, offset: -250, powers: { passive: "leapfrog", ultimate: "hopperult" } },
+  // pawn hops over one of the crowd's that stands nose to nose with it (bosses/hopper.ts). Carrot Patch, once a battle:
+  // five carrots planted, a race to pull them, then his spin (bosses/carrots.ts). Hidden from players until his art is
+  // wired in (`kit: null`; the test link `?boss=hopper&wip=1`). His offset from the boss sim (reports/hopper-sim.md).
+  { id: "hopper", name: HOPPER_NAME, icon: "🐇", kit: null, offset: -250, powers: { passive: "leapfrog", ultimate: "carrotpatch" } },
   // The Hidden Boss (working id "recluse"; Eric names him later: his name is this one string, wherever it shows). Hidden
   // from players (admins, Boss alone) except in the Crowd's boss final, which is always him (Eric, Oct 14). His strength
   // is fixed whatever the player's rating (BOSS_BRAIN.fixed: Maia at its top), so his offset is unused. The God King's
@@ -501,6 +500,8 @@ export interface BossPowerState {
   hop?: LeapfrogHop | null;
   /** How many hops the hopper has made this battle (at most BOSS_POWERS.hopMax). */
   hops?: number;
+  /** The hopper's Carrot Patch, from its cast on (his ultimate, once a battle): the carrots, the race, his spin. */
+  carrots?: CarrotPatch | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -670,6 +671,49 @@ export interface LeapfrogHop {
   to: string;
 }
 
+/** Who pulled a carrot: the crowd, or the boss (Chub & Chirp). */
+export type CarrotSide = "crowd" | "boss";
+
+/**
+ * Chub & Chirp's Carrot Patch (their ultimate, once a battle), from its cast on. The cast was his whole turn, after the
+ * crowd's move `at`: carrots planted on `squares`. A piece pulls one by ending its move on it (a capture onto it counts,
+ * and so does his Leapfrog hop landing there); a pulled carrot stays pulled (`pulls`: each square, who, and after which
+ * crowd move: the crowd's own move, or his move or hop after it). The race: each side's moves since the cast (BOSS_POWERS
+ * .carrotMoves each). It's `over` once every carrot is pulled ("pulled"), both sides' moves are done ("moves"), or he
+ * pulls his last one ("won": the battle is his at once). Then, after his move, his spin (`spin`), unless the battle ended
+ * first.
+ */
+export interface CarrotPatch {
+  at: number;
+  squares: string[];
+  pulls: CarrotPull[];
+  crowdMoves: number;
+  bossMoves: number;
+  over?: "pulled" | "moves" | "won";
+  spin?: CarrotSpin | null;
+}
+
+/** A carrot pulled: its square, by whom, after which crowd move (his move or hop then: after the crowd's), and whether his hop did it. */
+export interface CarrotPull {
+  square: string;
+  by: CarrotSide;
+  at: number;
+  hop?: true;
+}
+
+/**
+ * His spin, after his move once the race is over (after the crowd's move `at`): his tier (his carrots), the prize the
+ * roll gave (`rolled`: pieces as letters, "p" "n" "b" "r" "q"; none on tier 0), the prize he got (`prize`: stepped down
+ * when the engines can't take it, BOSS_POWERS.carrotPrizes's order), and where each piece of it was put (`squares`).
+ */
+export interface CarrotSpin {
+  at: number;
+  tier: number;
+  rolled: string[];
+  prize: string[];
+  squares: string[];
+}
+
 /** One of Hollow's dark squares: the crowd turn it fell as, and the last crowd turn it covers (darkTurns in all). */
 export interface DarkSquare {
   square: string;
@@ -764,7 +808,11 @@ export interface BurnEvent {
  * crowd's turn after it; `squares` the two, `square` the elephant's); `slam`, his Mammoth Slam at the start of his turn
  * (`squares` the pieces lifted); `land`, the Slam's pieces back down (`squares` where they landed; as a crowd turn
  * begins, or at the start of his turn when they come down early). The hopper's: `hop`, his Leapfrog (`squares`: the
- * hop's three, from, over and to; `square` where it landed).
+ * hop's three, from, over and to; `square` where it landed); `carrots`, his Carrot Patch's cast (his whole turn: as the
+ * crowd's turn after it begins; `squares` the carrots); `carrot`, a carrot pulled (`square`, `by`: the crowd's move, as
+ * it lands; his hop, at the start of his turn; his move, as the crowd's turn after it begins); `carrotSpin`, his spin
+ * once the race is over (as the crowd's turn after his move begins; `tier`, `prize`, `squares` where the prize went);
+ * `carrotWin`, his last carrot pulled: the battle is his (`square`).
  */
 export type PowerEventKind =
   | "freeze"
@@ -794,7 +842,11 @@ export type PowerEventKind =
   | "fuse"
   | "slam"
   | "land"
-  | "hop";
+  | "hop"
+  | "carrots"
+  | "carrot"
+  | "carrotSpin"
+  | "carrotWin";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
@@ -813,6 +865,11 @@ export interface PowerEvent {
   pick?: number;
   /** Wrangler's drag that stands in for the test trigger's showdown (the board couldn't hold a line-up). */
   ult?: true;
+  /** Chub & Chirp's carrot pulled: by whom. */
+  by?: CarrotSide;
+  /** Chub & Chirp's spin: his tier (his carrots) and the prize he got (piece letters; none: a blank). */
+  tier?: number;
+  prize?: string[];
 }
 
 /** The settings behind the God King's Last Stand. */

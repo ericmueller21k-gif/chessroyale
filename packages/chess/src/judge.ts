@@ -12,7 +12,7 @@ import { DEFAULT_SETTINGS, botChoose, mulberry32 } from "@chessroyale/core";
 import { legalMoves, sideToMove } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { applyRecheck, recheckTargets, repliesFrom, type EngineLike, type RecheckSettings } from "./runner.ts";
-import { allowedSearch, fireEscapes, fireRanked, jobAllows, judgeCandidates, judgeTop } from "./boss-powers.ts";
+import { allowedSearch, fireEscapes, fireRanked, jobAllows, judgeCandidates, judgeTop, racePulls, raceRanked, type CarrotRace } from "./boss-powers.ts";
 
 /** The lobby's rules for the bots' picks (so every judge picks for them exactly as the lobby would). */
 export interface JudgeRules {
@@ -45,6 +45,12 @@ export interface JudgeJob {
    * engine's (the lobby's runner takes the fire off them, once, for everyone).
    */
   burn?: string[];
+  /**
+   * Boss battle, Chub & Chirp's Carrot Patch: the race as the crowd's judge weighs it. The moves that pull a carrot are
+   * scored too, and the bots pick by every move's score with the race counted; the scores themselves stay the engine's
+   * (the lobby's runner counts the race, once, for everyone).
+   */
+  race?: CarrotRace;
   /** No engine server: the device re-checks close calls itself, with these settings, `priority` moves first. */
   recheck?: RecheckSettings;
   priority?: string[];
@@ -75,7 +81,11 @@ export interface JudgedBoard {
 
 /** The bots' picks, from the top moves (or the allowed search: see judgeCandidates) and the job's seed: the same on every device and in the lobby. */
 export function judgeBotPicks(job: JudgeJob, top: readonly MoveScore[], extra: readonly MoveScore[] = []): { picks: string[]; powerUps: number[] } {
-  const t = fireRanked(judgeCandidates(job, top, extra), job.fen, job.burn ?? [], sideToMove(job.fen));
+  // (The Carrot Patch's pulls the job scored are the bots' to pick too: jobOffers.)
+  const offers = new Set(jobOffers(job));
+  const offered = extra.filter((m) => offers.has(m.move) && !top.some((t) => t.move === m.move));
+  const base = judgeCandidates(job, top, extra);
+  const t = jobRanked(job, [...base, ...offered.filter((m) => jobAllows(job, m.move) && !base.some((b) => b.move === m.move))]);
   const best = t[0]?.expected ?? 0.5;
   const candidates = t.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
   const all = legalMoves(job.fen).filter((m) => jobAllows(job, m));
@@ -111,15 +121,34 @@ export async function runQuickJob(engine: EngineLike, job: JudgeJob, top?: Promi
   // A boss power left none of the top moves open: the second search covers every allowed move (and every pick).
   const open = await allowedSearch(engine, job, all);
   if (open) return { top: all, extra: open };
-  const bots = judgeBotPicks(job, all);
-  const missing = outsideTop(all, [...job.picks, ...bots.picks, ...jobEscapes(job)]);
-  const extra = missing.length ? await engine.scoreMoves(job.fen, missing) : [];
+  // (The Carrot Patch's pulls: scored first, the bots may pick them.)
+  const offers = outsideTop(all, jobOffers(job));
+  const offered = offers.length ? await engine.scoreMoves(job.fen, offers) : [];
+  const bots = judgeBotPicks(job, all, offered);
+  const missing = outsideTop([...all, ...offered], [...job.picks, ...bots.picks, ...jobEscapes(job)]);
+  const extra = [...offered, ...(missing.length ? await engine.scoreMoves(job.fen, missing) : [])];
   return { top: all, extra };
 }
 
-/** G-REX's fire: the moves that take a piece off a tile ablaze (scored too, so saving it is always on the table). */
-export function jobEscapes(job: Pick<JudgeJob, "fen" | "burn" | "allowed" | "barred">): string[] {
-  return job.burn?.length ? fireEscapes(job.fen, job.burn).filter((m) => jobAllows(job, m)) : [];
+/**
+ * The moves a job scores whatever the engine's top moves are: G-REX's fire, the moves that take a piece off a tile ablaze;
+ * Chub & Chirp's Carrot Patch, the moves that pull a carrot (so saving the piece, or pulling one, is always on the table).
+ */
+export function jobEscapes(job: Pick<JudgeJob, "fen" | "burn" | "race" | "allowed" | "barred">): string[] {
+  const fire = job.burn?.length ? fireEscapes(job.fen, job.burn) : [];
+  const race = job.race ? racePulls(job.fen, job.race) : [];
+  return [...new Set([...fire, ...race])].filter((m) => jobAllows(job, m));
+}
+
+/** The moves a job's bots may pick besides the engine's top moves (scored first): the Carrot Patch's pulls. */
+export function jobOffers(job: Pick<JudgeJob, "fen" | "race" | "allowed" | "barred">): string[] {
+  return job.race ? racePulls(job.fen, job.race).filter((m) => jobAllows(job, m)) : [];
+}
+
+/** Top moves as a job's bots see them: G-REX's fire (a piece left on a tile ablaze is gone), the Carrot Patch's race counted; best first. */
+export function jobRanked(job: Pick<JudgeJob, "fen" | "burn" | "race">, top: readonly MoveScore[]): MoveScore[] {
+  const fire = fireRanked(top, job.fen, job.burn ?? [], sideToMove(job.fen));
+  return job.race ? raceRanked(fire, job.fen, job.race) : fire;
 }
 
 /** The moves the job's re-check searches, from its quick report (none: no re-check, or no close calls). */

@@ -195,7 +195,7 @@ export type Phase =
    * you left before the end (see GameView.resign): you resigned (a loss; `bot`: online, a bot plays your seat), or you
    * left once you were already out (your place as it stood; the winner isn't known).
    */
-  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult; timeout?: boolean; simul?: { won: number; of: number } };
+  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult; timeout?: boolean; carrots?: boolean; simul?: { won: number; of: number } };
 
 /** One of the Hidden Boss's phase 2 boards as the screens see it (board 0 is yours). */
 export interface SimulBoardView {
