@@ -70,8 +70,8 @@ describe("how long the boss's move holds the screen (bossTurnShowMs)", () => {
     expect(crowdMated(notMated, "w")).toBe(false);
   });
 
-  it("holds for the attack at a mate by a boss that has one (Hollow, Alfil), the same alone or in a raid", () => {
-    expect(KING_ATTACKERS).toEqual(["hollow", "alfil"]);
+  it("holds for the attack at a mate by a boss that has one (Boingo, Hollow, Sawyer, Wrangler, Alfil), the same alone or in a raid", () => {
+    expect(KING_ATTACKERS).toEqual(["clown", "hollow", "sawyer", "pig", "alfil"]);
     for (const id of KING_ATTACKERS) {
       expect(hasKingAttack(id)).toBe(true);
       expect(mateAttackDue(view(id, MATED))).toBe(true);
@@ -81,7 +81,7 @@ describe("how long the boss's move holds the screen (bossTurnShowMs)", () => {
   });
 
   it("keeps today's hold for every other boss, and for any move that isn't a mate", () => {
-    for (const id of ["gingerbread", "clown", "grex", "bigboy"]) {
+    for (const id of ["gingerbread", "grex", "bigboy", "recluse"]) {
       expect(hasKingAttack(id)).toBe(false);
       expect(bossTurnShowMs(view(id, MATED))).toBe(bossShowMs({}));
       expect(bossTurnShowMs(view(id, MATED), true)).toBe(bossShowMs({}, true));

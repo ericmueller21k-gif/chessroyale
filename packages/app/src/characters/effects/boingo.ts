@@ -1,6 +1,6 @@
 /** Boingo's effects: the pie, flying and splatting. See ../effects.ts. */
 import { canvas, ellipse, inEllipse, roundLight, shade, toGrid, type Canvas } from "../paint.ts";
-import type { Character, Frame, Part, Speck } from "../sprite.ts";
+import type { Anim, Character, Frame, Part, Speck } from "../sprite.ts";
 import { SQUARE, type Pt } from "./common.ts";
 
 // ---- The pie (Boingo's passive): flying, splatting on a square, staying, fading.
@@ -124,4 +124,65 @@ export const PIE_FLY: Character = {
       }),
     },
   },
+};
+
+// ---- His attack on a king: a pie in the king's face, side on.
+
+/**
+ * A pie hitting the king from the left edge at (x, y), `step` 0 to 2: the pie arriving (its tin edge on and the cream
+ * bursting), the splat spread wide with cream flying on past him, the cream sliding down.
+ */
+const pieHitSpecks = (x: number, y: number, step: 0 | 1 | 2): Speck[] => {
+  const out: Speck[] = [];
+  const blob = (r: number, ry: number, cx: number, cy: number) => {
+    for (let dy = -Math.ceil(ry); dy <= Math.ceil(ry); dy++)
+      for (let dx = -Math.ceil(r); dx <= Math.ceil(r); dx++) if ((dx / r) ** 2 + (dy / ry) ** 2 <= 1) out.push([cx + dx, cy + dy, dx + dy < -1 ? "w" : dx + dy > 2 ? "X" : "W"]);
+  };
+  if (step === 0) {
+    blob(2.6, 3.2, x, y);
+    // The tin's edge, side on, and its crust, just behind the cream.
+    for (let dy = -3; dy <= 3; dy++) out.push([x - 3, y + dy, "S"], [x - 4, y + dy, "o"]);
+    out.push([x, y - 1, "r"], [x + 1, y - 1, "R"]);
+  } else if (step === 1) {
+    blob(4.6, 4.2, x + 1, y);
+    for (const [dx, dy] of [[-2, -5], [3, -5], [5, 3], [-1, 5]] as const) blob(1.6, 1.6, x + 1 + dx, y + dy);
+    out.push([x + 1, y, "r"], [x + 2, y, "R"]);
+    // Cream flying on past him.
+    for (let i = 0; i < 7; i++) out.push([x + 7 + (i % 3) * 2, Math.round(y - 4 + i * 1.5), i % 2 ? "w" : "W"]);
+  } else {
+    blob(3.6, 3.2, x + 1, y + 1);
+    for (const dx of [-2, 1, 3]) for (let d = 3; d <= 6 - (dx & 1); d++) out.push([x + 1 + dx, y + 1 + d, d > 4 ? "X" : "W"]);
+    for (let i = 0; i < 4; i++) out.push([x + 11 + i * 2, y - 1 + i * 2, "W"]);
+  }
+  return out.filter(([px, py]) => px > 0 && py > 0 && px < SQUARE - 1 && py < SQUARE - 1);
+};
+const pieHitAnims: Record<string, Anim> = {};
+for (const [kind, y] of [["H", 8], ["L", 13]] as const)
+  for (const side of ["L", "R"] as const) {
+    const sp = (step: 0 | 1 | 2): Speck[] => pieHitSpecks(18, y, step).map(([x, yy, k]): Speck => [side === "L" ? x : SQUARE - 1 - x, yy, k]);
+    pieHitAnims[`hit${kind}${side}`] = {
+      loop: false,
+      frames: [
+        { ms: 50, layers: [], specks: sp(0) },
+        { ms: 70, layers: [], specks: sp(1) },
+        { ms: 60, layers: [], specks: sp(2) },
+        { ms: 20, layers: [] },
+      ],
+    };
+  }
+
+/**
+ * A pie in a king's face (Boingo's attack on a king): `hit<H|L><L|R>`, at his head or a little lower, thrown in from
+ * the left or the right edge: the pie hits side on, the cream splats wide and flies on past him, then slides down.
+ * About 200 ms; ends empty. Over the piece (or the God King standing there).
+ */
+export const PIE_HIT: Character = {
+  id: "pie-hit",
+  name: "A pie in a king's face",
+  w: SQUARE,
+  h: SQUARE,
+  foot: [16, 31],
+  palette: PIE_PALETTE,
+  parts: {},
+  anims: pieHitAnims,
 };
