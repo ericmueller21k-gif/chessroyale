@@ -53,6 +53,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     each shard's counts and time; and the test time by file as a ready-made `ci-timings.json` (refreshed Oct 18 from
     two full runs). `result` is red if the plan or any shard is. A shard with a failed or flaky test uploads its HTML
     report with the retries' traces (`e2e-report-shard-N`, kept 7 days; `npx playwright show-report <folder>`).
+    Each shard's record (`e2e-summary-N`: its failed and flaky tests) is kept 90 days, for a look at which tests
+    catch real bugs and which only flake (Eric, Oct 18; the first look about two weeks on).
   - **Try the table locally:** `node e2e/ci-select.mjs files <path>...` prints what a PR changing those paths runs;
     its tests are `packages/server/test/ci-select.test.ts` (one area's file, docs only, foundations, unknown paths,
     changed and removed specs, every spec reachable, shard counts).
