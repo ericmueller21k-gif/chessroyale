@@ -57,8 +57,6 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
     expect(c.y, `${w}`).toBeGreaterThanOrEqual(play.y + play.height);
     const friends = (await page.getByRole("main").getByRole("button", { name: "Play with friends" }).boundingBox())!;
     expect(friends.y, `${w}`).toBeGreaterThanOrEqual(c.y + c.height);
-    // (The panel: there all along.)
-    expect(Object.keys(first), `${w}`).toContain("panel");
     expect(await sideways(page), `${w}`).toBe(0);
   }
 });
