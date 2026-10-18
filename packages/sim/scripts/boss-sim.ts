@@ -223,6 +223,8 @@ interface RaidPatch {
   counter?: number;
   /** Chub & Chirp: a forced Carrot Patch (the admins' trigger) at a crowd turn in this range; the battle stops after the race. */
   cast?: [number, number];
+  /** Start at this game (a run picked up where it stopped: the games before it are already in its rows). */
+  skip?: number;
 }
 
 /**
@@ -253,7 +255,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
   const engines = [await createNodeEngine({ nodes: RAID_NODES, hashMb: 16 })];
   mkdirSync(root + "reports/boss-sim", { recursive: true });
   for (const bossId of bosses) {
-    for (let g = 0; g < games; g++) {
+    for (let g = patch.skip ?? 0; g < games; g++) {
       const rng = mulberry32(seed * 7919 + g);
       const strikeRng = mulberry32(seed * 104729 + g);
       const strikeTurns = new Set<number>();
