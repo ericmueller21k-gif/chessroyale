@@ -25,6 +25,8 @@ export const POWER_WORDS: Record<PowerId, string> = {
   bullet: "Bullet",
   tusks: "fuses two pawns into an elephant",
   slam: "Mammoth Slam",
+  leapfrog: "hops pawns over yours",
+  hopperult: "ultimate to come",
 };
 
 /** A boss's card line for its powers: its passive, then its ultimate; empty for a boss without powers yet. */

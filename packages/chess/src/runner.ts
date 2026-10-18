@@ -104,6 +104,7 @@ import {
   bulletIncrement,
   stopReason,
   alfilBattle,
+  hopperBattle,
   landsAfterHisMove,
   slamAhead,
   topEach,
@@ -114,7 +115,7 @@ import {
   type BossMoveExtras,
   type ShowdownScout,
 } from "./boss-powers.ts";
-import type { BounceResult, LightsOutTest } from "@chessroyale/core";
+import type { BounceResult, LeapfrogHop, LightsOutTest } from "@chessroyale/core";
 
 /**
  * Runs a match round by round: deal, collect picks, score with the engine, draw,
@@ -1387,6 +1388,35 @@ export class MatchRunner {
    */
   applyAlfil(pick: string | null, loss: number | null = null, step: AlfilStep | null = null): AlfilStep | null {
     return alfilBattle.apply(this.battle, pick, loss, step);
+  }
+
+  /**
+   * The hopper's Leapfrog is due: his turn begins and a pawn of his can hop over one of the crowd's (hopperBattle.due).
+   * The hop comes before his move (he then moves) or is his move (his turn ends with it: bossToMove() is false after
+   * it), as BOSS_POWERS.hopIsMove says.
+   */
+  hopDue(): boolean {
+    return hopperBattle.due(this.battle);
+  }
+
+  /** The hop's candidate positions (one per hop he could make): the same on the server, the host and in solo. */
+  hopCandidates(): string[] {
+    return hopperBattle.candidates(this.battle);
+  }
+
+  /** The hop needs an engine's pick: more than one pawn can hop (one alone hops at once). */
+  hopNeedsEngine(): boolean {
+    return hopperBattle.needsEngine(this.battle);
+  }
+
+  /** The hop, from this device's engines (hopFrom: the one best for him); null: none was due. */
+  async playHop(engines: readonly EngineLike[] = this.opts.engines): Promise<LeapfrogHop | null> {
+    return hopperBattle.play(this.battle, engines);
+  }
+
+  /** The hop (from the host's engine online: one of the candidates, else the first; hopperBattle.apply); null: none was due. */
+  applyHop(pick: string | null): LeapfrogHop | null {
+    return hopperBattle.apply(this.battle, pick);
   }
 
   /** The boss's last move, and the piece it took (if any). */

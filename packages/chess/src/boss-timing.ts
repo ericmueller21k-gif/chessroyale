@@ -9,6 +9,7 @@ import { SAWYER_FX } from "./bosses/sawyer.ts";
 import { PIG_FX } from "./bosses/pig.ts";
 import { RECLUSE_FX } from "./bosses/recluse.ts";
 import { ALFIL_FX } from "./bosses/alfil.ts";
+import { HOPPER_FX } from "./bosses/hopper.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -51,7 +52,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * step, `spin`: its banner, then the board turns again); the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX } as const;
+export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX } as const;
 
 /** How long one power's moment holds the screen (ms). */
 export const powerFxMs = (e: { kind: keyof typeof POWER_FX; first?: boolean }): number => (POWER_FX[e.kind] ?? 0) + (POWER_FX_EXTRA[e.kind]?.(e) ?? 0);
@@ -114,7 +115,7 @@ export const BOSS_MOVE_ALONE_MS = 450;
 export interface QueenSlainView {
   crowdSide: "w" | "b";
   crowdMoves: number;
-  powers?: { bounce?: { at: number } | null; events?: readonly { kind: string }[]; fusion?: { at: number; why?: string } | null } | null;
+  powers?: { bounce?: { at: number } | null; hop?: { at: number } | null; events?: readonly { kind: string }[]; fusion?: { at: number; why?: string } | null } | null;
   board: { history: readonly string[]; bases?: readonly Base[] | null };
 }
 
@@ -131,13 +132,14 @@ const hisStepPlayed = (boss: { crowdMoves: number; powers?: { events?: readonly 
  * The crowd's move has just taken the boss's queen: "QUEEN SLAIN!" plays while he thinks, and he thinks at least as
  * long (bossThinkMs). Only the crowd's own capture of his queen (never his capture of yours: Hollow thinks again after
  * his own move for his extra move), and only in the thinking straight after it: once Big Boy's Big Bounce, or one of
- * Alfil's steps (his cast, the fusion, the Slam), has played between that move and his (his turn's second thinking,
- * the same last move), it's old news (Eric, Oct 16: the banner flashed up again for a second after his bounce).
+ * Alfil's steps (his cast, the fusion, the Slam), or the hopper's hop, has played between that move and his (his turn's
+ * second thinking, the same last move), it's old news (Eric, Oct 16: the banner flashed up again for a second after his
+ * bounce).
  */
 export function queenSlain(boss: QueenSlainView): boolean {
   const { history, bases } = boss.board;
   const m = history[history.length - 1];
-  if (!m || boss.powers?.bounce?.at === boss.crowdMoves || hisStepPlayed(boss)) return false;
+  if (!m || boss.powers?.bounce?.at === boss.crowdMoves || boss.powers?.hop?.at === boss.crowdMoves || hisStepPlayed(boss)) return false;
   const taken = pieceAt(fenAtPly(history, history.length - 1, bases), m.slice(2, 4));
   return taken?.type === "q" && taken.color !== boss.crowdSide;
 }

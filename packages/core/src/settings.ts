@@ -851,6 +851,17 @@ export const BOSS_POWERS = {
    */
   slamGuardLooks: 4,
   slamGuardNodes: 30_000,
+  /**
+   * The hopper's Leapfrog (his passive; Eric, Oct 18): at the start of his turn, when one of his pawns stands nose to
+   * nose with one of the crowd's (the crowd's pawn on the square in front of his) and the square beyond is empty, his
+   * pawn hops over it to that square (never onto the crowd's back rank), automatically; several can: the engine's pick
+   * (each position searched at hopNodes: the one best for him). `hopIsMove` false: the hop comes first and he still
+   * plays his move (variant A); true: the hop is his move that turn (variant B, as Alfil's fusion). At most hopMax a
+   * battle. The sim decides between them (reports/hopper-sim.md).
+   */
+  hopIsMove: false,
+  hopMax: 2,
+  hopNodes: 30_000,
 } as const;
 
 /**

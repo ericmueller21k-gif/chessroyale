@@ -291,10 +291,10 @@ export interface LobbyRecord {
    * How the boss's own move is played (the runner's bossMoveKind: "best" is a power's follow-up its engine search
    * scored, Wrangler's reply to the showdown's duel). "funhouse": the host plays the crowd's move for Boingo (his
    * ultimate); "extra": it plays Hollow's extra move; "bounce": it picks Big Boy's Big Bounce; "tusks", "fuse" and
-   * "slam": it picks Alfil's cast (the pair), his fusion's square and his Slam's lift.
+   * "slam": it picks Alfil's cast (the pair), his fusion's square and his Slam's lift; "hop": the hopper's Leapfrog hop.
    */
-  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam";
-  /** Big Boy's Big Bounce, Alfil's fusion and Slam: the candidates the host was sent (the answer must be one of them). */
+  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop";
+  /** Big Boy's Big Bounce, Alfil's fusion and Slam, the hopper's hop: the candidates the host was sent (the answer must be one of them). */
   bounceCandidates?: string[];
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
   bossPending?: string;
@@ -1390,9 +1390,9 @@ export class LobbyCore {
     const runner = this.runner!;
     const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
     const funhouse = this.r.bossKind === "funhouse";
-    // (A pick among candidate positions, not a move: Big Boy's bounce, Alfil's cast, fusion and Slam.)
+    // (A pick among candidate positions, not a move: Big Boy's bounce, Alfil's cast, fusion and Slam, the hopper's hop.)
     const kind = this.r.bossKind;
-    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam";
+    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam" || kind === "hop";
     // A power limits the moves: the boss's (a pie), or the crowd's for the move Boingo plays for it.
     const allowed = funhouse ? runner.crowdAllowed() : runner.bossAllowed();
     // (Wrangler's turn: his long pulls, a drag or the showdown to work out too, ordered by a seed of the turn's own.)
@@ -1413,6 +1413,7 @@ export class LobbyCore {
       // (His cast weighs its pairs' fusions as if they came now: the same pick as the fusion's.)
       ...(kind === "tusks" || kind === "fuse" ? { fuse: this.r.bounceCandidates ?? [] } : {}),
       ...(kind === "slam" ? { slam: this.r.bounceCandidates ?? [] } : {}),
+      ...(kind === "hop" ? { hop: this.r.bounceCandidates ?? [] } : {}),
       ...(allowed && !pick ? { allowed } : {}),
       // (Only the boss's own moves are Maia's: the funhouse's move for the crowd, Hollow's extra move and Big Boy's
       // bounce keep their own engine picks, and so does Wrangler's reply to the showdown's duel: the engine's best.)
@@ -1470,6 +1471,27 @@ export class LobbyCore {
     this.r.bounceCandidates = runner.alfilCandidates();
     this.broadcast(this.bossMessage(0, { thinking: true }));
     if (!runner.alfilNeedsEngine()) return this.playBoss("");
+    const host = this.hostNow();
+    this.r.hostId = host;
+    if (host) this.sendBossRequest(host);
+    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
+  }
+
+  /**
+   * The hopper's Leapfrog (at the start of his turn, after the crowd's move: the runner's hopDue): everyone sees him get
+   * ready (thinking) while the host's engine picks which pawn hops among the candidates (worked out here); one pawn
+   * alone needs no engine and hops at once (after your queen banner, if it's up). Then the hop plays for everyone, and
+   * his move (or, when the hop is his move, the crowd's turn). No host engine anywhere: the first pawn that can hops.
+   */
+  private requestHop() {
+    const runner = this.runner!;
+    this.r.phase = "boss";
+    this.r.bossKey = `h-${++this.r.counter}`;
+    this.r.bossKind = "hop";
+    this.r.bossMinAt = this.thinkMinAt();
+    this.r.bounceCandidates = runner.hopCandidates();
+    this.broadcast(this.bossMessage(0, { thinking: true }));
+    if (!runner.hopNeedsEngine()) return this.playBoss("");
     const host = this.hostNow();
     this.r.hostId = host;
     if (host) this.sendBossRequest(host);
@@ -1545,6 +1567,18 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
+    if (this.r.bossKind === "hop") {
+      // The hopper's hop (the host's pick, one of the candidates; else the first): it plays out, then his move. When the
+      // hop is his move, the crowd's turn begins as after his move (its moments, the hop's first, before the crowd's
+      // clock starts). None due any more (nothing came of it): straight on.
+      this.r.bossKind = undefined;
+      const picked = this.r.bounceCandidates?.includes(move) ? move : null;
+      this.r.bounceCandidates = undefined;
+      const hop = this.runner!.applyHop(picked);
+      const until = this.io.now() + (!this.runner!.bossToMove() ? bossTurnShowMs(this.runner!.bossView()) : hop ? powerMomentMs([{ kind: "hop" }]) : 0);
+      this.broadcast(this.bossMessage(until));
+      return this.setTimer("nextRound", until);
+    }
     if (this.r.bossKind === "extra") {
       // His extra move: not the crowd's, so nothing is scored; its banner plays out, then the crowd's turn.
       this.r.bossKind = undefined;
@@ -1584,7 +1618,7 @@ export class LobbyCore {
     // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in his funhouse, the
     // crowd's: a random allowed one too). His extra move needs the engine to stay small: without one, he skips it.
     const runner = this.runner!;
-    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam") return this.playBoss("");
+    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop") return this.playBoss("");
     const legal = (this.r.bossKind === "funhouse" ? runner.crowdAllowed() : runner.bossAllowed()) ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
     this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
   }
@@ -1626,8 +1660,8 @@ export class LobbyCore {
         }
         return this.finishMatch();
       }
-      // (Hollow's Lights out, Big Boy's Big Bounce and Alfil's steps come at the start of his turn, before his move.)
-      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : this.requestBoss();
+      // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps and the hopper's hop come at the start of his turn, before his move.)
+      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.hopDue() ? this.requestHop() : this.requestBoss();
       // (A failed Lights out: his extra move, after his own and before the crowd's turn.)
       if (runner.extraMoveDue()) return this.requestExtra();
       // (Boingo's funhouse: his move for the crowd, as its turn begins.)

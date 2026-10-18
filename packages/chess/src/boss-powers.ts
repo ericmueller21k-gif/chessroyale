@@ -57,6 +57,7 @@ export * from "./bosses/pig.ts";
 export * from "./bosses/recluse.ts";
 export * from "./bosses/recluse-phase2.ts";
 export * from "./bosses/alfil.ts";
+export * from "./bosses/hopper.ts";
 export * from "./bosses/index.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */

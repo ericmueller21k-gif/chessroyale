@@ -30,6 +30,7 @@ import {
   fuseFrom,
   slamAhead,
   slamFrom,
+  hopFrom,
   allowedSearch,
   fireRanked,
   jobEscapes,
@@ -703,6 +704,7 @@ export class NetMatch implements GameView {
         // (Alfil's fusion with the Slam's pieces landing right after it: its squares weighed with them down.)
         if (m.fuse) return void this.hostPick(m.key, async (engines) => (await fuseFrom(engines, m.fen, m.fuse!, undefined, m.land?.length ? slamAhead(m.land).after : null))?.fen ?? null);
         if (m.slam) return void this.hostPick(m.key, async (engines) => (await slamFrom(engines, m.fen, m.slam!))?.fen ?? null);
+        if (m.hop) return void this.hostPick(m.key, async (engines) => (await hopFrom(engines, m.fen, m.hop!))?.fen ?? null);
         return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null);
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
@@ -900,9 +902,9 @@ export class NetMatch implements GameView {
   }
 
   /**
-   * Alfil's cast, fusion and Mammoth Slam, host only: the candidate positions weighed on this device's engines (fuseFrom:
-   * the one best for him; slamFrom: played out, within the cap), answered as the position picked, or "" (none: the
-   * cast's first pair, the fusion's first square; nothing lifts).
+   * Alfil's cast, fusion and Mammoth Slam, and the hopper's hop, host only: the candidate positions weighed on this
+   * device's engines (fuseFrom and hopFrom: the one best for him; slamFrom: played out, within the cap), answered as the
+   * position picked, or "" (none: the cast's first pair, the fusion's first square, the first hop; nothing lifts).
    */
   private async hostPick(key: string, pick: (engines: UciEngine[]) => Promise<string | null>) {
     try {

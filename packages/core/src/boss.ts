@@ -76,12 +76,14 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "hopperult";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
- * drag and Alfil's Tusks, which come sooner and more often: their files).
+ * drag and Alfil's Tusks, which come sooner and more often, and the hopper's Leapfrog, whose battle starts with a hop
+ * due on his first turn: their files). `hopperult` holds the place of the hopper's ultimate, which isn't decided yet
+ * (Eric, Oct 18): it never comes (his rules have none, and his meter is off).
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "hopperult"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -126,6 +128,9 @@ export function bossInText(name: string, start = false, roster: readonly BossDef
   return start ? said[0]!.toUpperCase() + said.slice(1) : said;
 }
 
+/** The hopper's name wherever it shows (Eric, Oct 18): Chub the rabbit riding Chirp the grasshopper. Its id stays "hopper". */
+export const HOPPER_NAME = "Chub & Chirp";
+
 /**
  * Every boss, complete or not. Only a playable one (isPlayable: a complete character and powers) is ever chosen,
  * in every boss mode: the raid and solo's boss menu; the Crowd's boss final meets the `crowdFinal` one (crowdFinalBoss).
@@ -152,6 +157,11 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // "you can just push it"). His offset from the boss sim (docs/decisions/2026-10-17-alfil-rules.md; V1, the fusion is
   // his move: reports/alfil-sim.md).
   { id: "alfil", name: "Alfil", icon: "🦣", kit: "Alfil", offset: -250, powers: { passive: "tusks", ultimate: "slam" } },
+  // Chub & Chirp (HOPPER_NAME; id "hopper"): Chub the rabbit riding Chirp the grasshopper (Eric, Oct 18). Leapfrog: his
+  // pawn hops over one of the crowd's that stands nose to nose with it (bosses/hopper.ts). His ultimate isn't decided yet
+  // (`hopperult` holds its place: it never comes, and his meter is off). Hidden from players until his art is wired in
+  // (`kit: null`; the test link `?boss=hopper&wip=1`). His offset from the boss sim (reports/hopper-sim.md).
+  { id: "hopper", name: HOPPER_NAME, icon: "🐇", kit: null, offset: -250, powers: { passive: "leapfrog", ultimate: "hopperult" } },
   // The Hidden Boss (working id "recluse"; Eric names him later: his name is this one string, wherever it shows). Hidden
   // from players (admins, Boss alone) except in the Crowd's boss final, which is always him (Eric, Oct 14). His strength
   // is fixed whatever the player's rating (BOSS_BRAIN.fixed: Maia at its top), so his offset is unused. The God King's
@@ -487,6 +497,10 @@ export interface BossPowerState {
   airborne?: SlamPiece[] | null;
   /** Their last landing: where each came down (its own square, or the nearest empty one that's allowed). */
   landed?: SlamLanding | null;
+  /** The hopper's last hop (Leapfrog): his pawn over a crowd pawn nose to nose with it, to the square beyond. */
+  hop?: LeapfrogHop | null;
+  /** How many hops the hopper has made this battle (at most BOSS_POWERS.hopMax). */
+  hops?: number;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -645,6 +659,17 @@ export interface SlamLanding {
   early?: true;
 }
 
+/**
+ * A hop of the hopper's (Leapfrog), after the crowd's move `at`, at the start of his turn: his pawn on `from` hopped
+ * over the crowd's pawn on `over` (nose to nose with it) to the empty square beyond, `to`.
+ */
+export interface LeapfrogHop {
+  at: number;
+  from: string;
+  over: string;
+  to: string;
+}
+
 /** One of Hollow's dark squares: the crowd turn it fell as, and the last crowd turn it covers (darkTurns in all). */
 export interface DarkSquare {
   square: string;
@@ -738,7 +763,8 @@ export interface BurnEvent {
  * the start of his turn (two of his pawns marked: `squares`); `fuse`, their fusion, his move (with the moments of the
  * crowd's turn after it; `squares` the two, `square` the elephant's); `slam`, his Mammoth Slam at the start of his turn
  * (`squares` the pieces lifted); `land`, the Slam's pieces back down (`squares` where they landed; as a crowd turn
- * begins, or at the start of his turn when they come down early).
+ * begins, or at the start of his turn when they come down early). The hopper's: `hop`, his Leapfrog (`squares`: the
+ * hop's three, from, over and to; `square` where it landed).
  */
 export type PowerEventKind =
   | "freeze"
@@ -767,7 +793,8 @@ export type PowerEventKind =
   | "tusks"
   | "fuse"
   | "slam"
-  | "land";
+  | "land"
+  | "hop";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
