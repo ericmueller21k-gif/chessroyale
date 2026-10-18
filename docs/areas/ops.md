@@ -13,22 +13,50 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   The "Workers Builds: chessroyale" check fails instantly on PR branches (Cloudflare's preview build for non-production
   branches): only `check` (typecheck and unit tests, `.github/workflows/check.yml`) and the e2e run decide whether a PR
   is green. Merge with a merge commit, then confirm the deploy live.
-- **CI e2e** (Oct 15, DECISIONS.md "e2e on GitHub Actions for every PR"): `.github/workflows/e2e.yml` runs the whole
-  Playwright suite, both projects, on every PR to `main` and every push to `main`, on GitHub's standard runners (free:
-  the repository is public). CI runs the full e2e on every PR; local runs are for targeted checks and perf.
-  - **Layout:** 5 `shard` jobs side by side (about 17 minutes in all, 1 for setup), then `result`. Each shard runs whole
-    spec files, spread by their measured test time (`e2e/ci-shard.mjs` reads `e2e/ci-timings.json`; a new spec counts
-    as the median until the table is refreshed); inside a file the tests run in order, as locally. Each runner builds
-    the app once (`E2E_PREBUILT=1` tells Playwright's web server to start wrangler without building again) and serves
-    it with the same `wrangler dev` and test variables as locally (`playwright.config.ts`). 2 workers per runner, as
-    locally (half the runner's 4 CPUs).
+- **CI e2e** (Oct 15, DECISIONS.md "e2e on GitHub Actions for every PR"; fast PR checks since Oct 18,
+  `docs/decisions/2026-10-18-faster-pipeline.md`, a trial): `.github/workflows/e2e.yml`, on GitHub's standard runners
+  (free: the repository is public).
+  - **On a pull request: the fast check.** The `plan` job (`e2e/ci-select.mjs`, plain Node, no install; about 10 s)
+    diffs the PR's merge commit against its first parent (main as it is now) and looks each changed path up in
+    `e2e/areas.json`: path globs (`*` within a folder, `**` across folders) to spec files, area by area. The PR runs
+    the specs of every area it touches, plus any spec it changes, plus the smoke set; on as few shards as those need
+    (about 600 s of test time each, both projects; at most 5), so the whole run takes about 4 minutes for a docs-only
+    PR (3 m 44 s measured: the smoke set on 1 shard) and about 5 to 8 on the usual one (5 m 28 s measured for one of
+    Sawyer's files: his spec, the king attacks and the speech spec plus the smoke set, on 3 shards). The plan's summary on the run's page lists each
+    changed path and what it ran.
+  - **The smoke set** (every PR): `e2e/boss-smoke.spec.ts` once the boss kit lands (every boss's tile, battle, passive
+    and ult, no page errors), plus the three cheapest specs that between them prove the app boots, a solo battle plays
+    and a lobby works: `front-door.spec.ts` (home, Settings, the queue and the computer's layout through the real
+    server, about 55 s), `boss-character.spec.ts` (a whole Boss alone battle, Boingo, home to results on a phone and a
+    computer, about 40 s) and `lobby-chat.spec.ts` (two players in one lobby through the real server, the bots fill
+    it, the match starts; Solo's queue; a private lobby, about 85 s). About 3 minutes of test time, so 1 shard.
+  - **The whole suite on a PR** when it touches a shared foundation (`full` in `areas.json`: package.json, the
+    lockfile, the Playwright and Wrangler config, `e2e/helpers.ts`, this workflow and its scripts, `packages/core`, the
+    runner, the protocol and chess's shared rules, the server's entry points (`index.ts`, `api.ts`, `lobby.ts`,
+    `lobby-do.ts`) and its stored-data, sign-in, money, ranked and fair-play files, the app's entry, board, match flow
+    (`game.ts`, `solo.ts`, `net.ts`), the play screen and the components every mode shares), or a path no area has
+    (a new file: add it to its area, or leave it out if it's shared). **To force it**, add the `full-e2e` label to the
+    PR (that starts a new run, and every push after runs everything until the label is removed): the full lane's PRs
+    do. Or Actions → e2e → Run workflow on the PR's branch (a manual run tests everything).
+  - **On every push to main: the whole suite**, both projects, on 5 shards (about 17 minutes in all, 1 for setup):
+    the full run after each merge, which the director checks before the next merge.
+  - **Layout:** `plan`, then the `shard` jobs side by side, then `result`. Each shard runs whole spec files of the
+    plan's list (every spec file on main), spread by their measured test time (`e2e/ci-shard.mjs` reads
+    `e2e/ci-timings.json`; a new spec counts as the median until the table is refreshed); inside a file the tests run
+    in order, as locally. Each runner builds the app once (`E2E_PREBUILT=1` tells Playwright's web server to start
+    wrangler without building again) and serves it with the same `wrangler dev` and test variables as locally
+    (`playwright.config.ts`). 2 workers per runner, as locally (half the runner's 4 CPUs). Setup (checkout, npm ci,
+    Chromium from cache, the build) takes about a minute per shard.
   - **Reading a run:** `result`'s summary on the run's page (each shard's reporter, `e2e/ci-summary.ts`, writes a
-    record; `e2e/ci-summary-merge.mjs` renders them): flaky tests first, then failed ones, each with its shard,
-    `file:line`, project, the line it failed on and the gist of its error; each shard's counts and time; and the
-    test time by file as a ready-made `ci-timings.json`. `result` is red if any shard is. A shard with a failed or
-    flaky test uploads its HTML report with the retries' traces (`e2e-report-shard-N`, kept 7 days;
-    `npx playwright show-report <folder>`).
-  - **Retries and traces:** `--retries 1` in CI until the flaky-test batch lands; the goal is 0, as
+    record; `e2e/ci-summary-merge.mjs` renders them): the plan's line (what this run tested and why), flaky tests,
+    then failed ones, each with its shard, `file:line`, project, the line it failed on and the gist of its error;
+    each shard's counts and time; and the test time by file as a ready-made `ci-timings.json` (refreshed Oct 18 from
+    two full runs). `result` is red if the plan or any shard is. A shard with a failed or flaky test uploads its HTML
+    report with the retries' traces (`e2e-report-shard-N`, kept 7 days; `npx playwright show-report <folder>`).
+  - **Try the table locally:** `node e2e/ci-select.mjs files <path>...` prints what a PR changing those paths runs;
+    its tests are `packages/server/test/ci-select.test.ts` (one area's file, docs only, foundations, unknown paths,
+    changed and removed specs, every spec reachable, shard counts).
+  - **Retries and traces:** `--retries 1` in CI (PR and main) until the flaky-test batch lands; the goal is 0, as
     `playwright.config.ts` has it. A test that passes only on its retry is "flaky": the summary lists it first, so
     it stays in view. Traces only on that retry (`on-first-retry`): recording every test measured about 8% slower.
     Flakes only: "Re-run failed jobs" once; a test that fails again is real.
@@ -37,8 +65,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     1 worker; its report is kept 7 days: read its numbers as a trend, not a verdict).
   - **Caches:** npm (`setup-node`) and Playwright's Chromium (headless shell only, the browser headless runs use;
     `~/.cache/ms-playwright`, keyed by Playwright's version).
-  - **Concurrency:** a new push to a PR cancels that PR's run still going; pushes to `main` each get their own run.
-    A run takes 6 jobs at once: the account's limit on jobs at once (20 on GitHub Free) queues the rest.
+  - **Concurrency:** a new push to a PR (or a label added to it) cancels that PR's run still going; pushes to `main`
+    each get their own run. A full run takes 7 jobs (plan, 5 shards, result), a PR's fast check 3 to 7: the account's
+    limit on jobs at once (20 on GitHub Free) queues the rest.
   - **Not a required check yet;** if it becomes one, require `result` (one name, whatever the shard count).
 - **Schema at runtime:** D1 tables are made by the Worker (`CREATE TABLE IF NOT EXISTS`, then `ALTER TABLE` migrations
   that tolerate re-runs), so a deploy needs no migration step.
@@ -309,7 +338,7 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
 | The health view, its Access check, the report script | `packages/server/src/health.ts`, `access.ts`, `ops-admin.ts`; `scripts/ops-report.mjs` |
 | Load tests (simulated players over WebSockets and the API) | `scripts/load/` (`run.ts`, `burst.ts`, `staging.sh`) → `reports/load/` |
 | The engine server | `engine/`, `packages/server/src/engine.ts` |
-| CI | `.github/workflows/check.yml` (typecheck, unit tests), `e2e.yml` (the e2e suite); `e2e/ci-shard.mjs`, `ci-timings.json`, `ci-summary.ts` |
+| CI | `.github/workflows/check.yml` (typecheck, unit tests), `e2e.yml` (the e2e fast check on PRs, the suite on main); `e2e/areas.json`, `ci-select.mjs`, `ci-shard.mjs`, `ci-timings.json`, `ci-summary.ts`, `ci-summary-merge.mjs` |
 
 ## Settings
 
@@ -329,7 +358,8 @@ the overload limit counts their players (since Oct 15); the home page's line sti
   counts, row sizes, pruning, fingerprints, lobby codes in paths, the guards, the cron's jobs failing apart, the ops
   page); `health.test.ts` (Access's token, Squads on the live hub, the engine server's marks, the view and who may read
   it); `kill-switches.test.ts` (the switches, the cache, each refusal, never counted as an error, a resting boss never
-  met, even in a lobby made before); `rollback.test.ts` (which version "previous" is).
+  met, even in a lobby made before); `rollback.test.ts` (which version "previous" is); `ci-select.test.ts` (CI's e2e
+  plan: which specs a pull request runs).
 - e2e: `e2e/busy.spec.ts` (servers busy), `lobby-close.spec.ts`, `test-switches.spec.ts` (a player's switches
   ignored, an admin's working), `problems.spec.ts` (errors reach the store, the error boundary, a bug report's id and
   feedback by kind on `/admin/ops`, the size and rate caps, the health view), `kill-switches.spec.ts` (its own server
