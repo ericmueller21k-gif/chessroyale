@@ -292,8 +292,9 @@ export interface LobbyRecord {
    * scored, Wrangler's reply to the showdown's duel). "funhouse": the host plays the crowd's move for Boingo (his
    * ultimate); "extra": it plays Hollow's extra move; "bounce": it picks Big Boy's Big Bounce; "tusks", "fuse" and
    * "slam": it picks Alfil's cast (the pair), his fusion's square and his Slam's lift; "hop": which pawn of Chub & Chirp's hops.
+   * "carrots": Chub & Chirp's Carrot Patch cast (his whole turn; no host asked: the placement is the server's).
    */
-  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop";
+  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop" | "carrots";
   /** Big Boy's Big Bounce, Alfil's fusion and Slam, the hopper's hop: the candidates the host was sent (the answer must be one of them). */
   bounceCandidates?: string[];
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
@@ -1400,6 +1401,8 @@ export class LobbyCore {
     // (Alfil's Slam's pieces land as the crowd's turn after his move or his fusion begins: the host judges it with them
     // down, the landing guard. Not with his cast: his move follows it, and is asked for on its own.)
     const land = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "fuse" ? landsAfterHisMove(runner.state.boss) : null;
+    // (Chub & Chirp's Carrot Patch: his ordinary move in the race goes through his race brain, on the host's engine.)
+    const race = kind === "elo" ? (runner.bossRace("elo")?.race ?? null) : null;
     this.io.send(host, {
       t: "bossRequest",
       key: this.r.bossKey!,
@@ -1420,6 +1423,7 @@ export class LobbyCore {
       ...(this.r.bossBrain && !funhouse && !pick && this.r.bossKind !== "extra" && this.r.bossKind !== "best" ? { brain: this.r.bossBrain } : {}),
       ...(asks ? { ...(asks.pull ? { pull: asks.pull } : {}), ...(asks.drag ? { drag: true as const } : {}), ...(asks.showdown ? { showdown: asks.showdown } : {}), seed: asks.seed } : {}),
       ...(land ? { land: land.map((x) => ({ ...x })) } : {}),
+      ...(race ? { race } : {}),
     });
   }
 
@@ -1499,6 +1503,21 @@ export class LobbyCore {
   }
 
   /**
+   * Chub & Chirp's Carrot Patch (at the start of his turn after its warning, or the admins' trigger: the runner's
+   * carrotDue): everyone sees him get ready (thinking; your queen banner first, if it's up), then the cast, his whole
+   * turn, worked out here (no host: the placement is the position's and the seed's); then the crowd's turn, its moments
+   * (the cast's first) before the crowd's clock starts.
+   */
+  private requestCarrots() {
+    this.r.phase = "boss";
+    this.r.bossKey = `c-${++this.r.counter}`;
+    this.r.bossKind = "carrots";
+    this.r.bossMinAt = this.thinkMinAt();
+    this.broadcast(this.bossMessage(0, { thinking: true }));
+    return this.playBoss("");
+  }
+
+  /**
    * Hollow's extra move (the crowd failed Lights out): after his own move, he thinks again while the host's engine
    * picks a quiet move that gains him only a little (extraMoveFrom); everyone sees it land with its banner, then the
    * crowd's turn. No such move (or no engine anywhere): he skips it.
@@ -1567,6 +1586,15 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
+    if (this.r.bossKind === "carrots") {
+      // Chub & Chirp's cast: his whole turn (the crowd's turn begins as after his move: its moments, the cast's first).
+      // None due any more (nothing came of it): straight on.
+      this.r.bossKind = undefined;
+      this.runner!.applyCarrots();
+      const until = this.io.now() + (!this.runner!.bossToMove() ? bossTurnShowMs(this.runner!.bossView()) : 0);
+      this.broadcast(this.bossMessage(until));
+      return this.setTimer("nextRound", until);
+    }
     if (this.r.bossKind === "hop") {
       // Chub & Chirp's hop (the host's pick, one of the candidates; else the first): it plays out, then his move. None
       // due any more (nothing came of it): straight on to his move.
@@ -1617,7 +1645,7 @@ export class LobbyCore {
     // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in his funhouse, the
     // crowd's: a random allowed one too). His extra move needs the engine to stay small: without one, he skips it.
     const runner = this.runner!;
-    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop") return this.playBoss("");
+    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop" || this.r.bossKind === "carrots") return this.playBoss("");
     const legal = (this.r.bossKind === "funhouse" ? runner.crowdAllowed() : runner.bossAllowed()) ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
     this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
   }
@@ -1659,8 +1687,9 @@ export class LobbyCore {
         }
         return this.finishMatch();
       }
-      // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps and Chub & Chirp's hop come at the start of his turn, before his move.)
-      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.hopDue() ? this.requestHop() : this.requestBoss();
+      // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps, Chub & Chirp's Carrot Patch cast (his whole turn) and
+      // hop come at the start of his turn, before his move.)
+      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.carrotDue() ? this.requestCarrots() : runner.hopDue() ? this.requestHop() : this.requestBoss();
       // (A failed Lights out: his extra move, after his own and before the crowd's turn.)
       if (runner.extraMoveDue()) return this.requestExtra();
       // (Boingo's funhouse: his move for the crowd, as its turn begins.)
@@ -1734,6 +1763,7 @@ export class LobbyCore {
               ...(barred ? { barred } : {}),
               ...(runner.boss && runner.crowdAllowed() ? { allowed: runner.crowdAllowed()! } : {}),
               ...(runner.fireBurn().length ? { burn: runner.fireBurn() } : {}),
+              ...(runner.raceJob() ? { race: runner.raceJob()! } : {}),
             }
           : undefined;
       this.send(this.r.hostId, { t: "prefetch", fens, ...(plan ? { plan } : {}) }, false);
@@ -1883,6 +1913,7 @@ export class LobbyCore {
       ...(this.runner!.boss?.barred ? { barred: this.runner!.boss.barred } : {}),
       ...(this.runner!.boss && this.runner!.crowdAllowed(boardId) ? { allowed: this.runner!.crowdAllowed(boardId)! } : {}),
       ...(this.runner!.fireBurn().length ? { burn: this.runner!.fireBurn() } : {}),
+      ...(this.runner!.raceJob() ? { race: this.runner!.raceJob()! } : {}),
     }));
     // Close calls that can decide the cut are re-checked first.
     const bubble = this.cutPriority();
@@ -2207,6 +2238,7 @@ export class LobbyCore {
           ...(barred ? { barred } : {}),
           ...(runner.boss && runner.crowdAllowed(firstBoard) ? { allowed: runner.crowdAllowed(firstBoard)! } : {}),
           ...(runner.fireBurn().length ? { burn: runner.fireBurn() } : {}),
+          ...(runner.raceJob() ? { race: runner.raceJob()! } : {}),
           seed: seedFor(key, firstBoard),
           rules: this.judgeRules(),
         }
@@ -2240,6 +2272,7 @@ export class LobbyCore {
         ...(sj.barred ? { barred: sj.barred } : {}),
         ...(sj.allowed ? { allowed: sj.allowed } : {}),
         ...(sj.burn ? { burn: sj.burn } : {}),
+        ...(sj.race ? { race: sj.race } : {}),
         ...(sj.priority ? { priority: sj.priority } : {}),
       };
       const judges = (planned[String(sj.boardId)] ?? []).filter((id) => devices.some((d) => d.id === id)).slice(0, perJob);
@@ -2978,6 +3011,7 @@ export class LobbyCore {
       ...(runner.boss?.result ? { bossResult: runner.boss.result } : {}),
       // (The Hidden Boss's bullet clock ran out: he won on time. Read in the same event as the battle ended.)
       ...(runner.bossTimedOut ? { timeout: true } : {}),
+      ...(runner.bossCarrotWin ? { carrots: true } : {}),
       // Whether it counted for ranking (the results say so in words).
       ranked: this.ranked(),
     };

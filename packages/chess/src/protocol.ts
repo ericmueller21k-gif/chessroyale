@@ -4,6 +4,8 @@ import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
 import type { LastStandRound } from "./runner.ts";
 import type { JudgeJob, JudgeReport, JudgeRules } from "./judge.ts";
+import type { CarrotRace } from "./bosses/carrots.ts";
+import type { CarrotView } from "./bosses/hopper.ts";
 import type { MoveScore } from "./uci.ts";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
@@ -133,6 +135,13 @@ export interface ScoreJob {
    * that save it are scored too, and the bots count a piece left there as gone (the lobby's runner does the scoring).
    */
   burn?: string[];
+  /**
+   * Boss battle, Chub & Chirp's Carrot Patch (missing otherwise and from older servers; an older app ignores it): the race
+   * as the crowd's judge weighs it (the carrots still in the ground, his count, the moves left). The moves that pull a
+   * carrot are scored too, and the bots pick by every move's score with the race counted (raceRanked); the scores
+   * themselves stay the engine's (the lobby's runner counts the race, once, for everyone).
+   */
+  race?: CarrotRace;
   /** Picks that can decide the cut (players near the cut line): re-checked first (recheckCut* in settings). */
   priority?: string[];
 }
@@ -358,6 +367,13 @@ export interface NetBossPowers {
    * crowd's pawn on `over`, to `to` (null: none yet).
    */
   hop?: LeapfrogHop | null;
+  /**
+   * Their Carrot Patch (missing for other bosses and from older servers; an older app ignores it), from its cast on: the
+   * crowd move it came after, the carrots' squares and who pulled each (null: still in the ground), each side's count and
+   * moves left in the race, whether it's over and why, his tier (his carrots), and his spin once rolled (his tier, the
+   * prize rolled, the prize he got after any step down, where it went). Null: not cast.
+   */
+  carrots?: CarrotView | null;
 }
 
 /**
@@ -603,6 +619,8 @@ export type ServerMessage = { now: number } & (
         allowed?: string[];
         /** Boss battle, G-REX's fire: the tiles ablaze (the bots count a piece left there as gone). */
         burn?: string[];
+        /** Boss battle, Chub & Chirp's Carrot Patch: the race (the bots pick with it counted). */
+        race?: CarrotRace;
         /** Many judges: the bots pick from this seed and these rules (judgeBotPicks), so the scoring job agrees. */
         seed?: number;
         rules?: JudgeRules;
@@ -749,6 +767,13 @@ export type ServerMessage = { now: number } & (
        * same as "".
        */
       hop?: string[];
+      /**
+       * Chub & Chirp's Carrot Patch (id hopper), his ordinary move in the race: the race as his brain weighs it (the
+       * carrots still in the ground, his count, the moves left, how much the race weighs at his strength). Play his move
+       * through the race brain (bossMoveFrom's `race`: raceGuard, at BOSS_POWERS.carrotNodes on carrotLooks of his top
+       * moves). An older app ignores it and plays his move without it: he races worse, nothing breaks.
+       */
+      race?: CarrotRace;
     }
   /**
    * The boss's brain for this battle, to the host as the battle begins (on the Maia brain only): it starts loading
@@ -780,6 +805,8 @@ export type ServerMessage = { now: number } & (
       bossResult?: "crowd" | "boss" | "draw";
       /** Boss battle: the boss won on time (the Hidden Boss's bullet clock ran out). Missing: not on time, or an older server. */
       timeout?: boolean;
+      /** Boss battle: the boss won by his last carrot (Chub & Chirp's Carrot Patch). Missing: not so, or an older server. */
+      carrots?: boolean;
       /** It counted for ranking (real players filled at least RANKING.rankedMinHumanShare of the seats). Missing: an older server. */
       ranked?: boolean;
     }

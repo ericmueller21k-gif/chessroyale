@@ -89,6 +89,7 @@ import {
   fireStage,
   judgeEvaluation,
   judgeMustScore,
+  judgeOffers,
   judgeRanked,
   triggerUltimate,
   type LightsTally,
@@ -105,6 +106,13 @@ import {
   stopReason,
   alfilBattle,
   hopperBattle,
+  carrotBattle,
+  bossRace,
+  crowdRace,
+  pullsOf,
+  raceAfter,
+  raceAdjust,
+  raceWorth,
   landsAfterHisMove,
   slamAhead,
   topEach,
@@ -114,8 +122,9 @@ import {
   type BossLastMove,
   type BossMoveExtras,
   type ShowdownScout,
+  type CarrotRace,
 } from "./boss-powers.ts";
-import type { BounceResult, LeapfrogHop, LightsOutTest } from "@chessroyale/core";
+import type { BossPowerSettings, BounceResult, CarrotPatch, LeapfrogHop, LightsOutTest } from "@chessroyale/core";
 
 /**
  * Runs a match round by round: deal, collect picks, score with the engine, draw,
@@ -785,15 +794,19 @@ export class MatchRunner {
     const humans = playerIds.flatMap((id) => (this.player(id).isBot ? [] : [humanPicks.get(id)?.move ?? null])).filter((m): m is string => !!m && (!allowed || allowed.includes(m)));
     const open = await allowedSearch(engine, { fen: board.fen, allowed, picks: humans }, all);
     const top = judgeCandidates({ allowed }, all, open ?? []);
-    const botPicks = this.botPicksFor(boardId, playerIds, top);
+    // (The boss's rules may offer the bots more moves, scored first: Chub & Chirp's race, the moves that pull a carrot.)
+    const offers = judgeOffers(this.state.boss, board.fen).filter((m) => (!allowed || allowed.includes(m)) && !top.some((t) => t.move === m));
+    const offered = offers.length ? await engine.scoreMoves(board.fen, offers) : [];
+    const botPicks = this.botPicksFor(boardId, playerIds, [...top, ...offered]);
     const picks: Record<string, string | null> = {};
     for (const id of playerIds) picks[id] = this.player(id).isBot ? botPicks[id]! : (humanPicks.get(id)?.move ?? null);
     const known = new Map(top.map((m) => [m.move, m.expected]));
     for (const m of open ?? []) known.set(m.move, m.expected);
+    for (const m of offered) known.set(m.move, m.expected);
     // (The boss's rules for the judge, e.g. G-REX's fire: every move that takes a piece off a tile ablaze is scored too.)
     const escapes = judgeMustScore(this.state.boss, board.fen).filter((m) => !allowed || allowed.includes(m));
     const missing = [...new Set([...Object.values(picks), ...escapes].flatMap((m) => (m && !known.has(m) ? [m] : [])))];
-    const extra = [...(open ?? []), ...(missing.length ? await engine.scoreMoves(board.fen, missing) : [])];
+    const extra = [...(open ?? []), ...offered, ...(missing.length ? await engine.scoreMoves(board.fen, missing) : [])];
     for (const m of extra) known.set(m.move, m.expected);
     // Close calls are re-checked where a person is playing (a group of bots affects nobody real).
     const people = playerIds.some((id) => !this.player(id).isBot && humanPicks.get(id)?.move);
@@ -1108,6 +1121,7 @@ export class MatchRunner {
       humanBrain: null,
       brainNote: null,
       landingCheck: null,
+      raceCheck: null,
       bossLast: null,
       bossMemo: new Map(),
       bossViewMemo: null,
@@ -1118,7 +1132,7 @@ export class MatchRunner {
   }
 
   stageComplete(): boolean {
-    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime();
+    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || carrotBattle.won(this.state.boss);
     if (this.state.final) return finalComplete(this.state, this.settings) || this.finalGameOver();
     return stageComplete(this.state, this.settings);
   }
@@ -1175,9 +1189,13 @@ export class MatchRunner {
     const look = this.bossAhead();
     this.landingCheck = null;
     const ahead = look && { ...look, onCheck: (c: LandingCheck) => (this.landingCheck = c) };
+    // (Chub & Chirp's Carrot Patch: his race brain, on his ordinary moves in the race.)
+    const raceLook = this.bossRace(kind);
+    this.raceCheck = null;
+    const race = raceLook && { ...raceLook, onCheck: (c: RaceCheck) => (this.raceCheck = c) };
     const ordinary = async () =>
       mate ??
-      (await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined, ahead));
+      (await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined, ahead, race));
     const asks = this.bossAsks();
     if (asks) {
       // (His long pull, drag or showdown on every engine of this device; his ordinary move on `engine`, as ever.)
@@ -1210,6 +1228,8 @@ export class MatchRunner {
   brainNote: BrainNote | null = null;
   /** What the landing guard did with the boss's last move (null: it didn't look); the sims count it. */
   landingCheck: LandingCheck | null = null;
+  /** What his race brain did with his last move (null: it didn't look); the sims count it. */
+  raceCheck: RaceCheck | null = null;
 
   /**
    * The landing guard's look ahead for the boss's move now, or null: Alfil's Slam's pieces land as the crowd's turn
@@ -1418,6 +1438,40 @@ export class MatchRunner {
     return hopperBattle.apply(this.battle, pick);
   }
 
+  /**
+   * Chub & Chirp's Carrot Patch is due: the start of his turn after its warning (or the test trigger), once a battle
+   * (carrotBattle.due). The cast is his whole turn: no move of his follows it.
+   */
+  carrotDue(): boolean {
+    return carrotBattle.due(this.battle);
+  }
+
+  /** The Carrot Patch's cast (no engine: the same on the server, the host and in solo); null: none was due. */
+  applyCarrots(): CarrotPatch | null {
+    return carrotBattle.apply(this.battle);
+  }
+
+  /** The Carrot Patch's race as the crowd's judge weighs its move now (the score jobs' `race`), or null. */
+  raceJob(): CarrotRace | null {
+    const b = this.state.boss;
+    return b ? crowdRace(b, this.boards.get(this.state.boards[0]!)!.fen) : null;
+  }
+
+  /**
+   * His race brain's look for his move now (the boss request's `race`), or null: in the Carrot Patch's race, on his
+   * ordinary moves (not a slip, not the King's strike: he races as he plays), as raceGuard weighs it.
+   */
+  bossRace(kind: BossMoveKind = this.state.boss?.staggerNext ? "stagger" : "elo"): BossRace | null {
+    if (kind !== "elo") return null;
+    const race = bossRace(this.state.boss, this.boards.get(this.state.boards[0]!)!.fen);
+    return race ? { race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;
+  }
+
+  /** The battle was his by his last carrot (the Carrot Patch): for the result screen (the results' `carrots`). */
+  get bossCarrotWin(): boolean {
+    return carrotBattle.won(this.state.boss) && !this.finalGameOver();
+  }
+
   /** The boss's last move, and the piece it took (if any). */
   private bossLast: BossLastMove | null = null;
   /** The bosses' battle code's own store (Battle's memo). */
@@ -1470,13 +1524,14 @@ export class MatchRunner {
 
   /**
    * Ends the boss battle: the result from the board (mate, a draw, or the engine's verdict at the move cap), or the boss
-   * on time when the bullet clock ran out (bossOutOfTime).
+   * on time when the bullet clock ran out (bossOutOfTime), or the boss by his last carrot (Chub & Chirp's Carrot Patch:
+   * bossCarrotWin).
    */
   finishBossBattle(): "crowd" | "boss" | "draw" {
     const b = this.state.boss!;
     const timeout = this.bossOutOfTime() && !this.finalGameOver();
     const winner = this.gameWinner();
-    const result = timeout ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
+    const result = timeout || this.bossCarrotWin ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
     this.state = finishBoss(this.state, this.opts.rng, result, this.settings);
     this.bossTimedOut = timeout;
     return result;
@@ -1978,6 +2033,96 @@ export async function landingGuard(
   return { pick, move, searched: search.length, ms: performance.now() - t0 };
 }
 
+/**
+ * His race brain's look (Chub & Chirp's Carrot Patch; docs/decisions/2026-10-18-carrot-patch.md): the race as it stands
+ * for his move (`race`: the carrots still in the ground, his count, the moves left, how much the race weighs at his
+ * strength), how many of his search's best moves it weighs (`looks`), and the node budget each is searched at. `onCheck`
+ * hears what it did (the sims count it).
+ */
+export interface BossRace {
+  race: CarrotRace;
+  looks: number;
+  nodes: number;
+  onCheck?(check: RaceCheck): void;
+}
+
+/** What his race brain did: his pick, the move played (the same unless it gave way), the positions searched, the time it took, and whether it was his last carrot. */
+export interface RaceCheck {
+  pick: string;
+  move: string;
+  searched: number;
+  ms: number;
+  won?: true;
+}
+
+/**
+ * His race brain (Eric's sheet: "Stockfish's top few safe moves are re-scored by the race: his distance to the open
+ * carrots and yours, so he also blocks or takes your runners"), as the landing guard looks ahead. A move that pulls his
+ * last carrot wins the battle: it's played, as a mate would be (his pick if it's one, else the first such in his
+ * search's order, then square order). Else his pick, his search's `looks` best moves within the blunder guard of his
+ * best, and the moves that pull a carrot (as many again, his search's order first: a short list of his top moves leaves
+ * out moves within the guard, and a pull is the race's move), each one he may play here, are played and searched at
+ * `nodes` (the crowd to move: his score the rest; a move that ends the game, its ending's), and scored with the race (raceWorth: what his chances of each carrot make his prize
+ * worth; raceAdjust: against the best of them for the race, weighed by `race.weight`). The best so scored replaces his
+ * pick only for the race: its race worth above his pick's (never a stronger chess move in disguise), its own score
+ * within the guard of the best searched; equals: his pick. Any unscored is left out; his pick unscored, and it stands.
+ */
+export async function raceGuard(
+  engine: EngineLike,
+  fen: string,
+  pick: string,
+  top: readonly MoveScore[],
+  look: BossRace,
+  guard: BossGuard,
+  allowed: readonly string[] | null = null,
+  s: Pick<BossPowerSettings, "carrotCount" | "carrotSharp" | "carrotHurry" | "carrotOdds" | "carrotWinWorth" | "bouncePawnLogit"> = BOSS_POWERS,
+): Promise<RaceCheck> {
+  const t0 = performance.now();
+  const r = look.race;
+  const ok = new Set(allowed ?? legalMoves(fen));
+  const done = (move: string, searched: number, won = false): RaceCheck => ({ pick, move, searched, ms: performance.now() - t0, ...(won ? { won: true as const } : {}) });
+  if (!ok.has(pick) || !r.open.length) return done(pick, 0);
+  const sorted = [...top].sort((a, b) => b.expected - a.expected).filter((m) => ok.has(m.move));
+  const order = [...new Set([pick, ...sorted.map((m) => m.move), ...[...ok].sort()])];
+  const pulls = order.filter((m) => pullsOf(fen, m, r.open).length > 0);
+  // (His last carrot: the battle.)
+  const win = pulls.find((m) => r.his + pullsOf(fen, m, r.open).length >= s.carrotCount);
+  if (win) return done(win, 0, true);
+  const best = sorted[0]?.expected;
+  const safe = best === undefined ? [] : sorted.filter((m) => withinGuard(moveLoss(best, m.expected), guard)).map((m) => m.move);
+  const moves = [...new Set([pick, ...safe.slice(0, look.looks), ...pulls.slice(0, look.looks)])];
+  if (moves.length < 2) return done(pick, 0);
+  const scored = new Map<string, { chess: number; race: number }>();
+  const search: { move: string; fen: string; race: number }[] = [];
+  for (const m of moves) {
+    const after = raceAfter(fen, m, r);
+    const race = raceWorth(after.fen, after.race, s);
+    const end = gameEnd(after.fen, []);
+    if (end) scored.set(m, { chess: end === "checkmate" ? 1 : 0.5, race });
+    else search.push({ move: m, fen: after.fen, race });
+  }
+  const tops = await topEach([engine], search.map((x) => x.fen), look.nodes);
+  search.forEach((x, i) => {
+    const t = tops[i];
+    if (t) scored.set(x.move, { chess: 1 - t.expected, race: x.race });
+  });
+  const mine = scored.get(pick);
+  if (!mine) return done(pick, search.length);
+  const all = [...scored.values()];
+  const top1 = Math.max(...all.map((x) => x.chess));
+  const ref = Math.max(...all.map((x) => x.race));
+  const w = Math.max(0, Math.min(1, r.weight ?? 1));
+  const total = (x: { chess: number; race: number }) => raceAdjust(x.chess, ref - x.race, w, s);
+  let move = pick;
+  let at = total(mine);
+  for (const m of moves) {
+    const x = scored.get(m);
+    if (!x || m === pick || x.race <= mine.race + 1e-9 || !withinGuard(moveLoss(top1, x.chess), guard)) continue;
+    if (total(x) > at + 1e-9) [move, at] = [m, total(x)];
+  }
+  return done(move, search.length);
+}
+
 /** From the top moves, the one nearest the middle of `range` (points lost) that the guard allows; the best if none is in range. */
 function pickByLoss(top: readonly MoveScore[], range: readonly [number, number], guard: BossGuard): string {
   const best = top[0]!.expected;
@@ -2022,10 +2167,25 @@ export async function bossMoveFrom(
   allowed: readonly string[] | null = null,
   brain?: BossBrainCall,
   ahead: BossAhead | null = null,
+  race: BossRace | null = null,
 ): Promise<string> {
   const searched: { top: readonly MoveScore[] } = { top: [] };
   let move = await pickBossMove(engine, fen, elo, nodes, kind, rng, strikeLoss, guard, allowed, brain, searched);
   const k: BossMoveKind = kind === true ? "stumble" : kind === false ? "elo" : kind;
+  if (race && k === "elo" && searched.top.length) {
+    try {
+      const check = await raceGuard(engine, fen, move, searched.top, race, guard, allowed);
+      race.onCheck?.(check);
+      if (check.move !== move) {
+        // (The admins' debug line: the brain's pick gave way to the race.)
+        if (brain && brain.brain !== "stockfish") brain.onNote?.({ brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { share: brain.stockfishShare } : {}), by: "stockfish", why: "race" });
+        move = check.move;
+      }
+    } catch (e) {
+      // (The race never costs him his move: the pick stands, and the last check below still applies.)
+      console.error(`race brain failed in ${fen}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
   if (ahead && k !== "best" && searched.top.length) {
     try {
       const check = await landingGuard(engine, fen, move, searched.top, ahead, k === "stagger" ? strikeGuard(guard, strikeLoss) : guard, allowed);

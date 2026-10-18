@@ -25,6 +25,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
   const bossResult = match.phase.kind === "results" ? match.phase.bossResult : undefined;
   // (The bullet clock ran out: the Hidden Boss won on time.)
   const onTime = match.phase.kind === "results" && !!match.phase.timeout;
+  // (Chub & Chirp's Carrot Patch: they pulled their fifth carrot.)
+  const byCarrots = match.phase.kind === "results" && !!match.phase.carrots;
   // (The Hidden Boss's phase 2: how many of the four boards were won.)
   const simul = match.phase.kind === "results" ? match.phase.simul : undefined;
   // Boss battle: those still standing at the end share the result (a raid's whole crowd fought; the Crowd's, its
@@ -102,7 +104,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
             : bossResult === "crowd"
             ? `${alone ? "You" : "The crowd"} beat ${bossInText(match.boss.name)}!${survived ? " A win on your record." : ""}`
             : bossResult === "boss"
-              ? `${bossInText(match.boss.name, true)} won${onTime ? " on time" : ""}.`
+              ? `${bossInText(match.boss.name, true)} won${onTime ? " on time" : byCarrots ? " with their fifth carrot" : ""}.`
               : `A draw with ${bossInText(match.boss.name)}.`}
         </p>
       )}

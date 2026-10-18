@@ -1168,10 +1168,163 @@ describe("Chub & Chirp online (Leapfrog)", () => {
     }
   });
 
-  it("the admins' test trigger refuses (no ultimate yet), so nothing is left waiting for one", () => {
+  it("the admins' test trigger brings their Carrot Patch at the start of his next turn, before any hop (its cast is his whole turn)", () => {
     const L = hopper({ bossPowerTest: "leapfrog" });
+    expect(L.core.ultimateTrigger("p1", true)).toBe(true);
+    expect((L.core as unknown as { runner: MatchRunner }).runner.boss!.powers!.ultNext).toBe(true);
+    crowdPlays(L, "g1f3");
+    const next = toRound(L);
+    expect(next.boss!.powers!.carrots!.at).toBe(1);
+    expect(next.boss!.powers!.hop).toBeNull();
+    expect(next.boss!.powers!.warned).toBe(false);
+  });
+});
+
+describe("Chub & Chirp online (the Carrot Patch)", () => {
+  const toRound = (L: ReturnType<typeof setup>) => {
+    for (let i = 0; i < 10 && L.core.save().phase !== "play"; i++) L.advance(10_000);
+    return L.last("p1", "round")!;
+  };
+  const asked = (L: ReturnType<typeof setup>) => {
+    for (let i = 0; i < 10 && !L.last("p1", "bossRequest") && L.core.save().phase !== "play"; i++) L.advance(5_000);
+    return L.last("p1", "bossRequest")!;
+  };
+  const shown = (L: ReturnType<typeof setup>, id: string, from: number) => (L.inbox.get(id) ?? []).slice(from).filter((m): m is Extract<ServerMessage, { t: "boss" }> => m.t === "boss");
+  const runnerOf = (L: ReturnType<typeof setup>) => (L.core as unknown as { runner: MatchRunner }).runner;
+  /** Chub & Chirp (hidden: met as the test link does), no slips (his race brain on every ordinary move); `fen`: the battle from a position of our own. */
+  function hopper(patch: Partial<Settings> = {}, fen?: string) {
+    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "hopper", bossUnfinished: true, bossStumbleBelow: 0, ...patch });
+    for (const i of [0, 1]) L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, 1500);
+    L.core.message("p1", { t: "start" });
+    L.advance(1000);
+    if (fen) {
+      const runner = runnerOf(L);
+      const board = runner.boards.get(0)!;
+      runner.boards.set(0, { ...board, fen, bases: [...(board.bases ?? []), { ply: board.history.length, fen }] });
+    }
+    L.advance(60_000);
+    return L;
+  }
+  /** The race on, as these carrots stand (set on the lobby's runner, the crowd to move). */
+  function race(L: ReturnType<typeof setup>, squares: string[], o: { his?: string[]; crowd?: string[]; crowdMoves?: number; bossMoves?: number } = {}) {
+    const runner = runnerOf(L);
+    const p = runner.state.boss!.powers!;
+    const pulls = [...(o.his ?? []).map((square) => ({ square, by: "boss" as const, at: 0 })), ...(o.crowd ?? []).map((square) => ({ square, by: "crowd" as const, at: 0 }))];
+    runner.state = { ...runner.state, boss: { ...runner.state.boss!, powers: { ...p, ultAt: 0, ults: 1, carrots: { at: 0, squares, pulls, crowdMoves: o.crowdMoves ?? 0, bossMoves: o.bossMoves ?? 0 } } } };
+  }
+  function crowdPlays(L: ReturnType<typeof setup>, move: string) {
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move });
+    expect(L.hostScores("p1")).toBe(true);
+    L.advance(30_000);
+  }
+  const ROOK = "4k3/8/8/8/8/8/8/R3K3 w - - 0 30";
+
+  it("the cast (the test switch: at the start of his first turn): no host asked, everyone sees the same carrots, his whole turn, its moment before the crowd's clock", () => {
+    const L = hopper({ bossPowerTest: "carrotpatch" });
+    const r0 = L.last("p1", "round")!;
+    expect(r0.boss!.powers!.warned).toBe(true);
+    const from = (L.inbox.get("p2") ?? []).length;
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move: "d2d4" });
+    expect(L.hostScores("p1")).toBe(true);
+    L.inbox.set("p1", []);
+    L.advance(5_000);
+    expect(L.last("p1", "bossRequest")).toBeUndefined();
+    const cast = shown(L, "p2", from).find((m) => !m.thinking && m.boss.powers!.carrots)!;
+    expect(cast).toBeTruthy();
+    const c = cast.boss.powers!.carrots!;
+    expect(c.squares).toHaveLength(5);
+    expect(c).toMatchObject({ at: 1, crowd: 0, boss: 0, crowdLeft: 12, bossLeft: 12, over: null, tier: 0, spin: null });
+    expect(cast.boss.powers!.events.find((e) => e.kind === "carrots")).toEqual({ kind: "carrots", turn: 2, squares: c.squares });
+    expect(cast.until - (cast as unknown as { now: number }).now).toBe(bossTurnShowMs(cast.boss));
+    expect(L.last("p1", "boss")!.boss.powers).toEqual(cast.boss.powers);
+    // (His whole turn: the board passed with no move of his, a base at its ply; the meter is off from now on.)
+    expect(cast.boss.lastMove).toBeNull();
+    expect(cast.boss.board.history).toHaveLength(r0.board!.history.length + 1);
+    expect(cast.boss.board.bases).toContainEqual({ ply: cast.boss.board.history.length, fen: cast.boss.board.fen });
+    expect(cast.boss.powers!.rage).toBeNull();
+    const next = toRound(L);
+    expect(next.boss!.powers!.carrots).toEqual(c);
+    expect(sideToMove(next.board!.fen)).toBe("w");
+    // The admins' trigger refuses once it's come.
     expect(L.core.ultimateTrigger("p1", true)).toBe(false);
-    expect((L.core as unknown as { runner: MatchRunner }).runner.boss!.powers!.ultNext).toBeUndefined();
+  });
+
+  it("in the race the score jobs carry the race (the judge and the bots weigh it), and the host's boss request carries it for his race brain; the host and the server agree on what his move pulls", () => {
+    const L = hopper({}, ROOK);
+    race(L, ["d7", "c3", "h5", "e6", "g2"]);
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move: "e1d1" });
+    const jobs = L.last("p1", "scoreRequest")!.jobs;
+    expect(jobs[0]!.race).toEqual({ boss: "b", open: ["d7", "c3", "h5", "e6", "g2"], his: 0, crowdLeft: 12, bossLeft: 12, weight: 1 });
+    expect(L.hostScores("p1")).toBe(true);
+    L.advance(30_000);
+    const req = asked(L);
+    const runner = runnerOf(L);
+    expect(req.race).toEqual(runner.bossRace("elo")!.race);
+    expect(req.race).toMatchObject({ boss: "b", open: ["d7", "c3", "h5", "e6", "g2"], his: 0, crowdLeft: 11, bossLeft: 12 });
+    L.core.message("p1", { t: "bossMove", key: req.key, move: "e8d7" });
+    const b1 = L.last("p1", "boss")!;
+    const b2 = L.last("p2", "boss")!;
+    expect(b1.boss.powers!.carrots).toEqual(b2.boss.powers!.carrots);
+    expect(b1.boss.powers!.carrots).toMatchObject({ by: ["boss", null, null, null, null], boss: 1, crowd: 0, crowdLeft: 11, bossLeft: 11, tier: 1 });
+    expect(b1.boss.powers!.events).toContainEqual({ kind: "carrot", turn: 2, square: "d7", by: "boss" });
+    // (Out of the race: no race in the request.)
+    const plain = hopper({}, ROOK);
+    for (const id of ["p1", "p2"]) plain.core.message(id, { t: "pick", key: plain.last(id, "round")!.key, move: "e1d1" });
+    expect(plain.last("p1", "scoreRequest")!.jobs[0]!.race).toBeUndefined();
+    plain.hostScores("p1");
+    plain.advance(30_000);
+    expect(asked(plain).race).toBeUndefined();
+  });
+
+  it("junk from the host (a move he can't play), or no answer at all: his move is still played and the race goes on; the server's claims are its own", () => {
+    for (const answer of ["zz99", null]) {
+      const L = hopper({}, ROOK);
+      race(L, ["d7", "c3", "h5", "e6", "g2"]);
+      crowdPlays(L, "e1d1");
+      const req = asked(L);
+      expect(req.race).toBeTruthy();
+      if (answer === null) {
+        L.core.disconnect("p2");
+        for (let i = 0; i < 6 && runnerOf(L).boss!.powers!.carrots!.bossMoves === 0; i++) L.advance(15_000);
+      } else L.core.message("p1", { t: "bossMove", key: req.key, move: answer });
+      const c = runnerOf(L).boss!.powers!.carrots!;
+      expect(c.bossMoves, String(answer)).toBe(1);
+      expect(c.crowdMoves).toBe(1);
+      // (Whatever he played, a carrot he ended on is his: the board decides, not the host.)
+      const fen = runnerOf(L).boards.get(0)!.fen;
+      for (const p of c.pulls) expect(pieceAt(fen, p.square)?.color, p.square).toBe("b");
+    }
+  });
+
+  it("the spin is the server's: rolled once from the battle's seed after his last race move, the same prize and squares on every screen", () => {
+    const L = hopper({}, ROOK);
+    race(L, ["d7", "c3", "h5", "e6", "g2"], { his: ["c3", "h5"], crowd: ["g2"], crowdMoves: 11, bossMoves: 11 });
+    crowdPlays(L, "e1d1");
+    const req = asked(L);
+    L.core.message("p1", { t: "bossMove", key: req.key, move: "e8f8" });
+    const b1 = L.last("p1", "boss")!;
+    const b2 = L.last("p2", "boss")!;
+    const spin = b1.boss.powers!.carrots!.spin!;
+    expect(spin).toEqual(b2.boss.powers!.carrots!.spin);
+    expect(spin.tier).toBe(2);
+    expect(spin).toEqual(runnerOf(L).boss!.powers!.carrots!.spin);
+    expect(b1.boss.powers!.events.find((e) => e.kind === "carrotSpin")).toEqual({ kind: "carrotSpin", turn: 2, tier: 2, prize: spin.prize, squares: spin.squares });
+    for (const sq of spin.squares) expect(pieceAt(b1.boss.board.fen, sq)?.color).toBe("b");
+    expect(b1.until - L.now).toBe(bossTurnShowMs(b1.boss));
+  });
+
+  it("his last carrot wins the battle: the results say so (`carrots`), a boss win", () => {
+    const L = hopper({}, ROOK);
+    race(L, ["d7", "c3", "h5", "e6", "g2"], { his: ["c3", "h5", "e6", "g2"] });
+    crowdPlays(L, "e1d1");
+    const req = asked(L);
+    L.core.message("p1", { t: "bossMove", key: req.key, move: "e8d7" });
+    expect(L.last("p1", "boss")!.boss.powers!.events).toContainEqual({ kind: "carrotWin", turn: 2, square: "d7" });
+    for (let i = 0; i < 10 && !L.last("p1", "results"); i++) L.advance(10_000);
+    const res = L.last("p1", "results")!;
+    expect(res.bossResult).toBe("boss");
+    expect(res.carrots).toBe(true);
+    expect(res.timeout).toBeUndefined();
   });
 });
 

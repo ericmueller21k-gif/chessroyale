@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, test, bossAloneFromHome } from "./helpers.ts";
+import { BOARD_SEL, test, bossAloneFromHome, engineTop } from "./helpers.ts";
 
 /**
  * Chub & Chirp (id hopper), through their test link (?boss=hopper&wip=1: their rules are built before their art, so
@@ -90,5 +90,73 @@ test("Chub & Chirp's Leapfrog (the test switch): his pawn hops over yours at the
   // His move was played from the hop's position.
   const move = board.history[plies + 1];
   expect(hopped.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""))).toContain(move);
+  expect(errors).toEqual([]);
+});
+
+/**
+ * Their Carrot Patch, through the test switch (?power=carrotpatch: the battle starts from 1.e4 e5 2.Nf3 Nc6, your move,
+ * the warning as the first turn begins): your first move, then the cast at the start of his turn (his whole turn: the
+ * turn passes to you, the carrots planted, a base on the board), the race (you play the judge's best, which weighs the
+ * carrots, so you pull them), the race over, and his spin with the prize on his side. Rules only: the art is a later
+ * build, so this reads the battle's state (window.match), with real taps.
+ */
+test("Chub & Chirp's Carrot Patch (the test switch): the cast, the race's pulls, its end and his spin", async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/?debug&clock=60&boss=hopper&wip=1&power=carrotpatch&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  const boss = await page.evaluate(() => (window as any).match.boss);
+  expect(boss.powers.ultimate).toBe("carrotpatch");
+  expect(boss.powers.warned).toBe(true);
+  expect(boss.powers.carrots).toBeNull();
+  const crowd: "w" | "b" = boss.crowdSide;
+  const his = crowd === "w" ? "b" : "w";
+  const plies = await page.evaluate(() => (window as any).match.phase.board.history.length as number);
+  // (Watch from before his turn: the first frame the carrots are in the state, which phase it showed in, and the board then.)
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__castSeen = null;
+    const look = () => {
+      const m = w.match;
+      const c = m?.boss?.powers?.carrots;
+      if (!w.__castSeen && c) w.__castSeen = { phase: m.phase.kind, plies: m.boss.board.history.length, last: m.boss.lastMove, toMove: m.boss.board.fen.split(" ")[1], events: (m.boss.powers.events ?? []).map((e: { kind: string }) => e.kind) };
+      if (!w.__castSeen) requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  const first = await engineTop(page);
+  await play(page, first.top[0]!.move);
+  await yourMove(page);
+  const seen = await page.evaluate(() => (window as any).__castSeen);
+  // The cast was his whole turn: no move of his, the turn passed to you (the cast's moment on that screen), a base at its ply.
+  expect(seen).toMatchObject({ phase: "boss", plies: plies + 1, last: null, toMove: crowd });
+  expect(seen.events).toContain("carrots");
+  const cast = await page.evaluate(() => (window as any).match.boss);
+  expect(cast.powers.carrots.squares).toHaveLength(5);
+  expect(cast.powers.carrots).toMatchObject({ at: 1, crowdLeft: 12, bossLeft: 12, over: null, spin: null });
+  expect(cast.board.history).toHaveLength(plies + 1);
+  expect(cast.board.bases.some((b: { ply: number }) => b.ply === plies + 1)).toBe(true);
+  expect(cast.powers.rage).toBeNull();
+  // The race: you play the judge's best move (it weighs the carrots), turn by turn, until it's over and he has spun.
+  for (let turn = 0; turn < 14; turn++) {
+    const c = await page.evaluate(() => (window as any).match.boss?.powers?.carrots);
+    if (c.spin || c.over === "won") break;
+    const top = await engineTop(page);
+    await play(page, top.top[0]!.move);
+    await expect.poll(() => page.evaluate(() => (window as any).match.phase.kind), { timeout: 90_000 }).toMatch(/^(play|results)$/);
+    if ((await phase(page)) === "results") break;
+  }
+  const end = await page.evaluate(() => (window as any).match.boss);
+  const c = end.powers.carrots;
+  // A pull (yours or his), the race over, his spin rolled on his tier, the prize on his side of the board.
+  expect(c.by.filter((x: string | null) => x).length).toBeGreaterThan(0);
+  expect(c.over).toMatch(/^(pulled|moves)$/);
+  expect(c.spin).toBeTruthy();
+  expect(c.spin.tier).toBe(c.boss);
+  const board = new Chess(end.board.fen);
+  for (const sq of c.spin.squares) expect(board.get(sq as never)).toMatchObject({ color: his });
+  expect(end.result ?? null).toBeNull();
   expect(errors).toEqual([]);
 });

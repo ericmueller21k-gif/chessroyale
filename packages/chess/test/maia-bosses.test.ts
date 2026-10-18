@@ -83,7 +83,7 @@ describe("every boss on the Maia path", () => {
       const maia = adversarialMaia();
       const notes: BrainNote[] = [];
       r.humanBrain = { brain: plan.brain, rating: plan.rating!, engine: maia };
-      const played = { maia: 0, limited: 0, special: 0, strike: 0 };
+      const played = { maia: 0, limited: 0, special: 0, strike: 0, race: 0 };
       const asksDuring = async (f: () => Promise<unknown>) => {
         const before = maia.asks.length;
         await f();
@@ -108,6 +108,12 @@ describe("every boss on the Maia path", () => {
           for (let s = r.alfilStep(); s; s = r.alfilStep()) {
             expect(await asksDuring(() => r.playAlfil())).toBe(0);
             played.special++;
+          }
+          // (Chub & Chirp's Carrot Patch: the cast is his whole turn, worked out without an engine; Maia not asked.)
+          if (r.carrotDue()) {
+            expect(await asksDuring(async () => void r.applyCarrots())).toBe(0);
+            played.special++;
+            continue;
           }
           // (Chub & Chirp's hop before his move: the engine's pick, Maia not asked.)
           if (r.hopDue()) {
@@ -135,6 +141,11 @@ describe("every boss on the Maia path", () => {
             // The King's strike: Stockfish's own step back; Maia wasn't asked.
             expect(note.why).toBe("strike");
             played.strike++;
+          } else if (note.why === "race") {
+            // Chub & Chirp's race brain: Maia's pick gave way to a move better for the race (Stockfish's, scored by it).
+            expect(id).toBe("hopper");
+            expect(maia.asks.at(-1)!.fen).toBe(fen);
+            played.race++;
           } else if (note.why === "power") {
             // Wrangler's moves after his showdown's duel: the engine's best, as its search scored them; Maia not asked.
             expect(id).toBe("pig");

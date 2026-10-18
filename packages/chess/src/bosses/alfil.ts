@@ -334,43 +334,58 @@ export function liftedPieces(before: string, after: string, crowd: Side): SlamPi
  */
 export function landing(fen: string, pieces: readonly SlamPiece[], crowd: Side): { fen: string; landed: SlamLanding["pieces"]; stuck: SlamPiece[] } {
   const g = gridOf(fen);
-  const hisKing = gridKing(g, other(crowd));
   const landed: SlamLanding["pieces"] = [];
   const stuck: SlamPiece[] = [];
   const order = [...pieces].sort((a, b) => Number(g.has(a.square)) - Number(g.has(b.square)));
   for (const pc of order) {
-    const c = letter(crowd, pc.piece);
     const near = (sq: string) => Math.max(Math.abs(file(sq) - file(pc.square)), Math.abs(rank(sq) - rank(pc.square))) * 16 + Math.abs(file(sq) - file(pc.square)) + Math.abs(rank(sq) - rank(pc.square));
-    const allowed = (sq: string): boolean => {
-      if (g.has(sq) || (pc.piece === "b" && isLight(sq) !== isLight(pc.square)) || (pc.piece === "p" && (rank(sq) === 1 || rank(sq) === 8))) return false;
-      g.set(sq, c);
-      const ok = !(hisKing && gridAttackers(g, hisKing, crowd).includes(sq));
-      g.delete(sq);
-      return ok;
-    };
-    const tries = SQUARES.filter(allowed).sort((a, b) => near(a) - near(b) || (a < b ? -1 : 1));
-    const home = tries[0] === pc.square ? [pc.square] : [];
-    const safe = tries.filter((sq) => {
-      g.set(sq, c);
-      const h = hangs(g, sq);
-      g.delete(sq);
-      return !h;
-    });
-    // (Home if it can; else safe squares first, then the rest; each checked for a move left to the side to move.)
-    const pick = [...home, ...safe, ...tries].find((sq) => {
-      g.set(sq, c);
-      const ok = hasMove(editedFen(fen, g));
-      g.delete(sq);
-      return ok;
-    });
+    // (A bishop on its own color; nearest first, then square order.)
+    const squares = SQUARES.filter((sq) => pc.piece !== "b" || isLight(sq) === isLight(pc.square)).sort((a, b) => near(a) - near(b) || (a < b ? -1 : 1));
+    const pick = putDown(g, fen, letter(crowd, pc.piece), squares, pc.square);
     if (!pick) {
       stuck.push(pc);
       continue;
     }
-    g.set(pick, c);
     landed.push({ piece: pc.piece, from: pc.square, to: pick });
   }
   return { fen: landed.length ? editedFen(fen, g) : fen, landed, stuck };
+}
+
+/**
+ * One piece (`c`, a FEN letter) put down on `g` (changed in place), as the Slam's pieces land (landing) and Chub &
+ * Chirp's prize pieces go on (carrots.ts): of `order` (the squares in the order wanted), those allowed (empty; a pawn
+ * never on the first or last rank; never attacking the other side's king: no power's piece lands giving check), `first`
+ * if it's one of them, then those it isn't left hanging on, then the rest, each checked for a move left to the side to
+ * move in `fen`. Returns its square; null: nowhere (nothing put down).
+ */
+export function putDown(g: Grid, fen: string, c: string, order: readonly string[], first: string | null = null): string | null {
+  const side = sideOf(c);
+  const king = gridKing(g, other(side));
+  const allowed = (sq: string): boolean => {
+    if (g.has(sq) || (c.toLowerCase() === "p" && (rank(sq) === 1 || rank(sq) === 8))) return false;
+    g.set(sq, c);
+    const ok = !(king && gridAttackers(g, king, side).includes(sq));
+    g.delete(sq);
+    return ok;
+  };
+  const tries = order.filter(allowed);
+  const home = first !== null && tries.includes(first) ? [first] : [];
+  const safe = tries.filter((sq) => {
+    g.set(sq, c);
+    const h = hangs(g, sq);
+    g.delete(sq);
+    return !h;
+  });
+  // (Its first square if it can; else safe squares first, then the rest; each checked for a move left to the side to move.)
+  const pick = [...home, ...safe, ...tries].find((sq) => {
+    g.set(sq, c);
+    const ok = hasMove(editedFen(fen, g));
+    g.delete(sq);
+    return ok;
+  });
+  if (!pick) return null;
+  g.set(pick, c);
+  return pick;
 }
 
 /** A candidate's outcome as the engine played it out: the crowd's expected score once they're down (crowd to move), or a mate against it on the way. */

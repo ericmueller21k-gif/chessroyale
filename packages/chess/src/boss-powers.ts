@@ -58,6 +58,7 @@ export * from "./bosses/recluse.ts";
 export * from "./bosses/recluse-phase2.ts";
 export * from "./bosses/alfil.ts";
 export * from "./bosses/hopper.ts";
+export * from "./bosses/carrots.ts";
 export * from "./bosses/index.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */
@@ -132,13 +133,13 @@ export function strikeRage(boss: BossState, s: Pick<BossPowerSettings, "rageStri
 
 /**
  * An admin's test trigger: the boss's ultimate comes as the next crowd turn begins, without the warning. Safe at any
- * moment: nothing happens if the boss has no ultimate (none at all, or none built yet: `noUltimate`), one is already
- * under way (it never overlaps another) or on its way, or the battle is over; it only takes effect as a turn begins (prepareTurn), never in the middle of one or of a
- * moment. Once that ultimate's effect is over, it can be pulled again.
+ * moment: nothing happens if the boss has no ultimate, one is already under way (it never overlaps another) or on its
+ * way, its once-a-battle ultimate has come (`ultimateOnce`), or the battle is over; it only takes effect as a turn begins
+ * (prepareTurn), never in the middle of one or of a moment. Once that ultimate's effect is over, it can be pulled again.
  */
 export function triggerUltimate(boss: BossState | null | undefined): { boss: BossState | null | undefined; ok: boolean } {
   const p = boss?.powers;
-  if (!boss || !p || !bossPowers(boss) || bossRules(boss)?.noUltimate || boss.result || p.ultAt !== undefined) return { boss, ok: false };
+  if (!boss || !p || !bossPowers(boss) || boss.result || p.ultAt !== undefined || (bossRules(boss)?.ultimateOnce && p.ults)) return { boss, ok: false };
   if (p.ultNext) return { boss, ok: true };
   return { boss: { ...boss, powers: { ...p, ultNext: true } }, ok: true };
 }
@@ -223,6 +224,8 @@ export function rageOf(boss: BossState | null | undefined, s: RageRates = BOSS_P
   // (A meter of its own: Wrangler's.)
   const own = bossRules(boss)?.meter;
   if (own) return own(p, turnOf(boss!), { ...BOSS_POWERS, ...s });
+  // (Once a battle, Chub & Chirp's: from the turn after it, no meter.)
+  if (p.ultAt !== undefined && bossRules(boss)?.ultimateOnce && turnOf(boss!) > p.ultAt) return null;
   if (p.ultAt !== undefined) return turnOf(boss!) <= p.ultAt ? 1 : 0;
   return Math.max(0, Math.min(1, rageNow(p, rageSpeedOf(boss!.id, s), s) / s.rageFull));
 }
@@ -230,7 +233,7 @@ export function rageOf(boss: BossState | null | undefined, s: RageRates = BOSS_P
 /** The meter is held empty: an ultimate came and its effect still runs (the screens show it paused). */
 export const ragePaused = (boss: BossState | null | undefined): boolean => {
   const p = boss?.powers;
-  return !!p && p.ultAt !== undefined && turnOf(boss!) > p.ultAt && !bossRules(boss)?.meter;
+  return !!p && p.ultAt !== undefined && turnOf(boss!) > p.ultAt && !bossRules(boss)?.meter && !bossRules(boss)?.ultimateOnce;
 };
 
 // ---------------- The judge plays by the same rules ----------------
@@ -274,6 +277,12 @@ export function judgeCandidates(job: MoveLimits, top: readonly MoveScore[], extr
 export function judgeMustScore(boss: BossState | null | undefined, fen: string): string[] {
   const j = boss ? bossRules(boss)?.judge : undefined;
   return j ? j.mustScore(boss!, fen) : [];
+}
+
+/** The moves the bots may pick this crowd turn besides the engine's top moves (BossRules.judge.offer: the race's pulls); none for most bosses. */
+export function judgeOffers(boss: BossState | null | undefined, fen: string): string[] {
+  const j = boss ? bossRules(boss)?.judge : undefined;
+  return j?.offer ? j.offer(boss!, fen) : [];
 }
 
 /** Top moves as the judge ranks them this crowd turn under the boss's rules (for bots and hints), best first. */

@@ -21,12 +21,16 @@
  * Chub & Chirp's Leapfrog (id hopper): each row logs the hops and, for every turn of his with a pawn nose to nose that
  * couldn't hop, why (hopOptions; `cap`: out of hops). (The hop as his move, the variant the sim turned down, can't be
  * run from here: its switch went with it. It ran on commit eb678d7 only, checked out: reports/hopper-sim.md.)
+ * Their Carrot Patch: each row logs the cast (after which crowd move, the carrots and each one's lead for him as the
+ * cast saw it), every pull, how the race ended, his spin, and what his race brain did. `cast` ([from, to]): a forced cast
+ * (the admins' trigger) at a crowd turn drawn from that range, the battle stopped once the race and the spin are over
+ * (the carrot counts' extra samples: reports/hopper-carrots-sim.md). Tuning the placement: `{"powers": {"carrotLeads": [...]}}`.
  *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, applyMove, bossMoveFrom, botRoster, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, pickSlam, pieceAt, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, applyMove, bossMoveFrom, botRoster, carrotSpots, carrotsOf, carrotsOpen, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -217,6 +221,8 @@ interface RaidPatch {
   powers?: Record<string, unknown>;
   offset?: Record<string, number>;
   counter?: number;
+  /** Chub & Chirp: a forced Carrot Patch (the admins' trigger) at a crowd turn in this range; the battle stops after the race. */
+  cast?: [number, number];
 }
 
 /**
@@ -273,6 +279,19 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       // a pawn of his nose to nose with one of the crowd's, and each such pawn that couldn't hop, by why: hopOptions's
       // reasons, and `cap` once his hops are spent.)
       const hopper = { max: BOSS_POWERS.hopMax, hops: [] as { at: number; from: string; over: string; to: string; of: number }[], noseTurns: 0, refused: {} as Record<string, number> };
+      // (Their Carrot Patch: the cast, each carrot's lead for him and fewest moves each side as it saw them, the pulls,
+      // the end, the spin, and his race brain's looks: how many, how many changed his move, his last carrots taken.)
+      const castAt = patch.cast ? patch.cast[0] + Math.floor(mulberry32(seed * 31 + g)() * (patch.cast[1] - patch.cast[0] + 1)) : null;
+      const carrots = {
+        forced: castAt,
+        cast: null as null | { at: number; squares: string[]; leads: number[]; his: number[]; crowd: number[] },
+        pulls: [] as { square: string; by: string; at: number; hop?: true }[],
+        over: null as string | null,
+        his: 0,
+        crowd: 0,
+        spin: null as unknown,
+        brain: { looks: 0, changed: 0, won: 0, ms: 0 },
+      };
       const t0 = Date.now();
       while (!runner.isOver()) {
         if (runner.stageComplete()) {
@@ -313,10 +332,25 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             if (step === "fuse") f?.to ? alfil.fused++ : alfil.nowhere++;
             if (step === "fuse" && f?.to && pick) alfil.gains.push(pick.gain);
           }
+          if (bossId === "hopper" && runner.carrotDue()) {
+            // (The Carrot Patch's cast: his whole turn.)
+            const at = runner.boss!.crowdMoves;
+            const passed = passTurn(runner.boards.get(runner.state.boards[0]!)!.fen)!;
+            const spots = carrotSpots(passed, runner.boss!.crowdSide);
+            runner.applyCarrots();
+            const c = runner.boss!.powers!.carrots!;
+            const spot = (sq: string) => spots.find((x) => x.square === sq)!;
+            const round = (x: number) => (Number.isFinite(x) ? Math.round(x * 1000) / 1000 : -1);
+            carrots.cast = { at, squares: c.squares, leads: c.squares.map((sq) => spot(sq).lead), his: c.squares.map((sq) => round(spot(sq).his)), crowd: c.squares.map((sq) => round(spot(sq).crowd)) };
+            ults.push({ kind: "carrots", turn: at });
+            look();
+            continue;
+          }
           if (bossId === "hopper") {
             const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
             const his = runner.boss!.crowdSide === "w" ? "b" : "w";
-            const { options, refused } = hopOptions(fen, his);
+            const race = runner.boss!.powers!.carrots;
+            const { options, refused } = hopOptions(fen, his, raceOn(race) ? { open: carrotsOpen(race), his: carrotsOf(race, "boss") } : null);
             if (options.length || refused.length) hopper.noseTurns++;
             const spent = (runner.boss!.powers!.hops ?? 0) >= BOSS_POWERS.hopMax;
             for (const r of refused) hopper.refused[r.why] = (hopper.refused[r.why] ?? 0) + 1;
@@ -334,7 +368,17 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             await runner.playBoss(engines[0]);
             const c = runner.landingCheck;
             if (c) alfil.landing.push({ at, pick: c.pick, move: c.move, searched: c.searched, ms: Math.round(c.ms) });
+            const rc = runner.raceCheck;
+            if (rc) {
+              carrots.brain.looks++;
+              if (rc.move !== rc.pick) carrots.brain.changed++;
+              if (rc.won) carrots.brain.won++;
+              carrots.brain.ms += Math.round(rc.ms);
+            }
           }
+          // (A forced cast: once the race and his spin are over, or the battle his by his last carrot, the sample is in.)
+          const done = runner.boss!.powers?.carrots;
+          if (castAt !== null && done && (done.spin || done.over === "won")) break;
           look();
           continue;
         }
@@ -348,6 +392,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           continue;
         }
         runner.deal();
+        // (A forced Carrot Patch: the admins' trigger, as this crowd turn begins: the cast at the start of his turn after it.)
+        if (castAt !== null && bossId === "hopper" && runner.boss!.crowdMoves + 1 === castAt && !runner.boss!.powers?.carrots) runner.triggerUltimate();
         // (Alfil's marked pawns: a crowd that knows the rule takes one when it's cheap enough: patch.counter.)
         if (patch.counter !== undefined && bossId === "alfil") {
           const cost = await counterTusks(runner, engines[0]!, patch.counter);
@@ -369,7 +415,9 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         if (runner.bossKillDue()) runner.bossKill();
       }
       const b = runner.boss!;
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper } : {}) };
+      const pc = b.powers?.carrots;
+      if (pc) Object.assign(carrots, { pulls: pc.pulls, over: pc.over ?? null, his: carrotsOf(pc, "boss"), crowd: carrotsOf(pc, "crowd"), spin: pc.spin ?? null });
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }

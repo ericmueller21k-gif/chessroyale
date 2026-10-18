@@ -854,12 +854,66 @@ export const BOSS_POWERS = {
   /**
    * Chub & Chirp's Leapfrog (their passive; Eric, Oct 18): at the start of his turn, when one of his pawns stands nose
    * to nose with one of the crowd's (the crowd's pawn on the square in front of his) and the square beyond is empty, his
-   * pawn hops over it to that square (never onto the crowd's back rank), automatically, and he still plays his move
+   * pawn hops over it to that square (never onto the crowd's last two ranks), automatically, and he still plays his move
    * (the sim's variant A: reports/hopper-sim.md); several can: the engine's pick (each position searched at hopNodes:
    * the one best for him). At most hopMax a battle.
    */
   hopMax: 2,
   hopNodes: 30_000,
+  /**
+   * Chub & Chirp's Carrot Patch (their ultimate, once a battle; Eric, Oct 18; docs/decisions/2026-10-18-carrot-patch.md).
+   * The cast is his whole turn: carrotCount carrots on empty squares, at least one on each half, no two touching. Where
+   * they go (the math): each side's fewest moves to end a move on each square, from the position as it stands, give each
+   * square his lead (the crowd's moves there less his; the crowd moves first, so a tie is the crowd's), and a carrot
+   * goes where his lead is nearest each of `carrotLeads` (moves; the sim's tuning: reports/hopper-carrots-sim.md),
+   * nearer squares first, among squares some piece reaches within carrotReach moves. A piece pulls one by ending its
+   * move there. What the race is worth (his brain's and the judge's): who'd get each carrot as the race would go, each
+   * side one at a time, held by its margin (`carrotSharp` a ply, through a logistic), his own the less the later he'd
+   * pull them (`carrotHurry` a move: one in the ground isn't his yet); each count's prize at its average,
+   * in pawns; his last carrot `carrotWinWorth` pawns (the battle). The race
+   * lasts carrotMoves moves each; then his spin on his tier (his carrots: `carrotOdds`, each tier's prizes and their
+   * odds, Eric's sheet, tier 3 the softened table), his 5th carrot winning the battle at once. A prize the engines
+   * can't take (more than 8 pawns, or more pieces than promotions could make) steps down `carrotPrizes`, best first, to
+   * the next that fits.
+   * His race brain (the host's engine, as the landing guard): on his ordinary moves in the race, his pick, his search's
+   * carrotLooks best moves within the blunder guard and as many moves that pull a carrot are searched at carrotNodes (at
+   * most 9 × 30,000 nodes a move, about the move's own search again) and re-scored with the race (what his chances of
+   * each carrot make his prize worth), weighed by his strength: from carrotWeightMin at carrotSkill[0] Elo to all of it
+   * at carrotSkill[1]; a move that pulls his last carrot is always played. The crowd's judge weighs the race in full (the
+   * bots pick by it, the pulls among their choices).
+   */
+  carrotCount: 5,
+  carrotMoves: 12,
+  carrotLeads: [2, 1, 0, -1, -2] as readonly number[],
+  carrotReach: 4,
+  carrotSharp: 1.2,
+  carrotHurry: 0.85,
+  carrotWinWorth: 30,
+  carrotOdds: [
+    [{ prize: [], p: 1 }],
+    [
+      { prize: ["p"], p: 0.6 },
+      { prize: ["p", "p"], p: 0.4 },
+    ],
+    [
+      { prize: ["p", "p"], p: 0.4 },
+      { prize: ["n"], p: 0.3 },
+      { prize: ["b"], p: 0.3 },
+    ],
+    [
+      { prize: ["n"], p: 0.25 },
+      { prize: ["b"], p: 0.25 },
+      { prize: ["r"], p: 0.3 },
+      { prize: ["q"], p: 0.15 },
+      { prize: ["q", "r"], p: 0.05 },
+    ],
+    [{ prize: ["q", "q"], p: 1 }],
+  ] as readonly (readonly { prize: readonly string[]; p: number }[])[],
+  carrotPrizes: [["q", "q"], ["q", "r"], ["q"], ["r"], ["b"], ["n"], ["p", "p"], ["p"]] as readonly (readonly string[])[],
+  carrotLooks: 4,
+  carrotNodes: 30_000,
+  carrotSkill: [1000, 2000] as readonly [number, number],
+  carrotWeightMin: 0.25,
 } as const;
 
 /**
