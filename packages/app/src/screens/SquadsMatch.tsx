@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
 import { applyMove, inCheck, legalMoves, toSan, type MoveScore } from "@chessroyale/chess";
 import { matchClockLine, minutesName, tokenLines, type Colour, type Side, type SquadsEvent } from "@chessroyale/chess/squads";
@@ -328,20 +328,32 @@ export function SquadsMatchScreen({
   const home: BoardRef | null = mine && myBoard !== null ? { key: mine.key, board: myBoard } : spectateDefault(client);
   // A new half that asks something of you brings you back to your board.
   const seq = mine?.current?.seq ?? -1;
+  const jumpTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useLayoutEffect(() => {
-    if (duty && !myLocked) setWatch(null);
+    if (duty && !myLocked) {
+      clearTimeout(jumpTimer.current);
+      setWatch(null);
+    }
   }, [mine?.key, seq, !!duty]);
   // "Jump to my next board" (Relay; on unless switched off, remembered on this device): once you've moved, the big
-  // board goes to the board you play next, a beat later (your piece lands first), unless you've opened another.
+  // board goes to the board you play next, a beat later (your piece lands first), unless you've opened another. Once
+  // a half; the half ending at once (you were the last to move: Eric, Oct 18) doesn't call it off.
   const jump = useJumpNext();
   const moved = !!duty && duty.duty.role === "move" && !!me && !!mine!.visible[me];
   const study = mine && moved && jump ? studyBoard(mine, me) : null;
+  const jumpedIn = useRef<string | null>(null);
   useEffect(() => {
     if (study === null || !mine) return;
+    const half = `${mine.key}/${seq}`;
+    if (jumpedIn.current === half) return;
+    jumpedIn.current = half;
     const key = mine.key;
-    const t = setTimeout(() => setWatch((w) => w ?? { key, board: study }), SQUADS_LOBBY.watching.jumpAfterMs);
-    return () => clearTimeout(t);
+    jumpTimer.current = setTimeout(() => setWatch((w) => w ?? { key, board: study }), SQUADS_LOBBY.watching.jumpAfterMs);
   }, [mine?.key, seq, study]);
+  useEffect(() => {
+    if (!jump) clearTimeout(jumpTimer.current);
+  }, [jump]);
+  useEffect(() => () => clearTimeout(jumpTimer.current), []);
   // A watched match that has gone (finished long ago, or never was): back home.
   const viewing = watch && client.matches.get(watch.key) && shownMatches(matches).some((m) => m.key === watch.key) ? watch : home;
   const vm = viewing ? client.matches.get(viewing.key)! : null;
