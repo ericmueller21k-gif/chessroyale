@@ -159,7 +159,7 @@ export function BossBarExtra({ boss, until = 0 }: { boss: BossView; until?: numb
 // ---------------- The moments ----------------
 
 /** The boss's line for a power's moment (its kit's), the same on every screen; null without one. */
-export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick" | "ult">): string | null {
+export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick" | "ult" | "by" | "tier">): string | null {
   const ui = MOMENT_UI[m.kind];
   return ui.line ? ui.line(kit, m) : kitLine(kit, ui.kit, m.key);
 }

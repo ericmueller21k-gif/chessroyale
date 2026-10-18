@@ -8377,8 +8377,9 @@ button.fd-logo {
 
 /*
  * -- The Boss raid screen's character select (Eric, Oct 16: SF2 / PlayStation era; bs- for boss select) --
- * Slanted tiles (parallelograms: clip-path, so nothing sticks out sideways), five to a row on a phone (ten tiles since
- * Alfil, Oct 17: two full rows), all in one row from 600 px. The picked one gold.
+ * Slanted tiles (parallelograms: clip-path, so nothing sticks out sideways), six to a row (eleven tiles since Chub &
+ * Chirp, Oct 18: a row of six and one of five; eleven in one row were under 44 px in a computer's column). The picked
+ * one gold.
  */
 .bs-select {
   display: flex;
@@ -8386,8 +8387,8 @@ button.fd-logo {
   gap: 10px;
 }
 .bs-tiles {
-  --bs-gap: 6px;
-  --bs-per: 5;
+  --bs-gap: 4px;
+  --bs-per: 6;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -8395,7 +8396,7 @@ button.fd-logo {
 }
 @media (min-width: 600px) {
   .bs-tiles {
-    --bs-per: 10;
+    --bs-gap: 6px;
   }
 }
 .bs-tile {
@@ -13202,6 +13203,314 @@ img.qicon {
   height: 37.5%;
   border-radius: 50%;
   background: radial-gradient(circle, #ffffff 0 30%, rgba(255, 255, 255, 0.85) 45%, rgba(255, 246, 214, 0.45) 60%, rgba(255, 246, 214, 0) 72%);
+}
+
+/* ---- Chub & Chirp, a rabbit riding a grasshopper (components/Hopper.tsx; hp- for hopper) ---- */
+/* They cast from the board's top-left corner, in their own frame's shape (84 x 84: HOPPER_CASTER). */
+.pm-caster.pm-by-hopper {
+  aspect-ratio: 1;
+  width: 30%;
+  left: -6%;
+  top: -17%;
+}
+/* Their banners: carrot orange and the grasshopper's green. */
+.fight-banner.power-cut.carrot .fb-band {
+  background: repeating-linear-gradient(115deg, #c2561a 0 6cqw, #3f7a1f 6cqw 7.5cqw, #e8732a 7.5cqw 13.5cqw, #3f7a1f 13.5cqw 15cqw);
+  border-color: #ffe58a;
+}
+/* The carrots on the board (planted, popping out, the puller's token): one canvas under the pieces (z-index 1, the pieces
+   2), on the board's own squares. */
+.board-wrap > .hp-carrots {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+/* Their moments' pieces on their way (the hop's pawn, the prize dropping) and the carrots in flight: over the pieces. */
+.hp-layer {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 8;
+  pointer-events: none;
+}
+.hp-layer > * {
+  position: absolute;
+  pointer-events: none;
+}
+.hp-layer piece.hp-piece {
+  z-index: 2;
+  width: 12.5%;
+  height: 12.5%;
+  background-size: cover;
+  filter: drop-shadow(0 0.6cqw 0 rgba(0, 0, 0, 0.35));
+}
+.hp-fly {
+  z-index: 3;
+  width: 12.5%;
+  height: 12.5%;
+}
+.hp-icon {
+  image-rendering: pixelated;
+}
+/* His ladder after the cast: what each count of carrots wins on his spin, a card in the board's middle (dark in both
+   themes, as the banners are). */
+.hp-ladder {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: 76cqw;
+  box-sizing: border-box;
+  padding: 2.6cqw 3.6cqw 3cqw;
+  border: 0.7cqw solid #f2c14e;
+  border-radius: 2.6cqw;
+  background: rgba(20, 22, 27, 0.95);
+  color: #f3f1ec;
+  box-shadow: 0 1.2cqw 3cqw rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.hp-ladder-title {
+  margin-bottom: 1.8cqw;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 2.6cqw;
+  line-height: 1.3;
+  text-align: center;
+  color: #f2c14e;
+}
+.hp-ladder-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.9cqw;
+}
+.hp-ladder-rows li {
+  display: grid;
+  grid-template-columns: 9cqw minmax(0, 1fr);
+  align-items: center;
+  column-gap: 2cqw;
+  font-size: 3.8cqw;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.hp-ladder-n {
+  display: flex;
+  align-items: center;
+  gap: 0.6cqw;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 2.8cqw;
+}
+.hp-ladder-n .hp-icon {
+  width: 4.2cqw;
+  height: 4.2cqw;
+}
+.hp-ladder-rows li.none {
+  color: #a7a9b2;
+}
+.hp-ladder-rows li.win {
+  color: #f2c14e;
+}
+/* His spin's reel: one row of prize cards in a window across the board's middle, sliding past the gold line (a CSS
+   transform of the row, in steps of --hp-step: a card and its gap), stopping on what he rolled. */
+.hp-reel {
+  --hp-card: 17cqw;
+  --hp-step: 19cqw;
+  position: absolute;
+  z-index: 9;
+  left: 4cqw;
+  right: 4cqw;
+  top: 50%;
+  translate: 0 -50%;
+  pointer-events: none;
+}
+.hp-reel-label {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.8cqw;
+  width: max-content;
+  margin: 0 auto 1cqw;
+  padding: 0.9cqw 2cqw;
+  border-radius: 1.6cqw;
+  background: rgba(20, 22, 27, 0.92);
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 2.8cqw;
+  color: #f2c14e;
+}
+.hp-reel-label .hp-icon {
+  width: 4.4cqw;
+  height: 4.4cqw;
+}
+.hp-reel-window {
+  position: relative;
+  height: calc(var(--hp-card) + 4cqw);
+  overflow: hidden;
+  border: 0.7cqw solid #f2c14e;
+  border-radius: 2.4cqw;
+  background: #14161b;
+  box-shadow: 0 1.2cqw 3cqw rgba(0, 0, 0, 0.45);
+}
+.hp-reel-row {
+  display: flex;
+  gap: calc(var(--hp-step) - var(--hp-card));
+  padding: 2cqw 0 0 calc(50% - var(--hp-card) / 2);
+  will-change: transform;
+}
+.hp-card {
+  position: relative;
+  flex: 0 0 var(--hp-card);
+  height: var(--hp-card);
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 0.5cqw solid #8b8577;
+  border-radius: 1.8cqw;
+  background: linear-gradient(160deg, #fbf8f0, #e2dccb);
+}
+.hp-card.blank {
+  border-color: #3a3d46;
+  background: #262932;
+}
+.hp-card.jackpot {
+  border-color: #b4840f;
+  background: linear-gradient(160deg, #ffe58a, #f2c14e);
+}
+.hp-card.won {
+  border-color: #f2c14e;
+  box-shadow: 0 0 0 0.6cqw #f2c14e, 0 0 3cqw rgba(242, 193, 78, 0.9);
+}
+.hp-card-p {
+  position: relative;
+  display: block;
+  width: 13cqw;
+  height: 13cqw;
+}
+.hp-card.jackpot .hp-card-p {
+  width: 8cqw;
+  height: 8cqw;
+}
+.hp-card-p piece {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+}
+.hp-times {
+  position: absolute;
+  right: -2cqw;
+  bottom: -1cqw;
+  padding: 0.5cqw 0.7cqw;
+  border-radius: 1cqw;
+  background: #14161b;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 2.4cqw;
+  font-weight: 400;
+  color: #f2c14e;
+}
+/* The line the cards stop on: gold, a notch at the top and bottom. */
+.hp-reel-line {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 0.6cqw;
+  translate: -50% 0;
+  background: rgba(242, 193, 78, 0.85);
+}
+.hp-reel-line::before,
+.hp-reel-line::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+  border: 1.6cqw solid transparent;
+}
+.hp-reel-line::before {
+  top: 0;
+  border-top-color: #f2c14e;
+}
+.hp-reel-line::after {
+  bottom: 0;
+  border-bottom-color: #f2c14e;
+}
+.hp-reel-note {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  top: calc(50% + 15cqw);
+  translate: -50% 0;
+  width: max-content;
+  max-width: 88cqw;
+  padding: 1cqw 2cqw;
+  border-radius: 1.6cqw;
+  background: rgba(20, 22, 27, 0.92);
+  font-size: 3.4cqw;
+  font-weight: 700;
+  color: #f3f1ec;
+  text-align: center;
+  pointer-events: none;
+}
+/* The dock's race count (RaceBadge), at the status box's left: the pixel carrot, his count and yours, each on a disc of
+   its side's color (as the tokens on the board), your moves left under them. */
+.boss-dock-status:has(> .dk-race) {
+  grid-template-columns: auto minmax(0, 1fr);
+  padding-left: 8px;
+}
+.boss-dock-status:has(> .dk-race):has(> .dk-clock) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.dk-race {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding-right: 8px;
+  border-right: 1px solid var(--line);
+  line-height: 1;
+}
+.dk-race-counts {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.dk-race-icon {
+  width: 14px;
+  height: 14px;
+}
+.dk-race-n {
+  min-width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.dk-race-n.w {
+  background: #f7f3ea;
+  color: #14161b;
+  border: 1px solid #8b8577;
+}
+.dk-race-n.b {
+  background: #2a2521;
+  color: #f7f3ea;
+  border: 1px solid #5e564d;
+}
+.dk-race-left {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 /* ---- A boss's attack on a king (KingAttack.tsx): the God King in his Last Stand, the crowd's king at the boss's mate ---- */

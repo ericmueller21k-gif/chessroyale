@@ -156,6 +156,7 @@ for (const b of [
   { id: "bigboy", name: "Big Boy", facesLeft: true, sounds: ["bigboyBonk", "bigboySwish"] },
   { id: "gingerbread", name: "Ginger", facesLeft: false, sounds: ["gingerCrackle", "gingerCrunch"] },
   { id: "grex", name: "Jefferson", facesLeft: false, sounds: ["grexPop", "grexSparkle"] },
+  { id: "hopper", name: "Chub & Chirp", facesLeft: true, sounds: ["hopperToss", "hopperBonk"] },
 ])
   test(`the God King's Last Stand against ${b.name}: ${b.name} assaults him, then he falls and you pick again`, async ({ page }) => {
     const errors: string[] = [];

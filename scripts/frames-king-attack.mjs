@@ -3,7 +3,7 @@
 // 2.g4, the boss mates; its attack on your king, then the result). The page's clock is paused as the attack is about to
 // start and stepped 40 ms at a time, a frame of the board at each step (exact times, every frame), with full stills at
 // its beats; prints what's on screen as it changes. `gif` makes a GIF of each strip at its real speed (ffmpeg; any other word there, e.g. `-`, makes none).
-//   npm run frames:king-attack -- <out-dir> [hollow|alfil|sawyer|pig|clown|gingerbread|grex|bigboy] [phone|desktop|both] [laststand|mate|both] [light|dark] [gif] [width] [sq=<square>] [stills]
+//   npm run frames:king-attack -- <out-dir> [hollow|alfil|sawyer|pig|clown|gingerbread|grex|bigboy|hopper] [phone|desktop|both] [laststand|mate|both] [light|dark] [gif] [width] [sq=<square>] [stills]
 // `width` sets the phone's (or the computer's) window width in px (320, 360; 1280), the rest of the device unchanged.
 // `sq=a8` (the Last Stand only) sets a position on the board first so that your move lands on that square (a8, h8, e8,
 // a1 or h1 as White; mirrored top to bottom when the battle made you Black): the attack at the board's corners and top.

@@ -108,6 +108,13 @@ export interface Settings {
    * so Qxf7 mates the boss at once (to see a boss beaten: the Hidden Boss's collapse).
    */
   bossWinTest?: boolean;
+  /**
+   * Test switch, solo (?carrots=N, 0 to 5, with ?boss=hopper&power=carrotpatch): Chub & Chirp's cast plants N carrots
+   * each a step from one of his pieces and out of the crowd's reach, and the rest each a step from one of the crowd's
+   * and out of his: each side pulling its own, his spin comes on N carrots (5: his fifth wins the battle). The e2e's and
+   * the previews' way to a given count (docs/decisions/2026-10-18-hopper-wired.md).
+   */
+  bossCarrotTest?: number;
   /** Boss battle: the King's strike makes the boss's next move one that loses this many points (from its top moves). */
   kingStrikeLoss: readonly [number, number];
   /**

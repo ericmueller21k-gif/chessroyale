@@ -288,13 +288,13 @@ describe("boss powers online", () => {
       expect(L.core.save().runner!.state.boss!.id).not.toBe("clown");
     }
     const ids = new Set<string>();
-    for (let seed = 1; seed <= 80 && ids.size < 8; seed++) {
+    for (let seed = 1; seed <= 80 && ids.size < 9; seed++) {
       const L = setup({ ...RAID_SETTINGS }, {}, seed);
       L.core.connect(undefined, "A", "computer", false, 1500);
       L.core.message("p1", { t: "start" });
       ids.add(L.core.save().runner!.state.boss!.id!);
     }
-    expect([...ids].sort()).toEqual(["alfil", "bigboy", "clown", "gingerbread", "grex", "hollow", "pig", "sawyer"]);
+    expect([...ids].sort()).toEqual(["alfil", "bigboy", "clown", "gingerbread", "grex", "hollow", "hopper", "pig", "sawyer"]);
   });
 
   it("the test trigger: only an admin's is taken; it brings the ultimate as the next turn begins, once; switched off, nothing", () => {
@@ -1081,9 +1081,9 @@ describe("Chub & Chirp online (Leapfrog)", () => {
     return L.last("p1", "bossRequest")!;
   };
   const shown = (L: ReturnType<typeof setup>, id: string, from: number) => (L.inbox.get(id) ?? []).slice(from).filter((m): m is Extract<ServerMessage, { t: "boss" }> => m.t === "boss");
-  /** Chub & Chirp (hidden: met as the test link does), picked by the lobby; `fen`: the battle from a position of our own, the crowd to move. */
+  /** Chub & Chirp, picked by the lobby; `fen`: the battle from a position of our own, the crowd to move. */
   function hopper(patch: Partial<Settings> = {}, fen?: string) {
-    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "hopper", bossUnfinished: true, ...patch });
+    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "hopper", ...patch });
     for (const i of [0, 1]) L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, 1500);
     L.core.message("p1", { t: "start" });
     L.advance(1000);
@@ -1191,9 +1191,9 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
   };
   const shown = (L: ReturnType<typeof setup>, id: string, from: number) => (L.inbox.get(id) ?? []).slice(from).filter((m): m is Extract<ServerMessage, { t: "boss" }> => m.t === "boss");
   const runnerOf = (L: ReturnType<typeof setup>) => (L.core as unknown as { runner: MatchRunner }).runner;
-  /** Chub & Chirp (hidden: met as the test link does), no slips (his race brain on every ordinary move); `fen`: the battle from a position of our own. */
+  /** Chub & Chirp, picked by the lobby, no slips (his race brain on every ordinary move); `fen`: the battle from a position of our own. */
   function hopper(patch: Partial<Settings> = {}, fen?: string) {
-    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "hopper", bossUnfinished: true, bossStumbleBelow: 0, ...patch });
+    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "hopper", bossStumbleBelow: 0, ...patch });
     for (const i of [0, 1]) L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, 1500);
     L.core.message("p1", { t: "start" });
     L.advance(1000);

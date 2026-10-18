@@ -85,7 +85,7 @@ function fakeEngine(score: (fen: string, m: string) => number = (fen, m) => 0.3 
 const RUY = ["e2e4", "e7e5", "g1f3", "b8c6", "f1b5", "a7a6", "b5a4", "g8f6", "e1g1", "f8e7", "f1e1", "b7b5"];
 const opening = (moves: string[]): Opening => ({ id: "o", eco: "", name: "Test", family: "Test", unusual: false, moves, namedPlies: moves.length, expected: { 10: 0.52, 11: 0.48, 12: 0.52 } });
 /** His strength in these battles: no slips (bossStumbleBelow 0), so his race brain looks at every ordinary move. */
-const SETTINGS = (patch: Partial<Settings> = {}) => ({ ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossStumbleBelow: 0, bossId: "hopper", bossUnfinished: true, lastStandFrom: 999, ...patch }) as Settings;
+const SETTINGS = (patch: Partial<Settings> = {}) => ({ ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossStumbleBelow: 0, bossId: "hopper", lastStandFrom: 999, ...patch }) as Settings;
 
 /** A Boss alone against him (met as the test link does: his art isn't built yet). */
 function raid(o: { patch?: Partial<Settings>; seed?: number; engine?: EngineLike; side?: "w" | "b" } = {}) {
@@ -829,4 +829,25 @@ describe("the Carrot Patch: the ground rules, over many battles (a fuzz, as #273
     expect(counts.casts).toBeGreaterThanOrEqual(6);
     expect(counts.spins ?? 0).toBeGreaterThanOrEqual(2);
   }, 120_000);
+});
+
+describe("the carrots' test switch (?carrots=N: settings.bossCarrotTest)", () => {
+  it("plants N carrots a step from one of his pieces and out of the crowd's reach, the rest a step from the crowd's and out of his", async () => {
+    const { carrotsWithinReach, legalMoves } = await import("../src/index.ts");
+    // (The test switch's start, 1.e4 e5 2.Nf3 Nc6 3.d3, his turn passed: the crowd White to move.)
+    const fen = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/3P1N2/PPP2PPP/RNBQKB1R w KQkq - 0 3";
+    const his = fen.replace(" w ", " b ");
+    const to = (f: string) => new Set(legalMoves(f).map((m) => m.slice(2, 4)));
+    for (const n of [0, 3, 5]) {
+      const squares = carrotsWithinReach(fen, "w", n);
+      expect(squares, `${n}`).toHaveLength(BOSS_POWERS.carrotCount);
+      expect(new Set(squares).size).toBe(squares.length);
+      squares.forEach((sq, i) => {
+        expect(gridOf(fen).has(sq), sq).toBe(false);
+        const [near, far] = i < n ? [his, fen] : [fen, his];
+        expect(to(near).has(sq), `${n}: ${sq} a step away`).toBe(true);
+        expect(to(far).has(sq), `${n}: ${sq} out of reach`).toBe(false);
+      });
+    }
+  });
 });

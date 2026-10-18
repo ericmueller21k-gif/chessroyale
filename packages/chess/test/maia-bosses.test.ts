@@ -63,7 +63,7 @@ function adversarialMaia(): HumanEngineLike & { asks: { fen: string; rating: num
 const RUY = sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7"]);
 const opening = (moves: string[]): Opening => ({ id: "o", eco: "", name: "Test", family: "Test", unusual: false, moves, namedPlies: moves.length, expected: { [moves.length]: 0.52 } });
 const PLAYABLE = BOSS_ROSTER.filter(isPlayable).map((b) => b.id);
-/** Bosses whose powers are built before their art (Chub & Chirp, Oct 18): met as the test link does (bossUnfinished). */
+/** Bosses whose powers are built before their art (none since Chub & Chirp went live, Oct 18): met as the test link does (bossUnfinished). */
 const UNFINISHED = BOSS_ROSTER.filter((b) => b.powers && !b.kit && !b.adminOnly).map((b) => b.id);
 
 describe("every boss on the Maia path", () => {

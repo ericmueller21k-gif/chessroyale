@@ -5,8 +5,8 @@ import { ALFIL } from "../src/characters/alfil.ts";
 import { CARROT_FLY, CARROT_HIT, CARROT_ICON, CARROT_PATCH } from "../src/characters/effects/hopper.ts";
 import { frameKeys, type Anim } from "../src/characters/sprite.ts";
 
-// Chub & Chirp (the hopper) aren't in CHARACTERS yet (not wired in), so the characters test doesn't see them: the same
-// checks here, and his own moments' cues for the board art.
+// Chub & Chirp's art (the animation pack, the attack, the carrots): the characters test's checks for the board art too,
+// and his own moments' cues (the game's beats on them: hopper.test.ts).
 
 const cueTimes = (a: Anim): [string, number][] => {
   let t = 0;

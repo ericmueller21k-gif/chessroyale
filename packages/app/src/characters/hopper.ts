@@ -8,8 +8,9 @@
  *
  * His animation pack (Oct 18: docs/decisions/2026-10-18-hopper-animations.md): every animation the other bosses have,
  * his Leapfrog hop, his Carrot Patch cast, the carrot race won and lost, and his attack on a king (`HOPPER_ATTACK`:
- * carrots pelted at the king). `idle` frame 1 is the approved still. Not in the game yet; his board art (the carrots)
- * is in effects/hopper.ts.
+ * carrots pelted at the king). `idle` frame 1 is the approved still. His board art (the carrots) is in
+ * effects/hopper.ts. In the game (Oct 18): his kit (kits.ts), his lines (HOPPER_LINES), his sounds (hopper-sounds.ts)
+ * and his powers on the board (components/Hopper.tsx), timed by HOPPER_BEATS (docs/decisions/2026-10-18-hopper-wired.md).
  *
  * Rigging, as the other bosses: the grasshopper's body, wings, thorax and head and the rabbit's body and head are
  * painted once; the legs (all six, from hip, knee and foot), the antennae, the rabbit's ears and arms, the reins, the
@@ -1116,6 +1117,52 @@ export const HOPPER: Character = {
   halo: "#2a2a20",
   parts: PARTS,
   anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory, leapfrog, carrotPatch, raceWon, raceLost },
+};
+
+/**
+ * Their lines (Eric's draft, Oct 18: the `CHC-*` lines, as written): Chub does the talking, Chirp answers in chirps.
+ * Each at most 42 characters. How often a moment speaks: HOPPER_CHANCE; a power's moment always has its line. `power`
+ * is Leapfrog's hop, `ultimateWarn` the Carrot Patch coming, `ultimate` its cast; the race's own keys: `carrotHis` (he
+ * pulls one), `carrotYours` (you do), `spinBig` (his spin on 3 or 4 carrots), `spinSmall` (1 or 2), `spinEmpty` (none)
+ * and `carrotsAll` (his fifth: the battle is his).
+ */
+export const HOPPER_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
+  entrance: ["Chub and Chirp, reporting for hops!", "Ready, Chirp? (Chirp!)", "Two friends. One saddle. Big plans."],
+  move: ["Hup!", "Easy, Chirp. Easy.", "Nice and springy.", "Hop to it!"],
+  capture: ["Nibbled!", "Into the satchel!", "Chirp, look what I got!"],
+  hurt: ["Not the ears!", "Chirp! You okay, buddy?", "My scarf!"],
+  strike: ["Hop along now!", "Bounced out!"],
+  power: ["Leapfrog!", "Pardon us! Coming over!", "Mind your head!", "Up, over, and hello!", "Chirp never walks around."],
+  thinking: ["Chirp? …Chirp. Good point.", "Thinking with my ears…"],
+  check: ["Check! Thump, thump!", "Check! Chirp says hi!"],
+  smug: ["Best team in the meadow!", "High five, Chirp! Er, high six!"],
+  rattled: ["Chirp, hop faster!", "Uh-oh. Ears down."],
+  victory: ["Victory lap, Chirp!", "Carrots for everyone! Well, us."],
+  defeat: ["Chirp… carry me home…", "Out of hops…"],
+  ultimateWarn: ["I smell carrots…", "Chirp, start digging."],
+  ultimate: ["Carrot Patch! Race you!", "Five carrots. Ready, set, HOP!", "Dinner's planted. Hands off."],
+  carrotHis: ["Pulled one!", "Ooh, a big one!", "Count it, Chirp!", "Crunchy! That's ours."],
+  carrotYours: ["Those are OUR carrots!", "Carrot thief!", "Put that back!", "Chirp, they took one!"],
+  spinBig: ["Come on… come on… YES!", "Look at that haul!"],
+  spinSmall: ["A little something. Thanks!", "Small prize. Still a prize."],
+  spinEmpty: ["Nothing? Not even a pawn?", "Empty reel. Empty tummy.", "Well, it was fun to spin."],
+  carrotsAll: ["Five carrots! That's the game!", "All five! Good game, everyone!"],
+  kingAttack: ["Eat your veggies, your majesty!", "Carrots away! And away! And away!", "Open wide, King!"],
+};
+/** How often each moment speaks (the lines' draft: about 5 moves, 5 captures and 5 lost pieces a game have a line). */
+export const HOPPER_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
+  entrance: 1,
+  move: 0.12,
+  capture: 0.6,
+  check: 0.75,
+  hurt: 0.6,
+  thinking: 0.08,
+  smug: 0.8,
+  rattled: 0.8,
+  defeat: 1,
+  victory: 1,
+  strike: 0.8,
+  kingAttack: 1,
 };
 
 /** The part of them a portrait shows (the rabbit's head and the grasshopper's), in frame pixels. */

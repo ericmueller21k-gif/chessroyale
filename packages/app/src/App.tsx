@@ -117,6 +117,9 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     ...(q.get("mate") === "1" ? { bossMateTest: true } : {}),
     // Testing, solo: ?win=1, you mate the boss at once (1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6, your move: Qxf7): a boss beaten.
     ...(q.get("win") === "1" ? { bossWinTest: true } : {}),
+    // Testing, solo: ?carrots=N (0 to 5, with ?boss=hopper&power=carrotpatch), N of Chub & Chirp's carrots a step from
+    // one of his pieces and out of your reach, the rest a step from yours and out of his: his spin on N (5: he wins).
+    ...(/^[0-5]$/.test(q.get("carrots") ?? "") ? { bossCarrotTest: Number(q.get("carrots")) } : {}),
     // Testing: ?weakbots=1, every bot plays loosely and people rank above bots (WEAK_BOTS), so a test's player surely
     // survives the cuts.
     ...(q.get("weakbots") === "1" ? WEAK_BOTS : {}),
