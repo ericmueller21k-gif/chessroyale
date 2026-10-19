@@ -12,10 +12,12 @@ import { prewarmSawyer } from "./Sawyer.tsx";
 import { prewarmPig } from "./Pig.tsx";
 import { prewarmAlfil } from "./Alfil.tsx";
 import { prewarmHopper } from "./Hopper.tsx";
+import { prewarmSmudgy } from "./Smudgy.tsx";
 import { EngineOverlay, placeEngine, prewarmRecluse } from "./Recluse.tsx";
 import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 import { lightsId, syncLights } from "../characters/lights.ts";
+import { seenFen } from "../camo.ts";
 
 /**
  * A raid boss as a character (if it has one: see characters/kits.ts), standing across the board from the God King: on a
@@ -212,6 +214,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       bossBeat(kit, {
         stage,
         fen: boss.board.fen,
+        seen: seenFen,
         history: boss.board.history,
         bases: boss.board.bases,
         crowdSide: boss.crowdSide,
@@ -244,6 +247,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     if (kit.ch.id === "alfil") prewarmAlfil(kit.ch.name);
     // (Chub & Chirp's hop, cast and race, and the carrots.)
     if (kit.ch.id === "hopper") prewarmHopper(kit.ch.name);
+    // (Smudgy's splash, reveal and Repaint, and the paint.)
+    if (kit.ch.id === "smudgy") prewarmSmudgy(kit.ch.name);
     // (The Hidden Boss's phase change: his rage, his leap onto the board, the book thrown down, the chant.)
     if (kit.ch.id === "recluse") prewarmRecluse(boss.crowdSide);
     // (Its attack on a king too: the God King's Last Stand, or its mate.)

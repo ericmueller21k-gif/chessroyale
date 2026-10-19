@@ -12,6 +12,11 @@ export interface Arrow {
 /** The board's props (components/Board.tsx, board/OwnBoard.tsx). */
 export interface BoardProps {
   fen: string;
+  /**
+   * Draw `fen` as the game holds it, whatever the battle hides (Smudgy's hidden rook is otherwise drawn as one of his
+   * pawns: camo.ts). Only for a position the crowd could not play on as drawn.
+   */
+  unmasked?: boolean;
   orientation: "white" | "black";
   lastMove?: string | null;
   /** Enable moving for the side to move. */
@@ -24,6 +29,13 @@ export interface BoardProps {
    * the piece stays where it was, and the screen can say why.
    */
   onRefused?: (uci: string) => void;
+  /**
+   * A move the board offers (it is legal on the position it draws) that the game refuses: Smudgy's hidden rook, drawn as
+   * a pawn, makes some moves illegal that look legal (your king into its line, a piece it pins). At such a move the board
+   * calls `onRefused` instead of `onMove` and the piece stays where it was, so a refusal reads as one and never as a move
+   * that snapped back.
+   */
+  stopped?: (uci: string) => boolean;
   arrows?: Arrow[];
   small?: boolean;
   /** No move or capture sound, whatever the sound setting (the home's live window). Small boards are silent too. */

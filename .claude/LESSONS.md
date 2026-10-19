@@ -153,6 +153,14 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   When an engine's answer looks impossible, find out why and measure how often across many positions before adding a
   fallback where it showed.
 
+- **A rook that had to look like a pawn** (Oct 19, Smudgy, [decision](../docs/decisions/2026-10-19-smudgy-wired.md)):
+  - A position drawn differently from the one the game plays (a hidden piece) is drawn in one place that every screen goes
+    through (`camo.ts`'s `seenFen`, called by `Board.tsx`), with the names of moves through the same (`seenSan`); fixing
+    screens one by one leaks from the one forgotten. The e2e reads the board from the page and compares it with the game,
+    every frame and every ply of the history.
+  - Code that reads a drawn position with chess.js catches the throw: it refuses a pawn on rank 1 or 8, which a piece drawn
+    as a pawn can stand on.
+  - A power's moves that can't be forced by the engine in a test get a scripted test switch (`?paint=1`), not a retry loop.
 - **A queen banner that came back after the ult** (Oct 16, [story](../docs/history/lessons.md#a-queen-banner-that-came-back-after-the-ult-oct-16-2026)):
   - A banner for something that happened (a capture, a power) is keyed to that event happening, never to a state that
     stays true afterwards: a power that pauses the turn shows the same state again (`queenSlain`, not "the last move

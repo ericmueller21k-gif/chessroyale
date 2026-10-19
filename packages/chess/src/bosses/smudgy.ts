@@ -52,11 +52,32 @@ import { PIECE_VALUE, gridAttackers, gridKing, gridOf, placementOf, type Grid } 
 import { passTurn } from "./hollow.ts";
 
 /**
- * How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). Placeholders until his art (the
- * wiring lane sets them from his animations' cues): the swap under a splash of paint over his pawns, the paint dripping
- * off the rook as it strikes, "That was his rook!", the brush strokes of Repaint.
+ * Each of his moments beat by beat (ms into it), timed by his animations' cues (components/Smudgy.tsx draws them; a unit
+ * test checks every beat against its cue):
+ * - **camouflage** (as the crowd's turn after his second forced move begins): "CAMOUFLAGE!" for the banner's length, his
+ *   `camouflage` animation starting so its `splash` cue (400 ms in) lands at `splashAt`, a blob of paint flying to his
+ *   pawn row for `flyMs`, a splash landing on each square with one of his pawns (one every `stagger` ms, each spreading
+ *   for `landMs`); once the last has covered its square the rook and the pawn swap under it (`swapAt`), the paint holds
+ *   a beat (`holdMs`) and fades off the board as the crowd sees it (the same stagger, `fadeMs` each).
+ * - **unmask** (his hidden rook revealed, as the crowd's turn after his move begins): his `strike` animation starting so
+ *   its `drip` cue (110 ms in) lands at `dripAt`: the paint drips off the piece's square (`paintDrip`, 470 ms) and it
+ *   shows as the rook it is.
+ * - **rookTaken** (the crowd takes the hidden rook, as its move lands, while he thinks): a drip on that square at
+ *   `dripAt`, his line and the dock's "That was his rook!"; it fits the boss's shortest thinking (1200 ms).
+ * - **repaint** (his whole turn, as the crowd's turn after it begins): "REPAINT!" for the banner's length, his `repaint`
+ *   animation starting so its `stroke1` cue (210 ms in) lands at `stroke1At` (a cream stroke on his pawn's square, which
+ *   becomes the crowd's) and its `stroke2` cue (670 ms in) at `stroke2At` (a charcoal one on the crowd's piece's square,
+ *   which becomes his).
  */
-export const SMUDGY_FX = { camouflage: 2600, unmask: 1800, rookTaken: 2000, repaint: 3000 } as const;
+export const SMUDGY_BEATS = {
+  camouflage: { splashAt: 1500, flyMs: 380, stagger: 25, landMs: 220, swapAt: 2300, holdMs: 450, fadeMs: 260, total: 3300 },
+  unmask: { dripAt: 400, dripMs: 470, total: 1500 },
+  rookTaken: { dripAt: 150, dripMs: 470, total: 1200 },
+  repaint: { stroke1At: 1500, stroke2At: 1960, total: 3000 },
+} as const;
+
+/** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts): SMUDGY_BEATS's totals, so the server waits for them. */
+export const SMUDGY_FX = { camouflage: SMUDGY_BEATS.camouflage.total, unmask: SMUDGY_BEATS.unmask.total, rookTaken: SMUDGY_BEATS.rookTaken.total, repaint: SMUDGY_BEATS.repaint.total } as const;
 
 type CamoSettings = Pick<BossPowerSettings, "camoTries" | "camoStrikeTurn">;
 
@@ -411,6 +432,28 @@ export function repaintPick(
  */
 export const REPAINT_TEST_MOVES: readonly string[] = ["e2e4", "d7d5", "e4d5", "d8d5"];
 
+/**
+ * The test switch (?paint=1, solo; the e2e's way to a move refused for the painted piece): the crowd (White) to move with
+ * his Camouflage already done: his rook hidden on d7 (the swap a base at the end of a four-move game), his pawn that stood
+ * there now on h6, and the d-file open from d7 to d1, so your king's step onto d1 or d2 is a move the board you see offers
+ * (a pawn on d7 attacks nothing there) and the real board refuses (`paint`). The swap is long past (`at` -5), so the rook
+ * may strike from the first turn.
+ */
+export const PAINT_TEST = {
+  moves: ["e2e4", "h7h5", "d2d3", "h8h6"],
+  fen: "5rk1/pppr1ppp/7p/7p/8/8/PPP2PPP/4K2R w K - 0 1",
+  hidden: "d7",
+  lifted: "h6",
+  /**
+   * His moves with the switch on (?paint=1 or 2), by where the rook stands: 1, a step as a pawn would (still hidden), then
+   * a strike down the open file (it shows); 2, two steps down the file as a pawn would, for your rook (Ke2, Rd1, Rxd5) to take.
+   */
+  script: {
+    1: { d7: "d7d6", d6: "d6d2" },
+    2: { d7: "d7d6", d6: "d6d5" },
+  } as Record<1 | 2, Record<string, string>>,
+} as const;
+
 // ---------------- His rules ----------------
 
 /** His powers' state, changed (the match's state replaced, as everywhere). */
@@ -541,6 +584,11 @@ export const SMUDGY: BossRules = {
   opening: {
     fromStart: true,
     setUp(b, at) {
+      if (b.settings.bossPaintTest) {
+        const board = newBoard(at.boardId, { ...BOSS_OPENING, moves: [...PAINT_TEST.moves] }, PAINT_TEST.moves.length, at.generation);
+        b.boards.set(at.boardId, { ...board, fen: PAINT_TEST.fen, bases: [{ ply: PAINT_TEST.moves.length, fen: PAINT_TEST.fen }] });
+        return { camo: { side: "h", step: 2, missed: 0, due: null, swap: { at: -5, rook: PAINT_TEST.lifted, pawn: PAINT_TEST.hidden }, square: PAINT_TEST.hidden } };
+      }
       if (b.settings.bossPowerTest === "repaint") b.boards.set(at.boardId, newBoard(at.boardId, { ...BOSS_OPENING, moves: [...REPAINT_TEST_MOVES] }, REPAINT_TEST_MOVES.length, at.generation));
       // (He moves first as White: his first forced move is due as the battle begins.)
       const fen = b.boards.get(at.boardId)!.fen;
@@ -566,6 +614,18 @@ function repaintList(b: Battle): RepaintOption[] {
 }
 
 export const smudgyBattle = {
+  /**
+   * The test switch's move for him (?paint=1 or 2, solo): his hidden rook steps as his pawn would (so the e2e sees those
+   * moves named as a pawn's), then strikes down the open file or walks on to your king (PAINT_TEST.script), when he may.
+   * Undefined with the switch off, nothing hidden, or the move not allowed.
+   */
+  paintStep(b: Battle, allowed: readonly string[]): string | undefined {
+    const square = b.state.boss?.powers?.camo?.square;
+    const test = b.settings.bossPaintTest;
+    const move = test && square ? PAINT_TEST.script[test][square] : undefined;
+    return move && allowed.includes(move) ? move : undefined;
+  },
+
   /**
    * After the crowd's move: the hidden rook taken (revealed: `rookTaken`, as the move lands), and his turn beginning: the
    * forced move due, or a turn missed.

@@ -27,6 +27,8 @@ const BOSSES = [
   // room for another pawn of his and then his next pawn move, both up to his brain, so no crowd play brings it on
   // time; grabbing his pawns to make room blundered into the God King's Last Stand, whose leap rightly hides his words.)
   { id: "sawyer", name: "Sawyer", banner: "SAW CUT!" },
+  // (Smudgy's Camouflage, as your third turn begins: after his two forced moves.)
+  { id: "smudgy", name: "Smudgy", banner: "CAMOUFLAGE!" },
 ] as const;
 
 type Segment = { text: string; ok: boolean; why: string; from: number; to: number; before: number };

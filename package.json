@@ -29,6 +29,7 @@
     "frames:pig": "node scripts/frames-pig.mjs",
     "frames:alfil": "node scripts/frames-alfil.mjs",
     "frames:hopper": "node scripts/frames-hopper.mjs",
+    "frames:smudgy": "node scripts/frames-smudgy.mjs",
     "frames:recluse": "node scripts/frames-recluse.mjs",
     "frames:recluse2": "node scripts/frames-recluse2.mjs",
     "frames:queue": "node scripts/frames-queue-pop.mjs",

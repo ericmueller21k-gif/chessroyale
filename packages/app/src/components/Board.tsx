@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from "preact/hooks";
+import { seenFen } from "../camo.ts";
 import { play } from "../sound.ts";
 import { boardKnock } from "../move-sound.ts";
 import { OwnBoard } from "../board/OwnBoard.tsx";
@@ -6,9 +7,14 @@ import type { BoardProps } from "../board/types.ts";
 
 export type { Arrow, BoardProps } from "../board/types.ts";
 
-/** The board every screen draws (board/OwnBoard.tsx: docs/areas/board.md), and the knock for every move it shows. */
+/**
+ * The board every screen draws (board/OwnBoard.tsx: docs/areas/board.md), and the knock for every move it shows. It draws
+ * the position as the crowd sees it: while Smudgy's rook hides, that pawn-shaped piece is a pawn here, in every screen
+ * and size, with its move dots, its check ring and its knock (camo.ts). `unmasked`: the position as the game holds it.
+ */
 export function Board(props: BoardProps) {
-  const { fen, lastMove, small, silent } = props;
+  const { lastMove, small, silent } = props;
+  const fen = props.unmasked ? props.fen : seenFen(props.fen);
   const prevFen = useRef<string | null>(null);
   const lastSound = useRef(0);
 
@@ -28,5 +34,5 @@ export function Board(props: BoardProps) {
     play(knock);
   }, [fen]);
 
-  return <OwnBoard {...props} />;
+  return <OwnBoard {...props} fen={fen} />;
 }

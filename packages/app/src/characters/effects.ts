@@ -16,6 +16,7 @@ import { BOARD_GAP, SAW_CRACK, SAW_CUT, SAW_HIT } from "./effects/sawyer.ts";
 import { LASSO_HIT } from "./effects/pig.ts";
 import { ANKUS_HIT } from "./effects/alfil.ts";
 import { CARROT_FLY, CARROT_HIT, CARROT_ICON, CARROT_PATCH } from "./effects/hopper.ts";
+import { BRUSH_STROKE, PAINT_DRIP, PAINT_FLY, PAINT_HIT, PAINT_SPLASH } from "./effects/smudgy.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
 export { BOARD_CELL, SQUARE } from "./effects/common.ts";
@@ -63,4 +64,9 @@ export const EFFECT_SPRITES = {
   carrotFly: CARROT_FLY,
   carrotHit: CARROT_HIT,
   carrotIcon: CARROT_ICON,
+  paintSplash: PAINT_SPLASH,
+  paintDrip: PAINT_DRIP,
+  brushStroke: BRUSH_STROKE,
+  paintFly: PAINT_FLY,
+  paintHit: PAINT_HIT,
 } as const satisfies Record<string, Character>;

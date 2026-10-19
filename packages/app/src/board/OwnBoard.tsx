@@ -44,6 +44,18 @@ interface Track {
   elephants: Set<number>;
 }
 
+/**
+ * Whether the side to move is in check on the position the board draws. A position drawn for a moment that isn't one chess
+ * can read (Smudgy's revealed rook, still a pawn on the back rank until the paint drips off it) has no check to ring.
+ */
+function inCheckDrawn(fen: string): boolean {
+  try {
+    return inCheck(fen);
+  } catch {
+    return false;
+  }
+}
+
 /** A move you made, shown until the game next tells the board anything new. */
 type Local = { pieces: Map<string, PieceCode>; last: [string, string] };
 type Promotion = { from: string; to: string; dark?: boolean };
@@ -54,6 +66,8 @@ interface BoardActs {
   darkTry(uci: string): void;
   /** A legal move that `moves` doesn't allow, tried: the board's onRefused (none: nothing to work out). */
   refused: { current?: (uci: string) => void };
+  /** A move the board offers that the game refuses (BoardProps.stopped): it goes to `refused` instead of `move`. */
+  stopped: { current?: (uci: string) => boolean };
   promote(p: Promotion): void;
   selectDark(sq: string | null): void;
   /** The move you made, while it's shown (OwnBoard clears it). */
@@ -74,6 +88,8 @@ export function OwnBoard(props: BoardProps) {
   onDarkRef.current = onDarkTry;
   const onRefusedRef = useRef(props.onRefused);
   onRefusedRef.current = props.onRefused;
+  const stoppedRef = useRef(props.stopped);
+  stoppedRef.current = props.stopped;
   const [promotion, setPromotion] = useState<Promotion | null>(null);
   // Hollow's dark: a dark square tapped (selected without picking anything up).
   const [darkSel, setDarkSel] = useState<string | null>(null);
@@ -95,7 +111,7 @@ export function OwnBoard(props: BoardProps) {
   // A new position or the dark changing: no dark square stays selected.
   useLayoutEffect(() => setDarkSel(null), [fen, dark?.join(), interactive]);
 
-  const acts = useMemo<BoardActs>(() => ({ move: (uci) => onMoveRef.current?.(uci), darkTry: (uci) => onDarkRef.current?.(uci), refused: onRefusedRef, promote: setPromotion, selectDark: setDarkSel, local }), []);
+  const acts = useMemo<BoardActs>(() => ({ move: (uci) => onMoveRef.current?.(uci), darkTry: (uci) => onDarkRef.current?.(uci), refused: onRefusedRef, stopped: stoppedRef, promote: setPromotion, selectDark: setDarkSel, local }), []);
   // (The same element while nothing it shows has changed: Preact leaves it, and everything in it, alone.)
   const layer = useMemo(
     () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} elephants={elephants} acts={acts} />,
@@ -117,8 +133,10 @@ export function OwnBoard(props: BoardProps) {
               onClick={() => {
                 const pr = promotion;
                 setPromotion(null);
-                if (pr.dark) onDarkRef.current?.(pr.from + pr.to + p);
-                else onMoveRef.current?.(pr.from + pr.to + p);
+                const uci = pr.from + pr.to + p;
+                if (pr.dark) onDarkRef.current?.(uci);
+                else if (stoppedRef.current?.(uci)) onRefusedRef.current?.(uci);
+                else onMoveRef.current?.(uci);
               }}
               aria-label={{ q: "Queen", r: "Rook", b: "Bishop", n: "Knight" }[p]}
             >
@@ -259,6 +277,8 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     const legal = gestureMoves(s.fen, moves, from, to);
     // (Hollow's dark takes a drop anywhere: an ordinary move that isn't on stays where it was.)
     if (!legal.length) return;
+    // (A move the board offers that the game refuses, Smudgy's painted piece: it stays put, and the screen says why.)
+    if (acts.stopped.current?.(legal[0]!)) return acts.refused.current?.(legal[0]!);
     landNext.current = dropped;
     dragged.current = dropped;
     if (legal.length > 1) {
@@ -462,7 +482,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   const squares = new Map<string, string>();
   const mark = (sq: string, cls: string) => squares.set(sq, squares.has(sq) ? `${squares.get(sq)} ${cls}` : cls);
   if (shownLast) for (const sq of shownLast) mark(sq, "last-move");
-  if (BOARD.checkHighlight && !local.current && inCheck(fen)) {
+  if (BOARD.checkHighlight && !local.current && inCheckDrawn(fen)) {
     const king = [...shown].find(([, p]) => p === `${turnColor}k`)?.[0];
     if (king) mark(king, "check");
   }

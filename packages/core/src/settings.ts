@@ -93,6 +93,12 @@ export interface Settings {
    * the boss plays a mate in one whenever it has one: its attack on the crowd's king, then the result, at once.
    */
   bossMateTest?: boolean;
+  /**
+   * Test switch, solo (?paint=1 or 2, with ?boss=smudgy): the battle starts with Smudgy's rook already hidden on d7 and the
+   * crowd's king able to step into its line (bosses/smudgy.ts, PAINT_TEST): the e2e's way to a move refused for the painted
+   * piece. His moves are scripted: 1, the rook steps like a pawn, then strikes; 2, it steps twice like a pawn (to be taken).
+   */
+  bossPaintTest?: 1 | 2;
   /** Solo's difficulty (BOSS_DIFFICULTY): Elo on top of the boss's strength, within what the engine plays (0 online). */
   bossDifficulty: number;
   /**

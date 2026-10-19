@@ -16,6 +16,7 @@ const bubble = (p: Page) => p.locator(".bs-say .bs-bubble");
 // (Each boss's lines on the stage: characters/boss-select.ts.)
 const BOINGO = ["Honk honk! Showtime!", "Step right up!", "Who ordered a clown?"];
 const HOLLOW = ["Hollow is here.", "Did you leave a light on?", "I was always here.", "Hush now."];
+const SMUDGY = ["Every chameleon blends in. I'd rather stand out.", "Smudgy, artist. Don't touch the wet parts.", "A masterpiece, if I say so myself."];
 const HIDDEN = ["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."];
 
 test("the tiles and the stage: a tap drops the boss on, plays its sound once and says one of its lines; '?' is random; the Hidden Boss is a silhouette, unnamed, every choice locked", async ({ page }) => {
@@ -24,10 +25,11 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await page.goto("/?mode=raid");
   await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
   const tiles = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio");
-  // Nine bosses you can meet, the Hidden Boss's tile, then "?".
-  await expect(tiles).toHaveCount(11);
+  // Ten bosses you can meet (Smudgy the last), the Hidden Boss's tile, then "?".
+  await expect(tiles).toHaveCount(12);
   await expect(tiles.last()).toHaveAccessibleName("Random boss");
-  await expect(tiles.nth(9)).toHaveAccessibleName("Locked boss");
+  await expect(tiles.nth(9)).toHaveAccessibleName("Smudgy");
+  await expect(tiles.nth(10)).toHaveAccessibleName("Locked boss");
 
   // Boingo: his idle on the stage, his name and strength, his pie's splat once, one of his lines in his bubble.
   await tile(page, "Boingo the Clown").click();
@@ -53,6 +55,13 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await expect.poll(async () => (await sounds(page)).filter((s) => s.startsWith("hollowCast")).length).toBe(1);
   await expect.poll(async () => HOLLOW.includes((await bubble(page).getAttribute("aria-label")) ?? "")).toBe(true);
   for (const b of await page.locator(".rd-option").all()) await expect(b).toBeEnabled();
+
+  // Smudgy: his idle on the stage, his splash once, one of his three lines (the first is the longest, so the bubble wraps).
+  await tile(page, "Smudgy").click();
+  await expect(page.locator(".bs-stage .bs-sprite")).toHaveAttribute("data-fx", "smudgy");
+  await expect(page.locator(".bs-name")).toHaveText("Smudgy");
+  await expect.poll(async () => (await sounds(page)).filter((s) => s.startsWith("smudgySplash")).length).toBe(1);
+  await expect.poll(async () => SMUDGY.includes((await bubble(page).getAttribute("aria-label")) ?? "")).toBe(true);
 
   // "?": a question mark on the stage, a random boss; Boss alone says so.
   await tile(page, "Random boss").click();
@@ -157,7 +166,7 @@ test("a resting boss has no tile, and a pick of it reads as a random boss", asyn
   await page.addInitScript(() => localStorage.setItem("brc.bossId", "clown"));
   await page.goto("/?mode=raid");
   const tiles = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio");
-  await expect(tiles).toHaveCount(10);
+  await expect(tiles).toHaveCount(11);
   await expect(tile(page, "Boingo the Clown")).toHaveCount(0);
   await expect(tile(page, "Random boss")).toHaveAttribute("aria-checked", "true");
   await expect(page.locator(".bs-name")).toHaveText("Random boss");
@@ -175,7 +184,7 @@ test("the layout: the tiles in rows, the stage under them, the ways to play unde
       expect(b.right, `${w}`).toBeLessThanOrEqual(w!);
       expect(b.width, `${w}: a tile big enough to tap`).toBeGreaterThanOrEqual(44);
     }
-    // A row of six and one of five (eleven tiles since Chub & Chirp), a phone and a computer.
+    // Two rows of six (twelve tiles since Smudgy), a phone and a computer.
     const rows = new Set(boxes.map((b) => Math.round(b.top)));
     expect(rows.size, `${w}`).toBe(2);
     const tilesBottom = Math.max(...boxes.map((b) => b.bottom));
@@ -184,7 +193,7 @@ test("the layout: the tiles in rows, the stage under them, the ways to play unde
     expect(stage.y, `${w}`).toBeGreaterThan(tilesBottom);
     expect(first.y, `${w}`).toBeGreaterThan(stage.y + stage.height);
     // Every boss whole inside the stage's width (Wrangler's lasso out to one side, the tallest the Hidden Boss).
-    for (const name of ["Ginger", "Boingo the Clown", "Jefferson", "Hollow", "Big Boy", "Sawyer", "Wrangler", "Alfil", "Chub & Chirp", "Locked boss"]) {
+    for (const name of ["Ginger", "Boingo the Clown", "Jefferson", "Hollow", "Big Boy", "Sawyer", "Wrangler", "Alfil", "Chub & Chirp", "Smudgy", "Locked boss"]) {
       await tile(page, name).click();
       // (After its drop, which squashes it a little wider for a moment.)
       await page.waitForTimeout(500);
@@ -286,7 +295,7 @@ test("Boss alone's menu and the /bosses picker fit any window: whole, or their r
     // The full picker (/bosses): every boss and a random one, for an admin the Hidden Boss too: the longest list.
     await page.goto("/bosses");
     const all = page.getByRole("dialog", { name: "Choose your boss" });
-    await expect(all.locator(".boss-row")).toHaveCount(11);
+    await expect(all.locator(".boss-row")).toHaveCount(12);
     await expectMenuFits(page, all, `${w}x${h} /bosses`);
     expect(await sideways(page), `${w}x${h}`).toBe(0);
   }

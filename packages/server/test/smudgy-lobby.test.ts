@@ -93,6 +93,28 @@ describe("Smudgy online", () => {
     expect(L.last("p2", "round")!.boss!.powers!.camo).toEqual(camo);
   });
 
+  it("the home page's live window shows the board the crowd sees: his hidden rook a pawn, until the rook is revealed or the battle is over", () => {
+    const L = smudgy();
+    for (let k = 0; k < 2; k++) {
+      L.crowdPlays();
+      L.answer(L.asked()!.allowed![0]!);
+    }
+    const round = L.toRound();
+    const square = round.boss!.powers!.camo!.square!;
+    // The game has a rook there; anyone who looks at the home page sees one of his pawns.
+    expect(pieceAt(round.board!.fen, square)).toEqual({ color: "b", type: "r" });
+    const live = L.core.liveSummary().board!;
+    expect(pieceAt(live.fen, square)).toEqual({ color: "b", type: "p" });
+    expect(live.fen.split(" ")[0]!.replace(/[^r]/g, "")).toHaveLength(round.board!.fen.split(" ")[0]!.replace(/[^r]/g, "").length - 1);
+    // Nothing hidden (revealed, taken, or the battle over): the board as it is.
+    const r = L.runner();
+    const p = r.state.boss!.powers!;
+    r.state = { ...r.state, boss: { ...r.state.boss!, powers: { ...p, camo: { ...p.camo!, square: null } } } };
+    expect(L.core.liveSummary().board!.fen).toBe(round.board!.fen);
+    r.state = { ...r.state, boss: { ...r.state.boss!, result: "crowd", powers: { ...p } } };
+    expect(L.core.liveSummary().board!.fen).toBe(round.board!.fen);
+  });
+
   it("Repaint: the host is asked to pick among the pairs; its pick is his whole turn; its \"\" leaves him his move", () => {
     const L = smudgy({ bossPowerTest: "repaint" });
     expect(L.runner().boards.get(0)!.history.slice(0, 4)).toEqual([...REPAINT_TEST_MOVES]);

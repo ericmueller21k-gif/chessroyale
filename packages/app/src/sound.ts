@@ -18,6 +18,7 @@ import { pigSound, type PigSound } from "./characters/pig-sounds.ts";
 import { recluseSound, type RecluseSound } from "./characters/recluse-sounds.ts";
 import { alfilSound, type AlfilSound } from "./characters/alfil-sounds.ts";
 import { hopperSound, type HopperSound } from "./characters/hopper-sounds.ts";
+import { smudgySound, type SmudgySound } from "./characters/smudgy-sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
 import { captureWorkerError } from "./problems.ts";
 import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
@@ -240,6 +241,7 @@ const pig = (name: PigSound) => (t: number) => buffer(pigSound(name, ctx!.sample
 const recluse = (name: RecluseSound) => (t: number) => buffer(recluseSound(name, ctx!.sampleRate), t);
 const alfil = (name: AlfilSound) => (t: number) => buffer(alfilSound(name, ctx!.sampleRate), t);
 const hopper = (name: HopperSound) => (t: number) => buffer(hopperSound(name, ctx!.sampleRate), t);
+const smudgy = (name: SmudgySound) => (t: number) => buffer(smudgySound(name, ctx!.sampleRate), t);
 /** The God King tapped with no charges left: his soft "can't" (god-king-sounds.ts). */
 const kingCant = (t: number) => buffer(godKingSound("cant", ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
@@ -627,6 +629,14 @@ export type SoundName =
   | "hopperPop"
   | "hopperTick"
   | "hopperStop"
+  // Smudgy (a raid boss, a chameleon painter): synthesized, see characters/smudgy-sounds.ts.
+  | "smudgySplash"
+  | "smudgyDrip"
+  | "smudgySwish"
+  | "smudgyGiggle"
+  | "smudgyDab"
+  | "smudgyThump"
+  | "smudgyOof"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -791,6 +801,13 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   hopperPop: hopper("pop"),
   hopperTick: hopper("tick"),
   hopperStop: hopper("stop"),
+  smudgySplash: smudgy("splash"),
+  smudgyDrip: smudgy("drip"),
+  smudgySwish: smudgy("swish"),
+  smudgyGiggle: smudgy("giggle"),
+  smudgyDab: smudgy("dab"),
+  smudgyThump: smudgy("thump"),
+  smudgyOof: smudgy("oof"),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -910,6 +927,13 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   hopperPop: [["hopper", "pop"]],
   hopperTick: [["hopper", "tick"]],
   hopperStop: [["hopper", "stop"]],
+  smudgySplash: [["smudgy", "splash"]],
+  smudgyDrip: [["smudgy", "drip"]],
+  smudgySwish: [["smudgy", "swish"]],
+  smudgyGiggle: [["smudgy", "giggle"]],
+  smudgyDab: [["smudgy", "dab"]],
+  smudgyThump: [["smudgy", "thump"]],
+  smudgyOof: [["smudgy", "oof"]],
   kingCant: [["godKing", "cant"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */

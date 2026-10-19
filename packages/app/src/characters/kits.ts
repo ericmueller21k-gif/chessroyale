@@ -18,10 +18,11 @@ import { PIG, PIG_ATTACK, PIG_CHANCE, PIG_LINES, PIG_PORTRAIT } from "./pig.ts";
 import { RECLUSE, RECLUSE_BUST, RECLUSE_PORTRAIT } from "./recluse.ts";
 import { ALFIL, ALFIL_ATTACK, ALFIL_CHANCE, ALFIL_LINES, ALFIL_PORTRAIT } from "./alfil.ts";
 import { HOPPER, HOPPER_ATTACK, HOPPER_CHANCE, HOPPER_LINES, HOPPER_PORTRAIT } from "./hopper.ts";
+import { SMUDGY, SMUDGY_ATTACK, SMUDGY_CHANCE, SMUDGY_LINES, SMUDGY_PORTRAIT } from "./smudgy.ts";
 import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
-import { ankusItem, bonkItem, carrotItem, frostItem, lashItem, lassoItem, pieItem, popItem, sawItem, type SquareItem } from "./power-art.ts";
+import { ankusItem, bonkItem, carrotItem, frostItem, lashItem, lassoItem, paintItem, pieItem, popItem, sawItem, type SquareItem } from "./power-art.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
@@ -392,6 +393,51 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // He hops in and Chub pelts the king with carrots from his satchel, one on each hit (hopper.ts: HOPPER_ATTACK), a
     // bonk on its square each hit. (Facing our left, as Sawyer; 36 frame pixels a square, 1.8 off, as Boingo's throw.)
     kingAttack: { ch: HOPPER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, facesLeft: true, hit: carrotItem },
+  },
+  // Smudgy, the chameleon painter (Eric, Oct 19): docs/decisions/2026-10-19-smudgy-wired.md.
+  "Smudgy": {
+    ch: SMUDGY,
+    anims: {
+      // The boss's periodic strike on a piece is his capture cheer. (`strike` the beat is not `strike` the animation: his
+      // reveal, which is the rules' moment `unmask` and plays as `powerHit`.)
+      strike: "capture",
+      // Camouflage: the splash over his pawn row (the paint leaves the brush at `splash`).
+      power: "camouflage",
+      // The hidden rook revealed by his move: the tail snaps open and the paint drips off the piece (`drip`).
+      powerHit: "strike",
+      ultimateWarn: "check",
+      // Repaint: two strokes, `stroke1` (his pawn goes your color) and `stroke2` (your piece goes his).
+      ultimate: "repaint",
+      // The crowd takes the hidden rook: his oof.
+      ultimateHit: "hurt",
+    },
+    sounds: {
+      drop: "smudgySwish",
+      thump: "smudgyThump",
+      splat: "smudgySplash",
+      giggle: "smudgyGiggle",
+      oof: "smudgyOof",
+      flop: "smudgyThump",
+      swish: "smudgySwish",
+      dab: "smudgyDab",
+      // (The paint leaving his brush: a fling; it splashes on the board as it lands: the moment's own sound.)
+      splash: "smudgySwish",
+      drip: "smudgyDrip",
+      stroke1: "smudgySwish",
+      stroke2: "smudgySwish",
+      // (His attack on a king: a flick of the brush and the blob splatting on the king, in turn; he lands; his cheer.)
+      flick: "smudgySwish",
+      land: "smudgyThump",
+      cheer: "smudgyGiggle",
+    },
+    lines: SMUDGY_LINES,
+    chance: SMUDGY_CHANCE,
+    portrait: { ...SMUDGY_PORTRAIT, anim: "idle", frame: 0 },
+    // (Measured on a phone's bar at 320, 360 and 390 px: the wider box, as Sawyer's, Wrangler's, Alfil's and Chub & Chirp's.)
+    wide: true,
+    // He drops in and flicks his brush at the king, a blob of yellow paint splatting on its square each hit (smudgy.ts:
+    // SMUDGY_ATTACK). Facing our left, as Sawyer; 36 frame pixels a square, 1.8 off, as Chub & Chirp's.
+    kingAttack: { ch: SMUDGY_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, facesLeft: true, hit: paintItem },
   },
   "Hidden Boss": {
     ch: RECLUSE,

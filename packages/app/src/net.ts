@@ -66,6 +66,7 @@ import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { account } from "./account.ts";
 import { crumb } from "./problems.ts";
+import { trackCamo } from "./camo.ts";
 import { evalBarOn } from "./prefs.ts";
 import { RoundProgress } from "./progress.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
@@ -163,7 +164,15 @@ export class NetMatch implements GameView {
   /** The 2v2 final once it has started. */
   final: FinalView | null = null;
   /** The boss battle once it has started. */
-  boss: BossView | null = null;
+  // (The boss view, and what its screens draw of a hidden rook: camo.ts is told each time it changes.)
+  private bossNow: BossView | null = null;
+  get boss(): BossView | null {
+    return this.bossNow;
+  }
+  set boss(v: BossView | null) {
+    this.bossNow = v;
+    trackCamo(v);
+  }
   /** Matchmade lobby ("Play now"): starts by itself at fillAt (local time). */
   auto = false;
   fillAt: number | null = null;

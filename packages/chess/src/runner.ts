@@ -1222,6 +1222,8 @@ export class MatchRunner {
     const kind = this.bossMoveKind();
     // (Test switch: a mate in one whenever there is one.)
     const mate = this.settings.bossMateTest ? (this.bossAllowed() ?? legalMoves(fen)).find((m) => gameEnd(applyMove(fen, m), []) === "checkmate") : undefined;
+    // (Test switch ?paint=1: Smudgy's hidden rook steps like a pawn, whose name the e2e reads.)
+    const paint = this.settings.bossPaintTest ? smudgyBattle.paintStep(this.battle, this.bossAllowed() ?? legalMoves(fen)) : undefined;
     const brain = this.humanBrain;
     // (Alfil's Slam's pieces land as the crowd's turn after this move begins: his move is judged with them down.)
     const look = this.bossAhead();
@@ -1233,6 +1235,7 @@ export class MatchRunner {
     const race = raceLook && { ...raceLook, onCheck: (c: RaceCheck) => (this.raceCheck = c) };
     const ordinary = async () =>
       mate ??
+      paint ??
       (await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined, ahead, race));
     const asks = this.bossAsks();
     if (asks) {
