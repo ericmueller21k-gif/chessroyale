@@ -124,6 +124,20 @@ like 20 moves... it probably should fizzle out" (he left the cap itself open: "m
   fizzled, 3 repetitions, 50 moves on average, and the pawn army won 2 of 8. Kept at 10 for short fights (Eric's "fizzle
   out"); 15 is the number to try if fights feel cut short.
 
+## Checks (Eric, Oct 19 evening)
+
+The fizzle-out cut short attacks on a lone king (nothing left to take, so 10 quiet moves came before the mate). Eric: "it
+should end with either a certain number of checks in a row, or it just actually becomes checkmate... they're both a win...
+even five". So:
+
+- **A check restarts the fizzle-out count** like a capture does ("10 moves each with no capture or check").
+- **5 checks in a row by one side win, as mate does** (`checksToWin`; "5 checks in a row count as mate."; the same damage).
+  Five is about when checking back and forth would be a draw by repetition, so the rule is tested before the draws: what was
+  a perpetual check (a draw in chess) is now a win for the side giving it.
+- Real engine, the same 12 bot fights: 3 mates, 2 wins by checks (one was a repetition draw before), 6 fizzled, 1
+  repetition; 48 moves (both sides) on average, about 17 s. The pawn army against two knights and two bishops: 0 wins, 6
+  losses, 2 draws.
+
 ## Shelved (Eric, Oct 19 evening)
 
 "I'm honestly thinking we may have to shelve this idea for a bit and keep the button on maybe like an admin only screen for

@@ -355,10 +355,24 @@ describe("auto chess: the fight", () => {
     expect(await playFight("K6r/1P6/2n5/8/8/8/8/7k w - - 0 1", { pick: async () => null, wait: noWait, rng: mulberry32(1) })).toMatchObject({ end: "checkmate", winner: "b", moves: [] });
   });
 
-  it("a fight with nothing taken for 10 moves each fizzles out: more material wins, equal is a draw", async () => {
+  /** Moves played in order, by ply. */
+  const script = (plies: string[]) => async (_fen: string, history: readonly string[]) => plies[history.length] ?? null;
+
+  it("5 checks in a row win, as mate does (before the repetition they'd make), and a move that isn't check starts the count again", async () => {
+    expect(AUTOCHESS.checksToWin).toBe(5);
+    // A queen against a lone king: five checks, none of them mate.
+    const fen = "7k/8/8/8/8/8/8/K2Q4 w - - 0 1";
+    const fiveChecks = ["d1d4", "h8h7", "d4a7", "h7g8", "a7a8", "g8h7", "a8b7", "h7g8", "b7a8"];
+    expect(await playFight(fen, { pick: script(fiveChecks), wait: noWait, rng: mulberry32(1) })).toMatchObject({ end: "checks", winner: "w", moves: fiveChecks });
+    // Four checks, a quiet king move, then checks again: no win at the fifth check overall.
+    const broken = ["d1d4", "h8h7", "d4a7", "h7g8", "a7a8", "g8h7", "a8b7", "h7g8", "a1b1", "g8f8", "b7b8", "f8e7", "b8c7", "e7e6"];
+    const res = await playFight(fen, { pick: script(broken), wait: noWait, rng: mulberry32(1), cfg: { ...AUTOCHESS, moveCap: 7 } });
+    expect(res!.end).not.toBe("checks");
+    expect(res!.moves).toEqual(broken);
+  });
+
+  it("a fight with no capture or check for 10 moves each fizzles out: more material wins, equal is a draw", async () => {
     expect(AUTOCHESS.quietCap).toBe(10);
-    // Moves played in order, by ply (never repeating a position, never taking anything until told to).
-    const script = (plies: string[]) => async (_fen: string, history: readonly string[]) => plies[history.length] ?? null;
     // A rook against a pawn: 10 quiet moves each, then material (5 v 1) decides.
     const w: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
     const b: Army = { color: "b", king: "a8", board: { e7: "p" }, bench: [] };

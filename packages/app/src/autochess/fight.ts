@@ -4,12 +4,13 @@ import { material } from "./position.ts";
 import { other, type Color } from "./types.ts";
 
 /**
- * The fight: the engine plays both sides, the same search for each, a move about every 0.35 s, until mate, stalemate, a
- * draw by the rules, the move cap or too long with nothing taken, when the side with more material wins (equal is a draw).
- * Pawns don't promote (Eric, Oct 19: armies of pawns racing to queen took over): a pawn never moves onto its last rank.
+ * The fight: the engine plays both sides, the same search for each, a move about every 0.35 s, until mate or 5 checks in
+ * a row (a win either way), stalemate, a draw by the rules, the move cap or too long with no capture or check, when the
+ * side with more material wins (equal is a draw). Pawns don't promote (Eric, Oct 19: armies of pawns racing to queen took
+ * over): a pawn never moves onto its last rank.
  */
 
-export type FightEnd = "checkmate" | "stalemate" | "repetition" | "fifty_moves" | "insufficient_material" | "cap" | "quiet";
+export type FightEnd = "checkmate" | "checks" | "stalemate" | "repetition" | "fifty_moves" | "insufficient_material" | "cap" | "quiet";
 
 /** The moves a fight allows: every legal move but a promotion. */
 export const fightMoves = (fen: string): string[] => legalMoves(fen).filter((m) => m.length === 4);
@@ -75,12 +76,17 @@ export async function playFight(startFen: string, opts: FightOptions): Promise<F
   const wait = opts.wait ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const moves: string[] = [];
   let fen = startFen;
-  /** Moves (each side's) since something was last taken. */
+  /** Moves (each side's) since the last capture or check. */
   let quiet = 0;
+  /** Each side's checks in a row (its moves that gave check, with none between that didn't). */
+  const checks = { w: 0, b: 0 };
   for (;;) {
     const allowed = fightMoves(fen);
     // (A side whose only legal moves were promotions has none: mated if its king is attacked, else stalemated.)
     if (!allowed.length) return inCheck(fen) ? { winner: other(sideToMove(fen)), end: "checkmate", fen, moves } : { winner: null, end: "stalemate", fen, moves };
+    // (Before the draws by the rules: the checks that would repeat a position for a draw win here.)
+    const checker = other(sideToMove(fen));
+    if (checks[checker] >= cfg.checksToWin) return { winner: checker, end: "checks", fen, moves };
     const end = gameEnd(startFen, moves);
     if (end) return { winner: end === "checkmate" ? other(sideToMove(fen)) : null, end, fen, moves };
     if (moves.length >= 2 * cfg.moveCap || quiet >= 2 * cfg.quietCap) {
@@ -92,7 +98,10 @@ export async function playFight(startFen: string, opts: FightOptions): Promise<F
     if (opts.cancelled?.()) return null;
     const move = asked && allowed.includes(asked) ? asked : standInMove(fen, opts.rng)!;
     const next = applyMove(fen, move);
-    quiet = pieceCount(next) < pieceCount(fen) ? 0 : quiet + 1;
+    const check = inCheck(next);
+    const mover = sideToMove(fen);
+    checks[mover] = check ? checks[mover] + 1 : 0;
+    quiet = check || pieceCount(next) < pieceCount(fen) ? 0 : quiet + 1;
     fen = next;
     moves.push(move);
     opts.onStep?.({ fen, move, ply: moves.length });

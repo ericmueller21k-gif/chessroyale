@@ -11,6 +11,8 @@ export function endWords(end: EndKind, draw: boolean, cfg: AutoChessSettings = A
   switch (end) {
     case "checkmate":
       return "Checkmate.";
+    case "checks":
+      return `${cfg.checksToWin} checks in a row count as mate.`;
     case "stalemate":
       return "Stalemate.";
     case "repetition":
@@ -22,7 +24,7 @@ export function endWords(end: EndKind, draw: boolean, cfg: AutoChessSettings = A
     case "cap":
       return draw ? `${cfg.moveCap} moves played with equal material.` : `${cfg.moveCap} moves played: more material wins.`;
     case "quiet":
-      return draw ? `${cfg.quietCap} moves each with nothing taken, and equal material.` : `${cfg.quietCap} moves each with nothing taken: more material wins.`;
+      return draw ? `${cfg.quietCap} moves each with no capture or check, and equal material.` : `${cfg.quietCap} moves each with no capture or check: more material wins.`;
     case "both_checked":
       return "Both kings were in check at the start, so there was no fight.";
   }

@@ -682,7 +682,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
             {g.phase === "fight" && (
               <>
                 <p class="ac-card-say">{hint}</p>
-                <p class="ac-card-text">The engine plays both armies at the same strength, until mate, a draw, {cfg.moveCap} moves each, or {cfg.quietCap} each with nothing taken. Pawns don't promote.</p>
+                <p class="ac-card-text">The engine plays both armies at the same strength until mate or {cfg.checksToWin} checks in a row, a draw, {cfg.moveCap} moves each, or {cfg.quietCap} each with no capture or check. Pawns don't promote.</p>
               </>
             )}
             {(g.phase === "result" || g.phase === "over") && outcome && (
