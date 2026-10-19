@@ -8,8 +8,10 @@
  * Chub & Chirp), light from the top left. His wide stance has the gripping toes, the brush held up and the palette held
  * out in front of him.
  *
- * This is his still, for Eric's review (docs/decisions/2026-10-19-smudgy-still.md): one pose, `idle`'s one frame, and
- * `SMUDGY_PORTRAIT`. Nothing in the game draws him yet (he isn't in `CHARACTERS`, `BOSS_KITS` or the roster); the
+ * His still was approved (Oct 19) and is idle's first frame, pixel for pixel (docs/decisions/2026-10-19-smudgy-still.md);
+ * his animation pack (the moments every boss has, his attack on a king, and his own: Camouflage's splash, the strike's
+ * reveal, Repaint's cast) is drawn from poses below (docs/decisions/2026-10-19-smudgy-animations.md), his board art in
+ * effects/smudgy.ts. Nothing in the game draws him yet (he isn't in `CHARACTERS`, `BOSS_KITS` or the roster); the
  * preview draws him with its `extra=` option.
  *
  * Rigging, as the other bosses: the head, the casque, the beret, the torso, the apron and its splats, the feet, the
@@ -24,7 +26,9 @@
  *   recolors it alone.
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part } from "./sprite.ts";
+import { KING_ATTACK } from "@chessroyale/chess";
+import { moved } from "./attack-frame.ts";
+import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 export const SMUDGY_PALETTE: Record<string, string> = {
   k: "#14210f", // outline
@@ -87,6 +91,9 @@ export const SMUDGY_PALETTE: Record<string, string> = {
   "7": "#2fa84a",
   "8": "#7be08a",
   z: "#0d0e12", // ground shadow
+  "~": "#9fd8ff", // sweat
+  "9": "#4d4538", // dust, dark and light
+  "0": "#7d705a",
 };
 
 type Pt = readonly [number, number];
@@ -209,8 +216,16 @@ const FOOT_X = 44;
 
 /** The head's outline, clockwise from the muzzle's tip: a pointed snout. */
 const HEAD: Pt[] = [[16.5, 31.8], [19.5, 28.8], [24.5, 26.5], [29.5, 23.2], [35, 20.5], [41, 20], [45, 22], [47.5, 26], [47.5, 30], [45, 35], [40, 37.5], [33, 38], [26, 36.8], [20.5, 34.6], [17.5, 33.2]];
-/** His mouth, a smirk: along the jaw, curling up into his cheek. */
-const MOUTH: Pt[] = [[17.5, 32.8], [21, 33.4], [26, 34.2], [31, 33.9], [35, 32.4], [37.5, 30.2], [38.8, 28.2]];
+/** His mouth: the smirk of the still (along the jaw, curling up into his cheek), a wide grin, a yell and a frown. */
+export type Mouth = "smirk" | "grin" | "open" | "frown";
+const MOUTHS: Record<Mouth, { line: Pt[]; inside?: Pt[] }> = {
+  smirk: { line: [[17.5, 32.8], [21, 33.4], [26, 34.2], [31, 33.9], [35, 32.4], [37.5, 30.2], [38.8, 28.2]] },
+  // The grin: the same line curling higher, a dark mouth open under it, its tongue.
+  grin: { line: [[17.5, 32.4], [21, 32.9], [26, 33.5], [31, 33.1], [35, 31.4], [38, 28.8], [40, 26.2]], inside: [[19, 33.4], [26, 34.2], [32, 33.8], [36.5, 32], [39, 29.2], [37, 32.2], [33, 35.4], [26, 36.2], [21, 35.2]] },
+  // A yell: the line as it is and a dark mouth wide under it.
+  open: { line: [[17.5, 32.8], [21, 33.4], [26, 34.2], [31, 33.9], [35, 32.4], [37.5, 30.2], [38.8, 28.2]], inside: [[19, 33.6], [26, 34.4], [32, 34], [36, 32.6], [35, 35.6], [30, 37.2], [24, 37.2], [20, 35.6]] },
+  frown: { line: [[17.5, 33.8], [21, 34], [26, 34.4], [31, 34.6], [35, 35.4], [37, 36.6]] },
+};
 
 /**
  * The casque, a fin swept back from behind his eyes, striped by the angle from its pivot like a fan. It's short: his beret
@@ -270,15 +285,17 @@ function beret(tilt: number): { part: Part; at: Pt } {
 }
 
 /** His head: green above the mouth, the yellow-green jaw below it, a nostril, and a few stripes at his cheek. */
-function head(): { part: Part; at: Pt } {
+function head(mouth: Mouth): { part: Part; at: Pt } {
   const inside = inPoly(HEAD);
   const light = roundLight(34, 24, 17, 15, 0.16);
+  const { line, inside: gape } = MOUTHS[mouth];
   const mouthY = (x: number): number => {
-    const i = MOUTH.findIndex((p, j) => j > 0 && x <= p[0]);
-    if (i < 1) return x < MOUTH[0]![0] ? MOUTH[0]![1] : MOUTH.at(-1)![1];
-    const [a, b] = [MOUTH[i - 1]!, MOUTH[i]!];
+    const i = line.findIndex((p, j) => j > 0 && x <= p[0]);
+    if (i < 1) return x < line[0]![0] ? line[0]![1] : line.at(-1)![1];
+    const [a, b] = [line[i - 1]!, line[i]!];
     return a[1] + ((x - a[0]) / (b[0] - a[0])) * (b[1] - a[1]);
   };
+  const open = gape ? inPoly(gape) : null;
   return painted(15, 14, 36, 26, (F, S) => {
     F(inside, (x, y) => {
       // His cheek stripes: diagonal patches of orange and teal toward the casque.
@@ -289,9 +306,13 @@ function head(): { part: Part; at: Pt } {
       }
       return y > mouthY(x) + 0.5 && x < 38.5 ? ramp(THROAT, light(x, y) + 0.12) : ramp(GREEN, light(x, y));
     });
-    // The smirk, a line along the segments of MOUTH.
-    MOUTH.slice(1).forEach((q, i) => {
-      const a = MOUTH[i]!;
+    // An open mouth: dark, with the tongue in the bottom of it.
+    if (open) {
+      F((x, y) => open(x, y) && inside(x, y), (x, y) => (y > 35.4 && x > 23 && x < 33 ? "q" : "k"));
+    }
+    // The line of his mouth, along the segments.
+    line.slice(1).forEach((q, i) => {
+      const a = line[i]!;
       const n = Math.ceil(Math.hypot(q[0] - a[0], q[1] - a[1]) * 2);
       for (let j = 0; j <= n; j++) S(["k"], Math.floor(a[0] + ((q[0] - a[0]) * j) / n), Math.floor(a[1] + ((q[1] - a[1]) * j) / n));
     });
@@ -304,7 +325,11 @@ function head(): { part: Part; at: Pt } {
  * the turret's radius; the iris looks by (`gx`, `gy`) from the middle of the white, so the pupils sweep and swivel as
  * numbers.
  */
-function eye(cx: number, cy: number, rb: number, [gx, gy]: Pt): { part: Part; at: Pt } {
+export type Lid = "open" | "wide" | "half" | "shut" | "joy";
+/** How far down the opening his lid reaches, from the opening's middle in turret radii (up is negative). */
+const LID_AT: Record<Lid, number> = { open: -0.72, wide: -1.2, half: -0.05, shut: 1.3, joy: 1.3 };
+
+function eye(cx: number, cy: number, rb: number, [gx, gy]: Pt, lid: Lid = "open"): { part: Part; at: Pt } {
   const size = Math.ceil(rb * 2) + 1;
   const c = size / 2;
   // His turret is a cone of skin: a thick rim round the opening, darker on its inside edge, and a lid over the top of it.
@@ -321,15 +346,24 @@ function eye(cx: number, cy: number, rb: number, [gx, gy]: Pt): { part: Part; at
       const py = y + 0.5;
       const d = Math.hypot(px - c, py - c);
       if (d > rb) continue;
-      const lid = py < c - ro * 0.72;
-      if (d > ro || lid) {
+      const covered = py < c + ro * LID_AT[lid];
+      if (d > ro || covered) {
         cv[y]![x] = ramp(GREEN, bulb(x, y) - (d < ro + 1 ? 0.2 : 0));
         continue;
       }
-      cv[y]![x] = py < c - ro * 0.45 ? "S" : "h";
+      cv[y]![x] = py < c - ro * 0.45 && lid !== "wide" ? "S" : "h";
       const di = Math.hypot(px - ix, py - iy);
       if (di <= ri) cv[y]![x] = di >= ri - 0.9 ? "E" : py < iy ? "F" : "G";
       if (di <= rp) cv[y]![x] = "X";
+    }
+  // A shut eye: a dark crease across it, or an arch (happy).
+  if (lid === "shut" || lid === "joy")
+    for (let x = 0; x < size; x++) {
+      const t = (x + 0.5 - c) / ro;
+      if (Math.abs(t) > 0.92) continue;
+      const y = lid === "shut" ? Math.floor(c + 0.4) : Math.floor(c + 1.1 - 2.4 * (1 - t * t));
+      // (The arch is two pixels thick, so it reads at a glance.)
+      for (const yy of lid === "shut" ? [y] : [y, y + 1]) if (cv[yy]?.[x]) cv[yy]![x] = "k";
     }
   // Its glint: the pupil's top left pixel.
   const dark = cv.flatMap((row, y) => row.flatMap((k, x) => (k === "X" ? [[x, y] as Pt] : [])));
@@ -463,8 +497,10 @@ function tail(curl: number, sway: number, phase: number): { part: Part; at: Pt }
     const h = heading + sway * Math.sin(phase - s * 0.16) * (s / TAIL_LEN);
     x += Math.cos(h) * ds;
     y += Math.sin(h) * ds;
-    pts.push([x, y]);
-    r.push(4.1 - 2.6 * (i / steps));
+    const radius = 4.1 - 2.6 * (i / steps);
+    // (Resting on the ground when it's loose, never lower than his feet, and never out of his frame.)
+    pts.push([Math.min(x, 79.5 - radius), Math.min(y, GROUND - 0.5 - radius)]);
+    r.push(radius);
   }
   const bands = stripes("tgotgtogtotg", 4.6, TAIL_LEN, 1.1);
   return stroke(pts, r, (l, t, across) => bands(l - 0.06, t, across));
@@ -534,6 +570,9 @@ const PAINT_GLOB: readonly string[] = [
   "..........P.",
 ];
 
+/** Paint just taken from the palette: a small smear over the tip of the bristles. */
+const PAINT_SMEAR: readonly string[] = [".PRRP.", "PRKRRP", "PRRRRP", ".PPPP."];
+
 /** The palette: a wooden board with a thumb hole and a bite taken out of its edge, shaded from the top left. */
 function paletteBoard(): { part: Part; at: Pt } {
   const board = inEllipse(16, 56, 10.4, 7.2);
@@ -568,6 +607,7 @@ add("fist", () => ({ grid: FIST }));
 add("hand", () => ({ grid: HAND }));
 add("button", () => BUTTON);
 add("paintGlob", () => ({ grid: PAINT_GLOB }));
+add("paintSmear", () => ({ grid: PAINT_SMEAR }));
 add("shadow", () => shadow(60));
 add("foot", () => ({ grid: FOOT }));
 
@@ -590,15 +630,25 @@ const key = (pts: readonly Pt[]) => pts.map((p) => `${r2(p[0])},${r2(p[1])}`).jo
 export interface SmudgyPose {
   /** He sinks this many pixels (a crouch); his feet stay on the ground. */
   bob?: number;
-  /** The brush arm: the elbow, and the fist round the brush's handle. */
-  elbowF?: Pt;
+  /** The whole of him moved sideways, and lifted off the ground (his shadow stays). */
+  dx?: number;
+  air?: number;
+  /** His head (with its eyes, casque and beret) nodded down and leaning forward (negative: to our left) from his body. */
+  nod?: number;
+  lean?: number;
+  /** The brush arm: the fist round the brush's handle and the elbow (bent by itself when left out). */
   fist?: Pt;
-  /** The brush's axis: the butt of its handle and the tip of its bristles (its paint sits on the tip). */
+  elbowF?: Pt;
+  /** The brush's axis: the butt of its handle and the tip of its bristles (`holding` works them out from the fist). */
   brushButt?: Pt;
   brushTip?: Pt;
-  /** The palette arm: the elbow and the hand; the palette moves with the hand. */
-  elbowN?: Pt;
+  /** The brush arm drawn over his body (before the palette arm: across his belly, a dip) or over everything (a slash). */
+  front?: boolean | "top";
+  /** The paint on the brush: a full dollop (the still), the same on a brush held level (centered on the tip), a smear at the tip (just dipped) or none (a clean brush). */
+  paint?: "full" | "side" | "smear" | "none";
+  /** The palette arm: the hand and the elbow (bent by itself when left out); the palette moves with the hand. */
   handN?: Pt;
+  elbowN?: Pt;
   /** The tail: how curled it is (1 the spiral he stands with, 0 a loose hook), and a ripple down it: how far it bends the tip (radians) and where the ripple is (radians; animate it). */
   curl?: number;
   sway?: number;
@@ -608,17 +658,25 @@ export interface SmudgyPose {
   /** The beret moved from where it sits (a bounce), and how far it's tipped (degrees, negative: its front down). */
   beret?: Pt;
   beretTilt?: number;
-  /** Where each eye looks, from the middle of its white: the near eye (our right) and the far one. */
+  /** Where each eye looks, from the middle of its white: the near eye (our right) and the far one; and their lids. */
   gazeN?: Pt;
   gazeF?: Pt;
+  lidN?: Lid;
+  lidF?: Lid;
+  mouth?: Mouth;
 }
 
 const REST = {
   bob: 0,
+  dx: 0,
+  air: 0,
+  nod: 0,
+  lean: 0,
   elbowF: [31, 42] as Pt,
   fist: [19.5, 41.5] as Pt,
   brushButt: [21.5, 46] as Pt,
   brushTip: [9.5, 11.5] as Pt,
+  paint: "full" as "full" | "side" | "smear" | "none",
   elbowN: [33, 47.5] as Pt,
   handN: [27.5, 54] as Pt,
   curl: 1,
@@ -629,12 +687,57 @@ const REST = {
   beretTilt: -13,
   gazeN: [-1.3, 0.5] as Pt,
   gazeF: [-1.1, 0.5] as Pt,
+  lidN: "open" as Lid,
+  lidF: "open" as Lid,
+  mouth: "smirk" as Mouth,
 };
 
 const HIP_N: Pt = [46, 54];
 const HIP_F: Pt = [53, 54];
 const SHOULDER_N: Pt = [38.5, 42];
 const SHOULDER_F: Pt = [44, 39];
+/** His arms' bones: the upper arm and the forearm, as the still has them. */
+const BONES_F: Pt = [13.3, 11.5];
+const BONES_N: Pt = [7.8, 8.5];
+/** The brush, butt to tip, and where the fist holds it in the still (from the butt). */
+const BRUSH_LEN = 36.5;
+const GRIP = 4.9;
+
+/**
+ * The brush held with the fist at `fist`, its axis tilted `tilt` degrees from straight up (positive: the tip to our left,
+ * toward where he faces; 90 level, 180 down) and the fist `grip` px along it from the butt: the pose numbers that go
+ * with it.
+ */
+export function holding(fist: Pt, tilt: number, grip = GRIP): Required<Pick<SmudgyPose, "fist" | "brushButt" | "brushTip">> {
+  const a = (tilt * Math.PI) / 180;
+  const d: Pt = [-Math.sin(a), -Math.cos(a)];
+  return { fist, brushButt: [fist[0] - d[0] * grip, fist[1] - d[1] * grip], brushTip: [fist[0] + d[0] * (BRUSH_LEN - grip), fist[1] + d[1] * (BRUSH_LEN - grip)] };
+}
+/** The same, but given where the tip is. */
+export function holdingTip(tip: Pt, tilt: number, grip: number): Required<Pick<SmudgyPose, "fist" | "brushButt" | "brushTip">> {
+  const a = (tilt * Math.PI) / 180;
+  const d: Pt = [-Math.sin(a), -Math.cos(a)];
+  const butt: Pt = [tip[0] - d[0] * BRUSH_LEN, tip[1] - d[1] * BRUSH_LEN];
+  return { fist: [butt[0] + d[0] * grip, butt[1] + d[1] * grip], brushButt: butt, brushTip: tip };
+}
+
+/** An elbow for an arm of two bones `l1` and `l2` from `s` to `t`, bent down (or as far out as it reaches). */
+function elbowOf(s: Pt, t: Pt, [l1, l2]: Pt): Pt {
+  const dist = Math.hypot(t[0] - s[0], t[1] - s[1]) || 0.01;
+  const d = Math.min(dist, l1 + l2 - 0.01);
+  const [ux, uy] = [(t[0] - s[0]) / dist, (t[1] - s[1]) / dist];
+  const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d);
+  const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+  const [mx, my] = [s[0] + ux * a, s[1] + uy * a];
+  const c1: Pt = [mx - uy * h, my + ux * h];
+  const c2: Pt = [mx + uy * h, my - ux * h];
+  return c1[1] >= c2[1] ? c1 : c2;
+}
+
+const unit = (a: Pt, b: Pt): Pt => {
+  const d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  return [(b[0] - a[0]) / d, (b[1] - a[1]) / d];
+};
 
 /** The layers of a pose, back to front. */
 export function smudgyLayers(pose: SmudgyPose = {}): Layer[] {
@@ -642,6 +745,8 @@ export function smudgyLayers(pose: SmudgyPose = {}): Layer[] {
   const b = p.bob;
   const at = (part: string, x: number, y: number): Layer => ({ part, x: OX + Math.round(x), y: OY + Math.round(y) });
   const L = (pl: Placed, dy = 0, dx = 0) => at(pl.name, pl.at[0] + dx, pl.at[1] + dy);
+  /** A part of his head: it nods and leans with it. */
+  const H = (pl: Placed, dy = 0, dx = 0) => L(pl, b + p.nod + dy, p.lean + dx);
   const up = (q: Pt, dy: number): Pt => [q[0], q[1] + dy];
   // The palette moves with his hand: by how far it is from where it rests.
   const dPal: Pt = [p.handN[0] - REST.handN[0], p.handN[1] - REST.handN[1]];
@@ -651,45 +756,500 @@ export function smudgyLayers(pose: SmudgyPose = {}): Layer[] {
   };
   const tailKey = [p.curl, p.sway, p.swayPhase].map((v) => Math.round(v * 50) / 50).join(":");
   const brushPts = [p.brushButt, p.brushTip] as const;
-  const armF = [up(SHOULDER_F, b), up(p.elbowF, b), p.fist] as const;
-  const armN = [up(SHOULDER_N, b), up(p.elbowN, b), p.handN] as const;
-  const eyeN = placed(`eyeN:${p.gazeN}:${b}`, () => eye(40.5, 24.8 + b, 6.6, p.gazeN));
-  const eyeF = placed(`eyeF:${p.gazeF}:${b}`, () => eye(27, 25.2 + b, 5.4, p.gazeF));
-  return [
+  const shoulderF = up(SHOULDER_F, b);
+  const shoulderN = up(SHOULDER_N, b);
+  const armF = [shoulderF, pose.elbowF ? up(p.elbowF, b) : pose.fist ? elbowOf(shoulderF, p.fist, BONES_F) : up(REST.elbowF, b), p.fist] as const;
+  const armN = [shoulderN, pose.elbowN ? up(p.elbowN, b) : pose.handN ? elbowOf(shoulderN, p.handN, BONES_N) : up(REST.elbowN, b), p.handN] as const;
+  const eyeN = placed(`eyeN:${p.gazeN}:${b}:${p.lidN}`, () => eye(40.5, 24.8 + b, 6.6, p.gazeN, p.lidN));
+  const eyeF = placed(`eyeF:${p.gazeF}:${b}:${p.lidF}`, () => eye(27, 25.2 + b, 5.4, p.gazeF, p.lidF));
+  // The brush arm, and the brush in its fist: behind his body unless `front`.
+  const brushLayers: Layer[] = [
+    L(placed(`armF:${key(armF)}`, () => arm(armF[0], armF[1], armF[2], "gogtg"))),
+    L(placed(`brush:${key(brushPts)}`, () => brush(p.brushButt, p.brushTip))),
+    ...(p.paint === "full"
+      ? [at("paintGlob", p.brushTip[0] - 6, p.brushTip[1] - 6.5)]
+      : p.paint === "side"
+        ? [at("paintGlob", p.brushTip[0] - 6 + 2 * unit(p.brushButt, p.brushTip)[0], p.brushTip[1] - 4.5 + 2 * unit(p.brushButt, p.brushTip)[1])]
+        : p.paint === "smear"
+          ? [at("paintSmear", p.brushTip[0] - 2.5, p.brushTip[1] - 1.5)]
+          : []),
+    at("fist", p.fist[0] - 3, p.fist[1] - 2.5),
+  ];
+  const layers: Layer[] = [
     at("shadow", 15, GROUND - 3),
-    L(placed(`tail:${tailKey}`, () => tail(p.curl, p.sway, p.swayPhase)), b / 2),
+    // (The tail stays on the ground when he crouches: its root, behind his hip, is hidden either way.)
+    L(placed(`tail:${tailKey}`, () => tail(p.curl, p.sway, p.swayPhase))),
     leg("legF", HIP_F, [60, 61], [58, 65], "ggtgg"),
     at("foot", 58 - 9, GROUND - 6),
     leg("legN", HIP_N, [37, 61], [38, 65], "ggotg"),
     at("foot", 38 - 9, GROUND - 6),
-    // The brush arm, behind his body, and the brush in its fist.
-    L(placed(`armF:${key(armF)}`, () => arm(armF[0], armF[1], armF[2], "gogtg"))),
-    L(placed(`brush:${key(brushPts)}`, () => brush(p.brushButt, p.brushTip))),
-    at("paintGlob", p.brushTip[0] - 6, p.brushTip[1] - 6.5),
-    at("fist", p.fist[0] - 3, p.fist[1] - 2.5),
-    L(placed("casque", casque), b + p.casque[1], p.casque[0]),
+    ...(p.front ? [] : brushLayers),
+    H(placed("casque", casque), p.casque[1], p.casque[0]),
     L(placed("torso", torso), b),
     L(placed("apron", apron), b),
     L(placed("splats", splats), b),
     L(placed("strap", strap), b),
     at("button", 41, 39.5 + b),
     at("button", 49, 39.5 + b),
-    L(placed("head", head), b),
-    L(eyeF),
-    L(eyeN),
-    L(placed(`beret:${p.beretTilt}`, () => beret(p.beretTilt)), b + p.beret[1], p.beret[0]),
+    H(placed(`head:${p.mouth}`, () => head(p.mouth))),
+    H(eyeF, -b),
+    H(eyeN, -b),
+    H(placed(`beret:${p.beretTilt}`, () => beret(p.beretTilt)), p.beret[1], p.beret[0]),
+    ...(p.front === true ? brushLayers : []),
     // The palette arm, in front, and the palette in its hand.
     L(placed(`armN:${key(armN)}`, () => arm(armN[0], armN[1], armN[2], "gotg"))),
     L(placed("palette", paletteBoard), dPal[1], dPal[0]),
     L(placed("dabs", dabs), dPal[1], dPal[0]),
     at("hand", p.handN[0] - 2.5, p.handN[1] - 3),
+    ...(p.front === "top" ? brushLayers : []),
   ];
+  // The whole of him moved: sideways, and up (his shadow stays on the ground).
+  return p.dx || p.air ? layers.map((l) => (l.part === "shadow" ? { ...l, x: l.x + p.dx } : { ...l, x: l.x + p.dx, y: l.y - p.air })) : layers;
 }
 
+// ---- Things drawn on his frames: flecks of paint, sparkles, dust, thoughts, sweat.
+
+/** A speck at a scene point (the frame adds its own margins). */
+const sp = (x: number, y: number, k: string): Speck => [OX + Math.round(x), OY + Math.round(y), k];
+/**
+ * Paint at a scene point: `n` 1 a fleck, 2 a drop, 3 a blob. They're in the brush's paint keys (P, R, K), so a frame that
+ * recolors the brush recolors them too.
+ */
+const blob = (x: number, y: number, n: 1 | 2 | 3 | 4 = 2): Speck[] =>
+  n === 4
+    ? [".KKR.", "KRRRP", "RRRRP", "RRRPP", ".PPP."].flatMap((row, j) => [...row].flatMap((k, i): Speck[] => (k === "." ? [] : [sp(x - 2 + i, y - 2 + j, k)])))
+    : n === 1
+    ? [sp(x, y, "R")]
+    : n === 2
+      ? [sp(x, y, "K"), sp(x + 1, y, "R"), sp(x, y + 1, "R"), sp(x + 1, y + 1, "P")]
+      : [sp(x - 1, y - 1, "K"), sp(x, y - 1, "R"), sp(x + 1, y - 1, "R"), sp(x - 1, y, "R"), sp(x, y, "R"), sp(x + 1, y, "P"), sp(x, y + 1, "P"), sp(x + 1, y + 1, "P"), sp(x - 1, y + 1, "P")];
+/** A gold four-point sparkle, white at its heart. */
+const sparkle = (x: number, y: number, big = false): Speck[] => [
+  sp(x, y, "w"), sp(x - 1, y, "y"), sp(x + 1, y, "y"), sp(x, y - 1, "y"), sp(x, y + 1, "y"),
+  ...(big ? [sp(x - 2, y, "Y"), sp(x + 2, y, "Y"), sp(x, y - 2, "Y"), sp(x, y + 2, "Y")] : []),
+];
+/** Dust kicked up either side of his feet (`t` frames after he lands): `n` puffs a side rolling outward and up. */
+const dust = (t: number, n = 3, cx = FOOT_X, spread = 36): Speck[] => {
+  const out: Speck[] = [];
+  for (let side = -1; side <= 1; side += 2)
+    for (let i = 0; i < n; i++) {
+      const x = Math.round(cx + side * (spread * 0.5 + i * 3.5 + t * (2 + (i % 2))));
+      const y = GROUND - 1 - Math.round(t * (0.6 + (i % 3) * 0.5) + (i % 2));
+      const cloud: [number, number, string][] = t < 2 ? [[0, 0, "9"], [side, 0, "9"], [0, -1, "0"], [side, -1, "0"]] : [[0, 0, "0"], [side, -1, "9"]];
+      for (const [ox, oy, k] of cloud) out.push(sp(x + ox, y + oy, k));
+    }
+  return out;
+};
+/** His shadow alone on the ground (he's above the frame, or about to come down), `r` its half-width. */
+const groundShadow = (r: number, cx = FOOT_X): Speck[] => {
+  const out: Speck[] = [];
+  for (let x = -r; x <= r; x++) for (let y = -1; y <= 0; y++) if (Math.abs(x) < r - (y === -1 ? 2 : 0)) out.push(sp(cx + x, GROUND - 1 + y, "z"));
+  return out;
+};
+/** Thoughts: gold dots rising off his beret, one more each beat (the third a spark). */
+const thoughts = (n: number): Speck[] =>
+  ([[59, 5], [63, 0], [67, -5]] as Pt[]).slice(0, n).flatMap(([x, y], i): Speck[] => (i === 2 ? sparkle(x, y) : [sp(x, y, "Y"), sp(x + 1, y, "O"), sp(x, y - 1, "y")]));
+/** Sweat flying off his head, both ways. */
+const sweat = (i: number): Speck[] => {
+  const t = i % 4;
+  return [sp(24 - t, 21 + t * 2, "~"), sp(50 + t, 20 + t * 2, "~")];
+};
+/** Flecks of paint flung from where the brush's tip is, `t` frames after, fanning out along `dir` (degrees, 0 to our right, 90 down). */
+const flecks = (tip: Pt, dir: number, t: number, n = 6): Speck[] =>
+  Array.from({ length: n }, (_, i): Speck[] => {
+    const a = ((dir + (i - (n - 1) / 2) * 16) * Math.PI) / 180;
+    const d = 3 + t * (3.5 + (i % 3));
+    return blob(tip[0] + Math.cos(a) * d, tip[1] + Math.sin(a) * d + 0.25 * t * t, (i % 3 === 0 ? 2 : 1) as 1 | 2);
+  }).flat();
+
+/** A hit: every color goes pale. */
+const FLASH: Record<string, string> = Object.fromEntries(
+  Object.entries(SMUDGY_PALETTE)
+    .filter(([k]) => !["k", "z", "~", "9", "0", "w"].includes(k))
+    .map(([k, c]) => {
+      const n = parseInt(c.slice(1), 16);
+      const mix = (v: number) => Math.round(v + (255 - v) * 0.55).toString(16).padStart(2, "0");
+      return [k, `#${mix((n >> 16) & 255)}${mix((n >> 8) & 255)}${mix(n & 255)}`];
+    }),
+);
+
+/**
+ * The brush's paint recolored for Repaint (the paint keys P, R and K only: nothing else of his changes): his pawn
+ * painted your color (white's: a cream) and your knight or bishop his (black's: a charcoal).
+ */
+export const PAINT_CREAM: Record<string, string> = { P: "#b5a98a", R: "#f1e8d2", K: "#ffffff" };
+export const PAINT_CHARCOAL: Record<string, string> = { P: "#0f1013", R: "#30333a", K: "#6c727d" };
+
+/** A frame of a pose; its specks that would touch the frame's edge are dropped (the test's rule: nothing at the edge). */
+const F = (ms: number, pose: SmudgyPose = {}, extra: Partial<Frame> = {}): Frame => ({
+  ms,
+  layers: smudgyLayers(pose),
+  ...extra,
+  ...(extra.specks ? { specks: extra.specks.filter(([x, y]) => x >= 2 && y >= 2 && x <= W - 3 && y <= H - 3) } : {}),
+});
+const tipOf = (pose: SmudgyPose): Pt => pose.brushTip ?? REST.brushTip;
+
+// ---- His poses: the brush held a few ways, the eyes, the tail.
+
+/** The brush raised high beside his face; overhead; wound back over his head; flung forward; pointed ahead; slashed down. */
+const HOLD_UP = holding([21, 37.5], 10);
+const HOLD_OVER = holding([19.5, 36], 3);
+const HOLD_BACK = holding([24, 35], -16);
+const HOLD_FWD = holding([17, 40.5], 78);
+/** Waving: the brush swept out to the left. */
+const WAVE_L = holding([20, 38], 32);
+const HOLD_FLING = holding([21, 39], 38);
+const HOLD_POINT = holding([22, 39], 36);
+const STROKE = holding([26, 38], 135);
+/** Dipped in the palette: level across his belly, its tip on the yellow dab, the palette raised to meet it. */
+const DIP: SmudgyPose = { ...holdingTip([14.5, 46], 90, 21), handN: [28, 51], front: true };
+
+// ---- His animations. Frame counts and timings follow Alfil's and Chub & Chirp's.
+
+/** Breathing: [bob] per frame. */
+const BREATH = [0, 0, 0, 0, 1, 1, 1, 1] as const;
+const TAU = Math.PI * 2;
+
+/**
+ * Idle: he breathes; his tail is alive: it loosens a little and swings once a loop, a ripple running down it (it's
+ * still as he stands in the first frame, the approved still); his eyes swivel on their own, each looking its own way
+ * now and then, and he blinks; a drop of paint runs off his brush. Frame 1 is the approved still.
+ */
 const idle: Anim = {
   loop: true,
-  frames: [{ layers: smudgyLayers(), ms: 1000 } satisfies Frame],
+  frames: Array.from({ length: 16 }, (_, i) => {
+    const e = Math.sin((Math.PI * i) / 16) ** 2;
+    const both = i === 13;
+    const p: SmudgyPose = {
+      bob: BREATH[i % 8]!,
+      curl: 1 - 0.18 * e,
+      sway: 0.5 * e,
+      swayPhase: (TAU * i) / 16,
+      gazeN: i === 3 || i === 4 ? [0.9, -0.7] : i === 9 || i === 10 ? [-1.8, -0.9] : REST.gazeN,
+      gazeF: i === 3 || i === 4 ? [-1.6, 0.9] : i === 6 || i === 7 ? [0.7, 0.3] : i === 11 || i === 12 ? [-0.4, -1] : REST.gazeF,
+      lidN: both ? "shut" : "open",
+      lidF: both ? "shut" : "open",
+    };
+    const drop = i >= 6 && i <= 10 ? blob(5, 14 + (i - 6) * 3, 1) : [];
+    return F(125, p, { specks: drop });
+  }),
 };
+
+/**
+ * Entrance: his shadow spreads, he drops in from above, beret flying, and lands (a thump, dust, the beret bounced); then
+ * a flourish of the brush, a flick of paint and a grin, and he settles with a sly look.
+ */
+const entrance: Anim = {
+  loop: false,
+  frames: [
+    { ms: 100, layers: [], specks: groundShadow(8), cue: "drop" },
+    { ms: 100, layers: [], specks: groundShadow(16) },
+    F(70, { air: 7, curl: 0.55, sway: 0.4, lidN: "wide", lidF: "wide", mouth: "open", beret: [0, -3], beretTilt: -30 }, { specks: flecks(REST.brushTip, 80, 1, 3) }),
+    F(70, { air: 3, curl: 0.7, sway: 0.25, lidN: "wide", lidF: "wide", mouth: "open", beret: [0, -2], beretTilt: -24 }),
+    F(130, { bob: 3, curl: 0.85, lidN: "shut", lidF: "shut", beret: [0, 1] }, { cue: "thump", shake: [0, 2], specks: dust(0) }),
+    F(110, { bob: 1, beret: [0, -2], beretTilt: -8 }, { specks: dust(1) }),
+    F(110, { bob: 0, beret: [0, 0] }, { specks: dust(2) }),
+    F(160, { ...HOLD_OVER, mouth: "grin", lidN: "joy", lidF: "joy", curl: 0.9, sway: 0.3 }, { cue: "splat", specks: flecks(tipOf(HOLD_OVER), 110, 1, 5) }),
+    F(160, { ...HOLD_UP, mouth: "grin", lidF: "half", gazeN: [0.6, 0.3], curl: 1, beretTilt: -18 }, { specks: flecks(tipOf(HOLD_OVER), 110, 3, 5) }),
+    F(300, {}),
+  ],
+};
+
+/** Thinking: the brush's handle tapped on his chin, his eyes rolled up, gold dots rising off his beret; the tail curling slowly. */
+const thinking: Anim = {
+  loop: true,
+  frames: [0, 1, 2, 3].flatMap((n) =>
+    [0, 1, 2, 3].map((i) =>
+      F(130, { ...holding([24.5, i % 2 ? 37 : 37.8], 6), gazeN: [-0.5, -1.3], gazeF: i === 2 ? [0.4, -1.2] : [-1.4, -1.1], lidN: "half", lidF: "open", curl: [1, 0.92, 0.84, 0.92][i]!, sway: 0.08 * (i % 2 ? 1 : -1), swayPhase: i, beretTilt: i === 2 ? -9 : -16, bob: i === 2 ? 1 : 0 }, { specks: thoughts(n) }),
+    ),
+  ),
+};
+
+/** His move: a crouch, a hop with the tail whipping out behind and the beret lifting, a landing (dust), and a settle. */
+const move: Anim = {
+  loop: false,
+  frames: [
+    F(100, { bob: 2, beret: [0, 1] }),
+    F(90, { air: 2, curl: 0.8, sway: 0.3, lidN: "wide", lidF: "wide", ...holding([20, 39], 30), beret: [0, -1], beretTilt: -18 }),
+    F(110, { air: 5, curl: 0.45, sway: 0.4, lidN: "wide", lidF: "wide", mouth: "grin", ...holding([20, 39], 38), beret: [0, -3], beretTilt: -26 }),
+    F(130, { bob: 2, curl: 0.8, beret: [0, 1], lidN: "shut", lidF: "shut" }, { cue: "thump", shake: [0, 1], specks: dust(0, 2) }),
+    F(120, { bob: 1, beret: [0, -1], beretTilt: -9 }, { specks: dust(1, 2) }),
+    F(160, {}),
+  ],
+};
+
+/** A capture: he cheers, pumping the brush over his head, flicking paint, the tail corkscrewing, the beret bouncing. */
+const capture: Anim = {
+  loop: false,
+  frames: [
+    F(90, { bob: 1, ...HOLD_BACK, lean: 1 }, { cue: "splat" }),
+    ...Array.from({ length: 10 }, (_, i) => {
+      const odd = i % 2 === 1;
+      const hold = odd ? WAVE_L : HOLD_UP;
+      const p: SmudgyPose = { ...hold, air: odd ? 0 : 2, lidN: "joy", lidF: "joy", mouth: "grin", curl: odd ? 0.7 : 1, sway: odd ? 0.3 : -0.3, swayPhase: i * 1.2, beret: [0, odd ? 0 : -2], beretTilt: odd ? -10 : -20, bob: odd ? 1 : 0 };
+      return F(85, p, { cue: i === 4 ? "giggle" : undefined, specks: [...(i < 8 ? flecks(tipOf(hold), odd ? 100 : 70, 1 + (i % 3), 4) : []), ...(i < 6 && !odd ? sparkle(30 + i * 2, 1) : [])] });
+    }),
+    F(160, { mouth: "smirk", lidF: "half" }),
+  ],
+};
+
+/** Hurt: a flash, flecks fly off the brush, the beret pops off to the side, he's knocked back with his eyes shut; then he glares. */
+const hurt: Anim = {
+  loop: false,
+  frames: [
+    F(70, { bob: 2, dx: 1, lidN: "shut", lidF: "shut", mouth: "open", curl: 0.6, sway: 0.5, beret: [2, -4], beretTilt: -34 }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: flecks(REST.brushTip, 60, 1, 5) }),
+    F(80, { bob: 2, dx: 1, lidN: "shut", lidF: "shut", mouth: "open", curl: 0.7, sway: -0.4, beret: [3, -5], beretTilt: -38 }, { shake: [-1, 0], specks: flecks(REST.brushTip, 60, 2, 5) }),
+    F(90, { bob: 1, dx: 2, lidN: "wide", lidF: "wide", mouth: "frown", curl: 0.85, beret: [2, -2], beretTilt: -26 }, { specks: flecks(REST.brushTip, 60, 3, 4) }),
+    F(90, { bob: 1, dx: 1, lidN: "wide", lidF: "wide", mouth: "frown", beret: [1, -1], beretTilt: -18 }),
+    F(110, { nod: 1, lidN: "half", lidF: "half", gazeN: [-1.6, 0.9], gazeF: [-1.4, 0.9], mouth: "frown" }),
+    F(120, { lidN: "half", lidF: "open", gazeN: [0.5, 0.3], mouth: "smirk", ...HOLD_UP }),
+    F(160, {}),
+  ],
+};
+
+/** Check: he points the brush ahead (at the king) with a flourish of sparkle, grinning, his eye on it; twice. */
+const check: Anim = {
+  loop: false,
+  frames: [
+    F(100, { bob: 2, ...HOLD_BACK, lean: 1 }),
+    F(120, { ...HOLD_POINT, paint: "side", mouth: "grin", gazeN: [-1.8, 0], gazeF: [-1.6, 0], nod: 1, lean: -1, curl: 0.9 }, { cue: "swish", specks: sparkle(tipOf(HOLD_POINT)[0] - 3, tipOf(HOLD_POINT)[1] - 2) }),
+    F(100, { ...HOLD_POINT, paint: "side", mouth: "grin", gazeN: [-1.8, 0], gazeF: [-1.6, 0], nod: 1, lean: -1, bob: 1, curl: 0.95 }),
+    F(100, { ...HOLD_UP, lidF: "half", gazeN: [0.6, 0.3] }),
+    F(120, { ...HOLD_POINT, paint: "side", mouth: "grin", gazeN: [-1.8, 0], gazeF: [-1.6, 0], nod: 1, lean: -1, curl: 0.9 }, { specks: sparkle(tipOf(HOLD_POINT)[0] - 3, tipOf(HOLD_POINT)[1] - 2, true) }),
+    F(100, { ...HOLD_POINT, paint: "side", mouth: "grin", gazeN: [-1.8, 0], gazeF: [-1.6, 0], nod: 1, lean: -1, bob: 1 }),
+    F(150, { lidN: "half", lidF: "half" }),
+    F(160, { lidN: "half", lidF: "half", mouth: "grin" }),
+  ],
+};
+
+const SMUG_GAZE: readonly Pt[] = [[-1.1, 0.5], [-0.4, 0.4], [0.6, 0.3], [0.6, 0.3], [0.2, 0.4], [-0.6, 0.5], [-1.1, 0.5], [-1.1, 0.5]];
+/** Smug: leaning back, heavy-lidded, a grin, the beret tipped, the tail lazily swaying, one eye wandering. */
+const smug: Anim = {
+  loop: true,
+  frames: Array.from({ length: 8 }, (_, i) =>
+    F(150, {
+      lean: 1,
+      nod: -1,
+      mouth: "grin",
+      lidN: "half",
+      lidF: "half",
+      gazeN: REST.gazeN,
+      gazeF: SMUG_GAZE[i]!,
+      beretTilt: -18,
+      curl: 0.95 - 0.05 * Math.sin((TAU * i) / 8),
+      sway: 0.2,
+      swayPhase: (TAU * i) / 8,
+      beret: [0, i % 4 === 2 ? -1 : 0],
+    }),
+  ),
+};
+
+/** Rattled: shaking, eyes wide, mouth working, sweat flying, the tail wound tight and trembling, the beret jiggling. */
+const rattled: Anim = {
+  loop: true,
+  frames: Array.from({ length: 8 }, (_, i) => {
+    const p: SmudgyPose = {
+      dx: i % 2 ? 1 : -1,
+      bob: i % 4 === 2 ? 1 : 0,
+      lidN: "wide",
+      lidF: "wide",
+      mouth: i % 2 ? "open" : "frown",
+      curl: 1,
+      sway: 0.14 * (i % 2 ? 1 : -1),
+      swayPhase: i,
+      beret: [0, i % 2 ? -1 : 0],
+      beretTilt: -13 + (i % 2 ? 4 : -4),
+      ...holding([19.5 + (i % 2 ? 0.7 : -0.7), 41.5], 19.2),
+    };
+    return F(80, p, { specks: sweat(i) });
+  }),
+};
+
+/** The beret over his eyes, the sag of the end. */
+const SLUMP: SmudgyPose = { bob: 6, curl: 0.12, sway: 0, lidN: "shut", lidF: "shut", mouth: "frown", beret: [-1, 9], beretTilt: -7, ...STROKE, paint: "side", handN: [27.5, 58], nod: 1 };
+/**
+ * Defeat: a flash; the beret pops off his head, he reels; his tail uncurls and goes limp, the brush drops, and he slumps
+ * with the beret fallen over his eyes.
+ */
+const defeat: Anim = {
+  loop: false,
+  frames: [
+    F(80, { bob: 2, dx: 1, lidN: "shut", lidF: "shut", mouth: "open", beret: [2, -5], beretTilt: -36, curl: 0.6, sway: 0.5 }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: flecks(REST.brushTip, 60, 1, 5) }),
+    F(100, { bob: 2, dx: 2, lidN: "wide", lidF: "wide", mouth: "open", beret: [5, -8], beretTilt: -42, curl: 0.5, sway: -0.5 }, { specks: flecks(REST.brushTip, 60, 3, 4) }),
+    F(110, { bob: 4, dx: 1, lidN: "half", lidF: "half", mouth: "frown", beret: [2, -2], beretTilt: -24, curl: 0.3, sway: 0.2, ...holding([22, 43], 40) }),
+    F(120, { ...SLUMP, bob: 5, beret: [-1, 7] }, { cue: "flop", shake: [0, 1], specks: dust(0) }),
+    F(140, SLUMP, { specks: dust(1) }),
+    F(1000, SLUMP),
+  ],
+};
+
+/** Victory: he hops in place, the brush waving over his head and flicking yellow, the tail corkscrewing, the beret bouncing. */
+const victory: Anim = {
+  loop: true,
+  frames: Array.from({ length: 12 }, (_, i) => {
+    const air = [0, 2, 5, 6, 5, 2, 0, 0, 0, 0, 0, 0][i]!;
+    const wave = i % 2 ? WAVE_L : HOLD_UP;
+    const p: SmudgyPose = {
+      ...wave,
+      air,
+      bob: i === 0 || i === 6 ? 2 : 0,
+      lidN: "joy",
+      lidF: "joy",
+      mouth: "grin",
+      curl: 0.55 + 0.4 * Math.abs(Math.sin((TAU * i) / 12)),
+      sway: 0.4 * Math.sin((TAU * i) / 6),
+      swayPhase: (TAU * i) / 6,
+      beret: [0, air > 0 ? -2 : i === 6 ? 1 : 0],
+      beretTilt: air > 0 ? -22 : -12,
+      handN: air > 0 ? [27.5, 52] : REST.handN,
+    };
+    return F(110, p, { cue: i === 2 ? "giggle" : i === 6 ? "thump" : undefined, specks: [...(i === 6 ? dust(0, 2) : i === 7 ? dust(1, 2) : []), ...(i % 3 === 0 ? flecks(tipOf(wave), 90, 2, 3) : []), ...(i % 4 === 1 ? sparkle(34, -2) : [])] });
+  }),
+};
+
+/**
+ * Camouflage's splash (his passive, at the start): he dips the brush in the palette, raises it loaded, winds back and
+ * flings a big splash at the board (`splash`: it leaves the brush; the board flies it to his pawns), flecks flying; then
+ * a sly look, one eye on you, the other wandering, and the brush loaded again.
+ */
+const camouflage: Anim = {
+  loop: false,
+  frames: [
+    F(100, { bob: 1, ...DIP, paint: "smear", lidN: "half", lidF: "half", gazeN: [-1.4, 1], gazeF: [-1.2, 1] }),
+    F(110, { bob: 1, ...DIP, paint: "smear", lidN: "half", lidF: "half", gazeN: [-1.4, 1], gazeF: [-1.2, 1], mouth: "grin" }, { specks: sparkle(15, 43) }),
+    F(100, { ...HOLD_UP, paint: "full", mouth: "grin", lidN: "open", lidF: "open", curl: 0.95 }, { cue: "dab" }),
+    F(90, { bob: 1, ...HOLD_BACK, lean: 1, nod: -1, mouth: "grin", curl: 0.8, sway: 0.2, beretTilt: -18 }),
+    F(80, { ...HOLD_FLING, paint: "smear", lean: -1, nod: 1, mouth: "open", lidN: "wide", lidF: "wide", curl: 0.6, sway: 0.5, beret: [1, -1] }, { cue: "splash", specks: [...blob(tipOf(HOLD_FLING)[0] + 1, tipOf(HOLD_FLING)[1] - 5, 4), ...flecks(tipOf(HOLD_FLING), 235, 1, 7)] }),
+    F(90, { ...HOLD_FLING, paint: "smear", lean: -1, mouth: "grin", lidN: "joy", lidF: "joy", curl: 0.75, sway: 0.2 }, { specks: [...blob(tipOf(HOLD_FLING)[0] + 4, tipOf(HOLD_FLING)[1] - 11, 4), ...blob(tipOf(HOLD_FLING)[0] - 1, tipOf(HOLD_FLING)[1] - 7, 2), ...flecks(tipOf(HOLD_FLING), 245, 3, 7)] }),
+    F(80, { ...HOLD_UP, paint: "smear", mouth: "grin", lidN: "open", curl: 0.9 }, { specks: [...blob(tipOf(HOLD_FLING)[0] + 6, tipOf(HOLD_FLING)[1] - 15, 3), ...flecks(tipOf(HOLD_FLING), 250, 5, 6)] }),
+    F(110, { paint: "smear", mouth: "smirk", gazeN: [0.3, 0.4], gazeF: [-1.9, -0.6], lidN: "half", lidF: "open", beretTilt: -18 }),
+    F(110, { paint: "smear", mouth: "smirk", gazeN: [0.3, 0.4], gazeF: [-1.9, -0.6], lidN: "half", lidF: "open", beretTilt: -18, curl: 0.92 }),
+    F(90, { paint: "smear", mouth: "grin", gazeN: [0.3, 0.4], lidN: "half" }, { specks: sparkle(11, 11) }),
+    F(80, {}),
+  ],
+};
+
+/**
+ * The strike, the reveal (his passive's second half: the disguised piece makes its rook move and the paint drips off
+ * it, `drip`): he crouches with his tail wound tight, then the tail snaps open, the beret leaps off his head, and he
+ * laughs with the brush up; the tail curls back, the beret lands.
+ */
+const strike: Anim = {
+  loop: false,
+  frames: [
+    F(110, { bob: 2, curl: 1, lidN: "wide", lidF: "wide", mouth: "grin", beret: [0, 1] }),
+    F(60, { air: 1, curl: 0.15, sway: 0.5, swayPhase: 0, lidN: "joy", lidF: "joy", mouth: "grin", beret: [0, -5], beretTilt: -28, ...HOLD_UP }, { cue: "drip", specks: sparkle(46, -4) }),
+    F(70, { air: 3, curl: 0, sway: 0.35, swayPhase: 2, lidN: "joy", lidF: "joy", mouth: "grin", beret: [0, -5], beretTilt: -32, ...HOLD_OVER }, { specks: [...flecks(tipOf(HOLD_OVER), 90, 2, 5), ...sparkle(50, -3, true)] }),
+    F(80, { air: 2, curl: 0.3, sway: 0.4, swayPhase: 4, lidN: "joy", lidF: "joy", mouth: "grin", beret: [0, -3], beretTilt: -24, ...HOLD_UP }),
+    F(90, { bob: 2, curl: 0.6, sway: 0.25, swayPhase: 5, lidN: "shut", lidF: "shut", mouth: "grin", beret: [0, 1] }, { cue: "thump", shake: [0, 1], specks: dust(0, 2) }),
+    F(100, { bob: 0, curl: 0.8, sway: 0.15, swayPhase: 6, lidN: "joy", lidF: "joy", mouth: "grin", beret: [0, -2], beretTilt: -6 }, { specks: dust(1, 2) }),
+    F(110, { curl: 0.95, lidN: "joy", lidF: "joy", mouth: "grin", beret: [0, 0], beretTilt: -16 }),
+    F(140, { mouth: "smirk", lidN: "half", lidF: "half", beretTilt: -16 }),
+    F(160, {}),
+  ],
+};
+
+/**
+ * Repaint, his ultimate: two quick brush strokes. The paint on his brush goes your color (a cream), he winds back and
+ * strokes (`stroke1`: his pawn goes your color); it goes his color (a charcoal) with a sparkle, he winds back again and
+ * strokes (`stroke2`: your knight or bishop goes his); a flourish and a grin.
+ */
+const repaint: Anim = {
+  loop: false,
+  frames: [
+    F(120, { ...HOLD_UP, lidN: "half", lidF: "half", mouth: "grin", curl: 0.95 }, { pal: PAINT_CREAM, specks: sparkle(14, 4) }),
+    F(90, { bob: 1, ...HOLD_BACK, lean: 1, nod: -1, mouth: "grin", curl: 0.8, sway: 0.2 }, { pal: PAINT_CREAM }),
+    F(60, { ...STROKE, front: "top", paint: "side", lean: -1, nod: 1, mouth: "open", lidN: "wide", lidF: "wide", curl: 0.6, sway: 0.4, beret: [1, -1] }, { cue: "stroke1", pal: PAINT_CREAM, specks: [...blob(10, 56, 3), ...flecks([6, 62], 160, 1, 5)] }),
+    F(160, { ...STROKE, front: "top", paint: "side", lean: -1, mouth: "grin", lidN: "joy", lidF: "joy", curl: 0.75 }, { pal: PAINT_CREAM, specks: flecks([6, 62], 150, 3, 5) }),
+    F(150, { ...HOLD_UP, lidN: "open", lidF: "half", mouth: "grin", curl: 0.95, beret: [0, -1] }, { pal: PAINT_CHARCOAL, specks: sparkle(14, 4, true) }),
+    F(90, { bob: 1, ...HOLD_BACK, lean: 1, nod: -1, mouth: "grin", curl: 0.8, sway: -0.2 }, { pal: PAINT_CHARCOAL }),
+    F(60, { ...STROKE, front: "top", paint: "side", lean: -1, nod: 1, mouth: "open", lidN: "wide", lidF: "wide", curl: 0.6, sway: -0.4, beret: [1, -1] }, { cue: "stroke2", pal: PAINT_CHARCOAL, specks: [...blob(10, 56, 3), ...flecks([6, 62], 160, 1, 5)] }),
+    F(160, { ...STROKE, front: "top", paint: "side", lean: -1, mouth: "grin", lidN: "joy", lidF: "joy", curl: 0.75 }, { pal: PAINT_CHARCOAL, specks: flecks([6, 62], 150, 3, 5) }),
+    F(120, { ...HOLD_OVER, lidN: "joy", lidF: "joy", mouth: "grin", curl: 0.9, sway: 0.3, beret: [0, -2], beretTilt: -20 }, { specks: sparkle(30, 1) }),
+    F(140, { mouth: "smirk", lidN: "half", lidF: "half" }),
+    F(160, {}),
+  ],
+};
+
+// ---- His attack on a king (for his kit's `kingAttack` once he's wired in: perSquare 36, stand 1.8, facesLeft).
+
+/** Room ahead of him (to our left, where he faces) for the brush's reach and the paint's flight, and headroom to drop in from. */
+const ATTACK_REACH = 34;
+const ATTACK_TOP = 18;
+const AW = W + ATTACK_REACH;
+const AH = H + ATTACK_TOP;
+/** Where each blob reaches the king (scene pixels): at his head, or a little lower, in turn, past his square's middle. */
+const STAND = 1.8 * 36;
+const KING_AT = (i: number): Pt => [FOOT_X - STAND - 4, GROUND - 1 - (i % 2 ? 21 : 27)];
+/** A frame of his in the attack's bigger frame. */
+const fa = (fr: Frame): Frame => moved(fr, ATTACK_REACH, ATTACK_TOP, AW, AH);
+const landShadow = (r: number): Speck[] => groundShadow(r).map(([x, y, k]): Speck => [x + ATTACK_REACH, y + ATTACK_TOP, k]);
+
+/** A blob's flight from his brush to the king (scene pixels): a short lob, the point `t` (0 to 1) along it. */
+function lob(from: Pt, i: number, t: number): Pt {
+  const to = KING_AT(i);
+  const c: Pt = [(from[0] + to[0]) / 2, Math.min(from[1], to[1]) - 6];
+  return [(1 - t) ** 2 * from[0] + 2 * (1 - t) * t * c[0] + t * t * to[0], (1 - t) ** 2 * from[1] + 2 * (1 - t) * t * c[1] + t * t * to[1]];
+}
+/** Drops of paint behind the blob, from his brush, brighter toward it. */
+function paintTrail(from: Pt, i: number): Speck[] {
+  const out: Speck[] = [];
+  for (let n = 3; n <= 22; n++) {
+    const t = n / 28;
+    if (t < 0.45 && n % 2) continue;
+    const [x, y] = lob(from, i, t);
+    out.push(sp(x, y, t > 0.55 ? "K" : t > 0.35 ? "R" : "P"));
+  }
+  return out;
+}
+
+/** In the attack, his face is on the king: both eyes on him, the head nodded and leaning toward him. */
+const ON_KING: SmudgyPose = { gazeN: [-1.9, 0.9], gazeF: [-1.6, 0.9], nod: 1, lean: -1, lidN: "open", lidF: "open" };
+/**
+ * A flick: the brush flung at the king, the paint's blob just reaching his head at the end of a lob of drops (the board
+ * splats it on his square), his tail whipping.
+ */
+const flickAt = (i: number): Frame => {
+  const pose: SmudgyPose = { ...HOLD_FWD, ...ON_KING, mouth: "grin", bob: 1, curl: 0.7, sway: i % 2 ? -0.45 : 0.45, swayPhase: i, paint: "smear", beret: [0, i % 2 ? 0 : -1], beretTilt: i % 2 ? -17 : -9 };
+  const fr = fa(F(90, pose, { cue: i % 2 ? "splat" : "flick", shake: [i % 2 ? -1 : 1, 0] }));
+  const tip = tipOf(pose);
+  const [bx, by] = lob(tip, i, 0.86);
+  return { ...fr, specks: [...(fr.specks ?? []), ...[...paintTrail(tip, i), ...blob(bx, by, 4)].map(([x, y, k]): Speck => [x + ATTACK_REACH, y + ATTACK_TOP, k])] };
+};
+/** Between flicks: the brush swung back up and loaded, his eyes still on the king. */
+const windUp = (i: number): Frame =>
+  fa(F(80, { ...(i % 2 ? HOLD_UP : HOLD_BACK), ...ON_KING, mouth: "grin", lean: i % 2 ? -1 : 0, curl: 0.9, sway: i % 2 ? 0.2 : -0.2, swayPhase: i + 2, beretTilt: -14, paint: "full" }));
+
+/**
+ * His attack on a king, the king to our left (where he faces; the board mirrors him when it's to his right), on the
+ * shared beats (KING_ATTACK, boss-timing.ts): his shadow spreads, he drops in from above, beret flying, and lands
+ * (`land`); then he paints the king nonstop: ten flicks of the brush, a blob of yellow paint on each, cues `flick` and
+ * `splat` in turn (the cue frame is where the blob reaches the king's head: the board splats it there), his eyes and
+ * his face on the king throughout; he laughs, the brush up, and they bound off. The last frame is empty.
+ */
+const kingAttack: Anim = (() => {
+  const A = KING_ATTACK;
+  const frames: Frame[] = [
+    { ms: 100, layers: [], specks: landShadow(8) },
+    { ms: 100, layers: [], specks: landShadow(16) },
+    fa(F(80, { air: 24, ...HOLD_UP, curl: 0.55, sway: 0.4, lidN: "wide", lidF: "wide", mouth: "open", beret: [0, -4], beretTilt: -30 }, { cue: "drop" })),
+    fa(F(80, { air: 9, ...HOLD_UP, curl: 0.7, lidN: "wide", lidF: "wide", mouth: "open", beret: [0, -2], beretTilt: -24, ...ON_KING })),
+    fa(F(A.landAt - 360, { bob: 3, curl: 0.85, ...ON_KING, lidN: "shut", lidF: "shut", beret: [0, 1] }, { cue: "land", shake: [0, 1], specks: dust(0) })),
+    fa(F(A.lashAt - A.landAt, { ...HOLD_BACK, ...ON_KING, mouth: "grin", lean: 0, curl: 0.9, beretTilt: -14 }, { specks: dust(1) })),
+  ];
+  for (let i = 0; i < A.lashes; i++) frames.push(flickAt(i), windUp(i));
+  const laugh = A.leaveAt - (A.lashAt + A.lashes * A.lashEveryMs);
+  frames.push(fa(F(laugh, { ...HOLD_OVER, lidN: "joy", lidF: "joy", mouth: "grin", curl: 0.8, sway: 0.3 }, { cue: "cheer", specks: flecks(tipOf(HOLD_OVER), 100, 2, 4) })));
+  const leave = A.ms - A.leaveAt;
+  frames.push(
+    fa(F(leave - 300, { bob: 3, mouth: "grin", lidF: "half" })),
+    fa(F(80, { air: 8, ...HOLD_UP, curl: 0.6, sway: 0.4, lidN: "joy", lidF: "joy", mouth: "grin", beret: [0, -3], beretTilt: -24 }, { cue: "drop" })),
+    fa(F(80, { air: 24, ...HOLD_UP, curl: 0.5, sway: -0.4, lidN: "joy", lidF: "joy", mouth: "grin", beret: [0, -4], beretTilt: -30 })),
+    { ms: 80, layers: [], specks: landShadow(10) },
+    { ms: 60, layers: [] },
+  );
+  return { loop: false, frames };
+})();
 
 export const SMUDGY: Character = {
   id: "smudgy",
@@ -700,7 +1260,22 @@ export const SMUDGY: Character = {
   palette: SMUDGY_PALETTE,
   halo: "#26301f",
   parts: PARTS,
-  anims: { idle },
+  anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory, camouflage, strike, repaint },
+};
+
+/**
+ * Smudgy for his attack on a king: the same drawing, parts and palette, facing our left as always (as Sawyer), in a frame
+ * `ATTACK_REACH` wider on the left (his brush's reach and the paint's flight) and `ATTACK_TOP` taller (he drops in). Its
+ * `idle`, one still, is for the preview, which starts every reel from one.
+ */
+export const SMUDGY_ATTACK: Character = {
+  ...SMUDGY,
+  id: "smudgy-attack",
+  name: "Smudgy (his attack)",
+  w: AW,
+  h: AH,
+  foot: [SMUDGY.foot[0] + ATTACK_REACH, SMUDGY.foot[1] + ATTACK_TOP],
+  anims: { idle: { loop: true, frames: [fa(F(1000))] }, kingAttack },
 };
 
 /**
