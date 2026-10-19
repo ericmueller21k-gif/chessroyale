@@ -107,6 +107,7 @@ import {
   alfilBattle,
   hopperBattle,
   carrotBattle,
+  smudgyBattle,
   bossRace,
   crowdRace,
   pullsOf,
@@ -124,7 +125,7 @@ import {
   type ShowdownScout,
   type CarrotRace,
 } from "./boss-powers.ts";
-import type { BossPowerSettings, BounceResult, CarrotPatch, LeapfrogHop, LightsOutTest } from "@chessroyale/core";
+import type { BossPowerSettings, BounceResult, CarrotPatch, LeapfrogHop, LightsOutTest, RepaintResult } from "@chessroyale/core";
 
 /**
  * Runs a match round by round: deal, collect picks, score with the engine, draw,
@@ -1495,6 +1496,35 @@ export class MatchRunner {
    */
   applyCarrots(answer: string | null = null): CarrotPatch | null {
     return carrotBattle.apply(this.battle, answer);
+  }
+
+  /**
+   * Smudgy's Repaint is due: the start of his turn after its warning (or the test trigger), his forced moves done, a pair
+   * he could paint (smudgyBattle.repaintDue). It's his whole turn: no move of his follows it. Not when it waited this turn
+   * (no pair in the band): then his move.
+   */
+  repaintDue(): boolean {
+    return smudgyBattle.repaintDue(this.battle);
+  }
+
+  /** The Repaint's candidate positions (one per pair, the crowd to move): the same on the server, the host and in solo. */
+  repaintCandidates(): string[] {
+    return smudgyBattle.candidates(this.battle);
+  }
+
+  /** The Repaint's pick may fall outside the band: the test switch's first, or the admins' trigger. */
+  repaintAny(): boolean {
+    return smudgyBattle.any(this.battle);
+  }
+
+  /** The Repaint from this device's engines (repaintFrom); null: none was due, or no pair in the band (he moves). */
+  async playRepaint(engines: readonly EngineLike[] = this.opts.engines): Promise<RepaintResult | null> {
+    return smudgyBattle.play(this.battle, engines);
+  }
+
+  /** The Repaint (from the host's engine online: one of the candidates; anything else, none now, and he moves). */
+  applyRepaint(pick: string | null, gain: number | null = null): RepaintResult | null {
+    return smudgyBattle.apply(this.battle, pick, gain);
   }
 
   /** The Carrot Patch's race as the crowd's judge weighs its move now (the score jobs' `race`), or null. */

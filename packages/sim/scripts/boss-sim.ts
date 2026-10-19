@@ -28,11 +28,16 @@
  * `tier` and `difficulty`: the boss's strength as a player rated under that tier meets him on Solo's Hard (250) or
  * Hardest (500); the bots stay the raid's own. Leapfrog alone (the meter never filling): `{"powers": {"rageSpeed": {"hopper": 0.0001}}}`.
  *
+ * Smudgy (id smudgy): each row logs his Camouflage (the side of his forced moves, turns they waited, whether it was given
+ * up, the swap: after which crowd move and the squares; how the hidden rook was revealed and when, `strikeAfter` the crowd
+ * moves from the swap to it) and every Repaint tried (after which crowd move, the pairs he could paint, the pick's gain
+ * in pawns, or none in the band: `waits`).
+ *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, PASS_WAIT, applyMove, bossMoveFrom, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, PASS_WAIT, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -301,6 +306,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         // (The pass guard: each turn the cast waited, after which crowd move.)
         waits: [] as number[],
       };
+      // (Smudgy: every Repaint tried, and the turns none fitted.)
+      const smudgy = { repaints: [] as { at: number; of: number; gain: number; pawn: string; piece: string; gains: number[] }[], waits: [] as { at: number; of: number; gains: number[] }[] };
       const t0 = Date.now();
       while (!runner.isOver()) {
         if (runner.stageComplete()) {
@@ -363,6 +370,24 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             ults.push({ kind: "carrots", turn: at });
             look();
             continue;
+          }
+          if (bossId === "smudgy" && runner.repaintDue()) {
+            // (His Repaint: his whole turn, unless no pair fits the band: then his move.)
+            const at = runner.boss!.crowdMoves;
+            const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+            const candidates = runner.repaintCandidates();
+            // (repaintFrom's own steps, every pair's gain kept for the log.)
+            const scores = (await passScores(engines, fen, candidates, BOSS_POWERS.repaintNodes)) ?? [];
+            const gains = scores.map((x) => Math.round(x.gain * 100) / 100).sort((a, b) => a - b);
+            const pick = repaintPick(scores, runner.repaintAny());
+            const done = runner.applyRepaint(pick?.fen ?? null, pick?.gain ?? null);
+            if (done) {
+              smudgy.repaints.push({ at, of: candidates.length, gain: pick!.gain, pawn: done.pawn, piece: done.piece, gains });
+              ults.push({ kind: "repaint", turn: at });
+              look();
+              continue;
+            }
+            smudgy.waits.push({ at, of: candidates.length, gains });
           }
           if (bossId === "hopper") {
             const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
@@ -435,7 +460,9 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       const b = runner.boss!;
       const pc = b.powers?.carrots;
       if (pc) Object.assign(carrots, { pulls: pc.pulls, over: pc.over ?? null, his: carrotsOf(pc, "boss"), crowd: carrotsOf(pc, "crowd"), spin: pc.spin ?? null });
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}) };
+      const camo = b.powers?.camo;
+      const camoRow = camo ? { side: camo.side, missed: camo.missed, off: !!camo.off, swap: camo.swap ?? null, reveal: camo.reveal ?? null, hidden: camo.square, strikeAfter: camo.swap && camo.reveal ? camo.reveal.at - camo.swap.at : null } : null;
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }

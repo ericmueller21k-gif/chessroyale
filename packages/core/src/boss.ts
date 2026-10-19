@@ -76,13 +76,14 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
- * on his first turn, and his Carrot Patch, which comes at the start of his first turn: their files).
+ * on his first turn, and his Carrot Patch, which comes at the start of his first turn: their files). Smudgy's Camouflage
+ * comes from his first move whatever the switch says; ?power=repaint warns as the second turn begins.
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -161,6 +162,14 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // five carrots planted, a race to pull them, then his spin (bosses/carrots.ts). Live with their art (Eric, Oct 18:
   // docs/decisions/2026-10-18-hopper-wired.md). His offset from the boss sim (reports/hopper-sim.md).
   { id: "hopper", name: HOPPER_NAME, icon: "🐇", kit: HOPPER_NAME, offset: -250, powers: { passive: "leapfrog", ultimate: "carrotpatch" } },
+  // Smudgy, the chameleon painter (Eric, Oct 19): always from the starting position. Camouflage: his first two moves are
+  // forced (an end pawn two squares, that side's rook out through the gap), then the rook swaps places with one of his
+  // pawns and hides as a pawn until it strikes (bosses/smudgy.ts). Repaint, at most twice a battle: one of his pawns
+  // painted the crowd's color and one of the crowd's knights or bishops his, his whole turn. Hidden from players until
+  // his art is wired in (`kit: null`; the test link `?boss=smudgy&wip=1`, `&power=repaint`). His offset from the boss
+  // sim: 0, at the lobby's strength (his forced opening costs him; at −250 the crowd scored 0.69, at 0 0.44:
+  // reports/smudgy-sim.md; docs/decisions/2026-10-19-smudgy-rules.md).
+  { id: "smudgy", name: "Smudgy", icon: "🦎", kit: null, offset: 0, powers: { passive: "camouflage", ultimate: "repaint" } },
   // The Hidden Boss (working id "recluse"; Eric names him later: his name is this one string, wherever it shows). Hidden
   // from players (admins, Boss alone) except in the Crowd's boss final, which is always him (Eric, Oct 14). His strength
   // is fixed whatever the player's rating (BOSS_BRAIN.fixed: Maia at its top), so his offset is unused. The God King's
@@ -517,6 +526,17 @@ export interface BossPowerState {
   hops?: number;
   /** The hopper's Carrot Patch, from its cast on (his ultimate, once a battle): the carrots, the race, his spin. */
   carrots?: CarrotPatch | null;
+  /** Smudgy's Camouflage (his passive): his two forced moves, the swap, the rook hiding as a pawn, its reveal. */
+  camo?: Camouflage | null;
+  /** Smudgy's last Repaint (his ultimate): the pawn and the piece he painted. */
+  repaint?: RepaintResult | null;
+  /** How many Repaints Smudgy has made this battle (at most BOSS_POWERS.repaintMax). */
+  repaints?: number;
+  /**
+   * Smudgy's Repaint was due after this crowd move and no pair fitted (or no engine's answer): he plays his move, and it
+   * comes again at the start of his next turn, the warning staying. Never sent to screens.
+   */
+  repaintWait?: number;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -570,9 +590,10 @@ export interface SawCut {
 /**
  * The power that stops a move that is otherwise legal, either side (Sawyer's board saw and saw cut, Boingo's pie, Big
  * Boy's toy block): the screens say which when one of yours is refused, and when the boss's only move went through one
- * (a limit that would leave no move lifts for that turn).
+ * (a limit that would leave no move lifts for that turn). `paint`: Smudgy's hidden rook makes a move of yours illegal
+ * that the board as you see it allows (your king into its line, a piece it pins); never a move of his.
  */
-export type StopReason = "boardsaw" | "cut" | "pie" | "block";
+export type StopReason = "boardsaw" | "cut" | "pie" | "block" | "paint";
 
 /** Wrangler's long pull: his center pawn's double step (`from` to `via`), lassoed on to `to`, as crowd turn `turn` begins. */
 export interface LongPull {
@@ -729,6 +750,50 @@ export interface CarrotSpin {
   squares: string[];
 }
 
+/**
+ * Smudgy's Camouflage (Eric, Oct 19; docs/decisions/2026-10-19-smudgy-rules.md). His first two moves are forced: an end
+ * pawn two squares (`side`: the a- or h-file), then that side's rook out through the gap to its third rank. A forced
+ * move that can't be played on a turn waits for his next (`missed`), up to camoTries turns, then `off`: no Camouflage
+ * this battle. After the second, before the crowd's turn, the swap: the rook (on `swap.rook`) and one of his pawns (on
+ * `swap.pawn`) change places, and the rook hides as a pawn there. It moves like a pawn (forward, never a capture) until
+ * it strikes: any rook move from the crowd's move `swap.at + camoStrikeTurn` on. It's revealed when it moves other than
+ * as a pawn, when it gives check (directly or discovered), when his move leaves the crowd no move legal on both the
+ * board it sees and the true one ("stuck"), and when the crowd takes it (`reveal`).
+ */
+export interface Camouflage {
+  /** The side of his forced moves (null until the first is played). */
+  side: "a" | "h" | null;
+  /** His forced moves played so far (0, 1 or 2). */
+  step: number;
+  /** His turns on which the forced move due couldn't be played. */
+  missed: number;
+  /** The forced move due on his turn now (set as his turn begins; null: none, or none can be played now). */
+  due: string | null;
+  /** No Camouflage this battle (the forced moves couldn't be played within camoTries turns, or no pawn could take the rook's place). */
+  off?: true;
+  /** The swap, once done: after the crowd move `at`, the rook's square then (a real pawn stands there now) and the pawn's (the rook hides there). */
+  swap?: { at: number; rook: string; pawn: string };
+  /** The hidden rook's square now (null: not hidden, revealed or taken). */
+  square: string | null;
+  /** How it was revealed: after which crowd move (his move after it, or the crowd's move itself when it was taken), where, and how. */
+  reveal?: { at: number; square: string; how: "move" | "check" | "stuck" | "taken"; from?: string };
+}
+
+/**
+ * Smudgy's Repaint (his ultimate, his whole turn), after the crowd's move `at`: his pawn on `pawn` painted the crowd's
+ * color, the crowd's knight or bishop on `piece` (`type`: "n" or "b") painted his; `gain`, what it gained him in pawns by
+ * the engine (null: not known here, online the host's engine picked it); `outside`: the test switch's or the admins'
+ * trigger's, outside the band (none inside it).
+ */
+export interface RepaintResult {
+  at: number;
+  pawn: string;
+  piece: string;
+  type: "n" | "b";
+  gain: number | null;
+  outside?: true;
+}
+
 /** One of Hollow's dark squares: the crowd turn it fell as, and the last crowd turn it covers (darkTurns in all). */
 export interface DarkSquare {
   square: string;
@@ -827,7 +892,14 @@ export interface BurnEvent {
  * crowd's turn after it begins; `squares` the carrots); `carrot`, a carrot pulled (`square`, `by`: the crowd's move, as
  * it lands; his hop, at the start of his turn; his move, as the crowd's turn after it begins); `carrotSpin`, his spin
  * once the race is over (as the crowd's turn after his move begins; `tier`, `prize`, `squares` where the prize went);
- * `carrotWin`, his last carrot pulled: the battle is his (`square`).
+ * `carrotWin`, his last carrot pulled: the battle is his (`square`). Smudgy's: `camouflage`, the swap after his second
+ * forced move (as the crowd's turn after it begins; `square`: the rook's old square, where a real pawn now stands; where
+ * the rook hides is not in the moment, only in the view's `camo.square`: the app covers his whole pawn row); `unmask`,
+ * the hidden rook revealed by his move (`reveal` "move": a move no pawn could make, `squares` from and to; "check": it
+ * gives check, by its own pawn-shaped step or discovered; "stuck": his move left the crowd no move legal on the board it
+ * sees as well as the true one; `square` where it stands), as the crowd's turn after it begins; `rookTaken`,
+ * the crowd took it (`square`), as the crowd's move lands; `repaint`, his Repaint (his whole turn: as the crowd's turn
+ * after it begins; `squares`: his pawn now the crowd's, then the crowd's piece now his).
  */
 export type PowerEventKind =
   | "freeze"
@@ -861,7 +933,11 @@ export type PowerEventKind =
   | "carrots"
   | "carrot"
   | "carrotSpin"
-  | "carrotWin";
+  | "carrotWin"
+  | "camouflage"
+  | "unmask"
+  | "rookTaken"
+  | "repaint";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
@@ -885,6 +961,8 @@ export interface PowerEvent {
   /** Chub & Chirp's spin: his tier (his carrots) and the prize he got (piece letters; none: a blank). */
   tier?: number;
   prize?: string[];
+  /** Smudgy's unmask: how his hidden rook was revealed (a move no pawn could make, a check, or the crowd left no move it could see). */
+  reveal?: "move" | "check" | "stuck";
 }
 
 /** The settings behind the God King's Last Stand. */

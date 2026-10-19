@@ -290,6 +290,15 @@
       ],
       "specs": ["e2e/hopper.spec.ts"]
     },
+    "Smudgy (smudgy)": {
+      "paths": [
+        "packages/chess/src/bosses/smudgy.ts",
+        "packages/app/src/characters/smudgy*.ts",
+        "packages/app/src/characters/effects/smudgy.ts",
+        "packages/app/src/components/Smudgy.tsx"
+      ],
+      "specs": ["e2e/smudgy.spec.ts"]
+    },
     "Wrangler (pig)": {
       "paths": [
         "packages/chess/src/bosses/pig.ts",

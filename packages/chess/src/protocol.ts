@@ -1,4 +1,4 @@
-import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, LongPull, PowerEvent, PowerId, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplitPawn, StopReason, TusksCast } from "@chessroyale/core";
+import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplitPawn, StopReason, TusksCast } from "@chessroyale/core";
 import type { Base } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
@@ -6,6 +6,7 @@ import type { LastStandRound } from "./runner.ts";
 import type { JudgeJob, JudgeReport, JudgeRules } from "./judge.ts";
 import type { CarrotRace } from "./bosses/carrots.ts";
 import type { CarrotView } from "./bosses/hopper.ts";
+import type { CamoView } from "./bosses/smudgy.ts";
 import type { MoveScore } from "./uci.ts";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
@@ -374,6 +375,16 @@ export interface NetBossPowers {
    * prize rolled, the prize he got after any step down, where it went). Null: not cast.
    */
   carrots?: CarrotView | null;
+  /**
+   * Smudgy (missing for other bosses and from older servers; an older app ignores them): his Camouflage (the side of his
+   * forced moves and how many are played, whether it's off this battle, the hidden rook's square now: draw a pawn there,
+   * maskedFen; the swap, the crowd's move count from which it may strike, its reveal), his last Repaint (his pawn now the
+   * crowd's, the crowd's piece now his, its kind) and how many he's made. As with Hollow's dark, the hidden square is in
+   * the app's memory, not a secret: the screens hide it, and refuse a move it makes illegal (stopReason "paint").
+   */
+  camo?: CamoView | null;
+  repaint?: RepaintResult | null;
+  repaints?: number;
 }
 
 /**
@@ -782,6 +793,14 @@ export type ServerMessage = { now: number } & (
        * moves). An older app ignores it and plays his move without it: he races worse, nothing breaks.
        */
       race?: CarrotRace;
+      /**
+       * Smudgy's Repaint (his whole turn): the positions after each pair he could paint (the crowd to move). Answer the one
+       * picked (repaintFrom: within BOSS_POWERS.repaintBand, the nearest repaintTarget) as `move`, or "" when none is (no
+       * Repaint this turn: his move is asked for next). `repaintAny`: the test switch or the admins' trigger, the nearest
+       * even outside the band. An older app ignores it and plays a move, which isn't one of these: the same as "".
+       */
+      repaint?: string[];
+      repaintAny?: true;
     }
   /**
    * The boss's brain for this battle, to the host as the battle begins (on the Maia brain only): it starts loading

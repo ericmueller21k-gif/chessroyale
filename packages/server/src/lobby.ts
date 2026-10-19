@@ -294,8 +294,9 @@ export interface LobbyRecord {
    * ultimate); "extra": it plays Hollow's extra move; "bounce": it picks Big Boy's Big Bounce; "tusks", "fuse" and
    * "slam": it picks Alfil's cast (the pair), his fusion's square and his Slam's lift; "hop": which pawn of Chub & Chirp's hops.
    * "carrots": Chub & Chirp's Carrot Patch cast (his whole turn; no host asked: the placement is the server's).
+   * "repaint": it picks Smudgy's Repaint pair (his whole turn).
    */
-  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop" | "carrots";
+  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop" | "carrots" | "repaint";
   /** Big Boy's Big Bounce, Alfil's fusion and Slam, the hopper's hop: the candidates the host was sent (the answer must be one of them). */
   bounceCandidates?: string[];
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
@@ -1395,7 +1396,7 @@ export class LobbyCore {
     // (A pick among candidate positions, not a move: Big Boy's bounce, Alfil's cast, fusion and Slam, the hopper's hop;
     // and the Carrot Patch's cast, which only asks the pass guard.)
     const kind = this.r.bossKind;
-    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam" || kind === "hop" || kind === "carrots";
+    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam" || kind === "hop" || kind === "carrots" || kind === "repaint";
     // A power limits the moves: the boss's (a pie), or the crowd's for the move Boingo plays for it.
     const allowed = funhouse ? runner.crowdAllowed() : runner.bossAllowed();
     // (Wrangler's turn: his long pulls, a drag or the showdown to work out too, ordered by a seed of the turn's own.)
@@ -1419,6 +1420,7 @@ export class LobbyCore {
       ...(kind === "tusks" || kind === "fuse" ? { fuse: this.r.bounceCandidates ?? [] } : {}),
       ...(kind === "slam" ? { slam: this.r.bounceCandidates ?? [] } : {}),
       ...(kind === "hop" ? { hop: this.r.bounceCandidates ?? [] } : {}),
+      ...(kind === "repaint" ? { repaint: this.r.bounceCandidates ?? [], ...(runner.repaintAny() ? { repaintAny: true as const } : {}) } : {}),
       // (A step that spends his whole turn: the pass guard, on the host's engine. The server never searches.)
       ...(kind === "fuse" || kind === "carrots" ? { pass: true as const } : {}),
       ...(allowed && !pick ? { allowed } : {}),
@@ -1527,6 +1529,27 @@ export class LobbyCore {
   }
 
   /**
+   * Smudgy's Repaint (at the start of his turn after its warning, or the admins' trigger: the runner's repaintDue):
+   * everyone sees him get ready (thinking; your queen banner first, if it's up) while the host's engine picks the pair
+   * among the candidates (worked out here: the position's and the rules'); then the Repaint, his whole turn, and the
+   * crowd's turn, its moments (the Repaint's first) before the crowd's clock starts. The host's "" (none in the band), or
+   * no host engine anywhere: no Repaint this turn (it waits for his next, the warning staying), and his move is asked for.
+   */
+  private requestRepaint() {
+    const runner = this.runner!;
+    this.r.phase = "boss";
+    this.r.bossKey = `r-${++this.r.counter}`;
+    this.r.bossKind = "repaint";
+    this.r.bossMinAt = this.thinkMinAt();
+    this.r.bounceCandidates = runner.repaintCandidates();
+    this.broadcast(this.bossMessage(0, { thinking: true }));
+    const host = this.hostNow();
+    this.r.hostId = host;
+    if (host) this.sendBossRequest(host);
+    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
+  }
+
+  /**
    * Hollow's extra move (the crowd failed Lights out): after his own move, he thinks again while the host's engine
    * picks a quiet move that gains him only a little (extraMoveFrom); everyone sees it land with its banner, then the
    * crowd's turn. No such move (or no engine anywhere): he skips it.
@@ -1606,6 +1629,18 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
+    if (this.r.bossKind === "repaint") {
+      // Smudgy's Repaint (the host's pick, one of the candidates): his whole turn (the crowd's turn begins as after his
+      // move: its moments, the Repaint's first). Anything else (none in the band, none due any more): no Repaint now, and
+      // straight on to his move.
+      this.r.bossKind = undefined;
+      const picked = this.r.bounceCandidates?.includes(move) ? move : null;
+      this.r.bounceCandidates = undefined;
+      this.runner!.applyRepaint(picked);
+      const until = this.io.now() + (!this.runner!.bossToMove() ? bossTurnShowMs(this.runner!.bossView()) : 0);
+      this.broadcast(this.bossMessage(until));
+      return this.setTimer("nextRound", until);
+    }
     if (this.r.bossKind === "hop") {
       // Chub & Chirp's hop (the host's pick, one of the candidates; else the first): it plays out, then his move. None
       // due any more (nothing came of it): straight on to his move.
@@ -1656,7 +1691,7 @@ export class LobbyCore {
     // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in his funhouse, the
     // crowd's: a random allowed one too). His extra move needs the engine to stay small: without one, he skips it.
     const runner = this.runner!;
-    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop" || this.r.bossKind === "carrots") return this.playBoss("");
+    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop" || this.r.bossKind === "carrots" || this.r.bossKind === "repaint") return this.playBoss("");
     const legal = (this.r.bossKind === "funhouse" ? runner.crowdAllowed() : runner.bossAllowed()) ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
     this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
   }
@@ -1699,8 +1734,8 @@ export class LobbyCore {
         return this.finishMatch();
       }
       // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps, Chub & Chirp's Carrot Patch cast (his whole turn) and
-      // hop come at the start of his turn, before his move.)
-      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.carrotDue() ? this.requestCarrots() : runner.hopDue() ? this.requestHop() : this.requestBoss();
+      // hop, and Smudgy's Repaint (his whole turn) come at the start of his turn, before his move.)
+      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.carrotDue() ? this.requestCarrots() : runner.repaintDue() ? this.requestRepaint() : runner.hopDue() ? this.requestHop() : this.requestBoss();
       // (A failed Lights out: his extra move, after his own and before the crowd's turn.)
       if (runner.extraMoveDue()) return this.requestExtra();
       // (Boingo's funhouse: his move for the crowd, as its turn begins.)

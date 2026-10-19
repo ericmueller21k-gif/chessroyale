@@ -578,7 +578,7 @@ export const BOSS_POWERS = {
    * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
    * fire most of the game.
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -948,6 +948,26 @@ export const BOSS_POWERS = {
   carrotSkill: [1000, 2000] as readonly [number, number],
   carrotWeightMin: 0.25,
   carrotMinGain: 0.25,
+  /**
+   * Smudgy's Camouflage (Eric, Oct 19; docs/decisions/2026-10-19-smudgy-rules.md): his first two moves are forced (an end
+   * pawn two squares, then that side's rook out to its third rank). A forced move that can't be played on a turn (he's
+   * in check, a square is taken, the rook's square would be simply lost) waits for his next turn, up to camoTries turns
+   * in all, then no Camouflage this battle. After the swap the hidden rook moves only like a pawn until the crowd's
+   * camoStrikeTurn-th move after it ("from his 3rd turn after the swap": his turn after that crowd move), then any rook move.
+   */
+  camoTries: 3,
+  camoStrikeTurn: 3,
+  /**
+   * Smudgy's Repaint (his ultimate, his whole turn; Eric, Oct 19): one of his pawns painted the crowd's color and one of
+   * the crowd's knights or bishops his. The engine picks the pair: what it gains him (his evaluation with the crowd to
+   * move after it, against his evaluation before it with him to move, in pawns: passScores, each position searched at
+   * repaintNodes) within repaintBand, the nearest repaintTarget; none in the band: no Repaint that turn, again at the
+   * start of his next. At most repaintMax a battle (then his meter is off).
+   */
+  repaintBand: [1.5, 2.5] as readonly [number, number],
+  repaintTarget: 2,
+  repaintMax: 2,
+  repaintNodes: 30_000,
 } as const;
 
 /**

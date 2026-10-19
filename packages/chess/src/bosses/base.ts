@@ -265,6 +265,11 @@ export interface BossRules {
    */
   ultimateOnce?: boolean;
   /**
+   * Its ultimate comes at most this many times a battle (Smudgy's Repaint): after the last, as after a once-a-battle
+   * ultimate, the meter is off (its ultimateRunning holds for the rest of the battle) and the test trigger refuses.
+   */
+  ultimateMax?: number;
+  /**
    * The God King's help doesn't work against this boss (the Hidden Boss's passive): his move, his strike and his Last
    * Stand never come (the runner's kingDecision, callStrike, lastStandFor). A player's try at his move or strike spends a
    * charge as if it had worked (the runner's kingTried; Eric, Oct 14); the Last Stand, which nobody calls, spends nothing.
@@ -461,7 +466,7 @@ export function warnThenUnleash(next: BossPowerState, t: TurnContext): boolean {
 export type BossLastMove = { move: string; san: string; staggered?: boolean; captured?: string; through?: StopReason };
 
 /** The power fields `BossRules.stopReason` reads: the same in the match's state and in the screens' view. */
-export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block">>;
+export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block">> & { camo?: { square: string | null } | null };
 
 /**
  * What a boss's battle code (its moments in a match: the funhouse, Lights out, the bounce…) may use of the match

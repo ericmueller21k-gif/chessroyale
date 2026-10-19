@@ -10,6 +10,7 @@ import { PIG_FX } from "./bosses/pig.ts";
 import { RECLUSE_FX } from "./bosses/recluse.ts";
 import { ALFIL_FX } from "./bosses/alfil.ts";
 import { HOPPER_FX } from "./bosses/hopper.ts";
+import { SMUDGY_FX } from "./bosses/smudgy.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -52,7 +53,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * step, `spin`: its banner, then the board turns again); the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX } as const;
+export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX } as const;
 
 /** How long one power's moment holds the screen (ms). */
 export const powerFxMs = (e: { kind: keyof typeof POWER_FX; first?: boolean }): number => (POWER_FX[e.kind] ?? 0) + (POWER_FX_EXTRA[e.kind]?.(e) ?? 0);

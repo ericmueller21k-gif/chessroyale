@@ -18,7 +18,7 @@
  *     crowd's `crowdAllowed`, the boss's `bossAllowed`); the boss's move is one he was allowed (lifted: any legal).
  *  4. The replay from the last base reproduces the position (`fenAtPly`; "A move only legal after a burn", Oct 9), and
  *     the boss view builds and serializes (the screens and the lobby send it).
- *  5. No step at the start of his turn (Lights out, a bounce, Alfil's steps, the Carrot Patch's cast, a hop) leaves him
+ *  5. No step at the start of his turn (Lights out, a bounce, Alfil's steps, the Carrot Patch's cast, a Repaint, a hop) leaves him
  *     a promotion he didn't have as the crowd's move left the board: his move comes straight after, with no crowd turn
  *     between (#273's "instant queen"). A boss whose sheet allows one opts out in PROMOTION_OPT_OUT.
  *  6. A power's declared win beats a draw on the same move (#275's S1): whenever a power declares the battle his (an
@@ -56,7 +56,7 @@ export const PROMOTION_OPT_OUT: Readonly<Record<string, string>> = {};
  * The runner's steps the driver plays, by name. A runner method that names a step (`…Due`, `…Step`) and isn't listed
  * here fails the kit (`unknownSteps`): a new kind of step must be played by the driver, never skipped silently.
  */
-export const KNOWN_STEPS = ["lightsOutDue", "bounceDue", "alfilStep", "carrotDue", "hopDue", "extraMoveDue", "funhouseDue", "bossKillDue"] as const;
+export const KNOWN_STEPS = ["lightsOutDue", "bounceDue", "alfilStep", "carrotDue", "repaintDue", "hopDue", "extraMoveDue", "funhouseDue", "bossKillDue"] as const;
 
 /** Runner methods that look like steps but aren't in KNOWN_STEPS. */
 export function unknownSteps(): string[] {
@@ -536,6 +536,12 @@ export async function runBattle(k: KitBattle, sf: StockfishMoves | null): Promis
         note("carrots");
         await c.position(r, "the Carrot Patch's cast");
         c.promotion(r, crowdLeft, "the Carrot Patch's cast");
+      }
+      if (r.bossToMove() && r.repaintDue()) {
+        await r.playRepaint(engines).catch(() => r.applyRepaint(null));
+        note("repaint");
+        await c.position(r, "the Repaint");
+        c.promotion(r, crowdLeft, "the Repaint");
       }
       if (r.bossToMove() && r.hopDue()) {
         await r.playHop(engines).catch(() => r.applyHop(null));

@@ -60,6 +60,18 @@ describe("the FAQ's contents", () => {
     }
   });
 
+  it("Smudgy's block (his opening, Camouflage and Repaint) is ready for when his art is wired, every number from the settings", () => {
+    const def = BOSS_ROSTER.find((b) => b.id === "smudgy")!;
+    const words = BOSS_BLOCKS.smudgy!(BOSS_POWERS, def);
+    expect(words).toContain("starting position");
+    expect(words).toContain(`his ${BOSS_POWERS.camoStrikeTurn === 3 ? "3rd" : BOSS_POWERS.camoStrikeTurn} turn after the swap`);
+    expect(words).toContain(`after ${BOSS_POWERS.camoTries} turns without them`);
+    expect(words).toContain(`at most ${BOSS_POWERS.repaintMax} times a battle`);
+    expect(words).toContain(`between ${BOSS_POWERS.repaintBand[0]} and ${BOSS_POWERS.repaintBand[1]}`);
+    expect(words).toContain(def.offset === 0 ? "at the usual strength" : `${Math.abs(def.offset)} ${def.offset < 0 ? "under" : "over"} the usual strength`);
+    expect(words).not.toMatch(/undefined|NaN|\$\{/);
+  });
+
   it("leaves no markup in the words", () => {
     const t = text();
     expect(t).not.toMatch(/\*\*|\]\(#|\{#|\$\{|undefined|NaN|null/);
