@@ -8,9 +8,10 @@ import { test, bossAloneFromHome, submitMove } from "./helpers.ts";
  * (the hidden rook drawn as a pawn, the paint, the strike).
  * - Camouflage: from the starting position, his first two moves are the forced pair (an end pawn two squares, then
  *   that side's rook out to its third rank), then the swap: a real pawn on the rook's square, the rook on one of his
- *   pawns' squares, its moment as your turn begins.
- * - A refused move is picked again at no cost: a move you may not play leaves your turn as it was, and your next one
- *   counts.
+ *   pawns' squares, its moment as your turn begins; his own moves only those two while they're due.
+ * A move refused for the hidden rook ("paint") needs a position the opening never reaches (your king or a pinned piece
+ * on its line): packages/chess/test/smudgy.test.ts and packages/server/test/smudgy-lobby.test.ts cover it, and the
+ * wiring lane's e2e shows its words.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const state = (p: Page) =>
@@ -31,7 +32,7 @@ function quiet(fen: string, allowed: string[] | null): string {
   return (ok.find((m) => m.piece === "n") ?? ok[0] ?? legal[0])!.uci;
 }
 
-test("Smudgy: his two forced moves, then the swap; a refused move is picked again", async ({ page }) => {
+test("Smudgy: his two forced moves, then the swap", async ({ page }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -53,12 +54,6 @@ test("Smudgy: his two forced moves, then the swap; a refused move is picked agai
   // From the starting position (his opening), you White.
   expect(first.fen.split(" ")[0]).toBe("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
   const start = first.history.length;
-
-  // A refused move first: one you may not play (here not even legal) leaves your turn as it was.
-  await submitMove(page, "e1e8", first.fen);
-  await page.waitForTimeout(600);
-  expect(await phase(page)).toBe("play");
-  expect((await state(page)).fen).toBe(first.fen);
 
   // Your moves, until his two forced moves are played and the swap has come.
   for (let i = 0; i < 4; i++) {
