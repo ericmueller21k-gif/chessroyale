@@ -8337,17 +8337,15 @@ button.fd-logo {
  * above it. On a very small screen the card stops shrinking and the page scrolls.
  */
 @media (max-width: 1023px) {
-  /* (Gaps of 8 and a little less at the edges: Auto chess's thin button below the Boss raid card takes its 40 px from this
-     empty space and from the card's padding, so your pawn stays the size it was: docs/decisions/2026-10-19-autochess-demo.md.) */
   .fd-home:not(.queueing) {
-    gap: 8px;
-    padding-top: calc(env(safe-area-inset-top) + 8px);
-    padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
+    gap: 10px;
+    padding-top: calc(env(safe-area-inset-top) + 12px);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 14px);
   }
   .fd-home-main,
   .fd-play-col,
   .fd-go {
-    gap: 8px;
+    gap: 10px;
   }
   .fd-hint {
     margin-top: -4px;
@@ -8378,11 +8376,9 @@ button.fd-logo {
     .fd-hero-in {
       flex-direction: row;
       gap: 14px;
-      /* (Beside your name the card needs no room above and below the pawn: its own picture has some.) */
-      padding: 4px 12px;
     }
     .fd-hero .fd-pawn-hero {
-      height: clamp(48px, calc(100cqh - 8px), 130px);
+      height: clamp(48px, calc(100cqh - 24px), 130px);
     }
     .fd-hero-sub {
       display: -webkit-box;
@@ -17975,19 +17971,4 @@ button.sq-tiny {
   width: 100%;
   height: 100%;
   display: block;
-}
-/* Home's thin button, under the Boss raid card. */
-.ac-home-btn {
-  width: 100%;
-  height: 32px;
-  flex: none;
-  border: 1px solid var(--fd-line);
-  border-radius: 12px;
-  background: transparent;
-  color: var(--fd-sub);
-  font-family: Archivo, system-ui, sans-serif;
-  font-weight: 700;
-  font-size: 13px;
-  letter-spacing: 0.3px;
-  cursor: pointer;
 }

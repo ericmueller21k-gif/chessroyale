@@ -2690,6 +2690,13 @@ export interface AutoChessSettings {
   readonly fightNodes: number;
   /** A fight stops after this many moves a side; the side with more material (P1 N3 B3 R5 Q9) wins, equal is a draw. */
   readonly moveCap: number;
+  /**
+   * It also stops, the same way, after this many moves a side with no capture or check (Eric, Oct 19: a stuck fight
+   * fizzles out; a check keeps an attack going).
+   */
+  readonly quietCap: number;
+  /** A side that gives this many checks in a row wins, as by mate (Eric, Oct 19: "they're both a win"). */
+  readonly checksToWin: number;
   /** Hit points each; the first to 0 loses. A lost round costs `damageBase` plus `damagePerPiece` for every enemy piece (not the king) left. */
   readonly hp: number;
   readonly damageBase: number;
@@ -2735,6 +2742,8 @@ export const AUTOCHESS: AutoChessSettings = {
   fightMoveMs: 350,
   fightNodes: 6000,
   moveCap: 60,
+  quietCap: 10,
+  checksToWin: 5,
   hp: 20,
   damageBase: 2,
   damagePerPiece: 1,

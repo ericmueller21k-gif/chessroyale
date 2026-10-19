@@ -1,3 +1,4 @@
+import { legalMoves } from "@chessroyale/chess";
 import { ownEngine } from "../engine.ts";
 import { AUTOCHESS, type AutoChessSettings } from "@chessroyale/core";
 import { fightStart } from "./position.ts";
@@ -20,19 +21,31 @@ export function warmEngine(): void {
   });
 }
 
-/** The engine's move for a position, or null if it gives none in time (the fight plays a stand-in then). */
-export async function enginePick(fen: string, cfg: AutoChessSettings = AUTOCHESS, timeoutMs = 4000): Promise<string | null> {
+/**
+ * When the engine's best is a promotion (the fight allows none), it is asked for its top lines again, enough of them that
+ * this many are not promotions (each promotion is a line of its own: queen, rook, bishop, knight), and the best of those
+ * the fight allows is played.
+ */
+const PAST_PROMOTIONS = 3;
+
+/**
+ * The engine's move for a position, one of the fight's `allowed` moves (no promotions), or null if it gives none in time
+ * (the fight plays a stand-in then).
+ */
+export async function enginePick(fen: string, allowed: readonly string[], cfg: AutoChessSettings = AUTOCHESS, timeoutMs = 4000): Promise<string | null> {
   if (broken()) return null;
   try {
     // (The first look waits for the engine to load; a slow phone gets a good while, and a stalled one is given up on.)
     const engine = await Promise.race([ownEngine(), new Promise<never>((_, no) => setTimeout(() => no(new Error("engine timeout")), timeoutMs * 2))]);
-    const top = await Promise.race([engine.topMovesAt(fen, 1, cfg.fightNodes), new Promise<null>((r) => setTimeout(() => r(null), timeoutMs))]);
+    const look = (n: number) => Promise.race([engine.topMovesAt(fen, n, cfg.fightNodes), new Promise<null>((r) => setTimeout(() => r(null), timeoutMs))]);
+    let top = await look(1);
+    if (top !== null && top[0] && !allowed.includes(top[0].move)) top = await look(legalMoves(fen).length - allowed.length + PAST_PROMOTIONS);
     if (top === null) {
       failures++;
       return null;
     }
     failures = 0;
-    return top[0]?.move ?? null;
+    return top.find((t) => allowed.includes(t.move))?.move ?? null;
   } catch {
     failures++;
     return null;

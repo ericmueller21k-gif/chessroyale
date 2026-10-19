@@ -60,8 +60,7 @@ test("computer: a bot match plays in the live window above the buttons, labeled 
     await expect(win.locator(".fd-livewin-mode")).toHaveText("Crowd · 50 v 50");
     await expect(win.locator(".fd-livewin-line")).toHaveText(/crowd: |Final · .+ plays |wins · 1st |A draw|A new match is starting/);
     // A square board, as big as the room allows, inside the window; the window above the RANKED row, level with the
-    // top of your card; the column's foot (Auto chess's thin button, under the Boss raid card: Eric, Oct 19; it was PLAY's
-    // line until the Boss raid card moved to the bottom) level with the card's.
+    // top of your card; the column's foot (the Boss raid card, under PLAY: Eric, Oct 19) level with the card's.
     const box = (await win.boundingBox())!;
     const board = (await win.locator(".board-wrap").boundingBox())!;
     expect(Math.abs(board.width - board.height), `${w}x${h}`).toBeLessThan(2);
@@ -72,7 +71,7 @@ test("computer: a bot match plays in the live window above the buttons, labeled 
     expect(Math.abs(box.y - card.y)).toBeLessThan(2);
     const ranked = (await page.getByRole("radiogroup", { name: "RANKED" }).boundingBox())!;
     expect(box.y + box.height).toBeLessThanOrEqual(ranked.y);
-    const foot = (await page.locator(".ac-home-btn").boundingBox())!;
+    const foot = (await page.locator(".rd-card").boundingBox())!;
     expect(Math.abs(foot.y + foot.height - (card.y + card.height)), `${w}x${h}: the column's foot`).toBeLessThan(12);
     // Its words fit on their lines (cut short with "…" at worst, never spilling out).
     for (const sel of [".fd-livewin-head", ".fd-livewin-line"]) {

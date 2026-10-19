@@ -262,7 +262,10 @@ export function App() {
   /** The Boss raid screen (its card on home, the side menu's Boss raid, ?mode=raid). */
   const [raidOpen, setRaidOpen] = useState(raidInUrl);
   const [legal, setLegal] = useState<LegalPage | null>(() => legalPageOf(location.pathname));
-  /** Auto chess, the demo (/autochess: Home's thin button; client-only, no account needed). */
+  /**
+   * Auto chess, the demo (/autochess; client-only, no account needed). Shelved (Eric, Oct 19): no button on home, only
+   * Settings' Testing section (admins) opens it.
+   */
   const [showAutoChess, setShowAutoChess] = useState(() => location.pathname === "/autochess");
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
@@ -1196,6 +1199,11 @@ export function App() {
             setShowFaq(true);
             history.replaceState(null, "", section ? `/faq#faq-${section}` : "/faq");
           }}
+          onAutoChess={() => {
+            setShowSettings(false);
+            setShowAutoChess(true);
+            history.replaceState(null, "", "/autochess");
+          }}
         />
       </FrontFrame>
     );
@@ -1338,10 +1346,6 @@ export function App() {
         onProfile={() => openProfile({ you: true, name: account().profile?.user.name ?? "" })}
         onSettings={() => setShowSettings(true)}
         onShop={() => setShowShop("shop")}
-        onAutoChess={() => {
-          setShowAutoChess(true);
-          history.replaceState(null, "", "/autochess");
-        }}
       />
     </FrontFrame>
     );

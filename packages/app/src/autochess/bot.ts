@@ -8,13 +8,13 @@ import { KINDS, type Army, type Color, type Kind } from "./types.ts";
  * adjust step moves pieces greedily with the engine. It sells nothing. Everything random comes from the round's seed.
  */
 
-/** Early on it likes pawns and minor pieces; as income grows, rooks and a queen. Weights by kind: [early, late]. */
-const WEIGHTS: Record<Kind, readonly [number, number]> = { p: [5, 3], n: [3, 2.5], b: [3, 2.5], r: [1, 3], q: [0, 2] };
+/**
+ * Early on it likes minor pieces, with some pawns and rooks; as income grows, rooks and a queen. Weights by kind: [early,
+ * late]. (Not pawns first: Eric, Oct 19, it looked like pawn spam.)
+ */
+const WEIGHTS: Record<Kind, readonly [number, number]> = { p: [2, 1.5], n: [3, 2.5], b: [3, 2.5], r: [2, 3], q: [0, 2] };
 /** After this many rounds it buys the late mix. */
 const LATE_ROUND = 6;
-/** Rounds in which it buys pawns first (until it has this many). */
-const PAWNS_FIRST_UNTIL_ROUND = 3;
-const PAWNS_FIRST = 4;
 /** A queen only when this much more is left after it (it buys a queen when rich, not with its last coins). */
 const QUEEN_CHANGE = 40;
 /** It never fields more than this many pieces (a half has room for 31). */
@@ -37,8 +37,7 @@ export function botBuys(gold: number, round: number, rng: Rng, cfg: AutoChessSet
       return legalCounts({ ...n, [k]: n[k] + 1 }, cfg);
     });
     if (!options.length) break;
-    const pawnsFirst = round <= PAWNS_FIRST_UNTIL_ROUND && n.p < PAWNS_FIRST && options.includes("p");
-    const kind = pawnsFirst ? "p" : options[weightedIndex(rng, options.map((k) => WEIGHTS[k][0] + (WEIGHTS[k][1] - WEIGHTS[k][0]) * t))]!;
+    const kind = options[weightedIndex(rng, options.map((k) => WEIGHTS[k][0] + (WEIGHTS[k][1] - WEIGHTS[k][0]) * t))]!;
     bought.push(kind);
     n[kind]++;
     budget -= priceOf(kind, cfg);

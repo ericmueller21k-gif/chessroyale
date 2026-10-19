@@ -123,7 +123,8 @@ function newGame(seed: number, cfg: AutoChessSettings): Game {
 
 /** A phone's short steps for tests (`?quick=1`, a test switch): the same game in a few seconds a step. */
 function settingsFor(quick: boolean): AutoChessSettings {
-  return quick ? { ...AUTOCHESS, buySeconds: 6, lockSeconds: 1, circlesDelaySeconds: 0.5, adjustSeconds: 5, fightMoveMs: 60 } : AUTOCHESS;
+  // (Two seconds locked, so a test has time to try buying in the lock before the reveal.)
+  return quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, adjustSeconds: 5, fightMoveMs: 60 } : AUTOCHESS;
 }
 
 const colorName = (c: Color) => (c === "w" ? "White" : "Black");
@@ -249,7 +250,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     commit({ ...at, round: { ...at.round, botFinal }, fight: { fen: start.fen, last: null, plies: 0 } });
     if (start.draw) return finish(null, "both_checked", start.fen);
     const res = await playFight(start.fen, {
-      pick: (fen) => enginePick(fen, cfg),
+      pick: (fen, _history, allowed) => enginePick(fen, allowed, cfg),
       rng: mulberry32(roundSeed(at.match) ^ 0x2545f491),
       cancelled: () => cancelled.current,
       onStep: (s) => commit({ ...gref.current, fight: { fen: s.fen, last: s.move, plies: s.ply } }),
@@ -681,7 +682,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
             {g.phase === "fight" && (
               <>
                 <p class="ac-card-say">{hint}</p>
-                <p class="ac-card-text">The engine plays both armies at the same strength, until mate, stalemate, a draw by the rules or {cfg.moveCap} moves each.</p>
+                <p class="ac-card-text">The engine plays both armies at the same strength until mate or {cfg.checksToWin} checks in a row, a draw, {cfg.moveCap} moves each, or {cfg.quietCap} each with no capture or check. Pawns don't promote.</p>
               </>
             )}
             {(g.phase === "result" || g.phase === "over") && outcome && (

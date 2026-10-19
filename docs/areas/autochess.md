@@ -1,8 +1,9 @@
 # Auto chess (the demo)
 
-Lane: the director. A TFT-style auto battler with chess pieces, against a bot, all in the browser (`/autochess`; home's thin
-"Auto chess" button at the very bottom). A demo to feel it ("it might just be terrible"): nothing is recorded, rewarded or
-sent. Why it is the way it is: [docs/decisions/2026-10-19-autochess-demo.md](../decisions/2026-10-19-autochess-demo.md).
+Lane: the director. A TFT-style auto battler with chess pieces, against a bot, all in the browser (`/autochess`). A demo to
+feel it ("it might just be terrible"): nothing is recorded, rewarded or sent. **Shelved** (Eric, Oct 19: "it's going to take
+more work than I realized to make this balanced and fun"): no button on home; admins open it from Settings → TESTING ("Auto
+chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-autochess-demo.md](../decisions/2026-10-19-autochess-demo.md).
 
 ## How it works today
 
@@ -14,7 +15,8 @@ sent. Why it is the way it is: [docs/decisions/2026-10-19-autochess-demo.md](../
   the bot places them. **Reveal and adjust** 15 s: their real pieces show and stay shown (one plain line over their half),
   and each of your pieces may make one legal chess move on your half (no captures, nothing into their half); a moved piece is
   marked, a tap takes its move back. **Fight:** the engine plays both armies at the same strength, a move about every
-  0.35 s, to mate, stalemate, a draw by the rules or 60 moves a side (then material decides). **Result:** the loser loses 2
+  0.35 s, to mate or 5 checks in a row by one side (a win either way), stalemate, a draw by the rules, 60 moves a side or 10
+  a side with no capture or check (then material decides). **Pawns don't promote:** a pawn never moves onto its last rank. **Result:** the loser loses 2
   + 1 per enemy piece left; 20 HP each. **Nothing carries over but gold, HP and the win streak:** each round starts with
   the two kings only. Each side gets back 25% of its pieces' price still on the board and its bench in full; income 100 then
   +20 a round (max 200), interest, win streak gold; the result line shows the next round's gold.
