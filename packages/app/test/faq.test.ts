@@ -333,7 +333,10 @@ describe("the FAQ on Squads (v2: tokens, blocks, the team vote)", () => {
     const Q = FAQ_DEFAULTS.squads;
     const t = section("modes");
     expect(t).toContain(`${Q.tokens.perMatch} tokens for the match`);
-    expect(t).toContain(`${Q.blocks.bankPerMatch} block points a match`);
+    // No block points to start (Eric, Oct 19): the shop's only, so none in round 1.
+    expect(t).toContain("no squad starts with block points: buy them in the shop between rounds, for your next match (so round 1 has none)");
+    const M = Q.mercenary;
+    expect(t).toContain(`Block points (${M.items.blocks.prices!.join(", ")}, then ${M.items.blocks.prices!.at(-1)} coins each, up to ${M.items.blocks.cap} a round): ${M.blockPoints} block points for the match: squads start with none`);
     expect(t).toContain("the team vote");
     expect(t).toContain("a tie is settled by a coin");
     expect(t).not.toContain("Pick and Block");
@@ -400,14 +403,14 @@ describe("the FAQ on Squads' modes and Mercenary", () => {
     expect(t).not.toMatch(/breather/i);
     expect(t).toContain(`Stockfish token (${M.items.stockfish.price} coins, up to ${M.items.stockfish.cap} a round)`);
     expect(t).toContain(`Shield (${M.items.shield.price} coins`);
-    expect(t).toContain(`${M.priceStep} coins more for every one`);
+    expect(t).toContain(`more for every one of it your squad has already bought in the tournament (${M.priceStep} coins more, unless it says otherwise)`);
     expect(t).toContain("Never the other squad's moves");
     expect(t).toContain("use them or lose them");
     expect(t).toContain(`Time chip (25, 25, 50, 50, then 50 coins each; your squad holds up to ${M.items.chip.cap})`);
     expect(t).toContain(`${M.chipSeconds} seconds more for that move`);
     expect(t).toContain("kept for the next round");
     const changed = section("modes", { ...FAQ_DEFAULTS, squads: { ...Q, mercenary: { ...M, priceStep: 70, chipSeconds: 45, items: { ...M.items, chip: { price: 10, cap: 4, prices: [10, 20] } } } } });
-    expect(changed).toContain("70 coins more for every one");
+    expect(changed).toContain("(70 coins more, unless it says otherwise)");
     expect(changed).toContain("Time chip (10, 20, then 20 coins each; your squad holds up to 4): tap it during your squad's move, on the board you're playing: 45 seconds more");
   });
 });

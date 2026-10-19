@@ -71,11 +71,12 @@ async function nextDuty(page: Page, after: string | null, timeout = 90_000): Pro
 
 /**
  * Into a test lobby from SCOTCH, as White, with strong bots, past the votes. Blocks are Mercenary's (Classic has none):
- * `mode` sets it (no Mode vote then).
+ * `mode` sets it (no Mode vote then). Mercenary here gives every squad 5 block points (`blockPoints`): a real lobby has
+ * none to start, only the shop's, so none in round 1 (Eric, Oct 19).
  */
 async function testLobby(page: Page, start: "relay" | "pairs" | "final", mode: "classic" | "mercenary" = "classic") {
   await named(page, "Tess");
-  const q = new URLSearchParams({ nolanding: "", debug: "", clock: "120,0,3,0", fen: SCOTCH, bots: "strong", seat: "white", mode });
+  const q = new URLSearchParams({ nolanding: "", debug: "", clock: "120,0,3,0", fen: SCOTCH, bots: "strong", seat: "white", mode, ...(mode === "mercenary" ? { blockPoints: "5" } : {}) });
   await page.goto(`/squads/test/${start}?${q}`);
   await expect(page.getByRole("button", { name: "Skip votes" })).toBeVisible({ timeout: 40_000 });
   await page.getByRole("button", { name: "Skip votes" }).click();
@@ -146,7 +147,11 @@ test("a block: tap Block, their queen, where it would go; the arrow keeps drawin
   await page.getByRole("button", { name: "Done blocking" }).click();
   await tapSquare(page, "d1");
   await tapSquare(page, "d4");
-  await expect.poll(async () => (await seen(page)).mine).toBe("d1d4");
+  // (Your choice, or already played: the bots, quick, may all have moved while the arrow was watched, so yours, the
+  // last, ends the half at once and the choices are cleared.)
+  await expect
+    .poll(async () => (await seen(page)).mine ?? (await page.evaluate(([k, b]) => (window as any).squads.matches.get(k).boards[b].moves[0] ?? null, [s.key, board] as const)))
+    .toBe("d1d4");
   // Their half: the arrow stays up while they choose; then they've moved, not Qf6, and it's gone. (Your board's blocks:
   // the match's list has every board's, and a bot on another board may block a move too, even Qf6.)
   await expect.poll(async () => page.evaluate(([k, b]) => (window as any).squads.matches.get(k).blocks.filter((x: any) => x.board === b).map((x: any) => x.move), [s.key, board] as const), { timeout: 60_000 }).toEqual(["d8f6"]);

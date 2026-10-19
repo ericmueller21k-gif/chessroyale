@@ -2547,9 +2547,10 @@ export const SQUADS: SquadsSettings = {
   openingBalance: [0.4, 0.6],
   // Eric, Oct 12 (Squads v2): 5 tokens a Pairs match; a refund at about two pawns' worth (DECISIONS.md, "Squads v2").
   tokens: { perMatch: 5, refundGap: 0.37, pawnWorth: 0.185 },
-  // Eric, Oct 12: a 5-point bank per match; pawn 1, knight, bishop or rook 2, queen 3, castling 2, the king never.
+  // Eric, Oct 12: pawn 1, knight, bishop or rook 2, queen 3, castling 2, the king never. Oct 19: no points to start (it
+  // was 5 a match); Mercenary's come from the shop between rounds, so round 1, before any shop, has no blocks.
   blocks: {
-    bankPerMatch: 5,
+    bankPerMatch: 0,
     cost: { p: 1, n: 2, b: 2, r: 2, q: 3 },
     castlingCost: 2,
     maxPerTurn: null,
@@ -2599,7 +2600,9 @@ export const SQUADS: SquadsSettings = {
     priceStep: 100,
     items: {
       stockfish: { price: 200, cap: 2 },
-      blocks: { price: 100, cap: 2 },
+      // Eric, Oct 19: blocks only from the shop, and dear: two (275 + 325) take a whole wallet before Pairs (about
+      // 560-650), and a third is out of reach; then 425, 525 (docs/decisions/2026-10-19-squads-blocks-from-the-shop.md).
+      blocks: { price: 275, cap: 2, prices: [275, 325, 425, 525] },
       shield: { price: 100, cap: 2 },
       // Eric, Oct 13: chips 25, 25, 50, 50, then 50 each ("everyone should be able to basically reload on time
       // chips"); hold at most 3.

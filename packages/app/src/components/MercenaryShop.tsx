@@ -160,7 +160,7 @@ function ShopSheet({ client, w, round, explain, onExplained, onHide }: { client:
           <span>
             Your squad shares one wallet. Every match you play pays coins, more for a win; captures, mates and brilliant
             moves add to it, and the squad that has earned less gets catch-up coins. Anyone on your squad can buy, and items last for your next match only: use them
-            or lose them. Each item costs {SQUADS.mercenary.priceStep} more for every one your squad has already bought.
+            or lose them. Each item costs more for every one your squad has already bought.
           </span>
           <button type="button" class="fd-btn small" onClick={onExplained}>
             Got it

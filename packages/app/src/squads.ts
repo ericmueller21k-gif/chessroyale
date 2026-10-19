@@ -115,12 +115,12 @@ export async function squadsQueue(onBusy: (waitSeconds: number) => void, cancell
  * Test controls: a test lobby from the first vote (`votes`: bots in every other seat at once), or straight at Relay,
  * Pairs or the final (admins; anyone where SQUADS_TEST is on). `extra`: the link's own test options, passed on (`fen`:
  * the first round's position; `bots=strong`; `seat=white`: you play White on your first board; `mode=mercenary` or
- * `classic`: that mode, no Mode vote).
+ * `classic`: that mode, no Mode vote; `blockPoints=5`: every squad starts every match with them, Mercenary).
  */
 export async function squadsTestLobby(start: "votes" | "relay" | "pairs" | "final", clock?: string | null, extra?: URLSearchParams): Promise<SquadsSeatAnswer> {
   const q = new URLSearchParams({ start });
   if (clock) q.set("clock", clock);
-  for (const k of ["fen", "bots", "seat", "mode"]) {
+  for (const k of ["fen", "bots", "seat", "mode", "blockPoints"]) {
     const v = extra?.get(k);
     if (v) q.set(k, v);
   }

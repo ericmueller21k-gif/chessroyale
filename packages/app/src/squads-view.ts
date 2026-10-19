@@ -321,6 +321,15 @@ export function movesOfHalf(events: readonly SquadsEvent[], i: number): string[]
 // ---------------- Squads v2: blocks and tokens ----------------
 
 /** A side's block bank now: the match's, less the blocks it has placed this half (paid at once). */
+/**
+ * Blocks are part of this match for a side: Mercenary, and it came in with block points (none to start since Eric,
+ * Oct 19: only the shop's, so never in round 1). Once spent, still part of it ("No block points left").
+ */
+export function hasBlocks(m: Pick<LocalMatch, "mode" | "blockBanks" | "kit" | "blocks" | "placed">, side: Side): boolean {
+  if (m.mode === "classic") return false;
+  return m.blockBanks[side] > 0 || (m.kit?.[side]?.blocks ?? 0) > 0 || m.blocks.some((b) => b.side === side) || m.placed.some((b) => b.side === side);
+}
+
 export function blockBankNow(m: Pick<LocalMatch, "blockBanks" | "placed">, side: Side): number {
   return m.blockBanks[side] - m.placed.filter((b) => b.side === side).reduce((t, b) => t + b.cost, 0);
 }

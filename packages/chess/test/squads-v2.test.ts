@@ -49,6 +49,8 @@ const ONE_MOVE = "k7/8/8/8/8/8/1q6/K7 w - - 0 1";
 /** After 1.d4 Nf6 2.Bg5: White can take the knight. */
 const BG5 = "rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR w KQkq - 2 3";
 const CASTLING = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
+/** The block points each squad has here (none to start in a real match since Oct 19: the shop's). */
+const TEST_BANK = 5;
 
 function match(format: "relay" | "pairs" | "final", starts: string[], o: Partial<MatchSetup> = {}, s?: SquadsSettings): SquadsMatch {
   return createSquadsMatch(
@@ -64,6 +66,7 @@ function match(format: "relay" | "pairs" | "final", starts: string[], o: Partial
       delayMs: DELAY,
       incrementMs: 0,
       capMs: 20_000,
+      blockBanks: [TEST_BANK, TEST_BANK],
       ...o,
     },
     s,
@@ -276,13 +279,13 @@ describe("Squads v2: move blocks", () => {
     const r = placeBlock(m, NO_INPUTS, "a0", 0, "g8f6", 2_000);
     expect(r).toMatchObject({ block: { board: 0, side: 0, by: "a0", move: "g8f6", piece: "n", cost: 2 } });
     const inp = "inputs" in r ? r.inputs : NO_INPUTS;
-    expect(blockBankNow(m, inp, 0)).toBe(SQUADS.blocks.bankPerMatch - 2);
-    expect(blockBankNow(m, inp, 1)).toBe(SQUADS.blocks.bankPerMatch);
+    expect(blockBankNow(m, inp, 0)).toBe(TEST_BANK - 2);
+    expect(blockBankNow(m, inp, 1)).toBe(TEST_BANK);
     // As many a turn as the bank allows (Eric: "one big blocking play"), each a different move.
     expect(placeBlock(m, inp, "a0", 0, "g8f6", 2_100)).toEqual({ error: "block_taken" });
     const two = placeBlock(m, inp, "a0", 0, "e7e5", 2_100);
     expect(two).toMatchObject({ block: { move: "e7e5", cost: 1 } });
-    expect(blockBankNow(m, "inputs" in two ? two.inputs : inp, 0)).toBe(SQUADS.blocks.bankPerMatch - 3);
+    expect(blockBankNow(m, "inputs" in two ? two.inputs : inp, 0)).toBe(TEST_BANK - 3);
     // A limit a turn is a setting.
     const one: SquadsSettings = { ...SQUADS, blocks: { ...SQUADS.blocks, maxPerTurn: 1 } };
     expect(placeBlock(m, inp, "a0", 0, "e7e5", 2_100, one)).toEqual({ error: "block_taken" });
@@ -301,9 +304,9 @@ describe("Squads v2: move blocks", () => {
     expect(placeBlock(m, NO_INPUTS, "a0", 0, "g8f6", 0)).toMatchObject({ block: { cost: 2 } });
     const two = block(m, NO_INPUTS, "a0", 0, "g8f6");
     expect(placeBlock(m, two, "a2", 2, "e7e5", 0)).toEqual({ error: "bank" });
-    expect(relay().blockBanks).toEqual([SQUADS.blocks.bankPerMatch, SQUADS.blocks.bankPerMatch]);
-    expect(pairs().blockBanks).toEqual([SQUADS.blocks.bankPerMatch, SQUADS.blocks.bankPerMatch]);
-    expect(final().blockBanks).toEqual([SQUADS.blocks.bankPerMatch, SQUADS.blocks.bankPerMatch]);
+    // None to start (Eric, Oct 19: Mercenary's come from the shop only).
+    expect(SQUADS.blocks.bankPerMatch).toBe(0);
+    for (const f of ["relay", "pairs", "final"] as const) expect(match(f, [START_FEN], { blockBanks: undefined }).blockBanks).toEqual([0, 0]);
   });
 
   it("Pairs and the final: any of the squad's players on the board, until they've all locked in", () => {

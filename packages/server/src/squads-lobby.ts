@@ -326,7 +326,7 @@ export interface SquadsRecord {
    * all at the strongest skill (`strong`), and its opener playing White on their first board (`white`): so a test can
    * count on what happens.
    */
-  test?: { start: SquadsRound; clock?: SquadsClock; fen?: string; strong?: boolean; white?: boolean; mode?: SquadsMode; blocks?: boolean };
+  test?: { start: SquadsRound; clock?: SquadsClock; fen?: string; strong?: boolean; white?: boolean; mode?: SquadsMode; blocks?: boolean; blockPoints?: number };
   /** Mercenary: every squad's wallet, by squad id (empty in Classic). */
   wallets?: Wallet[];
   /** Mercenary: when each bot-run squad does its shopping (squad id → server time), while its shop is open. */
@@ -492,6 +492,8 @@ export function testLobbyOptions(q: URLSearchParams, now: number): { fillAt: num
       ...((q.get("bots") ?? "").split(",").includes("blocks") ? { blocks: true } : {}),
       ...(q.get("seat") === "white" ? { white: true } : {}),
       ...(q.get("mode") === "mercenary" || q.get("mode") === "classic" ? { mode: q.get("mode") as SquadsMode } : {}),
+      // Block points for every squad in every match (none to start otherwise: only the shop's; Mercenary).
+      ...(q.has("blockPoints") ? { blockPoints: Math.max(0, Math.min(20, Math.floor(Number(q.get("blockPoints")) || 0))) } : {}),
     },
     ...(keepMs !== undefined ? { keepMs } : {}),
   };
@@ -1050,12 +1052,15 @@ export class SquadsCore {
     }
     // A test lobby's own position for its first round (tests).
     const fen = this.r.test?.fen && round === this.r.test.start ? this.r.test.fen : null;
-    const m = fen
+    const made = fen
       ? createSquadsMatch(
           { ...planned, starts: planned.boards.map(() => ({ fen, openingId: null })), whites: planned.boards.map((x) => x.white), banksMs: planned.banks, blockBanks: planned.blockBanks },
           this.s,
         )
       : planned;
+    // A test lobby's block points (tests; Mercenary): every squad starts every match with them.
+    const points = made.mode === "classic" ? undefined : this.r.test?.blockPoints;
+    const m: SquadsMatch = points === undefined ? made : { ...made, blockBanks: [points, points] };
     const lm: LiveMatch = { key, round, index, m, state: "break", startsAt, seq: 0, half: null };
     this.matches.set(key, lm);
     this.r.matchKeys.push(key);

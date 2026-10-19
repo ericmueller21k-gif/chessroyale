@@ -136,7 +136,8 @@ describe("Mercenary on the server: the shop", () => {
     expect(lm.m.chips[side]).toBe(1);
     expect(lm.m.stockfish[side]).toBe(1);
     expect(lm.m.shields[side]).toBe(1);
-    expect(lm.m.blockBanks[side]).toBe(SQUADS.blocks.bankPerMatch + M.blockPoints);
+    // (No block points to start: only the shop's, Eric, Oct 19.)
+    expect(lm.m.blockBanks[side]).toBe(M.blockPoints);
     const w = L.last(solo, "wallets")!.wallets.find((x) => x.squadId === squad)!;
     expect(w.cart).toEqual({ stockfish: 0, blocks: 0, shield: 0, chip: 0 });
     expect(w.chips).toBe(0);
@@ -215,6 +216,8 @@ describe("Mercenary on the server: items in a match", () => {
       const lm = L.core.allMatches().find((m) => mineIn(m, red[0]!));
       if (!lm || !mineIn(lm, blue[0]!)) continue;
       L.core.message(red[0]!, { t: "buy", item: "shield" });
+      // (Blue's block points: none to start, only the shop's.)
+      L.core.message(blue[0]!, { t: "buy", item: "blocks" });
       L.advanceTo(lm.startsAt! + 1);
       const redSide = lm.m.sides.findIndex((x) => x.seats.includes(red[0]!));
       expect(lm.m.shields[redSide]).toBe(1);
@@ -243,7 +246,7 @@ describe("Mercenary on the server: items in a match", () => {
       expect(outcome).toMatchObject({ move: target, outcome: "shielded" });
       expect(half.match.shields[redSide]).toBe(0);
       expect(half.match.blocks).toEqual([]);
-      expect(half.match.blockBanks[blueDuty.side]).toBe(SQUADS.blocks.bankPerMatch - outcome.cost);
+      expect(half.match.blockBanks[blueDuty.side]).toBe(M.blockPoints - outcome.cost);
       expect(L.all(blue[0]!, "half").find((h) => h.key === lm.key)!.events).toEqual(half.events);
       return;
     }

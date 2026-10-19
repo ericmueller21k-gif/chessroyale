@@ -8,6 +8,7 @@ import {
   cheatEval,
   cheatLinesAt,
   blockBankNow,
+  hasBlocks,
   blockCheatFen,
   blockName,
   blocksShown,
@@ -379,6 +380,19 @@ describe("Mercenary on screen", () => {
   const M = SQUADS.mercenary;
   const none = { stockfish: 0, blocks: 0, shield: 0, chip: 0 };
 
+  it("blocks are part of a match only for a squad that came in with block points (none to start: Eric, Oct 19)", () => {
+    const merc = (o: Partial<LocalMatch>) => match({ mode: "mercenary", blockBanks: [0, 0], ...o });
+    // Round 1, before any shop: neither squad (no Block button, no points shown).
+    expect([hasBlocks(merc({}), 0), hasBlocks(merc({}), 1)]).toEqual([false, false]);
+    // Bought for this match: that squad only, and still once it's spent them all ("No block points left").
+    const bought = merc({ kit: [{ ...none, blocks: 1 }, none], blockBanks: [M.blockPoints, 0] });
+    expect([hasBlocks(bought, 0), hasBlocks(bought, 1)]).toEqual([true, false]);
+    expect(hasBlocks({ ...bought, blockBanks: [0, 0] }, 0)).toBe(true);
+    // A test lobby's points (no kit); Classic never.
+    expect(hasBlocks(merc({ blockBanks: [5, 5] }), 1)).toBe(true);
+    expect(hasBlocks(match({ mode: "classic", blockBanks: [5, 5] }), 0)).toBe(false);
+  });
+
   it("the shop's rows: strongest first, the price now (risen for each bought), the cart against the round's cap, why not", () => {
     const rows = shopRows({ coins: 260, bought: { ...none, shield: 1 }, cart: { ...none, shield: 1, chip: 1 }, chips: M.items.chip.cap - 1 });
     expect(rows.map((r) => r.item)).toEqual(["stockfish", "blocks", "shield", "chip"]);
@@ -387,7 +401,7 @@ describe("Mercenary on screen", () => {
     // Time chips: those held and in the cart against what a squad may hold; "−" only for the cart's.
     expect(by.chip).toMatchObject({ count: M.items.chip.cap, inCart: 1, can: false, why: "cap" });
     expect(by.stockfish).toMatchObject({ can: M.items.stockfish.price <= 260, why: M.items.stockfish.price <= 260 ? null : "coins" });
-    expect(by.blocks!.can).toBe(true);
+    expect(by.blocks).toMatchObject({ price: M.items.blocks.price, can: M.items.blocks.price <= 260, why: M.items.blocks.price <= 260 ? null : "coins" });
   });
 
   it("every item's words carry its numbers from settings", () => {
