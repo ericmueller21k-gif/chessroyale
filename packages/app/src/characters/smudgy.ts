@@ -1,22 +1,27 @@
 /**
  * Smudgy, the chameleon painter boss (Eric, Oct 19: "he learned painting because he always struggled to blend in like
- * the other chameleons"). After Eric's reference picture, redrawn: a lime-green chameleon with a tall casque striped in
+ * the other chameleons"). After Eric's reference picture, redrawn: a lime-green chameleon with a casque striped in
  * orange, teal and green, the same patchy stripes on his arms, legs and his spiral tail (he never blends in); big
- * round amber eyes, a friendly smirk; a cream apron splashed with paint on brown straps with gold buttons; in one hand
- * a big brush with a silver ferrule, dripping red paint, in the other a wooden palette of paint. Drawn three-quarters
- * on, facing our left (as Alfil, Sawyer and Chub & Chirp), light from the top left. His wide stance has the gripping
- * toes, the brush held up and the palette held out in front of him.
+ * amber eyes in turrets of skin, a friendly smirk; a painter's beret, deep plum, tipped on his casque; a cream apron
+ * splashed with paint on brown straps with gold buttons; in one hand a big brush with a silver ferrule, dripping
+ * yellow paint, in the other a wooden palette of paint. Drawn three-quarters on, facing our left (as Alfil, Sawyer and
+ * Chub & Chirp), light from the top left. His wide stance has the gripping toes, the brush held up and the palette held
+ * out in front of him.
  *
  * This is his still, for Eric's review (docs/decisions/2026-10-19-smudgy-still.md): one pose, `idle`'s one frame, and
  * `SMUDGY_PORTRAIT`. Nothing in the game draws him yet (he isn't in `CHARACTERS`, `BOSS_KITS` or the roster); the
  * preview draws him with its `extra=` option.
  *
- * Rigging, as the other bosses: the head, the casque, the torso, the apron and its splats, the feet, the palette and its
- * dabs are painted once; the tail, the legs, the arms, the straps, the brush, its paint and his eyes from numbers, so
- * the poses that follow are numbers in `SmudgyPose`: the brush arm (`elbowF`, `fist`, `brushButt`, `brushTip`), the
- * palette arm (`elbowN`, `handN`, `palette`), the tail (`tail`: its turns), the eyes (`gazeN`, `gazeF`: the pupils
- * sweep on their own), the casque (a part of its own, behind the head) and the brush's paint (a part of its own, in
- * the palette keys `P`, `R` and `K` and no others, so a frame's `pal` recolors it alone).
+ * Rigging, as the other bosses: the head, the casque, the beret, the torso, the apron and its splats, the feet, the
+ * palette and its dabs are painted once; the tail, the legs, the arms, the straps, the brush, its paint and his eyes
+ * from numbers, so the poses that follow are numbers in `SmudgyPose`:
+ * - the tail, his main moving part: `curl` (1 the spiral, 0 a loose hook, its length never changing) and a ripple down
+ *   it, `sway` and `swayPhase`;
+ * - the brush arm (`elbowF`, `fist`, `brushButt`, `brushTip`) and the palette arm (`elbowN`, `handN`);
+ * - the eyes (`gazeN`, `gazeF`: the pupils sweep on their own);
+ * - the casque and the beret, parts of their own (`casque`, `beret`, `beretTilt`);
+ * - the brush's paint, a part of its own in the palette keys `P`, `R` and `K` and no others, so a frame's `pal`
+ *   recolors it alone.
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part } from "./sprite.ts";
@@ -66,9 +71,13 @@ export const SMUDGY_PALETTE: Record<string, string> = {
   U: "#8a5e30", // the bristles: dark to light
   V: "#c79a5a",
   W: "#ecd29b",
-  P: "#a31d24", // the brush's paint (and nothing else): dark, mid, light
-  R: "#e3322b",
-  K: "#ff6a4d",
+  P: "#b97c06", // the brush's paint (and nothing else): yellow, dark, mid, light
+  R: "#f7c60f",
+  K: "#fff48c",
+  A: "#2a0e34", // his beret: deep plum, dark to light
+  T: "#4a1c58",
+  Z: "#6b2f7c",
+  o: "#9059a3",
   "1": "#d9342c", // the dabs on the palette and the splats on the apron: red, yellow, blue, green; mid and light
   "2": "#ff7a66",
   "3": "#f0b90f",
@@ -198,28 +207,66 @@ const FOOT_X = 44;
 
 // ---- The head: the casque behind it, then the head itself (muzzle, jaw, mouth), and the eyes over it.
 
-/** The head's outline, clockwise from the muzzle's tip. */
-const HEAD: Pt[] = [[18, 31], [20, 28.5], [25, 26.5], [30, 23], [35, 20.5], [41, 20], [45, 22], [47.5, 26], [47.5, 30], [45, 35], [40, 37.5], [33, 38], [26, 36.5], [20.5, 34.5], [18, 32.5]];
-/** His mouth, a smirk: along the jaw, curling up at his cheek. */
-const MOUTH: Pt[] = [[19, 32.5], [22, 33], [27, 33.8], [32, 33.4], [35.5, 31.8], [37, 29.8]];
+/** The head's outline, clockwise from the muzzle's tip: a pointed snout. */
+const HEAD: Pt[] = [[16.5, 31.8], [19.5, 28.8], [24.5, 26.5], [29.5, 23.2], [35, 20.5], [41, 20], [45, 22], [47.5, 26], [47.5, 30], [45, 35], [40, 37.5], [33, 38], [26, 36.8], [20.5, 34.6], [17.5, 33.2]];
+/** His mouth, a smirk: along the jaw, curling up into his cheek. */
+const MOUTH: Pt[] = [[17.5, 32.8], [21, 33.4], [26, 34.2], [31, 33.9], [35, 32.4], [37.5, 30.2], [38.8, 28.2]];
 
-/** The casque, a tall fin swept back from behind his eyes, striped by the angle from its pivot like a fan. */
+/**
+ * The casque, a fin swept back from behind his eyes, striped by the angle from its pivot like a fan. It's short: his beret
+ * sits on its top, so the crest shows below it, flowing up out of his head.
+ */
 function casque(): { part: Part; at: Pt } {
-  const outline: Pt[] = [[34, 22], [36, 14], [40, 8], [46, 4.2], [51, 4.8], [54, 9], [55.5, 15], [54, 22], [50.5, 29], [44, 26], [38, 24]];
+  const outline: Pt[] = [[34, 23], [35, 17], [38, 13], [44, 11], [52, 12], [56, 15.5], [58, 21], [56.5, 27], [51.5, 31], [44, 27], [38, 25]];
   const inside = inPoly(outline);
-  const [px, py] = [40, 25];
-  const light = roundLight(41, 14, 14, 14, 0.04);
+  const [px, py] = [40, 26];
+  const light = roundLight(42, 16, 14, 13, 0.1);
   // Bands in order from the front over the top to the back: the letter and where it ends (0 to 1 around the fan).
-  const bands: readonly (readonly [string, number])[] = [["g", 0.1], ["t", 0.22], ["o", 0.34], ["g", 0.42], ["t", 0.55], ["o", 0.68], ["g", 0.76], ["t", 0.86], ["o", 1]];
-  return painted(32, 3, 25, 28, (F) =>
+  const bands: readonly (readonly [string, number])[] = [["g", 0.1], ["t", 0.24], ["o", 0.38], ["g", 0.46], ["t", 0.6], ["o", 0.74], ["g", 0.82], ["t", 0.9], ["o", 1]];
+  return painted(33, 8, 27, 25, (F) =>
     F(inside, (x, y) => {
       const a = Math.atan2(y + 0.5 - py, x + 0.5 - px);
       // The edges between bands waver a little with the distance, so the patches aren't ruled lines.
-      const t = (a + 2.75) / 3 + 0.03 * Math.sin(Math.hypot(x - px, y - py) * 0.9);
+      const t = (a + 2.4) / 2.65 + 0.03 * Math.sin(Math.hypot(x - px, y - py) * 0.9);
       const hue = bands.find(([, to]) => t < to)?.[0] ?? "o";
       return ramp(HUES[hue]!, light(x, y));
     }),
   );
+}
+
+/**
+ * His beret, a painter's: a soft floppy disc with a puffed lip drooping at its front, a band round its foot and a stalk on
+ * top, tipped `tilt` degrees (negative: its front down, its back up). It sits on his casque; a part of its own.
+ */
+function beret(tilt: number): { part: Part; at: Pt } {
+  const [cx, cy] = [46.5, 11];
+  const th = (tilt * Math.PI) / 180;
+  const [cs, sn] = [Math.cos(th), Math.sin(th)];
+  const [rx, ry] = [12, 6.2];
+  /** A pixel in the beret's own frame: along it (negative toward his front) and across it (negative up). */
+  const local = (x: number, y: number): Pt => [(x + 0.5 - cx) * cs + (y + 0.5 - cy) * sn, -(x + 0.5 - cx) * sn + (y + 0.5 - cy) * cs];
+  // The lip droops on its front: it's deeper below the middle there.
+  const depth = (u: number, v: number): number => (v > 0 ? ry + 2.2 * Math.max(0, -u / rx) : ry);
+  const inside: Inside = (x, y) => {
+    const [u, v] = local(x, y);
+    return (u / rx) ** 2 + (v / depth(u, v)) ** 2 <= 1;
+  };
+  // The stalk: on the top of the disc, a little toward its front.
+  const [su, sv] = [-1.8, -ry - 0.6];
+  const stalk: Pt = [cx + su * cs - sv * sn, cy + su * sn + sv * cs];
+  return painted(30, 0, 32, 24, (F, S) => {
+    F(inside, (x, y) => {
+      const [u, v] = local(x, y);
+      const d = depth(u, v);
+      let l = 0.6 - 0.34 * (v / d) - 0.2 * (u / rx);
+      // A fold or two of the cloth, running from the stalk down toward the front.
+      if (Math.abs(v / ry - (-0.2 + 0.45 * Math.sin((u / rx) * 2.4 + 0.5))) < 0.09) l -= 0.3;
+      if (Math.abs(v / ry - (0.35 + 0.3 * Math.sin((u / rx) * 3.1 + 2))) < 0.07 && u > -rx * 0.5) l -= 0.25;
+      if (v > d * 0.68) return l > 0.5 ? "T" : "A";
+      return ramp("ATZo", l);
+    });
+    S(["Zo", "TA"], Math.round(stalk[0]) - 1, Math.round(stalk[1]) - 1);
+  });
 }
 
 /** His head: green above the mouth, the yellow-green jaw below it, a nostril, and a few stripes at his cheek. */
@@ -232,7 +279,7 @@ function head(): { part: Part; at: Pt } {
     const [a, b] = [MOUTH[i - 1]!, MOUTH[i]!];
     return a[1] + ((x - a[0]) / (b[0] - a[0])) * (b[1] - a[1]);
   };
-  return painted(16, 14, 34, 26, (F, S) => {
+  return painted(15, 14, 36, 26, (F, S) => {
     F(inside, (x, y) => {
       // His cheek stripes: diagonal patches of orange and teal toward the casque.
       if (x > 40.5 && y < 33) {
@@ -240,13 +287,15 @@ function head(): { part: Part; at: Pt } {
         if (v === 0) return ramp(ORANGE, light(x, y) + 0.1);
         if (v === 1) return ramp(TEAL, light(x, y));
       }
-      return y > mouthY(x) + 0.5 && x < 38 ? ramp(THROAT, light(x, y) + 0.12) : ramp(GREEN, light(x, y));
+      return y > mouthY(x) + 0.5 && x < 38.5 ? ramp(THROAT, light(x, y) + 0.12) : ramp(GREEN, light(x, y));
     });
-    for (let x = 19; x <= 37; x++) {
-      const y = Math.round(mouthY(x) - 0.5);
-      S(["k"], x, y);
-    }
-    S(["a"], 21, 29);
+    // The smirk, a line along the segments of MOUTH.
+    MOUTH.slice(1).forEach((q, i) => {
+      const a = MOUTH[i]!;
+      const n = Math.ceil(Math.hypot(q[0] - a[0], q[1] - a[1]) * 2);
+      for (let j = 0; j <= n; j++) S(["k"], Math.floor(a[0] + ((q[0] - a[0]) * j) / n), Math.floor(a[1] + ((q[1] - a[1]) * j) / n));
+    });
+    S(["a"], 20, 30);
   });
 }
 
@@ -258,10 +307,11 @@ function head(): { part: Part; at: Pt } {
 function eye(cx: number, cy: number, rb: number, [gx, gy]: Pt): { part: Part; at: Pt } {
   const size = Math.ceil(rb * 2) + 1;
   const c = size / 2;
-  const rs = rb - 1;
-  const ri = rs * 0.88;
+  // His turret is a cone of skin: a thick rim round the opening, darker on its inside edge, and a lid over the top of it.
+  const ro = rb - 2;
+  const ri = ro * 0.8;
   const rp = ri * 0.52;
-  const bulb = roundLight(c, c, rb, rb, 0.08);
+  const bulb = roundLight(c, c, rb, rb, 0.1);
   const cv = canvas(size, size);
   const ix = c + gx;
   const iy = c + gy;
@@ -271,11 +321,12 @@ function eye(cx: number, cy: number, rb: number, [gx, gy]: Pt): { part: Part; at
       const py = y + 0.5;
       const d = Math.hypot(px - c, py - c);
       if (d > rb) continue;
-      if (d > rs) {
-        cv[y]![x] = ramp(GREEN, bulb(x, y));
+      const lid = py < c - ro * 0.72;
+      if (d > ro || lid) {
+        cv[y]![x] = ramp(GREEN, bulb(x, y) - (d < ro + 1 ? 0.2 : 0));
         continue;
       }
-      cv[y]![x] = py < c - rs * 0.45 ? "S" : "h";
+      cv[y]![x] = py < c - ro * 0.45 ? "S" : "h";
       const di = Math.hypot(px - ix, py - iy);
       if (di <= ri) cv[y]![x] = di >= ri - 0.9 ? "E" : py < iy ? "F" : "G";
       if (di <= rp) cv[y]![x] = "X";
@@ -378,25 +429,45 @@ const HAND: readonly string[] = [
   ".bbb.",
 ];
 
+/** Where his tail leaves his hip, and where its curl begins. */
+const TAIL_ROOT: Pt = [55.5, 51];
+const TAIL_START: Pt = [57.4, 53.4];
+/** The tail's length from there, and the radius of the curl it winds into: from `TAIL_R0` at its start to `TAIL_R1` at its tip. */
+const TAIL_LEN = 56;
+const TAIL_R0 = 11.5;
+const TAIL_R1 = 3.2;
+/** The radius of the loose curl it hangs in when it's uncurled (`curl` 0). */
+const TAIL_LOOSE = 11;
+
 /**
- * His tail: from the back of his hip, down behind him and round in a spiral, thick at the root and thin at the tip,
- * with `turns` its turns (the spiral counter-clockwise on the screen), painted in bands of his three colors. The turns
- * are far enough apart for the outline to run between them, so the coil shows.
+ * His tail, walked along from his hip: its heading turns as it goes, counter-clockwise on the screen, by how tight it's
+ * curled. `curl` 1 is the spiral he stands with (its curve tightening toward the tip), 0 a loose hook hanging out
+ * behind him, between them it winds up or lets go (its length never changes). `sway` is how far, in radians, a ripple
+ * running down it bends it at the tip, `phase` where that ripple is (animate it to make the tail swing). Thick at the
+ * root and thin at the tip, in bands of his three colors.
  */
-function tail(turns: number): { part: Part; at: Pt } {
-  const C: Pt = [67, 56];
-  const steps = 72;
-  const sweep = turns * 2 * Math.PI;
-  const pts: Pt[] = [[56, 51.5]];
-  const r: number[] = [3.8];
-  for (let i = 0; i <= steps; i++) {
-    const u = i / steps;
-    const rad = 9.8 - 6.6 * u;
-    const a = Math.PI * 1.08 - sweep * u;
-    pts.push([C[0] + rad * Math.cos(a), C[1] + rad * Math.sin(a)]);
-    r.push(3.7 - 2.4 * u);
+function tail(curl: number, sway: number, phase: number): { part: Part; at: Pt } {
+  const steps = 76;
+  const ds = TAIL_LEN / steps;
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+  let heading = lerp(72, 104.4, curl) * (Math.PI / 180);
+  let [x, y] = TAIL_START;
+  const pts: Pt[] = [TAIL_ROOT, TAIL_START];
+  const r: number[] = [4.2, 4];
+  for (let i = 1; i <= steps; i++) {
+    const s = (i - 0.5) * ds;
+    // The spiral's radius of curvature at s (it tightens), blended with the loose hook's.
+    const rad = TAIL_R0 - ((TAIL_R0 - TAIL_R1) * s) / TAIL_LEN;
+    heading -= (lerp(1 / TAIL_LOOSE, 1 / rad, curl) * ds);
+    // The ripple: it grows toward the tip and travels down the tail.
+    const h = heading + sway * Math.sin(phase - s * 0.16) * (s / TAIL_LEN);
+    x += Math.cos(h) * ds;
+    y += Math.sin(h) * ds;
+    pts.push([x, y]);
+    r.push(4.1 - 2.6 * (i / steps));
   }
-  return stroke(pts, r, stripes("tgotgtogtotg", 5, steps * 0.9, 1.1));
+  const bands = stripes("tgotgtogtotg", 4.6, TAIL_LEN, 1.1);
+  return stroke(pts, r, (l, t, across) => bands(l - 0.06, t, across));
 }
 
 // ---- His brush and its paint, from the butt of its handle to the tip of its bristles.
@@ -528,10 +599,15 @@ export interface SmudgyPose {
   /** The palette arm: the elbow and the hand; the palette moves with the hand. */
   elbowN?: Pt;
   handN?: Pt;
-  /** The tail's turns of spiral (1.35: as he stands). */
-  tail?: number;
+  /** The tail: how curled it is (1 the spiral he stands with, 0 a loose hook), and a ripple down it: how far it bends the tip (radians) and where the ripple is (radians; animate it). */
+  curl?: number;
+  sway?: number;
+  swayPhase?: number;
   /** The casque moved from where it stands (a flare, a droop). */
   casque?: Pt;
+  /** The beret moved from where it sits (a bounce), and how far it's tipped (degrees, negative: its front down). */
+  beret?: Pt;
+  beretTilt?: number;
   /** Where each eye looks, from the middle of its white: the near eye (our right) and the far one. */
   gazeN?: Pt;
   gazeF?: Pt;
@@ -545,8 +621,12 @@ const REST = {
   brushTip: [9.5, 11.5] as Pt,
   elbowN: [33, 47.5] as Pt,
   handN: [27.5, 54] as Pt,
-  tail: 1.35,
+  curl: 1,
+  sway: 0,
+  swayPhase: 0,
   casque: [0, 0] as Pt,
+  beret: [0, 0] as Pt,
+  beretTilt: -13,
   gazeN: [-1.3, 0.5] as Pt,
   gazeF: [-1.1, 0.5] as Pt,
 };
@@ -569,14 +649,15 @@ export function smudgyLayers(pose: SmudgyPose = {}): Layer[] {
     const pts = [up(hip, b), up(knee, b / 2), ankle] as const;
     return L(placed(`${name}:${key(pts)}`, () => legPart(pts[0], pts[1], pts[2], pattern)));
   };
+  const tailKey = [p.curl, p.sway, p.swayPhase].map((v) => Math.round(v * 50) / 50).join(":");
   const brushPts = [p.brushButt, p.brushTip] as const;
   const armF = [up(SHOULDER_F, b), up(p.elbowF, b), p.fist] as const;
   const armN = [up(SHOULDER_N, b), up(p.elbowN, b), p.handN] as const;
-  const eyeN = placed(`eyeN:${p.gazeN}:${b}`, () => eye(39, 24.5 + b, 6.1, p.gazeN));
-  const eyeF = placed(`eyeF:${p.gazeF}:${b}`, () => eye(27.8, 24.8 + b, 5, p.gazeF));
+  const eyeN = placed(`eyeN:${p.gazeN}:${b}`, () => eye(40.5, 24.8 + b, 6.6, p.gazeN));
+  const eyeF = placed(`eyeF:${p.gazeF}:${b}`, () => eye(27, 25.2 + b, 5.4, p.gazeF));
   return [
     at("shadow", 15, GROUND - 3),
-    L(placed(`tail:${p.tail}`, () => tail(p.tail)), b / 2),
+    L(placed(`tail:${tailKey}`, () => tail(p.curl, p.sway, p.swayPhase)), b / 2),
     leg("legF", HIP_F, [60, 61], [58, 65], "ggtgg"),
     at("foot", 58 - 9, GROUND - 6),
     leg("legN", HIP_N, [37, 61], [38, 65], "ggotg"),
@@ -596,6 +677,7 @@ export function smudgyLayers(pose: SmudgyPose = {}): Layer[] {
     L(placed("head", head), b),
     L(eyeF),
     L(eyeN),
+    L(placed(`beret:${p.beretTilt}`, () => beret(p.beretTilt)), b + p.beret[1], p.beret[0]),
     // The palette arm, in front, and the palette in its hand.
     L(placed(`armN:${key(armN)}`, () => arm(armN[0], armN[1], armN[2], "gotg"))),
     L(placed("palette", paletteBoard), dPal[1], dPal[0]),
@@ -622,7 +704,7 @@ export const SMUDGY: Character = {
 };
 
 /**
- * The part of him a portrait shows (his head, casque and eyes, and the tip of his brush beside them, which says who he
- * is), in frame pixels.
+ * The part of him a portrait shows (his head, beret, casque and eyes, and the tip of his brush beside them, which says
+ * who he is), in frame pixels.
  */
-export const SMUDGY_PORTRAIT = { x: OX + 1, y: OY + 2, w: 58, h: 41 } as const;
+export const SMUDGY_PORTRAIT = { x: OX + 1, y: OY + 2, w: 60, h: 41 } as const;
