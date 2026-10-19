@@ -152,9 +152,9 @@ function BoardColorsChoice() {
  * Settings (Eric, Oct 15: "smoothness, quickness, with some variety offered"): the theme, sound (the move, capture and
  * reveal sounds), the board (animations, motion trail), quick chat, friends, how to play (and the FAQ), help (the
  * feedback sheet: bugs, feedback, ideas), installing, your sign-in, privacy and terms; and for admins, testing
- * (practice mode, the eval bar).
+ * (practice mode, the eval bar, and the shelved Auto chess demo).
  */
-export function SettingsScreen({ onBack, onFaq }: { onBack: () => void; onFaq?: (section?: string) => void }) {
+export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => void; onFaq?: (section?: string) => void; onAutoChess?: () => void }) {
   const { config, profile } = useAccount();
   const [, rerender] = useState(0);
   useEffect(() => onMuteChange(() => rerender((n) => n + 1)), []);
@@ -342,6 +342,12 @@ export function SettingsScreen({ onBack, onFaq }: { onBack: () => void; onFaq?: 
           <Toggle title="Eval bar" checked={evalBarOn()} onChange={setEvalBarOn}>
             The engine's winning chances in a bar beside the board, in every mode. Off: no bar, and the board takes its room.
           </Toggle>
+          {/* (Auto chess, the demo, shelved: Eric, Oct 19. Testers only; its screen is /autochess.) */}
+          {onAutoChess && (
+            <button type="button" class="fd-row-link" onClick={onAutoChess}>
+              Auto chess (shelved demo) ›
+            </button>
+          )}
         </section>
       )}
 

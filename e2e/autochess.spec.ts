@@ -1,10 +1,10 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { BOARD_SEL, named, test } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, named, test } from "./helpers.ts";
 
 /**
- * Auto chess, the demo (/autochess; docs/areas/autochess.md): home's thin button opens it, and a round is played from
- * buying to the fight's end, on a phone and a computer. `?quick=1` (a test switch) shortens the steps (buy 6 s with the last
- * second locked, circles half a second behind, adjust 5 s, a fight move every 60 ms); `?seed=` fixes the kings and the bot.
+ * Auto chess, the demo (/autochess; docs/areas/autochess.md; shelved: Settings' Testing section, for admins, opens it): a
+ * round is played from buying to the fight's end, on a phone and a computer. `?quick=1` (a test switch) shortens the steps (buy 7 s with the last
+ * 2 locked, circles half a second behind, adjust 5 s, a fight move every 60 ms); `?seed=` fixes the kings and the bot.
  */
 const phone = () => test.info().project.name === "phone";
 const QUICK = "/autochess?quick=1&seed=7";
@@ -79,18 +79,19 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => ((window as any).__soundLog = []));
 });
 
-test("home's thin Auto chess button, the very bottom of home, opens the screen; its back button goes home", async ({ page }) => {
+test("shelved (Eric, Oct 19): no button on home or in a player's Settings; an admin opens it from Settings' Testing; its back button goes home", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/");
-  const button = page.getByRole("button", { name: "Auto chess", exact: true });
-  await expect(button).toBeVisible();
-  // Thin, full width, under the Boss raid card, the last thing in home's column.
-  const b = (await button.boundingBox())!;
-  const raid = (await page.locator(".rd-card").boundingBox())!;
-  expect(b.height).toBeLessThanOrEqual(40);
-  expect(b.y).toBeGreaterThanOrEqual(raid.y + raid.height);
-  expect(Math.abs(b.width - raid.width)).toBeLessThan(2);
-  await button.click();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Auto chess/ })).toHaveCount(0);
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Auto chess/ })).toHaveCount(0);
+  await asAdmin(page);
+  await page.goto("/settings");
+  const row = page.getByRole("button", { name: "Auto chess (shelved demo) ›" });
+  await expect(row).toBeVisible();
+  await row.click();
   await expect(root(page)).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/autochess");
   await expect(page.locator(".ac-title strong")).toHaveText("Auto chess");
@@ -205,7 +206,7 @@ test("buy to the bench, place by tap and by drag, sell for 90% by drag and by ta
   await expect(page.locator(`${BOARD_SEL.piece}.black`)).toHaveCount(1);
   expect(await botGold(page)).toBeLessThan(100);
 
-  // The last second is locked: "Locked" on the timer, and nothing is bought, sold or moved.
+  // The last 2 seconds are locked: "Locked" on the timer, and nothing is bought, sold or moved.
   await expect(page.locator(".ac-clock span")).toHaveText("Locked", { timeout: 15_000 });
   const before = await goldOf(page);
   await buyPiece(page, "pawn").click({ force: true });

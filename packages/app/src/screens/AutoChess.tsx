@@ -123,7 +123,8 @@ function newGame(seed: number, cfg: AutoChessSettings): Game {
 
 /** A phone's short steps for tests (`?quick=1`, a test switch): the same game in a few seconds a step. */
 function settingsFor(quick: boolean): AutoChessSettings {
-  return quick ? { ...AUTOCHESS, buySeconds: 6, lockSeconds: 1, circlesDelaySeconds: 0.5, adjustSeconds: 5, fightMoveMs: 60 } : AUTOCHESS;
+  // (Two seconds locked, so a test has time to try buying in the lock before the reveal.)
+  return quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, adjustSeconds: 5, fightMoveMs: 60 } : AUTOCHESS;
 }
 
 const colorName = (c: Color) => (c === "w" ? "White" : "Black");

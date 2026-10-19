@@ -1,8 +1,9 @@
 # Auto chess (the demo)
 
-Lane: the director. A TFT-style auto battler with chess pieces, against a bot, all in the browser (`/autochess`; home's thin
-"Auto chess" button at the very bottom). A demo to feel it ("it might just be terrible"): nothing is recorded, rewarded or
-sent. Why it is the way it is: [docs/decisions/2026-10-19-autochess-demo.md](../decisions/2026-10-19-autochess-demo.md).
+Lane: the director. A TFT-style auto battler with chess pieces, against a bot, all in the browser (`/autochess`). A demo to
+feel it ("it might just be terrible"): nothing is recorded, rewarded or sent. **Shelved** (Eric, Oct 19: "it's going to take
+more work than I realized to make this balanced and fun"): no button on home; admins open it from Settings → TESTING ("Auto
+chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-autochess-demo.md](../decisions/2026-10-19-autochess-demo.md).
 
 ## How it works today
 

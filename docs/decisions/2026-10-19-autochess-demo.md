@@ -78,7 +78,7 @@ massive boards... running your opponent over... not very chess-like... boring qu
 - **The result waits for a tap** ("Next round"); the match end offers "Play again" and "Home".
 - **If the engine doesn't answer** (a stalled worker), the fight plays stand-in moves (a capture if there is one, else a
   random legal move) so a round always ends; the engine is given up on after three misses in a row.
-- **Test switches** (only where they work: an admin, e2e, dev): `?quick=1` (buy 6 s with the last second locked, circles half
+- **Test switches** (only where they work: an admin, e2e, dev): `?quick=1` (buy 7 s with the last 2 locked, circles half
   a second behind, adjust 5 s, a fight move every 60 ms) and `?seed=N` (the kings and the bot).
 - **CI:** the settings block is in `packages/core/src/settings.ts` as asked, and `packages/core/src/**` is a shared
   foundation in `e2e/areas.json`, so this PR runs the whole suite. The new area (its own paths and spec) is in `areas.json`
@@ -123,4 +123,12 @@ like 20 moves... it probably should fizzle out" (he left the cap itself open: "m
   average, about 10 s at 0.35 s a move. The pawn army lost all 8 to the minor pieces. With `quietCap` 15: 4 mates, 5
   fizzled, 3 repetitions, 50 moves on average, and the pawn army won 2 of 8. Kept at 10 for short fights (Eric's "fizzle
   out"); 15 is the number to try if fights feel cut short.
+
+## Shelved (Eric, Oct 19 evening)
+
+"I'm honestly thinking we may have to shelve this idea for a bit and keep the button on maybe like an admin only screen for
+testing... it's going to take more work than I realized to make this balanced and fun." So the home button is gone and home
+is exactly as it was before it (its spacing and `home-layout.spec.ts` / `live-window.spec.ts` back to before #298; your
+pawn is the size it was). Admins open the demo from Settings → TESTING, "Auto chess (shelved demo) ›". `/autochess` still
+opens it for anyone with the link (it's client-only and behind Access). The no-promotion and fizzle-out rules above stay in.
 
