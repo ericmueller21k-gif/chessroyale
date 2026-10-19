@@ -83,9 +83,8 @@ massive boards... running your opponent over... not very chess-like... boring qu
 - **CI:** the settings block is in `packages/core/src/settings.ts` as asked, and `packages/core/src/**` is a shared
   foundation in `e2e/areas.json`, so this PR runs the whole suite. The new area (its own paths and spec) is in `areas.json`
   for later PRs.
-- **`e2e/live-window.spec.ts`** compared the live window's column foot to PLAY's line, which stopped being the foot when the
-  Boss raid card moved under PLAY (#296; the spec isn't in that area's fast set); it now compares Auto chess's button, the
-  new foot.
+- **`e2e/live-window.spec.ts`** compares the column's foot to your card's bottom. It compared PLAY's line until the Boss raid
+  card moved to the bottom (#296; #297 changed it to the card); the foot is now Auto chess's button, so it compares that.
 - **The FAQ** is unchanged: the demo isn't a mode players can find in the FAQ's list yet; its words come with the game mode if
   people like it.
 
