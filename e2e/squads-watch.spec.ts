@@ -86,6 +86,10 @@ test("Jump to my next board, on by default: once you've moved, the big board goe
   const s = await nextDuty(page);
   expect(s.duty!.role).toBe("move");
   await expect(page.locator(".sq-tiny.on")).toHaveClass(/is-you/);
+  // The line above the board starts with the board's number, in the color you play there (Eric, Oct 18).
+  const [, no, colour] = (await page.locator(".sq-status").innerText()).match(/Board (\d) · you're (White|Black)/)!;
+  await expect(page.locator(".sq-board-no")).toHaveText(no!);
+  await expect(page.locator(".sq-board-no")).toHaveClass(colour === "White" ? /is-w/ : /is-b/);
   // The switch is on, with its (i): a sentence on what it does.
   await expect(jumpSwitch(page)).toBeChecked();
   await expect(page.locator(".sq-jump-info")).toHaveCount(0);
@@ -98,6 +102,9 @@ test("Jump to my next board, on by default: once you've moved, the big board goe
   await expect(page.locator(".sq-tiny.on .sq-mark.next")).toHaveCount(1, { timeout: 5_000 });
   expect(Date.now() - t0).toBeLessThan(4_000);
   expect(await order.seen()).toEqual({ moved: true, next: true });
+  // The number follows the big board: your next board's.
+  const [, nextNo] = (await page.locator(".sq-status").innerText()).match(/Watching Board (\d)/)!;
+  await expect(page.locator(".sq-board-no")).toHaveText(nextNo!);
   // Your next board, your side's way up; Back to my board, and it stays there for the rest of the half.
   await page.getByRole("button", { name: "Back to my board" }).click();
   await expect(page.locator(".sq-tiny.on")).toHaveClass(/is-you/);

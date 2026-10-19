@@ -340,6 +340,10 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   intro of `SQUADS_LOBBY.testShopSeconds` to shop in. `start=votes` (Eric, Oct 12) fills the moment its opener
   connects (`fillAt` = now): seated, bots in every other seat, the first vote after the full grid's moment, then the
   whole tournament.
+- **Open (Eric, Oct 18, after playtesting; nothing changed yet):** blocking feels chaotic on top of everything else;
+  it stays for now but may be phased out, or kept only for the rounds where it's a team decision (Pairs, the final:
+  a Relay match can get a block bank of 0, `MatchSetup.blockBanks`). Mercenary may be reworked; spending between
+  rounds stays a good idea.
 - **Mercenary** (the record's `wallets`, one per squad; `botShop` times). Each half's "coins" events go into the
   wallets (`earnFrom`), and everyone gets `wallets` (every squad's: coins, earned, cart, bought, its shop). A squad's
   shop (`shopOf`) is open from its match's end until its next match's first half (the other match feeding it, then
@@ -443,6 +447,10 @@ door's look; every class is `sq-`.
   you've moved or locked in: one opens full size with "Back to my board"; a new half that asks something of you brings
   you back), your board full size with « » through its moves (from its own start), and under it both squads' clocks
   with the free seconds counting down between them. The timer bar over the board is your move's deadline (no ticks).
+  - **Which board** (Eric, Oct 18; `docs/decisions/2026-10-18-squads-board-number.md`): the big board has a thin
+    accent frame, as its tiny board's ring in the strip, and the line above it starts with the board's number
+    (`.sq-board-no`; more than one board only), white or black as you play that board (neutral if you aren't in the
+    match).
   - **Jump to my next board** (Relay; Eric, Oct 14): a switch in the panel (after your move's panel), with an (i) that
     says in a sentence what it does (`JUMP_NEXT_LABEL`, `JUMP_NEXT_INFO`). On (the default, `watching.jumpToNext`;
     remembered on the device, `brc.squads.jumpNext`, `squadsJumpNext` in prefs.ts), once you've made your Relay move the
