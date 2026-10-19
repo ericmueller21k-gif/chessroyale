@@ -26,8 +26,11 @@
  *   en passant on the board you see, never onto your back rank, never onto a square where a pawn would give your king
  *   check (a check that isn't there).
  * - **The strike:** from the crowd's camoStrikeTurn-th move after the swap (his turn after it), any rook move. A move no
- *   pawn could make reveals it (`strike`, "move"); so does a check, whatever the turn, its own or discovered (`strike`,
- *   "check"); and so does the crowd taking it (`rookTaken`). At the battle's end the screens show the true board.
+ *   pawn could make reveals it (`unmask`, "move"); so does a check, whatever the turn, its own or discovered (`unmask`,
+ *   "check"); so does a move of his that leaves the crowd no move legal on both boards (`unmask`, "stuck": the board it
+ *   sees would have it stuck); and so does the crowd taking it (`rookTaken`). At the battle's end the screens show the
+ *   true board. While it hides, his moves are named on the board the crowd sees (specialMove), and the judge never
+ *   names or rewards a capture of it (hiddenJudged).
  * - One Camouflage a battle.
  *
  * His ultimate, Repaint (at most repaintMax a battle): his meter full (its warning as a crowd turn begins), at the start
@@ -53,7 +56,7 @@ import { passTurn } from "./hollow.ts";
  * wiring lane sets them from his animations' cues): the swap under a splash of paint over his pawns, the paint dripping
  * off the rook as it strikes, "That was his rook!", the brush strokes of Repaint.
  */
-export const SMUDGY_FX = { camouflage: 2600, strike: 1800, rookTaken: 2000, repaint: 3000 } as const;
+export const SMUDGY_FX = { camouflage: 2600, unmask: 1800, rookTaken: 2000, repaint: 3000 } as const;
 
 type CamoSettings = Pick<BossPowerSettings, "camoTries" | "camoStrikeTurn">;
 
@@ -233,6 +236,52 @@ export function paintRefuses(fen: string, square: string | null | undefined, mov
   return legalMoves(maskedFen(fen, square)).includes(move) && !legalMoves(fen).includes(move);
 }
 
+/**
+ * The crowd (to move in `fen`, his rook hidden on `square`) has a move legal on both the board it sees and the true one.
+ * Without one it would be stuck as it sees it: his move or pair that leads there unmasks the rook, or isn't made.
+ */
+export function seenMoveLeft(fen: string, square: string): boolean {
+  const seen = new Set(legalMoves(maskedFen(fen, square)));
+  return legalMoves(fen).some((m) => seen.has(m));
+}
+
+/**
+ * His move (`fen` before it, `after` after it; his rook hidden on `square`) unmasks the rook: the rook's own move that no
+ * pawn could make, or one that gives check, or another piece's move that discovers its check.
+ */
+export function unmaskedBy(fen: string, after: string, square: string, move: string, boss: Side): boolean {
+  if (from(move) !== square) return rookChecks(after, square, boss);
+  return !keepsDisguise(after, square, to(move), !!pieceAt(fen, to(move)), boss) || rookChecks(after, to(move), boss);
+}
+
+/** A crowd move captures the hidden rook (lands on its square). */
+const takesHidden = (move: string, square: string | null) => !!square && to(move) === square;
+
+/**
+ * The judge's evaluation while his rook hides on `square`: a capture of it is never the best move (the best of the other
+ * moves scored is), and its score is held to that best's, so a player who plays it loses nothing and one who doesn't
+ * isn't marked down for a rook nobody could see. Unchanged with nothing hidden, or with no other move scored.
+ */
+export function hiddenJudged<E extends { bestMove: string; bestExpected: number; expectedAfter: Record<string, number> }>(evaluation: E, square: string | null): E {
+  if (!square) return evaluation;
+  const all = Object.entries(evaluation.expectedAfter);
+  const others = all.filter(([m]) => !takesHidden(m, square));
+  if (!others.length || others.length === all.length) return evaluation;
+  const capture = takesHidden(evaluation.bestMove, square);
+  const [bestMove, bestExpected] = capture ? others.reduce((a, b) => (b[1] > a[1] || (b[1] === a[1] && b[0] < a[0]) ? b : a)) : [evaluation.bestMove, evaluation.bestExpected];
+  const expectedAfter = Object.fromEntries(all.map(([m, e]) => [m, takesHidden(m, square) ? Math.min(e, bestExpected) : e]));
+  return { ...evaluation, bestMove, bestExpected, expectedAfter };
+}
+
+/** The top moves as the judge ranks them while his rook hides (hints, the bots): a capture of it held to the best other move's score, after it. */
+export function hiddenRanked<M extends { move: string; expected: number }>(top: readonly M[], square: string | null): M[] {
+  const others = top.filter((m) => !takesHidden(m.move, square));
+  if (!square || !others.length || others.length === top.length) return [...top];
+  const best = Math.max(...others.map((m) => m.expected));
+  const held = top.filter((m) => takesHidden(m.move, square)).map((m) => ({ ...m, expected: Math.min(m.expected, best) }));
+  return [...others, ...held].sort((a, b) => b.expected - a.expected || Number(takesHidden(a.move, square)) - Number(takesHidden(b.move, square)));
+}
+
 /** The crowd's move from which (its count so far) the hidden rook may strike: camoStrikeTurn after the swap. Null: no swap. */
 export const strikeFrom = (c: Pick<Camouflage, "swap"> | null | undefined, s: CamoSettings = BOSS_POWERS): number | null => (c?.swap ? c.swap.at + s.camoStrikeTurn : null);
 
@@ -258,7 +307,7 @@ export interface CamoView {
   swap: { at: number; rook: string; pawn: string } | null;
   /** The crowd's move count from which the hidden rook may strike (null: no swap). */
   strikeAt: number | null;
-  reveal: { at: number; square: string; how: "move" | "check" | "taken"; from?: string } | null;
+  reveal: NonNullable<Camouflage["reveal"]> | null;
 }
 
 export function camoView(c: Camouflage | null | undefined): CamoView | null {
@@ -289,7 +338,8 @@ export interface RepaintOption {
  * each pawn of his with each knight or bishop of the crowd's. The turn passes (passTurn: none while he's in check). Never
  * a pawn one step from promoting for the crowd; never a position the engine refuses (a ninth pawn, the side not to move
  * in check); never the crowd in check, on the board or as it sees it; never one the crowd can't move in; never a mate in
- * one for the crowd, nor one for him were the crowd to pass.
+ * one for the crowd, nor one for him were the crowd to pass; with his rook hidden, never one that leaves the crowd no
+ * move legal on both the board it sees and the true one.
  */
 export function repaintOptions(fen: string, boss: Side, hidden: string | null = null): RepaintOption[] {
   const passed = passTurn(fen);
@@ -311,7 +361,7 @@ export function repaintOptions(fen: string, boss: Side, hidden: string | null = 
       if (stockfishRefuses(after)) continue;
       const king = gridKing(g, crowd);
       if (!king || gridAttackers(g, king, boss).length) continue;
-      if (hidden && pawnChecks(g, hidden, crowd)) continue;
+      if (hidden && (pawnChecks(g, hidden, crowd) || !seenMoveLeft(after, hidden))) continue;
       if (!legalMoves(after).length || mateInOne(after)) continue;
       const his = passTurn(after);
       if (his && mateInOne(his)) continue;
@@ -409,13 +459,16 @@ export const SMUDGY: BossRules = {
   },
   // Each Repaint its own turn; after the last, for the rest of the battle (no more come).
   ultimateRunning: (p, turn, s) => (p.repaints ?? 0) >= s.repaintMax || turn <= (p.ultAt ?? 0),
-  // As a crowd turn begins: the swap, the strike, the Repaint, each on the crowd turn right after it.
+  // As a crowd turn begins: the swap, the unmasking, the Repaint, each on the crowd turn right after it. The swap's
+  // moment names only the rook's old square (a real pawn now): where it hides is the view's `camo.square`, never a
+  // moment's field.
   everyTurn(next, t) {
     const c = next.camo;
-    if (c?.swap && c.swap.at + 1 === t.turn) t.events.push({ kind: "camouflage", turn: t.turn, square: c.swap.pawn, squares: [c.swap.rook, c.swap.pawn] });
+    if (c?.swap && c.swap.at + 1 === t.turn) t.events.push({ kind: "camouflage", turn: t.turn, square: c.swap.rook });
     if (c?.reveal && c.reveal.how !== "taken" && c.reveal.at + 1 === t.turn) {
       const r = c.reveal;
-      t.events.push({ kind: "strike", turn: t.turn, square: r.square, squares: r.from ? [r.from, r.square] : [r.square], reveal: r.how === "check" ? "check" : "move" });
+      const how = r.how === "taken" ? "move" : r.how;
+      t.events.push({ kind: "unmask", turn: t.turn, square: r.square, squares: r.from ? [r.from, r.square] : [r.square], reveal: how });
     }
     const rp = next.repaint;
     if (rp && rp.at + 1 === t.turn) t.events.push({ kind: "repaint", turn: t.turn, squares: [rp.pawn, rp.piece] });
@@ -450,19 +503,28 @@ export const SMUDGY: BossRules = {
     if (!rook || !mover || mover.color === rook.color) return null;
     return paintRefuses(fen, sq, move) ? "paint" : null;
   },
-  // The hidden rook's pawn-shaped step is named as a pawn's ("e6", not "Re6": the screens' line for his move), so the
-  // move's name gives nothing away. Any other move is named as it is (a strike or a check reveals it anyway).
+  // While his rook hides, every move of his is named on the board the crowd sees (the hidden rook's pawn-shaped step
+  // "e6", not "Re6"; his other rook's "Rd8", not "Rhd8" when the hidden one could reach d8 too), so no move's name gives
+  // it away. A move that reveals it (unmaskedBy) is named as it is. Null too for a move that isn't legal (a host out of
+  // date or tampered with: the runner plays a legal one instead).
   specialMove(boss, fen, move) {
     const sq = boss.powers?.camo?.square;
-    if (!sq || from(move) !== sq || pieceAt(fen, sq)?.type !== "r") return null;
-    const his = other(boss.crowdSide);
+    if (!sq || pieceAt(fen, sq)?.type !== "r" || !legalMoves(fen).includes(move)) return null;
     const after = applyMove(fen, move);
-    if (!keepsDisguise(after, sq, to(move), !!pieceAt(fen, to(move)), his) || rookChecks(after, to(move), his)) return null;
+    if (unmaskedBy(fen, after, sq, move, other(boss.crowdSide))) return null;
     try {
       return { play: move, san: toSan(maskedFen(fen, sq), move) };
     } catch {
       return null;
     }
+  },
+  // The judge while his rook hides: the engine sees it, the crowd doesn't, so a capture of the "pawn" it hides as is
+  // never the best move named (the round's "Best was …" would point at it) and never costs a player who didn't play it
+  // (hiddenJudged: its score held to the best other move's).
+  judge: {
+    mustScore: () => [],
+    rank: (boss, top) => hiddenRanked(top, boss.powers?.camo?.square ?? null),
+    evaluation: (boss, evaluation) => hiddenJudged(evaluation, boss.powers?.camo?.square ?? null),
   },
   // The crowd's turns while his rook hides (the engine sees it, the crowd doesn't) and the turn after a Repaint (the board
   // changed): its picks don't count for fair play.
@@ -553,13 +615,17 @@ export const smudgyBattle = {
     if (!sq) return;
     if (from(move) === sq) {
       const now = to(move);
-      const reveal = (how: "move" | "check") => setPowers(b, (p) => ({ ...p, camo: { ...c, square: null, reveal: { at: boss.crowdMoves, square: now, how, from: sq } } }));
+      const reveal = (how: "move" | "check" | "stuck") => setPowers(b, (p) => ({ ...p, camo: { ...c, square: null, reveal: { at: boss.crowdMoves, square: now, how, from: sq } } }));
       if (!keepsDisguise(fen, sq, now, !!b.bossLast?.captured, his)) return reveal("move");
       if (rookChecks(fen, now, his)) return reveal("check");
+      // (No move the crowd could make on both boards: the board it sees would leave it stuck. Revealed, as a check is.)
+      if (!seenMoveLeft(fen, now)) return reveal("stuck");
       setPowers(b, (p) => ({ ...p, camo: { ...c, square: now } }));
       return;
     }
-    if (pieceAt(fen, sq)?.type === "r" && rookChecks(fen, sq, his)) setPowers(b, (p) => ({ ...p, camo: { ...c, square: null, reveal: { at: boss.crowdMoves, square: sq, how: "check" } } }));
+    if (pieceAt(fen, sq)?.type !== "r") return;
+    const how = rookChecks(fen, sq, his) ? "check" : !seenMoveLeft(fen, sq) ? "stuck" : null;
+    if (how) setPowers(b, (p) => ({ ...p, camo: { ...c, square: null, reveal: { at: boss.crowdMoves, square: sq, how } } }));
   },
 
   /**
@@ -623,4 +689,4 @@ export const smudgyBattle = {
 };
 
 /** His events for a turn, by kind (the sims and tests read them). */
-export const smudgyEvents = (events: readonly PowerEvent[]) => events.filter((e) => e.kind === "camouflage" || e.kind === "strike" || e.kind === "rookTaken" || e.kind === "repaint");
+export const smudgyEvents = (events: readonly PowerEvent[]) => events.filter((e) => e.kind === "camouflage" || e.kind === "unmask" || e.kind === "rookTaken" || e.kind === "repaint");

@@ -757,7 +757,8 @@ export interface CarrotSpin {
  * this battle. After the second, before the crowd's turn, the swap: the rook (on `swap.rook`) and one of his pawns (on
  * `swap.pawn`) change places, and the rook hides as a pawn there. It moves like a pawn (forward, never a capture) until
  * it strikes: any rook move from the crowd's move `swap.at + camoStrikeTurn` on. It's revealed when it moves other than
- * as a pawn, when it gives check (directly or discovered), and when the crowd takes it (`reveal`).
+ * as a pawn, when it gives check (directly or discovered), when his move leaves the crowd no move legal on both the
+ * board it sees and the true one ("stuck"), and when the crowd takes it (`reveal`).
  */
 export interface Camouflage {
   /** The side of his forced moves (null until the first is played). */
@@ -775,7 +776,7 @@ export interface Camouflage {
   /** The hidden rook's square now (null: not hidden, revealed or taken). */
   square: string | null;
   /** How it was revealed: after which crowd move (his move after it, or the crowd's move itself when it was taken), where, and how. */
-  reveal?: { at: number; square: string; how: "move" | "check" | "taken"; from?: string };
+  reveal?: { at: number; square: string; how: "move" | "check" | "stuck" | "taken"; from?: string };
 }
 
 /**
@@ -892,10 +893,11 @@ export interface BurnEvent {
  * it lands; his hop, at the start of his turn; his move, as the crowd's turn after it begins); `carrotSpin`, his spin
  * once the race is over (as the crowd's turn after his move begins; `tier`, `prize`, `squares` where the prize went);
  * `carrotWin`, his last carrot pulled: the battle is his (`square`). Smudgy's: `camouflage`, the swap after his second
- * forced move (as the crowd's turn after it begins; `squares`: the rook's square, where a real pawn now stands, then the
- * pawn's, where the rook hides; the app covers his whole pawn row, so nobody sees which); `strike`, the hidden rook
- * revealed by his move (`reveal` "move": a move no pawn could make, `squares` from and to; "check": it gives check, by
- * its own pawn-shaped step or discovered; `square` where it stands), as the crowd's turn after it begins; `rookTaken`,
+ * forced move (as the crowd's turn after it begins; `square`: the rook's old square, where a real pawn now stands; where
+ * the rook hides is not in the moment, only in the view's `camo.square`: the app covers his whole pawn row); `unmask`,
+ * the hidden rook revealed by his move (`reveal` "move": a move no pawn could make, `squares` from and to; "check": it
+ * gives check, by its own pawn-shaped step or discovered; "stuck": his move left the crowd no move legal on the board it
+ * sees as well as the true one; `square` where it stands), as the crowd's turn after it begins; `rookTaken`,
  * the crowd took it (`square`), as the crowd's move lands; `repaint`, his Repaint (his whole turn: as the crowd's turn
  * after it begins; `squares`: his pawn now the crowd's, then the crowd's piece now his).
  */
@@ -933,7 +935,7 @@ export type PowerEventKind =
   | "carrotSpin"
   | "carrotWin"
   | "camouflage"
-  | "strike"
+  | "unmask"
   | "rookTaken"
   | "repaint";
 export interface PowerEvent {
@@ -959,8 +961,8 @@ export interface PowerEvent {
   /** Chub & Chirp's spin: his tier (his carrots) and the prize he got (piece letters; none: a blank). */
   tier?: number;
   prize?: string[];
-  /** Smudgy's strike: how his hidden rook was revealed (a move no pawn could make, or a check). */
-  reveal?: "move" | "check";
+  /** Smudgy's unmask: how his hidden rook was revealed (a move no pawn could make, a check, or the crowd left no move it could see). */
+  reveal?: "move" | "check" | "stuck";
 }
 
 /** The settings behind the God King's Last Stand. */

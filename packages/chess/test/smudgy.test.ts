@@ -13,6 +13,9 @@ import {
   crowdAllowed,
   fenAtPly,
   forcedMoves,
+  hiddenJudged,
+  hiddenRanked,
+  inCheck,
   initPowers,
   keepsDisguise,
   legalMoves,
@@ -26,10 +29,13 @@ import {
   rageOf,
   repaintFrom,
   repaintOptions,
+  rookChecks,
+  seenMoveLeft,
   sideToMove,
   smudgyBattle,
   stockfishRefuses,
   stopReason,
+  toSan,
   swapOptions,
   triggerUltimate,
   type Battle,
@@ -182,7 +188,10 @@ describe("Camouflage: the forced moves", () => {
     expect(pieceAt(masked, c.square!)).toEqual({ color: "b", type: "p" });
     expect([...masked.split(" ")[0]!].filter((x) => x === "p").length).toBe(9);
     // The moment, as the crowd's turn after it begins.
-    expect(r.boss!.powers!.events).toContainEqual({ kind: "camouflage", turn: 3, square: c.square, squares: [c.swap!.rook, c.square] });
+    // (Its fields name only the rook's old square: where it hides is the view's alone.)
+    const moment = r.boss!.powers!.events.find((e) => e.kind === "camouflage")!;
+    expect(moment).toEqual({ kind: "camouflage", turn: 3, square: c.swap!.rook });
+    expect(JSON.stringify(moment)).not.toContain(c.square!);
   });
 
   it("start with his move as White (the crowd Black): the first forced move is due as the battle begins", async () => {
@@ -242,15 +251,52 @@ describe("Camouflage: the hidden rook", () => {
     expect(keepsDisguise("k7/8/8/8/8/4R3/8/4K3 b - - 0 1", "e2", "e3", false, "w")).toBe(true);
   });
 
-  it("its pawn-shaped step is named as a pawn's (the screens' line for his move gives nothing away); a strike is named as it is", () => {
+  it("its pawn-shaped step is named as a pawn's (the screens' line for his move gives nothing away); a move that unmasks it is named as it is", () => {
     const fen = "4k3/4r3/8/8/8/8/8/R5K1 b - - 0 1";
     const rules = bossRules({ id: "smudgy" })!;
     expect(rules.specialMove!(bossOn(fen, hidden("e7"), 4), fen, "e7e6")).toEqual({ play: "e7e6", san: "e6" });
     expect(rules.specialMove!(bossOn(fen, hidden("e7"), 5), fen, "e7a7")).toBeNull();
-    expect(rules.specialMove!(bossOn(fen, hidden("e7"), 4), fen, "e8d8")).toBeNull();
+    // (His other moves too, on the board the crowd sees.)
+    expect(rules.specialMove!(bossOn(fen, hidden("e7"), 4), fen, "e8d8")).toEqual({ play: "e8d8", san: "Kd8" });
     // (A step that checks reveals it: named as the rook's.)
     const open = "4k3/4r3/8/8/8/8/8/R3K3 b - - 0 1";
     expect(rules.specialMove!(bossOn(open, hidden("e7"), 4), open, "e7e6")).toBeNull();
+  });
+
+  it("names every move of his on the board the crowd sees while it hides: his other rook's without a letter the hidden one would add (the review's B1)", () => {
+    const fen = "k6r/3r4/8/8/8/8/8/4K3 b - - 0 1";
+    expect(toSan(fen, "h8d8")).toBe("Rhd8");
+    const rules = bossRules({ id: "smudgy" })!;
+    expect(rules.specialMove!(bossOn(fen, hidden("d7"), 4), fen, "h8d8")).toEqual({ play: "h8d8", san: "Rd8" });
+    // (Through the runner: the dock's line for his move.)
+    const r = battle(5, "w");
+    const board = r.boards.get(0)!;
+    r.boards.set(0, { ...board, fen, bases: [...(board.bases ?? []), { ply: board.history.length, fen }] });
+    r.state = { ...r.state, boss: { ...r.state.boss!, crowdMoves: 4, powers: { ...r.state.boss!.powers!, camo: hidden("d7") } } };
+    r.applyBossMove("h8d8");
+    expect(r.bossView()?.lastMove?.san).toBe("Rd8");
+    // Nothing hidden: named as it is.
+    expect(rules.specialMove!(bossOn(fen, null, 4), fen, "h8d8")).toBeNull();
+  });
+
+  it("an illegal move from a host out of date never breaks its naming (the review's S2)", () => {
+    const fen = "4k3/4r3/8/8/8/8/3K4/8 b - - 0 30";
+    const rules = bossRules({ id: "smudgy" })!;
+    expect(() => rules.specialMove!(bossOn(fen, hidden("e7"), 4), fen, "e7d2")).not.toThrow();
+    expect(rules.specialMove!(bossOn(fen, hidden("e7"), 4), fen, "e7d2")).toBeNull();
+    expect(rules.specialMove!(bossOn(fen, hidden("e7"), 4), fen, "e7f5")).toBeNull();
+  });
+
+  it("is unmasked when his move would leave the crowd no move legal on both boards (the review's S1)", () => {
+    // Bc5 covers g1, Nf1 covers h2: after ...Rf3 (a pawn's step as you see it) your king's only moves run into the rook.
+    const before = "2k5/8/8/p1b5/P4r2/8/8/5n1K b - - 0 1";
+    const after = "2k5/8/8/p1b5/P7/5r2/8/5n1K w - - 1 2";
+    expect(keepsDisguise(after, "f4", "f3", false, "b")).toBe(true);
+    expect(seenMoveLeft(after, "f3")).toBe(false);
+    expect(legalMoves(before)).toContain("f4f3");
+    const b = stub(after, hidden("f4"), 4);
+    smudgyBattle.afterHisMove(b, "f4f3");
+    expect(b.state.boss!.powers!.camo).toMatchObject({ square: null, reveal: { at: 4, square: "f3", how: "stuck", from: "f4" } });
   });
 
   it("makes only those moves until its strike: then any rook move", () => {
@@ -288,7 +334,7 @@ describe("Camouflage: the hidden rook", () => {
     expect(b.state.boss!.powers!.events).toContainEqual({ kind: "rookTaken", turn: 7, square: "d6" });
   });
 
-  it("strikes as his brain wants once it may, and its moment plays as the crowd's turn after it begins", async () => {
+  it("strikes as his brain wants once it may, and its moment (unmask) plays as the crowd's turn after it begins", async () => {
     // Battles on the stand-in engine until one strikes: the strike's turn is never before camoStrikeTurn after the swap.
     let struck = 0;
     for (let seed = 1; seed <= 12 && struck < 2; seed++) {
@@ -299,7 +345,7 @@ describe("Camouflage: the hidden rook", () => {
         const c = r.boss!.powers!.camo;
         if (c?.reveal?.how === "move" && r.boss!.powers!.turn === c.reveal.at + 1) {
           expect(c.reveal.at).toBeGreaterThanOrEqual(c.swap!.at + BOSS_POWERS.camoStrikeTurn);
-          expect(r.boss!.powers!.events.find((e) => e.kind === "strike")).toMatchObject({ reveal: "move", square: c.reveal.square, squares: [c.reveal.from, c.reveal.square] });
+          expect(r.boss!.powers!.events.find((e) => e.kind === "unmask")).toMatchObject({ reveal: "move", square: c.reveal.square, squares: [c.reveal.from, c.reveal.square] });
           struck++;
           break;
         }
@@ -334,6 +380,29 @@ describe("Camouflage: what the crowd sees", () => {
     expect(legalMoves(fen)).toContain("d5d6");
     for (const m of ["d5d6", "d5e5", "d5e6"]) expect(allowed).not.toContain(m);
     expect(allowed).toContain("d5c4");
+  });
+
+  it("the judge never names or rewards a capture of the hidden rook as the best move (the review's B2)", () => {
+    const evaluation = { bestMove: "c5d7", bestExpected: 0.9, expectedAfter: { c5d7: 0.9, b5d7: 0.85, g1f3: 0.55, e2e4: 0.5 } };
+    const judged = hiddenJudged(evaluation, "d7");
+    expect(judged.bestMove).toBe("g1f3");
+    expect(judged.bestExpected).toBe(0.55);
+    expect(judged.expectedAfter).toEqual({ c5d7: 0.55, b5d7: 0.55, g1f3: 0.55, e2e4: 0.5 });
+    // Nothing hidden: unchanged; a best move elsewhere stays, the capture held to it.
+    expect(hiddenJudged(evaluation, null)).toBe(evaluation);
+    expect(hiddenJudged({ ...evaluation, bestMove: "g1f3", bestExpected: 0.95, expectedAfter: { ...evaluation.expectedAfter, g1f3: 0.95 } }, "d7")).toMatchObject({ bestMove: "g1f3", bestExpected: 0.95 });
+    // The hints and the bots: the capture after the best other move.
+    expect(hiddenRanked([{ move: "c5d7", expected: 0.9 }, { move: "g1f3", expected: 0.55 }], "d7").map((m) => [m.move, m.expected])).toEqual([["g1f3", 0.55], ["c5d7", 0.55]]);
+    // Through the runner: a round where a capture of the hidden rook is the engine's best.
+    const r = battle(7, "w");
+    const fen = "4k3/3r4/8/2N5/8/8/8/4K3 w - - 0 30";
+    const board = r.boards.get(0)!;
+    r.boards.set(0, { ...board, fen, bases: [...(board.bases ?? []), { ply: board.history.length, fen }] });
+    r.state = { ...r.state, boss: { ...r.state.boss!, crowdMoves: 4, powers: { ...r.state.boss!.powers!, camo: hidden("d7") } } };
+    r.deal();
+    const round = r.resolveBoard(0, ["h0"], { h0: "e1d2" }, { bestMove: "c5d7", bestExpected: 0.95, expectedAfter: { c5d7: 0.95, e1d2: 0.5, e1f2: 0.52 } });
+    expect(round.bestMove).toBe("e1f2");
+    expect(round.result.players.find((p) => p.playerId === "h0")).toBeTruthy();
   });
 
   it("the judge and the bots score only the crowd's allowed moves, and the turns he hides it don't count for fair play", async () => {
@@ -473,7 +542,13 @@ describe("Smudgy: a small fuzz of whole battles", () => {
       const his = side === "w" ? "b" : "w";
       for (let i = 0; i < 70 && !r.isOver() && !r.stageComplete(); i++) {
         if (i % 7 === 6 && !r.bossToMove()) r.triggerUltimate();
+        // (His move while the rook hides and stays hidden: named on the board the crowd saw; the review's SAN probe.)
+        const hid = r.bossToMove() ? r.boss!.powers!.camo?.square : null;
+        const seenBefore = hid ? maskedFen(fenOf(r), hid) : null;
+        const plies = r.boards.get(0)!.history.length;
         await step(r, (fen, allowed) => crowdPick(fen, allowed, rng));
+        const played = r.boards.get(0)!.history[plies];
+        if (hid && seenBefore && played && r.boss!.powers!.camo?.square && r.bossView()?.lastMove) expect(r.bossView()!.lastMove!.san, `seed ${seed}`).toBe(toSan(seenBefore, played));
         const fen = fenOf(r);
         const board = r.boards.get(0)!;
         const where = `seed ${seed}, ${board.history.join(" ")}`;
@@ -488,6 +563,10 @@ describe("Smudgy: a small fuzz of whole battles", () => {
             const allowed = r.crowdAllowed() ?? legalMoves(fen);
             expect(allowed.length, where).toBeGreaterThan(0);
             for (const m of allowed) expect(legalMoves(masked), where).toContain(m);
+            // Never in a check it can't see, nor in one that isn't there; never stuck on the board it sees.
+            expect(rookChecks(fen, c.square, his), where).toBe(false);
+            expect(inCheck(masked), where).toBe(inCheck(fen));
+            expect(seenMoveLeft(fen, c.square), where).toBe(true);
           }
         }
         expect(r.boss!.powers!.repaints ?? 0).toBeLessThanOrEqual(BOSS_POWERS.repaintMax);

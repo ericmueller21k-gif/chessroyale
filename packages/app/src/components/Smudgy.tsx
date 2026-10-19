@@ -11,9 +11,9 @@ import type { BossUi, MomentUi } from "./PowerParts.tsx";
 const nothing = () => null;
 
 /** The swap (as your turn begins after his second forced move), the strike, the rook taken (as your move lands), Repaint. */
-const MOMENTS: Record<"camouflage" | "strike" | "rookTaken" | "repaint", MomentUi> = {
+const MOMENTS: Record<"camouflage" | "unmask" | "rookTaken" | "repaint", MomentUi> = {
   camouflage: { order: 0, kit: "power", view: nothing },
-  strike: { order: 0, kit: "powerHit", view: nothing },
+  unmask: { order: 0, kit: "powerHit", view: nothing },
   rookTaken: { order: 0, kit: "powerHit", view: nothing },
   repaint: { order: 2, kit: "ultimate", view: nothing },
 };
