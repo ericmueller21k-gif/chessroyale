@@ -29,6 +29,8 @@ export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
   alfil: "alfilTrumpet",
   // Chirp's chirp.
   hopper: "hopperChirp",
+  // A splash of paint.
+  smudgy: "smudgySplash",
   // The Hidden Boss: his low, ominous hum (the stare).
   recluse: "recluseHum",
 };
@@ -44,6 +46,8 @@ export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
   pig: ["Howdy, varmints.", "Saddle up!", "Yee-haw!"],
   alfil: ["Before your bishops, there was me.", "The old piece is back.", "Make room. Big guy coming through.", "Old school wins."],
   hopper: ["Chub and Chirp! Best friends!", "He's Chirp. I'm Chub. We hop.", "Got any carrots?"],
+  // The director's draft (Oct 19), as written: two of his entrance lines and a smug one, which read right outside a match.
+  smudgy: ["Every chameleon blends in. I'd rather stand out.", "Smudgy, artist. Don't touch the wet parts.", "A masterpiece, if I say so myself."],
   // The Hidden Boss (Eric's own first line; never named on screen): the two in turn.
   recluse: ["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."],
 };

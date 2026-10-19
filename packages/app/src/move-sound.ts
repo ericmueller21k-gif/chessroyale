@@ -8,6 +8,15 @@ import { applyMove, pieceAt } from "@chessroyale/chess";
  */
 export function moveKnock(before: string | null | undefined, fen: string, lastMove: string | null | undefined, exact = false): "move" | "capture" | "castle" | null {
   if (!before || !lastMove || before === fen) return null;
+  try {
+    return knockOf(before, fen, lastMove, exact);
+  } catch {
+    // (A position chess can't read, drawn for a moment: Smudgy's revealed rook still a pawn on the back rank. No knock.)
+    return null;
+  }
+}
+
+function knockOf(before: string, fen: string, lastMove: string, exact: boolean): "move" | "capture" | "castle" | null {
   const from = lastMove.slice(0, 2);
   const to = lastMove.slice(2, 4);
   const mover = pieceAt(before, from);

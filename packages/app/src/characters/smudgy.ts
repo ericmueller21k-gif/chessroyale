@@ -1279,6 +1279,53 @@ export const SMUDGY_ATTACK: Character = {
 };
 
 /**
+ * His lines (the director's draft, Oct 19, as written: docs/decisions/2026-10-19-smudgy-wired.md): a cheerful, slightly
+ * vain artist who never blended in like the other chameleons and made peace with it by getting loud about color. Short,
+ * paint and gallery jokes, never mean. `power` is Camouflage's splash over his pawns; `camoStrike` the hidden rook
+ * revealed by his move (the rules' moment `unmask`, which is not the `strike` beat: that is his periodic strike on a
+ * piece); `rookTaken` the crowd taking it; `ultimateWarn` Repaint coming, `ultimate` Repaint itself. How often a
+ * moment speaks: SMUDGY_CHANCE; a power's moment always has its line.
+ */
+export const SMUDGY_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
+  entrance: ["Smudgy, artist. Don't touch the wet parts.", "Every chameleon blends in. I'd rather stand out.", "Hold still. I'm painting you into a corner."],
+  move: ["A little dab here…", "Broad strokes.", "Needs more yellow.", "Light touch."],
+  capture: ["Painted over!", "That one didn't go with the room.", "Into the scrap pile!"],
+  hurt: ["My palette!", "Hey! That was still drying!", "Smudged!"],
+  strike: ["Brush stroke!", "Splat!"],
+  power: ["Now you see it…", "Which one's which? Even I forget.", "Fresh coat for the boys."],
+  camoStrike: ["Surprise! A rook all along!", "Ta-da! Nobody ever notices me. Until now."],
+  rookTaken: ["Hey! How did you know?!", "My masterpiece!"],
+  thinking: ["Where does this one go…", "An artist never rushes."],
+  check: ["Check! Hold that pose!", "Check! Somebody frame this!"],
+  smug: ["A masterpiece, if I say so myself.", "The other chameleons should see me now."],
+  rattled: ["This isn't the picture I had in mind!", "Too many colors! Too many!"],
+  victory: ["Signed, Smudgy!", "Hang it in a gallery!"],
+  defeat: ["Back to the drawing board…", "I wanted to stand out. Not like this."],
+  ultimateWarn: ["My brush is getting itchy…", "Time for a new color scheme."],
+  ultimate: ["Repaint! Your side, my side, who can tell?", "A little white here, a little black there…", "Let's switch things up."],
+  kingAttack: ["Hold still, your majesty. You need a touch-up.", "Yellow's your color, King!", "Splat! Splat! Splat!"],
+};
+/** How often each moment speaks (Chub & Chirp's, plus every one of his powers' moments always: a power's line is always said). */
+export const SMUDGY_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
+  entrance: 1,
+  move: 0.12,
+  capture: 0.6,
+  check: 0.75,
+  hurt: 0.6,
+  thinking: 0.08,
+  smug: 0.8,
+  rattled: 0.8,
+  defeat: 1,
+  victory: 1,
+  strike: 0.8,
+  kingAttack: 1,
+  camoStrike: 1,
+  rookTaken: 1,
+  power: 1,
+  ultimate: 1,
+};
+
+/**
  * The part of him a portrait shows (his head, beret, casque and eyes, and the tip of his brush beside them, which says
  * who he is), in frame pixels.
  */

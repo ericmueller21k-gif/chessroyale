@@ -9,6 +9,7 @@ import { hopperSound } from "./hopper-sounds.ts";
 import { pigSound } from "./pig-sounds.ts";
 import { recluseSound } from "./recluse-sounds.ts";
 import { sawyerSound } from "./sawyer-sounds.ts";
+import { smudgySound } from "./smudgy-sounds.ts";
 
 /**
  * The bosses' synthesized sounds by module, each name its cache's (synth.ts, soundCache): one table for the page and
@@ -27,6 +28,7 @@ const MAKERS = {
   pig: pigSound,
   recluse: recluseSound,
   sawyer: sawyerSound,
+  smudgy: smudgySound,
 } as const;
 
 /** One boss sound: its module and its name there. */

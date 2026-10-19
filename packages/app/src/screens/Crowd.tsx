@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { PowerBoard, crowdView } from "../components/BossPowers.tsx";
-import { applyMove, inCheck, pieceAt, sideToMove, toSan } from "@chessroyale/chess";
+import { applyMove, inCheck, pieceAt, sideToMove } from "@chessroyale/chess";
+import { seenFen, seenSan } from "../camo.ts";
 import { blunderWords, capitalised, crowdMoveCues, type KingCue } from "../godKing.ts";
 import { brilliance, type Augment } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
@@ -202,7 +203,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
       target: from,
       mode: "move" as const,
       startAt: start + landAt,
-      san: toSan(fen, mine.result.playedMove),
+      san: seenSan(fen, mine.result.playedMove),
       piece: pieceAt(fen, from)?.type,
     };
   }, [mine, landAt]);
@@ -229,7 +230,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
       startAt: start + landAt,
       moveAt: start + playAt,
       exitAt,
-      san: toSan(fen, mine.result.playedMove),
+      san: seenSan(fen, mine.result.playedMove),
       piece,
     };
   }, [mine, landAt, playAt]);
@@ -248,7 +249,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   // and goes back as the piece slides back. In the dock, what it loses in plain words.
   const crowdSide = sideToMove(fen);
   const plunge = stand && played && stand.after !== undefined && ts >= LAST_STAND.badgeAt && ts < LAST_STAND.slideAt ? (crowdSide === "w" ? stand.after : 1 - stand.after) : null;
-  const verdict = useMemo(() => (stand ? capitalised(blunderWords(fen, stand)) : ""), [mine]);
+  // (In the words of the board the crowd sees: a boss reply only the hidden rook could make isn't named.)
+  const verdict = useMemo(() => (stand ? capitalised(blunderWords(seenFen(fen), stand)) : ""), [mine]);
   // (On the narrowest phones, "Your chances 52% → 9%" is shortened to "Chances 52% → 9%" to fit the dock.)
   const shortVerdict = verdict.replace(/^Your chances/, "Chances");
   const voters = picks.filter((p) => p.move).length;
@@ -316,7 +318,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                 // The warning: the blunder, and what it loses, in plain words (no numbers but the chances).
                 <>
                   <span class="dock-line">
-                    <strong class="bad blunder-mark">?? Blunder: {toSan(fen, stand.move)}</strong>
+                    <strong class="bad blunder-mark">?? Blunder: {seenSan(fen, stand.move)}</strong>
                   </span>
                   <span class="dock-line blunder-words">
                     <span class="wide-only">{verdict}</span>
@@ -330,7 +332,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                   </span>
                   <span class="dock-line muted">
                     {blow
-                      ? `${toSan(fen, stand.move)} is taken back`
+                      ? `${seenSan(fen, stand.move)} is taken back`
                       : (match.boss?.lastStand?.charges ?? 0) * match.settings.lastStandPowerUps > 0
                         ? `He leaves you ⚡×${(match.boss?.lastStand?.charges ?? 0) * match.settings.lastStandPowerUps}`
                         : alone
@@ -352,11 +354,11 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                   )
                 ) : mine.king ? (
                   <>
-                    <strong class="gold">👑 God King plays {toSan(fen, mine.result.playedMove)}</strong>
+                    <strong class="gold">👑 God King plays {seenSan(fen, mine.result.playedMove)}</strong>
                   </>
                 ) : (
                   <>
-                    <strong>Crowd plays {toSan(fen, mine.result.playedMove)}</strong>{" "}
+                    <strong>Crowd plays {seenSan(fen, mine.result.playedMove)}</strong>{" "}
                     <span class="muted">
                       · {picks.filter((p) => p.move === mine.result.playedMove).length}/{voters}
                     </span>
@@ -365,7 +367,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
               </span>
               <span class={`dock-line muted${me && allowanceNote(me) ? " allowance-words" : ""}`}>
                 {!me
-                  ? `You watched · best ${toSan(fen, mine.bestMove)}`
+                  ? `You watched · best ${seenSan(fen, mine.bestMove)}`
                   : !me.move
                     ? mine.king !== undefined && match.kingCalled
                       ? picks.length > 1
@@ -385,8 +387,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                       // "You: Nbxd7+ ⚡ (+45.3) · the best" needed 182. (The reveal's own words don't fit at all:
                       // docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md.)
                       <>
-                        <span class="dk-verdict">{me.move === mine.bestMove ? "Best move" : `Best was ${toSan(fen, mine.bestMove)}`}</span>
-                        {` · You: ${toSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore)})`}
+                        <span class="dk-verdict">{me.move === mine.bestMove ? "Best move" : `Best was ${seenSan(fen, mine.bestMove)}`}</span>
+                        {` · You: ${seenSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore)})`}
                       </>
                     )}
               </span>
@@ -406,7 +408,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
             const win = landed && r.move === mine.result.playedMove;
             return (
               <div key={r.move} class={`poll-row${win ? " win" : ""}${landed && !win ? " lose" : ""}${r.you ? " you" : ""}`}>
-                <span class="poll-move">{toSan(fen, r.move)}</span>
+                <span class="poll-move">{seenSan(fen, r.move)}</span>
                 <span class="poll-bar">
                   <i style={{ width: `${(100 * r.votes * grow) / top}%` }} />
                 </span>
@@ -417,7 +419,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           })}
           {yourRow && (
             <div class="poll-row you">
-              <span class="poll-move">{toSan(fen, yourRow.move)}</span>
+              <span class="poll-move">{seenSan(fen, yourRow.move)}</span>
               <span class="poll-bar">
                 <i style={{ width: `${(100 * yourRow.votes * grow) / top}%` }} />
               </span>
@@ -439,7 +441,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
               <span class="brilliant-mark" aria-hidden="true">‼</span>
               <span>
                 <strong>{youBrilliant ? "Brilliant! " : "Brilliant move: "}</strong>
-                {bril.moves.map((m) => toSan(fen, m)).join(" / ")} · only {bril.found} of {bril.total} found it
+                {bril.moves.map((m) => seenSan(fen, m)).join(" / ")} · only {bril.found} of {bril.total} found it
                 {youHelped ? " (with a power-up: it doesn't count)" : ""}
               </span>
             </div>
@@ -449,13 +451,13 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
               <>
                 <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore)}</span>
                 <span class="muted small">
-                  {me.move && me.move === mine.bestMove ? `you found the best move, ${toSan(fen, me.move)}` : `${me.move ? `you picked ${toSan(fen, me.move)}` : "no move from you"} · best was ${toSan(fen, mine.bestMove)}`}
+                  {me.move && me.move === mine.bestMove ? `you found the best move, ${seenSan(fen, me.move)}` : `${me.move ? `you picked ${seenSan(fen, me.move)}` : "no move from you"} · best was ${seenSan(fen, mine.bestMove)}`}
                 </span>
                 {/* The opening allowance on your pick: what it took off, or why it didn't (one line). */}
                 {allowanceNote(me) && <span class="allowance-line">{allowanceNote(me)}</span>}
               </>
             ) : (
-              <span class="muted small">Your team watched this one · best was {toSan(fen, mine.bestMove)}</span>
+              <span class="muted small">Your team watched this one · best was {seenSan(fen, mine.bestMove)}</span>
             )}
           </div>
         </div>

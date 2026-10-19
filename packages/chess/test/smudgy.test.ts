@@ -4,7 +4,9 @@ import {
   BOSS_OPENING,
   MatchRunner,
   POWER_FX,
+  PAINT_TEST,
   REPAINT_TEST_MOVES,
+  SMUDGY_BEATS,
   SMUDGY_FX,
   bossAllowed,
   bossRules,
@@ -106,17 +108,20 @@ function bossOn(fen: string, camo: Camouflage | null, crowdMoves: number): BossS
 const hidden = (square: string, swapAt = 2): Camouflage => ({ side: "h", step: 2, missed: 0, due: null, square, swap: { at: swapAt, rook: "h6", pawn: square } });
 
 describe("Smudgy on the roster", () => {
-  it("is on the roster with his powers, hidden from players until his art is wired, and his numbers are in BOSS_POWERS", () => {
+  it("is on the roster with his powers and his art (live: Oct 19), and his numbers are in BOSS_POWERS", () => {
     const def = BOSS_ROSTER.find((d) => d.id === "smudgy")!;
-    expect(def).toMatchObject({ name: "Smudgy", icon: "🦎", kit: null, powers: { passive: "camouflage", ultimate: "repaint" } });
-    expect(isPlayable(def)).toBe(false);
+    expect(def).toMatchObject({ name: "Smudgy", icon: "🦎", kit: "Smudgy", powers: { passive: "camouflage", ultimate: "repaint" } });
+    expect(isPlayable(def)).toBe(true);
     expect(bossRules(def)?.opening?.fromStart).toBe(true);
     expect(BOSS_POWERS).toMatchObject({ camoTries: 3, camoStrikeTurn: 3, repaintBand: [1.5, 2.5], repaintTarget: 2, repaintMax: 2 });
     expect(BOSS_POWERS.rageSpeed.smudgy).toBe(1);
   });
 
-  it("has every moment's length in POWER_FX", () => {
+  it("has every moment's length in POWER_FX, the beats' totals (his animations' cues: packages/app/test/smudgy-wired.test.ts)", () => {
     for (const [k, v] of Object.entries(SMUDGY_FX)) expect(POWER_FX[k as keyof typeof POWER_FX]).toBe(v);
+    expect(SMUDGY_FX).toEqual({ camouflage: SMUDGY_BEATS.camouflage.total, unmask: SMUDGY_BEATS.unmask.total, rookTaken: SMUDGY_BEATS.rookTaken.total, repaint: SMUDGY_BEATS.repaint.total });
+    // (His rook taken plays while he thinks, which lasts at least bossThinkMs's 1200 ms.)
+    expect(SMUDGY_FX.rookTaken).toBeLessThanOrEqual(1200);
   });
 });
 
@@ -581,3 +586,40 @@ describe("Smudgy: a small fuzz of whole battles", () => {
     expect(repaints).toBeGreaterThan(0);
   }, 120_000);
 });
+
+describe("the paint test switch (?paint=1)", () => {
+  it("starts with his rook already hidden on d7 where your king's step onto the d-file is offered by the board you see and refused by the real one", () => {
+    const r = new MatchRunner({ settings: kitSettings({ boss: "smudgy", test: "", maxMoves: 40 }, { bossPaintTest: true }), rng: mulberry32(3), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }] });
+    const board = r.boards.get(r.state.boards[0]!)!;
+    expect(board.fen).toBe(PAINT_TEST.fen);
+    expect(board.bases).toEqual([{ ply: 4, fen: PAINT_TEST.fen }]);
+    expect(replayOk(board.history)).toBe(true);
+    const camo = camoOf(r);
+    expect(camo).toMatchObject({ step: 2, square: "d7", swap: { rook: "h6", pawn: "d7" } });
+    expect(sideToMove(board.fen)).toBe("w");
+    // A position the engine plays (a ninth pawn is only on the board the crowd sees), no check on either board.
+    expect(stockfishRefuses(board.fen)).toBeNull();
+    const seen = maskedFen(board.fen, "d7");
+    expect(pieceAt(seen, "d7")).toEqual({ color: "b", type: "p" });
+    for (const m of ["e1d1", "e1d2"]) {
+      expect(legalMoves(seen)).toContain(m);
+      expect(legalMoves(board.fen)).not.toContain(m);
+      expect(paintRefuses(board.fen, "d7", m)).toBe(true);
+      expect(stopReason(r.bossView()!, board.fen, m)).toBe("paint");
+    }
+    // The moves it allows: those legal on both boards, so the king's other steps and castling.
+    const allowed = r.crowdAllowed() ?? legalMoves(board.fen);
+    expect(allowed).toEqual(expect.arrayContaining(["e1e2", "e1f1", "e1g1"]));
+    expect(allowed).not.toContain("e1d2");
+  });
+});
+
+/** The history is a game from the start (the intro replays it). */
+function replayOk(history: readonly string[]): boolean {
+  try {
+    fenAtPly(history, history.length, undefined);
+    return true;
+  } catch {
+    return false;
+  }
+}

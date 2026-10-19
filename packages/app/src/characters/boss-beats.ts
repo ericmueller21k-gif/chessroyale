@@ -58,6 +58,10 @@ export type Beat =
   | "spinSmall"
   | "spinEmpty"
   | "carrotsAll"
+  // Smudgy's hidden rook revealed by his move (the rules' moment `unmask`; not `strike`, the boss's periodic strike on a
+  // piece), and the crowd taking it.
+  | "camoStrike"
+  | "rookTaken"
   // A boss's attack on a king (its kit's `kingAttack`): the God King in his Last Stand, the crowd's king at its mate.
   | "kingAttack";
 /** The loops it rests in between moments (`ready`: Wrangler's, his meter full). */
@@ -76,6 +80,11 @@ export interface BeatState {
   lastMove: { captured?: string } | null;
   result?: "crowd" | "boss" | "draw" | null;
   victim?: string | null;
+  /**
+   * The board as the crowd sees it (Smudgy's hidden rook a pawn: camo.ts), for everything the character reads off a
+   * position (its material, a check): his mood is never a tell. Default: the position as it is.
+   */
+  seen?: (fen: string) => string;
   /**
    * Wrangler's meter is full and he's waiting to fire (its fill, the same for everyone: his powers' `ready`): his line
    * once, then his ready loop where he'd rest in his mood.
@@ -147,7 +156,9 @@ function before(history: readonly string[], back = 1, bases?: readonly Base[]): 
 export function bossBeat(cfg: BeatLines, s: BeatState): BeatResult {
   const ply = s.history.length;
   const bossSide = s.crowdSide === "w" ? "b" : "w";
-  const now = mood(s.fen, s.crowdSide);
+  const see = s.seen ?? ((f: string) => f);
+  const fen = see(s.fen);
+  const now = mood(fen, s.crowdSide);
   const out = (anim: Beat, loop: Loop, key: string, line = true): BeatResult => ({ anim, loop, key, line: line ? pickLine(cfg, anim, key) : null });
   if (s.stage === "over" || s.result) {
     const r = s.result ?? "draw";
@@ -160,18 +171,18 @@ export function bossBeat(cfg: BeatLines, s: BeatState): BeatResult {
   if (s.stage === "thinking") {
     // The crowd just moved: did it take one of the boss's pieces?
     const prev = before(s.history, 1, s.bases);
-    const took = prev !== null && material(s.fen, bossSide) < material(prev, bossSide);
+    const took = prev !== null && material(fen, bossSide) < material(see(prev), bossSide);
     return took ? out("hurt", "thinking", `hurt:${ply}`) : out("thinking", "thinking", `think:${ply}`);
   }
   const ready = s.ready !== undefined && s.ready !== null;
   if (s.stage === "bossMove") {
-    const anim: Beat = inCheck(s.fen) ? "check" : s.lastMove?.captured ? "capture" : "move";
+    const anim: Beat = inCheck(fen) ? "check" : s.lastMove?.captured ? "capture" : "move";
     return out(anim, ready ? "ready" : now, `${anim}:${ply}`);
   }
   // (Wrangler's meter full: his line once a fill, his ready loop until he fires.)
   if (ready) return out("ready", "ready", `ready:${s.ready}`);
   // The crowd's move: the boss's mood. It says something only when the mood has just changed.
   const prev = before(s.history, 2, s.bases);
-  const changed = now !== "idle" && (prev === null || mood(prev, s.crowdSide) !== now);
+  const changed = now !== "idle" && (prev === null || mood(see(prev), s.crowdSide) !== now);
   return out(now, now, `mood:${now}:${ply}`, changed);
 }

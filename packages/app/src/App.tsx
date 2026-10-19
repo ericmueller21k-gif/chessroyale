@@ -117,6 +117,9 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     ...(raid ? {} : chosenBoss() && bossInUrl() ? { bossId: chosenBoss() } : {}),
     // Testing, solo: ?mate=1, the boss mates you at once (1.f3 e5 2.g4, its move): its attack on your king, then the result.
     ...(q.get("mate") === "1" ? { bossMateTest: true } : {}),
+    // Testing, solo: ?paint=1 (with ?boss=smudgy), his rook already hidden where your king can step into its line: a move the
+    // board you see offers and the real board refuses ("A painted piece stops that move.").
+    ...(q.get("paint") === "1" ? { bossPaintTest: true } : {}),
     // Testing, solo: ?win=1, you mate the boss at once (1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6, your move: Qxf7): a boss beaten.
     ...(q.get("win") === "1" ? { bossWinTest: true } : {}),
     // Testing, solo: ?carrots=N (0 to 5, with ?boss=hopper&power=carrotpatch), N of Chub & Chirp's carrots a step from

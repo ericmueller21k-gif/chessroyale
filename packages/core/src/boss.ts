@@ -165,11 +165,11 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // Smudgy, the chameleon painter (Eric, Oct 19): always from the starting position. Camouflage: his first two moves are
   // forced (an end pawn two squares, that side's rook out through the gap), then the rook swaps places with one of his
   // pawns and hides as a pawn until it strikes (bosses/smudgy.ts). Repaint, at most twice a battle: one of his pawns
-  // painted the crowd's color and one of the crowd's knights or bishops his, his whole turn. Hidden from players until
-  // his art is wired in (`kit: null`; the test link `?boss=smudgy&wip=1`, `&power=repaint`). His offset from the boss
+  // painted the crowd's color and one of the crowd's knights or bishops his, his whole turn. Live with his art (Eric,
+  // Oct 19: docs/decisions/2026-10-19-smudgy-wired.md; the test links `?boss=smudgy`, `&power=repaint`). His offset from the boss
   // sim: 0, at the lobby's strength (his forced opening costs him; at −250 the crowd scored 0.69, at 0 0.44:
   // reports/smudgy-sim.md; docs/decisions/2026-10-19-smudgy-rules.md).
-  { id: "smudgy", name: "Smudgy", icon: "🦎", kit: null, offset: 0, powers: { passive: "camouflage", ultimate: "repaint" } },
+  { id: "smudgy", name: "Smudgy", icon: "🦎", kit: "Smudgy", offset: 0, powers: { passive: "camouflage", ultimate: "repaint" } },
   // The Hidden Boss (working id "recluse"; Eric names him later: his name is this one string, wherever it shows). Hidden
   // from players (admins, Boss alone) except in the Crowd's boss final, which is always him (Eric, Oct 14). His strength
   // is fixed whatever the player's rating (BOSS_BRAIN.fixed: Maia at its top), so his offset is unused. The God King's

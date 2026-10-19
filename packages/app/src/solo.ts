@@ -7,6 +7,7 @@ import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates,
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { playInPlace, setEngineAt, setFigureRun } from "./components/BossCharacter.tsx";
 import { play, warmSounds } from "./sound.ts";
+import { trackCamo } from "./camo.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
 import { ownEngine, pauseEngines, warmEngineServer, withServerRecheck } from "./engine.ts";
@@ -730,11 +731,16 @@ export class SoloMatch implements GameView {
   }
   get boss(): BossView | null {
     const v = this.runner?.bossView();
-    return v ? { ...v, board: v.board } : null;
+    const boss = v ? { ...v, board: v.board } : null;
+    // (What its screens draw of a hidden rook, Smudgy's: camo.ts is told each time the view is made.)
+    trackCamo(boss);
+    return boss;
   }
   private bossSnapshot(justKilled: string | null = null): BossView {
     const v = this.runner.bossView(justKilled)!;
-    return { ...v, board: v.board };
+    const boss = { ...v, board: v.board };
+    trackCamo(boss);
+    return boss;
   }
 
   /**

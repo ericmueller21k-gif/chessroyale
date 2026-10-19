@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { applyMove, fenAtPly, legalMoves, sideToMove, toSan } from "@chessroyale/chess";
+import { applyMove, fenAtPly, legalMoves, sideToMove } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
+import { seenFen, seenSan } from "../camo.ts";
 import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
 import { BoardClock } from "../components/BoardClock.tsx";
 import { EvalBar, knownEval } from "../components/EvalBar.tsx";
@@ -128,6 +129,21 @@ export function PlayScreen({
     () => (powerAllowed ? powerAllowed.filter((m) => m !== barred) : barred ? legalMoves(board.fen).filter((m) => m !== barred) : undefined),
     [board.fen, barred, powerAllowed?.join()],
   );
+  // Smudgy's hidden rook: the board draws it as a pawn, so the moves it offers (the dots) are the ones legal there, and a
+  // move legal there that the real board refuses (your king into the rook's line, a piece it pins) is tried like any
+  // other and stopped on the spot, the dock saying why ("A painted piece stops that move."), never played and snapped
+  // back. If the board it draws had no move at all, the real one is drawn and played (a mate or a stalemate on it is
+  // the game's to end; the rules reveal the rook before that, `unmask` "stuck").
+  const painted = useMemo(() => {
+    const seen = seenFen(board.fen);
+    if (seen === board.fen) return null;
+    const offered = legalMoves(seen).filter((m) => m !== barred);
+    const real = new Set(allowed ?? legalMoves(board.fen));
+    return { offered, noMove: !offered.length, stopped: (m: string) => !real.has(m) };
+  }, [board.fen, allowed?.join(), barred]);
+  const drawnTrue = !!painted?.noMove;
+  const offeredMoves = painted && !painted.noMove ? painted.offered : allowed;
+  const stoppedMove = painted && !painted.noMove ? painted.stopped : undefined;
   // The crowd's view of the board: its own side, or turned in Boingo's funhouse (upside down, or a quarter turn).
   const view = match.boss ? crowdView(match.boss, side) : { orientation: side === "w" ? ("white" as const) : ("black" as const), turn: 0 as const };
   const orientation = view.orientation;
@@ -182,10 +198,12 @@ export function PlayScreen({
   // What the God King might say about the position: danger first, then how it's going, then small talk.
   const kingCues = useMemo(() => {
     if (!match.boss || waiting) return [];
-    kingTurn(board.fen);
+    // (The God King speaks of the board you see: a hidden rook's threat isn't one he warns of.)
+    const seen = seenFen(board.fen);
+    kingTurn(seen);
     const w = knownEval(board.fen);
-    const prevFen = board.history.length >= 2 ? fenAtPly(board.history, board.history.length - 2, board.bases) : undefined;
-    const cues = turnCues({ fen: board.fen, side, charges: match.boss.kingCharges, ply: board.ply, ours: w === undefined ? undefined : side === "w" ? w : 1 - w, struckAt: strike?.at, prevFen, noHelp: kingBlocked(match.boss) });
+    const prevFen = board.history.length >= 2 ? seenFen(fenAtPly(board.history, board.history.length - 2, board.bases)) : undefined;
+    const cues = turnCues({ fen: seen, side, charges: match.boss.kingCharges, ply: board.ply, ours: w === undefined ? undefined : side === "w" ? w : 1 - w, struckAt: strike?.at, prevFen, noHelp: kingBlocked(match.boss) });
     // (Wrangler's forced duel: the move must be a duel, so "move your queen" or "shield the king" can't be heeded.)
     return duelTurn(match.boss) ? cues.filter((c) => c.cue !== "queenDanger" && c.cue !== "mateThreat") : cues;
   }, [board.fen, strike?.at, waiting]);
@@ -222,7 +240,7 @@ export function PlayScreen({
         <div class="board-row">
           {match.boss && <BossSide match={match} />}
           <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={fen} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} onRefused={match.boss ? (m) => setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing ? undefined : match.boss?.powers?.elephants}>
+          <Board fen={fen} unmasked={drawnTrue} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={offeredMoves} stopped={stoppedMove} onMove={(m) => match.submit(m)} onRefused={match.boss ? (m) => setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing ? undefined : match.boss?.powers?.elephants}>
             {/* (Stepping back through the game keeps the dark on its squares: it belongs to the square.) */}
             {match.boss?.powers && (!history.browsing || dark.length > 0) && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
             {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} />}
@@ -317,7 +335,7 @@ export function PlayScreen({
                 ) : hint !== null ? (
                   <span class="muted">{hint.length ? "⚡ Top 3" : "⚡ Asking the engine…"}</span>
                 ) : barred ? (
-                  <span class="muted barred-note">✕ {toSan(board.fen, barred)}</span>
+                  <span class="muted barred-note">✕ {seenSan(board.fen, barred)}</span>
                 ) : bulletOn(match.boss) ? (
                   // (The Hidden Boss's bullet clock, on every move to the end; once he has added time per move, the time
                   // control too: "Bullet 1+2". What's left in your bank is the dock's clock, at the box's right.)

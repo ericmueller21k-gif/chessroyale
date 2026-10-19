@@ -154,6 +154,23 @@
  *                               or lost, then the reel; the prize pieces drop onto their squares. Lines: `spinBig`,
  *                               `spinSmall`, `spinEmpty`; his fifth carrot (no spin): `carrotsAll`.
  *
+
+ *   "Smudgy"
+ *     power        "camouflage" Camouflage's splash (as your turn begins after his second forced move): he dips the brush on
+ *                               his palette (`dab`), winds back and flings it; at `splash` the paint leaves the brush: fly
+ *                               `paintFly` to his pawn row, land `paintSplash` on every square with one of his pawns (so no
+ *                               one can see which swapped), hold it while the rook swaps with a pawn under it, then fade it
+ *                               on the board the crowd sees (components/Smudgy.tsx).
+ *     powerHit     "strike"     The reveal (his hidden rook moves as no pawn could, gives check, or leaves you no move you
+ *                               can see): the tail snaps open and the beret leaps off; at `drip` the paint drips off the
+ *                               piece's square (`paintDrip`) as it shows as a rook. Lines: `kit.lines.camoStrike`.
+ *     ultimateWarn "check"      His brush pointed ahead, for the warning.
+ *     ultimate     "repaint"    Two strokes: at `stroke1` a cream `brushStroke` on his pawn's square (it becomes yours), at
+ *                               `stroke2` a charcoal one on your piece's square (it becomes his); the pieces change color
+ *                               at each stroke.
+ *     ultimateHit  "hurt"       The crowd takes the hidden rook (as your move lands): a drip on its square, his oof. Lines:
+ *                               `kit.lines.rookTaken`.
+
  *   Each moment's animation is in the kit (`BOSS_KITS[name].anims[power | ultimateWarn | ultimate]`), its lines
  *   are `kit.lines.power / ultimateWarn / ultimate` (pick with `pickLine(kit, "power", key)` from boss-beats.ts,
  *   keyed by the moment so every player gets the same line), and its sounds fire from its frames' cues.
@@ -215,6 +232,16 @@
  *                          king, high or low, from the left or right: a white flash and eight sparks bursting out.
  *   lashHit        square  hit<F|B><L|R><c> (ends empty, about 200 ms): a lash of Hollow's strand landing on a king,
  *                          a forehand (high) or backhand (low, rising), from the left or right edge, in bulb color c.
+ *   paintSplash    square  land<A|B|C> (a splash of paint lands over a piece: it spreads, `splat`; ends on hold's look),
+ *                          hold<A|B|C> (loop, a gleam moving on it), fade<A|B|C> (it thins and dries away, ends empty). Three
+ *                          shapes, in turn along a row of pawns. It covers the piece under it (a test measures that).
+ *   paintDrip      square  drip (ends empty, 470 ms, `drip` on its first frame): the paint on a piece's square, its drips
+ *                          running down; the piece shows through under it.
+ *   brushStroke    square  stroke<C|N> (ends empty, 340 ms, `swoosh`): a swoosh of cream (C: white's color) or charcoal (N:
+ *                          black's) paint across the square, bristle streaks in it, flecks flying.
+ *   paintFly       square  fly (loop): a blob of paint wobbling; move it from his brush to the square.
+ *   paintHit       square  hit<H|L><L|R> (ends empty, about 200 ms): a blob of paint splatting on a king's head (high) or a
+ *                          little lower, from the left or right edge: it splats, runs and drips (Smudgy's attack on a king).
  *
  * Play them with <BossEffect> (components/BossEffect.tsx), which plays their sounds from the frames' cues, once,
  * through the mute switch; or render frames yourself with `renderFrame`. For many square effects at once (G-REX's
@@ -264,6 +291,10 @@ export const POWER_ANIMS = [
   "carrotPatch",
   "raceWon",
   "raceLost",
+  "camouflage",
+  "strike",
+  "repaint",
+  "hurt",
 ] as const;
 export type PowerAnim = (typeof POWER_ANIMS)[number];
 
@@ -362,6 +393,14 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
     ultimateHit: { anim: "raceWon" },
     more: { raceLost: { anim: "raceLost" } },
   },
+  "Smudgy": {
+    power: { anim: "camouflage", hit: "splash", effects: ["paintFly", "paintSplash"] },
+    powerHit: { anim: "strike", hit: "drip", effects: ["paintDrip"] },
+    ultimateWarn: { anim: "check" },
+    ultimate: { anim: "repaint", hit: "stroke1", effects: ["brushStroke"] },
+    // (The crowd takes the hidden rook: a drip on its square, his oof where he stands.)
+    ultimateHit: { anim: "hurt", effects: ["paintDrip"] },
+  },
   "Alfil": {
     power: { anim: "tusksCast", hit: "cast" },
     powerHit: { anim: "tusksFuse", hit: "flash" },
@@ -444,6 +483,11 @@ export const EFFECTS: Record<EffectName, Effect> = {
   carrotFly: { ch: EFFECT_SPRITES.carrotFly, covers: "square", loop: "fly", sounds: {} },
   carrotHit: { ch: EFFECT_SPRITES.carrotHit, covers: "square", start: "hitHL", sounds: {} },
   carrotIcon: { ch: EFFECT_SPRITES.carrotIcon, covers: "strip", loop: "icon", sounds: {} },
+  paintSplash: { ch: EFFECT_SPRITES.paintSplash, covers: "square", start: "landA", loop: "holdA", end: "fadeA", sounds: { splat: "smudgySplash" } },
+  paintDrip: { ch: EFFECT_SPRITES.paintDrip, covers: "square", start: "drip", sounds: { drip: "smudgyDrip" } },
+  brushStroke: { ch: EFFECT_SPRITES.brushStroke, covers: "square", start: "strokeC", sounds: { swoosh: "smudgySwish" } },
+  paintFly: { ch: EFFECT_SPRITES.paintFly, covers: "square", loop: "fly", sounds: {} },
+  paintHit: { ch: EFFECT_SPRITES.paintHit, covers: "square", start: "hitHL", sounds: {} },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------
@@ -634,4 +678,9 @@ export function popItem(square: string, i: number, from: "L" | "R", since: numbe
 /** Chub's i-th carrot bonking the king (high, then a little lower, in turn), from his side. */
 export function carrotItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   return { square, name: "carrotHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
+}
+
+/** Smudgy's i-th blob of paint splatting on the king's square (on its head, then a little lower, in turn), from his side. */
+export function paintItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "paintHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }

@@ -11,8 +11,9 @@ describe("the boss template: who can be met", () => {
     expect(playableBosses([base, { ...base, id: "y", kit: null }, { ...base, id: "z", powers: null }]).map((b) => b.id)).toEqual(["x"]);
   });
 
-  it("today: Ginger (Freeze), Boingo the Clown, Jefferson (Fire), Hollow (Darkness), Big Boy (toy blocks, the Big Bounce), Sawyer (saw cuts, the board saw), Wrangler (the lasso drag, the showdown), Alfil (Tusks, the Mammoth Slam) and Chub & Chirp (Leapfrog, the Carrot Patch)", () => {
-    expect(playableBosses().map((b) => b.id).sort()).toEqual(["alfil", "bigboy", "clown", "gingerbread", "grex", "hollow", "hopper", "pig", "sawyer"]);
+  it("today: Ginger (Freeze), Boingo the Clown, Jefferson (Fire), Hollow (Darkness), Big Boy (toy blocks, the Big Bounce), Sawyer (saw cuts, the board saw), Wrangler (the lasso drag, the showdown), Alfil (Tusks, the Mammoth Slam), Chub & Chirp (Leapfrog, the Carrot Patch) and Smudgy (Camouflage, Repaint)", () => {
+    expect(playableBosses().map((b) => b.id).sort()).toEqual(["alfil", "bigboy", "clown", "gingerbread", "grex", "hollow", "hopper", "pig", "sawyer", "smudgy"]);
+    expect(BOSS_ROSTER.find((b) => b.id === "smudgy")).toMatchObject({ name: "Smudgy", icon: "🦎", kit: "Smudgy", offset: 0, powers: { passive: "camouflage", ultimate: "repaint" } });
     expect(BOSS_ROSTER.find((b) => b.id === "hopper")).toMatchObject({ name: "Chub & Chirp", icon: "🐇", kit: "Chub & Chirp", offset: -250, powers: { passive: "leapfrog", ultimate: "carrotpatch" } });
     expect(BOSS_ROSTER.find((b) => b.id === "alfil")).toMatchObject({ name: "Alfil", icon: "🦣", kit: "Alfil", offset: -250, powers: { passive: "tusks", ultimate: "slam" } });
     expect(BOSS_ROSTER.find((b) => b.id === "pig")).toMatchObject({ name: "Wrangler", icon: "🤠", kit: "Wrangler", powers: { passive: "drag", ultimate: "showdown" } });
@@ -57,7 +58,7 @@ describe("the boss template: who can be met", () => {
       // A picked boss that isn't playable is never met.
       expect(isPlayable(chooseBoss(i / 100, "golem"))).toBe(true);
     }
-    expect(seen).toEqual(new Set(["alfil", "bigboy", "clown", "gingerbread", "grex", "hollow", "hopper", "pig", "sawyer"]));
+    expect(seen).toEqual(new Set(["alfil", "bigboy", "clown", "gingerbread", "grex", "hollow", "hopper", "pig", "sawyer", "smudgy"]));
     expect(chooseBoss(0.99, "clown", "clown").id).toBe("clown");
     // With one playable boss, it's met even if it was the last one.
     const one: BossDef[] = [{ id: "a", name: "A", icon: "a", kit: "A", offset: 0, powers: { passive: "pie", ultimate: "funhouse" } }];
