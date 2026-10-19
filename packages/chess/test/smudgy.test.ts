@@ -242,6 +242,17 @@ describe("Camouflage: the hidden rook", () => {
     expect(keepsDisguise("k7/8/8/8/8/4R3/8/4K3 b - - 0 1", "e2", "e3", false, "w")).toBe(true);
   });
 
+  it("its pawn-shaped step is named as a pawn's (the screens' line for his move gives nothing away); a strike is named as it is", () => {
+    const fen = "4k3/4r3/8/8/8/8/8/R5K1 b - - 0 1";
+    const rules = bossRules({ id: "smudgy" })!;
+    expect(rules.specialMove!(bossOn(fen, hidden("e7"), 4), fen, "e7e6")).toEqual({ play: "e7e6", san: "e6" });
+    expect(rules.specialMove!(bossOn(fen, hidden("e7"), 5), fen, "e7a7")).toBeNull();
+    expect(rules.specialMove!(bossOn(fen, hidden("e7"), 4), fen, "e8d8")).toBeNull();
+    // (A step that checks reveals it: named as the rook's.)
+    const open = "4k3/4r3/8/8/8/8/8/R3K3 b - - 0 1";
+    expect(rules.specialMove!(bossOn(open, hidden("e7"), 4), open, "e7e6")).toBeNull();
+  });
+
   it("makes only those moves until its strike: then any rook move", () => {
     const fen = "4k3/4r3/8/8/8/8/8/R3K3 b - - 0 1";
     const rookMoves = (allowed: string[] | null) => (allowed ?? legalMoves(fen)).filter((m) => m.startsWith("e7")).sort();

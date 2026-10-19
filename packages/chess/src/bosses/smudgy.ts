@@ -41,7 +41,7 @@
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type Camouflage, type PowerEvent, type RepaintResult } from "@chessroyale/core";
 import { BOSS_OPENING, newBoard } from "../boards.ts";
-import { applyMove, legalMoves, mateInOne, pieceAt, sideToMove, withPiece } from "../rules.ts";
+import { applyMove, legalMoves, mateInOne, pieceAt, sideToMove, toSan, withPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { stockfishRefuses } from "../uci.ts";
 import { from, meterFull, other, passScores, powerRoll, testSwitch, to, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
@@ -335,8 +335,15 @@ export async function repaintFrom(
   any = false,
   s: Pick<BossPowerSettings, "repaintBand" | "repaintTarget" | "repaintNodes" | "bouncePawnLogit"> = BOSS_POWERS,
 ): Promise<{ fen: string; gain: number; outside: boolean } | null> {
-  const scores = await passScores(engines, fen, candidates, s.repaintNodes, s);
-  if (!scores?.length) return null;
+  return repaintPick((await passScores(engines, fen, candidates, s.repaintNodes, s)) ?? [], any, s);
+}
+
+/** The pick among scored pairs (repaintFrom's rule, pure; the sims log every pair's gain with it). */
+export function repaintPick(
+  scores: readonly { fen: string; gain: number }[],
+  any = false,
+  s: Pick<BossPowerSettings, "repaintBand" | "repaintTarget"> = BOSS_POWERS,
+): { fen: string; gain: number; outside: boolean } | null {
   const [lo, hi] = s.repaintBand;
   const inBand = scores.filter((x) => x.gain >= lo && x.gain <= hi);
   const pool = inBand.length ? inBand : any ? scores : [];
@@ -442,6 +449,20 @@ export const SMUDGY: BossRules = {
     const mover = pieceAt(fen, from(move));
     if (!rook || !mover || mover.color === rook.color) return null;
     return paintRefuses(fen, sq, move) ? "paint" : null;
+  },
+  // The hidden rook's pawn-shaped step is named as a pawn's ("e6", not "Re6": the screens' line for his move), so the
+  // move's name gives nothing away. Any other move is named as it is (a strike or a check reveals it anyway).
+  specialMove(boss, fen, move) {
+    const sq = boss.powers?.camo?.square;
+    if (!sq || from(move) !== sq || pieceAt(fen, sq)?.type !== "r") return null;
+    const his = other(boss.crowdSide);
+    const after = applyMove(fen, move);
+    if (!keepsDisguise(after, sq, to(move), !!pieceAt(fen, to(move)), his) || rookChecks(after, to(move), his)) return null;
+    try {
+      return { play: move, san: toSan(maskedFen(fen, sq), move) };
+    } catch {
+      return null;
+    }
   },
   // The crowd's turns while his rook hides (the engine sees it, the crowd doesn't) and the turn after a Repaint (the board
   // changed): its picks don't count for fair play.

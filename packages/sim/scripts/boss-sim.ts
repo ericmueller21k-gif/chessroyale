@@ -37,7 +37,7 @@
  */
 import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, PASS_WAIT, applyMove, bossMoveFrom, repaintFrom, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, PASS_WAIT, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -307,7 +307,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         waits: [] as number[],
       };
       // (Smudgy: every Repaint tried, and the turns none fitted.)
-      const smudgy = { repaints: [] as { at: number; of: number; gain: number; pawn: string; piece: string }[], waits: [] as { at: number; of: number }[] };
+      const smudgy = { repaints: [] as { at: number; of: number; gain: number; pawn: string; piece: string; gains: number[] }[], waits: [] as { at: number; of: number; gains: number[] }[] };
       const t0 = Date.now();
       while (!runner.isOver()) {
         if (runner.stageComplete()) {
@@ -376,15 +376,18 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             const at = runner.boss!.crowdMoves;
             const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
             const candidates = runner.repaintCandidates();
-            const pick = await repaintFrom(engines, fen, candidates, runner.repaintAny());
+            // (repaintFrom's own steps, every pair's gain kept for the log.)
+            const scores = (await passScores(engines, fen, candidates, BOSS_POWERS.repaintNodes)) ?? [];
+            const gains = scores.map((x) => Math.round(x.gain * 100) / 100).sort((a, b) => a - b);
+            const pick = repaintPick(scores, runner.repaintAny());
             const done = runner.applyRepaint(pick?.fen ?? null, pick?.gain ?? null);
             if (done) {
-              smudgy.repaints.push({ at, of: candidates.length, gain: pick!.gain, pawn: done.pawn, piece: done.piece });
+              smudgy.repaints.push({ at, of: candidates.length, gain: pick!.gain, pawn: done.pawn, piece: done.piece, gains });
               ults.push({ kind: "repaint", turn: at });
               look();
               continue;
             }
-            smudgy.waits.push({ at, of: candidates.length });
+            smudgy.waits.push({ at, of: candidates.length, gains });
           }
           if (bossId === "hopper") {
             const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
