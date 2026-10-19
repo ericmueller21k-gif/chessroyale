@@ -2661,3 +2661,99 @@ export const SQUADS: SquadsSettings = {
  * has always been (its board was set up never to show it).
  */
 export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: false };
+
+/**
+ * Auto chess, the demo (Oct 19, 2026; docs/decisions/2026-10-19-autochess-demo.md): you and a bot buy pieces with gold
+ * (the king is placed by the game), scout, nudge your pieces once, and the engine plays the position out for both sides.
+ * Every number is here so it can be tuned after Eric plays it ("we're just testing this thing"). Nothing carries over
+ * between rounds but gold, HP and the win streak (design v4): each round starts with only the two kings.
+ */
+export interface AutoChessSettings {
+  /** What each piece costs in the shop (a pawn 10 ... a queen 90: the chess value times ten, a bishop a little over a knight). */
+  readonly prices: { readonly p: number; readonly n: number; readonly b: number; readonly r: number; readonly q: number };
+  /** Selling a piece gives back this share of its price, rounded down (P9 N27 B28 R45 Q81). */
+  readonly sellBack: number;
+  /** The buy-and-place step, its locked end (no buying, selling or moving), and how far behind the opponent's circles show. */
+  readonly buySeconds: number;
+  readonly lockSeconds: number;
+  readonly circlesDelaySeconds: number;
+  /** The reveal and adjust step: each piece may make one legal chess move on your own half. */
+  readonly adjustSeconds: number;
+  /** The most pieces a side may move while adjusting (null: every piece may move once). */
+  readonly adjustMoveCap: number | null;
+  /** Pieces waiting off the board between the board and the shop. */
+  readonly benchSlots: number;
+  /** The kings stand on a random square of each side's back this-many ranks. */
+  readonly kingRanks: number;
+  /** The fight: one move about this often, each searched to this many nodes (the same for both sides). */
+  readonly fightMoveMs: number;
+  readonly fightNodes: number;
+  /** A fight stops after this many moves a side; the side with more material (P1 N3 B3 R5 Q9) wins, equal is a draw. */
+  readonly moveCap: number;
+  /** Hit points each; the first to 0 loses. A lost round costs `damageBase` plus `damagePerPiece` for every enemy piece (not the king) left. */
+  readonly hp: number;
+  readonly damageBase: number;
+  readonly damagePerPiece: number;
+  /** Gold at the start of round 1, before its income. */
+  readonly startGold: number;
+  /** A round's income: `first` in round 1, `step` more each round, up to `max`. */
+  readonly income: { readonly first: number; readonly step: number; readonly max: number };
+  /** Interest on gold banked before the income: `gold` for every full `per` banked, up to `max`. */
+  readonly interest: { readonly per: number; readonly gold: number; readonly max: number };
+  /** After a fight each side gets this share (rounded down) of the summed price of its pieces still on the board, win or lose; bench pieces get all of theirs back. */
+  readonly survivorRefund: number;
+  /**
+   * Gold for a streak, at the start of the next round: from `n` rounds in a row, `gold` (the highest row that fits). A draw
+   * ends both streaks. The loss streak's gold is 0 (off): a setting to try if rounds snowball.
+   */
+  readonly winStreakGold: readonly { readonly n: number; readonly gold: number }[];
+  readonly lossStreakGold: readonly { readonly n: number; readonly gold: number }[];
+  /** The legal-position limits (the engine refuses others): queens owned, pawns owned, pawns in one file. */
+  readonly queenLimit: number;
+  readonly maxPawns: number;
+  readonly pawnsPerFile: number;
+  /** The bot: the chance it keeps a hundred banked for interest (when it has the gold to), how many moves it tries while adjusting, and the search it uses. */
+  readonly bot: {
+    readonly saveChance: number;
+    readonly adjustTries: number;
+    readonly adjustDestinations: number;
+    readonly adjustNodes: number;
+    readonly adjustMargin: number;
+  };
+}
+
+export const AUTOCHESS: AutoChessSettings = {
+  prices: { p: 10, n: 30, b: 32, r: 50, q: 90 },
+  sellBack: 0.9,
+  buySeconds: 30,
+  lockSeconds: 3,
+  circlesDelaySeconds: 2,
+  adjustSeconds: 15,
+  adjustMoveCap: null,
+  benchSlots: 8,
+  kingRanks: 2,
+  fightMoveMs: 350,
+  fightNodes: 6000,
+  moveCap: 60,
+  hp: 20,
+  damageBase: 2,
+  damagePerPiece: 1,
+  startGold: 0,
+  income: { first: 100, step: 20, max: 200 },
+  interest: { per: 100, gold: 10, max: 30 },
+  survivorRefund: 0.25,
+  winStreakGold: [
+    { n: 2, gold: 10 },
+    { n: 4, gold: 20 },
+    { n: 5, gold: 30 },
+  ],
+  lossStreakGold: [
+    { n: 2, gold: 0 },
+    { n: 4, gold: 0 },
+    { n: 5, gold: 0 },
+  ],
+  queenLimit: 1,
+  maxPawns: 8,
+  pawnsPerFile: 3,
+  bot: { saveChance: 0.3, adjustTries: 24, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
+};

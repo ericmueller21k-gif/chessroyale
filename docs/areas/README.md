@@ -14,6 +14,7 @@ and `docs/history/`.
 | Matchmaking, lobbies and ranked | [matchmaking.md](matchmaking.md) | `hub` (joining), `ranked` (matching rules) |
 | Ranked 1 v 1: classic chess, the on-board time-control vote, ranks and placements | [ranked.md](ranked.md) | `ranked` (ratings, ranks, pairing), the director (rules, screens) |
 | The front door: home, queue, profiles, the live line | [hub.md](hub.md) | `hub` |
+| Auto chess, the demo: buy chess pieces with gold, place them, the engine plays the position out (a bot, in the browser) | [autochess.md](autochess.md) | the director |
 | Accounts and sign-in | [accounts.md](accounts.md) | `hub` |
 | Chat: quick chat, lobby chat, global chat | [chat.md](chat.md) | `social` |
 | The shop, crates, the locker and the icon builder | [shop.md](shop.md) | `item-builder` |

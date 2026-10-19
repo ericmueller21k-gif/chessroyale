@@ -34,6 +34,7 @@ import { setLiveBusy, startLive } from "./live.ts";
 import { setInviteHost } from "./friends.ts";
 import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
+import { AutoChessScreen } from "./screens/AutoChess.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, type FrontNav } from "./components/FrontMenu.tsx";
@@ -261,6 +262,8 @@ export function App() {
   /** The Boss raid screen (its card on home, the side menu's Boss raid, ?mode=raid). */
   const [raidOpen, setRaidOpen] = useState(raidInUrl);
   const [legal, setLegal] = useState<LegalPage | null>(() => legalPageOf(location.pathname));
+  /** Auto chess, the demo (/autochess: Home's thin button; client-only, no account needed). */
+  const [showAutoChess, setShowAutoChess] = useState(() => location.pathname === "/autochess");
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
   const [inviteSkipped, setInviteSkipped] = useState(false);
@@ -1153,6 +1156,16 @@ export function App() {
       </>
     );
   }
+  if (!match && showAutoChess) {
+    return (
+      <AutoChessScreen
+        onBack={() => {
+          setShowAutoChess(false);
+          history.replaceState(null, "", "/");
+        }}
+      />
+    );
+  }
   if (!match && legal) {
     return (
       <LegalScreen page={legal} onBack={() => leaveLegal(() => setLegal(null))} />
@@ -1325,6 +1338,10 @@ export function App() {
         onProfile={() => openProfile({ you: true, name: account().profile?.user.name ?? "" })}
         onSettings={() => setShowSettings(true)}
         onShop={() => setShowShop("shop")}
+        onAutoChess={() => {
+          setShowAutoChess(true);
+          history.replaceState(null, "", "/autochess");
+        }}
       />
     </FrontFrame>
     );

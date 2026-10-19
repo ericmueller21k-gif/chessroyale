@@ -439,6 +439,13 @@
       ],
       "specs": ["e2e/friends.spec.ts", "e2e/global-chat.spec.ts", "e2e/home-layout.spec.ts", "e2e/live-window.spec.ts"]
     },
+    "Auto chess, the demo": {
+      "paths": [
+        "packages/app/src/autochess/**",
+        "packages/app/src/screens/AutoChess.tsx"
+      ],
+      "specs": ["e2e/autochess.spec.ts", "e2e/home-layout.spec.ts"]
+    },
     "Settings, light and dark, install": {
       "paths": [
         "packages/app/src/screens/Settings.tsx",
