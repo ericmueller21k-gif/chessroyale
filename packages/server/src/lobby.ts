@@ -20,6 +20,7 @@ import {
   legalMoves,
   netBoard,
   boardSlots,
+  maskedFen,
   toSan,
   type BoardRound,
   type BoardScore,
@@ -3016,7 +3017,22 @@ export class LobbyCore {
     const played = b.result.playedMove;
     const top = [...counts.entries()].sort((x, y) => y[1] - x[1] || (x[0] === played ? -1 : y[0] === played ? 1 : 0)).slice(0, 3);
     const board = this.runner?.boards.get(b.boardId);
-    this.r.liveVotes = { ply: board?.history.length ?? 0, votes: top.map(([m, n]) => [toSan(b.fenBefore, m), n]) };
+    // (Named on the board the crowd sees: Smudgy's hidden rook a pawn, as the home page shows it too.)
+    const fen = maskedFen(b.fenBefore, this.hiddenRook(played));
+    this.r.liveVotes = { ply: board?.history.length ?? 0, votes: top.map(([m, n]) => [toSan(fen, m), n]) };
+  }
+
+  /**
+   * Where Smudgy's rook hides now (null: nowhere), for what the home page shows of a running battle: anyone may look at it
+   * (the live window), so its board is the one the crowd sees, the rook a pawn. `taken`: the crowd's move just played, which
+   * may be the one that took it (the votes on it are named on the board as it was).
+   */
+  private hiddenRook(taken?: string): string | null {
+    const boss = this.runner?.state.boss;
+    const camo = boss?.powers?.camo;
+    if (!boss || boss.result || !camo) return null;
+    if (camo.square) return camo.square;
+    return taken && camo.reveal?.how === "taken" && camo.reveal.square === taken.slice(2, 4) ? camo.reveal.square : null;
   }
 
   /** What the live line and the "playing now" list need to know about this lobby (and, for Crowd and raids, its board). */
@@ -3041,7 +3057,7 @@ export class LobbyCore {
       total: runner ? runner.state.players.length : null,
       bossElo: this.settings.raid ? (this.settings.bossFixedElo ?? null) : null,
       startedAt: this.r.startedAt ?? this.r.auto?.filledAt ?? null,
-      board: b ? { fen: b.fen, lastMove: b.lastMove, votes: votes && votes.ply === b.history.length ? votes.votes : [], ply: b.history.length } : null,
+      board: b ? { fen: maskedFen(b.fen, this.hiddenRook()), lastMove: b.lastMove, votes: votes && votes.ply === b.history.length ? votes.votes : [], ply: b.history.length } : null,
     };
   }
 
