@@ -34,6 +34,7 @@ import {
   slamAhead,
   slamFrom,
   hopFrom,
+  repaintFrom,
   allowedSearch,
   jobRanked,
   jobOffers,
@@ -715,6 +716,8 @@ export class NetMatch implements GameView {
           });
         if (m.slam) return void this.hostPick(m.key, async (engines) => (await slamFrom(engines, m.fen, m.slam!))?.fen ?? null);
         if (m.hop) return void this.hostPick(m.key, async (engines) => (await hopFrom(engines, m.fen, m.hop!))?.fen ?? null);
+        // (Smudgy's Repaint: the pair within the band, nearest its target; none: "", and he moves.)
+        if (m.repaint) return void this.hostPick(m.key, async (engines) => (await repaintFrom(engines, m.fen, m.repaint!, !!m.repaintAny))?.fen ?? null);
         // (Chub & Chirp's Carrot Patch cast spends his whole turn: only the pass guard to ask.)
         if (m.pass) return void this.hostPick(m.key, (engines) => castAnswer(engines, m.fen));
         return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null);

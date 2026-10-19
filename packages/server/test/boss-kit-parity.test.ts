@@ -16,6 +16,7 @@ import {
   legalMoves,
   pigTurn,
   repliesFrom,
+  repaintFrom,
   slamAhead,
   slamFrom,
   type BoardScore,
@@ -69,6 +70,7 @@ async function hostBoss(engine: EngineLike, s: Settings, m: Extract<Msg, { t: "b
   if (m.fuse) return reply((await fuseFrom(engines, m.fen, m.fuse, undefined, m.land?.length ? slamAhead(m.land).after : null))?.fen ?? "");
   if (m.slam) return reply((await slamFrom(engines, m.fen, m.slam))?.fen ?? "");
   if (m.hop) return reply((await hopFrom(engines, m.fen, m.hop))?.fen ?? "");
+  if (m.repaint) return reply((await repaintFrom(engines, m.fen, m.repaint, !!m.repaintAny))?.fen ?? "");
   const kind = m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo";
   const ahead = m.land?.length && !m.funhouse ? slamAhead(m.land) : null;
   const look = m.race && !m.funhouse ? { race: m.race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;
@@ -166,6 +168,8 @@ async function solo(start: MatchRunner): Promise<Trace> {
         seen();
       }
       if (r.bossToMove() && r.carrotDue()) r.applyCarrots();
+      seen();
+      if (r.bossToMove() && r.repaintDue()) await r.playRepaint(engines).catch(() => r.applyRepaint(null));
       seen();
       if (r.bossToMove() && r.hopDue()) await r.playHop(engines).catch(() => r.applyHop(null));
       seen();

@@ -870,6 +870,23 @@ export class SoloMatch implements GameView {
   }
 
   /**
+   * Smudgy's Repaint (at the start of his turn after its warning, or the admins' trigger): he gets ready (thinking; your
+   * queen banner first, if your move took his queen) while this device's engines pick the pair (repaintFrom), then the
+   * Repaint, his whole turn; then your turn, its moments (the Repaint's first) before your clock starts, as after his
+   * move. No pair in the band, or no engine answer: no Repaint this turn (it waits for his next), and he plays his move.
+   */
+  private async repaintTurn() {
+    const snap = this.bossSnapshot();
+    this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
+    const paint = this.runner.playRepaint(this.engines).catch(() => this.runner.applyRepaint(null));
+    await Promise.all([paint, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
+    if (this.stopped) return;
+    const showMs = !this.runner.bossToMove() ? bossTurnShowMs(this.runner.bossView(), this.alone) : 0;
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
+    this.timer = setTimeout(() => this.nextRound(), showMs);
+  }
+
+  /**
    * As your turn begins: if Wrangler's showdown may follow before long (the rules' `scout`: from his move showdownFrom
    * while he has one left; or the test trigger), his scout searches line-ups of three pairs and two on this position (an
    * engine of its own) until his turn; else it stops.
@@ -1130,7 +1147,7 @@ export class SoloMatch implements GameView {
       }
       // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps, Chub & Chirp's Carrot Patch cast (his whole turn) and
       // hop come at the start of his turn, before his move.)
-      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.carrotDue() ? this.carrotTurn() : this.runner.hopDue() ? this.hopTurn() : this.bossTurn());
+      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.carrotDue() ? this.carrotTurn() : this.runner.repaintDue() ? this.repaintTurn() : this.runner.hopDue() ? this.hopTurn() : this.bossTurn());
       // (A failed Lights out: his extra move, after his own and before your turn.)
       if (this.runner.extraMoveDue()) return void this.extraTurn();
       // (Boingo's funhouse: his move for you, as your turn begins.)
@@ -1370,6 +1387,8 @@ export class SoloMatch implements GameView {
           // (Chub & Chirp's Carrot Patch cast: his whole turn, unless the pass guard has it wait. Else his hop: no engine
           // answer, the first pawn that can.)
           if (this.runner.carrotDue()) await this.runner.playCarrots(this.engines).catch(() => this.runner.applyCarrots(null));
+          // (Smudgy's Repaint: his whole turn; no pair in the band, or no engine answer: he moves.)
+          if (this.runner.repaintDue()) await this.runner.playRepaint(this.engines).catch(() => this.runner.applyRepaint(null));
           if (this.runner.hopDue()) await this.runner.playHop(this.engines).catch(() => this.runner.applyHop(null));
           if (this.runner.bossToMove()) await this.runner.playBoss(this.engines[0]);
           continue;

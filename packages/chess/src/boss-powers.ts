@@ -61,6 +61,7 @@ export * from "./bosses/recluse-phase2.ts";
 export * from "./bosses/alfil.ts";
 export * from "./bosses/hopper.ts";
 export * from "./bosses/carrots.ts";
+export * from "./bosses/smudgy.ts";
 export * from "./bosses/index.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */
@@ -218,6 +219,17 @@ export function icedSquares(boss: BossState | null | undefined, fen: string): st
 }
 
 /**
+ * Its ultimate has come as often as a battle allows (`ultimateOnce`: once, Chub & Chirp's Carrot Patch; `ultimateMax`:
+ * Smudgy's Repaint, twice): the meter is off from the turn after the last, and the admins' test trigger refuses.
+ */
+export function ultimateSpent(boss: BossState | null | undefined): boolean {
+  const p = boss?.powers;
+  const rules = bossRules(boss);
+  if (!p || !rules || p.ultAt === undefined) return false;
+  return !!rules.ultimateOnce || (rules.ultimateMax !== undefined && (p.ults ?? 0) >= rules.ultimateMax);
+}
+
+/**
  * The rage meter, 0 to 1 (full: the warning, then the ultimate), null without powers. Full on the ultimate's own
  * turn; empty from then while its effect runs; then it fills again.
  */
@@ -227,8 +239,8 @@ export function rageOf(boss: BossState | null | undefined, s: RageRates = BOSS_P
   // (A meter of its own: Wrangler's.)
   const own = bossRules(boss)?.meter;
   if (own) return own(p, turnOf(boss!), { ...BOSS_POWERS, ...s });
-  // (Once a battle, Chub & Chirp's: from the turn after it, no meter.)
-  if (p.ultAt !== undefined && bossRules(boss)?.ultimateOnce && turnOf(boss!) > p.ultAt) return null;
+  // (Once a battle, Chub & Chirp's; Smudgy's last Repaint: from the turn after it, no meter.)
+  if (p.ultAt !== undefined && ultimateSpent(boss) && turnOf(boss!) > p.ultAt) return null;
   if (p.ultAt !== undefined) return turnOf(boss!) <= p.ultAt ? 1 : 0;
   return Math.max(0, Math.min(1, rageNow(p, rageSpeedOf(boss!.id, s), s) / s.rageFull));
 }
@@ -236,7 +248,7 @@ export function rageOf(boss: BossState | null | undefined, s: RageRates = BOSS_P
 /** The meter is held empty: an ultimate came and its effect still runs (the screens show it paused). */
 export const ragePaused = (boss: BossState | null | undefined): boolean => {
   const p = boss?.powers;
-  return !!p && p.ultAt !== undefined && turnOf(boss!) > p.ultAt && !bossRules(boss)?.meter && !bossRules(boss)?.ultimateOnce;
+  return !!p && p.ultAt !== undefined && turnOf(boss!) > p.ultAt && !bossRules(boss)?.meter && !ultimateSpent(boss);
 };
 
 // ---------------- The judge plays by the same rules ----------------
