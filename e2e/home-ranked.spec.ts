@@ -51,9 +51,9 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
     expect(Math.abs(c.width - r.width), `${w}: full width`).toBeLessThan(2);
     expect(await card.evaluate((e) => [...e.querySelectorAll(".rd-card-text > *")].every((x) => x.scrollWidth <= x.clientWidth + 0.5)), `${w}`).toBe(true);
     const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
-    // The card, then the row, then PLAY at the bottom (Eric, Oct 18), on a phone and a computer alike.
-    expect(c.y + c.height, `${w}`).toBeLessThanOrEqual(r.y);
+    // The row, then PLAY, then the card at the bottom (Eric, Oct 19: chess first), on a phone and a computer alike.
     expect(play.y, `${w}`).toBeGreaterThan(r.y + r.height);
+    expect(c.y, `${w}`).toBeGreaterThan(play.y + play.height);
     expect(await sideways(page), `${w}`).toBe(0);
   }
 });

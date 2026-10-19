@@ -980,15 +980,16 @@ export function HomeScreen({
         {hero}
         <div class="fd-play-col">
           {/*
-           * The same order on a phone and a computer (Eric, Oct 18): the Boss raid card (full width), the RANKED row, its
-           * panel, then PLAY and its line at the bottom. A computer has the live window above (from 1280 px). Every box
-           * keeps its size whatever is picked, so nothing moves on a click.
+           * The same order on a phone and a computer: the RANKED row, its panel, PLAY and its line, then the Boss raid card
+           * (full width) at the bottom (Eric, Oct 19: "chess focused at the heart"; until then the card was on top). A
+           * computer has the live window above (from 1280 px). Every box keeps its size whatever is picked, so nothing
+           * moves on a click.
            */}
           {wide && <LiveWindow />}
-          {bossCard}
           {ranked}
           {panel}
           {go}
+          {bossCard}
         </div>
       </div>
       {overlays}
