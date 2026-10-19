@@ -150,7 +150,7 @@ async function run(stage) {
           stills.push(...[0, 150, 300, 600, 900, 1200].map((ms) => ({ label: `taken-${String(ms).padStart(4, "0")}`, t: played.at + 600 + ms })));
           clip("taken", played.at - 200, played.at + 4500);
         } else {
-          stills.push(...[0, 900, 1800, 2100, 2200, 2400, 2700, 3000, 3300].map((ms) => ({ label: `strike-${String(ms).padStart(4, "0")}`, t: next.now + ms })));
+          stills.push(...[0, 200, 400, 600, 800, 1000, 1300, 1800, 2300].map((ms) => ({ label: `strike-${String(ms).padStart(4, "0")}`, t: next.now + ms })));
           const e = await waitUntil((x) => x.kind === "play" || x.kind === "results", 60_000);
           clip("strike", next.now - 600, e.now + 1500);
         }
