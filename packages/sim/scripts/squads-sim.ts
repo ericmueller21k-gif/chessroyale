@@ -816,7 +816,14 @@ table(
   }),
 );
 
-push("## Blocks (every round)", "", `A ${S.blocks.bankPerMatch}-point bank per squad per match. Bots block sparingly: the other squad's likely reply to their own move.`, "");
+push(
+  "## Blocks",
+  "",
+  S.blocks.bankPerMatch > 0
+    ? `A ${S.blocks.bankPerMatch}-point bank per squad per match${MERC ? `, and ${S.mercenary.blockPoints} more for each Block points bought` : ""}. Bots block sparingly: the other squad's likely reply to their own move.`
+    : `No block points to start: only the shop's (${S.mercenary.blockPoints} for each Block points bought), so none in round 1. Bots block sparingly: the other squad's likely reply to their own move.`,
+  "",
+);
 table(
   ["Mix", "Round", "Blocks per squad per match", "Points spent per squad per match", "In effect", "Lifted: impossible after the move", "…in check", "…no move left", "…mate in one"],
   MIXES.flatMap((mx) =>

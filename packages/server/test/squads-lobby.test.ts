@@ -150,11 +150,13 @@ describe("squads lobby: votes and the bracket", () => {
     // reaches its results before the lobby's safety close for a lobby nobody is in. With devices: about 30 minutes.)
     expect(minutes).toBeGreaterThan(15);
     expect(minutes).toBeLessThan(LOBBY_LIFE.lobbyAbandonedMinutes);
-    // Squads v2: the bots block now and then, and match a partner on an only move; with no device, no refunds.
+    // Squads v2: the bots match a partner on an only move; with no device, no refunds.
     const pairs = L.core.allMatches().filter((m) => m.round === 1);
     expect(pairs.flatMap((m) => m.m.tokenLog).length).toBeGreaterThan(0);
     expect(pairs.flatMap((m) => m.m.tokenLog).every((u) => u.verdict?.why === "no_judge")).toBe(true);
-    expect(L.core.allMatches().some((m) => m.m.blockBanks.some((b) => b < SQUADS.blocks.bankPerMatch))).toBe(true);
+    // No block points to start (Eric, Oct 19): round 1, before any shop, has no blocks; a later match's come from its kit.
+    expect(L.core.allMatches().filter((m) => m.round === 0).every((m) => m.m.blockBanks.every((b) => b === 0) && m.m.blocks.length === 0)).toBe(true);
+    for (const m of L.core.allMatches()) for (const side of [0, 1] as const) expect(m.m.blockBanks[side]).toBeLessThanOrEqual((m.m.kit?.[side]?.blocks ?? 0) * SQUADS.mercenary.blockPoints);
     const places = Object.values(L.core.record.placed).sort();
     expect(places).toEqual([1, 2, 3, 3, 5, 5, 5, 5]);
     const matches = L.core.allMatches();

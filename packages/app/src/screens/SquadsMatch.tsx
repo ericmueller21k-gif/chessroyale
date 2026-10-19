@@ -22,6 +22,7 @@ import {
   ROUND_NAME,
   bankText,
   blockBankNow,
+  hasBlocks,
   blockCheatFen,
   blockName,
   blocksShown,
@@ -269,7 +270,7 @@ function ClockLine({ client, m, board }: { client: SquadsClient; m: LocalMatch; 
                 </button>
               )}
             </span>
-            <SquadResources bank={m.mode === "classic" ? null : blockBankNow(m, side)} tokens={m.tokens ? m.tokens[side] : null} chips={merc ? chipsLeft(m, side) : null} you={side === mine} />
+            <SquadResources bank={hasBlocks(m, side) ? blockBankNow(m, side) : null} tokens={m.tokens ? m.tokens[side] : null} chips={merc ? chipsLeft(m, side) : null} you={side === mine} />
           </span>
         </>
       ))}
@@ -293,7 +294,8 @@ function Banner({ title, sub, until, children }: { title: string; sub?: Componen
 
 /** One line of plain-language rules for each format. */
 function rulesLine(m: LocalMatch): string {
-  if (m.format === "relay") return m.mode === "classic" ? "Each turn you make one move, one board along." : "Each turn you make one move, one board along. Before it, you can block some of their moves.";
+  // (Relay: no blocks, Mercenary too; they come from the shop, after round 1: Eric, Oct 19.)
+  if (m.format === "relay") return "Each turn you make one move, one board along.";
   if (m.format === "pairs") return "You and your partner each pick; a coin plays one. Pick the same move and it plays for sure: a token.";
   return "Your whole squad votes: the most picked move plays (a tie: a coin). Copy a teammate with a tap.";
 }
@@ -462,8 +464,8 @@ function MatchView({
   // Blocking: before your squad's move here is settled, with points in the bank.
   const bank = mySide === null ? 0 : blockBankNow(m, mySide);
   const settled = !!d && (d.duty.role === "move" ? !!mineChoice : d.duty.players.every((p) => m.locked.includes(p)));
-  // (Classic has no blocks.)
-  const canBlock = m.mode !== "classic" && !!d && m.state === "half" && !history.browsing && d.duty.board === boardId && !settled && !client.me?.botPlays;
+  // (Classic has no blocks; nor has a squad that came into this match without block points: none to start, Eric, Oct 19.)
+  const canBlock = mySide !== null && hasBlocks(m, mySide) && !!d && m.state === "half" && !history.browsing && d.duty.board === boardId && !settled && !client.me?.botPlays;
   const [blockMode, setBlockMode] = useState(false);
   const blocking = blockMode && canBlock && bank > 0;
   useLayoutEffect(() => {

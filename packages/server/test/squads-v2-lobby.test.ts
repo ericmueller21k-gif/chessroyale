@@ -20,13 +20,16 @@ const ofKind = <K extends SquadsEvent["kind"]>(events: readonly SquadsEvent[], k
 
 beforeEach(() => clearTopCache());
 
+const TEST_BANK = 5;
+
 /**
  * A test lobby at `start` with a party of 4 people in one squad, a solo person, and devices if asked; at its first half.
- * Classic (same-move tokens, no blocks) unless `mode` says Mercenary (blocks).
+ * Classic (same-move tokens, no blocks) unless `mode` says Mercenary (blocks: here TEST_BANK points every match, as the
+ * test lobbies' `blockPoints`; none to start in a real lobby since Oct 19, only the shop's).
  */
 function partyLobby(start: 0 | 1, opts: { devices?: boolean; seed?: number; fen?: string; mode?: "classic" | "mercenary" } = {}) {
   const mode = opts.mode ?? "classic";
-  const L = squadsLobby({ seed: opts.seed ?? 7, test: { start, mode, ...(opts.fen ? { fen: opts.fen } : {}) }, fillInMs: 5_000 });
+  const L = squadsLobby({ seed: opts.seed ?? 7, test: { start, mode, ...(mode === "mercenary" ? { blockPoints: TEST_BANK } : {}), ...(opts.fen ? { fen: opts.fen } : {}) }, fillInMs: 5_000 });
   L.core.reserve([{ size: 4, pass: "four" }], 60_000);
   const party = ["A", "B", "C", "D"].map((n) => L.join(n, { party: "four" }));
   const solo = L.join("Sol");
@@ -133,7 +136,7 @@ describe("squads v2 server: move blocks", () => {
     L.clear();
     L.core.message(mover, { t: "block", key: lm.key, seq, board: duty.board, move: "g8f6" });
     const seen = L.last(solo, "block")!;
-    expect(seen).toMatchObject({ key: lm.key, seq, bank: SQUADS.blocks.bankPerMatch - 2, block: { board: duty.board, side, by: mover, move: "g8f6", piece: "n", cost: 2 } });
+    expect(seen).toMatchObject({ key: lm.key, seq, bank: TEST_BANK - 2, block: { board: duty.board, side, by: mover, move: "g8f6", piece: "n", cost: 2 } });
     for (const p of party) expect(L.last(p, "block")).toEqual(seen);
     // The same move again: refused. Others, as many as the bank allows.
     L.core.message(mover, { t: "block", key: lm.key, seq, board: duty.board, move: "g8f6" });
@@ -184,18 +187,18 @@ describe("squads v2 server: move blocks", () => {
     L.core.message(mover, { t: "block", key: lm.key, seq: 0, board: duty.board, move: "e8f8" });
     expect(L.last(mover, "blockNo")).toMatchObject({ reason: "king" });
     L.core.message(mover, { t: "block", key: lm.key, seq: 0, board: duty.board, move: "f6e4" });
-    expect(L.last(solo, "block")!.bank).toBe(SQUADS.blocks.bankPerMatch - 2);
+    expect(L.last(solo, "block")!.bank).toBe(TEST_BANK - 2);
     L.core.message(mover, { t: "choose", key: lm.key, seq: 0, move: "g5f6" });
     L.runUntil(() => lm.state === "show", 60_000, "the half played");
     const half = L.all(solo, "half").find((h) => h.key === lm.key && h.seq === 0)!;
     expect(ofKind(half.events, "block")).toMatchObject([{ move: "f6e4", outcome: "impossible", cost: 2 }]);
-    expect(half.match.blockBanks[side]).toBe(SQUADS.blocks.bankPerMatch);
+    expect(half.match.blockBanks[side]).toBe(TEST_BANK);
     expect(half.match.blocks).toEqual([]);
   });
 
   it("in the final, the squad to move blocks; the other squad can't then choose that move (refused: blocked)", () => {
     for (let seed = 1; seed < 60; seed++) {
-      const L = squadsLobby({ seed, test: { start: 2, mode: "mercenary" }, fillInMs: 5_000 });
+      const L = squadsLobby({ seed, test: { start: 2, mode: "mercenary", blockPoints: TEST_BANK }, fillInMs: 5_000 });
       L.core.reserve([{ size: 4, pass: "red" }, { size: 4, pass: "blue" }], 60_000);
       const red = ["R1", "R2", "R3", "R4"].map((n) => L.join(n, { party: "red" }));
       const blue = ["B1", "B2", "B3", "B4"].map((n) => L.join(n, { party: "blue" }));
@@ -246,6 +249,10 @@ describe("squads v2 server: test lobbies and views", () => {
     expect(o.test).toEqual({ start: 1, fen, strong: true, white: true });
     expect(testLobbyOptions(new URLSearchParams({ start: "votes", mode: "mercenary" }), 0).test).toEqual({ start: 0, mode: "mercenary" });
     expect(testLobbyOptions(new URLSearchParams({ mode: "pillage" }), 0).test.mode).toBeUndefined();
+    // Block points for every squad (none to start otherwise), whole numbers 0-20.
+    expect(testLobbyOptions(new URLSearchParams({ mode: "mercenary", blockPoints: "5" }), 0).test.blockPoints).toBe(5);
+    expect(testLobbyOptions(new URLSearchParams({ blockPoints: "99" }), 0).test.blockPoints).toBe(20);
+    expect(testLobbyOptions(new URLSearchParams({ blockPoints: "x" }), 0).test.blockPoints).toBe(0);
     // The opener plays White on their first board, whatever the seed.
     for (let seed = 1; seed < 9; seed++) {
       const L = squadsLobby({ seed, test: o.test, fillInMs: 5_000 });

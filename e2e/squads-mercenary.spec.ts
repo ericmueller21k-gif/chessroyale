@@ -106,6 +106,9 @@ test("earning coins: your capture pays your squad's wallet (a knight's worth), s
   const s = await nextDuty(page);
   expect(s.duty!.role).toBe("move");
   expect(s.fen).toBe(BG5);
+  // No blocks in round 1 (Eric, Oct 19: none to start, only the shop's): no Block button, no block points shown.
+  await expect(page.getByRole("button", { name: /^Block/ })).toHaveCount(0);
+  await expect(page.locator(".sq-res-bank")).toHaveCount(0);
   // Both squads' coins under the board from the start (Mercenary).
   await expect(page.locator(".mc-kitline-side")).toHaveCount(2);
   const ply = await page.evaluate(([key, board]) => (window as any).squads.matches.get(key).boards[board].moves.length, [s.key, s.duty!.board] as const);
@@ -149,7 +152,8 @@ test("the shop between rounds, a Stockfish token, a Time chip and a shield: boug
   test.setTimeout(300_000);
   await named(page, "Tess");
   // Straight at Pairs: every squad still in has a test wallet, and the shop is open until the match starts.
-  const q = new URLSearchParams({ nolanding: "", debug: "", clock: "120,0,3,0", bots: "strong,blocks", mode: "mercenary" });
+  // (Block points for every squad, so the other squad's bots have blocks for your shield: none to start otherwise.)
+  const q = new URLSearchParams({ nolanding: "", debug: "", clock: "120,0,3,0", bots: "strong,blocks", mode: "mercenary", blockPoints: "5" });
   await page.goto(`/squads/test/pairs?${q}`);
   await expect(page.getByRole("button", { name: "Skip votes" })).toBeVisible({ timeout: 40_000 });
   await page.getByRole("button", { name: "Skip votes" }).click();

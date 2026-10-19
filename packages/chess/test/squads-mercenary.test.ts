@@ -93,6 +93,9 @@ const EN_PASSANT = "rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 
 /** A quiet middlegame, move 12 (ply 22). */
 const MIDDLE = "r1bq1rk1/pp2bppp/2n1pn2/2pp4/3P4/2PBPN2/PP1N1PPP/R1BQ1RK1 w - - 0 12";
 
+/** The block points each squad has here (none to start in a real match since Oct 19: the shop's). */
+const TEST_BANK = 5;
+
 function match(format: "relay" | "pairs" | "final", starts: string[], o: Partial<MatchSetup> = {}, s?: SquadsSettings): SquadsMatch {
   return createSquadsMatch(
     {
@@ -108,6 +111,7 @@ function match(format: "relay" | "pairs" | "final", starts: string[], o: Partial
       incrementMs: 0,
       capMs: CAP,
       mode: "mercenary",
+      blockBanks: [TEST_BANK, TEST_BANK],
       ...o,
     },
     s,
@@ -207,10 +211,12 @@ describe("Squads modes: Classic has no blocks; Mercenary has the bank for a matc
     expect(out.brilliant).toEqual([]);
   });
 
-  it("Mercenary: the bank for a match (Squads v2's), the same-move tokens as Classic's", () => {
+  it("Mercenary: no block points to start (Eric, Oct 19: only the shop's), the same-move tokens as Classic's", () => {
     const m = planMatch(plan("mercenary"), 1, 0, [squads[0]!, squads[1]!], library);
     expect(m.mode).toBe("mercenary");
-    expect(m.blockBanks).toEqual([SQUADS.blocks.bankPerMatch, SQUADS.blocks.bankPerMatch]);
+    expect(m.blockBanks).toEqual([0, 0]);
+    // Round 1 comes before any shop: no blocks there.
+    expect(planMatch(plan("mercenary"), 0, 0, [squads[0]!, squads[1]!], library).blockBanks).toEqual([0, 0]);
     expect(m.tokens).toEqual([SQUADS.tokens.perMatch, SQUADS.tokens.perMatch]);
     const c = planMatch(plan("classic"), 1, 0, [squads[0]!, squads[1]!], library);
     expect(c.tokens).toEqual(m.tokens);
@@ -424,15 +430,24 @@ describe("Mercenary: the shop", () => {
     expect(buyItem(newWallet(0), "chip")).toEqual({ error: "coins" });
     expect(unbuyItem(newWallet(0), "chip")).toEqual({ error: "none" });
     const w0 = rich(1000);
-    const a = buyItem(w0, "blocks");
+    const a = buyItem(w0, "shield");
     if ("error" in a) throw new Error(a.error);
-    const b = buyItem(a.wallet, "blocks");
+    const b = buyItem(a.wallet, "shield");
     if ("error" in b) throw new Error(b.error);
     expect(b.price).toBe(a.price + M.priceStep);
-    const back = unbuyItem(b.wallet, "blocks");
+    const back = unbuyItem(b.wallet, "shield");
     if ("error" in back) throw new Error(back.error);
     expect(back.refund).toBe(b.price);
     expect(back.wallet).toEqual(a.wallet);
+  });
+
+  it("block points (Eric, Oct 19): two take about a whole wallet before Pairs, a third is out of reach", () => {
+    const two = itemPrice("blocks", 0) + itemPrice("blocks", 1);
+    // A round-1 winner's wallet before Pairs: about 560-650 (reports/squads-mercenary.md).
+    expect(two).toBeGreaterThanOrEqual(560);
+    expect(two).toBeLessThanOrEqual(650);
+    expect(two + itemPrice("blocks", 2)).toBeGreaterThan(1000);
+    expect(M.items.blocks.cap).toBe(2);
   });
 
   it("one shared wallet: whoever on the squad buys, it all comes from (and goes into) the same cart", () => {
@@ -453,7 +468,7 @@ describe("Mercenary: the kit is for the next match only", () => {
     const m = applyKits(pairs(), [kit({ chip: 2, blocks: 1, stockfish: 2, shield: 1 }), NO_ITEMS]);
     expect(m.banks).toEqual([BANK, BANK]);
     expect(m.chips).toEqual([2, 0]);
-    expect(m.blockBanks).toEqual([SQUADS.blocks.bankPerMatch + M.blockPoints, SQUADS.blocks.bankPerMatch]);
+    expect(m.blockBanks).toEqual([TEST_BANK + M.blockPoints, TEST_BANK]);
     expect(m.stockfish).toEqual([2, 0]);
     expect(m.shields).toEqual([1, 0]);
     // Once only, and never into Classic.
@@ -533,7 +548,7 @@ describe("Mercenary: the items", () => {
       ["b8c6", "on"],
     ]);
     expect(out.match.shields).toEqual([0, 0]);
-    expect(out.match.blockBanks[0]).toBe(SQUADS.blocks.bankPerMatch - 2 * SQUADS.blocks.cost.n);
+    expect(out.match.blockBanks[0]).toBe(TEST_BANK - 2 * SQUADS.blocks.cost.n);
     expect(out.match.blocks.map((b) => b.move)).toEqual(["b8c6"]);
   });
 
@@ -544,7 +559,7 @@ describe("Mercenary: the items", () => {
     const out = resolveHalf(m, inputs(m, rest(m, { [mover]: "g5f6" }), block(m, NO_INPUTS, mover, 0, "f6e4")));
     expect(ofKind(out.events, "block").map((e) => e.outcome)).toEqual(["impossible"]);
     expect(out.match.shields[1]).toBe(1);
-    expect(out.match.blockBanks[0]).toBe(SQUADS.blocks.bankPerMatch);
+    expect(out.match.blockBanks[0]).toBe(TEST_BANK);
     // A check lifts every block (liftInCheck): the shield is kept.
     const c = applyKits(relay(["rnbqkbnr/ppppp1pp/8/5p2/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", START_FEN, START_FEN, START_FEN]), [NO_ITEMS, kit({ shield: 1 })]);
     const cm = moverOn(c, 0);
@@ -560,7 +575,7 @@ describe("Mercenary: the items", () => {
     const a = resolveHalf(only, inputs(only, { a0: "a1b1", a1: "a1b1", a2: "a1b1", a3: "a1b1" }, block(only, NO_INPUTS, "a0", 0, "h7h6")));
     expect(ofKind(a.events, "block").map((e) => e.outcome)).toEqual(["no_move"]);
     expect(a.match.shields[1]).toBe(1);
-    expect(a.match.blockBanks[0]).toBe(SQUADS.blocks.bankPerMatch);
+    expect(a.match.blockBanks[0]).toBe(TEST_BANK);
     // Black has h7-h6 and h7-h5: blocking both would leave none. The mercy lifts the later (refunded); the earlier would
     // take effect, so the shield cancels it (its point spent).
     const two = applyKits(final("7k/7p/8/8/8/8/8/K5R1 w - - 0 1"), [NO_ITEMS, kit({ shield: 1 })]);
@@ -569,7 +584,7 @@ describe("Mercenary: the items", () => {
     const b = resolveHalf(two, inputs(two, { a0: "a1b1", a1: "a1b1", a2: "a1b1", a3: "a1b1" }, inp));
     expect(ofKind(b.events, "block").map((e) => e.outcome)).toEqual(["shielded", "no_move"]);
     expect(b.match.shields[1]).toBe(0);
-    expect(b.match.blockBanks[0]).toBe(SQUADS.blocks.bankPerMatch - SQUADS.blocks.cost.p);
+    expect(b.match.blockBanks[0]).toBe(TEST_BANK - SQUADS.blocks.cost.p);
     expect(b.match.blocks).toEqual([]);
   });
 });
@@ -985,11 +1000,11 @@ describe("Mercenary: bots", () => {
     expect(rate(sharp)).toBeLessThan(M.bots.stockfishSharp + 0.05);
   });
 
-  it("the shop's ranking: the Stockfish token dearest (Eric: 200), then block points and shields, the Time chip cheapest", () => {
+  it("the shop's ranking: block points dearest (Eric, Oct 19), then the Stockfish token (Eric: 200), the shield, the Time chip cheapest", () => {
     const p = M.items;
     expect(p.stockfish.price).toBe(200);
-    expect(p.stockfish.price).toBeGreaterThan(p.blocks.price);
-    expect(p.blocks.price).toBe(p.shield.price);
+    expect(p.blocks.price).toBeGreaterThan(p.stockfish.price);
+    expect(p.stockfish.price).toBeGreaterThan(p.shield.price);
     expect(p.shield.price).toBeGreaterThan(p.chip.price);
     expect(p.stockfish.cap).toBeLessThanOrEqual(2);
   });

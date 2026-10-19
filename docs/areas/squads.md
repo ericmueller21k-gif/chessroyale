@@ -6,10 +6,10 @@ tournament (Eric, Oct 10). **The server** (phase 2: the lobby, parties, the queu
 the protocol; see "The server" below). **The screens** (phase 3: the menu slot, parties, the waiting room, the votes,
 the standings and team clocks, Relay, Pairs, the final's staging, spectating, the results, the test controls on
 screen, the app's side of bot work, the sounds; see "The screens" below). **Squads v2** (Eric, Oct 12; DECISIONS.md,
-"Squads v2"): same-move tokens in Pairs (refunded by the judge on players' devices), move blocks in every round, and
+"Squads v2"): same-move tokens in Pairs (refunded by the judge on players' devices), move blocks (since Oct 19 Mercenary's, bought in the shop), and
 the final a majority vote of the whole squad; the old Pick and Block is gone. **Modes** (Eric, Oct 12; DECISIONS.md,
 "Squads modes: Classic and Mercenary"): the first vote picks **Classic** (just chess: same-move tokens, no blocks, no
-coins) or **Mercenary** (coins, a team shop between rounds, items for the next match; blocks on), and shows a third
+coins) or **Mercenary** (coins, a team shop between rounds, items for the next match, blocks among them), and shows a third
 mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `mercenary` everywhere. **Time controls**
 (Eric, Oct 13; DECISIONS.md, "Squads: three chess time controls"): the Clock vote picks **Bullet 1+1**, **Blitz 3+2** or
 **Rapid 5+2** (5+3 until Eric's Oct 14 "It shouldn't be 55 minutes"; DECISIONS.md, "Squads: Rapid 5+2") (left to right,
@@ -99,10 +99,11 @@ move.
   - **The final** (one board): the whole squad to move votes (one duty, four players). Every pick made in time counts
     once; the most picked move plays; a tie for the most, a seeded coin between the tied moves; nobody picked, a
     random move (the "vote" event). Picks show live to their own squad only. No tokens.
-  - **Move blocks** (Mercenary, every round; `blocks.ts`; Classic's block bank is 0, so none): on its turn on a board, before its move there is settled, any of a
+  - **Move blocks** (Mercenary; `blocks.ts`; no block points to start, only the shop's, so none in round 1 and none in
+    Classic: Eric, Oct 19, `docs/decisions/2026-10-19-squads-blocks-from-the-shop.md`): on its turn on a board, before its move there is settled, any of a
     squad's players with a duty there may block moves of the other squad (`placeBlock`): a piece to a square, by how
     the piece moves (a slider up to and onto the first piece in its way, a pawn's pushes and diagonals, castling while
-    they have the right). Paid at once from the squad's block bank for the match (`blocks.bankPerMatch`, 5; pawn 1,
+    they have the right). Paid at once from the squad's block bank for the match (`blocks.bankPerMatch`, 0, plus its kit's; pawn 1,
     knight, bishop or rook 2, queen 3, castling 2, the king's ordinary moves never), as many a turn as the bank allows
     (`maxPerTurn` null). After the squad's move, each board's blocks are weighed together (`liftBlocks`): one whose
     move isn't possible any more is lifted; in check, all are; then, while they'd leave no move or only moves allowing
@@ -334,16 +335,16 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   seconds; without CAP the old 20 s ceiling, so older links keep their meaning; `testLobbyOptions`), that fills 5 s after it opens, skipping the rounds before (squads with more people go
   through). For tests also `fen=` (the first round's boards start there: a legal position, White to move),
   `bots=strong` (every bot at the strongest skill), `bots=blocks` (bots block whenever they can; `bots=strong,blocks`
-  for both) and `seat=white` (the opener plays White on their first board). `mode=mercenary|classic` sets the mode
+  for both), `seat=white` (the opener plays White on their first board) and `blockPoints=N` (Mercenary, 0-20: every
+  squad starts every match with N block points; none otherwise, so a test can block in round 1). `mode=mercenary|classic` sets the mode
   (no Mode vote); without it the Mode vote is held and the bots sit it out, so the opener's vote decides. A Mercenary
   test lobby that starts at Pairs or the final gives the squads still in a test wallet (`mercenary.testWallet`) and an
   intro of `SQUADS_LOBBY.testShopSeconds` to shop in. `start=votes` (Eric, Oct 12) fills the moment its opener
   connects (`fillAt` = now): seated, bots in every other seat, the first vote after the full grid's moment, then the
   whole tournament.
-- **Open (Eric, Oct 18, after playtesting; nothing changed yet):** blocking feels chaotic on top of everything else;
-  it stays for now but may be phased out, or kept only for the rounds where it's a team decision (Pairs, the final:
-  a Relay match can get a block bank of 0, `MatchSetup.blockBanks`). Mercenary may be reworked; spending between
-  rounds stays a good idea.
+- **Open (Eric, Oct 18-19, after playtesting):** blocking felt chaotic; since Oct 19 there are no block points to start
+  (the shop's only, two about a whole wallet), so none in round 1. Whether to drop it altogether, and how Mercenary
+  may be reworked (spending between rounds stays a good idea), is still open.
 - **Mercenary** (the record's `wallets`, one per squad; `botShop` times). Each half's "coins" events go into the
   wallets (`earnFrom`), and everyone gets `wallets` (every squad's: coins, earned, cart, bought, its shop). A squad's
   shop (`shopOf`) is open from its match's end until its next match's first half (the other match feeding it, then
@@ -487,7 +488,8 @@ door's look; every class is `sq-`.
     (refunded)"). Each board keeps its own latest banner (`banners`, `bannerOn` in `squads.ts`), so an event on another
     board or in another match never cuts it short (until Oct 16 one banner was shared by every board and match:
     docs/decisions/2026-10-16-flaky-e2e-batch-3.md).
-  - **Each squad's block points and tokens** under its clock, both squads, always (`SquadResources`).
+  - **Each squad's block points and tokens** under its clock, both squads (`SquadResources`); block points only for a
+    squad that came into the match with some (`hasBlocks`), and the Block button likewise.
   - **The token breakdown** after a Pairs match (`TokenBreakdown`; between matches, and on the results): every use,
     refunded or not, why, with numbers ("Qxd4: refunded, every other move lost at least 3.1 pawns").
   - **Staging:** each match opens with a card over the board (its round, its squads, one line of rules, the lobby's
