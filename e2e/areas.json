@@ -295,9 +295,10 @@
         "packages/chess/src/bosses/smudgy.ts",
         "packages/app/src/characters/smudgy*.ts",
         "packages/app/src/characters/effects/smudgy.ts",
-        "packages/app/src/components/Smudgy.tsx"
+        "packages/app/src/components/Smudgy.tsx",
+        "packages/app/src/camo.ts"
       ],
-      "specs": ["e2e/smudgy.spec.ts"]
+      "specs": ["e2e/boss-speech.spec.ts", "e2e/king-attack.spec.ts", "e2e/smudgy.spec.ts"]
     },
     "Wrangler (pig)": {
       "paths": [

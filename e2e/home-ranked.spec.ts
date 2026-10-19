@@ -169,7 +169,7 @@ test("the hidden /bosses opens the solo boss picker straight away (a player too)
   await expect(menu).toBeVisible();
   // The solo picker: its difficulty, not a raid's.
   await expect(menu.getByText(/^For your raid/)).toHaveCount(0);
-  await expect(menu.locator(".boss-row")).toHaveCount(10);
+  await expect(menu.locator(".boss-row")).toHaveCount(11);
   await menu.getByRole("button", { name: "Close" }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await page.goto("/?mode=raid");

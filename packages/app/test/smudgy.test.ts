@@ -5,9 +5,9 @@ import { BRUSH_STROKE, PAINT_DRIP, PAINT_FLY, PAINT_HIT, PAINT_SPLASH } from "..
 import { frameKeys, renderFrame, type Character } from "../src/characters/sprite.ts";
 
 /**
- * Smudgy's still, his animation pack and his board art (docs/decisions/2026-10-19-smudgy-animations.md). He isn't wired
- * in (not in CHARACTERS, BOSS_KITS or the roster), so the characters test doesn't see him: these are its checks for him
- * and his art, and the cues the board art hangs on.
+ * Smudgy's still, his animation pack and his board art (docs/decisions/2026-10-19-smudgy-animations.md): the checks for
+ * his art and the cues the board art hangs on. (He is wired in since docs/decisions/2026-10-19-smudgy-wired.md, so the
+ * characters and kit tests see him too; smudgy-wired.test.ts and camo.test.ts are his game's.)
  */
 const sheets = (ch: Character) => Object.entries(ch.anims).flatMap(([name, a]) => a.frames.map((f, i) => ({ name, i, f })));
 const atMs = (ch: Character, anim: string, cue: string): number => {

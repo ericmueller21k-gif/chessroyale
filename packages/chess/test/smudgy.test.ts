@@ -589,7 +589,7 @@ describe("Smudgy: a small fuzz of whole battles", () => {
 
 describe("the paint test switch (?paint=1)", () => {
   it("starts with his rook already hidden on d7 where your king's step onto the d-file is offered by the board you see and refused by the real one", () => {
-    const r = new MatchRunner({ settings: kitSettings({ boss: "smudgy", test: "", maxMoves: 40 }, { bossPaintTest: true }), rng: mulberry32(3), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }] });
+    const r = new MatchRunner({ settings: kitSettings({ boss: "smudgy", test: "", maxMoves: 40 }, { bossPaintTest: 1 }), rng: mulberry32(3), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }] });
     const board = r.boards.get(r.state.boards[0]!)!;
     expect(board.fen).toBe(PAINT_TEST.fen);
     expect(board.bases).toEqual([{ ply: 4, fen: PAINT_TEST.fen }]);
@@ -611,6 +611,45 @@ describe("the paint test switch (?paint=1)", () => {
     const allowed = r.crowdAllowed() ?? legalMoves(board.fen);
     expect(allowed).toEqual(expect.arrayContaining(["e1e2", "e1f1", "e1g1"]));
     expect(allowed).not.toContain("e1d2");
+  });
+});
+
+describe("the paint test switch's move for him", () => {
+  it("is the hidden rook's step as a pawn's, named as a pawn's, and it stays hidden", async () => {
+    const r = new MatchRunner({ settings: kitSettings({ boss: "smudgy", test: "", maxMoves: 40 }, { bossPaintTest: 1 }), rng: mulberry32(3), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }] });
+    r.deal();
+    await r.score(new Map([["h0", { move: "e1e2", thinkMs: 1000 }]]));
+    expect(r.bossToMove()).toBe(true);
+    expect(await r.playBoss(fakeEngine())).toBe("d7d6");
+    const board = r.boards.get(r.state.boards[0]!)!;
+    expect(pieceAt(board.fen, "d6")).toEqual({ color: "b", type: "r" });
+    const view = r.bossView()!;
+    expect(camoOf(r)).toMatchObject({ square: "d6" });
+    expect(view.lastMove?.san).toBe("d6");
+    // Then it strikes down the open file (a move no pawn makes, and a check on the king on e2): shown for what it is.
+    r.deal();
+    await r.score(new Map([["h0", { move: "a2a3", thinkMs: 1000 }]]));
+    expect(await r.playBoss(fakeEngine())).toBe("d6d2");
+    expect(camoOf(r)).toMatchObject({ square: null, reveal: { how: "move", square: "d2" } });
+    expect(r.bossView()!.lastMove?.san).toBe("Rd2+");
+  });
+});
+
+describe("the paint test switch's second script (?paint=2)", () => {
+  it("steps the hidden rook twice like a pawn, and your rook takes it hidden: the rook taken, not a reveal", async () => {
+    const r = new MatchRunner({ settings: kitSettings({ boss: "smudgy", test: "", maxMoves: 40 }, { bossPaintTest: 2 }), rng: mulberry32(3), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }] });
+    for (const [mine, his] of [["e1e2", "d7d6"], ["h1d1", "d6d5"]] as const) {
+      r.deal();
+      expect(r.crowdAllowed() ?? legalMoves(r.boards.get(r.state.boards[0]!)!.fen)).toContain(mine);
+      await r.score(new Map([["h0", { move: mine, thinkMs: 1000 }]]));
+      expect(await r.playBoss(fakeEngine())).toBe(his);
+      expect(r.bossView()!.lastMove?.san).toBe(his.slice(2));
+    }
+    r.deal();
+    expect(r.crowdAllowed() ?? legalMoves(r.boards.get(r.state.boards[0]!)!.fen)).toContain("d1d5");
+    await r.score(new Map([["h0", { move: "d1d5", thinkMs: 1000 }]]));
+    expect(camoOf(r)).toMatchObject({ square: null, reveal: { how: "taken", square: "d5" } });
+    expect(r.bossView()!.powers!.events.some((e) => e.kind === "rookTaken" && e.square === "d5")).toBe(true);
   });
 });
 

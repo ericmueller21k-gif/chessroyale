@@ -180,12 +180,12 @@ describe("what the words say of a hidden rook", () => {
     // A rook's strike: no move there; the real board names it, the strict one says nothing.
     expect(seenSanOrNull(fen, "e7a7")).toBeNull();
     expect(seenSan(fen, "e7a7")).toBe("Rea7");
+    // The hints say the same.
+    expect(hintsFrom(fen, [{ move: "e7e6", expected: 0.5 }]).map((h) => h.san)).toEqual(["e6"]);
     // A disambiguation that would name the rook is gone: both his rooks could reach d8 on the real board.
     const both = "r3k3/3r4/8/8/8/8/8/4K3 b - - 0 1";
     trackCamo(view([], [], both, "d7", { at: 0, rook: "h6", pawn: "d7" }));
     expect(seenSan(both, "a8d8")).toBe("Rd8");
-    // The hints say the same.
-    expect(hintsFrom(fen, [{ move: "e7e6", expected: 0.5 }]).map((h) => h.san)).toEqual(["e6"]);
   });
 
   it("says why a move the board offers but the real board refuses was stopped, in the dock's words", () => {
