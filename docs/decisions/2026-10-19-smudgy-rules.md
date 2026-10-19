@@ -90,7 +90,20 @@ sees it) is the next lane's. Until then he stays **hidden from players** (`kit: 
 
 ## The numbers
 
-SIM-NUMBERS
+From the raid sim ([reports/smudgy-sim.md](../../reports/smudgy-sim.md); 26 battles a setting, the bots at tier 1600):
+
+- **Offset 0** (he plays at the lobby's strength): the crowd scores **0.44 ± 0.09** in **45** crowd moves, in the
+  pack (0.08 to 0.55, 33 to 57 moves). At the usual −250 it scored 0.69 ± 0.08 in 53: too easy. His forced opening (a
+  wing pawn and a rook out on his first two moves) is a real cost that his powers make back only at full strength.
+- **`camoStrikeTurn` 3** (Eric's "3rd turn after the swap"): the strike came at a median of 8 crowd moves after the
+  swap (3 to 20); the crowd took the hidden rook in 5 battles of 26; Camouflage came in all 26, on time.
+- **`repaintTarget` 2, `repaintBand` [1.5, 2.5]** (Eric's): about 1.1 Repaints a battle, each 1.92 pawns on average
+  (1.59 to 2.46). Only 3% of pairs land in the band (a painted knight or bishop is often worth 4 to 8 pawns, or nothing
+  when it's taken back at once), so he tries turn after turn until one fits; the first comes at a median crowd move 15.
+  A target elsewhere in the band would change little.
+- **`repaintMax` 2** (Eric's); **`camoTries` 3** (the brief's "a few turns"; none was needed in the sim);
+  **`repaintNodes` 30,000** (the pass guard's search; up to about 24 pairs a turn on the host's device);
+  **`rageSpeed.smudgy` 1** (a Repaint is one turn, like the Big Bounce).
 
 Every number is in `BOSS_POWERS` (`camoTries`, `camoStrikeTurn`, `repaintBand`, `repaintTarget`, `repaintMax`,
 `repaintNodes`, `rageSpeed.smudgy`) and his offset in `BOSS_ROSTER`.

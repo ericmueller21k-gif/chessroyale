@@ -68,7 +68,7 @@ describe("the FAQ's contents", () => {
     expect(words).toContain(`after ${BOSS_POWERS.camoTries} turns without them`);
     expect(words).toContain(`at most ${BOSS_POWERS.repaintMax} times a battle`);
     expect(words).toContain(`between ${BOSS_POWERS.repaintBand[0]} and ${BOSS_POWERS.repaintBand[1]}`);
-    expect(words).toContain(`${Math.abs(def.offset)} under the usual strength`);
+    expect(words).toContain(def.offset === 0 ? "at the usual strength" : `${Math.abs(def.offset)} ${def.offset < 0 ? "under" : "over"} the usual strength`);
     expect(words).not.toMatch(/undefined|NaN|\$\{/);
   });
 
