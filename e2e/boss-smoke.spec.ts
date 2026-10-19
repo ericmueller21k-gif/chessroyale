@@ -26,6 +26,13 @@ const PASSIVE_EVENTS: Partial<Record<PowerId, PowerEventKind[]>> = {
 };
 
 const PLAYABLE = BOSS_ROSTER.filter(isPlayable);
+/**
+ * A boss whose ultimate needs a position the usual start doesn't give: his own test switch's start instead of his
+ * passive's. Smudgy's Repaint can't come while the crowd has all eight pawns (a ninth is a position the engine refuses),
+ * so with the usual start it came only if he happened to take a pawn first; `?power=repaint` starts a pawn down on each
+ * side, and his Camouflage still comes from it (bosses/smudgy.ts, REPAINT_TEST_MOVES).
+ */
+const SMOKE_POWER: Partial<Record<string, PowerId>> = { smudgy: "repaint" };
 const desktop = () => test.info().project.name === "desktop";
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase?.kind ?? "none").catch(() => "none");
 
@@ -77,7 +84,7 @@ PLAYABLE.forEach((def, i) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await asAdmin(page);
-    await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=${def.id}&power=${powers.passive}`);
+    await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=${def.id}&power=${SMOKE_POWER[def.id] ?? powers.passive}`);
     // His tile on the Boss raid screen.
     await openBossRaid(page);
     await expect(page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", { name: def.name, exact: true })).toBeVisible();
