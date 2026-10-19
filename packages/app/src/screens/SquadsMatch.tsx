@@ -551,6 +551,12 @@ function MatchView({
       <SquadsBoards client={client} watching={`${m.key}/${boardId}`} onWatch={canWatch ? onWatch : null} />
       <div class="board-area">
         <div class="sq-status-row">
+          {/* Which board this is at a glance (Eric, Oct 18): its number, in the color you play on it. */}
+          {m.boards.length > 1 && (
+            <span class={`sq-board-no${mySide === null ? "" : ` is-${colourOf(b, mySide)}`}`} aria-hidden="true">
+              {boardId + 1}
+            </span>
+          )}
           <div class="opening-name sq-status" aria-live="polite">
             {/* (A block placed or lifted: said here for a few seconds, both squads; the reveal's words come first.) */}
             {banner && !revealing ? (
