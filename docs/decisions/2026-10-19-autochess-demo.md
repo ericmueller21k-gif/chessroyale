@@ -44,7 +44,7 @@ massive boards... running your opponent over... not very chess-like... boring qu
   streak; a loss streak's gold is a setting at 0, off); and the last fight's refund: 25% (rounded down) of the summed price
   of that side's pieces still on the board, win or lose, and its bench pieces (they never fought) in full. The result shows the next round's gold line
   by line.
-- **The bot:** buys with simple rules (pawns first in the early rounds, then minors and rooks, a queen when rich, now and
+- **The bot:** buys with simple rules (a mix weighted to minor pieces early, then rooks, a queen when rich, now and
   then keeps a hundred banked for interest, sells nothing), places pawns in front and pieces behind (seeded, paced over the
   open part of the 30 s), and adjusts greedily with the engine: each candidate move scored by a 1500-node search of the
   position the fight would start from, kept only if it beats not moving, at most 24 searches.
@@ -93,3 +93,34 @@ massive boards... running your opponent over... not very chess-like... boring qu
 Twelve fights between two bot armies at rounds 1 to 6 with the real engine (6000 nodes a move): 7 mates, 2 cap decisions, 2
 draws by insufficient material, 1 repetition; White won 6, Black 3, 3 draws; 72 moves on average, about 22 ms a move on this
 machine (a phone is several times slower and still under the 350 ms a move takes). Every number to tune is in `AUTOCHESS`.
+
+## Oct 19 evening: pawns don't promote; quiet fights fizzle out (Eric, after playing)
+
+Eric: "the computer prefers just buying pawns because it just wants to get the pawns... promoted to queens. So that's not
+going to work." On a thin board a pawn on its fourth rank is three or four moves from a queen, so at 10 gold pawns beat
+everything else. Eric's options were no promotion, or pawns that vanish or refund at the far side; also "if it's not mate in
+like 20 moves... it probably should fizzle out" (he left the cap itself open: "maybe that's fine").
+
+- **Pawns don't promote:** the fight never plays a move onto a pawn's last rank, so a pawn stops on the rank before it
+  (still attacking and checking from there). The browser's Stockfish can't be told the rule, so the fight filters its
+  choice: when its best move is a promotion it is asked for its top lines again, as many as there are promotions plus three
+  (each promotion piece is a line of its own), and the best non-promotion is played; the stand-in
+  move never promotes either. A side whose only legal moves were promotions has none: mated if its king is attacked,
+  else stalemated. Chosen over "vanish or refund": a vanishing pawn would have the engine sacrificing pieces for a queen it
+  never gets, while a stopped pawn is a plain blocked pawn the engine's search handles as it is (it still likes advanced
+  pawns a little more than this rule deserves; both sides alike).
+- **Quiet fights fizzle out:** 10 moves a side with nothing taken ends the fight like the cap does (more material wins,
+  equal is a draw): "10 moves each with nothing taken: more material wins." / "..., and equal material." This also ends the
+  dead endings no-promotion makes (kings and stopped pawns) in a few seconds instead of running to the cap. `quietCap` in
+  `AUTOCHESS`. The 60-move cap stays as it was (Eric: "maybe that's fine"); it's one number if he wants 20 or 30.
+- **The bot no longer buys pawns first:** its early weights favor knights and bishops (pawn 2, knight 3, bishop 3, rook 2;
+  later pawn 1.5, minors 2.5, rook 3, queen 2).
+- The fight's card now reads: "The engine plays both armies at the same strength, until mate, a draw, 60 moves each, or 10
+  each with nothing taken. Pawns don't promote."
+- **Checked with the real engine** (6000 nodes, 12 bot-v-bot fights at rounds 1 to 6, and 8 fights of 8 pawns and a rook,
+  130 gold, against two knights and two bishops, 124 gold): no promotion was ever played (the engine reached for one 5
+  times and was turned to its best other move). Bot v bot: 3 mates, 8 fizzled out, 1 repetition; 30 moves (both sides) on
+  average, about 10 s at 0.35 s a move. The pawn army lost all 8 to the minor pieces. With `quietCap` 15: 4 mates, 5
+  fizzled, 3 repetitions, 50 moves on average, and the pawn army won 2 of 8. Kept at 10 for short fights (Eric's "fizzle
+  out"); 15 is the number to try if fights feel cut short.
+

@@ -249,7 +249,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     commit({ ...at, round: { ...at.round, botFinal }, fight: { fen: start.fen, last: null, plies: 0 } });
     if (start.draw) return finish(null, "both_checked", start.fen);
     const res = await playFight(start.fen, {
-      pick: (fen) => enginePick(fen, cfg),
+      pick: (fen, _history, allowed) => enginePick(fen, allowed, cfg),
       rng: mulberry32(roundSeed(at.match) ^ 0x2545f491),
       cancelled: () => cancelled.current,
       onStep: (s) => commit({ ...gref.current, fight: { fen: s.fen, last: s.move, plies: s.ply } }),
@@ -681,7 +681,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
             {g.phase === "fight" && (
               <>
                 <p class="ac-card-say">{hint}</p>
-                <p class="ac-card-text">The engine plays both armies at the same strength, until mate, stalemate, a draw by the rules or {cfg.moveCap} moves each.</p>
+                <p class="ac-card-text">The engine plays both armies at the same strength, until mate, a draw, {cfg.moveCap} moves each, or {cfg.quietCap} each with nothing taken. Pawns don't promote.</p>
               </>
             )}
             {(g.phase === "result" || g.phase === "over") && outcome && (

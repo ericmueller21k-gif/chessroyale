@@ -14,7 +14,8 @@ sent. Why it is the way it is: [docs/decisions/2026-10-19-autochess-demo.md](../
   the bot places them. **Reveal and adjust** 15 s: their real pieces show and stay shown (one plain line over their half),
   and each of your pieces may make one legal chess move on your half (no captures, nothing into their half); a moved piece is
   marked, a tap takes its move back. **Fight:** the engine plays both armies at the same strength, a move about every
-  0.35 s, to mate, stalemate, a draw by the rules or 60 moves a side (then material decides). **Result:** the loser loses 2
+  0.35 s, to mate, stalemate, a draw by the rules, 60 moves a side or 10 a side with nothing taken (then material
+  decides). **Pawns don't promote:** a pawn never moves onto its last rank. **Result:** the loser loses 2
   + 1 per enemy piece left; 20 HP each. **Nothing carries over but gold, HP and the win streak:** each round starts with
   the two kings only. Each side gets back 25% of its pieces' price still on the board and its bench in full; income 100 then
   +20 a round (max 200), interest, win streak gold; the result line shows the next round's gold.

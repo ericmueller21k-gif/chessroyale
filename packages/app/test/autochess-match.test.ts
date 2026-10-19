@@ -19,7 +19,7 @@ import {
 import { botAdjust, botAt, botBuys, botPlan, botPlaces } from "../src/autochess/bot.ts";
 import { emptyArmy, extras, halfSquares, kingSquares, legalCounts, owned, placeBlock } from "../src/autochess/army.ts";
 import { fightStart, armiesFen, material } from "../src/autochess/position.ts";
-import { playFight, standInMove } from "../src/autochess/fight.ts";
+import { fightMoves, playFight, standInMove } from "../src/autochess/fight.ts";
 import type { Army, Kind } from "../src/autochess/types.ts";
 
 describe("auto chess: the economy", () => {
@@ -164,15 +164,18 @@ describe("auto chess: the bot", () => {
     const plan = botPlan("b", "e8", 100, 1, mulberry32(4));
     const pawns = Object.entries(plan.army.board).filter(([, k]) => k === "p");
     const others = Object.entries(plan.army.board).filter(([, k]) => k !== "p");
-    expect(pawns.length).toBeGreaterThanOrEqual(3);
+    expect(pawns.length).toBeGreaterThanOrEqual(2);
     for (const [sq] of pawns) expect(Number(sq[1])).toBeLessThanOrEqual(6);
     for (const [sq] of others) expect(Number(sq[1])).toBeGreaterThanOrEqual(7);
   });
 
-  it("buys pawns first in the early rounds, a fresh army each round, rooks and a queen as income grows, and never sells", () => {
-    const early = botBuys(100, 1, mulberry32(1));
-    expect(early.slice(0, 4)).toEqual(["p", "p", "p", "p"]);
-    expect(early).not.toContain("q");
+  it("buys a mix early (not pawns first: Eric, Oct 19), a fresh army each round, rooks and a queen as income grows, and never sells", () => {
+    // Round 1, 100 gold: mostly pieces, some pawns, never a queen.
+    const kinds = { p: 0, n: 0, b: 0, r: 0, q: 0 };
+    for (let seed = 0; seed < 200; seed++) for (const k of botBuys(100, 1, mulberry32(seed))) kinds[k]++;
+    expect(kinds.q).toBe(0);
+    expect(kinds.p).toBeGreaterThan(0);
+    expect(kinds.p).toBeLessThan(kinds.n + kinds.b + kinds.r);
     let queens = 0;
     let rooks = 0;
     for (let seed = 0; seed < 200; seed++) {
@@ -331,6 +334,53 @@ describe("auto chess: the fight", () => {
     expect(res).toBeNull();
     expect(seen).toEqual([1, 2, 3, 4]);
     expect(applyMove(start.fen, standInMove(start.fen, mulberry32(1))!)).toBeTruthy();
+  });
+
+  it("pawns don't promote: a pawn never moves onto its last rank, and a side left with only promotions is stalemated or mated", async () => {
+    // White's pawn on b7 with its path clear: the fight's moves leave out b7b8 (and every promotion), the king's stay.
+    const w: Army = { color: "w", king: "e1", board: { b7: "p" }, bench: [] };
+    const b: Army = { color: "b", king: "h8", board: { h7: "p", g7: "p" }, bench: [] };
+    const start = fightStart(w, b);
+    expect(legalMoves(start.fen)).toContain("b7b8q");
+    expect(fightMoves(start.fen).some((m) => m.startsWith("b7"))).toBe(false);
+    expect(fightMoves(start.fen)).toContain("e1e2");
+    // The engine asking for a promotion gets a stand-in instead, never the promotion.
+    const res = await playFight(start.fen, { pick: async () => "b7b8q", wait: noWait, rng: mulberry32(3), cfg: { ...AUTOCHESS, moveCap: 4 } });
+    expect(res!.moves.some((m) => m.length === 5)).toBe(false);
+    // White's king on a8 can't step (the knight on c6 covers a7 and b8), so its only legal moves are the pawn's promotions:
+    // the fight allows none, so it is stalemated; with a rook checking from h8 as well, it is mated.
+    const onlyPromotions = "K7/1P6/2n5/8/8/8/8/7k w - - 0 1";
+    expect(legalMoves(onlyPromotions).every((m) => m.length === 5)).toBe(true);
+    expect(await playFight(onlyPromotions, { pick: async () => null, wait: noWait, rng: mulberry32(1) })).toMatchObject({ end: "stalemate", winner: null, moves: [] });
+    expect(await playFight("K6r/1P6/2n5/8/8/8/8/7k w - - 0 1", { pick: async () => null, wait: noWait, rng: mulberry32(1) })).toMatchObject({ end: "checkmate", winner: "b", moves: [] });
+  });
+
+  it("a fight with nothing taken for 10 moves each fizzles out: more material wins, equal is a draw", async () => {
+    expect(AUTOCHESS.quietCap).toBe(10);
+    // Moves played in order, by ply (never repeating a position, never taking anything until told to).
+    const script = (plies: string[]) => async (_fen: string, history: readonly string[]) => plies[history.length] ?? null;
+    // A rook against a pawn: 10 quiet moves each, then material (5 v 1) decides.
+    const w: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
+    const b: Army = { color: "b", king: "a8", board: { e7: "p" }, bench: [] };
+    const white = ["a1b1", "b1c1", "c1d1", "d1e1", "e1f1", "f1g1", "h2h3", "h3h4", "h4h5", "h5h6"];
+    const black = ["a8b8", "b8c8", "c8d8", "d8e8", "e8f8", "f8g8", "e7e6", "e6e5", "e5e4", "g8f8"];
+    const plies = white.flatMap((m, k) => [m, black[k]!]);
+    const res = await playFight(fightStart(w, b).fen, { pick: script(plies), wait: noWait, rng: mulberry32(1) });
+    expect(res).toMatchObject({ end: "quiet", winner: "w", moves: plies });
+    // A capture starts the count again: the rook takes the knight first, then 10 quiet moves each.
+    const w2: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
+    const b2: Army = { color: "b", king: "a8", board: { h7: "n" }, bench: [] };
+    const white2 = ["h2h7", "a1b1", "b1c1", "c1d1", "d1e1", "e1f1", "f1g1", "g1g2", "g2g3", "g3g4", "g4g5"];
+    const black2 = ["a8b8", "b8c8", "c8d8", "d8e8", "e8f8", "f8e8", "e8d8", "d8c8", "c8b8", "b8a8"];
+    const res2 = await playFight(fightStart(w2, b2).fen, { pick: script(white2.flatMap((m, k) => (black2[k] ? [m, black2[k]!] : [m]))), wait: noWait, rng: mulberry32(1) });
+    expect(res2).toMatchObject({ end: "quiet", winner: "w" });
+    expect(res2!.moves).toHaveLength(21);
+    // Equal material when it fizzles out: a draw.
+    const w3: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
+    const b3: Army = { color: "b", king: "a8", board: { a7: "r" }, bench: [] };
+    const black3 = ["a8b8", "b8c8", "c8d8", "a7a6", "a6a5", "a5a4", "a4a3", "d8e8", "e8f8", "f8e8"];
+    const res3 = await playFight(fightStart(w3, b3).fen, { pick: script(white.flatMap((m, k) => [m, black3[k]!])), wait: noWait, rng: mulberry32(1) });
+    expect(res3).toMatchObject({ end: "quiet", winner: null });
   });
 
   it("each move takes about the move time, with the engine's thinking inside it", async () => {

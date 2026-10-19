@@ -13,6 +13,8 @@ describe("auto chess: what the result says", () => {
     expect(endWords("insufficient_material", true)).toBe("Draw: not enough pieces left to mate.");
     expect(endWords("cap", false)).toBe("60 moves played: more material wins.");
     expect(endWords("cap", true)).toBe("60 moves played with equal material.");
+    expect(endWords("quiet", false)).toBe("10 moves each with nothing taken: more material wins.");
+    expect(endWords("quiet", true)).toBe("10 moves each with nothing taken, and equal material.");
     expect(endWords("both_checked", true)).toBe("Both kings were in check at the start, so there was no fight.");
   });
 

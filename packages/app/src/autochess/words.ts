@@ -21,6 +21,8 @@ export function endWords(end: EndKind, draw: boolean, cfg: AutoChessSettings = A
       return "Draw: not enough pieces left to mate.";
     case "cap":
       return draw ? `${cfg.moveCap} moves played with equal material.` : `${cfg.moveCap} moves played: more material wins.`;
+    case "quiet":
+      return draw ? `${cfg.quietCap} moves each with nothing taken, and equal material.` : `${cfg.quietCap} moves each with nothing taken: more material wins.`;
     case "both_checked":
       return "Both kings were in check at the start, so there was no fight.";
   }
