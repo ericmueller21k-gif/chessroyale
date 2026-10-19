@@ -512,6 +512,7 @@ export function HomeScreen({
   onSettings,
   onShop,
   onSignIn,
+  onAutoChess,
 }: {
   /** In the queue: the queue screen (or the line for a seat), shown in place of the play column. */
   queue?: ComponentChildren;
@@ -554,6 +555,8 @@ export function HomeScreen({
   /** The phone's shop icon in the top bar. */
   onShop: () => void;
   onSignIn: () => void;
+  /** The thin "Auto chess" button at the very bottom: the demo (Oct 19). */
+  onAutoChess: () => void;
 }) {
   const { profile } = useAccount();
   const live = useLive();
@@ -941,6 +944,12 @@ export function HomeScreen({
       </span>
     </button>
   );
+  // Auto chess, the demo (Eric, Oct 19: "just a thin button for now"): the very bottom of home.
+  const autoChess = (
+    <button type="button" class="ac-home-btn" onClick={onAutoChess}>
+      Auto chess
+    </button>
+  );
   return (
     <div class="fd-home">
       {/*
@@ -990,6 +999,7 @@ export function HomeScreen({
           {panel}
           {go}
           {bossCard}
+          {autoChess}
         </div>
       </div>
       {overlays}

@@ -8337,15 +8337,17 @@ button.fd-logo {
  * above it. On a very small screen the card stops shrinking and the page scrolls.
  */
 @media (max-width: 1023px) {
+  /* (Gaps of 8 and a little less at the edges: Auto chess's thin button below the Boss raid card takes its 40 px from this
+     empty space and from the card's padding, so your pawn stays the size it was: docs/decisions/2026-10-19-autochess-demo.md.) */
   .fd-home:not(.queueing) {
-    gap: 10px;
-    padding-top: calc(env(safe-area-inset-top) + 12px);
-    padding-bottom: calc(env(safe-area-inset-bottom) + 14px);
+    gap: 8px;
+    padding-top: calc(env(safe-area-inset-top) + 8px);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
   }
   .fd-home-main,
   .fd-play-col,
   .fd-go {
-    gap: 10px;
+    gap: 8px;
   }
   .fd-hint {
     margin-top: -4px;
@@ -8376,9 +8378,11 @@ button.fd-logo {
     .fd-hero-in {
       flex-direction: row;
       gap: 14px;
+      /* (Beside your name the card needs no room above and below the pawn: its own picture has some.) */
+      padding: 4px 12px;
     }
     .fd-hero .fd-pawn-hero {
-      height: clamp(48px, calc(100cqh - 24px), 130px);
+      height: clamp(48px, calc(100cqh - 8px), 130px);
     }
     .fd-hero-sub {
       display: -webkit-box;
@@ -17567,4 +17571,423 @@ button.sq-tiny {
 .dv-record {
   color: var(--fd-sub);
   font-weight: 600;
+}
+
+/* -- Auto chess, the demo (screens/AutoChess.tsx; docs/areas/autochess.md; ac- for auto chess) -- */
+.ac-root {
+  display: flex;
+  justify-content: center;
+  padding: calc(env(safe-area-inset-top) + 6px) calc(12px + env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 6px) calc(12px + env(safe-area-inset-left));
+}
+/*
+ * One column as wide as the board. The board is as wide as the screen allows, or as tall as the room under the rows around it
+ * (the top line 44, the opponent's row 26, the message line 32, the bench 44, the shop 64, your row 26 and the gaps: 290 px).
+ */
+.ac-col {
+  width: min(100%, calc(var(--app-h) - 290px), 560px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.ac-top {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ac-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.ac-title strong {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-weight: 400;
+  font-size: 17px;
+  white-space: nowrap;
+}
+.ac-title span {
+  font-size: 12px;
+  color: var(--fd-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ac-clock {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+.ac-clock b {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-weight: 400;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  min-height: 23px;
+}
+.ac-clock span {
+  font-size: 12px;
+  color: var(--fd-sub);
+  white-space: nowrap;
+}
+.ac-clock.locked span {
+  color: var(--fd-gold-text);
+  font-weight: 800;
+}
+.ac-side {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.ac-side strong {
+  font-size: 13px;
+}
+.ac-side .ac-chip + strong + .ac-stat {
+  margin-left: auto;
+}
+.ac-stat {
+  color: var(--fd-sub);
+}
+.ac-stat b {
+  color: var(--fd-text);
+  font-variant-numeric: tabular-nums;
+}
+.ac-chip {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+.ac-chip.w,
+.ac-circle.w::after {
+  background: #fff;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55);
+}
+.ac-chip.b,
+.ac-circle.b::after {
+  background: #2a2c33;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.6);
+}
+.ac-board {
+  width: 100%;
+  aspect-ratio: 1;
+}
+.ac-board .board-wrap {
+  width: 100%;
+}
+/* What is drawn over the squares: exactly the board (eighths of --board-size), the taps and drags of the buy and adjust steps. */
+.ac-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 4;
+  pointer-events: none;
+  touch-action: none;
+}
+.ac-layer.live {
+  pointer-events: auto;
+}
+.ac-theirs {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 50%;
+  background: rgba(10, 12, 16, 0.2);
+  pointer-events: none;
+}
+.ac-cell,
+.ac-circle {
+  position: absolute;
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
+  pointer-events: none;
+}
+/* Their pieces while you buy: where, not what. */
+.ac-circle::after {
+  content: "";
+  position: absolute;
+  inset: 24%;
+  border-radius: 50%;
+  animation: ac-appear 160ms ease-out;
+}
+@keyframes ac-appear {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-circle::after {
+    animation: none;
+  }
+}
+.ac-picked {
+  background: var(--sq-select);
+}
+.ac-dot::after {
+  content: "";
+  position: absolute;
+  inset: 35%;
+  border-radius: 50%;
+  background: var(--sq-dot);
+}
+/* A piece that has moved in the adjust step: marked, and a tap takes the move back. */
+.ac-moved {
+  background: rgba(242, 193, 78, 0.22);
+  box-shadow: inset 0 0 0 3px var(--fd-gold);
+}
+.ac-moved i {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  min-width: 38%;
+  height: 38%;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font-style: normal;
+  font-weight: 800;
+  font-size: calc(var(--board-size, 100%) / 8 * 0.3);
+  line-height: 1;
+}
+.ac-theirs-line {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  top: calc(var(--board-size, 100%) / 4);
+  transform: translateY(-50%);
+  padding: 7px 10px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(14, 16, 21, 0.78);
+  pointer-events: none;
+}
+.ac-msg {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ac-msg-text,
+.ac-card-say {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 1.25;
+  color: var(--fd-sub);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.ac-card-say {
+  flex: none;
+  min-height: 31px;
+}
+.ac-sell {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ac-bench {
+  height: 44px;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+  touch-action: none;
+}
+.ac-slot {
+  min-width: 0;
+  padding: 0;
+  border: 1px dashed var(--fd-line);
+  border-radius: 9px;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+}
+.ac-slot.has {
+  border-style: solid;
+  background: var(--fd-panel-2);
+  cursor: grab;
+}
+.ac-slot.picked {
+  box-shadow: inset 0 0 0 2px var(--fd-gold);
+}
+.ac-slot.lifted {
+  opacity: 0.35;
+}
+.ac-icon {
+  display: block;
+  width: 100%;
+  max-width: 44px;
+  aspect-ratio: 1;
+}
+.ac-slot .ac-icon {
+  width: min(100%, 42px);
+}
+.ac-icon piece {
+  position: static;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ac-shop {
+  position: relative;
+  height: 64px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.ac-shop.selling {
+  box-shadow: 0 0 0 2px var(--fd-gold);
+  border-radius: 12px;
+}
+.ac-buy {
+  min-width: 0;
+  padding: 3px 2px 2px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--fd-panel);
+  color: var(--fd-text);
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+.ac-buy .ac-icon {
+  height: 34px;
+  width: 34px;
+  flex: none;
+}
+.ac-buy b {
+  font-size: 14px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.ac-buy small {
+  min-height: 11px;
+  font-size: 10px;
+  line-height: 1.1;
+  color: var(--fd-muted);
+  white-space: nowrap;
+}
+.ac-buy.off {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+}
+.ac-sell-drop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(14, 16, 21, 0.86);
+  color: var(--fd-gold-text);
+  font-weight: 800;
+  font-size: 15px;
+  pointer-events: none;
+}
+/* The other steps' box, in the place of the message line, the bench and the shop (32 + 6 + 44 + 6 + 64 px). */
+.ac-card {
+  height: 152px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: var(--fd-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+.ac-card-head {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 16px;
+  line-height: 1.2;
+}
+.ac-card-text,
+.ac-card-gold {
+  font-size: 12.5px;
+  line-height: 1.3;
+  color: var(--fd-sub);
+}
+.ac-card-gold {
+  color: var(--fd-text);
+}
+.ac-card-buttons {
+  margin-top: auto;
+  display: flex;
+  gap: 8px;
+}
+.ac-go {
+  flex: 1 1 0;
+  height: 38px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+}
+.ac-go-2 {
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+}
+/* The piece being dragged follows the finger (placed by the screen), over everything. */
+.ac-ghost {
+  position: fixed !important;
+  left: 0;
+  top: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.92;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
+}
+.ac-ghost piece {
+  position: static;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* Home's thin button, under the Boss raid card. */
+.ac-home-btn {
+  width: 100%;
+  height: 32px;
+  flex: none;
+  border: 1px solid var(--fd-line);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fd-sub);
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  cursor: pointer;
 }

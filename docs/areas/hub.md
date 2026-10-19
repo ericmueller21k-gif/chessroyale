@@ -35,6 +35,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     (`bossCardFadeMs`), never the Hidden Boss or a resting boss, the card's size fixed; it waits while the app is
     hidden, and under reduced motion there's no fade (`BossCardFace` in `components/BossSelect.tsx`; test switch
     `?cardMs=`). The animated card with lines is shelved (a later idea).
+  - **Auto chess's button** (Oct 19; [docs/areas/autochess.md](autochess.md)): a thin full-width button, "Auto chess", at the
+    very bottom of the play column (under the Boss raid card), a phone and a computer alike, opening the demo at `/autochess`
+    (home's gaps and the card's padding gave it its room: your pawn is no smaller than before, `home-layout.spec.ts`
+    checks it at five phone sizes; on a computer the column's foot, now this button, is level with your card's bottom).
   - **The Boss raid screen: a character select** (Eric, Oct 16;
     [docs/decisions/2026-10-16-boss-character-select.md](../decisions/2026-10-16-boss-character-select.md);
     `BossSelect`): slanted tiles at the top, one per boss you can meet (five to a row on a phone, all nine in one row
