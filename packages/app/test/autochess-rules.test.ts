@@ -456,7 +456,10 @@ describe("auto chess: the adjust step", () => {
     expect(dropBlock(ten, 99)).toBe("limit");
     expect(dropSquareBlock(ten, 0, "c1", 99)).toBe("limit");
     expect(dropWords("limit", 99)).toBe("Your board is full: 10 pieces and your king at most.");
-    expect(dropWords("taken", 99)).toContain("that square is taken");
+    expect(dropWords("taken", 99)).toBe("That square is taken.");
+    expect(dropWords("half", 99)).toBe("Pieces go on your half of the board.");
+    expect(dropWords("backrank", 99)).toBe("Pawns can't stand on your back rank.");
+    expect(dropWords("king", 99)).toBe("That's your king's square.");
     // The reasons come in the order used, gold, limit.
     expect(dropBlock(adjustDrop(startAdjust(benched), 0, "d2"), 0)).toBe("used");
     expect(dropBlock(ten, 0)).toBe("gold");

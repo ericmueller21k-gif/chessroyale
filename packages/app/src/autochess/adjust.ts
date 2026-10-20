@@ -1,5 +1,5 @@
 import { AUTOCHESS, type AutoChessSettings } from "@chessroyale/core";
-import { boardCount, inHalf, onBoard, placeBlock, placeFromBench, squareOf, type PlaceBlock } from "./army.ts";
+import { boardCount, inHalf, onBoard, placeBlock, placeFromBench, placeWords, squareOf, type PlaceBlock } from "./army.ts";
 import type { Army, Kind } from "./types.ts";
 
 /**
@@ -201,26 +201,9 @@ export function dropWords(block: DropBlock | PlaceBlock | "none", gold: number, 
     case "limit":
       return `Your board is full: ${cfg.boardLimit} pieces and your king at most.`;
     default:
-      return `That piece can't go there: ${placeShort(block)}`;
+      // (A square that refuses the piece: the placement rules' own words.)
+      return placeWords(block, cfg);
   }
 }
-
-const placeShort = (block: PlaceBlock) => {
-  switch (block) {
-    case "half":
-      return "your half only.";
-    case "king":
-      return "that's your king's square.";
-    case "taken":
-      return "that square is taken.";
-    case "backrank":
-      return "pawns can't stand on your back rank.";
-    case "file":
-      return "three pawns a file at most.";
-    case "fixed":
-    case "limit":
-      return "not now.";
-  }
-};
 
 export const undoWords = (block: "none" | "needed") => (block === "needed" ? "Take back your other change first." : "Nothing to take back there.");
