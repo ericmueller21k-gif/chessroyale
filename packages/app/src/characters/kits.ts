@@ -7,7 +7,7 @@
  */
 import { BOSS_ROSTER, type BossDef } from "@chessroyale/core";
 import type { SoundName } from "../sound.ts";
-import type { Beat, BeatLines, Loop } from "./boss-beats.ts";
+import type { Beat, BeatLines, Loop, Stage } from "./boss-beats.ts";
 import { BIGBOY, BIGBOY_ATTACK, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT } from "./bigboy.ts";
 import { CLOWN, CLOWN_ATTACK, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_ATTACK, GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
@@ -19,10 +19,13 @@ import { RECLUSE, RECLUSE_BUST, RECLUSE_PORTRAIT } from "./recluse.ts";
 import { ALFIL, ALFIL_ATTACK, ALFIL_CHANCE, ALFIL_LINES, ALFIL_PORTRAIT } from "./alfil.ts";
 import { HOPPER, HOPPER_ATTACK, HOPPER_CHANCE, HOPPER_LINES, HOPPER_PORTRAIT } from "./hopper.ts";
 import { SMUDGY, SMUDGY_ATTACK, SMUDGY_CHANCE, SMUDGY_LINES, SMUDGY_PORTRAIT } from "./smudgy.ts";
+import { MOO, MOO_ATTACK, MOO_CHANCE, MOO_LINES, MOO_PORTRAIT } from "./moo.ts";
+import type { Stance } from "./stance.ts";
+import { mooPowered } from "./moo-state.ts";
 import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
-import { ankusItem, bonkItem, carrotItem, frostItem, lashItem, lassoItem, paintItem, pieItem, popItem, sawItem, type SquareItem } from "./power-art.ts";
+import { ankusItem, bonkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, type SquareItem } from "./power-art.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
@@ -37,6 +40,8 @@ export interface KingAttackKit {
   ch: Character;
   /** Its animation, the king to our right (or to our left, `facesLeft`); mirrored when the king is on its other side. */
   anim: string;
+  /** The same powered up, while the figure is (Moo's Full Moon, `BossKit.powered`): the animation shown then. */
+  poweredAnim?: string;
   /** Drawn facing our left, the king on that side (Sawyer, as he always is); else facing our right. */
   facesLeft?: boolean;
   /** Its size on the board: frame pixels to a square. */
@@ -81,6 +86,14 @@ export interface BossKit extends BeatLines {
   lookOf?: (boss: BossView) => string | undefined;
   /** Its attack on a king (the God King's Last Stand, its mate), if it has one: see KingAttackKit. */
   kingAttack?: KingAttackKit;
+  /**
+   * A look it takes on for a time (Moo & Moon's Full Moon: every animation he plays during it is drawn powered up; the
+   * director's call, Oct 20): `on` says from the battle's state and the clock whether it has it now; its animations are then
+   * their `p_` twin where the character has one (`p_move` for `move`), and its idle is `idle` here. See `poweredKit`.
+   */
+  powered?: { on: (boss: Pick<BossView, "id" | "startMove" | "powers">, now: number, stage?: Stage) => boolean; idle: string };
+  /** A figure that now and then changes how it rests (Moo hugs the moon, then sits on it): see characters/stance.ts. */
+  rest?: Stance;
   /**
    * A half-engine look that comes on over its drawing (the Hidden Boss, from his phase change: components/Recluse.tsx's
    * EngineOverlay, placed on his head frame by frame; BossCharacter's `setEngineAt`). An overlay, never its frames.
@@ -439,6 +452,76 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // SMUDGY_ATTACK). Facing our left, as Sawyer; 36 frame pixels a square, 1.8 off, as Chub & Chirp's.
     kingAttack: { ch: SMUDGY_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, facesLeft: true, hit: paintItem },
   },
+  // Moo & Moon, a cow and his friend the Moon (Eric, Oct 20): docs/decisions/2026-10-20-moo-wired.md.
+  "Moo": {
+    ch: MOO,
+    anims: {
+      // The periodic strike on a piece is his capture cheer.
+      strike: "capture",
+      // Moonbeam: he lifts his snout and moos; at `beam` the beam falls from the sky onto the piece.
+      power: "moonbeam",
+      // The Full Moon's end: the daze (the aura fizzles; at `calm` his colors go back).
+      powerHit: "dazed",
+      ultimateWarn: "check",
+      // The Full Moon: the moon swells, at `swap` his colors go gold and the aura flares on.
+      ultimate: "fullMoon",
+      // The flurry: the moon rises over his head and fires five beams, `beam1` to `beam5`.
+      ultimateHit: "flurry",
+    },
+    sounds: {
+      // (His entrance's drop and his attack's: a soft slide.)
+      drop: "mooSlip",
+      thump: "mooThump",
+      land: "mooThump",
+      // The four moos: a happy one (his entrance, a capture, a check, a win, the attack's last), a soft one (the moonbeam's),
+      // the big MOO (the Full Moon's) and a sleepy one (dazed).
+      moo: "mooHappy",
+      mooSoft: "mooSoft",
+      mooBig: "mooBig",
+      mooSleepy: "mooSleepy",
+      oof: "mooOof",
+      flop: "mooFlop",
+      // (Hugging and sitting: the moon slipping out of his arms, him plopping onto it; back, the hop and the catch.)
+      slip: "mooSlip",
+      plop: "mooPlop",
+      hop: "mooSlip",
+      catch: "mooPlop",
+      // The Moon: its hum as the beam gathers (a rising charge), the beam's bright whoosh, the swell as it fills to full, and the
+      // aura flaring on at the Full Moon's `swap`.
+      hum: "mooHum",
+      beam: "mooBeam",
+      swell: "mooSwell",
+      swap: "mooFlare",
+      // The flurry: the moon rising and humming, then its charge climbing under the five beams, a short bright zap each.
+      gather: "mooHum",
+      charge: "mooCharge",
+      beam1: "mooZap",
+      beam2: "mooZap",
+      beam3: "mooZap",
+      beam4: "mooZap",
+      beam5: "mooZap",
+      // The aura going out, and his colors coming back (a soft slide down).
+      fizz: "mooFizz",
+      calm: "mooSlip",
+      // (His attack on a king: the moon's small beam on each hit, `beam` and `shine` in turn.)
+      shine: "mooZap",
+    },
+    lines: MOO_LINES,
+    chance: MOO_CHANCE,
+    portrait: { ...MOO_PORTRAIT, anim: "idle", frame: 0 },
+    // (Measured on a phone's bar at 320, 360 and 390 px: his idle reaches 26 px left of his feet, past the usual box's 24; his
+    // height, 68 px, is Sawyer's and Smudgy's, so no `tall`. His powered glow reaches 34 and 32 either side, past `wide`'s 29: the
+    // bar clips it at the box, styles.css `.ch-moo`.)
+    wide: true,
+    // While the Full Moon lasts (the view's `fullMoon`, until the daze's `calm`) every animation is its powered twin and his idle
+    // is `powerIdle` (characters/moo-state.ts, `mooPowered`).
+    powered: { on: mooPowered, idle: "powerIdle" },
+    // At rest he hugs the moon, now and then lets go and sits on it, then hugs it again.
+    rest: { hugMs: 7000, sitMs: 5000, toSit: "toSit", sit: "sit", toHug: "toHug" },
+    // The moon shines a small moonbeam at the king, ten in a row, both of them looking at him (moo.ts: MOO_ATTACK). Facing our left,
+    // as Sawyer; 36 frame pixels a square, 1.8 off, as Smudgy's.
+    kingAttack: { ch: MOO_ATTACK, anim: "kingAttack", poweredAnim: "p_kingAttack", perSquare: 36, stand: 1.8, facesLeft: true, hit: moonItem },
+  },
   "Hidden Boss": {
     ch: RECLUSE,
     // (A phone's boss bar: his bust, head and shoulders, the same animations.)
@@ -502,6 +585,28 @@ export const BOSS_KITS: Record<string, BossKit> = {
     engine: true,
   },
 };
+
+/** Every moment a kit may name an animation for (and so every `anims` key a powered twin may replace). */
+const BEAT_NAMES = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit", "wax", "flurry", "dazed", "kingAttack"] as const satisfies readonly Beat[];
+const LOOP_NAMES = ["idle", "thinking", "smug", "rattled", "defeat", "victory"] as const satisfies readonly Loop[];
+const poweredKits = new WeakMap<BossKit, BossKit>();
+/**
+ * The kit as it draws while it's powered up (`BossKit.powered`): each moment's animation is its `p_` twin where the character
+ * has one (`p_move` for `move`; an animation already drawn powered, the transformation's `fullMoon`, stays), and each loop it
+ * rests in too, its idle `powered.idle`. Made once a kit.
+ */
+export function poweredKit(kit: BossKit): BossKit {
+  let k = poweredKits.get(kit);
+  if (!k) {
+    const twin = (name: string) => (kit.ch.anims[`p_${name}`] ? `p_${name}` : name);
+    const anims: Partial<Record<Beat, string>> = { ...kit.anims };
+    for (const b of BEAT_NAMES) anims[b] = twin(kit.anims[b] ?? b);
+    const loops: Partial<Record<Loop, string>> = { ...kit.loops };
+    for (const l of LOOP_NAMES) loops[l] = l === "idle" ? kit.powered!.idle : twin(kit.loops?.[l] ?? l);
+    poweredKits.set(kit, (k = { ...kit, anims, loops }));
+  }
+  return k;
+}
 
 /**
  * Test links only (?wip=1&kit=<name>, a test switch: test-switches.ts): a kit drawn before its boss is playable, shown

@@ -8,6 +8,7 @@ import { SHOWDOWN_KING_AT, pigBoard } from "../components/Pig.tsx";
 import { alfilFen, alfilJolt, earlyLanding } from "../components/Alfil.tsx";
 import { hopperFen, yourPulls } from "../components/Hopper.tsx";
 import { rookTakenMoment, smudgyFen } from "../components/Smudgy.tsx";
+import { fullMoonMoment, noteMooMoments } from "../components/Moo.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
 import { rememberBoss } from "../boss-history.ts";
 import { bossKit } from "../characters/kits.ts";
@@ -213,13 +214,16 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // Boss powers: the moments that come as the turn passes to the crowd (after the boss's move), or the funhouse's own.
   // (Beaten, the Hidden Boss's fall: the board holds while he collapses; no moment of the last turn plays again.)
   // (While he thinks, only Alfil's pieces coming down early, at the start of his turn: earlyLanding; a carrot of Chub &
-  // Chirp's your move just pulled: yourPulls; and Smudgy's hidden rook your move just took: rookTakenMoment.)
+  // Chirp's your move just pulled: yourPulls; Smudgy's hidden rook your move just took: rookTakenMoment; and Moo's Full Moon,
+  // as your move lands: fullMoonMoment.)
   const moments = useMemo(() => {
     if (intro || victim || fall) return [];
     if (mating) return mateMomentsOf(boss, until);
-    if (thinking) return lights ? [] : [earlyLanding(boss), ...yourPulls(boss), ...rookTakenMoment(boss)].filter((m) => m !== null);
+    if (thinking) return lights ? [] : [earlyLanding(boss), ...yourPulls(boss), ...rookTakenMoment(boss), ...fullMoonMoment(boss)].filter((m) => m !== null);
     return momentsOf(boss, until);
   }, [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating, fall]);
+  // (Moo's daze: he's drawn powered up until its `calm`, noted from the moment's start.)
+  noteMooMoments(boss, moments);
   const moment = momentAt(moments, now);
   // Each moment's line, into the boss's voice: its text box keeps it up for its time, into the crowd's turn.
   useMomentSpeech(boss, moments, now);

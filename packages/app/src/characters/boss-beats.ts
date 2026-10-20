@@ -62,6 +62,11 @@ export type Beat =
   // piece), and the crowd taking it.
   | "camoStrike"
   | "rookTaken"
+  // Moo & Moon's: the Moon filling up (a quarter, a half and three quarters of his ultimate's meter), the flurry of five
+  // beams, and the daze after the Full Moon.
+  | "wax"
+  | "flurry"
+  | "dazed"
   // A boss's attack on a king (its kit's `kingAttack`): the God King in his Last Stand, the crowd's king at its mate.
   | "kingAttack";
 /** The loops it rests in between moments (`ready`: Wrangler's, his meter full). */

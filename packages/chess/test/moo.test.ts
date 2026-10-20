@@ -107,10 +107,10 @@ function stub(fen: string, moo: BossPowerState["moo"], crowdMoves: number, test 
 }
 
 describe("Moo & Moon on the roster", () => {
-  it("is on the roster with his powers, not playable until his kit is wired, and his numbers are in BOSS_POWERS", () => {
+  it("is on the roster with his powers, live with his kit (playable), and his numbers are in BOSS_POWERS", () => {
     const def = BOSS_ROSTER.find((d) => d.id === "moo")!;
-    expect(def).toMatchObject({ name: "Moo & Moon", icon: "🐄", kit: null, powers: { passive: "moonbeam", ultimate: "fullmoon" } });
-    expect(isPlayable(def)).toBe(false);
+    expect(def).toMatchObject({ name: "Moo & Moon", icon: "🐄", kit: "Moo", powers: { passive: "moonbeam", ultimate: "fullmoon" } });
+    expect(isPlayable(def)).toBe(true);
     expect(bossRules(def)?.opening).toBeUndefined();
     expect(BOSS_POWERS).toMatchObject({ moonbeamEvery: 3, fullMoonMoves: 5, flurryBeams: 5 });
     expect(BOSS_POWERS.rageSpeed.moo).toBeGreaterThan(0);

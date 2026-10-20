@@ -3,7 +3,7 @@ import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import { BOSS_BANNER, BOSS_POWERS, type PowerEventKind } from "@chessroyale/core";
 import { KING_ATTACK, mateMoments, powerFxMs, powerMomentMs } from "@chessroyale/chess";
-import { bossKit, type BossKit } from "../characters/kits.ts";
+import { bossKit, poweredKit, type BossKit } from "../characters/kits.ts";
 import { cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { BossMoment } from "./BossEffect.tsx";
@@ -19,7 +19,7 @@ import { ALFIL_UI } from "./Alfil.tsx";
 import { HOPPER_UI } from "./Hopper.tsx";
 import { SMUDGY_UI } from "./Smudgy.tsx";
 import { MOO_UI } from "./Moo.tsx";
-import { PowerBanner, kitLine, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
+import { PowerBanner, kitLine, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 import { useFrameNow } from "./Countdown.tsx";
 
@@ -222,7 +222,9 @@ const kitAnim = (kit: BossKit | null, kind: PowerEventKind) => {
 export function PowerMoment({ boss, moment, now, orientation, side }: { boss: BossView; moment: Moment | null; now: number; orientation: "white" | "black"; side: "w" | "b" }) {
   if (!moment) return null;
   const t = now - moment.at;
-  const kit = bossKit(boss.name);
+  // (Moo's Full Moon: his moments' animations are powered while it lasts.)
+  const plain = bossKit(boss.name);
+  const kit = plain?.powered?.on(boss, now, "bossMove") ? poweredKit(plain) : plain;
   const banner = (text: string, sub?: string, tone = "", until = Infinity, from = 0) => {
     const ms = Math.min(BOSS_BANNER.ms, until - from);
     return t >= from && t < from + ms ? <PowerBanner key={moment.key} boss={boss} side={side} text={text} sub={sub} tone={tone} ms={ms} /> : null;
@@ -258,7 +260,7 @@ export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
   // (Warned, it's full: the test switch can bring the ultimate before the meter is. Older servers: null once spent.)
   const paused = !!p?.paused;
   const now = !!p && p.ultAt !== null && !paused;
-  const pct = !p || !show ? 0 : p.warned || now ? 100 : Math.round((p.rage ?? 0) * 100);
+  const pct = ragePct(boss) ?? 0;
   // The meter only drops when an ultimate empties it: from what this device last showed, it holds a moment (the screen
   // it drops on is a busy first frame: a slide would be half over before it's seen), then slides down on the page's
   // own clock, carried on by whichever screen draws it next, however soon the next turn comes (a screen change or a
