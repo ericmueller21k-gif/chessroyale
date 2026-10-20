@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
 import { applyMove, legalMoves, pieceAt, sanLineToUci, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
@@ -76,7 +76,41 @@ function moo(patch: Partial<Settings> = {}) {
   return { core, inbox, last, advance, runner, asked, toRound, crowdPlays, answer };
 }
 
-describe("Moo & Moon online", () => {
+/** Within a describe: the beams' target set to `target` (BOSS_POWERS.moonbeamTarget), put back after. */
+function onTarget(target: "best" | "valuable" | "random") {
+  const powers = BOSS_POWERS as { moonbeamTarget: string };
+  let was = "";
+  beforeAll(() => {
+    was = powers.moonbeamTarget;
+    powers.moonbeamTarget = target;
+  });
+  afterAll(() => {
+    powers.moonbeamTarget = was;
+  });
+}
+
+describe("Moo & Moon online, the \"random\" target: the host isn't asked for lines, the beam lands from the seed", () => {
+  onTarget("random");
+  it("his 3rd move's request asks nothing more; the beam stuns one of the crowd's mobile pieces for everyone", () => {
+    const L = moo();
+    for (let k = 1; k <= 3; k++) {
+      L.crowdPlays();
+      expect(L.asked()!.beam).toBeUndefined();
+      L.answer();
+    }
+    const round = L.toRound();
+    const p = round.boss!.powers!;
+    expect(p.stunned).toHaveLength(1);
+    const sq = p.stunned![0]!;
+    expect(pieceAt(round.board!.fen, sq)).toMatchObject({ color: L.runner().boss!.crowdSide });
+    expect(pieceAt(round.board!.fen, sq)!.type).not.toBe("k");
+    expect(p.events).toContainEqual({ kind: "moonbeam", turn: p.turn, square: sq });
+    expect(p.allowed!.some((m) => m.startsWith(sq))).toBe(false);
+  });
+});
+
+describe("Moo & Moon online, the \"best\" target", () => {
+  onTarget("best");
   it("the host is asked for the crowd's top moves after his 3rd move (only then), and its best line's piece is stunned for everyone", () => {
     const L = moo();
     expect(L.runner().boss!.id).toBe("moo");

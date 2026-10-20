@@ -6,11 +6,12 @@
  * - After every moonbeamEvery-th move of his (his 3rd, 6th, 9th…), at the end of his turn (afterBossMove), a beam of
  *   moonlight lands on one of the crowd's pieces: it can't move on the crowd's next turn (one turn; then it's free). It
  *   still attacks and defends; it just can't move. Its moment, `moonbeam`, plays as the crowd's turn begins.
- * - The target is the crowd's most useful piece: the one that moves in the crowd's engine-best move in the position after
- *   his move (the host's engine online, this device's in solo: beamLines). Never the king, and always a move left for the
- *   crowd: if it would leave none, the piece of the next best line, then the crowd's other pieces with a move by value
- *   (then by how many moves each has, ties from the seed: beamOrder). No piece fits: no beam that turn, and the count
- *   carries on (the next comes after his next moonbeamEvery-th move, as ever).
+ * - The target (BOSS_POWERS.moonbeamTarget, beamOrder): "random", one of the crowd's pieces with a move, from the seed
+ *   (the shipped one: the raid sim, reports/moo-sim.md); "valuable", Ginger's freeze's way; or "best", the one that
+ *   moves in the crowd's engine-best move in the position after his move (the host's engine online, this device's in
+ *   solo: beamLines), then the next lines' pieces, then by value. Never the king, and always a move left for the crowd:
+ *   if a piece would leave none, the next in that order. No piece fits: no beam that turn, and the count carries on (the
+ *   next comes after his next moonbeamEvery-th move, as ever).
  * - How the crowd's moves leave the stunned pieces out is Ginger's freeze's way (crowdFilter): the allowed moves are the
  *   only ones the judge scores, the bots pick and the God King plays, and a stunned turn doesn't count for fair play.
  *
@@ -20,8 +21,8 @@
  *   goes on: it doesn't take his move.
  * - For fullMoonMoves of his moves (this one first) his brain is the engine at full strength (bestReply: the engine's best
  *   at his move's own budget, never his Maia brain, a slip or the guard); the God King's strike still staggers one.
- * - The first of those turns ends with the flurry: flurryBeams moonbeams on different pieces of the crowd's, the most
- *   useful first (beamOrder), each stunned for the crowd's next turn, as many as leave the crowd a move (`flurry`, the
+ * - The first of those turns ends with the flurry: flurryBeams moonbeams on different pieces of the crowd's, picked as
+ *   the Moonbeam's are (beamOrder), each stunned for the crowd's next turn, as many as leave the crowd a move (`flurry`, the
  *   squares in the order they land). It replaces that turn's Moonbeam if both fall due; the Moonbeam's count goes on.
  * - After his last move at full strength, `dazed` as the crowd's turn begins: he's himself again. The meter is held empty
  *   from the transformation until then (ultimateRunning), then fills again.
@@ -54,17 +55,24 @@ export const MOO_BEATS = {
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts): MOO_BEATS's totals. */
 export const MOO_FX = { moonbeam: MOO_BEATS.moonbeam.total, flurry: MOO_BEATS.flurry.total, fullMoon: MOO_BEATS.fullMoon.total, dazed: MOO_BEATS.dazed.total } as const;
 
-type MooSettings = Pick<BossPowerSettings, "moonbeamEvery" | "moonbeamLines" | "moonbeamNodes" | "fullMoonMoves" | "flurryBeams">;
+type MooSettings = Pick<BossPowerSettings, "moonbeamTarget" | "moonbeamEvery" | "moonbeamLines" | "moonbeamNodes" | "fullMoonMoves" | "flurryBeams">;
+
+/** Which of the crowd's pieces a beam takes (BOSS_POWERS.moonbeamTarget). */
+export type MoonbeamTarget = BossPowerSettings["moonbeamTarget"];
 
 const FRESH: MooState = { moves: 0, stun: null, full: null };
 
 /**
- * The crowd's pieces a beam may take, most useful first (`fen`: the position after his move, the crowd to move): the
- * pieces moving in the engine's lines (`lines`, best first; each one legal here and a crowd piece's), then the crowd's
- * other pieces with a move by value, then by how many moves each has, ties from the seed (`at`: his move's number).
- * Never the king, never a piece without a move.
+ * The crowd's pieces a beam may take, in the order the beams take them (`fen`: the position after his move, the crowd to
+ * move; `at`: his move's number, for the seed). Never the king, never a piece without a move. By `target`
+ * (BOSS_POWERS.moonbeamTarget):
+ * - "best": the pieces moving in the engine's lines (`lines`, best first; each one legal here and a crowd piece's), then
+ *   the crowd's other pieces with a move by value, then by how many moves each has, ties from the seed;
+ * - "valuable" (Ginger's freeze's way): its three most valuable, mobile pieces (pieces before pawns, then value and
+ *   moves) in an order from the seed, then the rest in that ranking;
+ * - "random": every piece with a move, in an order from the seed.
  */
-export function beamOrder(fen: string, crowd: Side, lines: readonly string[] | null, seed: number, at: number): string[] {
+export function beamOrder(fen: string, crowd: Side, lines: readonly string[] | null, seed: number, at: number, target: MoonbeamTarget = BOSS_POWERS.moonbeamTarget): string[] {
   const legal = legalMoves(fen);
   const moves = new Map<string, number>();
   for (const m of legal) moves.set(from(m), (moves.get(from(m)) ?? 0) + 1);
@@ -72,14 +80,24 @@ export function beamOrder(fen: string, crowd: Side, lines: readonly string[] | n
     const piece = pieceAt(fen, sq);
     return !!piece && piece.color === crowd && piece.type !== "k" && moves.has(sq);
   };
+  const roll = (sq: string) => powerRoll(seed, "moonbeam", at, sq);
+  const pieces = [...moves.keys()].filter(ok).sort();
+  if (target === "random") return pieces.sort((a, b) => roll(a) - roll(b) || (a < b ? -1 : 1));
+  if (target === "valuable") {
+    const type = (sq: string) => pieceAt(fen, sq)!.type;
+    const score = (sq: string) => (type(sq) === "p" ? 0 : 100) + VALUE[type(sq)]! * 3 + moves.get(sq)!;
+    const ranked = pieces.sort((a, b) => score(b) - score(a) || (a < b ? -1 : 1));
+    const top = ranked.slice(0, 3).sort((a, b) => roll(a) - roll(b) || (a < b ? -1 : 1));
+    return [...top, ...ranked.slice(3)];
+  }
   const out: string[] = [];
   for (const m of lines ?? []) {
     const sq = from(m);
     if (legal.includes(m) && ok(sq) && !out.includes(sq)) out.push(sq);
   }
-  const rest = [...moves.keys()]
-    .filter((sq) => ok(sq) && !out.includes(sq))
-    .map((sq) => ({ sq, value: VALUE[pieceAt(fen, sq)!.type]!, n: moves.get(sq)!, roll: powerRoll(seed, "moonbeam", at, sq) }))
+  const rest = pieces
+    .filter((sq) => !out.includes(sq))
+    .map((sq) => ({ sq, value: VALUE[pieceAt(fen, sq)!.type]!, n: moves.get(sq)!, roll: roll(sq) }))
     .sort((a, b) => b.value - a.value || b.n - a.n || a.roll - b.roll || (a.sq < b.sq ? -1 : 1));
   return [...out, ...rest.map((r) => r.sq)];
 }
@@ -88,11 +106,11 @@ export function beamOrder(fen: string, crowd: Side, lines: readonly string[] | n
  * The squares `count` beams stun (beamOrder's, in turn), each kept only if the crowd still has a legal move with every
  * piece picked so far held: fewer when that runs out, none when no piece fits.
  */
-export function chooseBeams(fen: string, crowd: Side, lines: readonly string[] | null, count: number, seed: number, at: number): string[] {
+export function chooseBeams(fen: string, crowd: Side, lines: readonly string[] | null, count: number, seed: number, at: number, target: MoonbeamTarget = BOSS_POWERS.moonbeamTarget): string[] {
   if (count <= 0) return [];
   const legal = legalMoves(fen);
   const picked: string[] = [];
-  for (const sq of beamOrder(fen, crowd, lines, seed, at)) {
+  for (const sq of beamOrder(fen, crowd, lines, seed, at, target)) {
     if (picked.length >= count) break;
     const held = new Set([...picked, sq]);
     if (legal.some((m) => !held.has(from(m)))) picked.push(sq);
@@ -199,12 +217,15 @@ export const MOO: BossRules = {
 export const mooBattle = {
   /**
    * How many of the crowd's top lines his beams weigh after his move now (the boss request's `beam`; solo's own), or
-   * null: no beam lands after it (none due, not his turn, not his battle).
+   * null: no beam lands after it (none due, not his turn, not his battle), or its target doesn't weigh them (only "best"
+   * does).
    */
   beamAsk(b: Battle, s: MooSettings = BOSS_POWERS): number | null {
     const boss = b.state.boss;
     if (!boss?.powers || boss.id !== "moo" || boss.result || !b.bossToMove()) return null;
     const m = mooOf(boss.powers);
+    // (Only the "best" target weighs the engine's lines.)
+    if (s.moonbeamTarget !== "best") return null;
     return flurryNow(m, boss.crowdMoves) || beamAfter(m.moves + 1, b.settings.bossPowerTest, s) ? s.moonbeamLines : null;
   },
 
@@ -241,7 +262,7 @@ export const mooBattle = {
     const flurry = flurryNow(m, boss.crowdMoves);
     const count = flurry ? s.flurryBeams : beamAfter(moves, b.settings.bossPowerTest, s) ? 1 : 0;
     const fen = b.boards.get(b.state.boards[0]!)!.fen;
-    const squares = count && sideToMove(fen) === boss.crowdSide ? chooseBeams(fen, boss.crowdSide, lines, count, p.seed, moves) : [];
+    const squares = count && sideToMove(fen) === boss.crowdSide ? chooseBeams(fen, boss.crowdSide, lines, count, p.seed, moves, s.moonbeamTarget) : [];
     const stun = squares.length ? { turn: boss.crowdMoves + 1, squares, ...(flurry ? { flurry: true as const } : {}) } : null;
     let full = m.full;
     let dazed = m.dazed;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BOSS_POWERS, BOSS_ROSTER, isPlayable, mulberry32, type BossPowerState, type BossState, type PowerEvent } from "@chessroyale/core";
 import {
   BOSS_OPENING,
@@ -68,6 +68,19 @@ async function untilHisMove(r: MatchRunner, n: number, pick?: (fen: string, allo
   }
 }
 
+/** Within a describe: the beams' target set to `target` (BOSS_POWERS.moonbeamTarget), put back after. */
+function onTarget(target: "best" | "valuable" | "random") {
+  const powers = BOSS_POWERS as { moonbeamTarget: string };
+  let was = "";
+  beforeAll(() => {
+    was = powers.moonbeamTarget;
+    powers.moonbeamTarget = target;
+  });
+  afterAll(() => {
+    powers.moonbeamTarget = was;
+  });
+}
+
 const events = (r: MatchRunner): PowerEvent[] => r.bossView()?.powers?.events ?? [];
 
 /** A Battle on one position (him to move unless `crowdMoves` says the crowd has moved), for his after-move rules on their own. */
@@ -114,7 +127,8 @@ describe("Moo & Moon on the roster", () => {
   });
 });
 
-describe("Moonbeam: its target", () => {
+describe("Moonbeam: its target, \"best\" (the engine-best move's piece)", () => {
+  onTarget("best");
   // White (the crowd) to move: queen d1, rooks a1 h1, knights, pawns; his pieces anywhere.
   const fen = "r1bqkbnr/pppppppp/2n5/8/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3";
 
@@ -191,7 +205,8 @@ describe("Moonbeam: its target", () => {
   });
 });
 
-describe("Moonbeam in the match", () => {
+describe("Moonbeam in the match (the \"best\" target)", () => {
+  onTarget("best");
   it("comes after every 3rd move of his (the count from his first), at the end of his turn, on the engine-best move's piece", async () => {
     const r = battle(11);
     for (let n = 1; n <= 7; n++) {
@@ -284,6 +299,54 @@ describe("Moonbeam in the match", () => {
     const b = stub(after, { moves: 2, stun: null, full: null }, 1);
     mooBattle.afterHisMove(b, null);
     expect(b.state.boss!.powers!.moo!.stun).toEqual({ turn: 2, squares: ["d1"] });
+  });
+});
+
+describe("Moonbeam: its target, the other settings", () => {
+  const fen = "r1bqkbnr/pppppppp/2n5/8/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3";
+  const movers = [...new Set(legalMoves(fen).map(from))].filter((sq) => pieceAt(fen, sq)!.type !== "k").sort();
+
+  it("\"random\": every mobile piece but the king, each once, in an order from the seed (the engine's lines ignored)", () => {
+    const order = beamOrder(fen, "w", ["f1c4"], 1, 3, "random");
+    expect([...order].sort()).toEqual(movers);
+    expect(beamOrder(fen, "w", null, 1, 3, "random")).toEqual(order);
+    // (Another move of his, another order.)
+    const orders = new Set([3, 6, 9, 12, 15].map((at) => beamOrder(fen, "w", null, 1, at, "random")[0]));
+    expect(orders.size).toBeGreaterThan(1);
+  });
+
+  it("\"valuable\" (Ginger's way): one of the three most valuable mobile pieces, at random from the seed; then the rest by that ranking", () => {
+    // Pieces before pawns, then value (times 3) and moves: the queen (1 move), the h1 rook (1) and the f1 bishop (5; the
+    // f3 knight's 5 too, after it by square).
+    const top = ["d1", "f1", "h1"];
+    const picks = new Set<string>();
+    for (const at of [3, 6, 9, 12, 15, 18, 21]) {
+      const order = beamOrder(fen, "w", ["d2d4"], 1, at, "valuable");
+      expect([...order.slice(0, 3)].sort()).toEqual(top);
+      expect([...order].sort()).toEqual(movers);
+      picks.add(chooseBeams(fen, "w", null, 1, 1, at, "valuable")[0]!);
+    }
+    expect(picks.size).toBeGreaterThan(1);
+    for (const sq of picks) expect(top).toContain(sq);
+  });
+
+  it("the flurry follows the setting: five different pieces, never the king, always a move left", () => {
+    for (const target of ["best", "valuable", "random"] as const) {
+      const squares = chooseBeams(fen, "w", ["d2d4"], 5, 1, 3, target);
+      expect(squares).toHaveLength(5);
+      expect(new Set(squares).size).toBe(5);
+      expect(squares).not.toContain("e1");
+      expect(legalMoves(fen).some((m) => !squares.includes(from(m)))).toBe(true);
+      // (A check only one piece can answer: no beam, whatever the setting.)
+      expect(chooseBeams("3R4/7k/8/8/8/8/6PP/r6K w - - 0 1", "w", null, 5, 1, 3, target)).toEqual([]);
+    }
+  });
+
+  it("only \"best\" asks for the engine's lines: with the others the host isn't asked", () => {
+    const b = stub("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2", { moves: 2, stun: null, full: null }, 1);
+    expect(mooBattle.beamAsk(b, { ...BOSS_POWERS, moonbeamTarget: "best" })).toBe(BOSS_POWERS.moonbeamLines);
+    expect(mooBattle.beamAsk(b, { ...BOSS_POWERS, moonbeamTarget: "random" })).toBeNull();
+    expect(mooBattle.beamAsk(b, { ...BOSS_POWERS, moonbeamTarget: "valuable" })).toBeNull();
   });
 });
 
@@ -381,7 +444,7 @@ describe("Full Moon", () => {
     await crowdMove(r);
     expect(events(r).some((e) => e.kind === "fullMoon")).toBe(true);
     expect(r.boss!.powers!.ultNext).toBeUndefined();
-    expect(r.bossBeam()).toBe(BOSS_POWERS.moonbeamLines);
+    expect(r.bossBeam()).toBe(BOSS_POWERS.moonbeamTarget === "best" ? BOSS_POWERS.moonbeamLines : null);
     await r.playBoss();
     expect(mooOf(r).moves).toBe(3);
     const kinds = events(r).map((e) => e.kind);
@@ -390,7 +453,7 @@ describe("Full Moon", () => {
     // His 6th move still brings the Moonbeam (the count carried on through the Full Moon).
     await untilHisMove(r, 5);
     if (!r.bossToMove()) await crowdMove(r);
-    expect(r.bossBeam()).toBe(BOSS_POWERS.moonbeamLines);
+    expect(r.bossBeam()).toBe(BOSS_POWERS.moonbeamTarget === "best" ? BOSS_POWERS.moonbeamLines : null);
     await r.playBoss();
     expect(events(r).map((e) => e.kind)).toContain("moonbeam");
   });

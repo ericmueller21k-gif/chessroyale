@@ -976,11 +976,15 @@ export const BOSS_POWERS = {
   repaintNodes: 30_000,
   /**
    * Moo & Moon's Moonbeam (Eric, Oct 20; docs/decisions/2026-10-20-moo-rules.md): after every moonbeamEvery-th move of
-   * his, at the end of his turn, a beam stuns one of the crowd's pieces: it can't move on the crowd's next turn. The
-   * target: the piece that moves in the crowd's engine-best move after his move (the host's engine: its top
-   * moonbeamLines lines at moonbeamNodes), then the pieces of its next lines, then by value. Never the king; always a
-   * move left for the crowd.
+   * his, at the end of his turn, a beam stuns one of the crowd's pieces: it can't move on the crowd's next turn. Never
+   * the king; always a move left for the crowd. Which piece (moonbeamTarget; the Full Moon's flurry the same, on
+   * different pieces): "best", the piece that moves in the crowd's engine-best move after his move (the host's engine:
+   * its top moonbeamLines lines at moonbeamNodes), then the pieces of its next lines, then by value; "valuable",
+   * Ginger's freeze's way, one of the crowd's three most valuable mobile pieces at random; "random", any of its mobile
+   * pieces at random (from the seed). "random" since the raid sim (Oct 20, the director's call while Eric slept: "best"
+   * left the crowd 0.02, "random" 0.21; reports/moo-sim.md); "best" was the director's first reading of "most useful".
    */
+  moonbeamTarget: "random" as "best" | "valuable" | "random",
   moonbeamEvery: 3,
   moonbeamLines: 8,
   moonbeamNodes: 50_000,

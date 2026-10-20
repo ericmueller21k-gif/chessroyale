@@ -78,6 +78,9 @@ describe("the FAQ's contents", () => {
     expect(words).toContain("from the game so far");
     expect(words).toContain(`after every ${BOSS_POWERS.moonbeamEvery === 3 ? "3rd" : BOSS_POWERS.moonbeamEvery} move of his`);
     expect(words).toContain("Never your king");
+    // (The beam's target, as BOSS_POWERS.moonbeamTarget sets it: at random since the raid sim.)
+    expect(words).toContain(BOSS_POWERS.moonbeamTarget === "random" ? "one of your pieces that can move, at random" : BOSS_POWERS.moonbeamTarget === "valuable" ? "three most valuable pieces" : "the engine's best move for you");
+    for (const target of ["best", "valuable", "random"] as const) expect(BOSS_BLOCKS.moo!({ ...BOSS_POWERS, moonbeamTarget: target }, def)).not.toMatch(/undefined|NaN|\$\{/);
     expect(words).toContain(`For ${BOSS_POWERS.fullMoonMoves} moves of his`);
     expect(words).toContain(`a flurry: ${BOSS_POWERS.flurryBeams} moonbeams on ${BOSS_POWERS.flurryBeams} different pieces`);
     expect(words).toContain(def.offset === 0 ? "at the usual strength" : `${Math.abs(def.offset)} ${def.offset < 0 ? "under" : "over"} the usual strength`);
