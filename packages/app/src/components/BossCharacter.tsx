@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
-import { bossKit, type BossKit } from "../characters/kits.ts";
+import { bossKit, poweredKit, type BossKit } from "../characters/kits.ts";
+import { stanceAt } from "../characters/stance.ts";
+import { resetMoo } from "../characters/moo-state.ts";
 import { renderFrame, type Anim, type Character, type Frame } from "../characters/sprite.ts";
 import type { BossView, GameView, Phase } from "../game.ts";
 import { play, warmSounds } from "../sound.ts";
@@ -13,6 +15,7 @@ import { prewarmPig } from "./Pig.tsx";
 import { prewarmAlfil } from "./Alfil.tsx";
 import { prewarmHopper } from "./Hopper.tsx";
 import { prewarmSmudgy } from "./Smudgy.tsx";
+import { prewarmMoo } from "./Moo.tsx";
 import { EngineOverlay, placeEngine, prewarmRecluse } from "./Recluse.tsx";
 import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
@@ -54,6 +57,7 @@ export function resetBeats() {
   inPlace.run = null;
   figure.run = null;
   engine.at = null;
+  resetMoo();
 }
 
 /**
@@ -249,6 +253,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     if (kit.ch.id === "hopper") prewarmHopper(kit.ch.name);
     // (Smudgy's splash, reveal and Repaint, and the paint.)
     if (kit.ch.id === "smudgy") prewarmSmudgy(kit.ch.name);
+    // (Moo's moonbeam, flurry and daze, his powered-up twins, his sit, and the beams on the board.)
+    if (kit.ch.id === "moo") prewarmMoo(kit.ch.name);
     // (The Hidden Boss's phase change: his rage, his leap onto the board, the book thrown down, the chant.)
     if (kit.ch.id === "recluse") prewarmRecluse(boss.crowdSide);
     // (Its attack on a king too: the God King's Last Stand, or its mate.)
@@ -257,6 +263,9 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   // A recolor from the battle's state (Big Boy's black pawn), read as it's drawn.
   const lookRef = useRef<() => string>(() => "");
   lookRef.current = () => (kit?.lookOf ? kit.lookOf(boss) : undefined) ?? "";
+  // What the figure is drawn from each frame: the boss's state and the stage (Moo's Full Moon: powered up; read as it's drawn).
+  const nowRef = useRef({ boss, stage });
+  nowRef.current = { boss, stage };
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
   // (The Hidden Boss's half-engine look over his drawing, placed on his head frame by frame: Recluse.tsx.)
@@ -271,7 +280,16 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     const draw = () => {
       const now = Date.now();
       // (A run of its own animations in place, over its beat, while one lasts: the Hidden Boss's spellbook, his slam.)
-      const s = inPlaceShowing(kit.ch, now) ?? figureShowing(kit.ch, now) ?? showing(kit, beat, now, since);
+      // (Moo's Full Moon: every animation of his is its powered-up twin while it lasts.)
+      const live = kit.powered?.on(nowRef.current.boss, now, nowRef.current.stage) ? poweredKit(kit) : kit;
+      let s = inPlaceShowing(kit.ch, now) ?? figureShowing(kit.ch, now) ?? showing(live, beat, now, since);
+      // (Moo at rest: his idle, then now and then the sit and back: stance.ts. Never over a moment, which has settled into its
+      // idle first, and never powered up.)
+      if (kit.rest && live === kit && !figure.run && s.anim === (kit.loops?.idle ?? "idle")) {
+        const shot = kit.ch.anims[kit.anims[beat.anim] ?? beat.anim];
+        const rest = stanceAt(kit.ch, kit.rest, now - since - (shot && !shot.loop ? length(shot) : 0));
+        if (rest) s = rest;
+      }
       const look = lookRef.current();
       const id = `${s.anim}:${s.frame}:${look}:${lightsId()}`;
       if (eng.current) {

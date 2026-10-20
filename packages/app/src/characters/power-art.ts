@@ -171,6 +171,15 @@
  *     ultimateHit  "hurt"       The crowd takes the hidden rook (as your move lands): a drip on its square, his oof. Lines:
  *                               `kit.lines.rookTaken`.
 
+ *   "Moo"
+ *     power        "moonbeam"   The Moonbeam: the moon glows and he lifts his snout and moos; at `beam` the beam falls (`moonbeam`
+ *                               fall, hit) onto the crowd's piece, which keeps its glow and the burned-in crescent (`moonScorch`) until
+ *                               the crowd has moved. Lines: `kit.lines.power`.
+ *     powerHit     "dazed"      The Full Moon over: the aura fizzles, at `calm` his colors go back, a Zzz over his head. Lines: `dazed`.
+ *     ultimateWarn "check"      His moo at the king, for the warning.
+ *     ultimate     "fullMoon"   The transformation, while he thinks: the moon swells, at `swap` his colors go gold and the aura flares on.
+ *     ultimateHit  "flurry"     The five beams: at `beam1` to `beam5` (120 ms apart) one falls on each square, all hold together. Lines: `flurry`.
+ *
  *   Each moment's animation is in the kit (`BOSS_KITS[name].anims[power | ultimateWarn | ultimate]`), its lines
  *   are `kit.lines.power / ultimateWarn / ultimate` (pick with `pickLine(kit, "power", key)` from boss-beats.ts,
  *   keyed by the moment so every player gets the same line), and its sounds fire from its frames' cues.
@@ -242,6 +251,11 @@
  *   paintFly       square  fly (loop): a blob of paint wobbling; move it from his brush to the square.
  *   paintHit       square  hit<H|L><L|R> (ends empty, about 200 ms): a blob of paint splatting on a king's head (high) or a
  *                          little lower, from the left or right edge: it splats, runs and drips (Smudgy's attack on a king).
+ *   moonbeam       strip   fall (220 ms, `beam`), hit (240 ms, `hit`: its shimmer), hold (loop: the stunned piece's glow, see-through),
+ *                          fade (ends empty); 32 x 256, a column eight squares tall whose bottom square is the target (components/Moo.tsx).
+ *   moonScorch     square  burn (220 ms), hold (loop), fade (ends empty): a crescent moon burned into the square, under the piece.
+ *   moonHit        square  hit<H|L><L|R> (ends empty, about 200 ms): a small moonbeam landing on a king's head or a little lower,
+ *                          from the left or right edge: a flash, a ring of sparkles (Moo's attack on a king).
  *
  * Play them with <BossEffect> (components/BossEffect.tsx), which plays their sounds from the frames' cues, once,
  * through the mute switch; or render frames yourself with `renderFrame`. For many square effects at once (G-REX's
@@ -295,6 +309,10 @@ export const POWER_ANIMS = [
   "strike",
   "repaint",
   "hurt",
+  "moonbeam",
+  "fullMoon",
+  "flurry",
+  "dazed",
 ] as const;
 export type PowerAnim = (typeof POWER_ANIMS)[number];
 
@@ -401,6 +419,18 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
     // (The crowd takes the hidden rook: a drip on its square, his oof where he stands.)
     ultimateHit: { anim: "hurt", effects: ["paintDrip"] },
   },
+  "Moo": {
+    // The Moonbeam: he lifts his snout and moos; at `beam` the beam falls onto the piece (`moonbeam`), hits it and holds as the
+    // stunned mark with the crescent burned into its square (`moonScorch`).
+    power: { anim: "moonbeam", hit: "beam", effects: ["moonbeam", "moonScorch"] },
+    // The daze after the Full Moon: the aura fizzles and at `calm` the colors go back.
+    powerHit: { anim: "dazed", hit: "calm" },
+    ultimateWarn: { anim: "check" },
+    // The Full Moon: at `swap` the colors go gold and the aura flares on.
+    ultimate: { anim: "fullMoon", hit: "swap" },
+    // The flurry: at `beam1` to `beam5` a beam falls on each of five squares.
+    ultimateHit: { anim: "flurry", hit: "beam1", effects: ["moonbeam", "moonScorch"] },
+  },
   "Alfil": {
     power: { anim: "tusksCast", hit: "cast" },
     powerHit: { anim: "tusksFuse", hit: "flash" },
@@ -488,6 +518,14 @@ export const EFFECTS: Record<EffectName, Effect> = {
   brushStroke: { ch: EFFECT_SPRITES.brushStroke, covers: "square", start: "strokeC", sounds: { swoosh: "smudgySwish" } },
   paintFly: { ch: EFFECT_SPRITES.paintFly, covers: "square", loop: "fly", sounds: {} },
   paintHit: { ch: EFFECT_SPRITES.paintHit, covers: "square", start: "hitHL", sounds: {} },
+  // The moonbeam, a column eight squares tall (its bottom square the target): falls, hits (its shimmer), holds as the stunned mark,
+  // fades. Only the shimmer plays on the board (components/Moo.tsx): the whoosh is his `beam` cue's, the same instant, and the
+  // flurry's five are quiet (the moon's `beam1` to `beam5` cues are their sound).
+  moonbeam: { ch: EFFECT_SPRITES.moonbeam, covers: "strip", start: "fall", loop: "hold", end: "fade", sounds: { beam: "mooBeam", hit: "mooShimmer" } },
+  // The crescent moon burned into the stunned piece's square, under the piece: burns in, holds, fades (drawn quiet: the beam's shimmer
+  // is its sound).
+  moonScorch: { ch: EFFECT_SPRITES.moonScorch, covers: "square", start: "burn", loop: "hold", end: "fade", sounds: { burn: "mooShimmer" } },
+  moonHit: { ch: EFFECT_SPRITES.moonHit, covers: "square", start: "hitHL", sounds: {} },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------
@@ -678,6 +716,11 @@ export function popItem(square: string, i: number, from: "L" | "R", since: numbe
 /** Chub's i-th carrot bonking the king (high, then a little lower, in turn), from his side. */
 export function carrotItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   return { square, name: "carrotHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
+}
+
+/** Moo's i-th little moonbeam landing on the king's square (on its head, then a little lower, in turn), from his side. */
+export function moonItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "moonHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }
 
 /** Smudgy's i-th blob of paint splatting on the king's square (on its head, then a little lower, in turn), from his side. */

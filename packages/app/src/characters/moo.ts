@@ -313,6 +313,18 @@ function placed(name: string, make: () => { part: Part; at: Pt }): Placed {
   }
   return { name, at };
 }
+/**
+ * A part whose place is known before it is painted (a full-frame glow or aura): registered now, painted only when a frame that uses
+ * it is first drawn. His auras (one per powered pose: a glow and flames hugging its outline) take 20 ms or more each, and he has
+ * a hundred of them, so none is made when the app loads (.claude/LESSONS.md: nothing a boss needs only in his battle).
+ */
+function placedLazy(name: string, at: Pt, make: () => Part): Placed {
+  if (!placedAt.has(name)) {
+    add(name, make);
+    placedAt.set(name, at);
+  }
+  return { name, at };
+}
 const r2 = (v: number) => Math.round(v * 2) / 2;
 const key = (...v: number[]) => v.map(r2).join(",");
 
@@ -564,15 +576,37 @@ function glow(cv: Canvas, sil: Mask, R: number, keys: string, box: { left: numbe
   const BAYER = [[0.125, 0.625], [0.875, 0.375]] as const;
   const n = keys.length;
   const reach = Math.ceil(R / Math.min(1, 1 / up)) + 1;
+  // How far along its row the nearest pixel of him is, for every pixel of every row (Infinity: none in the row): the nearest
+  // pixel of him in a row is all a pixel needs from it (the distance only grows with the sideways gap), so a pixel looks at
+  // one number a row instead of every pixel in a window. The same distances, found in a fraction of the time (an aura is
+  // made for every pose he strikes powered up, a hundred of them).
+  const side = sil.map((row) => {
+    const near = new Float64Array(row.length).fill(Infinity);
+    let last = -Infinity;
+    for (let x = 0; x < row.length; x++) {
+      if (row[x]) last = x;
+      near[x] = x - last;
+    }
+    last = Infinity;
+    for (let x = row.length - 1; x >= 0; x--) {
+      if (row[x]) last = x;
+      near[x] = Math.min(near[x]!, last - x);
+    }
+    return near;
+  });
   for (let y = box.top; y <= box.floor; y++)
     for (let x = box.left; x <= box.right; x++) {
-      let d = Infinity;
-      for (let dy = -reach; dy <= reach; dy++)
-        for (let dx = -reach; dx <= reach; dx++) {
-          if (!sil[y + dy]?.[x + dx]) continue;
-          // His pixel is below this one (dy > 0): this one is above him, where the glow fades quickest.
-          d = Math.min(d, Math.hypot(dx, dy * (dy > 0 ? up : dy < 0 ? down : 1)));
-        }
+      // (The nearest squared, and a square root only for the one found: `Math.hypot` is slow, and a hundred auras are made.)
+      let near = Infinity;
+      for (let dy = -reach; dy <= reach; dy++) {
+        const gap = side[y + dy]?.[x];
+        if (gap === undefined || gap > reach) continue;
+        // His pixel is below this one (dy > 0): this one is above him, where the glow fades quickest.
+        const v = dy * (dy > 0 ? up : dy < 0 ? down : 1);
+        const sq = gap * gap + v * v;
+        if (sq < near) near = sq;
+      }
+      const d = Math.sqrt(near);
       if (d > R) continue;
       const level = Math.min(n, Math.floor((1 - d / R) ** 0.95 * n + BAYER[y & 1]![x & 1]!));
       if (level > 0 && !cv[y]![x]!.match(/[^.]/)) cv[y]![x] = keys[level - 1]!;
@@ -772,7 +806,7 @@ export function mooLayers(pose: MooPose = {}, stance: Stance = "hug"): Layer[] {
     const face = faceAt(Math.round(t * 20) / 20);
     if (p.moonGlow > 0) {
       const probe: Layer = { part: m.name, x: m.at[0] + OX + p.dx + mx, y: m.at[1] + OY + p.dy + my + (stance === "hug" ? p.bob : 0) };
-      const g = placed(`mglow${p.moonGlow}:${m.name}@${probe.x},${probe.y}`, () => moonGlow(p.moonGlow, frameKeys(BASE, { layers: [probe], ms: 0 }).map((r) => r.map((k) => k !== null))));
+      const g = placedLazy(`mglow${p.moonGlow}:${m.name}@${probe.x},${probe.y}`, [-OX, -OY], () => moonGlow(p.moonGlow, frameKeys(BASE, { layers: [probe], ms: 0 }).map((r) => r.map((k) => k !== null))).part);
       out.push({ part: g.name, x: g.at[0] + OX, y: g.at[1] + OY });
     }
     sink(m, mx, my);
@@ -828,7 +862,7 @@ export function mooLayers(pose: MooPose = {}, stance: Stance = "hug"): Layer[] {
     const body = out.filter((l) => !l.part.startsWith("shadow") && !l.part.startsWith("mglow"));
     const variant = p.aura;
     const size = Math.round(p.auraSize * 8) / 8;
-    const a = placed(`aura${variant}:${size}:${hashLayers(body)}`, () => aura(variant, frameKeys(BASE, { layers: body, ms: 0 }).map((r) => r.map((k) => k !== null)), size));
+    const a = placedLazy(`aura${variant}:${size}:${hashLayers(body)}`, [-OX, -OY], () => aura(variant, frameKeys(BASE, { layers: body, ms: 0 }).map((r) => r.map((k) => k !== null)), size).part);
     out.unshift({ part: a.name, x: a.at[0] + OX, y: a.at[1] + OY });
   }
   return out;
@@ -1022,6 +1056,44 @@ const F = (ms: number, pose: MooPose = {}, extra: Partial<Frame> & { stance?: St
 /** A frame of him powered up: the powered-up pose with `pose` on top, in the powered-up colors. */
 const FP = (ms: number, pose: MooPose = {}, extra: Partial<Frame> & { stance?: Stance } = {}): Frame => F(ms, { ...POWERED, ...pose }, { power: true, ...extra });
 
+/** What builds a frame from a pose (F, or Fp: the same pose powered up), so one animation's code makes both of its looks. */
+type FrameFn = (ms: number, pose?: MooPose, extra?: Partial<Frame> & { stance?: Stance; power?: boolean }) => Frame;
+
+/**
+ * A pose powered up (Full Moon: every move he plays at full strength is drawn this way; the director's call, Oct 20): the
+ * powered-up face and fur (the crest, the patch round the glowing eye, angry brows), his ears 62 degrees further up and
+ * his tail 8 further out than the pose has them, his head 3 lower into the moon (the aura's room), and the aura, a
+ * flicker variant per frame (`step`). What the pose does besides (a hop, a crouch, the moon's look) stays. Shut eyes stay
+ * shut and heavy lids stay heavy; the worried brows of a hit stay.
+ */
+function poweredPose(pose: MooPose, step: number): MooPose {
+  const eyes = pose.eyes ?? "open";
+  return {
+    ...pose,
+    crest: true,
+    patchF: true,
+    eyes: eyes === "shut" || eyes === "half" ? eyes : "glow",
+    brows: pose.brows === "worry" ? "worry" : "angry",
+    earN: Math.max(-75, (pose.earN ?? 26) - 62),
+    earF: Math.max(-75, (pose.earF ?? 26) - 62),
+    tail: (pose.tail ?? 0) + 8,
+    head: [pose.head?.[0] ?? 0, (pose.head?.[1] ?? 0) + 3],
+    aura: (step % 3) as 0 | 1 | 2,
+  };
+}
+/** A hit's flash in the powered-up colors: the gold and the glowing white go pale too (FLASH is the normal cow's). */
+const FLASH_POWER: Record<string, string> = (() => {
+  const lighten = (c: string) => {
+    const n = parseInt(c.slice(1), 16);
+    const mix = (v: number) => Math.round(v + (255 - v) * 0.55).toString(16).padStart(2, "0");
+    return `#${mix((n >> 16) & 255)}${mix((n >> 8) & 255)}${mix(n & 255)}`;
+  };
+  return { ...FLASH, ...Object.fromEntries(Object.entries(MOO_POWER_PALETTE).filter(([, c]) => c.length === 7).map(([k, c]) => [k, lighten(c)])) };
+})();
+/** F, powered up: the same pose and extras through `poweredPose`, in the powered-up colors (a flash in theirs). */
+let powerStep = 0;
+const Fp: FrameFn = (ms, pose = {}, extra = {}) => F(ms, poweredPose(pose, powerStep++), { ...extra, power: true, ...(extra.pal === FLASH ? { pal: FLASH_POWER } : {}) });
+
 // ---- His animations. Frame counts and timings follow the other bosses'.
 
 const TAU = Math.PI * 2;
@@ -1105,7 +1177,7 @@ const entrance: Anim = {
 };
 
 /** Thinking: he chews, his eyes up toward the board, his ears and tail easing; the moon glances at the board, mouth a line; a thought rises (moonlit dots, then a pawn). */
-const thinking: Anim = {
+const thinking = (F: FrameFn): Anim => ({
   loop: true,
   frames: [0, 1, 2, 3].flatMap((n) =>
     [0, 1, 2, 3].map((i) =>
@@ -1123,10 +1195,10 @@ const thinking: Anim = {
       }, { specks: thoughts(n + 1) }),
     ),
   ),
-};
+});
 
 /** His move: a crouch, a hop with the tail up and his ears flying, a landing (dust), and a settle. */
-const move: Anim = {
+const move = (F: FrameFn): Anim => ({
   loop: false,
   frames: [
     F(100, { bob: 2, earN: 32, earF: 32 }),
@@ -1136,10 +1208,10 @@ const move: Anim = {
     F(120, { bob: 1, earN: 18, earF: 18, tail: 8 }, { specks: dust(1, 2) }),
     F(160, {}),
   ],
-};
+});
 
 /** A capture: he cheers, mooing, hopping, his ears flapping, the moon laughing, sparkles. */
-const capture: Anim = {
+const capture = (F: FrameFn): Anim => ({
   loop: false,
   frames: [
     F(90, { bob: 1, earN: 34, earF: 34 }),
@@ -1160,10 +1232,10 @@ const capture: Anim = {
     }),
     F(160, { eyes: "half" }),
   ],
-};
+});
 
 /** Hurt: a flash, he's knocked back with his eyes shut and his ears flung, the moon gasping; then he glares. */
-const hurt: Anim = {
+const hurt = (F: FrameFn): Anim => ({
   loop: false,
   frames: [
     F(70, { bob: 2, dx: 1, eyes: "shut", mouth: "open", brows: "worry", earN: -8, earF: -8, tail: 18, moon: [-1, 1], moonEyes: "open", moonMouth: "o" }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: sweat(0) }),
@@ -1174,10 +1246,10 @@ const hurt: Anim = {
     F(120, { eyes: "half", brows: "angry", moonEyes: "open", moonMouth: "flat" }),
     F(160, {}),
   ],
-};
+});
 
 /** Check: he points his snout at the king and moos, the moon glowing and looking too, sparkling; twice. */
-const check: Anim = {
+const check = (F: FrameFn): Anim => ({
   loop: false,
   frames: [
     F(100, { bob: 2, head: [1, 1], earN: 38, earF: 38 }),
@@ -1189,11 +1261,11 @@ const check: Anim = {
     F(150, { eyes: "half" }),
     F(160, { eyes: "half" }),
   ],
-};
+});
 
 const SMUG_GAZE: readonly Pt[] = [[-1, 0], [0, 0], [1, 0], [1, 0], [0, 0], [-1, 0], [-1, 0], [-1, 0]];
 /** Smug: head back, heavy-lidded, the smile, his ears lazing and tail swaying, one eye wandering; the moon snickers (eyes a line now and then). */
-const smug: Anim = {
+const smug = (F: FrameFn): Anim => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     F(150, {
@@ -1207,11 +1279,11 @@ const smug: Anim = {
       moonMouth: i % 4 === 2 ? "open" : "smile",
     }),
   ),
-};
+});
 
 const RATTLED_GAZE: readonly Pt[] = [[1, 0], [-1, 0], [0, -1], [-1, 1]];
 /** Rattled: shaking, eyes wide, mouth working, sweat flying, his ears and tail trembling; the moon gasps, eyes darting. */
-const rattled: Anim = {
+const rattled = (F: FrameFn): Anim => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     F(80, {
@@ -1227,13 +1299,13 @@ const rattled: Anim = {
       moonMouth: i % 2 ? "o" : "frown",
     }, { specks: sweat(i) }),
   ),
-};
+});
 
 /**
  * Defeat: the hit flings him back, the moon slips out of his arms and he drops onto it, sitting; he slumps, his head down
  * and his ears limp, the moon looking at him, worried (held a second).
  */
-const defeat: Anim = {
+const defeat = (F: FrameFn): Anim => ({
   loop: false,
   frames: [
     F(140, { bob: 2, dx: 1, eyes: "shut", mouth: "open", brows: "worry", earN: -10, earF: -10, tail: 16, moonT: 0.1, moon: [-1, 2], moonEyes: "open", moonMouth: "o" }, { cue: "oof", pal: FLASH, shake: [1, 0] }),
@@ -1243,10 +1315,10 @@ const defeat: Anim = {
     F(220, { bob: 2, head: [2, 6], eyes: "shut", brows: "worry", earN: 62, earF: 62, tail: -14, moonEyes: "open", moonGaze: [0, 1], moonMouth: "frown" }, { stance: "sit" }),
     F(730, { bob: 2, head: [2, 6], eyes: "shut", brows: "worry", earN: 62, earF: 62, tail: -14, moonEyes: "open", moonGaze: [0, 1], moonMouth: "frown" }, { stance: "sit" }),
   ],
-};
+});
 
 /** Victory: he hops, mooing, his ears up and flapping, the moon laughing; sparkles. */
-const victory: Anim = {
+const victory = (F: FrameFn): Anim => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const air = [0, 2, 5, 6, 5, 2, 0, 0, 0, 0, 0, 0][i]!;
@@ -1263,7 +1335,7 @@ const victory: Anim = {
       moonMouth: air > 0 || i === 6 ? "open" : "smile",
     }, { cue: i === 2 ? "moo" : i === 6 ? "thump" : undefined, specks: [...(i === 6 ? dust(0, 2) : i === 7 ? dust(1, 2) : []), ...(i % 4 === 1 ? sparkle(30 + (i % 3) * 4, 4) : [])] });
   }),
-};
+});
 
 // ---- Hugging the moon, sitting on it, and back.
 
@@ -1292,7 +1364,7 @@ const toHug: Anim = { loop: false, frames: switchFrames([...SWITCH].reverse(), [
  * sky, ears back, and moos (`beam`: the beam starts falling from the sky onto your piece); the glow holds, motes of light
  * rising off the moon, and eases off.
  */
-const moonbeam: Anim = (() => {
+const moonbeam = (F: FrameFn): Anim => {
   const glowAt = [1, 2, 3, 3, 3, 3, 3, 2, 2, 1, 0] as const;
   const ms = [80, 90, 90, 90, 100, 100, 100, 100, 100, 90, 100];
   const up = (i: number): MooPose => {
@@ -1314,9 +1386,9 @@ const moonbeam: Anim = (() => {
   };
   return {
     loop: false,
-    frames: ms.map((m, i) => F(m, up(i), { cue: i === 1 ? "hum" : i === 4 ? "beam" : i === 5 ? "moo" : undefined, specks: i >= 2 && i <= 8 ? rays(i) : [] })),
+    frames: ms.map((m, i) => F(m, up(i), { cue: i === 1 ? "hum" : i === 4 ? "beam" : i === 5 ? "mooSoft" : undefined, specks: i >= 2 && i <= 8 ? rays(i) : [] })),
   };
-})();
+};
 
 /**
  * Full Moon, the transformation (about as long as Alfil's Slam cast): the moon brightens to full (a word, a laugh), motes
@@ -1335,7 +1407,7 @@ const fullMoon: Anim = {
     F(60, { moonGlow: 3, moonEyes: "happy", moonMouth: "open", bob: 1, eyes: "glow", brows: "angry", crest: true, patchF: true, earN: -30, earF: -30, head: [0, 3] }, { pal: FLASH, shake: [0, -1] }),
     FP(70, { aura: 1, auraSize: 0.85, moonGlow: 3, moonEyes: "happy", moonMouth: "open", bob: 1 }, { shake: [0, 1] }),
     FP(100, { aura: 2, moonGlow: 2, moonEyes: "happy", moonMouth: "smile", bob: 2, head: [0, 4], tail: 12 }, { shake: [1, 0] }),
-    FP(100, { aura: 0, moonGlow: 2, moonEyes: "happy", moonMouth: "open", head: [0, 0], mouth: "open", earN: -58, earF: -58, tail: 20, dy: -2 }, { cue: "moo", shake: [0, -1], specks: [...sparkle(2, 16, true), ...sparkle(44, 14, true)] }),
+    FP(100, { aura: 0, moonGlow: 2, moonEyes: "happy", moonMouth: "open", head: [0, 0], mouth: "open", earN: -58, earF: -58, tail: 20, dy: -2 }, { cue: "mooBig", shake: [0, -1], specks: [...sparkle(2, 16, true), ...sparkle(44, 14, true)] }),
     FP(100, { aura: 1, moonGlow: 2, moonEyes: "happy", moonMouth: "open", head: [0, 0], mouth: "open", earN: -62, earF: -62, tail: 22, dy: -2 }, { shake: [0, 1], specks: sparkle(24, 4) }),
     FP(100, { aura: 2, moonGlow: 1, moonEyes: "happy", moonMouth: "open", head: [0, 1], mouth: "open", earN: -54, earF: -54, tail: 18 }, { shake: [1, 0] }),
     FP(120, { aura: 0, moonGlow: 1, moonEyes: "happy", moonMouth: "smile", head: [0, 2], earN: -40, earF: -40 }),
@@ -1393,7 +1465,7 @@ const dazed: Anim = {
     F(90, { aura: 2, auraSize: 0.5, dx: 1, brows: "worry", eyes: "half", crest: true, patchF: true, earN: -10, earF: -10, head: [0, 4], moonEyes: "open", moonMouth: "o" }, { pal: FLASH }),
     FP(90, { aura: 0, auraSize: 0.3, dx: -1, eyes: "half", brows: "worry", earN: 10, earF: 10, head: [0, 5], moonEyes: "open", moonMouth: "o" }),
     F(110, { dx: 1, eyes: "shut", brows: "worry", earN: 44, earF: 44, head: [0, 4], tail: -6, moonEyes: "open", moonGaze: [1, 0], moonMouth: "frown" }, { cue: "calm", specks: iconSpecks("zzz", 40, 4, ZZZ) }),
-    F(110, { dx: -1, bob: 1, eyes: "shut", brows: "worry", earN: 48, earF: 48, head: [0, 5], tail: -8, moon: [3, -8], moonFront: true, moonEyes: "open", moonGaze: [1, 0], moonMouth: "o" }, { specks: iconSpecks("zzz", 41, 0, ZZZ) }),
+    F(110, { dx: -1, bob: 1, eyes: "shut", brows: "worry", earN: 48, earF: 48, head: [0, 5], tail: -8, moon: [3, -8], moonFront: true, moonEyes: "open", moonGaze: [1, 0], moonMouth: "o" }, { cue: "mooSleepy", specks: iconSpecks("zzz", 41, 0, ZZZ) }),
     F(110, { dx: 1, bob: 2, eyes: "shut", brows: "worry", earN: 50, earF: 50, head: [-1, 6], tail: -8, moon: [9, -15], moonFront: true, moonEyes: "happy", moonMouth: "open" }, { shake: [0, 1], specks: iconSpecks("zzz", 42, -4, ZZZ) }),
     F(110, { dx: -1, bob: 1, eyes: "shut", brows: "worry", earN: 46, earF: 46, head: [0, 5], tail: -6, moon: [3, -7], moonFront: true, moonEyes: "open", moonGaze: [1, 0], moonMouth: "o" }, { specks: iconSpecks("zzz", 43, -8, ZZZ) }),
     F(110, { dx: 1, bob: 2, eyes: "shut", brows: "worry", earN: 48, earF: 48, head: [-1, 6], tail: -8, moon: [9, -14], moonFront: true, moonEyes: "happy", moonMouth: "open" }, { shake: [0, 1], specks: iconSpecks("zzz", 44, -12, ZZZ) }),
@@ -1451,13 +1523,13 @@ function beam(from: Pt, to: Pt, fatness = 1): Speck[] {
 /** In the attack, both of them look at the king: his eyes and the moon's turned to him, his brows down, the stare nonstop. */
 const ON_KING: MooPose = { gaze: [-1, 0], brows: "angry", head: [-1, 0], moonEyes: "open", moonGaze: [-1, 0] };
 /** A beat: the moon shines a small moonbeam at the king (the cue frame is where the board flashes it on his square). */
-const shineAt = (i: number): Frame => {
+const shineAt = (F: FrameFn, i: number): Frame => {
   const fr = fa(F(90, { ...ON_KING, bob: 1, moonGlow: 3, moonMouth: "o", mouth: "chew", earN: 18 + (i % 2) * 8, earF: 18 + (i % 2) * 8, tail: i % 2 ? 10 : -4 }, { cue: i % 2 ? "shine" : "beam", shake: [i % 2 ? -1 : 1, 0] }));
   const [tx, ty] = KING_AT(i);
   return { ...fr, specks: [...(fr.specks ?? []), ...beam([2, 38], [tx, ty], 1).map(([x, y, k]): Speck => [x + ATTACK_REACH, y, k])] };
 };
 /** Between beats: the glow eases, the stare holds. */
-const easeAt = (i: number): Frame => fa(F(80, { ...ON_KING, moonGlow: 1, moonMouth: "flat", earN: 22, earF: 22, tail: i % 2 ? -4 : 6 }));
+const easeAt = (F: FrameFn, i: number): Frame => fa(F(80, { ...ON_KING, moonGlow: 1, moonMouth: "flat", earN: 22, earF: 22, tail: i % 2 ? -4 : 6 }));
 
 /**
  * His attack on a king, the king to our left (where he faces; the board mirrors him when it's to his right), on the
@@ -1466,7 +1538,7 @@ const easeAt = (i: number): Frame => fa(F(80, { ...ON_KING, moonGlow: 1, moonMou
  * is where the board flashes the beam on the king's square), both of them staring at him, relentless; he moos once,
  * satisfied, and they float off. The last frame is empty.
  */
-const kingAttack: Anim = (() => {
+const kingAttack = (F: FrameFn): Anim => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(8) },
@@ -1476,7 +1548,7 @@ const kingAttack: Anim = (() => {
     fa(F(A.landAt - 360, { bob: 3, eyes: "shut", earN: 40, earF: 40, moonEyes: "flat" }, { cue: "land", shake: [0, 1], specks: dust(0) })),
     fa(F(A.lashAt - A.landAt, { ...ON_KING, moonGlow: 1, moonMouth: "flat", earN: 22, earF: 22 }, { specks: dust(1) })),
   ];
-  for (let i = 0; i < A.lashes; i++) frames.push(shineAt(i), easeAt(i));
+  for (let i = 0; i < A.lashes; i++) frames.push(shineAt(F, i), easeAt(F, i));
   const laugh = A.leaveAt - (A.lashAt + A.lashes * A.lashEveryMs);
   frames.push(fa(F(laugh, { head: [-1, -1], mouth: "open", eyes: "joy", earN: 8, earF: 8, tail: 14, moonEyes: "happy", moonMouth: "open" }, { cue: "moo", specks: sparkle(8, 24) })));
   const leave = A.ms - A.leaveAt;
@@ -1488,7 +1560,7 @@ const kingAttack: Anim = (() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})();
+};
 
 export const MOO: Character = {
   id: "moo",
@@ -1499,7 +1571,40 @@ export const MOO: Character = {
   palette: MOO_PALETTE,
   halo: "#2c2624",
   parts: PARTS,
-  anims: { idle, sit, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory, toSit, toHug, moonbeam, fullMoon, powerIdle, flurry, dazed, power: { loop: true, frames: [F(1000, POWERED, { power: true })] } },
+  anims: {
+    idle,
+    sit,
+    entrance,
+    thinking: thinking(F),
+    move: move(F),
+    capture: capture(F),
+    hurt: hurt(F),
+    check: check(F),
+    smug: smug(F),
+    rattled: rattled(F),
+    defeat: defeat(F),
+    victory: victory(F),
+    toSit,
+    toHug,
+    moonbeam: moonbeam(F),
+    fullMoon,
+    powerIdle,
+    flurry,
+    dazed,
+    power: { loop: true, frames: [F(1000, POWERED, { power: true })] },
+    // The same moves powered up, for as long as the Full Moon lasts (poweredPose: the director's call, Oct 20: every animation
+    // he plays during it draws powered). A beat's loop `idle` is `powerIdle` then.
+    p_thinking: thinking(Fp),
+    p_move: move(Fp),
+    p_capture: capture(Fp),
+    p_hurt: hurt(Fp),
+    p_check: check(Fp),
+    p_smug: smug(Fp),
+    p_rattled: rattled(Fp),
+    p_defeat: defeat(Fp),
+    p_victory: victory(Fp),
+    p_moonbeam: moonbeam(Fp),
+  },
 };
 
 /**
@@ -1512,8 +1617,58 @@ export const MOO_ATTACK: Character = {
   name: "Moo (his attack)",
   w: AW,
   foot: [MOO.foot[0] + ATTACK_REACH, MOO.foot[1]],
-  anims: { idle: { loop: true, frames: [fa(F(1000))] }, kingAttack },
+  anims: { idle: { loop: true, frames: [fa(F(1000))] }, kingAttack: kingAttack(F), p_kingAttack: kingAttack(Fp) },
 };
 
 /** What a portrait shows (his head, an ear, his horns and a bit of the moon's face), in frame pixels. */
 export const MOO_PORTRAIT = { x: OX + 1, y: OY + 3, w: 44, h: 44 } as const;
+
+/**
+ * What the Moon and Moo say (the director's lines, Oct 20, as written: docs/decisions/2026-10-20-moo-wired.md): two voices in
+ * one line, as Chub & Chirp's "(Chirp!)": the Moon talks (curious, cheerful, a little chatty, amazed by everything on Earth,
+ * proud of its buddy, saying "we" a lot) and Moo answers in parentheses with moos only, plus his tiny pixel icons: `{id}` is
+ * one of MOO_ICONS, drawn inline in the speech bubble (speech-icons.ts), dropped where only text can show. `power` is the
+ * Moonbeam (the passive), `wax` the Moon filling up (a quarter, a half and three quarters of his ultimate's meter: the meter's
+ * moon says them, components/Moo.tsx), `ultimate` the Full Moon's transformation, `flurry` the five beams and `dazed` the
+ * Full Moon over. How often a moment speaks: MOO_CHANCE; a power's moment always has its line.
+ */
+export const MOO_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
+  entrance: ["Hi! This is Moo. He's my best friend. (Moo! {heart})", "I watched your farm for ages. Let's play! (Moo? {question})", "Moo, look! Little horses! (Moooo… {sparkle})"],
+  move: ["Ooh, good one, Moo!", "(Moo.)", "Easy does it, buddy.", "(Moo. {pawn})"],
+  capture: ["We got one! (MOO! {sparkle})", "Sorry, little piece! (Moo.)", "(Moo! {heart})"],
+  hurt: ["Hey! That one was ours! (Moo. {anger})", "Moo! Are you okay?! (…moo.)", "(MOO! {anger})"],
+  strike: ["Moonlight, coming down!", "(Moo! {sparkle})"],
+  power: ["Moonbeam! Stay right there, please.", "A little moonlight for you!", "Shhh. That one's napping now. (Moo. {zzz})"],
+  wax: ["I'm getting fuller, Moo… I can feel it! (Mooo…)", "Half a moon! Halfway there! (Moo! {moon})", "Almost full! (Moo moo! {sparkle})"],
+  thinking: ["Hmm… which one, Moo? (Moo. {pawn})", "Moo's chewing on it. (Moo. {grass})"],
+  check: ["Check! Did we do that? (MOO! {sparkle})", "Your king looks worried! (Moo? {question})"],
+  smug: ["Best friends make the best moves! (Moo! {heart})", "(Moo. {cowbell})"],
+  rattled: ["Uh-oh. Moo, hold me tighter. (Moo… {question})", "So many pieces, Moo! (Moo?!)"],
+  victory: ["We did it, Moo! (MOOOO! {heart})", "Best night ever! (Moo! {cowbell})"],
+  defeat: ["That's okay, Moo. We have each other. (…moo. {heart})", "Time to go home… (Moo. {zzz})"],
+  ultimateWarn: ["Moo… I think I'm almost full… (Moo? {moon})", "Look up, everyone! (Mooo… {sparkle})"],
+  ultimate: ["FULL MOON! Now, Moo! (MOOOOOO!!)", "Take my light, buddy! (MOO! {sparkle})"],
+  flurry: ["Moonbeams, everywhere! (MOO MOO MOO!)", "Lights out, little pieces!"],
+  dazed: ["Oh dear. Too much moon. (…moo. {zzz})", "Easy, buddy. Easy. (Moo… {zzz})"],
+  kingAttack: ["Shine, shine, shine! (MOO! {sparkle})", "Sorry, King. Moo really wants to win! (Moo!)", "Moonbeam, moonbeam, moonbeam! (MOO!)"],
+};
+/** How often each moment speaks (Smudgy's, plus his wax, flurry and dazed always; his powers' moments always say theirs). */
+export const MOO_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
+  entrance: 1,
+  move: 0.12,
+  capture: 0.6,
+  check: 0.75,
+  hurt: 0.6,
+  thinking: 0.08,
+  smug: 0.8,
+  rattled: 0.8,
+  defeat: 1,
+  victory: 1,
+  strike: 0.8,
+  kingAttack: 1,
+  power: 1,
+  wax: 1,
+  ultimate: 1,
+  flurry: 1,
+  dazed: 1,
+};

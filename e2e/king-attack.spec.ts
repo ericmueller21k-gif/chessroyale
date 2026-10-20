@@ -144,7 +144,7 @@ test("the God King's Last Stand against Hollow: Hollow lashes him, then he falls
 });
 
 /**
- * Sawyer's saw, Wrangler's lasso, Boingo's pies, Big Boy's lollipop, Ginger's cane, Jefferson's Roman candle, Chub & Chirp's pitch and Smudgy's brush on the
+ * Sawyer's saw, Wrangler's lasso, Boingo's pies, Big Boy's lollipop, Ginger's cane, Jefferson's Roman candle, Chub & Chirp's pitch, Smudgy's brush and Moo & Moon's moonbeams on the
  * God King in his Last Stand (Eric, Oct 18: "a relentless assault"), with real taps on a phone and a computer, watched every frame: the boss drops in beside him as the piece
  * slides back, on the side toward the board's middle (his drawing mirrored to face him), a hit on every beat with its
  * gold "−N", his own sounds, his figure wholly on screen; then the Last Stand ends as always. No page errors.
@@ -158,6 +158,7 @@ for (const b of [
   { id: "grex", name: "Jefferson", facesLeft: false, sounds: ["grexPop", "grexSparkle"] },
   { id: "hopper", name: "Chub & Chirp", facesLeft: true, sounds: ["hopperToss", "hopperBonk"] },
   { id: "smudgy", name: "Smudgy", facesLeft: true, sounds: ["smudgySwish", "smudgySplash"] },
+  { id: "moo", name: "Moo & Moon", facesLeft: true, sounds: ["mooBeam", "mooZap"] },
 ])
   test(`the God King's Last Stand against ${b.name}: ${b.name} assaults him, then he falls and you pick again`, async ({ page }) => {
     const errors: string[] = [];

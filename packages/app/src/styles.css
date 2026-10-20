@@ -17972,3 +17972,82 @@ button.sq-tiny {
   height: 100%;
   display: block;
 }
+
+/* ---- Moo & Moon (components/Moo.tsx; mo- for Moo) ---- */
+/* He casts from the board's top-left corner, in his own frame's shape (74 x 108, with room above him for the flurry's rising moon:
+   MOO.h). His feet where the others': 17% down the board, his middle 10% across. */
+.pm-caster.pm-by-moo {
+  aspect-ratio: 74 / 108;
+  width: 27%;
+  left: -3.5%;
+  top: -20%;
+}
+/* A phone's boss bar: his powered glow and flames reach 34 px left and 32 right of his feet, past the wide box's 29; the box clips
+   them cleanly (left and right only: nothing above or below is cut). */
+.boss-char.place-bar.ch-moo .boss-char-sprite {
+  clip-path: inset(-120px 8px -8px 8px);
+}
+/* His words' pixel icons (speech.tsx, LineIcon: Moo's heart, milk, sparkle…): one image pixel to a screen pixel, at the text's height,
+   sitting on its line. */
+.line-icon {
+  display: inline-block;
+  vertical-align: -2px;
+  margin: 0 1px;
+  image-rendering: pixelated;
+}
+/* The moonbeam on a stunned piece: a column eight squares tall whose bottom square is the target (Moo's effects/moo.ts), clipped at
+   the board's top, over the pieces, never taking a tap. On the board's own squares (eighths of --board-size). */
+.mo-sky {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  overflow: hidden;
+  pointer-events: none;
+}
+.mo-beam {
+  position: absolute;
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * (var(--sq-y, 0) - 7) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: var(--board-size, 100%);
+  pointer-events: none;
+}
+/* His ultimate's meter as the moon, new to full, beside the rage meter in his bar (components/Moo.tsx, MoonPhase). */
+.mo-moon {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: 6px;
+  vertical-align: -2px;
+  line-height: 0;
+}
+.mo-moon svg {
+  display: block;
+}
+/* (With the moon beside it his meter is a little shorter: at 320 px the skulls, the meter and the moon would not fit his name's column in one row,
+   and the bar would grow a line.) */
+.boss-threat:has(> .mo-moon) .rage-meter {
+  width: 32px;
+}
+.boss-threat > .mo-moon {
+  margin-left: 4px;
+}
+.mo-moon .dark {
+  fill: #4b5588;
+}
+.mo-moon .lit {
+  fill: #ffe27a;
+}
+.mo-moon.paused {
+  opacity: 0.55;
+}
+/* The held beam (the stunned piece's glow) fades out three squares above the piece: the art's hold runs a half-see-through shaft
+   all the way up the file, which veils every piece above it for the crowd's whole turn (and five at once in the flurry). One
+   mask; remove it to get the art's whole shaft. The falling and hitting beam is whole. */
+.mo-beam[data-phase="hold"],
+.mo-beam[data-phase="fade"] {
+  mask-image: linear-gradient(to top, #000 0, #000 12.5%, transparent 43.75%);
+  -webkit-mask-image: linear-gradient(to top, #000 0, #000 12.5%, transparent 43.75%);
+}

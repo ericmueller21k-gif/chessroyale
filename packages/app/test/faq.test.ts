@@ -72,12 +72,15 @@ describe("the FAQ's contents", () => {
     expect(words).not.toMatch(/undefined|NaN|\$\{/);
   });
 
-  it("Moo & Moon's block (Moonbeam and the Full Moon) is ready for when his art is wired, every number from the settings", () => {
+  it("Moo & Moon's block (Moonbeam and the Full Moon) reads right: every number from the settings, and what the board shows", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "moo")!;
     const words = BOSS_BLOCKS.moo!(BOSS_POWERS, def);
     expect(words).toContain("from the game so far");
     expect(words).toContain(`after every ${BOSS_POWERS.moonbeamEvery === 3 ? "3rd" : BOSS_POWERS.moonbeamEvery} move of his`);
     expect(words).toContain("Never your king");
+    // (What the board shows: the glow and the crescent while a piece is held, and his gold fur.)
+    expect(words).toContain("glows, with a crescent moon burned into its square");
+    expect(words).toContain("his fur turns gold");
     // (The beam's target, as BOSS_POWERS.moonbeamTarget sets it: at random since the raid sim.)
     expect(words).toContain(BOSS_POWERS.moonbeamTarget === "random" ? "one of your pieces that can move, at random" : BOSS_POWERS.moonbeamTarget === "valuable" ? "three most valuable pieces" : "the engine's best move for you");
     for (const target of ["best", "valuable", "random"] as const) expect(BOSS_BLOCKS.moo!({ ...BOSS_POWERS, moonbeamTarget: target }, def)).not.toMatch(/undefined|NaN|\$\{/);

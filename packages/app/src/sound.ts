@@ -19,6 +19,7 @@ import { recluseSound, type RecluseSound } from "./characters/recluse-sounds.ts"
 import { alfilSound, type AlfilSound } from "./characters/alfil-sounds.ts";
 import { hopperSound, type HopperSound } from "./characters/hopper-sounds.ts";
 import { smudgySound, type SmudgySound } from "./characters/smudgy-sounds.ts";
+import { mooSound, type MooSound } from "./characters/moo-sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
 import { captureWorkerError } from "./problems.ts";
 import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
@@ -242,6 +243,7 @@ const recluse = (name: RecluseSound) => (t: number) => buffer(recluseSound(name,
 const alfil = (name: AlfilSound) => (t: number) => buffer(alfilSound(name, ctx!.sampleRate), t);
 const hopper = (name: HopperSound) => (t: number) => buffer(hopperSound(name, ctx!.sampleRate), t);
 const smudgy = (name: SmudgySound) => (t: number) => buffer(smudgySound(name, ctx!.sampleRate), t);
+const mooBoss = (name: MooSound) => (t: number) => buffer(mooSound(name, ctx!.sampleRate), t);
 /** The God King tapped with no charges left: his soft "can't" (god-king-sounds.ts). */
 const kingCant = (t: number) => buffer(godKingSound("cant", ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
@@ -662,6 +664,24 @@ export type SoundName =
   | "smudgyDab"
   | "smudgyThump"
   | "smudgyOof"
+  // Moo & Moon (a raid boss, a cow and his friend the Moon): synthesized, see characters/moo-sounds.ts.
+  | "mooSoft"
+  | "mooHappy"
+  | "mooBig"
+  | "mooSleepy"
+  | "mooThump"
+  | "mooOof"
+  | "mooFlop"
+  | "mooSlip"
+  | "mooPlop"
+  | "mooHum"
+  | "mooCharge"
+  | "mooSwell"
+  | "mooFlare"
+  | "mooBeam"
+  | "mooZap"
+  | "mooShimmer"
+  | "mooFizz"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -834,6 +854,23 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   smudgyDab: smudgy("dab"),
   smudgyThump: smudgy("thump"),
   smudgyOof: smudgy("oof"),
+  mooSoft: mooBoss("mooSoft"),
+  mooHappy: mooBoss("mooHappy"),
+  mooBig: mooBoss("mooBig"),
+  mooSleepy: mooBoss("mooSleepy"),
+  mooThump: mooBoss("thump"),
+  mooOof: mooBoss("oof"),
+  mooFlop: mooBoss("flop"),
+  mooSlip: mooBoss("slip"),
+  mooPlop: mooBoss("plop"),
+  mooHum: mooBoss("hum"),
+  mooCharge: mooBoss("charge"),
+  mooSwell: mooBoss("swell"),
+  mooFlare: mooBoss("flare"),
+  mooBeam: mooBoss("beam"),
+  mooZap: mooBoss("zap"),
+  mooShimmer: mooBoss("shimmer"),
+  mooFizz: mooBoss("fizz"),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -960,6 +997,23 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   smudgyDab: [["smudgy", "dab"]],
   smudgyThump: [["smudgy", "thump"]],
   smudgyOof: [["smudgy", "oof"]],
+  mooSoft: [["moo", "mooSoft"]],
+  mooHappy: [["moo", "mooHappy"]],
+  mooBig: [["moo", "mooBig"]],
+  mooSleepy: [["moo", "mooSleepy"]],
+  mooThump: [["moo", "thump"]],
+  mooOof: [["moo", "oof"]],
+  mooFlop: [["moo", "flop"]],
+  mooSlip: [["moo", "slip"]],
+  mooPlop: [["moo", "plop"]],
+  mooHum: [["moo", "hum"]],
+  mooCharge: [["moo", "charge"]],
+  mooSwell: [["moo", "swell"]],
+  mooFlare: [["moo", "flare"]],
+  mooBeam: [["moo", "beam"]],
+  mooZap: [["moo", "zap"]],
+  mooShimmer: [["moo", "shimmer"]],
+  mooFizz: [["moo", "fizz"]],
   kingCant: [["godKing", "cant"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */

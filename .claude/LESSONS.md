@@ -121,6 +121,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - Anything that shows many new frames at once (a board of tiles) is drawn ahead, a slice a frame. A sound made in
     code is made before its cue, and costs no more than about 30 ms on a computer.
   - Nothing a boss needs only in its battle is made when the app loads.
+  - A slice a frame can't split one frame's work: a frame that paints a big part of its own (Moo's auras, 5 to 20 ms each,
+    a hundred and fifty of them) is a long task on a phone however small the slice. Those go one at a time, a beat apart
+    (`drip` in `components/Moo.tsx`, Oct 20), in the order they'll be needed. Measure the first move with
+    `npm run perf:boss -- <dir> <boss> phone 4`: the long tasks and slow frames in the first row.
   - Boss sounds are made ahead in the sound worker (`sound-worker.ts`, Oct 14), never on the page: a new boss's sounds
     go in `MAKE` in `sound.ts` and `characters/boss-sounds.ts`.
   - Big Boy's perf check (`e2e/perf.spec.ts`) sat near its budget on a slowed phone (8 to 16% dropped against 15%)

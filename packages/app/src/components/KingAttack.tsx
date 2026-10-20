@@ -69,8 +69,12 @@ export function attackTop(ka: KingAttackKit): number {
     if (t >= KING_ATTACK.landAt - 110 && t < KING_ATTACK.leaveAt + 100) {
       for (const l of f.layers) {
         const part = ka.ch.parts[l.part];
-        // (An outlined part grows a pixel all round.)
-        if (part && partSize(part, l.rot ?? 0)[1] > 0) top = Math.min(top, l.y - (part.outline === false ? 0 : 1));
+        // (An outlined part grows a pixel all round. A see-through glow or aura fills a whole frame with nothing in most of it,
+        // Moo's: it counts from its first row that has anything.)
+        if (part && partSize(part, l.rot ?? 0)[1] > 0) {
+          const first = part.outline === false && !l.rot ? Math.max(0, part.grid.findIndex((r) => /[^. ]/.test(r))) : 0;
+          top = Math.min(top, l.y + first - (part.outline === false ? 0 : 1));
+        }
       }
       for (const [, y] of f.specks ?? []) top = Math.min(top, y);
     }
@@ -223,7 +227,8 @@ export function KingAttack({
       )}
       {him && (
         <span class={`ka-boss${mirrored ? " flip" : ""}`} style={{ left: sq(box.x), top: sq(box.y), width: sq(box.w), aspectRatio: `${ch.w} / ${ch.h}`, ...(clipTop > 0 ? { clipPath: `inset(${(clipTop * 100).toFixed(2)}% 0 0 0)` } : {}) }}>
-          <SpriteAnim ch={ch} anim={ka.anim} since={startAt} sounds={kit.sounds} id={`attack-${seed}`} />
+          {/* (Moo's attack during his Full Moon is drawn powered up: the kit's `poweredAnim`.) */}
+          <SpriteAnim ch={ch} anim={ka.poweredAnim && kit.powered?.on(boss, now, "bossMove") ? ka.poweredAnim : ka.anim} since={startAt} sounds={kit.sounds} id={`attack-${seed}`} />
         </span>
       )}
       {/* (Each lash's "−N" says which lash it is, for e2e/king-attack.spec.ts: every one shows.) */}

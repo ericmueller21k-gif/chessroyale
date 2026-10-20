@@ -72,7 +72,7 @@ describe("how long the boss's move holds the screen (bossTurnShowMs)", () => {
   });
 
   it("holds for the attack at a mate by a boss that has one (every playable boss but the Hidden Boss), the same alone or in a raid", () => {
-    expect(KING_ATTACKERS).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy"]);
+    expect(KING_ATTACKERS).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo"]);
     for (const id of KING_ATTACKERS) {
       expect(hasKingAttack(id)).toBe(true);
       expect(mateAttackDue(view(id, MATED))).toBe(true);

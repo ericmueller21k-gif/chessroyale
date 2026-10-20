@@ -151,6 +151,18 @@ export function stageSince(key: string, now: number): number {
   return t;
 }
 
+/**
+ * The rage meter's number, 0-100 (full once the one-turn warning has come or the ultimate is on its turn; empty while its
+ * effect runs), or null when the boss shows no meter now (none, or the battle is over). One function for the meter and for
+ * Moo's moon beside it, so they never say two things.
+ */
+export function ragePct(boss: Pick<BossView, "powers" | "result">): number | null {
+  const p = boss.powers;
+  if (!p || p.rage === null || boss.result) return null;
+  const now = p.ultAt !== null && !p.paused;
+  return p.warned || now ? 100 : Math.round((p.rage ?? 0) * 100);
+}
+
 export const PIECE_WORD: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
 
 /** A small, stable hash, for picking a line the same everywhere. */

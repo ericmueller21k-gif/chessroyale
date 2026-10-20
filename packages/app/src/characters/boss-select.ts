@@ -31,6 +31,8 @@ export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
   hopper: "hopperChirp",
   // A splash of paint.
   smudgy: "smudgySplash",
+  // His happy moo.
+  moo: "mooHappy",
   // The Hidden Boss: his low, ominous hum (the stare).
   recluse: "recluseHum",
 };
@@ -48,6 +50,8 @@ export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
   hopper: ["Chub and Chirp! Best friends!", "He's Chirp. I'm Chub. We hop.", "Got any carrots?"],
   // The director's draft (Oct 19), as written: two of his entrance lines and a smug one, which read right outside a match.
   smudgy: ["Every chameleon blends in. I'd rather stand out.", "Smudgy, artist. Don't touch the wet parts.", "A masterpiece, if I say so myself."],
+  // The director's draft (Oct 20), as written (`{heart}` is one of his pixel icons, drawn in the line: speech-icons.ts).
+  moo: ["Hi! This is Moo. He's my best friend. (Moo! {heart})", "I watched your farm for ages. Let's play! (Moo? {question})", "Best friends make the best moves! (Moo! {heart})"],
   // The Hidden Boss (Eric's own first line; never named on screen): the two in turn.
   recluse: ["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."],
 };

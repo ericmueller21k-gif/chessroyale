@@ -135,7 +135,11 @@ async function run(kind, name, context, throttle) {
     await p.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
     await p.getByRole("button", { name: /^Create a (lobby|raid)$/ }).click();
     await p.getByRole("button", { name: /^Start with 1 player$/ }).click();
-  } else await p.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  } else {
+    // (Home's Boss raid card first, since Oct 19: Boss alone is a choice on its screen.)
+    await p.getByRole("main").getByRole("button", { name: /^Boss raid/ }).click();
+    await p.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+  }
   if (throttle > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: throttle });
   const phase = () => p.evaluate(() => window.match?.phase.kind ?? null);
   const waitFor = async (want, ms = 120_000) => {

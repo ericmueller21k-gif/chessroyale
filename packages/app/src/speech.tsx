@@ -21,6 +21,9 @@ import type { ComponentChildren, JSX } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { SPEECH } from "@chessroyale/core";
 import { useFrameNow } from "./components/Countdown.tsx";
+import { lineLength, plainLine, sliceLine, type LineSeg } from "./speech-icons.ts";
+import { mooIconSprite, type MooIconId } from "./characters/moo.ts";
+import { renderFrame } from "./characters/sprite.ts";
 
 /** How much a line matters: only a critical line cuts in on another (and any line on chatter); the rest wait their turn. */
 export const CHATTER = -1;
@@ -38,14 +41,14 @@ export interface Spoken {
   until: number;
 }
 
-/** How long a line takes to type out (ms). */
-export const typeMs = (text: string) => text.length * SPEECH.typeMs;
+/** How long a line takes to type out (ms; an icon in it, Moo's `{heart}`, counts as one character: speech-icons.ts). */
+export const typeMs = (text: string) => lineLength(text) * SPEECH.typeMs;
 /** How long a line stays fully readable once typed (ms): longer for a longer line, up to a cap. */
-export const readMs = (text: string) => Math.min(SPEECH.maxReadMs, SPEECH.readMs + SPEECH.perCharMs * text.length);
+export const readMs = (text: string) => Math.min(SPEECH.maxReadMs, SPEECH.readMs + SPEECH.perCharMs * lineLength(text));
 /** How long a line is up, from its first letter to the end of its fade (ms). */
 export const holdMs = (text: string) => typeMs(text) + readMs(text) + SPEECH.fadeMs;
 /** How many of a line's characters have typed out by `now`. */
-export const typedCount = (text: string, at: number, now: number) => Math.max(0, Math.min(text.length, Math.floor((now - at) / SPEECH.typeMs) + 1));
+export const typedCount = (text: string, at: number, now: number) => Math.max(0, Math.min(lineLength(text), Math.floor((now - at) / SPEECH.typeMs) + 1));
 
 interface Waiting {
   text: string;
@@ -164,7 +167,7 @@ export function Say({ voice, text, sayKey, priority = NORMAL }: { voice: Voice; 
  * would run off the screen takes a smaller size (`fits` steps: its CSS's `.fit1`…), and past the last step is moved
  * back into view. It's never hidden.
  */
-export function SpeechBox({ class: cls, text, at, until, now, fits = 0, children, ...rest }: { class: string; text: string; at: number; until: number; now: number; fits?: number; children?: ComponentChildren } & Omit<JSX.HTMLAttributes<HTMLDivElement>, "class">) {
+export function SpeechBox({ class: cls, text, at, until, now, fits = 0, children, ...props }: { class: string; text: string; at: number; until: number; now: number; fits?: number; children?: ComponentChildren } & Omit<JSX.HTMLAttributes<HTMLDivElement>, "class">) {
   const el = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState<{ step: number; dx: number; dy: number }>({ step: 0, dx: 0, dy: 0 });
   useLayoutEffect(() => {
@@ -176,16 +179,52 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, children
     if (fit.step < fits) setFit({ step: fit.step + 1, dx: 0, dy: 0 });
     else setFit({ step: fit.step, dx: r.left < 0 ? -r.left : r.right > innerWidth ? innerWidth - r.right : 0, dy: r.top < 0 ? -r.top : 0 });
   }, [fit]);
-  const shown = typedCount(text, at, now);
+  const { shown, rest } = sliceLine(text, typedCount(text, at, now));
   const leaving = until - now < SPEECH.fadeMs;
   const style = fit.dx || fit.dy ? { transform: `translate(${Math.round(fit.dx)}px, ${Math.round(fit.dy)}px)` } : undefined;
   return (
-    <div ref={el} class={`${cls}${now - at < 200 ? " fresh" : ""}${leaving ? " leaving" : ""}${fit.step ? ` fit${fit.step}` : ""}`} style={style} role="status" aria-label={text} data-fit={fit.step} {...rest}>
-      <span aria-hidden="true">{text.slice(0, shown)}</span>
+    <div ref={el} class={`${cls}${now - at < 200 ? " fresh" : ""}${leaving ? " leaving" : ""}${fit.step ? ` fit${fit.step}` : ""}`} style={style} role="status" aria-label={plainLine(text)} data-fit={fit.step} {...props}>
+      <span aria-hidden="true">
+        <LineText segs={shown} />
+      </span>
       <span class="speech-rest" aria-hidden="true">
-        {text.slice(shown)}
+        <LineText segs={rest} />
       </span>
       {children}
     </div>
   );
+}
+
+/** A line's words and icons (speech-icons.ts), the icons drawn inline at text height. */
+function LineText({ segs }: { segs: readonly LineSeg[] }) {
+  return (
+    <>
+      {segs.map((s, i) => (s.icon ? <LineIcon key={i} id={s.icon} /> : s.text))}
+    </>
+  );
+}
+
+/** One of Moo's icons as it's drawn in a line: a pixel image, cropped to its pixels and its outline, one pixel to a pixel. */
+const iconImages = new Map<MooIconId, { url: string; w: number; h: number }>();
+function iconImage(id: MooIconId): { url: string; w: number; h: number } {
+  let im = iconImages.get(id);
+  if (!im) {
+    const ch = mooIconSprite(id);
+    const r = renderFrame(ch, ch.anims.idle!.frames[0]!);
+    let [x0, y0, x1, y1] = [r.w, r.h, -1, -1];
+    for (let y = 0; y < r.h; y++)
+      for (let x = 0; x < r.w; x++)
+        if (r.data[(y * r.w + x) * 4 + 3]! > 0) [x0, y0, x1, y1] = [Math.min(x0, x), Math.min(y0, y), Math.max(x1, x), Math.max(y1, y)];
+    const [w, h] = [x1 - x0 + 1, y1 - y0 + 1];
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    cv.getContext("2d")?.putImageData(new ImageData(new Uint8ClampedArray(r.data), r.w, r.h), -x0, -y0, x0, y0, w, h);
+    iconImages.set(id, (im = { url: cv.toDataURL(), w, h }));
+  }
+  return im;
+}
+export function LineIcon({ id }: { id: MooIconId }) {
+  const { url, w, h } = iconImage(id);
+  return <img class="line-icon" src={url} width={w} height={h} alt="" aria-hidden="true" draggable={false} data-icon={id} />;
 }

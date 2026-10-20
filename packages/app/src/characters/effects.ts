@@ -17,6 +17,7 @@ import { LASSO_HIT } from "./effects/pig.ts";
 import { ANKUS_HIT } from "./effects/alfil.ts";
 import { CARROT_FLY, CARROT_HIT, CARROT_ICON, CARROT_PATCH } from "./effects/hopper.ts";
 import { BRUSH_STROKE, PAINT_DRIP, PAINT_FLY, PAINT_HIT, PAINT_SPLASH } from "./effects/smudgy.ts";
+import { MOONBEAM, MOON_HIT, MOON_SCORCH } from "./effects/moo.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
 export { BOARD_CELL, SQUARE } from "./effects/common.ts";
@@ -69,4 +70,7 @@ export const EFFECT_SPRITES = {
   brushStroke: BRUSH_STROKE,
   paintFly: PAINT_FLY,
   paintHit: PAINT_HIT,
+  moonbeam: MOONBEAM,
+  moonScorch: MOON_SCORCH,
+  moonHit: MOON_HIT,
 } as const satisfies Record<string, Character>;

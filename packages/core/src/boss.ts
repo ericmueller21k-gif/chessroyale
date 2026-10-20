@@ -180,11 +180,11 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // moves, at the end of his turn, a beam stuns one of the crowd's mobile pieces, at random (it can't move on the
   // crowd's next turn).
   // Full Moon: he plays at full strength for 5 of his moves, and the first ends with a flurry of 5 beams
-  // (bosses/moo.ts; docs/decisions/2026-10-20-moo-rules.md). Not playable until his kit is wired (kit null; the test
-  // link `?boss=moo&wip=1`, `&power=fullmoon` or `&power=moonbeam`). The raid sim: with the beam on the crowd's engine-best piece
-  // he was far too strong (the crowd 0.02); with the beam's target at random, 0.21 in 44 moves, in the pack, at the
-  // usual −250 (reports/moo-sim.md).
-  { id: "moo", name: "Moo & Moon", icon: "🐄", kit: null, offset: -250, powers: { passive: "moonbeam", ultimate: "fullmoon" } },
+  // (bosses/moo.ts; docs/decisions/2026-10-20-moo-rules.md). Live with his art (Eric, Oct 20: "ship it however it comes
+  // out"; docs/decisions/2026-10-20-moo-wired.md; the test links `?boss=moo`, `&power=fullmoon` or `&power=moonbeam`). The
+  // raid sim: with the beam on the crowd's engine-best piece he was far too strong (the crowd 0.02); with the beam's target
+  // at random, 0.21 in 44 moves, in the pack, at the usual −250 (reports/moo-sim.md).
+  { id: "moo", name: "Moo & Moon", icon: "🐄", kit: "Moo", offset: -250, powers: { passive: "moonbeam", ultimate: "fullmoon" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },

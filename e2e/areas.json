@@ -304,10 +304,12 @@
       "paths": [
         "packages/chess/src/bosses/moo.ts",
         "packages/app/src/characters/moo*.ts",
+        "packages/app/src/characters/stance.ts",
         "packages/app/src/characters/effects/moo.ts",
-        "packages/app/src/components/Moo.tsx"
+        "packages/app/src/components/Moo.tsx",
+        "packages/app/src/speech-icons.ts"
       ],
-      "specs": ["e2e/moo.spec.ts"]
+      "specs": ["e2e/boss-speech.spec.ts", "e2e/king-attack.spec.ts", "e2e/moo.spec.ts"]
     },
     "Wrangler (pig)": {
       "paths": [

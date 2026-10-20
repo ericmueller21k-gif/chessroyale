@@ -74,7 +74,7 @@ describe("Moo & Moon (code-drawn pixel art)", () => {
     // Full Moon: the colors swap, then the big moo.
     const swap = MOO.anims.fullMoon!.frames.find((f) => f.cue === "swap")!;
     expect(swap.pal).toMatchObject(MOO_POWER_PALETTE);
-    expect(atMs(MOO, "fullMoon", "swap")).toBeLessThan(atMs(MOO, "fullMoon", "moo"));
+    expect(atMs(MOO, "fullMoon", "swap")).toBeLessThan(atMs(MOO, "fullMoon", "mooBig"));
     // The flurry: five beams one after another, FLURRY_STAGGER_MS apart (the board art's stagger), in the powered-up colors.
     const beams = cuesOf(MOO, "flurry").filter(([, c]) => /^beam\d$/.test(c));
     expect(beams.map(([, c]) => c)).toEqual(["beam1", "beam2", "beam3", "beam4", "beam5"]);
