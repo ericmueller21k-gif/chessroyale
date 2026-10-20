@@ -183,8 +183,10 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // (bosses/moo.ts; docs/decisions/2026-10-20-moo-rules.md). Live with his art (Eric, Oct 20: "ship it however it comes
   // out"; docs/decisions/2026-10-20-moo-wired.md; the test links `?boss=moo`, `&power=fullmoon` or `&power=moonbeam`). The
   // raid sim: with the beam on the crowd's engine-best piece he was far too strong (the crowd 0.02); with the beam's target
-  // at random, 0.21 in 44 moves, in the pack, at the usual −250 (reports/moo-sim.md).
-  { id: "moo", name: "Moo & Moon", icon: "🐄", kit: "Moo", offset: -250, powers: { passive: "moonbeam", ultimate: "fullmoon" } },
+  // at random, 0.21 in 44 moves, in the pack, at the usual −250 (reports/moo-sim.md). Live at −240: Big Boy's test wants him
+  // weaker underneath than every playable boss not named in it, and a tie at −250 failed it; Moo plays at Stockfish's strength
+  // floor (about 1320 to 1350), so 10 points change nothing in play (the director's call, Oct 20; docs/decisions/2026-10-20-moo-wired.md).
+  { id: "moo", name: "Moo & Moon", icon: "🐄", kit: "Moo", offset: -240, powers: { passive: "moonbeam", ultimate: "fullmoon" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },

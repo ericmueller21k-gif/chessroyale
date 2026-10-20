@@ -13,7 +13,7 @@ describe("the boss template: who can be met", () => {
 
   it("today: Ginger (Freeze), Boingo the Clown, Jefferson (Fire), Hollow (Darkness), Big Boy (toy blocks, the Big Bounce), Sawyer (saw cuts, the board saw), Wrangler (the lasso drag, the showdown), Alfil (Tusks, the Mammoth Slam), Chub & Chirp (Leapfrog, the Carrot Patch), Smudgy (Camouflage, Repaint) and Moo & Moon (Moonbeam, the Full Moon)", () => {
     expect(playableBosses().map((b) => b.id).sort()).toEqual(["alfil", "bigboy", "clown", "gingerbread", "grex", "hollow", "hopper", "moo", "pig", "sawyer", "smudgy"]);
-    expect(BOSS_ROSTER.find((b) => b.id === "moo")).toMatchObject({ name: "Moo & Moon", icon: "🐄", kit: "Moo", offset: -250, powers: { passive: "moonbeam", ultimate: "fullmoon" } });
+    expect(BOSS_ROSTER.find((b) => b.id === "moo")).toMatchObject({ name: "Moo & Moon", icon: "🐄", kit: "Moo", offset: -240, powers: { passive: "moonbeam", ultimate: "fullmoon" } });
     expect(BOSS_ROSTER.find((b) => b.id === "smudgy")).toMatchObject({ name: "Smudgy", icon: "🦎", kit: "Smudgy", offset: 0, powers: { passive: "camouflage", ultimate: "repaint" } });
     expect(BOSS_ROSTER.find((b) => b.id === "hopper")).toMatchObject({ name: "Chub & Chirp", icon: "🐇", kit: "Chub & Chirp", offset: -250, powers: { passive: "leapfrog", ultimate: "carrotpatch" } });
     expect(BOSS_ROSTER.find((b) => b.id === "alfil")).toMatchObject({ name: "Alfil", icon: "🦣", kit: "Alfil", offset: -250, powers: { passive: "tusks", ultimate: "slam" } });
