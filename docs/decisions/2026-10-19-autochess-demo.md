@@ -146,3 +146,67 @@ is exactly as it was before it (its spacing and `home-layout.spec.ts` / `live-wi
 pawn is the size it was). Admins open the demo from Settings → TESTING, "Auto chess (shelved demo) ›". `/autochess` still
 opens it for anyone with the link (it's client-only and behind Access). The no-promotion and fizzle-out rules above stay in.
 
+
+## v5 (Eric, Oct 20): the shop, lock in, visible pawns, auto-drop, a tighter adjust step, faster fights
+
+Eric's notes ("These numbers may need adjusting"; every number is in `AUTOCHESS`) held the demo until Moo & Moon was live and he gave
+the all clear; Moo is live (#301), and the director asked for the build. Built one change at a time, each its own commit.
+
+**What changed**
+1. **The shop is five random slots:** pawn 75%, knight 10%, bishop 8%, rook 5%, queen 2% (`shop.odds`), prices unchanged. Buying
+   rolls a new piece into the slot; **Reroll** costs 5 for all five (`shop.rerollCost`); the shop refills free each round. No hold
+   button. Every roll is seeded by the round, the reroll count and the refill count.
+2. **Lock in:** your board, bench and shop freeze; the first side to lock gets 25 gold at once (`lockInBonus`); the other sees
+   "Locked in"; both locked ends the step. Eric: the race is fine as is, no minimum pieces ("the player who doesn't lock in sees your
+   shadows and might have an advantage then of adjusting pieces").
+3. **At most 10 pieces and the king on a board** (`boardLimit`); bench stays 8. When buying ends, bench pieces drop onto the board
+   left to right until it has 8 (`autoDropTo`; Eric's "if you already have 8 and then you have 2 sitting on your rack, then they
+   won't drop in", his answer to the question of 8 against 10).
+4. **The opponent's pawns show as real pawns while you buy** (2 s behind); a placed pawn is picked up once, its next placement final.
+   Eric's answer: a pawn moved back to the bench uses its one move.
+5. **The adjust step is one chess move and one drop for 25 gold** (`adjustMoves`, `adjustDrops`, `adjustDropCost`), either, both or
+   neither, in any order, each can be taken back. Eric: not two drops for now ("adding in two, we can consider that later").
+6. **The fight:** a side left with only its king loses at once (both: a draw); after 30 moves a side, moves play at 0.175 s instead of
+   0.35 s (`fightFastAfter`, `fightFastMoveMs`).
+7. **The bot** buys from its own shop, rerolls now and then, locks in at a seeded time, drops when it can pay.
+
+**Calls I made (reasons)**
+- **Buttons in a row of their own** under the shop (Reroll left, Lock in right, 34 px). The shop's five slots can't share a row with
+  them at 320 px (a slot would be about 40 px wide, narrower than "Bench full"). The row costs height, so the page's gaps and
+  padding went from 6 px to 4 px (net 22 px, not 40). Where the height decides the board it is a little smaller: 2% at 360×640,
+  4% at 390×664, 8% at 320×568, 4% at 1280×800 and 7% at 1280×600 (measured from the formula); at 390×844 and up nothing changes.
+  The step's box for the other steps is 186 px, so the board still doesn't move between steps.
+- **"Locked in" by their name shows at once,** not 2 s behind like the circles: the bonus goes to whoever is first, and a bonus lost
+  to a lock you couldn't see yet would feel like a trick. The bot's gold shows its bonus at once for the same reason.
+- **The bot's lock-in** is seeded between 30% and 95% of the step's open part (before its locked end), with all its pieces down
+  a moment before, or never 15% of the time, so a quick player can beat it to the 25 and a slow one usually doesn't
+  (`bot.lockFrom`, `lockTo`, `neverLockChance`). A tie in time goes to the bot (practically never).
+- **Lock in can't be undone,** ends only your own buying (the other side's step goes on, with you watching its pawns and circles),
+  and its 25 gold can pay for the adjust drop (the first-lock-and-drop line is the point of it).
+- **Where a piece auto-drops:** the first good empty square, pawns on the third rank from home, then the fourth, then the second;
+  pieces on the back rank, then the second, then the third; files from the left of the screen (White's a to h, Black's h to a, since
+  your half is always at the bottom). A pawn that had used its pick-up lands final.
+- **A pawn's pick-up counts when it lands somewhere else:** a drag that is cancelled, or dropped on its own square, costs nothing.
+  A fixed pawn can still be dragged onto the shop row to sell it, and tapped to select it for "Sell 9"; the line says so.
+- **The one move includes the king** ("any one of your pieces"), and it may be the piece you just dropped. Taking a change back is
+  by replaying what is left: a change another one stands on waits ("Take back your other change first."): e.g. a drop onto the square
+  a moved piece left.
+- **A bench piece dropped in the adjust step costs 25** and counts as a survivor (25% back) instead of a bench piece (all back): a drop
+  is a bet that the piece fights.
+- **A lone king loses before anything else** (mate, stalemate, "not enough pieces"), so King and knight against a bare king, which
+  used to be a draw, is a loss for the bare king: that is Eric's rule ("boring moving around"). The bot never starts with a bare king
+  (it always buys), and a player who buys nothing loses at once with "A side left with only its king loses at once.".
+- **The speed-up** is 30 moves a side (60 plies) and the counter then reads "Move 31 of 60 · twice as fast".
+- **The bot's shop buying:** it picks among the five slots it sees by weights (minor pieces and rooks over pawns, a queen when rich);
+  a shop is mostly pawns, so pawns are the filler. It rerolls (5 gold, at most 3 a round, only with 60 gold or more and enough left
+  for a knight) at 15% a look, 40% when the shop shows only pawns. It puts down 8 and keeps one more on its bench only if it keeps the
+  25 gold for the drop. Measured (2000 plans a round, one setting): round 1 buys 5.5 pieces for 96 of 100 gold (4 pawns), round 5
+  7.8 pieces for 161 of 220, a ninth piece in 38% of round-5 plans, rerolls 0.7 to 1.6 a round.
+- **The bot's drop:** the engine's expected score saturates at 0 and 1 (in 60 real-engine setups, 1500 nodes, the best drop changed
+  the score in 2 of 16 cases with a bench piece), so a drop that merely beats the margin almost never showed up. It now drops when the
+  best square scores better, or at least as well when the bot's score is under 0.9 (`bot.dropBelow`): 7 of 16 in the same run. Already
+  winning, it keeps its gold. Beatable: it still picks one move and one drop from a 1500-node search.
+- **`?gold=N`** (a test switch, like `?quick=1` and `?seed=N`) adds N gold to round 1, to try a big army and to test the 10-piece board.
+- **CI:** the numbers are in `packages/core/src/settings.ts` as asked, which `e2e/areas.json` counts as shared, so this PR runs the
+  whole e2e suite.
+- **Seeds in the e2e file:** the shop, the kings and the bot all come from `?seed=N`. A different roll order changes every fixture.
