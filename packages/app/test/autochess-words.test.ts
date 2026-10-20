@@ -64,6 +64,8 @@ describe("auto chess: survivors and promotions", () => {
       adjustSeconds: 15,
       adjustMoveCap: null,
       benchSlots: 8,
+      boardLimit: 10,
+      autoDropTo: 8,
       kingRanks: 2,
       fightMoveMs: 350,
       moveCap: 60,

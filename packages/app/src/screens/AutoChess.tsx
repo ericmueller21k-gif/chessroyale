@@ -9,6 +9,7 @@ import { testParams } from "../test-switches.ts";
 import { adjustBlock, adjustMove, adjustTargets, adjustWords, startAdjust, undoBlock, undoMove, type Adjusted } from "../autochess/adjust.ts";
 import { botAdjust, botAt, botPlan } from "../autochess/bot.ts";
 import {
+  autoDrop,
   buyBlock,
   buyWords,
   emptyArmy,
@@ -71,6 +72,9 @@ interface RoundState {
   locks: Locks;
   /** Your adjust step: where your pieces stand and which have moved. */
   adj: Adjusted | null;
+  /** How many of your bench pieces dropped onto your board when buying ended, and the bot's army then (its bench dropped too). */
+  autoDropped: number;
+  botStart: Army | null;
   plan: BotPlan;
   /** The bot's army after its adjust step (hidden until the fight). */
   botFinal: Army | null;
@@ -118,7 +122,7 @@ function startRound(prev: MatchState, cfg: AutoChessSettings): { match: MatchSta
   const seed = roundSeed(match);
   const kings = kingSquares(seed, cfg);
   const plan = botPlan(theirs, kings[theirs], match.bot.gold, match.round, mulberry32(seed ^ 0x9e3779b9), cfg);
-  return { match, round: { you: emptyArmy(mine, kings[mine]), shop: newShop(shopSeed(seed), cfg), locks: noLocks, adj: null, plan, botFinal: null, gold } };
+  return { match, round: { you: emptyArmy(mine, kings[mine]), shop: newShop(shopSeed(seed), cfg), locks: noLocks, adj: null, autoDropped: 0, botStart: null, plan, botFinal: null, gold } };
 }
 
 function newGame(seed: number, cfg: AutoChessSettings): Game {
@@ -127,9 +131,11 @@ function newGame(seed: number, cfg: AutoChessSettings): Game {
 }
 
 /** A phone's short steps for tests (`?quick=1`, a test switch): the same game in a few seconds a step. */
-function settingsFor(quick: boolean): AutoChessSettings {
+function settingsFor(quick: boolean, gold: number): AutoChessSettings {
   // (Two seconds locked, so a test has time to try buying in the lock before the reveal.)
-  return quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, adjustSeconds: 5, fightMoveMs: 60 } : AUTOCHESS;
+  const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, adjustSeconds: 5, fightMoveMs: 60 } : AUTOCHESS;
+  // (`?gold=N`: N more gold at the start of round 1, to try a big army.)
+  return gold > 0 ? { ...base, startGold: base.startGold + gold } : base;
 }
 
 const colorName = (c: Color) => (c === "w" ? "White" : "Black");
@@ -156,7 +162,8 @@ export function AutoChessScreen({ onBack }: { onBack: () => void }) {
 function AutoChessGame({ onBack }: { onBack: () => void }) {
   const params = testParams();
   const quick = params.get("quick") === "1";
-  const cfg = useMemo(() => settingsFor(quick), []);
+  const extraGold = Math.max(0, Math.floor(Number(params.get("gold")) || 0));
+  const cfg = useMemo(() => settingsFor(quick, extraGold), []);
   const seedParam = Number(params.get("seed"));
   const [game, setGame] = useState<Game>(() => newGame(Number.isFinite(seedParam) && params.get("seed") ? seedParam : (Math.random() * 2 ** 31) | 0, cfg));
   const gref = useRef(game);
@@ -232,16 +239,19 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     setDrag(null);
     press.current = null;
     setMsg("");
-    const you = cur.round.you;
+    // The pieces still on a bench drop onto its board by themselves (up to the limit), yours and the bot's.
+    const dropped = autoDrop(cur.round.you, cfg);
+    const you = dropped.army;
+    const botStart = autoDrop(cur.round.plan.army, cfg).army;
     // (What the bot spent is paid now, and its lock-in bonus if it locked first; it sells nothing.)
     const locks = tickLocks(cur.round.locks, performance.now() - cur.phaseStart, cur.round.plan.lockAt);
     const match: MatchState = { ...cur.match, bot: { ...cur.match.bot, gold: cur.match.bot.gold - cur.round.plan.spent + bonusFor(locks, "bot", cfg) } };
-    commit({ ...cur, match, phase: "adjust", phaseStart: performance.now(), round: { ...cur.round, locks, adj: startAdjust(you) } });
+    commit({ ...cur, match, phase: "adjust", phaseStart: performance.now(), round: { ...cur.round, locks, adj: startAdjust(you), autoDropped: dropped.dropped, botStart } });
     // The bot adjusts out of sight, from your army as it stood when it locked, and its moves show at the fight.
-    const run: BotRun = { stop: false, done: null, latest: cur.round.plan.army };
+    const run: BotRun = { stop: false, done: null, latest: botStart };
     botRun.current = run;
     const seed = roundSeed(match);
-    run.done = botAdjust(cur.round.plan.army, botEvaluator(you, other(youColor(match.round)), cfg), mulberry32(seed ^ 0x51ed270b), () => run.stop || cancelled.current, cfg, (army) => (run.latest = army)).then(
+    run.done = botAdjust(botStart, botEvaluator(you, other(youColor(match.round)), cfg), mulberry32(seed ^ 0x51ed270b), () => run.stop || cancelled.current, cfg, (army) => (run.latest = army)).then(
       () => undefined,
       () => undefined,
     );
@@ -282,7 +292,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const color = youColor(cur.match.round);
     const on = piecesOn(fen);
     const who = winner === null ? "draw" : winner === color ? "you" : "bot";
-    const { match, result } = settleRound(cur.match, who, { you: on[color], bot: on[other(color)] }, { you: cur.round.you.bench, bot: [] }, cfg);
+    const { match, result } = settleRound(cur.match, who, { you: on[color], bot: on[other(color)] }, { you: (cur.round.adj?.army ?? cur.round.you).bench, bot: [] }, cfg);
     const won = matchWinner(match);
     const next = won ? null : goldBreakdown(match.round + 1, match.you, cfg);
     commit({ ...cur, match, phase: won ? "over" : "result", phaseStart: performance.now(), outcome: { result, end, next } });
@@ -537,7 +547,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   // ---------------- What to draw ----------------
 
   const you = g.phase === "adjust" || g.phase === "fight" ? (g.round.adj?.army ?? g.round.you) : g.round.you;
-  const botArmy = g.round.botFinal && g.phase !== "buy" && g.phase !== "adjust" ? g.round.botFinal : g.round.plan.army;
+  const botArmy = g.round.botFinal && g.phase !== "buy" && g.phase !== "adjust" ? g.round.botFinal : g.phase === "buy" ? g.round.plan.army : (g.round.botStart ?? g.round.plan.army);
   const botKing = g.round.plan.army.king;
   const delayed = Math.max(0, elapsed / 1000 - cfg.circlesDelaySeconds);
   const seen = g.phase === "buy" ? botAt(g.round.plan.events, delayed) : null;
@@ -750,8 +760,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                   {msg || hint}
                 </p>
                 <p class="ac-card-text">
+                  {g.round.autoDropped > 0 && `${g.round.autoDropped} ${g.round.autoDropped === 1 ? "piece" : "pieces"} from your bench dropped onto your board. `}
                   Their real pieces stay shown. Your moves stay hidden from them until the fight. Tap a piece you moved (↩) to take its move back.
-                  {g.round.you.bench.length > 0 && ` ${g.round.you.bench.length} on your bench sit out and are refunded in full.`}
+                  {you.bench.length > 0 && ` ${you.bench.length} on your bench sit out and are refunded in full.`}
                 </p>
               </>
             )}

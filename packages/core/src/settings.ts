@@ -2715,6 +2715,10 @@ export interface AutoChessSettings {
   readonly adjustMoveCap: number | null;
   /** Pieces waiting off the board between the board and the shop. */
   readonly benchSlots: number;
+  /** Most pieces a side may have on its board, its king not counted (v5, Eric Oct 20: "10 pieces + the king"). */
+  readonly boardLimit: number;
+  /** When buying ends, pieces still on the bench drop onto the board until it has this many (the rest stay on the bench). */
+  readonly autoDropTo: number;
   /** The kings stand on a random square of each side's back this-many ranks. */
   readonly kingRanks: number;
   /** The fight: one move about this often, each searched to this many nodes (the same for both sides). */
@@ -2776,6 +2780,8 @@ export const AUTOCHESS: AutoChessSettings = {
   adjustSeconds: 15,
   adjustMoveCap: null,
   benchSlots: 8,
+  boardLimit: 10,
+  autoDropTo: 8,
   kingRanks: 2,
   fightMoveMs: 350,
   fightNodes: 6000,

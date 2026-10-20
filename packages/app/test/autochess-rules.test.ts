@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import { AUTOCHESS } from "@chessroyale/core";
 import { stockfishRefuses } from "@chessroyale/chess";
 import {
+  autoDrop,
+  boardCount,
   boardPieces,
   buy,
   buyBlock,
   buyWords,
   emptyArmy,
   extras,
+  firstGoodSquare,
   halfSquares,
   inHalf,
   kingSquares,
@@ -152,6 +155,84 @@ describe("auto chess: placing", () => {
     x = toBench(x, "d4");
     expect(x).toEqual({ color: "w", king: "e1", board: {}, bench: ["p", "n"] });
     expect(boardPieces(placeFromBench(x, 0, "a3"))).toEqual([{ square: "a3", kind: "p" }]);
+  });
+});
+
+describe("auto chess: the board limit and the bench's auto-drop (v5)", () => {
+  /** Ten pieces on White's half: eight pawns on rank 3 and two knights on b1 and g1 (the king on e1). */
+  const ten: Record<string, Kind> = { a3: "p", b3: "p", c3: "p", d3: "p", e3: "p", f3: "p", g3: "p", h3: "p", b1: "n", g1: "n" };
+
+  it("holds at most 10 pieces and the king on a side's board, and says why", () => {
+    expect(AUTOCHESS.boardLimit).toBe(10);
+    expect(AUTOCHESS.benchSlots).toBe(8);
+    const nine = army("w", "e1", Object.fromEntries(Object.entries(ten).slice(0, 9)), ["b"]);
+    expect(boardCount(nine)).toBe(9);
+    expect(placeBlock(nine, "b", "c1")).toBeNull();
+    const full = army("w", "e1", ten, ["b"]);
+    expect(boardCount(full)).toBe(10);
+    expect(placeBlock(full, "b", "c1")).toBe("limit");
+    expect(placeBlock(full, "p", "a2")).toBe("limit");
+    expect(placeBlock(full, "b", "c1", undefined, { ...AUTOCHESS, boardLimit: 11 })).toBeNull();
+    // A taken square or someone's half is named first; a piece already on the board may still move about.
+    expect(placeBlock(full, "b", "a3")).toBe("taken");
+    expect(placeBlock(full, "b", "a5")).toBe("half");
+    expect(placeBlock(full, "n", "c1", "b1")).toBeNull();
+    expect(placeWords("limit")).toBe("Your board is full: 10 pieces and your king at most.");
+    // Black's board is limited the same way.
+    expect(placeBlock(army("b", "e8", Object.fromEntries(Object.keys(ten).map((_, i) => [`${"abcdefgh"[i % 8]}${6 - Math.floor(i / 8)}`, "p" as Kind]))), "n", "c8")).toBe("limit");
+  });
+
+  it("when buying ends, bench pieces drop left to right in bench order, each on its first good square: pawns in front, pieces behind", () => {
+    const a = army("w", "e1", {}, ["n", "p", "p", "r", "p"]);
+    const { army: out, dropped } = autoDrop(a);
+    expect(dropped).toBe(5);
+    expect(out.bench).toEqual([]);
+    // The knight first: the back rank from the left; then pawns on the third rank from the left, then the rook next on the back rank.
+    expect(out.board).toEqual({ a1: "n", a3: "p", b3: "p", b1: "r", c3: "p" });
+    expect(out.king).toBe("e1");
+    // Black's half is at the bottom of its screen, turned: its files run h to a, its home is the eighth rank.
+    const black = autoDrop(army("b", "e8", {}, ["p", "q", "p"])).army;
+    expect(black.board).toEqual({ h6: "p", h8: "q", g6: "p" });
+    expect(firstGoodSquare(army("b", "e8"), "n")).toBe("h8");
+  });
+
+  it("skips the king's square, taken squares and the pawn rules; a full third rank sends pawns to the fourth", () => {
+    const a = army("w", "a3", { b3: "p", c3: "p", d3: "p", e3: "p", f3: "p", g3: "p", h3: "p" }, ["p", "n", "r"]);
+    // (The king stands on a3, so the third rank has no square left: the pawn goes to the fourth rank's a4.)
+    const out = autoDrop(a, { ...AUTOCHESS, autoDropTo: 10 }).army;
+    expect(out.board.a4).toBe("p");
+    expect(out.board.a1).toBe("n");
+    expect(out.board.b1).toBe("r");
+    expect(autoDrop(army("w", "a1", {}, ["n"])).army.board).toEqual({ b1: "n" });
+    // Three pawns in a file at most: with a2, a3 and a4 taken a pawn finds another file.
+    expect(firstGoodSquare(army("w", "e1", { a2: "p", a3: "p", a4: "p" }), "p")).toBe("b3");
+  });
+
+  it("stops when the board has 8: 8 on the board and 2 on the bench, they won't drop in; with 6 on the board only two do", () => {
+    const eight: Record<string, Kind> = { a3: "p", b3: "p", c3: "p", d3: "p", e3: "p", f3: "p", a1: "r", h1: "r" };
+    const stay = autoDrop(army("w", "e1", eight, ["n", "b"]));
+    expect(stay.dropped).toBe(0);
+    expect(stay.army.bench).toEqual(["n", "b"]);
+    expect(stay.army.board).toEqual(eight);
+    const six = Object.fromEntries(Object.entries(eight).slice(0, 6));
+    const two = autoDrop(army("w", "e1", six, ["n", "b", "r", "q"]));
+    expect(two.dropped).toBe(2);
+    expect(boardCount(two.army)).toBe(8);
+    // The first two in bench order dropped; the others wait, in order.
+    expect(two.army.bench).toEqual(["r", "q"]);
+    expect(Object.values(two.army.board).filter((k) => k === "n" || k === "b")).toHaveLength(2);
+    // The number is a setting.
+    expect(AUTOCHESS.autoDropTo).toBe(8);
+    expect(autoDrop(army("w", "e1", eight, ["n", "b"]), { ...AUTOCHESS, autoDropTo: 9 }).dropped).toBe(1);
+    // Nothing on the bench: nothing happens.
+    expect(autoDrop(army("w", "e1", eight)).army).toEqual(army("w", "e1", eight));
+  });
+
+  it("never passes the board's own limit, whatever the auto-drop number is", () => {
+    const nine: Record<string, Kind> = { a3: "p", b3: "p", c3: "p", d3: "p", e3: "p", f3: "p", g3: "p", a1: "r", h1: "r" };
+    const out = autoDrop(army("w", "e1", nine, ["n", "b", "q"]), { ...AUTOCHESS, autoDropTo: 20 });
+    expect(boardCount(out.army)).toBe(10);
+    expect(out.army.bench).toEqual(["b", "q"]);
   });
 });
 

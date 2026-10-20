@@ -146,6 +146,8 @@ describe("auto chess: the bot", () => {
         expect(e.at).toBeLessThanOrEqual(AUTOCHESS.buySeconds - AUTOCHESS.lockSeconds - 1);
       }
       expect(plan.army.board).not.toHaveProperty(king);
+      // Never more than the board holds.
+      expect(Object.keys(plan.army.board).length).toBeLessThanOrEqual(AUTOCHESS.boardLimit);
       expect(owned(plan.army).q).toBeLessThanOrEqual(AUTOCHESS.queenLimit);
       expect(extras(owned(plan.army)) + owned(plan.army).p).toBeLessThanOrEqual(8);
       // Every position the fight could start from is one the engine accepts.

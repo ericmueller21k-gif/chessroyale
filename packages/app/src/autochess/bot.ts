@@ -17,8 +17,6 @@ const WEIGHTS: Record<Kind, readonly [number, number]> = { p: [2, 1.5], n: [3, 2
 const LATE_ROUND = 6;
 /** A queen only when this much more is left after it (it buys a queen when rich, not with its last coins). */
 const QUEEN_CHANGE = 40;
-/** It never fields more than this many pieces (a half has room for 31). */
-const MOST_PIECES = 14;
 
 /** What the bot buys with `gold` in `round`, in the order it buys. Sometimes it keeps a hundred banked for interest. */
 export function botBuys(gold: number, round: number, rng: Rng, cfg: AutoChessSettings = AUTOCHESS): Kind[] {
@@ -30,7 +28,8 @@ export function botBuys(gold: number, round: number, rng: Rng, cfg: AutoChessSet
   const bought: Kind[] = [];
   // (What it owns, counted against the same limits the player's shop has; it never needs a bench.)
   const n: Record<Kind, number> = { p: 0, n: 0, b: 0, r: 0, q: 0 };
-  while (bought.length < MOST_PIECES) {
+  // (Never more than the board holds.)
+  while (bought.length < cfg.boardLimit) {
     const options = KINDS.filter((k) => {
       if (priceOf(k, cfg) > budget) return false;
       if (k === "q" && (n.q >= cfg.queenLimit || budget < priceOf("q", cfg) + QUEEN_CHANGE)) return false;

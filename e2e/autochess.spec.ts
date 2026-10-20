@@ -363,6 +363,101 @@ test("lock in: you lock before the opponent, and when it locks too the step ends
   expect(errors).toEqual([]);
 });
 
+/** Buys the first shop slot that matches (a CSS suffix for `.ac-buy`), rerolling for 5 gold until the shop shows one. */
+async function buyAny(p: Page, suffix: string) {
+  for (let i = 0; i < 12; i++) {
+    const slot = p.locator(`.ac-buy${suffix}`).first();
+    if (await slot.count()) return tap(p, slot);
+    await tap(p, reroll(p));
+  }
+  throw new Error(`the shop never showed .ac-buy${suffix}`);
+}
+const placeNext = async (p: Page, square: string) => {
+  await tap(p, benchPieces(p).first());
+  await tapSquare(p, square);
+};
+
+test("the board holds 10 pieces and the king: the eleventh is refused with the reason, a placed piece may still move", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  // (`gold=` adds gold at the start of round 1; the full 30 s step, so there is time for all of it.)
+  await page.goto("/autochess?seed=1866&gold=400");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  // (400 more, and the income 100 and the interest on 400, 30.)
+  expect(await goldOf(page)).toBe(530);
+  const squares = await freeSquares(page, [2, 3, 4]);
+  // A queen, a knight, a rook and five pawns fill the bench; place them all, then eight pawns and three pieces in all are bought.
+  await buyAny(page, '[data-kind="q"]');
+  await buyAny(page, '[data-kind="n"]');
+  await buyAny(page, '[data-kind="r"]');
+  for (let i = 0; i < 5; i++) await buyAny(page, '[data-kind="p"]');
+  await expect(benchPieces(page)).toHaveCount(8);
+  for (let i = 0; i < 8; i++) await placeNext(page, squares[i]!);
+  await expect(benchPieces(page)).toHaveCount(0);
+  for (let i = 0; i < 3; i++) await buyAny(page, '[data-kind="p"]');
+  await placeNext(page, squares[8]!);
+  await placeNext(page, squares[9]!);
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(11);
+  // The eleventh piece (the king not counted) is refused, with the reason, and stays on the bench.
+  await tap(page, benchPieces(page).first());
+  await tapSquare(page, squares[10]!);
+  await expect(page.locator(".ac-msg")).toContainText("Your board is full: 10 pieces and your king at most.");
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(11);
+  await expect(benchPieces(page)).toHaveCount(1);
+  await expect(page.locator(".ac-dot")).toHaveCount(0);
+  // A piece already on the board may still move to another square.
+  await tapSquare(page, squares[0]!);
+  await tapSquare(page, squares[12]!);
+  await expect(page.locator(`${BOARD_SEL.piece}.white[data-square="${squares[12]}"]`)).toHaveCount(1);
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(11);
+  expect(errors).toEqual([]);
+});
+
+test("auto-drop: when buying ends, bench pieces drop onto the board left to right, pawns in front and pieces behind", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto(QUICK);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const king = (await root(page).getAttribute("data-king"))!;
+  // Two pawns and a knight, none of them placed.
+  await tap(page, buyPiece(page, "pawn"));
+  await tap(page, buyPiece(page, "pawn"));
+  await tap(page, buyPiece(page, "knight"));
+  await expect(benchPieces(page)).toHaveCount(3);
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(1);
+  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
+  // Pawns from the left of the third rank, the knight from the left of the back rank (the king stands on neither: ranks 1-2).
+  expect(Number(king[1])).toBeLessThanOrEqual(2);
+  await expect(piece(page, "white", "pawn", "a3")).toBeVisible();
+  await expect(piece(page, "white", "pawn", "b3")).toBeVisible();
+  await expect(piece(page, "white", "knight", king === "a1" ? "b1" : "a1")).toBeVisible();
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(4);
+  await expect(page.locator(".ac-card-text")).toContainText("3 pieces from your bench dropped onto your board.");
+  expect(errors).toEqual([]);
+});
+
+test("auto-drop stops at 8 on the board: two more on the bench stay there (the opponent locks at 9 s, so locking in ends the step)", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await page.goto("/autochess?seed=3&gold=400");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const squares = await freeSquares(page, [2, 3, 4]);
+  for (let i = 0; i < 8; i++) await buyAny(page, '[data-kind="p"]');
+  for (let i = 0; i < 8; i++) await placeNext(page, squares[i]!);
+  await expect(benchPieces(page)).toHaveCount(0);
+  await buyAny(page, ':not([data-kind="p"]):not([data-kind="q"])');
+  await buyAny(page, ':not([data-kind="p"]):not([data-kind="q"])');
+  await expect(benchPieces(page)).toHaveCount(2);
+  // Their lock-in comes at about 9 s; lock in after it and the step ends at once.
+  await expect(page.locator(".ac-bot-locked")).toBeVisible({ timeout: 20_000 });
+  await tap(page, lockButton(page));
+  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 2000 });
+  // 8 on the board and 2 on the bench: they didn't drop in.
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(9);
+  await expect(page.locator(".ac-card-text")).toContainText("2 on your bench sit out");
+  await expect(page.locator(".ac-card-text")).not.toContainText("dropped onto your board");
+  expect(errors).toEqual([]);
+});
+
 test("a drag with a finger: a bench piece onto the board and a placed piece back to the bench", async ({ page }) => {
   test.skip(!phone(), "real touch events, as a phone makes them");
   const errors = watchErrors(page);

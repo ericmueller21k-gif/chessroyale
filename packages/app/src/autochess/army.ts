@@ -87,16 +87,20 @@ export function buyWords(block: BuyBlock, kind: Kind, gold: number, cfg: AutoChe
   }
 }
 
-export type PlaceBlock = "half" | "king" | "taken" | "backrank" | "file";
+/** How many pieces stand on the board (the king not counted). */
+export const boardCount = (army: Army) => Object.keys(army.board).length;
+
+export type PlaceBlock = "half" | "king" | "taken" | "limit" | "backrank" | "file";
 
 /**
  * Why `kind` can't stand on `square` of this army's half now, or null. `from`: the square it's moving from (so a pawn
- * moving along its own file isn't counted twice).
+ * moving along its own file isn't counted twice, and a piece already on the board doesn't count against the board's limit).
  */
 export function placeBlock(army: Army, kind: Kind, square: string, from?: string, cfg: AutoChessSettings = AUTOCHESS): PlaceBlock | null {
   if (!inHalf(square, army.color)) return "half";
   if (square === army.king) return "king";
   if (army.board[square] && square !== from) return "taken";
+  if (from === undefined && boardCount(army) >= cfg.boardLimit) return "limit";
   if (kind === "p") {
     if (rankOf(square) === backRank(army.color)) return "backrank";
     const inFile = Object.entries(army.board).filter(([sq, k]) => k === "p" && sq !== from && fileOf(sq) === fileOf(square)).length;
@@ -113,6 +117,8 @@ export function placeWords(block: PlaceBlock, cfg: AutoChessSettings = AUTOCHESS
       return "That's your king's square.";
     case "taken":
       return "That square is taken.";
+    case "limit":
+      return `Your board is full: ${cfg.boardLimit} pieces and your king at most.`;
     case "backrank":
       return "Pawns can't stand on your back rank.";
     case "file":
@@ -139,6 +145,39 @@ export function moveOnBoard(army: Army, from: string, to: string): Army {
 export function toBench(army: Army, from: string): Army {
   const { [from]: kind, ...rest } = army.board;
   return { ...army, board: rest, bench: [...army.bench, kind!] };
+}
+
+/**
+ * Where a piece goes when it drops by itself: the first good empty square, pawns in front (the third rank from home, then the
+ * fourth, then the second) and pieces behind (home, then the second, then the third), files from the left of the screen (your
+ * half is at the bottom: White's a to h, Black's h to a), by the usual placement rules. Null if there is none.
+ */
+export function firstGoodSquare(army: Army, kind: Kind, cfg: AutoChessSettings = AUTOCHESS): string | null {
+  const home = backRank(army.color);
+  const dir = army.color === "w" ? 1 : -1;
+  const ranks = kind === "p" ? [home + 2 * dir, home + 3 * dir, home + dir] : [home, home + dir, home + 2 * dir];
+  const files = army.color === "w" ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
+  const squares = [...ranks.flatMap((rank) => files.map((f) => squareOf(f, rank))), ...halfSquares(army.color)];
+  return squares.find((sq) => !placeBlock(army, kind, sq, undefined, cfg)) ?? null;
+}
+
+/**
+ * When the buying step ends: the pieces still on the bench drop onto the board by themselves, left to right in bench order,
+ * each on its first good square, until the board has `autoDropTo` pieces (Eric: "if you already have 8 and then you have 2
+ * sitting on your rack, then they won't drop in"). The rest stay on the bench. `dropped`: how many went.
+ */
+export function autoDrop(army: Army, cfg: AutoChessSettings = AUTOCHESS): { army: Army; dropped: number } {
+  let cur = army;
+  let dropped = 0;
+  let i = 0;
+  while (i < cur.bench.length && boardCount(cur) < cfg.autoDropTo) {
+    const square = firstGoodSquare(cur, cur.bench[i]!, cfg);
+    if (square) {
+      cur = placeFromBench(cur, i, square);
+      dropped++;
+    } else i++;
+  }
+  return { army: cur, dropped };
 }
 
 /** Sells a piece (the bench slot `index`, or the board's `square`): the army without it, and the gold it gives. */
