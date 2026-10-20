@@ -234,6 +234,8 @@ test("the shop: a reroll costs 2 and rolls all five offers (the same for the sam
   await expect(reroll(page)).toContainText("2");
   await tap(page, reroll(page));
   expect(await goldOf(page)).toBe(98);
+  // (A shuffle and a coin's clink.)
+  expect(await soundCount(page, "acReroll")).toBe(1);
   const rolled = await offers(page);
   expect(rolled).toHaveLength(5);
   expect(rolled).not.toEqual(first);
@@ -282,6 +284,8 @@ test("buying: tap an offer's silhouette or its shop card, and it lands on its sq
   await expect(piece(page, "white", "rook", "b4")).toBeVisible();
   expect(await goldOf(page)).toBe(50);
   await expect(page.locator(".ac-msg")).toContainText("Another offer was on b4: it rolled again.");
+  // (A solid thunk as it lands: one place sound for each piece bought onto its square.)
+  expect(await soundCount(page, "acPlace")).toBe(1);
   const after = await offers(page);
   expect(after).toHaveLength(5);
   expect(after.map((o) => o.square)).not.toContain("b4");
@@ -290,6 +294,7 @@ test("buying: tap an offer's silhouette or its shop card, and it lands on its sq
   await tap(page, card(page, 2));
   await expect(piece(page, "white", "pawn", "g3")).toBeVisible();
   expect(await goldOf(page)).toBe(40);
+  expect(await soundCount(page, "acPlace")).toBe(2);
   await expect(piece(page, "white", "rook", "b4")).toBeVisible();
   // Two pawns share d4 (slots 1 and 3, side by side): tap the right one's silhouette (slot 3) and a pawn stands on d4; the left one rolled again.
   const right = await silhouette(page, 3).boundingBox();
@@ -379,6 +384,9 @@ test("the bench: drag an offer onto it to hold it (it keeps its square), tap it 
   await expect(held(page).first().locator("small")).toHaveText("b4");
   expect(await goldOf(page)).toBe(50);
   await expect(page.locator(".ac-msg")).toContainText("Held the rook for b4. Tap it on the bench to place it.");
+  // (A soft pop for a hold, not the thunk of a piece landing.)
+  expect(await soundCount(page, "acHold")).toBe(1);
+  expect(await soundCount(page, "acPlace")).toBe(0);
   await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(1);
   // A new offer rolled into slot 0; the others stay, the pawn offered for b4 too (nothing stands on b4).
   const after = await offers(page);
@@ -388,9 +396,11 @@ test("the bench: drag an offer onto it to hold it (it keeps its square), tap it 
   await dragMouse(page, middle((await silhouette(page, 3).boundingBox())!), await benchMiddle(page));
   await expect(held(page)).toHaveCount(2);
   expect(await goldOf(page)).toBe(40);
+  expect(await soundCount(page, "acHold")).toBe(2);
   // Tapping the held pawn places it on d4 (free): the bench slot empties, and the other offer on d4 (slot 1) rolls again.
   await tap(page, held(page).nth(1));
   await expect(piece(page, "white", "pawn", "d4")).toBeVisible();
+  expect(await soundCount(page, "acPlace")).toBe(1);
   await expect(held(page)).toHaveCount(1);
   expect(await goldOf(page)).toBe(40);
   await expect(page.locator(".ac-msg")).toContainText("Another offer was on d4: it rolled again.");
@@ -404,9 +414,21 @@ test("the bench: drag an offer onto it to hold it (it keeps its square), tap it 
   await expect(page.locator(".ac-msg")).toContainText("b4 is taken.");
   await expect(held(page)).toHaveCount(1);
   // Sell the held rook by dragging it onto the shop row: 75% of 50, rounded down, is 37.
-  await dragMouse(page, middle((await held(page).first().boundingBox())!), await shopMiddle(page));
+  const slotBox = (await held(page).first().boundingBox())!;
+  await dragMouse(page, middle(slotBox), await shopMiddle(page));
   await expect(held(page)).toHaveCount(0);
   expect(await goldOf(page)).toBe(67);
+  // The 37 floats up right over the slot the rook was sold from (it is in the bench row, over the first slot), and is gone a moment later.
+  const bench0 = (await bench(page).boundingBox())!;
+  const flo = page.locator(".ac-float");
+  await expect(flo).toHaveCount(1);
+  await expect(flo).toHaveText("+37");
+  const fb = (await flo.boundingBox())!;
+  expect(fb.x + fb.width / 2).toBeGreaterThan(slotBox.x - 2);
+  expect(fb.x + fb.width / 2).toBeLessThan(slotBox.x + slotBox.width + 2);
+  expect(fb.y).toBeLessThan(bench0.y + bench0.height);
+  expect(fb.y + fb.height).toBeGreaterThan(bench0.y - 45);
+  await expect(flo).toHaveCount(0, { timeout: 3000 });
   await expect(page.locator(".ac-msg")).toContainText("Sold the rook for 37.");
   expect(await soundCount(page, "sell")).toBe(1);
   expect(errors).toEqual([]);
@@ -471,6 +493,9 @@ test("levels: you start at level 4 (4 pieces on the board), the 5th is refused w
   await tap(page, xpButton(page));
   await expect(youLevel(page)).toHaveText("Lv 5 · 2/8 XP");
   await expect(youLevel(page).locator("b.pop")).toBeVisible();
+  // (A small rising chime for the XP, a bigger one as the level comes.)
+  expect(await soundCount(page, "acXp")).toBe(1);
+  expect(await soundCount(page, "acLevel")).toBe(1);
   expect(await goldOf(page)).toBe(before - 20);
   await expect(page.locator(".ac-msg")).toContainText("Level 5: your board may hold 5 pieces.");
   await tap(page, held(page).first());
@@ -480,6 +505,8 @@ test("levels: you start at level 4 (4 pieces on the board), the 5th is refused w
   await tap(page, xpButton(page));
   await expect(youLevel(page)).toHaveText("Lv 5 · 6/8 XP");
   await expect(page.locator(".ac-msg")).toContainText("Bought 4 XP.");
+  expect(await soundCount(page, "acXp")).toBe(2);
+  expect(await soundCount(page, "acLevel")).toBe(1);
   // All the way up: 82 XP in all from level 4's 2 is 21 buys (the first two are done): level 10, "max", and no more to buy.
   await page.evaluate(() => {
     const b = [...document.querySelectorAll<HTMLButtonElement>(".ac-xp")][0]!;
@@ -531,6 +558,83 @@ test("avatars: your pawn sits under your side of the board and theirs above thei
   expect(errors).toEqual([]);
 });
 
+test("feel: every button presses down while it is held (Reroll sinks onto its shadow) and comes back up", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto(DUP);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const sunk = (loc: Locator) => loc.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform === "none" ? undefined : getComputedStyle(el).transform).m42);
+  const buttons: [string, Locator, number][] = [
+    ["Reroll", reroll(page), 3],
+    ["Buy XP", xpButton(page), 3],
+    ["Lock in", lockButton(page), 3],
+    ["a shop card", card(page, 2), 2],
+    ["the back button", page.getByRole("button", { name: "Back to home" }), 2],
+  ];
+  for (const [name, loc, least] of buttons) {
+    const c = middle((await loc.boundingBox())!);
+    await page.mouse.move(c.x, c.y);
+    await page.mouse.down();
+    await expect.poll(() => sunk(loc), { message: `${name} sinks while it is held`, timeout: 2000 }).toBeGreaterThanOrEqual(least - 0.6);
+    // Let go away from it (so nothing is bought, rerolled or locked), and it comes back up.
+    await page.mouse.move(c.x, c.y - 200);
+    await page.mouse.up();
+    await expect.poll(() => sunk(loc), { message: `${name} comes back up`, timeout: 2000 }).toBeLessThan(0.5);
+  }
+  expect(await goldOf(page)).toBe(100);
+  expect(errors).toEqual([]);
+});
+
+test("a sale floats its gold up from the square the piece stood on (+67 for a queen), light CSS that is gone a moment later; nothing floats for a purchase", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto(POOR);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  await tap(page, card(page, 0));
+  await expect(piece(page, "white", "queen", "g3")).toBeVisible();
+  // Buying needs no animation.
+  await expect(page.locator(".ac-float")).toHaveCount(0);
+  const g3 = await center(page, "g3");
+  const sq = (await page.locator(".ac-layer").boundingBox())!.width / 8;
+  await tapSquare(page, "g3");
+  await tap(page, page.getByRole("button", { name: "Sell 67", exact: true }));
+  const flo = page.locator(".ac-float");
+  await expect(flo).toHaveCount(1);
+  await expect(flo).toHaveText("+67");
+  // Its box is the square's; the number starts on it and rises (a CSS animation: the number's own box moves, the script does nothing per frame).
+  const box = (await flo.boundingBox())!;
+  expect(Math.abs(box.x + box.width / 2 - g3.x)).toBeLessThan(2);
+  expect(Math.abs(box.y + box.height / 2 - g3.y)).toBeLessThan(2);
+  expect(Math.abs(box.width - sq)).toBeLessThan(2);
+  const num = flo.locator("b");
+  const early = (await num.boundingBox())!;
+  expect(early.y + early.height / 2).toBeGreaterThan(g3.y - sq / 2 - 6);
+  await page.waitForTimeout(450);
+  const later = (await num.boundingBox())!;
+  expect(later.y, "the number rises").toBeLessThan(early.y - 4);
+  expect(Math.abs(later.x + later.width / 2 - g3.x), "straight up").toBeLessThan(3);
+  expect(await num.evaluate((el) => getComputedStyle(el).animationName)).toBe("ac-float");
+  await expect(flo).toHaveCount(0, { timeout: 3000 });
+  expect(errors).toEqual([]);
+});
+
+test("mute is respected: with sound off every one of these sounds is asked for muted", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.addInitScript(() => localStorage.setItem("brc.muted", "1"));
+  await page.goto("/autochess?seed=9");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  await tap(page, card(page, 2));
+  await dragMouse(page, middle((await card(page, 3).boundingBox())!), await benchMiddle(page));
+  await tap(page, xpButton(page));
+  await tapSquare(page, "g3");
+  await tap(page, page.getByRole("button", { name: /^Sell \d+$/ }));
+  await tap(page, reroll(page));
+  await tap(page, lockButton(page));
+  const log = await page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => /^(ac|sell)/.test(l)));
+  // A sound of each kind was asked for, and none of them is un-muted.
+  for (const name of ["acReroll", "acPlace", "acHold", "acXp", "sell", "acLock"]) expect(log.some((l) => l.startsWith(`${name}:`)), name).toBe(true);
+  expect(log.every((l) => l.endsWith(":muted"))).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test("lock in: the first side to lock gets 25 gold at once, and your board, bench and shop freeze", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(NEVER);
@@ -544,6 +648,7 @@ test("lock in: the first side to lock gets 25 gold at once, and your board, benc
   // Lock in: +25 at once (the bot never locks with this seed, so you are first), the button and the timer say so.
   await tap(page, lockButton(page));
   expect(await goldOf(page)).toBe(115);
+  expect(await soundCount(page, "acLock")).toBe(1);
   await expect(root(page)).toHaveAttribute("data-bonus", "you");
   await expect(root(page)).toHaveAttribute("data-you-locked", "1");
   await expect(lockButton(page)).toHaveText("Locked in");
@@ -653,6 +758,8 @@ test("while you buy their pieces are plain circles (pawns too), 2 s behind; ever
   }
   expect(seen.clash).toBe(0);
   expect(seen.unringed).toBe(0);
+  // A ping as each circle turns into its piece: one for each reveal.
+  expect(await soundCount(page, "acReveal")).toBe(Math.max(...real));
   // The reveal shows everything for real: the circles go, and each shows its piece (the revealed ones stayed where they were).
   const circles = await page.locator(".ac-circle").count();
   const shown = await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count();

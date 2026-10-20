@@ -8,6 +8,7 @@
  */
 
 import { QUICK_CHAT } from "@chessroyale/core";
+import { autochessSound, type AutochessSound } from "./autochess/sounds.ts";
 import { clownSound, type ClownSound } from "./characters/clown-sounds.ts";
 import { gingerSound, type GingerSound } from "./characters/gingerbread-sounds.ts";
 import { WHISTLES, grexSound, whistlePick, type GrexSound } from "./characters/grex-sounds.ts";
@@ -232,6 +233,7 @@ function buffer(data: Float32Array, at: number, rate = 1) {
   src.connect(master!);
   src.start(at);
 }
+const autochess = (name: AutochessSound) => (t: number) => buffer(autochessSound(name, ctx!.sampleRate), t);
 const clown = (name: ClownSound) => (t: number) => buffer(clownSound(name, ctx!.sampleRate), t);
 const ginger = (name: GingerSound) => (t: number) => buffer(gingerSound(name, ctx!.sampleRate), t);
 const grex = (name: GrexSound) => (t: number) => buffer(grexSound(name, ctx!.sampleRate), t);
@@ -402,29 +404,6 @@ function bubblePop(at: number, level: number) {
 }
 
 /**
- * Auto chess's sell sound (docs/decisions/2026-10-19-autochess-demo.md): a coin, two quick bright notes rising (E6, then
- * B6) with a tiny tap on the first. Short and quieter than a move's knock.
- */
-function coinSell(at: number) {
-  const c = ctx!;
-  const note = (t: number, f: number, len: number, level: number) => {
-    const o = c.createOscillator();
-    o.type = "triangle";
-    o.frequency.setValueAtTime(f, t);
-    const g = c.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(level, t + 0.006);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
-    o.connect(g).connect(master!);
-    o.start(t);
-    o.stop(t + len + 0.02);
-  };
-  note(at, 1318.5, 0.09, 0.1);
-  note(at + 0.075, 1975.5, 0.18, 0.1);
-  tap(at, 3200, 0.05);
-}
-
-/**
  * Voices for the reveal's "selecting move" roulette (Settings → Sound, "Reveal sound"). Each plays one note; the
  * roulette climbs a major arpeggio from `base` (C, E, G, C), and the winner is three of the same note.
  */
@@ -539,8 +518,16 @@ export type SoundName =
   | "gavel"
   | "pop"
   | "popSoft"
-  // Auto chess (the demo): a piece sold.
+  // Auto chess (the demo), synthesized: see autochess/sounds.ts. A piece sold (a coin cascade), a reroll, a piece placed, one held
+  // on the bench, XP bought, a level up, a lock in and one of their pieces revealed.
   | "sell"
+  | "acReroll"
+  | "acPlace"
+  | "acHold"
+  | "acXp"
+  | "acLevel"
+  | "acLock"
+  | "acReveal"
   | "chat"
   // Boingo the Clown (a raid boss): synthesised, see characters/clown-sounds.ts.
   | "clownBoing"
@@ -737,7 +724,14 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   // The queue: a pawn pops into its seat (a short soft "pop"), and a bot's, quieter.
   pop: (t) => bubblePop(t, 1),
   popSoft: (t) => bubblePop(t, 0.45),
-  sell: coinSell,
+  sell: autochess("sell"),
+  acReroll: autochess("reroll"),
+  acPlace: autochess("place"),
+  acHold: autochess("hold"),
+  acXp: autochess("xp"),
+  acLevel: autochess("level"),
+  acLock: autochess("lock"),
+  acReveal: autochess("reveal"),
   // Quick chat: a team message arrives. A soft, short tick, well under a move's knock.
   chat: (t) => {
     clockTick(t, 0.5 * QUICK_CHAT.tickLevel);
@@ -886,6 +880,14 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
  * (his smash took 150 ms on a computer), Big Boy's, Sawyer's, Wrangler's, Alfil's, Chub & Chirp's. Each a list of its module and name (a few for one cue).
  */
 const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
+  sell: [["autochess", "sell"]],
+  acReroll: [["autochess", "reroll"]],
+  acPlace: [["autochess", "place"]],
+  acHold: [["autochess", "hold"]],
+  acXp: [["autochess", "xp"]],
+  acLevel: [["autochess", "level"]],
+  acLock: [["autochess", "lock"]],
+  acReveal: [["autochess", "reveal"]],
   clownBoing: [["clown", "boing"]],
   clownHonk: [["clown", "honk"]],
   clownSqueak: [["clown", "squeak"]],

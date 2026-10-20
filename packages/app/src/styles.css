@@ -18180,6 +18180,100 @@ button.sq-tiny {
   background: var(--fd-panel-2);
   color: var(--fd-text);
 }
+/*
+ * A gold amount floating up from a square of the board or a slot of the bench (components/FloatGold.tsx; "+22" where a piece was sold,
+ * later "+5" where a pawn cashes in): the number rises a little and fades, one CSS animation on one box. On the board it sits on its
+ * square (eighths of --board-size, as the other marks do); on the bench over its slot.
+ */
+.ac-float {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 6;
+}
+.ac-float.on-board {
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
+}
+.ac-float.on-bench {
+  left: calc((100% - 12px) / 4 * var(--slot, 0) + 4px * var(--slot, 0));
+  top: 0;
+  width: calc((100% - 12px) / 4);
+  height: 100%;
+}
+.ac-float b {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-weight: 400;
+  font-size: 17px;
+  line-height: 1;
+  color: #ffd84a;
+  text-shadow: 0 0 3px #3a2600, 0 0 3px #3a2600, 0 1px 0 #3a2600, 0 -1px 0 #3a2600;
+  font-variant-numeric: tabular-nums;
+  animation: ac-float 1000ms ease-out both;
+}
+@keyframes ac-float {
+  0% {
+    transform: translateY(2px) scale(0.7);
+    opacity: 0;
+  }
+  14% {
+    transform: translateY(-4px) scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-36px) scale(1);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-float b {
+    animation: ac-float-fade 1000ms ease-out both;
+  }
+  @keyframes ac-float-fade {
+    0%,
+    60% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+}
+/*
+ * Every button here presses down (Eric, Oct 20: "every button gets the pressed-down feel", from TFT): while it is held it sinks a couple
+ * of pixels and shrinks a hair, and comes back up with a short spring. The Reroll button is a thicker key that visibly drops onto its
+ * shadow.
+ */
+.ac-root button {
+  transition: transform 120ms cubic-bezier(0.3, 1.5, 0.5, 1), box-shadow 120ms ease-out, filter 120ms ease-out;
+}
+.ac-root button:active {
+  transform: translateY(2px) scale(0.965);
+  filter: brightness(0.93);
+  transition-duration: 40ms;
+}
+.ac-ctl button {
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.16);
+  margin-bottom: 3px;
+  height: 31px;
+}
+.ac-ctl button:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0.16);
+  filter: brightness(0.92);
+}
+.ac-ctl .ac-reroll:active {
+  transform: translateY(3px) scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-root button,
+  .ac-root button:active {
+    transition: none;
+  }
+}
 /* The piece being dragged follows the finger (placed by the screen), over everything. */
 .ac-ghost {
   position: fixed !important;

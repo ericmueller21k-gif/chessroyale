@@ -6,7 +6,8 @@ import { Board } from "../components/Board.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { Avatar } from "../components/Items.tsx";
 import { cellOf, dragStarted, squareAtPoint } from "../board/logic.ts";
-import { play } from "../sound.ts";
+import { play, unlockAudio, warmSounds } from "../sound.ts";
+import { FLOAT_MS, FloatGold, type FloatAt } from "../components/FloatGold.tsx";
 import { testParams } from "../test-switches.ts";
 import { adjustBlock, adjustMarks, adjustMove, adjustTargets, adjustWords, movesUsed, startAdjust, undoAction, undoBlock, undoWords, type Adjusted } from "../autochess/adjust.ts";
 import { botAdjust, botPlan } from "../autochess/bot.ts";
@@ -133,6 +134,8 @@ function settingsFor(quick: boolean, gold: number, adjust: boolean): AutoChessSe
 }
 
 const colorName = (c: Color) => (c === "w" ? "White" : "Black");
+/** The sounds this screen plays, made ahead (off the page's thread) once the audio is awake. */
+const SOUNDS_USED = ["acPlace", "acHold", "acReroll", "sell", "acXp", "acLevel", "acLock", "acReveal"] as const;
 /** What the opponent is called: the same word as a bot in a 1 v 1. */
 const BOT_NAME = "Bot";
 /** The seed of a round's reveals (which of their pieces shows, and when: reveal.ts). */
@@ -148,11 +151,15 @@ function PieceIcon({ color, kind }: { color: Color; kind: Kind | "k" }) {
 }
 
 /** A side's level and the XP toward the next ("Lv 4 · 2/4 XP"); the number pops when the level goes up. */
-function LevelTag({ level, xp, who, cfg }: { level: number; xp: number; who: string; cfg: AutoChessSettings }) {
+function LevelTag({ level, xp, who, cfg, chime = false }: { level: number; xp: number; who: string; cfg: AutoChessSettings; chime?: boolean }) {
   const last = useRef(level);
   const [pops, setPops] = useState(0);
-  useEffect(() => {
-    if (level > last.current) setPops((n) => n + 1);
+  // (In a layout effect: the chime and the pop come with the number changing, not a paint later. `chime`: yours only.)
+  useLayoutEffect(() => {
+    if (level > last.current) {
+      setPops((n) => n + 1);
+      if (chime) play("acLevel");
+    }
     last.current = level;
   }, [level]);
   const need = xpToNext(level, cfg);
@@ -197,6 +204,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     setSelState(h);
   };
   const [drag, setDrag] = useState<Hold | null>(null);
+  const [floats, setFloats] = useState<{ id: number; amount: number; at: FloatAt }[]>([]);
+  const floatId = useRef(0);
+  const floatTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [msg, setMsg] = useState("");
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const say = (text: string) => {
@@ -205,6 +215,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     msgTimer.current = setTimeout(() => setMsg(""), SAY_MS);
   };
   const cancelled = useRef(false);
+  /** The first tap wakes the audio (browsers need a tap), and the sounds are made ahead. */
+  const wake = () => {
+    unlockAudio();
+    warmSounds(SOUNDS_USED);
+  };
   const botRun = useRef<BotRun>({ stop: false, done: null, latest: game.round.plan.army });
   const layerRef = useRef<HTMLDivElement>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
@@ -249,6 +264,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       cancelled.current = true;
       botRun.current.stop = true;
       if (msgTimer.current) clearTimeout(msgTimer.current);
+      floatTimers.current.forEach(clearTimeout);
     };
   }, []);
 
@@ -357,6 +373,13 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     return true;
   };
 
+  /** A gold amount floating up from a square or a bench slot (FloatGold), gone after its time. */
+  function addFloat(amount: number, at: FloatAt) {
+    const id = ++floatId.current;
+    setFloats((f) => [...f, { id, amount, at }]);
+    floatTimers.current.push(setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), FLOAT_MS + 150));
+  }
+
   /** How many pieces your board may hold now: your level. */
   const boardRoom = () => gref.current.match.you.level;
   const withGold = (gold: number, army: Army) => {
@@ -381,7 +404,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     // (Another offer on the same square rolled again: the player is told, so an offer doesn't change under their finger unexplained.)
     if (bought.replaced) say(`Another offer was on ${offer.square}: it rolled again.`);
     else setMsg("");
-    play("pop");
+    play("acPlace");
   }
 
   /** Buys the offer in a shop slot to hold it on the bench: it keeps its square, and a new offer is rolled into the slot. */
@@ -395,7 +418,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: held.gold } }, round: { ...cur.round, you: held.army, shop: held.shop } });
     setSel(null);
     say(`Held the ${KIND_NAME[offer.kind]} for ${offer.square}. Tap it on the bench to place it.`);
-    play("pop");
+    play("acHold");
   }
 
   /** Places a held piece on the square it kept, when that square is free and the board has room. */
@@ -413,7 +436,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     setSel(null);
     if (replaced) say(`Another offer was on ${held.square}: it rolled again.`);
     else setMsg("");
-    play("pop");
+    play("acPlace");
   }
 
   /** Buys XP for gold: a level when there is enough, which is room for another piece. */
@@ -426,7 +449,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const next = buyXp(you, you.gold, cfg);
     commit({ ...cur, match: { ...cur.match, you: { ...you, level: next.level, xp: next.xp, gold: next.gold } } });
     say(next.level > you.level ? `Level ${next.level}: your board may hold ${next.level} pieces.` : `Bought ${cfg.levels.buyXp} XP.`);
-    play("pop");
+    play("acXp");
   }
 
   /** Lock in: your buying is over (your board and shop freeze); the first side to do it gets the bonus, and both locked ends the step. */
@@ -440,7 +463,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     setDrag(null);
     press.current = null;
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: cur.match.you.gold + bonus } }, round: { ...cur.round, locks } });
-    play("pop");
+    play("acLock");
     if (bothLocked(locks, at, cur.round.plan.lockAt)) return toAdjust();
     say(bonus ? `You locked in first: +${bonus} gold.` : "You locked in.");
   }
@@ -453,7 +476,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if ("block" in next) return say(rerollWords(cur.match.you.gold, cfg));
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: next.gold } }, round: { ...cur.round, shop: next.shop } });
     setMsg("");
-    play("pop");
+    play("acReroll");
   }
 
   /** Sells a piece standing on your board, or one held on your bench: 75% of its price back. */
@@ -465,6 +488,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     setSel(null);
     play("sell");
     say(`Sold the ${KIND_NAME[hold.kind as Kind]} for ${gold}.`);
+    // The gold floats up from where the piece stood: its square, or its slot on the bench.
+    addFloat(gold, isSquare(hold) ? cellOf(hold.at.square, orientation) : { slot: hold.at.held, of: cfg.benchSlots });
   }
 
   /** A piece let go on a target, while buying: the shop takes a piece of yours (a sale), the bench takes an offer (you hold it). */
@@ -650,6 +675,14 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   // While buying you see every piece of theirs (pawns too) as a plain circle, 2 s behind, and every few seconds one of them is revealed at random and stays shown.
   const seen = g.phase === "buy" ? botSeen(g.round.plan.events, revealSeed(g.match), elapsed / 1000, cfg) : null;
 
+  // A piece of theirs revealed: a ping as its circle turns into the piece (a layout effect: it comes with the piece, whatever the screen does next).
+  const revealCount = seen?.revealed.length ?? 0;
+  const lastReveals = useRef(0);
+  useLayoutEffect(() => {
+    if (revealCount > lastReveals.current) play("acReveal");
+    lastReveals.current = revealCount;
+  }, [revealCount, g.match.round]);
+
   let fen: string;
   let lastMove: string | null = null;
   if ((g.phase === "fight" || g.phase === "result" || g.phase === "over") && g.fight) {
@@ -716,7 +749,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const myHp = Math.max(0, g.match.you.hp);
 
   return (
-    <div class="fd-root ac-root" data-phase={g.phase} data-round={g.match.round} data-you-locked={youLocked ? "1" : undefined} data-bot-locked={botIsLocked ? "1" : undefined} data-bonus={g.round.locks.bonus ?? undefined} data-you={mine} data-king={g.round.you.king} data-bot-king={botKing}>
+    <div class="fd-root ac-root" onPointerDownCapture={wake} data-phase={g.phase} data-round={g.match.round} data-you-locked={youLocked ? "1" : undefined} data-bot-locked={botIsLocked ? "1" : undefined} data-bonus={g.round.locks.bonus ?? undefined} data-you={mine} data-king={g.round.you.king} data-bot-king={botKing}>
       <div class="ac-col">
         <header class="ac-top">
           <BackButton onClick={onBack} label="Back to home" />
@@ -788,6 +821,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 );
               })}
               {held && isSquare(held) && <span class="ac-cell ac-picked" style={sq(held.at.square)} />}
+              {floats.filter((f) => "col" in f.at).map((f) => (
+                <FloatGold key={f.id} amount={f.amount} at={f.at} />
+              ))}
               {dots.map((square) => (
                 <span key={square} class="ac-cell ac-dot" style={sq(square)} />
               ))}
@@ -809,7 +845,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
           </span>
           <span class="ac-who">
             <strong class="ac-name">{myName}</strong>
-            <LevelTag level={g.match.you.level} xp={g.match.you.xp} who="Your" cfg={cfg} />
+            <LevelTag level={g.match.you.level} xp={g.match.you.xp} who="Your" cfg={cfg} chime />
           </span>
           <span class="ac-stats">
             <span class="ac-line">
@@ -872,6 +908,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 );
               })}
               {dragOffer && <div class="ac-sell-drop">Drop to hold it for {priceOf(dragOffer.kind, cfg)}</div>}
+              {floats.filter((f) => "slot" in f.at).map((f) => (
+                <FloatGold key={f.id} amount={f.amount} at={f.at} />
+              ))}
             </div>
             <div class={`ac-shop${dragPiece ? " selling" : ""}`} data-ac-drop="shop" aria-label="Shop">
               {g.round.shop.slots.map((offer, slot) => {
