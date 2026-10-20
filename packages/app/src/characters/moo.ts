@@ -24,7 +24,7 @@
  * eyes, the raised ears and the aura).
  */
 import { canvas, flame, inEllipse, line, poly, roundLight, toGrid, type Canvas } from "./paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part } from "./sprite.ts";
+import { frameKeys, lazyParts, type Anim, type Character, type Frame, type Layer, type Part } from "./sprite.ts";
 
 export const MOO_PALETTE: Record<string, string> = {
   k: "#25140d", // outline
@@ -63,6 +63,10 @@ export const MOO_PALETTE: Record<string, string> = {
   "7": "#ffc933",
   "8": "#ffe55c",
   "9": "#fffbc2",
+  G: "#ffe45ae8", // the glow round him when he's powered up: see-through gold, strong to faint (the aura's own keys)
+  H: "#ffd63cb8",
+  I: "#ffb02a80",
+  J: "#ff94184a",
   z: "#0d0e12", // ground shadow
 };
 
@@ -191,7 +195,7 @@ function strokes(list: readonly Stroke[], more?: (S: Stamp, cv: Canvas, x0: numb
 
 const GROUND = 70;
 const FOOT_X = 25;
-const OX = 8;
+const OX = 12;
 const OY = 6;
 const W = OX + 62;
 const H = OY + GROUND + 4;
@@ -254,6 +258,8 @@ const MOON_CHEEK: readonly string[] = ["Vv", "vv"];
 // ---- Parts and the pose.
 
 const { parts: PARTS, add } = lazyParts();
+/** The character as drawn without its halo or any animation: for `frameKeys`, to find a pose's outline for the aura to hug. */
+const BASE: Character = { id: "moo", name: "Moo", w: W, h: H, foot: [OX + FOOT_X, OY + GROUND], palette: MOO_PALETTE, parts: PARTS, anims: {} };
 type Placed = { name: string; at: Pt };
 const placedAt = new Map<string, Pt>();
 /** A part painted at a place of its own (its `at`), made the first time it's drawn, by a name that says how. */
@@ -475,43 +481,95 @@ function brows(): { part: Part; at: Pt } {
   );
 }
 
-// ---- The aura: golden flames behind him, from the shared flame shape recolored into the aura's own keys.
+// ---- The aura: a soft golden glow hugging his outline, and flames rising round him; one part of its own behind everything.
 
-function aura(seed: number): { part: Part; at: Pt } {
-  const tongues: readonly (readonly [number, number, number, number, number])[] = [
-    // base x, base y, width, height, lean (out toward its side as it rises). The ones above and behind his head have
-    // their bases hidden behind it; the ones at his sides stand on the ground.
-    [3, 70, 7, 38, -2],
-    [7, 70, 8, 46, -2],
-    [11, 22, 7, 18, -2],
-    [16, 17, 7, 11, -1],
-    [22, 14, 7, 8, 0],
-    [27, 13, 8, 8, 0],
-    [32, 15, 7, 10, 1],
-    [37, 21, 8, 16, 2],
-    [41, 26, 8, 20, 2],
-    [41, 70, 8, 42, 2],
-    [46, 70, 7, 34, 2],
-    [50, 70, 5, 22, 3],
-    // the low ones along the ground
-    [14, 70, 6, 10, -1],
-    [25, 70, 7, 9, 0],
-    [36, 70, 6, 10, 1],
-  ];
+/**
+ * The aura for one pose, in frame pixels (`sil` is the pose's outline: which pixels it covers). The glow is see-through
+ * gold in four strengths, fading with the distance from his outline (dithered, so it's soft but never blended; it fades
+ * faster above and below him, so it never reaches the frame's top or the ground). The flames are the shared `flame`
+ * shape in the aura's keys, tongues standing along his outline and rising above it at their own heights, a taller row
+ * behind a shorter one; `variant` picks the heights, so a flicker is a different variant each frame.
+ */
+function aura(variant: number, sil: readonly (readonly boolean[])[]): { part: Part; at: Pt } {
+  const cv = canvas(W, H);
+  const seed = variant * 2.3 + 1;
+  const rnd = (i: number) => {
+    const v = Math.sin(i * 12.9898 + seed * 78.233) * 43758.5453;
+    return v - Math.floor(v);
+  };
+  const first: number[] = Array(W).fill(Infinity);
+  let [x0, x1, bottom] = [W, -1, -1];
+  sil.forEach((row, y) => row.forEach((on, x) => {
+    if (!on) return;
+    first[x] = Math.min(first[x]!, y);
+    [x0, x1, bottom] = [Math.min(x0, x), Math.max(x1, x), Math.max(bottom, y)];
+  }));
+  const [top, floor, left, right] = [OY + 1, OY + GROUND + 2, 3, W - 4];
+  // The glow.
+  const R = 7.5;
+  const BAYER = [[0.125, 0.625], [0.875, 0.375]] as const;
+  for (let y = top; y <= floor; y++)
+    for (let x = left; x <= right; x++) {
+      let d = Infinity;
+      for (let dy = -8; dy <= 8; dy++)
+        for (let dx = -8; dx <= 8; dx++) {
+          if (!sil[y + dy]?.[x + dx]) continue;
+          // His pixel is below this one (dy > 0): this one is above him, where the glow fades quickest.
+          d = Math.min(d, Math.hypot(dx, dy * (dy > 0 ? 1.9 : dy < 0 ? 3 : 1)));
+        }
+      if (d > R) continue;
+      const level = Math.min(4, Math.floor((1 - d / R) ** 0.95 * 4 + BAYER[y & 1]![x & 1]!));
+      if (level > 0) cv[y]![x] = "JIHG"[level - 1]!;
+    }
+  // The flames.
   const MAP: Record<string, string> = { y: "9", Y: "8", f: "7", F: "6", R: "5" };
-  return painted(
-    0,
-    0,
-    54,
-    70,
-    (_F, S) => {
-      tongues.forEach(([bx, by, w, h, lean], i) => {
-        const rows = flame(w, h, seed + i * 1.7, lean).map((r) => [...r].map((c) => MAP[c] ?? c).join(""));
-        S(rows, Math.round(bx - w / 2), by - h);
-      });
-    },
-    false,
-  );
+  const cx = (x0 + x1) / 2;
+  const half = Math.max(1, (x1 - x0) / 2);
+  /** Where his outline is highest near column x, a slope away from it so the flames beside him stand lower. */
+  const topNear = (x: number): number => {
+    let t = Infinity;
+    for (let c = Math.max(0, x - 12); c <= Math.min(W - 1, x + 12); c++) if (first[c]! < Infinity) t = Math.min(t, first[c]! + 0.9 * Math.abs(c - x));
+    return t;
+  };
+  const tongue = (x: number, base: number, tip: number, salt: number) => {
+    const w = 6 + Math.floor(rnd(x + salt + 17) * 3);
+    const h = base - tip;
+    if (h < 7) return;
+    const lean = Math.round(((x - cx) / half) * 3);
+    flame(w, h, seed + x * 0.7 + salt, lean).forEach((r, j) =>
+      [...r].forEach((c, i) => {
+        const X = Math.round(x - w / 2) + i;
+        const Y = base - h + j;
+        if (c !== "." && X >= left && X <= right && Y >= top && Y <= floor) cv[Y]![X] = MAP[c] ?? c;
+      }),
+    );
+  };
+  // A back row standing on the ground at his two sides, mostly hidden by him: what shows is the flames beside his outline.
+  [x0 - 3, x0 + 1, x0 + 5, x1 - 5, x1 - 1, x1 + 3].forEach((x, i) => tongue(x, bottom, bottom - Math.round(24 + 12 * rnd(i + 3)), 7));
+  // Then tongues along his outline: on him a tongue's foot is hidden inside it, beside him it stands on the ground; each rises
+  // a little above the highest point of him near it, never more than a third of his height.
+  const row = (step: number, offset: number, lift: readonly [number, number], salt: number) => {
+    for (let x = x0 - 6 + offset; x <= x1 + 6; x += step) {
+      const t = topNear(x);
+      if (!Number.isFinite(t)) continue;
+      const inner = first[x] ?? Infinity;
+      const onHim = Number.isFinite(inner);
+      const base = onHim ? inner + 5 : bottom;
+      let tip = Math.round(t - (lift[0] + (lift[1] - lift[0]) * rnd(x + salt)));
+      if (tip < top) tip = top + Math.floor(rnd(x + salt + 5) * 9);
+      tongue(x, base, Math.max(tip, base - Math.round((onHim ? 14 : 12) + 12 * rnd(x + salt + 9))), salt);
+    }
+  };
+  row(4, 0, [7, 16], 0);
+  row(4, 2, [2, 7], 41);
+  return { part: { grid: toGrid(cv), outline: false }, at: [-OX, -OY] };
+}
+
+/** A short hash of a pose's layers, to name the aura made for it. */
+function hashLayers(layers: readonly Layer[]): string {
+  let h = 5381;
+  for (const l of layers) for (const c of `${l.part}@${l.x},${l.y};`) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0;
+  return h.toString(36);
 }
 
 // ---- The pose: the numbers that move him (scene pixels, degrees).
@@ -524,7 +582,7 @@ export interface MooPose {
   dy?: number;
   /** His head, with his eyes, brows, horns, tuft and the roots of his ears riding on it: it nuzzles the moon. */
   head?: Pt;
-  /** Each ear's angle below the horizontal, out to its side (negative: standing up): they flop. */
+  /** Each ear's angle below the horizontal, out to its side (negative: standing up): they flop. Both are drawn the same way, the one on our left (`earF`) the other's mirror, and never over the moon. */
   earN?: number;
   earF?: number;
   /** His tail's swing out from hanging straight (degrees). */
@@ -550,7 +608,7 @@ const REST_HUG: Required<MooPose> = {
   dy: 0,
   head: [0, 0],
   earN: 26,
-  earF: 28,
+  earF: 26,
   tail: 0,
   eyes: "open",
   brows: "none",
@@ -573,7 +631,7 @@ const REST_SIT: Required<MooPose> = {
 };
 
 /** The numbers that power him up: with `pal: MOO_POWER_PALETTE`, the powered-up still. */
-export const POWERED: MooPose = { earN: -36, earF: -34, eyes: "glow", brows: "angry", crest: true, aura: 0, head: [0, 1], tail: 8 };
+export const POWERED: MooPose = { earN: -36, earF: -36, eyes: "glow", brows: "angry", crest: true, aura: 0, head: [0, 3], tail: 8 };
 
 /**
  * A pose as layers, back to front: hugging the moon (standing on his hind legs) or sitting on it (it floats under him
@@ -586,7 +644,6 @@ export function mooLayers(pose: MooPose = {}, stance: Stance = "hug"): Layer[] {
   const [hx, hy] = p.head;
   const [mx, my] = p.moon;
   const mouth = p.moonMouth === "open" ? MOON_OPEN : MOON_SMILE;
-  if (p.aura !== null) put(placed(`aura${p.aura}`, () => aura(p.aura! * 2.3)));
   if (stance === "hug") {
     out.push({ part: "shadow", x: OX + FOOT_X - 17, y: OY + GROUND - 2 });
     put(placed(`tail${key(p.tail)}`, () => tail(p.tail, [39.4, 51])));
@@ -623,16 +680,24 @@ export function mooLayers(pose: MooPose = {}, stance: Stance = "hug"): Layer[] {
     put(placed(`armN${key(...p.elbowN, ...p.handN)}`, () => arm(p.elbowN, p.handN)));
   }
   // The head and what rides on it, far side first.
-  put(placed(`earF${key(p.earF)}`, () => ear([14, 15], -1, p.earF, 10)), hx, hy);
   put(placed("hornF", () => horn([16.5, 11.6], [14.8, 8], [13.4, 4.8])), hx, hy);
   put(placed("head", head), hx, hy);
   if (p.crest) put(placed("crest", () => hair(crestRows(), [18, 0])), hx, hy);
   else put(placed("tuft", () => hair(TUFT, [19, 5])), hx, hy);
+  // The two ears are mirror images about the middle of his head (x 22.5): the same root depth, length and angle.
+  put(placed(`earF${key(p.earF)}`, () => ear([12.5, 14.5], -1, p.earF, 10.5)), hx, hy);
   put(placed(`earN${key(p.earN)}`, () => ear([32.5, 14.5], 1, p.earN, 10.5)), hx, hy);
   put(typed(`eyeF${p.eyes}`, EYE_F[p.eyes], EYE_AT.F), hx, hy);
   put(typed(`eyeN${p.eyes}`, EYE_N[p.eyes], EYE_AT.N), hx, hy);
   if (p.brows === "angry") put(placed("brows", brows), hx, hy);
   put(placed("hornN", () => horn([28.6, 11.4], [30, 8.2], [31.4, 6])), hx, hy);
+  if (p.aura !== null) {
+    // Behind everything, made for this pose's outline (the shadow is no part of it).
+    const body = out.filter((l) => !l.part.startsWith("shadow"));
+    const variant = p.aura;
+    const a = placed(`aura${variant}:${hashLayers(body)}`, () => aura(variant, frameKeys(BASE, { layers: body, ms: 0 }).map((r) => r.map((k) => k !== null))));
+    out.unshift({ part: a.name, x: a.at[0] + OX, y: a.at[1] + OY });
+  }
   return out;
 }
 
@@ -656,3 +721,88 @@ export const MOO: Character = {
 
 /** What a portrait shows (his head, an ear, his horns and a bit of the moon's face), in frame pixels. */
 export const MOO_PORTRAIT = { x: OX + 1, y: OY + 3, w: 44, h: 44 } as const;
+
+// ---- Moo's icons: he can't talk, so besides his moos he says things with these, in a line of text.
+
+/**
+ * A little picture for his speech line: `grid` is its pixels (a palette key each, `.` empty) and `palette` its colors. It has
+ * no outline of its own: drawn as a sprite (`mooIconSprite`) it gets the same dark outline and faint halo as every figure,
+ * light from the top left, so it reads on light and dark grounds. Each is about 10 pixels tall (12 with its outline).
+ */
+export interface MooIcon {
+  grid: readonly string[];
+  palette: Readonly<Record<string, string>>;
+}
+
+export const MOO_ICONS = {
+  /** A bottle of milk: a blue cap, a glass neck and shoulders, a white body. */
+  milk: {
+    grid: ["..ccc..", "..cCc..", "..gwg..", ".gwwwg.", "gwWwwwg", "gwWwwwg", "gwwwwsg", "gwwwwsg", "gwwwssg", ".ggggg."],
+    palette: { c: "#3f7fd0", C: "#8fbcf5", g: "#8fb8dc", w: "#f6f6f0", W: "#ffffff", s: "#c4d0e2" },
+  },
+  /** A heart. */
+  heart: {
+    grid: [".rrr...rrr.", "rHHrr.rrrrr", "rHrrrrrrrrr", "rrrrrrrrrrs", "rrrrrrrrrrs", ".rrrrrrrrs.", "..rrrrrrs..", "...rrrrs...", "....rrs....", ".....s....."],
+    palette: { r: "#e8384f", H: "#ff9aa8", s: "#b01f3a" },
+  },
+  /** A chess pawn (him thinking of a piece). */
+  pawn: {
+    grid: ["...ww...", "..wWww..", "..wwws..", "...ws...", "..wwws..", "...ws...", "...ws...", "..wwss..", ".wwwwss.", ".sssssss"],
+    palette: { w: "#f1e8d2", W: "#fffaf0", s: "#bfb08e" },
+  },
+  /** "Zzz": napping, or dazed after the full moon. */
+  zzz: {
+    grid: [".......ZZZZ", ".........z.", "........z..", ".......ssss", "ZZZZZZ.....", "....zz.....", "...zz......", "..zz.......", ".zz........", "ssssss....."],
+    palette: { Z: "#e6f4ff", z: "#9ccbf5", s: "#6aa0dc" },
+  },
+  /** A tuft of grass with a little flower. */
+  grass: {
+    grid: [".....p.....", "....pyp....", ".....p.....", ".....g.....", "..g..g..g..", "..gg.gG.gg.", ".gGg.gGgGg.", ".gGgGgGgGg.", "gGGgGgGGGgg", "ggggggggggg"],
+    palette: { g: "#3a8f3a", G: "#7ad25e", p: "#f27aa8", y: "#ffd23a" },
+  },
+  /** A sparkle: a four-pointed star. */
+  sparkle: {
+    grid: ["....y....", "....y....", "...yYy...", "...yYy...", "yyyYYYyyy", "...yYy...", "...yYy...", "....y....", "....y...."],
+    palette: { y: "#ffd23a", Y: "#fff6a8" },
+  },
+  /** The cartoon anger mark: for when you take his piece. */
+  anger: {
+    grid: ["rrr....rrr", "rHr....rrr", "rr......rr", "..........", "..........", "..........", "rr......rr", "rrr....rrr", "rrr....rrr"],
+    palette: { r: "#e0342c", H: "#ff8a7a" },
+  },
+  /** A question mark. */
+  question: {
+    grid: [".yyyy.", "yYyyyy", "yy..yo", "....yo", "...yoo", "..yoo.", "..yo..", "......", "..yo..", "..yo.."],
+    palette: { y: "#ffd23a", Y: "#fff6a8", o: "#d9921a" },
+  },
+  /** A tiny crescent moon: his friend. */
+  moon: {
+    grid: ["..yyyy..", ".yYyyy..", "yYyyy...", "yYyy....", "yyyy....", "yyyy....", "yyyyo...", "yyyyoo..", ".yyyyoo.", "..yyyyoo"],
+    palette: { y: "#f8c744", Y: "#ffe58a", o: "#d8921f" },
+  },
+  /** A cowbell: a leather loop, a brass bell and its clapper. */
+  cowbell: {
+    grid: ["...lll...", "...l.l...", "..yyyyy..", ".yYyyyyo.", ".yYyyyyo.", ".yYyyyyo.", "yyYyyyyoo", "yyYyyyyoo", "ooooooooo", "...ddd..."],
+    palette: { l: "#8a5a34", y: "#e8b23a", Y: "#fff0a0", o: "#b8801a", d: "#7a4a1a" },
+  },
+} as const satisfies Record<string, MooIcon>;
+
+export type MooIconId = keyof typeof MOO_ICONS;
+
+/** An icon as a one-frame sprite (three pixels of room all round for its outline and halo), drawn the way every figure is. */
+export function mooIconSprite(id: MooIconId): Character {
+  const icon: MooIcon = MOO_ICONS[id];
+  const w = Math.max(...icon.grid.map((r) => r.length)) + 6;
+  const h = icon.grid.length + 6;
+  return {
+    id: `moo-icon-${id}`,
+    name: `Moo icon: ${id}`,
+    w,
+    h,
+    foot: [Math.floor(w / 2), h - 3],
+    palette: { k: MOO_PALETTE.k!, ...icon.palette },
+    halo: "#2c2624",
+    parts: { icon: { grid: icon.grid } },
+    anims: { idle: { loop: true, frames: [{ ms: 1000, layers: [{ part: "icon", x: 3, y: 3 }] }] } },
+  };
+}
