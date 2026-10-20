@@ -17,8 +17,9 @@ import {
   type MatchState,
 } from "../src/autochess/economy.ts";
 import { botAdjust, botAt, botBuys, botPlan } from "../src/autochess/bot.ts";
+import { addXp } from "../src/autochess/level.ts";
 import { newShop } from "../src/autochess/shop.ts";
-import { buyBlock, emptyArmy, extras, halfSquares, kingSquares, legalCounts, owned, placeBlock } from "../src/autochess/army.ts";
+import { buyBlock, carryBench, emptyArmy, extras, halfSquares, kingSquares, legalCounts, owned, placeBlock } from "../src/autochess/army.ts";
 import { fightStart, armiesFen, material } from "../src/autochess/position.ts";
 import { fightMoves, moveMs, playFight, standInMove } from "../src/autochess/fight.ts";
 import { endWords, moveWords } from "../src/autochess/words.ts";
@@ -342,6 +343,46 @@ describe("auto chess: the bot", () => {
     let m = 0;
     await botAdjust(army, async () => (m++, 0.5), mulberry32(3), () => m >= 2);
     expect(m).toBeLessThanOrEqual(3);
+  });
+
+  it("over a whole match of rounds the bot stays legal under all of it: its level, bench, XP, rerolls and gold, round after round, for 150 seeds", () => {
+    for (let seed = 0; seed < 150; seed++) {
+      let gold = 0;
+      let level = { level: AUTOCHESS.levels.start, xp: 0 };
+      let bench: Army["bench"] = [];
+      for (let round = 1; round <= 10; round++) {
+        level = addXp(level, AUTOCHESS.levels.freeXp);
+        gold += incomeFor(round) + interestFor(gold);
+        const color = round % 2 ? "b" : "w";
+        const king = kingSquares(seed * 31 + round)[color];
+        const carried = carryBench(bench);
+        // What it held comes in on squares of its half (turned with the colors), at most the bench's size.
+        expect(carried.length).toBeLessThanOrEqual(AUTOCHESS.benchSlots);
+        for (const h of carried) expect(halfSquares(color)).toContain(h.square);
+        const plan = botPlan(color, king, gold, round, mulberry32(seed * 100 + round), AUTOCHESS, carried, level);
+        // Gold: never spends what it hasn't (a placed held piece is free).
+        expect(plan.spent).toBeLessThanOrEqual(gold);
+        for (const e of plan.events) expect(e.price).toBe(e.type === "place" ? 0 : e.type === "reroll" ? AUTOCHESS.shop.rerollCost : e.type === "xp" ? AUTOCHESS.levels.buyXpCost : AUTOCHESS.prices[e.kind as Kind]);
+        // Level: only what it bought (the free XP came before), and the board never holds more than the level.
+        expect(plan.level).toEqual(addXp(level, plan.events.filter((e) => e.type === "xp").length * AUTOCHESS.levels.buyXp));
+        expect(Object.keys(plan.army.board).length).toBeLessThanOrEqual(plan.level.level);
+        // Pieces: board and bench together are a legal army (the pawn, queen and extras limits), the bench holds at most its slots, each piece on its half, the king alone on its square.
+        expect(legalCounts(owned(plan.army))).toBe(true);
+        expect(plan.army.bench.length).toBeLessThanOrEqual(AUTOCHESS.benchSlots);
+        for (const h of plan.army.bench) expect(halfSquares(color)).toContain(h.square);
+        for (const sq of Object.keys(plan.army.board)) expect(halfSquares(color)).toContain(sq);
+        expect(plan.army.board).not.toHaveProperty(king);
+        // Everything it held either went down or is still held; nothing is lost or made.
+        const held0 = carried.map((h) => `${h.kind}${h.square}`).sort();
+        const placed = plan.events.filter((e) => e.type === "place").map((e) => `${e.kind}${e.square}`);
+        for (const p of placed) expect(held0).toContain(p);
+        expect(plan.army.bench.filter((h) => held0.includes(`${h.kind}${h.square}`)).length + placed.length).toBeGreaterThanOrEqual(held0.length);
+        gold -= plan.spent;
+        expect(gold).toBeGreaterThanOrEqual(0);
+        level = plan.level;
+        bench = plan.army.bench;
+      }
+    }
   });
 
   it("under the rules the bot's whole step stays legal: its buys and its one move, for 120 seeds", async () => {

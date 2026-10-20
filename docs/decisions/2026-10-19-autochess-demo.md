@@ -210,3 +210,96 @@ the all clear; Moo is live (#301), and the director asked for the build. Built o
 - **CI:** the numbers are in `packages/core/src/settings.ts` as asked, which `e2e/areas.json` counts as shared, so this PR runs the
   whole e2e suite.
 - **Seeds in the e2e file:** the shop, the kings and the bot all come from `?seed=N`. A different roll order changes every fixture.
+
+
+## v6 (Eric, Oct 20 evening): the shop decides where pieces go, a bench that carries over, levels, avatars, sounds that feel good
+
+Eric: "we're finally moving in the right direction." His notes (the director's design file, "v6" sections and their answers) replace
+the v5 flow where they differ. Built one change at a time, each its own commit (steps 1 to 7; step 8, the bot, went in with each of
+them and has its own tests). How it works now: [docs/areas/autochess.md](../areas/autochess.md). Every number is in `AUTOCHESS`.
+
+**What changed**
+1. **The shop places pieces.** Five offers, each a piece and a square of your half ("Bishop c2"), the same odds, only squares you
+   could use; green silhouettes on the board (two on a square: smaller, side by side); tap an offer (card or silhouette) to buy it, it
+   lands on its square; reroll 2 gold; no free placing; every board starts with just the king.
+2. **A bench of 4 that carries over;** hold by dragging an offer onto it, a held piece keeps its square and is placed by a tap; selling
+   gives back 75% (was 90%), from the board or the bench.
+3. **Levels:** the board holds as many pieces as your level (start 4, top 10); +2 XP free each round, 4 XP for 20 gold, the thresholds 4,
+   8, 12, 16, 20, 24. The old fixed board limit (`boardLimit`, 10) is gone.
+4. **Their board while you buy:** circles only, pawns too (2 s behind), and one piece revealed at random every 5 s (five in the 30 s),
+   staying shown.
+5. **The adjust step:** 5 s (was 15) and one change: a piece to any legal empty square of your half. A setting turns it off. v5's adjust
+   drop, the bench auto-drop and the one-move-per-pawn rule are removed.
+6. **Avatars** in each side's strip, with name, level and XP; a level-up pops the number.
+7. **Sounds and feel:** eight synthesized sounds, a pressed-down feel on every button, a floating "+N" on a sale.
+8. **The bot** plays all of it.
+
+**Calls I made (reasons)**
+- **An offer whose square gets taken is replaced, not greyed.** Eric left it to me ("replaced or greyed"). A greyed offer is a dead slot
+  for the rest of the round (nothing can free the square except selling), and a replaced one keeps the shop worth looking at. The player
+  is told so an offer doesn't change under their finger unexplained: "Another offer was on b4: it rolled again." An offer whose kind is
+  over a limit (a second queen, a ninth pawn) is greyed with its reason as in v5, since the limit isn't a thing of one square.
+- **Hold is a drag, with no "Hold" button.** Eric allowed either. The shop row is five slots and a button per slot doesn't fit at 320 px
+  (a slot is about 54 px wide), and dragging to the bench (right above the shop) is the same gesture as dragging a piece to the shop to
+  sell it. The message line says so ("Drag one to the bench to hold it."), and an offer the board has no room for is not greyed (it can
+  be held): its label says "Level full" in gold.
+- **A held piece's square turns with the colors.** The colors alternate each round, so "c2" (White's half) is not on Black's half the
+  next round: the square is mirrored the way the kings are (same file, rank 9 minus the rank), so a held piece is still on its owner's
+  half, the same way round. "b4" held in round 1 is "b5" in round 2.
+- **What is held counts as owned** for the legal-position limits (one queen at most, 8 pawns, extras), so a held queen blocks a second
+  queen, and a held piece can always be placed without breaking them. "One queen a round." became "One queen at most." (a queen held
+  from an earlier round is still your one).
+- **Selling a held piece is by dragging it onto the shop row** (a tap places it); a board piece sells by dragging it there or tapping it
+  and "Sell N". 75% of the price, rounded down (P7 N22 B24 R37 Q67).
+- **+2 XP at every round's start, round 1 included** ("+2 XP free each round"), so level 5 comes at round 2's start with nothing bought,
+  and the opponent gets the same. XP beyond a threshold carries over; at the top level XP stays 0 and Buy XP says "You are at the top
+  level, 10.". Buy XP is a third button in the row under the shop; while the first-lock bonus is open the Lock in button is two lines
+  (its name over "+25 gold") so the three fit at 320 px.
+- **The strips are 32 px (were 26) and the board is a little smaller where the height decides it:** the name over "Lv 4 · 2/4 XP" and
+  HP and gold over income, with a pawn: the rest of the page is 324 px (was 312), 12 px less board at 320×568 and 360×640 (about 5%);
+  at 390×844 and up nothing changes. Your strip sits right under the board (above the message line, the bench and the shop) and theirs
+  right above it, so each pawn is "by its side of the board" (the God King's dock is likewise by the board).
+- **The reveal picks among the pieces on their board at that time, not only the circles already shown** (those are 2 s behind). With the
+  circles only, a bot placing slowly wasted the reveal at 5 s (measured: a seed's first piece went down at 11 s), and Eric wants five
+  reveals. A piece whose circle isn't shown yet just appears as the piece, with its ring and ping. With nothing on their board at a reveal
+  time, nothing is revealed then. For the same reason **the bot now puts its pieces down evenly over the first 70% of the open step**
+  (`bot.placeBy`; they were spread over all of it), a reroll or XP a moment before the piece it was for.
+- **The adjust change excludes the king:** the game places both kings, mirrored, for fairness ("pieces" in Eric's levels means not the
+  king), and a king that walks to a corner changes what a mirrored board means. A tap on a square with one of your pieces picks that
+  piece up, so the "taken" and "king's square" refusals show when a piece is dragged there. Refusals use the placement rules' own words.
+- **`?quick=1` adjust is 8 s** (the real one is 5) so a test has time for its taps; one test plays the real 5 s (a full-length step ended
+  by locking in after the opponent's lock) and checks it.
+- **Avatars:** your pawn is drawn by the same `Avatar` as home and profiles, in your board's color for the round (so it also says which
+  side you play); the opponent is named "Bot" (the 1 v 1 bot's name), a look from `botLook` seeded by the match.
+- **The level chime plays when your level number changes** (Buy XP, or the round's free XP), with the pop; Buy XP itself plays the small
+  rising chime. Sounds are synthesized like the bosses' (`autochess/sounds.ts`, in the same cache and sound worker), each with its peak
+  under half a move's (0.32) and its mean level 2 dB under a move's (-23.3 dBFS), measured in a unit test: reroll peak 0.29, mean -30.5
+  dB; place 0.30, -26.4; hold 0.22, -24.0; sell 0.28, -25.9; XP 0.28, -24.1; level 0.19, -24.1; lock 0.29, -27.9; reveal 0.23, -24.1.
+  Another test checks each pair differs in length or brightness. The old "sell" (two notes) is replaced by the cascade, same play name.
+- **Pressed-down feel:** CSS only (`:active` sinks a button 2 px and shrinks it a hair with a short spring back; Reroll, Buy XP and Lock
+  in sit on a 3 px shadow and drop onto it). The floating gold is `components/FloatGold.tsx`: a box over a square (or a bench slot) with
+  one CSS animation, 1 s, no script per frame; a later round's pawn cash-in ("+5") places it the same way. Buying has none.
+- **The bot** (the numbers are `AUTOCHESS.bot`): places held pieces first (free); buys by weights from its own shop; rerolls (2 gold) at
+  most 4 a round; buys XP (20 gold) only when that gives it a level, or when it has 140 or more (it saves up), at most 3 a round; with its
+  board full holds a non-pawn at 50% a look, at most 2 a round; adjusts with a small engine search (1500 nodes, at most 16 tries, 3 random
+  squares per piece). Simulated over 400 matches of 8 rounds without fights (the bot alone, with the income): round 1 it has 4.1 pieces
+  on the board (level 4.4), round 4 5.5 (level 5.9), round 8 7.2 (level 7.6), a bench of 0.35 pieces, and it ends round 8 with about 260
+  gold unspent: it is limited by its level, as a player is, and is beatable by one who levels. With the real engine, 24 setups: the bot
+  changes a piece in 10 of them, 17 searches and 183 ms an adjust on this machine (the step is 5 s).
+- **CI:** the numbers are in `packages/core/src/settings.ts` (a shared path in `e2e/areas.json`), and `sound.ts` is shared too, so this
+  PR runs the whole e2e suite.
+- **Seeds in the e2e file** are listed at its top (the shop and the kings from `?seed=N`, the bot's lock-in time from its own draw).
+- **One slow request is not a game bug:** once, a first request to the local server took 5.4 s (`/api/status`, then
+  `/api/auth/config`, which the screen waits for) and the test's 5 s check gave up; it passed on its re-run. The timeout was not
+  lengthened.
+
+**Player-visible text** (exact; old → new where it changed)
+- The buy step's line: "Tap an offer to buy it: it lands on its square. Drag one to the bench to hold it." (was "Tap a piece to buy it. Drag it onto your half, or tap a square."). Locked in: "You're locked in. Your board, bench and shop are frozen until the step ends." (unchanged).
+- The timer's labels: "Buy" (was "Buy & place"), "Locked", "Locked in", "Move" (was "Move & drop"), "Fight", "Round over", "Match over".
+- Offers: "Bishop c2" under the piece and price; short reasons "No gold", "Level full" (was "Board full"), "Bench full", "Taken", "Max 1", "Max 8", "Too many", "Locked".
+- Lines: "Not enough gold: a rook costs 50 and you have 10.", "Your level allows 4 pieces on the board. Buy XP to level up." (was "Your board is full: 10 pieces and your king at most."; on an offer: + " Drag the offer to the bench to hold it."), "Your bench is full: 4 pieces at most. Place or sell one first." (was "Your bench is full. Place or sell a piece first."), "b4 is taken.", "c2 is your king's square.", "One queen at most." (was "One queen a round."), "8 pawns at most.", "Another offer was on b4: it rolled again.", "Held the rook for b4. Tap it on the bench to place it.".
+- Reroll and XP: "Reroll 2" (was "Reroll 5"), "Buy XP 20", "Not enough gold: a reroll costs 2 and you have 0.", "Not enough gold: 4 XP cost 20 and you have 10.", "You are at the top level, 10.", "Level 5: your board may hold 5 pieces.", "Bought 4 XP.".
+- Selling: "Queen selected. Tap Sell to sell it for 67." (was 81 at 90%), "Sell 67", "Sold the queen for 67.", "Drop to sell for 67", "Drop to hold it for 50", the floating "+67".
+- Strips: "Bot" (was "Opponent"), your account's name (was "You"), "Lv 4 · 2/4 XP", "Lv 10 · max", "HP", "Gold", "Income +100", "Locked in".
+- Adjust: "Move one piece to any empty square of your half. Tap a piece, then a square." (was "One move and one drop (25 gold). Tap a piece, then a square."), "Their pieces stay shown; yours stay hidden until the fight. Tap ↩ to take your move back." (was "... Tap ↩ to take a change back. Bench pieces left over are refunded."), "Your opponent is moving their pieces…", "You've made your move. Tap the piece you moved (↩) to take it back.", "Pick one of your pieces.", "Your king stays where the game put it.", "Pieces go on your half of the board.", "That's your king's square.", "That square is taken.", "Pawns can't stand on your back rank.", "3 pawns a file at most." (was, for a piece that can't go there: "That piece can't move there: one chess move, onto an empty square of your half.").
+- Gone (they went with v5's drop, auto-drop and pawn pick-up): "You've made your drop. Tap the piece you dropped (↩) to take it back.", "Not enough gold: a drop costs 25 and you have N.", "Pick a piece from your bench.", "3 bench pieces dropped onto your board.", "This pawn can't move again. You can still sell it.".

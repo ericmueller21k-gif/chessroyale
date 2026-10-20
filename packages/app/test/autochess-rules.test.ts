@@ -30,7 +30,7 @@ import {
   squareBlock,
   usableSquares,
 } from "../src/autochess/army.ts";
-import { adjustBlock, adjustMarks, adjustMove, adjustTargets, adjustWords, movesUsed, startAdjust, undoAction, undoBlock, undoWords } from "../src/autochess/adjust.ts";
+import { adjustBlock, adjustMarks, adjustMove, adjustTargets, adjustWords, movesUsed, startAdjust, stepAfterBuy, undoAction, undoBlock, undoWords } from "../src/autochess/adjust.ts";
 import { armiesFen, fightStart, material, piecesOn } from "../src/autochess/position.ts";
 import type { Army, Kind, Offer } from "../src/autochess/types.ts";
 
@@ -350,6 +350,13 @@ describe("auto chess: the adjust step (v6): one change, any legal empty square o
     expect(adjustMarks(chain)).toEqual([{ square: "a4", action: "move" }]);
     expect(undoBlock(chain, "a3")).toBe("none");
     expect(undoWords("needed")).toBe("Take back your other move first.");
+  });
+
+  it("the step can be turned off: with `adjustStep` false the buy step leads straight to the fight, with it on to the adjust step; 5 seconds long", () => {
+    expect(AUTOCHESS.adjustStep).toBe(true);
+    expect(AUTOCHESS.adjustSeconds).toBe(5);
+    expect(stepAfterBuy()).toBe("adjust");
+    expect(stepAfterBuy({ ...AUTOCHESS, adjustStep: false })).toBe("fight");
   });
 
   it("the position after the change is always a legal army: the pawn and piece limits hold, whatever is moved where (a fuzz of a few hundred changes)", () => {

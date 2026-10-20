@@ -2685,9 +2685,10 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
 
 /**
  * Auto chess, the demo (Oct 19, 2026; docs/decisions/2026-10-19-autochess-demo.md): you and a bot buy pieces with gold
- * (the king is placed by the game), scout, nudge your pieces once, and the engine plays the position out for both sides.
- * Every number is here so it can be tuned after Eric plays it ("we're just testing this thing"). Nothing carries over
- * between rounds but gold, HP and the win streak (design v4): each round starts with only the two kings.
+ * (the shop offers each a piece and a square of your half; the king is placed by the game), scout, move one piece once, and the
+ * engine plays the position out for both sides. Every number is here so it can be tuned after Eric plays it ("we're just
+ * testing this thing"). Nothing carries over between rounds but gold, HP, the win streak, each side's bench and its level and
+ * XP (design v4 and v6): each round starts with only the two kings on the boards.
  */
 export interface AutoChessSettings {
   /** What each piece costs in the shop (a pawn 10 ... a queen 90: the chess value times ten, a bishop a little over a knight). */

@@ -16,6 +16,9 @@ export function adjustTargets(army: Army, from: string, cfg: AutoChessSettings =
   return halfSquares(army.color).filter((sq) => sq !== from && !squareBlock(army, kind, sq, from, cfg));
 }
 
+/** Where the buy step leads: the adjust step, or (with the step turned off, `adjustStep` false) straight to the fight. */
+export const stepAfterBuy = (cfg: AutoChessSettings = AUTOCHESS): "adjust" | "fight" => (cfg.adjustStep ? "adjust" : "fight");
+
 /** One thing done in the adjust step: a piece moved. */
 export type AdjustAction = { type: "move"; from: string; to: string };
 

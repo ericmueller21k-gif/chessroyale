@@ -9,7 +9,7 @@ import { cellOf, dragStarted, squareAtPoint } from "../board/logic.ts";
 import { play, unlockAudio, warmSounds } from "../sound.ts";
 import { FLOAT_MS, FloatGold, type FloatAt } from "../components/FloatGold.tsx";
 import { testParams } from "../test-switches.ts";
-import { adjustBlock, adjustMarks, adjustMove, adjustTargets, adjustWords, movesUsed, startAdjust, undoAction, undoBlock, undoWords, type Adjusted } from "../autochess/adjust.ts";
+import { adjustBlock, adjustMarks, adjustMove, adjustTargets, adjustWords, movesUsed, startAdjust, stepAfterBuy, undoAction, undoBlock, undoWords, type Adjusted } from "../autochess/adjust.ts";
 import { botAdjust, botPlan } from "../autochess/bot.ts";
 import { buyBlock, buyWords, carryBench, emptyArmy, heldBlock, heldWords, holdBlock, kingSquares, offerLabel, placeHeld, priceOf, sellHeld, sellPiece, sellValue } from "../autochess/army.ts";
 import {
@@ -292,7 +292,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     // The bot adjusts out of sight, from your army as it stood when it locked, and its change shows at the fight.
     const run: BotRun = { stop: false, done: null, latest: botStart };
     botRun.current = run;
-    if (!cfg.adjustStep) {
+    if (stepAfterBuy(cfg) === "fight") {
       void toFight();
       return;
     }
@@ -731,7 +731,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const hint =
     g.phase === "buy"
       ? youLocked
-        ? "You're locked in. Your board and shop are frozen until the step ends."
+        ? "You're locked in. Your board, bench and shop are frozen until the step ends."
         : "Tap an offer to buy it: it lands on its square. Drag one to the bench to hold it."
       : g.phase === "adjust"
         ? "Move one piece to any empty square of your half. Tap a piece, then a square."
