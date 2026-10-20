@@ -90,13 +90,25 @@ export function buyWords(block: BuyBlock, kind: Kind, gold: number, cfg: AutoChe
 /** How many pieces stand on the board (the king not counted). */
 export const boardCount = (army: Army) => Object.keys(army.board).length;
 
-export type PlaceBlock = "half" | "king" | "taken" | "limit" | "backrank" | "file";
+export type PlaceBlock = "fixed" | "half" | "king" | "taken" | "limit" | "backrank" | "file";
+
+/** A pawn on this square has had its one pick-up: it can't be moved again (selling it is still allowed). */
+export const pawnFixed = (army: Army, square: string) => army.board[square] === "p" && !!army.fixed?.includes(square);
+/** The pawn in this bench slot has had its one pick-up: its next placement is final. */
+export const benchFixed = (army: Army, index: number) => !!army.benchFixed?.includes(index);
+
+/** The army with these marks (a key only when it has something, so plain armies stay plain). */
+function marked(army: Army, fixed: string[], benchFixedSlots: number[]): Army {
+  const { fixed: _f, benchFixed: _b, ...rest } = army;
+  return { ...rest, ...(fixed.length ? { fixed } : {}), ...(benchFixedSlots.length ? { benchFixed: benchFixedSlots } : {}) };
+}
 
 /**
  * Why `kind` can't stand on `square` of this army's half now, or null. `from`: the square it's moving from (so a pawn
  * moving along its own file isn't counted twice, and a piece already on the board doesn't count against the board's limit).
  */
 export function placeBlock(army: Army, kind: Kind, square: string, from?: string, cfg: AutoChessSettings = AUTOCHESS): PlaceBlock | null {
+  if (from !== undefined && pawnFixed(army, from)) return "fixed";
   if (!inHalf(square, army.color)) return "half";
   if (square === army.king) return "king";
   if (army.board[square] && square !== from) return "taken";
@@ -111,6 +123,8 @@ export function placeBlock(army: Army, kind: Kind, square: string, from?: string
 
 export function placeWords(block: PlaceBlock, cfg: AutoChessSettings = AUTOCHESS): string {
   switch (block) {
+    case "fixed":
+      return "This pawn can't move again. You can still sell it.";
     case "half":
       return "Pieces go on your half of the board.";
     case "king":
@@ -129,22 +143,28 @@ export function placeWords(block: PlaceBlock, cfg: AutoChessSettings = AUTOCHESS
 /** Buys a piece onto the bench (the caller checked `buyBlock`). */
 export const buy = (army: Army, kind: Kind): Army => ({ ...army, bench: [...army.bench, kind] });
 
-/** Puts the bench piece at `index` on `square` (the caller checked `placeBlock`). */
+/** The bench slots' marks after slot `index` leaves the bench (the later slots move up). */
+const afterLeaving = (slots: readonly number[] | undefined, index: number) => (slots ?? []).filter((i) => i !== index).map((i) => (i > index ? i - 1 : i));
+
+/** Puts the bench piece at `index` on `square` (the caller checked `placeBlock`). A pawn that had been picked up is final there. */
 export function placeFromBench(army: Army, index: number, square: string): Army {
   const kind = army.bench[index]!;
-  return { ...army, board: { ...army.board, [square]: kind }, bench: army.bench.filter((_, i) => i !== index) };
+  const next = { ...army, board: { ...army.board, [square]: kind }, bench: army.bench.filter((_, i) => i !== index) };
+  return marked(next, benchFixed(army, index) ? [...(army.fixed ?? []), square] : (army.fixed ?? []), afterLeaving(army.benchFixed, index));
 }
 
-/** Moves a piece already on the board to another square of the half. */
+/** Moves a piece already on the board to another square of the half (the caller checked `placeBlock`). A pawn's move is its one pick-up: it is final there. */
 export function moveOnBoard(army: Army, from: string, to: string): Army {
   const { [from]: kind, ...rest } = army.board;
-  return { ...army, board: { ...rest, [to]: kind! } };
+  const fixed = (army.fixed ?? []).filter((sq) => sq !== from);
+  return marked({ ...army, board: { ...rest, [to]: kind! } }, kind === "p" ? [...fixed, to] : fixed, army.benchFixed ?? []);
 }
 
-/** Takes a piece off the board onto the bench (the caller checked there is room). */
+/** Takes a piece off the board onto the bench (the caller checked there is room and, for a pawn, that it wasn't final). A pawn's next placement is final. */
 export function toBench(army: Army, from: string): Army {
   const { [from]: kind, ...rest } = army.board;
-  return { ...army, board: rest, bench: [...army.bench, kind!] };
+  const slots = army.benchFixed ?? [];
+  return marked({ ...army, board: rest, bench: [...army.bench, kind!] }, (army.fixed ?? []).filter((sq) => sq !== from), kind === "p" ? [...slots, army.bench.length] : slots);
 }
 
 /**
@@ -184,10 +204,10 @@ export function autoDrop(army: Army, cfg: AutoChessSettings = AUTOCHESS): { army
 export function sellPiece(army: Army, at: { bench: number } | { square: string }, cfg: AutoChessSettings = AUTOCHESS): { army: Army; gold: number } {
   if ("bench" in at) {
     const kind = army.bench[at.bench]!;
-    return { army: { ...army, bench: army.bench.filter((_, i) => i !== at.bench) }, gold: sellValue(kind, cfg) };
+    return { army: marked({ ...army, bench: army.bench.filter((_, i) => i !== at.bench) }, army.fixed ?? [], afterLeaving(army.benchFixed, at.bench)), gold: sellValue(kind, cfg) };
   }
   const { [at.square]: kind, ...rest } = army.board;
-  return { army: { ...army, board: rest }, gold: sellValue(kind!, cfg) };
+  return { army: marked({ ...army, board: rest }, (army.fixed ?? []).filter((sq) => sq !== at.square), army.benchFixed ?? []), gold: sellValue(kind!, cfg) };
 }
 
 /** The pieces standing on the board, in a steady order (square names sorted). */

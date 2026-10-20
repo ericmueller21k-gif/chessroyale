@@ -117,6 +117,12 @@ export function botPlan(
   return { events, army, spent: events.reduce((s, e) => s + e.price, 0), lockAt };
 }
 
+/** What you see of the bot's board while buying: its pawns as real pawns, every other piece as a plain circle (until the reveal). */
+export function botShown(squares: Record<string, Kind>): { pawns: string[]; circles: string[] } {
+  const entries = Object.entries(squares);
+  return { pawns: entries.filter(([, k]) => k === "p").map(([sq]) => sq), circles: entries.filter(([, k]) => k !== "p").map(([sq]) => sq) };
+}
+
 /** What the bot has done by `seconds` into the step: the pieces on the board and the gold it has spent. */
 export function botAt(events: readonly BotEvent[], seconds: number): { squares: Record<string, Kind>; spent: number } {
   const squares: Record<string, Kind> = {};

@@ -16,6 +16,12 @@ export interface Army {
   king: string;
   board: Record<string, Kind>;
   bench: Kind[];
+  /**
+   * Each pawn may be picked up once while buying (v5): after that its next placement is final (it can still be sold). The
+   * board squares of the pawns that are final now, and the bench slots whose pawn's next placement is. Left out when empty.
+   */
+  fixed?: string[];
+  benchFixed?: number[];
 }
 
 export const other = (c: Color): Color => (c === "w" ? "b" : "w");

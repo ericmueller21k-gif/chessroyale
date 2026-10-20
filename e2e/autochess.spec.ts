@@ -253,9 +253,9 @@ test("buy to the bench, place by tap and by drag, sell for 90% by drag and by ta
   await expect(page.locator(".ac-msg")).toContainText("Your bench is full. Place or sell a piece first.");
   expect(await goldOf(page)).toBe(15);
 
-  // The opponent's pieces show as plain circles, behind; no real black piece but the king until the reveal.
+  // The opponent's pieces show behind: pawns as real pawns, the rest as plain circles; no other real black piece but the king until the reveal.
   await expect.poll(() => page.locator(".ac-circle").count()).toBeGreaterThan(0);
-  await expect(page.locator(`${BOARD_SEL.piece}.black`)).toHaveCount(1);
+  await expect(page.locator(`${BOARD_SEL.piece}.black:not(.pawn):not(.king)`)).toHaveCount(0);
   expect(await botGold(page)).toBeLessThan(100);
 
   // The last 2 seconds are locked: "Locked" on the timer, and nothing is bought, sold or moved.
@@ -458,6 +458,92 @@ test("auto-drop stops at 8 on the board: two more on the bench stay there (the o
   expect(errors).toEqual([]);
 });
 
+test("the opponent's pawns show as real pawns while you buy (2 s behind), their other pieces as circles until the reveal", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/autochess?quick=1&seed=9");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  // Both kinds show up: a real black pawn, and a circle for something else.
+  await expect.poll(() => page.locator(`${BOARD_SEL.piece}.black.pawn`).count(), { timeout: 6000 }).toBeGreaterThan(0);
+  await expect.poll(() => page.locator(".ac-circle").count(), { timeout: 6000 }).toBeGreaterThan(0);
+  // No circle sits on a pawn, and no black piece but a pawn and the king is drawn for real.
+  const clash = await page.locator(".ac-circle").evaluateAll((els) => els.filter((e) => document.querySelector(`piece.black.pawn[data-square="${e.getAttribute("data-square")}"]`)).length);
+  expect(clash).toBe(0);
+  await expect(page.locator(`${BOARD_SEL.piece}.black:not(.pawn):not(.king)`)).toHaveCount(0);
+  const pawns = await page.locator(`${BOARD_SEL.piece}.black.pawn`).count();
+  const circles = await page.locator(".ac-circle").count();
+  // The reveal shows everything for real: the circles go, and each shows its piece (the pawns stayed where they were).
+  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
+  await expect(page.locator(".ac-circle")).toHaveCount(0);
+  expect(await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count()).toBeGreaterThanOrEqual(pawns + circles);
+  expect(errors).toEqual([]);
+});
+
+test("a pawn can be picked up once: its next placement is final, with a plain line when it is tapped; it can still be sold; other pieces move freely", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  // (The full 30 s step: plenty of time for all the taps.)
+  await page.goto("/autochess?seed=1866");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const sq = await freeSquares(page, [3]);
+  const [s1, s2, s3, s4] = [sq[0]!, sq[1]!, sq[2]!, sq[3]!];
+  const line = "This pawn can't move again. You can still sell it.";
+  await tap(page, buyPiece(page, "pawn"));
+  await tap(page, buyPiece(page, "pawn"));
+  await tap(page, buyPiece(page, "knight"));
+  // The first placement is free; the pawn can then be moved once: moved to s2, it is final there (a dot marks it).
+  await tap(page, benchPieces(page).first());
+  await tapSquare(page, s1);
+  await expect(page.locator(".ac-fixed")).toHaveCount(0);
+  await tapSquare(page, s1);
+  await tapSquare(page, s2);
+  await expect(piece(page, "white", "pawn", s2)).toBeVisible();
+  await expect(piece(page, "white", "pawn", s1)).toHaveCount(0);
+  await expect(page.locator(`.ac-fixed[data-square="${s2}"]`)).toHaveCount(1);
+  // Tapped, it says so (and offers the sale), shows no squares to go to, and a tap on another square doesn't move it.
+  await tapSquare(page, s2);
+  await expect(page.locator(".ac-msg")).toContainText(line);
+  await expect(page.getByRole("button", { name: "Sell 9", exact: true })).toBeVisible();
+  await expect(page.locator(".ac-dot")).toHaveCount(0);
+  await tapSquare(page, s3);
+  await expect(page.locator(".ac-msg")).toContainText(line);
+  await expect(piece(page, "white", "pawn", s2)).toBeVisible();
+  await expect(piece(page, "white", "pawn", s3)).toHaveCount(0);
+  // Nor to the bench by a drag.
+  const bench = (await page.locator(".ac-bench").boundingBox())!;
+  await dragMouse(page, await center(page, s2), { x: bench.x + bench.width / 2, y: bench.y + bench.height / 2 });
+  await expect(piece(page, "white", "pawn", s2)).toBeVisible();
+  await expect(page.locator(".ac-msg")).toContainText(line);
+  // The other way round: the second pawn placed, then picked up to the bench; its next placement is final.
+  await tap(page, benchPieces(page).first());
+  await tapSquare(page, s3);
+  await dragMouse(page, await center(page, s3), { x: bench.x + bench.width / 2, y: bench.y + bench.height / 2 });
+  await expect(piece(page, "white", "pawn", s3)).toHaveCount(0);
+  await expect(page.locator(".ac-slot.fixed")).toHaveCount(1);
+  await tap(page, page.locator(".ac-slot.has", { has: page.locator("piece.pawn") }));
+  await tapSquare(page, s4);
+  await expect(piece(page, "white", "pawn", s4)).toBeVisible();
+  await expect(page.locator(`.ac-fixed[data-square="${s4}"]`)).toHaveCount(1);
+  await tapSquare(page, s4);
+  await expect(page.locator(".ac-msg")).toContainText(line);
+  // It can still be sold: 90% of 10.
+  const gold = await goldOf(page);
+  await tap(page, page.getByRole("button", { name: "Sell 9", exact: true }));
+  await expect(piece(page, "white", "pawn", s4)).toHaveCount(0);
+  expect(await goldOf(page)).toBe(gold + 9);
+  await expect(page.locator(`.ac-fixed[data-square="${s4}"]`)).toHaveCount(0);
+  // Other pieces move freely: the knight, placed and moved three times.
+  const knightSqs = [s1, s3, s4, s1];
+  await tap(page, benchPieces(page).first());
+  await tapSquare(page, knightSqs[0]!);
+  for (let i = 1; i < knightSqs.length; i++) {
+    await tapSquare(page, knightSqs[i - 1]!);
+    await tapSquare(page, knightSqs[i]!);
+    await expect(piece(page, "white", "knight", knightSqs[i]!)).toBeVisible();
+  }
+  await expect(page.locator(".ac-msg")).not.toContainText(line);
+  expect(errors).toEqual([]);
+});
+
 test("a drag with a finger: a bench piece onto the board and a placed piece back to the bench", async ({ page }) => {
   test.skip(!phone(), "real touch events, as a phone makes them");
   const errors = watchErrors(page);
@@ -498,13 +584,14 @@ test("the reveal: their real pieces show, stay shown through the adjust step; on
   // Circles first (where, not what), over the 30 (here 6) seconds; the last ones come a moment after the bot is done.
   await expect.poll(() => page.locator(".ac-circle").count(), { timeout: 15_000 }).toBeGreaterThan(2);
   const circles = await page.locator(".ac-circle").count();
-  await expect(page.locator(`${BOARD_SEL.piece}.black`)).toHaveCount(1);
+  const pawnsSeen = await page.locator(`${BOARD_SEL.piece}.black.pawn`).count();
+  await expect(page.locator(`${BOARD_SEL.piece}.black:not(.pawn):not(.king)`)).toHaveCount(0);
   // The reveal: their real pieces, kept shown as they were when it locked (the circles' squares hold real pieces).
   await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
   await expect(page.locator(".ac-theirs-line")).toHaveText("Your opponent is moving their pieces…");
   await expect(page.locator(".ac-circle")).toHaveCount(0);
   const theirs = await page.locator(`${BOARD_SEL.piece}.black`).count();
-  expect(theirs).toBeGreaterThanOrEqual(circles + 1);
+  expect(theirs).toBeGreaterThanOrEqual(circles + pawnsSeen + 1);
   // (The line is plain: no blur over their half.)
   expect(await page.locator(".ac-theirs-line").evaluate((el) => getComputedStyle(el).filter + getComputedStyle(el).backdropFilter)).toBe("nonenone");
   await expect(page.locator(".ac-clock span")).toHaveText("Move your pieces");

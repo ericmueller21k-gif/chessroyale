@@ -3,6 +3,7 @@ import { AUTOCHESS } from "@chessroyale/core";
 import { stockfishRefuses } from "@chessroyale/chess";
 import {
   autoDrop,
+  benchFixed,
   boardCount,
   boardPieces,
   buy,
@@ -17,6 +18,7 @@ import {
   legalCounts,
   moveOnBoard,
   owned,
+  pawnFixed,
   placeBlock,
   placeFromBench,
   placeWords,
@@ -233,6 +235,88 @@ describe("auto chess: the board limit and the bench's auto-drop (v5)", () => {
     const out = autoDrop(army("w", "e1", nine, ["n", "b", "q"]), { ...AUTOCHESS, autoDropTo: 20 });
     expect(boardCount(out.army)).toBe(10);
     expect(out.army.bench).toEqual(["b", "q"]);
+  });
+});
+
+describe("auto chess: a pawn is picked up once (v5)", () => {
+  it("a placed pawn may be picked up once: wherever it goes (another square, or the bench and later a square) its next placement is final", () => {
+    // Placed from the bench the first time: free to be picked up.
+    let a = placeFromBench(army("w", "e1", {}, ["p"]), 0, "a3");
+    expect(a).toEqual({ color: "w", king: "e1", board: { a3: "p" }, bench: [] });
+    expect(pawnFixed(a, "a3")).toBe(false);
+    expect(placeBlock(a, "p", "b3", "a3")).toBeNull();
+    // Moved to another square: final there.
+    a = moveOnBoard(a, "a3", "b3");
+    expect(pawnFixed(a, "b3")).toBe(true);
+    expect(a.fixed).toEqual(["b3"]);
+    expect(placeBlock(a, "p", "c3", "b3")).toBe("fixed");
+    expect(placeBlock(a, "p", "b4", "b3")).toBe("fixed");
+    // The other way: picked up to the bench, its next placement is final.
+    let b = placeFromBench(army("w", "e1", {}, ["p", "n"]), 0, "a3");
+    b = toBench(b, "a3");
+    expect(b.bench).toEqual(["n", "p"]);
+    expect(b.benchFixed).toEqual([1]);
+    expect(benchFixed(b, 1)).toBe(true);
+    expect(benchFixed(b, 0)).toBe(false);
+    b = placeFromBench(b, 1, "c3");
+    expect(b.board.c3).toBe("p");
+    expect(pawnFixed(b, "c3")).toBe(true);
+    expect(b.benchFixed).toBeUndefined();
+    expect(placeBlock(b, "p", "d3", "c3")).toBe("fixed");
+    // Slots that move up keep their mark: two pawns used their pick-up, the first leaves the bench.
+    let c = army("w", "e1", {}, ["p", "p"]);
+    c = placeFromBench(placeFromBench(c, 0, "a3"), 0, "b3");
+    c = toBench(toBench(c, "a3"), "b3");
+    expect(c.benchFixed).toEqual([0, 1]);
+    c = placeFromBench(c, 0, "d3");
+    expect(c.benchFixed).toEqual([0]);
+    expect(pawnFixed(c, "d3")).toBe(true);
+    expect(benchFixed(c, 0)).toBe(true);
+    // A pawn bought later is fresh.
+    expect(benchFixed(buy(c, "p"), 1)).toBe(false);
+  });
+
+  it("a fixed pawn can still be sold (on the board or on the bench), and a sold pawn's mark goes with it", () => {
+    let a = moveOnBoard(placeFromBench(army("w", "e1", {}, ["p"]), 0, "a3"), "a3", "b3");
+    const sold = sellPiece(a, { square: "b3" });
+    expect(sold.gold).toBe(9);
+    expect(sold.army).toEqual(army("w", "e1"));
+    expect(sold.army.fixed).toBeUndefined();
+    // On the bench: the mark of the slot leaves with the pawn; another slot's mark moves up.
+    a = army("w", "e1", {}, ["p", "p"]);
+    a = toBench(toBench(placeFromBench(placeFromBench(a, 0, "a3"), 0, "b3"), "b3"), "a3");
+    expect(a.benchFixed).toEqual([0, 1]);
+    const out = sellPiece(a, { bench: 0 }).army;
+    expect(out.bench).toEqual(["p"]);
+    expect(out.benchFixed).toEqual([0]);
+    // Selling a pawn on the board that isn't fixed leaves the other fixed pawns' marks.
+    const two = placeFromBench(moveOnBoard(placeFromBench(army("w", "e1", {}, ["p", "p"]), 0, "a3"), "a3", "c3"), 0, "d3");
+    expect(two.fixed).toEqual(["c3"]);
+    expect(sellPiece(two, { square: "d3" }).army.fixed).toEqual(["c3"]);
+  });
+
+  it("other pieces move freely, as often as you like", () => {
+    let a = placeFromBench(army("w", "e1", {}, ["n", "r"]), 0, "b3");
+    for (const to of ["c3", "d3", "e3", "b3", "f3"]) {
+      expect(placeBlock(a, "n", to, Object.keys(a.board).find((sq) => a.board[sq] === "n"))).toBeNull();
+      a = moveOnBoard(a, Object.keys(a.board).find((sq) => a.board[sq] === "n")!, to);
+    }
+    a = toBench(a, "f3");
+    a = placeFromBench(a, 1, "a1");
+    expect(a.fixed).toBeUndefined();
+    expect(a.benchFixed).toBeUndefined();
+    expect(a.board).toEqual({ a1: "n" });
+  });
+
+  it("a moved-then-final pawn still counts for the file rule; the auto-drop places a bench-fixed pawn for good", () => {
+    const a = army("w", "e1", {}, ["p", "p"]);
+    const used = toBench(moveOnBoard(placeFromBench(a, 0, "a3"), "a3", "b3"), "b3");
+    expect(used.benchFixed).toEqual([1]);
+    const out = autoDrop(used).army;
+    expect(Object.keys(out.board).sort()).toEqual(["a3", "b3"]);
+    expect(out.fixed).toHaveLength(1);
+    expect(pawnFixed(out, "b3") || pawnFixed(out, "a3")).toBe(true);
+    expect(placeWords("fixed")).toBe("This pawn can't move again. You can still sell it.");
   });
 });
 

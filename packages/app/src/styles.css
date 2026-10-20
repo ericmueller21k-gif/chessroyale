@@ -17735,6 +17735,25 @@ button.sq-tiny {
 .ac-picked {
   background: var(--sq-select);
 }
+/* A pawn that has had its one pick-up (it can't move again): a small gold dot in its corner; the same on a bench slot whose pawn's next placement is final. */
+.ac-fixed::after,
+.ac-slot.fixed::after {
+  content: "";
+  position: absolute;
+  right: 12%;
+  bottom: 12%;
+  width: 16%;
+  height: 16%;
+  min-width: 6px;
+  min-height: 6px;
+  border-radius: 50%;
+  background: var(--fd-gold);
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.45);
+}
+.ac-slot.fixed::after {
+  right: 6px;
+  bottom: 6px;
+}
 .ac-dot::after {
   content: "";
   position: absolute;
@@ -17819,6 +17838,7 @@ button.sq-tiny {
   touch-action: none;
 }
 .ac-slot {
+  position: relative;
   min-width: 0;
   padding: 0;
   border: 1px dashed var(--fd-line);

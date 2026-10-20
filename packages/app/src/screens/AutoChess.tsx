@@ -7,14 +7,16 @@ import { cellOf, dragStarted, squareAtPoint } from "../board/logic.ts";
 import { play } from "../sound.ts";
 import { testParams } from "../test-switches.ts";
 import { adjustBlock, adjustMove, adjustTargets, adjustWords, startAdjust, undoBlock, undoMove, type Adjusted } from "../autochess/adjust.ts";
-import { botAdjust, botAt, botPlan } from "../autochess/bot.ts";
+import { botAdjust, botAt, botPlan, botShown } from "../autochess/bot.ts";
 import {
   autoDrop,
+  benchFixed,
   buyBlock,
   buyWords,
   emptyArmy,
   kingSquares,
   moveOnBoard,
+  pawnFixed,
   placeBlock,
   placeFromBench,
   placeWords,
@@ -389,6 +391,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if ("shop" in target) return sell(hold);
     if ("bench" in target) {
       if (!isSquare(hold)) return;
+      if (pawnFixed(army, hold.at.square)) return say(placeWords("fixed", cfg));
       if (army.bench.length >= cfg.benchSlots) return say(buyWords("bench", hold.kind, 0).line);
       withArmy(toBench(army, hold.at.square));
       setSel(null);
@@ -456,7 +459,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if (phase === "adjust" && isSquare(hold) && gref.current.round.adj?.moved[hold.at.square] !== undefined) return takeBack(hold.at.square);
     if (sameHold(selRef.current, hold)) return setSel(null);
     setSel(hold);
-    if (phase === "buy") say(`${KIND_NAME[hold.kind as Kind][0]!.toUpperCase()}${KIND_NAME[hold.kind as Kind].slice(1)} picked up. Tap a square of your half to place it.`);
+    if (phase === "buy") {
+      // (A pawn that has had its one pick-up stays where it is; selling it is still allowed.)
+      if (isSquare(hold) && pawnFixed(gref.current.round.you, hold.at.square)) return say(placeWords("fixed", cfg));
+      say(`${KIND_NAME[hold.kind as Kind][0]!.toUpperCase()}${KIND_NAME[hold.kind as Kind].slice(1)} picked up. Tap a square of your half to place it.`);
+    }
   }
 
   function tapSquare(square: string) {
@@ -551,13 +558,15 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const botKing = g.round.plan.army.king;
   const delayed = Math.max(0, elapsed / 1000 - cfg.circlesDelaySeconds);
   const seen = g.phase === "buy" ? botAt(g.round.plan.events, delayed) : null;
+  // While buying you see their pawns as pawns, 2 s behind; every other piece is a plain circle until the reveal.
+  const shown = seen ? botShown(seen.squares) : { pawns: [], circles: [] };
 
   let fen: string;
   let lastMove: string | null = null;
   if ((g.phase === "fight" || g.phase === "result" || g.phase === "over") && g.fight) {
     fen = g.fight.fen;
     lastMove = g.fight.last;
-  } else if (g.phase === "buy") fen = fenFrom([...armyPieces(you), { square: botKing, color: theirs, kind: "k" }]);
+  } else if (g.phase === "buy") fen = fenFrom([...armyPieces(you), { square: botKing, color: theirs, kind: "k" }, ...shown.pawns.map((square) => ({ square, color: theirs, kind: "p" as const }))]);
   else fen = mine === "w" ? armiesFen(you, botArmy) : armiesFen(botArmy, you);
 
   const sq = (square: string) => {
@@ -654,7 +663,10 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               onLostPointerCapture={(e) => endPress(e, true)}
             >
               {(g.phase === "buy" || g.phase === "adjust") && <div class="ac-theirs" />}
-              {seen && Object.entries(seen.squares).map(([square]) => <span key={square} class={`ac-circle ${theirs}`} data-square={square} style={sq(square)} />)}
+              {shown.circles.map((square) => (
+                <span key={square} class={`ac-circle ${theirs}`} data-square={square} style={sq(square)} />
+              ))}
+              {g.phase === "buy" && (you.fixed ?? []).map((square) => <span key={square} class="ac-cell ac-fixed" data-square={square} style={sq(square)} />)}
               {held && isSquare(held) && <span class="ac-cell ac-picked" style={sq(held.at.square)} />}
               {dots.map((square) => (
                 <span key={square} class="ac-cell ac-dot" style={sq(square)} />
@@ -692,7 +704,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                   <button
                     key={i}
                     type="button"
-                    class={`ac-slot has${picked ? " picked" : ""}${drag && sameHold(drag, { kind, at: { bench: i } }) ? " lifted" : ""}`}
+                    class={`ac-slot has${picked ? " picked" : ""}${drag && sameHold(drag, { kind, at: { bench: i } }) ? " lifted" : ""}${benchFixed(g.round.you, i) ? " fixed" : ""}`}
                     aria-label={`Bench: ${KIND_NAME[kind]}`}
                     aria-pressed={picked}
                     onPointerDown={(e) => slotDown(e, i, kind)}
