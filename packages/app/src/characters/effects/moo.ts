@@ -14,9 +14,17 @@
  *             hit    (ends on hold's first look, 240 ms, cue `hit`: the flash) it lands: a white flash over the square
  *                    (the piece still shows through at the edges), a ring of light spreading, sparkles flying.
  *             hold   (loop, 3 frames, 680 ms) what stays through the crowd's turn: the shaft thin and faint, the square
- *                    softly lit with a bright blue edge and a little crescent in its corner (this is the stunned mark: the
- *                    glow and the crescent are the whole of it); everything in it is see-through, so the piece shows.
+ *                    softly lit with a bright blue edge; everything in it is see-through, so the piece shows. It goes with
+ *                    `scorch` (below), which is the stunned mark.
  *             fade   (ends empty, 300 ms) the glow thins and goes.
+ *   moonScorch  square  the stunned mark: a crescent moon burned into the square, a charred outline of soot black with a
+ *             faint soot tint inside it, as if the beam had scorched it in. It goes UNDER the piece (draw it under the pieces,
+ *             as Grex's fireShadow): the piece stands on it, and the outline is open in the middle, so nothing is hidden
+ *             even if it is drawn over. Start `burn` when the beam's `hit` lands, then `hold` while the piece is stunned, and
+ *             `fade` with the beam's `fade` at the end.
+ *             burn   (ends on hold's first look, 220 ms, cue `burn`) it scorches in: white-hot, then orange, embers going out.
+ *             hold   (loop, 1000 ms) cold char, an ember or two twinkling in it.
+ *             fade   (ends empty, 320 ms) the scorch thins away.
  *   moonHit   square  hit<H|L><L|R> (ends empty, about 200 ms): the small beam landing on a king's head (high) or a little
  *             lower, from the left or right edge: a flash, a ring of sparkles, motes.
  *
@@ -40,15 +48,12 @@ export const MOON_PALETTE: Record<string, string> = {
   "2": "#b6d6ffa2",
   "3": "#9ec4ff5e",
   "4": "#8db6f532",
-  m: "#f8c744", // the little crescent: its yellow, light and shade
-  n: "#ffe58a",
-  o: "#c9801f",
 };
 
 /** The same palette, every color's see-through by `f` (0 to 1) of what it was, for a glow thinning away. */
-const faded = (f: number): Record<string, string> =>
+const faded = (f: number, pal: Record<string, string> = MOON_PALETTE): Record<string, string> =>
   Object.fromEntries(
-    Object.entries(MOON_PALETTE).map(([k, v]) => {
+    Object.entries(pal).map(([k, v]) => {
       const a = v.length === 9 ? parseInt(v.slice(7), 16) : 255;
       return [k, `${v.slice(0, 7)}${Math.round(a * f).toString(16).padStart(2, "0")}`];
     }),
@@ -81,13 +86,15 @@ interface Beam {
   wave: number;
   /** A faint beam: no white core, no dark outline. */
   faint?: boolean;
+  /** Where the shaft has faded out toward the target, so it doesn't veil the piece standing there. */
+  fadeTo?: number;
 }
 
 /** The shaft as a grid column: layered zones from the core out (white, pale, blue, edge, outline, glow), fading out toward the sky, dithered. */
 function shaft(cv: Canvas, b: Beam): void {
   for (let y = 0; y <= Math.min(TALL - 1, b.front); y++) {
     // Strong at the bottom, fading to nothing over the top 90 pixels of the column; the head is brightest.
-    const sky = clamp(y / 90) ** 0.8;
+    const sky = clamp(y / 90) ** 0.8 * (b.fadeTo ? clamp((b.fadeTo - y) / 14) : 1);
     const toHead = b.front - y;
     const cx = MID + Math.sin(y * 0.16 + b.wave) * (0.3 + 0.8 * (y / TALL));
     const half = b.half * (0.7 + 0.3 * (y / TALL));
@@ -152,7 +159,7 @@ function flash(cv: Canvas, r: number): void {
     }
 }
 
-/** What stays on the square while the piece can't move: a bright blue edge a pixel in, a pale band inside it, a faint tint, a crescent in the corner. */
+/** What stays on the square while the piece can't move: a bright blue edge a pixel in and a pale band inside it (the middle is left clear for the scorch under the piece). */
 function held(cv: Canvas, shimmer: number): void {
   for (let y = SQ0; y < TALL; y++)
     for (let x = 0; x < SQUARE; x++) {
@@ -160,11 +167,7 @@ function held(cv: Canvas, shimmer: number): void {
       if (edgeDist === 0) cv[y]![x] = "e";
       else if (edgeDist === 1) cv[y]![x] = (x + y + shimmer) % 3 === 0 ? "W" : "2";
       else if (edgeDist === 2) cv[y]![x] = "3";
-      else cv[y]![x] = (x + y + shimmer) % 4 === 0 ? "4" : cv[y]![x]!;
     }
-  // The crescent, top right: an outline, a yellow body, a pale light on its upper left.
-  const cres = [".kkk.", "kmnnk", "kmk..", "kmk..", "kmmok", ".kkk."];
-  cres.forEach((row, j) => [...row].forEach((k, i) => (k !== "." ? (cv[SQ0 + 3 + j]![SQUARE - 9 + i] = k) : undefined)));
 }
 
 const beamParts: Record<string, Part> = {};
@@ -191,7 +194,7 @@ beamParts.hit2 = part((cv) => {
 });
 for (const [i, w] of [0, 2.1, 4.2].entries())
   beamParts[`hold${i}`] = part((cv) => {
-    shaft(cv, { front: TALL, core: 0, half: 3.2 + (i % 2) * 0.6, glow: 5, wave: w, faint: true });
+    shaft(cv, { front: TALL, core: 0, half: 3.2 + (i % 2) * 0.6, glow: 5, wave: w, faint: true, fadeTo: SQ0 + 1 });
     held(cv, i);
   });
 
@@ -255,6 +258,96 @@ export const MOONBEAM: Character = {
 /** How long after one beam's `fall` the next starts in the flurry (moo.ts's `beam1` to `beam5` cues are this far apart), and how many there are. */
 export const FLURRY_STAGGER_MS = 120;
 export const FLURRY_BEAMS = 5;
+
+// ---- The scorch: a crescent moon burned into the square, the stunned mark.
+
+export const SCORCH_PALETTE: Record<string, string> = {
+  a: "#15100c", // char: soot black
+  b: "#2b211a", // charcoal, where the char is thin
+  c: "#5a4a3c", // ash at its edge
+  s: "#1a140f3a", // soot, see-through: the tint inside the crescent
+  t: "#1a140f1c", // a smudge of it round the outline
+  f: "#e8540f", // embers: glowing, hot, white-hot
+  g: "#ffb347",
+  h: "#fff2b0",
+};
+
+const nz = (x: number, y: number, k = 0) => {
+  const v = Math.sin(x * 12.9898 + y * 78.233 + k * 37.7) * 43758.5453;
+  return v - Math.floor(v);
+};
+/** The crescent's region: a disc with a bite out of its upper right, its tips pointing up and right (a moon, ☽). */
+const crescent = (x: number, y: number): boolean => Math.hypot(x + 0.5 - 15.2, y + 0.5 - 16.2) <= 14.3 && Math.hypot(x + 0.5 - 21.6, y + 0.5 - 13.4) > 10.3;
+
+/** How far (in pixels) a pixel of the crescent is from outside it (up to 4). */
+const insideDepth = (x: number, y: number): number => {
+  let d = 4;
+  for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (!crescent(x + dx, y + dy)) d = Math.min(d, Math.hypot(dx, dy));
+  return d;
+};
+
+/**
+ * The scorch, `heat` 3 white-hot as it burns in to 0 cold char: a ragged outline of char about three pixels thick
+ * (thicker where the burn took harder), a soot tint inside it, a smudge round it, flecks of ash; the embers in it fade
+ * with the heat.
+ */
+function scorch(heat: 0 | 1 | 2 | 3): Part {
+  const cv = canvas(SQUARE, SQUARE);
+  for (let y = 0; y < SQUARE; y++)
+    for (let x = 0; x < SQUARE; x++) {
+      const n = nz(x, y);
+      if (crescent(x, y)) {
+        const d = insideDepth(x, y);
+        const thick = 2.5 + 1.1 * nz(x >> 1, y >> 1, 3) + (nz(x, y, 5) > 0.93 ? 0.8 : 0);
+        if (d <= thick) {
+          const hot = heat === 3 ? (n > 0.2 ? "h" : "g") : heat === 2 ? (n > 0.55 ? "g" : "f") : heat === 1 && n > 0.86 ? "f" : "";
+          cv[y]![x] = hot || (d > 2 ? "b" : "a");
+        } else cv[y]![x] = "s";
+      }
+    }
+  // A ragged smudge round the outside, and flecks of ash a little further out.
+  const src = cv.map((r) => [...r]);
+  for (let y = 0; y < SQUARE; y++)
+    for (let x = 0; x < SQUARE; x++) {
+      if (src[y]![x] !== ".") continue;
+      let near = 9;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (crescent(x + dx, y + dy)) near = Math.min(near, Math.hypot(dx, dy));
+      if (near <= 1.5 && nz(x, y, 7) > 0.35) cv[y]![x] = "t";
+      else if (near <= 2.3 && nz(x, y, 9) > 0.8) cv[y]![x] = "c";
+    }
+  return { grid: toGrid(cv), outline: false };
+}
+
+/** Embers twinkling in the cold char: a few outline pixels glowing, `i` which frame. */
+const embers = (i: number): Speck[] => {
+  const spots: [number, number][] = [];
+  for (let y = 0; y < SQUARE; y++) for (let x = 0; x < SQUARE; x++) if (crescent(x, y) && insideDepth(x, y) <= 1.5 && nz(x, y, 11 + i) > 0.972) spots.push([x, y]);
+  return spots.slice(0, 4).map(([x, y]): Speck => [x, y, i % 2 ? "g" : "f"]);
+};
+
+const scorchParts: Record<string, Part> = { s3: scorch(3), s2: scorch(2), s1: scorch(1), s0: scorch(0) };
+const sc = (name: string): Layer => ({ part: name, x: 0, y: 0 });
+export const MOON_SCORCH: Character = {
+  id: "moon-scorch",
+  name: "A crescent moon burned into a square",
+  w: SQUARE,
+  h: SQUARE,
+  foot: [16, 31],
+  palette: SCORCH_PALETTE,
+  parts: scorchParts,
+  anims: {
+    burn: {
+      loop: false,
+      frames: [
+        { ms: 60, layers: [sc("s3")], cue: "burn", specks: embers(1) },
+        { ms: 70, layers: [sc("s2")], specks: embers(2) },
+        { ms: 90, layers: [sc("s1")], specks: embers(3) },
+      ],
+    },
+    hold: { loop: true, frames: [{ ms: 500, layers: [sc("s0")], specks: embers(4) }, { ms: 500, layers: [sc("s0")], specks: embers(5) }] },
+    fade: { loop: false, frames: [...[0.7, 0.45, 0.22].map((f): Frame => ({ ms: 80, layers: [sc("s0")], pal: faded(f, SCORCH_PALETTE) })), { ms: 80, layers: [] }] },
+  },
+};
 
 // ---- The small beam landing on a king (his attack on a king).
 

@@ -112,11 +112,20 @@ UFO's tractor beam.
   sky above it (place it with its bottom on the square, let the board clip what's above its top edge; the shaft fades to
   nothing toward its top). `fall` (220 ms, cue `beam`: the sound; a bright head races down the shaft, the shaft ablaze behind it,
   the square's pool of light waking), `hit` (240 ms, cue `hit`: the flash; a white flash over the square with a ring of light
-  and sparkles), `hold` (loop, 680 ms: the shaft thin and faint, the square softly lit with a bright blue edge and a little
-  crescent in its corner), `fade` (300 ms, ends empty).
-- **The stunned mark** is `hold`'s square: the glow, the blue edge and the little crescent. All of it is see-through (a test
-  checks the square's middle has no opaque pixel), so you can see which piece is stunned and what is on it; the held glow
-  was enough, no other mark is drawn.
+  and sparkles), `hold` (loop, 680 ms: the shaft thin and faint, fading out above the square, and the square edged in bright blue), `fade` (300 ms, ends empty).
+- **The stunned mark** is a **crescent moon burned into the square** (`moonScorch`, `MOON_SCORCH`; Eric, Oct 20: the little
+  crescent in the corner "looks odd, not like a moon"): a blackened, charred outline of a crescent about three pixels thick
+  with ragged edges, a see-through soot tint inside it, a smudge round it and flecks of ash, 28 pixels across so it reads as a
+  moon at 40 px squares and at the phone's 320 px board. It goes **under the piece** (draw it under the pieces, as Grex's
+  fireShadow): the piece stands on it, and the outline is open in the middle (a test keeps the middle under 30 per cent
+  opaque), so it hides nothing even if it is drawn over. `burn` (220 ms, cue `burn`) starts at the beam's `hit`: it scorches in
+  white-hot, then orange, the embers going out; `hold` (loop, 1000 ms) is the cold char with an ember or two twinkling;
+  `fade` (320 ms, ends empty) thins it away with the beam's `fade` at the end.
+  **The held glow stays**, lighter: the beam's `hold` is now just the blue edge and the pale band inside it (the faint tint
+  that was inside is gone, and the faint shaft fades out above the square instead of running down over the piece, which
+  had veiled it), all see-through. With the scorch the edge says "stunned" at a glance and the char says why; the middle of
+  the square is left clear for both. `board-art.png` and `burned-moon-before-after.png` show it on a light and a dark square
+  of each scheme.
 - **The flurry** is the same column on five squares: start each one's `fall` `FLURRY_STAGGER_MS` (120) after the last, which is
   how far apart the moon's cues `beam1` to `beam5` are (a test keeps the two equal), let them all reach `hold` together, then play
   every `fade` at once.

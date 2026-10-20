@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { KING_ATTACK, kingAttackHits } from "@chessroyale/chess";
 import { MOO, MOO_ATTACK, MOO_ICONS, MOO_PALETTE, MOO_POWER_PALETTE, mooIconSprite, mooLayers, type MooIconId } from "../src/characters/moo.ts";
-import { FLURRY_BEAMS, FLURRY_STAGGER_MS, MOONBEAM, MOON_HIT } from "../src/characters/effects/moo.ts";
+import { FLURRY_BEAMS, FLURRY_STAGGER_MS, MOONBEAM, MOON_HIT, MOON_SCORCH } from "../src/characters/effects/moo.ts";
 import { frameKeys, renderFrame, type Character } from "../src/characters/sprite.ts";
 
 /**
@@ -134,7 +134,7 @@ describe("Moo's icons", () => {
 });
 
 describe("Moo's board art", () => {
-  for (const [name, ch] of Object.entries({ MOONBEAM, MOON_HIT })) {
+  for (const [name, ch] of Object.entries({ MOONBEAM, MOON_HIT, MOON_SCORCH })) {
     it(`${name}: its colors in its palette, one-shots ending empty`, () => {
       for (const [pn, part] of Object.entries(ch.parts)) for (const row of part.grid) for (const k of row) if (k !== "." && k !== " ") expect(ch.palette, `${pn}: "${k}"`).toHaveProperty(k);
       for (const [an, a] of Object.entries(ch.anims)) {
@@ -142,8 +142,8 @@ describe("Moo's board art", () => {
           expect(renderFrame(ch, f).data.length).toBe(ch.w * ch.h * 4);
           for (const [, , k] of f.specks ?? []) expect(ch.palette, `${an}: "${k}"`).toHaveProperty(k);
         }
-        // (A beam's fall ends on its hit's first look and the hit on the hold's, which the board keeps up.)
-        if (!a.loop && !["fall", "hit"].includes(an)) expect(frameKeys(ch, a.frames.at(-1)!).flat().filter(Boolean), `${an} ends empty`).toEqual([]);
+        // (A beam's fall ends on its hit's first look, the hit and the scorch's burn on the hold's, which the board keeps up.)
+        if (!a.loop && !["fall", "hit", "burn"].includes(an)) expect(frameKeys(ch, a.frames.at(-1)!).flat().filter(Boolean), `${an} ends empty`).toEqual([]);
       }
     });
   }
@@ -155,12 +155,30 @@ describe("Moo's board art", () => {
     expect(MOONBEAM.anims.fall!.frames[0]!.cue).toBe("beam");
     expect(MOONBEAM.anims.hit!.frames[0]!.cue).toBe("hit");
     expect(length(MOONBEAM, "fall")).toBeLessThanOrEqual(240);
-    // The held glow is see-through, so the piece shows: the square's middle (the crescent in its corner aside) has no opaque pixel in it.
+    // The held glow is see-through, so the piece shows: the square's middle has no opaque pixel in it.
     const keys = frameKeys(MOONBEAM, MOONBEAM.anims.hold!.frames[0]!);
     const opaque = (k: string | null | undefined) => !!k && MOONBEAM.palette[k]!.length === 7;
     let solid = 0;
-    for (let y = 224 + 6; y < 256 - 6; y++) for (let x = 6; x < 22; x++) if (opaque(keys[y]![x])) solid++;
+    for (let y = 224 + 6; y < 256 - 6; y++) for (let x = 6; x < 26; x++) if (opaque(keys[y]![x])) solid++;
     expect(solid).toBe(0);
     expect(Object.keys(MOON_HIT.anims).sort()).toEqual(["hitHL", "hitHR", "hitLL", "hitLR"]);
+  });
+
+  it("burns a crescent moon into the square, under the piece: it burns in, holds, and fades away", () => {
+    expect([MOON_SCORCH.w, MOON_SCORCH.h]).toEqual([32, 32]);
+    expect(Object.keys(MOON_SCORCH.anims).sort()).toEqual(["burn", "fade", "hold"]);
+    expect(MOON_SCORCH.anims.hold!.loop).toBe(true);
+    expect(MOON_SCORCH.anims.burn!.frames[0]!.cue).toBe("burn");
+    expect(length(MOON_SCORCH, "burn")).toBeLessThanOrEqual(240);
+    // It is big enough to read as a crescent (a good part of the square), and open in the middle: where a piece stands, most
+    // of it is see-through soot (a faint tint), never opaque char.
+    const keys = frameKeys(MOON_SCORCH, MOON_SCORCH.anims.hold!.frames[0]!);
+    const opaque = (k: string | null | undefined) => !!k && MOON_SCORCH.palette[k]!.length === 7;
+    let all = 0;
+    for (const row of keys) for (const k of row) if (opaque(k)) all++;
+    expect(all).toBeGreaterThan(120);
+    let middle = 0;
+    for (let y = 9; y < 25; y++) for (let x = 11; x < 23; x++) if (opaque(keys[y]![x])) middle++;
+    expect(middle / (16 * 12)).toBeLessThan(0.3);
   });
 });
