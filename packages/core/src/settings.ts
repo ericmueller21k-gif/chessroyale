@@ -2765,9 +2765,16 @@ export interface AutoChessSettings {
     readonly lockFrom: number;
     readonly lockTo: number;
     readonly neverLockChance: number;
+    /** Its shop rerolls (5 gold): at most this many a round, only with this much gold, this often (more often when the shop shows nothing but pawns). */
+    readonly maxRerolls: number;
+    readonly rerollGold: number;
+    readonly rerollChance: number;
+    readonly rerollChanceBare: number;
     readonly saveChance: number;
     readonly adjustTries: number;
     readonly dropTries: number;
+    /** It drops a bench piece when its best drop beats what it has, or when it isn't already winning (its chance under this): the engine's score saturates at 0 and 1. */
+    readonly dropBelow: number;
     readonly adjustDestinations: number;
     readonly adjustNodes: number;
     readonly adjustMargin: number;
@@ -2817,5 +2824,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, saveChance: 0.3, adjustTries: 24, dropTries: 8, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 60, rerollChance: 0.15, rerollChanceBare: 0.4, saveChance: 0.3, adjustTries: 24, dropTries: 8, dropBelow: 0.9, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
 };

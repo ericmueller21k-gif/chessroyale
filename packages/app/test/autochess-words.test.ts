@@ -83,6 +83,7 @@ describe("auto chess: survivors and promotions", () => {
       interest: { per: 100, gold: 10, max: 30 },
       survivorRefund: 0.25,
       queenLimit: 1,
+      bot: expect.objectContaining({ lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 60, rerollChance: 0.15, rerollChanceBare: 0.4, dropTries: 8, dropBelow: 0.9 }),
       maxPawns: 8,
       pawnsPerFile: 3,
     });
