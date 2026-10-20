@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { AUTOCHESS, mulberry32, type AutoChessSettings } from "@chessroyale/core";
+import { AUTOCHESS, botLook, mulberry32, type AutoChessSettings } from "@chessroyale/core";
+import { account } from "../account.ts";
 import { useAccount } from "./Profile.tsx";
 import { Board } from "../components/Board.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
+import { Avatar } from "../components/Items.tsx";
 import { cellOf, dragStarted, squareAtPoint } from "../board/logic.ts";
 import { play } from "../sound.ts";
 import { testParams } from "../test-switches.ts";
@@ -131,6 +133,8 @@ function settingsFor(quick: boolean, gold: number, adjust: boolean): AutoChessSe
 }
 
 const colorName = (c: Color) => (c === "w" ? "White" : "Black");
+/** What the opponent is called: the same word as a bot in a 1 v 1. */
+const BOT_NAME = "Bot";
 /** The seed of a round's reveals (which of their pieces shows, and when: reveal.ts). */
 const revealSeed = (match: MatchState) => (roundSeed(match) ^ 0x6b43a9b5) >>> 0;
 
@@ -153,7 +157,7 @@ function LevelTag({ level, xp, who, cfg }: { level: number; xp: number; who: str
   }, [level]);
   const need = xpToNext(level, cfg);
   return (
-    <span class="ac-lv" data-level={level} aria-label={`${who} level ${level}${need === null ? ", the top level" : `, ${xp} of ${need} XP`}`}>
+    <span class="ac-lv" data-level={level} style={{ "--xp": need === null ? 1 : xp / need } as Record<string, number>} aria-label={`${who} level ${level}${need === null ? ", the top level" : `, ${xp} of ${need} XP`}`}>
       Lv{" "}
       <b key={pops} class={pops ? "pop" : undefined}>
         {level}
@@ -208,6 +212,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const press = useRef<{ id: number; hold: Hold; x: number; y: number; started: boolean } | null>(null);
 
   const g = game;
+  // The two avatars (v6): your pawn as home and your profile dress it (your name and items), and the bot's own, a plain look seeded by the match.
+  const profile = account().profile;
+  const myName = profile?.user.name || "You";
+  const myLook = profile?.locker?.look;
+  const theirLook = useMemo(() => botLook(`autochess:${game.match.seed}`).look, [game.match.seed]);
   const mine = youColor(g.match.round);
   const theirs = other(mine);
   const orientation = mine === "w" ? "white" : "black";
@@ -724,10 +733,12 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
         </header>
 
         <div class="ac-side ac-opp" aria-label="Your opponent">
-          <span class={`ac-chip ${theirs}`} aria-hidden="true" />
+          <span class="ac-avatar" aria-hidden="true">
+            <Avatar look={theirLook} side={theirs} />
+          </span>
           <span class="ac-who">
-            <strong>Opponent</strong>
-            <LevelTag level={botLevelNow.level} xp={botLevelNow.xp} who="Opponent's" cfg={cfg} />
+            <strong class="ac-name">{BOT_NAME}</strong>
+            <LevelTag level={botLevelNow.level} xp={botLevelNow.xp} who={`${BOT_NAME}'s`} cfg={cfg} />
           </span>
           <span class="ac-stats">
             <span class="ac-line">
@@ -790,6 +801,29 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               {g.phase === "adjust" && <div class="ac-theirs-line">Your opponent is moving their pieces…</div>}
             </div>
           </Board>
+        </div>
+
+        <div class="ac-side ac-me" aria-label="You">
+          <span class="ac-avatar" aria-hidden="true">
+            <Avatar look={myLook} side={mine} />
+          </span>
+          <span class="ac-who">
+            <strong class="ac-name">{myName}</strong>
+            <LevelTag level={g.match.you.level} xp={g.match.you.xp} who="Your" cfg={cfg} />
+          </span>
+          <span class="ac-stats">
+            <span class="ac-line">
+              <span class="ac-stat ac-hp-you" aria-label="Your HP">
+                HP <b>{myHp}</b>
+              </span>
+              <span class="ac-stat ac-gold-you" aria-label="Your gold">
+                Gold <b>{goldNow}</b>
+              </span>
+            </span>
+            <span class="ac-stat ac-income" aria-label="This round's income">
+              Income <b>+{incomeFor(g.match.round)}</b>
+            </span>
+          </span>
         </div>
 
         {g.phase === "buy" && (
@@ -941,26 +975,6 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        <div class="ac-side ac-me" aria-label="You">
-          <span class={`ac-chip ${mine}`} aria-hidden="true" />
-          <span class="ac-who">
-            <strong>You</strong>
-            <LevelTag level={g.match.you.level} xp={g.match.you.xp} who="Your" cfg={cfg} />
-          </span>
-          <span class="ac-stats">
-            <span class="ac-line">
-              <span class="ac-stat ac-hp-you" aria-label="Your HP">
-                HP <b>{myHp}</b>
-              </span>
-              <span class="ac-stat ac-gold-you" aria-label="Your gold">
-                Gold <b>{goldNow}</b>
-              </span>
-            </span>
-            <span class="ac-stat ac-income" aria-label="This round's income">
-              Income <b>+{incomeFor(g.match.round)}</b>
-            </span>
-          </span>
-        </div>
       </div>
       {drag && (
         <div ref={ghostRef} class="hb-pieces ac-ghost" style={{ width: `${boxOf().width / 8}px`, height: `${boxOf().width / 8}px` }} aria-hidden="true">

@@ -493,6 +493,44 @@ test("levels: you start at level 4 (4 pieces on the board), the 5th is refused w
   expect(errors).toEqual([]);
 });
 
+test("avatars: your pawn sits under your side of the board and theirs above theirs, each with its name, level and XP", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto(DUP);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const board = (await page.locator(".hb-board").boundingBox())!;
+  const me = (await page.locator(".ac-me").boundingBox())!;
+  const opp = (await page.locator(".ac-opp").boundingBox())!;
+  // By the board: theirs right above its top edge, yours right under its bottom edge.
+  expect(board.y - (opp.y + opp.height), "their strip is right above the board").toBeLessThanOrEqual(10);
+  expect(board.y - (opp.y + opp.height)).toBeGreaterThanOrEqual(-1);
+  expect(me.y - (board.y + board.height), "your strip is right under the board").toBeLessThanOrEqual(10);
+  expect(me.y - (board.y + board.height)).toBeGreaterThanOrEqual(-1);
+  // Each has a pawn drawn (your color to match your pieces: White in round 1; theirs Black), its name and its level line.
+  for (const [who, color, name] of [["me", "white", "Pawnder"], ["opp", "black", "Bot"]] as const) {
+    const strip = page.locator(`.ac-${who}`);
+    await expect(strip.locator(".ac-avatar .avatar")).toHaveCount(1);
+    await expect(strip.locator(`.ac-avatar .avatar piece.${color}.pawn, .ac-avatar .avatar .avatar-skin`).first()).toBeAttached();
+    const box = (await strip.locator(".ac-avatar").boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(28);
+    expect(box.height).toBeGreaterThanOrEqual(28);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    await expect(strip.locator(".ac-name")).toHaveText(name);
+    await expect(strip.locator(".ac-lv")).toHaveText("Lv 4 · 2/4 XP");
+    // The XP toward the next level is the gold line under the words: half of it (2 of 4).
+    expect(await strip.locator(".ac-lv").evaluate((el) => getComputedStyle(el).getPropertyValue("--xp"))).toBe("0.5");
+    // (The pawn's drawing is not blank: its box holds a piece or a skin with size.)
+    const drawn = await strip.locator(".ac-avatar .avatar").evaluate((el) => ({ w: el.getBoundingClientRect().width, kids: el.children.length }));
+    expect(drawn.w).toBeGreaterThan(20);
+    expect(drawn.kids).toBeGreaterThan(0);
+  }
+  // Their numbers stay in their strip, and the long name of an account fits its strip (ellipsis, no overflow) at the narrowest screen.
+  await page.setViewportSize({ width: 320, height: 568 });
+  await expect(page.locator(".ac-me")).toBeVisible();
+  expect(await page.locator(".ac-me").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect(await page.locator(".ac-opp").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test("lock in: the first side to lock gets 25 gold at once, and your board, bench and shop freeze", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(NEVER);
@@ -919,7 +957,7 @@ test("layouts: the board, shop and your row fit the screen with no scrolling, at
         scroll: document.documentElement.scrollHeight - innerHeight,
         sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         board: { w: board.width, h: board.height, top: board.top, left: board.left, right: board.right },
-        me: r(".ac-me").bottom,
+        foot: Math.max(r(".ac-ctl").bottom, r(".ac-me").bottom),
         buttons: [...document.querySelectorAll(".ac-buy")].map((b) => b.getBoundingClientRect()).map((b) => ({ r: b.right, l: b.left })),
         labels: [...document.querySelectorAll(".ac-buy small")].map((s) => s.scrollWidth - s.clientWidth),
         slots: [...document.querySelectorAll(".ac-slot")].map((b) => ({ w: b.getBoundingClientRect().width, l: b.getBoundingClientRect().left, r: b.getBoundingClientRect().right, over: b.scrollWidth - b.clientWidth })),
@@ -936,7 +974,7 @@ test("layouts: the board, shop and your row fit the screen with no scrolling, at
     expect(Math.abs(m.board.w - m.board.h), `${w}×${h}: a square board`).toBeLessThan(1.5);
     expect(m.board.left, `${w}×${h}`).toBeGreaterThanOrEqual(0);
     expect(m.board.right, `${w}×${h}`).toBeLessThanOrEqual(w);
-    expect(m.me, `${w}×${h}: your row on screen`).toBeLessThanOrEqual(h);
+    expect(m.foot, `${w}×${h}: the buttons and your row on screen`).toBeLessThanOrEqual(h);
     expect(m.clock, `${w}×${h}: the clock inside`).toBeLessThanOrEqual(w);
     expect(m.rows.every((x) => x <= 0), `${w}×${h}: both strips (name, level, numbers) fit their width`).toBe(true);
     expect(m.ctl, `${w}×${h}: Reroll, Buy XP and Lock in`).toHaveLength(3);
@@ -963,11 +1001,16 @@ test("layouts: the board, shop and your row fit the screen with no scrolling, at
   await page.setViewportSize({ width: phone() ? 390 : 1280, height: phone() ? 664 : 800 });
   await page.goto(POOR);
   const before = (await page.locator(".hb-board").boundingBox())!;
-  const bottom = (await page.locator(".ac-me").boundingBox())!;
+  const foot = async () => {
+    const b = (await page.locator(".ac-card, .ac-ctl").first().boundingBox())!;
+    return b.y + b.height;
+  };
+  const bottom = await foot();
   await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
   const during = (await page.locator(".hb-board").boundingBox())!;
-  const bottom2 = (await page.locator(".ac-me").boundingBox())!;
+  const bottom2 = await foot();
   expect(Math.abs(during.y - before.y) + Math.abs(during.width - before.width)).toBeLessThan(1);
-  expect(Math.abs(bottom2.y - bottom.y)).toBeLessThan(1);
+  expect(Math.abs(bottom2 - bottom), "the foot of the box under the board stays").toBeLessThan(1);
+  // (And your strip, right under the board, stays put too.)
   expect(errors).toEqual([]);
 });

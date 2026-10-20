@@ -17636,7 +17636,7 @@ button.sq-tiny {
   color: var(--fd-gold-text);
   font-weight: 800;
 }
-/* A side's strip (v6): its chip (an avatar in a later step), its name over its level and XP, and its numbers at the right over a second line. */
+/* A side's strip (v6): its pawn avatar, its name over its level and XP, and its numbers at the right over a second line. The opponent's is above the board and yours just under it. */
 .ac-side {
   height: 32px;
   display: flex;
@@ -17674,9 +17674,13 @@ button.sq-tiny {
   gap: 8px;
 }
 .ac-lv {
+  align-self: flex-start;
   font-size: 11.5px;
   color: var(--fd-sub);
   font-variant-numeric: tabular-nums;
+  /* The XP toward the next level, a thin gold line under the words (--xp: 0 to 1). */
+  background: linear-gradient(var(--fd-gold), var(--fd-gold)) 0 100% / calc(var(--xp, 0) * 100%) 2px no-repeat;
+  padding-bottom: 1px;
 }
 .ac-lv b {
   display: inline-block;
@@ -17713,18 +17717,15 @@ button.sq-tiny {
   color: var(--fd-text);
   font-variant-numeric: tabular-nums;
 }
-.ac-chip {
+.ac-avatar {
   flex: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
+  width: 30px;
+  height: 30px;
 }
-.ac-chip.w,
 .ac-circle.w::after {
   background: #fff;
   box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55);
 }
-.ac-chip.b,
 .ac-circle.b::after {
   background: #2a2c33;
   box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.6);
