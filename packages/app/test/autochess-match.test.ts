@@ -114,6 +114,23 @@ describe("auto chess: the economy", () => {
     const fresh = emptyArmy(youColor(2), kingSquares(roundSeed(m2))[youColor(2)]);
     expect(fresh.board).toEqual({});
   });
+
+  it("the bench is the one thing held from round to round (v6): each side's bench stays in the match through the fight's settling and the next round's pay", () => {
+    expect(newMatch(5).you.bench).toEqual([]);
+    expect(newMatch(5).bot.bench).toEqual([]);
+    const held = { you: [{ kind: "n" as Kind, square: "c3" }], bot: [{ kind: "q" as Kind, square: "d7" }] };
+    let m: MatchState = beginRound(newMatch(5)).match;
+    m = { ...m, you: { ...m.you, bench: held.you }, bot: { ...m.bot, bench: held.bot } };
+    const settled = settleRound(m, "you", { you: ["p"], bot: [] }).match;
+    expect(settled.you.bench).toEqual(held.you);
+    expect(settled.bot.bench).toEqual(held.bot);
+    const next = beginRound(settled).match;
+    expect(next.you.bench).toEqual(held.you);
+    expect(next.bot.bench).toEqual(held.bot);
+    // No refund for a held piece: only the pieces on the board when the fight ended come back at 25%.
+    expect(goldBreakdown(2, settled.you).survivors).toBe(2);
+    expect(Object.keys(goldBreakdown(2, settled.you)).sort()).toEqual(["income", "interest", "saved", "streak", "survivors", "total"]);
+  });
 });
 
 /** Builds a legal army the way the player does: buys with the shop's rules, then places with the board's. */
@@ -137,10 +154,13 @@ describe("auto chess: the bot", () => {
       const king = kingSquares(seed)[color];
       const plan = botPlan(color, king, gold, round, rng);
       expect(plan.spent).toBeLessThanOrEqual(gold);
-      // Every piece it bought is on the board, on the square its offer named; rerolls have no square.
-      expect(plan.events.filter((e) => e.square).length).toBe(Object.keys(plan.army.board).length);
-      expect(plan.events.filter((e) => e.kind !== "reroll").length).toBe(Object.keys(plan.army.board).length);
-      expect(plan.events.filter((e) => e.kind === "reroll").every((e) => e.square === null)).toBe(true);
+      // Every piece it bought is on the board, on the square its offer named, or on its bench, with the square it will land on; rerolls have no square.
+      const onBoard = plan.events.filter((e) => e.type === "buy" || e.type === "place");
+      expect(onBoard.length).toBe(Object.keys(plan.army.board).length);
+      expect(plan.events.filter((e) => e.type === "hold").length).toBe(plan.army.bench.length);
+      expect(plan.events.filter((e) => e.type !== "reroll").every((e) => e.square !== null)).toBe(true);
+      expect(plan.events.filter((e) => e.kind === "reroll").every((e) => e.square === null && e.type === "reroll")).toBe(true);
+      expect(plan.army.bench.length).toBeLessThanOrEqual(AUTOCHESS.benchSlots);
       checkArmy(plan.army);
       for (const e of plan.events) {
         if (e.square) {
@@ -226,8 +246,51 @@ describe("auto chess: the bot", () => {
     expect(withReroll).toBeGreaterThan(40);
     expect(withReroll).toBeLessThan(240);
     expect(rerolls).toBeGreaterThan(withReroll - 1);
-    // It never owns more than the board holds.
-    for (let seed = 0; seed < 300; seed++) expect(botBuys(emptyArmy("w", "e1"), 400, 6, mulberry32(seed)).buys.filter((b) => b.kind !== "reroll").length).toBeLessThanOrEqual(AUTOCHESS.boardLimit);
+    // It never puts more on its board than the board holds, nor more on its bench than the bench holds.
+    for (let seed = 0; seed < 300; seed++) {
+      const { buys, army } = botBuys(emptyArmy("w", "e1"), 400, 6, mulberry32(seed));
+      expect(buys.filter((b) => b.type === "buy" || b.type === "place").length).toBeLessThanOrEqual(AUTOCHESS.boardLimit);
+      expect(army.bench.length).toBeLessThanOrEqual(AUTOCHESS.benchSlots);
+    }
+  });
+
+  it("places what it held first, for nothing, where the squares are free; then buys; and what it can't place stays on its bench", () => {
+    const held = [{ kind: "n" as Kind, square: "c6" }, { kind: "q" as Kind, square: "d8" }, { kind: "r" as Kind, square: "e8" }];
+    for (let seed = 0; seed < 100; seed++) {
+      // (The king stands on e8: the rook held for e8 can't land this round.)
+      const plan = botPlan("b", "e8", 100, 1 + (seed % 6), mulberry32(seed), AUTOCHESS, held);
+      const placed = plan.events.filter((e) => e.type === "place");
+      expect(placed.map((e) => e.kind)).toEqual(["n", "q"]);
+      expect(placed.every((e) => e.price === 0)).toBe(true);
+      expect(plan.army.board).toMatchObject({ c6: "n", d8: "q" });
+      expect(plan.army.bench).toEqual(expect.arrayContaining([{ kind: "r", square: "e8" }]));
+      // A queen held is the one queen: it never buys another.
+      expect(owned(plan.army).q).toBe(1);
+      // What is placed costs nothing: the gold spent is only the buys, holds and rerolls.
+      expect(plan.spent).toBe(plan.events.reduce((sum, e) => sum + (e.type === "place" ? 0 : e.price), 0));
+      expect(plan.spent).toBeLessThanOrEqual(100);
+      expect(plan.army.board).not.toHaveProperty("e8");
+    }
+  });
+
+  it("with its board full (its level's limit) it holds a good piece on its bench, never a pawn, up to the setting, and pays for it", () => {
+    let held = 0;
+    for (let seed = 0; seed < 300; seed++) {
+      const { buys, army } = botBuys(emptyArmy("b", "e8"), 300, 6, mulberry32(seed), AUTOCHESS, 3);
+      expect(Object.keys(army.board).length).toBeLessThanOrEqual(3);
+      const holds = buys.filter((b) => b.type === "hold");
+      expect(holds.length).toBeLessThanOrEqual(AUTOCHESS.bot.maxHolds);
+      expect(holds.every((b) => b.kind !== "p" && b.price === AUTOCHESS.prices[b.kind as Kind] && b.square !== null)).toBe(true);
+      expect(army.bench).toEqual(holds.map((b) => ({ kind: b.kind, square: b.square })));
+      // A hold only comes once the board is full.
+      const firstHold = buys.findIndex((b) => b.type === "hold");
+      if (firstHold >= 0) expect(buys.slice(0, firstHold).filter((b) => b.type === "buy" || b.type === "place")).toHaveLength(3);
+      expect(buys.reduce((sum, b) => sum + b.price, 0)).toBeLessThanOrEqual(300);
+      held += holds.length;
+    }
+    // "Now and then": it holds, but not every time.
+    expect(held).toBeGreaterThan(100);
+    expect(held).toBeLessThan(500);
   });
 
   it("shows what it has done by a time (the circles are drawn from this, 2 s behind): pieces on squares, and what it has spent, rerolls too", () => {
@@ -240,7 +303,7 @@ describe("auto chess: the bot", () => {
       const t = plan.events[Math.floor(plan.events.length / 2)]!.at;
       const done = plan.events.filter((e) => e.at <= t);
       const mid = botAt(plan.events, t);
-      expect(Object.keys(mid.squares)).toHaveLength(done.filter((e) => e.square).length);
+      expect(Object.keys(mid.squares)).toHaveLength(done.filter((e) => e.type === "buy" || e.type === "place").length);
       expect(mid.spent).toBe(done.reduce((sum, e) => sum + e.price, 0));
     }
   });
@@ -254,15 +317,15 @@ describe("auto chess: the bot", () => {
       expect(shown.circles.every((sq) => seen[sq] !== "p")).toBe(true);
       expect([...shown.pawns, ...shown.circles].sort()).toEqual(Object.keys(seen).sort());
       // Early on, only what it has done so far shows.
-      const first = plan.events.find((e) => e.square)!;
+      const first = plan.events.find((e) => e.square && e.type !== "hold")!;
       const early = botShown(botAt(plan.events, first.at).squares);
-      expect(early.pawns.length + early.circles.length).toBe(plan.events.filter((e) => e.square && e.at <= first.at).length);
+      expect(early.pawns.length + early.circles.length).toBe(plan.events.filter((e) => e.square && e.at <= first.at && e.type !== "hold").length);
     }
     expect(botShown({ a6: "p", c8: "n", b7: "q" })).toEqual({ pawns: ["a6"], circles: ["c8", "b7"] });
   });
 
   it("adjusts greedily: its one move is kept only when the position scores better than standing still, and there is only one", async () => {
-    const army: Army = { color: "w", king: "e1", board: { a2: "p", b2: "p", g1: "n" } };
+    const army: Army = { color: "w", king: "e1", board: { a2: "p", b2: "p", g1: "n" }, bench: [] };
     const wide = { ...AUTOCHESS, bot: { ...AUTOCHESS.bot, adjustDestinations: 8 } };
     const changed = (a: Army) => Object.entries(a.board).filter(([sq, k]) => army.board[sq] !== k).length + (a.king !== army.king ? 1 : 0);
     // A scorer that likes the knight on f3 and nothing else.
@@ -327,8 +390,8 @@ describe("auto chess: the fight", () => {
     expect(AUTOCHESS.moveCap).toBe(60);
     // A rook against nothing, both kings stepping about: the cap (3 moves a side here) decides, by material.
     const cfg = { ...AUTOCHESS, moveCap: 3 };
-    const w: Army = { color: "w", king: "e1", board: { a2: "r" } };
-    const b: Army = { color: "b", king: "e8", board: { h7: "p" } };
+    const w: Army = { color: "w", king: "e1", board: { a2: "r" }, bench: [] };
+    const b: Army = { color: "b", king: "e8", board: { h7: "p" }, bench: [] };
     const start = fightStart(w, b);
     const kingOnly = async (fen: string) => legalMoves(fen).find((m) => (fen.split(" ")[1] === "w" ? m.startsWith("e1") || m.startsWith("d1") || m.startsWith("d2") : m.startsWith("e8") || m.startsWith("d8"))) ?? null;
     const res = await playFight(start.fen, { pick: kingOnly, wait: noWait, rng: mulberry32(1), cfg });
@@ -338,8 +401,8 @@ describe("auto chess: the fight", () => {
 
   it("a cap with equal material is a draw", async () => {
     const cfg = { ...AUTOCHESS, moveCap: 3 };
-    const w: Army = { color: "w", king: "a1", board: { c2: "n" } };
-    const b: Army = { color: "b", king: "h8", board: { f7: "n" } };
+    const w: Army = { color: "w", king: "a1", board: { c2: "n" }, bench: [] };
+    const b: Army = { color: "b", king: "h8", board: { f7: "n" }, bench: [] };
     const start = fightStart(w, b);
     // Each side only steps its king (never a capture), so material stays equal.
     const kingOnly = async (fen: string) => legalMoves(fen).find((m) => (fen.split(" ")[1] === "w" ? m.startsWith("a1") || m.startsWith("b1") || m.startsWith("b2") : m.startsWith("h8") || m.startsWith("g8") || m.startsWith("g7"))) ?? null;
@@ -372,8 +435,8 @@ describe("auto chess: the fight", () => {
 
   it("finds mate, and the side that was mated loses", async () => {
     // White's king on g6 and rook on a2: the rook to a8 mates the king on h8 (Black has a pawn left: a side with only a king loses at once).
-    const w: Army = { color: "w", king: "g6", board: { a2: "r" } };
-    const b: Army = { color: "b", king: "h8", board: { b5: "p" } };
+    const w: Army = { color: "w", king: "g6", board: { a2: "r" }, bench: [] };
+    const b: Army = { color: "b", king: "h8", board: { b5: "p" }, bench: [] };
     const start = fightStart(w, b);
     expect(start.mover).toBe("w");
     const pick = async (fen: string) => (legalMoves(fen).includes("a2a8") ? "a2a8" : null);
@@ -383,19 +446,19 @@ describe("auto chess: the fight", () => {
 
   it("a side that starts mated loses at once, a side that starts stalemated draws at once (no moves played)", async () => {
     // White's king on h1 is attacked by a rook on h8 and shut in by a rook on g8: Black wins, White having moved first (White keeps a pawn, so it isn't a lone king).
-    const mated = fightStart({ color: "w", king: "h1", board: { a2: "p" } }, { color: "b", king: "a8", board: { h8: "r", g8: "r" } });
+    const mated = fightStart({ color: "w", king: "h1", board: { a2: "p" }, bench: [] }, { color: "b", king: "a8", board: { h8: "r", g8: "r" }, bench: [] });
     expect(mated.mover).toBe("w");
     expect(await playFight(mated.fen, { pick: async () => null, wait: noWait, rng: mulberry32(1) })).toMatchObject({ end: "checkmate", winner: "b", moves: [] });
     // White's king on a1 isn't attacked but can't move: a rook covers b1 and b2, a bishop a2.
     // (A white pawn on h7 is blocked by the black king on h8: it has no move either.)
-    const stale = fightStart({ color: "w", king: "a1", board: { h7: "p" } }, { color: "b", king: "h8", board: { b8: "r", e6: "b" } });
+    const stale = fightStart({ color: "w", king: "a1", board: { h7: "p" }, bench: [] }, { color: "b", king: "h8", board: { b8: "r", e6: "b" }, bench: [] });
     expect(stale.mover).toBe("w");
     expect(await playFight(stale.fen, { pick: async () => null, wait: noWait, rng: mulberry32(1) })).toMatchObject({ end: "stalemate", winner: null, moves: [] });
   });
 
   it("a stand-in move is played when the engine gives none or an illegal one, and a cancelled fight returns nothing", async () => {
-    const w: Army = { color: "w", king: "e1", board: { a2: "p" } };
-    const b: Army = { color: "b", king: "e8", board: { a7: "p" } };
+    const w: Army = { color: "w", king: "e1", board: { a2: "p" }, bench: [] };
+    const b: Army = { color: "b", king: "e8", board: { a7: "p" }, bench: [] };
     const start = fightStart(w, b);
     const seen: number[] = [];
     let cancel = false;
@@ -416,8 +479,8 @@ describe("auto chess: the fight", () => {
 
   it("pawns don't promote: a pawn never moves onto its last rank, and a side left with only promotions is stalemated or mated", async () => {
     // White's pawn on b7 with its path clear: the fight's moves leave out b7b8 (and every promotion), the king's stay.
-    const w: Army = { color: "w", king: "e1", board: { b7: "p" } };
-    const b: Army = { color: "b", king: "h8", board: { h7: "p", g7: "p" } };
+    const w: Army = { color: "w", king: "e1", board: { b7: "p" }, bench: [] };
+    const b: Army = { color: "b", king: "h8", board: { h7: "p", g7: "p" }, bench: [] };
     const start = fightStart(w, b);
     expect(legalMoves(start.fen)).toContain("b7b8q");
     expect(fightMoves(start.fen).some((m) => m.startsWith("b7"))).toBe(false);
@@ -452,24 +515,24 @@ describe("auto chess: the fight", () => {
   it("a fight with no capture or check for 10 moves each fizzles out: more material wins, equal is a draw", async () => {
     expect(AUTOCHESS.quietCap).toBe(10);
     // A rook against a pawn: 10 quiet moves each, then material (5 v 1) decides.
-    const w: Army = { color: "w", king: "a1", board: { h2: "r" } };
-    const b: Army = { color: "b", king: "a8", board: { e7: "p" } };
+    const w: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
+    const b: Army = { color: "b", king: "a8", board: { e7: "p" }, bench: [] };
     const white = ["a1b1", "b1c1", "c1d1", "d1e1", "e1f1", "f1g1", "h2h3", "h3h4", "h4h5", "h5h6"];
     const black = ["a8b8", "b8c8", "c8d8", "d8e8", "e8f8", "f8g8", "e7e6", "e6e5", "e5e4", "g8f8"];
     const plies = white.flatMap((m, k) => [m, black[k]!]);
     const res = await playFight(fightStart(w, b).fen, { pick: script(plies), wait: noWait, rng: mulberry32(1) });
     expect(res).toMatchObject({ end: "quiet", winner: "w", moves: plies });
     // A capture starts the count again: the rook takes the knight first, then 10 quiet moves each.
-    const w2: Army = { color: "w", king: "a1", board: { h2: "r" } };
-    const b2: Army = { color: "b", king: "a8", board: { h7: "n", e7: "p" } };
+    const w2: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
+    const b2: Army = { color: "b", king: "a8", board: { h7: "n", e7: "p" }, bench: [] };
     const white2 = ["h2h7", "a1b1", "b1c1", "c1d1", "d1e1", "e1f1", "f1g1", "g1g2", "g2g3", "g3g4", "g4g5"];
     const black2 = ["a8b8", "b8c8", "c8d8", "d8e8", "e8f8", "f8e8", "e8d8", "d8c8", "c8b8", "b8a8"];
     const res2 = await playFight(fightStart(w2, b2).fen, { pick: script(white2.flatMap((m, k) => (black2[k] ? [m, black2[k]!] : [m]))), wait: noWait, rng: mulberry32(1) });
     expect(res2).toMatchObject({ end: "quiet", winner: "w" });
     expect(res2!.moves).toHaveLength(21);
     // Equal material when it fizzles out: a draw.
-    const w3: Army = { color: "w", king: "a1", board: { h2: "r" } };
-    const b3: Army = { color: "b", king: "a8", board: { a7: "r" } };
+    const w3: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
+    const b3: Army = { color: "b", king: "a8", board: { a7: "r" }, bench: [] };
     const black3 = ["a8b8", "b8c8", "c8d8", "a7a6", "a6a5", "a5a4", "a4a3", "d8e8", "e8f8", "f8e8"];
     const res3 = await playFight(fightStart(w3, b3).fen, { pick: script(white.flatMap((m, k) => [m, black3[k]!])), wait: noWait, rng: mulberry32(1) });
     expect(res3).toMatchObject({ end: "quiet", winner: null });
@@ -479,27 +542,27 @@ describe("auto chess: the fight", () => {
     const idle = { pick: async () => null, wait: noWait, rng: mulberry32(1) };
     // A side that starts with only its king loses: no move is played, whatever the other has (even a lone knight: it used to be "not enough pieces").
     for (const board of [{ a2: "n" }, { a2: "p" }, { d1: "q", a1: "r" }] as Record<string, Kind>[]) {
-      const blackLone = fightStart({ color: "w", king: "e1", board }, { color: "b", king: "e8", board: {} });
+      const blackLone = fightStart({ color: "w", king: "e1", board }, { color: "b", king: "e8", board: {}, bench: [] });
       expect(await playFight(blackLone.fen, idle)).toMatchObject({ end: "king_alone", winner: "w", moves: [] });
     }
     for (const board of [{ a7: "n" }, { a7: "p" }, { d8: "q", a8: "r" }] as Record<string, Kind>[]) {
-      const whiteLone = fightStart({ color: "w", king: "e1", board: {} }, { color: "b", king: "e8", board });
+      const whiteLone = fightStart({ color: "w", king: "e1", board: {}, bench: [] }, { color: "b", king: "e8", board });
       expect(await playFight(whiteLone.fen, idle)).toMatchObject({ end: "king_alone", winner: "b", moves: [] });
     }
     // Both with only a king: a draw.
-    const both = fightStart({ color: "w", king: "e1", board: {} }, { color: "b", king: "e8", board: {} });
+    const both = fightStart({ color: "w", king: "e1", board: {}, bench: [] }, { color: "b", king: "e8", board: {}, bench: [] });
     expect(await playFight(both.fen, idle)).toMatchObject({ end: "king_alone", winner: null, moves: [] });
     // Left alone during the fight: White's rook takes Black's last piece, and Black loses at once (one move played, no more).
-    const w: Army = { color: "w", king: "e1", board: { a1: "r" } };
-    const b: Army = { color: "b", king: "e8", board: { a7: "p" } };
+    const w: Army = { color: "w", king: "e1", board: { a1: "r" }, bench: [] };
+    const b: Army = { color: "b", king: "e8", board: { a7: "p" }, bench: [] };
     const res = await playFight(fightStart(w, b).fen, { ...idle, pick: async (fen) => (legalMoves(fen).includes("a1a7") ? "a1a7" : null) });
     expect(res).toMatchObject({ end: "king_alone", winner: "w", moves: ["a1a7"] });
     // The king taking the last piece does it too (the king isn't a piece that counts).
-    const w2: Army = { color: "w", king: "a6", board: { h2: "p" } };
-    const b2: Army = { color: "b", king: "h8", board: { a7: "p" } };
+    const w2: Army = { color: "w", king: "a6", board: { h2: "p" }, bench: [] };
+    const b2: Army = { color: "b", king: "h8", board: { a7: "p" }, bench: [] };
     expect(await playFight(fightStart(w2, b2).fen, { ...idle, pick: async () => "a6a7" })).toMatchObject({ end: "king_alone", winner: "w", moves: ["a6a7"] });
     // It comes before stalemate: a lone king with no move loses all the same.
-    const stale = fightStart({ color: "w", king: "c6", board: { b6: "q" } }, { color: "b", king: "a8", board: {} });
+    const stale = fightStart({ color: "w", king: "c6", board: { b6: "q" }, bench: [] }, { color: "b", king: "a8", board: {}, bench: [] });
     expect(await playFight(stale.fen, idle)).toMatchObject({ end: "king_alone", winner: "w", moves: [] });
     expect(endWords("king_alone", false)).toBe("A side left with only its king loses at once.");
     expect(endWords("king_alone", true)).toBe("Both sides are down to a king: a draw.");
@@ -510,8 +573,8 @@ describe("auto chess: the fight", () => {
     expect([0, 1, 58, 59, 60, 61, 100].map((plies) => moveMs(plies))).toEqual([350, 350, 350, 350, 175, 175, 175]);
     // A fight played with kings stepping about (it ends by repetition after 8 plies): the waits are 350 until the speed-up, then 175.
     const waits: number[] = [];
-    const w: Army = { color: "w", king: "a1", board: { h2: "r" } };
-    const b: Army = { color: "b", king: "a8", board: { h7: "p" } };
+    const w: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
+    const b: Army = { color: "b", king: "a8", board: { h7: "p" }, bench: [] };
     const kingSteps = async (fen: string, history: readonly string[]) => {
       const white = fen.split(" ")[1] === "w";
       const k = Math.floor(history.length / 2) % 2;
@@ -531,14 +594,14 @@ describe("auto chess: the fight", () => {
 
   it("each move takes about the move time, with the engine's thinking inside it", async () => {
     const waits: number[] = [];
-    const w: Army = { color: "w", king: "e1", board: {} };
-    const b: Army = { color: "b", king: "e8", board: {} };
+    const w: Army = { color: "w", king: "e1", board: {}, bench: [] };
+    const b: Army = { color: "b", king: "e8", board: {}, bench: [] };
     // Kings only: both sides down to a king, a draw before any move.
     const res = await playFight(fightStart(w, b).fen, { pick: async () => null, wait: async (ms) => void waits.push(ms), rng: mulberry32(1) });
     expect(res).toMatchObject({ end: "king_alone", winner: null, moves: [] });
     expect(waits).toEqual([]);
-    const w2: Army = { color: "w", king: "e1", board: { a2: "p" } };
-    const b2: Army = { color: "b", king: "e8", board: { h7: "p" } };
+    const w2: Army = { color: "w", king: "e1", board: { a2: "p" }, bench: [] };
+    const b2: Army = { color: "b", king: "e8", board: { h7: "p" }, bench: [] };
     let moves = 0;
     await playFight(fightStart(w2, b2).fen, { pick: async () => null, wait: async (ms) => void waits.push(ms), rng: mulberry32(1), cancelled: () => ++moves > 2 });
     expect(waits.every((ms) => ms === AUTOCHESS.fightMoveMs)).toBe(true);

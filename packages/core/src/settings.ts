@@ -2702,8 +2702,13 @@ export interface AutoChessSettings {
     readonly odds: { readonly p: number; readonly n: number; readonly b: number; readonly r: number; readonly q: number };
     readonly rerollCost: number;
   };
-  /** Selling a piece gives back this share of its price, rounded down (P9 N27 B28 R45 Q81). */
+  /** Selling a piece, from the board or the bench, gives back this share of its price, rounded down (v6, Eric Oct 20: 75%: P7 N22 B24 R37 Q67). */
   readonly sellBack: number;
+  /**
+   * The bench (v6, Eric Oct 20: "the bench is going to be a massive strategy"): this many held pieces, each keeping the square it
+   * was offered on. Held pieces stay from round to round (the board's pieces still don't).
+   */
+  readonly benchSlots: number;
   /** The first side to lock in (end its buying, freezing its board, bench and shop) gets this much gold at once (v5, Eric Oct 20). */
   readonly lockInBonus: number;
   /** The buy-and-place step, its locked end (no buying, selling or moving), and how far behind the opponent's circles show. */
@@ -2765,6 +2770,9 @@ export interface AutoChessSettings {
     readonly rerollGold: number;
     readonly rerollChance: number;
     readonly rerollChanceBare: number;
+    /** With its board full it holds a good piece (not a pawn) on its bench: at most this many a round, each time with this chance (else it keeps the gold). */
+    readonly maxHolds: number;
+    readonly holdChance: number;
     readonly saveChance: number;
     readonly adjustTries: number;
     readonly adjustDestinations: number;
@@ -2776,7 +2784,8 @@ export interface AutoChessSettings {
 export const AUTOCHESS: AutoChessSettings = {
   prices: { p: 10, n: 30, b: 32, r: 50, q: 90 },
   shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 2 },
-  sellBack: 0.9,
+  sellBack: 0.75,
+  benchSlots: 4,
   lockInBonus: 25,
   buySeconds: 30,
   lockSeconds: 3,
@@ -2812,5 +2821,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, saveChance: 0.3, adjustTries: 16, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, maxHolds: 2, holdChance: 0.5, saveChance: 0.3, adjustTries: 16, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
 };

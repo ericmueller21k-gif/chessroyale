@@ -1,5 +1,5 @@
 import { AUTOCHESS, mulberry32, weightedIndex, type AutoChessSettings, type Rng } from "@chessroyale/core";
-import { buyBlock, buyOffer, kindBlock, priceOf, usableSquares, type BuyBlock } from "./army.ts";
+import { buyBlock, buyOffer, holdBlock, holdOffer, kindBlock, priceOf, usableSquares, type BuyBlock, type HoldBlock } from "./army.ts";
 import { KINDS, type Army, type Kind, type Offer } from "./types.ts";
 
 /**
@@ -90,21 +90,41 @@ export const rerollWords = (gold: number, cfg: AutoChessSettings = AUTOCHESS) =>
 /**
  * What a buy from a slot gives: the army with the piece on its square, the gold left and the shop with the slot rolled again
  * (and any other offer on that square), or why not. `replaced`: how many other offers had their square taken and rolled again.
+ * `limit`: how many pieces the board may hold.
  */
 export function buyFromSlot(
   side: { army: Army; gold: number; shop: Shop },
   slot: number,
   seed: number,
   cfg: AutoChessSettings = AUTOCHESS,
+  limit: number = cfg.boardLimit,
 ): { army: Army; gold: number; shop: Shop; replaced: number } | { block: BuyBlock } {
   const offer = side.shop.slots[slot];
   if (!offer) return { block: "gold" };
-  const block = buyBlock(side.army, side.gold, offer, cfg);
+  const block = buyBlock(side.army, side.gold, offer, cfg, limit);
   if (block) return { block };
   const army = buyOffer(side.army, offer);
   const refilled = refillSlot(side.shop, slot, seed, army, cfg);
   const { shop, replaced } = replaceTaken(refilled, seed, army, cfg);
   return { army, gold: side.gold - priceOf(offer.kind, cfg), shop, replaced };
+}
+
+/**
+ * Buying a slot's offer to hold it on the bench: the piece waits there, keeping its square (nothing lands on the board, so no
+ * other offer's square is taken), and a new offer rolls into the slot.
+ */
+export function holdFromSlot(
+  side: { army: Army; gold: number; shop: Shop },
+  slot: number,
+  seed: number,
+  cfg: AutoChessSettings = AUTOCHESS,
+): { army: Army; gold: number; shop: Shop } | { block: HoldBlock } {
+  const offer = side.shop.slots[slot];
+  if (!offer) return { block: "gold" };
+  const block = holdBlock(side.army, side.gold, offer, cfg);
+  if (block) return { block };
+  const army = holdOffer(side.army, offer);
+  return { army, gold: side.gold - priceOf(offer.kind, cfg), shop: refillSlot(side.shop, slot, seed, army, cfg) };
 }
 
 /** A reroll: the gold left and the new shop, or why not. */

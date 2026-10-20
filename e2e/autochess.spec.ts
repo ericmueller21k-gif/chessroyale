@@ -56,6 +56,8 @@ async function tapAt(p: Page, x: number, y: number) {
   else await p.mouse.click(x, y);
 }
 const tap = async (p: Page, l: Locator) => (phone() ? l.tap() : l.click());
+/** A tap on something greyed (aria-disabled): Playwright won't act on it unless forced; a player can. */
+const tapGreyed = async (p: Page, l: Locator) => (phone() ? l.tap({ force: true }) : l.click({ force: true }));
 const tapSquare = async (p: Page, sq: string) => {
   const c = await center(p, sq);
   await tapAt(p, c.x, c.y);
@@ -98,6 +100,11 @@ async function tapSilhouette(p: Page, slot: number) {
 const reroll = (p: Page) => p.getByRole("button", { name: /^Reroll the shop/ });
 const piece = (p: Page, color: "white" | "black", role: string, square: string) => p.locator(`${BOARD_SEL.piece}.${color}.${role}[data-square="${square}"]`);
 const lockButton = (p: Page) => p.getByRole("button", { name: /^Lock(ed)? in/ });
+const bench = (p: Page) => p.locator(".ac-bench");
+const held = (p: Page) => p.locator(".ac-slot.has");
+/** The bench row's middle (where an offer is dropped to hold it), and the shop row's (where a piece is dropped to sell it). */
+const benchMiddle = async (p: Page) => middle((await bench(p).boundingBox())!);
+const shopMiddle = async (p: Page) => middle((await p.locator(".ac-shop").boundingBox())!);
 
 /** Taps the first offer that isn't greyed, up to `max` times; how many were bought. */
 async function buyAll(p: Page, max: number) {
@@ -185,8 +192,10 @@ test("the shop: five offers, each a piece and a square of your half, drawn as gl
   const [r, g, b] = (await page.locator(".ac-sil-shape").first().evaluate((el) => getComputedStyle(el).backgroundColor.match(/\d+/g)!.map(Number))) as number[];
   expect(g!).toBeGreaterThan(r!);
   expect(g!).toBeGreaterThan(b!);
-  // The board holds only the kings: nothing is placed for free.
+  // The board holds only the kings: nothing is placed for free. The bench has its four slots, empty.
   await expect(page.locator(BOARD_SEL.piece)).toHaveCount(2);
+  await expect(page.locator(".ac-slot")).toHaveCount(4);
+  await expect(held(page)).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -291,29 +300,29 @@ test("buying: a greyed offer says why (gold, the one-queen limit), whole when it
   await expect(page.locator(".ac-msg")).toContainText("Not enough gold: a rook costs 50 and you have 10.");
   await expect(card(page, 3)).toContainText("Max 1");
   await card(page, 3).click({ force: true });
-  await expect(page.locator(".ac-msg")).toContainText("One queen a round.");
+  await expect(page.locator(".ac-msg")).toContainText("One queen at most.");
   await expect(piece(page, "white", "rook", "e3")).toHaveCount(0);
   expect(await goldOf(page)).toBe(10);
   // The king is the game's: tapping it says so.
   await tapSquare(page, "h1");
   await expect(page.locator(".ac-msg")).toContainText("Your king is placed by the game.");
-  // Sell by tapping your queen: it says what it gives, "Sell 81" (90% of 90), and the sell sound plays.
+  // Sell by tapping your queen: it says what it gives, "Sell 67" (75% of 90, rounded down), and the sell sound plays.
   await tapSquare(page, "g3");
-  await expect(page.locator(".ac-msg")).toContainText("Queen selected. Tap Sell to sell it for 81.");
-  await tap(page, page.getByRole("button", { name: "Sell 81", exact: true }));
+  await expect(page.locator(".ac-msg")).toContainText("Queen selected. Tap Sell to sell it for 67.");
+  await tap(page, page.getByRole("button", { name: "Sell 67", exact: true }));
   await expect(piece(page, "white", "queen", "g3")).toHaveCount(0);
-  expect(await goldOf(page)).toBe(91);
+  expect(await goldOf(page)).toBe(77);
   expect(await soundCount(page, "sell")).toBe(1);
-  // Buy a pawn (10) and sell it by dragging it onto the shop row: 90% of 10 is 9.
+  // Buy a pawn (10) and sell it by dragging it onto the shop row: 75% of 10 is 7.
   const now = await offers(page);
   const pawnSlot = now.findIndex((o) => o.kind === "p");
   const pawnSquare = now[pawnSlot]!.square;
   await tap(page, card(page, pawnSlot));
   await expect(piece(page, "white", "pawn", pawnSquare)).toBeVisible();
-  expect(await goldOf(page)).toBe(81);
-  await dragMouse(page, await center(page, pawnSquare), middle((await page.locator(".ac-shop").boundingBox())!));
+  expect(await goldOf(page)).toBe(67);
+  await dragMouse(page, await center(page, pawnSquare), await shopMiddle(page));
   await expect(piece(page, "white", "pawn", pawnSquare)).toHaveCount(0);
-  expect(await goldOf(page)).toBe(90);
+  expect(await goldOf(page)).toBe(74);
   expect(await soundCount(page, "sell")).toBe(2);
   // The last 2 seconds are locked: "Locked" on the timer, and nothing is bought, sold or moved; the silhouettes dim.
   await expect(page.locator(".ac-clock span")).toHaveText("Locked", { timeout: 15_000 });
@@ -326,7 +335,80 @@ test("buying: a greyed offer says why (gold, the one-queen limit), whole when it
   expect(errors).toEqual([]);
 });
 
-test("lock in: the first side to lock gets 25 gold at once, and your board and shop freeze", async ({ page }) => {
+test("the bench: drag an offer onto it to hold it (it keeps its square), tap it to place it when its square is free, sell it by dragging it onto the shop", async ({ page }) => {
+  const errors = watchErrors(page);
+  // (The full 30 s step: a drag takes a while, and the quick step's 5 open seconds are a tap-test's.)
+  await page.goto("/autochess?seed=9");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const before = await offers(page);
+  // The rook for b4 (slot 0) is dragged from its shop card onto the bench: 50 gold, it waits there with its square, nothing lands on the board.
+  await dragMouse(page, middle((await card(page, 0).boundingBox())!), await benchMiddle(page));
+  await expect(held(page)).toHaveCount(1);
+  await expect(held(page).first()).toHaveAttribute("data-kind", "r");
+  await expect(held(page).first()).toHaveAttribute("data-square", "b4");
+  await expect(held(page).first().locator("small")).toHaveText("b4");
+  expect(await goldOf(page)).toBe(50);
+  await expect(page.locator(".ac-msg")).toContainText("Held the rook for b4. Tap it on the bench to place it.");
+  await expect(page.locator(BOARD_SEL.piece)).toHaveCount(2);
+  // A new offer rolled into slot 0; the others stay, the pawn offered for b4 too (nothing stands on b4).
+  const after = await offers(page);
+  expect(after).toHaveLength(5);
+  expect(after.slice(1)).toEqual(before.slice(1));
+  // An offer's silhouette is dragged the same way: the pawn for d4 (the right one of the pair, slot 3).
+  await dragMouse(page, middle((await silhouette(page, 3).boundingBox())!), await benchMiddle(page));
+  await expect(held(page)).toHaveCount(2);
+  expect(await goldOf(page)).toBe(40);
+  // Tapping the held pawn places it on d4 (free): the bench slot empties, and the other offer on d4 (slot 1) rolls again.
+  await tap(page, held(page).nth(1));
+  await expect(piece(page, "white", "pawn", "d4")).toBeVisible();
+  await expect(held(page)).toHaveCount(1);
+  expect(await goldOf(page)).toBe(40);
+  await expect(page.locator(".ac-msg")).toContainText("Another offer was on d4: it rolled again.");
+  expect((await offers(page)).map((o) => o.square)).not.toContain("d4");
+  // The pawn offered for b4 (slot 4) is bought onto b4: the held rook's square is taken, so tapping the rook says so and nothing happens.
+  await tap(page, card(page, 4));
+  await expect(piece(page, "white", "pawn", "b4")).toBeVisible();
+  expect(await goldOf(page)).toBe(30);
+  await expect(held(page).first()).toHaveClass(/off/);
+  await tapGreyed(page, held(page).first());
+  await expect(page.locator(".ac-msg")).toContainText("b4 is taken.");
+  await expect(held(page)).toHaveCount(1);
+  // Sell the held rook by dragging it onto the shop row: 75% of 50, rounded down, is 37.
+  await dragMouse(page, middle((await held(page).first().boundingBox())!), await shopMiddle(page));
+  await expect(held(page)).toHaveCount(0);
+  expect(await goldOf(page)).toBe(67);
+  await expect(page.locator(".ac-msg")).toContainText("Sold the rook for 37.");
+  expect(await soundCount(page, "sell")).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test("the bench holds 4: a fifth is refused with the reason; the shop's offers stay holdable when the board has no room", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/autochess?seed=9&gold=300");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  expect(await goldOf(page)).toBe(430);
+  // Four pawns onto the bench (a pawn offer each time).
+  for (let i = 0; i < 4; i++) {
+    await dragMouse(page, middle((await page.locator('.ac-buy[data-kind="p"]').first().boundingBox())!), await benchMiddle(page));
+    await expect(held(page)).toHaveCount(i + 1);
+  }
+  // (`gold=300` adds 300 to round 1: the income 100 and the interest on 300, 30, make 430; four pawns are 40.)
+  expect(await goldOf(page)).toBe(430 - 40);
+  // The fifth: refused, with the reason; gold and the bench unchanged.
+  const gold = await goldOf(page);
+  await dragMouse(page, middle((await page.locator('.ac-buy[data-kind="p"]').first().boundingBox())!), await benchMiddle(page));
+  await expect(page.locator(".ac-msg")).toContainText("Your bench is full: 4 pieces at most. Place or sell one first.");
+  await expect(held(page)).toHaveCount(4);
+  expect(await goldOf(page)).toBe(gold);
+  // Two pawns held for squares of one file and a third: each is placed on its own square when tapped, never anywhere else.
+  const squares = await held(page).evaluateAll((els) => els.map((e) => e.getAttribute("data-square")!));
+  await tap(page, held(page).first());
+  await expect(piece(page, "white", "pawn", squares[0]!)).toBeVisible();
+  await expect(held(page)).toHaveCount(3);
+  expect(errors).toEqual([]);
+});
+
+test("lock in: the first side to lock gets 25 gold at once, and your board, bench and shop freeze", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(NEVER);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -352,6 +434,8 @@ test("lock in: the first side to lock gets 25 gold at once, and your board and s
   const kinds = await offers(page);
   await reroll(page).click({ force: true });
   expect(await offers(page)).toEqual(kinds);
+  await dragMouse(page, middle((await card(page, 0).boundingBox())!), await benchMiddle(page));
+  await expect(held(page)).toHaveCount(0);
   await tapSquare(page, "g3");
   await expect(page.locator(".ac-msg")).toContainText(frozen);
   await expect(page.getByRole("button", { name: /^Sell/ })).toHaveCount(0);
@@ -432,9 +516,9 @@ test("a drag with a finger: a placed piece onto the shop row sells it", async ({
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await card(page, 4).tap();
   await expect(piece(page, "white", "pawn", "b3")).toBeVisible();
-  await dragTouch(page, await center(page, "b3"), middle((await page.locator(".ac-shop").boundingBox())!));
+  await dragTouch(page, await center(page, "b3"), await shopMiddle(page));
   await expect(piece(page, "white", "pawn", "b3")).toHaveCount(0);
-  expect(await goldOf(page)).toBe(99);
+  expect(await goldOf(page)).toBe(97);
   expect(errors).toEqual([]);
 });
 
@@ -511,9 +595,13 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   const errors = watchErrors(page);
   await page.goto(FIGHT);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  // Buy what the shop shows (pawns, a rook, with the 100 gold), five times.
+  // Hold the rook offered for e4 (slot 3): 50 now, and it stays on the bench through the fight and into the next round.
+  await dragMouse(page, middle((await card(page, 3).boundingBox())!), await benchMiddle(page));
+  await expect(held(page)).toHaveCount(1);
+  expect(await goldOf(page)).toBe(50);
+  // Buy what the shop shows with the rest (pawns), up to five times.
   const bought = await buyAll(page, 5);
-  expect(bought).toBeGreaterThanOrEqual(4);
+  expect(bought).toBeGreaterThanOrEqual(2);
   const left = await goldOf(page);
   await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
   await expect(root(page)).toHaveAttribute("data-phase", "fight", { timeout: 15_000 });
@@ -561,6 +649,11 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   await expect(page.locator(".ac-title span")).toHaveText("Round 2 · you play Black");
   await expect(page.locator(BOARD_SEL.wrap)).toHaveClass(/orientation-black/);
   await expect(page.locator(BOARD_SEL.piece)).toHaveCount(2);
+  // What was held stays: the rook is on the bench still, for the square turned with the colors (e4 for White, e5 for Black), and tapping it places it there.
+  await expect(held(page)).toHaveCount(1);
+  await expect(held(page).first()).toHaveAttribute("data-kind", "r");
+  await expect(held(page).first()).toHaveAttribute("data-square", "e5");
+  await expect(held(page).first().locator("small")).toHaveText("e5");
   // The shop refilled free: five offers, on Black's half (ranks 5 to 8), and the gold is only the round's pay.
   const shown = await offers(page);
   expect(shown).toHaveLength(5);
@@ -572,10 +665,14 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   expect(Number(k2[1])).toBeGreaterThanOrEqual(7);
   expect(b2[0]).toBe(k2[0]);
   expect(Number(k2[1]) + Number(b2[1])).toBe(9);
-  // Black's pieces land on the half at the bottom of the screen, on the offered square.
-  const slot = shown.findIndex((o) => o.kind === "p");
+  // Black's pieces land on the half at the bottom of the screen, on the offered square; the held rook lands on its own.
+  const slot = shown.findIndex((o) => o.kind === "p" && o.square !== "e5");
   await tap(page, card(page, slot));
   await expect(piece(page, "black", "pawn", shown[slot]!.square)).toBeVisible();
+  await tap(page, held(page).first());
+  await expect(piece(page, "black", "rook", "e5")).toBeVisible();
+  await expect(held(page)).toHaveCount(0);
+  expect(await goldOf(page)).toBe(total - 10);
   expect(errors).toEqual([]);
 });
 
@@ -627,6 +724,7 @@ test("layouts: the board, shop and your row fit the screen with no scrolling, at
         me: r(".ac-me").bottom,
         buttons: [...document.querySelectorAll(".ac-buy")].map((b) => b.getBoundingClientRect()).map((b) => ({ r: b.right, l: b.left })),
         labels: [...document.querySelectorAll(".ac-buy small")].map((s) => s.scrollWidth - s.clientWidth),
+        slots: [...document.querySelectorAll(".ac-slot")].map((b) => b.getBoundingClientRect()).map((b) => ({ w: b.width, l: b.left, r: b.right })),
         clock: r(".ac-clock").right,
       };
     });
@@ -639,6 +737,8 @@ test("layouts: the board, shop and your row fit the screen with no scrolling, at
     expect(m.clock, `${w}×${h}: the clock inside`).toBeLessThanOrEqual(w);
     expect(m.buttons.every((b) => b.l >= 0 && b.r <= w), `${w}×${h}: the shop inside`).toBe(true);
     expect(m.labels.every((x) => x <= 0), `${w}×${h}: each offer's label ("Bishop c2") fits under its price`).toBe(true);
+    expect(m.slots).toHaveLength(4);
+    expect(m.slots.every((b) => b.w >= 60 && b.l >= 0 && b.r <= w), `${w}×${h}: the bench's four slots inside the screen`).toBe(true);
     // A phone's board is as wide as the room allows; the others' room is the height.
     if (w <= 430) expect(m.board.w, `${w}×${h}`).toBeGreaterThan(Math.min(w - 40, h - 322) - 10);
   }

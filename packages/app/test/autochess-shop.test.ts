@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AUTOCHESS, mulberry32 } from "@chessroyale/core";
 import { buyOffer, emptyArmy, halfSquares, kindBlock, placeBlock, squareBlock } from "../src/autochess/army.ts";
 import { beginRound, newMatch, roundSeed } from "../src/autochess/economy.ts";
-import { buyFromSlot, newShop, refillSlot, replaceTaken, rerollBlock, rerollFor, rerollShop, rerollWords, rollOffer, shopSeed, type Shop } from "../src/autochess/shop.ts";
+import { buyFromSlot, holdFromSlot, newShop, refillSlot, replaceTaken, rerollBlock, rerollFor, rerollShop, rerollWords, rollOffer, shopSeed, type Shop } from "../src/autochess/shop.ts";
 import { KINDS, type Army, type Kind, type Offer } from "../src/autochess/types.ts";
 
 const share = (kinds: readonly Kind[]) => Object.fromEntries(KINDS.map((k) => [k, (100 * kinds.filter((x) => x === k).length) / kinds.length])) as Record<Kind, number>;
@@ -101,6 +101,32 @@ describe("auto chess: the shop (v6)", () => {
     expect(buyFromSlot({ army, gold: 60, shop }, 4, 5)).toEqual({ block: "gold" });
     expect(buyFromSlot({ army: { ...army, board: { a3: "p", b3: "p", c3: "p", d3: "p", e3: "p", f3: "p", g3: "p", h3: "p" } }, gold: 500, shop: shopOf([offer("p", "a2")]) }, 0, 5)).toEqual({ block: "pawns" });
     expect(buyFromSlot({ army: { ...army, board: { d2: "q" } }, gold: 500, shop }, 4, 5)).toEqual({ block: "queen" });
+  });
+
+  it("holding an offer pays, puts the piece on the bench with its square, rolls a new offer into the slot, and leaves other offers on that square alone", () => {
+    const army = king();
+    const shop = shopOf([offer("p", "c2"), offer("b", "c2"), offer("r", "h1"), offer("p", "d4"), offer("n", "g3")]);
+    const held = holdFromSlot({ army, gold: 100, shop }, 1, 77);
+    if ("block" in held) throw new Error("should hold");
+    expect(held.gold).toBe(68);
+    expect(held.army.bench).toEqual([offer("b", "c2")]);
+    expect(held.army.board).toEqual({});
+    expect(held.shop.slots).toHaveLength(5);
+    // Only slot 1 changed (nothing stands on c2, so the pawn offered there is still good).
+    expect(held.shop.slots.filter((_, i) => i !== 1)).toEqual([offer("p", "c2"), offer("r", "h1"), offer("p", "d4"), offer("n", "g3")]);
+    expect(holdFromSlot({ army, gold: 100, shop }, 1, 77)).toEqual(held);
+    // The bench's reasons: gold, a full bench, the limits (a held queen is the one queen).
+    expect(holdFromSlot({ army, gold: 20, shop }, 1, 77)).toEqual({ block: "gold" });
+    const full = { ...army, bench: [offer("p", "a2"), offer("p", "b2"), offer("p", "e2"), offer("p", "f2")] };
+    expect(holdFromSlot({ army: full, gold: 100, shop }, 1, 77)).toEqual({ block: "bench" });
+    expect(holdFromSlot({ army: { ...army, bench: [offer("q", "d1")] }, gold: 500, shop: shopOf([offer("q", "d2")]) }, 0, 77)).toEqual({ block: "queen" });
+    // What is held counts as owned when the shop rolls: with a queen on the bench no queen is offered.
+    const withQueen = { ...army, bench: [offer("q", "d1")] };
+    for (let seed = 0; seed < 300; seed++) for (const o of newShop(seed, withQueen).slots) expect(o.kind).not.toBe("q");
+    // A bought offer has no hold left to give: a full board still takes a hold.
+    const fullBoard: Army = { ...army, board: { a3: "p", b3: "p", c3: "p", d3: "p", e3: "p", f3: "p", g3: "p", h3: "p", b1: "n", g1: "n" } };
+    expect(buyFromSlot({ army: fullBoard, gold: 100, shop }, 1, 77)).toEqual({ block: "limit" });
+    expect(holdFromSlot({ army: fullBoard, gold: 100, shop }, 1, 77)).toMatchObject({ gold: 68 });
   });
 
   it("an offer whose square gets taken is replaced by a new roll (not greyed), and the new offers are usable", () => {

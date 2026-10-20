@@ -7,9 +7,14 @@ import {
   buyBlock,
   buyOffer,
   buyWords,
+  carryBench,
   emptyArmy,
   extras,
   halfSquares,
+  heldBlock,
+  heldWords,
+  holdBlock,
+  holdOffer,
   inHalf,
   kindBlock,
   kingSquares,
@@ -17,7 +22,9 @@ import {
   offerLabel,
   owned,
   placeBlock,
+  placeHeld,
   placeWords,
+  sellHeld,
   sellPiece,
   sellValue,
   squareBlock,
@@ -27,15 +34,18 @@ import { adjustBlock, adjustMarks, adjustMove, adjustTargets, adjustWords, moves
 import { armiesFen, fightStart, material, piecesOn } from "../src/autochess/position.ts";
 import type { Army, Kind, Offer } from "../src/autochess/types.ts";
 
-const army = (color: "w" | "b", king: string, board: Record<string, Kind> = {}): Army => ({ color, king, board });
+const army = (color: "w" | "b", king: string, board: Record<string, Kind> = {}, bench: Offer[] = []): Army => ({ color, king, board, bench });
 const offer = (kind: Kind, square: string): Offer => ({ kind, square });
 
 describe("auto chess: buying an offer", () => {
-  it("sells for a share of the price, rounded down", () => {
-    expect(AUTOCHESS.sellBack).toBe(0.9);
-    expect(["p", "n", "b", "r", "q"].map((k) => sellValue(k as Kind))).toEqual([9, 27, 28, 45, 81]);
+  it("sells for 75% of the price, rounded down, from the board or the bench", () => {
+    expect(AUTOCHESS.sellBack).toBe(0.75);
+    expect(["p", "n", "b", "r", "q"].map((k) => sellValue(k as Kind))).toEqual([7, 22, 24, 37, 67]);
     const placed = buyOffer(emptyArmy("w", "e1"), offer("n", "c3"));
-    expect(sellPiece(placed, "c3")).toEqual({ army: emptyArmy("w", "e1"), gold: 27 });
+    expect(sellPiece(placed, "c3")).toEqual({ army: emptyArmy("w", "e1"), gold: 22 });
+    const held = holdOffer(holdOffer(emptyArmy("w", "e1"), offer("r", "a1")), offer("q", "d1"));
+    expect(sellHeld(held, 1)).toEqual({ army: holdOffer(emptyArmy("w", "e1"), offer("r", "a1")), gold: 67 });
+    expect(sellHeld(held, 0).army.bench).toEqual([offer("q", "d1")]);
   });
 
   it("the prices are pawn 10, knight 30, bishop 32, rook 50, queen 90", () => {
@@ -44,7 +54,7 @@ describe("auto chess: buying an offer", () => {
 
   it("a bought offer lands on its square, and nowhere else", () => {
     const a = buyOffer(emptyArmy("w", "e1"), offer("b", "c2"));
-    expect(a).toEqual({ color: "w", king: "e1", board: { c2: "b" } });
+    expect(a).toEqual({ color: "w", king: "e1", board: { c2: "b" }, bench: [] });
     expect(boardPieces(buyOffer(a, offer("p", "a3")))).toEqual([{ square: "a3", kind: "p" }, { square: "c2", kind: "b" }]);
   });
 
@@ -54,7 +64,7 @@ describe("auto chess: buying an offer", () => {
     expect(buyBlock(a, 9, offer("p", "a3"))).toBe("gold");
     expect(buyBlock(a, 89, offer("q", "d1"))).toBe("gold");
     expect(buyBlock(a, 90, offer("q", "d1"))).toBeNull();
-    // One queen a round, whatever the gold.
+    // One queen at most, whatever the gold.
     expect(buyBlock(buyOffer(a, offer("q", "d1")), 500, offer("q", "d2"))).toBe("queen");
     // A square a piece stands on now (the offer is stale), the king's, or off the half: taken.
     expect(buyBlock(buyOffer(a, offer("n", "c3")), 500, offer("p", "c3"))).toBe("taken");
@@ -82,13 +92,14 @@ describe("auto chess: buying an offer", () => {
   });
 
   it("has words for every reason, and a label under each offer: the piece and its square", () => {
-    for (const block of ["gold", "limit", "taken", "queen", "pawns", "extras"] as const) {
+    for (const block of ["gold", "limit", "taken", "queen", "pawns", "extras", "bench"] as const) {
       const w = buyWords(block, offer("q", "d1"), 10);
       expect(w.short.length).toBeGreaterThan(0);
       expect(w.line.endsWith(".")).toBe(true);
     }
     expect(buyWords("gold", offer("q", "d1"), 10).line).toBe("Not enough gold: a queen costs 90 and you have 10.");
-    expect(buyWords("queen", offer("q", "d1"), 100).line).toBe("One queen a round.");
+    expect(buyWords("queen", offer("q", "d1"), 100).line).toBe("One queen at most.");
+    expect(buyWords("bench", offer("n", "c3"), 100)).toEqual({ short: "Bench full", line: "Your bench is full: 4 pieces at most. Place or sell one first." });
     expect(buyWords("taken", offer("b", "c2"), 100).line).toBe("c2 is taken.");
     expect([offer("b", "c2"), offer("n", "g1"), offer("p", "h4"), offer("q", "d1"), offer("r", "a1")].map(offerLabel)).toEqual(["Bishop c2", "Knight g1", "Pawn h4", "Queen d1", "Rook a1"]);
   });
@@ -170,6 +181,64 @@ describe("auto chess: placing", () => {
 
 /** Ten pieces on White's half: eight pawns on rank 3 and two knights on b1 and g1 (the king on e1). */
 const ten = (): Record<string, Kind> => ({ a3: "p", b3: "p", c3: "p", d3: "p", e3: "p", f3: "p", g3: "p", h3: "p", b1: "n", g1: "n" });
+
+describe("auto chess: the bench (v6)", () => {
+  const held = (...o: Offer[]) => army("w", "e1", {}, o);
+
+  it("holds 4 pieces, each keeping the square it was offered on, and what is held counts as owned for the limits", () => {
+    expect(AUTOCHESS.benchSlots).toBe(4);
+    const a = holdOffer(emptyArmy("w", "e1"), offer("b", "c2"));
+    expect(a.bench).toEqual([offer("b", "c2")]);
+    expect(a.board).toEqual({});
+    expect(owned(held(offer("q", "d1"), offer("p", "a2")))).toEqual({ p: 1, n: 0, b: 0, r: 0, q: 1 });
+    // A queen held is the one queen: another can't be bought, onto the board or to hold.
+    const queen = held(offer("q", "d1"));
+    expect(buyBlock(queen, 500, offer("q", "d2"))).toBe("queen");
+    expect(holdBlock(queen, 500, offer("q", "d2"))).toBe("queen");
+    // Eight pawns owned, bench and board together, is the pawn limit.
+    const pawns = army("w", "e1", { a3: "p", b3: "p", c3: "p", d3: "p" }, [offer("p", "e3"), offer("p", "f3"), offer("p", "g3"), offer("p", "h3")]);
+    expect(kindBlock(pawns, "p")).toBe("pawns");
+  });
+
+  it("says why an offer can't be held: the limits, then the bench's room, then gold", () => {
+    const a = emptyArmy("w", "e1");
+    expect(holdBlock(a, 100, offer("n", "c3"))).toBeNull();
+    expect(holdBlock(a, 29, offer("n", "c3"))).toBe("gold");
+    // A full board doesn't stop a hold (that is what the bench is for), but a full bench does.
+    expect(holdBlock(army("w", "e1", ten()), 500, offer("b", "c1"))).toBeNull();
+    const four = held(offer("p", "a2"), offer("p", "b2"), offer("p", "c2"), offer("p", "d2"));
+    expect(holdBlock(four, 500, offer("n", "c3"))).toBe("bench");
+    // The limits come first, then the bench, then gold.
+    expect(holdBlock({ ...four, bench: [offer("q", "d1"), ...four.bench.slice(1)] }, 0, offer("q", "d2"))).toBe("queen");
+    expect(holdBlock(four, 0, offer("n", "c3"))).toBe("bench");
+  });
+
+  it("a held piece is placed on its own square when that is free and the board has room, and nowhere else", () => {
+    const a = held(offer("n", "c3"), offer("r", "a1"));
+    expect(heldBlock(a, 0)).toBeNull();
+    const placed = placeHeld(a, 0);
+    expect(placed.board).toEqual({ c3: "n" });
+    expect(placed.bench).toEqual([offer("r", "a1")]);
+    // The square taken (by a piece bought onto it), or this round's king's square: refused, with the square named.
+    expect(heldBlock(army("w", "e1", { c3: "p" }, [offer("n", "c3")]), 0)).toBe("taken");
+    expect(heldBlock(army("w", "c3", {}, [offer("n", "c3")]), 0)).toBe("king");
+    expect(heldWords("taken", "c3")).toBe("c3 is taken.");
+    expect(heldWords("king", "c3")).toBe("c3 is your king's square.");
+    expect(heldWords("limit", "c3")).toBe("Your board is full: 10 pieces and your king at most.");
+    // The board's room: a full board refuses it (the limit is how many pieces it may hold), and a bigger limit lets it in.
+    const full = army("w", "e1", ten(), [offer("b", "c2")]);
+    expect(heldBlock(full, 0)).toBe("limit");
+    expect(heldBlock(full, 0, AUTOCHESS, 11)).toBeNull();
+  });
+
+  it("a bench carries into the next round on squares turned with the colors: the same file, the rank mirrored", () => {
+    expect(carryBench([offer("n", "c3"), offer("q", "d1"), offer("p", "h4")])).toEqual([offer("n", "c6"), offer("q", "d8"), offer("p", "h5")]);
+    expect(carryBench(carryBench([offer("n", "c3")]))).toEqual([offer("n", "c3")]);
+    expect(carryBench([])).toEqual([]);
+    // A white half square becomes a black half square, and back.
+    for (const sq of halfSquares("w")) expect(inHalf(carryBench([offer("n", sq)])[0]!.square, "b")).toBe(true);
+  });
+});
 
 describe("auto chess: the board limit", () => {
   it("holds at most 10 pieces and the king on a side's board, and says why", () => {

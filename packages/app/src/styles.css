@@ -17835,8 +17835,7 @@ button.sq-tiny {
   pointer-events: none;
 }
 .ac-msg {
-  /* (The message line is 32 px and the bench 44 under it: the bench comes back in v6's second step, so for now the line holds its room.) */
-  height: 80px;
+  height: 32px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -17869,12 +17868,18 @@ button.sq-tiny {
   font-size: 13px;
   cursor: pointer;
 }
+/* The bench (v6): four slots, each a held piece and the square it will land on. Drag an offer onto the row to hold it. */
 .ac-bench {
+  position: relative;
   height: 44px;
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   touch-action: none;
+}
+.ac-bench.holding {
+  box-shadow: 0 0 0 2px var(--fd-gold);
+  border-radius: 11px;
 }
 .ac-slot {
   position: relative;
@@ -17883,14 +17888,24 @@ button.sq-tiny {
   border: 1px dashed var(--fd-line);
   border-radius: 9px;
   background: transparent;
-  display: grid;
-  place-items: center;
+  color: var(--fd-text);
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   touch-action: none;
 }
 .ac-slot.has {
   border-style: solid;
   background: var(--fd-panel-2);
-  cursor: grab;
+  cursor: pointer;
+}
+.ac-slot small {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--fd-sub);
 }
 .ac-slot.has.off {
   opacity: 0.5;
@@ -17909,7 +17924,8 @@ button.sq-tiny {
   aspect-ratio: 1;
 }
 .ac-slot .ac-icon {
-  width: min(100%, 42px);
+  width: 34px;
+  flex: none;
 }
 .ac-icon piece {
   position: static;
@@ -17962,6 +17978,11 @@ button.sq-tiny {
 .ac-buy.off {
   opacity: 0.5;
   filter: grayscale(0.7);
+}
+/* An offer the board has no room for: still holdable, so not greyed; its reason shows in gold. */
+.ac-buy.hold-only small {
+  color: var(--fd-gold-text);
+  font-weight: 700;
 }
 /* Reroll (and, beside it, Lock in) under the shop. */
 .ac-ctl {

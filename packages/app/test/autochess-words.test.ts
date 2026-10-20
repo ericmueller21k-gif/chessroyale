@@ -58,7 +58,8 @@ describe("auto chess: survivors and promotions", () => {
   it("the settings hold the design's numbers (v4, v5, v6): tune them here, nowhere else", () => {
     expect(AUTOCHESS).toMatchObject({
       shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 2 },
-      sellBack: 0.9,
+      sellBack: 0.75,
+      benchSlots: 4,
       lockInBonus: 25,
       buySeconds: 30,
       lockSeconds: 3,
@@ -79,7 +80,7 @@ describe("auto chess: survivors and promotions", () => {
       interest: { per: 100, gold: 10, max: 30 },
       survivorRefund: 0.25,
       queenLimit: 1,
-      bot: expect.objectContaining({ lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4 }),
+      bot: expect.objectContaining({ lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, maxHolds: 2, holdChance: 0.5 }),
       maxPawns: 8,
       pawnsPerFile: 3,
     });

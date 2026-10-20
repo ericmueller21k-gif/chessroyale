@@ -1,9 +1,9 @@
 import { AUTOCHESS, type AutoChessSettings } from "@chessroyale/core";
-import type { Army, Color, Kind } from "./types.ts";
+import type { Army, Color, Kind, Offer } from "./types.ts";
 
 /**
- * Gold, streaks and hit points between rounds. Nothing carries over between rounds but gold, HP and the win streak
- * (docs/decisions/2026-10-19-autochess-demo.md, "v4").
+ * Gold, streaks and hit points between rounds. Nothing carries over between rounds but gold, HP, the win streak and the bench
+ * (docs/decisions/2026-10-19-autochess-demo.md, "v4", and "v6" for the bench): the board's pieces still go home each round.
  */
 
 /** A round's income: 100 in round 1, 20 more each round, up to 200. */
@@ -32,6 +32,8 @@ export interface SideState {
   losses: number;
   /** From the last fight; paid out with the next round's income. */
   refund: Refund;
+  /** The pieces held on the bench (v6), each with the square it will land on; they stay from round to round. */
+  bench: Offer[];
 }
 
 export interface MatchState {
@@ -43,7 +45,7 @@ export interface MatchState {
 }
 
 export function newMatch(seed: number, cfg: AutoChessSettings = AUTOCHESS): MatchState {
-  const side = (): SideState => ({ gold: cfg.startGold, hp: cfg.hp, wins: 0, losses: 0, refund: { survivors: 0 } });
+  const side = (): SideState => ({ gold: cfg.startGold, hp: cfg.hp, wins: 0, losses: 0, refund: { survivors: 0 }, bench: [] });
   return { seed, round: 0, you: side(), bot: side() };
 }
 
