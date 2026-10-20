@@ -23,6 +23,7 @@ const PASSIVE_EVENTS: Partial<Record<PowerId, PowerEventKind[]>> = {
   tusks: ["tusks"],
   leapfrog: ["hop"],
   camouflage: ["camouflage"],
+  moonbeam: ["moonbeam"],
 };
 
 const PLAYABLE = BOSS_ROSTER.filter(isPlayable);

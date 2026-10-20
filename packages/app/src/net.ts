@@ -59,6 +59,7 @@ import {
   type BossMoveKind,
   type CarrotRace,
   pigTurn,
+  beamLines,
   ShowdownScout,
   kingHelpBlocked,
 } from "@chessroyale/chess";
@@ -729,7 +730,7 @@ export class NetMatch implements GameView {
         if (m.repaint) return void this.hostPick(m.key, async (engines) => (await repaintFrom(engines, m.fen, m.repaint!, !!m.repaintAny))?.fen ?? null);
         // (Chub & Chirp's Carrot Patch cast spends his whole turn: only the pass guard to ask.)
         if (m.pass) return void this.hostPick(m.key, (engines) => castAnswer(engines, m.fen));
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null);
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
         return void this.useBrain(m.brain);
@@ -818,9 +819,10 @@ export class NetMatch implements GameView {
    * brain (`brain`, the lobby's plan for the battle) with Maia, never waiting for it (Stockfish's move meanwhile).
    * "best" (Wrangler's reply to the showdown's duel): the engine's best at full strength, sent without a brain.
    * `land`: Alfil's Slam's pieces land as the crowd's turn after this move begins, so it's judged with them down too
-   * (the landing guard; the move still comes from `fen`).
+   * (the landing guard; the move still comes from `fen`). `beam` (Moo's Moonbeam lands after this move): the crowd's top
+   * that-many moves after it go with the move (beamLines).
    */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null) {
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null, beam: number | null = null) {
     try {
       const engines = await this.engines();
       const [engine] = engines;
@@ -842,7 +844,8 @@ export class NetMatch implements GameView {
       // Boingo's funhouse: the crowd's move, played for it (a weak but recoverable one); else the boss's own (a pie
       // stops it too). The server sends the one move to everyone.
       const move = funhouse ? await funhouseMoveFrom(engine!, fen, allowed) : await ordinary();
-      this.send({ t: "bossMove", key, move });
+      const lines = beam && !funhouse ? await beamLines(engine!, fen, move, beam) : null;
+      this.send({ t: "bossMove", key, move, ...(lines ? { beam: lines } : {}) });
       this.emit();
     } catch {
       // No engine here: the server asks someone else, or plays a random move.

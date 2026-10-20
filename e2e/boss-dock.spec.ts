@@ -30,7 +30,11 @@ async function quietMove(page: Page) {
     const m = (window as any).match;
     return { fen: m.phase.board.fen as string, allowed: (m.runner.crowdAllowed() ?? null) as string[] | null };
   });
-  const moves = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion && (!allowed || allowed.includes(m.lan)));
+  const all = new Chess(fen).moves({ verbose: true }).filter((m) => !allowed || allowed.includes(m.lan));
+  // (A quiet one when there is one; in check, every answer can be a capture (PR #300's CI: Ginger had taken the queen
+  // with check), and then any allowed move.)
+  const quiet = all.filter((m) => !m.captured && !m.promotion);
+  const moves = quiet.length ? quiet : all;
   await submitMove(page, (moves.find((m) => m.piece === "p") ?? moves[0]!).lan, fen);
   await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
 }

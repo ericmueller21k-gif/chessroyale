@@ -76,14 +76,16 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
  * on his first turn, and his Carrot Patch, which comes at the start of his first turn: their files). Smudgy's Camouflage
- * comes from his first move whatever the switch says; ?power=repaint warns as the second turn begins.
+ * comes from his first move whatever the switch says; ?power=repaint warns as the second turn begins. Moo & Moon's
+ * ?power=moonbeam brings a beam after every one of his moves (not every third), ?power=fullmoon warns as the second turn
+ * begins (the Full Moon at the start of his turn after it).
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -174,6 +176,15 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // from players (admins, Boss alone) except in the Crowd's boss final, which is always him (Eric, Oct 14). His strength
   // is fixed whatever the player's rating (BOSS_BRAIN.fixed: Maia at its top), so his offset is unused. The God King's
   // help doesn't work against him ("nohelp"), and his ultimate turns the clock into bullet ("bullet").
+  // Moo & Moon (Eric, Oct 20): a cow who can't talk and his friend, a chatty crescent moon. Moonbeam: every 3 of his
+  // moves, at the end of his turn, a beam stuns one of the crowd's mobile pieces, at random (it can't move on the
+  // crowd's next turn).
+  // Full Moon: he plays at full strength for 5 of his moves, and the first ends with a flurry of 5 beams
+  // (bosses/moo.ts; docs/decisions/2026-10-20-moo-rules.md). Not playable until his kit is wired (kit null; the test
+  // link `?boss=moo&wip=1`, `&power=fullmoon` or `&power=moonbeam`). The raid sim: with the beam on the crowd's engine-best piece
+  // he was far too strong (the crowd 0.02); with the beam's target at random, 0.21 in 44 moves, in the pack, at the
+  // usual −250 (reports/moo-sim.md).
+  { id: "moo", name: "Moo & Moon", icon: "🐄", kit: null, offset: -250, powers: { passive: "moonbeam", ultimate: "fullmoon" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
@@ -537,8 +548,26 @@ export interface BossPowerState {
    * comes again at the start of his next turn, the warning staying. Never sent to screens.
    */
   repaintWait?: number;
+  /** Moo & Moon's powers (Moonbeam, the Full Moon). */
+  moo?: MooState | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
+}
+
+/**
+ * Moo & Moon's powers in a battle (id moo; Eric, Oct 20; the chess package's bosses/moo.ts).
+ * - `moves`: his moves this battle (Moonbeam comes after every BOSS_POWERS.moonbeamEvery-th).
+ * - `stun`: the crowd's pieces a moonbeam holds: these squares (in the order the beams landed) can't move on crowd turn
+ *   `turn`; `flurry`: the Full Moon's flurry put them there. Cleared as the crowd's move lands. Null: none.
+ * - `full`: the Full Moon under way: it came after crowd move `at` (at the start of his turn); `left`, his moves still at
+ *   full strength. Null: none.
+ * - `dazed`: the crowd turn whose start plays the Full Moon's end (after his last move at full strength).
+ */
+export interface MooState {
+  moves: number;
+  stun: { turn: number; squares: string[]; flurry?: true } | null;
+  full: { at: number; left: number } | null;
+  dazed?: number;
 }
 
 /**
@@ -899,7 +928,11 @@ export interface BurnEvent {
  * gives check, by its own pawn-shaped step or discovered; "stuck": his move left the crowd no move legal on the board it
  * sees as well as the true one; `square` where it stands), as the crowd's turn after it begins; `rookTaken`,
  * the crowd took it (`square`), as the crowd's move lands; `repaint`, his Repaint (his whole turn: as the crowd's turn
- * after it begins; `squares`: his pawn now the crowd's, then the crowd's piece now his).
+ * after it begins; `squares`: his pawn now the crowd's, then the crowd's piece now his). Moo & Moon's: `moonbeam`, a beam
+ * at the end of his turn (`square`: the crowd's piece it stuns, which can't move this crowd turn) and `flurry`, the Full
+ * Moon's beams at the end of its first turn (`squares`, in the order they land), each as the crowd's turn after his move
+ * begins; `fullMoon`, his transformation at the start of his turn (as the crowd's move lands, while he thinks: his move
+ * follows it); `dazed`, the Full Moon over, as the crowd's turn after his last move at full strength begins.
  */
 export type PowerEventKind =
   | "freeze"
@@ -937,7 +970,11 @@ export type PowerEventKind =
   | "camouflage"
   | "unmask"
   | "rookTaken"
-  | "repaint";
+  | "repaint"
+  | "moonbeam"
+  | "flurry"
+  | "fullMoon"
+  | "dazed";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;

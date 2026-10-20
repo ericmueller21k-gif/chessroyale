@@ -410,7 +410,10 @@ test("Smudgy's hidden rook taken: stepped like a pawn, named as one, then your r
   await play(page, "d1d5");
   await expect.poll(async () => (await frames(page)).some((r) => r.taken === "d5"), { timeout: 20_000 }).toBe(true);
   await expect.poll(async () => (await frames(page)).some((r) => /That was his rook!/.test(r.dock)), { timeout: 20_000 }).toBe(true);
-  expect(await heard(page)).toContain("smudgyDrip");
+  // The drip comes 150 ms into the moment (SMUDGY_BEATS.rookTaken.dripAt), the dock's words from its start: watched for
+  // until the moment is over (POWER_FX.rookTaken, 1200 ms), not read the instant the words show (PR #300's CI read it
+  // in the moment's first frame: the frames recorded stop there).
+  await expect.poll(() => heard(page), { timeout: 2_000 }).toContain("smudgyDrip");
   await yourMove(page);
   const t = await state(page);
   expect(t.boss.powers.camo.square).toBeNull();

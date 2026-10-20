@@ -29,6 +29,8 @@ export const POWER_WORDS: Record<PowerId, string> = {
   carrotpatch: "Carrot Patch",
   camouflage: "hides a rook among his pawns",
   repaint: "Repaint",
+  moonbeam: "stuns a piece with a moonbeam",
+  fullmoon: "Full Moon",
 };
 
 /** A boss's card line for its powers: its passive, then its ultimate; empty for a boss without powers yet. */
