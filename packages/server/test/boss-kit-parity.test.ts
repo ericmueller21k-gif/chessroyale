@@ -3,6 +3,7 @@ import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings
 import {
   MatchRunner,
   allowedSearch,
+  beamLines,
   bossGuardFrom,
   bossMoveFrom,
   bounceFrom,
@@ -79,7 +80,10 @@ async function hostBoss(engine: EngineLike, s: Settings, m: Extract<Msg, { t: "b
     const answer = await pigTurn(engines, m.fen, { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) }, ordinary);
     return reply(answer.move, { ...(answer.drag !== undefined ? { drag: answer.drag } : {}), ...(answer.showdown !== undefined ? { showdown: answer.showdown } : {}) });
   }
-  return reply(m.funhouse ? await funhouseMoveFrom(engine, m.fen, m.allowed ?? null) : await ordinary());
+  const move = m.funhouse ? await funhouseMoveFrom(engine, m.fen, m.allowed ?? null) : await ordinary();
+  // (Moo's Moonbeam after his move: the crowd's top moves after it go with the move.)
+  const beam = m.beam && !m.funhouse ? await beamLines(engine, m.fen, move, m.beam) : null;
+  return { ...reply(move), ...(beam ? { beam } : {}) };
 }
 
 /** What a battle showed: each crowd turn's position and allowed moves, every power event, the result. */

@@ -584,7 +584,7 @@ export const BOSS_POWERS = {
    * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
    * fire most of the game.
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -974,6 +974,27 @@ export const BOSS_POWERS = {
   repaintTarget: 2,
   repaintMax: 2,
   repaintNodes: 30_000,
+  /**
+   * Moo & Moon's Moonbeam (Eric, Oct 20; docs/decisions/2026-10-20-moo-rules.md): after every moonbeamEvery-th move of
+   * his, at the end of his turn, a beam stuns one of the crowd's pieces: it can't move on the crowd's next turn. Never
+   * the king; always a move left for the crowd. Which piece (moonbeamTarget; the Full Moon's flurry the same, on
+   * different pieces): "best", the piece that moves in the crowd's engine-best move after his move (the host's engine:
+   * its top moonbeamLines lines at moonbeamNodes), then the pieces of its next lines, then by value; "valuable",
+   * Ginger's freeze's way, one of the crowd's three most valuable mobile pieces at random; "random", any of its mobile
+   * pieces at random (from the seed). "random" since the raid sim (Oct 20, the director's call while Eric slept: "best"
+   * left the crowd 0.02, "random" 0.21; reports/moo-sim.md); "best" was the director's first reading of "most useful".
+   */
+  moonbeamTarget: "random" as "best" | "valuable" | "random",
+  moonbeamEvery: 3,
+  moonbeamLines: 8,
+  moonbeamNodes: 50_000,
+  /**
+   * His Full Moon (on the rage meter; Eric, Oct 20: "max stockfish for 5 of his plays... we may even need to make it like
+   * 7"): fullMoonMoves of his moves at full strength (the engine's best at his move's own budget, bossNodes: never his
+   * brain, a slip or the guard), the first ending with a flurry of flurryBeams moonbeams on different pieces.
+   */
+  fullMoonMoves: 5,
+  flurryBeams: 5,
 } as const;
 
 /**

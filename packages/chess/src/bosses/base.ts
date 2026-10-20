@@ -404,6 +404,8 @@ export interface BossMoveExtras {
   edge?: number | null;
   /** The test trigger's line-up is outside the band (the host found none inside it). */
   outside?: boolean | null;
+  /** Moo's Moonbeam: the crowd's top moves after his move, best first (beamLines; the host's answer online), each checked before it's used. */
+  beam?: readonly string[] | null;
 }
 
 /** A board's evaluation as the judge works it out: its best move, that move's expected score, and every move's. */

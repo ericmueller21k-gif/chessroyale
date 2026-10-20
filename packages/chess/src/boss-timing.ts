@@ -11,6 +11,7 @@ import { RECLUSE_FX } from "./bosses/recluse.ts";
 import { ALFIL_FX } from "./bosses/alfil.ts";
 import { HOPPER_FX } from "./bosses/hopper.ts";
 import { SMUDGY_FX } from "./bosses/smudgy.ts";
+import { MOO_FX } from "./bosses/moo.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -53,7 +54,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * step, `spin`: its banner, then the board turns again); the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX } as const;
+export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX } as const;
 
 /** How long one power's moment holds the screen (ms). */
 export const powerFxMs = (e: { kind: keyof typeof POWER_FX; first?: boolean }): number => (POWER_FX[e.kind] ?? 0) + (POWER_FX_EXTRA[e.kind]?.(e) ?? 0);
@@ -153,6 +154,13 @@ export function queenSlain(boss: QueenSlainView): boolean {
 export function bossThinkMs(boss: QueenSlainView, burnt = false, afterMs = 0): number {
   return Math.max(queenSlain(boss) ? BOSS_BANNER.ms + 500 : 1200, burnt ? FIRE_BURN_MS : 0, afterMs);
 }
+
+/**
+ * Moo's Full Moon came at the start of his turn (as the crowd's move just played landed: its `fullMoon` among this turn's
+ * events): his transformation plays before his move, so his thinking lasts at least as long (the ms; 0: none).
+ */
+export const fullMoonMs = (boss: { powers?: { events?: readonly { kind: string }[] } | null } | null | undefined): number =>
+  boss?.powers?.events?.some((e) => e.kind === "fullMoon") ? POWER_FX.fullMoon : 0;
 
 /**
  * Alfil's Slam: its pieces came down early after the crowd's move just played (he had a mate in one only while they

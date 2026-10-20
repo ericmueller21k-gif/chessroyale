@@ -94,8 +94,9 @@ describe("every boss on the Maia path", () => {
         // (Wrangler's showdown searches its line-ups for real, up to seconds a turn while his meter is full and none
         // qualifies on this test's engine: his trigger once, mid-battle, and his showdowns spent after it. Chub & Chirp's
         // Carrot Patch, once a battle: after twenty moves, as this test's crowd doesn't race and his fifth carrot would
-        // end the battle before Maia had played enough.)
-        const at = id === "pig" ? 6 : id === "hopper" ? 20 : null;
+        // end the battle before Maia had played enough. Moo's Full Moon, the engine's moves for five of his: once, after
+        // twenty moves, or the trigger pulled every turn keeps him at full strength all battle.)
+        const at = id === "pig" ? 6 : id === "hopper" || id === "moo" ? 20 : null;
         if (at === null || r.boss!.crowdMoves === at) r.triggerUltimate();
         if (id === "pig" && r.boss!.powers!.ults) r.boss!.powers!.ults = BOSS_POWERS.showdownMax;
         if (r.bossToMove()) {
@@ -151,8 +152,10 @@ describe("every boss on the Maia path", () => {
             expect(maia.asks.at(-1)!.fen).toBe(fen);
             played.race++;
           } else if (note.why === "power") {
-            // Wrangler's moves after his showdown's duel: the engine's best, as its search scored them; Maia not asked.
-            expect(id).toBe("pig");
+            // Wrangler's moves after his showdown's duel: the engine's best, as its search scored them; Moo's moves during
+            // his Full Moon: the engine at full strength. Maia not asked.
+            expect(["pig", "moo"]).toContain(id);
+            if (id === "moo") expect(r.boss!.powers!.moo?.full ?? r.boss!.powers!.moo?.dazed).toBeTruthy();
             expect(maia.asks.length).toBe(asked);
             played.special++;
           } else {
@@ -188,7 +191,7 @@ describe("every boss on the Maia path", () => {
       // Today's Stockfish move (its limited-strength search) was never needed: Maia always had an allowed move.
       expect(engine.elo).toBe(0);
       // Each boss's own special moment came and kept its own pick.
-      if (id === "clown" || id === "hollow" || id === "bigboy" || id === "pig" || id === "alfil" || id === "hopper") expect(played.special).toBeGreaterThan(0);
+      if (id === "clown" || id === "hollow" || id === "bigboy" || id === "pig" || id === "alfil" || id === "hopper" || id === "moo") expect(played.special).toBeGreaterThan(0);
       // Powers that limit the boss's moves did, and Maia stayed within them.
       if (id === "clown" || id === "bigboy" || id === "sawyer") expect(played.limited).toBeGreaterThan(0);
       // Sawyer's first move is a pawn's: Maia was asked for pawn moves only.

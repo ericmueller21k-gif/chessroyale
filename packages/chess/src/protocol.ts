@@ -385,6 +385,13 @@ export interface NetBossPowers {
   camo?: CamoView | null;
   repaint?: RepaintResult | null;
   repaints?: number;
+  /**
+   * Moo & Moon (missing for other bosses and from older servers): the crowd's pieces a moonbeam holds now (they can't
+   * move this crowd turn; in the order the beams landed; empty once the crowd's move lands), and the Full Moon under way
+   * (`left`: his moves still at full strength, this one included while he thinks; null: none, he's himself).
+   */
+  stunned?: string[];
+  fullMoon?: { left: number } | null;
 }
 
 /**
@@ -485,9 +492,10 @@ export type ClientMessage =
   /**
    * Boss battle, host only: the boss's move (Wrangler's long pull written as its three squares), and what its turn was
    * asked to work out besides (Wrangler's): the lasso drag after it ("c3c4", "" none) and the showdown's line-up after it
-   * (checkLineup's spec, "" none). The server checks each against the rules.
+   * (checkLineup's spec, "" none). The server checks each against the rules. `beam` (Moo's Moonbeam, asked with
+   * `beam`): the crowd's top moves after his move, best first (beamLines); the server checks each.
    */
-  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean }
+  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[] }
   /** Leaving before the match starts (Cancel in the queue): the seat is freed. */
   | { t: "leave" }
   /**
@@ -801,6 +809,12 @@ export type ServerMessage = { now: number } & (
        */
       repaint?: string[];
       repaintAny?: true;
+      /**
+       * Moo & Moon's Moonbeam (or his Full Moon's flurry) lands after this move: list the crowd's top this-many moves in
+       * the position after it (beamLines, at BOSS_POWERS.moonbeamNodes) as the answer's `beam`. An older app ignores it:
+       * the beams then take the crowd's pieces by value (the server's own fallback).
+       */
+      beam?: number;
     }
   /**
    * The boss's brain for this battle, to the host as the battle begins (on the Maia brain only): it starts loading
