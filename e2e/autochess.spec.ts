@@ -790,6 +790,8 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
 test("a side that starts the fight with only its king loses at once: the round is over with no move played", async ({ page }) => {
   test.setTimeout(90_000);
   const errors = watchErrors(page);
+  // (At the narrowest screen: the result's box must hold its words and buttons.)
+  await page.setViewportSize({ width: 320, height: 568 });
   await page.goto(NEVER);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   // Buy nothing: your king stands alone against the bot's army.
@@ -807,6 +809,9 @@ test("a side that starts the fight with only its king loses at once: the round i
   expect(await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count()).toBe(lost - 2);
   // Nothing spent, nothing lost: the gold is saved, with the interest and the income.
   await expect(page.locator(".ac-card-gold")).toHaveText("Next round: 100 saved + 120 income + 10 interest = 230 gold");
+  const card = await page.locator(".ac-card").evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight, buttons: (el.querySelector(".ac-go") as HTMLElement).getBoundingClientRect().bottom - el.getBoundingClientRect().bottom }));
+  expect(card.scroll, "the result's box holds its words").toBeLessThanOrEqual(card.client);
+  expect(card.buttons, "the button is inside the box").toBeLessThanOrEqual(0);
   expect(errors).toEqual([]);
 });
 
@@ -846,6 +851,18 @@ test("layouts: the board, bench, shop and your row fit the screen with no scroll
     // A phone's board is as wide as the room allows; the others' room is the height.
     if (w <= 430) expect(m.board.w, `${w}×${h}`).toBeGreaterThan(Math.min(w - 40, h - 322) - 10);
   }
+  // The adjust step's box at the narrowest screen, with its longest words (pieces that dropped by themselves): nothing is cut off.
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto(QUICK);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  for (const name of ["pawn", "pawn", "knight"]) await tap(page, buyPiece(page, name));
+  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
+  await expect(page.locator(".ac-card-text")).toContainText("3 bench pieces dropped onto your board.");
+  const clipped = () => page.locator(".ac-card").evaluate((el) => Array.from(el.children).filter((c) => c.getBoundingClientRect().bottom > el.getBoundingClientRect().bottom + 0.5).length + (el.scrollHeight > el.clientHeight ? 1 : 0));
+  expect(await clipped(), "the adjust step's box holds its words").toBe(0);
+  // And the fight's, with its rules.
+  await expect(root(page)).toHaveAttribute("data-phase", "fight", { timeout: 15_000 });
+  expect(await clipped(), "the fight's box holds its words").toBe(0);
   // The result box is the same size as the shop and bench it replaces: the board doesn't move when the step changes.
   await page.setViewportSize({ width: phone() ? 390 : 1280, height: phone() ? 664 : 800 });
   await page.goto(QUICK);
