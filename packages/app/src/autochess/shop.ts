@@ -97,7 +97,7 @@ export function buyFromSlot(
   slot: number,
   seed: number,
   cfg: AutoChessSettings = AUTOCHESS,
-  limit: number = cfg.boardLimit,
+  limit: number = cfg.levels.max,
 ): { army: Army; gold: number; shop: Shop; replaced: number } | { block: BuyBlock } {
   const offer = side.shop.slots[slot];
   if (!offer) return { block: "gold" };

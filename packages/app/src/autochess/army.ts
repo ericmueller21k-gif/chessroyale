@@ -77,7 +77,7 @@ export type BuyBlock = KindBlock | "limit" | "taken" | "gold";
  * Why this offer can't be bought onto the board now, or null. The limits come first (they hold all round), then the square, then
  * the board's room (`limit`: how many pieces it may hold), then gold.
  */
-export function buyBlock(army: Army, gold: number, offer: Offer, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.boardLimit): BuyBlock | null {
+export function buyBlock(army: Army, gold: number, offer: Offer, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.levels.max): BuyBlock | null {
   const kind = kindBlock(army, offer.kind, cfg);
   if (kind) return kind;
   // (An offer is rolled onto a usable square; if it has stopped being one, a piece stands on it now.)
@@ -102,13 +102,13 @@ export function holdBlock(army: Army, gold: number, offer: Offer, cfg: AutoChess
 export const offerLabel = (offer: Offer) => `${KIND_NAME[offer.kind][0]!.toUpperCase()}${KIND_NAME[offer.kind].slice(1)} ${offer.square}`;
 
 /** The shop's words for an offer that can't be bought: short (under its price) and whole (the line under the board). */
-export function buyWords(block: BuyBlock | "bench", offer: Offer, gold: number, cfg: AutoChessSettings = AUTOCHESS): { short: string; line: string } {
+export function buyWords(block: BuyBlock | "bench", offer: Offer, gold: number, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.levels.max): { short: string; line: string } {
   const name = KIND_NAME[offer.kind];
   switch (block) {
     case "gold":
       return { short: "No gold", line: `Not enough gold: a ${name} costs ${cfg.prices[offer.kind]} and you have ${gold}.` };
     case "limit":
-      return { short: "Board full", line: placeWords("limit", cfg) };
+      return { short: "Level full", line: placeWords("limit", cfg, limit) };
     case "bench":
       return { short: "Bench full", line: `Your bench is full: ${cfg.benchSlots} pieces at most. Place or sell one first.` };
     case "taken":
@@ -143,14 +143,14 @@ export function squareBlock(army: Army, kind: Kind, square: string, from?: strin
 }
 
 /** Why `kind` can't be put on `square` now, or null: the square's rules, then the board's room (`limit`; a piece already on the board, `from`, doesn't count against it). */
-export function placeBlock(army: Army, kind: Kind, square: string, from?: string, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.boardLimit): PlaceBlock | null {
+export function placeBlock(army: Army, kind: Kind, square: string, from?: string, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.levels.max): PlaceBlock | null {
   const block = squareBlock(army, kind, square, from, cfg);
   if (block) return block;
   if (from === undefined && boardCount(army) >= limit) return "limit";
   return null;
 }
 
-export function placeWords(block: PlaceBlock, cfg: AutoChessSettings = AUTOCHESS): string {
+export function placeWords(block: PlaceBlock, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.levels.max): string {
   switch (block) {
     case "half":
       return "Pieces go on your half of the board.";
@@ -159,7 +159,7 @@ export function placeWords(block: PlaceBlock, cfg: AutoChessSettings = AUTOCHESS
     case "taken":
       return "That square is taken.";
     case "limit":
-      return `Your board is full: ${cfg.boardLimit} pieces and your king at most.`;
+      return `Your level allows ${limit} pieces on the board. Buy XP to level up.`;
     case "backrank":
       return "Pawns can't stand on your back rank.";
     case "file":
@@ -192,7 +192,7 @@ export function sellHeld(army: Army, index: number, cfg: AutoChessSettings = AUT
 }
 
 /** Why a held piece can't be placed now, or null: its square isn't free (taken, the king's), or the board has no room (`limit`). */
-export function heldBlock(army: Army, index: number, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.boardLimit): PlaceBlock | null {
+export function heldBlock(army: Army, index: number, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.levels.max): PlaceBlock | null {
   const held = army.bench[index]!;
   return placeBlock(army, held.kind, held.square, undefined, cfg, limit);
 }
@@ -204,10 +204,10 @@ export function placeHeld(army: Army, index: number): Army {
 }
 
 /** The words for a held piece that can't be placed, with its square named. */
-export function heldWords(block: PlaceBlock, square: string, cfg: AutoChessSettings = AUTOCHESS): string {
+export function heldWords(block: PlaceBlock, square: string, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.levels.max): string {
   if (block === "taken") return `${square} is taken.`;
   if (block === "king") return `${square} is your king's square.`;
-  return placeWords(block, cfg);
+  return placeWords(block, cfg, limit);
 }
 
 /**

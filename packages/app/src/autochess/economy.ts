@@ -1,4 +1,5 @@
 import { AUTOCHESS, type AutoChessSettings } from "@chessroyale/core";
+import { addXp } from "./level.ts";
 import type { Army, Color, Kind, Offer } from "./types.ts";
 
 /**
@@ -34,6 +35,9 @@ export interface SideState {
   refund: Refund;
   /** The pieces held on the bench (v6), each with the square it will land on; they stay from round to round. */
   bench: Offer[];
+  /** Your level (how many pieces the board may hold) and the XP toward the next one (v6); they stay for the whole match. */
+  level: number;
+  xp: number;
 }
 
 export interface MatchState {
@@ -45,7 +49,7 @@ export interface MatchState {
 }
 
 export function newMatch(seed: number, cfg: AutoChessSettings = AUTOCHESS): MatchState {
-  const side = (): SideState => ({ gold: cfg.startGold, hp: cfg.hp, wins: 0, losses: 0, refund: { survivors: 0 }, bench: [] });
+  const side = (): SideState => ({ gold: cfg.startGold, hp: cfg.hp, wins: 0, losses: 0, refund: { survivors: 0 }, bench: [], level: cfg.levels.start, xp: 0 });
   return { seed, round: 0, you: side(), bot: side() };
 }
 
@@ -77,11 +81,11 @@ export function goldBreakdown(round: number, side: SideState, cfg: AutoChessSett
   return { saved: side.gold, survivors: side.refund.survivors, income, interest, streak, total: banked + income + interest + streak };
 }
 
-/** Starts the next round: both sides are paid, and the round number goes up. */
+/** Starts the next round: both sides are paid and get their free XP (a round's start, round 1 included), and the round number goes up. */
 export function beginRound(match: MatchState, cfg: AutoChessSettings = AUTOCHESS): { match: MatchState; gold: { you: GoldBreakdown; bot: GoldBreakdown } } {
   const round = match.round + 1;
   const gold = { you: goldBreakdown(round, match.you, cfg), bot: goldBreakdown(round, match.bot, cfg) };
-  const paid = (s: SideState, g: GoldBreakdown): SideState => ({ ...s, gold: g.total, refund: { survivors: 0 } });
+  const paid = (s: SideState, g: GoldBreakdown): SideState => ({ ...s, ...addXp(s, cfg.levels.freeXp, cfg), gold: g.total, refund: { survivors: 0 } });
   return { match: { ...match, round, you: paid(match.you, gold.you), bot: paid(match.bot, gold.bot) }, gold };
 }
 

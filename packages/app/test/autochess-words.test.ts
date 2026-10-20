@@ -66,7 +66,7 @@ describe("auto chess: survivors and promotions", () => {
       circlesDelaySeconds: 2,
       adjustSeconds: 15,
       adjustMoves: 1,
-      boardLimit: 10,
+      levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
       kingRanks: 2,
       fightMoveMs: 350,
       fightFastAfter: 30,
@@ -80,7 +80,7 @@ describe("auto chess: survivors and promotions", () => {
       interest: { per: 100, gold: 10, max: 30 },
       survivorRefund: 0.25,
       queenLimit: 1,
-      bot: expect.objectContaining({ lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, maxHolds: 2, holdChance: 0.5 }),
+      bot: expect.objectContaining({ lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, maxHolds: 2, holdChance: 0.5, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7 }),
       maxPawns: 8,
       pawnsPerFile: 3,
     });

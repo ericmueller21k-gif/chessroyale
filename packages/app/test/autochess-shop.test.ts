@@ -205,7 +205,7 @@ describe("auto chess: the shop (v6)", () => {
         }
         expect(placeBlock(army, shop.slots[slot]!.kind, shop.slots[slot]!.square)).toBeNull();
         ({ army, gold, shop } = bought);
-        expect(Object.keys(army.board).length).toBeLessThanOrEqual(AUTOCHESS.boardLimit);
+        expect(Object.keys(army.board).length).toBeLessThanOrEqual(AUTOCHESS.levels.max);
       }
       expect(Object.values(army.board).filter((k) => k === "q").length).toBeLessThanOrEqual(1);
       expect(Object.values(army.board).filter((k) => k === "p").length).toBeLessThanOrEqual(8);

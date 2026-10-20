@@ -224,7 +224,7 @@ describe("auto chess: the bench (v6)", () => {
     expect(heldBlock(army("w", "c3", {}, [offer("n", "c3")]), 0)).toBe("king");
     expect(heldWords("taken", "c3")).toBe("c3 is taken.");
     expect(heldWords("king", "c3")).toBe("c3 is your king's square.");
-    expect(heldWords("limit", "c3")).toBe("Your board is full: 10 pieces and your king at most.");
+    expect(heldWords("limit", "c3", AUTOCHESS, 4)).toBe("Your level allows 4 pieces on the board. Buy XP to level up.");
     // The board's room: a full board refuses it (the limit is how many pieces it may hold), and a bigger limit lets it in.
     const full = army("w", "e1", ten(), [offer("b", "c2")]);
     expect(heldBlock(full, 0)).toBe("limit");
@@ -240,23 +240,25 @@ describe("auto chess: the bench (v6)", () => {
   });
 });
 
-describe("auto chess: the board limit", () => {
-  it("holds at most 10 pieces and the king on a side's board, and says why", () => {
-    expect(AUTOCHESS.boardLimit).toBe(10);
+describe("auto chess: the board's room (the level)", () => {
+  it("holds as many pieces (the king not counted) as it is told: your level; a piece already on the board doesn't count against it", () => {
     const nine = army("w", "e1", Object.fromEntries(Object.entries(ten()).slice(0, 9)));
     expect(boardCount(nine)).toBe(9);
-    expect(placeBlock(nine, "b", "c1")).toBeNull();
+    expect(placeBlock(nine, "b", "c1", undefined, AUTOCHESS, 10)).toBeNull();
+    expect(placeBlock(nine, "b", "c1", undefined, AUTOCHESS, 9)).toBe("limit");
     const full = army("w", "e1", ten());
     expect(boardCount(full)).toBe(10);
+    // (No limit given: the top level's.)
     expect(placeBlock(full, "b", "c1")).toBe("limit");
     expect(placeBlock(full, "p", "a2")).toBe("limit");
-    expect(placeBlock(full, "b", "c1", undefined, { ...AUTOCHESS, boardLimit: 11 })).toBeNull();
+    expect(placeBlock(full, "b", "c1", undefined, AUTOCHESS, 11)).toBeNull();
     // A taken square or someone's half is named first; a piece already on the board doesn't count against it.
     expect(placeBlock(full, "b", "a3")).toBe("taken");
     expect(placeBlock(full, "b", "a5")).toBe("half");
     expect(placeBlock(full, "n", "c1", "b1")).toBeNull();
     expect(squareBlock(full, "b", "c1")).toBeNull();
-    expect(placeWords("limit")).toBe("Your board is full: 10 pieces and your king at most.");
+    expect(placeWords("limit", AUTOCHESS, 4)).toBe("Your level allows 4 pieces on the board. Buy XP to level up.");
+    expect(buyWords("limit", offer("b", "c1"), 100, AUTOCHESS, 4)).toEqual({ short: "Level full", line: "Your level allows 4 pieces on the board. Buy XP to level up." });
   });
 });
 

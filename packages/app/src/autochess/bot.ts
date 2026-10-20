@@ -1,6 +1,7 @@
 import { AUTOCHESS, mulberry32, shuffle, weightedIndex, type AutoChessSettings, type Rng } from "@chessroyale/core";
 import { adjustBlock, adjustMove, adjustTargets, startAdjust } from "./adjust.ts";
 import { boardCount, buyBlock, buyOffer, emptyArmy, heldBlock, holdBlock, holdOffer, placeHeld, priceOf } from "./army.ts";
+import { addXp, buyXp, xpBlock, type Level } from "./level.ts";
 import { newShop, refillSlot, replaceTaken, rerollShop } from "./shop.ts";
 import { type Army, type Color, type Kind, type Offer } from "./types.ts";
 
@@ -8,8 +9,8 @@ import { type Army, type Color, type Kind, type Offer } from "./types.ts";
  * The bot (v6): it plays the same shop you do. Its own offers (the same odds, its own seeded rolls) each name a piece and a
  * square on its half; it picks among what it sees by simple weights, rerolling now and then when it has gold to spare, locks in
  * at a seeded time, and in the adjust step moves greedily with the engine. What it held from an earlier round goes down first,
- * free; when its board is full it holds a good piece on its bench for the next round. It sells nothing. Everything random comes
- * from the round's seed.
+ * free; it buys XP now and then (when that gives it a level), and when its board is full (its level's limit) it holds a good piece
+ * on its bench for the next round. It sells nothing. Everything random comes from the round's seed.
  */
 
 /**
@@ -22,13 +23,13 @@ const LATE_ROUND = 6;
 /** A queen only when this much more is left after it (it buys a queen when rich, not with its last coins). */
 const QUEEN_CHANGE = 40;
 
-/** What the bot does: buys a piece onto its board, holds one on its bench, places a held one (free), or rerolls its shop. */
-export type BotAct = "buy" | "hold" | "place" | "reroll";
+/** What the bot does: buys a piece onto its board, holds one on its bench, places a held one (free), rerolls its shop, or buys XP. */
+export type BotAct = "buy" | "hold" | "place" | "reroll" | "xp";
 
-/** One thing the bot does: a piece (and its price, 0 for a held piece placed) on a square, or a reroll of its shop. */
+/** One thing the bot does: a piece (and its price, 0 for a held piece placed) on a square, a reroll of its shop, or XP. */
 export interface BotBuy {
   type: BotAct;
-  kind: Kind | "reroll";
+  kind: Kind | "reroll" | "xp";
   price: number;
   square: string | null;
 }
@@ -36,11 +37,19 @@ export interface BotBuy {
 /**
  * What the bot does with `gold` in `round`, in order: it places what it held (where the squares and its board's room allow), then
  * buys from its own shop (a piece on a square of its half: it picks among what is on offer by its weights, and a bought slot rolls
- * a new offer), now and then rerolling when it has gold to spare (more often when the shop shows nothing but pawns). When its board
- * is full (`limit` pieces) it may hold a good piece on its bench instead (not a pawn). Sometimes it keeps a hundred banked for
- * interest. `army`: its army when it is done, bench included.
+ * a new offer), now and then rerolling when it has gold to spare (more often when the shop shows nothing but pawns). It buys XP now
+ * and then, when that would give it a level (room for another piece) or it is rich; with its board full (its level's number of pieces)
+ * it may hold a good piece on its bench instead (not a pawn). Sometimes it keeps a hundred banked for interest. `army`: its army
+ * when it is done, bench included; `level`: its level and XP after what it bought (`from`: what it had).
  */
-export function botBuys(start: Army, gold: number, round: number, rng: Rng, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.boardLimit): { buys: BotBuy[]; army: Army } {
+export function botBuys(
+  start: Army,
+  gold: number,
+  round: number,
+  rng: Rng,
+  cfg: AutoChessSettings = AUTOCHESS,
+  from: Level = { level: cfg.levels.start, xp: 0 },
+): { buys: BotBuy[]; army: Army; level: Level } {
   const per = cfg.interest.per;
   let budget = gold;
   // (Saving: only when the interest is worth it and a few pieces' worth is left to spend.)
@@ -48,28 +57,45 @@ export function botBuys(start: Army, gold: number, round: number, rng: Rng, cfg:
   const t = Math.min(1, (round - 1) / (LATE_ROUND - 1));
   const seed = (rng() * 2 ** 32) >>> 0;
   let army = start;
+  let level = from;
   const out: BotBuy[] = [];
+  let xpBuys = 0;
+  /** XP, when it is worth it (it gives a level, or the bot is rich), the bot can pay, and it hasn't bought its share: `chance` of the time. */
+  const tryXp = (chance: number) => {
+    const worth = addXp(level, cfg.levels.buyXp, cfg).level > level.level || budget >= cfg.bot.xpRichGold;
+    if (xpBuys >= cfg.bot.maxXpBuys || xpBlock(level, budget, cfg) || !worth || rng() >= chance) return false;
+    const next = buyXp(level, budget, cfg);
+    level = { level: next.level, xp: next.xp };
+    budget = next.gold;
+    out.push({ type: "xp", kind: "xp", price: cfg.levels.buyXpCost, square: null });
+    xpBuys++;
+    return true;
+  };
   // What it held goes down first, for nothing, wherever its square is free and the board has room.
   for (let i = 0; i < army.bench.length; ) {
     const held = army.bench[i]!;
-    if (heldBlock(army, i, cfg, limit)) i++;
+    if (heldBlock(army, i, cfg, level.level)) i++;
     else {
       out.push({ type: "place", kind: held.kind, price: 0, square: held.square });
       army = placeHeld(army, i);
     }
   }
+  // A level first, now and then, when there is gold for it and more besides.
+  if (budget >= cfg.bot.xpGold) tryXp(cfg.bot.xpChance);
   let shop = newShop(seed, army, cfg);
   let rerolls = 0;
   let holds = 0;
   for (let looks = 0; looks < 60; looks++) {
     // (A full board only holds, a full bench only buys; neither: done.)
-    const boardRoom = boardCount(army) < limit;
+    const boardRoom = boardCount(army) < level.level;
     const holding = !boardRoom;
+    // A full board: a level makes room, when it comes to that; else a good piece goes to the bench.
+    if (holding && tryXp(cfg.bot.xpChanceFull)) continue;
     if (holding && (army.bench.length >= cfg.benchSlots || holds >= cfg.bot.maxHolds)) break;
     const options = shop.slots
       .map((offer, slot) => ({ offer, slot }))
       .filter(({ offer }) => {
-        if (holding ? offer.kind === "p" || holdBlock(army, budget, offer, cfg) : buyBlock(army, budget, offer, cfg, limit)) return false;
+        if (holding ? offer.kind === "p" || holdBlock(army, budget, offer, cfg) : buyBlock(army, budget, offer, cfg, level.level)) return false;
         return !(offer.kind === "q" && budget < priceOf("q", cfg) + QUEEN_CHANGE);
       });
     const bare = options.every((o) => o.offer.kind === "p");
@@ -98,15 +124,15 @@ export function botBuys(start: Army, gold: number, round: number, rng: Rng, cfg:
       shop = replaceTaken(refillSlot(shop, pick.slot, seed, army, cfg), seed, army, cfg).shop;
     }
   }
-  return { buys: out, army };
+  return { buys: out, army, level: { level: level.level, xp: level.xp } };
 }
 
-/** One thing the bot does while buying, `at` seconds into the step: a piece appears on a square, is held, or the shop is rerolled. */
+/** One thing the bot does while buying, `at` seconds into the step: a piece appears on a square, is held, the shop is rerolled, or XP is bought. */
 export interface BotEvent {
   at: number;
   type: BotAct;
-  kind: Kind | "reroll";
-  /** Where the piece lands (a held one: where it will land): null for a reroll. */
+  kind: Kind | "reroll" | "xp";
+  /** Where the piece lands (a held one: where it will land): null for a reroll or XP. */
   square: string | null;
   /** Its price (the bot's gold drops by it at that moment). */
   price: number;
@@ -115,7 +141,8 @@ export interface BotEvent {
 /**
  * The bot's whole buy-and-place step: what it does (and when: seconds into the step, spread over the part of it that isn't
  * locked, in the order it did them), and when it locks in (`lockAt`, seconds into the step; null: never). Its army when it is
- * done is `army`, the bench it carries into the next round included. `bench`: what it held coming in.
+ * done is `army`, the bench it carries into the next round included, and its level and XP after what it bought is `level`.
+ * `bench`: what it held coming in; `from`: its level and XP coming in.
  */
 export function botPlan(
   color: Color,
@@ -125,11 +152,11 @@ export function botPlan(
   rng: Rng,
   cfg: AutoChessSettings = AUTOCHESS,
   bench: Offer[] = [],
-  limit: number = cfg.boardLimit,
-): { events: BotEvent[]; army: Army; spent: number; lockAt: number | null } {
+  from: Level = { level: cfg.levels.start, xp: 0 },
+): { events: BotEvent[]; army: Army; level: Level; spent: number; lockAt: number | null } {
   // (Its lock-in time comes from a draw of its own, so changing how it buys never moves it: the e2e tests pick seeds by it.)
   const lockRng = mulberry32((rng() * 2 ** 32) >>> 0);
-  const { buys, army } = botBuys(emptyArmy(color, king, bench), gold, round, rng, cfg, limit);
+  const { buys, army, level } = botBuys(emptyArmy(color, king, bench), gold, round, rng, cfg, from);
   const open = cfg.buySeconds - cfg.lockSeconds - 1;
   // It locks in (its board freezes) at a seeded time in the open part of the step, or now and then never; its last piece goes down a moment before.
   const never = lockRng() < cfg.bot.neverLockChance;
@@ -144,7 +171,7 @@ export function botPlan(
     price: buy.price,
   }));
   events.sort((a, b) => a.at - b.at);
-  return { events, army, spent: events.reduce((sum, e) => sum + e.price, 0), lockAt };
+  return { events, army, level, spent: events.reduce((sum, e) => sum + e.price, 0), lockAt };
 }
 
 /** What you see of the bot's board while buying: its pawns as real pawns, every other piece as a plain circle (until the reveal). */
@@ -153,17 +180,19 @@ export function botShown(squares: Record<string, Kind>): { pawns: string[]; circ
   return { pawns: entries.filter(([, k]) => k === "p").map(([sq]) => sq), circles: entries.filter(([, k]) => k !== "p").map(([sq]) => sq) };
 }
 
-/** What the bot has done by `seconds` into the step: the pieces on the board and the gold it has spent. */
-export function botAt(events: readonly BotEvent[], seconds: number): { squares: Record<string, Kind>; spent: number } {
+/** What the bot has done by `seconds` into the step: the pieces on the board, the gold it has spent and the XP it has bought (times). */
+export function botAt(events: readonly BotEvent[], seconds: number): { squares: Record<string, Kind>; spent: number; xpBuys: number } {
   const squares: Record<string, Kind> = {};
   let spent = 0;
+  let xpBuys = 0;
   for (const e of events) {
     if (e.at > seconds) break;
     // (A held piece isn't on the board: you see where pieces stand, not what is on its bench.)
-    if ((e.type === "buy" || e.type === "place") && e.square && e.kind !== "reroll") squares[e.square] = e.kind;
+    if ((e.type === "buy" || e.type === "place") && e.square && e.kind !== "reroll" && e.kind !== "xp") squares[e.square] = e.kind;
     spent += e.price;
+    if (e.type === "xp") xpBuys++;
   }
-  return { squares, spent };
+  return { squares, spent, xpBuys };
 }
 
 /**

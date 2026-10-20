@@ -2718,8 +2718,19 @@ export interface AutoChessSettings {
   /** The reveal and adjust step (v5): this many chess moves in all (any piece). */
   readonly adjustSeconds: number;
   readonly adjustMoves: number;
-  /** Most pieces a side may have on its board, its king not counted (v5, Eric Oct 20: "10 pieces + the king"). */
-  readonly boardLimit: number;
+  /**
+   * Levels (v6, Eric Oct 20: "the board's piece limit is your level"): your level is how many pieces (not the king) you may have
+   * on the board. You start at `start`, the top is `max`; each round's start gives `freeXp` XP; `buyXp` XP cost `buyXpCost` gold;
+   * the XP to the next level is `xpToNext[level - start]` (4 to 5: 4, 5 to 6: 8, ... 9 to 10: 24).
+   */
+  readonly levels: {
+    readonly start: number;
+    readonly max: number;
+    readonly freeXp: number;
+    readonly buyXp: number;
+    readonly buyXpCost: number;
+    readonly xpToNext: readonly number[];
+  };
   /** The kings stand on a random square of each side's back this-many ranks. */
   readonly kingRanks: number;
   /** The fight: one move about this often, each searched to this many nodes (the same for both sides). */
@@ -2773,6 +2784,13 @@ export interface AutoChessSettings {
     /** With its board full it holds a good piece (not a pawn) on its bench: at most this many a round, each time with this chance (else it keeps the gold). */
     readonly maxHolds: number;
     readonly holdChance: number;
+    /** It buys XP (20 gold for 4) now and then: at most this many a round, with this chance each time it has the gold (more with its board full: a level is room). */
+    readonly maxXpBuys: number;
+    readonly xpGold: number;
+    /** With this much gold it buys XP even when that gives no level yet (it saves up for the next). */
+    readonly xpRichGold: number;
+    readonly xpChance: number;
+    readonly xpChanceFull: number;
     readonly saveChance: number;
     readonly adjustTries: number;
     readonly adjustDestinations: number;
@@ -2792,7 +2810,7 @@ export const AUTOCHESS: AutoChessSettings = {
   circlesDelaySeconds: 2,
   adjustSeconds: 15,
   adjustMoves: 1,
-  boardLimit: 10,
+  levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
   kingRanks: 2,
   fightMoveMs: 350,
   fightNodes: 6000,
@@ -2821,5 +2839,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, maxHolds: 2, holdChance: 0.5, saveChance: 0.3, adjustTries: 16, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, maxHolds: 2, holdChance: 0.5, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7, saveChance: 0.3, adjustTries: 16, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
 };

@@ -23,6 +23,7 @@ import {
   type RoundResult,
 } from "../autochess/economy.ts";
 import { botEvaluator, enginePick, warmEngine } from "../autochess/engine.ts";
+import { addXp, buyXp, levelWords, xpBlock, xpToNext, xpWords } from "../autochess/level.ts";
 import { bonusFor, botLocked, bothLocked, buyFreeze, freezeWords, noLocks, tickLocks, youLock, type Locks } from "../autochess/lockin.ts";
 import { buyFromSlot, holdFromSlot, newShop, replaceTaken, rerollFor, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
 import { playFight } from "../autochess/fight.ts";
@@ -109,7 +110,7 @@ function startRound(prev: MatchState, cfg: AutoChessSettings): { match: MatchSta
   const seed = roundSeed(match);
   const kings = kingSquares(seed, cfg);
   // (What each side held comes into the round on the same squares turned with the colors.)
-  const plan = botPlan(theirs, kings[theirs], match.bot.gold, match.round, mulberry32(seed ^ 0x9e3779b9), cfg, carryBench(match.bot.bench));
+  const plan = botPlan(theirs, kings[theirs], match.bot.gold, match.round, mulberry32(seed ^ 0x9e3779b9), cfg, carryBench(match.bot.bench), { level: match.bot.level, xp: match.bot.xp });
   const you = emptyArmy(mine, kings[mine], carryBench(match.you.bench));
   return { match, round: { you, shop: newShop(shopSeed(seed), you, cfg), locks: noLocks, adj: null, botStart: null, plan, botFinal: null, gold } };
 }
@@ -134,6 +135,26 @@ function PieceIcon({ color, kind }: { color: Color; kind: Kind | "k" }) {
   return (
     <span class="hb-pieces ac-icon" aria-hidden="true">
       <piece class={`${color === "w" ? "white" : "black"} ${KIND_NAME[kind]}`} />
+    </span>
+  );
+}
+
+/** A side's level and the XP toward the next ("Lv 4 · 2/4 XP"); the number pops when the level goes up. */
+function LevelTag({ level, xp, who, cfg }: { level: number; xp: number; who: string; cfg: AutoChessSettings }) {
+  const last = useRef(level);
+  const [pops, setPops] = useState(0);
+  useEffect(() => {
+    if (level > last.current) setPops((n) => n + 1);
+    last.current = level;
+  }, [level]);
+  const need = xpToNext(level, cfg);
+  return (
+    <span class="ac-lv" data-level={level} aria-label={`${who} level ${level}${need === null ? ", the top level" : `, ${xp} of ${need} XP`}`}>
+      Lv{" "}
+      <b key={pops} class={pops ? "pop" : undefined}>
+        {level}
+      </b>
+      {need === null ? " · max" : ` · ${xp}/${need} XP`}
     </span>
   );
 }
@@ -236,7 +257,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const match: MatchState = {
       ...cur.match,
       you: { ...cur.match.you, bench: you.bench },
-      bot: { ...cur.match.bot, gold: cur.match.bot.gold - cur.round.plan.spent + bonusFor(locks, "bot", cfg), bench: botStart.bench },
+      bot: { ...cur.match.bot, gold: cur.match.bot.gold - cur.round.plan.spent + bonusFor(locks, "bot", cfg), bench: botStart.bench, level: cur.round.plan.level.level, xp: cur.round.plan.level.xp },
     };
     commit({ ...cur, match, phase: "adjust", phaseStart: performance.now(), round: { ...cur.round, locks, adj: startAdjust(you), botStart } });
     // The bot adjusts out of sight, from your army as it stood when it locked, and its moves show at the fight.
@@ -319,8 +340,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     return true;
   };
 
-  /** How many pieces your board may hold now. */
-  const boardRoom = () => cfg.boardLimit;
+  /** How many pieces your board may hold now: your level. */
+  const boardRoom = () => gref.current.match.you.level;
   const withGold = (gold: number, army: Army) => {
     const cur = gref.current;
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold } }, round: { ...cur.round, you: army } });
@@ -334,7 +355,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if (!offer) return;
     const bought = buyFromSlot({ army: cur.round.you, gold: cur.match.you.gold, shop: cur.round.shop }, slot, shopSeed(roundSeed(cur.match)), cfg, boardRoom());
     if ("block" in bought) {
-      const line = buyWords(bought.block, offer, cur.match.you.gold, cfg).line;
+      const line = buyWords(bought.block, offer, cur.match.you.gold, cfg, boardRoom()).line;
       // (A board with no room still takes it on the bench: say so.)
       return say(bought.block === "limit" && !holdBlock(cur.round.you, cur.match.you.gold, offer, cfg) ? `${line} Drag the offer to the bench to hold it.` : line);
     }
@@ -367,7 +388,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const held = cur.round.you.bench[index];
     if (!held) return;
     const block = heldBlock(cur.round.you, index, cfg, boardRoom());
-    if (block) return say(heldWords(block, held.square, cfg));
+    if (block) return say(heldWords(block, held.square, cfg, boardRoom()));
     const army = placeHeld(cur.round.you, index);
     // (Offers on that square roll again, as when an offer is bought onto it.)
     const { shop, replaced } = replaceTaken(cur.round.shop, shopSeed(roundSeed(cur.match)), army, cfg);
@@ -375,6 +396,19 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     setSel(null);
     if (replaced) say(`Another offer was on ${held.square}: it rolled again.`);
     else setMsg("");
+    play("pop");
+  }
+
+  /** Buys XP for gold: a level when there is enough, which is room for another piece. */
+  function buyXpNow() {
+    if (!buying()) return;
+    const cur = gref.current;
+    const you = cur.match.you;
+    const block = xpBlock(you, you.gold, cfg);
+    if (block) return say(xpWords(block, you.gold, cfg));
+    const next = buyXp(you, you.gold, cfg);
+    commit({ ...cur, match: { ...cur.match, you: { ...you, level: next.level, xp: next.xp, gold: next.gold } } });
+    say(next.level > you.level ? `Level ${next.level}: your board may hold ${next.level} pieces.` : `Bought ${cfg.levels.buyXp} XP.`);
     play("pop");
   }
 
@@ -619,7 +653,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
 
   // The offers: each a glowing silhouette on its square, grouped by square (two on one square sit side by side, smaller).
   const offers = g.phase === "buy" ? g.round.shop.slots : [];
-  const offerBlocks = offers.map((o) => buyBlock(g.round.you, g.match.you.gold, o, cfg, boardRoom()));
+  const offerBlocks = offers.map((o) => buyBlock(g.round.you, g.match.you.gold, o, cfg, g.match.you.level));
   // (An offer the board has no room for can still be held: its card isn't greyed, it says why it can't be tapped.)
   const holdOnly = offers.map((o, slot) => offerBlocks[slot] === "limit" && !holdBlock(g.round.you, g.match.you.gold, o, cfg));
   const squaresWithOffers = [...new Set(offers.map((o) => o.square))];
@@ -659,6 +693,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const outcome = g.outcome;
   const matchEnd = g.phase === "over" && outcome ? matchWords(outcome.result.outcome === "you") : null;
 
+  // The opponent's level, as far as you see it: while you buy, the XP it has bought so far (2 s behind, as its pieces are).
+  const botLevelNow = seen ? addXp({ level: g.match.bot.level, xp: g.match.bot.xp }, seen.xpBuys * cfg.levels.buyXp, cfg) : { level: g.match.bot.level, xp: g.match.bot.xp };
+  const xpOff = locked || !!xpBlock(g.match.you, goldNow, cfg);
   const botHp = Math.max(0, g.match.bot.hp);
   const myHp = Math.max(0, g.match.you.hp);
 
@@ -681,17 +718,24 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
 
         <div class="ac-side ac-opp" aria-label="Your opponent">
           <span class={`ac-chip ${theirs}`} aria-hidden="true" />
-          <strong>Opponent</strong>
-          {botIsLocked && (
-            <span class="ac-tag ac-bot-locked" aria-label="Opponent locked in">
-              Locked in
-            </span>
-          )}
-          <span class="ac-stat ac-hp-bot" aria-label="Opponent's HP">
-            HP <b>{botHp}</b>
+          <span class="ac-who">
+            <strong>Opponent</strong>
+            <LevelTag level={botLevelNow.level} xp={botLevelNow.xp} who="Opponent's" cfg={cfg} />
           </span>
-          <span class="ac-stat ac-gold-bot" aria-label="Opponent's gold">
-            Gold <b>{botGoldNow}</b>
+          <span class="ac-stats">
+            <span class="ac-line">
+              <span class="ac-stat ac-hp-bot" aria-label="Opponent's HP">
+                HP <b>{botHp}</b>
+              </span>
+              <span class="ac-stat ac-gold-bot" aria-label="Opponent's gold">
+                Gold <b>{botGoldNow}</b>
+              </span>
+            </span>
+            {botIsLocked && (
+              <span class="ac-tag ac-bot-locked" aria-label="Opponent locked in">
+                Locked in
+              </span>
+            )}
           </span>
         </div>
 
@@ -759,7 +803,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               {Array.from({ length: cfg.benchSlots }, (_, i) => {
                 const h = g.round.you.bench[i];
                 if (!h) return <div key={`empty${i}`} class="ac-slot" />;
-                const block = heldBlock(g.round.you, i, cfg, boardRoom());
+                const block = heldBlock(g.round.you, i, cfg, g.match.you.level);
                 const lifted = !!drag && isHeld(drag) && drag.at.held === i;
                 return (
                   <button
@@ -770,7 +814,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                     data-kind={h.kind}
                     data-square={h.square}
                     aria-disabled={!!block || locked}
-                    aria-label={`Place the ${KIND_NAME[h.kind]} held for ${h.square}${locked ? ", locked" : block ? `, ${heldWords(block, h.square, cfg)}` : ""}`}
+                    aria-label={`Place the ${KIND_NAME[h.kind]} held for ${h.square}${locked ? ", locked" : block ? `, ${heldWords(block, h.square, cfg, g.match.you.level)}` : ""}`}
                     onPointerDown={(e) => heldDown(e, i, h.kind)}
                     onPointerMove={movePress}
                     onPointerUp={(e) => endPress(e)}
@@ -788,7 +832,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
             <div class={`ac-shop${dragPiece ? " selling" : ""}`} data-ac-drop="shop" aria-label="Shop">
               {g.round.shop.slots.map((offer, slot) => {
                 const block = offerBlocks[slot] ?? null;
-                const words = block ? buyWords(block, offer, goldNow, cfg) : null;
+                const words = block ? buyWords(block, offer, goldNow, cfg, g.match.you.level) : null;
                 const dim = (!!block && !holdOnly[slot]) || locked;
                 return (
                   <button
@@ -819,9 +863,12 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               <button type="button" class={`ac-reroll${locked || goldNow < cfg.shop.rerollCost ? " off" : ""}`} aria-disabled={locked || goldNow < cfg.shop.rerollCost} aria-label={`Reroll the shop, ${cfg.shop.rerollCost} gold`} onClick={reroll}>
                 Reroll <b>{cfg.shop.rerollCost}</b>
               </button>
+              <button type="button" class={`ac-xp${xpOff ? " off" : ""}`} aria-disabled={xpOff} aria-label={`Buy ${cfg.levels.buyXp} XP, ${cfg.levels.buyXpCost} gold`} onClick={buyXpNow}>
+                Buy XP <b>{cfg.levels.buyXpCost}</b>
+              </button>
               <button
                 type="button"
-                class={`ac-lock${youLocked ? " done" : locked ? " off" : ""}`}
+                class={`ac-lock${youLocked ? " done" : locked ? " off" : ""}${bonusOpen && !locked ? " bonus" : ""}`}
                 aria-disabled={locked}
                 aria-label={youLocked ? "Locked in" : `Lock in${bonusOpen ? `, the first to lock in gets ${cfg.lockInBonus} gold` : ""}`}
                 onClick={lockIn}
@@ -886,15 +933,22 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
 
         <div class="ac-side ac-me" aria-label="You">
           <span class={`ac-chip ${mine}`} aria-hidden="true" />
-          <strong>You</strong>
-          <span class="ac-stat ac-hp-you" aria-label="Your HP">
-            HP <b>{myHp}</b>
+          <span class="ac-who">
+            <strong>You</strong>
+            <LevelTag level={g.match.you.level} xp={g.match.you.xp} who="Your" cfg={cfg} />
           </span>
-          <span class="ac-stat ac-gold-you" aria-label="Your gold">
-            Gold <b>{goldNow}</b>
-          </span>
-          <span class="ac-stat ac-income" aria-label="This round's income">
-            Income <b>+{incomeFor(g.match.round)}</b>
+          <span class="ac-stats">
+            <span class="ac-line">
+              <span class="ac-stat ac-hp-you" aria-label="Your HP">
+                HP <b>{myHp}</b>
+              </span>
+              <span class="ac-stat ac-gold-you" aria-label="Your gold">
+                Gold <b>{goldNow}</b>
+              </span>
+            </span>
+            <span class="ac-stat ac-income" aria-label="This round's income">
+              Income <b>+{incomeFor(g.match.round)}</b>
+            </span>
           </span>
         </div>
       </div>

@@ -17577,11 +17577,11 @@ button.sq-tiny {
 }
 /*
  * One column as wide as the board. The board is as wide as the screen allows, or as tall as the room under the rows around it
- * (the top line 44, the opponent's row 26, the message line 32, the bench 44, the shop 64, the buttons 34, your row 26, seven
- * gaps of 4 and the page's padding: 312 px).
+ * (the top line 44, the opponent's row 32, the message line 32, the bench 44, the shop 64, the buttons 34, your row 32, seven
+ * gaps of 4 and the page's padding: 324 px).
  */
 .ac-col {
-  width: min(100%, calc(var(--app-h) - 312px), 560px);
+  width: min(100%, calc(var(--app-h) - 324px), 560px);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -17636,8 +17636,9 @@ button.sq-tiny {
   color: var(--fd-gold-text);
   font-weight: 800;
 }
+/* A side's strip (v6): its chip (an avatar in a later step), its name over its level and XP, and its numbers at the right over a second line. */
 .ac-side {
-  height: 26px;
+  height: 32px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -17647,9 +17648,63 @@ button.sq-tiny {
 }
 .ac-side strong {
   font-size: 13px;
+  line-height: 1.15;
 }
-.ac-side .ac-chip + strong + .ac-stat {
-  margin-left: auto;
+.ac-who {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.ac-who strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ac-stats {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  line-height: 1.15;
+}
+.ac-line {
+  display: flex;
+  gap: 8px;
+}
+.ac-lv {
+  font-size: 11.5px;
+  color: var(--fd-sub);
+  font-variant-numeric: tabular-nums;
+}
+.ac-lv b {
+  display: inline-block;
+  color: var(--fd-text);
+  font-weight: 800;
+}
+/* A level-up pops the number: it jumps up, big and gold, and settles. */
+.ac-lv b.pop {
+  animation: ac-pop 700ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+@keyframes ac-pop {
+  0% {
+    transform: scale(1);
+    color: var(--fd-text);
+  }
+  30% {
+    transform: scale(2.1) translateY(-2px);
+    color: var(--fd-gold-text);
+  }
+  100% {
+    transform: scale(1);
+    color: var(--fd-text);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-lv b.pop {
+    animation: none;
+  }
 }
 .ac-stat {
   color: var(--fd-sub);
@@ -17924,7 +17979,7 @@ button.sq-tiny {
   aspect-ratio: 1;
 }
 .ac-slot .ac-icon {
-  width: 34px;
+  width: 30px;
   flex: none;
 }
 .ac-icon piece {
@@ -17984,11 +18039,11 @@ button.sq-tiny {
   color: var(--fd-gold-text);
   font-weight: 700;
 }
-/* Reroll (and, beside it, Lock in) under the shop. */
+/* Reroll, Buy XP and Lock in under the shop. */
 .ac-ctl {
   height: 34px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 .ac-ctl button {
@@ -18023,6 +18078,15 @@ button.sq-tiny {
   font-size: 12px;
   font-weight: 700;
 }
+/* While the first-lock bonus is open the button is two lines (the bonus under its name), so the three buttons fit at 320 px. */
+.ac-ctl .ac-lock.bonus {
+  flex-direction: column;
+  gap: 0;
+  line-height: 1.1;
+}
+.ac-ctl .ac-lock.bonus small {
+  font-size: 10.5px;
+}
 .ac-ctl .ac-lock.done {
   background: var(--fd-panel);
   color: var(--fd-gold-text);
@@ -18030,8 +18094,7 @@ button.sq-tiny {
 }
 /* "Locked in" by their name: the opponent's buying is over. */
 .ac-tag {
-  margin-right: auto;
-  padding: 1px 6px;
+  padding: 0 6px;
   border-radius: 999px;
   background: var(--fd-gold);
   color: var(--fd-gold-ink);

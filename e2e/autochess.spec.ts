@@ -100,13 +100,17 @@ async function tapSilhouette(p: Page, slot: number) {
 const reroll = (p: Page) => p.getByRole("button", { name: /^Reroll the shop/ });
 const piece = (p: Page, color: "white" | "black", role: string, square: string) => p.locator(`${BOARD_SEL.piece}.${color}.${role}[data-square="${square}"]`);
 const lockButton = (p: Page) => p.getByRole("button", { name: /^Lock(ed)? in/ });
+const xpButton = (p: Page) => p.getByRole("button", { name: /^Buy \d+ XP/ });
+/** A side's level line ("Lv 4 · 2/4 XP"). */
+const youLevel = (p: Page) => p.locator(".ac-me .ac-lv");
+const botLevel = (p: Page) => p.locator(".ac-opp .ac-lv");
 const bench = (p: Page) => p.locator(".ac-bench");
 const held = (p: Page) => p.locator(".ac-slot.has");
 /** The bench row's middle (where an offer is dropped to hold it), and the shop row's (where a piece is dropped to sell it). */
 const benchMiddle = async (p: Page) => middle((await bench(p).boundingBox())!);
 const shopMiddle = async (p: Page) => middle((await p.locator(".ac-shop").boundingBox())!);
 
-/** Taps the first offer that isn't greyed, up to `max` times; how many were bought. */
+/** Taps the first offer that isn't greyed, up to `max` times (the board holds as many pieces as your level, 4 to begin with); how many taps. */
 async function buyAll(p: Page, max: number) {
   let n = 0;
   for (; n < max; n++) {
@@ -303,6 +307,11 @@ test("buying: a greyed offer says why (gold, the one-queen limit), whole when it
   await expect(page.locator(".ac-msg")).toContainText("One queen at most.");
   await expect(piece(page, "white", "rook", "e3")).toHaveCount(0);
   expect(await goldOf(page)).toBe(10);
+  // Buy XP (4 XP for 20 gold) is greyed too, with its reason.
+  await expect(xpButton(page)).toHaveAttribute("aria-disabled", "true");
+  await xpButton(page).click({ force: true });
+  await expect(page.locator(".ac-msg")).toContainText("Not enough gold: 4 XP cost 20 and you have 10.");
+  expect(await goldOf(page)).toBe(10);
   // The king is the game's: tapping it says so.
   await tapSquare(page, "h1");
   await expect(page.locator(".ac-msg")).toContainText("Your king is placed by the game.");
@@ -408,6 +417,61 @@ test("the bench holds 4: a fifth is refused with the reason; the shop's offers s
   expect(errors).toEqual([]);
 });
 
+test("levels: you start at level 4 (4 pieces on the board), the 5th is refused with the reason, Buy XP (4 XP for 20 gold) makes room, and the number pops", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/autochess?seed=9&gold=800");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  // 800 more, the income 100 and the interest, 30 at the most: 930. Round 1's free 2 XP: level 4, 2 of 4.
+  expect(await goldOf(page)).toBe(930);
+  await expect(youLevel(page)).toHaveText("Lv 4 · 2/4 XP");
+  await expect(botLevel(page)).toContainText("Lv 4");
+  await expect(xpButton(page)).toContainText("Buy XP");
+  await expect(xpButton(page)).toContainText("20");
+  // Four pieces on the board: the level's number.
+  await buyAll(page, 4);
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(5);
+  // The fifth is refused: the offers say "Level full" (not greyed: they can still be held), and a tap says why.
+  const gold = await goldOf(page);
+  const slot = page.locator(".ac-buy.hold-only").first();
+  await expect(slot).toContainText("Level full");
+  await expect(page.locator(".ac-sil.off")).toHaveCount(5);
+  await tapGreyed(page, slot);
+  await expect(page.locator(".ac-msg")).toContainText("Your level allows 4 pieces on the board. Buy XP to level up. Drag the offer to the bench to hold it.");
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(5);
+  expect(await goldOf(page)).toBe(gold);
+  // Held on the bench instead, and placed once there is room.
+  await dragMouse(page, middle((await slot.boundingBox())!), await benchMiddle(page));
+  await expect(held(page)).toHaveCount(1);
+  await tapGreyed(page, held(page).first());
+  await expect(page.locator(".ac-msg")).toContainText("Your level allows 4 pieces on the board. Buy XP to level up.");
+  await expect(held(page)).toHaveCount(1);
+  // Buy XP: 20 gold, 4 XP: 2 + 4 reaches the 4 for level 5, with 2 over: "Lv 5 · 2/8 XP"; the number pops, and the board may hold 5.
+  const before = await goldOf(page);
+  await tap(page, xpButton(page));
+  await expect(youLevel(page)).toHaveText("Lv 5 · 2/8 XP");
+  await expect(youLevel(page).locator("b.pop")).toBeVisible();
+  expect(await goldOf(page)).toBe(before - 20);
+  await expect(page.locator(".ac-msg")).toContainText("Level 5: your board may hold 5 pieces.");
+  await tap(page, held(page).first());
+  await expect(held(page)).toHaveCount(0);
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(6);
+  // Another 4 XP is no level yet: it says so in the numbers (6 of 8), no pop of its own.
+  await tap(page, xpButton(page));
+  await expect(youLevel(page)).toHaveText("Lv 5 · 6/8 XP");
+  await expect(page.locator(".ac-msg")).toContainText("Bought 4 XP.");
+  // All the way up: 82 XP in all from level 4's 2 is 21 buys (the first two are done): level 10, "max", and no more to buy.
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll<HTMLButtonElement>(".ac-xp")][0]!;
+    for (let i = 0; i < 19; i++) b.click();
+  });
+  await expect(youLevel(page)).toHaveText("Lv 10 · max");
+  await expect(xpButton(page)).toHaveAttribute("aria-disabled", "true");
+  await xpButton(page).click({ force: true });
+  await expect(page.locator(".ac-msg")).toContainText("You are at the top level, 10.");
+  expect(await goldOf(page)).toBe(before - 21 * 20);
+  expect(errors).toEqual([]);
+});
+
 test("lock in: the first side to lock gets 25 gold at once, and your board, bench and shop freeze", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(NEVER);
@@ -434,6 +498,8 @@ test("lock in: the first side to lock gets 25 gold at once, and your board, benc
   const kinds = await offers(page);
   await reroll(page).click({ force: true });
   expect(await offers(page)).toEqual(kinds);
+  await xpButton(page).click({ force: true });
+  await expect(youLevel(page)).toHaveText("Lv 4 · 2/4 XP");
   await dragMouse(page, middle((await card(page, 0).boundingBox())!), await benchMiddle(page));
   await expect(held(page)).toHaveCount(0);
   await tapSquare(page, "g3");
@@ -599,8 +665,9 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   await dragMouse(page, middle((await card(page, 3).boundingBox())!), await benchMiddle(page));
   await expect(held(page)).toHaveCount(1);
   expect(await goldOf(page)).toBe(50);
-  // Buy what the shop shows with the rest (pawns), up to five times.
-  const bought = await buyAll(page, 5);
+  // Buy what the shop shows with the rest (pawns), up to four times (level 4: four pieces on the board).
+  await expect(youLevel(page)).toHaveText("Lv 4 · 2/4 XP");
+  const bought = await buyAll(page, 4);
   expect(bought).toBeGreaterThanOrEqual(2);
   const left = await goldOf(page);
   await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
@@ -649,6 +716,10 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   await expect(page.locator(".ac-title span")).toHaveText("Round 2 · you play Black");
   await expect(page.locator(BOARD_SEL.wrap)).toHaveClass(/orientation-black/);
   await expect(page.locator(BOARD_SEL.piece)).toHaveCount(2);
+  // Round 2's free 2 XP made level 5 (2 + 2 of 4): the number pops at the round's start. The opponent got its 2 XP too.
+  await expect(youLevel(page)).toHaveText("Lv 5 · 0/8 XP");
+  await expect(youLevel(page).locator("b.pop")).toBeVisible();
+  await expect(botLevel(page)).toContainText(/Lv [5-9] · /);
   // What was held stays: the rook is on the bench still, for the square turned with the colors (e4 for White, e5 for Black), and tapping it places it there.
   await expect(held(page)).toHaveCount(1);
   await expect(held(page).first()).toHaveAttribute("data-kind", "r");
@@ -724,8 +795,13 @@ test("layouts: the board, shop and your row fit the screen with no scrolling, at
         me: r(".ac-me").bottom,
         buttons: [...document.querySelectorAll(".ac-buy")].map((b) => b.getBoundingClientRect()).map((b) => ({ r: b.right, l: b.left })),
         labels: [...document.querySelectorAll(".ac-buy small")].map((s) => s.scrollWidth - s.clientWidth),
-        slots: [...document.querySelectorAll(".ac-slot")].map((b) => b.getBoundingClientRect()).map((b) => ({ w: b.width, l: b.left, r: b.right })),
+        slots: [...document.querySelectorAll(".ac-slot")].map((b) => ({ w: b.getBoundingClientRect().width, l: b.getBoundingClientRect().left, r: b.getBoundingClientRect().right, over: b.scrollWidth - b.clientWidth })),
         clock: r(".ac-clock").right,
+        rows: [".ac-opp", ".ac-me"].map((sel) => {
+          const el = document.querySelector(sel)!;
+          return el.scrollWidth - el.clientWidth;
+        }),
+        ctl: [...document.querySelectorAll(".ac-ctl button")].map((b) => ({ l: b.getBoundingClientRect().left, r: b.getBoundingClientRect().right, over: b.scrollWidth - b.clientWidth, h: b.getBoundingClientRect().height })),
       };
     });
     expect(m.scroll, `${w}×${h}: scrolling`).toBeLessThanOrEqual(0);
@@ -735,12 +811,15 @@ test("layouts: the board, shop and your row fit the screen with no scrolling, at
     expect(m.board.right, `${w}×${h}`).toBeLessThanOrEqual(w);
     expect(m.me, `${w}×${h}: your row on screen`).toBeLessThanOrEqual(h);
     expect(m.clock, `${w}×${h}: the clock inside`).toBeLessThanOrEqual(w);
+    expect(m.rows.every((x) => x <= 0), `${w}×${h}: both strips (name, level, numbers) fit their width`).toBe(true);
+    expect(m.ctl, `${w}×${h}: Reroll, Buy XP and Lock in`).toHaveLength(3);
+    expect(m.ctl.every((b) => b.l >= 0 && b.r <= w && b.over <= 0 && b.h >= 30), `${w}×${h}: the three buttons fit, with their words`).toBe(true);
     expect(m.buttons.every((b) => b.l >= 0 && b.r <= w), `${w}×${h}: the shop inside`).toBe(true);
     expect(m.labels.every((x) => x <= 0), `${w}×${h}: each offer's label ("Bishop c2") fits under its price`).toBe(true);
     expect(m.slots).toHaveLength(4);
-    expect(m.slots.every((b) => b.w >= 60 && b.l >= 0 && b.r <= w), `${w}×${h}: the bench's four slots inside the screen`).toBe(true);
+    expect(m.slots.every((b) => b.w >= 50 && b.l >= 0 && b.r <= w && b.over <= 0), `${w}×${h}: the bench's four slots inside the screen`).toBe(true);
     // A phone's board is as wide as the room allows; the others' room is the height.
-    if (w <= 430) expect(m.board.w, `${w}×${h}`).toBeGreaterThan(Math.min(w - 40, h - 322) - 10);
+    if (w <= 430) expect(m.board.w, `${w}×${h}`).toBeGreaterThan(Math.min(w - 40, h - 334) - 10);
   }
   // The adjust step's box at the narrowest screen, with its longest words: nothing is cut off. (An army of a few pieces, so the fight lasts.)
   await page.setViewportSize({ width: 320, height: 568 });
