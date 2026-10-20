@@ -57,6 +57,7 @@ describe("auto chess: survivors and promotions", () => {
     expect(AUTOCHESS).toMatchObject({
       shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 5 },
       sellBack: 0.9,
+      lockInBonus: 25,
       buySeconds: 30,
       lockSeconds: 3,
       circlesDelaySeconds: 2,

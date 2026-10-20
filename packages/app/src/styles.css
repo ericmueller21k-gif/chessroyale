@@ -17640,7 +17640,7 @@ button.sq-tiny {
   height: 26px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   font-size: 13px;
   min-width: 0;
   white-space: nowrap;
@@ -17930,6 +17930,29 @@ button.sq-tiny {
 .ac-ctl button.off {
   opacity: 0.5;
   filter: grayscale(0.7);
+}
+.ac-ctl .ac-lock {
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+}
+.ac-ctl .ac-lock small {
+  font-size: 12px;
+  font-weight: 700;
+}
+.ac-ctl .ac-lock.done {
+  background: var(--fd-panel);
+  color: var(--fd-gold-text);
+  cursor: default;
+}
+/* "Locked in" by their name: the opponent's buying is over. */
+.ac-tag {
+  margin-right: auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font-size: 10.5px;
+  font-weight: 800;
 }
 .ac-sell-drop {
   position: absolute;

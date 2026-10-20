@@ -2703,6 +2703,8 @@ export interface AutoChessSettings {
   };
   /** Selling a piece gives back this share of its price, rounded down (P9 N27 B28 R45 Q81). */
   readonly sellBack: number;
+  /** The first side to lock in (end its buying, freezing its board, bench and shop) gets this much gold at once (v5, Eric Oct 20). */
+  readonly lockInBonus: number;
   /** The buy-and-place step, its locked end (no buying, selling or moving), and how far behind the opponent's circles show. */
   readonly buySeconds: number;
   readonly lockSeconds: number;
@@ -2751,6 +2753,10 @@ export interface AutoChessSettings {
   readonly pawnsPerFile: number;
   /** The bot: the chance it keeps a hundred banked for interest (when it has the gold to), how many moves it tries while adjusting, and the search it uses. */
   readonly bot: {
+    /** It locks in at a seeded time between these shares of the step's open part (before its locked end), or never, this often. */
+    readonly lockFrom: number;
+    readonly lockTo: number;
+    readonly neverLockChance: number;
     readonly saveChance: number;
     readonly adjustTries: number;
     readonly adjustDestinations: number;
@@ -2763,6 +2769,7 @@ export const AUTOCHESS: AutoChessSettings = {
   prices: { p: 10, n: 30, b: 32, r: 50, q: 90 },
   shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 5 },
   sellBack: 0.9,
+  lockInBonus: 25,
   buySeconds: 30,
   lockSeconds: 3,
   circlesDelaySeconds: 2,
@@ -2795,5 +2802,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { saveChance: 0.3, adjustTries: 24, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, saveChance: 0.3, adjustTries: 24, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
 };

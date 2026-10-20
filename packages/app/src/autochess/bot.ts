@@ -88,22 +88,34 @@ export function botPlaces(color: Color, king: string, kinds: readonly Kind[], rn
 
 /**
  * The bot's whole buy-and-place step: what it buys, where it puts it, and when (seconds into the step, spread over the part
- * of it that isn't locked, in the order it bought). Its army when it is done is `army`.
+ * of it that isn't locked, in the order it bought), and when it locks in (`lockAt`, seconds into the step; null: never). Its
+ * army when it is done is `army`.
  */
-export function botPlan(color: Color, king: string, gold: number, round: number, rng: Rng, cfg: AutoChessSettings = AUTOCHESS): { events: BotEvent[]; army: Army; spent: number } {
+export function botPlan(
+  color: Color,
+  king: string,
+  gold: number,
+  round: number,
+  rng: Rng,
+  cfg: AutoChessSettings = AUTOCHESS,
+): { events: BotEvent[]; army: Army; spent: number; lockAt: number | null } {
   const kinds = botBuys(gold, round, rng, cfg);
   const placements = botPlaces(color, king, kinds, rng, cfg);
   const open = cfg.buySeconds - cfg.lockSeconds - 1;
+  // It locks in (its board freezes) at a seeded time in the open part of the step, or now and then never; its last piece goes down a moment before.
+  const never = rng() < cfg.bot.neverLockChance;
+  const lockAt = never ? null : open * (cfg.bot.lockFrom + (cfg.bot.lockTo - cfg.bot.lockFrom) * rng());
+  const span = lockAt === null ? open : lockAt - 0.2;
   const n = placements.length;
   const events: BotEvent[] = placements.map((p, i) => ({
-    at: Math.min(open, Math.max(0.5, open * (0.1 + (0.9 * (i + 0.5)) / n) + (rng() - 0.5) * 0.04 * open)),
+    at: Math.min(span, Math.max(0.5, span * (0.1 + (0.9 * (i + 0.5)) / n) + (rng() - 0.5) * 0.04 * span)),
     kind: p.kind,
     square: p.square,
     price: priceOf(p.kind, cfg),
   }));
   events.sort((a, b) => a.at - b.at);
   const army: Army = { ...emptyArmy(color, king), board: Object.fromEntries(placements.map((p) => [p.square, p.kind])) };
-  return { events, army, spent: events.reduce((s, e) => s + e.price, 0) };
+  return { events, army, spent: events.reduce((s, e) => s + e.price, 0), lockAt };
 }
 
 /** What the bot has done by `seconds` into the step: the pieces on the board and the gold it has spent. */

@@ -268,6 +268,101 @@ test("buy to the bench, place by tap and by drag, sell for 90% by drag and by ta
   expect(errors).toEqual([]);
 });
 
+// Seeds for the lock-in tests (the bot's lock time comes from its plan: with ?quick=1 the open part of the step is 4 s):
+// 1866 the bot never locks; 1 it locks at 2.2 s; 12 at 3.4 s.
+const NEVER = "/autochess?quick=1&seed=1866";
+const EARLY = "/autochess?quick=1&seed=1";
+const LATE = "/autochess?quick=1&seed=12";
+const lockButton = (p: Page) => p.getByRole("button", { name: /^Lock(ed)? in/ });
+
+test("lock in: the first side to lock gets 25 gold at once, and your board, bench and shop freeze", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto(NEVER);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  // The button says what it is worth while the bonus is open.
+  await expect(lockButton(page)).toContainText("Lock in");
+  await expect(lockButton(page)).toContainText("+25 gold");
+  await tap(page, page.locator('.ac-buy[data-kind="p"]').first());
+  await tap(page, benchPieces(page).first());
+  const squares = await freeSquares(page, [3]);
+  await tapSquare(page, squares[0]!);
+  expect(await goldOf(page)).toBe(90);
+  await tap(page, buyPiece(page, "pawn"));
+  expect(await goldOf(page)).toBe(80);
+  await expect(benchPieces(page)).toHaveCount(1);
+  // Lock in: +25 at once (the bot never locks with this seed, so you are first), the button and the timer say so.
+  await tap(page, lockButton(page));
+  expect(await goldOf(page)).toBe(105);
+  await expect(root(page)).toHaveAttribute("data-bonus", "you");
+  await expect(root(page)).toHaveAttribute("data-you-locked", "1");
+  await expect(lockButton(page)).toHaveText("Locked in");
+  await expect(lockButton(page)).toHaveAttribute("aria-disabled", "true");
+  await expect(page.locator(".ac-clock span")).toHaveText("Locked in");
+  await expect(page.locator(".ac-msg")).toContainText("You locked in first: +25 gold.");
+  // Frozen: no buying, rerolling, placing, selling or moving; each says why, and nothing changes.
+  const frozen = "You're locked in: your board, bench and shop are frozen.";
+  await buyPiece(page, "pawn").click({ force: true });
+  await expect(page.locator(".ac-msg")).toContainText(frozen);
+  const kinds = await shopKinds(page);
+  await reroll(page).click({ force: true });
+  expect(await shopKinds(page)).toEqual(kinds);
+  await tap(page, benchPieces(page).first());
+  await tapSquare(page, squares[1]!);
+  await expect(page.locator(`${BOARD_SEL.piece}.white.pawn`)).toHaveCount(1);
+  await expect(benchPieces(page)).toHaveCount(1);
+  await tapSquare(page, squares[0]!);
+  await expect(page.locator(".ac-msg")).toContainText(frozen);
+  await expect(page.getByRole("button", { name: /^Sell/ })).toHaveCount(0);
+  await lockButton(page).click({ force: true });
+  expect(await goldOf(page)).toBe(105);
+  // The bot never locks here, so the step runs its time out; the gold is kept for the adjust step.
+  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
+  expect(await goldOf(page)).toBe(105);
+  expect(errors).toEqual([]);
+});
+
+test("lock in: when the opponent locks first you see it, get no bonus, and both locked ends the step at once", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto(EARLY);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const t0 = Date.now();
+  await expect(page.locator(".ac-bot-locked")).toHaveCount(0);
+  await expect(lockButton(page)).toContainText("+25 gold");
+  // At 2.2 s the opponent locks in: "Locked in" by their name, the bonus gone from the button.
+  await expect(page.locator(".ac-bot-locked")).toHaveText("Locked in", { timeout: 6000 });
+  await expect(page.getByLabel("Opponent locked in")).toBeVisible();
+  await expect(root(page)).toHaveAttribute("data-bonus", "bot");
+  await expect(lockButton(page)).not.toContainText("+25");
+  // Their row still fits at the narrowest screen, with the tag in it.
+  const fits = await page.locator(".ac-opp").evaluate((el) => el.scrollWidth <= el.clientWidth);
+  expect(fits).toBe(true);
+  expect(await goldOf(page)).toBe(100);
+  // You lock in second: no bonus, and the step ends at once (it would run to 7 s).
+  await tap(page, lockButton(page));
+  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 1500 });
+  expect(Date.now() - t0).toBeLessThan(6500);
+  expect(await goldOf(page)).toBe(100);
+  await expect(page.locator(".ac-bot-locked")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("lock in: you lock before the opponent, and when it locks too the step ends at once", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto(LATE);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const t0 = Date.now();
+  await tap(page, lockButton(page));
+  await expect(root(page)).toHaveAttribute("data-bonus", "you");
+  expect(await goldOf(page)).toBe(125);
+  await expect(page.locator(".ac-bot-locked")).toHaveCount(0);
+  // The opponent locks at 3.4 s: both locked, so the adjust step begins then, not at the 7 s end.
+  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 5000 });
+  expect(Date.now() - t0).toBeLessThan(6000);
+  expect(await goldOf(page)).toBe(125);
+  expect(errors).toEqual([]);
+});
+
 test("a drag with a finger: a bench piece onto the board and a placed piece back to the bench", async ({ page }) => {
   test.skip(!phone(), "real touch events, as a phone makes them");
   const errors = watchErrors(page);

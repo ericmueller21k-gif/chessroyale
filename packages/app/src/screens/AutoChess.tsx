@@ -36,6 +36,7 @@ import {
   type RoundResult,
 } from "../autochess/economy.ts";
 import { botEvaluator, enginePick, warmEngine } from "../autochess/engine.ts";
+import { bonusFor, botLocked, bothLocked, buyFreeze, freezeWords, noLocks, tickLocks, youLock, type Locks } from "../autochess/lockin.ts";
 import { buyFromSlot, newShop, rerollFor, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
 import { playFight } from "../autochess/fight.ts";
 import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn } from "../autochess/position.ts";
@@ -66,6 +67,8 @@ interface RoundState {
   you: Army;
   /** The shop's five slots (new every round, free). */
   shop: Shop;
+  /** Lock in (end your buying, first gets the bonus): when you locked, and who got the bonus. */
+  locks: Locks;
   /** Your adjust step: where your pieces stand and which have moved. */
   adj: Adjusted | null;
   plan: BotPlan;
@@ -115,7 +118,7 @@ function startRound(prev: MatchState, cfg: AutoChessSettings): { match: MatchSta
   const seed = roundSeed(match);
   const kings = kingSquares(seed, cfg);
   const plan = botPlan(theirs, kings[theirs], match.bot.gold, match.round, mulberry32(seed ^ 0x9e3779b9), cfg);
-  return { match, round: { you: emptyArmy(mine, kings[mine]), shop: newShop(shopSeed(seed), cfg), adj: null, plan, botFinal: null, gold } };
+  return { match, round: { you: emptyArmy(mine, kings[mine]), shop: newShop(shopSeed(seed), cfg), locks: noLocks, adj: null, plan, botFinal: null, gold } };
 }
 
 function newGame(seed: number, cfg: AutoChessSettings): Game {
@@ -190,7 +193,12 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   // (Never negative: the clock was read a moment before this step began.)
   const elapsed = Math.max(0, now - g.phaseStart);
   const lockedAt = (cfg.buySeconds - cfg.lockSeconds) * 1000;
-  const locked = g.phase === "buy" && elapsed >= lockedAt;
+  // Frozen: the step's last seconds, or you locked in (your board, bench and shop stay as they are).
+  const youLocked = g.phase === "buy" && g.round.locks.you !== null;
+  const locked = g.phase === "buy" && buyFreeze(g.round.locks, elapsed, cfg) !== null;
+  const botIsLocked = g.phase === "buy" && botLocked(g.round.plan.lockAt, elapsed);
+  // (The bonus is still to be had while nobody has locked in.)
+  const bonusOpen = g.phase === "buy" && g.round.locks.bonus === null && !botIsLocked;
 
   useEffect(() => {
     warmEngine();
@@ -198,8 +206,13 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       const cur = gref.current;
       const t = performance.now();
       setNow(t);
-      if (cur.phase === "buy" && t - cur.phaseStart >= cfg.buySeconds * 1000) toAdjust();
-      else if (cur.phase === "adjust" && t - cur.phaseStart >= cfg.adjustSeconds * 1000) void toFight();
+      if (cur.phase === "buy") {
+        // The bot locks in when its time comes (the first to lock gets the bonus); both locked, or the time up, ends the step.
+        const at = t - cur.phaseStart;
+        const locks = tickLocks(cur.round.locks, at, cur.round.plan.lockAt);
+        if (locks !== cur.round.locks) commit({ ...cur, round: { ...cur.round, locks } });
+        if (at >= cfg.buySeconds * 1000 || bothLocked(locks, at, cur.round.plan.lockAt)) toAdjust();
+      } else if (cur.phase === "adjust" && t - cur.phaseStart >= cfg.adjustSeconds * 1000) void toFight();
     }, TICK_MS);
     return () => {
       clearInterval(id);
@@ -218,10 +231,12 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     setSel(null);
     setDrag(null);
     press.current = null;
+    setMsg("");
     const you = cur.round.you;
-    // (What the bot spent is paid now; it sells nothing.)
-    const match: MatchState = { ...cur.match, bot: { ...cur.match.bot, gold: cur.match.bot.gold - cur.round.plan.spent } };
-    commit({ ...cur, match, phase: "adjust", phaseStart: performance.now(), round: { ...cur.round, adj: startAdjust(you) } });
+    // (What the bot spent is paid now, and its lock-in bonus if it locked first; it sells nothing.)
+    const locks = tickLocks(cur.round.locks, performance.now() - cur.phaseStart, cur.round.plan.lockAt);
+    const match: MatchState = { ...cur.match, bot: { ...cur.match.bot, gold: cur.match.bot.gold - cur.round.plan.spent + bonusFor(locks, "bot", cfg) } };
+    commit({ ...cur, match, phase: "adjust", phaseStart: performance.now(), round: { ...cur.round, locks, adj: startAdjust(you) } });
     // The bot adjusts out of sight, from your army as it stood when it locked, and its moves show at the fight.
     const run: BotRun = { stop: false, done: null, latest: cur.round.plan.army };
     botRun.current = run;
@@ -294,8 +309,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const buying = () => {
     const cur = gref.current;
     if (cur.phase !== "buy") return false;
-    if (performance.now() - cur.phaseStart >= lockedAt) {
-      say("Locked: no buying, selling or moving.");
+    const freeze = buyFreeze(cur.round.locks, performance.now() - cur.phaseStart, cfg);
+    if (freeze) {
+      say(freezeWords(freeze));
       return false;
     }
     return true;
@@ -317,6 +333,22 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: bought.gold } }, round: { ...cur.round, you: bought.army, shop: bought.shop } });
     setMsg("");
     play("pop");
+  }
+
+  /** Lock in: your buying is over (your board, bench and shop freeze); the first side to do it gets the bonus, and both locked ends the step. */
+  function lockIn() {
+    if (!buying()) return;
+    const cur = gref.current;
+    const at = performance.now() - cur.phaseStart;
+    const locks = youLock(cur.round.locks, at, cur.round.plan.lockAt);
+    const bonus = bonusFor(locks, "you", cfg);
+    setSel(null);
+    setDrag(null);
+    press.current = null;
+    commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: cur.match.you.gold + bonus } }, round: { ...cur.round, locks } });
+    play("pop");
+    if (bothLocked(locks, at, cur.round.plan.lockAt)) return toAdjust();
+    say(bonus ? `You locked in first: +${bonus} gold.` : "You locked in.");
   }
 
   /** Rolls the whole shop again for gold. */
@@ -534,14 +566,14 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
 
   const interactiveLayer = (g.phase === "buy" && !locked) || (g.phase === "adjust" && elapsed < cfg.adjustSeconds * 1000);
   const goldNow = g.match.you.gold;
-  const botGoldNow = g.phase === "buy" ? g.match.bot.gold - (seen?.spent ?? 0) : g.match.bot.gold;
+  const botGoldNow = g.phase === "buy" ? g.match.bot.gold - (seen?.spent ?? 0) + bonusFor(g.round.locks, "bot", cfg) : g.match.bot.gold;
 
   // The clock and the step's name.
   let clock = "";
   let label = "";
   if (g.phase === "buy") {
     clock = clockWords(cfg.buySeconds * 1000 - elapsed);
-    label = locked ? "Locked" : "Buy & place";
+    label = youLocked ? "Locked in" : locked ? "Locked" : "Buy & place";
   } else if (g.phase === "adjust") {
     clock = clockWords(cfg.adjustSeconds * 1000 - elapsed);
     label = "Move your pieces";
@@ -552,7 +584,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const held = sel ?? null;
   const hint =
     g.phase === "buy"
-      ? "Tap a piece to buy it. Drag it onto your half, or tap a square."
+      ? youLocked
+        ? "You're locked in. Your board, bench and shop are frozen until the step ends."
+        : "Tap a piece to buy it. Drag it onto your half, or tap a square."
       : g.phase === "adjust"
         ? "Each piece may make one chess move on your half. Tap a piece, then a square."
         : g.phase === "fight"
@@ -566,7 +600,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const myHp = Math.max(0, g.match.you.hp);
 
   return (
-    <div class="fd-root ac-root" data-phase={g.phase} data-round={g.match.round} data-you={mine} data-king={g.round.you.king} data-bot-king={botKing}>
+    <div class="fd-root ac-root" data-phase={g.phase} data-round={g.match.round} data-you-locked={youLocked ? "1" : undefined} data-bot-locked={botIsLocked ? "1" : undefined} data-bonus={g.round.locks.bonus ?? undefined} data-you={mine} data-king={g.round.you.king} data-bot-king={botKing}>
       <div class="ac-col">
         <header class="ac-top">
           <BackButton onClick={onBack} label="Back to home" />
@@ -585,6 +619,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
         <div class="ac-side ac-opp" aria-label="Your opponent">
           <span class={`ac-chip ${theirs}`} aria-hidden="true" />
           <strong>Opponent</strong>
+          {botIsLocked && (
+            <span class="ac-tag ac-bot-locked" aria-label="Opponent locked in">
+              Locked in
+            </span>
+          )}
           <span class="ac-stat ac-hp-bot" aria-label="Opponent's HP">
             HP <b>{botHp}</b>
           </span>
@@ -685,6 +724,21 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
             <div class="ac-ctl">
               <button type="button" class={`ac-reroll${locked || goldNow < cfg.shop.rerollCost ? " off" : ""}`} aria-disabled={locked || goldNow < cfg.shop.rerollCost} aria-label={`Reroll the shop, ${cfg.shop.rerollCost} gold`} onClick={reroll}>
                 Reroll <b>{cfg.shop.rerollCost}</b>
+              </button>
+              <button
+                type="button"
+                class={`ac-lock${youLocked ? " done" : locked ? " off" : ""}`}
+                aria-disabled={locked}
+                aria-label={youLocked ? "Locked in" : `Lock in${bonusOpen ? `, the first to lock in gets ${cfg.lockInBonus} gold` : ""}`}
+                onClick={lockIn}
+              >
+                {youLocked ? (
+                  "Locked in"
+                ) : (
+                  <>
+                    Lock in {bonusOpen && <small>+{cfg.lockInBonus} gold</small>}
+                  </>
+                )}
               </button>
             </div>
           </>
