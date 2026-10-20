@@ -34,6 +34,8 @@ const WIN_BOUND = WIN - 1000;
 const INF = 32000;
 const MAX_PLY = 128;
 
+/** The evaluation cache's size, less one (2^16 entries). */
+const EVAL_MASK = (1 << 16) - 1;
 const EXACT = 1;
 const LOWER = 2;
 const UPPER = 3;
@@ -71,6 +73,9 @@ export class Searcher {
   private ttMove: Int32Array;
   private ttData: Int32Array;
   private killers = new Int32Array(MAX_PLY * 2);
+  private quietsTried = new Int32Array(MAX_PLY * 64);
+  private evalKey = new Int32Array(EVAL_MASK + 1);
+  private evalScore = new Int32Array(EVAL_MASK + 1);
   private history = new Int32Array(16 * 128);
   private moves = new Int32Array(MAX_PLY * 256);
   private scores = new Int32Array(MAX_PLY * 256);
@@ -97,6 +102,7 @@ export class Searcher {
     this.ttCheck.fill(0);
     this.ttMove.fill(0);
     this.ttData.fill(0);
+    this.evalKey.fill(0);
     this.killers.fill(0);
     this.history.fill(0);
   }
@@ -236,9 +242,15 @@ export class Searcher {
       }
     }
 
-    const staticEval = inCheck ? -INF : evaluate(pos, this.evalOpts);
+    const staticEval = inCheck ? -INF : this.evalCached(lo, hi);
 
     if (!pvNode && !inCheck && ply > 0) {
+      // Razoring: far below alpha near the leaves, only captures could save it.
+      if (depth <= 2 && staticEval + 240 * depth < alpha) {
+        const q = this.quiesce(alpha - 1, alpha, ply);
+        if (this.stopped) return 0;
+        if (q < alpha) return q;
+      }
       // Reverse futility: far above beta near the leaves.
       if (depth <= 6 && staticEval - 85 * depth >= beta && Math.abs(beta) < WIN_BOUND) return staticEval;
       // Null move: pass, and if a reduced search still holds beta, so would a real move (not with few pieces: zugzwang).
@@ -265,6 +277,7 @@ export class Searcher {
     this.order(base, end, ttMove, ply);
 
     let legal = 0;
+    let quiets = 0;
     let bestScore = -INF;
     let bestMove = 0;
     const startAlpha = alpha;
@@ -277,6 +290,7 @@ export class Searcher {
       if (!pos.make(m)) continue;
       legal++;
       const givesCheck = pos.inCheck;
+      if (!tactical && quiets < 64) this.quietsTried[ply * 64 + quiets++] = m;
       // Pruning of quiet moves near the leaves.
       if (!pvNode && !inCheck && !tactical && !givesCheck && legal > 1 && bestScore > -WIN_BOUND) {
         if (depth <= 4 && legal > LMP[depth]!) {
@@ -330,6 +344,12 @@ export class Searcher {
               }
               const hIdx = pos.board[moveFrom(m)]! * 128 + moveTo(m);
               this.history[hIdx] = Math.min(1 << 20, this.history[hIdx]! + depth * depth);
+              // The quiet moves tried before it, which didn't cut: a little less likely next time.
+              for (let q = 0; q < quiets - 1; q++) {
+                const o = this.quietsTried[ply * 64 + q]!;
+                const oIdx = pos.board[moveFrom(o)]! * 128 + moveTo(o);
+                this.history[oIdx] = Math.max(0, this.history[oIdx]! - depth);
+              }
             }
             break;
           }
@@ -361,7 +381,7 @@ export class Searcher {
     const inCheck = pos.inCheck;
     let best = -INF;
     if (!inCheck) {
-      best = evaluate(pos, this.evalOpts);
+      best = this.evalCached(pos.ttLo(), pos.ttHi());
       if (best >= beta) return best;
       if (best > alpha) alpha = best;
     }
@@ -369,7 +389,6 @@ export class Searcher {
     const end = pos.generate(this.moves, base, !inCheck);
     this.order(base, end, 0, ply);
     let legal = 0;
-    const them = pos.side ^ 1;
     for (let i = base; i < end; i++) {
       const m = this.pick(i, end);
       const flags = moveFlags(m);
@@ -380,9 +399,9 @@ export class Searcher {
         const gain = victim + (promo ? VAL[promo]! - 100 : 0) - (flags & F_CASHIN ? 100 : 0);
         // Delta: even winning this cleanly can't reach alpha.
         if (!promo && best + gain + 180 < alpha) continue;
-        // A capture by a bigger piece onto a guarded square is likely a loss (a cheap stand-in for exchange evaluation).
+        // A capture that loses material in the exchange on its square.
         const attacker = VAL[typeOf(pos.board[moveFrom(m)]!)]!;
-        if (!promo && !(flags & F_CASHIN) && attacker > victim + 50 && pos.attacked(to, them)) continue;
+        if (!promo && !(flags & F_CASHIN) && attacker > victim && pos.see(m) < 0) continue;
       }
       if (!pos.make(m)) continue;
       legal++;
@@ -402,6 +421,18 @@ export class Searcher {
     return best;
   }
 
+  /** The evaluation, through a small cache (keyed like the table, plus the cash-ins, which the evaluation also counts). */
+  private evalCached(lo: number, hi: number): number {
+    const pos = this.pos;
+    const k = (hi ^ Math.imul(pos.cashed[0]!, 0x9e3779b1) ^ Math.imul(pos.cashed[1]!, 0x85ebca6b)) | 1;
+    const slot = lo & EVAL_MASK;
+    if (this.evalKey[slot] === k) return this.evalScore[slot]!;
+    const v = evaluate(pos, this.evalOpts);
+    this.evalKey[slot] = k;
+    this.evalScore[slot] = v;
+    return v;
+  }
+
   /** Scores the moves in [base, end) for ordering. */
   private order(base: number, end: number, ttMove: number, ply: number): void {
     const b = this.pos.board;
@@ -416,7 +447,10 @@ export class Searcher {
         const promo = movePromo(m);
         if (flags & F_CAPTURE) {
           const victim = b[moveTo(m)] ? typeOf(b[moveTo(m)]!) : 1;
-          s = (1 << 26) + victim * 64 - typeOf(b[moveFrom(m)]!) + (promo === QUEEN ? 1 << 25 : 0);
+          const attacker = typeOf(b[moveFrom(m)]!);
+          s = (1 << 26) + victim * 64 - attacker + (promo === QUEEN ? 1 << 25 : 0);
+          // (A capture that loses the exchange goes after the killers.)
+          if (!promo && VAL[attacker]! > VAL[victim]! && this.pos.see(m) < 0) s -= (1 << 26) - (1 << 23);
         } else if (promo) s = promo === QUEEN ? (1 << 26) + 600 : -(1 << 20);
         else if (flags & F_CASHIN) s = 1 << 22;
         else if (m === k1) s = (1 << 24) + 2;

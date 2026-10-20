@@ -950,6 +950,7 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   expect(fight.say).toMatch(/^Move \d+ of 60/);
   expect(fight.label).toBe("Fight");
   expect(fight.text).toContain("A side left with only its king loses. After 30 moves each, moves play twice as fast.");
+  expect(fight.text).toContain("A pawn that reaches the far end cashes in for +5 gold.");
   expect(fight.lastMove).toBe(true);
   // The board's usual knocks play for the engine's moves (a capture sounds as it does everywhere).
   expect(await page.evaluate(() => (window as any).__soundLog.filter((l: string) => /^(move|capture):/.test(l)).length)).toBeGreaterThan(0);
@@ -958,7 +959,7 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   const words = (await page.locator(".ac-card .ac-card-text").innerText()).trim();
   const lost = words.match(/(?:You|Your opponent) loses? (\d+) HP\./);
   const gold = (await page.locator(".ac-card-gold").innerText()).trim();
-  expect(gold).toMatch(/^Next round: \d+ saved \+ \d+ income( \+ \d+ interest)?( \+ \d+ streak)?( \+ \d+ survivors)? = \d+ gold$/);
+  expect(gold).toMatch(/^Next round: \d+ saved \+ \d+ income( \+ \d+ interest)?( \+ \d+ streak)?( \+ \d+ survivors)?( \+ \d+ from cash-ins)? = \d+ gold$/);
   expect(gold).toMatch(new RegExp(`^Next round: ${left} saved \\+ 120 income`));
   const [youHp, botHp] = [await hp(page, "you"), await hp(page, "bot")];
   if (head.startsWith("You win")) {
@@ -1016,6 +1017,58 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   await expect(piece(page, "black", "rook", "e5")).toBeVisible();
   await expect(held(page)).toHaveCount(0);
   expect(await goldOf(page)).toBe(total - 10);
+  expect(errors).toEqual([]);
+});
+
+test("a pawn reaching the far end cashes in: it lands, a coin sounds, \"+5\" floats up from its square, it leaves, and the 5 gold is in the next round's line", async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  // (A test switch, `?fightfen=`: the fight starts from this position. White's king on h1 is shut in and its h-pawn blocked, so its one
+  // move is the b-pawn's step onto b8: a cash-in. You are White in round 1.)
+  const fen = "6r1/1P6/8/4k3/8/7p/7P/7K w - - 0 1";
+  // (The screen never loads Stockfish: the HunChess engine plays the fight.)
+  const stockfish: string[] = [];
+  page.on("request", (r) => /stockfish/i.test(r.url()) && stockfish.push(r.url()));
+  await page.goto(`/autochess?quick=1&seed=3&adjust=0&fightfen=${encodeURIComponent(fen)}`);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  // Every frame from here: a pawn drawn on b8, and the floating gold (its amount and the square it sits on).
+  await page.evaluate(() => {
+    const seen = { pawnOnB8: false, floats: [] as { amount: string; x: string; y: string }[], pawnAfter: true };
+    (window as any).__cash = seen;
+    const look = () => {
+      if (document.querySelector('.hb-board piece.white.pawn[data-square="b8"]')) seen.pawnOnB8 = true;
+      for (const f of document.querySelectorAll<HTMLElement>(".ac-float.on-board")) {
+        const at = { amount: f.dataset.amount!, x: f.style.getPropertyValue("--sq-x"), y: f.style.getPropertyValue("--sq-y") };
+        if (!seen.floats.some((s) => s.amount === at.amount && s.x === at.x && s.y === at.y)) seen.floats.push(at);
+      }
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  await tap(page, lockButton(page));
+  await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 60_000 });
+  const cash = await page.evaluate(() => (window as any).__cash as { pawnOnB8: boolean; floats: { amount: string; x: string; y: string }[] });
+  // The pawn stood on b8 for a moment, then left: "+5" floated from b8 (column 1, row 0 with White at the bottom).
+  expect(cash.pawnOnB8).toBe(true);
+  expect(cash.floats).toContainEqual({ amount: "5", x: "1", y: "0" });
+  await expect(page.locator(`${BOARD_SEL.piece}.white.pawn[data-square="b8"]`)).toHaveCount(0);
+  expect(await soundCount(page, "acCash")).toBe(1);
+  // The 5 gold waits for the next round, in its own part of the line.
+  await expect(page.locator(".ac-card-gold")).toContainText("+ 5 from cash-ins");
+  expect(stockfish).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test("a fight always ends even if the engine never answers (?stall=1): its looks time out to stand-in moves", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await page.goto("/autochess?quick=1&seed=3&adjust=0&stall=1");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  await buyAll(page, 4);
+  await tap(page, lockButton(page));
+  await expect(root(page)).toHaveAttribute("data-phase", "fight", { timeout: 15_000 });
+  await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 90_000 });
+  await expect(page.locator(".ac-card-head")).toHaveText(/^(You win the round\.|You lose the round\.|The round is a draw\.)$/);
   expect(errors).toEqual([]);
 });
 

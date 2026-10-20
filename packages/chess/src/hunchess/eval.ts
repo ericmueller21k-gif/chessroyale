@@ -50,6 +50,9 @@ const MOB_MG = [0, 0, 4, 5, 2, 1, 0];
 const MOB_EG = [0, 0, 4, 5, 4, 2, 0];
 const MOB_BASE = [0, 0, 4, 6, 6, 12, 0];
 
+/** A piece (not a pawn) attacked by an enemy pawn. */
+const PAWN_THREAT_MG = 40;
+const PAWN_THREAT_EG = 30;
 /** King safety: attack units by piece type bearing on the king's squares, and the penalty for a total (mg). */
 const ATTACK_UNITS = [0, 0, 2, 2, 3, 5, 0];
 const SAFETY = (units: number) => Math.min(500, Math.round((units * units) / 2.2));
@@ -97,13 +100,13 @@ export function evaluate(pos: Position, opts: EvalOptions = DEFAULT_EVAL): numbe
   backB.fill(-1);
   let nPawns = 0;
   let nPieces = 0;
-  for (let s = 0; s < 128; s++) {
-    if (s & 0x88) {
-      s += 7;
-      continue;
-    }
+  const list = pos.list;
+  for (let li = 0; li < 64; li++) {
+    // (Both colors' lists: White's at 0..31, Black's at 32..63.)
+    if (li === pos.listLen[0]!) li = 32;
+    if (li >= 32 + pos.listLen[1]!) break;
+    const s = list[li]!;
     const p = b[s]!;
-    if (!p) continue;
     if (p === PAWN) {
       const f = (s & 7) + 1;
       const r = s >> 4;
@@ -162,6 +165,13 @@ export function evaluate(pos: Position, opts: EvalOptions = DEFAULT_EVAL): numbe
     if (passed) {
       mg += sign * (fight ? PASSED_FIGHT_MG : PASSED_MG)[rel]!;
       eg += sign * (fight ? PASSED_FIGHT_EG : PASSED_EG)[rel]!;
+      // Chess endings: an advanced passed pawn is stronger with its own king near the square ahead and the enemy king far.
+      if (!fight && rel >= 3) {
+        const ahead = s + (us === WHITE ? 16 : -16);
+        const own = pos.kings[us]!;
+        const enemy = pos.kings[us ^ 1]!;
+        eg += sign * (rel - 2) * (5 * kingDist(enemy, ahead) - 2 * kingDist(own, ahead));
+      }
     }
   }
 
@@ -174,6 +184,11 @@ export function evaluate(pos: Position, opts: EvalOptions = DEFAULT_EVAL): numbe
     const sign = us === WHITE ? 1 : -1;
     const guard = us === WHITE ? guardB : guardW;
     const zone = us === WHITE ? zoneB : zoneW;
+    // A piece an enemy pawn attacks is in trouble (it must move or be lost).
+    if (guard[s]) {
+      mg -= sign * PAWN_THREAT_MG;
+      eg -= sign * PAWN_THREAT_EG;
+    }
     let mob = 0;
     let units = 0;
     if (t === KNIGHT) {

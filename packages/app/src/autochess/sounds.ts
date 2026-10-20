@@ -10,13 +10,14 @@
  * - xp (Buy XP): a small rising chime, three bell notes up;
  * - level (a level-up): a bigger chime, a rising arpeggio that ends in a ringing chord;
  * - lock (Lock in): a latch, a click and a clack;
- * - reveal (one of their pieces shown): a short high ping, a scoop up to a bell note.
+ * - reveal (one of their pieces shown): a short high ping, a scoop up to a bell note;
+ * - cash (a pawn cashing in at the far end of the fight): a short double clink, two coins, the second higher.
  *
- * (The play names in sound.ts: acReroll, acPlace, acHold, sell, acXp, acLevel, acLock, acReveal.)
+ * (The play names in sound.ts: acReroll, acPlace, acHold, sell, acXp, acLevel, acLock, acReveal, acCash.)
  */
 import { bandpass, lowpass, noise, osc, render, sine, soft, soundCache } from "../characters/synth.ts";
 
-export type AutochessSound = "reroll" | "place" | "hold" | "sell" | "xp" | "level" | "lock" | "reveal";
+export type AutochessSound = "reroll" | "place" | "hold" | "sell" | "xp" | "level" | "lock" | "reveal" | "cash";
 
 /** An exponential decay with a quick attack (a struck thing): 0 before `at`, then rising over `attack` s and falling with time constant `tau`. */
 const strike = (t: number, at: number, tau: number, attack = 0.002) => (t < at ? 0 : Math.min(1, (t - at) / attack) * Math.exp(-(t - at) / tau));
@@ -95,10 +96,16 @@ const SOUNDS: Record<AutochessSound, (rate: number) => Float32Array> = {
     const o2 = osc(rate, (t) => 3136 * (1 - 0.18 * Math.exp(-t / 0.012)), sine);
     return render(rate, 0.34, (t) => 0.26 * strike(t, 0, 0.11, 0.002) * o(t) + 0.07 * strike(t, 0, 0.05, 0.002) * o2(t));
   },
+  // Two coins, quick: a clink and a brighter one just after (short: it plays during a fight, between moves).
+  cash: (rate) => {
+    const a = bell(rate, 2637, COIN);
+    const b = bell(rate, 3520, COIN);
+    return render(rate, 0.22, (t) => a(t, 0, 0.3) + b(t, 0.06, 0.26));
+  },
 };
 
 /** Trims each so it sits a little under a move's loudness (peak well under the move's; mean a few dB under it). */
-const LEVEL: Record<AutochessSound, number> = { reroll: 0.55, place: 0.38, hold: 0.8, sell: 0.9, xp: 0.85, level: 0.68, lock: 0.8, reveal: 0.85 };
+const LEVEL: Record<AutochessSound, number> = { reroll: 0.55, place: 0.38, hold: 0.8, sell: 0.9, xp: 0.85, level: 0.68, lock: 0.8, reveal: 0.85, cash: 0.62 };
 
 const cache = soundCache("autochess");
 /** The samples for one of these sounds at a sample rate (made once, then reused). */

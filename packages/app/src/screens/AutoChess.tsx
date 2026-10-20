@@ -25,12 +25,12 @@ import {
   type MatchState,
   type RoundResult,
 } from "../autochess/economy.ts";
-import { botEvaluator, enginePick, warmEngine } from "../autochess/engine.ts";
+import { botEvaluator, enginePick, newFight, stallEngine, warmEngine } from "../autochess/engine.ts";
 import { addXp, buyXp, levelWords, xpBlock, xpToNext, xpWords } from "../autochess/level.ts";
 import { bonusFor, botLocked, bothLocked, buyFreeze, freezeWords, noLocks, tickLocks, youLock, type Locks } from "../autochess/lockin.ts";
 import { botSeen } from "../autochess/reveal.ts";
 import { buyFromSlot, holdFromSlot, newShop, replaceTaken, rerollFor, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
-import { playFight } from "../autochess/fight.ts";
+import { playFight, withPiece } from "../autochess/fight.ts";
 import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn } from "../autochess/position.ts";
 import { KIND_NAME, other, type Army, type Color, type Kind, type Offer } from "../autochess/types.ts";
 import { clockWords, damageWords, endWords, goldWords, headline, matchWords, moveWords, type EndKind } from "../autochess/words.ts";
@@ -49,6 +49,8 @@ const TICK_MS = 120;
 const SAY_MS = 4200;
 /** At the end of the adjust step the fight waits at most this long for the bot's last look. */
 const BOT_WAIT_MS = 2500;
+/** A pawn that cashes in stands on the last rank this long (its move's slide), then leaves the board. */
+const CASH_LEAVE_MS = 220;
 
 type Phase = "buy" | "adjust" | "fight" | "result" | "over";
 
@@ -135,7 +137,7 @@ function settingsFor(quick: boolean, gold: number, adjust: boolean): AutoChessSe
 
 const colorName = (c: Color) => (c === "w" ? "White" : "Black");
 /** The sounds this screen plays, made ahead (off the page's thread) once the audio is awake. */
-const SOUNDS_USED = ["acPlace", "acHold", "acReroll", "sell", "acXp", "acLevel", "acLock", "acReveal"] as const;
+const SOUNDS_USED = ["acPlace", "acHold", "acReroll", "sell", "acXp", "acLevel", "acLock", "acReveal", "acCash"] as const;
 /** What the opponent is called: the same word as a bot in a 1 v 1. */
 const BOT_NAME = "Bot";
 /** The seed of a round's reveals (which of their pieces shows, and when: reveal.ts). */
@@ -190,6 +192,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const extraGold = Math.max(0, Math.floor(Number(params.get("gold")) || 0));
   const cfg = useMemo(() => settingsFor(quick, extraGold, params.get("adjust") !== "0"), []);
   const seedParam = Number(params.get("seed"));
+  // (Test switches for the fight: `?stall=1` the engine never answers, so stand-in moves play; `?fightfen=` the fight starts from that position.)
+  stallEngine(params.get("stall") === "1");
+  const fightFen = params.get("fightfen");
   const [game, setGame] = useState<Game>(() => newGame(Number.isFinite(seedParam) && params.get("seed") ? seedParam : (Math.random() * 2 ** 31) | 0, cfg));
   const gref = useRef(game);
   const commit = (g: Game) => {
@@ -319,26 +324,38 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const at = gref.current;
     const you = at.round.adj?.army ?? at.round.you;
     const color = youColor(at.match.round);
-    const start = color === "w" ? fightStart(you, botFinal) : fightStart(botFinal, you);
+    const start = fightFen ? { fen: fightFen, mover: "w" as Color, draw: false } : color === "w" ? fightStart(you, botFinal) : fightStart(botFinal, you);
     commit({ ...at, round: { ...at.round, botFinal }, fight: { fen: start.fen, last: null, plies: 0 } });
     if (start.draw) return finish(null, "both_checked", start.fen);
+    newFight();
     const res = await playFight(start.fen, {
-      pick: (fen, _history, allowed) => enginePick(fen, allowed, cfg),
+      pick: (game, allowed) => enginePick(game, allowed, cfg),
       rng: mulberry32(roundSeed(at.match) ^ 0x2545f491),
       cancelled: () => cancelled.current,
-      onStep: (s) => commit({ ...gref.current, fight: { fen: s.fen, last: s.move, plies: s.ply } }),
+      onStep: (s) => {
+        if (!s.cashIn) return commit({ ...gref.current, fight: { fen: s.fen, last: s.move, plies: s.ply } });
+        // A cash-in: the pawn lands on the last rank, a coin sounds and "+5" floats up from the square; then it leaves the board.
+        const square = s.move.slice(2, 4);
+        commit({ ...gref.current, fight: { fen: withPiece(s.fen, square, s.cashIn === "w" ? "P" : "p"), last: s.move, plies: s.ply } });
+        play("acCash");
+        addFloat(cfg.cashInGold, cellOf(square, orientation));
+        setTimeout(() => {
+          const now = gref.current;
+          if (now.fight?.plies === s.ply) commit({ ...now, fight: { ...now.fight, fen: s.fen } });
+        }, CASH_LEAVE_MS);
+      },
       cfg,
     });
-    if (res) finish(res.winner, res.end, res.fen);
+    if (res) finish(res.winner, res.end, res.fen, res.cashIns);
   }
 
-  /** The fight is over: the loser loses HP, the refunds wait for the next round, and the result shows. */
-  function finish(winner: Color | null, end: EndKind, fen: string) {
+  /** The fight is over: the loser loses HP, the refunds (and the cash-ins' gold) wait for the next round, and the result shows. */
+  function finish(winner: Color | null, end: EndKind, fen: string, cashIns: { w: number; b: number } = { w: 0, b: 0 }) {
     const cur = gref.current;
     const color = youColor(cur.match.round);
     const on = piecesOn(fen);
     const who = winner === null ? "draw" : winner === color ? "you" : "bot";
-    const { match, result } = settleRound(cur.match, who, { you: on[color], bot: on[other(color)] }, cfg);
+    const { match, result } = settleRound(cur.match, who, { you: on[color], bot: on[other(color)] }, cfg, { you: cashIns[color], bot: cashIns[other(color)] });
     const won = matchWinner(match);
     const next = won ? null : goldBreakdown(match.round + 1, match.you, cfg);
     commit({ ...cur, match, phase: won ? "over" : "result", phaseStart: performance.now(), outcome: { result, end, next } });
@@ -981,7 +998,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 <p class="ac-card-say">{hint}</p>
                 <p class="ac-card-text">
                   The engine plays both armies at the same strength until mate or {cfg.checksToWin} checks in a row, a draw, {cfg.moveCap} moves each, or {cfg.quietCap} each with no capture or check. A side left with only its king loses. After {cfg.fightFastAfter} moves each, moves play twice as fast.
-                  Pawns don't promote.
+                  A pawn that reaches the far end cashes in for +{cfg.cashInGold} gold.
                 </p>
               </>
             )}

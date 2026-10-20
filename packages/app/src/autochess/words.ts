@@ -46,12 +46,13 @@ export function damageWords(r: RoundResult): string {
   return "Nobody loses HP.";
 }
 
-/** The next round's gold, line by line (the zero ones left out, but the savings and the income stay). */
+/** The next round's gold, line by line (the zero ones left out, but the savings and the income stay); "from cash-ins": the gold of pawns that reached the far end. */
 export function goldWords(g: GoldBreakdown): string {
   const parts = [`${g.saved} saved`, `${g.income} income`];
   if (g.interest) parts.push(`${g.interest} interest`);
   if (g.streak) parts.push(`${g.streak} streak`);
   if (g.survivors) parts.push(`${g.survivors} survivors`);
+  if (g.cashIns) parts.push(`${g.cashIns} from cash-ins`);
   return `Next round: ${parts.join(" + ")} = ${g.total} gold`;
 }
 

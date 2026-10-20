@@ -103,6 +103,23 @@ describe("HunChess search", () => {
     expect(checked).toBeGreaterThan(30);
   });
 
+  it("weighs an exchange on a square (static exchange evaluation, x-rays included)", () => {
+    const see = (fen: string, uci: string) => {
+      const pos = new Position(fen);
+      return pos.see(pos.parseMove(uci));
+    };
+    // A queen takes a pawn guarded by a pawn: loses 950 for 100.
+    expect(see("4k3/8/2p5/3p4/8/8/8/3QK3 w - - 0 1", "d1d5")).toBe(100 - 950);
+    // A pawn takes a knight guarded by a pawn: wins 320 for 100.
+    expect(see("4k3/8/2p5/3n4/4P3/8/8/4K3 w - - 0 1", "e4d5")).toBe(320 - 100);
+    // Rook takes a rook backed by a rook, with our second rook behind (x-ray): R takes R, R takes R, R takes R: +500.
+    expect(see("3r3k/3r4/8/8/8/8/3R4/3RK3 w - - 0 1", "d2d7")).toBe(500);
+    // With their king next to the square it is one more recapture: even.
+    expect(see("3rk3/3r4/8/8/8/8/3R4/3RK3 w - - 0 1", "d2d7")).toBe(0);
+    // An undefended piece: all of it.
+    expect(see("4k3/8/8/3b4/8/8/8/3RK3 w - - 0 1", "d1d5")).toBe(330);
+  });
+
   it("turns scores into expected results: a win is 1, a loss 0, level 0.5", () => {
     expect(expectedScore(WIN - 3)).toBe(1);
     expect(expectedScore(-(WIN - 3))).toBe(0);

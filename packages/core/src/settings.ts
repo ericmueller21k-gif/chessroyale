@@ -2741,9 +2741,19 @@ export interface AutoChessSettings {
   };
   /** The kings stand on a random square of each side's back this-many ranks. */
   readonly kingRanks: number;
-  /** The fight: one move about this often, each searched to this many nodes (the same for both sides). */
+  /**
+   * The fight: one move about this often, each searched by the HunChess engine to this many nodes (the same for both sides,
+   * deterministic; docs/decisions/2026-10-21-hunchess-engine.md).
+   */
   readonly fightMoveMs: number;
   readonly fightNodes: number;
+  /**
+   * The fight has no promotion: a pawn that moves onto its last rank **cashes in** (HunChess engine, Eric Oct 20): it leaves the
+   * board and its owner gets `cashInGold` gold at the round's end. The engine counts a cash-in as the pawn given up plus
+   * `cashInValue` centipawns (a small nudge for the gold), so it cashes in when the pawn is lost anyway, not as a goal.
+   */
+  readonly cashInGold: number;
+  readonly cashInValue: number;
   /** After this many moves a side, moves play at `fightFastMoveMs` instead (v5, Eric Oct 20: twice as fast). */
   readonly fightFastAfter: number;
   readonly fightFastMoveMs: number;
@@ -2825,7 +2835,9 @@ export const AUTOCHESS: AutoChessSettings = {
   levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
   kingRanks: 2,
   fightMoveMs: 350,
-  fightNodes: 6000,
+  fightNodes: 30000,
+  cashInGold: 5,
+  cashInValue: 20,
   fightFastAfter: 30,
   fightFastMoveMs: 175,
   moveCap: 60,
@@ -2851,5 +2863,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7, saveChance: 0.3, adjustTries: 16, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7, saveChance: 0.3, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
 };

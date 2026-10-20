@@ -3,11 +3,12 @@ import { AUTOCHESS_SOUNDS, autochessSound, type AutochessSound } from "../src/au
 import { makeBossSound } from "../src/characters/boss-sounds.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 
-// Auto chess's sounds (v6, Eric Oct 20: "sounds that feel good"): reroll, place, hold, sell, XP, level up, lock in and a reveal,
+// Auto chess's sounds (v6, Eric Oct 20: "sounds that feel good"): reroll, place, hold, sell, XP, level up, lock in, a reveal and a
+// pawn's cash-in in the fight (the HunChess engine, Oct 21),
 // synthesized, each under a piece's move in peak and loudness (as every synthesized sound here is) and each clearly its own.
 
 const RATE = 44100;
-const NAMES: AutochessSound[] = ["reroll", "place", "hold", "sell", "xp", "level", "lock", "reveal"];
+const NAMES: AutochessSound[] = ["reroll", "place", "hold", "sell", "xp", "level", "lock", "reveal", "cash"];
 
 /** What a sound measures: its peak, its loudness (mean level over the whole sample, dBFS), how long it sounds (s) and how bright (zero crossings a second). */
 function measure(s: Float32Array) {
@@ -27,7 +28,7 @@ function measure(s: Float32Array) {
 }
 
 describe("auto chess: the sounds (v6)", () => {
-  it("there is one for each thing: reroll, place, hold, sell, XP, level up, lock in, a reveal", () => {
+  it("there is one for each thing: reroll, place, hold, sell, XP, level up, lock in, a reveal, a cash-in", () => {
     expect([...AUTOCHESS_SOUNDS].sort()).toEqual([...NAMES].sort());
   });
 

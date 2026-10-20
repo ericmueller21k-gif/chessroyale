@@ -154,6 +154,11 @@ CASTLE_MASK[sq(7, 7)] = 15 & ~4;
 
 const MAX_PLY = 1024;
 
+/** Exchange values (centipawns) by type, and scratch space for `see`. */
+const SEE_VAL = [0, 100, 320, 330, 500, 950, 20000];
+const SEE_GAINS = new Int32Array(40);
+const SEE_CLEARED = new Int32Array(80);
+
 /** One position and its history (for unmaking moves and spotting repetitions). */
 export class Position {
   board = new Int8Array(128);
@@ -168,6 +173,10 @@ export class Position {
   counts = new Int32Array(16);
   /** Non-king pieces per color. */
   pieces = new Int32Array(2);
+  /** Piece lists: each color's squares (kings too) at [color * 32 + i] for i below `listLen[color]`, and each square's place in its list. */
+  list = new Int16Array(64);
+  listLen = new Int32Array(2);
+  private listIdx = new Int8Array(128);
   /** The position's key (placement, side, castling, en passant): repetitions compare it. */
   keyLo = 0;
   keyHi = 0;
@@ -218,6 +227,7 @@ export class Position {
     this.board.fill(0);
     this.counts.fill(0);
     this.pieces.fill(0);
+    this.listLen.fill(0);
     this.mg = 0;
     this.eg = 0;
     this.phase = 0;
@@ -282,9 +292,24 @@ export class Position {
     return `${out} ${this.side === WHITE ? "w" : "b"} ${c || "-"} ${this.ep >= 0 ? squareName(this.ep) : "-"} ${this.halfmove} ${this.fullmove}`;
   }
 
+  private listAdd(c: number, s: number) {
+    const idx = this.listLen[c]!++;
+    this.list[c * 32 + idx] = s;
+    this.listIdx[s] = idx;
+  }
+
+  private listRemove(c: number, s: number) {
+    const idx = this.listIdx[s]!;
+    const last = --this.listLen[c]!;
+    const moved = this.list[c * 32 + last]!;
+    this.list[c * 32 + idx] = moved;
+    this.listIdx[moved] = idx;
+  }
+
   private put(p: number, s: number) {
     this.board[s] = p;
     this.counts[p]!++;
+    this.listAdd(colorOf(p), s);
     const t = typeOf(p);
     if (t === KING) this.kings[colorOf(p)] = s;
     else this.pieces[colorOf(p)]!++;
@@ -418,13 +443,12 @@ export class Position {
     const up = us === WHITE ? 16 : -16;
     const startRank = us === WHITE ? 1 : 6;
     const lastRank = us === WHITE ? 7 : 0;
-    for (let from = 0; from < 128; from++) {
-      if (from & 0x88) {
-        from += 7;
-        continue;
-      }
+    const list = this.list;
+    const base = us * 32;
+    const count = this.listLen[us]!;
+    for (let li = 0; li < count; li++) {
+      const from = list[base + li]!;
       const p = b[from]!;
-      if (!p || colorOf(p) !== us) continue;
       const t = typeOf(p);
       if (t === PAWN) {
         const one = from + up;
@@ -522,6 +546,9 @@ export class Position {
     const i = p * 128;
     this.board[from] = 0;
     this.board[to] = p;
+    const idx = this.listIdx[from]!;
+    this.list[(p >> 3) * 32 + idx] = to;
+    this.listIdx[to] = idx;
     this.mg += PST_MG[i + to]! - PST_MG[i + from]!;
     this.eg += PST_EG[i + to]! - PST_EG[i + from]!;
     this.keyLo ^= Z_PIECE_LO[i + from]! ^ Z_PIECE_LO[i + to]!;
@@ -532,6 +559,7 @@ export class Position {
     const p = this.board[s]!;
     const i = p * 128 + s;
     this.board[s] = 0;
+    this.listRemove(p >> 3, s);
     this.counts[p]!--;
     this.pieces[colorOf(p)]!--;
     this.phase -= PHASE_INC[typeOf(p)]!;
@@ -544,6 +572,7 @@ export class Position {
   private add(p: number, s: number) {
     const i = p * 128 + s;
     this.board[s] = p;
+    this.listAdd(p >> 3, s);
     this.counts[p]!++;
     this.pieces[colorOf(p)]!++;
     this.phase += PHASE_INC[typeOf(p)]!;
@@ -759,6 +788,90 @@ export class Position {
     this.checks[1] = this.uChecks[sp * 2 + 1]!;
     this.inCheck = false;
     this.plies--;
+  }
+
+  /**
+   * Static exchange evaluation of a capture (or any move) onto its square: what the mover wins (centipawns, pawn 100) if both sides
+   * keep taking back there with their least valuable piece, each free to stop. X-rays (a rook behind a rook) count.
+   */
+  see(m: number): number {
+    const b = this.board;
+    const from = moveFrom(m);
+    const to = moveTo(m);
+    const flags = moveFlags(m);
+    const gains = SEE_GAINS;
+    const cleared = SEE_CLEARED;
+    let nCleared = 0;
+    gains[0] = flags & F_EP ? SEE_VAL[PAWN]! : b[to] ? SEE_VAL[typeOf(b[to]!)]! : 0;
+    // (A cash-in's pawn leaves: it can't be taken back.)
+    if (flags & F_CASHIN) return gains[0]! - SEE_VAL[PAWN]!;
+    let onSquare = SEE_VAL[movePromo(m) || typeOf(b[from]!)]!;
+    if (movePromo(m)) gains[0] = gains[0]! + onSquare - SEE_VAL[PAWN]!;
+    cleared[nCleared++] = from;
+    cleared[nCleared++] = b[from]!;
+    b[from] = 0;
+    let side = colorOf(cleared[1]!) ^ 1;
+    let d = 0;
+    for (;;) {
+      const at = this.leastAttacker(to, side);
+      if (at < 0) break;
+      d++;
+      gains[d] = onSquare - gains[d - 1]!;
+      onSquare = SEE_VAL[typeOf(b[at]!)]!;
+      cleared[nCleared++] = at;
+      cleared[nCleared++] = b[at]!;
+      b[at] = 0;
+      side ^= 1;
+      if (Math.max(-gains[d - 1]!, gains[d]!) < 0) break;
+    }
+    while (d > 0) {
+      gains[d - 1] = -Math.max(-gains[d - 1]!, gains[d]!);
+      d--;
+    }
+    for (let i = 0; i < nCleared; i += 2) b[cleared[i]!] = cleared[i + 1]!;
+    return gains[0]!;
+  }
+
+  /** The square of `side`'s least valuable piece attacking `s` on the board as it stands, or -1. */
+  private leastAttacker(s: number, side: number): number {
+    const b = this.board;
+    const pawn = pieceOf(side, PAWN);
+    const p1 = side === WHITE ? s - 15 : s + 15;
+    const p2 = side === WHITE ? s - 17 : s + 17;
+    if (!(p1 & 0x88) && b[p1] === pawn) return p1;
+    if (!(p2 & 0x88) && b[p2] === pawn) return p2;
+    const knight = pieceOf(side, KNIGHT);
+    for (let i = 0; i < 8; i++) {
+      const t = s + KNIGHT_STEPS[i]!;
+      if (!(t & 0x88) && b[t] === knight) return t;
+    }
+    let best = -1;
+    let bestVal = 1e9;
+    for (let i = 0; i < 8; i++) {
+      const d = i < 4 ? BISHOP_DIRS[i]! : ROOK_DIRS[i - 4]!;
+      let t = s + d;
+      while (!(t & 0x88)) {
+        const p = b[t]!;
+        if (p) {
+          if (colorOf(p) === side) {
+            const ty = typeOf(p);
+            if ((ty === QUEEN || ty === (i < 4 ? BISHOP : ROOK)) && SEE_VAL[ty]! < bestVal) {
+              best = t;
+              bestVal = SEE_VAL[ty]!;
+            }
+          }
+          break;
+        }
+        t += d;
+      }
+    }
+    if (best >= 0) return best;
+    const king = pieceOf(side, KING);
+    for (let i = 0; i < 8; i++) {
+      const t = s + KING_STEPS[i]!;
+      if (!(t & 0x88) && b[t] === king) return t;
+    }
+    return -1;
   }
 
   /** Plays moves for good: they can't be unmade (a game's history replayed before a search). Keeps the repetition history. */

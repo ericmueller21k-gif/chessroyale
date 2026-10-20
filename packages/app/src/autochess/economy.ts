@@ -20,9 +20,11 @@ export function streakGold(table: AutoChessSettings["winStreakGold"], n: number)
   return gold;
 }
 
-/** What a fight gives back to its side: a share of the price of the pieces still on the board. */
+/** What a fight gives back to its side: a share of the price of the pieces still on the board, and the gold of its pawns that cashed in. */
 export interface Refund {
   survivors: number;
+  /** Gold from pawns that reached the far end and cashed in (`cashInGold` each). */
+  cashIns?: number;
 }
 
 export interface SideState {
@@ -63,6 +65,7 @@ export const roundSeed = (match: MatchState) => (match.seed + match.round * 7919
 export interface GoldBreakdown {
   saved: number;
   survivors: number;
+  cashIns: number;
   income: number;
   interest: number;
   streak: number;
@@ -74,11 +77,12 @@ export interface GoldBreakdown {
  * included.
  */
 export function goldBreakdown(round: number, side: SideState, cfg: AutoChessSettings = AUTOCHESS): GoldBreakdown {
-  const banked = side.gold + side.refund.survivors;
+  const cashIns = side.refund.cashIns ?? 0;
+  const banked = side.gold + side.refund.survivors + cashIns;
   const income = incomeFor(round, cfg);
   const interest = interestFor(banked, cfg);
   const streak = Math.max(streakGold(cfg.winStreakGold, side.wins), streakGold(cfg.lossStreakGold, side.losses));
-  return { saved: side.gold, survivors: side.refund.survivors, income, interest, streak, total: banked + income + interest + streak };
+  return { saved: side.gold, survivors: side.refund.survivors, cashIns, income, interest, streak, total: banked + income + interest + streak };
 }
 
 /** Starts the next round: both sides are paid and get their free XP (a round's start, round 1 included), and the round number goes up. */
@@ -113,18 +117,21 @@ export interface RoundResult {
 }
 
 /**
- * Settles a round: the loser loses HP, the win and loss streaks move on (a draw ends both), and each side's refund waits
- * for the next round's pay. `left`: the pieces on the board when the fight ended, by side.
+ * Settles a round: the loser loses HP, the win and loss streaks move on (a draw ends both), and each side's refund (its
+ * survivors' share and its cash-ins' gold) waits for the next round's pay. `left`: the pieces on the board when the fight ended,
+ * by side; `cashIns`: how many of each side's pawns cashed in during the fight.
  */
 export function settleRound(
   match: MatchState,
   outcome: RoundOutcome,
   left: { you: readonly Kind[]; bot: readonly Kind[] },
   cfg: AutoChessSettings = AUTOCHESS,
+  cashIns: { you: number; bot: number } = { you: 0, bot: 0 },
 ): { match: MatchState; result: RoundResult } {
   const piecesLeft = outcome === "you" ? left.you.length : outcome === "bot" ? left.bot.length : 0;
   const damage = outcome === "draw" ? 0 : damageFor(piecesLeft, cfg);
-  const refund = { you: refundFor(left.you, cfg), bot: refundFor(left.bot, cfg) };
+  const withCash = (r: Refund, n: number): Refund => (n ? { ...r, cashIns: n * cfg.cashInGold } : r);
+  const refund = { you: withCash(refundFor(left.you, cfg), cashIns.you), bot: withCash(refundFor(left.bot, cfg), cashIns.bot) };
   const next = (s: SideState, won: boolean, lost: boolean, r: Refund): SideState => ({
     ...s,
     hp: lost ? s.hp - damage : s.hp,
