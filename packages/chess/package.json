@@ -9,6 +9,7 @@
     "./node": "./src/node.ts",
     "./squads": "./src/squads/index.ts",
     "./duel": "./src/duel/index.ts",
+    "./hunchess": "./src/hunchess/index.ts",
     "./data/*": "./data/*"
   },
   "dependencies": {
