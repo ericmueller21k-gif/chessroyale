@@ -53,7 +53,7 @@ describe("auto chess: survivors and promotions", () => {
     expect(match.bot.hp).toBe(17);
   });
 
-  it("the settings hold the design's numbers (v4): tune them here, nowhere else", () => {
+  it("the settings hold the design's numbers (v4, v5): tune them here, nowhere else", () => {
     expect(AUTOCHESS).toMatchObject({
       shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 5 },
       sellBack: 0.9,
@@ -62,7 +62,9 @@ describe("auto chess: survivors and promotions", () => {
       lockSeconds: 3,
       circlesDelaySeconds: 2,
       adjustSeconds: 15,
-      adjustMoveCap: null,
+      adjustMoves: 1,
+      adjustDrops: 1,
+      adjustDropCost: 25,
       benchSlots: 8,
       boardLimit: 10,
       autoDropTo: 8,

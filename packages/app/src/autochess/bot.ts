@@ -1,5 +1,5 @@
 import { AUTOCHESS, shuffle, weightedIndex, type AutoChessSettings, type Rng } from "@chessroyale/core";
-import { adjustBlock, adjustMove, adjustTargets, startAdjust } from "./adjust.ts";
+import { adjustBlock, adjustDrop, adjustMove, adjustTargets, dropBlock, dropSquareBlock, startAdjust } from "./adjust.ts";
 import { backRank, emptyArmy, halfSquares, legalCounts, placeBlock, priceOf, squareOf } from "./army.ts";
 import { KINDS, type Army, type Color, type Kind } from "./types.ts";
 
@@ -136,40 +136,58 @@ export function botAt(events: readonly BotEvent[], seconds: number): { squares: 
 }
 
 /**
- * The bot's adjust step: it looks at a few moves for each piece, scoring the position each would make with `evaluate`
- * (its chance of winning, 0 to 1, from a small engine search of the position the fight would start from), and keeps a
- * move only if it beats not moving. Every piece moves at most once. A small search by design: it shouldn't be
- * unbeatable. `stop` ends it early (the step is over); what it has done by then stands. `onMove`: told of the army after each
- * move it keeps (so a slow engine loses it nothing).
+ * The bot's adjust step (v5): its one chess move and, when it can afford it, one drop from its bench, each picked greedily with
+ * `evaluate` (its chance of winning, 0 to 1, from a small engine search of the position the fight would start from): it tries
+ * a few moves (a few squares for each of some pieces) and keeps the best only if it beats standing still; then, with the gold for
+ * it, tries its bench pieces on a few squares and keeps the best drop only if it beats what it has. A small search by design: it
+ * shouldn't be unbeatable. `stop` ends it early (the step is over); what it has done by then stands. `onChange`: told of the army
+ * after each change it keeps (so a slow engine loses it nothing). `gold`: what it has left (a drop costs `adjustDropCost`).
  */
 export async function botAdjust(
   army: Army,
+  gold: number,
   evaluate: (army: Army) => Promise<number>,
   rng: Rng,
   stop: () => boolean,
   cfg: AutoChessSettings = AUTOCHESS,
-  onMove?: (army: Army) => void,
+  onChange?: (army: Army) => void,
 ): Promise<Army> {
   let state = startAdjust(army);
   let best = await evaluate(state.army);
+  // The move: most of the tries; the drop has its own.
+  const moveTries = Math.max(1, cfg.bot.adjustTries - cfg.bot.dropTries);
   let tries = 0;
-  const pieces = shuffle(rng, [army.king, ...Object.keys(army.board)]);
-  for (const from of pieces) {
-    if (stop() || tries >= cfg.bot.adjustTries) break;
-    const targets = shuffle(rng, adjustTargets(state.army, from)).slice(0, cfg.bot.adjustDestinations);
-    let pick: { to: string; score: number } | null = null;
-    for (const to of targets) {
-      if (stop() || tries >= cfg.bot.adjustTries) break;
+  let pick: { from: string; to: string; score: number } | null = null;
+  search: for (const from of shuffle(rng, [army.king, ...Object.keys(army.board)])) {
+    for (const to of shuffle(rng, adjustTargets(state.army, from)).slice(0, cfg.bot.adjustDestinations)) {
+      if (stop() || tries >= moveTries) break search;
       if (adjustBlock(state, from, to, cfg)) continue;
       tries++;
-      const score = await evaluate(adjustMove(state, from, to).army);
-      if (score > (pick?.score ?? best + cfg.bot.adjustMargin)) pick = { to, score };
+      const score = await evaluate(adjustMove(state, from, to, cfg).army);
+      if (score > (pick?.score ?? best + cfg.bot.adjustMargin)) pick = { from, to, score };
     }
-    if (pick && !stop() && !adjustBlock(state, from, pick.to, cfg)) {
-      state = adjustMove(state, from, pick.to);
-      best = pick.score;
-      onMove?.(state.army);
+  }
+  if (pick && !stop() && !adjustBlock(state, pick.from, pick.to, cfg)) {
+    state = adjustMove(state, pick.from, pick.to, cfg);
+    best = pick.score;
+    onChange?.(state.army);
+  }
+  // The drop: each kind on its bench (the first of each, in bench order) on a few squares of its half.
+  if (stop() || dropBlock(state, gold, cfg) !== null) return state.army;
+  const slots = state.army.bench.flatMap((k, i) => (state.army.bench.indexOf(k) === i ? [i] : []));
+  const perPiece = Math.max(1, Math.floor(cfg.bot.dropTries / Math.max(1, slots.length)));
+  let drop: { slot: number; square: string; score: number } | null = null;
+  for (const slot of slots) {
+    const squares = shuffle(rng, halfSquares(army.color).filter((sq) => !dropSquareBlock(state, slot, sq, gold, cfg))).slice(0, perPiece);
+    for (const square of squares) {
+      if (stop()) break;
+      const score = await evaluate(adjustDrop(state, slot, square, cfg).army);
+      if (score > (drop?.score ?? best + cfg.bot.adjustMargin)) drop = { slot, square, score };
     }
+  }
+  if (drop && !stop() && !dropSquareBlock(state, drop.slot, drop.square, gold, cfg)) {
+    state = adjustDrop(state, drop.slot, drop.square, cfg);
+    onChange?.(state.army);
   }
   return state.army;
 }

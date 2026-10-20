@@ -26,7 +26,23 @@ import {
   sellValue,
   toBench,
 } from "../src/autochess/army.ts";
-import { adjustBlock, adjustMove, adjustTargets, startAdjust, undoBlock, undoMove } from "../src/autochess/adjust.ts";
+import {
+  adjustBlock,
+  adjustDrop,
+  adjustMarks,
+  adjustMove,
+  adjustTargets,
+  adjustWords,
+  dropBlock,
+  dropSquareBlock,
+  dropsUsed,
+  dropWords,
+  movesUsed,
+  startAdjust,
+  undoAction,
+  undoBlock,
+  undoWords,
+} from "../src/autochess/adjust.ts";
 import { armiesFen, fightStart, material, piecesOn } from "../src/autochess/position.ts";
 import type { Army, Kind } from "../src/autochess/types.ts";
 
@@ -364,50 +380,117 @@ describe("auto chess: the adjust step", () => {
     expect(adjustTargets(army("b", "h8"), "h8").sort()).toEqual(["g7", "g8", "h7"]);
   });
 
-  it("each piece moves once; the move can be taken back, unless its square is taken again", () => {
+  it("one chess move in all (any piece): after it every other move, and a second move of the same piece, is refused; it can be taken back", () => {
+    expect(AUTOCHESS.adjustMoves).toBe(1);
     let s = startAdjust(w);
     expect(adjustBlock(s, "b2", "b4")).toBeNull();
-    s = adjustMove(s, "b2", "b4");
-    expect(s.army.board.b4).toBe("p");
-    expect(s.army.board.b2).toBeUndefined();
-    expect(s.moved).toEqual({ b4: "b2" });
-    // A second move of the same piece is refused, and so is a move of a square with no piece.
-    expect(adjustBlock(s, "b4", "b5")).toBe("moved");
     expect(adjustBlock(s, "h3", "h4")).toBe("none");
     expect(adjustBlock(s, "c3", "c4")).toBe("illegal");
     expect(adjustBlock(s, "c3", "e5")).toBe("illegal");
-    // Another piece may now take b2; the first can't go back until that is undone.
-    s = adjustMove(s, "a1", "b1");
-    expect(adjustBlock(startAdjust(w), "a1", "b2")).toBe("illegal");
-    s = adjustMove(s, "c3", "e4");
+    s = adjustMove(s, "b2", "b4");
+    expect(s.army.board.b4).toBe("p");
+    expect(s.army.board.b2).toBeUndefined();
+    expect(s.actions).toEqual([{ type: "move", from: "b2", to: "b4" }]);
+    expect(movesUsed(s)).toBe(1);
+    // No second move: not by another piece, not by the same one, not by the king.
+    expect(adjustBlock(s, "c3", "e4")).toBe("used");
+    expect(adjustBlock(s, "b4", "b5")).toBe("used");
+    expect(adjustBlock(s, "e1", "e2")).toBe("used");
+    expect(adjustWords("used")).toBe("You've made your move. Tap the piece you moved (↩) to take it back.");
+    // Taken back, the move is free again, for any piece.
     expect(undoBlock(s, "b4")).toBeNull();
-    s = undoMove(s, "b4");
-    expect(s.army.board.b2).toBe("p");
-    expect(Object.keys(s.moved).sort()).toEqual(["b1", "e4"]);
-    // Taken: a piece moved onto the square the other came from.
-    let t = startAdjust(army("w", "e1", { a1: "r", a2: "p" }));
-    t = adjustMove(t, "a2", "a3");
-    t = adjustMove(t, "a1", "a2");
-    // The pawn came from a2, where the rook stands now: the rook's move is taken back first.
-    expect(undoBlock(t, "a3")).toBe("taken");
-    expect(undoBlock(t, "a2")).toBeNull();
-    t = undoMove(t, "a2");
-    expect(undoBlock(t, "a3")).toBeNull();
-    expect(undoBlock(t, "h4")).toBe("none");
+    const undone = undoAction(s, "b4");
+    expect(undone.gives).toBe(0);
+    expect(undone.state.army).toEqual(w);
+    expect(undone.state.actions).toEqual([]);
+    expect(adjustBlock(undone.state, "c3", "e4")).toBeNull();
+    expect(undoBlock(s, "h4")).toBe("none");
+    // The king is a piece: it may take the one move (a step onto an empty square of its half).
+    const k = adjustMove(startAdjust(army("w", "e1", { a3: "p" })), "e1", "e2");
+    expect(k.army.king).toBe("e2");
+    expect(adjustBlock(k, "a3", "a4")).toBe("used");
+    expect(undoAction(k, "e2").state.army.king).toBe("e1");
+    // The number is a setting.
+    const two = { ...AUTOCHESS, adjustMoves: 2 };
+    expect(adjustBlock(adjustMove(startAdjust(w), "b2", "b4", two), "c3", "e4", two)).toBeNull();
+    expect(adjustBlock(adjustMove(adjustMove(startAdjust(w), "b2", "b4", two), "c3", "e4", two), "d1", "c1", two)).toBe("used");
   });
 
-  it("the king can move once too, and the cap (off by default) limits the moves", () => {
-    let s = startAdjust(army("w", "e1", { a3: "p", b3: "p" }));
-    s = adjustMove(s, "e1", "e2");
-    expect(s.army.king).toBe("e2");
-    expect(adjustBlock(s, "e2", "e3")).toBe("moved");
-    s = undoMove(s, "e2");
-    expect(s.army.king).toBe("e1");
-    const capped = { ...AUTOCHESS, adjustMoveCap: 1 };
-    s = adjustMove(startAdjust(army("w", "e1", { a3: "p", b3: "p" })), "a3", "a4");
-    expect(adjustBlock(s, "b3", "b4", capped)).toBe("cap");
-    expect(adjustBlock(s, "b3", "b4")).toBeNull();
-    expect(AUTOCHESS.adjustMoveCap).toBeNull();
+  const benched = army("w", "e1", { a3: "p", b3: "p", c3: "p" }, ["n", "p", "r"]);
+
+  it("one drop of a bench piece onto an empty square of your half, for 25 gold; taking it back puts the piece on its bench slot and gives the gold back", () => {
+    expect([AUTOCHESS.adjustDrops, AUTOCHESS.adjustDropCost]).toEqual([1, 25]);
+    let s = startAdjust(benched);
+    expect(dropBlock(s, 25)).toBeNull();
+    expect(dropBlock(s, 24)).toBe("gold");
+    expect(dropSquareBlock(s, 0, "d1", 25)).toBeNull();
+    s = adjustDrop(s, 1, "d3");
+    expect(s.army.board.d3).toBe("p");
+    expect(s.army.bench).toEqual(["n", "r"]);
+    expect(dropsUsed(s)).toBe(1);
+    // A second drop is refused, whatever the gold.
+    expect(dropBlock(s, 500)).toBe("used");
+    expect(dropSquareBlock(s, 0, "d1", 500)).toBe("used");
+    expect(dropWords("used")).toBe("You've made your drop. Tap the piece you dropped (↩) to take it back.");
+    expect(dropWords("gold", 10)).toBe("Not enough gold: a drop costs 25 and you have 10.");
+    // Taken back: the pawn is on the bench in its old slot, and the 25 comes back.
+    expect(undoBlock(s, "d3")).toBeNull();
+    const undone = undoAction(s, "d3");
+    expect(undone.gives).toBe(25);
+    expect(undone.state.army).toEqual(benched);
+    expect(dropBlock(undone.state, 25)).toBeNull();
+    expect(dropSquareBlock(startAdjust(benched), 5, "d1", 99)).toBe("none");
+  });
+
+  it("a drop follows the placement rules and the board's limit, each with its reason", () => {
+    const s = startAdjust(benched);
+    expect(dropSquareBlock(s, 0, "a3", 99)).toBe("taken");
+    expect(dropSquareBlock(s, 0, "e1", 99)).toBe("king");
+    expect(dropSquareBlock(s, 0, "e5", 99)).toBe("half");
+    expect(dropSquareBlock(s, 1, "d1", 99)).toBe("backrank");
+    expect(dropSquareBlock(s, 1, "a2", 99)).toBeNull();
+    const four = startAdjust(army("w", "e1", { a2: "p", a3: "p", a4: "p" }, ["p"]), );
+    expect(dropSquareBlock(four, 0, "b2", 99)).toBeNull();
+    // 10 on the board already: the bench pieces can't drop (the greyed reason).
+    const ten = startAdjust(army("w", "e1", { a3: "p", b3: "p", c3: "p", d3: "p", e3: "p", f3: "p", g3: "p", h3: "p", b1: "n", g1: "n" }, ["b"]));
+    expect(dropBlock(ten, 99)).toBe("limit");
+    expect(dropSquareBlock(ten, 0, "c1", 99)).toBe("limit");
+    expect(dropWords("limit", 99)).toBe("Your board is full: 10 pieces and your king at most.");
+    expect(dropWords("taken", 99)).toContain("that square is taken");
+    // The reasons come in the order used, gold, limit.
+    expect(dropBlock(adjustDrop(startAdjust(benched), 0, "d2"), 0)).toBe("used");
+    expect(dropBlock(ten, 0)).toBe("gold");
+  });
+
+  it("a move and a drop, in either order: the dropped piece may be the one that moves; a change that another stands on can't be taken back first", () => {
+    // Move, then drop onto the square the piece left.
+    let s = adjustMove(startAdjust(benched), "c3", "c4");
+    s = adjustDrop(s, 0, "c3");
+    expect(s.army.board).toMatchObject({ c4: "p", c3: "n" });
+    expect(adjustMarks(s)).toEqual([{ square: "c4", action: "move" }, { square: "c3", action: "drop" }]);
+    // The move can't be taken back while the knight stands on the square it left; the drop can.
+    expect(undoBlock(s, "c4")).toBe("needed");
+    expect(undoWords("needed")).toBe("Take back your other change first.");
+    expect(undoBlock(s, "c3")).toBeNull();
+    const noKnight = undoAction(s, "c3").state;
+    expect(undoBlock(noKnight, "c4")).toBeNull();
+    // Drop, then move the dropped piece: the drop can't be taken back until the move is.
+    let t = adjustDrop(startAdjust(benched), 0, "d1");
+    t = adjustMove(t, "d1", "e3");
+    expect(t.army.board).toMatchObject({ e3: "n" });
+    expect(t.army.board.d1).toBeUndefined();
+    expect(adjustMarks(t)).toEqual([{ square: "e3", action: "move" }]);
+    expect(undoBlock(t, "d1")).toBe("none");
+    const back = undoAction(t, "e3").state;
+    expect(back.army.board.d1).toBe("n");
+    expect(adjustMarks(back)).toEqual([{ square: "d1", action: "drop" }]);
+    expect(undoAction(back, "d1").state.army).toEqual(benched);
+    // Either, both or neither: neither is the army as it was.
+    expect(startAdjust(benched).army).toBe(benched);
+    // The move's undo can break a later drop only when it stands on the move's square; any other order is free.
+    const u = adjustDrop(adjustMove(startAdjust(benched), "c3", "c4"), 2, "h2");
+    expect(undoBlock(u, "c4")).toBeNull();
+    expect(undoBlock(u, "h2")).toBeNull();
   });
 });
 

@@ -17,7 +17,7 @@ import {
   type MatchState,
 } from "../src/autochess/economy.ts";
 import { botAdjust, botAt, botBuys, botPlan, botPlaces, botShown } from "../src/autochess/bot.ts";
-import { emptyArmy, extras, halfSquares, kingSquares, legalCounts, owned, placeBlock } from "../src/autochess/army.ts";
+import { autoDrop, emptyArmy, extras, halfSquares, kingSquares, legalCounts, owned, placeBlock } from "../src/autochess/army.ts";
 import { fightStart, armiesFen, material } from "../src/autochess/position.ts";
 import { fightMoves, playFight, standInMove } from "../src/autochess/fight.ts";
 import type { Army, Kind } from "../src/autochess/types.ts";
@@ -229,31 +229,86 @@ describe("auto chess: the bot", () => {
     expect(new Set(files).size).toBe(8);
   });
 
-  it("adjusts greedily: it keeps a move only when the position scores better than not moving, each piece once", async () => {
+  it("adjusts greedily: its one move is kept only when the position scores better than standing still, and there is only one", async () => {
     const army: Army = { color: "w", king: "e1", board: { a2: "p", b2: "p", g1: "n" }, bench: [] };
+    const wide = { ...AUTOCHESS, bot: { ...AUTOCHESS.bot, adjustDestinations: 8 } };
+    const changed = (a: Army) => Object.entries(a.board).filter(([sq, k]) => army.board[sq] !== k).length + (a.king !== army.king ? 1 : 0);
     // A scorer that likes the knight on f3 and nothing else.
     const calls: Army[] = [];
     const evaluate = async (a: Army) => {
       calls.push(a);
       return a.board.f3 === "n" ? 0.9 : 0.5;
     };
-    const out = await botAdjust(army, evaluate, mulberry32(1), () => false, { ...AUTOCHESS, bot: { ...AUTOCHESS.bot, adjustDestinations: 8 } });
+    const out = await botAdjust(army, 0, evaluate, mulberry32(1), () => false, wide);
     expect(out.board.f3).toBe("n");
-    // Not moved: the pawns, which no candidate improved.
+    // The rest did not move.
     expect(out.board.a2).toBe("p");
     expect(out.board.b2).toBe("p");
     expect(out.king).toBe("e1");
+    expect(changed(out)).toBe(1);
+    // A scorer that likes two different moves (the knight to f3, the pawn to a4) still gets one move.
+    const both = await botAdjust(army, 0, async (a) => 0.5 + (a.board.f3 === "n" ? 0.2 : 0) + (a.board.a4 === "p" ? 0.2 : 0), mulberry32(1), () => false, wide);
+    expect(changed(both)).toBe(1);
     // A scorer that likes nothing: it stands still.
-    const still = await botAdjust(army, async () => 0.5, mulberry32(1), () => false);
-    expect(still).toEqual(army);
-    // Small by design: at most `adjustTries` searches beyond the first.
+    expect(await botAdjust(army, 0, async () => 0.5, mulberry32(1), () => false)).toEqual(army);
+    // Small by design: at most the move's tries and the drop's tries beyond the first look.
     let n = 0;
-    await botAdjust({ ...army, board: { a2: "p", b2: "p", c2: "p", d2: "p", e2: "p", f2: "p", g2: "p", h2: "p", b1: "n", g1: "n", c1: "b", f1: "b" } }, async () => (n++, 0.5), mulberry32(2), () => false);
+    await botAdjust({ ...army, board: { a2: "p", b2: "p", c2: "p", d2: "p", e2: "p", f2: "p", g2: "p", h2: "p", b1: "n", g1: "n", c1: "b", f1: "b" }, bench: ["q"] }, 100, async () => (n++, 0.5), mulberry32(2), () => false);
     expect(n).toBeLessThanOrEqual(AUTOCHESS.bot.adjustTries + 1);
     // And it stops when told to.
     let m = 0;
-    await botAdjust(army, async () => (m++, 0.5), mulberry32(3), () => m >= 2);
+    await botAdjust(army, 100, async () => (m++, 0.5), mulberry32(3), () => m >= 2);
     expect(m).toBeLessThanOrEqual(3);
+  });
+
+  it("drops one bench piece when it can pay for it (25 gold) and the drop beats what it has; never with less gold, a full board or a drop that doesn't help", async () => {
+    const army: Army = { color: "b", king: "e8", board: { a7: "p", b7: "p" }, bench: ["n", "r"] };
+    // A scorer that likes every extra piece on the board.
+    const likesPieces = async (a: Army) => 0.5 + 0.05 * Object.keys(a.board).length;
+    const out = await botAdjust(army, 25, likesPieces, mulberry32(1), () => false);
+    expect(Object.keys(out.board)).toHaveLength(3);
+    expect(out.bench).toHaveLength(1);
+    // The dropped piece stands on its own half (ranks 5 to 8), not on its king or a piece.
+    const [square] = Object.keys(out.board).filter((sq) => !army.board[sq]);
+    expect(Number(square![1])).toBeGreaterThanOrEqual(5);
+    expect(square).not.toBe("e8");
+    // 24 gold, or no bench, or a drop the scorer doesn't like: nothing is dropped.
+    expect((await botAdjust(army, 24, likesPieces, mulberry32(1), () => false)).bench).toEqual(["n", "r"]);
+    expect((await botAdjust({ ...army, bench: [] }, 99, likesPieces, mulberry32(1), () => false)).board).toEqual(army.board);
+    expect((await botAdjust(army, 99, async () => 0.5, mulberry32(1), () => false)).bench).toEqual(["n", "r"]);
+    // A full board (10 pieces): the bench stays.
+    const ten: Army = { color: "b", king: "e8", board: { a6: "p", b6: "p", c6: "p", d6: "p", e6: "p", f6: "p", g6: "p", h6: "p", b8: "n", g8: "n" }, bench: ["b"] };
+    expect((await botAdjust(ten, 99, likesPieces, mulberry32(1), () => false)).bench).toEqual(["b"]);
+    // Told to stop before it starts the drop: it doesn't.
+    let looks = 0;
+    const early = await botAdjust(army, 99, async (a) => (looks++, likesPieces(a)), mulberry32(1), () => looks >= 1);
+    expect(early.bench).toEqual(["n", "r"]);
+  });
+
+  it("under all the v5 rules the bot's whole step stays legal: its buys, its board of up to 8 after the auto-drop, its one move and one drop, for 120 seeds", async () => {
+    for (let seed = 0; seed < 120; seed++) {
+      const color = seed % 2 ? "w" : "b";
+      const king = kingSquares(seed)[color];
+      const plan = botPlan(color, king, 100 + (seed % 6) * 40, 1 + (seed % 9), mulberry32(seed));
+      const start = autoDrop(plan.army).army;
+      expect(Object.keys(start.board).length).toBeLessThanOrEqual(AUTOCHESS.boardLimit);
+      expect(legalCounts(owned(start))).toBe(true);
+      // A deterministic scorer standing in for the engine: likes pieces further up the board.
+      const score = async (a: Army) => 0.4 + 0.01 * Object.keys(a.board).reduce((sum, sq) => sum + Math.abs(Number(sq[1]) - (color === "w" ? 1 : 8)), 0) / 4;
+      const out = await botAdjust(start, 60, score, mulberry32(seed + 77), () => false);
+      checkArmy({ ...out, bench: out.bench });
+      expect(Object.keys(out.board).length).toBeLessThanOrEqual(AUTOCHESS.boardLimit);
+      // One drop at most, so at most one piece fewer on the bench; the pieces are the same ones.
+      expect(start.bench.length - out.bench.length).toBeLessThanOrEqual(AUTOCHESS.adjustDrops);
+      expect(Object.keys(out.board).length - Object.keys(start.board).length).toBe(start.bench.length - out.bench.length);
+      expect(out.board).not.toHaveProperty(out.king);
+      expect(halfSquares(color)).toEqual(expect.arrayContaining([out.king, ...Object.keys(out.board)]));
+      // The position is one the engine accepts (when it isn't a drawn start).
+      const opp = emptyArmy(color === "w" ? "b" : "w", kingSquares(seed)[color === "w" ? "b" : "w"]);
+      const [w, b] = color === "w" ? [out, opp] : [opp, out];
+      const s = fightStart(w, b);
+      if (!s.draw) expect(stockfishRefuses(s.fen), `seed ${seed}`).toBeNull();
+    }
   });
 });
 

@@ -2709,10 +2709,11 @@ export interface AutoChessSettings {
   readonly buySeconds: number;
   readonly lockSeconds: number;
   readonly circlesDelaySeconds: number;
-  /** The reveal and adjust step: each piece may make one legal chess move on your own half. */
+  /** The reveal and adjust step (v5): this many chess moves in all (any piece), and this many drops of a bench piece, each for the cost in gold. */
   readonly adjustSeconds: number;
-  /** The most pieces a side may move while adjusting (null: every piece may move once). */
-  readonly adjustMoveCap: number | null;
+  readonly adjustMoves: number;
+  readonly adjustDrops: number;
+  readonly adjustDropCost: number;
   /** Pieces waiting off the board between the board and the shop. */
   readonly benchSlots: number;
   /** Most pieces a side may have on its board, its king not counted (v5, Eric Oct 20: "10 pieces + the king"). */
@@ -2763,6 +2764,7 @@ export interface AutoChessSettings {
     readonly neverLockChance: number;
     readonly saveChance: number;
     readonly adjustTries: number;
+    readonly dropTries: number;
     readonly adjustDestinations: number;
     readonly adjustNodes: number;
     readonly adjustMargin: number;
@@ -2778,7 +2780,9 @@ export const AUTOCHESS: AutoChessSettings = {
   lockSeconds: 3,
   circlesDelaySeconds: 2,
   adjustSeconds: 15,
-  adjustMoveCap: null,
+  adjustMoves: 1,
+  adjustDrops: 1,
+  adjustDropCost: 25,
   benchSlots: 8,
   boardLimit: 10,
   autoDropTo: 8,
@@ -2808,5 +2812,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, saveChance: 0.3, adjustTries: 24, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, saveChance: 0.3, adjustTries: 24, dropTries: 8, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
 };
