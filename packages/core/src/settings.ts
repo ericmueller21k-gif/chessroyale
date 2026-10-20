@@ -2685,41 +2685,60 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
 
 /**
  * Auto chess, the demo (Oct 19, 2026; docs/decisions/2026-10-19-autochess-demo.md): you and a bot buy pieces with gold
- * (the king is placed by the game), scout, nudge your pieces once, and the engine plays the position out for both sides.
- * Every number is here so it can be tuned after Eric plays it ("we're just testing this thing"). Nothing carries over
- * between rounds but gold, HP and the win streak (design v4): each round starts with only the two kings.
+ * (the shop offers each a piece and a square of your half; the king is placed by the game), scout, move one piece once, and the
+ * engine plays the position out for both sides. Every number is here so it can be tuned after Eric plays it ("we're just
+ * testing this thing"). Nothing carries over between rounds but gold, HP, the win streak, each side's bench and its level and
+ * XP (design v4 and v6): each round starts with only the two kings on the boards.
  */
 export interface AutoChessSettings {
   /** What each piece costs in the shop (a pawn 10 ... a queen 90: the chess value times ten, a bishop a little over a knight). */
   readonly prices: { readonly p: number; readonly n: number; readonly b: number; readonly r: number; readonly q: number };
   /**
-   * The shop (v5, Eric Oct 20): this many random slots, each rolling a piece by these odds (percent); buying a piece rolls a
-   * new one into its slot; one reroll of all the slots costs `rerollCost` gold. The shop refills free at each round's start.
+   * The shop (v5, Eric Oct 20; v6 Oct 20 evening): this many offers, each a piece (rolled by these odds, percent) and a square on
+   * your half where it will land; buying an offer rolls a new one into its slot; one reroll of all the offers costs `rerollCost`
+   * gold. The shop refills free at each round's start.
    */
   readonly shop: {
     readonly slots: number;
     readonly odds: { readonly p: number; readonly n: number; readonly b: number; readonly r: number; readonly q: number };
     readonly rerollCost: number;
   };
-  /** Selling a piece gives back this share of its price, rounded down (P9 N27 B28 R45 Q81). */
+  /** Selling a piece, from the board or the bench, gives back this share of its price, rounded down (v6, Eric Oct 20: 75%: P7 N22 B24 R37 Q67). */
   readonly sellBack: number;
+  /**
+   * The bench (v6, Eric Oct 20: "the bench is going to be a massive strategy"): this many held pieces, each keeping the square it
+   * was offered on. Held pieces stay from round to round (the board's pieces still don't).
+   */
+  readonly benchSlots: number;
   /** The first side to lock in (end its buying, freezing its board, bench and shop) gets this much gold at once (v5, Eric Oct 20). */
   readonly lockInBonus: number;
   /** The buy-and-place step, its locked end (no buying, selling or moving), and how far behind the opponent's circles show. */
   readonly buySeconds: number;
   readonly lockSeconds: number;
   readonly circlesDelaySeconds: number;
-  /** The reveal and adjust step (v5): this many chess moves in all (any piece), and this many drops of a bench piece, each for the cost in gold. */
+  /** While you buy, one of their pieces (a circle, a pawn too) is revealed at random every this many seconds, and stays shown (v6, Eric Oct 20: 5 s, so 5 in the 30). */
+  readonly revealSeconds: number;
+  /**
+   * The adjust step (v6, Eric Oct 20): `adjustSeconds` long, with their full board shown, in which you make `adjustMoves` change (move
+   * one of your pieces to any legal empty square of your half: not a chess move), hidden from them until the fight. `adjustStep`
+   * false turns the step off (straight to the fight): "we could test it out" both ways (`?adjust=0` in the address, for testers).
+   */
+  readonly adjustStep: boolean;
   readonly adjustSeconds: number;
   readonly adjustMoves: number;
-  readonly adjustDrops: number;
-  readonly adjustDropCost: number;
-  /** Pieces waiting off the board between the board and the shop. */
-  readonly benchSlots: number;
-  /** Most pieces a side may have on its board, its king not counted (v5, Eric Oct 20: "10 pieces + the king"). */
-  readonly boardLimit: number;
-  /** When buying ends, pieces still on the bench drop onto the board until it has this many (the rest stay on the bench). */
-  readonly autoDropTo: number;
+  /**
+   * Levels (v6, Eric Oct 20: "the board's piece limit is your level"): your level is how many pieces (not the king) you may have
+   * on the board. You start at `start`, the top is `max`; each round's start gives `freeXp` XP; `buyXp` XP cost `buyXpCost` gold;
+   * the XP to the next level is `xpToNext[level - start]` (4 to 5: 4, 5 to 6: 8, ... 9 to 10: 24).
+   */
+  readonly levels: {
+    readonly start: number;
+    readonly max: number;
+    readonly freeXp: number;
+    readonly buyXp: number;
+    readonly buyXpCost: number;
+    readonly xpToNext: readonly number[];
+  };
   /** The kings stand on a random square of each side's back this-many ranks. */
   readonly kingRanks: number;
   /** The fight: one move about this often, each searched to this many nodes (the same for both sides). */
@@ -2765,16 +2784,25 @@ export interface AutoChessSettings {
     readonly lockFrom: number;
     readonly lockTo: number;
     readonly neverLockChance: number;
-    /** Its shop rerolls (5 gold): at most this many a round, only with this much gold, this often (more often when the shop shows nothing but pawns). */
+    /** Its shop rerolls (2 gold): at most this many a round, only with this much gold, this often (more often when the shop shows nothing but pawns). */
     readonly maxRerolls: number;
     readonly rerollGold: number;
     readonly rerollChance: number;
     readonly rerollChanceBare: number;
+    /** With its board full it holds a good piece (not a pawn) on its bench: at most this many a round, each time with this chance (else it keeps the gold). */
+    readonly maxHolds: number;
+    readonly holdChance: number;
+    /** Its pieces go down evenly over the step's open part, the last by this share of it (so something is on its board early, to scout). */
+    readonly placeBy: number;
+    /** It buys XP (20 gold for 4) now and then: at most this many a round, with this chance each time it has the gold (more with its board full: a level is room). */
+    readonly maxXpBuys: number;
+    readonly xpGold: number;
+    /** With this much gold it buys XP even when that gives no level yet (it saves up for the next). */
+    readonly xpRichGold: number;
+    readonly xpChance: number;
+    readonly xpChanceFull: number;
     readonly saveChance: number;
     readonly adjustTries: number;
-    readonly dropTries: number;
-    /** It drops a bench piece when its best drop beats what it has, or when it isn't already winning (its chance under this): the engine's score saturates at 0 and 1. */
-    readonly dropBelow: number;
     readonly adjustDestinations: number;
     readonly adjustNodes: number;
     readonly adjustMargin: number;
@@ -2783,19 +2811,18 @@ export interface AutoChessSettings {
 
 export const AUTOCHESS: AutoChessSettings = {
   prices: { p: 10, n: 30, b: 32, r: 50, q: 90 },
-  shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 5 },
-  sellBack: 0.9,
+  shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 2 },
+  sellBack: 0.75,
+  benchSlots: 4,
   lockInBonus: 25,
   buySeconds: 30,
   lockSeconds: 3,
   circlesDelaySeconds: 2,
-  adjustSeconds: 15,
+  revealSeconds: 5,
+  adjustStep: true,
+  adjustSeconds: 5,
   adjustMoves: 1,
-  adjustDrops: 1,
-  adjustDropCost: 25,
-  benchSlots: 8,
-  boardLimit: 10,
-  autoDropTo: 8,
+  levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
   kingRanks: 2,
   fightMoveMs: 350,
   fightNodes: 6000,
@@ -2824,5 +2851,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 60, rerollChance: 0.15, rerollChanceBare: 0.4, saveChance: 0.3, adjustTries: 24, dropTries: 8, dropBelow: 0.9, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7, saveChance: 0.3, adjustTries: 16, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
 };

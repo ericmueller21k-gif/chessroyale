@@ -52,7 +52,6 @@ export function goldWords(g: GoldBreakdown): string {
   if (g.interest) parts.push(`${g.interest} interest`);
   if (g.streak) parts.push(`${g.streak} streak`);
   if (g.survivors) parts.push(`${g.survivors} survivors`);
-  if (g.bench) parts.push(`${g.bench} bench`);
   return `Next round: ${parts.join(" + ")} = ${g.total} gold`;
 }
 

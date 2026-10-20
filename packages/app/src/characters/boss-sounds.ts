@@ -1,3 +1,4 @@
+import { autochessSound } from "../autochess/sounds.ts";
 import { alfilSound } from "./alfil-sounds.ts";
 import { bigBoySound } from "./bigboy-sounds.ts";
 import { clownSound } from "./clown-sounds.ts";
@@ -18,6 +19,8 @@ import { smudgySound } from "./smudgy-sounds.ts";
  * synthesized ones too: `godKing`.)
  */
 const MAKERS = {
+  // (Auto chess's, not a boss's: the same cache, worker and ahead-of-time making.)
+  autochess: autochessSound,
   alfil: alfilSound,
   bigBoy: bigBoySound,
   clown: clownSound,

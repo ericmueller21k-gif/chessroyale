@@ -1,9 +1,10 @@
 import { AUTOCHESS, type AutoChessSettings } from "@chessroyale/core";
-import type { Army, Color, Kind } from "./types.ts";
+import { addXp } from "./level.ts";
+import type { Army, Color, Kind, Offer } from "./types.ts";
 
 /**
- * Gold, streaks and hit points between rounds. Nothing carries over between rounds but gold, HP and the win streak
- * (docs/decisions/2026-10-19-autochess-demo.md, "v4").
+ * Gold, streaks and hit points between rounds. Nothing carries over between rounds but gold, HP, the win streak and the bench
+ * (docs/decisions/2026-10-19-autochess-demo.md, "v4", and "v6" for the bench): the board's pieces still go home each round.
  */
 
 /** A round's income: 100 in round 1, 20 more each round, up to 200. */
@@ -19,10 +20,9 @@ export function streakGold(table: AutoChessSettings["winStreakGold"], n: number)
   return gold;
 }
 
-/** What a fight gives back to its side: a share of the pieces still on the board, and all the bench pieces' price. */
+/** What a fight gives back to its side: a share of the price of the pieces still on the board. */
 export interface Refund {
   survivors: number;
-  bench: number;
 }
 
 export interface SideState {
@@ -33,6 +33,11 @@ export interface SideState {
   losses: number;
   /** From the last fight; paid out with the next round's income. */
   refund: Refund;
+  /** The pieces held on the bench (v6), each with the square it will land on; they stay from round to round. */
+  bench: Offer[];
+  /** Your level (how many pieces the board may hold) and the XP toward the next one (v6); they stay for the whole match. */
+  level: number;
+  xp: number;
 }
 
 export interface MatchState {
@@ -44,7 +49,7 @@ export interface MatchState {
 }
 
 export function newMatch(seed: number, cfg: AutoChessSettings = AUTOCHESS): MatchState {
-  const side = (): SideState => ({ gold: cfg.startGold, hp: cfg.hp, wins: 0, losses: 0, refund: { survivors: 0, bench: 0 } });
+  const side = (): SideState => ({ gold: cfg.startGold, hp: cfg.hp, wins: 0, losses: 0, refund: { survivors: 0 }, bench: [], level: cfg.levels.start, xp: 0 });
   return { seed, round: 0, you: side(), bot: side() };
 }
 
@@ -58,7 +63,6 @@ export const roundSeed = (match: MatchState) => (match.seed + match.round * 7919
 export interface GoldBreakdown {
   saved: number;
   survivors: number;
-  bench: number;
   income: number;
   interest: number;
   streak: number;
@@ -70,18 +74,18 @@ export interface GoldBreakdown {
  * included.
  */
 export function goldBreakdown(round: number, side: SideState, cfg: AutoChessSettings = AUTOCHESS): GoldBreakdown {
-  const banked = side.gold + side.refund.survivors + side.refund.bench;
+  const banked = side.gold + side.refund.survivors;
   const income = incomeFor(round, cfg);
   const interest = interestFor(banked, cfg);
   const streak = Math.max(streakGold(cfg.winStreakGold, side.wins), streakGold(cfg.lossStreakGold, side.losses));
-  return { saved: side.gold, survivors: side.refund.survivors, bench: side.refund.bench, income, interest, streak, total: banked + income + interest + streak };
+  return { saved: side.gold, survivors: side.refund.survivors, income, interest, streak, total: banked + income + interest + streak };
 }
 
-/** Starts the next round: both sides are paid, and the round number goes up. */
+/** Starts the next round: both sides are paid and get their free XP (a round's start, round 1 included), and the round number goes up. */
 export function beginRound(match: MatchState, cfg: AutoChessSettings = AUTOCHESS): { match: MatchState; gold: { you: GoldBreakdown; bot: GoldBreakdown } } {
   const round = match.round + 1;
   const gold = { you: goldBreakdown(round, match.you, cfg), bot: goldBreakdown(round, match.bot, cfg) };
-  const paid = (s: SideState, g: GoldBreakdown): SideState => ({ ...s, gold: g.total, refund: { survivors: 0, bench: 0 } });
+  const paid = (s: SideState, g: GoldBreakdown): SideState => ({ ...s, ...addXp(s, cfg.levels.freeXp, cfg), gold: g.total, refund: { survivors: 0 } });
   return { match: { ...match, round, you: paid(match.you, gold.you), bot: paid(match.bot, gold.bot) }, gold };
 }
 
@@ -91,9 +95,9 @@ export const damageFor = (enemyPiecesLeft: number, cfg: AutoChessSettings = AUTO
 /** The summed price of some pieces. */
 export const worth = (kinds: readonly Kind[], cfg: AutoChessSettings = AUTOCHESS) => kinds.reduce((sum, k) => sum + cfg.prices[k], 0);
 
-/** What a side gets back after a fight: 25% (rounded down) of the summed price of what's still on the board, and the bench in full. */
-export function refundFor(onBoard: readonly Kind[], bench: readonly Kind[], cfg: AutoChessSettings = AUTOCHESS): Refund {
-  return { survivors: Math.floor(worth(onBoard, cfg) * cfg.survivorRefund), bench: worth(bench, cfg) };
+/** What a side gets back after a fight: 25% (rounded down) of the summed price of what's still on the board. */
+export function refundFor(onBoard: readonly Kind[], cfg: AutoChessSettings = AUTOCHESS): Refund {
+  return { survivors: Math.floor(worth(onBoard, cfg) * cfg.survivorRefund) };
 }
 
 export type RoundOutcome = "you" | "bot" | "draw";
@@ -116,12 +120,11 @@ export function settleRound(
   match: MatchState,
   outcome: RoundOutcome,
   left: { you: readonly Kind[]; bot: readonly Kind[] },
-  bench: { you: readonly Kind[]; bot: readonly Kind[] },
   cfg: AutoChessSettings = AUTOCHESS,
 ): { match: MatchState; result: RoundResult } {
   const piecesLeft = outcome === "you" ? left.you.length : outcome === "bot" ? left.bot.length : 0;
   const damage = outcome === "draw" ? 0 : damageFor(piecesLeft, cfg);
-  const refund = { you: refundFor(left.you, bench.you, cfg), bot: refundFor(left.bot, bench.bot, cfg) };
+  const refund = { you: refundFor(left.you, cfg), bot: refundFor(left.bot, cfg) };
   const next = (s: SideState, won: boolean, lost: boolean, r: Refund): SideState => ({
     ...s,
     hp: lost ? s.hp - damage : s.hp,
@@ -142,5 +145,5 @@ export function matchWinner(match: MatchState): "you" | "bot" | null {
   return null;
 }
 
-/** An army's pieces on the board and on the bench, as kinds (for settling). */
-export const armyKinds = (army: Army): { board: Kind[]; bench: Kind[] } => ({ board: Object.values(army.board), bench: [...army.bench] });
+/** An army's pieces on the board, as kinds (for settling). */
+export const armyKinds = (army: Army): Kind[] => Object.values(army.board);

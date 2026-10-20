@@ -16,9 +16,10 @@ import {
   youColor,
   type MatchState,
 } from "../src/autochess/economy.ts";
-import { botAdjust, botAt, botBuys, botPlan, botPlaces, botShown } from "../src/autochess/bot.ts";
+import { botAdjust, botAt, botBuys, botPlan } from "../src/autochess/bot.ts";
+import { addXp } from "../src/autochess/level.ts";
 import { newShop } from "../src/autochess/shop.ts";
-import { autoDrop, emptyArmy, extras, halfSquares, kingSquares, legalCounts, owned, placeBlock } from "../src/autochess/army.ts";
+import { buyBlock, carryBench, emptyArmy, extras, halfSquares, kingSquares, legalCounts, owned, placeBlock } from "../src/autochess/army.ts";
 import { fightStart, armiesFen, material } from "../src/autochess/position.ts";
 import { fightMoves, moveMs, playFight, standInMove } from "../src/autochess/fight.ts";
 import { endWords, moveWords } from "../src/autochess/words.ts";
@@ -46,21 +47,21 @@ describe("auto chess: the economy", () => {
     expect(m.you.gold).toBe(0);
     const first = beginRound(m);
     expect(first.match.round).toBe(1);
-    expect(first.gold.you).toEqual({ saved: 0, survivors: 0, bench: 0, income: 100, interest: 0, streak: 0, total: 100 });
+    expect(first.gold.you).toEqual({ saved: 0, survivors: 0, income: 100, interest: 0, streak: 0, total: 100 });
     expect(first.match.you.gold).toBe(100);
-    // Round 2 with 130 saved, a 2-win streak, 7 from the survivors and 30 from the bench: interest counts all of what was banked.
-    const side = { gold: 130, hp: 20, wins: 2, losses: 0, refund: { survivors: 7, bench: 30 } };
+    // Round 2 with 130 saved, a 2-win streak and 7 from the survivors: interest counts all of what was banked.
+    const side = { gold: 130, hp: 20, wins: 2, losses: 0, refund: { survivors: 7 } };
     const g = goldBreakdown(2, side);
-    expect(g).toEqual({ saved: 130, survivors: 7, bench: 30, income: 120, interest: 10, streak: 10, total: 130 + 7 + 30 + 120 + 10 + 10 });
-    // 167 banked is 1 hundred; 200 would be two.
-    expect(goldBreakdown(2, { ...side, gold: 163 }).interest).toBe(20);
+    expect(g).toEqual({ saved: 130, survivors: 7, income: 120, interest: 10, streak: 10, total: 130 + 7 + 120 + 10 + 10 });
+    // 163 saved and 7 back is 170 banked, still one hundred; 200 would be two.
+    expect(goldBreakdown(2, { ...side, gold: 193 }).interest).toBe(20);
   });
 
-  it("a fight gives back 25% of the pieces still on the board (rounded down), the bench in full", () => {
-    expect(refundFor(["p", "p", "p", "n"], [])).toEqual({ survivors: 15, bench: 0 });
-    expect(refundFor(["p"], [])).toEqual({ survivors: 2, bench: 0 });
-    expect(refundFor([], [])).toEqual({ survivors: 0, bench: 0 });
-    expect(refundFor(["q", "r", "b"], ["n", "p"])).toEqual({ survivors: Math.floor((90 + 50 + 32) * 0.25), bench: 40 });
+  it("a fight gives back 25% of the pieces still on the board (rounded down)", () => {
+    expect(refundFor(["p", "p", "p", "n"])).toEqual({ survivors: 15 });
+    expect(refundFor(["p"])).toEqual({ survivors: 2 });
+    expect(refundFor([])).toEqual({ survivors: 0 });
+    expect(refundFor(["q", "r", "b"])).toEqual({ survivors: Math.floor((90 + 50 + 32) * 0.25) });
   });
 
   it("you are White in round 1, then the colors alternate", () => {
@@ -70,24 +71,24 @@ describe("auto chess: the economy", () => {
   it("the loser loses 2 + 1 per enemy piece left; a draw costs nothing; a win ends the other side's streak", () => {
     expect([0, 1, 5, 12].map((n) => damageFor(n))).toEqual([2, 3, 7, 14]);
     let m: MatchState = beginRound(newMatch(7)).match;
-    let r = settleRound(m, "you", { you: ["p", "p", "n"], bot: [] }, { you: ["q"], bot: [] });
+    let r = settleRound(m, "you", { you: ["p", "p", "n"], bot: [] });
     expect(r.result).toMatchObject({ outcome: "you", damage: 5, piecesLeft: 3 });
     expect(r.match.bot.hp).toBe(15);
     expect(r.match.you.hp).toBe(20);
-    expect(r.match.you).toMatchObject({ wins: 1, losses: 0, refund: { survivors: 12, bench: 90 } });
-    expect(r.match.bot).toMatchObject({ wins: 0, losses: 1, refund: { survivors: 0, bench: 0 } });
+    expect(r.match.you).toMatchObject({ wins: 1, losses: 0, refund: { survivors: 12 } });
+    expect(r.match.bot).toMatchObject({ wins: 0, losses: 1, refund: { survivors: 0 } });
     m = beginRound(r.match).match;
     expect(m.round).toBe(2);
-    // Gold: the saved coins (100 earlier, none spent here) plus the refund and income.
-    expect(m.you.gold).toBe(100 + 12 + 90 + 120 + 20);
-    expect(m.you.refund).toEqual({ survivors: 0, bench: 0 });
+    // Gold: the saved coins (100 earlier, none spent here) plus the refund, 10 interest (112 banked) and income.
+    expect(m.you.gold).toBe(100 + 12 + 120 + 10);
+    expect(m.you.refund).toEqual({ survivors: 0 });
     // A draw: nobody loses HP, and both streaks end.
-    r = settleRound(m, "draw", { you: ["p"], bot: ["p", "p"] }, { you: [], bot: [] });
+    r = settleRound(m, "draw", { you: ["p"], bot: ["p", "p"] });
     expect(r.result).toMatchObject({ outcome: "draw", damage: 0 });
     expect(r.match.you).toMatchObject({ hp: 20, wins: 0, losses: 0 });
     expect(r.match.bot).toMatchObject({ hp: 15, wins: 0, losses: 0 });
     // The bot wins: you lose 2 + its pieces left.
-    r = settleRound(m, "bot", { you: [], bot: ["r", "r", "p", "p"] }, { you: [], bot: [] });
+    r = settleRound(m, "bot", { you: [], bot: ["r", "r", "p", "p"] });
     expect(r.match.you.hp).toBe(20 - 6);
     expect(r.match.you.losses).toBe(1);
   });
@@ -106,14 +107,30 @@ describe("auto chess: the economy", () => {
     const k = kingSquares(roundSeed(m));
     const you = emptyArmy(youColor(m.round), k[youColor(m.round)]);
     expect(you.board).toEqual({});
-    expect(you.bench).toEqual([]);
-    const next = settleRound(m, "you", { you: ["q", "r"], bot: ["p"] }, { you: [], bot: [] }).match;
+    const next = settleRound(m, "you", { you: ["q", "r"], bot: ["p"] }).match;
     const m2 = beginRound(next).match;
     // (The state has no armies at all: the next round's are built from nothing.)
     expect(Object.keys(m2).sort()).toEqual(["bot", "round", "seed", "you"]);
     expect(roundSeed(m2)).not.toBe(roundSeed(m));
     const fresh = emptyArmy(youColor(2), kingSquares(roundSeed(m2))[youColor(2)]);
     expect(fresh.board).toEqual({});
+  });
+
+  it("the bench is the one thing held from round to round (v6): each side's bench stays in the match through the fight's settling and the next round's pay", () => {
+    expect(newMatch(5).you.bench).toEqual([]);
+    expect(newMatch(5).bot.bench).toEqual([]);
+    const held = { you: [{ kind: "n" as Kind, square: "c3" }], bot: [{ kind: "q" as Kind, square: "d7" }] };
+    let m: MatchState = beginRound(newMatch(5)).match;
+    m = { ...m, you: { ...m.you, bench: held.you }, bot: { ...m.bot, bench: held.bot } };
+    const settled = settleRound(m, "you", { you: ["p"], bot: [] }).match;
+    expect(settled.you.bench).toEqual(held.you);
+    expect(settled.bot.bench).toEqual(held.bot);
+    const next = beginRound(settled).match;
+    expect(next.you.bench).toEqual(held.you);
+    expect(next.bot.bench).toEqual(held.bot);
+    // No refund for a held piece: only the pieces on the board when the fight ended come back at 25%.
+    expect(goldBreakdown(2, settled.you).survivors).toBe(2);
+    expect(Object.keys(goldBreakdown(2, settled.you)).sort()).toEqual(["income", "interest", "saved", "streak", "survivors", "total"]);
   });
 });
 
@@ -129,7 +146,7 @@ function checkArmy(a: Army) {
 }
 
 describe("auto chess: the bot", () => {
-  it("buys within its gold and the shop's limits, and places on its own half, legally, for 300 seeds and every round", () => {
+  it("buys within its gold and the shop's limits, and puts its pieces on its own half, legally, for 300 seeds and every round", () => {
     for (let seed = 0; seed < 300; seed++) {
       const round = 1 + (seed % 12);
       const gold = [100, 100, 130, 156, 200, 254, 330, 410][seed % 8]! + (seed % 5) * 7;
@@ -138,9 +155,13 @@ describe("auto chess: the bot", () => {
       const king = kingSquares(seed)[color];
       const plan = botPlan(color, king, gold, round, rng);
       expect(plan.spent).toBeLessThanOrEqual(gold);
-      // Every piece it put down is on the board; rerolls and the piece it keeps on the bench have no square.
-      expect(plan.events.filter((e) => e.square).length).toBe(Object.keys(plan.army.board).length);
-      expect(plan.events.filter((e) => e.kind !== "reroll").length).toBe(Object.keys(plan.army.board).length + plan.army.bench.length);
+      // Every piece it bought is on the board, on the square its offer named, or on its bench, with the square it will land on; rerolls have no square.
+      const onBoard = plan.events.filter((e) => e.type === "buy" || e.type === "place");
+      expect(onBoard.length).toBe(Object.keys(plan.army.board).length);
+      expect(plan.events.filter((e) => e.type === "hold").length).toBe(plan.army.bench.length);
+      expect(plan.events.filter((e) => e.type !== "reroll" && e.type !== "xp").every((e) => e.square !== null)).toBe(true);
+      expect(plan.events.filter((e) => e.type === "reroll" || e.type === "xp").every((e) => e.square === null)).toBe(true);
+      expect(plan.army.bench.length).toBeLessThanOrEqual(AUTOCHESS.benchSlots);
       checkArmy(plan.army);
       for (const e of plan.events) {
         if (e.square) {
@@ -151,13 +172,8 @@ describe("auto chess: the bot", () => {
         // Over the step's open part, never in the locked end.
         expect(e.at).toBeLessThanOrEqual(AUTOCHESS.buySeconds - AUTOCHESS.lockSeconds - 1);
       }
-      // It puts down what the auto-drop would fill the board to, and keeps at most the one piece it can drop in the adjust step (with the gold for it left).
-      expect(Object.keys(plan.army.board).length).toBeLessThanOrEqual(AUTOCHESS.autoDropTo);
-      expect(plan.army.bench.length).toBeLessThanOrEqual(AUTOCHESS.adjustDrops);
-      if (plan.army.bench.length) expect(gold - plan.spent).toBeGreaterThanOrEqual(AUTOCHESS.adjustDropCost);
       expect(plan.army.board).not.toHaveProperty(king);
-      // Never more than the board holds.
-      expect(Object.keys(plan.army.board).length).toBeLessThanOrEqual(AUTOCHESS.boardLimit);
+      expect(Object.keys(plan.army.board).length).toBeLessThanOrEqual(plan.level.level);
       expect(owned(plan.army).q).toBeLessThanOrEqual(AUTOCHESS.queenLimit);
       expect(extras(owned(plan.army)) + owned(plan.army).p).toBeLessThanOrEqual(8);
       // Every position the fight could start from is one the engine accepts.
@@ -168,33 +184,27 @@ describe("auto chess: the bot", () => {
     }
   });
 
-  it("is deterministic for a seed, and keeps pawns in front and pieces behind", () => {
+  it("is deterministic for a seed", () => {
     const a = botPlan("b", "e8", 200, 5, mulberry32(9));
     const b = botPlan("b", "e8", 200, 5, mulberry32(9));
     expect(a).toEqual(b);
-    // Black's pawns: sixth rank first (in front), its pieces on the back ranks.
-    const plan = botPlan("b", "e8", 100, 1, mulberry32(4));
-    const pawns = Object.entries(plan.army.board).filter(([, k]) => k === "p");
-    const others = Object.entries(plan.army.board).filter(([, k]) => k !== "p");
-    expect(pawns.length).toBeGreaterThanOrEqual(2);
-    for (const [sq] of pawns) expect(Number(sq[1])).toBeLessThanOrEqual(6);
-    for (const [sq] of others) expect(Number(sq[1])).toBeGreaterThanOrEqual(7);
+    expect(botBuys(emptyArmy("w", "e1"), 150, 3, mulberry32(4))).toEqual(botBuys(emptyArmy("w", "e1"), 150, 3, mulberry32(4)));
   });
 
-  it("buys from its own random shop: its first piece is one the seeded shop shows (a reroll may come first), and the same seed buys the same", () => {
+  it("buys from its own random shop: its first piece is one the seeded shop shows, on the offer's square (a reroll may come first)", () => {
     for (let seed = 0; seed < 100; seed++) {
+      const army = emptyArmy("w", "e1");
       // (At 100 gold it doesn't draw for saving first, so the shop's seed is the first draw.)
-      const shop = newShop((mulberry32(seed)() * 2 ** 32) >>> 0);
-      const buys = botBuys(100, 1, mulberry32(seed));
-      expect(buys).toEqual(botBuys(100, 1, mulberry32(seed)));
-      if (buys[0]!.kind !== "reroll") expect(shop.slots).toContain(buys[0]!.kind);
+      const shop = newShop((mulberry32(seed)() * 2 ** 32) >>> 0, army);
+      const { buys } = botBuys(army, 100, 1, mulberry32(seed));
+      if (buys[0]!.kind !== "reroll" && buys[0]!.kind !== "xp") expect(shop.slots).toContainEqual({ kind: buys[0]!.kind, square: buys[0]!.square });
     }
   });
 
-  it("buys a mix (not pawns first: Eric, Oct 19), rooks and a queen as income grows, a fresh army each round, and never sells", () => {
+  it("buys a mix (not pawns first: Eric, Oct 19), rooks and a queen as income grows, and never sells", () => {
     // Round 1, 100 gold: some pawns, more pieces than a random shop's 25%, never a queen.
     const kinds = { p: 0, n: 0, b: 0, r: 0, q: 0 };
-    for (let seed = 0; seed < 200; seed++) for (const b of botBuys(100, 1, mulberry32(seed))) if (b.kind !== "reroll") kinds[b.kind]++;
+    for (let seed = 0; seed < 200; seed++) for (const b of botBuys(emptyArmy("w", "e1"), 100, 1, mulberry32(seed)).buys) if (b.kind !== "reroll" && b.kind !== "xp") kinds[b.kind]++;
     const total = kinds.p + kinds.n + kinds.b + kinds.r + kinds.q;
     expect(kinds.q).toBe(0);
     expect(kinds.p).toBeGreaterThan(0);
@@ -202,7 +212,7 @@ describe("auto chess: the bot", () => {
     let queens = 0;
     let rooks = 0;
     for (let seed = 0; seed < 200; seed++) {
-      const late = botBuys(200, 8, mulberry32(seed)).flatMap((b) => (b.kind === "reroll" ? [] : [b.kind]));
+      const late = botBuys(emptyArmy("w", "e1"), 200, 8, mulberry32(seed), AUTOCHESS, { level: 9, xp: 0 }).buys.flatMap((b) => (b.kind === "reroll" || b.kind === "xp" ? [] : [b.kind]));
       queens += late.filter((k) => k === "q").length;
       rooks += late.filter((k) => k === "r").length;
       expect(late.filter((k) => k === "q").length).toBeLessThanOrEqual(1);
@@ -213,80 +223,99 @@ describe("auto chess: the bot", () => {
     // Sometimes it keeps a hundred banked for interest (30%, when it has 130 or more).
     let kept = 0;
     for (let seed = 0; seed < 200; seed++) {
-      const spent = botBuys(160, 4, mulberry32(seed)).reduce((sum, b) => sum + b.price, 0);
+      const spent = botBuys(emptyArmy("w", "e1"), 160, 4, mulberry32(seed)).buys.reduce((sum, b) => sum + b.price, 0);
       if (spent <= 60) kept++;
     }
     expect(kept).toBeGreaterThan(30);
     expect(kept).toBeLessThan(100);
   });
 
-  it("rerolls its shop now and then when it has gold to spare: at most 3 a round, never when it is poor, and every reroll costs 5", () => {
+  it("rerolls its shop now and then when it has gold to spare: at most 4 a round, never when it is poor, and every reroll costs 2", () => {
     let withReroll = 0;
     let rerolls = 0;
     for (let seed = 0; seed < 300; seed++) {
-      const buys = botBuys(100 + (seed % 4) * 40, 1 + (seed % 6), mulberry32(seed));
+      const { buys } = botBuys(emptyArmy("w", "e1"), 100 + (seed % 4) * 40, 1 + (seed % 6), mulberry32(seed));
       const n = buys.filter((b) => b.kind === "reroll").length;
       expect(n).toBeLessThanOrEqual(AUTOCHESS.bot.maxRerolls);
-      for (const b of buys) expect(b.price).toBe(b.kind === "reroll" ? AUTOCHESS.shop.rerollCost : AUTOCHESS.prices[b.kind]);
+      for (const b of buys) expect(b.price).toBe(b.kind === "reroll" ? AUTOCHESS.shop.rerollCost : b.kind === "xp" ? AUTOCHESS.levels.buyXpCost : b.type === "place" ? 0 : AUTOCHESS.prices[b.kind]);
       if (n) withReroll++;
       rerolls += n;
       // Poor: under the gold it likes to keep, it never rerolls.
-      expect(botBuys(50, 1, mulberry32(seed)).filter((b) => b.kind === "reroll")).toHaveLength(0);
+      expect(botBuys(emptyArmy("w", "e1"), 30, 1, mulberry32(seed)).buys.filter((b) => b.kind === "reroll")).toHaveLength(0);
     }
     // "Now and then": some plans, not most.
     expect(withReroll).toBeGreaterThan(40);
-    expect(withReroll).toBeLessThan(220);
+    expect(withReroll).toBeLessThan(240);
     expect(rerolls).toBeGreaterThan(withReroll - 1);
-    // It never owns more than it can use: 8 down and one to drop.
-    for (let seed = 0; seed < 300; seed++) expect(botBuys(400, 6, mulberry32(seed)).filter((b) => b.kind !== "reroll").length).toBeLessThanOrEqual(AUTOCHESS.autoDropTo + AUTOCHESS.adjustDrops);
-    // The ninth piece is bought only with the drop's gold kept.
+    // It never puts more on its board than the board holds, nor more on its bench than the bench holds.
     for (let seed = 0; seed < 300; seed++) {
-      const gold = 150 + (seed % 7) * 10;
-      const buys = botBuys(gold, 4, mulberry32(seed));
-      if (buys.filter((b) => b.kind !== "reroll").length > AUTOCHESS.autoDropTo) expect(gold - buys.reduce((s, b) => s + b.price, 0)).toBeGreaterThanOrEqual(AUTOCHESS.adjustDropCost);
+      const { buys, army, level } = botBuys(emptyArmy("w", "e1"), 400, 6, mulberry32(seed));
+      expect(buys.filter((b) => b.type === "buy" || b.type === "place").length).toBeLessThanOrEqual(level.level);
+      expect(army.bench.length).toBeLessThanOrEqual(AUTOCHESS.benchSlots);
     }
+  });
+
+  it("places what it held first, for nothing, where the squares are free; then buys; and what it can't place stays on its bench", () => {
+    const held = [{ kind: "n" as Kind, square: "c6" }, { kind: "q" as Kind, square: "d8" }, { kind: "r" as Kind, square: "e8" }];
+    for (let seed = 0; seed < 100; seed++) {
+      // (The king stands on e8: the rook held for e8 can't land this round.)
+      const plan = botPlan("b", "e8", 100, 1 + (seed % 6), mulberry32(seed), AUTOCHESS, held);
+      const placed = plan.events.filter((e) => e.type === "place");
+      expect(placed.map((e) => e.kind)).toEqual(["n", "q"]);
+      expect(placed.every((e) => e.price === 0)).toBe(true);
+      expect(plan.army.board).toMatchObject({ c6: "n", d8: "q" });
+      expect(plan.army.bench).toEqual(expect.arrayContaining([{ kind: "r", square: "e8" }]));
+      // A queen held is the one queen: it never buys another.
+      expect(owned(plan.army).q).toBe(1);
+      // What is placed costs nothing: the gold spent is only the buys, holds and rerolls.
+      expect(plan.spent).toBe(plan.events.reduce((sum, e) => sum + (e.type === "place" ? 0 : e.price), 0));
+      expect(plan.spent).toBeLessThanOrEqual(100);
+      expect(plan.army.board).not.toHaveProperty("e8");
+    }
+  });
+
+  const noXp = { ...AUTOCHESS, bot: { ...AUTOCHESS.bot, xpChance: 0, xpChanceFull: 0 } };
+
+  it("with its board full (its level's limit) it holds a good piece on its bench, never a pawn, up to the setting, and pays for it", () => {
+    let held = 0;
+    for (let seed = 0; seed < 300; seed++) {
+      // (Level 4 is 4 pieces; no XP, so the limit stays: the holds come once the fourth piece is down.)
+      const { buys, army } = botBuys(emptyArmy("b", "e8"), 300, 6, mulberry32(seed), noXp, { level: 4, xp: 0 });
+      expect(Object.keys(army.board).length).toBeLessThanOrEqual(4);
+      const holds = buys.filter((b) => b.type === "hold");
+      expect(holds.length).toBeLessThanOrEqual(AUTOCHESS.bot.maxHolds);
+      expect(holds.every((b) => b.kind !== "p" && b.price === AUTOCHESS.prices[b.kind as Kind] && b.square !== null)).toBe(true);
+      expect(army.bench).toEqual(holds.map((b) => ({ kind: b.kind, square: b.square })));
+      // A hold only comes once the board is full.
+      const firstHold = buys.findIndex((b) => b.type === "hold");
+      if (firstHold >= 0) expect(buys.slice(0, firstHold).filter((b) => b.type === "buy" || b.type === "place")).toHaveLength(4);
+      expect(buys.reduce((sum, b) => sum + b.price, 0)).toBeLessThanOrEqual(300);
+      held += holds.length;
+    }
+    // "Now and then": it holds, but not every time.
+    expect(held).toBeGreaterThan(100);
+    expect(held).toBeLessThan(500);
   });
 
   it("shows what it has done by a time (the circles are drawn from this, 2 s behind): pieces on squares, and what it has spent, rerolls too", () => {
     for (let seed = 0; seed < 40; seed++) {
       const plan = botPlan("b", "e8", 100 + (seed % 3) * 60, 1 + (seed % 5), mulberry32(seed));
-      expect(botAt(plan.events, 0)).toEqual({ squares: {}, spent: 0 });
+      expect(botAt(plan.events, 0)).toEqual({ squares: {}, spent: 0, xpBuys: 0 });
       const all = botAt(plan.events, 99);
       expect(all.squares).toEqual(plan.army.board);
       expect(all.spent).toBe(plan.spent);
       const t = plan.events[Math.floor(plan.events.length / 2)]!.at;
       const done = plan.events.filter((e) => e.at <= t);
       const mid = botAt(plan.events, t);
-      expect(Object.keys(mid.squares)).toHaveLength(done.filter((e) => e.square).length);
+      expect(Object.keys(mid.squares)).toHaveLength(done.filter((e) => e.type === "buy" || e.type === "place").length);
       expect(mid.spent).toBe(done.reduce((sum, e) => sum + e.price, 0));
     }
   });
 
-  it("while you buy you see its pawns as real pawns and every other piece as a circle (2 s behind, as the circles are)", () => {
-    for (let seed = 0; seed < 50; seed++) {
-      const plan = botPlan("b", "e8", 100 + (seed % 4) * 40, 1 + (seed % 6), mulberry32(seed));
-      const seen = botAt(plan.events, 99).squares;
-      const shown = botShown(seen);
-      expect(shown.pawns.every((sq) => seen[sq] === "p")).toBe(true);
-      expect(shown.circles.every((sq) => seen[sq] !== "p")).toBe(true);
-      expect([...shown.pawns, ...shown.circles].sort()).toEqual(Object.keys(seen).sort());
-      // Early on, only what it has done so far shows.
-      const first = plan.events.find((e) => e.square)!;
-      const early = botShown(botAt(plan.events, first.at).squares);
-      expect(early.pawns.length + early.circles.length).toBe(plan.events.filter((e) => e.square && e.at <= first.at).length);
-    }
-    expect(botShown({ a6: "p", c8: "n", b7: "q" })).toEqual({ pawns: ["a6"], circles: ["c8", "b7"] });
-  });
-
-  it("places by the same rules as a player (pawns on distinct files while there are files)", () => {
-    const placed = botPlaces("w", "e1", ["p", "p", "p", "p", "p", "p", "p", "p", "n"], mulberry32(5));
-    const files = placed.filter((p) => p.kind === "p").map((p) => p.square[0]);
-    expect(new Set(files).size).toBe(8);
-  });
-
-  it("adjusts greedily: its one move is kept only when the position scores better than standing still, and there is only one", async () => {
+  it("adjusts greedily: its one change (a piece to any legal empty square) is kept only when the position scores better than standing still, and there is only one", async () => {
     const army: Army = { color: "w", king: "e1", board: { a2: "p", b2: "p", g1: "n" }, bench: [] };
-    const wide = { ...AUTOCHESS, bot: { ...AUTOCHESS.bot, adjustDestinations: 8 } };
+    // (Every square of the half is a destination now, so a scorer that likes one is found by looking at all of them.)
+    const wide = { ...AUTOCHESS, bot: { ...AUTOCHESS.bot, adjustDestinations: 40, adjustTries: 200 } };
     const changed = (a: Army) => Object.entries(a.board).filter(([sq, k]) => army.board[sq] !== k).length + (a.king !== army.king ? 1 : 0);
     // A scorer that likes the knight on f3 and nothing else.
     const calls: Army[] = [];
@@ -294,7 +323,7 @@ describe("auto chess: the bot", () => {
       calls.push(a);
       return a.board.f3 === "n" ? 0.9 : 0.5;
     };
-    const out = await botAdjust(army, 0, evaluate, mulberry32(1), () => false, wide);
+    const out = await botAdjust(army, evaluate, mulberry32(1), () => false, wide);
     expect(out.board.f3).toBe("n");
     // The rest did not move.
     expect(out.board.a2).toBe("p");
@@ -302,63 +331,73 @@ describe("auto chess: the bot", () => {
     expect(out.king).toBe("e1");
     expect(changed(out)).toBe(1);
     // A scorer that likes two different moves (the knight to f3, the pawn to a4) still gets one move.
-    const both = await botAdjust(army, 0, async (a) => 0.5 + (a.board.f3 === "n" ? 0.2 : 0) + (a.board.a4 === "p" ? 0.2 : 0), mulberry32(1), () => false, wide);
+    const both = await botAdjust(army, async (a) => 0.5 + (a.board.f3 === "n" ? 0.2 : 0) + (a.board.a4 === "p" ? 0.2 : 0), mulberry32(1), () => false, wide);
     expect(changed(both)).toBe(1);
     // A scorer that likes nothing: it stands still.
-    expect(await botAdjust(army, 0, async () => 0.5, mulberry32(1), () => false)).toEqual(army);
-    // Small by design: at most the move's tries and the drop's tries beyond the first look.
+    expect(await botAdjust(army, async () => 0.5, mulberry32(1), () => false)).toEqual(army);
+    // Small by design: at most the tries beyond the first look.
     let n = 0;
-    await botAdjust({ ...army, board: { a2: "p", b2: "p", c2: "p", d2: "p", e2: "p", f2: "p", g2: "p", h2: "p", b1: "n", g1: "n", c1: "b", f1: "b" }, bench: ["q"] }, 100, async () => (n++, 0.5), mulberry32(2), () => false);
+    await botAdjust({ ...army, board: { a2: "p", b2: "p", c2: "p", d2: "p", e2: "p", f2: "p", g2: "p", h2: "p", b1: "n", g1: "n", c1: "b", f1: "b" } }, async () => (n++, 0.5), mulberry32(2), () => false);
     expect(n).toBeLessThanOrEqual(AUTOCHESS.bot.adjustTries + 1);
     // And it stops when told to.
     let m = 0;
-    await botAdjust(army, 100, async () => (m++, 0.5), mulberry32(3), () => m >= 2);
+    await botAdjust(army, async () => (m++, 0.5), mulberry32(3), () => m >= 2);
     expect(m).toBeLessThanOrEqual(3);
   });
 
-  it("drops one bench piece when it can pay for it (25 gold) and the drop beats what it has or it isn't winning; never with less gold, a full board, a drop that makes things worse or when it is already winning", async () => {
-    const army: Army = { color: "b", king: "e8", board: { a7: "p", b7: "p" }, bench: ["n", "r"] };
-    // A scorer that likes every extra piece on the board.
-    const likesPieces = async (a: Army) => 0.5 + 0.05 * Object.keys(a.board).length;
-    const out = await botAdjust(army, 25, likesPieces, mulberry32(1), () => false);
-    expect(Object.keys(out.board)).toHaveLength(3);
-    expect(out.bench).toHaveLength(1);
-    // The dropped piece stands on its own half (ranks 5 to 8), not on its king or a piece.
-    const [square] = Object.keys(out.board).filter((sq) => !army.board[sq]);
-    expect(Number(square![1])).toBeGreaterThanOrEqual(5);
-    expect(square).not.toBe("e8");
-    // 24 gold, or no bench, or a drop the scorer doesn't like: nothing is dropped.
-    expect((await botAdjust(army, 24, likesPieces, mulberry32(1), () => false)).bench).toEqual(["n", "r"]);
-    expect((await botAdjust({ ...army, bench: [] }, 99, likesPieces, mulberry32(1), () => false)).board).toEqual(army.board);
-    // The engine's score saturates, so a bot that is not already winning drops (one piece) even when no square scores better; one that is winning keeps its gold; none drops where it scores worse.
-    expect((await botAdjust(army, 99, async () => 0.5, mulberry32(1), () => false)).bench).toHaveLength(1);
-    expect((await botAdjust(army, 99, async () => 0.95, mulberry32(1), () => false)).bench).toEqual(["n", "r"]);
-    expect((await botAdjust(army, 99, async (a) => 0.5 - 0.05 * Object.keys(a.board).length, mulberry32(1), () => false)).bench).toEqual(["n", "r"]);
-    // A full board (10 pieces): the bench stays.
-    const ten: Army = { color: "b", king: "e8", board: { a6: "p", b6: "p", c6: "p", d6: "p", e6: "p", f6: "p", g6: "p", h6: "p", b8: "n", g8: "n" }, bench: ["b"] };
-    expect((await botAdjust(ten, 99, likesPieces, mulberry32(1), () => false)).bench).toEqual(["b"]);
-    // Told to stop before it starts the drop: it doesn't.
-    let looks = 0;
-    const early = await botAdjust(army, 99, async (a) => (looks++, likesPieces(a)), mulberry32(1), () => looks >= 1);
-    expect(early.bench).toEqual(["n", "r"]);
+  it("over a whole match of rounds the bot stays legal under all of it: its level, bench, XP, rerolls and gold, round after round, for 150 seeds", () => {
+    for (let seed = 0; seed < 150; seed++) {
+      let gold = 0;
+      let level = { level: AUTOCHESS.levels.start, xp: 0 };
+      let bench: Army["bench"] = [];
+      for (let round = 1; round <= 10; round++) {
+        level = addXp(level, AUTOCHESS.levels.freeXp);
+        gold += incomeFor(round) + interestFor(gold);
+        const color = round % 2 ? "b" : "w";
+        const king = kingSquares(seed * 31 + round)[color];
+        const carried = carryBench(bench);
+        // What it held comes in on squares of its half (turned with the colors), at most the bench's size.
+        expect(carried.length).toBeLessThanOrEqual(AUTOCHESS.benchSlots);
+        for (const h of carried) expect(halfSquares(color)).toContain(h.square);
+        const plan = botPlan(color, king, gold, round, mulberry32(seed * 100 + round), AUTOCHESS, carried, level);
+        // Gold: never spends what it hasn't (a placed held piece is free).
+        expect(plan.spent).toBeLessThanOrEqual(gold);
+        for (const e of plan.events) expect(e.price).toBe(e.type === "place" ? 0 : e.type === "reroll" ? AUTOCHESS.shop.rerollCost : e.type === "xp" ? AUTOCHESS.levels.buyXpCost : AUTOCHESS.prices[e.kind as Kind]);
+        // Level: only what it bought (the free XP came before), and the board never holds more than the level.
+        expect(plan.level).toEqual(addXp(level, plan.events.filter((e) => e.type === "xp").length * AUTOCHESS.levels.buyXp));
+        expect(Object.keys(plan.army.board).length).toBeLessThanOrEqual(plan.level.level);
+        // Pieces: board and bench together are a legal army (the pawn, queen and extras limits), the bench holds at most its slots, each piece on its half, the king alone on its square.
+        expect(legalCounts(owned(plan.army))).toBe(true);
+        expect(plan.army.bench.length).toBeLessThanOrEqual(AUTOCHESS.benchSlots);
+        for (const h of plan.army.bench) expect(halfSquares(color)).toContain(h.square);
+        for (const sq of Object.keys(plan.army.board)) expect(halfSquares(color)).toContain(sq);
+        expect(plan.army.board).not.toHaveProperty(king);
+        // Everything it held either went down or is still held; nothing is lost or made.
+        const held0 = carried.map((h) => `${h.kind}${h.square}`).sort();
+        const placed = plan.events.filter((e) => e.type === "place").map((e) => `${e.kind}${e.square}`);
+        for (const p of placed) expect(held0).toContain(p);
+        expect(plan.army.bench.filter((h) => held0.includes(`${h.kind}${h.square}`)).length + placed.length).toBeGreaterThanOrEqual(held0.length);
+        gold -= plan.spent;
+        expect(gold).toBeGreaterThanOrEqual(0);
+        level = plan.level;
+        bench = plan.army.bench;
+      }
+    }
   });
 
-  it("under all the v5 rules the bot's whole step stays legal: its buys, its board of up to 8 after the auto-drop, its one move and one drop, for 120 seeds", async () => {
+  it("under the rules the bot's whole step stays legal: its buys and its one move, for 120 seeds", async () => {
     for (let seed = 0; seed < 120; seed++) {
       const color = seed % 2 ? "w" : "b";
       const king = kingSquares(seed)[color];
       const plan = botPlan(color, king, 100 + (seed % 6) * 40, 1 + (seed % 9), mulberry32(seed));
-      const start = autoDrop(plan.army).army;
-      expect(Object.keys(start.board).length).toBeLessThanOrEqual(AUTOCHESS.boardLimit);
+      const start = plan.army;
+      expect(Object.keys(start.board).length).toBeLessThanOrEqual(plan.level.level);
       expect(legalCounts(owned(start))).toBe(true);
       // A deterministic scorer standing in for the engine: likes pieces further up the board.
       const score = async (a: Army) => 0.4 + 0.01 * Object.keys(a.board).reduce((sum, sq) => sum + Math.abs(Number(sq[1]) - (color === "w" ? 1 : 8)), 0) / 4;
-      const out = await botAdjust(start, 60, score, mulberry32(seed + 77), () => false);
-      checkArmy({ ...out, bench: out.bench });
-      expect(Object.keys(out.board).length).toBeLessThanOrEqual(AUTOCHESS.boardLimit);
-      // One drop at most, so at most one piece fewer on the bench; the pieces are the same ones.
-      expect(start.bench.length - out.bench.length).toBeLessThanOrEqual(AUTOCHESS.adjustDrops);
-      expect(Object.keys(out.board).length - Object.keys(start.board).length).toBe(start.bench.length - out.bench.length);
+      const out = await botAdjust(start, score, mulberry32(seed + 77), () => false);
+      checkArmy(out);
+      expect(Object.keys(out.board).length).toBe(Object.keys(start.board).length);
       expect(out.board).not.toHaveProperty(out.king);
       expect(halfSquares(color)).toEqual(expect.arrayContaining([out.king, ...Object.keys(out.board)]));
       // The position is one the engine accepts (when it isn't a drawn start).
@@ -532,11 +571,11 @@ describe("auto chess: the fight", () => {
     const idle = { pick: async () => null, wait: noWait, rng: mulberry32(1) };
     // A side that starts with only its king loses: no move is played, whatever the other has (even a lone knight: it used to be "not enough pieces").
     for (const board of [{ a2: "n" }, { a2: "p" }, { d1: "q", a1: "r" }] as Record<string, Kind>[]) {
-      const blackLone = fightStart({ color: "w", king: "e1", board, bench: [] }, { color: "b", king: "e8", board: {}, bench: [] });
+      const blackLone = fightStart({ color: "w", king: "e1", board }, { color: "b", king: "e8", board: {}, bench: [] });
       expect(await playFight(blackLone.fen, idle)).toMatchObject({ end: "king_alone", winner: "w", moves: [] });
     }
     for (const board of [{ a7: "n" }, { a7: "p" }, { d8: "q", a8: "r" }] as Record<string, Kind>[]) {
-      const whiteLone = fightStart({ color: "w", king: "e1", board: {}, bench: [] }, { color: "b", king: "e8", board, bench: [] });
+      const whiteLone = fightStart({ color: "w", king: "e1", board: {}, bench: [] }, { color: "b", king: "e8", board });
       expect(await playFight(whiteLone.fen, idle)).toMatchObject({ end: "king_alone", winner: "b", moves: [] });
     }
     // Both with only a king: a draw.
