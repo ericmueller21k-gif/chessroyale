@@ -7,7 +7,12 @@ import { BOARD_SEL, asAdmin, named, test } from "./helpers.ts";
  * 2 locked, circles half a second behind, adjust 5 s, a fight move every 60 ms); `?seed=` fixes the kings and the bot.
  */
 const phone = () => test.info().project.name === "phone";
-const QUICK = "/autochess?quick=1&seed=7";
+// (A tap or click that finds nothing fails in seconds, not at the test's end.)
+test.use({ actionTimeout: 15_000 });
+// (Seed 1866: round 1's shop is queen, knight, rook, pawn, pawn; the shop's rolls are seeded by the round and the reroll count.)
+const QUICK = "/autochess?quick=1&seed=1866";
+const PRICES: Record<string, number> = { p: 10, n: 30, b: 32, r: 50, q: 90 };
+const CODE: Record<string, string> = { pawn: "p", knight: "n", bishop: "b", rook: "r", queen: "q" };
 
 /** Every page error and console error of a test: none may happen. */
 function watchErrors(page: Page) {
@@ -64,7 +69,11 @@ async function dragTouch(p: Page, from: { x: number; y: number }, to: { x: numbe
   await cdp.detach();
 }
 
-const buyPiece = (p: Page, name: string) => p.getByRole("button", { name: new RegExp(`^Buy a ${name}`) });
+/** The first shop slot holding this piece (the shop has five random slots; a bought slot rolls a new piece). */
+const buyPiece = (p: Page, name: string) => p.locator(`.ac-buy[data-kind="${CODE[name]}"]`).first();
+/** What the five slots hold now, in order. */
+const shopKinds = (p: Page) => p.locator(".ac-buy").evaluateAll((els) => els.map((e) => e.getAttribute("data-kind")!));
+const reroll = (p: Page) => p.getByRole("button", { name: /^Reroll the shop/ });
 const benchPieces = (p: Page) => p.locator(".ac-slot.has");
 const piece = (p: Page, color: "white" | "black", role: string, square: string) => p.locator(`${BOARD_SEL.piece}.${color}.${role}[data-square="${square}"]`);
 
@@ -105,6 +114,45 @@ test("shelved (Eric, Oct 19): no button on home or in a player's Settings; an ad
   expect(errors).toEqual([]);
 });
 
+test("the shop: five random slots, a bought slot rolls anew, a reroll of all five costs 5 gold (the same for the same seed) and is refused without the gold", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto(QUICK);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  expect(await shopKinds(page)).toEqual(["q", "n", "r", "p", "p"]);
+  expect(await goldOf(page)).toBe(100);
+  // Reroll is a button with its cost on it.
+  await expect(reroll(page)).toContainText("Reroll");
+  await expect(reroll(page)).toContainText("5");
+  // Buying a slot (the knight, 30) rolls a new piece into that slot only.
+  await tap(page, page.locator('.ac-buy[data-slot="1"]'));
+  expect(await goldOf(page)).toBe(70);
+  const after = await shopKinds(page);
+  expect(after).toHaveLength(5);
+  expect(after.filter((_, i) => i !== 1)).toEqual(["q", "r", "p", "p"]);
+  // A reroll rolls all five again for 5 gold.
+  await tap(page, reroll(page));
+  expect(await goldOf(page)).toBe(65);
+  const rolled = await shopKinds(page);
+  expect(rolled).toHaveLength(5);
+  await expect(page.locator(".ac-buy b")).toHaveText(rolled.map((k) => String(PRICES[k])));
+  // Seeded by the round and the reroll count: a fresh start rerolled once shows the same five pieces.
+  await page.goto(QUICK);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  expect(await shopKinds(page)).toEqual(["q", "n", "r", "p", "p"]);
+  await tap(page, reroll(page));
+  expect(await shopKinds(page)).toEqual(rolled);
+  expect(await goldOf(page)).toBe(95);
+  // Without the gold it is refused, with the reason.
+  for (let i = 0; i < 19; i++) await tap(page, reroll(page));
+  expect(await goldOf(page)).toBe(0);
+  await expect(reroll(page)).toHaveAttribute("aria-disabled", "true");
+  await reroll(page).click({ force: true });
+  await expect(page.locator(".ac-msg")).toContainText("Not enough gold: a reroll costs 5 and you have 0.");
+  expect(await goldOf(page)).toBe(0);
+  expect(await shopKinds(page)).toHaveLength(5);
+  expect(errors).toEqual([]);
+});
+
 test("buy to the bench, place by tap and by drag, sell for 90% by drag and by tap, the reasons, and the lock", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(QUICK);
@@ -121,8 +169,10 @@ test("buy to the bench, place by tap and by drag, sell for 90% by drag and by ta
   await expect(piece(page, "white", "king", king)).toBeVisible();
   await expect(piece(page, "black", "king", botKing)).toBeVisible();
   await expect(page.locator(BOARD_SEL.wrap)).toHaveClass(/orientation-white/);
-  // The shop: five pieces with their prices (pawn 10, knight 30, bishop 32, rook 50, queen 90).
-  await expect(page.locator(".ac-buy b")).toHaveText(["10", "30", "32", "50", "90"]);
+  // The shop: five slots, each a piece with its price (pawn 10, knight 30, bishop 32, rook 50, queen 90).
+  const kinds = await shopKinds(page);
+  expect(kinds).toEqual(["q", "n", "r", "p", "p"]);
+  await expect(page.locator(".ac-buy b")).toHaveText(kinds.map((k) => String(PRICES[k])));
   await expect(page.locator(".ac-slot")).toHaveCount(8);
 
   // Buy a pawn and a knight: onto the bench, gold down, a pop.
@@ -196,8 +246,10 @@ test("buy to the bench, place by tap and by drag, sell for 90% by drag and by ta
   await expect(buyPiece(page, "pawn")).toContainText("Max 8");
   await buyPiece(page, "pawn").click({ force: true });
   await expect(page.locator(".ac-msg")).toContainText("8 pawns at most.");
-  await expect(buyPiece(page, "knight")).toContainText("Bench full");
-  await buyPiece(page, "knight").click({ force: true });
+  // (Any piece but a pawn: the bench is named before the gold.)
+  const notPawn = page.locator('.ac-buy:not([data-kind="p"])').first();
+  await expect(notPawn).toContainText("Bench full");
+  await notPawn.click({ force: true });
   await expect(page.locator(".ac-msg")).toContainText("Your bench is full. Place or sell a piece first.");
   expect(await goldOf(page)).toBe(15);
 
@@ -369,6 +421,8 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   await expect(page.locator(BOARD_SEL.wrap)).toHaveClass(/orientation-black/);
   await expect(page.locator(BOARD_SEL.piece)).toHaveCount(2);
   await expect(page.locator(".ac-slot.has")).toHaveCount(0);
+  // The shop refilled free: five slots, and the gold is only the round's pay.
+  expect(await shopKinds(page)).toHaveLength(5);
   expect(await goldOf(page)).toBe(total);
   await expect(page.locator(".ac-income b")).toHaveText("+120");
   const k2 = (await root(page).getAttribute("data-king"))!;
@@ -419,7 +473,7 @@ test("layouts: the board, bench, shop and your row fit the screen with no scroll
     expect(m.buttons.every((b) => b.l >= 0 && b.r <= w), `${w}×${h}: the shop inside`).toBe(true);
     expect(m.bench.every((x) => x >= 28), `${w}×${h}: the bench's slots`).toBe(true);
     // A phone's board is as wide as the room allows; the others' room is the height.
-    if (w <= 430) expect(m.board.w, `${w}×${h}`).toBeGreaterThan(Math.min(w - 40, h - 300) - 10);
+    if (w <= 430) expect(m.board.w, `${w}×${h}`).toBeGreaterThan(Math.min(w - 40, h - 322) - 10);
   }
   // The result box is the same size as the shop and bench it replaces: the board doesn't move when the step changes.
   await page.setViewportSize({ width: phone() ? 390 : 1280, height: phone() ? 664 : 800 });

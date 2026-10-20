@@ -17573,17 +17573,18 @@ button.sq-tiny {
 .ac-root {
   display: flex;
   justify-content: center;
-  padding: calc(env(safe-area-inset-top) + 6px) calc(12px + env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 6px) calc(12px + env(safe-area-inset-left));
+  padding: calc(env(safe-area-inset-top) + 4px) calc(12px + env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 4px) calc(12px + env(safe-area-inset-left));
 }
 /*
  * One column as wide as the board. The board is as wide as the screen allows, or as tall as the room under the rows around it
- * (the top line 44, the opponent's row 26, the message line 32, the bench 44, the shop 64, your row 26 and the gaps: 290 px).
+ * (the top line 44, the opponent's row 26, the message line 32, the bench 44, the shop 64, the buttons 34, your row 26, seven
+ * gaps of 4 and the page's padding: 312 px).
  */
 .ac-col {
-  width: min(100%, calc(var(--app-h) - 290px), 560px);
+  width: min(100%, calc(var(--app-h) - 312px), 560px);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 .ac-top {
@@ -17899,6 +17900,37 @@ button.sq-tiny {
   opacity: 0.5;
   filter: grayscale(0.7);
 }
+/* Reroll (and, beside it, Lock in) under the shop. */
+.ac-ctl {
+  height: 34px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.ac-ctl button {
+  min-width: 0;
+  border: 0;
+  border-radius: 12px;
+  background: var(--fd-panel);
+  color: var(--fd-text);
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ac-ctl button b {
+  font-variant-numeric: tabular-nums;
+  color: var(--fd-gold-text);
+}
+.ac-ctl button.off {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+}
 .ac-sell-drop {
   position: absolute;
   inset: 0;
@@ -17911,9 +17943,9 @@ button.sq-tiny {
   font-size: 15px;
   pointer-events: none;
 }
-/* The other steps' box, in the place of the message line, the bench and the shop (32 + 6 + 44 + 6 + 64 px). */
+/* The other steps' box, in the place of the message line, the bench, the shop and the buttons (32 + 4 + 44 + 4 + 64 + 4 + 34 px). */
 .ac-card {
-  height: 152px;
+  height: 186px;
   padding: 8px 10px;
   border-radius: 14px;
   background: var(--fd-panel);

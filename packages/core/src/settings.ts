@@ -2692,6 +2692,15 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
 export interface AutoChessSettings {
   /** What each piece costs in the shop (a pawn 10 ... a queen 90: the chess value times ten, a bishop a little over a knight). */
   readonly prices: { readonly p: number; readonly n: number; readonly b: number; readonly r: number; readonly q: number };
+  /**
+   * The shop (v5, Eric Oct 20): this many random slots, each rolling a piece by these odds (percent); buying a piece rolls a
+   * new one into its slot; one reroll of all the slots costs `rerollCost` gold. The shop refills free at each round's start.
+   */
+  readonly shop: {
+    readonly slots: number;
+    readonly odds: { readonly p: number; readonly n: number; readonly b: number; readonly r: number; readonly q: number };
+    readonly rerollCost: number;
+  };
   /** Selling a piece gives back this share of its price, rounded down (P9 N27 B28 R45 Q81). */
   readonly sellBack: number;
   /** The buy-and-place step, its locked end (no buying, selling or moving), and how far behind the opponent's circles show. */
@@ -2752,6 +2761,7 @@ export interface AutoChessSettings {
 
 export const AUTOCHESS: AutoChessSettings = {
   prices: { p: 10, n: 30, b: 32, r: 50, q: 90 },
+  shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 5 },
   sellBack: 0.9,
   buySeconds: 30,
   lockSeconds: 3,

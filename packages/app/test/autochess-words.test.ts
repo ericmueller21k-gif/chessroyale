@@ -55,6 +55,7 @@ describe("auto chess: survivors and promotions", () => {
 
   it("the settings hold the design's numbers (v4): tune them here, nowhere else", () => {
     expect(AUTOCHESS).toMatchObject({
+      shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 5 },
       sellBack: 0.9,
       buySeconds: 30,
       lockSeconds: 3,

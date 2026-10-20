@@ -9,7 +9,6 @@ import { testParams } from "../test-switches.ts";
 import { adjustBlock, adjustMove, adjustTargets, adjustWords, startAdjust, undoBlock, undoMove, type Adjusted } from "../autochess/adjust.ts";
 import { botAdjust, botAt, botPlan } from "../autochess/bot.ts";
 import {
-  buy,
   buyBlock,
   buyWords,
   emptyArmy,
@@ -37,9 +36,10 @@ import {
   type RoundResult,
 } from "../autochess/economy.ts";
 import { botEvaluator, enginePick, warmEngine } from "../autochess/engine.ts";
+import { buyFromSlot, newShop, rerollFor, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
 import { playFight } from "../autochess/fight.ts";
 import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn } from "../autochess/position.ts";
-import { KIND_NAME, KINDS, other, type Army, type Color, type Kind } from "../autochess/types.ts";
+import { KIND_NAME, other, type Army, type Color, type Kind } from "../autochess/types.ts";
 import { clockWords, damageWords, endWords, goldWords, headline, matchWords, type EndKind } from "../autochess/words.ts";
 
 /**
@@ -64,6 +64,8 @@ type BotPlan = ReturnType<typeof botPlan>;
 /** Everything that belongs to one round (a new one every round: nothing carries over but gold, HP and the streak). */
 interface RoundState {
   you: Army;
+  /** The shop's five slots (new every round, free). */
+  shop: Shop;
   /** Your adjust step: where your pieces stand and which have moved. */
   adj: Adjusted | null;
   plan: BotPlan;
@@ -113,7 +115,7 @@ function startRound(prev: MatchState, cfg: AutoChessSettings): { match: MatchSta
   const seed = roundSeed(match);
   const kings = kingSquares(seed, cfg);
   const plan = botPlan(theirs, kings[theirs], match.bot.gold, match.round, mulberry32(seed ^ 0x9e3779b9), cfg);
-  return { match, round: { you: emptyArmy(mine, kings[mine]), adj: null, plan, botFinal: null, gold } };
+  return { match, round: { you: emptyArmy(mine, kings[mine]), shop: newShop(shopSeed(seed), cfg), adj: null, plan, botFinal: null, gold } };
 }
 
 function newGame(seed: number, cfg: AutoChessSettings): Game {
@@ -305,12 +307,25 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold } }, round: { ...cur.round, you: army } });
   };
 
-  function buyPiece(kind: Kind) {
+  /** Buys the piece in a shop slot onto the bench; a new piece is rolled into the slot. */
+  function buySlot(slot: number) {
     if (!buying()) return;
     const cur = gref.current;
-    const block = buyBlock(cur.round.you, cur.match.you.gold, kind);
-    if (block) return say(buyWords(block, kind, cur.match.you.gold).line);
-    withGold(cur.match.you.gold - priceOf(kind), buy(cur.round.you, kind));
+    const kind = cur.round.shop.slots[slot]!;
+    const bought = buyFromSlot({ army: cur.round.you, gold: cur.match.you.gold, shop: cur.round.shop }, slot, shopSeed(roundSeed(cur.match)), cfg);
+    if ("block" in bought) return say(buyWords(bought.block, kind, cur.match.you.gold).line);
+    commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: bought.gold } }, round: { ...cur.round, you: bought.army, shop: bought.shop } });
+    setMsg("");
+    play("pop");
+  }
+
+  /** Rolls the whole shop again for gold. */
+  function reroll() {
+    if (!buying()) return;
+    const cur = gref.current;
+    const next = rerollFor({ gold: cur.match.you.gold, shop: cur.round.shop }, shopSeed(roundSeed(cur.match)), cfg);
+    if ("block" in next) return say(rerollWords(cur.match.you.gold, cfg));
+    commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: next.gold } }, round: { ...cur.round, shop: next.shop } });
     setMsg("");
     play("pop");
   }
@@ -645,17 +660,19 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               })}
             </div>
             <div class={`ac-shop${drag ? " selling" : ""}`} data-ac-drop="shop" aria-label="Shop">
-              {KINDS.map((kind) => {
+              {g.round.shop.slots.map((kind, slot) => {
                 const block = buyBlock(g.round.you, goldNow, kind);
                 const words = block ? buyWords(block, kind, goldNow) : null;
                 return (
                   <button
-                    key={kind}
+                    key={slot}
                     type="button"
                     class={`ac-buy${block || locked ? " off" : ""}`}
+                    data-slot={slot}
+                    data-kind={kind}
                     aria-disabled={!!block || locked}
                     aria-label={`Buy a ${KIND_NAME[kind]}, ${priceOf(kind)} gold${locked ? ", locked" : words ? `, ${words.short}` : ""}`}
-                    onClick={() => buyPiece(kind)}
+                    onClick={() => buySlot(slot)}
                   >
                     <PieceIcon color={mine} kind={kind} />
                     <b>{priceOf(kind)}</b>
@@ -664,6 +681,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 );
               })}
               {drag && drag.kind !== "k" && <div class="ac-sell-drop">Drop to sell for {sellValue(drag.kind)}</div>}
+            </div>
+            <div class="ac-ctl">
+              <button type="button" class={`ac-reroll${locked || goldNow < cfg.shop.rerollCost ? " off" : ""}`} aria-disabled={locked || goldNow < cfg.shop.rerollCost} aria-label={`Reroll the shop, ${cfg.shop.rerollCost} gold`} onClick={reroll}>
+                Reroll <b>{cfg.shop.rerollCost}</b>
+              </button>
             </div>
           </>
         ) : (
