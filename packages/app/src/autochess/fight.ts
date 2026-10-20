@@ -1,19 +1,24 @@
 import { AUTOCHESS, type AutoChessSettings, type Rng } from "@chessroyale/core";
 import { applyMove, gameEnd, inCheck, legalMoves, sideToMove } from "@chessroyale/chess";
-import { material } from "./position.ts";
+import { material, piecesOn } from "./position.ts";
 import { other, type Color } from "./types.ts";
 
 /**
  * The fight: the engine plays both sides, the same search for each, a move about every 0.35 s, until mate or 5 checks in
  * a row (a win either way), stalemate, a draw by the rules, the move cap or too long with no capture or check, when the
  * side with more material wins (equal is a draw). Pawns don't promote (Eric, Oct 19: armies of pawns racing to queen took
- * over): a pawn never moves onto its last rank.
+ * over): a pawn never moves onto its last rank. A side left with only its king loses at once (both kings alone: a draw), which is
+ * also true of a side that starts the fight so (Eric, Oct 20: "boring moving around... makes it go faster"). After 30 moves a
+ * side, moves play twice as fast.
  */
 
-export type FightEnd = "checkmate" | "checks" | "stalemate" | "repetition" | "fifty_moves" | "insufficient_material" | "cap" | "quiet";
+export type FightEnd = "checkmate" | "checks" | "stalemate" | "repetition" | "fifty_moves" | "insufficient_material" | "cap" | "quiet" | "king_alone";
 
 /** The moves a fight allows: every legal move but a promotion. */
 export const fightMoves = (fen: string): string[] => legalMoves(fen).filter((m) => m.length === 4);
+
+/** How long a move takes: `fightMoveMs`, and after `fightFastAfter` moves a side (this many plies so far, two to a move) `fightFastMoveMs`. */
+export const moveMs = (plies: number, cfg: AutoChessSettings = AUTOCHESS) => (plies >= 2 * cfg.fightFastAfter ? cfg.fightFastMoveMs : cfg.fightMoveMs);
 
 /** How many pieces stand on the board (kings too). */
 const pieceCount = (fen: string) => fen.split(" ")[0]!.replace(/[^a-zA-Z]/g, "").length;
@@ -81,6 +86,9 @@ export async function playFight(startFen: string, opts: FightOptions): Promise<F
   /** Each side's checks in a row (its moves that gave check, with none between that didn't). */
   const checks = { w: 0, b: 0 };
   for (;;) {
+    // (First of all: a side with only its king loses; both, a draw. Before mate, stalemate and "not enough pieces" too.)
+    const on = piecesOn(fen);
+    if (!on.w.length || !on.b.length) return { winner: on.w.length ? "w" : on.b.length ? "b" : null, end: "king_alone", fen, moves };
     const allowed = fightMoves(fen);
     // (A side whose only legal moves were promotions has none: mated if its king is attacked, else stalemated.)
     if (!allowed.length) return inCheck(fen) ? { winner: other(sideToMove(fen)), end: "checkmate", fen, moves } : { winner: null, end: "stalemate", fen, moves };
@@ -94,7 +102,7 @@ export async function playFight(startFen: string, opts: FightOptions): Promise<F
       return { winner: m.w > m.b ? "w" : m.b > m.w ? "b" : null, end: moves.length >= 2 * cfg.moveCap ? "cap" : "quiet", fen, moves };
     }
     // (The engine thinks while the move's time runs, so a move takes about `fightMoveMs`, not that plus the search.)
-    const [asked] = await Promise.all([opts.pick(fen, moves, allowed).catch(() => null), wait(cfg.fightMoveMs)]);
+    const [asked] = await Promise.all([opts.pick(fen, moves, allowed).catch(() => null), wait(moveMs(moves.length, cfg))]);
     if (opts.cancelled?.()) return null;
     const move = asked && allowed.includes(asked) ? asked : standInMove(fen, opts.rng)!;
     const next = applyMove(fen, move);

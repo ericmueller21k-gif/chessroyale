@@ -2692,23 +2692,42 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
 export interface AutoChessSettings {
   /** What each piece costs in the shop (a pawn 10 ... a queen 90: the chess value times ten, a bishop a little over a knight). */
   readonly prices: { readonly p: number; readonly n: number; readonly b: number; readonly r: number; readonly q: number };
+  /**
+   * The shop (v5, Eric Oct 20): this many random slots, each rolling a piece by these odds (percent); buying a piece rolls a
+   * new one into its slot; one reroll of all the slots costs `rerollCost` gold. The shop refills free at each round's start.
+   */
+  readonly shop: {
+    readonly slots: number;
+    readonly odds: { readonly p: number; readonly n: number; readonly b: number; readonly r: number; readonly q: number };
+    readonly rerollCost: number;
+  };
   /** Selling a piece gives back this share of its price, rounded down (P9 N27 B28 R45 Q81). */
   readonly sellBack: number;
+  /** The first side to lock in (end its buying, freezing its board, bench and shop) gets this much gold at once (v5, Eric Oct 20). */
+  readonly lockInBonus: number;
   /** The buy-and-place step, its locked end (no buying, selling or moving), and how far behind the opponent's circles show. */
   readonly buySeconds: number;
   readonly lockSeconds: number;
   readonly circlesDelaySeconds: number;
-  /** The reveal and adjust step: each piece may make one legal chess move on your own half. */
+  /** The reveal and adjust step (v5): this many chess moves in all (any piece), and this many drops of a bench piece, each for the cost in gold. */
   readonly adjustSeconds: number;
-  /** The most pieces a side may move while adjusting (null: every piece may move once). */
-  readonly adjustMoveCap: number | null;
+  readonly adjustMoves: number;
+  readonly adjustDrops: number;
+  readonly adjustDropCost: number;
   /** Pieces waiting off the board between the board and the shop. */
   readonly benchSlots: number;
+  /** Most pieces a side may have on its board, its king not counted (v5, Eric Oct 20: "10 pieces + the king"). */
+  readonly boardLimit: number;
+  /** When buying ends, pieces still on the bench drop onto the board until it has this many (the rest stay on the bench). */
+  readonly autoDropTo: number;
   /** The kings stand on a random square of each side's back this-many ranks. */
   readonly kingRanks: number;
   /** The fight: one move about this often, each searched to this many nodes (the same for both sides). */
   readonly fightMoveMs: number;
   readonly fightNodes: number;
+  /** After this many moves a side, moves play at `fightFastMoveMs` instead (v5, Eric Oct 20: twice as fast). */
+  readonly fightFastAfter: number;
+  readonly fightFastMoveMs: number;
   /** A fight stops after this many moves a side; the side with more material (P1 N3 B3 R5 Q9) wins, equal is a draw. */
   readonly moveCap: number;
   /**
@@ -2742,8 +2761,20 @@ export interface AutoChessSettings {
   readonly pawnsPerFile: number;
   /** The bot: the chance it keeps a hundred banked for interest (when it has the gold to), how many moves it tries while adjusting, and the search it uses. */
   readonly bot: {
+    /** It locks in at a seeded time between these shares of the step's open part (before its locked end), or never, this often. */
+    readonly lockFrom: number;
+    readonly lockTo: number;
+    readonly neverLockChance: number;
+    /** Its shop rerolls (5 gold): at most this many a round, only with this much gold, this often (more often when the shop shows nothing but pawns). */
+    readonly maxRerolls: number;
+    readonly rerollGold: number;
+    readonly rerollChance: number;
+    readonly rerollChanceBare: number;
     readonly saveChance: number;
     readonly adjustTries: number;
+    readonly dropTries: number;
+    /** It drops a bench piece when its best drop beats what it has, or when it isn't already winning (its chance under this): the engine's score saturates at 0 and 1. */
+    readonly dropBelow: number;
     readonly adjustDestinations: number;
     readonly adjustNodes: number;
     readonly adjustMargin: number;
@@ -2752,16 +2783,24 @@ export interface AutoChessSettings {
 
 export const AUTOCHESS: AutoChessSettings = {
   prices: { p: 10, n: 30, b: 32, r: 50, q: 90 },
+  shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 5 },
   sellBack: 0.9,
+  lockInBonus: 25,
   buySeconds: 30,
   lockSeconds: 3,
   circlesDelaySeconds: 2,
   adjustSeconds: 15,
-  adjustMoveCap: null,
+  adjustMoves: 1,
+  adjustDrops: 1,
+  adjustDropCost: 25,
   benchSlots: 8,
+  boardLimit: 10,
+  autoDropTo: 8,
   kingRanks: 2,
   fightMoveMs: 350,
   fightNodes: 6000,
+  fightFastAfter: 30,
+  fightFastMoveMs: 175,
   moveCap: 60,
   quietCap: 10,
   checksToWin: 5,
@@ -2785,5 +2824,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { saveChance: 0.3, adjustTries: 24, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 60, rerollChance: 0.15, rerollChanceBare: 0.4, saveChance: 0.3, adjustTries: 24, dropTries: 8, dropBelow: 0.9, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
 };

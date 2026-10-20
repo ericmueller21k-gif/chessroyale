@@ -16,6 +16,8 @@ describe("auto chess: what the result says", () => {
     expect(endWords("quiet", false)).toBe("10 moves each with no capture or check: more material wins.");
     expect(endWords("quiet", true)).toBe("10 moves each with no capture or check, and equal material.");
     expect(endWords("checks", false)).toBe("5 checks in a row count as mate.");
+    expect(endWords("king_alone", false)).toBe("A side left with only its king loses at once.");
+    expect(endWords("king_alone", true)).toBe("Both sides are down to a king: a draw.");
     expect(endWords("both_checked", true)).toBe("Both kings were in check at the start, so there was no fight.");
   });
 
@@ -53,17 +55,25 @@ describe("auto chess: survivors and promotions", () => {
     expect(match.bot.hp).toBe(17);
   });
 
-  it("the settings hold the design's numbers (v4): tune them here, nowhere else", () => {
+  it("the settings hold the design's numbers (v4, v5): tune them here, nowhere else", () => {
     expect(AUTOCHESS).toMatchObject({
+      shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 5 },
       sellBack: 0.9,
+      lockInBonus: 25,
       buySeconds: 30,
       lockSeconds: 3,
       circlesDelaySeconds: 2,
       adjustSeconds: 15,
-      adjustMoveCap: null,
+      adjustMoves: 1,
+      adjustDrops: 1,
+      adjustDropCost: 25,
       benchSlots: 8,
+      boardLimit: 10,
+      autoDropTo: 8,
       kingRanks: 2,
       fightMoveMs: 350,
+      fightFastAfter: 30,
+      fightFastMoveMs: 175,
       moveCap: 60,
       hp: 20,
       damageBase: 2,
@@ -73,6 +83,7 @@ describe("auto chess: survivors and promotions", () => {
       interest: { per: 100, gold: 10, max: 30 },
       survivorRefund: 0.25,
       queenLimit: 1,
+      bot: expect.objectContaining({ lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 60, rerollChance: 0.15, rerollChanceBare: 0.4, dropTries: 8, dropBelow: 0.9 }),
       maxPawns: 8,
       pawnsPerFile: 3,
     });
