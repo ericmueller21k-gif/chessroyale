@@ -7,7 +7,7 @@ import { cellOf, dragStarted, squareAtPoint } from "../board/logic.ts";
 import { play } from "../sound.ts";
 import { testParams } from "../test-switches.ts";
 import { adjustBlock, adjustMarks, adjustMove, adjustTargets, adjustWords, movesUsed, startAdjust, undoAction, undoBlock, undoWords, type Adjusted } from "../autochess/adjust.ts";
-import { botAdjust, botAt, botPlan, botShown } from "../autochess/bot.ts";
+import { botAdjust, botPlan } from "../autochess/bot.ts";
 import { buyBlock, buyWords, carryBench, emptyArmy, heldBlock, heldWords, holdBlock, kingSquares, offerLabel, placeHeld, priceOf, sellHeld, sellPiece, sellValue } from "../autochess/army.ts";
 import {
   beginRound,
@@ -25,6 +25,7 @@ import {
 import { botEvaluator, enginePick, warmEngine } from "../autochess/engine.ts";
 import { addXp, buyXp, levelWords, xpBlock, xpToNext, xpWords } from "../autochess/level.ts";
 import { bonusFor, botLocked, bothLocked, buyFreeze, freezeWords, noLocks, tickLocks, youLock, type Locks } from "../autochess/lockin.ts";
+import { botSeen } from "../autochess/reveal.ts";
 import { buyFromSlot, holdFromSlot, newShop, replaceTaken, rerollFor, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
 import { playFight } from "../autochess/fight.ts";
 import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn } from "../autochess/position.ts";
@@ -123,12 +124,14 @@ function newGame(seed: number, cfg: AutoChessSettings): Game {
 /** A phone's short steps for tests (`?quick=1`, a test switch): the same game in a few seconds a step. */
 function settingsFor(quick: boolean, gold: number): AutoChessSettings {
   // (Two seconds locked, so a test has time to try buying in the lock before the reveal.)
-  const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, adjustSeconds: 5, fightMoveMs: 60, fightFastMoveMs: 30 } : AUTOCHESS;
+  const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, revealSeconds: 1.5, adjustSeconds: 5, fightMoveMs: 60, fightFastMoveMs: 30 } : AUTOCHESS;
   // (`?gold=N`: N more gold at the start of round 1, to try a big army.)
   return gold > 0 ? { ...base, startGold: base.startGold + gold } : base;
 }
 
 const colorName = (c: Color) => (c === "w" ? "White" : "Black");
+/** The seed of a round's reveals (which of their pieces shows, and when: reveal.ts). */
+const revealSeed = (match: MatchState) => (roundSeed(match) ^ 0x6b43a9b5) >>> 0;
 
 /** A piece's picture: the board's own art, in a box that sizes it. */
 function PieceIcon({ color, kind }: { color: Color; kind: Kind | "k" }) {
@@ -629,17 +632,15 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const you = g.phase === "adjust" || g.phase === "fight" ? (g.round.adj?.army ?? g.round.you) : g.round.you;
   const botArmy = g.round.botFinal && g.phase !== "buy" && g.phase !== "adjust" ? g.round.botFinal : g.phase === "buy" ? g.round.plan.army : (g.round.botStart ?? g.round.plan.army);
   const botKing = g.round.plan.army.king;
-  const delayed = Math.max(0, elapsed / 1000 - cfg.circlesDelaySeconds);
-  const seen = g.phase === "buy" ? botAt(g.round.plan.events, delayed) : null;
-  // While buying you see their pawns as pawns, 2 s behind; every other piece is a plain circle until the reveal.
-  const shown = seen ? botShown(seen.squares) : { pawns: [], circles: [] };
+  // While buying you see every piece of theirs (pawns too) as a plain circle, 2 s behind, and every few seconds one of them is revealed at random and stays shown.
+  const seen = g.phase === "buy" ? botSeen(g.round.plan.events, revealSeed(g.match), elapsed / 1000, cfg) : null;
 
   let fen: string;
   let lastMove: string | null = null;
   if ((g.phase === "fight" || g.phase === "result" || g.phase === "over") && g.fight) {
     fen = g.fight.fen;
     lastMove = g.fight.last;
-  } else if (g.phase === "buy") fen = fenFrom([...armyPieces(you), { square: botKing, color: theirs, kind: "k" }, ...shown.pawns.map((square) => ({ square, color: theirs, kind: "p" as const }))]);
+  } else if (g.phase === "buy") fen = fenFrom([...armyPieces(you), { square: botKing, color: theirs, kind: "k" }, ...(seen?.revealed ?? []).map((r) => ({ square: r.square, color: theirs, kind: r.kind }))]);
   else fen = mine === "w" ? armiesFen(you, botArmy) : armiesFen(botArmy, you);
 
   const sq = (square: string) => {
@@ -751,8 +752,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               onLostPointerCapture={(e) => endPress(e, true)}
             >
               {(g.phase === "buy" || g.phase === "adjust") && <div class="ac-theirs" />}
-              {shown.circles.map((square) => (
+              {(seen?.circles ?? []).map((square) => (
                 <span key={square} class={`ac-circle ${theirs}`} data-square={square} style={sq(square)} />
+              ))}
+              {(seen?.revealed ?? []).map((r) => (
+                <span key={r.square} class="ac-ping" data-square={r.square} style={sq(r.square)} />
               ))}
               {squaresWithOffers.map((square) => {
                 const slots = offers.flatMap((o, slot) => (o.square === square ? [slot] : []));

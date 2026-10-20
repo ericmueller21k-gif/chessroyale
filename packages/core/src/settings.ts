@@ -2715,6 +2715,8 @@ export interface AutoChessSettings {
   readonly buySeconds: number;
   readonly lockSeconds: number;
   readonly circlesDelaySeconds: number;
+  /** While you buy, one of their pieces (a circle, a pawn too) is revealed at random every this many seconds, and stays shown (v6, Eric Oct 20: 5 s, so 5 in the 30). */
+  readonly revealSeconds: number;
   /** The reveal and adjust step (v5): this many chess moves in all (any piece). */
   readonly adjustSeconds: number;
   readonly adjustMoves: number;
@@ -2784,6 +2786,8 @@ export interface AutoChessSettings {
     /** With its board full it holds a good piece (not a pawn) on its bench: at most this many a round, each time with this chance (else it keeps the gold). */
     readonly maxHolds: number;
     readonly holdChance: number;
+    /** Its pieces go down evenly over the step's open part, the last by this share of it (so something is on its board early, to scout). */
+    readonly placeBy: number;
     /** It buys XP (20 gold for 4) now and then: at most this many a round, with this chance each time it has the gold (more with its board full: a level is room). */
     readonly maxXpBuys: number;
     readonly xpGold: number;
@@ -2808,6 +2812,7 @@ export const AUTOCHESS: AutoChessSettings = {
   buySeconds: 30,
   lockSeconds: 3,
   circlesDelaySeconds: 2,
+  revealSeconds: 5,
   adjustSeconds: 15,
   adjustMoves: 1,
   levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
@@ -2839,5 +2844,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, maxHolds: 2, holdChance: 0.5, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7, saveChance: 0.3, adjustTries: 16, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7, saveChance: 0.3, adjustTries: 16, adjustDestinations: 3, adjustNodes: 1500, adjustMargin: 0.02 },
 };

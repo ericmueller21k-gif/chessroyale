@@ -17760,7 +17760,8 @@ button.sq-tiny {
   pointer-events: none;
 }
 .ac-cell,
-.ac-circle {
+.ac-circle,
+.ac-ping {
   position: absolute;
   left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
   top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
@@ -17782,8 +17783,28 @@ button.sq-tiny {
     opacity: 0;
   }
 }
+/* A piece of theirs revealed: a gold ring opens from its square, once (it is a CSS animation on a still box: nothing per frame). */
+.ac-ping::after {
+  content: "";
+  position: absolute;
+  inset: 14%;
+  border-radius: 50%;
+  border: 3px solid var(--fd-gold);
+  animation: ac-ping 700ms ease-out both;
+}
+@keyframes ac-ping {
+  from {
+    transform: scale(0.45);
+    opacity: 0.95;
+  }
+  to {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .ac-circle::after {
+  .ac-circle::after,
+  .ac-ping::after {
     animation: none;
   }
 }

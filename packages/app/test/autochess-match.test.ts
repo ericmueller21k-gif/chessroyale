@@ -16,7 +16,7 @@ import {
   youColor,
   type MatchState,
 } from "../src/autochess/economy.ts";
-import { botAdjust, botAt, botBuys, botPlan, botShown } from "../src/autochess/bot.ts";
+import { botAdjust, botAt, botBuys, botPlan } from "../src/autochess/bot.ts";
 import { newShop } from "../src/autochess/shop.ts";
 import { buyBlock, emptyArmy, extras, halfSquares, kingSquares, legalCounts, owned, placeBlock } from "../src/autochess/army.ts";
 import { fightStart, armiesFen, material } from "../src/autochess/position.ts";
@@ -309,22 +309,6 @@ describe("auto chess: the bot", () => {
       expect(Object.keys(mid.squares)).toHaveLength(done.filter((e) => e.type === "buy" || e.type === "place").length);
       expect(mid.spent).toBe(done.reduce((sum, e) => sum + e.price, 0));
     }
-  });
-
-  it("while you buy you see its pawns as real pawns and every other piece as a circle (2 s behind, as the circles are)", () => {
-    for (let seed = 0; seed < 50; seed++) {
-      const plan = botPlan("b", "e8", 100 + (seed % 4) * 40, 1 + (seed % 6), mulberry32(seed));
-      const seen = botAt(plan.events, 99).squares;
-      const shown = botShown(seen);
-      expect(shown.pawns.every((sq) => seen[sq] === "p")).toBe(true);
-      expect(shown.circles.every((sq) => seen[sq] !== "p")).toBe(true);
-      expect([...shown.pawns, ...shown.circles].sort()).toEqual(Object.keys(seen).sort());
-      // Early on, only what it has done so far shows.
-      const first = plan.events.find((e) => e.square && e.type !== "hold")!;
-      const early = botShown(botAt(plan.events, first.at).squares);
-      expect(early.pawns.length + early.circles.length).toBe(plan.events.filter((e) => e.square && e.at <= first.at && e.type !== "hold").length);
-    }
-    expect(botShown({ a6: "p", c8: "n", b7: "q" })).toEqual({ pawns: ["a6"], circles: ["c8", "b7"] });
   });
 
   it("adjusts greedily: its one move is kept only when the position scores better than standing still, and there is only one", async () => {

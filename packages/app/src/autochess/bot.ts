@@ -162,22 +162,21 @@ export function botPlan(
   const never = lockRng() < cfg.bot.neverLockChance;
   const lockAt = never ? null : open * (cfg.bot.lockFrom + (cfg.bot.lockTo - cfg.bot.lockFrom) * lockRng());
   const span = lockAt === null ? open : lockAt - 0.2;
-  const n = buys.length;
-  const events: BotEvent[] = buys.map((buy, i) => ({
-    at: Math.min(span, Math.max(0.5, span * (0.1 + (0.9 * (i + 0.5)) / Math.max(1, n)) + (rng() - 0.5) * 0.04 * span)),
-    type: buy.type,
-    kind: buy.kind,
-    square: buy.square,
-    price: buy.price,
-  }));
+  // Its pieces go down evenly from a second in until `placeBy` of the way through (so there is something on its board to reveal early
+  // and the circles show up over the first part of the step); a reroll or XP comes a moment before the piece it was for.
+  const pieces = buys.filter((b) => b.type !== "reroll" && b.type !== "xp").length;
+  const first = Math.min(1, span / 4);
+  const last = Math.max(first, span * cfg.bot.placeBy);
+  let slot = 0;
+  const events: BotEvent[] = buys.map((buy) => {
+    const piece = buy.type !== "reroll" && buy.type !== "xp";
+    const base = first + ((last - first) * (slot + 0.5)) / Math.max(1, pieces);
+    if (piece) slot++;
+    const at = piece ? base : base - 0.3 - rng() * 0.2;
+    return { at: Math.min(span, Math.max(0.5, at + (rng() - 0.5) * 0.04 * span)), type: buy.type, kind: buy.kind, square: buy.square, price: buy.price };
+  });
   events.sort((a, b) => a.at - b.at);
   return { events, army, level, spent: events.reduce((sum, e) => sum + e.price, 0), lockAt };
-}
-
-/** What you see of the bot's board while buying: its pawns as real pawns, every other piece as a plain circle (until the reveal). */
-export function botShown(squares: Record<string, Kind>): { pawns: string[]; circles: string[] } {
-  const entries = Object.entries(squares);
-  return { pawns: entries.filter(([, k]) => k === "p").map(([sq]) => sq), circles: entries.filter(([, k]) => k !== "p").map(([sq]) => sq) };
 }
 
 /** What the bot has done by `seconds` into the step: the pieces on the board, the gold it has spent and the XP it has bought (times). */

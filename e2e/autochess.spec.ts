@@ -121,6 +121,27 @@ async function buyAll(p: Page, max: number) {
   return n;
 }
 
+/**
+ * Watches the fight from before it can begin (a short one, a draw by repetition in a dozen quick moves, can come and go between two
+ * looks of a poll): what the box said, the step's name and whether a move was highlighted; read with `fightSeen`.
+ */
+async function watchFight(p: Page) {
+  await p.evaluate(() => {
+    const root = document.querySelector<HTMLElement>(".ac-root")!;
+    const seen = { fight: false, say: "", text: "", label: "", lastMove: false };
+    (window as any).__fight = seen;
+    new MutationObserver(() => {
+      if (root.dataset.phase !== "fight") return;
+      seen.fight = true;
+      seen.say ||= document.querySelector(".ac-card-say")?.textContent ?? "";
+      seen.text ||= document.querySelector(".ac-card-text")?.textContent ?? "";
+      seen.label ||= document.querySelector(".ac-clock span")?.textContent ?? "";
+      if (document.querySelector(".hb-board square.last-move")) seen.lastMove = true;
+    }).observe(root, { attributes: true, subtree: true, childList: true, characterData: true });
+  });
+}
+const fightSeen = (p: Page) => p.evaluate(() => (window as any).__fight as { fight: boolean; say: string; text: string; label: string; lastMove: boolean });
+
 test.beforeEach(async ({ page }) => {
   await named(page, "Pawnder");
   await page.addInitScript(() => ((window as any).__soundLog = []));
@@ -196,8 +217,8 @@ test("the shop: five offers, each a piece and a square of your half, drawn as gl
   const [r, g, b] = (await page.locator(".ac-sil-shape").first().evaluate((el) => getComputedStyle(el).backgroundColor.match(/\d+/g)!.map(Number))) as number[];
   expect(g!).toBeGreaterThan(r!);
   expect(g!).toBeGreaterThan(b!);
-  // The board holds only the kings: nothing is placed for free. The bench has its four slots, empty.
-  await expect(page.locator(BOARD_SEL.piece)).toHaveCount(2);
+  // The board holds only your king: nothing is placed for free. The bench has its four slots, empty.
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(1);
   await expect(page.locator(".ac-slot")).toHaveCount(4);
   await expect(held(page)).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -278,8 +299,8 @@ test("buying: tap an offer's silhouette or its shop card, and it lands on its sq
   await expect(piece(page, "white", "pawn", "d4")).toBeVisible();
   expect(await goldOf(page)).toBe(30);
   expect((await offers(page)).map((o) => o.square)).not.toContain("d4");
-  // Nothing was placed for free, and nothing on the board but what was bought: the kings, a rook and two pawns.
-  await expect(page.locator(BOARD_SEL.piece)).toHaveCount(5);
+  // Nothing was placed for free, and nothing of yours on the board but what was bought: the king, a rook and two pawns.
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(4);
   expect(errors).toEqual([]);
 });
 
@@ -358,7 +379,7 @@ test("the bench: drag an offer onto it to hold it (it keeps its square), tap it 
   await expect(held(page).first().locator("small")).toHaveText("b4");
   expect(await goldOf(page)).toBe(50);
   await expect(page.locator(".ac-msg")).toContainText("Held the rook for b4. Tap it on the bench to place it.");
-  await expect(page.locator(BOARD_SEL.piece)).toHaveCount(2);
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(1);
   // A new offer rolled into slot 0; the others stay, the pawn offered for b4 too (nothing stands on b4).
   const after = await offers(page);
   expect(after).toHaveLength(5);
@@ -555,23 +576,72 @@ test("lock in: you lock before the opponent, and when it locks too the step ends
   expect(errors).toEqual([]);
 });
 
-test("the opponent's pawns show as real pawns while you buy (2 s behind), their other pieces as circles until the reveal", async ({ page }) => {
+test("while you buy their pieces are plain circles (pawns too), 2 s behind; every few seconds one is revealed at random and stays shown", async ({ page }) => {
   const errors = watchErrors(page);
+  // (Quick: a reveal every 1.5 s, the circles half a second behind.)
   await page.goto("/autochess?quick=1&seed=9");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  // Both kinds show up: a real black pawn, and a circle for something else.
-  await expect.poll(() => page.locator(`${BOARD_SEL.piece}.black.pawn`).count(), { timeout: 6000 }).toBeGreaterThan(0);
   await expect.poll(() => page.locator(".ac-circle").count(), { timeout: 6000 }).toBeGreaterThan(0);
-  // No circle sits on a pawn, and no black piece but a pawn and the king is drawn for real.
-  const clash = await page.locator(".ac-circle").evaluateAll((els) => els.filter((e) => document.querySelector(`piece.black.pawn[data-square="${e.getAttribute("data-square")}"]`)).length);
-  expect(clash).toBe(0);
-  await expect(page.locator(`${BOARD_SEL.piece}.black:not(.pawn):not(.king)`)).toHaveCount(0);
-  const pawns = await page.locator(`${BOARD_SEL.piece}.black.pawn`).count();
+  // Watch the board for the step's open part: the real black pieces (not the king) only ever grow, by one at a time, never a pawn drawn as a pawn without being revealed,
+  // and a revealed piece's square has no circle on it (it turned into the piece) but its gold ring.
+  const seen = await page.evaluate(
+    () =>
+      new Promise<{ real: number[]; clash: number; unringed: number }>((resolve) => {
+        const real: number[] = [];
+        let clash = 0;
+        let unringed = 0;
+        const t0 = performance.now();
+        const look = () => {
+          // (Only while buying: the next step shows everything for real.)
+          if (document.querySelector(".ac-root")?.getAttribute("data-phase") !== "buy") return resolve({ real, clash, unringed });
+          const pieces = [...document.querySelectorAll<HTMLElement>(".hb-board piece.black:not(.king)")];
+          real.push(pieces.length);
+          for (const p of pieces) {
+            const sq = p.getAttribute("data-square");
+            if (document.querySelector(`.ac-circle[data-square="${sq}"]`)) clash++;
+            if (!document.querySelector(`.ac-ping[data-square="${sq}"]`)) unringed++;
+          }
+          if (performance.now() - t0 < 6200) setTimeout(look, 80);
+          else resolve({ real, clash, unringed });
+        };
+        look();
+      }),
+  );
+  const real = seen.real;
+  expect(Math.max(...real), "something was revealed").toBeGreaterThan(0);
+  for (let i = 1; i < real.length; i++) {
+    expect(real[i]!, "a revealed piece stays shown").toBeGreaterThanOrEqual(real[i - 1]!);
+    expect(real[i]! - real[i - 1]!, "one reveal at a time").toBeLessThanOrEqual(1);
+  }
+  expect(seen.clash).toBe(0);
+  expect(seen.unringed).toBe(0);
+  // The reveal shows everything for real: the circles go, and each shows its piece (the revealed ones stayed where they were).
   const circles = await page.locator(".ac-circle").count();
-  // The reveal shows everything for real: the circles go, and each shows its piece (the pawns stayed where they were).
+  const shown = await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count();
   await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
   await expect(page.locator(".ac-circle")).toHaveCount(0);
-  expect(await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count()).toBeGreaterThanOrEqual(pawns + circles);
+  expect(await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count()).toBeGreaterThanOrEqual(shown + circles);
+  expect(errors).toEqual([]);
+});
+
+test("the reveals come every 5 seconds of the 30 (the first at 5 s, the next at 10 s)", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/autochess?seed=9");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const t0 = Date.now();
+  const real = () => page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count();
+  expect(await real()).toBe(0);
+  // (Polled every 50 ms: the clock is read every 120 ms, so a reveal shows within a tick of its time.)
+  const waitFor = async (n: number) => {
+    await expect.poll(real, { timeout: 15_000, intervals: [50] }).toBeGreaterThanOrEqual(n);
+    return (Date.now() - t0) / 1000;
+  };
+  const first = await waitFor(1);
+  expect(first).toBeGreaterThan(4.7);
+  expect(first).toBeLessThan(6.4);
+  const second = await waitFor(2);
+  expect(second).toBeGreaterThan(9.7);
+  expect(second).toBeLessThan(11.4);
   expect(errors).toEqual([]);
 });
 
@@ -600,14 +670,13 @@ test("the reveal: their real pieces show, stay shown through the adjust step; on
   // Circles first (where, not what), over the 30 (here 7) seconds.
   await expect.poll(() => page.locator(".ac-circle").count(), { timeout: 15_000 }).toBeGreaterThan(0);
   const circles = await page.locator(".ac-circle").count();
-  const pawnsSeen = await page.locator(`${BOARD_SEL.piece}.black.pawn`).count();
-  await expect(page.locator(`${BOARD_SEL.piece}.black:not(.pawn):not(.king)`)).toHaveCount(0);
-  // The reveal: their real pieces, kept shown as they were when it locked (the circles' squares hold real pieces).
+  const revealed = await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count();
+  // The full reveal: their real pieces, kept shown as they were when it locked (the circles' squares hold real pieces).
   await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
   await expect(page.locator(".ac-theirs-line")).toHaveText("Your opponent is moving their pieces…");
   await expect(page.locator(".ac-circle")).toHaveCount(0);
   const theirs = await page.locator(`${BOARD_SEL.piece}.black`).count();
-  expect(theirs).toBeGreaterThanOrEqual(circles + pawnsSeen + 1);
+  expect(theirs).toBeGreaterThanOrEqual(circles + revealed + 1);
   // (The line is plain: no blur over their half.)
   expect(await page.locator(".ac-theirs-line").evaluate((el) => getComputedStyle(el).filter + getComputedStyle(el).backdropFilter)).toBe("nonenone");
   await expect(page.locator(".ac-clock span")).toHaveText("Move");
@@ -670,17 +739,18 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   const bought = await buyAll(page, 4);
   expect(bought).toBeGreaterThanOrEqual(2);
   const left = await goldOf(page);
-  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
-  await expect(root(page)).toHaveAttribute("data-phase", "fight", { timeout: 15_000 });
-  // The fight: moves appear (the board changes, a last-move highlight), "Move N of 60".
-  await expect(page.locator(".ac-card-say")).toContainText(/Move \d+ of 60/);
-  await expect(page.locator(`${BOARD_SEL.square}.last-move`).first()).toBeAttached({ timeout: 10_000 });
-  await expect(page.locator(".ac-clock span")).toHaveText("Fight");
-  await expect(page.locator(".ac-card-text")).toContainText("A side left with only its king loses. After 30 moves each, moves play twice as fast.");
+  await watchFight(page);
+  // To a result (through the adjust step and the fight).
+  await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 150_000 });
+  // The fight: "Move N of 60" with its rules in the box, the step named "Fight", the moves highlighted on the board.
+  const fight = await fightSeen(page);
+  expect(fight.fight).toBe(true);
+  expect(fight.say).toMatch(/^Move \d+ of 60/);
+  expect(fight.label).toBe("Fight");
+  expect(fight.text).toContain("A side left with only its king loses. After 30 moves each, moves play twice as fast.");
+  expect(fight.lastMove).toBe(true);
   // The board's usual knocks play for the engine's moves (a capture sounds as it does everywhere).
   expect(await page.evaluate(() => (window as any).__soundLog.filter((l: string) => /^(move|capture):/.test(l)).length)).toBeGreaterThan(0);
-  // To a result.
-  await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 150_000 });
   const head = (await page.locator(".ac-card-head").innerText()).trim();
   expect(head).toMatch(/^(You win the round\.|You lose the round\.|The round is a draw\.)$/);
   const words = (await page.locator(".ac-card .ac-card-text").innerText()).trim();
@@ -715,7 +785,7 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   await expect(root(page)).toHaveAttribute("data-round", "2");
   await expect(page.locator(".ac-title span")).toHaveText("Round 2 · you play Black");
   await expect(page.locator(BOARD_SEL.wrap)).toHaveClass(/orientation-black/);
-  await expect(page.locator(BOARD_SEL.piece)).toHaveCount(2);
+  await expect(page.locator(`${BOARD_SEL.piece}.black`)).toHaveCount(1);
   // Round 2's free 2 XP made level 5 (2 + 2 of 4): the number pops at the round's start. The opponent got its 2 XP too.
   await expect(youLevel(page)).toHaveText("Lv 5 · 0/8 XP");
   await expect(youLevel(page).locator("b.pop")).toBeVisible();
