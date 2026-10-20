@@ -60,7 +60,7 @@ import { buyFromSlot, newShop, rerollFor, rerollWords, shopSeed, type Shop } fro
 import { playFight } from "../autochess/fight.ts";
 import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn } from "../autochess/position.ts";
 import { KIND_NAME, other, type Army, type Color, type Kind } from "../autochess/types.ts";
-import { clockWords, damageWords, endWords, goldWords, headline, matchWords, type EndKind } from "../autochess/words.ts";
+import { clockWords, damageWords, endWords, goldWords, headline, matchWords, moveWords, type EndKind } from "../autochess/words.ts";
 
 /**
  * Auto chess, the demo (/autochess; docs/decisions/2026-10-19-autochess-demo.md, docs/areas/autochess.md): you against a
@@ -151,7 +151,7 @@ function newGame(seed: number, cfg: AutoChessSettings): Game {
 /** A phone's short steps for tests (`?quick=1`, a test switch): the same game in a few seconds a step. */
 function settingsFor(quick: boolean, gold: number): AutoChessSettings {
   // (Two seconds locked, so a test has time to try buying in the lock before the reveal.)
-  const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, adjustSeconds: 5, fightMoveMs: 60 } : AUTOCHESS;
+  const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, adjustSeconds: 5, fightMoveMs: 60, fightFastMoveMs: 30 } : AUTOCHESS;
   // (`?gold=N`: N more gold at the start of round 1, to try a big army.)
   return gold > 0 ? { ...base, startGold: base.startGold + gold } : base;
 }
@@ -664,7 +664,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       : g.phase === "adjust"
         ? `One move and one drop (${cfg.adjustDropCost} gold). Tap a piece, then a square.`
         : g.phase === "fight"
-          ? `Move ${Math.max(1, Math.ceil(((g.fight?.plies ?? 0) + 1) / 2))} of ${cfg.moveCap}`
+          ? moveWords(g.fight?.plies ?? 0, cfg)
           : "";
 
   const outcome = g.outcome;
@@ -862,7 +862,10 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
             {g.phase === "fight" && (
               <>
                 <p class="ac-card-say">{hint}</p>
-                <p class="ac-card-text">The engine plays both armies at the same strength until mate or {cfg.checksToWin} checks in a row, a draw, {cfg.moveCap} moves each, or {cfg.quietCap} each with no capture or check. Pawns don't promote.</p>
+                <p class="ac-card-text">
+                  The engine plays both armies at the same strength until mate or {cfg.checksToWin} checks in a row, a draw, {cfg.moveCap} moves each, or {cfg.quietCap} each with no capture or check. A side left with only its king loses. After {cfg.fightFastAfter} moves each, moves play twice as fast.
+                  Pawns don't promote.
+                </p>
               </>
             )}
             {(g.phase === "result" || g.phase === "over") && outcome && (

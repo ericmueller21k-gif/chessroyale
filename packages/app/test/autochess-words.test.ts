@@ -16,6 +16,8 @@ describe("auto chess: what the result says", () => {
     expect(endWords("quiet", false)).toBe("10 moves each with no capture or check: more material wins.");
     expect(endWords("quiet", true)).toBe("10 moves each with no capture or check, and equal material.");
     expect(endWords("checks", false)).toBe("5 checks in a row count as mate.");
+    expect(endWords("king_alone", false)).toBe("A side left with only its king loses at once.");
+    expect(endWords("king_alone", true)).toBe("Both sides are down to a king: a draw.");
     expect(endWords("both_checked", true)).toBe("Both kings were in check at the start, so there was no fight.");
   });
 
@@ -70,6 +72,8 @@ describe("auto chess: survivors and promotions", () => {
       autoDropTo: 8,
       kingRanks: 2,
       fightMoveMs: 350,
+      fightFastAfter: 30,
+      fightFastMoveMs: 175,
       moveCap: 60,
       hp: 20,
       damageBase: 2,

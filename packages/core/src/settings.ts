@@ -2725,6 +2725,9 @@ export interface AutoChessSettings {
   /** The fight: one move about this often, each searched to this many nodes (the same for both sides). */
   readonly fightMoveMs: number;
   readonly fightNodes: number;
+  /** After this many moves a side, moves play at `fightFastMoveMs` instead (v5, Eric Oct 20: twice as fast). */
+  readonly fightFastAfter: number;
+  readonly fightFastMoveMs: number;
   /** A fight stops after this many moves a side; the side with more material (P1 N3 B3 R5 Q9) wins, equal is a draw. */
   readonly moveCap: number;
   /**
@@ -2789,6 +2792,8 @@ export const AUTOCHESS: AutoChessSettings = {
   kingRanks: 2,
   fightMoveMs: 350,
   fightNodes: 6000,
+  fightFastAfter: 30,
+  fightFastMoveMs: 175,
   moveCap: 60,
   quietCap: 10,
   checksToWin: 5,

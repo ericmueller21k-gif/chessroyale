@@ -25,10 +25,16 @@ export function endWords(end: EndKind, draw: boolean, cfg: AutoChessSettings = A
       return draw ? `${cfg.moveCap} moves played with equal material.` : `${cfg.moveCap} moves played: more material wins.`;
     case "quiet":
       return draw ? `${cfg.quietCap} moves each with no capture or check, and equal material.` : `${cfg.quietCap} moves each with no capture or check: more material wins.`;
+    case "king_alone":
+      return draw ? "Both sides are down to a king: a draw." : "A side left with only its king loses at once.";
     case "both_checked":
       return "Both kings were in check at the start, so there was no fight.";
   }
 }
+
+/** The fight's move counter: "Move 12 of 60", and "twice as fast" once the moves speed up. */
+export const moveWords = (plies: number, cfg: AutoChessSettings = AUTOCHESS) =>
+  `Move ${Math.max(1, Math.ceil((plies + 1) / 2))} of ${cfg.moveCap}${plies >= 2 * cfg.fightFastAfter ? " · twice as fast" : ""}`;
 
 /** The headline of a round. */
 export const headline = (r: RoundResult) => (r.outcome === "you" ? "You win the round." : r.outcome === "bot" ? "You lose the round." : "The round is a draw.");

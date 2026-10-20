@@ -728,6 +728,7 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   await expect(page.locator(".ac-card-say")).toContainText(/Move \d+ of 60/);
   await expect(page.locator(`${BOARD_SEL.square}.last-move`).first()).toBeAttached({ timeout: 10_000 });
   await expect(page.locator(".ac-clock span")).toHaveText("Fight");
+  await expect(page.locator(".ac-card-text")).toContainText("A side left with only its king loses. After 30 moves each, moves play twice as fast.");
   // The board's usual knocks play for the engine's moves (a capture sounds as it does everywhere).
   expect(await page.evaluate(() => (window as any).__soundLog.filter((l: string) => /^(move|capture):/.test(l)).length)).toBeGreaterThan(0);
   // To a result.
@@ -783,6 +784,29 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   const sq = (await freeSquares(page, [6, 7])).find((s) => s !== k2)!;
   await tapSquare(page, sq);
   await expect(piece(page, "black", "pawn", sq)).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("a side that starts the fight with only its king loses at once: the round is over with no move played", async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  await page.goto(NEVER);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  // Buy nothing: your king stands alone against the bot's army.
+  await expect(root(page)).toHaveAttribute("data-phase", "result", { timeout: 40_000 });
+  await expect(page.locator(".ac-card-head")).toHaveText("You lose the round.");
+  const words = (await page.locator(".ac-card .ac-card-text").innerText()).trim();
+  expect(words).toMatch(/^A side left with only its king loses at once\. You lose (\d+) HP\.$/);
+  const lost = Number(words.match(/You lose (\d+) HP/)![1]);
+  // 2 for the loss and 1 for each of their pieces left (all of them: nothing was played).
+  expect(lost).toBeGreaterThanOrEqual(3);
+  expect(await hp(page, "you")).toBe(20 - lost);
+  expect(await hp(page, "bot")).toBe(20);
+  // No move was played: the board is the position the fight started from (every piece of theirs still there).
+  await expect(page.locator(`${BOARD_SEL.square}.last-move`)).toHaveCount(0);
+  expect(await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count()).toBe(lost - 2);
+  // Nothing spent, nothing lost: the gold is saved, with the interest and the income.
+  await expect(page.locator(".ac-card-gold")).toHaveText("Next round: 100 saved + 120 income + 10 interest = 230 gold");
   expect(errors).toEqual([]);
 });
 
