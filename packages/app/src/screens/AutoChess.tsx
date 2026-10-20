@@ -6,41 +6,9 @@ import { BackButton } from "../components/FrontDoor.tsx";
 import { cellOf, dragStarted, squareAtPoint } from "../board/logic.ts";
 import { play } from "../sound.ts";
 import { testParams } from "../test-switches.ts";
-import {
-  adjustBlock,
-  adjustDrop,
-  adjustMarks,
-  adjustMove,
-  adjustTargets,
-  adjustWords,
-  dropBlock,
-  dropSquareBlock,
-  dropWords,
-  movesUsed,
-  startAdjust,
-  undoAction,
-  undoBlock,
-  undoWords,
-  type Adjusted,
-} from "../autochess/adjust.ts";
+import { adjustBlock, adjustMarks, adjustMove, adjustTargets, adjustWords, movesUsed, startAdjust, undoAction, undoBlock, undoWords, type Adjusted } from "../autochess/adjust.ts";
 import { botAdjust, botAt, botPlan, botShown } from "../autochess/bot.ts";
-import {
-  autoDrop,
-  benchFixed,
-  buyBlock,
-  buyWords,
-  emptyArmy,
-  kingSquares,
-  moveOnBoard,
-  pawnFixed,
-  placeBlock,
-  placeFromBench,
-  placeWords,
-  priceOf,
-  sellPiece,
-  sellValue,
-  toBench,
-} from "../autochess/army.ts";
+import { buyBlock, buyWords, emptyArmy, kingSquares, offerLabel, placeBlock, priceOf, sellPiece, sellValue } from "../autochess/army.ts";
 import {
   beginRound,
   goldBreakdown,
@@ -59,15 +27,15 @@ import { bonusFor, botLocked, bothLocked, buyFreeze, freezeWords, noLocks, tickL
 import { buyFromSlot, newShop, rerollFor, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
 import { playFight } from "../autochess/fight.ts";
 import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn } from "../autochess/position.ts";
-import { KIND_NAME, other, type Army, type Color, type Kind } from "../autochess/types.ts";
+import { KIND_NAME, other, type Army, type Color, type Kind, type Offer } from "../autochess/types.ts";
 import { clockWords, damageWords, endWords, goldWords, headline, matchWords, moveWords, type EndKind } from "../autochess/words.ts";
 
 /**
  * Auto chess, the demo (/autochess; docs/decisions/2026-10-19-autochess-demo.md, docs/areas/autochess.md): you against a
- * bot, all in this browser. Each round the game puts both kings down; you buy pieces onto a bench and place them on your
- * half (30 s, the last 3 locked) while the bot's pieces show as plain circles 2 s behind; then their real pieces show and
- * each of your pieces may make one legal chess move (15 s); then the engine plays both armies out. The rules are in
- * `autochess/` (pure, tested); this draws them. Nothing is recorded, rewarded or sent anywhere.
+ * bot, all in this browser. Each round the game puts both kings down; the shop offers pieces, each with a square of your half
+ * (30 s, the last 3 locked) while the bot's pieces show as plain circles 2 s behind; then their real pieces show and you get
+ * one chess move (15 s); then the engine plays both armies out. The rules are in `autochess/` (pure, tested); this draws
+ * them. Nothing is recorded, rewarded or sent anywhere.
  */
 
 /** How often the clock is read: the countdown, the circles 2 s behind and the end of each step. Nothing is drawn per frame. */
@@ -84,14 +52,13 @@ type BotPlan = ReturnType<typeof botPlan>;
 /** Everything that belongs to one round (a new one every round: nothing carries over but gold, HP and the streak). */
 interface RoundState {
   you: Army;
-  /** The shop's five slots (new every round, free). */
+  /** The shop's offers (new every round, free). */
   shop: Shop;
   /** Lock in (end your buying, first gets the bonus): when you locked, and who got the bonus. */
   locks: Locks;
-  /** Your adjust step: where your pieces stand and what you did (one move, one drop). */
+  /** Your adjust step: where your pieces stand and what you did (one move). */
   adj: Adjusted | null;
-  /** How many of your bench pieces dropped onto your board when buying ended, and the bot's army then (its bench dropped too). */
-  autoDropped: number;
+  /** The bot's army when buying ended. */
   botStart: Army | null;
   plan: BotPlan;
   /** The bot's army after its adjust step (hidden until the fight). */
@@ -123,12 +90,12 @@ interface BotRun {
   latest: Army;
 }
 
-/** A piece being held: picked up for a drag, or selected by a tap. */
+/** A piece being held: picked up for a drag, or selected by a tap; or an offer pressed. */
 interface Hold {
   kind: Kind | "k";
-  at: { bench: number } | { square: string };
+  at: { offer: number } | { square: string };
 }
-type Target = { square: string } | { bench: true } | { shop: true } | null;
+type Target = { square: string } | { shop: true } | null;
 
 const sameHold = (a: Hold | null, b: Hold | null) => !!a && !!b && JSON.stringify(a.at) === JSON.stringify(b.at);
 const isSquare = (h: Hold): h is Hold & { at: { square: string } } => "square" in h.at;
@@ -140,7 +107,8 @@ function startRound(prev: MatchState, cfg: AutoChessSettings): { match: MatchSta
   const seed = roundSeed(match);
   const kings = kingSquares(seed, cfg);
   const plan = botPlan(theirs, kings[theirs], match.bot.gold, match.round, mulberry32(seed ^ 0x9e3779b9), cfg);
-  return { match, round: { you: emptyArmy(mine, kings[mine]), shop: newShop(shopSeed(seed), cfg), locks: noLocks, adj: null, autoDropped: 0, botStart: null, plan, botFinal: null, gold } };
+  const you = emptyArmy(mine, kings[mine]);
+  return { match, round: { you, shop: newShop(shopSeed(seed), you, cfg), locks: noLocks, adj: null, botStart: null, plan, botFinal: null, gold } };
 }
 
 function newGame(seed: number, cfg: AutoChessSettings): Game {
@@ -257,19 +225,17 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     setDrag(null);
     press.current = null;
     setMsg("");
-    // The pieces still on a bench drop onto its board by themselves (up to the limit), yours and the bot's.
-    const dropped = autoDrop(cur.round.you, cfg);
-    const you = dropped.army;
-    const botStart = autoDrop(cur.round.plan.army, cfg).army;
+    const you = cur.round.you;
+    const botStart = cur.round.plan.army;
     // (What the bot spent is paid now, and its lock-in bonus if it locked first; it sells nothing.)
     const locks = tickLocks(cur.round.locks, performance.now() - cur.phaseStart, cur.round.plan.lockAt);
     const match: MatchState = { ...cur.match, bot: { ...cur.match.bot, gold: cur.match.bot.gold - cur.round.plan.spent + bonusFor(locks, "bot", cfg) } };
-    commit({ ...cur, match, phase: "adjust", phaseStart: performance.now(), round: { ...cur.round, locks, adj: startAdjust(you), autoDropped: dropped.dropped, botStart } });
+    commit({ ...cur, match, phase: "adjust", phaseStart: performance.now(), round: { ...cur.round, locks, adj: startAdjust(you), botStart } });
     // The bot adjusts out of sight, from your army as it stood when it locked, and its moves show at the fight.
     const run: BotRun = { stop: false, done: null, latest: botStart };
     botRun.current = run;
     const seed = roundSeed(match);
-    run.done = botAdjust(botStart, match.bot.gold, botEvaluator(you, other(youColor(match.round)), cfg), mulberry32(seed ^ 0x51ed270b), () => run.stop || cancelled.current, cfg, (army) => (run.latest = army)).then(
+    run.done = botAdjust(botStart, botEvaluator(you, other(youColor(match.round)), cfg), mulberry32(seed ^ 0x51ed270b), () => run.stop || cancelled.current, cfg, (army) => (run.latest = army)).then(
       () => undefined,
       () => undefined,
     );
@@ -288,10 +254,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     await Promise.race([run.done, new Promise((r) => setTimeout(r, BOT_WAIT_MS))]);
     if (cancelled.current) return;
     const botFinal = run.latest;
-    const at0 = gref.current;
-    // (A drop costs the bot too; paid now, so the gold shown through the step didn't give it away.)
-    const botDrops = (at0.round.botStart?.bench.length ?? 0) - botFinal.bench.length;
-    const at: Game = { ...at0, match: { ...at0.match, bot: { ...at0.match.bot, gold: at0.match.bot.gold - botDrops * cfg.adjustDropCost } } };
+    const at = gref.current;
     const you = at.round.adj?.army ?? at.round.you;
     const color = youColor(at.match.round);
     const start = color === "w" ? fightStart(you, botFinal) : fightStart(botFinal, you);
@@ -313,7 +276,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const color = youColor(cur.match.round);
     const on = piecesOn(fen);
     const who = winner === null ? "draw" : winner === color ? "you" : "bot";
-    const { match, result } = settleRound(cur.match, who, { you: on[color], bot: on[other(color)] }, { you: (cur.round.adj?.army ?? cur.round.you).bench, bot: cur.round.botFinal?.bench ?? [] }, cfg);
+    const { match, result } = settleRound(cur.match, who, { you: on[color], bot: on[other(color)] }, cfg);
     const won = matchWinner(match);
     const next = won ? null : goldBreakdown(match.round + 1, match.you, cfg);
     commit({ ...cur, match, phase: won ? "over" : "result", phaseStart: performance.now(), outcome: { result, end, next } });
@@ -334,7 +297,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     commit(newGame((Math.random() * 2 ** 31) | 0, cfg));
   }
 
-  // ---------------- Buying, placing, selling ----------------
+  // ---------------- Buying, selling ----------------
 
   /** Whether the buy step takes an action now (not locked, not over). Read from the clock, not from the last tick. */
   const buying = () => {
@@ -354,19 +317,23 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold } }, round: { ...cur.round, you: army } });
   };
 
-  /** Buys the piece in a shop slot onto the bench; a new piece is rolled into the slot. */
+  /** Buys the offer in a shop slot: the piece lands on its square, and a new offer is rolled into the slot. */
   function buySlot(slot: number) {
     if (!buying()) return;
     const cur = gref.current;
-    const kind = cur.round.shop.slots[slot]!;
+    const offer = cur.round.shop.slots[slot];
+    if (!offer) return;
     const bought = buyFromSlot({ army: cur.round.you, gold: cur.match.you.gold, shop: cur.round.shop }, slot, shopSeed(roundSeed(cur.match)), cfg);
-    if ("block" in bought) return say(buyWords(bought.block, kind, cur.match.you.gold).line);
+    if ("block" in bought) return say(buyWords(bought.block, offer, cur.match.you.gold, cfg).line);
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: bought.gold } }, round: { ...cur.round, you: bought.army, shop: bought.shop } });
-    setMsg("");
+    setSel(null);
+    // (Another offer on the same square rolled again: the player is told, so an offer doesn't change under their finger unexplained.)
+    if (bought.replaced) say(`Another offer was on ${offer.square}: it rolled again.`);
+    else setMsg("");
     play("pop");
   }
 
-  /** Lock in: your buying is over (your board, bench and shop freeze); the first side to do it gets the bonus, and both locked ends the step. */
+  /** Lock in: your buying is over (your board and shop freeze); the first side to do it gets the bonus, and both locked ends the step. */
   function lockIn() {
     if (!buying()) return;
     const cur = gref.current;
@@ -386,45 +353,29 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   function reroll() {
     if (!buying()) return;
     const cur = gref.current;
-    const next = rerollFor({ gold: cur.match.you.gold, shop: cur.round.shop }, shopSeed(roundSeed(cur.match)), cfg);
+    const next = rerollFor({ gold: cur.match.you.gold, shop: cur.round.shop, army: cur.round.you }, shopSeed(roundSeed(cur.match)), cfg);
     if ("block" in next) return say(rerollWords(cur.match.you.gold, cfg));
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: next.gold } }, round: { ...cur.round, shop: next.shop } });
     setMsg("");
     play("pop");
   }
 
+  /** Sells a piece standing on your board. */
   function sell(hold: Hold) {
-    if (hold.kind === "k" || !buying()) return;
+    if (!isSquare(hold) || !buying()) return;
     const cur = gref.current;
-    const { army, gold } = sellPiece(cur.round.you, hold.at);
+    const { army, gold } = sellPiece(cur.round.you, hold.at.square, cfg);
     withGold(cur.match.you.gold + gold, army);
     setSel(null);
     play("sell");
-    say(`Sold the ${KIND_NAME[hold.kind]} for ${gold}.`);
+    say(`Sold the ${KIND_NAME[hold.kind as Kind]} for ${gold}.`);
   }
 
-  /** A held piece let go on a target, while buying. */
+  /** A held piece let go on a target, while buying: only the shop takes it (a sale). */
   function dropWhileBuying(hold: Hold, target: Target) {
-    if (hold.kind === "k" || !target || !buying()) return;
-    const army = gref.current.round.you;
+    if (!target || !buying()) return;
     if ("shop" in target) return sell(hold);
-    if ("bench" in target) {
-      if (!isSquare(hold)) return;
-      if (pawnFixed(army, hold.at.square)) return say(placeWords("fixed", cfg));
-      if (army.bench.length >= cfg.benchSlots) return say(buyWords("bench", hold.kind, 0).line);
-      withArmy(toBench(army, hold.at.square));
-      setSel(null);
-      setMsg("");
-      return play("move");
-    }
-    const from = isSquare(hold) ? hold.at.square : undefined;
-    if (from === target.square) return setSel(null);
-    const block = placeBlock(army, hold.kind, target.square, from, cfg);
-    if (block) return say(placeWords(block, cfg));
-    withArmy(isSquare(hold) ? moveOnBoard(army, hold.at.square, target.square) : placeFromBench(army, (hold.at as { bench: number }).bench, target.square));
     setSel(null);
-    setMsg("");
-    play("move");
   }
 
   // ---------------- Adjusting ----------------
@@ -439,36 +390,21 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if (from === to) return setSel(null);
     const block = adjustBlock(adj, from, to, cfg);
     if (block) return say(adjustWords(block, cfg));
-    commit({ ...cur, round: { ...cur.round, adj: adjustMove(adj, from, to, cfg) } });
+    commit({ ...cur, round: { ...cur.round, adj: adjustMove(adj, from, to) } });
     setSel(null);
     setMsg("");
     play("move");
   }
 
-  /** Your one drop: a bench piece onto an empty square of your half, for gold. */
-  function dropFromBench(slot: number, square: string) {
-    if (!adjusting()) return;
-    const cur = gref.current;
-    const adj = cur.round.adj!;
-    const gold = cur.match.you.gold;
-    const block = dropSquareBlock(adj, slot, square, gold, cfg);
-    if (block) return say(dropWords(block, gold, cfg));
-    commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: gold - cfg.adjustDropCost } }, round: { ...cur.round, adj: adjustDrop(adj, slot, square, cfg) } });
-    setSel(null);
-    setMsg("");
-    play("move");
-  }
-
-  /** Takes a change back (a move, or a drop: its piece goes back to the bench and its gold comes back). */
+  /** Takes your move back. */
   function takeBack(at: string) {
     if (!adjusting()) return;
     const cur = gref.current;
     const adj = cur.round.adj!;
-    const block = undoBlock(adj, at, cfg);
+    const block = undoBlock(adj, at);
     if (block === "needed") return say(undoWords(block));
     if (block) return;
-    const undone = undoAction(adj, at, cfg);
-    commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: cur.match.you.gold + undone.gives } }, round: { ...cur.round, adj: undone.state } });
+    commit({ ...cur, round: { ...cur.round, adj: undoAction(adj, at) } });
     setSel(null);
     setMsg("");
   }
@@ -490,52 +426,39 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const phase = gref.current.phase;
     if (phase === "buy") {
       if (!buying()) return;
+      if ("offer" in hold.at) return buySlot(hold.at.offer);
       if (hold.kind === "k") return say("Your king is placed by the game.");
     } else if (!adjusting()) return;
     if (phase === "adjust") {
-      const cur = gref.current;
-      const adj = cur.round.adj!;
-      // (A piece you moved or dropped takes its change back when tapped.)
+      const adj = gref.current.round.adj!;
+      // (A piece you moved takes its move back when tapped.)
       if (isSquare(hold) && adjustMarks(adj).some((m) => m.square === (hold.at as { square: string }).square)) return takeBack(hold.at.square);
-      // (A bench piece you can't drop says why.)
-      if (!isSquare(hold)) {
-        const why = dropBlock(adj, cur.match.you.gold, cfg);
-        if (why) return say(dropWords(why, cur.match.you.gold, cfg));
-      }
     }
     if (sameHold(selRef.current, hold)) return setSel(null);
     setSel(hold);
-    if (phase === "buy") {
-      // (A pawn that has had its one pick-up stays where it is; selling it is still allowed.)
-      if (isSquare(hold) && pawnFixed(gref.current.round.you, hold.at.square)) return say(placeWords("fixed", cfg));
-      say(`${KIND_NAME[hold.kind as Kind][0]!.toUpperCase()}${KIND_NAME[hold.kind as Kind].slice(1)} picked up. Tap a square of your half to place it.`);
-    }
+    if (phase === "buy") say(`${KIND_NAME[hold.kind as Kind][0]!.toUpperCase()}${KIND_NAME[hold.kind as Kind].slice(1)} selected. Tap Sell to sell it for ${sellValue(hold.kind as Kind, cfg)}.`);
   }
 
   function tapSquare(square: string) {
     const hold = selRef.current;
     if (!hold) return;
-    if (gref.current.phase === "buy") dropWhileBuying(hold, { square });
+    if (gref.current.phase === "buy") setSel(null);
     else if (isSquare(hold)) adjustTo(hold.at.square, square);
-    else dropFromBench((hold.at as { bench: number }).bench, square);
   }
 
   function dropped(hold: Hold, target: Target) {
     if (gref.current.phase === "buy") dropWhileBuying(hold, target);
-    else if (target && "square" in target) {
-      if (isSquare(hold)) adjustTo(hold.at.square, target.square);
-      else dropFromBench((hold.at as { bench: number }).bench, target.square);
-    } else setSel(null);
+    else if (target && "square" in target && isSquare(hold)) adjustTo(hold.at.square, target.square);
+    else setSel(null);
   }
 
   const boxOf = () => layerRef.current!.getBoundingClientRect();
 
-  /** Where a point is: a square of the board, the bench, or the shop. */
+  /** Where a point is: a square of the board, or the shop. */
   function targetAt(x: number, y: number): Target {
     const square = squareAtPoint(x, y, boxOf(), orientation);
     if (square) return { square };
     const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-ac-drop]");
-    if (el?.dataset.acDrop === "bench") return { bench: true };
     if (el?.dataset.acDrop === "shop") return { shop: true };
     return null;
   }
@@ -550,7 +473,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const p = press.current;
     if (!p || e.pointerId !== p.id) return;
     ghostAt.current = { x: e.clientX, y: e.clientY };
-    if (!p.started && dragStarted(e.clientX - p.x, e.clientY - p.y) && (p.hold.kind !== "k" || gref.current.phase === "adjust")) {
+    // (While buying only a piece standing on your board is dragged, to the shop to sell it; the king and the offers stay put.)
+    const dragsNow = gref.current.phase === "adjust" || (isSquare(p.hold) && p.hold.kind !== "k");
+    if (!p.started && dragStarted(e.clientX - p.x, e.clientY - p.y) && dragsNow) {
       p.started = true;
       // (A piece picked up to drag is the selected one too.)
       setSel(p.hold);
@@ -577,22 +502,34 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     } else if (!cancel) tapPiece(p.hold);
   }
 
+  /** The offers standing on a square, left to right on the screen (by shop slot). */
+  const offersOn = (square: string) => gref.current.round.shop.slots.flatMap((o, slot) => (o.square === square ? [slot] : []));
+
   function layerDown(e: PointerEvent) {
     const cur = gref.current;
     if (cur.phase !== "buy" && cur.phase !== "adjust") return;
     if ((e.target as Element).closest("button")) return;
-    const square = squareAtPoint(e.clientX, e.clientY, boxOf(), orientation);
+    const box = boxOf();
+    const square = squareAtPoint(e.clientX, e.clientY, box, orientation);
     if (!square) return;
+    if (cur.phase === "buy") {
+      // An offer's silhouette: a tap buys it. (Two on one square sit side by side: the half of the square the finger is on.)
+      const slots = offersOn(square);
+      if (slots.length) {
+        const { col } = cellOf(square, orientation);
+        const within = (e.clientX - box.left) / (box.width / 8) - col;
+        const slot = slots[Math.min(slots.length - 1, Math.max(0, Math.floor(within * slots.length)))]!;
+        return startPress(e, { kind: cur.round.shop.slots[slot]!.kind, at: { offer: slot } });
+      }
+    }
     const kind = pieceOf(square);
-    // (The king can't be picked up while buying: with a piece in hand, its square is a square that refuses it.)
-    if (kind === "k" && cur.phase === "buy" && selRef.current) return tapSquare(square);
     if (kind) return startPress(e, { kind, at: { square } });
     tapSquare(square);
   }
 
-  function slotDown(e: PointerEvent, index: number, kind: Kind) {
-    if (gref.current.phase !== "buy" && gref.current.phase !== "adjust") return;
-    startPress(e, { kind, at: { bench: index } });
+  function offerDown(e: PointerEvent, slot: number, kind: Kind) {
+    if (gref.current.phase !== "buy") return;
+    startPress(e, { kind, at: { offer: slot } });
   }
 
   // The dragged piece's first place, before the pointer moves again.
@@ -623,20 +560,14 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     return { "--sq-x": col, "--sq-y": row } as Record<string, number>;
   };
 
-  // The squares the held piece may go to (while buying: any empty one of your half it may stand on).
+  // The squares the picked piece may move to in the adjust step.
   const dots: string[] = [];
-  if (sel && g.phase === "adjust" && g.round.adj) {
-    const adj = g.round.adj;
-    if (isSquare(sel)) {
-      if (movesUsed(adj) < cfg.adjustMoves) dots.push(...adjustTargets(adj.army, sel.at.square));
-    } else if (sel.kind !== "k" && !dropBlock(adj, g.match.you.gold, cfg)) {
-      for (let rank = 1; rank <= 8; rank++) for (const f of "abcdefgh") if (!placeBlock(adj.army, sel.kind, `${f}${rank}`, undefined, cfg)) dots.push(`${f}${rank}`);
-    }
-  } else if (sel && sel.kind !== "k" && g.phase === "buy" && !locked) {
-    const from = isSquare(sel) ? sel.at.square : undefined;
-    for (let rank = 1; rank <= 8; rank++)
-      for (const f of "abcdefgh") if (!placeBlock(g.round.you, sel.kind, `${f}${rank}`, from, cfg)) dots.push(`${f}${rank}`);
-  }
+  if (sel && g.phase === "adjust" && g.round.adj && isSquare(sel) && movesUsed(g.round.adj) < cfg.adjustMoves) dots.push(...adjustTargets(g.round.adj.army, sel.at.square));
+
+  // The offers: each a glowing silhouette on its square, grouped by square (two on one square sit side by side, smaller).
+  const offers = g.phase === "buy" ? g.round.shop.slots : [];
+  const offerBlocks = offers.map((o) => buyBlock(g.round.you, g.match.you.gold, o, cfg));
+  const squaresWithOffers = [...new Set(offers.map((o) => o.square))];
 
   const interactiveLayer = (g.phase === "buy" && !locked) || (g.phase === "adjust" && elapsed < cfg.adjustSeconds * 1000);
   const goldNow = g.match.you.gold;
@@ -647,10 +578,10 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   let label = "";
   if (g.phase === "buy") {
     clock = clockWords(cfg.buySeconds * 1000 - elapsed);
-    label = youLocked ? "Locked in" : locked ? "Locked" : "Buy & place";
+    label = youLocked ? "Locked in" : locked ? "Locked" : "Buy";
   } else if (g.phase === "adjust") {
     clock = clockWords(cfg.adjustSeconds * 1000 - elapsed);
-    label = "Move & drop";
+    label = "Move";
   } else if (g.phase === "fight") {
     label = "Fight";
   } else label = g.phase === "over" ? "Match over" : "Round over";
@@ -659,10 +590,10 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const hint =
     g.phase === "buy"
       ? youLocked
-        ? "You're locked in. Your board, bench and shop are frozen until the step ends."
-        : "Tap a piece to buy it. Drag it onto your half, or tap a square."
+        ? "You're locked in. Your board and shop are frozen until the step ends."
+        : "Tap an offer to buy it: it lands on its square."
       : g.phase === "adjust"
-        ? `One move and one drop (${cfg.adjustDropCost} gold). Tap a piece, then a square.`
+        ? "One chess move. Tap a piece, then a square."
         : g.phase === "fight"
           ? moveWords(g.fight?.plies ?? 0, cfg)
           : "";
@@ -721,7 +652,18 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               {shown.circles.map((square) => (
                 <span key={square} class={`ac-circle ${theirs}`} data-square={square} style={sq(square)} />
               ))}
-              {g.phase === "buy" && (you.fixed ?? []).map((square) => <span key={square} class="ac-cell ac-fixed" data-square={square} style={sq(square)} />)}
+              {squaresWithOffers.map((square) => {
+                const slots = offers.flatMap((o, slot) => (o.square === square ? [slot] : []));
+                return (
+                  <span key={square} class="ac-offers" data-square={square} style={sq(square)}>
+                    {slots.map((slot, i) => (
+                      <span key={slot} class={`ac-sil${offerBlocks[slot] || locked ? " off" : ""}`} data-slot={slot} data-kind={offers[slot]!.kind} style={{ "--n": slots.length, "--i": i } as Record<string, number>}>
+                        <i class={`ac-sil-shape ${KIND_NAME[offers[slot]!.kind]}`} />
+                      </span>
+                    ))}
+                  </span>
+                );
+              })}
               {held && isSquare(held) && <span class="ac-cell ac-picked" style={sq(held.at.square)} />}
               {dots.map((square) => (
                 <span key={square} class="ac-cell ac-dot" style={sq(square)} />
@@ -741,9 +683,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
         {g.phase === "buy" && (
           <div class="ac-msg" role="status" aria-live="polite">
             <span class="ac-msg-text">{msg || hint}</span>
-            {!locked && held && held.kind !== "k" && (
+            {!locked && held && isSquare(held) && held.kind !== "k" && (
               <button type="button" class="ac-sell" onClick={() => sell(held)}>
-                Sell {sellValue(held.kind)}
+                Sell {sellValue(held.kind, cfg)}
               </button>
             )}
           </div>
@@ -751,52 +693,34 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
 
         {g.phase === "buy" ? (
           <>
-            <div class="ac-bench" data-ac-drop="bench" aria-label="Your bench" onClick={(e) => (e.target as Element).closest(".ac-slot.has") === null && held && isSquare(held) && dropWhileBuying(held, { bench: true })}>
-              {Array.from({ length: cfg.benchSlots }, (_, i) => {
-                const kind = g.round.you.bench[i];
-                const picked = !!held && "bench" in held.at && held.at.bench === i;
-                return kind ? (
-                  <button
-                    key={i}
-                    type="button"
-                    class={`ac-slot has${picked ? " picked" : ""}${drag && sameHold(drag, { kind, at: { bench: i } }) ? " lifted" : ""}${benchFixed(g.round.you, i) ? " fixed" : ""}`}
-                    aria-label={`Bench: ${KIND_NAME[kind]}`}
-                    aria-pressed={picked}
-                    onPointerDown={(e) => slotDown(e, i, kind)}
-                    onPointerMove={movePress}
-                    onPointerUp={(e) => endPress(e)}
-                    onPointerCancel={(e) => endPress(e, true)}
-                    onLostPointerCapture={(e) => endPress(e, true)}
-                  >
-                    <PieceIcon color={mine} kind={kind} />
-                  </button>
-                ) : (
-                  <span key={i} class="ac-slot" aria-hidden="true" />
-                );
-              })}
-            </div>
             <div class={`ac-shop${drag ? " selling" : ""}`} data-ac-drop="shop" aria-label="Shop">
-              {g.round.shop.slots.map((kind, slot) => {
-                const block = buyBlock(g.round.you, goldNow, kind);
-                const words = block ? buyWords(block, kind, goldNow) : null;
+              {g.round.shop.slots.map((offer, slot) => {
+                const block = offerBlocks[slot] ?? null;
+                const words = block ? buyWords(block, offer, goldNow, cfg) : null;
                 return (
                   <button
                     key={slot}
                     type="button"
                     class={`ac-buy${block || locked ? " off" : ""}`}
                     data-slot={slot}
-                    data-kind={kind}
+                    data-kind={offer.kind}
+                    data-square={offer.square}
                     aria-disabled={!!block || locked}
-                    aria-label={`Buy a ${KIND_NAME[kind]}, ${priceOf(kind)} gold${locked ? ", locked" : words ? `, ${words.short}` : ""}`}
-                    onClick={() => buySlot(slot)}
+                    aria-label={`Buy a ${KIND_NAME[offer.kind]} on ${offer.square}, ${priceOf(offer.kind)} gold${locked ? ", locked" : words ? `, ${words.short}` : ""}`}
+                    onPointerDown={(e) => offerDown(e, slot, offer.kind)}
+                    onPointerMove={movePress}
+                    onPointerUp={(e) => endPress(e)}
+                    onPointerCancel={(e) => endPress(e, true)}
+                    onLostPointerCapture={(e) => endPress(e, true)}
+                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), buySlot(slot))}
                   >
-                    <PieceIcon color={mine} kind={kind} />
-                    <b>{priceOf(kind)}</b>
-                    <small>{locked ? "Locked" : (words?.short ?? "")}</small>
+                    <PieceIcon color={mine} kind={offer.kind} />
+                    <b>{priceOf(offer.kind)}</b>
+                    <small>{locked ? "Locked" : (words?.short ?? offerLabel(offer))}</small>
                   </button>
                 );
               })}
-              {drag && drag.kind !== "k" && <div class="ac-sell-drop">Drop to sell for {sellValue(drag.kind)}</div>}
+              {drag && drag.kind !== "k" && <div class="ac-sell-drop">Drop to sell for {sellValue(drag.kind as Kind, cfg)}</div>}
             </div>
             <div class="ac-ctl">
               <button type="button" class={`ac-reroll${locked || goldNow < cfg.shop.rerollCost ? " off" : ""}`} aria-disabled={locked || goldNow < cfg.shop.rerollCost} aria-label={`Reroll the shop, ${cfg.shop.rerollCost} gold`} onClick={reroll}>
@@ -826,37 +750,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 <p class="ac-card-say" role="status" aria-live="polite">
                   {msg || hint}
                 </p>
-                <div class="ac-bench" aria-label="Your bench">
-                  {Array.from({ length: cfg.benchSlots }, (_, i) => {
-                    const kind = you.bench[i];
-                    const picked = !!held && "bench" in held.at && held.at.bench === i;
-                    // (Greyed when the drop can't be made: used, no gold, or a full board; tapped, it says which.)
-                    const off = dropBlock(g.round.adj!, goldNow, cfg) !== null;
-                    return kind ? (
-                      <button
-                        key={i}
-                        type="button"
-                        class={`ac-slot has${picked ? " picked" : ""}${off ? " off" : ""}${drag && sameHold(drag, { kind, at: { bench: i } }) ? " lifted" : ""}`}
-                        aria-label={`Bench: ${KIND_NAME[kind]}${off ? ", can't be dropped now" : `, drop for ${cfg.adjustDropCost} gold`}`}
-                        aria-pressed={picked}
-                        aria-disabled={off}
-                        onPointerDown={(e) => slotDown(e, i, kind)}
-                        onPointerMove={movePress}
-                        onPointerUp={(e) => endPress(e)}
-                        onPointerCancel={(e) => endPress(e, true)}
-                        onLostPointerCapture={(e) => endPress(e, true)}
-                      >
-                        <PieceIcon color={mine} kind={kind} />
-                      </button>
-                    ) : (
-                      <span key={i} class="ac-slot" aria-hidden="true" />
-                    );
-                  })}
-                </div>
-                <p class="ac-card-text">
-                  {g.round.autoDropped > 0 && `${g.round.autoDropped} bench ${g.round.autoDropped === 1 ? "piece" : "pieces"} dropped onto your board. `}
-                  Their pieces stay shown; yours stay hidden until the fight. Tap ↩ to take a change back. Bench pieces left over are refunded.
-                </p>
+                <p class="ac-card-text">Their pieces stay shown; yours stay hidden until the fight. Tap ↩ to take your move back.</p>
               </>
             )}
             {g.phase === "fight" && (

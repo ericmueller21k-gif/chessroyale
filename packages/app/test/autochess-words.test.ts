@@ -30,11 +30,11 @@ describe("auto chess: what the result says", () => {
     expect(matchWords(false)).toEqual({ head: "You lose the match.", sub: "You are out of HP." });
   });
 
-  it("the gold line adds up: savings, income, interest, streak, survivors, bench (the empty ones left out)", () => {
-    const g = goldBreakdown(3, { gold: 120, hp: 20, wins: 2, losses: 0, refund: { survivors: 11, bench: 30 } });
-    expect(g.total).toBe(120 + 11 + 30 + 140 + 10 + 10);
-    expect(goldWords(g)).toBe("Next round: 120 saved + 140 income + 10 interest + 10 streak + 11 survivors + 30 bench = 321 gold");
-    const plain = goldBreakdown(2, { gold: 0, hp: 20, wins: 0, losses: 1, refund: { survivors: 0, bench: 0 } });
+  it("the gold line adds up: savings, income, interest, streak, survivors (the empty ones left out)", () => {
+    const g = goldBreakdown(3, { gold: 120, hp: 20, wins: 2, losses: 0, refund: { survivors: 11 } });
+    expect(g.total).toBe(120 + 11 + 140 + 10 + 10);
+    expect(goldWords(g)).toBe("Next round: 120 saved + 140 income + 10 interest + 10 streak + 11 survivors = 291 gold");
+    const plain = goldBreakdown(2, { gold: 0, hp: 20, wins: 0, losses: 1, refund: { survivors: 0 } });
     expect(goldWords(plain)).toBe("Next round: 0 saved + 120 income = 120 gold");
   });
 
@@ -48,16 +48,16 @@ describe("auto chess: survivors and promotions", () => {
     // White's pawn became a queen on a8; Black has a rook and a pawn.
     const fen = "Q3k3/8/8/8/8/8/p7/r3K3 w - - 0 1";
     expect(piecesOn(fen)).toEqual({ w: ["q"], b: ["p", "r"] });
-    expect(refundFor(piecesOn(fen).w, [])).toEqual({ survivors: Math.floor(90 * AUTOCHESS.survivorRefund), bench: 0 });
-    const { match, result } = settleRound(beginRound(newMatch(1)).match, "you", { you: piecesOn(fen).w, bot: piecesOn(fen).b }, { you: [], bot: [] });
+    expect(refundFor(piecesOn(fen).w)).toEqual({ survivors: Math.floor(90 * AUTOCHESS.survivorRefund) });
+    const { match, result } = settleRound(beginRound(newMatch(1)).match, "you", { you: piecesOn(fen).w, bot: piecesOn(fen).b });
     // You won with one piece left: the bot loses 2 + 1.
     expect(result.damage).toBe(3);
     expect(match.bot.hp).toBe(17);
   });
 
-  it("the settings hold the design's numbers (v4, v5): tune them here, nowhere else", () => {
+  it("the settings hold the design's numbers (v4, v5, v6): tune them here, nowhere else", () => {
     expect(AUTOCHESS).toMatchObject({
-      shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 5 },
+      shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 2 },
       sellBack: 0.9,
       lockInBonus: 25,
       buySeconds: 30,
@@ -65,11 +65,7 @@ describe("auto chess: survivors and promotions", () => {
       circlesDelaySeconds: 2,
       adjustSeconds: 15,
       adjustMoves: 1,
-      adjustDrops: 1,
-      adjustDropCost: 25,
-      benchSlots: 8,
       boardLimit: 10,
-      autoDropTo: 8,
       kingRanks: 2,
       fightMoveMs: 350,
       fightFastAfter: 30,
@@ -83,7 +79,7 @@ describe("auto chess: survivors and promotions", () => {
       interest: { per: 100, gold: 10, max: 30 },
       survivorRefund: 0.25,
       queenLimit: 1,
-      bot: expect.objectContaining({ lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 60, rerollChance: 0.15, rerollChanceBare: 0.4, dropTries: 8, dropBelow: 0.9 }),
+      bot: expect.objectContaining({ lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4 }),
       maxPawns: 8,
       pawnsPerFile: 3,
     });

@@ -1,13 +1,12 @@
 import { AUTOCHESS, type AutoChessSettings } from "@chessroyale/core";
-import { boardCount, inHalf, onBoard, placeBlock, placeFromBench, placeWords, squareOf, type PlaceBlock } from "./army.ts";
-import type { Army, Kind } from "./types.ts";
+import { inHalf, onBoard, squareOf } from "./army.ts";
+import type { Army } from "./types.ts";
 
 /**
- * The adjust step (v5): after the reveal you get one chess move in total (any one of your pieces, the king too) and one drop of
- * a bench piece onto an empty square of your half for gold: either, both or neither, in any order, and each can be taken back
- * while the step lasts. A move is the piece's own move, onto an empty square of your own half with the path clear; no captures,
- * nothing into their half, no castling, no en passant. A pawn pushes one square (two from its start rank when both are empty).
- * Check doesn't matter here: the fight's start rule covers it. A drop follows the placement rules and the board's limit.
+ * The adjust step (v5): after the reveal you get one chess move in total (any one of your pieces, the king too), which can be
+ * taken back while the step lasts. A move is the piece's own move, onto an empty square of your own half with the path clear; no
+ * captures, nothing into their half, no castling, no en passant. A pawn pushes one square (two from its start rank when both are
+ * empty). Check doesn't matter here: the fight's start rule covers it.
  */
 
 const ORTHO: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -64,8 +63,8 @@ export function adjustTargets(army: Army, from: string): string[] {
   return out;
 }
 
-/** One thing done in the adjust step: a chess move, or a drop of a bench piece (its slot and kind when it was dropped). */
-export type AdjustAction = { type: "move"; from: string; to: string } | { type: "drop"; slot: number; kind: Kind; square: string };
+/** One thing done in the adjust step: a chess move. */
+export type AdjustAction = { type: "move"; from: string; to: string };
 
 /** An army in the adjust step: the army it began with, where its pieces stand now, and what was done to get there, in order. */
 export interface Adjusted {
@@ -76,27 +75,19 @@ export interface Adjusted {
 
 export const startAdjust = (army: Army): Adjusted => ({ start: army, army, actions: [] });
 
-export const movesUsed = (state: Adjusted) => state.actions.filter((a) => a.type === "move").length;
-export const dropsUsed = (state: Adjusted) => state.actions.filter((a) => a.type === "drop").length;
+export const movesUsed = (state: Adjusted) => state.actions.length;
 
-/** The square an action left its piece on. */
-const actionSquare = (a: AdjustAction) => (a.type === "move" ? a.to : a.square);
-
-/** Plays one action on an army, or null if it isn't legal there (moves: the piece's own; drops: the placement rules, the same piece in the slot). */
-function play(army: Army, a: AdjustAction, cfg: AutoChessSettings): Army | null {
-  if (a.type === "move") {
-    if (!adjustTargets(army, a.from).includes(a.to)) return null;
-    return army.king === a.from ? { ...army, king: a.to } : { ...army, board: Object.fromEntries(Object.entries(army.board).map(([sq, k]) => [sq === a.from ? a.to : sq, k])) };
-  }
-  if (army.bench[a.slot] !== a.kind || placeBlock(army, a.kind, a.square, undefined, cfg)) return null;
-  return placeFromBench(army, a.slot, a.square);
+/** Plays one action on an army, or null if it isn't legal there. */
+function play(army: Army, a: AdjustAction): Army | null {
+  if (!adjustTargets(army, a.from).includes(a.to)) return null;
+  return army.king === a.from ? { ...army, king: a.to } : { ...army, board: Object.fromEntries(Object.entries(army.board).map(([sq, k]) => [sq === a.from ? a.to : sq, k])) };
 }
 
-/** The army after these actions from `start`, or null if one of them isn't legal in that order (taking one back can break a later one). */
-function replay(start: Army, actions: readonly AdjustAction[], cfg: AutoChessSettings): Army | null {
+/** The army after these actions from `start`, or null if one of them isn't legal in that order. */
+function replay(start: Army, actions: readonly AdjustAction[]): Army | null {
   let army: Army | null = start;
   for (const a of actions) {
-    army = army && play(army, a, cfg);
+    army = army && play(army, a);
     if (!army) return null;
   }
   return army;
@@ -113,68 +104,43 @@ export function adjustBlock(state: Adjusted, from: string, to: string, cfg: Auto
 }
 
 /** Makes the move (the caller checked `adjustBlock`). */
-export function adjustMove(state: Adjusted, from: string, to: string, cfg: AutoChessSettings = AUTOCHESS): Adjusted {
+export function adjustMove(state: Adjusted, from: string, to: string): Adjusted {
   const action: AdjustAction = { type: "move", from, to };
-  return { ...state, army: play(state.army, action, cfg)!, actions: [...state.actions, action] };
+  return { ...state, army: play(state.army, action)!, actions: [...state.actions, action] };
 }
 
-/** Why a bench piece can't be dropped at all now (before a square is picked), or null: the drop is used, the gold isn't there, or the board is full. */
-export type DropBlock = "used" | "gold" | "limit";
-
-export function dropBlock(state: Adjusted, gold: number, cfg: AutoChessSettings = AUTOCHESS): DropBlock | null {
-  if (dropsUsed(state) >= cfg.adjustDrops) return "used";
-  if (gold < cfg.adjustDropCost) return "gold";
-  if (boardCount(state.army) >= cfg.boardLimit) return "limit";
-  return null;
-}
-
-/** Why the bench piece in `slot` can't go on `square`, or null: the drop's own reasons first, then the placement rules. */
-export function dropSquareBlock(state: Adjusted, slot: number, square: string, gold: number, cfg: AutoChessSettings = AUTOCHESS): DropBlock | PlaceBlock | "none" | null {
-  const kind = state.army.bench[slot];
-  if (!kind) return "none";
-  return dropBlock(state, gold, cfg) ?? placeBlock(state.army, kind, square, undefined, cfg);
-}
-
-/** Drops the bench piece in `slot` on `square` (the caller checked `dropSquareBlock`). */
-export function adjustDrop(state: Adjusted, slot: number, square: string, cfg: AutoChessSettings = AUTOCHESS): Adjusted {
-  const action: AdjustAction = { type: "drop", slot, kind: state.army.bench[slot]!, square };
-  return { ...state, army: play(state.army, action, cfg)!, actions: [...state.actions, action] };
-}
-
-/** The squares of the pieces you changed (each shows ↩: tap it to take the change back): the last action that left a piece there, if it's still there. */
-export function adjustMarks(state: Adjusted): { square: string; action: "move" | "drop" }[] {
+/** The squares of the pieces you moved (each shows ↩: tap it to take the move back): where a moved piece stands now. */
+export function adjustMarks(state: Adjusted): { square: string; action: "move" }[] {
   const { army, actions } = state;
-  const out: { square: string; action: "move" | "drop" }[] = [];
+  const out: { square: string; action: "move" }[] = [];
   actions.forEach((a, i) => {
-    const square = actionSquare(a);
-    const here = army.king === square || !!army.board[square];
+    const here = army.king === a.to || !!army.board[a.to];
     // (A piece moved on again isn't there any more, and its later move holds the mark.)
-    const movedOn = actions.slice(i + 1).some((b) => b.type === "move" && b.from === square);
-    if (here && !movedOn) out.push({ square, action: a.type });
+    const movedOn = actions.slice(i + 1).some((b) => b.from === a.to);
+    if (here && !movedOn) out.push({ square: a.to, action: "move" });
   });
   return out;
 }
 
 /** The action a tap on this square would take back (the last one that left a piece there), or -1. */
 const actionAt = (state: Adjusted, square: string) => {
-  const mark = adjustMarks(state).find((m) => m.square === square);
-  if (!mark) return -1;
-  for (let i = state.actions.length - 1; i >= 0; i--) if (actionSquare(state.actions[i]!) === square && state.actions[i]!.type === mark.action) return i;
+  if (!adjustMarks(state).some((m) => m.square === square)) return -1;
+  for (let i = state.actions.length - 1; i >= 0; i--) if (state.actions[i]!.to === square) return i;
   return -1;
 };
 
-/** Why a change can't be taken back, or null: nothing changed there, or a later change of yours stands on it. */
-export function undoBlock(state: Adjusted, square: string, cfg: AutoChessSettings = AUTOCHESS): "none" | "needed" | null {
+/** Why a move can't be taken back, or null: nothing moved there, or a later move of yours stands on it. */
+export function undoBlock(state: Adjusted, square: string): "none" | "needed" | null {
   const i = actionAt(state, square);
   if (i < 0) return "none";
-  return replay(state.start, state.actions.filter((_, j) => j !== i), cfg) ? null : "needed";
+  return replay(state.start, state.actions.filter((_, j) => j !== i)) ? null : "needed";
 }
 
-/** Takes the change on this square back (the caller checked `undoBlock`): a drop's piece goes back to its bench slot. `gives`: gold back (a drop's price). */
-export function undoAction(state: Adjusted, square: string, cfg: AutoChessSettings = AUTOCHESS): { state: Adjusted; gives: number } {
+/** Takes the move on this square back (the caller checked `undoBlock`). */
+export function undoAction(state: Adjusted, square: string): Adjusted {
   const i = actionAt(state, square);
   const actions = state.actions.filter((_, j) => j !== i);
-  return { state: { ...state, army: replay(state.start, actions, cfg)!, actions }, gives: state.actions[i]!.type === "drop" ? cfg.adjustDropCost : 0 };
+  return { ...state, army: replay(state.start, actions)!, actions };
 }
 
 /** The words for a refused adjust move. */
@@ -189,21 +155,4 @@ export function adjustWords(block: AdjustBlock, cfg: AutoChessSettings = AUTOCHE
   }
 }
 
-/** The words for a drop that can't be made (the reason is on the bench piece too, greyed). */
-export function dropWords(block: DropBlock | PlaceBlock | "none", gold: number, cfg: AutoChessSettings = AUTOCHESS): string {
-  switch (block) {
-    case "used":
-      return cfg.adjustDrops === 1 ? "You've made your drop. Tap the piece you dropped (↩) to take it back." : `${cfg.adjustDrops} drops at most.`;
-    case "gold":
-      return `Not enough gold: a drop costs ${cfg.adjustDropCost} and you have ${gold}.`;
-    case "none":
-      return "Pick a piece from your bench.";
-    case "limit":
-      return `Your board is full: ${cfg.boardLimit} pieces and your king at most.`;
-    default:
-      // (A square that refuses the piece: the placement rules' own words.)
-      return placeWords(block, cfg);
-  }
-}
-
-export const undoWords = (block: "none" | "needed") => (block === "needed" ? "Take back your other change first." : "Nothing to take back there.");
+export const undoWords = (block: "none" | "needed") => (block === "needed" ? "Take back your other move first." : "Nothing to take back there.");

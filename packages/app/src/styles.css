@@ -17735,24 +17735,62 @@ button.sq-tiny {
 .ac-picked {
   background: var(--sq-select);
 }
-/* A pawn that has had its one pick-up (it can't move again): a small gold dot in its corner; the same on a bench slot whose pawn's next placement is final. */
-.ac-fixed::after,
-.ac-slot.fixed::after {
-  content: "";
+/*
+ * The shop's offers on the board (v6): each a glowing silhouette of its piece, on its square. A soft green with a dark green edge
+ * and a green glow, so it reads on the classic, green and gold squares alike. The shape is the board's own white piece used as a
+ * mask (the glow is on the box around it, as a filter on the masked element itself would be masked away). Two or more offers on
+ * one square sit side by side, each a share of the square's width (--n offers, this one the --i-th).
+ */
+.ac-offers {
   position: absolute;
-  right: 12%;
-  bottom: 12%;
-  width: 16%;
-  height: 16%;
-  min-width: 6px;
-  min-height: 6px;
-  border-radius: 50%;
-  background: var(--fd-gold);
-  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.45);
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
+  pointer-events: none;
 }
-.ac-slot.fixed::after {
-  right: 6px;
-  bottom: 6px;
+.ac-sil {
+  position: absolute;
+  top: 50%;
+  left: calc(100% * var(--i, 0) / var(--n, 1));
+  width: calc(100% / var(--n, 1));
+  aspect-ratio: 1;
+  transform: translateY(-50%);
+  filter: drop-shadow(0 0 0.7px #04361a) drop-shadow(0 0 0.7px #04361a) drop-shadow(0 0 5px rgba(64, 255, 120, 0.95));
+  animation: ac-appear 160ms ease-out;
+}
+.ac-sil-shape {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #c4f9cf;
+  -webkit-mask: var(--shape) center / contain no-repeat;
+  mask: var(--shape) center / contain no-repeat;
+}
+.ac-sil-shape.pawn {
+  --shape: url("./board/pieces/cburnett/Chess_plt45.svg");
+}
+.ac-sil-shape.knight {
+  --shape: url("./board/pieces/cburnett/Chess_nlt45.svg");
+}
+.ac-sil-shape.bishop {
+  --shape: url("./board/pieces/cburnett/Chess_blt45.svg");
+}
+.ac-sil-shape.rook {
+  --shape: url("./board/pieces/cburnett/Chess_rlt45.svg");
+}
+.ac-sil-shape.queen {
+  --shape: url("./board/pieces/cburnett/Chess_qlt45.svg");
+}
+/* An offer you can't buy now: dim and without the glow. */
+.ac-sil.off {
+  opacity: 0.45;
+  filter: drop-shadow(0 0 0.7px #1b2a20);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-sil {
+    animation: none;
+  }
 }
 .ac-dot::after {
   content: "";
@@ -17797,7 +17835,8 @@ button.sq-tiny {
   pointer-events: none;
 }
 .ac-msg {
-  height: 32px;
+  /* (The message line is 32 px and the bench 44 under it: the bench comes back in v6's second step, so for now the line holds its room.) */
+  height: 80px;
   display: flex;
   align-items: center;
   gap: 8px;
