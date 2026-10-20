@@ -36,7 +36,7 @@ import { clockWords, damageWords, endWords, goldWords, headline, matchWords, mov
  * Auto chess, the demo (/autochess; docs/decisions/2026-10-19-autochess-demo.md, docs/areas/autochess.md): you against a
  * bot, all in this browser. Each round the game puts both kings down; the shop offers pieces, each with a square of your half
  * (30 s, the last 3 locked) while the bot's pieces show as plain circles 2 s behind; then their real pieces show and you get
- * one chess move (15 s); then the engine plays both armies out. The rules are in `autochess/` (pure, tested); this draws
+ * one change (5 s: a piece to any empty square of your half); then the engine plays both armies out. The rules are in `autochess/` (pure, tested); this draws
  * them. Nothing is recorded, rewarded or sent anywhere.
  */
 
@@ -122,11 +122,12 @@ function newGame(seed: number, cfg: AutoChessSettings): Game {
 }
 
 /** A phone's short steps for tests (`?quick=1`, a test switch): the same game in a few seconds a step. */
-function settingsFor(quick: boolean, gold: number): AutoChessSettings {
+function settingsFor(quick: boolean, gold: number, adjust: boolean): AutoChessSettings {
   // (Two seconds locked, so a test has time to try buying in the lock before the reveal.)
-  const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, revealSeconds: 1.5, adjustSeconds: 5, fightMoveMs: 60, fightFastMoveMs: 30 } : AUTOCHESS;
-  // (`?gold=N`: N more gold at the start of round 1, to try a big army.)
-  return gold > 0 ? { ...base, startGold: base.startGold + gold } : base;
+  const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, revealSeconds: 1.5, adjustSeconds: 8, fightMoveMs: 60, fightFastMoveMs: 30 } : AUTOCHESS;
+  // (`?gold=N`: N more gold at the start of round 1, to try a big army; `?adjust=0`: no adjust step, straight to the fight.)
+  const out = gold > 0 ? { ...base, startGold: base.startGold + gold } : base;
+  return adjust ? out : { ...out, adjustStep: false };
 }
 
 const colorName = (c: Color) => (c === "w" ? "White" : "Black");
@@ -176,7 +177,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const params = testParams();
   const quick = params.get("quick") === "1";
   const extraGold = Math.max(0, Math.floor(Number(params.get("gold")) || 0));
-  const cfg = useMemo(() => settingsFor(quick, extraGold), []);
+  const cfg = useMemo(() => settingsFor(quick, extraGold, params.get("adjust") !== "0"), []);
   const seedParam = Number(params.get("seed"));
   const [game, setGame] = useState<Game>(() => newGame(Number.isFinite(seedParam) && params.get("seed") ? seedParam : (Math.random() * 2 ** 31) | 0, cfg));
   const gref = useRef(game);
@@ -244,7 +245,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
 
   // ---------------- The steps ----------------
 
-  /** The buying is over: their real pieces show (as they were when it locked), and your pieces may move once each. */
+  /** The buying is over: their real pieces show (as they were when it locked), and you may move one piece. With the adjust step off, straight to the fight. */
   function toAdjust() {
     const cur = gref.current;
     if (cur.phase !== "buy") return;
@@ -263,9 +264,13 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       bot: { ...cur.match.bot, gold: cur.match.bot.gold - cur.round.plan.spent + bonusFor(locks, "bot", cfg), bench: botStart.bench, level: cur.round.plan.level.level, xp: cur.round.plan.level.xp },
     };
     commit({ ...cur, match, phase: "adjust", phaseStart: performance.now(), round: { ...cur.round, locks, adj: startAdjust(you), botStart } });
-    // The bot adjusts out of sight, from your army as it stood when it locked, and its moves show at the fight.
+    // The bot adjusts out of sight, from your army as it stood when it locked, and its change shows at the fight.
     const run: BotRun = { stop: false, done: null, latest: botStart };
     botRun.current = run;
+    if (!cfg.adjustStep) {
+      void toFight();
+      return;
+    }
     const seed = roundSeed(match);
     run.done = botAdjust(botStart, botEvaluator(you, other(youColor(match.round)), cfg), mulberry32(seed ^ 0x51ed270b), () => run.stop || cancelled.current, cfg, (army) => (run.latest = army)).then(
       () => undefined,
@@ -465,7 +470,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
 
   const adjusting = () => gref.current.phase === "adjust" && performance.now() - gref.current.phaseStart < cfg.adjustSeconds * 1000;
 
-  /** Your one chess move. */
+  /** Your one change: a piece of yours to any legal empty square of your half. */
   function adjustTo(from: string, to: string) {
     if (!adjusting()) return;
     const cur = gref.current;
@@ -513,6 +518,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       if (isHeld(hold)) return placeHeldAt(hold.at.held);
       if (hold.kind === "k") return say("Your king is placed by the game.");
     } else if (!adjusting()) return;
+    if (phase === "adjust" && hold.kind === "k") return say(adjustWords("kingfixed", cfg));
     if (phase === "adjust") {
       const adj = gref.current.round.adj!;
       // (A piece you moved takes its move back when tapped.)
@@ -686,7 +692,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
         ? "You're locked in. Your board and shop are frozen until the step ends."
         : "Tap an offer to buy it: it lands on its square. Drag one to the bench to hold it."
       : g.phase === "adjust"
-        ? "One chess move. Tap a piece, then a square."
+        ? "Move one piece to any empty square of your half. Tap a piece, then a square."
         : g.phase === "fight"
           ? moveWords(g.fight?.plies ?? 0, cfg)
           : "";

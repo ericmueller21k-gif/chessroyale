@@ -311,9 +311,10 @@ describe("auto chess: the bot", () => {
     }
   });
 
-  it("adjusts greedily: its one move is kept only when the position scores better than standing still, and there is only one", async () => {
+  it("adjusts greedily: its one change (a piece to any legal empty square) is kept only when the position scores better than standing still, and there is only one", async () => {
     const army: Army = { color: "w", king: "e1", board: { a2: "p", b2: "p", g1: "n" }, bench: [] };
-    const wide = { ...AUTOCHESS, bot: { ...AUTOCHESS.bot, adjustDestinations: 8 } };
+    // (Every square of the half is a destination now, so a scorer that likes one is found by looking at all of them.)
+    const wide = { ...AUTOCHESS, bot: { ...AUTOCHESS.bot, adjustDestinations: 40, adjustTries: 200 } };
     const changed = (a: Army) => Object.entries(a.board).filter(([sq, k]) => army.board[sq] !== k).length + (a.king !== army.king ? 1 : 0);
     // A scorer that likes the knight on f3 and nothing else.
     const calls: Army[] = [];

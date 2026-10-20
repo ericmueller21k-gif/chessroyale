@@ -4,7 +4,7 @@ import { BOARD_SEL, asAdmin, named, test } from "./helpers.ts";
 /**
  * Auto chess, the demo (/autochess; docs/areas/autochess.md; shelved: Settings' Testing section, for admins, opens it): a
  * round is played from buying to the fight's end, on a phone and a computer. `?quick=1` (a test switch) shortens the steps (buy 7 s with the last
- * 2 locked, circles half a second behind, adjust 5 s, a fight move every 60 ms); `?seed=` fixes the kings, the shop and the bot.
+ * 2 locked, circles half a second behind, a reveal every 1.5 s, adjust 8 s, a fight move every 60 ms); `?adjust=0` turns the adjust step off; `?seed=` fixes the kings, the shop and the bot.
  */
 const phone = () => test.info().project.name === "phone";
 // (A tap or click that finds nothing fails in seconds, not at the test's end.)
@@ -658,7 +658,7 @@ test("a drag with a finger: a placed piece onto the shop row sells it", async ({
   expect(errors).toEqual([]);
 });
 
-test("the reveal: their real pieces show, stay shown through the adjust step; one chess move in all: an illegal one refused, a second refused, the move taken back, the king may take it", async ({ page }) => {
+test("the reveal: their full board shows and stays through the adjust step; one change: a piece to any legal empty square of your half, the refusals say why, a second is refused, it can be taken back, the king stays", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(LATE);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -680,48 +680,105 @@ test("the reveal: their real pieces show, stay shown through the adjust step; on
   // (The line is plain: no blur over their half.)
   expect(await page.locator(".ac-theirs-line").evaluate((el) => getComputedStyle(el).filter + getComputedStyle(el).backdropFilter)).toBe("nonenone");
   await expect(page.locator(".ac-clock span")).toHaveText("Move");
-  await expect(page.locator(".ac-card-say")).toHaveText("One chess move. Tap a piece, then a square.");
+  await expect(page.locator(".ac-card-say")).toHaveText("Move one piece to any empty square of your half. Tap a piece, then a square.");
 
-  // An illegal move is refused (a pawn onto a square it can't reach), and nothing is used up.
-  await tapSquare(page, "g2");
-  await tapSquare(page, "e4");
-  await expect(page.locator(".ac-card-say")).toContainText("That piece can't move there");
-  await expect(piece(page, "white", "pawn", "g2")).toBeVisible();
-  await expect(page.locator(".ac-moved")).toHaveCount(0);
-  // Your one move: the pawn on its start rank pushes two (a dot on each square, then the move), and is marked.
-  await tapSquare(page, "f2");
-  await expect(page.locator(".ac-dot")).toHaveCount(2);
-  await tapSquare(page, "f4");
-  await expect(piece(page, "white", "pawn", "f4")).toBeVisible();
-  await expect(page.locator('.ac-moved[data-square="f4"]')).toBeVisible();
+  // Refused, each with its reason, and nothing is used up: their half, a taken square, the king's square, your back rank (for a pawn).
+  // (Dragged: a tap on a square with one of your pieces, the king too, picks that one up instead.)
+  const refused = async (to: string, words: string) => {
+    await dragMouse(page, await center(page, "g2"), await center(page, to));
+    await expect(page.locator(".ac-card-say")).toContainText(words);
+    await expect(piece(page, "white", "pawn", "g2")).toBeVisible();
+    await expect(page.locator(".ac-moved")).toHaveCount(0);
+  };
+  await refused("e6", "Pieces go on your half of the board.");
+  await refused("f2", "That square is taken.");
+  await refused("c1", "That's your king's square.");
+  await refused("a1", "Pawns can't stand on your back rank.");
+  // Your one change: not a chess move. The pawn on g2 (picked up by the last drag) may go to any empty square of ranks 2 to 4: 24 less the two
+  // pawns' squares, 22 dots; here to h4 by a tap.
+  await expect(page.locator(".ac-dot")).toHaveCount(22);
+  await tapSquare(page, "h4");
+  await expect(piece(page, "white", "pawn", "h4")).toBeVisible();
+  await expect(piece(page, "white", "pawn", "g2")).toHaveCount(0);
+  await expect(page.locator('.ac-moved[data-square="h4"]')).toBeVisible();
   // The opponent's pieces haven't changed meanwhile, and are still shown.
   await expect(page.locator(`${BOARD_SEL.piece}.black`)).toHaveCount(theirs);
-  // One move in all: no other piece may move now, nor the same one again.
+  // One change in all: no other piece may move now, nor the same one again.
   const used = "You've made your move. Tap the piece you moved (↩) to take it back.";
-  await tapSquare(page, "g2");
+  await tapSquare(page, "f2");
   await expect(page.locator(".ac-dot")).toHaveCount(0);
-  await tapSquare(page, "g3");
+  await tapSquare(page, "f3");
   await expect(page.locator(".ac-card-say")).toContainText(used);
-  await expect(piece(page, "white", "pawn", "g2")).toBeVisible();
-  await dragMouse(page, await center(page, "f4"), await center(page, "f5"));
-  await expect(page.locator(".ac-card-say")).toContainText(used);
-  await expect(piece(page, "white", "pawn", "f4")).toBeVisible();
-  await expect(page.locator(".ac-moved")).toHaveCount(1);
-  // A tap on the moved piece takes its move back.
-  await tapSquare(page, "f4");
   await expect(piece(page, "white", "pawn", "f2")).toBeVisible();
-  await expect(page.locator(".ac-moved")).toHaveCount(0);
-  // The king may take the one move too, and takes it back.
-  await tapSquare(page, "c1");
-  expect(await page.locator(".ac-dot").count()).toBeGreaterThan(1);
-  await tapSquare(page, "c2");
-  await expect(piece(page, "white", "king", "c2")).toBeVisible();
+  await dragMouse(page, await center(page, "h4"), await center(page, "h3"));
+  await expect(page.locator(".ac-card-say")).toContainText(used);
+  await expect(piece(page, "white", "pawn", "h4")).toBeVisible();
   await expect(page.locator(".ac-moved")).toHaveCount(1);
-  await tapSquare(page, "c2");
-  await expect(piece(page, "white", "king", "c1")).toBeVisible();
+  // A tap on the moved piece takes its move back; then the other pawn may use the change (by a drag, this time).
+  await tapSquare(page, "h4");
+  await expect(piece(page, "white", "pawn", "g2")).toBeVisible();
   await expect(page.locator(".ac-moved")).toHaveCount(0);
+  await dragMouse(page, await center(page, "f2"), await center(page, "a4"));
+  await expect(piece(page, "white", "pawn", "a4")).toBeVisible();
+  await tapSquare(page, "a4");
+  await expect(piece(page, "white", "pawn", "f2")).toBeVisible();
+  // The king stays where the game put it: no squares to go to, and it says so.
+  await tapSquare(page, "c1");
+  await expect(page.locator(".ac-dot")).toHaveCount(0);
+  await expect(page.locator(".ac-card-say")).toContainText("Your king stays where the game put it.");
+  await expect(piece(page, "white", "king", "c1")).toBeVisible();
   // Their pieces were shown all through.
   await expect(page.locator(`${BOARD_SEL.piece}.black`)).toHaveCount(theirs);
+  expect(errors).toEqual([]);
+});
+
+test("the adjust step is 5 seconds, then the fight; with the step off (?adjust=0) the buy step goes straight to the fight", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  // (Seed 11: the opponent locks in at about 8.7 s of the 30; locking in after it ends the buy step at once.)
+  await page.goto("/autochess?seed=11");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  await page.evaluate(() => {
+    const root = document.querySelector<HTMLElement>(".ac-root")!;
+    const marks: { phase: string; at: number }[] = [{ phase: root.dataset.phase!, at: performance.now() }];
+    (window as any).__phases = marks;
+    new MutationObserver(() => {
+      if (marks[marks.length - 1]!.phase !== root.dataset.phase) marks.push({ phase: root.dataset.phase!, at: performance.now() });
+    }).observe(root, { attributes: true, attributeFilter: ["data-phase"] });
+  });
+  await expect(page.locator(".ac-bot-locked")).toBeVisible({ timeout: 20_000 });
+  await tap(page, lockButton(page));
+  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 2000 });
+  // The clock starts at 0:05 (it rounds up), and the fight comes 5 seconds after the step began.
+  await expect(page.locator(".ac-clock b")).toHaveText(/^0:0[45]$/);
+  await expect(root(page)).toHaveAttribute("data-phase", /^(fight|result)$/, { timeout: 8000 });
+  const marks = await page.evaluate(() => (window as any).__phases as { phase: string; at: number }[]);
+  const adjust = marks.find((m) => m.phase === "adjust")!;
+  const next = marks.find((m) => m.at > adjust.at && m.phase !== "adjust")!;
+  expect((next.at - adjust.at) / 1000).toBeGreaterThan(4.9);
+  expect((next.at - adjust.at) / 1000).toBeLessThan(5.6);
+
+  // The step off: buy, then the fight (never the adjust step), with both boards in full from the first move.
+  await page.goto("/autochess?quick=1&seed=11&adjust=0");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  await page.evaluate(() => {
+    const root = document.querySelector<HTMLElement>(".ac-root")!;
+    const seen: string[] = [root.dataset.phase!];
+    (window as any).__seen = seen;
+    new MutationObserver(() => {
+      if (seen[seen.length - 1] !== root.dataset.phase) seen.push(root.dataset.phase!);
+    }).observe(root, { attributes: true, attributeFilter: ["data-phase"] });
+  });
+  await tap(page, card(page, 4));
+  await expect(root(page)).toHaveAttribute("data-phase", /^(fight|result)$/, { timeout: 15_000 });
+  await expect(page.locator(".ac-theirs-line")).toHaveCount(0);
+  const seen = await page.evaluate(() => (window as any).__seen as string[]);
+  expect(seen).not.toContain("adjust");
+  expect(seen[0]).toBe("buy");
+  expect(seen[1]).toBe("fight");
+  // Their pieces are all real for the fight (no circle is left).
+  await expect(page.locator(".ac-circle")).toHaveCount(0);
+  expect(await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count()).toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });
 

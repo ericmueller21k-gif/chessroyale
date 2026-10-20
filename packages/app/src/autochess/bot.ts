@@ -195,9 +195,9 @@ export function botAt(events: readonly BotEvent[], seconds: number): { squares: 
 }
 
 /**
- * The bot's adjust step: its one chess move, picked greedily with `evaluate` (its chance of winning, 0 to 1, from a small
- * engine search of the position the fight would start from): it tries a few moves (a few squares for each of some pieces) and
- * keeps the best only if it beats standing still. A small search by design: it shouldn't be unbeatable. `stop` ends it early (the
+ * The bot's adjust step: its one change (one of its pieces to any legal empty square of its half), picked greedily with `evaluate`
+ * (its chance of winning, 0 to 1, from a small engine search of the position the fight would start from): it tries a few changes
+ * (a few random squares for each of some pieces) and keeps the best only if it beats standing still. A small search by design: it shouldn't be unbeatable. `stop` ends it early (the
  * step is over); what it has done by then stands. `onChange`: told of the army after the change it keeps (so a slow engine
  * loses it nothing).
  */
@@ -213,7 +213,7 @@ export async function botAdjust(
   const best = await evaluate(state.army);
   let tries = 0;
   let pick: { from: string; to: string; score: number } | null = null;
-  search: for (const from of shuffle(rng, [army.king, ...Object.keys(army.board)])) {
+  search: for (const from of shuffle(rng, Object.keys(army.board))) {
     for (const to of shuffle(rng, adjustTargets(state.army, from)).slice(0, cfg.bot.adjustDestinations)) {
       if (stop() || tries >= cfg.bot.adjustTries) break search;
       if (adjustBlock(state, from, to, cfg)) continue;

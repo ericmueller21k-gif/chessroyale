@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AUTOCHESS } from "@chessroyale/core";
+import { AUTOCHESS, mulberry32 } from "@chessroyale/core";
 import { stockfishRefuses } from "@chessroyale/chess";
 import {
   boardCount,
@@ -262,89 +262,117 @@ describe("auto chess: the board's room (the level)", () => {
   });
 });
 
-describe("auto chess: the adjust step", () => {
+describe("auto chess: the adjust step (v6): one change, any legal empty square of your half", () => {
   const w = army("w", "e1", { a2: "p", a3: "p", b2: "p", c3: "n", d1: "q", a1: "r", f1: "b" });
-  it("a pawn pushes one, or two from its start rank when both are empty; a blocked pawn can't", () => {
-    expect(adjustTargets(w, "b2").sort()).toEqual(["b3", "b4"]);
-    // a2 is blocked by a3; a3 can step to a4.
-    expect(adjustTargets(w, "a2")).toEqual([]);
-    expect(adjustTargets(w, "a3")).toEqual(["a4"]);
-    // The last square of the half: the next is theirs.
-    expect(adjustTargets(army("w", "e1", { a4: "p" }), "a4")).toEqual([]);
-    expect(adjustTargets(army("w", "e1", { a3: "p" }), "a3")).toEqual(["a4"]);
-    // Black's go the other way: two from the seventh rank.
-    expect(adjustTargets(army("b", "e8", { c7: "p" }), "c7").sort()).toEqual(["c5", "c6"]);
-    expect(adjustTargets(army("b", "e8", { c5: "p" }), "c5")).toEqual([]);
-    // A pawn two from its start square isn't blocked by the king.
-    expect(adjustTargets(army("w", "b3", { b2: "p" }), "b2")).toEqual([]);
+
+  it("a piece may go to any empty square of its half where it may stand: not a chess move (a knight to the far corner), never the king's or a taken square", () => {
+    // The knight: every empty square of the half but its own, the king's and the six taken ones: 32 - 1 (e1) - 7 (all seven of yours) = 24.
+    const knight = adjustTargets(w, "c3");
+    expect(knight).toHaveLength(24);
+    expect(knight).toEqual(expect.arrayContaining(["h4", "h1", "a4", "g2"]));
+    for (const sq of ["e1", "c3", "a2", "a3", "b2", "d1", "a1", "f1"]) expect(knight).not.toContain(sq);
+    expect(knight.every((sq) => inHalf(sq, "w"))).toBe(true);
+    // The rook and queen and bishop are not shut in or held to their lines either.
+    expect(adjustTargets(w, "a1")).toHaveLength(24);
+    expect(adjustTargets(w, "d1")).toContain("h4");
+    expect(adjustTargets(w, "f1")).toContain("b4");
+    // Black's half is ranks 5 to 8.
+    const black = adjustTargets(army("b", "e8", { c7: "n" }), "c7");
+    expect(black).toHaveLength(32 - 1 - 1);
+    expect(black.every((sq) => inHalf(sq, "b"))).toBe(true);
+    expect(black).toContain("a8");
+    expect(black).not.toContain("e8");
   });
 
-  it("in a stack of pawns only the front one has a push (and a full file of three, ranks 2 to 4, has none: the next square is theirs)", () => {
-    const stack = army("w", "e1", { f2: "p", f3: "p" });
-    expect(adjustTargets(stack, "f2")).toEqual([]);
-    expect(adjustTargets(stack, "f3")).toEqual(["f4"]);
-    const full = army("w", "e1", { f2: "p", f3: "p", f4: "p" });
-    for (const sq of ["f2", "f3", "f4"]) expect(adjustTargets(full, sq)).toEqual([]);
+  it("a pawn goes to your 2nd to 4th rank, never your back rank, and not onto a file of three", () => {
+    const pawn = adjustTargets(w, "b2");
+    expect(pawn.every((sq) => ["2", "3", "4"].includes(sq[1]!))).toBe(true);
+    expect(pawn).toEqual(expect.arrayContaining(["h4", "b3", "b4", "e3"]));
+    expect(pawn).not.toContain("b1");
+    // (Ranks 2 to 4 are 24 squares; a2, a3, b2 (itself), c3 are taken: 24 - 4 = 20; b2 itself is excluded: 20.)
+    expect(pawn).toHaveLength(20);
+    // A black pawn: ranks 5 to 7.
+    expect(adjustTargets(army("b", "e8", { c7: "p" }), "c7").every((sq) => ["5", "6", "7"].includes(sq[1]!))).toBe(true);
+    // The file limit (a setting of two a file for this check): a pawn can't join a full file, but may move within its own.
+    const two = { ...AUTOCHESS, pawnsPerFile: 2 };
+    const pair = army("w", "e1", { a2: "p", a3: "p", b2: "p" });
+    expect(adjustTargets(pair, "b2", two).some((sq) => sq[0] === "a")).toBe(false);
+    expect(adjustTargets(pair, "b2").some((sq) => sq[0] === "a")).toBe(true);
+    expect(adjustBlock(startAdjust(pair), "b2", "a4", two)).toBe("file");
+    expect(adjustBlock(startAdjust(pair), "a2", "a4", two)).toBeNull();
   });
 
-  it("a knight jumps, a bishop and a rook slide until something stands in the way, nothing leaves the half or captures", () => {
-    // The knight on c3: a4, b1, d5(off: rank 5), e4, e2, a2(taken), b5(off), d1(taken).
-    expect(adjustTargets(w, "c3").sort()).toEqual(["a4", "b1", "e2", "e4"]);
-    // The bishop on f1: g2, h3 and e2, d3 (c4 is the last in the half), nothing past it.
-    expect(adjustTargets(w, "f1").sort()).toEqual(["c4", "d3", "e2", "g2", "h3"]);
-    // The rook on a1 is shut in by a2 and (b1 empty) c1... b1, c1 free, d1 has the queen.
-    expect(adjustTargets(w, "a1").sort()).toEqual(["b1", "c1"]);
-    // The queen on d1: along the rank to e1? that's the king: blocked; c1, b1; up the file to d4; diagonals.
-    expect(adjustTargets(w, "d1")).toEqual(expect.arrayContaining(["c1", "b1", "d2", "d3", "d4", "e2", "f3", "g4"]));
-    expect(adjustTargets(w, "d1")).not.toContain("e1");
-    expect(adjustTargets(w, "d1")).not.toContain("d5");
-    for (const sq of ["c3", "f1", "a1", "d1"]) for (const t of adjustTargets(w, sq)) expect(inHalf(t, "w")).toBe(true);
+  it("the king stays where the game put it: it has no targets and can't be moved", () => {
+    expect(adjustTargets(w, "e1")).toEqual([]);
+    expect(adjustBlock(startAdjust(w), "e1", "e2")).toBe("kingfixed");
+    expect(adjustWords("kingfixed")).toBe("Your king stays where the game put it.");
+    expect(adjustTargets(w, "h3")).toEqual([]);
   });
 
-  it("the king may step once, onto an empty square of its half", () => {
-    expect(adjustTargets(army("w", "e4"), "e4").sort()).toEqual(["d3", "d4", "e3", "f3", "f4"]);
-    expect(adjustTargets(army("b", "h8"), "h8").sort()).toEqual(["g7", "g8", "h7"]);
-  });
-
-  it("one chess move in all (any piece): after it every other move, and a second move of the same piece, is refused; it can be taken back", () => {
+  it("one change in all: after it every other move, and a second move of the same piece, is refused; it can be taken back, and then any piece may go", () => {
     expect(AUTOCHESS.adjustMoves).toBe(1);
     let s = startAdjust(w);
-    expect(adjustBlock(s, "b2", "b4")).toBeNull();
+    expect(adjustBlock(s, "c3", "h4")).toBeNull();
     expect(adjustBlock(s, "h3", "h4")).toBe("none");
-    expect(adjustBlock(s, "c3", "c4")).toBe("illegal");
-    expect(adjustBlock(s, "c3", "e5")).toBe("illegal");
-    s = adjustMove(s, "b2", "b4");
-    expect(s.army.board.b4).toBe("p");
-    expect(s.army.board.b2).toBeUndefined();
-    expect(s.actions).toEqual([{ type: "move", from: "b2", to: "b4" }]);
-    expect(adjustMarks(s)).toEqual([{ square: "b4", action: "move" }]);
+    // Refused with the square's own reason: their half, the king's square, a taken square, a pawn on your back rank.
+    expect(adjustBlock(s, "c3", "e5")).toBe("half");
+    expect(adjustBlock(s, "c3", "e1")).toBe("king");
+    expect(adjustBlock(s, "c3", "a2")).toBe("taken");
+    expect(adjustBlock(s, "b2", "c1")).toBe("backrank");
+    expect(adjustWords("half")).toBe("Pieces go on your half of the board.");
+    expect(adjustWords("king")).toBe("That's your king's square.");
+    expect(adjustWords("taken")).toBe("That square is taken.");
+    expect(adjustWords("backrank")).toBe("Pawns can't stand on your back rank.");
+    s = adjustMove(s, "c3", "h4");
+    expect(s.army.board.h4).toBe("n");
+    expect(s.army.board.c3).toBeUndefined();
+    expect(s.army.king).toBe("e1");
+    expect(s.actions).toEqual([{ type: "move", from: "c3", to: "h4" }]);
+    expect(adjustMarks(s)).toEqual([{ square: "h4", action: "move" }]);
     expect(movesUsed(s)).toBe(1);
-    // No second move: not by another piece, not by the same one, not by the king.
-    expect(adjustBlock(s, "c3", "e4")).toBe("used");
-    expect(adjustBlock(s, "b4", "b5")).toBe("used");
-    expect(adjustBlock(s, "e1", "e2")).toBe("used");
+    // No second change: not by another piece, not by the same one.
+    expect(adjustBlock(s, "b2", "b4")).toBe("used");
+    expect(adjustBlock(s, "h4", "h3")).toBe("used");
     expect(adjustWords("used")).toBe("You've made your move. Tap the piece you moved (↩) to take it back.");
-    // Taken back, the move is free again, for any piece.
-    expect(undoBlock(s, "b4")).toBeNull();
-    const undone = undoAction(s, "b4");
+    // Taken back, the change is free again, for any piece.
+    expect(undoBlock(s, "h4")).toBeNull();
+    const undone = undoAction(s, "h4");
     expect(undone.army).toEqual(w);
     expect(undone.actions).toEqual([]);
-    expect(adjustBlock(undone, "c3", "e4")).toBeNull();
-    expect(undoBlock(s, "h4")).toBe("none");
-    // The king is a piece: it may take the one move (a step onto an empty square of its half).
-    const k = adjustMove(startAdjust(army("w", "e1", { a3: "p" })), "e1", "e2");
-    expect(k.army.king).toBe("e2");
-    expect(adjustBlock(k, "a3", "a4")).toBe("used");
-    expect(undoAction(k, "e2").army.king).toBe("e1");
+    expect(adjustBlock(undone, "b2", "b4")).toBeNull();
+    expect(undoBlock(s, "h3")).toBe("none");
     // The number is a setting.
     const two = { ...AUTOCHESS, adjustMoves: 2 };
-    expect(adjustBlock(adjustMove(startAdjust(w), "b2", "b4"), "c3", "e4", two)).toBeNull();
-    expect(adjustBlock(adjustMove(adjustMove(startAdjust(w), "b2", "b4"), "c3", "e4"), "d1", "c1", two)).toBe("used");
-    // Two moves, the first taken back needs the second's square free: a later move that stands on it comes first.
+    expect(adjustBlock(adjustMove(startAdjust(w), "c3", "h4"), "b2", "b4", two)).toBeNull();
+    expect(adjustBlock(adjustMove(adjustMove(startAdjust(w), "c3", "h4"), "b2", "b4"), "d1", "d2", two)).toBe("used");
+    // Two changes, the first taken back needs a later change that stands on its square to come first.
     const chain = adjustMove(adjustMove(startAdjust(army("w", "e1", { a2: "p" })), "a2", "a3"), "a3", "a4");
     expect(adjustMarks(chain)).toEqual([{ square: "a4", action: "move" }]);
     expect(undoBlock(chain, "a3")).toBe("none");
     expect(undoWords("needed")).toBe("Take back your other move first.");
+  });
+
+  it("the position after the change is always a legal army: the pawn and piece limits hold, whatever is moved where (a fuzz of a few hundred changes)", () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const rng = mulberry32(seed);
+      const kingAt = kingSquares(seed).w;
+      let a = emptyArmy("w", kingAt);
+      const kinds: Kind[] = ["p", "p", "p", "n", "b", "r", "q", "p"];
+      for (const kind of kinds) {
+        const free = usableSquares(a, kind);
+        if (free.length) a = buyOffer(a, { kind, square: free[Math.floor(rng() * free.length)]! });
+      }
+      const pieces = Object.keys(a.board);
+      const from = pieces[Math.floor(rng() * pieces.length)]!;
+      const targets = adjustTargets(a, from);
+      expect(targets.length).toBeGreaterThan(0);
+      const to = targets[Math.floor(rng() * targets.length)]!;
+      const after = adjustMove(startAdjust(a), from, to).army;
+      expect(Object.values(after.board).sort()).toEqual(Object.values(a.board).sort());
+      expect(after.board).not.toHaveProperty(kingAt);
+      expect(legalCounts(owned(after))).toBe(true);
+      for (const [sq, kind] of Object.entries(after.board)) expect(squareBlock({ ...after, board: Object.fromEntries(Object.entries(after.board).filter(([s]) => s !== sq)) }, kind, sq)).toBeNull();
+    }
   });
 });
 

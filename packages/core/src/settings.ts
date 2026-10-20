@@ -2717,7 +2717,12 @@ export interface AutoChessSettings {
   readonly circlesDelaySeconds: number;
   /** While you buy, one of their pieces (a circle, a pawn too) is revealed at random every this many seconds, and stays shown (v6, Eric Oct 20: 5 s, so 5 in the 30). */
   readonly revealSeconds: number;
-  /** The reveal and adjust step (v5): this many chess moves in all (any piece). */
+  /**
+   * The adjust step (v6, Eric Oct 20): `adjustSeconds` long, with their full board shown, in which you make `adjustMoves` change (move
+   * one of your pieces to any legal empty square of your half: not a chess move), hidden from them until the fight. `adjustStep`
+   * false turns the step off (straight to the fight): "we could test it out" both ways (`?adjust=0` in the address, for testers).
+   */
+  readonly adjustStep: boolean;
   readonly adjustSeconds: number;
   readonly adjustMoves: number;
   /**
@@ -2813,7 +2818,8 @@ export const AUTOCHESS: AutoChessSettings = {
   lockSeconds: 3,
   circlesDelaySeconds: 2,
   revealSeconds: 5,
-  adjustSeconds: 15,
+  adjustStep: true,
+  adjustSeconds: 5,
   adjustMoves: 1,
   levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
   kingRanks: 2,
