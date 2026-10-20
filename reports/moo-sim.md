@@ -1,8 +1,9 @@
 # Moo & Moon's calibration: Moonbeam and the Full Moon (Oct 20, 2026)
 
 Moo & Moon (id `moo`; docs/decisions/2026-10-20-moo-rules.md). From the game so far. **Moonbeam:** after every 3rd
-move of his, at the end of his turn, a beam stuns one of the crowd's pieces (the one in its engine-best move after his
-move) for the crowd's next turn. **Full Moon** (the rage meter): at the start of his turn he transforms; his next 5
+move of his, at the end of his turn, a beam stuns one of the crowd's pieces for the crowd's next turn: one of its pieces
+with a move, at random (`moonbeamTarget` "random", shipped; the first runs, mooA and mooR5, took the piece in its
+engine-best move after his, "best"). **Full Moon** (the rage meter): at the start of his turn he transforms; his next 5
 moves are the engine's best at full strength, the first ending with a flurry of 5 beams; then he's dazed and himself
 again.
 

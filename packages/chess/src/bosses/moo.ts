@@ -103,6 +103,20 @@ export function beamOrder(fen: string, crowd: Side, lines: readonly string[] | n
 }
 
 /**
+ * A stunned piece can't take part in `move` (`fen`: before it): the piece moving is held, or the move is castling and
+ * the rook it moves is held (its corner on the king's rank: the h-file for a king's step to the g-file, the a-file
+ * for one to the c-file).
+ */
+export function stunnedIn(fen: string, move: string, held: ReadonlySet<string> | readonly string[]): boolean {
+  const has = (sq: string) => ("has" in held ? held.has(sq) : held.includes(sq));
+  if (has(from(move))) return true;
+  const f0 = move.charCodeAt(0);
+  const f1 = move.charCodeAt(2);
+  if (Math.abs(f1 - f0) !== 2 || move[1] !== move[3] || pieceAt(fen, from(move))?.type !== "k") return false;
+  return has(`${f1 > f0 ? "h" : "a"}${move[1]}`);
+}
+
+/**
  * The squares `count` beams stun (beamOrder's, in turn), each kept only if the crowd still has a legal move with every
  * piece picked so far held: fewer when that runs out, none when no piece fits.
  */
@@ -113,7 +127,7 @@ export function chooseBeams(fen: string, crowd: Side, lines: readonly string[] |
   for (const sq of beamOrder(fen, crowd, lines, seed, at, target)) {
     if (picked.length >= count) break;
     const held = new Set([...picked, sq]);
-    if (legal.some((m) => !held.has(from(m)))) picked.push(sq);
+    if (legal.some((m) => !stunnedIn(fen, m, held))) picked.push(sq);
   }
   return picked;
 }
@@ -191,10 +205,10 @@ export const MOO: BossRules = {
   },
   // (Moonbeam works through his moves: afterBossMove.)
   passive() {},
-  // Stunned pieces can't move this turn (Ginger's frozen piece's way).
-  crowdFilter(allowed, boss) {
+  // Stunned pieces can't move this turn (Ginger's frozen piece's way), nor castle with a stunned rook (stunnedIn).
+  crowdFilter(allowed, boss, fen) {
     const stun = stunOn(mooOf(boss.powers), turnOf(boss));
-    return stun ? allowed.filter((m) => !stun.squares.includes(from(m))) : allowed;
+    return stun ? allowed.filter((m) => !stunnedIn(fen, m, stun.squares)) : allowed;
   },
   powerTurn: (boss) => !!stunOn(mooOf(boss.powers), turnOf(boss)),
   // The Full Moon: his moves are the engine's at full strength (the runner's "best").
@@ -240,7 +254,8 @@ export const mooBattle = {
     if (!boss || !p || boss.id !== "moo") return;
     let next = p.moo?.stun ? { ...p, moo: { ...p.moo, stun: null } } : p;
     const due = !!next.ultNext || (next.warnAt !== undefined && next.warnAt <= boss.crowdMoves);
-    if (next.ultAt === undefined && due && !boss.result && b.bossToMove()) {
+    // (Not once the battle is over: a result, a mate or stalemate, the move cap.)
+    if (next.ultAt === undefined && due && !boss.result && b.bossToMove() && boss.crowdMoves < b.settings.bossMaxMoves) {
       const { ultNext: _trigger, ...rest } = next;
       const events: PowerEvent[] = [...rest.events, { kind: "fullMoon", turn: rest.turn }];
       next = unleashed({ ...rest, ultAt: boss.crowdMoves, moo: { ...mooOf(rest), full: { at: boss.crowdMoves, left: Math.max(1, Math.round(s.fullMoonMoves)) } }, events });

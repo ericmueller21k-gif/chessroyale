@@ -25,6 +25,7 @@ import {
   rageOf,
   ragePaused,
   sideToMove,
+  stunnedIn,
   triggerUltimate,
   type Battle,
   type EngineLike,
@@ -171,6 +172,24 @@ describe("Moonbeam: its target, \"best\" (the engine-best move's piece)", () => 
     const check = "3R4/7k/8/8/8/8/6PP/r6K w - - 0 1";
     expect(legalMoves(check)).toEqual(["d8d1"]);
     expect(chooseBeams(check, "w", ["d8d1"], 1, 1, 3)).toEqual([]);
+  });
+
+  it("a stunned rook can't castle either: the king's castling move with it is left out, and counted out of the moves left", () => {
+    const fen = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4";
+    expect(legalMoves(fen)).toContain("e1g1");
+    expect(stunnedIn(fen, "e1g1", ["h1"])).toBe(true);
+    expect(stunnedIn(fen, "e1f1", ["h1"])).toBe(false);
+    expect(stunnedIn(fen, "e1g1", ["a1"])).toBe(false);
+    expect(stunnedIn(fen, "h1g1", new Set(["h1"]))).toBe(true);
+    // (Black's too: a8 for the c-file, h8 for the g-file.)
+    const black = "r3k2r/8/8/8/8/8/8/4K3 b kq - 0 1";
+    expect(stunnedIn(black, "e8c8", ["a8"])).toBe(true);
+    expect(stunnedIn(black, "e8g8", ["a8"])).toBe(false);
+    const boss = { id: "moo", crowdSide: "w", crowdMoves: 3, powers: { ...initPowers(1, fen, "w"), turn: 4, moo: { moves: 3, stun: { turn: 4, squares: ["h1"] }, full: null } } } as unknown as BossState;
+    const allowed = crowdAllowed(boss, fen)!;
+    expect(allowed).not.toContain("e1g1");
+    expect(allowed).not.toContain("h1g1");
+    expect(allowed).toContain("e1f1");
   });
 
   it("takes the next most useful piece when the first would leave no move", () => {
@@ -501,6 +520,22 @@ describe("Full Moon", () => {
     expect(next.powers!.ultNext).toBe(true);
     expect(next.powers!.events.some((e) => e.kind === "warn")).toBe(false);
     expect(next.powers!.ultAt).toBeUndefined();
+  });
+
+  it("not once the battle has reached its move cap", () => {
+    const fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";
+    const b = stub(fen, { moves: 39, stun: null, full: null }, 40);
+    expect(b.settings.bossMaxMoves).toBe(40);
+    b.state.boss!.powers = { ...b.state.boss!.powers!, warnAt: 40 };
+    expect(b.bossToMove()).toBe(true);
+    mooBattle.afterCrowdMove(b);
+    expect(b.state.boss!.powers!.ultAt).toBeUndefined();
+    expect(b.state.boss!.powers!.events.some((e) => e.kind === "fullMoon")).toBe(false);
+    // (One move earlier it comes.)
+    const c = stub(fen, { moves: 38, stun: null, full: null }, 39);
+    c.state.boss!.powers = { ...c.state.boss!.powers!, warnAt: 39 };
+    mooBattle.afterCrowdMove(c);
+    expect(c.state.boss!.powers!.ultAt).toBe(39);
   });
 
   it("not when the crowd's move ended the battle", () => {

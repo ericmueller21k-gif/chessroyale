@@ -10,7 +10,7 @@
  * measures every one), which "Your move." in front didn't leave room for.
  */
 import type { StopReason } from "@chessroyale/core";
-import { stopReason, type StopFields } from "@chessroyale/chess";
+import { stopReason, stunnedIn, type StopFields } from "@chessroyale/chess";
 
 /** How long a refused move's reason stays in the dock (unless the position changes first). */
 export const REFUSED_MS = 3000;
@@ -47,7 +47,8 @@ type BossLike = { id?: string; barred?: string | null; powers?: (StopFields & { 
 export function refusedLine(boss: BossLike, fen: string, move: string): string {
   if (boss.barred && boss.barred === move) return REFUSED.barred;
   if (boss.powers?.iced?.includes(move.slice(0, 2))) return REFUSED.frozen;
-  if (boss.powers?.stunned?.includes(move.slice(0, 2))) return REFUSED.stunned;
+  // (Moo's moonbeam: the stunned piece's own move, or castling with a stunned rook.)
+  if (boss.powers?.stunned?.length && stunnedIn(fen, move, boss.powers.stunned)) return REFUSED.stunned;
   const why = stopReason(boss, fen, move);
   return why ? REFUSED[why] : REFUSED_OTHER;
 }

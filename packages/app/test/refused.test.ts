@@ -62,3 +62,14 @@ describe("the dock's words", () => {
     }
   });
 });
+
+describe("Moo & Moon's moonbeam in the dock's words", () => {
+  it("the stunned piece's own move, and castling with a stunned rook: \"Moonlight holds that piece.\"", () => {
+    const fen = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4";
+    const boss = { id: "moo", powers: { stunned: ["h1"] } };
+    expect(refusedLine(boss, fen, "h1g1")).toBe(REFUSED.stunned);
+    expect(refusedLine(boss, fen, "e1g1")).toBe(REFUSED.stunned);
+    expect(REFUSED.stunned).toBe("Moonlight holds that piece.");
+  });
+});
+
