@@ -72,6 +72,18 @@ describe("the FAQ's contents", () => {
     expect(words).not.toMatch(/undefined|NaN|\$\{/);
   });
 
+  it("Moo & Moon's block (Moonbeam and the Full Moon) is ready for when his art is wired, every number from the settings", () => {
+    const def = BOSS_ROSTER.find((b) => b.id === "moo")!;
+    const words = BOSS_BLOCKS.moo!(BOSS_POWERS, def);
+    expect(words).toContain("from the game so far");
+    expect(words).toContain(`after every ${BOSS_POWERS.moonbeamEvery === 3 ? "3rd" : BOSS_POWERS.moonbeamEvery} move of his`);
+    expect(words).toContain("Never your king");
+    expect(words).toContain(`For ${BOSS_POWERS.fullMoonMoves} moves of his`);
+    expect(words).toContain(`a flurry: ${BOSS_POWERS.flurryBeams} moonbeams on ${BOSS_POWERS.flurryBeams} different pieces`);
+    expect(words).toContain(def.offset === 0 ? "at the usual strength" : `${Math.abs(def.offset)} ${def.offset < 0 ? "under" : "over"} the usual strength`);
+    expect(words).not.toMatch(/undefined|NaN|\$\{/);
+  });
+
   it("leaves no markup in the words", () => {
     const t = text();
     expect(t).not.toMatch(/\*\*|\]\(#|\{#|\$\{|undefined|NaN|null/);

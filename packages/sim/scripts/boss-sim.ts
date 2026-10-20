@@ -33,11 +33,15 @@
  * moves from the swap to it) and every Repaint tried (after which crowd move, the pairs he could paint, the pick's gain
  * in pawns, or none in the band: `waits`).
  *
+ * Moo & Moon (id moo): each row logs his Moonbeams (how many landed), each flurry's stunned count, and each Full Moon
+ * (after which crowd move it came, the crowd's material lead, in pawns, as it came and after his last move at full
+ * strength; null when the battle ended first) and his moves at full strength.
+ *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, PASS_WAIT, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, PASS_WAIT, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -308,6 +312,13 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       };
       // (Smudgy: every Repaint tried, and the turns none fitted.)
       const smudgy = { repaints: [] as { at: number; of: number; gain: number; pawn: string; piece: string; gains: number[] }[], waits: [] as { at: number; of: number; gains: number[] }[] };
+      // (Moo & Moon: his beams, each flurry's size, each Full Moon with the crowd's material lead as it came and after it.)
+      const moo = { beams: 0, flurries: [] as number[], moons: [] as { at: number; before: number; after: number | null }[], best: 0 };
+      const lead = () => {
+        const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+        const crowd = runner.boss!.crowdSide;
+        return materialOf(fen, crowd) - materialOf(fen, crowd === "w" ? "b" : "w");
+      };
       const t0 = Date.now();
       while (!runner.isOver()) {
         if (runner.stageComplete()) {
@@ -408,7 +419,19 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           // (Alfil's fusion is his move: then his turn is over.)
           if (runner.bossToMove()) {
             const at = runner.boss!.crowdMoves;
+            // (Moo: his Full Moon came as the crowd's move landed; his move at full strength.)
+            if (bossId === "moo" && runner.boss!.powers?.moo?.full?.at === at && !moo.moons.some((m) => m.at === at)) {
+              moo.moons.push({ at, before: lead(), after: null });
+              ults.push({ kind: "fullMoon", turn: at });
+            }
+            if (bossId === "moo" && runner.bossBestReply() && !runner.boss!.staggerNext) moo.best++;
             await runner.playBoss(engines[0]);
+            if (bossId === "moo") {
+              const m = runner.boss!.powers?.moo;
+              if (m?.stun?.flurry) moo.flurries.push(m.stun.squares.length);
+              else if (m?.stun) moo.beams++;
+              if (runner.boss!.powers?.events.some((e) => e.kind === "dazed") && moo.moons.length) moo.moons[moo.moons.length - 1]!.after = lead();
+            }
             const c = runner.landingCheck;
             if (c) alfil.landing.push({ at, pick: c.pick, move: c.move, searched: c.searched, ms: Math.round(c.ms) });
             const rc = runner.raceCheck;
@@ -462,7 +485,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       if (pc) Object.assign(carrots, { pulls: pc.pulls, over: pc.over ?? null, his: carrotsOf(pc, "boss"), crowd: carrotsOf(pc, "crowd"), spin: pc.spin ?? null });
       const camo = b.powers?.camo;
       const camoRow = camo ? { side: camo.side, missed: camo.missed, off: !!camo.off, swap: camo.swap ?? null, reveal: camo.reveal ?? null, hidden: camo.square, strikeAfter: camo.swap && camo.reveal ? camo.reveal.at - camo.swap.at : null } : null;
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }

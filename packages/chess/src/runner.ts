@@ -108,6 +108,8 @@ import {
   hopperBattle,
   carrotBattle,
   smudgyBattle,
+  mooBattle,
+  beamLines,
   bossRace,
   crowdRace,
   pullsOf,
@@ -1244,9 +1246,19 @@ export class MatchRunner {
       this.applyBossMove(answer.move, kind === "stagger", { drag: answer.drag ?? null, showdown: answer.showdown ?? null, edge: answer.edge ?? null, outside: answer.outside ?? null });
       return answer.move;
     }
+    // (Moo's Moonbeam lands after this move: the crowd's top moves after it, on this device's engine, as the host does online.)
+    const beam = this.bossBeam();
     const move = await ordinary();
-    this.applyBossMove(move, kind === "stagger");
+    this.applyBossMove(move, kind === "stagger", beam ? { beam: await beamLines(engine, fen, move, beam) } : {});
     return move;
+  }
+
+  /**
+   * Moo's Moonbeam (or the Full Moon's flurry) lands after the boss's move now: how many of the crowd's top lines it
+   * weighs after it (the boss request's `beam`), or null: none.
+   */
+  bossBeam(): number | null {
+    return mooBattle.beamAsk(this.battle);
   }
 
   /**

@@ -62,6 +62,7 @@ export * from "./bosses/alfil.ts";
 export * from "./bosses/hopper.ts";
 export * from "./bosses/carrots.ts";
 export * from "./bosses/smudgy.ts";
+export * from "./bosses/moo.ts";
 export * from "./bosses/index.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */

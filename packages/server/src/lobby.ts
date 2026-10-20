@@ -12,6 +12,7 @@ import {
   bossTurnShowMs,
   bossThinkMs,
   landedEarlyMs,
+  fullMoonMs,
   landsAfterHisMove,
   PASS_WAIT,
   powerMomentMs,
@@ -303,7 +304,7 @@ export interface LobbyRecord {
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
   bossPending?: string;
   /** What came with that move (Wrangler's drag or showdown line-up), held with it. */
-  bossPendingExtras?: { drag?: string; showdown?: string; outside?: boolean };
+  bossPendingExtras?: { drag?: string; showdown?: string; outside?: boolean; beam?: string[] };
   bossMinAt?: number;
   bossIntroDone?: boolean;
   /**
@@ -1109,7 +1110,7 @@ export class LobbyCore {
       }
       case "bossMove":
         if (playerId === this.r.hostId && this.r.phase === "boss" && this.r.bossKey === msg.key)
-          this.playBoss(msg.move, { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}), ...(msg.outside === true ? { outside: true } : {}) });
+          this.playBoss(msg.move, { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}), ...(msg.outside === true ? { outside: true } : {}), ...(Array.isArray(msg.beam) ? { beam: msg.beam.filter((x): x is string => typeof x === "string").slice(0, 32) } : {}) });
         return;
       case "leave":
         // (Cancel on the queue screen once its seats have filled is leaving the match: before move 1, a bot sits in.)
@@ -1379,9 +1380,10 @@ export class LobbyCore {
     const view = this.runner!.bossView()!;
     const b = this.runner!.state.boss;
     const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves && (x.piece || x.fizzled));
-    // (Alfil's pieces came down early after your move: their landing plays first too.)
-    const landed = landedEarlyMs(b);
-    return queenSlain(view) || burnt || landed ? this.io.now() + bossThinkMs(view, burnt, landed) : undefined;
+    // (Alfil's pieces came down early after your move: their landing plays first too; so does Moo's Full Moon, his
+    // transformation at the start of his turn.)
+    const own = landedEarlyMs(b) + fullMoonMs(b);
+    return queenSlain(view) || burnt || own ? this.io.now() + bossThinkMs(view, burnt, own) : undefined;
   }
 
   /** What the boss's own turn asks the host for besides its move (Wrangler's long pull, drag or showdown), or null. */
@@ -1407,6 +1409,8 @@ export class LobbyCore {
     const land = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "fuse" ? landsAfterHisMove(runner.state.boss) : null;
     // (Chub & Chirp's Carrot Patch: his ordinary move in the race goes through his race brain, on the host's engine.)
     const race = kind === "elo" ? (runner.bossRace("elo")?.race ?? null) : null;
+    // (Moo's Moonbeam lands after this move: the host lists the crowd's top moves after it.)
+    const beam = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best" ? runner.bossBeam() : null;
     this.io.send(host, {
       t: "bossRequest",
       key: this.r.bossKey!,
@@ -1431,6 +1435,7 @@ export class LobbyCore {
       ...(asks ? { ...(asks.pull ? { pull: asks.pull } : {}), ...(asks.drag ? { drag: true as const } : {}), ...(asks.showdown ? { showdown: asks.showdown } : {}), seed: asks.seed } : {}),
       ...(land ? { land: land.map((x) => ({ ...x })) } : {}),
       ...(race ? { race } : {}),
+      ...(beam ? { beam } : {}),
     });
   }
 
@@ -1583,7 +1588,7 @@ export class LobbyCore {
     this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
   }
 
-  private playBoss(move: string, extras: { drag?: string; showdown?: string; outside?: boolean } = {}) {
+  private playBoss(move: string, extras: { drag?: string; showdown?: string; outside?: boolean; beam?: string[] } = {}) {
     this.r.bossKey = undefined;
     // Too soon (your queen banner is still up): hold the move (or Big Boy's bounce) until then.
     if (this.r.bossMinAt && this.io.now() < this.r.bossMinAt - 50) {
@@ -1669,8 +1674,8 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
-    // (Wrangler's drag or showdown line-up: the runner checks each against his rules before it's used.)
-    this.runner!.applyBossMove(move, undefined, { drag: extras.drag ?? null, showdown: extras.showdown ?? null, outside: extras.outside ?? null });
+    // (Wrangler's drag or showdown line-up, Moo's lines for his Moonbeam: the runner checks each against his rules before it's used.)
+    this.runner!.applyBossMove(move, undefined, { drag: extras.drag ?? null, showdown: extras.showdown ?? null, outside: extras.outside ?? null, beam: extras.beam ?? null });
     // As the turn passes to the crowd, any power that comes with it (a freeze, a pie, the warning, the blizzard)
     // plays out before the crowd's clock starts.
     // (At a mate, the boss's attack on the crowd's king, if it has one: the result waits for it.)
