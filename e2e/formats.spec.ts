@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { crowdFinalBoss } from "@chessroyale/core";
-import { BOARD_SEL, createLobbyFromHome, engineTop, named, soloFromHome, submitMove, test, watchFor, bossAloneFromHome, pickMode } from "./helpers.ts";
+import { BOARD_SEL, createLobbyFromHome, engineTop, named, soloFromHome, submitMove, test, bossAloneFromHome, pickMode } from "./helpers.ts";
 
 /** The boss final's boss (Eric, Oct 14: always the Hidden Boss), by his roster name. */
 const finalBoss = crowdFinalBoss()!;
@@ -131,7 +131,7 @@ test("boss battle (solo): always the Hidden Boss; he replies, never strikes, the
   await expect(page.locator(".team-result")).toBeVisible();
 });
 
-test("boss raid (solo): you against a boss from a named opening; the King can strike it", async ({ page }) => {
+test("boss raid (solo): you against a boss from the starting position (Eric, Oct 21); the King can strike it", async ({ page }) => {
   test.setTimeout(8 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=6");
@@ -143,16 +143,15 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   await expect(menu).toBeVisible();
   await expect(menu.locator(".boss-row")).toHaveCount(1);
   await expect(menu.getByRole("button", { name: /Match the group/ })).toHaveCount(0);
-  // (The opening's name lands 1.8 s into the card, which goes at 2.6 s, after Maia's loading step of no set length:
-  // watched from before it can appear, as a poll can look either side of that window.)
-  const roulette = await watchFor(page, { landed: { selector: ".opening-roulette.landed" } });
   await menu.getByRole("button", { name: /Boingo the Clown/ }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
-  await expect.poll(() => roulette.seen(), { timeout: 5_000 }).toEqual({ landed: true });
+  // No opening to name: the intro says it's a fresh game.
+  await expect(page.locator(".boss-intro-note")).toHaveText("A fresh game from the starting position. You play White.");
+  await expect(page.locator(".opening-roulette")).toHaveCount(0);
   const boss = await page.evaluate(() => (window as any).match.boss);
   expect(boss.raid).toBe(true);
   expect(boss.name).toBe("Boingo the Clown");
-  expect(boss.board.ply).toBe(10);
+  expect(boss.board.ply).toBe(0);
   // On your first move, strike the boss (alone, you're the whole crowd): its next move is staggered.
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
   // He stands by the board and introduces himself. Tap him: his commands open above his head; tap again to close.

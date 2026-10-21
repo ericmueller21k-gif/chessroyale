@@ -171,7 +171,7 @@ describe("a pick scored above the engine's first line", () => {
   });
 
   it("the God King plays the best move with no re-check at all: a pick 3 points above the first line, nothing else close (resolveBoard names it)", async () => {
-    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossMaxMoves: 12, lastStandFrom: 999, bossId: "clown" } as Settings;
+    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossMaxMoves: 12, lastStandFrom: 999, bossId: "clown" } as Settings;
     const quick = engine({}, 0.53);
     let deepSearches = 0;
     const counted: EngineLike = { ...quick, scoreMovesAt: async (fen, moves, nodes) => (deepSearches++, quick.scoreMovesAt!(fen, moves, nodes)) };
@@ -198,7 +198,7 @@ describe("a pick scored above the engine's first line", () => {
   });
 
   it("the God King plays the best move: the pick above the first line", async () => {
-    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossMaxMoves: 12, lastStandFrom: 999, bossId: "clown" } as Settings;
+    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossMaxMoves: 12, lastStandFrom: 999, bossId: "clown" } as Settings;
     const runner = new MatchRunner({
       settings,
       rng: mulberry32(11),
@@ -267,7 +267,7 @@ describe("the re-check, with a pick scored above the first line (its anchor)", (
     const hung = sanLineToUci(["e4", "Nf6", "Nc3", "e5", "d3", "Bc5", "Nf3", "d6", "Be2", "Nxe4"]);
     const make = () =>
       new MatchRunner({
-        settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossMaxMoves: 12, lastStandFrom: 999, bossId: "clown" } as Settings,
+        settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossMaxMoves: 12, lastStandFrom: 999, bossId: "clown" } as Settings,
         rng: mulberry32(11),
         engines: [engine()],
         library: [{ ...library[0]!, moves: hung, namedPlies: hung.length }],

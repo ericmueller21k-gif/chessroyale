@@ -77,7 +77,7 @@ function setup(settings: Partial<Settings> = {}, icons: Record<string, string> =
 
 /** A raid of two people against a boss, with a power brought at once (the test switch), the Last Stand off. */
 function raid(patch: Partial<Settings>, lastBoss: (string | null)[] = [null, null]) {
-  const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, ...patch });
+  const L = setup({ ...RAID_SETTINGS, raidOpening: true, lastStandFrom: 999, ...patch });
   lastBoss.forEach((b, i) => L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, 1500, undefined, undefined, b));
   L.core.message("p1", { t: "start" });
   L.advance(1000);
@@ -282,7 +282,7 @@ describe("boss powers online", () => {
 
   it("a random boss avoids the one most of the lobby met last; only playable bosses are met", () => {
     for (const seed of [1, 2, 3, 4]) {
-      const L = setup({ ...RAID_SETTINGS }, {}, seed);
+      const L = setup({ ...RAID_SETTINGS, raidOpening: true }, {}, seed);
       for (const [i, b] of ["clown", "clown", "gingerbread"].entries()) L.core.connect(undefined, `P${i}`, "computer", false, 1500, undefined, undefined, b);
       L.core.message("p1", { t: "start" });
       expect(L.core.save().runner!.state.boss!.id).not.toBe("clown");
@@ -291,7 +291,7 @@ describe("boss powers online", () => {
     // (Every playable boss turns up: eleven of them with Moo & Moon, so more seeds than there were.)
     const playable = playableBosses().map((b) => b.id).sort();
     for (let seed = 1; seed <= 300 && ids.size < playable.length; seed++) {
-      const L = setup({ ...RAID_SETTINGS }, {}, seed);
+      const L = setup({ ...RAID_SETTINGS, raidOpening: true }, {}, seed);
       L.core.connect(undefined, "A", "computer", false, 1500);
       L.core.message("p1", { t: "start" });
       ids.add(L.core.save().runner!.state.boss!.id!);
@@ -1141,7 +1141,7 @@ describe("Chub & Chirp online (Leapfrog)", () => {
   const shown = (L: ReturnType<typeof setup>, id: string, from: number) => (L.inbox.get(id) ?? []).slice(from).filter((m): m is Extract<ServerMessage, { t: "boss" }> => m.t === "boss");
   /** Chub & Chirp, picked by the lobby; `fen`: the battle from a position of our own, the crowd to move. */
   function hopper(patch: Partial<Settings> = {}, fen?: string) {
-    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "hopper", ...patch });
+    const L = setup({ ...RAID_SETTINGS, raidOpening: true, lastStandFrom: 999, bossId: "hopper", ...patch });
     for (const i of [0, 1]) L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, 1500);
     L.core.message("p1", { t: "start" });
     L.advance(1000);
@@ -1255,7 +1255,7 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
   const runnerOf = (L: ReturnType<typeof setup>) => (L.core as unknown as { runner: MatchRunner }).runner;
   /** Chub & Chirp, picked by the lobby, no slips (his race brain on every ordinary move); `fen`: the battle from a position of our own. */
   function hopper(patch: Partial<Settings> = {}, fen?: string) {
-    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "hopper", bossStumbleBelow: 0, ...patch });
+    const L = setup({ ...RAID_SETTINGS, raidOpening: true, lastStandFrom: 999, bossId: "hopper", bossStumbleBelow: 0, ...patch });
     for (const i of [0, 1]) L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, 1500);
     L.core.message("p1", { t: "start" });
     L.advance(1000);
@@ -1500,7 +1500,7 @@ describe("Chub & Chirp online (the Carrot Patch)", () => {
 describe("the boss's brain online (BOSS_BRAIN: Maia while it's off for players only for a lobby of admins)", () => {
   /** A raid of people, each an admin or not (as the Durable Object found them), the Last Stand off. */
   function raidOf(patch: Partial<Settings>, admins: boolean[], rating = 1500) {
-    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, ...patch });
+    const L = setup({ ...RAID_SETTINGS, raidOpening: true, lastStandFrom: 999, ...patch });
     admins.forEach((a, i) => L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, rating, undefined, undefined, null, null, a));
     L.core.message("p1", { t: "start" });
     L.advance(1000);
@@ -1757,7 +1757,7 @@ describe("Wrangler online", () => {
 
   it("his reply to the duel (Eric, Oct 13), and his moves while its tactics are live: the host is asked for the engine's best, without his brain or a slip; everyone gets it; then his brain again", async () => {
     // A lobby of admins (his brain: Maia), slips on (every move of his a stumble).
-    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, bossId: "pig", bossPowerTest: "showdown", bossKillEvery: 99, bossStumbleBelow: 9999, bossStumbleMax: 1 });
+    const L = setup({ ...RAID_SETTINGS, raidOpening: true, lastStandFrom: 999, bossId: "pig", bossPowerTest: "showdown", bossKillEvery: 99, bossStumbleBelow: 9999, bossStumbleMax: 1 });
     for (const [i, name] of ["P1", "P2"].entries()) L.core.connect(undefined, name, i ? "phone" : "computer", false, 1500, undefined, undefined, null, null, true);
     L.core.message("p1", { t: "start" });
     L.advance(1000);

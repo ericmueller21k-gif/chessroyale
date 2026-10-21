@@ -45,7 +45,7 @@ function judge(script: { best?: string; bestExpected: number; blunder: string; b
 /** Solo boss raid (just you), the God King with all his charges unless told otherwise. */
 function raid(engine: EngineLike, patch: Partial<Settings> = {}, players = 1) {
   // (G-REX: the boss this seed met before Big Boy joined the draw.)
-  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "grex", ...patch } as Settings;
+  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossId: "grex", ...patch } as Settings;
   return new MatchRunner({
     settings,
     rng: mulberry32(5),
@@ -233,7 +233,7 @@ describe("the God King's Last Stand: the rule", () => {
 
   it("the re-pick: bots never pick the barred move, it isn't the best, and the boss's strike waits for it", async () => {
     // Ten players (the 50 v 50 final's size): two humans, eight bots; the blunder forced by the test switch.
-    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, minSurvivors: 1 } as Settings;
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, minSurvivors: 1 } as Settings;
     const engine = judge({ best: "d2d4", bestExpected: 0.55, blunder: "d2d4", blunderExpected: 0.55 });
     const runner = new MatchRunner({
       settings,
@@ -267,7 +267,7 @@ describe("the God King's Last Stand: the rule", () => {
   it("the move he took back doesn't bring the boss's strike closer, and the strike still weighs that round's picks", async () => {
     // Found in a 50 v 50 boss final: a Last Stand on the move after a strike, and the next strike came two crowd
     // moves later, because the taken-back round counted toward it as a move. Five players: three blunder.
-    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000 } as Settings;
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000 } as Settings;
     const engine = judge({ bestExpected: 0.55, blunder: "d2d4", blunderExpected: 0.08 });
     const ids = ["h0", "h1", "h2", "h3", "h4"];
     const runner = new MatchRunner({ settings, rng: mulberry32(9), engines: [engine], library: [opening(RUY)], entrants: ids.map((id) => ({ id, name: id, isBot: false })) });
@@ -392,7 +392,7 @@ describe("the God King's Last Stand: real blunders, the real judge", () => {
     it(`${name}: ${san} calls for the Last Stand from move 1`, async () => {
       const runner = new MatchRunner({
         // (G-REX: the boss this seed met before Big Boy joined the draw.)
-        settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 3190, bossId: "grex" } as Settings,
+        settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 3190, bossId: "grex" } as Settings,
         rng: mulberry32(1),
         engines: [engine],
         library: [opening(moves)],
@@ -419,7 +419,7 @@ describe("the God King's Last Stand: real blunders, the real judge", () => {
     // (Bxd1 loses to Bxf7+ Ke7 Nd5#: the engine rates the queen offer the best move, so it gives nothing away.)
     const moves = sanLineToUci(["e4", "e5", "Nf3", "d6", "Bc4", "Bg4", "Nc3", "Nc6", "h3", "Bh5"]);
     const runner = new MatchRunner({
-      settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 3190, bossId: "grex" } as Settings,
+      settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 3190, bossId: "grex" } as Settings,
       rng: mulberry32(1),
       engines: [engine],
       library: [opening(moves)],

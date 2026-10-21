@@ -73,7 +73,7 @@ describe("every boss on the Maia path", () => {
 
   for (const id of [...PLAYABLE, ...UNFINISHED]) {
     it(`${id}: Maia plays its normal moves within every power's limits; its special moves keep their own picks`, async () => {
-      const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1800, bossId: id, bossUnfinished: UNFINISHED.includes(id), lastStandFrom: 999, bossMaxMoves: 60, ...(id === "alfil" ? { bossPowerTest: "tusks" } : id === "hopper" ? { bossPowerTest: "leapfrog" } : {}) } as Settings;
+      const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 1800, bossId: id, bossUnfinished: UNFINISHED.includes(id), lastStandFrom: 999, bossMaxMoves: 60, ...(id === "alfil" ? { bossPowerTest: "tusks" } : id === "hopper" ? { bossPowerTest: "leapfrog" } : {}) } as Settings;
       const engine = fakeEngine();
       const r = new MatchRunner({ settings, rng: mulberry32(11), engines: [engine], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
       expect(r.boss!.id).toBe(id);
@@ -205,7 +205,7 @@ describe("every boss on the Maia path", () => {
 
 describe("the bridge band and the top, in a battle", () => {
   const battle = (elo: number, crowd = false, engine = fakeEngine()) => {
-    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: elo, bossId: "gingerbread", lastStandFrom: 999 } as Settings;
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: elo, bossId: "gingerbread", lastStandFrom: 999 } as Settings;
     const entrants = [{ id: "h0", name: "H", isBot: false }, ...(crowd ? [{ id: "h1", name: "I", isBot: false }] : [])];
     return new MatchRunner({ settings, rng: mulberry32(3), engines: [engine], library: [opening(RUY)], entrants });
   };

@@ -67,7 +67,7 @@ const opening = (moves: string[]): Opening => ({ id: "o", eco: "", name: "Test",
 const TRADED = sanLineToUci(["e4", "d5", "exd5", "Qxd5", "Nc3", "Qa5", "d4", "Nf6", "Nf3", "c6", "Bc4", "Bf5"]);
 
 function raid(opts: { patch?: Partial<Settings>; seed?: number; engine?: EngineLike | ((r: () => MatchRunner) => EngineLike); line?: string[] } = {}) {
-  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "sawyer", lastStandLoss: 999, lastStandLossFloor: 999, ...opts.patch } as Settings;
+  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossId: "sawyer", lastStandLoss: 999, lastStandLossFloor: 999, ...opts.patch } as Settings;
   let runner: MatchRunner | null = null;
   const engine = typeof opts.engine === "function" ? opts.engine(() => runner!) : (opts.engine ?? fakeEngine());
   runner = new MatchRunner({ settings, rng: mulberry32(opts.seed ?? 5), engines: [engine], library: [opening(opts.line ?? TRADED)], entrants: [{ id: "h0", name: "H", isBot: false }] });

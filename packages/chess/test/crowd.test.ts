@@ -232,10 +232,26 @@ describe("Crowd mode", () => {
     expect(runner.state.players.map((p) => p.placement).sort((a, b) => a! - b!)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
   });
 
-  it("boss raid: humans only, the boss from the first move on a named opening, strikes down to half, the King's strike staggers the boss", async () => {
+  it("boss raid: every raid from the starting position (Eric, Oct 21), the crowd White; raidOpening keeps the old named opening", () => {
+    const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    const lib: Opening[] = [{ ...library[0]!, moves: sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1"]), expected: { 10: 0.52 } }];
+    const entrants = Array.from({ length: 6 }, (_, i) => ({ id: `h${i}`, name: `H${i}`, isBot: false }));
+    for (const bossId of ["grex", "gingerbread", "alfil", "moo"]) {
+      const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, lastStandFrom: 999, bossId } as Settings;
+      const runner = new MatchRunner({ settings, rng: mulberry32(11), engines: [fake], library: lib, entrants });
+      expect(runner.boards.get(0)!.fen, bossId).toBe(START);
+      expect(runner.boards.get(0)!.history, bossId).toEqual([]);
+      expect(runner.boss!.crowdSide, bossId).toBe("w");
+      expect(runner.bossToMove(), bossId).toBe(false);
+      const old = new MatchRunner({ settings: { ...settings, raidOpening: true }, rng: mulberry32(11), engines: [fake], library: lib, entrants });
+      expect(old.boards.get(0)!.history, bossId).toHaveLength(10);
+    }
+  });
+
+  it("boss raid: humans only, the boss from the first move (here on the old named opening: raidOpening), strikes down to half, the King's strike staggers the boss", async () => {
     // (The fake engine's numbers are random, so its "blunders" would call for the God King's Last Stand, which has its own tests.)
     // (Jefferson: the boss this seed met before Sawyer joined the draw; a boss who plays from the named opening.)
-    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossMaxMoves: 12, lastStandFrom: 999, bossId: "grex" } as Settings;
+    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossMaxMoves: 12, lastStandFrom: 999, bossId: "grex" } as Settings;
     const lib: Opening[] = [{ ...library[0]!, moves: sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1"]), expected: { 10: 0.52 } }];
     const runner = new MatchRunner({
       settings,

@@ -232,7 +232,7 @@ describe("the test trigger", () => {
 
   it("in a match: pressed mid-turn it waits for the turn's end, for Ginger and Boingo; after the end it does nothing", async () => {
     for (const id of ["gingerbread", "clown"] as const) {
-      const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: id, lastStandFrom: 999, bossMaxMoves: 4 } as Settings;
+      const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossId: id, lastStandFrom: 999, bossMaxMoves: 4 } as Settings;
       const runner = new MatchRunner({ settings, rng: mulberry32(5), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
       runner.deal();
       const before = runner.crowdAllowed();
@@ -574,7 +574,7 @@ describe("the judge treats a piece left to burn as already gone", () => {
   });
 
   it("in a match, the runner scores the escape as the best and the burn happens after the crowd's move", async () => {
-    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "gingerbread", lastStandFrom: 999 } as Settings;
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossId: "gingerbread", lastStandFrom: 999 } as Settings;
     const runner = new MatchRunner({ settings, rng: mulberry32(2), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
     // G-REX in Ginger's place, with a tile ablaze under the knight on f3.
     const fen = runner.boards.get(0)!.fen;
@@ -620,7 +620,7 @@ describe("a board whose position changed between moves", () => {
 describe("solo's difficulty", () => {
   it("the boss plays at your strength plus its offset plus the difficulty, capped at the engine's strongest; the boss stays random", () => {
     const elo = (extra: number, base = 2000) => {
-      const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: base, bossDifficulty: extra } as Settings;
+      const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: base, bossDifficulty: extra } as Settings;
       return new MatchRunner({ settings, rng: mulberry32(4), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] }).boss!;
     };
     // (Its own offset under the lobby's strength: whichever boss the draw met.)

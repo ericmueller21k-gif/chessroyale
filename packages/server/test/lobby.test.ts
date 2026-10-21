@@ -700,7 +700,7 @@ describe("lobby: Crowd mode", () => {
     expect(st.filter((s) => s.isBot).every((s) => s.uid === undefined)).toBe(true);
   });
 
-  it("boss raid: humans only, the boss a step above the group's average rating, from a named opening", () => {
+  it("boss raid: humans only, the boss a step above the group's average rating, from the starting position (Eric, Oct 21)", () => {
     const L = setup({ ...RAID_SETTINGS });
     L.core.connect(undefined, "Ann", "computer", false, 1500);
     L.core.connect(undefined, "Bo", "phone", false, 1900);
@@ -711,11 +711,11 @@ describe("lobby: Crowd mode", () => {
     const intro = L.last("p2", "boss")!;
     expect(intro.intro).toBe(true);
     expect(intro.boss.raid).toBe(true);
-    expect(intro.boss.openingName).toBeTruthy();
-    expect(intro.boss.board.ply).toBe(10);
-    // No opening screen first: the intro replays the opening from the start itself, then "START!".
+    expect(intro.boss.openingName).toBeFalsy();
+    expect(intro.boss.board.ply).toBe(0);
+    // No opening screen first: the intro, then "START!".
     expect(L.last("p2", "opening")).toBeUndefined();
-    const introMs = bossIntroTimeline(10).total;
+    const introMs = bossIntroTimeline(0).total;
     expect(intro.until - intro.now).toBe(introMs);
     L.advance(introMs);
     const r = L.last("p1", "round")!;
