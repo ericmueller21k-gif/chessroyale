@@ -182,8 +182,8 @@ export class Searcher {
 
   /**
    * The rules at a node: a score if the game is over here by them, else null. Mate and stalemate are found by the move loop. A
-   * fight's stall (a repetition, the quiet cap, the move cap) goes to the side the engine's score of the position favors by
-   * `stallWinMargin`, the same judgment the fight's referee makes (`judge`); a repetition inside the search counts as one (two-fold,
+   * fight's stall (a repetition, the quiet cap, the move cap) goes to the side whose judged score has gained `stallWinMargin` on
+   * the fight's start (`gainBase`), the same judgment the fight's referee makes (`judge`); a repetition inside the search counts as one (two-fold,
    * as in chess: nothing can be won by repeating now but the stall itself).
    */
   private ruleScore(ply: number): number | null {
@@ -204,9 +204,11 @@ export class Searcher {
   private stall(ply: number): number {
     const pos = this.pos;
     if (!pos.hasLegalMove()) return pos.inCheck ? -(WIN - ply) : 0;
-    const s = this.judge(ply);
+    // (What the side to move has gained since the fight's start: the judge's score less the start's, both the judge's measure.)
+    const base = pos.side === WHITE ? pos.gainBase : -pos.gainBase;
+    const gain = this.judge(ply) - base;
     const m = pos.rules.stallWinMargin;
-    return s >= m ? RULE_WIN - ply : s <= -m ? -(RULE_WIN - ply) : 0;
+    return gain >= m ? RULE_WIN - ply : gain <= -m ? -(RULE_WIN - ply) : 0;
   }
 
   /** The engine's score of the position as a stall's judge sees it: a full-window quiescence search, with no rule ending it (side to move's view). */

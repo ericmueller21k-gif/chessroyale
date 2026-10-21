@@ -1,8 +1,9 @@
 /**
  * The HunChess engine: our own chess engine for Auto chess, written from scratch, that knows every rule of a fight (no
  * promotion: a pawn on its last rank cashes in; a side left with only its king loses; a stall (a repetition, the quiet cap, the
- * move cap) goes to the side the engine's score favors by a pawn) and plays the ordinary game too (to measure it against
- * Stockfish). docs/decisions/2026-10-21-hunchess-engine.md, docs/decisions/2026-10-21-autochess-endings.md.
+ * move cap) goes to the side that gained a pawn over the fight, by the engine's score) and plays the ordinary game too (to
+ * measure it against Stockfish). docs/decisions/2026-10-21-hunchess-engine.md, docs/decisions/2026-10-21-autochess-endings.md,
+ * docs/decisions/2026-10-21-autochess-gain.md.
  */
 
 import { BLACK, CHESS_RULES, moveUci, Position, WHITE, type HunResult, type HunRules } from "./board.ts";
@@ -20,9 +21,13 @@ export interface HunGame {
   rules: HunRules;
 }
 
-/** The position a game has reached (its history kept, for repetitions and the fight's counters). Throws on an illegal move. */
-export function replay(game: HunGame): Position {
+/**
+ * The position a game has reached (its history kept, for repetitions and the fight's counters). Throws on an illegal move. A fight
+ * gets its gains' yardstick (`gainBase`: the judge's score of its start; `cashInValue` is the evaluation's).
+ */
+export function replay(game: HunGame, cashInValue = DEFAULT_EVAL.cashInValue): Position {
   const pos = new Position(game.startFen, game.rules);
+  if (game.rules.variant === "fight") pos.gainBase = startScore(game.startFen, game.rules, cashInValue);
   for (const m of game.moves) pos.play(m);
   pos.commit();
   return pos;
@@ -35,34 +40,59 @@ export function gameMoves(game: HunGame): string[] {
   return pos.legalMoves().map(moveUci);
 }
 
-/** A game's result, with a stall's judged score (centipawns, White's view) when it was one. */
-export type JudgedResult = HunResult & { score?: number };
+/**
+ * A game's result; a fight's stall comes with how it was judged (centipawns, White's view): `score`, the judge's score of the final
+ * position, and `gain`, that less the fight's start (`gainBase`).
+ */
+export type JudgedResult = HunResult & { score?: number; gain?: number };
 
 /** One stall judge per cash-in value (the evaluation counts cash-ins), each searched from a clean slate every time. */
 const judges = new Map<number, Searcher>();
 
-/** The engine's score that decides a stall in this position, White's view (deterministic: the same on any device). */
+/**
+ * The stall judge's score of a position, White's view: a quiescence search from a clean slate, with no node limit or clock, so it
+ * is the same on any device. The one measure of a fight's gains: its start, a stall's end, and every move for "too far ahead".
+ */
 export function stallScore(pos: Position, cashInValue = DEFAULT_EVAL.cashInValue): number {
   let judge = judges.get(cashInValue);
   if (!judge) judges.set(cashInValue, (judge = new Searcher({ ...DEFAULT_EVAL, cashInValue }, 4)));
   return judge.stallScore(pos);
 }
 
+/** The judge's score of a fight's start position (its gains' yardstick), remembered for the few fights in play. */
+const starts = new Map<string, number>();
+export function startScore(startFen: string, rules: HunRules, cashInValue = DEFAULT_EVAL.cashInValue): number {
+  const key = `${cashInValue} ${startFen}`;
+  let s = starts.get(key);
+  if (s === undefined) {
+    if (starts.size >= 64) starts.clear();
+    starts.set(key, (s = stallScore(new Position(startFen, rules), cashInValue)));
+  }
+  return s;
+}
+
+/** What White has gained since the fight's start, by the judge (centipawns; Black's gain is the negative). */
+export function gainScore(pos: Position, cashInValue = DEFAULT_EVAL.cashInValue): number {
+  return stallScore(pos, cashInValue) - pos.gainBase;
+}
+
 /**
- * The result if the game is over now, else null; a fight's stall is judged: the side the engine's score favors by `stallWinMargin`
- * wins, closer is a draw.
+ * The result if the game is over now, else null; a fight's stall is judged by the gains: the side whose score has gained
+ * `stallWinMargin` on the fight's start wins, closer is a draw (Eric, Oct 21: "the opponent should be rewarded for doing better with
+ * fewer pieces").
  */
 export function judgedResult(pos: Position, cashInValue = DEFAULT_EVAL.cashInValue): JudgedResult | null {
   const r = pos.result();
   if (!r?.stall) return r;
   const score = stallScore(pos, cashInValue);
+  const gain = score - pos.gainBase;
   const m = pos.rules.stallWinMargin;
-  return { ...r, winner: score >= m ? WHITE : score <= -m ? BLACK : -1, score };
+  return { ...r, winner: gain >= m ? WHITE : gain <= -m ? BLACK : -1, score, gain };
 }
 
 /** The game's result if it is over, else null (a stall judged). */
 export function gameResult(game: HunGame, cashInValue = DEFAULT_EVAL.cashInValue): JudgedResult | null {
-  return judgedResult(replay(game), cashInValue);
+  return judgedResult(replay(game, cashInValue), cashInValue);
 }
 
 /** The moves to a forced mate a search's score says the side to move has (a mate, not another rule's win), or null. */
@@ -124,7 +154,7 @@ export class HunchessEngine {
 
   /** The best move for a game's position, searched to the node budget (or `nodes`). */
   best(game: HunGame, nodes = this.nodes): HunMove {
-    const pos = replay(game);
+    const pos = replay(game, this.searcher.evalOpts.cashInValue);
     if (pos.result()) return { move: null, score: 0, expected: 0.5, depth: 0, nodes: 0, pv: [] };
     const r = this.searcher.search(pos, { nodes });
     return { move: r.move ? moveUci(r.move) : null, score: r.score, expected: expectedScore(r.score), depth: r.depth, nodes: r.nodes, pv: r.pv.map(moveUci) };
