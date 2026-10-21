@@ -2770,10 +2770,13 @@ export interface AutoChessSettings {
   readonly cashInValue: number;
   /**
    * Moves play at `fightFastMoveMs` (twice as fast) after this many moves a side (v5, Eric Oct 20), and also once either side is
-   * down to its king and pawns (Eric, Oct 21: "the last thing we want to see is just the king moving around").
+   * down to its king and pawns (Eric, Oct 21: "the last thing we want to see is just the king moving around"), or once this many
+   * pieces or fewer are left on the whole board besides the kings, pawns included (`fightFastPieces`; Eric, Oct 21: a pawn and a
+   * rook against two knights "should have gone about twice as fast").
    */
   readonly fightFastAfter: number;
   readonly fightFastMoveMs: number;
+  readonly fightFastPieces: number;
   /**
    * A fight stalls after this many moves a side, or this many moves a side with no capture or cash-in (a check doesn't count:
    * Eric, Oct 21), or at a threefold repetition. A stall goes to the side the HunChess engine's score of the final position
@@ -2868,6 +2871,7 @@ export const AUTOCHESS: AutoChessSettings = {
   cashInValue: 20,
   fightFastAfter: 30,
   fightFastMoveMs: 300,
+  fightFastPieces: 5,
   moveCap: 60,
   quietCap: 10,
   stallWinMargin: 100,

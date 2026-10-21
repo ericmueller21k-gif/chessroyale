@@ -21,7 +21,7 @@ import { addXp } from "../src/autochess/level.ts";
 import { newShop } from "../src/autochess/shop.ts";
 import { buyBlock, carryBench, emptyArmy, extras, halfSquares, kingSquares, legalCounts, owned, placeBlock } from "../src/autochess/army.ts";
 import { fightStart, armiesFen, material } from "../src/autochess/position.ts";
-import { fightMoves, moveMs, playFight, rulesFor, standInMove, withPiece, type FightSoFar } from "../src/autochess/fight.ts";
+import { fightMoves, moveMs, playFight, rulesFor, standInMove, thinFight, withPiece, type FightSoFar } from "../src/autochess/fight.ts";
 import { HunchessEngine, replay, WIN } from "@chessroyale/chess/hunchess";
 import { endWords, moveWords } from "../src/autochess/words.ts";
 import type { Army, Kind } from "../src/autochess/types.ts";
@@ -700,7 +700,8 @@ describe("auto chess: the fight", () => {
       const k = Math.floor(history.length / 2) % 2;
       return white ? (k ? "a2a1" : "a1a2") : k ? "a7a8" : "a8a7";
     };
-    const res = await playFight(fightStart(w, b).fen, { pick: byFen(kingSteps), wait: async (ms) => void waits.push(ms), rng: mulberry32(1), cfg: { ...AUTOCHESS, fightFastAfter: 2 } });
+    // (fightFastPieces 0: a rook against a knight is thinned out, which has its own test below.)
+    const res = await playFight(fightStart(w, b).fen, { pick: byFen(kingSteps), wait: async (ms) => void waits.push(ms), rng: mulberry32(1), cfg: { ...AUTOCHESS, fightFastAfter: 2, fightFastPieces: 0 } });
     expect(res!.moves).toHaveLength(8);
     expect(waits).toEqual([600, 600, 600, 600, 300, 300, 300, 300]);
     // The setting: a fast fight from the start.
@@ -720,6 +721,34 @@ describe("auto chess: the fight", () => {
     expect(moveWords(0, AUTOCHESS, true)).toBe("Move 1 of 60 · twice as fast");
   });
 
+  it("twice as fast once 5 or fewer pieces are left besides the kings (Eric, Oct 21: a pawn and a rook against two knights)", async () => {
+    expect(AUTOCHESS.fightFastPieces).toBe(5);
+    const fen = (w: Army, b: Army) => fightStart(w, b).fen;
+    const W = (board: Army["board"]): Army => ({ color: "w", king: "a1", board, bench: [] });
+    const B = (board: Army["board"]): Army => ({ color: "b", king: "a8", board, bench: [] });
+    // Eric's fight: a pawn and a rook against two knights, 4 pieces: fast.
+    expect(thinFight(fen(W({ d4: "p", h2: "r" }), B({ c6: "n", f6: "n" })))).toBe(true);
+    // 5: fast; 6: not yet (each side has a piece besides pawns).
+    expect(thinFight(fen(W({ d4: "p", h2: "r", c3: "b" }), B({ c6: "n", f6: "n" })))).toBe(true);
+    expect(thinFight(fen(W({ d4: "p", h2: "r", c3: "b" }), B({ c6: "n", f6: "n", d6: "p" })))).toBe(false);
+    // Down to king and pawns stays fast however many pieces: 8 here.
+    expect(thinFight(fen(W({ a2: "p", b2: "p", c2: "p", d2: "p" }), B({ c6: "n", f6: "n", h6: "r", d6: "q" })))).toBe(true);
+    // The setting: 3 makes Eric's fight wait.
+    expect(thinFight(fen(W({ d4: "p", h2: "r" }), B({ c6: "n", f6: "n" })), { ...AUTOCHESS, fightFastPieces: 3 })).toBe(false);
+    // In a fight: the waits are the fast ones from the first move, and the counter says so.
+    const waits: number[] = [];
+    const w = W({ h2: "r", b3: "p" });
+    const b = B({ g6: "n", c6: "n" });
+    const steps = async (f: string, history: readonly string[]) => {
+      const white = f.split(" ")[1] === "w";
+      const k = Math.floor(history.length / 2) % 2;
+      return white ? (k ? "a2a1" : "a1a2") : k ? "a7a8" : "a8a7";
+    };
+    await playFight(fen(w, b), { pick: byFen(steps), wait: async (ms) => void waits.push(ms), rng: mulberry32(1) });
+    expect(waits.length).toBeGreaterThan(0);
+    expect(waits.every((ms) => ms === AUTOCHESS.fightFastMoveMs)).toBe(true);
+  });
+
   it("each move takes about the move time, with the engine's thinking inside it", async () => {
     const waits: number[] = [];
     const w: Army = { color: "w", king: "e1", board: {}, bench: [] };
@@ -731,7 +760,8 @@ describe("auto chess: the fight", () => {
     const w2: Army = { color: "w", king: "e1", board: { a2: "p", b1: "n" }, bench: [] };
     const b2: Army = { color: "b", king: "e8", board: { h7: "p", g8: "n" }, bench: [] };
     let moves = 0;
-    await playFight(fightStart(w2, b2).fen, { pick: async () => null, wait: async (ms) => void waits.push(ms), rng: mulberry32(1), cancelled: () => ++moves > 2 });
+    // (fightFastPieces 0: four pieces would play fast, which has its own test.)
+    await playFight(fightStart(w2, b2).fen, { pick: async () => null, wait: async (ms) => void waits.push(ms), rng: mulberry32(1), cancelled: () => ++moves > 2, cfg: { ...AUTOCHESS, fightFastPieces: 0 } });
     expect(waits.every((ms) => ms === AUTOCHESS.fightMoveMs)).toBe(true);
     expect(waits.length).toBeGreaterThan(0);
   });
