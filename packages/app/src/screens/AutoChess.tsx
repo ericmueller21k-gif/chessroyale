@@ -51,6 +51,8 @@ const SAY_MS = 4200;
 const BOT_WAIT_MS = 2500;
 /** A pawn that cashes in stands on the last rank this long (its move's slide), then leaves the board. */
 const CASH_LEAVE_MS = 220;
+/** A press on a silhouette on the board is a tap while the pointer stays this close to where it went down (a finger always wobbles); farther, it is neither a tap nor a drag, and does nothing. */
+const TAP_SLOP_PX = 10;
 
 type Phase = "buy" | "adjust" | "fight" | "result" | "over";
 
@@ -103,6 +105,8 @@ interface BotRun {
 interface Hold {
   kind: Kind | "k";
   at: { offer: number } | { square: string } | { held: number };
+  /** An offer's silhouette on the board (Eric, Oct 21): it is only ever tapped, never picked up, dragged or dropped. */
+  tapOnly?: boolean;
 }
 type Target = { square: string } | { shop: true } | { bench: true } | null;
 
@@ -237,7 +241,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const layerRef = useRef<HTMLDivElement>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
   const ghostAt = useRef({ x: 0, y: 0 });
-  const press = useRef<{ id: number; hold: Hold; x: number; y: number; started: boolean } | null>(null);
+  /** The press in progress: the pointer, the element that captured it, what was pressed, where, whether it became a drag (or, for a silhouette, wandered off). */
+  const press = useRef<{ id: number; el: Element; hold: Hold; x: number; y: number; started: boolean; wandered: boolean } | null>(null);
+
+  /** The latest `endPress` and `cancelGesture` (the window's listeners are set once, and the board's turn each round: a stale copy would read the wrong way up). */
+  const latest = useRef({ endPress: (_e: PointerEvent, _cancel?: boolean) => {}, cancelGesture: () => {} });
 
   const g = game;
   // The two avatars (v6): your pawn as home and your profile dress it (your name and items), and the bot's own, a plain look seeded by the match.
@@ -272,8 +280,23 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
         if (at >= cfg.buySeconds * 1000 || bothLocked(locks, at, cur.round.plan.lockAt)) toAdjust();
       } else if (cur.phase === "adjust" && t - cur.phaseStart >= cfg.adjustSeconds * 1000) void toFight();
     }, TICK_MS);
+    // A press ends with its pointer, whatever the element it began on has become (a card that left the screen with its step, a layer that stopped taking taps): the
+    // pointer let go, cancelled, or lost its capture (a drag then ends with no action), and the window losing the pointer ends it too.
+    const pointerEnd = (e: PointerEvent) => {
+      const p = press.current;
+      if (!p || e.pointerId !== p.id) return;
+      // (The capture lost by its element being taken off the screen reaches the document; a capture lost on another element isn't this press's.)
+      if (e.type === "lostpointercapture" && e.target !== p.el && p.el.isConnected) return;
+      latest.current.endPress(e, e.type !== "pointerup");
+    };
+    const blurred = () => latest.current.cancelGesture();
+    const types = ["pointerup", "pointercancel", "lostpointercapture"] as const;
+    for (const t of types) window.addEventListener(t, pointerEnd);
+    window.addEventListener("blur", blurred);
     return () => {
       clearInterval(id);
+      for (const t of types) window.removeEventListener(t, pointerEnd);
+      window.removeEventListener("blur", blurred);
       cancelled.current = true;
       botRun.current.stop = true;
       if (msgTimer.current) clearTimeout(msgTimer.current);
@@ -287,9 +310,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   function toAdjust() {
     const cur = gref.current;
     if (cur.phase !== "buy") return;
-    setSel(null);
-    setDrag(null);
-    press.current = null;
+    cancelGesture();
     setMsg("");
     const you = cur.round.you;
     const botStart = cur.round.plan.army;
@@ -320,8 +341,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   async function toFight() {
     const cur = gref.current;
     if (cur.phase !== "adjust") return;
-    setSel(null);
-    press.current = null;
+    cancelGesture();
     const run = botRun.current;
     run.stop = true;
     commit({ ...cur, phase: "fight", phaseStart: performance.now() });
@@ -373,13 +393,13 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const cur = gref.current;
     if (cur.phase !== "result") return;
     const { match, round } = startRound(cur.match, cfg);
-    setSel(null);
+    cancelGesture();
     setMsg("");
     commit({ match, phase: "buy", phaseStart: performance.now(), round, fight: null, outcome: null });
   }
 
   function playAgain() {
-    setSel(null);
+    cancelGesture();
     setMsg("");
     commit(newGame((Math.random() * 2 ** 31) | 0, cfg));
   }
@@ -484,9 +504,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const at = performance.now() - cur.phaseStart;
     const locks = youLock(cur.round.locks, at, cur.round.plan.lockAt);
     const bonus = bonusFor(locks, "you", cfg);
-    setSel(null);
-    setDrag(null);
-    press.current = null;
+    cancelGesture();
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: cur.match.you.gold + bonus } }, round: { ...cur.round, locks } });
     play("acLock");
     if (bothLocked(locks, at, cur.round.plan.lockAt)) return toAdjust();
@@ -504,13 +522,18 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     play("acReroll");
   }
 
-  /** Sells a piece standing on your board, or one held on your bench: 75% of its price back. */
+  /**
+   * Sells a piece standing on your board, or one held on your bench: 75% of its price back. Only a piece of yours that is there now, of the kind the
+   * hold says, is sold (a hold can go stale: the piece was sold some other way while it was held): no gold for anything else, never for the king or an offer.
+   */
   function sell(hold: Hold) {
     if ((!isSquare(hold) && !isHeld(hold)) || !buying()) return;
     const cur = gref.current;
-    const { army, gold } = isSquare(hold) ? sellPiece(cur.round.you, hold.at.square, cfg) : sellHeld(cur.round.you, hold.at.held, cfg);
-    withGold(cur.match.you.gold + gold, army);
+    const sold = isSquare(hold) ? sellPiece(cur.round.you, hold.at.square, hold.kind, cfg) : sellHeld(cur.round.you, hold.at.held, hold.kind, cfg);
     setSel(null);
+    if (!sold) return;
+    const { army, gold } = sold;
+    withGold(cur.match.you.gold + gold, army);
     play("sell");
     say(`Sold the ${KIND_NAME[hold.kind as Kind]} for ${gold}.`);
     // The gold floats up from where the piece stood: its square, or its slot on the bench.
@@ -615,16 +638,44 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
 
   function startPress(e: PointerEvent, hold: Hold) {
     if (press.current || !e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
-    press.current = { id: e.pointerId, hold, x: e.clientX, y: e.clientY, started: false };
-    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    const el = e.currentTarget as Element;
+    press.current = { id: e.pointerId, el, hold, x: e.clientX, y: e.clientY, started: false, wandered: false };
+    el.setPointerCapture?.(e.pointerId);
+  }
+
+  /**
+   * A gesture is over with no action, whatever it was: the press is let go (and its pointer capture released), the drag's ghost goes, and nothing stays selected.
+   * Every step's end does this (the lock, lock in, the reveal, the adjust step's end, the result, the next round), so a finger still down across one
+   * can't carry a drag into the next.
+   */
+  function cancelGesture() {
+    const p = press.current;
+    press.current = null;
+    if (p) {
+      try {
+        p.el.releasePointerCapture?.(p.id);
+      } catch {
+        // (The pointer is already gone.)
+      }
+    }
+    setDrag(null);
+    setSel(null);
   }
 
   function movePress(e: PointerEvent) {
     const p = press.current;
     if (!p || e.pointerId !== p.id) return;
+    if (p.hold.tapOnly) {
+      // (A silhouette on the board is only tapped: a pointer that wanders off it picks nothing up, drags nothing and drops nothing.)
+      if (!p.wandered && (e.clientX - p.x) ** 2 + (e.clientY - p.y) ** 2 >= TAP_SLOP_PX ** 2) p.wandered = true;
+      return;
+    }
     ghostAt.current = { x: e.clientX, y: e.clientY };
-    // (While buying you drag an offer to the bench to hold it, and a piece of yours (on the board or the bench) to the shop to sell it; the king stays put.)
-    const dragsNow = gref.current.phase === "adjust" || isOffer(p.hold) || isHeld(p.hold) || (isSquare(p.hold) && p.hold.kind !== "k");
+    // (While buying you drag an offer from the shop to the bench to hold it, and a piece of yours (on the board or the bench) to the shop to sell it; the king stays put.)
+    // (Nothing is picked up in the last seconds or once you've locked in: a press there is a tap, and says why nothing happens.)
+    const cur = gref.current;
+    const frozen = cur.phase === "buy" && buyFreeze(cur.round.locks, performance.now() - cur.phaseStart, cfg) !== null;
+    const dragsNow = !frozen && (cur.phase === "adjust" || isOffer(p.hold) || isHeld(p.hold) || (isSquare(p.hold) && p.hold.kind !== "k"));
     if (!p.started && dragStarted(e.clientX - p.x, e.clientY - p.y) && dragsNow) {
       p.started = true;
       // (A piece picked up to drag is the selected one too.)
@@ -649,7 +700,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       setDrag(null);
       if (!cancel) dropped(p.hold, targetAt(e.clientX, e.clientY));
       else setSel(null);
-    } else if (!cancel) tapPiece(p.hold);
+    } else if (!cancel && !p.wandered) tapPiece(p.hold);
   }
 
   /** The offers standing on a square, left to right on the screen (by shop slot). */
@@ -663,13 +714,13 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const square = squareAtPoint(e.clientX, e.clientY, box, orientation);
     if (!square) return;
     if (cur.phase === "buy") {
-      // An offer's silhouette: a tap buys it. (Two on one square sit side by side: the half of the square the finger is on.)
+      // An offer's silhouette: a tap buys it, and that is all it does: it is never picked up, dragged or sold. (Two on one square sit side by side: the half of the square the finger is on.)
       const slots = offersOn(square);
       if (slots.length) {
         const { col } = cellOf(square, orientation);
         const within = (e.clientX - box.left) / (box.width / 8) - col;
         const slot = slots[Math.min(slots.length - 1, Math.max(0, Math.floor(within * slots.length)))]!;
-        return startPress(e, { kind: cur.round.shop.slots[slot]!.kind, at: { offer: slot } });
+        return startPress(e, { kind: cur.round.shop.slots[slot]!.kind, at: { offer: slot }, tapOnly: true });
       }
     }
     const kind = pieceOf(square);
@@ -686,6 +737,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if (gref.current.phase !== "buy") return;
     startPress(e, { kind, at: { held: index } });
   }
+
+  latest.current = { endPress, cancelGesture };
 
   // The dragged piece's first place, before the pointer moves again.
   useLayoutEffect(() => {
@@ -733,6 +786,13 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const squaresWithOffers = [...new Set(offers.map((o) => o.square))];
 
   const interactiveLayer = (g.phase === "buy" && !locked) || (g.phase === "adjust" && elapsed < cfg.adjustSeconds * 1000);
+  // A press, drag or selection never outlives the moment it can act: when the step changes, the round turns, or the board stops taking presses (the last seconds of buying locked, the adjust step's time up) it is over, with no action.
+  useLayoutEffect(() => {
+    if (!interactiveLayer) cancelGesture();
+  }, [interactiveLayer]);
+  useLayoutEffect(() => {
+    cancelGesture();
+  }, [g.phase, g.match.round]);
   const goldNow = g.match.you.gold;
   const botGoldNow = g.phase === "buy" ? g.match.bot.gold - (seen?.spent ?? 0) + bonusFor(g.round.locks, "bot", cfg) : g.match.bot.gold;
 
@@ -890,7 +950,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
         {g.phase === "buy" && (
           <div class="ac-msg" role="status" aria-live="polite">
             <span class="ac-msg-text">{msg || hint}</span>
-            {!locked && held && isSquare(held) && held.kind !== "k" && (
+            {!locked && held && isSquare(held) && held.kind !== "k" && g.round.you.board[held.at.square] === held.kind && (
               <button type="button" class="ac-sell" onClick={() => sell(held)}>
                 Sell {sellValue(held.kind, cfg)}
               </button>
@@ -1037,7 +1097,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
         )}
 
       </div>
-      {drag && (
+      {drag && (g.phase === "buy" || g.phase === "adjust") && (
         <div ref={ghostRef} class="hb-pieces ac-ghost" style={{ width: `${boxOf().width / 8}px`, height: `${boxOf().width / 8}px` }} aria-hidden="true">
           <piece class={`${mine === "w" ? "white" : "black"} ${KIND_NAME[drag.kind]}`} />
         </div>

@@ -42,10 +42,33 @@ describe("auto chess: buying an offer", () => {
     expect(AUTOCHESS.sellBack).toBe(0.75);
     expect(["p", "n", "b", "r", "q"].map((k) => sellValue(k as Kind))).toEqual([7, 22, 24, 37, 67]);
     const placed = buyOffer(emptyArmy("w", "e1"), offer("n", "c3"));
-    expect(sellPiece(placed, "c3")).toEqual({ army: emptyArmy("w", "e1"), gold: 22 });
+    expect(sellPiece(placed, "c3", "n")).toEqual({ army: emptyArmy("w", "e1"), gold: 22 });
     const held = holdOffer(holdOffer(emptyArmy("w", "e1"), offer("r", "a1")), offer("q", "d1"));
-    expect(sellHeld(held, 1)).toEqual({ army: holdOffer(emptyArmy("w", "e1"), offer("r", "a1")), gold: 67 });
-    expect(sellHeld(held, 0).army.bench).toEqual([offer("q", "d1")]);
+    expect(sellHeld(held, 1, "q")).toEqual({ army: holdOffer(emptyArmy("w", "e1"), offer("r", "a1")), gold: 67 });
+    expect(sellHeld(held, 0, "r")!.army.bench).toEqual([offer("q", "d1")]);
+  });
+
+  it("a sale only pays for a piece of yours that is there now, of the kind the seller says: a stale hold, the king and an offer pay nothing (Eric, Oct 21)", () => {
+    const placed = buyOffer(emptyArmy("w", "e1"), offer("n", "c3"));
+    // The square emptied (the piece was sold already), or another kind stands there now.
+    expect(sellPiece(emptyArmy("w", "e1"), "c3", "n")).toBeNull();
+    expect(sellPiece(placed, "c3", "q")).toBeNull();
+    expect(sellPiece(placed, "c4", "n")).toBeNull();
+    // The king isn't sold, wherever it stands; nothing is paid for it.
+    expect(sellPiece(placed, "e1", "k")).toBeNull();
+    expect(sellPiece(placed, "c3", "k")).toBeNull();
+    // Selling twice: the second finds nothing and pays nothing.
+    const once = sellPiece(placed, "c3", "n")!;
+    expect(sellPiece(once.army, "c3", "n")).toBeNull();
+    // The bench: an empty slot, a slot past the end, or another kind held there now.
+    const held = holdOffer(emptyArmy("w", "e1"), offer("r", "a1"));
+    expect(sellHeld(held, 1, "r")).toBeNull();
+    expect(sellHeld(held, 0, "q")).toBeNull();
+    expect(sellHeld(held, -1, "r")).toBeNull();
+    expect(sellHeld(sellHeld(held, 0, "r")!.army, 0, "r")).toBeNull();
+    // Nothing was changed by a refused sale.
+    expect(placed.board).toEqual({ c3: "n" });
+    expect(held.bench).toEqual([offer("r", "a1")]);
   });
 
   it("the prices are pawn 10, knight 30, bishop 32, rook 50, queen 90", () => {

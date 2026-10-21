@@ -17945,7 +17945,7 @@ button.sq-tiny {
   font-size: 13px;
   cursor: pointer;
 }
-/* The bench (v6): four slots, each a held piece and the square it will land on. Drag an offer onto the row to hold it. */
+/* The bench (v6): four slots, each a held piece and the square it will land on. Drag an offer from the shop onto the row to hold it. */
 .ac-bench {
   position: relative;
   height: 44px;
@@ -18034,6 +18034,8 @@ button.sq-tiny {
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
+  /* A card is tapped to buy and dragged to the bench to hold: a finger's drag is ours (without this the browser takes it for a pan and cancels it). */
+  touch-action: none;
 }
 .ac-buy .ac-icon {
   height: 34px;

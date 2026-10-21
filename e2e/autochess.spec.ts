@@ -395,8 +395,8 @@ test("the bench: drag an offer onto it to hold it (it keeps its square), tap it 
   const after = await offers(page);
   expect(after).toHaveLength(5);
   expect(after.slice(1)).toEqual(before.slice(1));
-  // An offer's silhouette is dragged the same way: the pawn for d4 (the right one of the pair, slot 3).
-  await dragMouse(page, middle((await silhouette(page, 3).boundingBox())!), await benchMiddle(page));
+  // A second offer is dragged the same way, from its shop card (a silhouette on the board is only tapped): the pawn for d4 (slot 3).
+  await dragMouse(page, middle((await card(page, 3).boundingBox())!), await benchMiddle(page));
   await expect(held(page)).toHaveCount(2);
   expect(await goldOf(page)).toBe(40);
   expect(await soundCount(page, "acHold")).toBe(2);
@@ -1205,5 +1205,259 @@ test("layouts: the board, shop and your row fit the screen with no scrolling, at
   expect(Math.abs(during.y - before.y) + Math.abs(during.width - before.width)).toBeLessThan(1);
   expect(Math.abs(bottom2 - bottom), "the foot of the box under the board stays").toBeLessThan(1);
   // (And your strip, right under the board, stays put too.)
+  expect(errors).toEqual([]);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Drags cut off, silhouettes that are only tapped, a sale of a piece that isn't there (Eric's first test of the new fights, Oct 21:
+// docs/decisions/2026-10-21-autochess-drag-fixes.md). Each of these failed on main (bc9a97e) before its fix.
+// ---------------------------------------------------------------------------------------------------------------------------------
+
+const ghosts = (p: Page) => p.locator(".ac-ghost");
+const sellZone = (p: Page) => p.locator(".ac-sell-drop");
+/** What a drag that does nothing must leave alone: your gold, your pieces on the board and the bench. */
+const holdings = (p: Page) =>
+  p.evaluate(() => ({
+    gold: Number(document.querySelector(".ac-gold-you b")?.textContent),
+    board: [...document.querySelectorAll(".hb-board piece.white")].map((e) => `${e.className.replace(/ ?anim/, "")}@${(e as HTMLElement).dataset.square}`).sort(),
+    bench: [...document.querySelectorAll(".ac-slot.has")].map((e) => `${(e as HTMLElement).dataset.kind}@${(e as HTMLElement).dataset.square}`),
+  }));
+/** Every white piece drawn on the page (not the avatar's pawn or the shop's and bench's little icons), and those on the board itself: a ghost is drawn outside the board. */
+const whitePieces = (p: Page) =>
+  p.evaluate(() => ({
+    all: [...document.querySelectorAll("piece.white")].filter((e) => !e.closest(".ac-avatar, .ac-icon")).length,
+    board: document.querySelectorAll(".hb-board piece.white").length,
+  }));
+/** The mouse button goes down on a point and the pointer moves off it: a drag in progress, the button still down. */
+async function pickUp(p: Page, from: { x: number; y: number }, by = { x: 14, y: -40 }) {
+  await p.mouse.move(from.x, from.y);
+  await p.mouse.down();
+  await p.mouse.move(from.x + 6, from.y - 6, { steps: 2 });
+  await p.mouse.move(from.x + by.x, from.y + by.y, { steps: 4 });
+}
+/** A finger down on a point and moved to another, still down: `end` lifts it, `cancel` has the browser cancel it. */
+async function holdTouch(p: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
+  const cdp = await p.context().newCDPSession(p);
+  const point = (x: number, y: number) => [{ x, y, id: 1 }];
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: point(from.x, from.y) });
+  for (let i = 1; i <= 8; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: point(from.x + ((to.x - from.x) * i) / 8, from.y + ((to.y - from.y) * i) / 8) });
+  const finish = async (type: "touchEnd" | "touchCancel") => {
+    await cdp.send("Input.dispatchTouchEvent", { type, touchPoints: [] });
+    await cdp.detach();
+  };
+  return { end: () => finish("touchEnd"), cancel: () => finish("touchCancel") };
+}
+
+test("a drag cut off by the end of the adjust step ends with it: no frozen ghost over the fight, the result or the next round (Eric's second queen on g1)", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors = watchErrors(page);
+  await page.goto("/autochess?quick=1&seed=9");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const shown = await offers(page);
+  const pawn = shown.findIndex((o) => o.kind === "p");
+  const square = shown[pawn]!.square;
+  await tap(page, card(page, pawn));
+  await expect(piece(page, "white", "pawn", square)).toBeVisible();
+  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
+  // Pick the pawn up, as Eric picked up his queen, and keep holding: the drag is live, its ghost under the pointer.
+  await pickUp(page, await center(page, square), { x: 24, y: -36 });
+  await expect(ghosts(page)).toHaveCount(1);
+  // The step ends under the finger: the fight begins, and the drag is over: no ghost, only the pieces that are really there.
+  await expect(root(page)).toHaveAttribute("data-phase", /^(fight|result)$/, { timeout: 15_000 });
+  await expect(ghosts(page)).toHaveCount(0);
+  const mid = await whitePieces(page);
+  expect(mid.all, "no white piece drawn off the board").toBe(mid.board);
+  expect(mid.board, "the king and the pawn at most").toBeLessThanOrEqual(2);
+  // Letting go afterwards changes nothing.
+  await page.mouse.move(300, 300, { steps: 3 });
+  await page.mouse.up();
+  await expect(ghosts(page)).toHaveCount(0);
+  await expect(root(page)).toHaveAttribute("data-phase", "result", { timeout: 200_000 });
+  await expect(ghosts(page)).toHaveCount(0);
+  const end = await whitePieces(page);
+  expect(end.all).toBe(end.board);
+  // The next round starts clean: no ghost, no "Drop to sell" over the shop, and drags work (an offer is held by dragging its card onto the bench).
+  await tap(page, page.getByRole("button", { name: "Next round" }));
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  await expect(ghosts(page)).toHaveCount(0);
+  await expect(sellZone(page)).toHaveCount(0);
+  await expect(page.locator(".ac-shop")).not.toHaveClass(/selling/);
+  const gold = await goldOf(page);
+  const price = PRICES[(await offers(page))[0]!.kind]!;
+  await dragMouse(page, middle((await card(page, 0).boundingBox())!), await benchMiddle(page));
+  await expect(held(page)).toHaveCount(1);
+  expect(await goldOf(page)).toBe(gold - price);
+  expect(errors).toEqual([]);
+});
+
+for (const via of ["a shop card", "a piece on the board", "a held piece"] as const) {
+  test(`a drag from ${via} that is still held when the buy step locks ends there with no action, and stays ended through the end of the step`, async ({ page }) => {
+    test.setTimeout(60_000);
+    const errors = watchErrors(page);
+    await page.goto("/autochess?quick=1&seed=9");
+    await expect(root(page)).toHaveAttribute("data-phase", "buy");
+    const shown = await offers(page);
+    const pawn = shown.findIndex((o) => o.kind === "p");
+    let from: { x: number; y: number };
+    let to: { x: number; y: number };
+    if (via === "a shop card") {
+      from = middle((await card(page, pawn).boundingBox())!);
+      to = await benchMiddle(page);
+    } else if (via === "a piece on the board") {
+      await tap(page, card(page, pawn));
+      await expect(piece(page, "white", "pawn", shown[pawn]!.square)).toBeVisible();
+      from = await center(page, shown[pawn]!.square);
+      to = await shopMiddle(page);
+    } else {
+      await dragMouse(page, middle((await card(page, pawn).boundingBox())!), await benchMiddle(page));
+      await expect(held(page)).toHaveCount(1);
+      from = middle((await held(page).first().boundingBox())!);
+      to = await shopMiddle(page);
+    }
+    const before = await holdings(page);
+    await pickUp(page, from);
+    await expect(ghosts(page)).toHaveCount(1);
+    // The last seconds lock the step: the drag ends there (nothing follows the finger through the lock), and the drop does nothing.
+    await expect(page.locator(".ac-clock span")).toHaveText("Locked", { timeout: 8000 });
+    // (Within a moment of "Locked" showing, not by the end of the two locked seconds.)
+    await expect(ghosts(page)).toHaveCount(0, { timeout: 700 });
+    await page.mouse.move(to.x, to.y, { steps: 4 });
+    await expect(ghosts(page)).toHaveCount(0);
+    await expect(sellZone(page)).toHaveCount(0);
+    expect(await holdings(page)).toEqual(before);
+    // The step ends with the button still down: still no ghost, and then the release changes nothing either.
+    await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 8000 });
+    await expect(ghosts(page)).toHaveCount(0);
+    await page.mouse.up();
+    await expect(ghosts(page)).toHaveCount(0);
+    expect(await goldOf(page)).toBe(before.gold);
+    expect((await holdings(page)).board).toEqual(before.board);
+    expect(errors).toEqual([]);
+  });
+}
+
+test("locking in under a drag ends the drag: the bonus is the only gold that moves, and nothing is held", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto(NEVER);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  await pickUp(page, middle((await card(page, 1).boundingBox())!));
+  await expect(ghosts(page)).toHaveCount(1);
+  // (A click on the button while the mouse button is down on the card: a second pointer, a keyboard or a switch does the same.)
+  await lockButton(page).evaluate((b) => (b as HTMLButtonElement).click());
+  await expect(ghosts(page)).toHaveCount(0);
+  const b = await benchMiddle(page);
+  await page.mouse.move(b.x, b.y, { steps: 4 });
+  await page.mouse.up();
+  await expect(ghosts(page)).toHaveCount(0);
+  expect(await goldOf(page)).toBe(125);
+  await expect(held(page)).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("a drag whose pointer is cancelled or loses its capture ends with no action: nothing bought, held or sold, no ghost", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.addInitScript(() => document.addEventListener("pointerdown", (e) => ((window as any).__pointer = e.pointerId), true));
+  await page.goto("/autochess?seed=9");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const shown = await offers(page);
+  const pawn = shown.findIndex((o) => o.kind === "p");
+  const before = await holdings(page);
+  // The capture is lost mid-drag (the browser took the pointer away): the drag is dropped, so the bench gets nothing.
+  const cardBox = (await card(page, pawn).boundingBox())!;
+  await pickUp(page, middle(cardBox));
+  await expect(ghosts(page)).toHaveCount(1);
+  await page.evaluate((slot) => document.querySelector(`.ac-buy[data-slot="${slot}"]`)!.releasePointerCapture((window as any).__pointer), pawn);
+  await expect(ghosts(page)).toHaveCount(0);
+  const b = await benchMiddle(page);
+  await page.mouse.move(b.x, b.y, { steps: 4 });
+  await page.mouse.up();
+  expect(await holdings(page)).toEqual(before);
+  // A cancelled pointer (a phone's touch the browser takes for a scroll) does the same.
+  if (phone()) {
+    const finger = await holdTouch(page, middle((await card(page, pawn).boundingBox())!), b);
+    await expect(ghosts(page)).toHaveCount(1);
+    await finger.cancel();
+    await expect(ghosts(page)).toHaveCount(0);
+    expect(await holdings(page)).toEqual(before);
+  }
+  // Nothing is stuck: a drag after both still holds the card's piece.
+  await dragMouse(page, middle((await card(page, pawn).boundingBox())!), await benchMiddle(page));
+  await expect(held(page)).toHaveCount(1);
+  expect(await goldOf(page)).toBe(before.gold - PRICES[shown[pawn]!.kind]!);
+  expect(errors).toEqual([]);
+});
+
+test("a silhouette on the board is only tapped: pressing it and dragging it picks nothing up and drops nothing, on the sell zone, the bench or the board (Eric: 'it just sold a piece that didn't exist')", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/autochess?seed=9");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const shown = await offers(page);
+  const pawns = shown.flatMap((o, slot) => (o.kind === "p" ? [slot] : []));
+  const [first, second] = pawns as [number, number];
+  // One of yours to be sold if the silhouette's drag could reach it: the first pawn, bought by tap.
+  await tap(page, card(page, first));
+  await expect(piece(page, "white", "pawn", shown[first]!.square)).toBeVisible();
+  const before = await holdings(page);
+  const offersBefore = await offers(page);
+  const at = middle((await silhouette(page, second).boundingBox())!);
+  const targets = { "the sell zone": await shopMiddle(page), "the bench": await benchMiddle(page), "the board": await center(page, "g3"), "the shop's edge": { x: at.x, y: (await page.locator(".ac-shop").boundingBox())!.y + 2 } };
+  for (const [name, to] of Object.entries(targets)) {
+    await pickUp(page, at, { x: 8, y: -8 });
+    await page.mouse.move(to.x, to.y, { steps: 8 });
+    // (Nothing follows the pointer, and neither the shop row nor the bench lights up for a drop.)
+    await expect(ghosts(page), `a silhouette dragged to ${name}: no ghost`).toHaveCount(0);
+    await expect(sellZone(page), `${name}: no drop zone`).toHaveCount(0);
+    await page.mouse.up();
+    expect(await holdings(page), `dropped on ${name}: nothing changed`).toEqual(before);
+    expect(await offers(page), `${name}: the shop is as it was`).toEqual(offersBefore);
+    await expect(page.locator(".ac-sil")).toHaveCount(5);
+    expect(await soundCount(page, "sell"), `${name}: nothing sold`).toBe(0);
+  }
+  await expect(page.locator(".ac-float")).toHaveCount(0);
+  // A finger does the same.
+  if (phone()) {
+    for (const [name, to] of Object.entries(targets)) {
+      const finger = await holdTouch(page, at, to);
+      await expect(ghosts(page), `a finger dragging a silhouette to ${name}: no ghost`).toHaveCount(0);
+      await finger.end();
+      expect(await holdings(page), `a finger's drop on ${name}`).toEqual(before);
+    }
+  }
+  // A tap still buys it, though a finger wobbles a little (a few pixels) as it taps.
+  await page.mouse.move(at.x, at.y);
+  await page.mouse.down();
+  await page.mouse.move(at.x + 3, at.y - 2, { steps: 2 });
+  await page.mouse.up();
+  await expect(piece(page, "white", "pawn", shown[second]!.square)).toBeVisible();
+  expect(await goldOf(page)).toBe(before.gold - PRICES.p!);
+  expect(errors).toEqual([]);
+});
+
+test("a sale only pays for a piece of yours that is there: selling a piece the pointer is still carrying (the Sell button, the keyboard) pays once, not again at the drop", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/autochess?seed=9");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const shown = await offers(page);
+  const pawn = shown.findIndex((o) => o.kind === "p");
+  await tap(page, card(page, pawn));
+  await expect(piece(page, "white", "pawn", shown[pawn]!.square)).toBeVisible();
+  const gold = await goldOf(page);
+  // Pick the pawn up (picking it up selects it, so "Sell 7" shows), then sell it with the keyboard while it is still held.
+  await pickUp(page, await center(page, shown[pawn]!.square), { x: 10, y: -30 });
+  await expect(ghosts(page)).toHaveCount(1);
+  const sell = page.getByRole("button", { name: "Sell 7", exact: true });
+  await sell.focus();
+  await page.keyboard.press("Enter");
+  await expect(piece(page, "white", "pawn", shown[pawn]!.square)).toHaveCount(0);
+  expect(await goldOf(page)).toBe(gold + 7);
+  // Dropping what is no longer there on the sell zone: no second payment (it was a NaN before), no second "Sold".
+  const shop = await shopMiddle(page);
+  await page.mouse.move(shop.x, shop.y, { steps: 6 });
+  await page.mouse.up();
+  await expect(ghosts(page)).toHaveCount(0);
+  expect(await goldOf(page)).toBe(gold + 7);
+  expect(await soundCount(page, "sell")).toBe(1);
+  await expect(page.locator(".ac-float")).toHaveCount(1);
+  await expect(page.locator(".ac-msg")).toContainText("Sold the pawn for 7.");
   expect(errors).toEqual([]);
 });
