@@ -468,7 +468,7 @@ export function warnThenUnleash(next: BossPowerState, t: TurnContext): boolean {
 export type BossLastMove = { move: string; san: string; staggered?: boolean; captured?: string; through?: StopReason };
 
 /** The power fields `BossRules.stopReason` reads: the same in the match's state and in the screens' view. */
-export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block">> & { camo?: { square: string | null } | null };
+export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block">> & { camo?: { square: string | null } | null; garden?: { plants: readonly { square: string }[] } | null };
 
 /**
  * What a boss's battle code (its moments in a match: the funhouse, Lights out, the bounce…) may use of the match
@@ -495,4 +495,10 @@ export interface Battle {
   bossPassed(): void;
   /** A boss's own scratch store, kept for the match (Big Boy's bounce candidates, worked out once per position). */
   readonly memo: Map<string, unknown>;
+  /**
+   * The match's clock for powers that run in real time (the hippo gardener's seeds), in ms: the lobby's (the server's
+   * time) online, the page's visible time solo (the runner's `clock`). Without one (tests, the sims), a stand-in: each
+   * crowd move counts as BOSS_POWERS.seedEverySec.
+   */
+  now(): number;
 }

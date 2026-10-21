@@ -21,6 +21,7 @@ import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain } from "./boss-brain
 import { prefetchMaia, startMaia } from "./maia.ts";
 import { MaiaGate, type GateEnd } from "./maia-gate.ts";
 import { testParams } from "./test-switches.ts";
+import { gardenClock } from "./garden-clock.ts";
 
 export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
@@ -348,6 +349,8 @@ export class SoloMatch implements GameView {
       engines: this.engines.map((e) => withServerRecheck(e, () => this.runner?.state.boards.length ?? 1)),
       library,
       raidSide: this.raidSide,
+      // (The hippo gardener's seeds: this device's time while the page is in view.)
+      clock: gardenClock,
       // Boss alone is just you against the boss; a Solo raid has bots in the crowd.
       entrants: [
         { id: HUMAN, name: this.playerName, isBot: false, practice: this.practice },
@@ -905,6 +908,24 @@ export class SoloMatch implements GameView {
   }
 
   /**
+   * The hippo gardener's watering (at the start of his turn after its warning, or the admins' trigger): he gets ready
+   * (thinking; your queen banner first, if your move took his queen) while this device's engines place what the seeds
+   * rolled (waterFrom), then the watering, his whole turn; then your turn, its moments (the watering's first) before your
+   * clock starts, as after his move. The pass guard, or no engine answer: no watering this turn (it waits for his next),
+   * and he plays his move.
+   */
+  private async waterTurn() {
+    const snap = this.bossSnapshot();
+    this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
+    const water = this.runner.playWater(this.engines).catch(() => this.runner.applyWater(null));
+    await Promise.all([water, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
+    if (this.stopped) return;
+    const showMs = !this.runner.bossToMove() ? bossTurnShowMs(this.runner.bossView(), this.alone) : 0;
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
+    this.timer = setTimeout(() => this.nextRound(), showMs);
+  }
+
+  /**
    * As your turn begins: if Wrangler's showdown may follow before long (the rules' `scout`: from his move showdownFrom
    * while he has one left; or the test trigger), his scout searches line-ups of three pairs and two on this position (an
    * engine of its own) until his turn; else it stops.
@@ -1165,7 +1186,7 @@ export class SoloMatch implements GameView {
       }
       // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps, Chub & Chirp's Carrot Patch cast (his whole turn) and
       // hop come at the start of his turn, before his move.)
-      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.carrotDue() ? this.carrotTurn() : this.runner.repaintDue() ? this.repaintTurn() : this.runner.hopDue() ? this.hopTurn() : this.bossTurn());
+      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.carrotDue() ? this.carrotTurn() : this.runner.repaintDue() ? this.repaintTurn() : this.runner.waterDue() ? this.waterTurn() : this.runner.hopDue() ? this.hopTurn() : this.bossTurn());
       // (A failed Lights out: his extra move, after his own and before your turn.)
       if (this.runner.extraMoveDue()) return void this.extraTurn();
       // (Boingo's funhouse: his move for you, as your turn begins.)
@@ -1409,6 +1430,8 @@ export class SoloMatch implements GameView {
           if (this.runner.carrotDue()) await this.runner.playCarrots(this.engines).catch(() => this.runner.applyCarrots(null));
           // (Smudgy's Repaint: his whole turn; no pair in the band, or no engine answer: he moves.)
           if (this.runner.repaintDue()) await this.runner.playRepaint(this.engines).catch(() => this.runner.applyRepaint(null));
+          // (The hippo gardener's watering: his whole turn; the pass guard, or no engine answer: he moves.)
+          if (this.runner.waterDue()) await this.runner.playWater(this.engines).catch(() => this.runner.applyWater(null));
           if (this.runner.hopDue()) await this.runner.playHop(this.engines).catch(() => this.runner.applyHop(null));
           if (this.runner.bossToMove()) await this.runner.playBoss(this.engines[0]);
           continue;

@@ -19,6 +19,7 @@ import {
   repliesFrom,
   repaintFrom,
   slamAhead,
+  waterAnswer,
   slamFrom,
   type BoardScore,
   type EngineLike,
@@ -38,6 +39,11 @@ import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 type Msg = ServerMessage;
 const MAX_MOVES = 14;
+/**
+ * The hippo gardener's seeds waiting at every watering (the ?seeds= test switch; other bosses never read it): his count
+ * runs on the server's clock online and on none in this solo copy, so it's set, and both paths roll the same seeds.
+ */
+const KIT_SEEDS_WAITING = 10;
 const library = [KIT_OPENING];
 
 /** The crowd's move, from the position alone: the same on both paths. */
@@ -72,6 +78,7 @@ async function hostBoss(engine: EngineLike, s: Settings, m: Extract<Msg, { t: "b
   if (m.slam) return reply((await slamFrom(engines, m.fen, m.slam))?.fen ?? "");
   if (m.hop) return reply((await hopFrom(engines, m.fen, m.hop))?.fen ?? "");
   if (m.repaint) return reply((await repaintFrom(engines, m.fen, m.repaint, !!m.repaintAny))?.fen ?? "");
+  if (m.water) return reply((await waterAnswer(engines, m.fen, m.water, !!m.waterAny)).answer);
   const kind = m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo";
   const ahead = m.land?.length && !m.funhouse ? slamAhead(m.land) : null;
   const look = m.race && !m.funhouse ? { race: m.race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;
@@ -99,7 +106,7 @@ const eventKey = (e: object) => JSON.stringify(e, Object.keys(e).sort());
 async function online(bossId: string, test: string): Promise<{ trace: Trace; start: MatchRunner }> {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
-  const settings = { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...RAID_SETTINGS, lastStandFrom: 999, bossId, bossPowerTest: test, bossUnfinished: true, bossHidden: true, bossMaxMoves: MAX_MOVES } as Settings;
+  const settings = { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...RAID_SETTINGS, lastStandFrom: 999, bossId, bossPowerTest: test, bossUnfinished: true, bossHidden: true, bossMaxMoves: MAX_MOVES, bossSeedTest: KIT_SEEDS_WAITING } as Settings;
   const core = new LobbyCore(newLobbyRecord("KITPA", now), { now: () => now, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), msg as Msg]), icon: () => undefined }, library, mulberry32(7), settings);
   // (Rated 3000: the boss a step above, past the strength where he slips, so his move is the same on both paths.)
   for (const [i, id] of ["P1", "P2"].entries()) core.connect(undefined, id, i ? "phone" : "computer", false, 3000);
@@ -174,6 +181,8 @@ async function solo(start: MatchRunner): Promise<Trace> {
       if (r.bossToMove() && r.carrotDue()) r.applyCarrots();
       seen();
       if (r.bossToMove() && r.repaintDue()) await r.playRepaint(engines).catch(() => r.applyRepaint(null));
+      seen();
+      if (r.bossToMove() && r.waterDue()) await r.playWater(engines).catch(() => r.applyWater(null));
       seen();
       if (r.bossToMove() && r.hopDue()) await r.playHop(engines).catch(() => r.applyHop(null));
       seen();

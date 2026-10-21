@@ -37,11 +37,17 @@
  * (after which crowd move it came, the crowd's material lead, in pawns, as it came and after his last move at full
  * strength; null when the battle ended first) and his moves at full strength.
  *
+ * The hippo gardener (id gardener): his seeds come by real time, so the sim keeps a clock of its own: each crowd turn
+ * passes the crowd's pick (`pickSec` in the patch: 10 by default, 5 a fast crowd, 20 one that runs the raid's clock out),
+ * the reveal, his thinking and his move's show (GARDEN_TURN_SEC) and the turn's moments. Each row logs every watering
+ * (after which crowd move, the seeds, what they rolled, what came up, what was dropped, his gain by the engine, the
+ * positions searched and the ms, his own pieces eaten, the jackpot) and every one that waited (the pass guard).
+ *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, PASS_WAIT, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, PASS_WAIT, powerMomentMs, waterAnswer, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -239,7 +245,17 @@ interface RaidPatch {
   /** The boss's tier (bossFixedElo: a player rated just under it; the usual is 1600) and Solo's difficulty (bossDifficulty: Hard 250, Hardest 500). */
   tier?: number;
   difficulty?: number;
+  /**
+   * The hippo gardener's seeds come by real time: how long the crowd takes to pick, in seconds (the default 10, half the
+   * raid's 20 s move clock: a crowd of thinkers; 5 a fast crowd, 20 one that runs the clock out every turn). Each crowd
+   * turn plus his turn passes that, the reveal (revealSeconds), his thinking and his move's show (GARDEN_TURN_SEC) and the
+   * turn's power moments (powerMomentMs) on the sim's clock.
+   */
+  pickSec?: number;
 }
+
+/** His thinking (bossThinkMs, at least 1.2 s) and his move on screen (bossShowMs, 1.8 s) each turn, for the sim's clock. */
+const GARDEN_TURN_SEC = 3;
 
 /**
  * The crowd's counter to Alfil's cast (patch.counter): with two of his pawns marked, the captures that take one; the
@@ -276,7 +292,10 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       while (strikeTurns.size < strikes) strikeTurns.add(6 + Math.floor(strikeRng() * 25));
       // (A boss whose powers are built before its art: met as the test link does, bossUnfinished.)
       const s = { ...settings, ...RAID_SETTINGS, bossId, bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES, ...(patch.tier ? { bossFixedElo: patch.tier } : {}), ...(patch.difficulty ? { bossDifficulty: patch.difficulty } : {}) } as Settings;
-      const runner = new MatchRunner({ settings: s, rng, engines, library, entrants: botRoster(rng, s.lobbySize, s) });
+      // (The clock for the hippo gardener's seeds: the crowd's pick (patch.pickSec), the reveal, his turn and the moments.)
+      let clockMs = 0;
+      const pickSec = patch.pickSec ?? 10;
+      const runner = new MatchRunner({ settings: s, rng, engines, library, entrants: botRoster(rng, s.lobbySize, s), clock: () => clockMs });
       const ults: { kind: string; turn: number }[] = [];
       let seen = -1;
       const look = () => {
@@ -312,6 +331,14 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       };
       // (Smudgy: every Repaint tried, and the turns none fitted.)
       const smudgy = { repaints: [] as { at: number; of: number; gain: number; pawn: string; piece: string; gains: number[] }[], waits: [] as { at: number; of: number; gains: number[] }[] };
+      // (The hippo gardener: every watering (after which crowd move, the seeds and their rolls, what came up, his gain by the
+      // engine, the positions searched and the time, his own pieces eaten, the jackpot) and every one that waited.)
+      const garden = {
+        pickSec,
+        waterings: [] as { at: number; seeds: number; rolled: Record<string, number>; placed: Record<string, number>; dropped: Record<string, number>; gain: number | null; looks: number; ms: number; own: number; jackpot: boolean }[],
+        waits: [] as { at: number; seeds: number; gain: number | null; answer: string }[],
+        plants: 0,
+      };
       // (Moo & Moon: his beams, each flurry's size, each Full Moon with the crowd's material lead as it came and after it.)
       const moo = { beams: 0, flurries: [] as number[], moons: [] as { at: number; before: number; after: number | null }[], best: 0 };
       const lead = () => {
@@ -400,6 +427,36 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             }
             smudgy.waits.push({ at, of: candidates.length, gains });
           }
+          if (bossId === "gardener" && runner.waterDue()) {
+            // (His watering: his whole turn, unless the pass guard has it wait (or no answer): then his move.)
+            const at = runner.boss!.crowdMoves;
+            const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+            const ask = runner.waterAsk()!;
+            const tw = Date.now();
+            const { answer, pick } = await waterAnswer(engines, fen, ask, runner.waterAny());
+            const ms = Date.now() - tw;
+            const done = runner.applyWater(answer, pick?.gain ?? null);
+            const tally = (ks: readonly string[]) => ks.reduce<Record<string, number>>((t, k) => ((t[k] = (t[k] ?? 0) + 1), t), {});
+            if (done) {
+              garden.waterings.push({
+                at,
+                seeds: done.seeds,
+                rolled: tally(done.rolled),
+                placed: tally(done.growth.map((x) => x.kind)),
+                dropped: tally(done.growth.flatMap((x) => (x.dropped ? [x.dropped] : []))),
+                gain: done.gain,
+                looks: pick?.looks ?? 0,
+                ms,
+                own: done.growth.filter((x) => x.own).length,
+                jackpot: !!done.jackpot,
+              });
+              garden.plants += done.growth.filter((x) => x.kind === "plant").length;
+              ults.push({ kind: "water", turn: at });
+              look();
+              continue;
+            }
+            garden.waits.push({ at, seeds: ask.kinds.length, gain: pick?.gain ?? null, answer: answer === PASS_WAIT ? "wait" : answer || "none" });
+          }
           if (bossId === "hopper") {
             const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
             const his = runner.boss!.crowdSide === "w" ? "b" : "w";
@@ -475,6 +532,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           }
         }
         const tusksBefore = runner.boss!.powers?.tusks;
+        // (The sim's clock: this crowd turn's moments, the crowd's pick, the reveal, then his turn.)
+        clockMs += powerMomentMs(runner.boss!.powers?.events) + (pickSec + (s.revealSeconds ?? 0) + GARDEN_TURN_SEC) * 1000;
         await runner.score(new Map());
         if (tusksBefore && runner.boss!.powers?.fusion?.why === "taken" && runner.boss!.powers.fusion.at === runner.boss!.crowdMoves) alfil.taken++;
         if (runner.boss!.powers?.landed?.early && runner.boss!.powers.landed.at === runner.boss!.crowdMoves) alfil.early++;
@@ -485,7 +544,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       if (pc) Object.assign(carrots, { pulls: pc.pulls, over: pc.over ?? null, his: carrotsOf(pc, "boss"), crowd: carrotsOf(pc, "crowd"), spin: pc.spin ?? null });
       const camo = b.powers?.camo;
       const camoRow = camo ? { side: camo.side, missed: camo.missed, off: !!camo.off, swap: camo.swap ?? null, reveal: camo.reveal ?? null, hidden: camo.square, strikeAfter: camo.swap && camo.reveal ? camo.reveal.at - camo.swap.at : null } : null;
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }

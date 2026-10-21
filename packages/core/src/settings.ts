@@ -127,6 +127,12 @@ export interface Settings {
    * given count (docs/decisions/2026-10-18-hopper-wired.md).
    */
   bossCarrotTest?: number;
+  /**
+   * Test switch, solo (?seeds=N, 0 to 10, with ?boss=gardener): the hippo gardener has exactly N seeds waiting at every
+   * watering, whatever the clock says (his meter shows N): the e2e's, the sims' and the boss kit's way to a set count
+   * (docs/decisions/2026-10-21-gardener-rules.md).
+   */
+  bossSeedTest?: number;
   /** Boss battle: the King's strike makes the boss's next move one that loses this many points (from its top moves). */
   kingStrikeLoss: readonly [number, number];
   /**
@@ -596,7 +602,7 @@ export const BOSS_POWERS = {
    * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
    * fire most of the game.
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1007,6 +1013,42 @@ export const BOSS_POWERS = {
    */
   fullMoonMoves: 5,
   flurryBeams: 5,
+  /**
+   * The hippo gardener's Seeds (his passive; Eric, Oct 20: "a second meter on a real timer... every 30 seconds it fills and
+   * he plants a seed"; docs/decisions/2026-10-21-gardener-rules.md): seedsAtStart waiting as the battle begins, then one
+   * every seedEverySec seconds of real time, whoever's turn it is, up to seedMax waiting. Where they are is never decided
+   * until he waters. Online the server's clock; solo and Boss alone the device's, counting only while the page is in view.
+   */
+  seedsAtStart: 5,
+  seedEverySec: 30,
+  seedMax: 10,
+  /**
+   * His Watering (his ultimate, his whole turn; Eric, Oct 20: "his lottery"): every waiting seed rolls one of these, in
+   * percent (seeded from the battle): nothing, a plain plant (blocks an empty square for plantTurns crowd turns), a killer
+   * plant (eats a non-king piece of either side), a pawn, a knight, bishop or rook (which one: seeded, a third each), a
+   * queen. They add up to 100.
+   */
+  waterOdds: { nothing: 40, plant: 30, killer: 12, pawn: 12, piece: 5, queen: 1 } as Readonly<Record<"nothing" | "plant" | "killer" | "pawn" | "piece" | "queen", number>>,
+  plantTurns: 3,
+  /**
+   * Where the host's engines put what came up (waterFrom: outcome by outcome, the biggest first): his total gain from the
+   * watering (his evaluation after it, the crowd to move, against his before it, him to move, in pawns of log-odds,
+   * bouncePawnLogit) at most the band's top, nearest waterTarget. A rolled queen (the jackpot) goes where it gains nearest
+   * jackpotMax, however far over (a queen up saturates the engine's win chances near 7 from an even position, so a cap
+   * would only ever leave it hanging: Eric, "if he gets really lucky, you're just losing the game, and that's fine"), and
+   * the rest of that watering is placed under jackpotMax (or what the queen gained), nearest it. An outcome that can't be
+   * placed without going over the top is dropped (it comes up as nothing). Under the band's bottom is kept: what came up
+   * was small (only plants), and nothing placed would only be less. Each outcome
+   * weighs at most waterLooks squares (seeded among those its guards allow; a killer plant the crowd's pieces first, his
+   * own only when none keeps the band), each searched at waterNodes; a watering searches at most waterBudget positions in
+   * all, besides the one before it, so ten seeds never stall a phone.
+   */
+  waterBand: [0.5, 2.5] as readonly [number, number],
+  waterTarget: 1.5,
+  jackpotMax: 6,
+  waterLooks: 4,
+  waterNodes: 20_000,
+  waterBudget: 48,
 } as const;
 
 /**

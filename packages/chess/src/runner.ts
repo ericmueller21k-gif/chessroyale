@@ -109,6 +109,8 @@ import {
   carrotBattle,
   smudgyBattle,
   mooBattle,
+  gardenerBattle,
+  type WaterAsk,
   beamLines,
   bossRace,
   crowdRace,
@@ -127,7 +129,7 @@ import {
   type ShowdownScout,
   type CarrotRace,
 } from "./boss-powers.ts";
-import type { BossPowerSettings, BounceResult, CarrotPatch, LeapfrogHop, LightsOutTest, RepaintResult } from "@chessroyale/core";
+import type { BossPowerSettings, BounceResult, CarrotPatch, LeapfrogHop, LightsOutTest, RepaintResult, WaterResult } from "@chessroyale/core";
 
 /**
  * Runs a match round by round: deal, collect picks, score with the engine, draw,
@@ -372,6 +374,11 @@ export class MatchRunner {
       entrants: readonly Entrant[];
       /** Boss raid: the side the crowd plays (White unless "b": a test switch, so the God King can be seen in black). */
       raidSide?: Side;
+      /**
+       * The clock for powers that run in real time (the hippo gardener's seeds), in ms: the lobby's (the server's time)
+       * online, the page's visible time solo. Without one, a stand-in (Battle.now).
+       */
+      clock?: () => number;
     },
   ) {
     this.top = new TopMovesCache(opts.settings.botCandidateMoves);
@@ -1137,7 +1144,7 @@ export class MatchRunner {
 
   static restore(
     snapshot: RunnerSnapshot,
-    opts: { settings: Settings; rng: Rng; engines: readonly EngineLike[]; library: readonly Opening[] },
+    opts: { settings: Settings; rng: Rng; engines: readonly EngineLike[]; library: readonly Opening[]; clock?: () => number },
   ): MatchRunner {
     const byId = new Map(opts.library.map((o) => [o.id, o]));
     const runner = Object.create(MatchRunner.prototype) as MatchRunner;
@@ -1570,6 +1577,46 @@ export class MatchRunner {
     return carrotBattle.won(this.state.boss) && boardEnd(this.boards.get(this.state.boards[0]!)!) !== "checkmate";
   }
 
+  /**
+   * The match's clock for powers that run in real time (Battle.now): the runner's `clock` (the server's time online, the
+   * page's visible time solo); without one (tests, the sims), each crowd move counts as BOSS_POWERS.seedEverySec.
+   */
+  clockNow(): number {
+    return this.opts.clock ? this.opts.clock() : (this.state.boss?.crowdMoves ?? 0) * BOSS_POWERS.seedEverySec * 1000;
+  }
+
+  /**
+   * The hippo gardener's watering is due: the start of his turn after its warning (or the admins' trigger), not waiting
+   * after this crowd move (gardenerBattle.due). It's his whole turn: no move of his follows it. Not when it waits (the pass
+   * guard, no answer): then his move.
+   */
+  waterDue(): boolean {
+    return gardenerBattle.due(this.battle);
+  }
+
+  /**
+   * What the watering needs placed (the boss request's `water`): the seeds' rolls, taken the first time it's asked for and
+   * kept, the plain plants on the board, the order of the squares tried. Null when none is due.
+   */
+  waterAsk(): WaterAsk | null {
+    return gardenerBattle.ask(this.battle);
+  }
+
+  /** The watering comes even when it would lose him real material (the test switch's first, or the admins' trigger). */
+  waterAny(): boolean {
+    return gardenerBattle.any(this.battle);
+  }
+
+  /** The watering from this device's engines (waterFrom); null: none was due, or it waits (he moves). */
+  async playWater(engines: readonly EngineLike[] = this.opts.engines): Promise<WaterResult | null> {
+    return gardenerBattle.play(this.battle, engines);
+  }
+
+  /** The watering (online the host's answer, checked: waterCheck); anything else, none now, and he moves. */
+  applyWater(answer: string | null, gain: number | null = null): WaterResult | null {
+    return gardenerBattle.apply(this.battle, answer, gain);
+  }
+
   /** The boss's last move, and the piece it took (if any). */
   private bossLast: BossLastMove | null = null;
   /** The bosses' battle code's own store (Battle's memo). */
@@ -1605,6 +1652,7 @@ export class MatchRunner {
       afterCrowdMove: (move) => runner.afterCrowdMove(move),
       bossPassed: () => runner.preparePowers(),
       memo: runner.bossMemo,
+      now: () => runner.clockNow(),
     };
   }
 

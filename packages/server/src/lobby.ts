@@ -24,6 +24,7 @@ import {
   maskedFen,
   toSan,
   type BoardRound,
+  type WaterAsk,
   type BoardScore,
   type ClientMessage,
   type NetFinal,
@@ -296,9 +297,9 @@ export interface LobbyRecord {
    * ultimate); "extra": it plays Hollow's extra move; "bounce": it picks Big Boy's Big Bounce; "tusks", "fuse" and
    * "slam": it picks Alfil's cast (the pair), his fusion's square and his Slam's lift; "hop": which pawn of Chub & Chirp's hops.
    * "carrots": Chub & Chirp's Carrot Patch cast (his whole turn; no host asked: the placement is the server's).
-   * "repaint": it picks Smudgy's Repaint pair (his whole turn).
+   * "repaint": it picks Smudgy's Repaint pair (his whole turn). "water": it places the hippo gardener's watering (his whole turn).
    */
-  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop" | "carrots" | "repaint";
+  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop" | "carrots" | "repaint" | "water";
   /** Big Boy's Big Bounce, Alfil's fusion and Slam, the hopper's hop: the candidates the host was sent (the answer must be one of them). */
   bounceCandidates?: string[];
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
@@ -454,6 +455,12 @@ const BOSS_TIMEOUT_MS = 15_000;
  */
 const bossTimeoutMs = (asks: { showdown?: string; drag?: true } | null): number => BOSS_TIMEOUT_MS + (asks?.showdown === "test" ? 25_000 : asks?.showdown ? 15_000 : asks?.drag ? 8_000 : 0);
 
+/** The hippo gardener's watering as the boss request asks it of the host (the roll kept on the runner), or nothing. */
+const waterAsk = (runner: MatchRunner): { water?: WaterAsk; waterAny?: true } => {
+  const water = runner.waterAsk();
+  return water ? { water, ...(runner.waterAny() ? { waterAny: true as const } : {}) } : {};
+};
+
 export class LobbyCore {
   private runner: MatchRunner | null = null;
 
@@ -470,7 +477,8 @@ export class LobbyCore {
     if (settings.bossesOff) this.settings = { ...this.settings, bossesOff: settings.bossesOff };
     if (record.moveClock) this.settings = { ...this.settings, moveClockSeconds: record.moveClock, moveClockSteps: [] };
     if (record.runner) {
-      this.runner = MatchRunner.restore(record.runner, { settings: this.settings, rng, engines: [], library });
+      // (The clock for powers that run in real time, the hippo gardener's seeds: the server's.)
+      this.runner = MatchRunner.restore(record.runner, { settings: this.settings, rng, engines: [], library, clock: () => this.io.now() });
     }
   }
 
@@ -1175,6 +1183,7 @@ export class LobbyCore {
       engines: [],
       library: this.library,
       entrants: [...this.r.humans.map((h) => ({ id: h.id, name: h.name, isBot: false, practice: !!h.practice })), ...bots],
+      clock: () => this.io.now(),
     });
     const now = this.io.now();
     if (this.r.auto) {
@@ -1399,7 +1408,7 @@ export class LobbyCore {
     // (A pick among candidate positions, not a move: Big Boy's bounce, Alfil's cast, fusion and Slam, the hopper's hop;
     // and the Carrot Patch's cast, which only asks the pass guard.)
     const kind = this.r.bossKind;
-    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam" || kind === "hop" || kind === "carrots" || kind === "repaint";
+    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam" || kind === "hop" || kind === "carrots" || kind === "repaint" || kind === "water";
     // A power limits the moves: the boss's (a pie), or the crowd's for the move Boingo plays for it.
     const allowed = funhouse ? runner.crowdAllowed() : runner.bossAllowed();
     // (Wrangler's turn: his long pulls, a drag or the showdown to work out too, ordered by a seed of the turn's own.)
@@ -1426,6 +1435,7 @@ export class LobbyCore {
       ...(kind === "slam" ? { slam: this.r.bounceCandidates ?? [] } : {}),
       ...(kind === "hop" ? { hop: this.r.bounceCandidates ?? [] } : {}),
       ...(kind === "repaint" ? { repaint: this.r.bounceCandidates ?? [], ...(runner.repaintAny() ? { repaintAny: true as const } : {}) } : {}),
+      ...(kind === "water" ? waterAsk(runner) : {}),
       // (A step that spends his whole turn: the pass guard, on the host's engine. The server never searches.)
       ...(kind === "fuse" || kind === "carrots" ? { pass: true as const } : {}),
       ...(allowed && !pick ? { allowed } : {}),
@@ -1556,6 +1566,27 @@ export class LobbyCore {
   }
 
   /**
+   * The hippo gardener's watering (at the start of his turn after its warning, or the admins' trigger: the runner's
+   * waterDue): the seeds are rolled here, from the server's clock (the count) and the battle's seed (the outcomes), and
+   * everyone sees him get ready (thinking; your queen banner first, if it's up) while the host's engines place them
+   * (waterFrom); then the watering, his whole turn, checked against the roll and the rules (waterCheck), and the crowd's
+   * turn, its moments (the watering's first) before the crowd's clock starts. The host's PASS_WAIT (the pass guard), "",
+   * anything else, or no host engine anywhere: no watering this turn (it waits for his next), and his move is asked for.
+   */
+  private requestWater() {
+    this.r.phase = "boss";
+    this.r.bossKey = `r-${++this.r.counter}`;
+    this.r.bossKind = "water";
+    this.r.bossMinAt = this.thinkMinAt();
+    this.runner!.waterAsk();
+    this.broadcast(this.bossMessage(0, { thinking: true }));
+    const host = this.hostNow();
+    this.r.hostId = host;
+    if (host) this.sendBossRequest(host);
+    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
+  }
+
+  /**
    * Hollow's extra move (the crowd failed Lights out): after his own move, he thinks again while the host's engine
    * picks a quiet move that gains him only a little (extraMoveFrom); everyone sees it land with its banner, then the
    * crowd's turn. No such move (or no engine anywhere): he skips it.
@@ -1647,6 +1678,16 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
+    if (this.r.bossKind === "water") {
+      // The hippo gardener's watering (the host's placement, checked): his whole turn (the crowd's turn begins as after his
+      // move: its moments, the watering's first). Anything else (PASS_WAIT, "", not a placement of this roll, none due any
+      // more): no watering now, and straight on to his move.
+      this.r.bossKind = undefined;
+      this.runner!.applyWater(move);
+      const until = this.io.now() + (!this.runner!.bossToMove() ? bossTurnShowMs(this.runner!.bossView()) : 0);
+      this.broadcast(this.bossMessage(until));
+      return this.setTimer("nextRound", until);
+    }
     if (this.r.bossKind === "hop") {
       // Chub & Chirp's hop (the host's pick, one of the candidates; else the first): it plays out, then his move. None
       // due any more (nothing came of it): straight on to his move.
@@ -1697,7 +1738,7 @@ export class LobbyCore {
     // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in his funhouse, the
     // crowd's: a random allowed one too). His extra move needs the engine to stay small: without one, he skips it.
     const runner = this.runner!;
-    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop" || this.r.bossKind === "carrots" || this.r.bossKind === "repaint") return this.playBoss("");
+    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop" || this.r.bossKind === "carrots" || this.r.bossKind === "repaint" || this.r.bossKind === "water") return this.playBoss("");
     const legal = (this.r.bossKind === "funhouse" ? runner.crowdAllowed() : runner.bossAllowed()) ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
     this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
   }
@@ -1740,8 +1781,9 @@ export class LobbyCore {
         return this.finishMatch();
       }
       // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps, Chub & Chirp's Carrot Patch cast (his whole turn) and
-      // hop, and Smudgy's Repaint (his whole turn) come at the start of his turn, before his move.)
-      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.carrotDue() ? this.requestCarrots() : runner.repaintDue() ? this.requestRepaint() : runner.hopDue() ? this.requestHop() : this.requestBoss();
+      // hop, Smudgy's Repaint and the hippo gardener's watering (each his whole turn) come at the start of his turn, before
+      // his move.)
+      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.carrotDue() ? this.requestCarrots() : runner.repaintDue() ? this.requestRepaint() : runner.waterDue() ? this.requestWater() : runner.hopDue() ? this.requestHop() : this.requestBoss();
       // (A failed Lights out: his extra move, after his own and before the crowd's turn.)
       if (runner.extraMoveDue()) return this.requestExtra();
       // (Boingo's funhouse: his move for the crowd, as its turn begins.)
