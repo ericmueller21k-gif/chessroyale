@@ -69,6 +69,10 @@ and on a phone that isn't that slow, it keeps 175 ms). The node budget keeps bot
 
 ## Fights (`hunchess-fights.ts`)
 
+> **These are the fights under the rules as merged.** How fights end changed later on Oct 21 (no check streak, stalls decided by
+> the engine's score, an early end when a side is far ahead): the same 80 fights before and after are in
+> [reports/autochess-endings.md](autochess-endings.md).
+
 80 fights between two bot armies (rounds 1 to 8, as `sparseStarts` makes them: the bot's buys for both sides, 4 to 10 pieces a side),
 played by the real fight (`playFight`, the fight's rules) with the engine at 30,000 nodes for both sides.
 
