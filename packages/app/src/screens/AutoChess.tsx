@@ -360,7 +360,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
         const square = s.move.slice(2, 4);
         commit({ ...gref.current, fight: { fen: withPiece(s.fen, square, s.cashIn === "w" ? "P" : "p"), last: s.move, plies: s.ply } });
         play("acCash");
-        addFloat(cfg.cashInGold, cellOf(square, orientation));
+        // (From the round's own colors: this runs from the timer made on the first render, whose `orientation` is round 1's.)
+        addFloat(cfg.cashInGold, cellOf(square, color === "w" ? "white" : "black"));
         setTimeout(() => {
           const now = gref.current;
           if (now.fight?.plies === s.ply) commit({ ...now, fight: { ...now.fight, fen: s.fen } });
