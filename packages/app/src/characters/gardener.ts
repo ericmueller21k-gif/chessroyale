@@ -1,25 +1,25 @@
 /**
  * The hippo gardener (Eric, Oct 20: "a hippo who waters plants and plants seeds"; no name yet, his id is `gardener`). After
  * Eric's reference picture, redrawn: an upright hippo with intentionally realistic proportions (a heavy barrel body, short
- * thick legs, a big square muzzle with two nostrils, small round ears and small eyes, pinkish-grey skin with a pinker belly,
- * throat and cheeks), a green gardening apron on straps with a front pocket (a white daisy and a yellow dot on it) and a
- * small burlap seed bag peeking out of the pocket (the director's touch: his planting animation pulls seeds from it); in one
- * hand a brass-and-green spray nozzle with a spray of water coming out of it, and ONE continuous garden hose: a coil slung
- * over his far shoulder, its free end running across his chest to the nozzle. Drawn three-quarters on, facing our left (as
- * Alfil, Sawyer, Chub & Chirp, Smudgy and Moo), so he sprays toward the board; light from the top left.
+ * thick legs, a big square muzzle with two nostrils and a soft smile, small round ears, pinkish-grey skin with a pinker
+ * belly, throat and cheeks) and no clothes (Eric, second pass: the apron is gone, and the seeds will come from his hand). He
+ * holds a garden hose in both hands: the near hand on a brass-and-green spray nozzle with a spray of water coming out of it
+ * (toward the board), the other hand on the hose a little behind it. The hose is one piece: from his hands it hangs across
+ * his belly and wraps round behind him (a small loop shows at his back), and its end trails to a small coil on the ground
+ * by his back foot. Drawn three-quarters on, facing our left (as Alfil, Sawyer, Chub & Chirp, Smudgy and Moo), so he sprays
+ * toward the board; light from the top left.
  *
  * This is his still only (docs/decisions/2026-10-20-gardener-still.md): the first frame of `idle`, nothing else; his powers and
  * his animations come later. He isn't in `CHARACTERS`, `BOSS_KITS` or the roster, and nothing in the game draws him yet; the
  * preview draws him with its `extra=` option.
  *
  * Rigging, so the poses that follow are numbers (`GardenerPose`), as the other bosses':
- * - the nozzle arm (`fist`, `elbowN`, `nozzle`: it aims) and the water spray, a part of its own (`spray`: its length, droop
- *   and flicker: it turns on and off and arcs over the board), and the hose that runs from the coil to the nozzle wherever
- *   the fist goes (`sag`);
- * - the other arm (`hand`, `elbowF`: it reaches into the pocket and tosses seeds), the pocket and the seed bag (`bag`: how
- *   far it stands out of the pocket);
+ * - the nozzle hand (`fist`, `elbowN`, `nozzle`: it aims) and the water spray, a part of its own (`spray`: its length, droop
+ *   and flicker: it turns on and off and arcs over the board);
+ * - the other hand (`hand`, `elbowF`: it holds the hose, lets go, reaches for seeds and tosses them), and the hose, which is
+ *   redrawn from the two hands wherever they go (`sag`: how far it hangs across his belly);
  * - the head moves as one (`head`), with the jaw a part of its own (`jaw`: degrees open, a great yawn or roar), the ears
- *   (`earN`, `earF`: they flick), the eyes (`eyes`, `gaze`) and the tail (`tail`);
+ *   (`earN`, `earF`: they flick), the eyes (`eyes`) and the tail (`tail`);
  * - his legs step (`stepN`, `stepF`) and he breathes (`bob`).
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
@@ -49,11 +49,7 @@ export const GARDENER_PALETTE: Record<string, string> = {
   W: "#d4636e",
   T: "#f3ead2",
   t: "#cdbf9f",
-  A: "#274f33", // his apron: leaf green, dark to light
-  B: "#38753f",
-  C: "#5a9a4a",
-  D: "#8cc261",
-  E: "#17483f", // the hose: deep teal-green, dark to light
+  E: "#17483f", // the hose: deep teal green, dark to light
   F: "#22705a",
   G: "#33a479",
   H: "#7fe0ae",
@@ -61,11 +57,6 @@ export const GARDENER_PALETTE: Record<string, string> = {
   K: "#b87a14",
   L: "#f2c14e",
   M: "#ffe58a",
-  P: "#6f4f2c", // the seed bag's burlap: dark to light, and its twine
-  Q: "#9c7342",
-  R: "#c79d63",
-  S: "#e6c78f",
-  s: "#c0392b",
   "1": "#2a6fc2", // water: deep to pale
   "2": "#4fa3ee",
   "3": "#8bcdfb",
@@ -83,10 +74,8 @@ type Key = (x: number, y: number) => string;
 const SKIN = "abcde";
 const PINK = "fghi";
 const MUZZLE = "mnoq";
-const LEAF = "ABCD";
 const HOSE = "EFGH";
 const BRASS = "JKLM";
-const BURLAP = "PQRS";
 
 const ramp = (r: string, l: number) => r[Math.max(0, Math.min(r.length - 1, Math.floor(l * r.length)))]!;
 const union = (...fs: Inside[]): Inside => (x, y) => fs.some((f) => f(x, y));
@@ -196,24 +185,29 @@ const H = OY + GROUND + 6;
 /** The ground point he is placed by (x): between his feet, a little toward his front so the muzzle and the nozzle reach no farther one side than his tail and back do the other. */
 const FOOT_X = 35;
 /** The middle of his two feet (his shadow's). */
-const FEET_X = 37.5;
+const FEET_X = 33.5;
 /** How far his head (the skull, ears, eyes, muzzle and jaw, all painted in one place) stands above where they're painted. */
 const HEAD_UP = -2;
 
 // ---- The body: the torso, the legs and feet, the tail.
 
-/** His torso: a barrel, wider at the belly than the chest, the belly bulging toward the front; grey over the back, pink at the throat and belly. */
+/** His torso: a barrel, wider at the belly than the chest, the belly bulging toward the front; grey over his back and sides, pink on the belly and throat. */
 function torso(): { part: Part; at: Pt } {
   const inside = union(E(38.5, 31, 16.5, 14), E(36.5, 43.5, 19.5, 15));
-  const light = roundLight(34, 36, 22, 25, 0.06);
-  const belly = patch(30, 48, 15, 11.5, 1.3);
+  const light = roundLight(34, 36, 22, 25, 0.08);
+  const belly = patch(30.5, 45.5, 15.5, 12.8, 1.3);
   const throat = patch(31.5, 29.5, 10, 5.5, 2.1);
   return painted(16, 16, 42, 46, (F, S) => {
     F(inside, (x, y) => (belly(x, y) || throat(x, y) ? ramp(PINK, light(x, y) + 0.2) : ramp(SKIN, light(x, y))));
-    // The navel, below the hem of his apron.
-    S(["f"], 33, 57);
+    // The navel: a dark crease and a light touch beside it.
+    S(["f", "f"], 31, 50);
+    S(["i"], 32, 50);
   });
 }
+
+/** The legs' places (x of their middles): the near one in front, the far one behind. */
+const LEG_N = 23;
+const LEG_F = 44;
 
 /** A leg and its foot, centered at `cx`: a thick column into a wide foot with three nails at the front. `lift` raises the foot. */
 function leg(cx: number, lift: number): { part: Part; at: Pt } {
@@ -231,80 +225,8 @@ function leg(cx: number, lift: number): { part: Part; at: Pt } {
 
 /** His tail: a short flat paddle off his rump, `swing` pixels up or down at its tip. */
 function tail(swing: number): { part: Part; at: Pt } {
-  const pts: Pt[] = [[54.5, 50], [57, 50.5 + swing * 0.4], [58.6, 51.4 + swing]];
+  const pts: Pt[] = [[53.5, 52.5], [56, 53.3 + swing * 0.4], [58, 54.4 + swing]];
   return stroke(pts, [2, 1.7, 1.4], (l) => ramp(SKIN, l));
-}
-
-// ---- His apron: the bib and skirt, the straps, the pocket, the seed bag in it.
-
-const BIB_TOP = 38.5;
-const HEM = 54;
-
-/** The apron: a bib and a skirt flaring to a curved hem, shaded across its folds, with a daisy and a yellow dot. */
-function apron(): { part: Part; at: Pt } {
-  const shape = inPoly([[25.5, BIB_TOP], [40.5, BIB_TOP], [41.5, 46], [46.5, HEM - 1], [41, HEM + 1.2], [33, HEM + 1.8], [25, HEM + 0.8], [20.5, HEM - 1], [24.5, 46]]);
-  return painted(19, 37, 30, 22, (F, S) => {
-    F(shape, (x, y) => {
-      // Light from the left, a fold or two down it and a shade under the hem.
-      let l = 0.84 - (x - 24) * 0.022 - (y - BIB_TOP) * 0.004;
-      if (Math.abs(x - 43 - (y - 46) * 0.22) < 0.6 && y > 47) l -= 0.3;
-      if (Math.abs(x - 26 + (y - 46) * 0.2) < 0.55 && y > 47) l -= 0.3;
-      if (y > HEM + 0.2) l -= 0.3;
-      return ramp(LEAF, l);
-    });
-    // His daisy (white petals, a yellow heart) on the bib, and a smaller one on the skirt: a dot or two of white and yellow.
-    S([".w.", "wLw", ".w."], 23, 49);
-    S(["wL"], 43, 51);
-  });
-}
-
-/** The straps: from the bib's corners over his shoulders. */
-function straps(): { part: Part; at: Pt } {
-  const near = stroke([[26.5, BIB_TOP + 0.5], [25, 33], [23.5, 28.5]], [1.3, 1.3, 1.3], (l) => ramp(LEAF, l - 0.1));
-  const far = stroke([[39.5, BIB_TOP + 0.5], [43, 33], [47, 28.5]], [1.3, 1.3, 1.3], (l) => ramp(LEAF, l - 0.1));
-  const x0 = Math.min(near.at[0], far.at[0]);
-  const y0 = Math.min(near.at[1], far.at[1]);
-  const w = Math.max(near.at[0] + near.part.grid[0]!.length, far.at[0] + far.part.grid[0]!.length) - x0;
-  const h = Math.max(near.at[1] + near.part.grid.length, far.at[1] + far.part.grid.length) - y0;
-  return painted(x0, y0, w, h, (_F, S) => {
-    S(near.part.grid, near.at[0], near.at[1]);
-    S(far.part.grid, far.at[0], far.at[1]);
-  });
-}
-
-const BUTTON: Part = { grid: ["ML", "LK"], outline: true };
-
-/** The pocket's front: a panel with a dark rim, a lighter lip and a stitched seam, drawn over the bag's foot. */
-function pocket(): { part: Part; at: Pt } {
-  return painted(
-    28,
-    46,
-    13,
-    8,
-    (F, S) => {
-      F(inPoly([[28, 46], [41, 46], [41, 54], [28, 54]]), (x, y) => (x < 29 || x >= 40 || y < 47 || y >= 53 ? "A" : y < 49 ? "D" : y > 50.5 ? "B" : "C"));
-      // Its stitching.
-      S(["B.B.B.B.B"], 30, 49);
-    },
-    false,
-  );
-}
-
-/** The seed bag, `out` pixels of it standing above the pocket's lip: a burlap sack, its mouth cuffed and heaped with seeds, red twine round it. */
-function bag(out: number): { part: Part; at: Pt } {
-  const rows = [
-    "....SQ....",
-    "..SQPSQQ..",
-    ".SQQPSQPQ.",
-    ".RRRRRRRR.",
-    ".RQRRRRQRP",
-    "RRsssssssP",
-    "RRRRRRQQQP",
-    "RRRRQQQQPP",
-    "RQQQQQPPPP",
-  ];
-  const y0 = 46 - out;
-  return painted(29, y0, 10, rows.length, (_F, S) => S(rows.slice(0, Math.max(3, Math.min(rows.length, out + 2))), 29, y0));
 }
 
 // ---- His head: the skull and muzzle, the jaw, the mouth inside it, the ears and the eyes.
@@ -316,8 +238,8 @@ const HEAD_INSIDE = union(inPoly(HEAD_POLY), inPoly(NOSE_POLY));
 /** Where the ears and the eyes sit on the skull (their top left). */
 const EAR_F: Pt = [24, 2];
 const EAR_N: Pt = [36, 3];
-const EYE_N: Pt = [34, 10];
-const EYE_F: Pt = [26, 9];
+const EYE_N: Pt = [33, 9];
+const EYE_F: Pt = [25, 8];
 /** Where the jaw hinges (under his cheek), and the closed jaw's outline. */
 const HINGE: Pt = [33.5, 22.4];
 const JAW_POLY: Pt[] = [[11.5, 23.4], [21, 23.9], [28, 23.7], [32, 22.8], [32.4, 25], [30.6, 27.2], [25, 28.4], [19, 28.6], [13.5, 27.2], [10.5, 25]];
@@ -340,8 +262,8 @@ function head(): { part: Part; at: Pt } {
     // Its nostrils (a pale rim, the dark hole): the one at the tip, and the second behind it.
     S([".nn.", "nyyn", "nyyn"], 9, 10);
     S([".nn.", "nyyn"], 15, 11);
-    // The corner of his mouth, curling up into his cheek.
-    S([".y", "yy", "y."], 33, 20);
+    // A soft smile: his mouth's line curling up into his cheek.
+    for (const [x, y] of [[29, 23], [30, 22.4], [31, 22], [32, 21.4], [33, 21], [34, 20.4], [35, 19.6], [35.5, 18.6]] as Pt[]) S(["y"], Math.floor(x), Math.floor(y));
   });
 }
 
@@ -402,27 +324,27 @@ function ear(x0: number, y0: number, tilt: number): { part: Part; at: Pt } {
 }
 
 export type Eyes = "open" | "half" | "shut" | "wide";
-/** An eye: a small dark one with a glint (the pupil's top left pixel); `w` its width. */
+/** An eye: a round dark one with a glint (a pale pixel up and to the left); `w` its width (the far eye, seen at an angle, is narrower). */
 function eye(x0: number, y0: number, w: number, lid: Eyes): { part: Part; at: Pt } {
   const rows: Record<Eyes, string[]> = {
-    open: w >= 3 ? ["wxx", "xxx", "xxx"] : ["wx", "xx", "xx"],
-    half: w >= 3 ? ["xxx", ".xx"] : ["xx", ".x"],
-    shut: w >= 3 ? ["xxx"] : ["xx"],
-    wide: w >= 3 ? [".xx.", "xwxx", "xxxx", ".xx."] : [".x.", "wxx", ".x."],
+    open: w >= 4 ? [".xx.", "xwxx", "xxxx", ".xx."] : [".xx", "xwx", ".xx"],
+    half: w >= 4 ? ["xxxx", ".xx."] : ["xxx", ".xx"],
+    shut: w >= 4 ? ["xxxx"] : ["xxx"],
+    wide: w >= 4 ? [".xxx.", "xwwxx", "xwxxx", ".xxx."] : [".xx.", "xwx.", ".xx."],
   };
-  return painted(x0, y0, 5, 4, (_F, S) => S(rows[lid], x0, y0), false);
+  return painted(x0, y0, 5, 5, (_F, S) => S(rows[lid], x0, y0), false);
 }
 
 // ---- His arms, the hose and the nozzle, the water.
 
 /** The nozzle arm: shoulder, elbow and fist, a thick sausage of skin lit from the top left. */
 function armN(s: Pt, e: Pt, f: Pt): { part: Part; at: Pt } {
-  return stroke([s, e, f], [5.2, 4.6, 3.7], (l) => ramp(SKIN, l + 0.05));
+  return stroke([s, e, f], [4.9, 4.4, 3.7], (l) => ramp(SKIN, l + 0.05));
 }
 
 /** The other arm, hanging at his flank: shoulder, elbow, hand. */
 function armF(s: Pt, e: Pt, f: Pt): { part: Part; at: Pt } {
-  return stroke([s, e, f], [5.4, 4.9, 3.9], (l) => ramp(SKIN, l - 0.02));
+  return stroke([s, e, f], [4.8, 4.4, 3.8], (l) => ramp(SKIN, l - 0.16));
 }
 
 /** His hand: dark knuckles on top, the fingers curling under. */
@@ -551,7 +473,6 @@ function shadow(w: number): Part {
 
 const { parts: PARTS, add } = lazyParts();
 add("fist", () => fist());
-add("button", () => BUTTON);
 add("shadow", () => shadow(54));
 
 type Placed = { name: string; at: Pt };
@@ -593,13 +514,11 @@ export interface GardenerPose {
   spray?: number;
   droop?: number;
   seed?: number;
-  /** The hose from the coil to the nozzle: how far it hangs below the straight line between them. */
-  sag?: number;
-  /** The other arm: the hand and the elbow (bent by itself when left out). */
+  /** The other hand (on the hose a little behind the nozzle) and its elbow (bent by itself when left out). */
   hand?: Pt;
   elbowF?: Pt;
-  /** How many pixels of the seed bag stand above the pocket's lip (0 down in it). */
-  bag?: number;
+  /** The hose from his hands across his belly and behind him: how far it hangs below the line between them. */
+  sag?: number;
   /** The tail's tip, up or down. */
   tail?: number;
   /** The feet's lift (a step). */
@@ -621,21 +540,18 @@ const REST = {
   spray: 16,
   droop: 6,
   seed: 3,
-  sag: 3.4,
-  hand: [47.5, 48.5] as Pt,
-  bag: 7,
+  sag: 8,
+  hand: [31, 41] as Pt,
   tail: 0,
   stepN: 0,
   stepF: 0,
 };
 
 const SHOULDER_N: Pt = [25.5, 31];
-const SHOULDER_F: Pt = [51.5, 28.5];
-/** Where the hose's coil lies over his far shoulder (the middle of its rings). */
-const COIL: Pt = [50, 28.5];
+const SHOULDER_F: Pt = [38, 30];
 /** His arms' bones: the upper arm and the forearm. */
-const BONES_N: Pt = [6.4, 6.4];
-const BONES_F: Pt = [11, 11];
+const BONES_N: Pt = [5.2, 5.2];
+const BONES_F: Pt = [7, 7];
 const NOZZLE_LEN = 12;
 /** How far behind the fist the nozzle's fitting is, and the hose's end behind that. */
 const GRIP = 3.5;
@@ -653,35 +569,42 @@ function elbowOf(s: Pt, t: Pt, [l1, l2]: Pt, down = true): Pt {
   return (c1[1] >= c2[1]) === down ? c1 : c2;
 }
 
-/** The hose from `a` (where it leaves the coil) to `b` (the nozzle's fitting), hanging `sag` pixels below the line between them. */
-function hose(a: Pt, b: Pt, sag: number): { part: Part; at: Pt } {
-  const pts: Pt[] = Array.from({ length: 13 }, (_, i) => {
-    const t = i / 12;
-    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t + sag * 4 * t * (1 - t)] as Pt;
-  });
-  return stroke(pts, pts.map(() => 1.05), (l, _s, across) => (across < -0.3 && l > 0.55 ? "G" : ramp(HOSE, l - 0.22)));
-}
+/** Where the hose reaches the edge of his belly and passes behind him, and the small loop that shows at his back before it goes in. */
+const WRAP: Pt = [54.6, 42.2];
+const BACK_LOOP: readonly Pt[] = [[54, 41.8], [57.2, 41.6], [58.4, 44.2], [57, 46.8], [53.5, 47.4]];
+/** The coil of hose on the ground by his back foot (the middle of it). */
+const GROUND_COIL: Pt = [56.6, 63.4];
+
+/** A point of a quadratic curve from `a` through the control point `c` to `b`, `t` from 0 to 1. */
+const bez = (a: Pt, c: Pt, b: Pt, t: number): Pt => [(1 - t) ** 2 * a[0] + 2 * (1 - t) * t * c[0] + t * t * b[0], (1 - t) ** 2 * a[1] + 2 * (1 - t) * t * c[1] + t * t * b[1]];
 
 /**
- * The coil over his far shoulder: the hose wound three times into a ring (his arm passes through the hole), a dark seam
- * between the turns and a highlight along the top left of each; the end leaves it at the lower left.
+ * The hose in front of him: from the nozzle's fitting `butt` to his other hand, and from there hanging `sag` pixels deep across
+ * his belly to where it goes behind him (`WRAP`). It ends just inside his side, so it looks to pass behind.
  */
-function coil(): { part: Part; at: Pt } {
-  const [cx, cy] = COIL;
-  return painted(Math.floor(cx) - 8, Math.floor(cy) - 8, 17, 17, (F) => {
-    const rad2 = (x: number, y: number) => Math.hypot(x + 0.5 - cx, (y + 0.5 - cy) / 1.06);
+function hoseFront(butt: Pt, hand: Pt, sag: number): { part: Part; at: Pt } {
+  const control: Pt = [(hand[0] + WRAP[0]) / 2 + 1, Math.max(hand[1], WRAP[1]) + sag];
+  const pts: Pt[] = [butt, [(butt[0] + hand[0]) / 2, (butt[1] + hand[1]) / 2], hand, ...Array.from({ length: 12 }, (_, i) => bez(hand, control, WRAP, (i + 1) / 12))];
+  return stroke(pts, pts.map(() => 1.05), (l, _s, across) => (across < -0.3 && l > 0.55 ? "G" : ramp(HOSE, l - 0.18)));
+}
+
+/** The loop of hose behind him, showing past his side: drawn behind his body, so it comes out of it and goes back in. */
+function hoseBack(): { part: Part; at: Pt } {
+  return stroke(BACK_LOOP, BACK_LOOP.map(() => 1.05), (l, _s, across) => (across < -0.3 && l > 0.55 ? "G" : ramp(HOSE, l - 0.18)));
+}
+
+/** The small coil of hose on the ground by his back foot: two turns seen at a slant, a dark seam between them. */
+function groundCoil(): { part: Part; at: Pt } {
+  const [cx, cy] = GROUND_COIL;
+  return painted(Math.floor(cx) - 5, Math.floor(cy) - 3, 11, 7, (F) => {
+    const r = (x: number, y: number) => Math.hypot((x + 0.5 - cx) / 3.7, (y + 0.5 - cy) / 2.3);
     F(
+      (x, y) => r(x, y) <= 1 && r(x, y) >= 0.38,
       (x, y) => {
-        const r = rad2(x, y);
-        return r <= 6.2 && r >= 1.7;
-      },
-      (x, y) => {
-        const t = (rad2(x, y) - 1.7) / 1.5;
-        const turn = Math.floor(t);
-        if (turn >= 1 && t - turn < 0.36) return "E";
-        // Each turn is lit from the top left: its lightest on that side, its darkest on the other; the turns alternate.
-        const l = 0.5 + ((cx - x) * 0.6 + (cy - y) * 0.6) / 12 + (turn % 2 === 0 ? 0.12 : -0.14);
-        return l > 0.78 ? "H" : ramp(HOSE, l - 0.04);
+        const d = r(x, y);
+        if (d > 0.62 && d < 0.7) return "E";
+        const l = 0.55 + ((cx - x) * 0.5 + (cy - y) * 0.9) / 8 + (d > 0.7 ? 0.08 : -0.06);
+        return l > 0.8 ? "H" : ramp(HOSE, l - 0.1);
       },
     );
   });
@@ -701,38 +624,32 @@ export function gardenerLayers(pose: GardenerPose = {}): Layer[] {
   const fistN: Pt = up(p.fist, b);
   const handF: Pt = up(p.hand, b);
   const elbowN = pose.elbowN ? up(pose.elbowN, b) : elbowOf(shoulderN, fistN, BONES_N);
-  const elbowF = pose.elbowF ? up(pose.elbowF, b) : pose.hand ? elbowOf(shoulderF, handF, BONES_F, true) : up([55.5, 40], b);
+  const elbowF = pose.elbowF ? up(pose.elbowF, b) : elbowOf(shoulderF, handF, BONES_F, true);
   // The nozzle's axis, from its fitting behind his fist out to its cap, tilted `nozzle` degrees up from level (toward our left).
   const th = rad(p.nozzle);
   const butt: Pt = [fistN[0] + Math.cos(th) * GRIP, fistN[1] + Math.sin(th) * GRIP];
   const tip: Pt = [butt[0] - Math.cos(th) * NOZZLE_LEN, butt[1] - Math.sin(th) * NOZZLE_LEN];
-  const hoseEnd: Pt = [butt[0] + Math.cos(th) * 0.5, butt[1] + Math.sin(th) * 0.5];
-  const coilEnd: Pt = up([COIL[0] - 4.4, COIL[1] + 4.2], b);
+  const hoseEnd: Pt = [butt[0] + Math.cos(th) * 0.6, butt[1] + Math.sin(th) * 0.6];
   const layers: Layer[] = [
     at("shadow", FEET_X - 27, GROUND - 3),
+    L(placed("groundCoil", groundCoil)),
     L(placed(`tail:${r2(p.tail)}`, () => tail(p.tail)), b),
-    L(placed(`leg:${48}:${r2(p.stepF)}`, () => leg(48, p.stepF))),
-    L(placed(`leg:${27}:${r2(p.stepN)}`, () => leg(27, p.stepN))),
+    L(placed(`leg:${LEG_F}:${r2(p.stepF)}`, () => leg(LEG_F, p.stepF))),
+    L(placed(`leg:${LEG_N}:${r2(p.stepN)}`, () => leg(LEG_N, p.stepN))),
+    L(placed("hoseBack", hoseBack), b),
     L(placed("torso", torso), b),
-    L(placed("apron", apron), b),
-    L(placed("straps", straps), b),
-    at("button", 25, BIB_TOP + b + 0.5),
-    at("button", 40, BIB_TOP + b + 0.5),
-    ...(p.bag > 0 ? [L(placed(`bag:${p.bag}`, () => bag(p.bag)), b)] : []),
-    L(placed("pocket", pocket), b),
     H(placed(`mouthIn:${p.jaw}`, () => mouthIn(p.jaw))),
     H(placed(`jaw:${p.jaw}`, () => jaw(p.jaw))),
     H(placed("head", head)),
     H(placed(`earF:${p.earF}`, () => ear(EAR_F[0], EAR_F[1], p.earF))),
     H(placed(`earN:${p.earN}`, () => ear(EAR_N[0], EAR_N[1], p.earN))),
-    H(placed(`eyeF:${p.eyes}`, () => eye(EYE_F[0], EYE_F[1], 2, p.eyes))),
-    H(placed(`eyeN:${p.eyes}`, () => eye(EYE_N[0], EYE_N[1], 3, p.eyes))),
+    H(placed(`eyeF:${p.eyes}`, () => eye(EYE_F[0], EYE_F[1], 3, p.eyes))),
+    H(placed(`eyeN:${p.eyes}`, () => eye(EYE_N[0], EYE_N[1], 4, p.eyes))),
     L(placed(`armF:${key([shoulderF, elbowF, handF])}`, () => armF(shoulderF, elbowF, handF))),
-    at("fist", handF[0] - 3, handF[1] - 2),
-    L(placed("coil", coil), b),
     L(placed(`armN:${key([shoulderN, elbowN, fistN])}`, () => armN(shoulderN, elbowN, fistN))),
-    L(placed(`hose:${key([coilEnd, hoseEnd])}:${r2(p.sag)}`, () => hose(coilEnd, hoseEnd, p.sag))),
+    L(placed(`hose:${key([hoseEnd, handF])}:${r2(p.sag)}`, () => hoseFront(hoseEnd, handF, p.sag))),
     L(placed(`nozzle:${key([butt, tip])}`, () => nozzle(butt, tip))),
+    at("fist", handF[0] - 3, handF[1] - 2.5),
     at("fist", fistN[0] - 3, fistN[1] - 2.5),
   ];
   if (p.spray > 0) layers.push(L(placed(`spray:${key([tip])}:${p.nozzle}:${p.spray}:${p.droop}:${p.seed}`, () => spray([tip[0] - 1.5, tip[1]], 180 - p.nozzle, p.spray, p.droop, p.seed))));

@@ -34,11 +34,11 @@ describe("the hippo gardener's still", () => {
     expect(p.y + p.h).toBeLessThanOrEqual(GARDENER.h);
   });
 
-  it("moves by numbers: the jaw, the water, the arms and the bag redraw without error and stay in the frame", () => {
+  it("moves by numbers: the jaw, the water, the hands and the hose redraw without error and stay in the frame", () => {
     const poses: GardenerPose[] = [
       { jaw: 30, eyes: "wide", spray: 0 },
       { nozzle: 40, fist: [17, 29], spray: 22, droop: 12, seed: 7 },
-      { hand: [36, 47], bag: 3, bob: 1, earN: -2, earF: 2, stepN: 3, tail: 2 },
+      { hand: [36, 47], bob: 1, earN: -2, earF: 2, stepN: 3, tail: 2 },
     ];
     for (const pose of poses) {
       const k = frameKeys(GARDENER, { layers: gardenerLayers(pose), ms: 100 });
