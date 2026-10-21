@@ -129,6 +129,9 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     // Testing, solo: ?carrots=N (0 to 5, with ?boss=hopper&power=carrotpatch), N of Chub & Chirp's carrots a step from
     // one of his pieces and out of your reach, the rest a step from yours and out of his: his spin on N (5: he wins).
     ...(/^[0-5]$/.test(q.get("carrots") ?? "") ? { bossCarrotTest: Number(q.get("carrots")) } : {}),
+    // Testing, solo: ?seeds=N (0 to 10, with ?boss=gardener), N seeds at every watering of the hippo gardener's, whatever
+    // the clock says (his meter shows N).
+    ...(/^(?:[0-9]|10)$/.test(q.get("seeds") ?? "") ? { bossSeedTest: Number(q.get("seeds")) } : {}),
     // Testing: ?weakbots=1, every bot plays loosely and people rank above bots (WEAK_BOTS), so a test's player surely
     // survives the cuts.
     ...(q.get("weakbots") === "1" ? WEAK_BOTS : {}),

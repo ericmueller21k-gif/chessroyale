@@ -35,6 +35,7 @@ import {
   slamFrom,
   hopFrom,
   repaintFrom,
+  waterAnswer,
   allowedSearch,
   jobRanked,
   jobOffers,
@@ -728,6 +729,9 @@ export class NetMatch implements GameView {
         if (m.hop) return void this.hostPick(m.key, async (engines) => (await hopFrom(engines, m.fen, m.hop!))?.fen ?? null);
         // (Smudgy's Repaint: the pair within the band, nearest its target; none: "", and he moves.)
         if (m.repaint) return void this.hostPick(m.key, async (engines) => (await repaintFrom(engines, m.fen, m.repaint!, !!m.repaintAny))?.fen ?? null);
+        // (The hippo gardener's watering: what the seeds rolled, placed by this device's engines within the band; the pass
+        // guard's PASS_WAIT unless it's the test switch's or the trigger's; "" with no answer: it waits, and he moves.)
+        if (m.water) return void this.hostPick(m.key, async (engines) => (await waterAnswer(engines, m.fen, m.water!, !!m.waterAny)).answer);
         // (Chub & Chirp's Carrot Patch cast spends his whole turn: only the pass guard to ask.)
         if (m.pass) return void this.hostPick(m.key, (engines) => castAnswer(engines, m.fen));
         return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null);

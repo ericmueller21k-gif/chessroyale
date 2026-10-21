@@ -76,16 +76,18 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
  * on his first turn, and his Carrot Patch, which comes at the start of his first turn: their files). Smudgy's Camouflage
  * comes from his first move whatever the switch says; ?power=repaint warns as the second turn begins. Moo & Moon's
  * ?power=moonbeam brings a beam after every one of his moves (not every third), ?power=fullmoon warns as the second turn
- * begins (the Full Moon at the start of his turn after it).
+ * begins (the Full Moon at the start of his turn after it). The hippo gardener's Seeds count from the battle's start whatever
+ * the switch says; ?power=water warns as the second turn begins (the watering at the start of his turn after it; ?seeds=N for
+ * a set count).
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -132,6 +134,9 @@ export function bossInText(name: string, start = false, roster: readonly BossDef
 
 /** The hopper's name wherever it shows (Eric, Oct 18): Chub the rabbit riding Chirp the grasshopper. Its id stays "hopper". */
 export const HOPPER_NAME = "Chub & Chirp";
+
+/** The hippo gardener's name wherever it shows (Eric, Oct 21): a plain name, like Smudgy's. His id stays "gardener". */
+export const GARDENER_NAME = "Puddles";
 
 /**
  * Every boss, complete or not. Only a playable one (isPlayable: a complete character and powers) is ever chosen,
@@ -187,6 +192,14 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // weaker underneath than every playable boss not named in it, and a tie at −250 failed it; Moo plays at Stockfish's strength
   // floor (about 1320 to 1350), so 10 points change nothing in play (the director's call, Oct 20; docs/decisions/2026-10-20-moo-wired.md).
   { id: "moo", name: "Moo & Moon", icon: "🐄", kit: "Moo", offset: -240, powers: { passive: "moonbeam", ultimate: "fullmoon" } },
+  // Puddles, the hippo gardener (GARDENER_NAME; Eric, Oct 20, named Oct 21): Seeds, a public count on a real-time meter (5 as the
+  // battle begins, one every 30 s, up to 10), and Watering, his whole turn: every seed rolls nothing, a plain plant that
+  // blocks a square for 3 crowd turns, a killer plant that eats a piece of either side, a piece grown for him, or the queen
+  // jackpot, placed by the host's engines so his gain stays in a fair band (bosses/gardener.ts;
+  // docs/decisions/2026-10-21-gardener-rules.md). Not playable until his art is wired in (`kit: null`; the test links
+  // `?boss=gardener&wip=1`, `&power=water`, `&seeds=10`). His offset from the raid sim: the usual −250, with
+  // rageSpeed 1.2 the crowd scores 0.17 in 46 moves with 3.0 waterings a battle, inside the pack (reports/gardener-sim.md).
+  { id: "gardener", name: GARDENER_NAME, icon: "🦛", kit: null, offset: -250, powers: { passive: "seeds", ultimate: "water" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
@@ -552,6 +565,8 @@ export interface BossPowerState {
   repaintWait?: number;
   /** Moo & Moon's powers (Moonbeam, the Full Moon). */
   moo?: MooState | null;
+  /** The hippo gardener's powers (Seeds, Watering). */
+  garden?: GardenState | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -570,6 +585,71 @@ export interface MooState {
   stun: { turn: number; squares: string[]; flurry?: true } | null;
   full: { at: number; left: number } | null;
   dazed?: number;
+}
+
+/**
+ * What one seed comes up as at the hippo gardener's watering (BOSS_POWERS.waterOdds): nothing, a plain plant, a killer
+ * plant, or a piece grown for him (its letter: a pawn, a knight, bishop or rook, the queen jackpot).
+ */
+export type WaterKind = "nothing" | "plant" | "killer" | "p" | "n" | "b" | "r" | "q";
+
+/**
+ * One seed's outcome at a watering, where it came up (`square`): a plain plant on an empty square; a killer plant on the
+ * piece it ate (`ate`: its FEN letter, uppercase White's; `own`: one of his); a piece grown for him on an empty square;
+ * nothing (the sprout wilts; `dropped`: it rolled that outcome, which couldn't be placed within the band and its guards).
+ */
+export interface WaterGrowth {
+  kind: WaterKind;
+  square: string;
+  ate?: string;
+  own?: true;
+  dropped?: WaterKind;
+}
+
+/** A plain plant on the board: it blocks `square` from crowd turn `at` + 1 to crowd turn `until` (plantTurns of them). */
+export interface GardenPlant {
+  square: string;
+  at: number;
+  until: number;
+}
+
+/**
+ * A watering, after the crowd's move `at` (his whole turn): `seeds` waiting, each one's roll in seed order (`rolled`),
+ * what came up where in the order the screens play it (`growth`: killer plants, then grown pieces, then plain plants,
+ * then nothing), and what it gained him by the engine (in pawns; null: not known here, online the host's engine placed
+ * it). `jackpot`: a queen came up (the band's top lifted to jackpotMax).
+ */
+export interface WaterResult {
+  at: number;
+  seeds: number;
+  rolled: WaterKind[];
+  growth: WaterGrowth[];
+  gain: number | null;
+  jackpot?: true;
+}
+
+/**
+ * The hippo gardener's powers in a battle (id gardener; Eric, Oct 20; the chess package's bosses/gardener.ts).
+ * - The seed meter, a pure function of the garden's clock (online the server's, solo the device's while the page is in
+ *   view): `base` seeds waiting at clock time `since` (ms), one more every seedEverySec, up to seedMax (seedsAt). Reset to
+ *   none by each watering, from the moment its count was taken.
+ * - `plants`: the plain plants on the board (each blocks its square as a toy block does, for plantTurns crowd turns).
+ * - `roll`: the watering due after the crowd's move `at`, rolled when it was first asked for (the clock then, the count,
+ *   each seed's outcome), so the server, the host and solo place the same. Never sent to screens.
+ * - `wait`: the watering was due after this crowd move and waits (passing would lose real material, or no engine's
+ *   answer): he plays his move; it comes at the start of his next turn. Never sent to screens.
+ * - `water`: his last watering; `waterings`: how many this battle.
+ */
+export interface GardenState {
+  since: number;
+  base: number;
+  /** The test switch's set count (?seeds=N): every watering has this many, whatever the clock says. */
+  fixed?: number;
+  plants: GardenPlant[];
+  roll?: { at: number; clock: number; seeds: number; kinds: WaterKind[] } | null;
+  wait?: number;
+  water?: WaterResult | null;
+  waterings: number;
 }
 
 /**
@@ -622,9 +702,10 @@ export interface SawCut {
  * The power that stops a move that is otherwise legal, either side (Sawyer's board saw and saw cut, Boingo's pie, Big
  * Boy's toy block): the screens say which when one of yours is refused, and when the boss's only move went through one
  * (a limit that would leave no move lifts for that turn). `paint`: Smudgy's hidden rook makes a move of yours illegal
- * that the board as you see it allows (your king into its line, a piece it pins); never a move of his.
+ * that the board as you see it allows (your king into its line, a piece it pins); never a move of his. `plant`: the hippo
+ * gardener's plain plant, as a toy block (either side).
  */
-export type StopReason = "boardsaw" | "cut" | "pie" | "block" | "paint";
+export type StopReason = "boardsaw" | "cut" | "pie" | "block" | "paint" | "plant";
 
 /** Wrangler's long pull: his center pawn's double step (`from` to `via`), lassoed on to `to`, as crowd turn `turn` begins. */
 export interface LongPull {
@@ -934,7 +1015,13 @@ export interface BurnEvent {
  * at the end of his turn (`square`: the crowd's piece it stuns, which can't move this crowd turn) and `flurry`, the Full
  * Moon's beams at the end of its first turn (`squares`, in the order they land), each as the crowd's turn after his move
  * begins; `fullMoon`, his transformation at the start of his turn (as the crowd's move lands, while he thinks: his move
- * follows it); `dazed`, the Full Moon over, as the crowd's turn after his last move at full strength begins.
+ * follows it); `dazed`, the Full Moon over, as the crowd's turn after his last move at full strength begins. The hippo
+ * gardener's: `plantMany`, his opening toss of seedsAtStart seeds (`seeds`), as the first crowd turn begins, and `plant`,
+ * one more seed on his real-time meter (`seeds`: how many wait now), which no turn's events carry: the screens play it
+ * over whoever's turn it is as their clock sees the count rise (seedsAt), and the server never waits for either (their
+ * POWER_FX is 0). `water`, his watering (his whole turn: as the crowd's turn after it begins; `growth`, what came up where
+ * in the order it plays: killer plants, grown pieces, plain plants, then nothing), then his reaction: `bigCheer` (a queen
+ * grew), `cheer` (another piece grew) or `shrug` (nothing came up at all).
  */
 export type PowerEventKind =
   | "freeze"
@@ -976,7 +1063,13 @@ export type PowerEventKind =
   | "moonbeam"
   | "flurry"
   | "fullMoon"
-  | "dazed";
+  | "dazed"
+  | "plantMany"
+  | "plant"
+  | "water"
+  | "cheer"
+  | "bigCheer"
+  | "shrug";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
@@ -1002,6 +1095,10 @@ export interface PowerEvent {
   prize?: string[];
   /** Smudgy's unmask: how his hidden rook was revealed (a move no pawn could make, a check, or the crowd left no move it could see). */
   reveal?: "move" | "check" | "stuck";
+  /** The hippo gardener's seeds: how many he tossed (plantMany), or wait now (plant). */
+  seeds?: number;
+  /** His watering: what came up where, in the order it plays. */
+  growth?: WaterGrowth[];
 }
 
 /** The settings behind the God King's Last Stand. */

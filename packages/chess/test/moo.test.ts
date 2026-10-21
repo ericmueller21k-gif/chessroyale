@@ -102,6 +102,7 @@ function stub(fen: string, moo: BossPowerState["moo"], crowdMoves: number, test 
     afterCrowdMove: () => undefined,
     bossPassed: () => undefined,
     memo: new Map(),
+    now: () => 0,
   };
   return b;
 }

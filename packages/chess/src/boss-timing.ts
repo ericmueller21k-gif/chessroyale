@@ -12,6 +12,7 @@ import { ALFIL_FX } from "./bosses/alfil.ts";
 import { HOPPER_FX } from "./bosses/hopper.ts";
 import { SMUDGY_FX } from "./bosses/smudgy.ts";
 import { MOO_FX } from "./bosses/moo.ts";
+import { GARDENER_FX, waterMs } from "./bosses/gardener.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -54,16 +55,25 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * step, `spin`: its banner, then the board turns again); the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX } as const;
+export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX } as const;
+
+/** What a moment's length reads of its event: its kind, Hollow's first cover, the hippo gardener's watering's outcomes. */
+type FxEvent = { kind: keyof typeof POWER_FX; first?: boolean; growth?: readonly { kind: string }[] };
 
 /** How long one power's moment holds the screen (ms). */
-export const powerFxMs = (e: { kind: keyof typeof POWER_FX; first?: boolean }): number => (POWER_FX[e.kind] ?? 0) + (POWER_FX_EXTRA[e.kind]?.(e) ?? 0);
+export const powerFxMs = (e: FxEvent): number => (POWER_FX[e.kind] ?? 0) + (POWER_FX_EXTRA[e.kind]?.(e) ?? 0);
 
-/** A moment that can hold longer (Hollow's first cover of the dark): the extra ms, by its kind. */
-const POWER_FX_EXTRA: Partial<Record<keyof typeof POWER_FX, (e: { first?: boolean }) => number>> = { ...HOLLOW_FX_EXTRA };
+/**
+ * A moment that can hold longer, the extra ms by its kind: Hollow's first cover of the dark; the hippo gardener's
+ * watering, as long as what came up takes to play (waterMs).
+ */
+const POWER_FX_EXTRA: Partial<Record<keyof typeof POWER_FX, (e: FxEvent) => number>> = {
+  ...HOLLOW_FX_EXTRA,
+  water: (e) => waterMs((e.growth ?? []) as Parameters<typeof waterMs>[0]) - GARDENER_FX.water,
+};
 
 /** How long a turn's power moments take, one after another. */
-export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX; first?: boolean }[] | null | undefined): number {
+export function powerMomentMs(events: readonly FxEvent[] | null | undefined): number {
   return (events ?? []).reduce((t, e) => t + powerFxMs(e), 0);
 }
 

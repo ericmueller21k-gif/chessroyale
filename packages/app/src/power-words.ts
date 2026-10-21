@@ -31,6 +31,8 @@ export const POWER_WORDS: Record<PowerId, string> = {
   repaint: "Repaint",
   moonbeam: "stuns a piece with a moonbeam",
   fullmoon: "Full Moon",
+  seeds: "plants seeds as the clock runs",
+  water: "Watering",
 };
 
 /** A boss's card line for its powers: its passive, then its ultimate; empty for a boss without powers yet. */

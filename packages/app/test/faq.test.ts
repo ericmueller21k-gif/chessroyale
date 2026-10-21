@@ -72,6 +72,26 @@ describe("the FAQ's contents", () => {
     expect(words).not.toMatch(/undefined|NaN|\$\{/);
   });
 
+  it("the hippo gardener's block (Seeds and Watering) is ready for when his art is wired, every number from the settings", () => {
+    const def = BOSS_ROSTER.find((b) => b.id === "gardener")!;
+    const words = BOSS_BLOCKS.gardener!(BOSS_POWERS, def);
+    const o = BOSS_POWERS.waterOdds;
+    expect(words).toContain("starting position");
+    expect(words).toContain(`${BOSS_POWERS.seedsAtStart} seeds go in as the battle begins, then one more every ${BOSS_POWERS.seedEverySec} seconds of real time`);
+    expect(words).toContain(`up to ${BOSS_POWERS.seedMax} waiting`);
+    expect(words).toContain("counts only while the game is on your screen");
+    expect(words).toContain(`nothing (${o.nothing}%), a plain plant (${o.plant}%), a killer plant (${o.killer}%), a pawn for him (${o.pawn}%), a knight, bishop or rook for him (${o.piece}%), or a queen for him (${o.queen}%)`);
+    expect(words).toContain(`blocks it for ${BOSS_POWERS.plantTurns} turns of yours`);
+    expect(words).toContain(`about ${BOSS_POWERS.waterTarget} pawns (at most ${BOSS_POWERS.waterBand[1]})`);
+    expect(words).toContain("A queen is his jackpot, and it has no cap");
+    expect(words).toContain(`no further than ${BOSS_POWERS.jackpotMax} pawns, or than the queen alone did`);
+    expect(words).toContain("he can't grow a piece he still has a full set of");
+    expect(words).not.toContain("worth up to");
+    expect(Object.values(o).reduce((a, b) => a + b, 0)).toBe(100);
+    expect(words).toContain(def.offset === 0 ? "at the usual strength" : `${Math.abs(def.offset)} ${def.offset < 0 ? "under" : "over"} the usual strength`);
+    expect(words).not.toMatch(/undefined|NaN|\$\{/);
+  });
+
   it("Moo & Moon's block (Moonbeam and the Full Moon) reads right: every number from the settings, and what the board shows", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "moo")!;
     const words = BOSS_BLOCKS.moo!(BOSS_POWERS, def);

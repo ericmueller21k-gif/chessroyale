@@ -22,6 +22,7 @@ export const REFUSED: Record<StopReason | "frozen" | "stunned" | "barred", strin
   pie: "A pie blocks that square.",
   block: "A toy block is in the way.",
   paint: "A painted piece stops that move.",
+  plant: "A plant is in the way.",
   frozen: "That piece is frozen.",
   stunned: "Moonlight holds that piece.",
   barred: "The God King took that move back.",
@@ -38,6 +39,7 @@ export const THROUGH: Record<StopReason, string> = {
   block: "His only move: past the block.",
   // (Never said: "paint" is only ever a move of yours, refused for his hidden rook.)
   paint: "His only move: out of paint.",
+  plant: "His only move: past the plant.",
 };
 
 /** The boss as the screens see it, as far as these words need. */

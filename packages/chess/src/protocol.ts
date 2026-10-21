@@ -7,6 +7,7 @@ import type { JudgeJob, JudgeReport, JudgeRules } from "./judge.ts";
 import type { CarrotRace } from "./bosses/carrots.ts";
 import type { CarrotView } from "./bosses/hopper.ts";
 import type { CamoView } from "./bosses/smudgy.ts";
+import type { GardenView, WaterAsk } from "./bosses/gardener.ts";
 import type { MoveScore } from "./uci.ts";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
@@ -392,6 +393,14 @@ export interface NetBossPowers {
    */
   stunned?: string[];
   fullMoon?: { left: number } | null;
+  /**
+   * The hippo gardener (missing for other bosses and from older servers; an older app ignores it): his seed meter (`since`
+   * and `base`: seedsAt with the screens' clock gives the seeds waiting and the next one's time; the server's clock online,
+   * the page's visible time solo; `fixed`, the test switch's set count), the plain plants on the board with the crowd
+   * turns each still blocks (`left`: 3, 2, 1), his last watering's outcomes (`water`: what came up where, in the order it
+   * plays) and how many he's made.
+   */
+  garden?: GardenView | null;
 }
 
 /**
@@ -809,6 +818,15 @@ export type ServerMessage = { now: number } & (
        */
       repaint?: string[];
       repaintAny?: true;
+      /**
+       * The hippo gardener's watering (his whole turn): what the seeds rolled, the plain plants on the board, the order the
+       * squares are tried in. Answer the placement as `move` (waterAnswer: waterFrom's, as its letters and squares, "none"
+       * for nothing at all; PASS_WAIT when passing would lose real material, unless `waterAny`: the test switch or the
+       * admins' trigger; "" with no engine). The server checks it (waterCheck). An older app ignores it and plays a move,
+       * which isn't a placement: the watering waits for his next turn.
+       */
+      water?: WaterAsk;
+      waterAny?: true;
       /**
        * Moo & Moon's Moonbeam (or his Full Moon's flurry) lands after this move: list the crowd's top this-many moves in
        * the position after it (beamLines, at BOSS_POWERS.moonbeamNodes) as the answer's `beam`. An older app ignores it:

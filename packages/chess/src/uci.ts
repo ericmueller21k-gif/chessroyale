@@ -360,9 +360,12 @@ export class UciEngine {
     return this.serial(() => this.search(fen, n));
   }
 
-  /** The same at another budget (Big Boy's Big Bounce scores a few positions quickly). */
-  topMovesAt(fen: string, n: number, nodes: number): Promise<MoveScore[]> {
-    return this.serial(() => this.search(fen, n, undefined, nodes));
+  /**
+   * The same at another budget (Big Boy's Big Bounce scores a few positions quickly); `moves`: only those searched
+   * (searchmoves: the hippo gardener's plants leave some out, the search's shape otherwise the same).
+   */
+  topMovesAt(fen: string, n: number, nodes: number, moves?: readonly string[]): Promise<MoveScore[]> {
+    return this.serial(() => this.search(fen, n, moves, nodes));
   }
 
   /**

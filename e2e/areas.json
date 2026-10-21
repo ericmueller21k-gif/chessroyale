@@ -290,6 +290,16 @@
       ],
       "specs": ["e2e/hopper.spec.ts"]
     },
+    "The hippo gardener (gardener)": {
+      "paths": [
+        "packages/chess/src/bosses/gardener.ts",
+        "packages/app/src/characters/gardener*.ts",
+        "packages/app/src/characters/effects/gardener.ts",
+        "packages/app/src/components/Gardener.tsx",
+        "packages/app/src/garden-clock.ts"
+      ],
+      "specs": ["e2e/gardener.spec.ts"]
+    },
     "Smudgy (smudgy)": {
       "paths": [
         "packages/chess/src/bosses/smudgy.ts",

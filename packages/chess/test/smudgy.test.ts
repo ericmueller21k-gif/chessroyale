@@ -96,6 +96,7 @@ function stub(fen: string, camo: Camouflage, crowdMoves: number, captured?: stri
     afterCrowdMove: () => undefined,
     bossPassed: () => undefined,
     memo: new Map(),
+    now: () => 0,
   };
   return b;
 }
