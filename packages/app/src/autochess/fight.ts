@@ -7,10 +7,10 @@ import type { Color } from "./types.ts";
  * left with only its king (it loses at once; both kings alone: a draw; also a side that starts the fight so: Eric, Oct 20: "boring
  * moving around... makes it go faster"), stalemate or too little material (draws), or a **stall**: a threefold repetition, 10 moves a
  * side with no capture or cash-in, or 60 moves a side. A stall goes to the side the engine's score of the final position favors by a
- * pawn (`stallWinMargin`); closer is a draw. **Too far ahead:** a side the engine's score favors by 5 pawns (`decisiveMargin`) after 3
+ * pawn (`stallWinMargin`); closer is a draw. **Too far ahead:** a side the engine's score favors by 5 pawns (`decisiveMargin`) after 6
  * of its own moves in a row (`decisiveMoves`) wins at once, unless the engine has found it a forced mate (or a forced win by another
- * rule) within 5 moves (`mateShowMoves`), which plays out. Checks count for nothing (Eric, Oct 21: no more "5 checks in a row"). No promotion (Eric, Oct 20): a pawn that moves onto its last rank cashes in, leaving the board,
- * and its owner gets `cashInGold` at the round's end. Moves play twice as fast after 30 moves a side, or once either side is down to
+ * rule) within 5 moves (`mateShowMoves`), which plays out. Checks count for nothing (Eric, Oct 21: no more "5 checks in a row").
+ * No promotion (Eric, Oct 20): a pawn that moves onto its last rank cashes in, leaving the board, and its owner gets `cashInGold` at the round's end. Moves play twice as fast after 30 moves a side, or once either side is down to
  * its king and pawns. The rules are the engine's own (`@chessroyale/chess/hunchess`), so what the engine searches and what the fight
  * plays are the same thing (docs/decisions/2026-10-21-hunchess-engine.md, docs/decisions/2026-10-21-autochess-endings.md).
  */

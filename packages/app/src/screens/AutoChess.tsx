@@ -76,7 +76,7 @@ interface RoundState {
 interface Outcome {
   result: RoundResult;
   end: EndKind;
-  /** Who won the fight and, for a stall, the engine's deciding score (for the result's words). */
+  /** Who won the fight, your color and, for a stall, the engine's deciding score (for the result's words). */
   detail: EndDetail;
   /** Next round's gold, line by line (null when the match is over). */
   next: GoldBreakdown | null;
@@ -366,7 +366,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const { match, result } = settleRound(cur.match, who, { you: on[color], bot: on[other(color)] }, cfg, { you: cashIns[color], bot: cashIns[other(color)] });
     const won = matchWinner(match);
     const next = won ? null : goldBreakdown(match.round + 1, match.you, cfg);
-    commit({ ...cur, match, phase: won ? "over" : "result", phaseStart: performance.now(), outcome: { result, end, next, detail: { winner, ...(score !== undefined ? { score } : {}) } } });
+    commit({ ...cur, match, phase: won ? "over" : "result", phaseStart: performance.now(), outcome: { result, end, next, detail: { winner, you: color, ...(score !== undefined ? { score } : {}) } } });
   }
 
   function nextRound() {

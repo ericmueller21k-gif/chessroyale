@@ -25,7 +25,7 @@ const FIGHT = "/autochess?quick=1&seed=3";
 const NEVER = DUP;
 /** Every way a fight's result line can begin (the reason it ended), then the HP line. */
 const RESULT_WHY =
-  /^(Checkmate\.|Stalemate\.|(White|Black) too far ahead: 5\+ pawns for 3 moves\.|Fight stalled \((moves repeated|10 moves each, no capture|60 moves each)\): ((White|Black) (ahead by \d+ pawns?|far ahead)|less than a pawn apart, a draw)\.|Draw by the fifty-move rule\.|Draw: not enough pieces left to mate\.|A side left with only its king loses at once\.|Both sides are down to a king: a draw\.) /;
+  /^(Checkmate\.|Stalemate\.|(You're|Your opponent is) too far ahead: 5\+ pawns for 6 moves\.|Fight stalled \((moves repeated|10 moves each, no capture|60 moves each)\): ((you're|your opponent is) (\d+ pawns? up|far ahead)|less than a pawn apart, a draw)\.|Draw by the fifty-move rule\.|Draw: not enough pieces left to mate\.|A side left with only its king loses at once\.|Both sides are down to a king: a draw\.) /;
 const PRICES: Record<string, number> = { p: 10, n: 30, b: 32, r: 50, q: 90 };
 const NAMES: Record<string, string> = { p: "Pawn", n: "Knight", b: "Bishop", r: "Rook", q: "Queen" };
 
@@ -952,7 +952,7 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   expect(fight.fight).toBe(true);
   expect(fight.say).toMatch(/^Move \d+ of 60/);
   expect(fight.label).toBe("Fight");
-  expect(fight.text).toContain("A side loses with only its king left, or when the engine sees it 5 pawns down for 3 moves.");
+  expect(fight.text).toContain("A side loses with only its king left, or when the engine sees it 5 pawns down for 6 moves.");
   expect(fight.text).toContain("A stall (repeats, 10 moves each with no capture, or 60) goes to the side a pawn up.");
   expect(fight.text).not.toMatch(/checks? in a row/);
   expect(fight.text).toContain("A pawn that reaches the far end cashes in for +5 gold.");
@@ -1086,9 +1086,9 @@ test("the result says why: a stall goes to the side the engine's score favors, a
   // (`?fightfen=`: fights from the sim's 80 (reports/autochess-endings.md), each played the same every time. You are White.)
   const cases = [
     // Rook and pawns each; Black's rook is the more active: 10 moves each with no capture, and the score has Black a pawn up.
-    { fen: "5k2/p3p3/8/2pr4/3P4/5P2/1P1R4/5K2 w - - 0 1", head: "You lose the round.", why: "Fight stalled (10 moves each, no capture): Black ahead by 1 pawn. You lose " },
-    // White's two bishops and pawns against two knights: 5 pawns up by the score for 3 of its moves, it wins at once.
-    { fen: "4k3/2n1p3/7p/2n5/P3PB2/P7/1P3P2/2B1K3 w - - 0 1", head: "You win the round.", why: "White too far ahead: 5+ pawns for 3 moves. Your opponent loses " },
+    { fen: "5k2/p3p3/8/2pr4/3P4/5P2/1P1R4/5K2 w - - 0 1", head: "You lose the round.", why: "Fight stalled (10 moves each, no capture): your opponent is 1 pawn up. You lose " },
+    // White's two bishops and pawns against two knights: 5 pawns up by the score for 6 of its moves, it wins at once.
+    { fen: "4k3/2n1p3/7p/2n5/P3PB2/P7/1P3P2/2B1K3 w - - 0 1", head: "You win the round.", why: "You're too far ahead: 5+ pawns for 6 moves. Your opponent loses " },
   ];
   for (const c of cases) {
     await page.goto(`/autochess?quick=1&seed=3&adjust=0&fightfen=${encodeURIComponent(c.fen)}`);

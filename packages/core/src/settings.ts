@@ -2773,7 +2773,9 @@ export interface AutoChessSettings {
    * The clean-up ends early (Eric, Oct 21): a side the engine's score favors by `decisiveMargin` centipawns or more after
    * `decisiveMoves` of its own moves in a row wins at once ("too far ahead"), unless the engine has found it a forced mate (or a
    * forced win by another rule: a bare king, a won stall) within `mateShowMoves` moves, which plays out. The score is the engine's
-   * own for the move it played (its fixed node budget: the same on any device); a stand-in move counts for nothing.
+   * own for the move it played (its fixed node budget: the same on any device); a stand-in move counts for nothing. Eric's brief said
+   * 3 moves; 6 since the sim (Oct 21, the director's call on PR #305): with 3, 31 of 80 fights were over after 3 moves a side (about
+   * 2 s); 6 gives the same winners and draw rate. reports/autochess-endings.md.
    */
   readonly decisiveMargin: number;
   readonly decisiveMoves: number;
@@ -2856,7 +2858,7 @@ export const AUTOCHESS: AutoChessSettings = {
   quietCap: 10,
   stallWinMargin: 100,
   decisiveMargin: 500,
-  decisiveMoves: 3,
+  decisiveMoves: 6,
   mateShowMoves: 5,
   hp: 20,
   damageBase: 2,

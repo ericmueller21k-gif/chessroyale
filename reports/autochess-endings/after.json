@@ -4,20 +4,24 @@
     "nodes": 30000,
     "ends": {
       "decided": {
-        "count": 54,
-        "pct": 67.5
+        "count": 39,
+        "pct": 48.8
       },
       "quiet": {
+        "count": 17,
+        "pct": 21.3
+      },
+      "king_alone": {
         "count": 15,
         "pct": 18.8
       },
-      "king_alone": {
+      "checkmate": {
         "count": 7,
         "pct": 8.8
       },
-      "checkmate": {
-        "count": 4,
-        "pct": 5
+      "repetition": {
+        "count": 2,
+        "pct": 2.5
       }
     },
     "draws": {
@@ -29,13 +33,13 @@
       "black": 34
     },
     "movesASide": {
-      "average": 10.9,
-      "median": 8.75,
+      "average": 13.4,
+      "median": 11.75,
       "longest": 40
     },
     "seconds": {
-      "average": 6.8,
-      "median": 5.2,
+      "average": 8.3,
+      "median": 7,
       "longest": 24.5
     },
     "moreMaterial": {
@@ -46,58 +50,57 @@
       "equalStarts": 14
     },
     "kingWalkPlies": {
-      "average": 2,
-      "median": 1,
+      "average": 2.3,
+      "median": 2,
       "longest": 10,
       "fightsWith6Plus": 5
     },
     "oneSideKingMoves": {
-      "average": 2.4,
+      "average": 3.1,
       "median": 2,
       "longest": 11,
-      "fightsWith5Plus": 11,
-      "fightsWith10Plus": 1
+      "fightsWith5Plus": 16,
+      "fightsWith10Plus": 2
     },
-    "cashInsPerFight": 0.01,
-    "fightsWithACashIn": 1,
-    "engineMsPerMove": 44.2
+    "cashInsPerFight": 0.03,
+    "fightsWithACashIn": 2,
+    "engineMsPerMove": 42.6
   },
   "fights": [
     {
       "name": "round 5: 6 v 7",
-      "end": "decided",
+      "end": "checkmate",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 13,
+      "seconds": 3.499999999999999,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 1,
-      "kingSteps": 1,
-      "score": 29989
+      "kingSteps": 2
     },
     {
       "name": "round 7: 7 v 4",
       "end": "decided",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 11,
+      "seconds": 3.8500000000000005,
       "cashIns": 0,
       "ahead": "w",
-      "kingWalk": 1,
-      "kingSteps": 2,
-      "score": 614
+      "kingWalk": 2,
+      "kingSteps": 3,
+      "score": 643
     },
     {
       "name": "round 3: 4 v 5",
-      "end": "decided",
+      "end": "repetition",
       "winner": "w",
-      "plies": 15,
-      "seconds": 5.249999999999999,
+      "plies": 27,
+      "seconds": 7.699999999999997,
       "cashIns": 0,
       "ahead": "w",
-      "kingWalk": 1,
-      "kingSteps": 1,
-      "score": 627
+      "kingWalk": 3,
+      "kingSteps": 5,
+      "score": 305
     },
     {
       "name": "round 5: 6 v 5",
@@ -113,27 +116,26 @@
     },
     {
       "name": "round 3: 5 v 5",
-      "end": "decided",
+      "end": "checkmate",
       "winner": "b",
-      "plies": 6,
-      "seconds": 2.1,
+      "plies": 18,
+      "seconds": 6.299999999999998,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 1,
-      "kingSteps": 1,
-      "score": 1843
+      "kingSteps": 4
     },
     {
       "name": "round 5: 6 v 6",
       "end": "decided",
       "winner": "b",
-      "plies": 6,
-      "seconds": 2.1,
+      "plies": 12,
+      "seconds": 4.2,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 1,
       "kingSteps": 2,
-      "score": 876
+      "score": 942
     },
     {
       "name": "round 3: 5 v 4",
@@ -162,49 +164,47 @@
       "name": "round 2: 5 v 4",
       "end": "decided",
       "winner": "b",
-      "plies": 6,
-      "seconds": 2.1,
+      "plies": 12,
+      "seconds": 4.2,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 0,
       "kingSteps": 0,
-      "score": 765
-    },
-    {
-      "name": "round 8: 8 v 6",
-      "end": "decided",
-      "winner": "b",
-      "plies": 42,
-      "seconds": 9.100000000000001,
-      "cashIns": 0,
-      "ahead": null,
-      "kingWalk": 8,
-      "kingSteps": 5,
       "score": 29489
     },
     {
-      "name": "round 5: 7 v 6",
-      "end": "decided",
+      "name": "round 8: 8 v 6",
+      "end": "king_alone",
       "winner": "b",
-      "plies": 6,
-      "seconds": 2.1,
+      "plies": 52,
+      "seconds": 10.850000000000009,
+      "cashIns": 1,
+      "ahead": null,
+      "kingWalk": 8,
+      "kingSteps": 5
+    },
+    {
+      "name": "round 5: 7 v 6",
+      "end": "repetition",
+      "winner": "b",
+      "plies": 22,
+      "seconds": 7.699999999999997,
       "cashIns": 0,
       "ahead": "b",
-      "kingWalk": 0,
-      "kingSteps": 0,
-      "score": 2085
+      "kingWalk": 1,
+      "kingSteps": 4,
+      "score": -1755
     },
     {
       "name": "round 8: 8 v 8",
-      "end": "decided",
+      "end": "checkmate",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 17,
+      "seconds": 5.249999999999999,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 1,
-      "kingSteps": 1,
-      "score": 2323
+      "kingSteps": 1
     },
     {
       "name": "round 1: 4 v 4",
@@ -232,37 +232,36 @@
       "name": "round 7: 7 v 6",
       "end": "decided",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 11,
+      "seconds": 3.8500000000000005,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 1,
       "kingSteps": 1,
-      "score": 614
+      "score": 645
     },
     {
       "name": "round 3: 5 v 5",
-      "end": "decided",
+      "end": "king_alone",
       "winner": "w",
-      "plies": 6,
-      "seconds": 2.1,
+      "plies": 20,
+      "seconds": 5.599999999999999,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 1,
-      "kingSteps": 3,
-      "score": 911
+      "kingSteps": 4
     },
     {
       "name": "round 4: 6 v 6",
       "end": "decided",
       "winner": "w",
-      "plies": 16,
-      "seconds": 5.599999999999999,
+      "plies": 22,
+      "seconds": 6.999999999999997,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 1,
       "kingSteps": 1,
-      "score": 552
+      "score": 709
     },
     {
       "name": "round 8: 8 v 4",
@@ -301,49 +300,48 @@
       "name": "round 3: 6 v 6",
       "end": "decided",
       "winner": "b",
-      "plies": 6,
-      "seconds": 1.05,
+      "plies": 12,
+      "seconds": 2.1,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 1,
       "kingSteps": 2,
-      "score": 1109
+      "score": 1189
     },
     {
       "name": "round 4: 6 v 6",
       "end": "decided",
       "winner": "w",
-      "plies": 29,
-      "seconds": 10.149999999999995,
+      "plies": 35,
+      "seconds": 12.249999999999993,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 2,
       "kingSteps": 2,
-      "score": 669
+      "score": 744
     },
     {
       "name": "round 2: 5 v 5",
-      "end": "decided",
+      "end": "quiet",
       "winner": "w",
-      "plies": 27,
-      "seconds": 4.724999999999998,
+      "plies": 37,
+      "seconds": 6.474999999999996,
       "cashIns": 0,
       "ahead": null,
       "kingWalk": 10,
-      "kingSteps": 7,
-      "score": 29489
+      "kingSteps": 10,
+      "score": 188
     },
     {
       "name": "round 2: 5 v 6",
-      "end": "decided",
+      "end": "king_alone",
       "winner": "w",
-      "plies": 37,
-      "seconds": 12.249999999999996,
+      "plies": 47,
+      "seconds": 14.000000000000004,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 3,
-      "kingSteps": 3,
-      "score": 719
+      "kingSteps": 6
     },
     {
       "name": "round 7: 7 v 7",
@@ -360,25 +358,25 @@
       "name": "round 8: 8 v 8",
       "end": "decided",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 11,
+      "seconds": 3.8500000000000005,
       "cashIns": 0,
       "ahead": "w",
-      "kingWalk": 0,
-      "kingSteps": 0,
-      "score": 1024
+      "kingWalk": 1,
+      "kingSteps": 2,
+      "score": 1175
     },
     {
       "name": "round 8: 8 v 8",
       "end": "decided",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.05,
+      "plies": 11,
+      "seconds": 2.1,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 1,
       "kingSteps": 1,
-      "score": 1280
+      "score": 1352
     },
     {
       "name": "round 4: 6 v 6",
@@ -394,15 +392,14 @@
     },
     {
       "name": "round 8: 8 v 8",
-      "end": "decided",
+      "end": "king_alone",
       "winner": "b",
-      "plies": 38,
-      "seconds": 9.800000000000004,
+      "plies": 52,
+      "seconds": 12.250000000000014,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 3,
-      "kingSteps": 3,
-      "score": 29487
+      "kingSteps": 4
     },
     {
       "name": "round 6: 7 v 7",
@@ -420,61 +417,61 @@
       "name": "round 8: 6 v 8",
       "end": "decided",
       "winner": "b",
-      "plies": 24,
-      "seconds": 8.399999999999997,
+      "plies": 30,
+      "seconds": 10.499999999999995,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 1,
       "kingSteps": 2,
-      "score": 542
+      "score": 627
     },
     {
       "name": "round 5: 6 v 6",
       "end": "decided",
       "winner": "b",
-      "plies": 42,
-      "seconds": 14.69999999999999,
+      "plies": 48,
+      "seconds": 16.799999999999994,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 2,
       "kingSteps": 3,
-      "score": 828
+      "score": 864
     },
     {
       "name": "round 3: 5 v 5",
+      "end": "decided",
+      "winner": "w",
+      "plies": 25,
+      "seconds": 8.749999999999996,
+      "cashIns": 0,
+      "ahead": "w",
+      "kingWalk": 3,
+      "kingSteps": 3,
+      "score": 773
+    },
+    {
+      "name": "round 6: 7 v 7",
+      "end": "decided",
+      "winner": "w",
+      "plies": 11,
+      "seconds": 3.8500000000000005,
+      "cashIns": 0,
+      "ahead": "w",
+      "kingWalk": 1,
+      "kingSteps": 1,
+      "score": 763
+    },
+    {
+      "name": "round 2: 5 v 5",
       "end": "decided",
       "winner": "w",
       "plies": 19,
       "seconds": 6.649999999999998,
       "cashIns": 0,
       "ahead": "w",
-      "kingWalk": 3,
-      "kingSteps": 3,
-      "score": 628
-    },
-    {
-      "name": "round 6: 7 v 7",
-      "end": "decided",
-      "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
-      "cashIns": 0,
-      "ahead": "w",
-      "kingWalk": 0,
-      "kingSteps": 0,
-      "score": 687
-    },
-    {
-      "name": "round 2: 5 v 5",
-      "end": "decided",
-      "winner": "w",
-      "plies": 13,
-      "seconds": 4.55,
-      "cashIns": 0,
-      "ahead": "w",
-      "kingWalk": 1,
+      "kingWalk": 2,
       "kingSteps": 1,
-      "score": 541
+      "score": 652
     },
     {
       "name": "round 5: 6 v 6",
@@ -492,97 +489,95 @@
       "name": "round 7: 7 v 5",
       "end": "decided",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 11,
+      "seconds": 3.8500000000000005,
       "cashIns": 0,
       "ahead": "w",
-      "kingWalk": 0,
-      "kingSteps": 0,
-      "score": 536
+      "kingWalk": 3,
+      "kingSteps": 3,
+      "score": 542
     },
     {
       "name": "round 2: 5 v 5",
       "end": "decided",
       "winner": "b",
-      "plies": 6,
-      "seconds": 1.05,
+      "plies": 12,
+      "seconds": 2.1,
       "cashIns": 0,
       "ahead": "b",
-      "kingWalk": 0,
-      "kingSteps": 0,
-      "score": 785
+      "kingWalk": 1,
+      "kingSteps": 2,
+      "score": 799
     },
     {
       "name": "round 8: 8 v 8",
       "end": "decided",
       "winner": "b",
-      "plies": 6,
-      "seconds": 2.1,
+      "plies": 12,
+      "seconds": 4.2,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 0,
       "kingSteps": 0,
-      "score": 907
+      "score": 1006
     },
     {
       "name": "round 2: 4 v 5",
-      "end": "decided",
+      "end": "king_alone",
       "winner": "b",
-      "plies": 6,
-      "seconds": 1.05,
+      "plies": 20,
+      "seconds": 3.4999999999999987,
       "cashIns": 0,
       "ahead": "b",
-      "kingWalk": 3,
-      "kingSteps": 2,
-      "score": 1001
+      "kingWalk": 5,
+      "kingSteps": 7
     },
     {
       "name": "round 1: 4 v 5",
       "end": "decided",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 11,
+      "seconds": 3.8500000000000005,
       "cashIns": 0,
       "ahead": "w",
-      "kingWalk": 0,
-      "kingSteps": 0,
-      "score": 573
+      "kingWalk": 1,
+      "kingSteps": 1,
+      "score": 729
     },
     {
       "name": "round 1: 4 v 4",
       "end": "decided",
       "winner": "w",
-      "plies": 17,
-      "seconds": 5.949999999999998,
+      "plies": 23,
+      "seconds": 8.049999999999997,
       "cashIns": 0,
       "ahead": null,
       "kingWalk": 4,
       "kingSteps": 2,
-      "score": 551
+      "score": 565
     },
     {
       "name": "round 1: 4 v 4",
       "end": "decided",
       "winner": "b",
-      "plies": 44,
-      "seconds": 15.39999999999999,
+      "plies": 50,
+      "seconds": 17.499999999999996,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 3,
-      "kingSteps": 3,
-      "score": 529
+      "kingSteps": 4,
+      "score": 551
     },
     {
       "name": "round 8: 8 v 8",
-      "end": "decided",
+      "end": "king_alone",
       "winner": "b",
-      "plies": 52,
-      "seconds": 18.2,
+      "plies": 64,
+      "seconds": 20.65000000000001,
       "cashIns": 0,
       "ahead": null,
-      "kingWalk": 3,
-      "kingSteps": 4,
-      "score": 29485
+      "kingWalk": 4,
+      "kingSteps": 4
     },
     {
       "name": "round 7: 4 v 7",
@@ -599,13 +594,13 @@
       "name": "round 7: 7 v 7",
       "end": "decided",
       "winner": "w",
-      "plies": 35,
-      "seconds": 9.450000000000003,
+      "plies": 41,
+      "seconds": 10.500000000000007,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 5,
       "kingSteps": 4,
-      "score": 552
+      "score": 29489
     },
     {
       "name": "round 3: 5 v 5",
@@ -621,15 +616,14 @@
     },
     {
       "name": "round 6: 7 v 4",
-      "end": "decided",
+      "end": "king_alone",
       "winner": "w",
-      "plies": 5,
-      "seconds": 0.875,
+      "plies": 17,
+      "seconds": 2.974999999999999,
       "cashIns": 0,
       "ahead": "w",
-      "kingWalk": 2,
-      "kingSteps": 2,
-      "score": 1107
+      "kingWalk": 3,
+      "kingSteps": 8
     },
     {
       "name": "round 1: 5 v 5",
@@ -647,73 +641,72 @@
       "name": "round 8: 8 v 8",
       "end": "decided",
       "winner": "b",
-      "plies": 38,
-      "seconds": 11.550000000000002,
+      "plies": 44,
+      "seconds": 12.600000000000007,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 3,
-      "kingSteps": 2,
-      "score": 546
+      "kingSteps": 5,
+      "score": 29487
     },
     {
       "name": "round 6: 7 v 7",
       "end": "decided",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 11,
+      "seconds": 3.8500000000000005,
       "cashIns": 0,
       "ahead": "w",
-      "kingWalk": 0,
-      "kingSteps": 0,
-      "score": 1097
+      "kingWalk": 1,
+      "kingSteps": 1,
+      "score": 1148
     },
     {
       "name": "round 6: 7 v 7",
       "end": "decided",
       "winner": "b",
-      "plies": 18,
-      "seconds": 6.299999999999998,
+      "plies": 24,
+      "seconds": 8.399999999999997,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 1,
       "kingSteps": 2,
-      "score": 563
+      "score": 516
     },
     {
       "name": "round 3: 6 v 5",
       "end": "decided",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 11,
+      "seconds": 3.8500000000000005,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 1,
       "kingSteps": 1,
-      "score": 727
+      "score": 745
     },
     {
       "name": "round 3: 5 v 5",
       "end": "decided",
       "winner": "b",
-      "plies": 26,
-      "seconds": 9.099999999999996,
+      "plies": 32,
+      "seconds": 11.199999999999994,
       "cashIns": 0,
       "ahead": "b",
-      "kingWalk": 1,
+      "kingWalk": 2,
       "kingSteps": 2,
-      "score": 546
+      "score": 586
     },
     {
       "name": "round 1: 4 v 5",
-      "end": "decided",
+      "end": "king_alone",
       "winner": "w",
-      "plies": 27,
-      "seconds": 7.699999999999997,
+      "plies": 35,
+      "seconds": 9.100000000000001,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 7,
-      "kingSteps": 5,
-      "score": 29489
+      "kingSteps": 5
     },
     {
       "name": "round 3: 5 v 5",
@@ -741,25 +734,25 @@
       "name": "round 4: 6 v 6",
       "end": "decided",
       "winner": "b",
-      "plies": 6,
-      "seconds": 2.1,
+      "plies": 12,
+      "seconds": 4.2,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 1,
-      "kingSteps": 1,
-      "score": 1102
+      "kingSteps": 2,
+      "score": 1309
     },
     {
       "name": "round 8: 5 v 8",
       "end": "decided",
       "winner": "b",
-      "plies": 6,
-      "seconds": 2.1,
+      "plies": 12,
+      "seconds": 4.2,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 2,
-      "kingSteps": 1,
-      "score": 660
+      "kingSteps": 2,
+      "score": 720
     },
     {
       "name": "round 1: 4 v 4",
@@ -788,37 +781,37 @@
       "name": "round 2: 5 v 5",
       "end": "decided",
       "winner": "w",
-      "plies": 5,
-      "seconds": 0.875,
+      "plies": 11,
+      "seconds": 1.9250000000000003,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 1,
-      "kingSteps": 1,
-      "score": 784
+      "kingSteps": 2,
+      "score": 945
     },
     {
       "name": "round 8: 8 v 4",
       "end": "decided",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 11,
+      "seconds": 3.8500000000000005,
       "cashIns": 0,
       "ahead": "w",
-      "kingWalk": 0,
-      "kingSteps": 0,
-      "score": 1321
+      "kingWalk": 1,
+      "kingSteps": 1,
+      "score": 1382
     },
     {
       "name": "round 3: 6 v 5",
       "end": "decided",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 11,
+      "seconds": 3.8500000000000005,
       "cashIns": 0,
       "ahead": "b",
-      "kingWalk": 0,
-      "kingSteps": 0,
-      "score": 569
+      "kingWalk": 1,
+      "kingSteps": 1,
+      "score": 558
     },
     {
       "name": "round 3: 5 v 5",
@@ -836,61 +829,61 @@
       "name": "round 6: 7 v 7",
       "end": "decided",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 11,
+      "seconds": 3.8500000000000005,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 1,
-      "kingSteps": 1,
-      "score": 1381
+      "kingSteps": 2,
+      "score": 1624
     },
     {
       "name": "round 7: 7 v 7",
       "end": "decided",
       "winner": "w",
-      "plies": 29,
-      "seconds": 10.149999999999995,
+      "plies": 35,
+      "seconds": 12.249999999999993,
       "cashIns": 0,
       "ahead": null,
       "kingWalk": 1,
-      "kingSteps": 5,
-      "score": 509
+      "kingSteps": 7,
+      "score": 777
     },
     {
       "name": "round 1: 4 v 4",
       "end": "decided",
       "winner": "w",
-      "plies": 21,
-      "seconds": 7.349999999999997,
+      "plies": 27,
+      "seconds": 9.449999999999996,
       "cashIns": 0,
       "ahead": null,
       "kingWalk": 2,
       "kingSteps": 2,
-      "score": 556
+      "score": 533
     },
     {
       "name": "round 2: 5 v 5",
       "end": "decided",
       "winner": "b",
-      "plies": 32,
-      "seconds": 11.199999999999994,
+      "plies": 38,
+      "seconds": 13.299999999999992,
       "cashIns": 0,
       "ahead": "b",
       "kingWalk": 2,
       "kingSteps": 2,
-      "score": 555
+      "score": 553
     },
     {
       "name": "round 2: 5 v 5",
       "end": "decided",
       "winner": "b",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 11,
+      "seconds": 3.8500000000000005,
       "cashIns": 0,
       "ahead": null,
       "kingWalk": 1,
       "kingSteps": 1,
-      "score": 635
+      "score": 685
     },
     {
       "name": "round 1: 4 v 4",
@@ -906,27 +899,27 @@
     },
     {
       "name": "round 5: 4 v 6",
-      "end": "decided",
+      "end": "quiet",
       "winner": "b",
-      "plies": 20,
-      "seconds": 6.999999999999997,
+      "plies": 26,
+      "seconds": 9.099999999999996,
       "cashIns": 0,
       "ahead": "b",
-      "kingWalk": 2,
-      "kingSteps": 2,
-      "score": 696
+      "kingWalk": 3,
+      "kingSteps": 4,
+      "score": -329
     },
     {
       "name": "round 5: 6 v 7",
       "end": "decided",
       "winner": "w",
-      "plies": 5,
-      "seconds": 1.75,
+      "plies": 11,
+      "seconds": 3.8500000000000005,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 1,
       "kingSteps": 1,
-      "score": 1148
+      "score": 1208
     },
     {
       "name": "round 7: 7 v 7",
@@ -980,13 +973,13 @@
       "name": "round 8: 8 v 8",
       "end": "decided",
       "winner": "w",
-      "plies": 15,
-      "seconds": 5.249999999999999,
+      "plies": 21,
+      "seconds": 7.349999999999997,
       "cashIns": 0,
       "ahead": "w",
       "kingWalk": 1,
       "kingSteps": 2,
-      "score": 682
+      "score": 692
     },
     {
       "name": "round 1: 4 v 4",
@@ -1004,13 +997,13 @@
       "name": "round 8: 8 v 8",
       "end": "decided",
       "winner": "b",
-      "plies": 6,
-      "seconds": 2.1,
+      "plies": 12,
+      "seconds": 4.2,
       "cashIns": 0,
       "ahead": "b",
-      "kingWalk": 0,
-      "kingSteps": 0,
-      "score": 932
+      "kingWalk": 1,
+      "kingSteps": 1,
+      "score": 1031
     }
   ]
 }

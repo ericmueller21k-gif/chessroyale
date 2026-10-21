@@ -574,7 +574,7 @@ describe("auto chess: the fight", () => {
     const res = await playFight(fightStart(w, b).fen, { pick: script(plies), wait: noWait, rng: mulberry32(1) });
     expect(res).toMatchObject({ end: "quiet", winner: "w", moves: plies });
     expect(res!.score).toBeGreaterThan(300);
-    expect(endWords("quiet", false, AUTOCHESS, { winner: res!.winner, score: res!.score! })).toMatch(/^Fight stalled \(10 moves each, no capture\): White ahead by \d+ pawns\.$/);
+    expect(endWords("quiet", false, AUTOCHESS, { winner: res!.winner, score: res!.score!, you: "w" })).toMatch(/^Fight stalled \(10 moves each, no capture\): you're \d+ pawns up\.$/);
     // A capture starts the count again: the rook takes the knight first, then 10 quiet moves each.
     const w2: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
     const b2: Army = { color: "b", king: "a8", board: { h7: "n", e7: "p" }, bench: [] };
@@ -603,35 +603,44 @@ describe("auto chess: the fight", () => {
     expect(res!.score).toBeGreaterThanOrEqual(100);
   });
 
-  it("too far ahead: a side the engine scores 5 pawns up after 3 of its own moves in a row wins at once, unless it has found a quick win", async () => {
-    expect([AUTOCHESS.decisiveMargin, AUTOCHESS.decisiveMoves, AUTOCHESS.mateShowMoves]).toEqual([500, 3, 5]);
+  it("too far ahead: a side the engine scores 5 pawns up after 6 of its own moves in a row wins at once, unless it has found a quick win", async () => {
+    expect([AUTOCHESS.decisiveMargin, AUTOCHESS.decisiveMoves, AUTOCHESS.mateShowMoves]).toEqual([500, 6, 5]);
     const w: Army = { color: "w", king: "a1", board: { h2: "r", g2: "r" }, bench: [] };
     const b: Army = { color: "b", king: "a8", board: { e7: "p", d7: "p" }, bench: [] };
     const fen = fightStart(w, b).fen;
-    const white = ["a1b1", "b1c1", "c1d1", "d1e1"];
-    const black = ["a8b8", "b8c8", "c8b8", "b8c8"];
+    const white = ["a1b1", "b1c1", "c1d1", "d1e1", "e1f1", "f1g1", "g1h1"];
+    const black = ["a8b8", "b8c8", "c8b8", "b8c8", "c8b8", "b8c8", "c8b8"];
+    const behind = Array(7).fill(-600);
     /** White's moves with this score, Black's with its own (the side moving's view). */
-    const scored = (ws: number[], bs: number[] = [-600, -600, -600, -600]) => async (g: FightSoFar) => {
+    const scored = (ws: number[], bs: number[] = behind) => async (g: FightSoFar) => {
       const k = Math.floor(g.moves.length / 2);
       return g.moves.length % 2 ? { move: black[k]!, score: bs[k]! } : { move: white[k]!, score: ws[k]! };
     };
-    // Three of White's moves at 5 pawns or more: the fight ends after White's third, before Black answers it.
-    const res = await playFight(fen, { pick: scored([520, 700, 510, 900]), wait: noWait, rng: mulberry32(1) });
-    expect(res).toMatchObject({ end: "decided", winner: "w", moves: white.slice(0, 3).flatMap((m, k) => (k < 2 ? [m, black[k]!] : [m])), score: 510 });
-    expect(endWords("decided", false, AUTOCHESS, { winner: "w" })).toBe("White too far ahead: 5+ pawns for 3 moves.");
+    const short = { ...AUTOCHESS, moveCap: 7 };
+    // Six of White's moves at 5 pawns or more: the fight ends after White's sixth, before Black answers it.
+    const res = await playFight(fen, { pick: scored([520, 700, 510, 900, 600, 530, 999]), wait: noWait, rng: mulberry32(1) });
+    expect(res).toMatchObject({ end: "decided", winner: "w", score: 530 });
+    expect(res!.moves).toEqual(white.slice(0, 6).flatMap((m, k) => (k < 5 ? [m, black[k]!] : [m])));
+    expect(endWords("decided", false, AUTOCHESS, { winner: "w", you: "w" })).toBe("You're too far ahead: 5+ pawns for 6 moves.");
+    expect(endWords("decided", false, AUTOCHESS, { winner: "w", you: "b" })).toBe("Your opponent is too far ahead: 5+ pawns for 6 moves.");
     // A move under the margin starts the count again (and a bare move, a stand-in's, counts for nothing).
-    const broken = await playFight(fen, { pick: scored([520, 499, 700, 700]), wait: noWait, rng: mulberry32(1), cfg: { ...AUTOCHESS, moveCap: 4 } });
+    const broken = await playFight(fen, { pick: scored([520, 700, 510, 900, 499, 700, 700]), wait: noWait, rng: mulberry32(1), cfg: short });
     expect(broken!.end).not.toBe("decided");
+    expect(broken!.moves).toHaveLength(14);
     // A found mate within 5 moves plays out (a quick mate is fun to watch): no early end while the engine sees it.
-    const mating = await playFight(fen, { pick: scored([WIN - 9, WIN - 7, WIN - 5, WIN - 3]), wait: noWait, rng: mulberry32(1), cfg: { ...AUTOCHESS, moveCap: 4 } });
+    const mating = await playFight(fen, { pick: scored([WIN - 9, WIN - 9, WIN - 7, WIN - 7, WIN - 5, WIN - 5, WIN - 3]), wait: noWait, rng: mulberry32(1), cfg: short });
     expect(mating!.end).not.toBe("decided");
     // One further off is decided all the same.
-    const far = await playFight(fen, { pick: scored([WIN - 13, WIN - 13, WIN - 13, WIN - 13]), wait: noWait, rng: mulberry32(1) });
+    const far = await playFight(fen, { pick: scored(Array(7).fill(WIN - 13)), wait: noWait, rng: mulberry32(1) });
     expect(far).toMatchObject({ end: "decided", winner: "w" });
-    // The losing side's view counts for it too: Black scored 5 pawns up wins the same way.
-    const black5 = await playFight(fen, { pick: scored([-600, -600, -600, -600], [600, 600, 600, 600]), wait: noWait, rng: mulberry32(1) });
+    // The losing side's view counts for it too: Black scored 5 pawns up wins the same way, after its own sixth move.
+    const black5 = await playFight(fen, { pick: scored(behind, Array(7).fill(600)), wait: noWait, rng: mulberry32(1) });
     expect(black5).toMatchObject({ end: "decided", winner: "b" });
-    expect(black5!.moves).toHaveLength(6);
+    expect(black5!.moves).toHaveLength(12);
+    // The count is a setting.
+    const three = await playFight(fen, { pick: scored(Array(7).fill(600)), wait: noWait, rng: mulberry32(1), cfg: { ...AUTOCHESS, decisiveMoves: 3 } });
+    expect(three).toMatchObject({ end: "decided", winner: "w" });
+    expect(three!.moves).toHaveLength(5);
   });
 
   it("with the real engine, a side far ahead ends the fight early (or mates, or takes the last piece) instead of walking its king about", async () => {

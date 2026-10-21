@@ -12,7 +12,8 @@ engine's own score (material and position).**
    the side the HunChess score of the final position favors by at least `stallWinMargin` (100 centipawns, a pawn); closer is a draw.
    Deterministic (the same fight gives the same result on any device), and the search knows the rule. Stalemate and too little
    material stay draws, as in chess; the fifty-move rule stays (the quiet cap comes first).
-3. **The clean-up ends early:** a side the score favors by `decisiveMargin` (500, 5 pawns) for `decisiveMoves` (3) of its own moves
+3. **The clean-up ends early:** a side the score favors by `decisiveMargin` (500, 5 pawns) for `decisiveMoves` (3 in the brief; 6
+   since the sim, see below) of its own moves
    in a row wins at once (the end `decided`), unless the engine has found it a forced mate within `mateShowMoves` (5) moves, which
    plays out.
 4. **Checks no longer restart the quiet count.** Only a capture or a cash-in does.
@@ -63,22 +64,27 @@ How Auto chess works now: [docs/areas/autochess.md](../areas/autochess.md); the 
   play changes that, and the search already plays for the biggest edge.
 - **"Thin" is computed before each move** from the board: either side with no knight, bishop, rook or queen. The move counter shows
   "twice as fast" from then on, as it does after 30 moves.
-- **The result line** names the reason in the screen's words and sides ("White", "Black", as in "Round 1 · you play White"):
-  - a stall: `Fight stalled (<why>): <side> ahead by <n> pawn(s).`, or `... less than a pawn apart, a draw.`; the why is
-    `moves repeated`, `10 moves each, no capture` or `60 moves each`. Whole pawns, rounded (1.5 is 2), never under 1 for a win;
-    `far ahead` if the judge saw a mate. "No capture" leaves out "or cash-in" to stay short on a 320 px phone (a cash-in is rare:
-    0.14 a fight before, fewer now); the rules box says the same.
-  - the early end: `<side> too far ahead: 5+ pawns for 3 moves.` (the numbers from the settings).
+- **The result line** names the reason, and the sides as the rest of the screen names them: **"you" and "your opponent"**
+  ("You lose 5 HP.", "Your opponent is moving their pieces…"). The first build said "White" and "Black", but your color changes
+  every round (White in round 1, then Black, and so on: only the title says "Round 2 · you play Black"), so at the result a player
+  would have to work out which side they were. "You" can't be misread, and it is as short at 320 px.
+  - a stall: `Fight stalled (<why>): you're <n> pawn(s) up.` or `... your opponent is <n> pawn(s) up.`, or
+    `... less than a pawn apart, a draw.`; the why is `moves repeated`, `10 moves each, no capture` or `60 moves each`. Whole pawns,
+    rounded (1.5 is 2), never under 1 for a win; `far ahead` if the judge saw a mate. "No capture" leaves out "or cash-in" to stay
+    short on a 320 px phone (a cash-in is rare: 0.14 a fight before, fewer now); the rules box says the same.
+  - the early end: `You're too far ahead: 5+ pawns for 6 moves.` or `Your opponent is too far ahead: 5+ pawns for 6 moves.` (the
+    numbers come from the settings).
   - mate, stalemate, a bare king, the fifty-move rule and too little material keep their lines.
 - **The rules box** while the fight plays was rewritten for the new rules (it said "until mate or 5 checks in a row"). It must fit
   the box at 320 px (the layout e2e checks it): a first, fuller version (388 characters) didn't, so the speed-up sentence went (the
   move counter already says "twice as fast") and the words are as short as the old box's (280 characters).
-- **Settings:** `checksToWin` removed; `stallWinMargin` 100, `decisiveMargin` 500, `decisiveMoves` 3, `mateShowMoves` 5 as Eric set
-  them. See the sim below for a proposed change.
+- **Settings:** `checksToWin` removed; `stallWinMargin` 100, `decisiveMargin` 500 and `mateShowMoves` 5 as Eric set them;
+  **`decisiveMoves` 6, not the brief's 3**: the sim below found 3 ended 31 of 80 fights after 3 moves a side, and the director
+  approved the change on PR #305.
 - **Tests:** the engine's (stalls judged the same every time, the side behind avoiding a lost repetition, mates told from other
   wins), the fight's (stalls by the score, checks no longer winning or restarting the count, the early end and its exceptions,
   the speed-up when thin, a real-engine fight far ahead ending early), the words, and an e2e at 320 px that plays two of the sim's
-  fights (`?fightfen=`) and checks their exact result lines: a quiet-cap stall Black wins by a pawn, and White too far ahead.
+  fights (`?fightfen=`) and checks their exact result lines: a quiet-cap stall your opponent wins by a pawn, and you too far ahead.
 - **Ordinary chess is untouched:** 629 searches from 40 openings give the same move, score, depth and node count before and after,
   so the Stockfish match wasn't rerun.
 
@@ -87,24 +93,28 @@ How Auto chess works now: [docs/areas/autochess.md](../areas/autochess.md); the 
 | Where | Before | After |
 | --- | --- | --- |
 | Result, 5 checks | `5 checks in a row count as mate.` | (gone) |
-| Result, repetition | `Draw by repetition.` | `Fight stalled (moves repeated): White ahead by 2 pawns.` / `Fight stalled (moves repeated): less than a pawn apart, a draw.` |
-| Result, quiet cap | `10 moves each with no capture or check: more material wins.` / `10 moves each with no capture or check, and equal material.` | `Fight stalled (10 moves each, no capture): Black ahead by 1 pawn.` / `Fight stalled (10 moves each, no capture): less than a pawn apart, a draw.` |
-| Result, move cap | `60 moves played: more material wins.` / `60 moves played with equal material.` | `Fight stalled (60 moves each): White ahead by 6 pawns.` / `Fight stalled (60 moves each): less than a pawn apart, a draw.` (any stall, if the judge saw a mate: `... Black far ahead.`) |
-| Result, early end (new) | | `White too far ahead: 5+ pawns for 3 moves.` |
-| Fight rules box | `The engine plays both armies at the same strength until mate or 5 checks in a row, a draw, 60 moves each, or 10 each with no capture or check. A side left with only its king loses. After 30 moves each, moves play twice as fast. A pawn that reaches the far end cashes in for +5 gold.` | `The engine plays both armies at the same strength. A side loses with only its king left, or when the engine sees it 5 pawns down for 3 moves. A stall (repeats, 10 moves each with no capture, or 60) goes to the side a pawn up. A pawn that reaches the far end cashes in for +5 gold.` |
+| Result, repetition | `Draw by repetition.` | `Fight stalled (moves repeated): you're 2 pawns up.` / `Fight stalled (moves repeated): your opponent is 2 pawns up.` / `Fight stalled (moves repeated): less than a pawn apart, a draw.` |
+| Result, quiet cap | `10 moves each with no capture or check: more material wins.` / `10 moves each with no capture or check, and equal material.` | `Fight stalled (10 moves each, no capture): your opponent is 1 pawn up.` (or `you're 1 pawn up.`) / `Fight stalled (10 moves each, no capture): less than a pawn apart, a draw.` |
+| Result, move cap | `60 moves played: more material wins.` / `60 moves played with equal material.` | `Fight stalled (60 moves each): you're 6 pawns up.` (or `your opponent is 6 pawns up.`) / `Fight stalled (60 moves each): less than a pawn apart, a draw.` (any stall, if the judge saw a mate: `... you're far ahead.` / `... your opponent is far ahead.`) |
+| Result, early end (new) | | `You're too far ahead: 5+ pawns for 6 moves.` / `Your opponent is too far ahead: 5+ pawns for 6 moves.` |
+| Fight rules box | `The engine plays both armies at the same strength until mate or 5 checks in a row, a draw, 60 moves each, or 10 each with no capture or check. A side left with only its king loses. After 30 moves each, moves play twice as fast. A pawn that reaches the far end cashes in for +5 gold.` | `The engine plays both armies at the same strength. A side loses with only its king left, or when the engine sees it 5 pawns down for 6 moves. A stall (repeats, 10 moves each with no capture, or 60) goes to the side a pawn up. A pawn that reaches the far end cashes in for +5 gold.` |
 | Move counter | `Move 12 of 60 · twice as fast` after 30 moves each | the same, and also once a side is down to its king and pawns |
 
-## The sim, and a proposed change
+## The sim, and the change to 6 moves
 
 The same 80 fights as the engine's report, before (main, e709a59) and after: [reports/autochess-endings.md](../../reports/autochess-endings.md).
-In short, with Eric's numbers: the ends are too far ahead 54, quiet cap 15, bare king 7, mate 4 (before: bare king 28, 5 checks 25,
-quiet 10, mate 6, move cap 6, repetition 5); draws 7 (8); a fight is 10.9 moves a side on average, 8.8 at the median, 40 at most
-(27, 22, 60), 6.8 s, 5.2 s, 24.5 s (16.7, 15.4, 31.5); the bigger army wins 61, loses 3, draws 2 of 66 (61, 2, 3); the longest
-king-only stretch 10 plies (14), one side's longest king walk 11 moves (16); cash-ins 0.01 a fight (0.14). 76 of 80 fights have
-the same winner.
+As shipped (`decisiveMoves` 6):
+- **Ends:** too far ahead 39, quiet cap 17, bare king 15, mate 7, repetition 2. Before: bare king 28, 5 checks 25, quiet 10,
+  mate 6, move cap 6, repetition 5.
+- **Draws:** 7 (before 8).
+- **Length in moves a side:** 13.4 on average, 11.8 at the median, 40 at most (before 27, 22, 60).
+- **Length in seconds:** 8.3, 7.0, 24.5 (before 16.7, 15.4, 31.5).
+- **The bigger army** wins 61, loses 3 and draws 2 of 66 uneven fights (before 61, 2, 3).
+- **Longest king-only stretch:** 10 plies (before 14). One side's longest king walk: 11 moves (before 16).
+- **Cash-ins:** 0.03 a fight (before 0.14).
+- **Winners:** 76 of 80 fights have the same winner as before.
 
-**What looks wrong for fun: 31 of 80 fights are over after 3 moves a side (about 2 s)**, because the bot armies are often lopsided
-from the start and the engine sees one side 5 pawns up at once. **Proposed, not applied (Eric's number stays until he says):
-`decisiveMoves` 6.** With it no fight ends inside 6 moves a side except by mate or a bare king, the median fight is 11.8 moves a
-side (7 s), the winners and the draw rate are the same, and king walks stay short. A bigger `decisiveMargin` (800, 1000) was tried
-too: it keeps lopsided fights going longer and the king walks come back.
+**Why 6, not 3:** with the brief's 3, 31 of 80 fights were over after 3 moves a side, about 2 s. The bot armies are often lopsided
+from the start, so the engine sees one side 5 pawns up at once. I proposed 6 and the director approved it on PR #305. With 6, no
+fight ends inside 6 moves a side except by mate or a bare king, and the winners and the draw rate are the same as with 3. A bigger
+`decisiveMargin` (800, 1000) was tried too: it keeps lopsided fights going longer, and the king walks come back.

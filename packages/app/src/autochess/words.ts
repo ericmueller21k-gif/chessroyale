@@ -8,33 +8,45 @@ import type { Color } from "./types.ts";
 /** How a fight ended ("both_checked": both kings were attacked as it began, so there was no fight). */
 export type EndKind = FightEnd | "both_checked";
 
-/** A fight's end in detail: who won, and a stall's deciding score (the engine's, centipawns, White's view). */
+/**
+ * A fight's end in detail: who won, a stall's deciding score (the engine's, centipawns, White's view), and the player's color (the
+ * sides are named "you" and "your opponent", as the rest of the screen names them; without it, White and Black).
+ */
 export interface EndDetail {
   winner?: Color | null;
   score?: number;
+  you?: Color;
 }
 
 const SIDE: Record<Color, string> = { w: "White", b: "Black" };
 
-/** A stall's winner's lead by the engine's score: "ahead by 2 pawns" (whole pawns, never under 1 for a win), "far ahead" for a mate it saw. */
+/** A stall's winner's lead by the engine's score: "2 pawns up" (whole pawns, never under 1 for a win), "far ahead" for a mate it saw. */
 function lead(score: number): string {
   if (Math.abs(score) >= 10000) return "far ahead";
   const pawns = Math.max(1, Math.round(Math.abs(score) / 100));
-  return `ahead by ${pawns} ${pawns === 1 ? "pawn" : "pawns"}`;
+  return `${pawns} ${pawns === 1 ? "pawn" : "pawns"} up`;
 }
+
+/** The winning side with its verb: "you're", "your opponent is" (or "White is" when the player's color isn't given). */
+function whoIs(winner: Color, you: Color | undefined): string {
+  if (!you) return `${SIDE[winner]} is`;
+  return winner === you ? "you're" : "your opponent is";
+}
+
+const capital = (s: string) => s[0]!.toUpperCase() + s.slice(1);
 
 export function endWords(end: EndKind, draw: boolean, cfg: AutoChessSettings = AUTOCHESS, detail: EndDetail = {}): string {
   /** A stall: why it stalled, then the side the engine's score favors and by how much, or that it's less than a pawn either way. */
   const stall = (why: string) => {
     if (draw || detail.score === undefined) return `Fight stalled (${why}): less than a pawn apart, a draw.`;
     const winner = detail.winner ?? (detail.score > 0 ? "w" : "b");
-    return `Fight stalled (${why}): ${SIDE[winner]} ${lead(detail.score)}.`;
+    return `Fight stalled (${why}): ${whoIs(winner, detail.you)} ${lead(detail.score)}.`;
   };
   switch (end) {
     case "checkmate":
       return "Checkmate.";
     case "decided":
-      return detail.winner ? `${SIDE[detail.winner]} too far ahead: ${cfg.decisiveMargin / 100}+ pawns for ${cfg.decisiveMoves} moves.` : "One side too far ahead.";
+      return detail.winner ? `${capital(whoIs(detail.winner, detail.you))} too far ahead: ${cfg.decisiveMargin / 100}+ pawns for ${cfg.decisiveMoves} moves.` : "One side too far ahead.";
     case "stalemate":
       return "Stalemate.";
     case "repetition":
