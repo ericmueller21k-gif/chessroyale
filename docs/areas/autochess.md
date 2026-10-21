@@ -43,7 +43,7 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
   put it. A refused square says why in the placement rules' words. `adjustStep` false skips the step (straight to the fight); testers
   add `?adjust=0`.
 - **Fight:** **the HunChess engine** (our own, `packages/chess/src/hunchess/`, in a Web Worker: [the decision](../decisions/2026-10-21-hunchess-engine.md))
-  plays both armies at the same fixed node budget (`fightNodes`), a move about every 0.35 s and **twice as fast (0.175 s) after 30 moves
+  plays both armies at the same fixed node budget (`fightNodes`), a move about every 0.6 s and **twice as fast (0.3 s) after 30 moves
   a side, or once either side is down to its king and pawns**, to mate, stalemate or too little material to mate (draws), or a
   **stall**: a threefold repetition, 10 moves a side with no capture or cash-in (a check doesn't count), or 60 moves a side. **A stall
   goes to the side the engine's score of the final position (material and position) favors by a pawn** (`stallWinMargin`); closer is a

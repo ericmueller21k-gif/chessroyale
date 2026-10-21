@@ -9,12 +9,16 @@ sides.
 - **Before** is main at e709a59 (the merged rules) running this branch's `hunchess-fights.ts`, with its pick returning the bare move
   as main's fight expects. It reproduces the engine report's numbers exactly: bare king 28, 5 checks 25, quiet 10, mate 6, cap 6,
   repetition 5; White 37, Black 35, draws 8; 0.14 cash-ins a fight.
-- **After** is this branch as shipped: `stallWinMargin` 100, `decisiveMargin` 500, `decisiveMoves` 6, `mateShowMoves` 5.
+- **After** is this branch as shipped: `stallWinMargin` 100, `decisiveMargin` 500, `decisiveMoves` 6, `mateShowMoves` 5, and the
+  slower pace: `fightMoveMs` 600 and `fightFastMoveMs` 300 (were 350 and 175; Eric: "I think 7 seconds is too short. For fights,
+  they should take a little bit longer.").
 - **First build** is Eric's brief as written, with `decisiveMoves` 3. It ended 31 of 80 fights after 3 moves a side, so the count
   became 6 (the director's call on PR #305; see below).
 
-Seconds are the fight's real pace: the sum of the waits the fight asks for. That is 0.35 s a move, and 0.175 s after 30 moves a
-side; after this change, also 0.175 s once a side is down to its king and pawns. Raw data, fight by fight:
+Seconds are the fight's real pace: the sum of the waits the fight asks for. Before, that was 0.35 s a move and 0.175 s after 30
+moves a side. After, it is 0.6 s a move and 0.3 s after 30 moves a side or once a side is down to its king and pawns. The pace
+doesn't change the moves: the engine searches a fixed number of nodes, so the fights are identical at either pace, and only the
+seconds change (by 600/350, the same ratio for both speeds). The first build and the other tries are shown at the new pace too. Raw data, fight by fight:
 [reports/autochess-endings/](autochess-endings/).
 
 ```sh
@@ -29,7 +33,7 @@ npx tsx packages/sim/scripts/hunchess-fights.ts fights=80 set.decisiveMoves=3 ou
 | **Ends** | bare king 28 (35%), 5 checks 25 (31%), quiet cap 10 (12.5%), mate 6 (7.5%), move cap 6 (7.5%), repetition 5 (6%) | too far ahead 39 (49%), quiet cap 17 (21%), bare king 15 (19%), mate 7 (9%), repetition 2 (2.5%) | too far ahead 54 (67.5%), quiet cap 15 (19%), bare king 7 (9%), mate 4 (5%) |
 | **Draws** | 8 (10%) | 7 (8.8%) | 7 (8.8%) |
 | **Moves a side:** average / median / longest | 27 / 22 / 60 | 13.4 / 11.8 / 40 | 10.9 / 8.8 / 40 |
-| **Seconds:** average / median / longest | 16.7 / 15.4 / 31.5 | 8.3 / 7.0 / 24.5 | 6.8 / 5.2 / 24.5 |
+| **Seconds:** average / median / longest | 16.7 / 15.4 / 31.5 (at 350 ms; 28.6 / 26.4 / 54.0 at 600 ms) | **14.1 / 12.0 / 42.0** (8.3 / 7.0 / 24.5 at 350 ms) | 11.7 / 9.0 / 42.0 |
 | Fights over in 3 moves a side or fewer | 1 | 1 | **31** |
 | **Bigger army** (P1 N3 B3 R5 Q9; 66 of 80 fights start uneven): wins / losses / draws | 61 / 2 / 3 | 61 / 3 / 2 | 61 / 3 / 2 |
 | **Won by the side that started behind** | 2 (3% of uneven starts) | 3 (4.5%) | 3 (4.5%) |
@@ -62,23 +66,45 @@ first move, and the fight ended before it had begun. That is "many fights over i
 
 **Shipped: `decisiveMoves` 6** (`decisiveMargin` stays 500). The winners and the draw rate are the same as with 3, and:
 - no fight ends before 6 moves a side except by mate or a bare king (1 fight in 3 moves, 3 in 5);
-- the median fight is 11.8 moves a side (7 s), about half of before (22 moves, 15 s);
-- no fight is longer than 40 moves a side (24.5 s); before, the longest was 60 (31.5 s);
+- the median fight is 11.8 moves a side, about half of before (22 moves);
+- no fight is longer than 40 moves a side; before, the longest was 60;
 - king walks stay short;
 - more fights end by their own rule (bare king 15, mate 7) instead of "too far ahead" (39).
 
-Lopsided starts still end early: 23 of the 39 early ends come right at 6 moves a side (about 4 s). That is the rule doing its job on
+Lopsided starts still end early: 23 of the 39 early ends come right at 6 moves a side (about 7 s at the new pace). That is the rule doing its job on
 a fight that was decided from the start.
 
 Other numbers tried (all 80 fights; raw data in the folder above):
 
-| `decisiveMargin` / `decisiveMoves` | Too far ahead | Over in ≤3 moves a side | Moves a side: average / median | Seconds: median | King walks of 5+ moves |
+| `decisiveMargin` / `decisiveMoves` | Too far ahead | Over in ≤3 moves a side | Moves a side: average / median | Seconds at 600 ms: average / median | King walks of 5+ moves |
 | --- | --- | --- | --- | --- | --- |
-| 500 / 3 (first build) | 54 | 31 | 10.9 / 8.8 | 5.2 | 11 |
-| **500 / 6 (shipped)** | 39 | 1 | 13.4 / 11.8 | 7.0 | 16 |
-| 800 / 3 | 37 | 18 | 14.4 / 15.3 | 9.1 | 19 |
-| 800 / 5 | 25 | 1 | 15.8 / 16.5 | 9.1 | 21 |
-| 1000 / 5 | 14 | 1 | 17.0 / 17.5 | 10.2 | 28 |
+| 500 / 3 (first build) | 54 | 31 | 10.9 / 8.8 | 11.7 / 9.0 | 11 |
+| **500 / 6 (shipped)** | 39 | 1 | 13.4 / 11.8 | 14.1 / 12.0 | 16 |
+| 800 / 3 | 37 | 18 | 14.4 / 15.3 | 15.4 / 15.6 | 19 |
+| 800 / 5 | 25 | 1 | 15.8 / 16.5 | 16.7 / 15.6 | 21 |
+| 1000 / 5 | 14 | 1 | 17.0 / 17.5 | 18.0 / 17.4 | 28 |
 
 A bigger margin keeps lopsided fights going longer, and the king walks come back (28 fights with one at 1000). A longer count with
 the same margin is the cheapest fix for the 2-second fights.
+
+## The pace: 600 ms a move
+
+Eric found 7 s too short, so the pace is now 600 ms a move (300 ms when fast). The target was a typical fight of about 12 to 15 s.
+The rules and the moves are unchanged.
+
+| Pace (normal / fast) | Seconds: average / median / longest |
+| --- | --- |
+| 350 / 175 ms (before) | 8.3 / 7.0 / 24.5 |
+| **600 / 300 ms (shipped)** | **14.1 / 12.0 / 42.0** |
+| 650 / 325 ms | 15.3 / 13.0 / 45.5 |
+| 700 / 350 ms | 16.5 / 14.0 / 49.0 |
+
+- **The median lands at 12.0 s, the bottom edge of the target**, and the average at 14.1 s. Fights vary a lot: a quarter are
+  under 6.6 s (lopsided starts, decided at 6 moves a side), and a quarter are over 21 s. If the middle of the target is wanted,
+  **650 ms (fast 325 ms) gives a 13.0 s median**; 700 ms gives 14.0 s.
+- **The engine has more room now.** The node budget (30,000) was sized to fit 350 ms on a phone with its CPU slowed 4x, where a
+  move took 174 ms on average and 338 ms at most ([reports/hunchess-engine.md](hunchess-engine.md)). At 600 ms every measured
+  move fits. At the fast 300 ms, only the slowest moves on such a phone run over, where before most of them did (194 of 283
+  over 175 ms).
+- **Nothing else depends on the pace.** The worker's 4 s fallback is its own timeout. The e2e tests run with `?quick=1`, which sets
+  its own 60 / 30 ms. Only the unit tests that check the setting's numbers needed updating.

@@ -687,10 +687,11 @@ describe("auto chess: the fight", () => {
     expect(endWords("king_alone", true)).toBe("Both sides are down to a king: a draw.");
   });
 
-  it("after 30 moves a side, moves play twice as fast (350 ms, then 175 ms): the speed-up is a setting", async () => {
-    expect([AUTOCHESS.fightMoveMs, AUTOCHESS.fightFastAfter, AUTOCHESS.fightFastMoveMs]).toEqual([350, 30, 175]);
-    expect([0, 1, 58, 59, 60, 61, 100].map((plies) => moveMs(plies))).toEqual([350, 350, 350, 350, 175, 175, 175]);
-    // A fight played with kings stepping about (it ends by repetition after 8 plies): the waits are 350 until the speed-up, then 175.
+  it("after 30 moves a side, moves play twice as fast (600 ms, then 300 ms): the speed-up is a setting", async () => {
+    // (Eric, Oct 21: "for fights, they should take a little bit longer": 350 and 175 ms before.)
+    expect([AUTOCHESS.fightMoveMs, AUTOCHESS.fightFastAfter, AUTOCHESS.fightFastMoveMs]).toEqual([600, 30, 300]);
+    expect([0, 1, 58, 59, 60, 61, 100].map((plies) => moveMs(plies))).toEqual([600, 600, 600, 600, 300, 300, 300]);
+    // A fight played with kings stepping about (it ends by repetition after 8 plies): the waits are 600 until the speed-up, then 300.
     const waits: number[] = [];
     const w: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
     const b: Army = { color: "b", king: "a8", board: { h7: "n" }, bench: [] };
@@ -701,7 +702,7 @@ describe("auto chess: the fight", () => {
     };
     const res = await playFight(fightStart(w, b).fen, { pick: byFen(kingSteps), wait: async (ms) => void waits.push(ms), rng: mulberry32(1), cfg: { ...AUTOCHESS, fightFastAfter: 2 } });
     expect(res!.moves).toHaveLength(8);
-    expect(waits).toEqual([350, 350, 350, 350, 175, 175, 175, 175]);
+    expect(waits).toEqual([600, 600, 600, 600, 300, 300, 300, 300]);
     // The setting: a fast fight from the start.
     const quick: number[] = [];
     await playFight(fightStart(w, b).fen, { pick: byFen(kingSteps), wait: async (ms) => void quick.push(ms), rng: mulberry32(1), cfg: { ...AUTOCHESS, moveCap: 3, fightFastAfter: 0, fightFastMoveMs: 10 } });
@@ -714,8 +715,8 @@ describe("auto chess: the fight", () => {
     const bp: Army = { color: "b", king: "a8", board: { h7: "p" }, bench: [] };
     const thinRes = await playFight(fightStart(w, bp).fen, { pick: byFen(kingSteps), wait: async (ms) => void thin.push(ms), rng: mulberry32(1) });
     expect(thinRes!.moves).toHaveLength(8);
-    expect(thin).toEqual(Array(8).fill(175));
-    expect(moveMs(0, AUTOCHESS, true)).toBe(175);
+    expect(thin).toEqual(Array(8).fill(300));
+    expect(moveMs(0, AUTOCHESS, true)).toBe(300);
     expect(moveWords(0, AUTOCHESS, true)).toBe("Move 1 of 60 · twice as fast");
   });
 

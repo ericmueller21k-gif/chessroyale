@@ -20,6 +20,9 @@ engine's own score (material and position).**
 5. **Faster when it thins out:** moves play at `fightFastMoveMs` once either side is down to its king and pawns, as well as after
    `fightFastAfter` moves a side.
 6. **The result says why.**
+7. **A slower pace** (Eric, on PR #305: "I think 7 seconds is too short. For fights, they should take a little bit longer."):
+   `fightMoveMs` 350 to 600 ms, `fightFastMoveMs` 175 to 300 ms (after 30 moves a side, or once a side is down to king and
+   pawns); the target was a typical fight of about 12 to 15 s.
 
 How Auto chess works now: [docs/areas/autochess.md](../areas/autochess.md); the numbers:
 [reports/autochess-endings.md](../../reports/autochess-endings.md).
@@ -108,7 +111,8 @@ As shipped (`decisiveMoves` 6):
   mate 6, move cap 6, repetition 5.
 - **Draws:** 7 (before 8).
 - **Length in moves a side:** 13.4 on average, 11.8 at the median, 40 at most (before 27, 22, 60).
-- **Length in seconds:** 8.3, 7.0, 24.5 (before 16.7, 15.4, 31.5).
+- **Length in seconds, at the new pace (600 / 300 ms):** 14.1 on average, 12.0 at the median, 42.0 at most. At the old pace
+  (350 / 175 ms) the same fights took 8.3, 7.0 and 24.5; before this change, fights took 16.7, 15.4 and 31.5.
 - **The bigger army** wins 61, loses 3 and draws 2 of 66 uneven fights (before 61, 2, 3).
 - **Longest king-only stretch:** 10 plies (before 14). One side's longest king walk: 11 moves (before 16).
 - **Cash-ins:** 0.03 a fight (before 0.14).
@@ -118,3 +122,14 @@ As shipped (`decisiveMoves` 6):
 from the start, so the engine sees one side 5 pawns up at once. I proposed 6 and the director approved it on PR #305. With 6, no
 fight ends inside 6 moves a side except by mate or a bare king, and the winners and the draw rate are the same as with 3. A bigger
 `decisiveMargin` (800, 1000) was tried too: it keeps lopsided fights going longer, and the king walks come back.
+
+## The pace
+
+- **600 ms a move, 300 ms when fast** (the director's numbers, from Eric's "a little bit longer"). The rules and the moves are
+  unchanged; the engine searches a fixed number of nodes, so the fights are identical and only the seconds change.
+- **The median fight is 12.0 s, the bottom edge of the 12 to 15 s target** (average 14.1 s; a quarter of fights are under 6.6 s,
+  a quarter over 21 s). **650 ms (325 fast) would give a 13.0 s median**, and 700 ms gives 14.0 s; left at 600 until Eric or the
+  director says.
+- **Nothing else depended on the old pace.** The worker's 4 s fallback is its own timeout, and the e2e tests run with `?quick=1`,
+  which sets its own 60 / 30 ms. The engine now has room to spare: its node budget was sized to fit 350 ms on a phone with its
+  CPU slowed 4x. Only the unit tests that check the numbers changed.

@@ -2,7 +2,8 @@
 
 > **Later the same day, how fights end changed** ([autochess-endings](2026-10-21-autochess-endings.md)): no more "5 checks in a
 > row win"; a stall (threefold repetition, the quiet cap, the move cap) goes to the side the engine's score favors by a pawn, not
-> to more counted material; a side far ahead for 3 moves wins early; a check no longer restarts the quiet count. The notes below
+> to more counted material; a side far ahead for 6 moves wins early; a check no longer restarts the quiet count; and a fight
+> plays at 600 ms a move (300 ms when fast), not 350 (175), so the 30,000-node budget below has room to spare. The notes below
 > are kept as built, with what changed noted.
 
 ## What Eric asked for

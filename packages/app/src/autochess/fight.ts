@@ -3,7 +3,7 @@ import { BLACK, F_CASHIN, fightRules, judgedResult, moveFlags, moveUci, parseSqu
 import type { Color } from "./types.ts";
 
 /**
- * The fight: the HunChess engine plays both sides, the same search for each, a move about every 0.35 s, until mate (a win), a side
+ * The fight: the HunChess engine plays both sides, the same search for each, a move about every 0.6 s, until mate (a win), a side
  * left with only its king (it loses at once; both kings alone: a draw; also a side that starts the fight so: Eric, Oct 20: "boring
  * moving around... makes it go faster"), stalemate or too little material (draws), or a **stall**: a threefold repetition, 10 moves a
  * side with no capture or cash-in, or 60 moves a side. A stall goes to the side the engine's score of the final position favors by a

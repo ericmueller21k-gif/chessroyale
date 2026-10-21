@@ -2743,7 +2743,9 @@ export interface AutoChessSettings {
   readonly kingRanks: number;
   /**
    * The fight: one move about this often, each searched by the HunChess engine to this many nodes (the same for both sides,
-   * deterministic; docs/decisions/2026-10-21-hunchess-engine.md).
+   * deterministic; docs/decisions/2026-10-21-hunchess-engine.md). 600 ms since Oct 21 (was 350; Eric: "for fights, they should
+   * take a little bit longer"; the fast pace 175 to 300 ms with it): the node budget was sized for 350 ms on a 4x-slowed phone, so
+   * the engine now has room to spare. docs/decisions/2026-10-21-autochess-endings.md.
    */
   readonly fightMoveMs: number;
   readonly fightNodes: number;
@@ -2755,7 +2757,7 @@ export interface AutoChessSettings {
   readonly cashInGold: number;
   readonly cashInValue: number;
   /**
-   * Moves play at `fightFastMoveMs` after this many moves a side (v5, Eric Oct 20: twice as fast), and also once either side is
+   * Moves play at `fightFastMoveMs` (twice as fast) after this many moves a side (v5, Eric Oct 20), and also once either side is
    * down to its king and pawns (Eric, Oct 21: "the last thing we want to see is just the king moving around").
    */
   readonly fightFastAfter: number;
@@ -2848,12 +2850,12 @@ export const AUTOCHESS: AutoChessSettings = {
   adjustMoves: 1,
   levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
   kingRanks: 2,
-  fightMoveMs: 350,
+  fightMoveMs: 600,
   fightNodes: 30000,
   cashInGold: 5,
   cashInValue: 20,
   fightFastAfter: 30,
-  fightFastMoveMs: 175,
+  fightFastMoveMs: 300,
   moveCap: 60,
   quietCap: 10,
   stallWinMargin: 100,
