@@ -87,17 +87,19 @@ describe("auto chess: survivors", () => {
     expect(match.bot.hp).toBe(17);
   });
 
-  it("the settings hold the design's numbers (v4, v5, v6): tune them here, nowhere else", () => {
+  it("the settings hold the design's numbers (v4, v5, v6, v7): tune them here, nowhere else", () => {
     expect(AUTOCHESS).toMatchObject({
-      shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 2 },
+      shop: { slots: 4, rerollCost: 2 },
       sellBack: 0.75,
       benchSlots: 4,
+      lockIn: false,
       lockInBonus: 25,
       buySeconds: 30,
       lockSeconds: 3,
       circlesDelaySeconds: 2,
       adjustStep: true,
-      adjustSeconds: 5,
+      adjustMode: "legal",
+      adjustSeconds: 7,
       adjustMoves: 1,
       levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
       kingRanks: 2,

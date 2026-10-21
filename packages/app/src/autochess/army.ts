@@ -101,24 +101,26 @@ export function holdBlock(army: Army, gold: number, offer: Offer, cfg: AutoChess
 /** An offer's label under its piece: "Bishop c2". */
 export const offerLabel = (offer: Offer) => `${KIND_NAME[offer.kind][0]!.toUpperCase()}${KIND_NAME[offer.kind].slice(1)} ${offer.square}`;
 
-/** The shop's words for an offer that can't be bought: short (under its price) and whole (the line under the board). */
+/**
+ * The shop's words for an offer that can't be bought: `short` (a card's reason, for its label) and `line` (what the small spot under
+ * the board says when it is tapped: short words, about 15 characters a line, never an explanation).
+ */
 export function buyWords(block: BuyBlock | "bench", offer: Offer, gold: number, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.levels.max): { short: string; line: string } {
-  const name = KIND_NAME[offer.kind];
   switch (block) {
     case "gold":
-      return { short: "No gold", line: `Not enough gold: a ${name} costs ${cfg.prices[offer.kind]} and you have ${gold}.` };
+      return { short: "No gold", line: `Need ${cfg.prices[offer.kind] - gold} more` };
     case "limit":
       return { short: "Level full", line: placeWords("limit", cfg, limit) };
     case "bench":
-      return { short: "Bench full", line: `Your bench is full: ${cfg.benchSlots} pieces at most. Place or sell one first.` };
+      return { short: "Bench full", line: "Bench full" };
     case "taken":
-      return { short: "Taken", line: `${offer.square} is taken.` };
+      return { short: "Taken", line: `${offer.square} is taken` };
     case "queen":
-      return { short: "Max 1", line: cfg.queenLimit === 1 ? "One queen at most." : `${cfg.queenLimit} queens at most.` };
+      return { short: "Max 1", line: cfg.queenLimit === 1 ? "One queen max" : `${cfg.queenLimit} queens max` };
     case "pawns":
-      return { short: "Max 8", line: `${cfg.maxPawns} pawns at most.` };
+      return { short: "Max 8", line: `${cfg.maxPawns} pawns max` };
     case "extras":
-      return { short: "Too many", line: `Too many pieces: pawns plus extra pieces (past 1 queen, 2 rooks, 2 bishops and 2 knights) can't pass ${cfg.maxPawns}.` };
+      return { short: "Too many", line: "Too many pieces" };
   }
 }
 
@@ -153,17 +155,17 @@ export function placeBlock(army: Army, kind: Kind, square: string, from?: string
 export function placeWords(block: PlaceBlock, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.levels.max): string {
   switch (block) {
     case "half":
-      return "Pieces go on your half of the board.";
+      return "Your half only";
     case "king":
-      return "That's your king's square.";
+      return "King's square";
     case "taken":
-      return "That square is taken.";
+      return "Square taken";
     case "limit":
-      return `Your level allows ${limit} pieces on the board. Buy XP to level up.`;
+      return "Board full: buy XP";
     case "backrank":
-      return "Pawns can't stand on your back rank.";
+      return "Not on back rank";
     case "file":
-      return `${cfg.pawnsPerFile} pawns a file at most.`;
+      return `${cfg.pawnsPerFile} pawns a file`;
   }
 }
 
@@ -210,10 +212,10 @@ export function placeHeld(army: Army, index: number): Army {
   return { ...army, board: { ...army.board, [held.square]: held.kind }, bench: army.bench.filter((_, i) => i !== index) };
 }
 
-/** The words for a held piece that can't be placed, with its square named. */
+/** The words for a held piece that can't be placed, with its square named (short, as the others). */
 export function heldWords(block: PlaceBlock, square: string, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.levels.max): string {
-  if (block === "taken") return `${square} is taken.`;
-  if (block === "king") return `${square} is your king's square.`;
+  if (block === "taken") return `${square} is taken`;
+  if (block === "king") return `King is on ${square}`;
   return placeWords(block, cfg, limit);
 }
 

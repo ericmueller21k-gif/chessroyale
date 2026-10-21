@@ -2743,6 +2743,15 @@ export const SQUADS: SquadsSettings = {
  */
 export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: false };
 
+/** What the shop offers, in percent, by kind (pawn, knight, bishop, rook, queen): a row adds up to 100. */
+export interface ShopOdds {
+  readonly p: number;
+  readonly n: number;
+  readonly b: number;
+  readonly r: number;
+  readonly q: number;
+}
+
 /**
  * Auto chess, the demo (Oct 19, 2026; docs/decisions/2026-10-19-autochess-demo.md): you and a bot buy pieces with gold
  * (the shop offers each a piece and a square of your half; the king is placed by the game), scout, move one piece once, and the
@@ -2754,13 +2763,17 @@ export interface AutoChessSettings {
   /** What each piece costs in the shop (a pawn 10 ... a queen 90: the chess value times ten, a bishop a little over a knight). */
   readonly prices: { readonly p: number; readonly n: number; readonly b: number; readonly r: number; readonly q: number };
   /**
-   * The shop (v5, Eric Oct 20; v6 Oct 20 evening): this many offers, each a piece (rolled by these odds, percent) and a square on
+   * The shop (v5, Eric Oct 20; v6 Oct 20 evening; v7 Oct 21): this many offers (4 since v7, was 5), each a piece and a square on
    * your half where it will land; buying an offer rolls a new one into its slot; one reroll of all the offers costs `rerollCost`
-   * gold. The shop refills free at each round's start.
+   * gold. The shop refills free at each round's start. **The odds follow the level of whoever's shop it is** (v7, Eric Oct 21: "when
+   * you level you have slightly higher chances for better pieces and pawn odds slightly decrease... [queens] shouldn't even appear
+   * till level 7 like in TFT"): `oddsByLevel[level - 1]` is the percent of each kind for a shop rolled at that level, level 1 first
+   * (play starts at `levels.start`, 4, and tops at `levels.max`, 10); each row adds up to 100. No rooks before level 5, no queens
+   * before 7 (Eric: "Rooks should start at level 5"). The bot rolls by its own level.
    */
   readonly shop: {
     readonly slots: number;
-    readonly odds: { readonly p: number; readonly n: number; readonly b: number; readonly r: number; readonly q: number };
+    readonly oddsByLevel: readonly ShopOdds[];
     readonly rerollCost: number;
   };
   /** Selling a piece, from the board or the bench, gives back this share of its price, rounded down (v6, Eric Oct 20: 75%: P7 N22 B24 R37 Q67). */
@@ -2770,7 +2783,14 @@ export interface AutoChessSettings {
    * was offered on. Held pieces stay from round to round (the board's pieces still don't).
    */
   readonly benchSlots: number;
-  /** The first side to lock in (end its buying, freezing its board, bench and shop) gets this much gold at once (v5, Eric Oct 20). */
+  /**
+   * Lock in (v5, Eric Oct 20): a button that ends your buying (freezing your board, bench and shop); the first side to lock in gets
+   * `lockInBonus` gold at once. **Off since v7** (Eric, Oct 21: "the whole function/feature" goes "for now... just remove the button
+   * keep the logic there, might wanna readd it later"): with `lockIn` false there is no button, no bonus for anyone (the bot's
+   * included: it never locks) and every buy step runs its full time (the last `lockSeconds` still lock). The code stays behind this
+   * switch (`?lockin=1` turns it on for testers).
+   */
+  readonly lockIn: boolean;
   readonly lockInBonus: number;
   /** The buy-and-place step, its locked end (no buying, selling or moving), and how far behind the opponent's circles show. */
   readonly buySeconds: number;
@@ -2779,11 +2799,17 @@ export interface AutoChessSettings {
   /** While you buy, one of their pieces (a circle, a pawn too) is revealed at random every this many seconds, and stays shown (v6, Eric Oct 20: 5 s, so 5 in the 30). */
   readonly revealSeconds: number;
   /**
-   * The adjust step (v6, Eric Oct 20): `adjustSeconds` long, with their full board shown, in which you make `adjustMoves` change (move
-   * one of your pieces to any legal empty square of your half: not a chess move), hidden from them until the fight. `adjustStep`
-   * false turns the step off (straight to the fight): "we could test it out" both ways (`?adjust=0` in the address, for testers).
+   * The adjust step, shown to players as the **move step** (v6, Eric Oct 20; v2 Oct 21): `adjustSeconds` long, with their full board
+   * shown, in which you make `adjustMoves` change, hidden from them until the fight. `adjustStep` false turns the step off (straight to
+   * the fight): "we could test it out" both ways (`?adjust=0` in the address, for testers). **`adjustMode`** picks the change:
+   * `"legal"` (v7, Eric Oct 21: "it's too strong, instead it highlights one piece at random of yours and you get 7 seconds to do a
+   * LEGAL move on your half of the board"): one of your pieces (never the king, one with at least one legal chess move that stays on
+   * your half; picked at random, seeded by the round) is lit, and you play one legal chess move with it that stays on your half, or
+   * skip; with no such piece you have no move that round. The bot gets the same: its own random piece and the engine's best such move.
+   * `"teleport"` (the v6 step, kept in code, off): move any one piece of yours to any empty square of your half.
    */
   readonly adjustStep: boolean;
+  readonly adjustMode: "legal" | "teleport";
   readonly adjustSeconds: number;
   readonly adjustMoves: number;
   /**
@@ -2901,16 +2927,34 @@ export interface AutoChessSettings {
 
 export const AUTOCHESS: AutoChessSettings = {
   prices: { p: 10, n: 30, b: 32, r: 50, q: 90 },
-  shop: { slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 2 },
+  shop: {
+    slots: 4,
+    // Percent P/N/B/R/Q by level, level 1 first (v7, Eric Oct 21).
+    oddsByLevel: [
+      { p: 82, n: 10, b: 8, r: 0, q: 0 },
+      { p: 80, n: 11, b: 9, r: 0, q: 0 },
+      { p: 77, n: 12, b: 11, r: 0, q: 0 },
+      { p: 74, n: 14, b: 12, r: 0, q: 0 },
+      { p: 66, n: 14, b: 13, r: 7, q: 0 },
+      { p: 60, n: 16, b: 15, r: 9, q: 0 },
+      { p: 54, n: 18, b: 16, r: 11, q: 1 },
+      { p: 48, n: 19, b: 18, r: 12, q: 3 },
+      { p: 42, n: 20, b: 19, r: 14, q: 5 },
+      { p: 36, n: 21, b: 20, r: 16, q: 7 },
+    ],
+    rerollCost: 2,
+  },
   sellBack: 0.75,
   benchSlots: 4,
+  lockIn: false,
   lockInBonus: 25,
   buySeconds: 30,
   lockSeconds: 3,
   circlesDelaySeconds: 2,
   revealSeconds: 5,
   adjustStep: true,
-  adjustSeconds: 5,
+  adjustMode: "legal",
+  adjustSeconds: 7,
   adjustMoves: 1,
   levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
   kingRanks: 2,

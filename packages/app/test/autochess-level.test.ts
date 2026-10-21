@@ -41,8 +41,8 @@ describe("auto chess: levels (v6)", () => {
     expect(xpBlock(L(10), 500)).toBe("max");
     expect(buyXp(L(4, 2), 50)).toEqual({ level: 5, xp: 2, gold: 30 });
     expect(buyXp(L(4), 20)).toEqual({ level: 5, xp: 0, gold: 0 });
-    expect(xpWords("gold", 12)).toBe("Not enough gold: 4 XP cost 20 and you have 12.");
-    expect(xpWords("max", 99)).toBe("You are at the top level, 10.");
+    expect(xpWords("gold", 12)).toBe("Need 8 more");
+    expect(xpWords("max", 99)).toBe("Top level (10)");
     expect(levelWords(L(4, 2))).toBe("Lv 4 · 2/4 XP");
     expect(levelWords(L(9, 23))).toBe("Lv 9 · 23/24 XP");
     expect(levelWords(L(10))).toBe("Lv 10 · max");
@@ -70,7 +70,7 @@ describe("auto chess: levels (v6)", () => {
     expect(buyBlock(army, 100, offer("n", "c1"), AUTOCHESS, 5)).toBeNull();
     expect(placeBlock(army, "n", "c1", undefined, AUTOCHESS, 4)).toBe("limit");
     expect(placeBlock(army, "n", "c1", "a3", AUTOCHESS, 4)).toBeNull();
-    expect(placeWords("limit", AUTOCHESS, 4)).toBe("Your level allows 4 pieces on the board. Buy XP to level up.");
+    expect(placeWords("limit", AUTOCHESS, 4)).toBe("Board full: buy XP");
     // A held piece waits for room: refused at the limit, placed once the level allows.
     const held = holdOffer(army, offer("n", "c1"));
     expect(heldBlock(held, 0, AUTOCHESS, 4)).toBe("limit");

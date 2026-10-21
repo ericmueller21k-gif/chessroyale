@@ -1,32 +1,84 @@
 import { describe, expect, it } from "vitest";
-import { AUTOCHESS, mulberry32 } from "@chessroyale/core";
+import { AUTOCHESS, mulberry32, type AutoChessSettings } from "@chessroyale/core";
 import { buyOffer, emptyArmy, halfSquares, heldBlock, kindBlock, placeBlock, placeHeld, squareBlock, usableSquares } from "../src/autochess/army.ts";
 import { beginRound, newMatch, roundSeed } from "../src/autochess/economy.ts";
-import { buyFromSlot, holdFromSlot, newShop, refillSlot, replaceTaken, rerollBlock, rerollFor, rerollShop, rerollWords, rollOffer, shopSeed, type Shop } from "../src/autochess/shop.ts";
+import { buyFromSlot, holdFromSlot, newShop, oddsFor, refillSlot, replaceTaken, rerollBlock, rerollFor, rerollShop, rerollWords, rollOffer, shopSeed, type Shop } from "../src/autochess/shop.ts";
 import { KINDS, type Army, type Kind, type Offer } from "../src/autochess/types.ts";
 
 const share = (kinds: readonly Kind[]) => Object.fromEntries(KINDS.map((k) => [k, (100 * kinds.filter((x) => x === k).length) / kinds.length])) as Record<Kind, number>;
 const king = (color: "w" | "b" = "w") => emptyArmy(color, color === "w" ? "e1" : "e8");
 const offer = (kind: Kind, square: string): Offer => ({ kind, square });
 const shopOf = (slots: Offer[]): Shop => ({ slots, rerolls: 0, refills: 0 });
+/** The settings with the same odds at every level (to force a kind: the odds are a setting). */
+const alwaysOdds = (odds: { p: number; n: number; b: number; r: number; q: number }): AutoChessSettings => ({ ...AUTOCHESS, shop: { ...AUTOCHESS.shop, oddsByLevel: AUTOCHESS.shop.oddsByLevel.map(() => odds) } });
 
 describe("auto chess: the shop (v6)", () => {
-  it("holds the design's numbers: 5 offers, pawn 75% knight 10% bishop 8% rook 5% queen 2%, a reroll for 2, prices unchanged", () => {
-    expect(AUTOCHESS.shop).toEqual({ slots: 5, odds: { p: 75, n: 10, b: 8, r: 5, q: 2 }, rerollCost: 2 });
-    expect(Object.values(AUTOCHESS.shop.odds).reduce((a, b) => a + b, 0)).toBe(100);
+  it("holds the design's numbers: 4 offers, the odds by level (the whole table: autochess-odds.test.ts), a reroll for 2, prices unchanged", () => {
+    expect(AUTOCHESS.shop.slots).toBe(4);
+    expect(AUTOCHESS.shop.rerollCost).toBe(2);
+    expect(AUTOCHESS.shop.oddsByLevel).toHaveLength(10);
     expect(AUTOCHESS.prices).toEqual({ p: 10, n: 30, b: 32, r: 50, q: 90 });
   });
 
-  it("rolls pieces at the odds, over many rolls (single rolls, and the offers of many seeded shops)", () => {
-    const rng = mulberry32(12345);
-    const rolled = Array.from({ length: 40000 }, () => rollOffer(rng, king())!.kind);
-    for (const k of KINDS) expect(Math.abs(share(rolled)[k] - AUTOCHESS.shop.odds[k]), `${k} rolled`).toBeLessThan(1);
-    const slots = Array.from({ length: 6000 }, (_, seed) => newShop(shopSeed(seed), king()).slots.map((o) => o.kind)).flat();
-    expect(slots).toHaveLength(30000);
-    for (const k of KINDS) expect(Math.abs(share(slots)[k] - AUTOCHESS.shop.odds[k]), `${k} in shops`).toBeLessThan(1);
-    // The odds are a setting: all queens when the setting says so.
-    const queens = { ...AUTOCHESS, shop: { ...AUTOCHESS.shop, odds: { p: 0, n: 0, b: 0, r: 0, q: 1 } } };
-    expect(newShop(7, king(), queens).slots.map((o) => o.kind)).toEqual(["q", "q", "q", "q", "q"]);
+  it("rolls pieces at the odds of the level, over many rolls (single rolls, and the offers of many seeded shops)", () => {
+    for (const level of [1, 4, 7, 10]) {
+      const row = oddsFor(level);
+      const rng = mulberry32(12345 + level);
+      const rolled = Array.from({ length: 40000 }, () => rollOffer(rng, king(), AUTOCHESS, new Set(), level)!.kind);
+      for (const k of KINDS) expect(Math.abs(share(rolled)[k] - row[k]), `${k} rolled at level ${level}`).toBeLessThan(1);
+      const slots = Array.from({ length: 6000 }, (_, seed) => newShop(shopSeed(seed), king(), AUTOCHESS, level).slots.map((o) => o.kind)).flat();
+      expect(slots).toHaveLength(24000);
+      for (const k of KINDS) expect(Math.abs(share(slots)[k] - row[k]), `${k} in shops at level ${level}`).toBeLessThan(1);
+    }
+    // The default is the start level's row (4).
+    const rng = mulberry32(5);
+    const byDefault = Array.from({ length: 20000 }, () => rollOffer(rng, king())!.kind);
+    expect(byDefault).not.toContain("r");
+    expect(byDefault).not.toContain("q");
+    // The odds are a setting: all queens when the setting says so, whatever the level.
+    const queens = alwaysOdds({ p: 0, n: 0, b: 0, r: 0, q: 1 });
+    expect(newShop(7, king(), queens).slots.map((o) => o.kind)).toEqual(["q", "q", "q", "q"]);
+    expect(newShop(7, king(), queens, 9).slots.map((o) => o.kind)).toEqual(["q", "q", "q", "q"]);
+  });
+
+  it("a shop rolls by the level it is rolled at: no rook below level 5, no queen below 7, and the next roll after a level-up uses the new row", () => {
+    const army = king();
+    for (let seed = 0; seed < 300; seed++) {
+      for (const level of [1, 2, 3, 4]) expect(newShop(seed, army, AUTOCHESS, level).slots.map((o) => o.kind)).not.toContain("r");
+      for (const level of [1, 2, 3, 4, 5, 6]) expect(newShop(seed, army, AUTOCHESS, level).slots.map((o) => o.kind)).not.toContain("q");
+    }
+    // Level 4's shop keeps its offers when the level goes up; a refill or a reroll then rolls by the new level.
+    const low = newShop(shopSeed(3), army, AUTOCHESS, 4);
+    const kinds = new Set<string>();
+    for (let seed = 0; seed < 400; seed++) for (const o of rerollShop(low, shopSeed(seed), army, AUTOCHESS, 10).slots) kinds.add(o.kind);
+    expect([...kinds].sort()).toEqual(["b", "n", "p", "q", "r"]);
+    const refilled = new Set<string>();
+    let s = low;
+    for (let i = 0; i < 400; i++) {
+      s = refillSlot(s, 1, shopSeed(3), army, AUTOCHESS, 10);
+      refilled.add(s.slots[1]!.kind);
+    }
+    expect(refilled.has("r") && refilled.has("q")).toBe(true);
+    // A buy refills at the buyer's level (`side.level`), a hold and a reroll too.
+    const rich = shopOf([offer("p", "a3"), offer("p", "b3"), offer("p", "c3"), offer("p", "d3")]);
+    const seen = new Set<string>();
+    for (let seed = 0; seed < 300; seed++) {
+      const bought = buyFromSlot({ army, gold: 100, shop: rich, level: 10 }, 0, seed, AUTOCHESS, 10);
+      if ("block" in bought) throw new Error("should buy");
+      seen.add(bought.shop.slots[0]!.kind);
+      const held = holdFromSlot({ army, gold: 100, shop: rich, level: 10 }, 0, seed + 1000);
+      if ("block" in held) throw new Error("should hold");
+      seen.add(held.shop.slots[0]!.kind);
+      const again = rerollFor({ army, gold: 100, shop: rich, level: 10 }, seed + 2000);
+      if ("block" in again) throw new Error("should reroll");
+      for (const o of again.shop.slots) seen.add(o.kind);
+    }
+    expect(seen.has("q") && seen.has("r")).toBe(true);
+    for (let seed = 0; seed < 300; seed++) {
+      const bought = buyFromSlot({ army, gold: 100, shop: rich, level: 4 }, 0, seed, AUTOCHESS, 4);
+      if ("block" in bought) throw new Error("should buy");
+      expect(["p", "n", "b"]).toContain(bought.shop.slots[0]!.kind);
+    }
   });
 
   it("every offer is on a square you could use: empty, your half, not your king's; pawns on your 2nd to 4th rank only", () => {
@@ -43,33 +95,34 @@ describe("auto chess: the shop (v6)", () => {
     // Pieces other than pawns are rolled anywhere on the half: over many rolls every square of an empty half shows up, the back rank too.
     const seen = new Set<string>();
     const rng = mulberry32(3);
-    for (let i = 0; i < 4000; i++) seen.add(rollOffer(rng, king(), { ...AUTOCHESS, shop: { ...AUTOCHESS.shop, odds: { p: 0, n: 1, b: 0, r: 0, q: 0 } } })!.square);
+    for (let i = 0; i < 4000; i++) seen.add(rollOffer(rng, king(), alwaysOdds({ p: 0, n: 1, b: 0, r: 0, q: 0 }))!.square);
     expect(seen.size).toBe(31);
   });
 
   it("only what the legal-position limits allow is offered: with 8 pawns no pawn, with a queen no second queen; the others keep their odds", () => {
     const eight: Army = { ...king(), board: { a3: "p", b3: "p", c3: "p", d3: "p", e3: "p", f3: "p", g3: "p", h3: "p" } };
     const rng = mulberry32(9);
-    const kinds = Array.from({ length: 6000 }, () => rollOffer(rng, eight)!.kind);
+    const kinds = Array.from({ length: 6000 }, () => rollOffer(rng, eight, AUTOCHESS, new Set(), 10)?.kind);
+    // (With 8 pawns the engine refuses any extra piece too, so with no pawn and no extra there is nothing to offer at all.)
     expect(kinds).not.toContain("p");
     expect(kindBlock(eight, "p")).toBe("pawns");
     const withQueen: Army = { ...king(), board: { d1: "q" } };
     const rng2 = mulberry32(10);
-    const after = Array.from({ length: 6000 }, () => rollOffer(rng2, withQueen)!.kind);
+    const after = Array.from({ length: 6000 }, () => rollOffer(rng2, withQueen, AUTOCHESS, new Set(), 10)!.kind);
     expect(after).not.toContain("q");
-    // (The odds of the others, renormalized: pawn 75 of 98.)
-    expect(Math.abs(share(after).p - (75 / 98) * 100)).toBeLessThan(2);
+    // (Level 10's odds of the others, renormalized: pawn 36 of 93.)
+    expect(Math.abs(share(after).p - (36 / 93) * 100)).toBeLessThan(2);
   });
 
-  it("a round's shop has 5 offers and is the same for the same seed; another round shows another shop", () => {
+  it("a round's shop has 4 offers and is the same for the same seed; another round shows another shop", () => {
     const a = newShop(shopSeed(99), king());
-    expect(a.slots).toHaveLength(5);
+    expect(a.slots).toHaveLength(4);
     expect(a).toEqual(newShop(shopSeed(99), king()));
     let differs = 0;
     for (let seed = 0; seed < 100; seed++) {
       const m1 = beginRound(newMatch(seed)).match;
       const m2 = beginRound(m1).match;
-      expect(newShop(shopSeed(roundSeed(m1)), king()).slots).toHaveLength(5);
+      expect(newShop(shopSeed(roundSeed(m1)), king()).slots).toHaveLength(4);
       if (JSON.stringify(newShop(shopSeed(roundSeed(m1)), king()).slots) !== JSON.stringify(newShop(shopSeed(roundSeed(m2)), king()).slots)) differs++;
     }
     expect(differs).toBeGreaterThan(95);
@@ -151,20 +204,20 @@ describe("auto chess: the shop (v6)", () => {
     expect(b3.shop.slots.map((o) => o.square)).not.toContain("c2");
   });
 
-  it("a reroll costs 2 for all five offers, is refused under 2, and is seeded by the reroll count", () => {
+  it("a reroll costs 2 for all four offers, is refused under 2, and is seeded by the reroll count", () => {
     const army = king();
     const shop = newShop(shopSeed(3), army);
     const next = rerollFor({ gold: 12, shop, army }, shopSeed(3));
     if ("block" in next) throw new Error("should reroll");
     expect(next.gold).toBe(10);
-    expect(next.shop.slots).toHaveLength(5);
+    expect(next.shop.slots).toHaveLength(4);
     expect(next.shop.rerolls).toBe(1);
     expect(rerollFor({ gold: 12, shop, army }, shopSeed(3))).toEqual(next);
     expect(rerollFor({ gold: 1, shop, army }, shopSeed(3))).toEqual({ block: "gold" });
     expect(rerollFor({ gold: 2, shop, army }, shopSeed(3))).toMatchObject({ gold: 0 });
     expect(rerollBlock(1)).toBe("gold");
     expect(rerollBlock(2)).toBeNull();
-    expect(rerollWords(1)).toBe("Not enough gold: a reroll costs 2 and you have 1.");
+    expect(rerollWords(1)).toBe("Need 1 more");
     // Each reroll shows a different roll of all the offers.
     let changed = 0;
     for (let seed = 0; seed < 200; seed++) {
@@ -187,7 +240,7 @@ describe("auto chess: the shop (v6)", () => {
     const m2 = beginRound(m1).match;
     // (Gold: the saved 100 + 10 interest + 120 income; the new shop cost nothing.)
     expect(m2.you.gold).toBe(100 + 10 + 120);
-    expect(newShop(shopSeed(roundSeed(m2)), king("b")).slots).toHaveLength(5);
+    expect(newShop(shopSeed(roundSeed(m2)), king("b")).slots).toHaveLength(4);
   });
 
   it("buying everything it can leaves only legal armies: never past the pawn, queen or square rules (a fuzz of a few hundred buys)", () => {
@@ -216,7 +269,11 @@ describe("auto chess: the shop (v6)", () => {
 
 describe("auto chess: one offer to a square (Eric, Oct 21: 'pieces should never be duplicate on one spot')", () => {
   const squares = (shop: Shop) => shop.slots.map((o) => o.square);
-  /** The whole rule, after any change: five offers, each on its own square, on a square you could use (so not your pieces', not your king's). */
+  /**
+   * The whole rule, after any change: a full shop, each offer on its own square, on a square you could use (so not your pieces',
+   * not your king's). (Rolled at level 10, where every kind but a second queen is on offer: at level 4 an army with 8 pawns and its minor
+   * pieces has nothing left to be offered, as no rook or queen is.)
+   */
   const expectOneEach = (shop: Shop, army: Army, where: string) => {
     expect(shop.slots, `${where}: a full shop`).toHaveLength(AUTOCHESS.shop.slots);
     expect(new Set(squares(shop)).size, `${where}: ${squares(shop)}`).toBe(shop.slots.length);
@@ -230,29 +287,30 @@ describe("auto chess: one offer to a square (Eric, Oct 21: 'pieces should never 
       { ...king(), board: { a2: "p", b2: "p", c2: "n", d1: "q", h4: "r" } },
       { ...king("b"), board: { a7: "p", b7: "p", c7: "n", d8: "q", h5: "r" } },
     ];
+    const LV = AUTOCHESS.levels.max;
     let steps = 0;
     for (const [n, start] of starts.entries()) {
       for (let seed = 0; seed < 220; seed++) {
         const shopSeed0 = shopSeed(seed * 7919 + n);
         let army = start;
-        let shop = newShop(shopSeed0, army);
+        let shop = newShop(shopSeed0, army, AUTOCHESS, LV);
         expectOneEach(shop, army, `seed ${seed}, first roll`);
         const rng = mulberry32(seed * 31 + n);
         for (let i = 0; i < 24; i++) {
           const roll = rng();
           if (roll < 0.15) {
             // A reroll (more than one in a row now and then).
-            shop = rerollShop(shop, shopSeed0, army);
+            shop = rerollShop(shop, shopSeed0, army, AUTOCHESS, LV);
             expectOneEach(shop, army, `seed ${seed}, reroll`);
           } else if (roll < 0.75) {
             // A buy onto the board: the slot refills and anything that can't use its square rolls again.
-            const bought = buyFromSlot({ army, gold: 1000, shop }, Math.floor(rng() * shop.slots.length), shopSeed0);
+            const bought = buyFromSlot({ army, gold: 1000, shop, level: LV }, Math.floor(rng() * shop.slots.length), shopSeed0);
             if ("block" in bought) continue;
             ({ army, shop } = bought);
             expectOneEach(shop, army, `seed ${seed}, buy`);
           } else if (roll < 0.9) {
             // A hold: the offer waits on the bench with its square.
-            const held = holdFromSlot({ army, gold: 1000, shop }, Math.floor(rng() * shop.slots.length), shopSeed0);
+            const held = holdFromSlot({ army, gold: 1000, shop, level: LV }, Math.floor(rng() * shop.slots.length), shopSeed0);
             if ("block" in held) continue;
             ({ army, shop } = held);
             expectOneEach(shop, army, `seed ${seed}, hold`);
@@ -261,7 +319,7 @@ describe("auto chess: one offer to a square (Eric, Oct 21: 'pieces should never 
             const index = Math.floor(rng() * army.bench.length);
             if (heldBlock(army, index)) continue;
             army = placeHeld(army, index);
-            shop = replaceTaken(shop, shopSeed0, army).shop;
+            shop = replaceTaken(shop, shopSeed0, army, AUTOCHESS, LV).shop;
             expectOneEach(shop, army, `seed ${seed}, a held piece placed`);
           }
           steps++;
@@ -276,11 +334,11 @@ describe("auto chess: one offer to a square (Eric, Oct 21: 'pieces should never 
     const usable = usableSquares(army, "n");
     const taken = new Set(usable.slice(1));
     for (let seed = 0; seed < 50; seed++) {
-      const only = { ...AUTOCHESS, shop: { ...AUTOCHESS.shop, odds: { p: 0, n: 1, b: 0, r: 0, q: 0 } } };
+      const only = alwaysOdds({ p: 0, n: 1, b: 0, r: 0, q: 0 });
       expect(rollOffer(mulberry32(seed), army, only, taken)).toEqual({ kind: "n", square: usable[0] });
     }
     // Every square of the half is taken: nothing can be offered.
-    const only = { ...AUTOCHESS, shop: { ...AUTOCHESS.shop, odds: { p: 0, n: 1, b: 0, r: 0, q: 0 } } };
+    const only = alwaysOdds({ p: 0, n: 1, b: 0, r: 0, q: 0 });
     expect(rollOffer(mulberry32(1), army, only, new Set(usable))).toBeNull();
     expect(rollOffer(mulberry32(1), army, AUTOCHESS, new Set(usable))).toBeNull();
     // Every square a pawn could take is taken (ranks 2 to 4): no pawn is offered, the others are, on the squares left (the back rank).
@@ -296,19 +354,19 @@ describe("auto chess: one offer to a square (Eric, Oct 21: 'pieces should never 
 
   it("a shop that was built with two offers on one square is put right by replaceTaken (the later one rolls again), and one with none changes nothing", () => {
     const army = king();
-    const doubled = shopOf([offer("p", "c2"), offer("b", "c2"), offer("r", "h1"), offer("p", "d4"), offer("n", "d4")]);
+    const doubled = shopOf([offer("p", "c2"), offer("b", "c2"), offer("p", "d4"), offer("n", "d4")]);
     const fixed = replaceTaken(doubled, 11, army);
     expect(fixed.replaced).toBe(2);
     expect(fixed.from).toEqual(["c2", "d4"]);
     expectOneEach(fixed.shop, army, "after replaceTaken");
-    // The earlier offer of each pair, and the one that wasn't doubled, stayed.
-    expect([fixed.shop.slots[0], fixed.shop.slots[2], fixed.shop.slots[3]]).toEqual([offer("p", "c2"), offer("r", "h1"), offer("p", "d4")]);
-    const fine = shopOf([offer("p", "c2"), offer("b", "d2"), offer("r", "h1"), offer("p", "d4"), offer("n", "g3")]);
+    // The earlier offer of each pair stayed.
+    expect([fixed.shop.slots[0], fixed.shop.slots[2]]).toEqual([offer("p", "c2"), offer("p", "d4")]);
+    const fine = shopOf([offer("p", "c2"), offer("b", "d2"), offer("p", "d4"), offer("n", "g3")]);
     expect(replaceTaken(fine, 11, army)).toEqual({ shop: fine, replaced: 0, from: [] });
   });
 
   it("the squares an offer is rolled for are as evenly spread as ever: a pawn lands on each of its 24 squares about as often (the first roll, and a refill beside four others)", () => {
-    const only = { ...AUTOCHESS, shop: { ...AUTOCHESS.shop, odds: { p: 1, n: 0, b: 0, r: 0, q: 0 } } };
+    const only = alwaysOdds({ p: 1, n: 0, b: 0, r: 0, q: 0 });
     const army = king();
     const counts = new Map<string, number>();
     const N = 6000;
@@ -328,19 +386,18 @@ describe("auto chess: one offer to a square (Eric, Oct 21: 'pieces should never 
     let same = 0;
     let collided = 0;
     for (let seed = 0; seed < 600; seed++) {
-      // The roll as it was before: five offers one after another from the round's stream, squares drawn from every usable one.
+      // The roll as it was before: the offers one after another from the round's stream, squares drawn from every usable one.
       const rng = mulberry32((seed ^ Math.imul(1, 0x9e3779b1) ^ Math.imul(1, 0x85ebca6b)) >>> 0);
-      const old = Array.from({ length: 5 }, () => rollOffer(rng, army)!);
-      if (new Set(old.map((o) => o.square)).size < 5) {
+      const old = Array.from({ length: AUTOCHESS.shop.slots }, () => rollOffer(rng, army)!);
+      if (new Set(old.map((o) => o.square)).size < AUTOCHESS.shop.slots) {
         collided++;
         continue;
       }
       expect(newShop(seed, army).slots, `seed ${seed}`).toEqual(old);
       same++;
     }
-    // (About a third of first shops had two offers on a square: those are the ones that change.)
-    expect(collided).toBeGreaterThan(100);
+    // (About a fifth of first shops have two offers on a square: those are the ones that change.)
+    expect(collided).toBeGreaterThan(40);
     expect(same).toBeGreaterThan(300);
   });
 });
-

@@ -1,14 +1,15 @@
 import { AUTOCHESS, mulberry32, shuffle, weightedIndex, type AutoChessSettings, type Rng } from "@chessroyale/core";
-import { adjustBlock, adjustMove, adjustTargets, startAdjust } from "./adjust.ts";
+import { adjustBlock, adjustMove, adjustTargets, startAdjust, startMove } from "./adjust.ts";
 import { boardCount, buyBlock, buyOffer, emptyArmy, heldBlock, holdBlock, holdOffer, placeHeld, priceOf } from "./army.ts";
 import { addXp, buyXp, xpBlock, type Level } from "./level.ts";
 import { newShop, refillSlot, replaceTaken, rerollShop } from "./shop.ts";
 import { type Army, type Color, type Kind, type Offer } from "./types.ts";
 
 /**
- * The bot (v6): it plays the same shop you do. Its own offers (the same odds, its own seeded rolls) each name a piece and a
+ * The bot (v6): it plays the same shop you do. Its own offers (the odds of its own level, its own seeded rolls) each name a piece and a
  * square on its half; it picks among what it sees by simple weights, rerolling now and then when it has gold to spare, locks in
- * at a seeded time, and in the adjust step moves greedily with the engine. What it held from an earlier round goes down first,
+ * at a seeded time (only while lock-in is on: not since v7), and in the move step plays the engine's best legal move with a random
+ * piece of its own (v7; the v6 adjust step, behind `adjustMode`, moves greedily with the engine). What it held from an earlier round goes down first,
  * free; it buys XP now and then (when that gives it a level), and when its board is full (its level's limit) it holds a good piece
  * on its bench for the next round. It sells nothing. Everything random comes from the round's seed.
  */
@@ -82,7 +83,7 @@ export function botBuys(
   }
   // A level first, now and then, when there is gold for it and more besides.
   if (budget >= cfg.bot.xpGold) tryXp(cfg.bot.xpChance);
-  let shop = newShop(seed, army, cfg);
+  let shop = newShop(seed, army, cfg, level.level);
   let rerolls = 0;
   let holds = 0;
   for (let looks = 0; looks < 60; looks++) {
@@ -102,7 +103,7 @@ export function botBuys(
     // Gold to spare: a reroll leaves enough for a knight and the bot has the gold it likes to keep.
     const spare = rerolls < cfg.bot.maxRerolls && budget >= cfg.bot.rerollGold && budget - cfg.shop.rerollCost >= priceOf("n", cfg);
     if (spare && rng() < (bare && boardRoom ? cfg.bot.rerollChanceBare : cfg.bot.rerollChance)) {
-      shop = rerollShop(shop, seed, army, cfg);
+      shop = rerollShop(shop, seed, army, cfg, level.level);
       rerolls++;
       budget -= cfg.shop.rerollCost;
       out.push({ type: "reroll", kind: "reroll", price: cfg.shop.rerollCost, square: null });
@@ -118,10 +119,10 @@ export function botBuys(
     if (holding) {
       army = holdOffer(army, pick.offer);
       holds++;
-      shop = refillSlot(shop, pick.slot, seed, army, cfg);
+      shop = refillSlot(shop, pick.slot, seed, army, cfg, level.level);
     } else {
       army = buyOffer(army, pick.offer);
-      shop = replaceTaken(refillSlot(shop, pick.slot, seed, army, cfg), seed, army, cfg).shop;
+      shop = replaceTaken(refillSlot(shop, pick.slot, seed, army, cfg, level.level), seed, army, cfg, level.level).shop;
     }
   }
   return { buys: out, army, level: { level: level.level, xp: level.xp } };
@@ -160,7 +161,8 @@ export function botPlan(
   const open = cfg.buySeconds - cfg.lockSeconds - 1;
   // It locks in (its board freezes) at a seeded time in the open part of the step, or now and then never; its last piece goes down a moment before.
   const never = lockRng() < cfg.bot.neverLockChance;
-  const lockAt = never ? null : open * (cfg.bot.lockFrom + (cfg.bot.lockTo - cfg.bot.lockFrom) * lockRng());
+  // (With lock-in off, since v7, it never locks: no bonus for anyone, and it places over the whole open part of the step.)
+  const lockAt = !cfg.lockIn || never ? null : open * (cfg.bot.lockFrom + (cfg.bot.lockTo - cfg.bot.lockFrom) * lockRng());
   const span = lockAt === null ? open : lockAt - 0.2;
   // Its pieces go down evenly from a second in until `placeBy` of the way through (so there is something on its board to reveal early
   // and the circles show up over the first part of the step); a reroll or XP comes a moment before the piece it was for.
@@ -199,16 +201,17 @@ export function botAt(events: readonly BotEvent[], seconds: number): { squares: 
  * (its chance of winning, 0 to 1, from a small engine search of the position the fight would start from): it tries a few changes
  * (a few random squares for each of some pieces) and keeps the best only if it beats standing still. A small search by design: it shouldn't be unbeatable. `stop` ends it early (the
  * step is over); what it has done by then stands. `onChange`: told of the army after the change it keeps (so a slow engine
- * loses it nothing).
+ * loses it nothing). This is the v6 teleport step (`adjustMode` "teleport"), whatever mode the settings are in.
  */
 export async function botAdjust(
   army: Army,
   evaluate: (army: Army) => Promise<number>,
   rng: Rng,
   stop: () => boolean,
-  cfg: AutoChessSettings = AUTOCHESS,
+  settings: AutoChessSettings = AUTOCHESS,
   onChange?: (army: Army) => void,
 ): Promise<Army> {
+  const cfg: AutoChessSettings = { ...settings, adjustMode: "teleport" };
   let state = startAdjust(army);
   const best = await evaluate(state.army);
   let tries = 0;
@@ -227,4 +230,40 @@ export async function botAdjust(
     onChange?.(state.army);
   }
   return state.army;
+}
+
+/**
+ * The bot's move step (v7, Eric Oct 21: "the bot gets the same"): one piece of its own is picked at random (seeded by the round: the
+ * same pick `startMove` makes for the same seed; never the king, one with a legal move that stays on its half), and it plays the
+ * best legal move with it by `evaluate` (its chance of winning, 0 to 1, from a small engine search of the position the fight would
+ * start from), or skips if no move beats standing still by `adjustMargin` (a player may skip too). It tries up to `adjustTries`
+ * of that piece's moves. `opponent`: your army as it stood when the buying ended. `stop` ends it early (the step is over); what it
+ * has done by then stands. `onChange`: told of the army after the move it keeps. Null pick (no piece can move): nothing happens.
+ */
+export async function botMove(
+  army: Army,
+  opponent: Army,
+  seed: number,
+  evaluate: (army: Army) => Promise<number>,
+  stop: () => boolean,
+  cfg: AutoChessSettings = AUTOCHESS,
+  onChange?: (army: Army) => void,
+): Promise<Army> {
+  const state = startMove(army, opponent, seed, cfg);
+  const piece = state.pick;
+  if (!piece) return army;
+  const best = await evaluate(army);
+  let pick: { to: string; score: number } | null = null;
+  let tries = 0;
+  for (const to of shuffle(mulberry32(seed ^ 0x51ed270b), piece.targets)) {
+    if (stop() || tries >= cfg.bot.adjustTries) break;
+    if (adjustBlock(state, piece.square, to, cfg)) continue;
+    tries++;
+    const score = await evaluate(adjustMove(state, piece.square, to).army);
+    if (score > (pick?.score ?? best + cfg.bot.adjustMargin)) pick = { to, score };
+  }
+  if (!pick || stop() || adjustBlock(state, piece.square, pick.to, cfg)) return army;
+  const moved = adjustMove(state, piece.square, pick.to).army;
+  onChange?.(moved);
+  return moved;
 }

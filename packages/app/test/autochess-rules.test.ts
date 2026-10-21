@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AUTOCHESS, mulberry32 } from "@chessroyale/core";
+import { AUTOCHESS, mulberry32, type AutoChessSettings } from "@chessroyale/core";
 import { stockfishRefuses } from "@chessroyale/chess";
 import {
   boardCount,
@@ -111,19 +111,21 @@ describe("auto chess: buying an offer", () => {
     expect(legalCounts({ p: 8, n: 3, b: 2, r: 2, q: 1 })).toBe(false);
     expect(legalCounts({ p: 4, n: 4, b: 4, r: 2, q: 1 })).toBe(true);
     expect(legalCounts({ p: 4, n: 5, b: 4, r: 2, q: 1 })).toBe(false);
-    expect(buyWords("extras", offer("n", "c1"), 0).line).toContain("can't pass 8");
+    expect(buyWords("extras", offer("n", "c1"), 0).line).toBe("Too many pieces");
   });
 
-  it("has words for every reason, and a label under each offer: the piece and its square", () => {
+  it("has words for every reason (short: they show in the small spot under the board), and a label under each offer: the piece and its square", () => {
     for (const block of ["gold", "limit", "taken", "queen", "pawns", "extras", "bench"] as const) {
       const w = buyWords(block, offer("q", "d1"), 10);
       expect(w.short.length).toBeGreaterThan(0);
-      expect(w.line.endsWith(".")).toBe(true);
+      // (The spot holds about 15 characters a line, two lines.)
+      expect(w.line.length, block).toBeLessThanOrEqual(24);
     }
-    expect(buyWords("gold", offer("q", "d1"), 10).line).toBe("Not enough gold: a queen costs 90 and you have 10.");
-    expect(buyWords("queen", offer("q", "d1"), 100).line).toBe("One queen at most.");
-    expect(buyWords("bench", offer("n", "c3"), 100)).toEqual({ short: "Bench full", line: "Your bench is full: 4 pieces at most. Place or sell one first." });
-    expect(buyWords("taken", offer("b", "c2"), 100).line).toBe("c2 is taken.");
+    expect(buyWords("gold", offer("q", "d1"), 10).line).toBe("Need 80 more");
+    expect(buyWords("queen", offer("q", "d1"), 100).line).toBe("One queen max");
+    expect(buyWords("bench", offer("n", "c3"), 100)).toEqual({ short: "Bench full", line: "Bench full" });
+    expect(buyWords("taken", offer("b", "c2"), 100).line).toBe("c2 is taken");
+    expect(buyWords("pawns", offer("p", "c2"), 100).line).toBe("8 pawns max");
     expect([offer("b", "c2"), offer("n", "g1"), offer("p", "h4"), offer("q", "d1"), offer("r", "a1")].map(offerLabel)).toEqual(["Bishop c2", "Knight g1", "Pawn h4", "Queen d1", "Rook a1"]);
   });
 
@@ -198,7 +200,7 @@ describe("auto chess: placing", () => {
     expect(placeBlock({ ...full, board: { a2: "p", a3: "p" } }, "p", "a4", "a3")).toBeNull();
     // A rook in that file doesn't count.
     expect(placeBlock(army("w", "e1", { a2: "r", a3: "p" }), "p", "a4", undefined, { ...AUTOCHESS, pawnsPerFile: 2 })).toBeNull();
-    for (const b of ["half", "king", "taken", "backrank", "file"] as const) expect(placeWords(b).endsWith(".")).toBe(true);
+    expect(["half", "king", "taken", "backrank", "file", "limit"].map((b) => placeWords(b as never))).toEqual(["Your half only", "King's square", "Square taken", "Not on back rank", "3 pawns a file", "Board full: buy XP"]);
   });
 });
 
@@ -245,9 +247,9 @@ describe("auto chess: the bench (v6)", () => {
     // The square taken (by a piece bought onto it), or this round's king's square: refused, with the square named.
     expect(heldBlock(army("w", "e1", { c3: "p" }, [offer("n", "c3")]), 0)).toBe("taken");
     expect(heldBlock(army("w", "c3", {}, [offer("n", "c3")]), 0)).toBe("king");
-    expect(heldWords("taken", "c3")).toBe("c3 is taken.");
-    expect(heldWords("king", "c3")).toBe("c3 is your king's square.");
-    expect(heldWords("limit", "c3", AUTOCHESS, 4)).toBe("Your level allows 4 pieces on the board. Buy XP to level up.");
+    expect(heldWords("taken", "c3")).toBe("c3 is taken");
+    expect(heldWords("king", "c3")).toBe("King is on c3");
+    expect(heldWords("limit", "c3", AUTOCHESS, 4)).toBe("Board full: buy XP");
     // The board's room: a full board refuses it (the limit is how many pieces it may hold), and a bigger limit lets it in.
     const full = army("w", "e1", ten(), [offer("b", "c2")]);
     expect(heldBlock(full, 0)).toBe("limit");
@@ -280,12 +282,14 @@ describe("auto chess: the board's room (the level)", () => {
     expect(placeBlock(full, "b", "a5")).toBe("half");
     expect(placeBlock(full, "n", "c1", "b1")).toBeNull();
     expect(squareBlock(full, "b", "c1")).toBeNull();
-    expect(placeWords("limit", AUTOCHESS, 4)).toBe("Your level allows 4 pieces on the board. Buy XP to level up.");
-    expect(buyWords("limit", offer("b", "c1"), 100, AUTOCHESS, 4)).toEqual({ short: "Level full", line: "Your level allows 4 pieces on the board. Buy XP to level up." });
+    expect(placeWords("limit", AUTOCHESS, 4)).toBe("Board full: buy XP");
+    expect(buyWords("limit", offer("b", "c1"), 100, AUTOCHESS, 4)).toEqual({ short: "Level full", line: "Board full: buy XP" });
   });
 });
 
-describe("auto chess: the adjust step (v6): one change, any legal empty square of your half", () => {
+describe("auto chess: the teleport adjust step (v6, kept behind `adjustMode`): one change, any legal empty square of your half", () => {
+  /** The old step, which the v7 move step replaced as the default (Eric, Oct 21): the code stays behind the setting. */
+  const TELE: AutoChessSettings = { ...AUTOCHESS, adjustMode: "teleport" };
   const w = army("w", "e1", { a2: "p", a3: "p", b2: "p", c3: "n", d1: "q", a1: "r", f1: "b" });
 
   it("a piece may go to any empty square of its half where it may stand: not a chess move (a knight to the far corner), never the king's or a taken square", () => {
@@ -321,31 +325,31 @@ describe("auto chess: the adjust step (v6): one change, any legal empty square o
     const pair = army("w", "e1", { a2: "p", a3: "p", b2: "p" });
     expect(adjustTargets(pair, "b2", two).some((sq) => sq[0] === "a")).toBe(false);
     expect(adjustTargets(pair, "b2").some((sq) => sq[0] === "a")).toBe(true);
-    expect(adjustBlock(startAdjust(pair), "b2", "a4", two)).toBe("file");
-    expect(adjustBlock(startAdjust(pair), "a2", "a4", two)).toBeNull();
+    expect(adjustBlock(startAdjust(pair), "b2", "a4", { ...TELE, pawnsPerFile: 2 })).toBe("file");
+    expect(adjustBlock(startAdjust(pair), "a2", "a4", { ...TELE, pawnsPerFile: 2 })).toBeNull();
   });
 
   it("the king stays where the game put it: it has no targets and can't be moved", () => {
     expect(adjustTargets(w, "e1")).toEqual([]);
-    expect(adjustBlock(startAdjust(w), "e1", "e2")).toBe("kingfixed");
-    expect(adjustWords("kingfixed")).toBe("Your king stays where the game put it.");
+    expect(adjustBlock(startAdjust(w), "e1", "e2", TELE)).toBe("kingfixed");
+    expect(adjustWords("kingfixed")).toBe("King stays put");
     expect(adjustTargets(w, "h3")).toEqual([]);
   });
 
   it("one change in all: after it every other move, and a second move of the same piece, is refused; it can be taken back, and then any piece may go", () => {
     expect(AUTOCHESS.adjustMoves).toBe(1);
     let s = startAdjust(w);
-    expect(adjustBlock(s, "c3", "h4")).toBeNull();
-    expect(adjustBlock(s, "h3", "h4")).toBe("none");
+    expect(adjustBlock(s, "c3", "h4", TELE)).toBeNull();
+    expect(adjustBlock(s, "h3", "h4", TELE)).toBe("none");
     // Refused with the square's own reason: their half, the king's square, a taken square, a pawn on your back rank.
-    expect(adjustBlock(s, "c3", "e5")).toBe("half");
-    expect(adjustBlock(s, "c3", "e1")).toBe("king");
-    expect(adjustBlock(s, "c3", "a2")).toBe("taken");
-    expect(adjustBlock(s, "b2", "c1")).toBe("backrank");
-    expect(adjustWords("half")).toBe("Pieces go on your half of the board.");
-    expect(adjustWords("king")).toBe("That's your king's square.");
-    expect(adjustWords("taken")).toBe("That square is taken.");
-    expect(adjustWords("backrank")).toBe("Pawns can't stand on your back rank.");
+    expect(adjustBlock(s, "c3", "e5", TELE)).toBe("half");
+    expect(adjustBlock(s, "c3", "e1", TELE)).toBe("king");
+    expect(adjustBlock(s, "c3", "a2", TELE)).toBe("taken");
+    expect(adjustBlock(s, "b2", "c1", TELE)).toBe("backrank");
+    expect(adjustWords("half")).toBe("Your half only");
+    expect(adjustWords("king")).toBe("King's square");
+    expect(adjustWords("taken")).toBe("Square taken");
+    expect(adjustWords("backrank")).toBe("Not on back rank");
     s = adjustMove(s, "c3", "h4");
     expect(s.army.board.h4).toBe("n");
     expect(s.army.board.c3).toBeUndefined();
@@ -354,30 +358,32 @@ describe("auto chess: the adjust step (v6): one change, any legal empty square o
     expect(adjustMarks(s)).toEqual([{ square: "h4", action: "move" }]);
     expect(movesUsed(s)).toBe(1);
     // No second change: not by another piece, not by the same one.
-    expect(adjustBlock(s, "b2", "b4")).toBe("used");
-    expect(adjustBlock(s, "h4", "h3")).toBe("used");
-    expect(adjustWords("used")).toBe("You've made your move. Tap the piece you moved (↩) to take it back.");
+    expect(adjustBlock(s, "b2", "b4", TELE)).toBe("used");
+    expect(adjustBlock(s, "h4", "h3", TELE)).toBe("used");
+    expect(adjustWords("used")).toBe("Moved. Tap ↩ to undo.");
     // Taken back, the change is free again, for any piece.
     expect(undoBlock(s, "h4")).toBeNull();
     const undone = undoAction(s, "h4");
     expect(undone.army).toEqual(w);
     expect(undone.actions).toEqual([]);
-    expect(adjustBlock(undone, "b2", "b4")).toBeNull();
+    expect(adjustBlock(undone, "b2", "b4", TELE)).toBeNull();
     expect(undoBlock(s, "h3")).toBe("none");
     // The number is a setting.
-    const two = { ...AUTOCHESS, adjustMoves: 2 };
+    const two = { ...TELE, adjustMoves: 2 };
     expect(adjustBlock(adjustMove(startAdjust(w), "c3", "h4"), "b2", "b4", two)).toBeNull();
     expect(adjustBlock(adjustMove(adjustMove(startAdjust(w), "c3", "h4"), "b2", "b4"), "d1", "d2", two)).toBe("used");
     // Two changes, the first taken back needs a later change that stands on its square to come first.
     const chain = adjustMove(adjustMove(startAdjust(army("w", "e1", { a2: "p" })), "a2", "a3"), "a3", "a4");
     expect(adjustMarks(chain)).toEqual([{ square: "a4", action: "move" }]);
     expect(undoBlock(chain, "a3")).toBe("none");
-    expect(undoWords("needed")).toBe("Take back your other move first.");
+    expect(undoWords("needed")).toBe("Undo the other first");
+    expect(undoWords("none")).toBe("Nothing to undo");
   });
 
-  it("the step can be turned off: with `adjustStep` false the buy step leads straight to the fight, with it on to the adjust step; 5 seconds long", () => {
+  it("the step can be turned off: with `adjustStep` false the buy step leads straight to the fight, with it on to the adjust step; 7 seconds long, in the legal move mode, the old step behind the setting", () => {
     expect(AUTOCHESS.adjustStep).toBe(true);
-    expect(AUTOCHESS.adjustSeconds).toBe(5);
+    expect(AUTOCHESS.adjustSeconds).toBe(7);
+    expect(AUTOCHESS.adjustMode).toBe("legal");
     expect(stepAfterBuy()).toBe("adjust");
     expect(stepAfterBuy({ ...AUTOCHESS, adjustStep: false })).toBe("fight");
   });
