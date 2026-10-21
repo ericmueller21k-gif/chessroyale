@@ -1,5 +1,10 @@
 # The HunChess engine: our own chess engine for Auto chess (Oct 21, 2026)
 
+> **Later the same day, how fights end changed** ([autochess-endings](2026-10-21-autochess-endings.md)): no more "5 checks in a
+> row win"; a stall (threefold repetition, the quiet cap, the move cap) goes to the side the engine's score favors by a pawn, not
+> to more counted material; a side far ahead for 3 moves wins early; a check no longer restarts the quiet count. The notes below
+> are kept as built, with what changed noted.
+
 ## What Eric asked for
 
 Auto chess fights are played by an engine for both armies, and Stockfish can't be told our rules: it thought a pawn one step
@@ -18,7 +23,9 @@ pawn stops one short". How Auto chess works now: [docs/areas/autochess.md](../ar
    a side left with only its king loses (both: a draw); 10 moves a side with no capture, cash-in or check, or 60 moves a side: the
    side with more material (P1 N3 B3 R5 Q9) wins, equal is a draw; mate, stalemate, threefold repetition, the fifty-move rule and
    too little material to mate exactly as chess.js counts them. The counters that decide results (each side's checks in a row,
-   quiet plies, plies played, cash-ins) are part of the position, so the search plays toward and away from them. **Ordinary
+   quiet plies, plies played, cash-ins) are part of the position, so the search plays toward and away from them. (Changed Oct 21:
+   no check streak and no check counters; a check doesn't restart the quiet count; the caps and a threefold repetition are a
+   stall, decided by the engine's score of the final position.) **Ordinary
    chess** (castling, promotion) for measuring it against Stockfish. Perft matches the published counts and chess.js move for move.
 2. **The search and evaluation** (`search.ts`, `eval.ts`, `pst.ts`): iterative deepening, principal variation search with
    aspiration windows, quiescence on captures and cash-ins (all moves in check), a transposition table keyed by the position and
@@ -28,7 +35,7 @@ pawn stops one short". How Auto chess works now: [docs/areas/autochess.md](../ar
    piece-square values of our own shapes, blended from middlegame to endgame; the bishop pair; doubled, isolated and passed pawns
    (in a fight a passed pawn is worth little, and a pawn less in the endgame: no queen at the end); mobility; rooks on open files;
    king safety (the pawn shelter and pieces bearing on the king's squares); and the fight's rules: a side down to its last piece
-   or two is close to losing, checks in a row are worth something, and a cash-in is the pawn given up plus `cashInValue` (20
+   or two is close to losing, checks in a row are worth something (gone Oct 21, with the rule), and a cash-in is the pawn given up plus `cashInValue` (20
    centipawns) for the gold. **A fixed node budget a move, the same for both sides, deterministic** (no randomness at all).
 3. **In the game:** the engine runs in its own Web Worker (`autochess/hunchess-worker.ts`); the fight (`fight.ts`) is refereed by
    the engine's own rules code, and the bot's adjust looks use the engine. The Auto chess screen no longer loads Stockfish.
@@ -48,8 +55,10 @@ pawn stops one short". How Auto chess works now: [docs/areas/autochess.md](../ar
   knows it, so it never does it.
 - **Repetition in a fight is the true threefold, even inside the search.** Engines usually call a position repeated once inside
   the search a draw; here a checking side that repeats can still reach 5 checks in a row before the third time, so a two-fold is
-  not a draw in a fight. (Ordinary chess keeps the usual two-fold shortcut.)
-- **All wins score alike** (mate, 5 checks, a bare king, material at a cap): a win is a win in a fight. The damage counts the
+  not a draw in a fight. (Ordinary chess keeps the usual two-fold shortcut.) (Changed Oct 21: with no check streak to win, the
+  two-fold shortcut is back in a fight too; a position repeated inside the search is a stall, judged by the score.)
+- **All wins score alike** (mate, 5 checks, a bare king, material at a cap): a win is a win in a fight. (Changed: a win by a rule
+  other than mate now scores a little under any mate, so a found mate can be told apart: it plays out instead of the early end.) The damage counts the
   pieces left, but the engine plays to win, not to farm damage.
 - **The cash-in on screen:** the pawn slides onto the last rank like any move (the board's knock plays), a short double coin clink
   (`acCash`, a new synthesized sound, under a move's peak and loudness like the others) and the floating "+5" from v6's

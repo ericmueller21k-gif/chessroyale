@@ -57,11 +57,13 @@ export function endWords(end: EndKind, draw: boolean, cfg: AutoChessSettings = A
 /** Centipawns as players read them: "a pawn", "5 pawns". */
 const pawnsWords = (cp: number) => (cp === 100 ? "a pawn" : `${cp / 100} pawns`);
 
-/** The fight's rules, in the box while it plays. */
+/**
+ * The fight's rules, in the box while it plays (short: it must fit a 320 px phone; the speed-up shows in the move counter, "twice as
+ * fast", so it isn't repeated here).
+ */
 export const fightRulesWords = (cfg: AutoChessSettings = AUTOCHESS) =>
-  `The engine plays both armies at the same strength. A side left with only its king loses, and so does one the engine sees ${pawnsWords(cfg.decisiveMargin)} behind for ${cfg.decisiveMoves} moves. ` +
-  `A stall (moves repeated, ${cfg.quietCap} moves each with no capture, or ${cfg.moveCap} each) goes to the side it sees ${pawnsWords(cfg.stallWinMargin)} ahead. ` +
-  `After ${cfg.fightFastAfter} moves each, or once a side has only pawns, moves play twice as fast. A pawn that reaches the far end cashes in for +${cfg.cashInGold} gold.`;
+  `The engine plays both armies at the same strength. A side loses with only its king left, or when the engine sees it ${pawnsWords(cfg.decisiveMargin)} down for ${cfg.decisiveMoves} moves. ` +
+  `A stall (repeats, ${cfg.quietCap} moves each with no capture, or ${cfg.moveCap}) goes to the side ${pawnsWords(cfg.stallWinMargin)} up. A pawn that reaches the far end cashes in for +${cfg.cashInGold} gold.`;
 
 /** The fight's move counter: "Move 12 of 60", and "twice as fast" once the moves speed up (after 30 moves each, or a side down to king and pawns: `thin`). */
 export const moveWords = (plies: number, cfg: AutoChessSettings = AUTOCHESS, thin = false) =>

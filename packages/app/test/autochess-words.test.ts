@@ -7,11 +7,10 @@ import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline
 describe("auto chess: what the result says", () => {
   it("the fight's rules, in the box while it plays, from the settings", () => {
     expect(fightRulesWords()).toBe(
-      "The engine plays both armies at the same strength. A side left with only its king loses, and so does one the engine sees 5 pawns behind for 3 moves. " +
-        "A stall (moves repeated, 10 moves each with no capture, or 60 each) goes to the side it sees a pawn ahead. " +
-        "After 30 moves each, or once a side has only pawns, moves play twice as fast. A pawn that reaches the far end cashes in for +5 gold.",
+      "The engine plays both armies at the same strength. A side loses with only its king left, or when the engine sees it 5 pawns down for 3 moves. " +
+        "A stall (repeats, 10 moves each with no capture, or 60) goes to the side a pawn up. A pawn that reaches the far end cashes in for +5 gold.",
     );
-    expect(fightRulesWords({ ...AUTOCHESS, stallWinMargin: 200 })).toContain("goes to the side it sees 2 pawns ahead.");
+    expect(fightRulesWords({ ...AUTOCHESS, stallWinMargin: 200 })).toContain("goes to the side 2 pawns up.");
   });
 
   it("names how the fight ended; a stall says why and who the engine's score favors, in whole pawns", () => {

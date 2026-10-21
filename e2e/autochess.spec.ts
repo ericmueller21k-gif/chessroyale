@@ -23,6 +23,9 @@ const EARLY = "/autochess?quick=1&seed=11";
 const POOR = "/autochess?quick=1&seed=60";
 const FIGHT = "/autochess?quick=1&seed=3";
 const NEVER = DUP;
+/** Every way a fight's result line can begin (the reason it ended), then the HP line. */
+const RESULT_WHY =
+  /^(Checkmate\.|Stalemate\.|(White|Black) too far ahead: 5\+ pawns for 3 moves\.|Fight stalled \((moves repeated|10 moves each, no capture|60 moves each)\): ((White|Black) (ahead by \d+ pawns?|far ahead)|less than a pawn apart, a draw)\.|Draw by the fifty-move rule\.|Draw: not enough pieces left to mate\.|A side left with only its king loses at once\.|Both sides are down to a king: a draw\.) /;
 const PRICES: Record<string, number> = { p: 10, n: 30, b: 32, r: 50, q: 90 };
 const NAMES: Record<string, string> = { p: "Pawn", n: "Knight", b: "Bishop", r: "Rook", q: "Queen" };
 
@@ -122,7 +125,7 @@ async function buyAll(p: Page, max: number) {
 }
 
 /**
- * Watches the fight from before it can begin (a short one, a draw by repetition in a dozen quick moves, can come and go between two
+ * Watches the fight from before it can begin (a short one, decided early in a few quick moves, can come and go between two
  * looks of a poll): what the box said, the step's name and whether a move was highlighted; read with `fightSeen`.
  */
 async function watchFight(p: Page) {
@@ -949,7 +952,9 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   expect(fight.fight).toBe(true);
   expect(fight.say).toMatch(/^Move \d+ of 60/);
   expect(fight.label).toBe("Fight");
-  expect(fight.text).toContain("A side left with only its king loses. After 30 moves each, moves play twice as fast.");
+  expect(fight.text).toContain("A side loses with only its king left, or when the engine sees it 5 pawns down for 3 moves.");
+  expect(fight.text).toContain("A stall (repeats, 10 moves each with no capture, or 60) goes to the side a pawn up.");
+  expect(fight.text).not.toMatch(/checks? in a row/);
   expect(fight.text).toContain("A pawn that reaches the far end cashes in for +5 gold.");
   expect(fight.lastMove).toBe(true);
   // The board's usual knocks play for the engine's moves (a capture sounds as it does everywhere).
@@ -957,6 +962,8 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   const head = (await page.locator(".ac-card-head").innerText()).trim();
   expect(head).toMatch(/^(You win the round\.|You lose the round\.|The round is a draw\.)$/);
   const words = (await page.locator(".ac-card .ac-card-text").innerText()).trim();
+  // The result says why the fight ended (a stall: why, and who the engine's score favors by how much).
+  expect(words).toMatch(RESULT_WHY);
   const lost = words.match(/(?:You|Your opponent) loses? (\d+) HP\./);
   const gold = (await page.locator(".ac-card-gold").innerText()).trim();
   expect(gold).toMatch(/^Next round: \d+ saved \+ \d+ income( \+ \d+ interest)?( \+ \d+ streak)?( \+ \d+ survivors)?( \+ \d+ from cash-ins)? = \d+ gold$/);
@@ -1069,6 +1076,32 @@ test("a fight always ends even if the engine never answers (?stall=1): its looks
   await expect(root(page)).toHaveAttribute("data-phase", "fight", { timeout: 15_000 });
   await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 90_000 });
   await expect(page.locator(".ac-card-head")).toHaveText(/^(You win the round\.|You lose the round\.|The round is a draw\.)$/);
+  expect(errors).toEqual([]);
+});
+
+test("the result says why: a stall goes to the side the engine's score favors, and a side far ahead wins early (at 320 px, the box holds it)", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await page.setViewportSize({ width: 320, height: 568 });
+  // (`?fightfen=`: fights from the sim's 80 (reports/autochess-endings.md), each played the same every time. You are White.)
+  const cases = [
+    // Rook and pawns each; Black's rook is the more active: 10 moves each with no capture, and the score has Black a pawn up.
+    { fen: "5k2/p3p3/8/2pr4/3P4/5P2/1P1R4/5K2 w - - 0 1", head: "You lose the round.", why: "Fight stalled (10 moves each, no capture): Black ahead by 1 pawn. You lose " },
+    // White's two bishops and pawns against two knights: 5 pawns up by the score for 3 of its moves, it wins at once.
+    { fen: "4k3/2n1p3/7p/2n5/P3PB2/P7/1P3P2/2B1K3 w - - 0 1", head: "You win the round.", why: "White too far ahead: 5+ pawns for 3 moves. Your opponent loses " },
+  ];
+  for (const c of cases) {
+    await page.goto(`/autochess?quick=1&seed=3&adjust=0&fightfen=${encodeURIComponent(c.fen)}`);
+    await expect(root(page)).toHaveAttribute("data-phase", "buy");
+    await tap(page, lockButton(page));
+    await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 60_000 });
+    await expect(page.locator(".ac-card-head")).toHaveText(c.head);
+    const words = (await page.locator(".ac-card .ac-card-text").innerText()).trim();
+    expect(words.startsWith(c.why), words).toBe(true);
+    const box = await page.locator(".ac-card").evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight, buttons: (el.querySelector(".ac-go") as HTMLElement).getBoundingClientRect().bottom - el.getBoundingClientRect().bottom }));
+    expect(box.scroll, "the result's box holds its words").toBeLessThanOrEqual(box.client);
+    expect(box.buttons, "the button is inside the box").toBeLessThanOrEqual(0);
+  }
   expect(errors).toEqual([]);
 });
 

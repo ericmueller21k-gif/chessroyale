@@ -2770,9 +2770,10 @@ export interface AutoChessSettings {
   readonly quietCap: number;
   readonly stallWinMargin: number;
   /**
-   * The clean-up ends early: a side the engine's score favors by `decisiveMargin` centipawns or more after `decisiveMoves` of its
-   * own moves in a row wins at once ("too far ahead"), unless the engine has found it a forced mate within `mateShowMoves` moves,
-   * which plays out.
+   * The clean-up ends early (Eric, Oct 21): a side the engine's score favors by `decisiveMargin` centipawns or more after
+   * `decisiveMoves` of its own moves in a row wins at once ("too far ahead"), unless the engine has found it a forced mate (or a
+   * forced win by another rule: a bare king, a won stall) within `mateShowMoves` moves, which plays out. The score is the engine's
+   * own for the move it played (its fixed node budget: the same on any device); a stand-in move counts for nothing.
    */
   readonly decisiveMargin: number;
   readonly decisiveMoves: number;
