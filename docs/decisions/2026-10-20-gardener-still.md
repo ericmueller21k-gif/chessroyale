@@ -11,12 +11,21 @@ only: one still. His powers (hidden seeds on a timer, watering the board for his
   hippo: grey-mauve back and sides, a pink belly with a navel, a pink throat. The seeds will come from his hand in the planting
   animation. The belly is bigger and pinker for it.
 - **The hose is held in both hands.** The near hand is on the nozzle (spraying toward the board, as before); the other hand
-  holds the hose 13 px behind it, so the line between the hands shows. From that hand the hose hangs across his belly and goes
-  behind him at his side, where a small loop shows (the loop is drawn behind his body, so it comes out of it and goes back in);
-  its end trails to a small coil on the ground by his back foot. **No coil on his shoulder** ("it looks like a shield"). The idle
-  is no wider than the first pass (28 left, 25 right).
+  holds the hose too. **No coil on his shoulder** ("it looks like a shield"). (This pass put the other hand near the middle of
+  his chest, and the end of the hose in a small coil on the ground; the third pass changed both.)
 - **A friendlier face:** a bigger, round eye (4 x 4, a glint inside) and a smaller one for the far eye, and a soft smile line from
   the corner of his mouth up into his cheek. The head, muzzle and proportions are as they were.
+
+## Third pass (Oct 21, Eric: two fixes)
+
+- **No coil on the ground** (Eric: it "reads badly, like a mess on the floor"). The spare hose is looped behind his back,
+  hidden by his body and his back leg but for one short curve that shows past his hip (`BACK_LOOP`, `hoseBack`), so it reads as
+  hose that will feed out from behind him when he pulls on it.
+- **His other arm is back where it was in the first pass** (out at his right side: shoulder (51.5, 28.5), elbow (55.5, 40), hand
+  (47.5, 48.5), the same thickness and color), and the hose moves to fit it, not the arm: from the nozzle it sags across his belly
+  through that hand (the hand is on the hose) and on to his hip, where it goes behind him. His tail moved a little up, under the
+  elbow, to leave the hip's curve of hose clear; his legs are back at their first-pass places (no coil to leave room for).
+  The near arm, the face, the colors and the size are the second pass's. The idle is as wide as before (28 left, 25 right).
 
 ## What was built
 
@@ -31,9 +40,9 @@ Parts are painted once and poses are numbers (`GardenerPose`), as the other boss
 
 - **the nozzle hand** (`fist`, `elbowN`, `nozzle`: it aims; the elbow bends by itself) and **the water spray as a part of its
   own** (`spray` its length, 0 off; `droop`; `seed` picks the streaks and drops, so a flicker is a new seed each frame);
-- **the other hand** (`hand`, `elbowF`) and **the hose**: the front of it is one part redrawn from the nozzle's fitting through
-  that hand to his side (`sag` is how far it hangs across his belly), so it stays in one piece wherever either hand goes. The
-  loop at his back and the coil on the ground are parts of their own, drawn behind him;
+- **the other arm** (`hand`, `elbowF`) and **the hose**: the front of it is one part redrawn from the nozzle's fitting through
+  that hand to his hip (`sag` is how far it hangs across his belly), so it stays in one piece wherever either hand goes. The
+  spare hose behind him (`BACK_LOOP`) is a part of its own, drawn behind his body and leg;
 - **the head** moves as one (`head`), with **the jaw a part of its own** (`jaw`, degrees open: hinged under the cheek, the dark
   mouth and a tusk appear as it opens), **the ears** (`earN`, `earF`: lean at the tip), **the eyes** (`eyes`: open, half,
   shut, wide) and the nostrils in the muzzle;
@@ -51,12 +60,12 @@ The jaw hangs over his chest when it opens: a yawn needs the head raised or the 
   (`TALLEST / PX` in `BossSelect.tsx`), so he is drawn at the usual 0.8. The frame has room to the left for the spray only as it
   is in the still; a longer spray (his ultimate) wants a wider copy of him, as Smudgy's and Moo's attack frames.
 - **The phone's boss bar: he needs the `wide` box.** From his feet (outline, halo one more): 28 left (the muzzle's tip and the
-  nozzle's cap) and 25 right (his back, the loop of hose, the tail and the coil); the usual box holds 24 each side, `wide` 29.
+  nozzle's cap) and 25 right (his back, the loop of hose and the tail); the usual box holds 24 each side, `wide` 29.
   The spray reaches 16 farther left (44), past `wide`: on the bar draw it short or off (`spray: 4`, `spray: 0`).
 
 ## Simplified for the pixel size
 
-- **The hose:** a smooth tube, no ribs; the small coil on the ground is two turns in a six-pixel ring.
+- **The hose:** a smooth tube, no ribs; the spare hose behind him is one loop, most of it hidden.
 - **The spray:** streaks and drops in four blues, no mist; it has no outline (it is water), so on a light ground its palest
   pixels are lost and the middle tones carry it.
 - **His skin:** no wrinkles, no pores; the muzzle has a few stubble dots and two nostrils, the ears a pink inside; no teeth or

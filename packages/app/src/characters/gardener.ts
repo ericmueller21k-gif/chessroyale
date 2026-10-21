@@ -4,10 +4,11 @@
  * thick legs, a big square muzzle with two nostrils and a soft smile, small round ears, pinkish-grey skin with a pinker
  * belly, throat and cheeks) and no clothes (Eric, second pass: the apron is gone, and the seeds will come from his hand). He
  * holds a garden hose in both hands: the near hand on a brass-and-green spray nozzle with a spray of water coming out of it
- * (toward the board), the other hand on the hose a little behind it. The hose is one piece: from his hands it hangs across
- * his belly and wraps round behind him (a small loop shows at his back), and its end trails to a small coil on the ground
- * by his back foot. Drawn three-quarters on, facing our left (as Alfil, Sawyer, Chub & Chirp, Smudgy and Moo), so he sprays
- * toward the board; light from the top left.
+ * (toward the board), the other hand, out at his right side, on the hose where it hangs across his belly. The hose is one
+ * piece: from the nozzle it sags across his belly through that hand and goes behind him at his hip; the spare hose is looped
+ * behind his back, hidden by his body but for a short curve that shows past his hip (it feeds out from there when he pulls on
+ * it). Drawn three-quarters on, facing our left (as Alfil, Sawyer, Chub & Chirp, Smudgy and Moo), so he sprays toward the
+ * board; light from the top left.
  *
  * This is his still only (docs/decisions/2026-10-20-gardener-still.md): the first frame of `idle`, nothing else; his powers and
  * his animations come later. He isn't in `CHARACTERS`, `BOSS_KITS` or the roster, and nothing in the game draws him yet; the
@@ -16,8 +17,9 @@
  * Rigging, so the poses that follow are numbers (`GardenerPose`), as the other bosses':
  * - the nozzle hand (`fist`, `elbowN`, `nozzle`: it aims) and the water spray, a part of its own (`spray`: its length, droop
  *   and flicker: it turns on and off and arcs over the board);
- * - the other hand (`hand`, `elbowF`: it holds the hose, lets go, reaches for seeds and tosses them), and the hose, which is
- *   redrawn from the two hands wherever they go (`sag`: how far it hangs across his belly);
+ * - the other arm (`hand`, `elbowF`: it holds the hose, lets go, reaches for seeds and tosses them), and the hose, which is
+ *   redrawn from the nozzle through that hand wherever they go (`sag`: how far it hangs across his belly), with the spare
+ *   behind him (`BACK_LOOP`);
  * - the head moves as one (`head`), with the jaw a part of its own (`jaw`: degrees open, a great yawn or roar), the ears
  *   (`earN`, `earF`: they flick), the eyes (`eyes`) and the tail (`tail`);
  * - his legs step (`stepN`, `stepF`) and he breathes (`bob`).
@@ -185,7 +187,7 @@ const H = OY + GROUND + 6;
 /** The ground point he is placed by (x): between his feet, a little toward his front so the muzzle and the nozzle reach no farther one side than his tail and back do the other. */
 const FOOT_X = 35;
 /** The middle of his two feet (his shadow's). */
-const FEET_X = 33.5;
+const FEET_X = 35.5;
 /** How far his head (the skull, ears, eyes, muzzle and jaw, all painted in one place) stands above where they're painted. */
 const HEAD_UP = -2;
 
@@ -206,8 +208,8 @@ function torso(): { part: Part; at: Pt } {
 }
 
 /** The legs' places (x of their middles): the near one in front, the far one behind. */
-const LEG_N = 23;
-const LEG_F = 44;
+const LEG_N = 25;
+const LEG_F = 46;
 
 /** A leg and its foot, centered at `cx`: a thick column into a wide foot with three nails at the front. `lift` raises the foot. */
 function leg(cx: number, lift: number): { part: Part; at: Pt } {
@@ -225,7 +227,7 @@ function leg(cx: number, lift: number): { part: Part; at: Pt } {
 
 /** His tail: a short flat paddle off his rump, `swing` pixels up or down at its tip. */
 function tail(swing: number): { part: Part; at: Pt } {
-  const pts: Pt[] = [[53.5, 52.5], [56, 53.3 + swing * 0.4], [58, 54.4 + swing]];
+  const pts: Pt[] = [[53.5, 48.6], [55.8, 49 + swing * 0.4], [57.6, 49.9 + swing]];
   return stroke(pts, [2, 1.7, 1.4], (l) => ramp(SKIN, l));
 }
 
@@ -344,7 +346,7 @@ function armN(s: Pt, e: Pt, f: Pt): { part: Part; at: Pt } {
 
 /** The other arm, hanging at his flank: shoulder, elbow, hand. */
 function armF(s: Pt, e: Pt, f: Pt): { part: Part; at: Pt } {
-  return stroke([s, e, f], [4.8, 4.4, 3.8], (l) => ramp(SKIN, l - 0.16));
+  return stroke([s, e, f], [5.4, 4.9, 3.9], (l) => ramp(SKIN, l - 0.02));
 }
 
 /** His hand: dark knuckles on top, the fingers curling under. */
@@ -514,10 +516,10 @@ export interface GardenerPose {
   spray?: number;
   droop?: number;
   seed?: number;
-  /** The other hand (on the hose a little behind the nozzle) and its elbow (bent by itself when left out). */
+  /** The other hand (out at his right side, on the hose) and its elbow (bent by itself when the hand is given, else as it stands). */
   hand?: Pt;
   elbowF?: Pt;
-  /** The hose from his hands across his belly and behind him: how far it hangs below the line between them. */
+  /** The hose from the nozzle through his other hand and behind him: how far it hangs below the line between the hands. */
   sag?: number;
   /** The tail's tip, up or down. */
   tail?: number;
@@ -540,18 +542,18 @@ const REST = {
   spray: 16,
   droop: 6,
   seed: 3,
-  sag: 8,
-  hand: [31, 41] as Pt,
+  sag: 9,
+  hand: [47.5, 48.5] as Pt,
   tail: 0,
   stepN: 0,
   stepF: 0,
 };
 
 const SHOULDER_N: Pt = [25.5, 31];
-const SHOULDER_F: Pt = [38, 30];
+const SHOULDER_F: Pt = [51.5, 28.5];
 /** His arms' bones: the upper arm and the forearm. */
 const BONES_N: Pt = [5.2, 5.2];
-const BONES_F: Pt = [7, 7];
+const BONES_F: Pt = [11, 11];
 const NOZZLE_LEN = 12;
 /** How far behind the fist the nozzle's fitting is, and the hose's end behind that. */
 const GRIP = 3.5;
@@ -569,45 +571,32 @@ function elbowOf(s: Pt, t: Pt, [l1, l2]: Pt, down = true): Pt {
   return (c1[1] >= c2[1]) === down ? c1 : c2;
 }
 
-/** Where the hose reaches the edge of his belly and passes behind him, and the small loop that shows at his back before it goes in. */
-const WRAP: Pt = [54.6, 42.2];
-const BACK_LOOP: readonly Pt[] = [[54, 41.8], [57.2, 41.6], [58.4, 44.2], [57, 46.8], [53.5, 47.4]];
-/** The coil of hose on the ground by his back foot (the middle of it). */
-const GROUND_COIL: Pt = [56.6, 63.4];
+/**
+ * Where the hose goes behind him at his hip, and the spare hose looped behind his back: drawn behind his body and his leg, so it
+ * comes out of them and goes back in, showing as one short curve past his hip.
+ */
+const WRAP: Pt = [51.8, 52];
+const BACK_LOOP: readonly Pt[] = [[50.4, 51.6], [55.2, 52.1], [57.8, 54.4], [56.6, 57.2], [50.2, 58.4]];
 
 /** A point of a quadratic curve from `a` through the control point `c` to `b`, `t` from 0 to 1. */
 const bez = (a: Pt, c: Pt, b: Pt, t: number): Pt => [(1 - t) ** 2 * a[0] + 2 * (1 - t) * t * c[0] + t * t * b[0], (1 - t) ** 2 * a[1] + 2 * (1 - t) * t * c[1] + t * t * b[1]];
 
 /**
- * The hose in front of him: from the nozzle's fitting `butt` to his other hand, and from there hanging `sag` pixels deep across
- * his belly to where it goes behind him (`WRAP`). It ends just inside his side, so it looks to pass behind.
+ * The hose in front of him: from the nozzle's fitting `butt` sagging `sag` pixels across his belly to his other hand, and from
+ * there to where it goes behind him (`WRAP`). It ends just inside his side, so it looks to pass behind.
  */
 function hoseFront(butt: Pt, hand: Pt, sag: number): { part: Part; at: Pt } {
-  const control: Pt = [(hand[0] + WRAP[0]) / 2 + 1, Math.max(hand[1], WRAP[1]) + sag];
-  const pts: Pt[] = [butt, [(butt[0] + hand[0]) / 2, (butt[1] + hand[1]) / 2], hand, ...Array.from({ length: 12 }, (_, i) => bez(hand, control, WRAP, (i + 1) / 12))];
+  const control: Pt = [(butt[0] + hand[0]) / 2 - 2, Math.max(butt[1], hand[1]) + sag];
+  const pts: Pt[] = [
+    ...Array.from({ length: 13 }, (_, i) => bez(butt, control, hand, i / 12)),
+    ...Array.from({ length: 4 }, (_, i): Pt => [hand[0] + ((WRAP[0] - hand[0]) * (i + 1)) / 4, hand[1] + ((WRAP[1] - hand[1]) * (i + 1)) / 4]),
+  ];
   return stroke(pts, pts.map(() => 1.05), (l, _s, across) => (across < -0.3 && l > 0.55 ? "G" : ramp(HOSE, l - 0.18)));
 }
 
-/** The loop of hose behind him, showing past his side: drawn behind his body, so it comes out of it and goes back in. */
+/** The spare hose behind him, past his hip. */
 function hoseBack(): { part: Part; at: Pt } {
   return stroke(BACK_LOOP, BACK_LOOP.map(() => 1.05), (l, _s, across) => (across < -0.3 && l > 0.55 ? "G" : ramp(HOSE, l - 0.18)));
-}
-
-/** The small coil of hose on the ground by his back foot: two turns seen at a slant, a dark seam between them. */
-function groundCoil(): { part: Part; at: Pt } {
-  const [cx, cy] = GROUND_COIL;
-  return painted(Math.floor(cx) - 5, Math.floor(cy) - 3, 11, 7, (F) => {
-    const r = (x: number, y: number) => Math.hypot((x + 0.5 - cx) / 3.7, (y + 0.5 - cy) / 2.3);
-    F(
-      (x, y) => r(x, y) <= 1 && r(x, y) >= 0.38,
-      (x, y) => {
-        const d = r(x, y);
-        if (d > 0.62 && d < 0.7) return "E";
-        const l = 0.55 + ((cx - x) * 0.5 + (cy - y) * 0.9) / 8 + (d > 0.7 ? 0.08 : -0.06);
-        return l > 0.8 ? "H" : ramp(HOSE, l - 0.1);
-      },
-    );
-  });
 }
 
 /** The layers of a pose, back to front. */
@@ -624,7 +613,7 @@ export function gardenerLayers(pose: GardenerPose = {}): Layer[] {
   const fistN: Pt = up(p.fist, b);
   const handF: Pt = up(p.hand, b);
   const elbowN = pose.elbowN ? up(pose.elbowN, b) : elbowOf(shoulderN, fistN, BONES_N);
-  const elbowF = pose.elbowF ? up(pose.elbowF, b) : elbowOf(shoulderF, handF, BONES_F, true);
+  const elbowF = pose.elbowF ? up(pose.elbowF, b) : pose.hand ? elbowOf(shoulderF, handF, BONES_F, true) : up([55.5, 40], b);
   // The nozzle's axis, from its fitting behind his fist out to its cap, tilted `nozzle` degrees up from level (toward our left).
   const th = rad(p.nozzle);
   const butt: Pt = [fistN[0] + Math.cos(th) * GRIP, fistN[1] + Math.sin(th) * GRIP];
@@ -632,7 +621,6 @@ export function gardenerLayers(pose: GardenerPose = {}): Layer[] {
   const hoseEnd: Pt = [butt[0] + Math.cos(th) * 0.6, butt[1] + Math.sin(th) * 0.6];
   const layers: Layer[] = [
     at("shadow", FEET_X - 27, GROUND - 3),
-    L(placed("groundCoil", groundCoil)),
     L(placed(`tail:${r2(p.tail)}`, () => tail(p.tail)), b),
     L(placed(`leg:${LEG_F}:${r2(p.stepF)}`, () => leg(LEG_F, p.stepF))),
     L(placed(`leg:${LEG_N}:${r2(p.stepN)}`, () => leg(LEG_N, p.stepN))),
@@ -649,7 +637,7 @@ export function gardenerLayers(pose: GardenerPose = {}): Layer[] {
     L(placed(`armN:${key([shoulderN, elbowN, fistN])}`, () => armN(shoulderN, elbowN, fistN))),
     L(placed(`hose:${key([hoseEnd, handF])}:${r2(p.sag)}`, () => hoseFront(hoseEnd, handF, p.sag))),
     L(placed(`nozzle:${key([butt, tip])}`, () => nozzle(butt, tip))),
-    at("fist", handF[0] - 3, handF[1] - 2.5),
+    at("fist", handF[0] - 3, handF[1] - 2),
     at("fist", fistN[0] - 3, fistN[1] - 2.5),
   ];
   if (p.spray > 0) layers.push(L(placed(`spray:${key([tip])}:${p.nozzle}:${p.spray}:${p.droop}:${p.seed}`, () => spray([tip[0] - 1.5, tip[1]], 180 - p.nozzle, p.spray, p.droop, p.seed))));
