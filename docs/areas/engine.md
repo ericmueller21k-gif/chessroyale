@@ -4,6 +4,10 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 
 ## How it works today
 
+- **Not Auto chess:** its fights and its bot use our own engine, the HunChess engine (`packages/chess/src/hunchess/`, in a Web Worker),
+  which knows that game's rules; Stockfish isn't loaded on that screen ([autochess.md](autochess.md),
+  [the decision](../decisions/2026-10-21-hunchess-engine.md)).
+
 - **The judge.** Every pick is scored by Stockfish as an expected score (win plus half a draw, 0 to 1) at
   `engineNodes` (250k) per position, top lines first; the score a pick gets is its loss against the best move.
   `packages/chess/src/uci.ts` (`UciEngine`) speaks UCI; the same code runs in Node (tests, sims: `src/node.ts`) and in

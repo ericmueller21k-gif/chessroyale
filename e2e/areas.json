@@ -453,7 +453,8 @@
     "Auto chess, the demo": {
       "paths": [
         "packages/app/src/autochess/**",
-        "packages/app/src/screens/AutoChess.tsx"
+        "packages/app/src/screens/AutoChess.tsx",
+        "packages/chess/src/hunchess/**"
       ],
       "specs": ["e2e/autochess.spec.ts", "e2e/home-layout.spec.ts"]
     },
