@@ -1,5 +1,9 @@
 # Auto chess: how fights end (Oct 21, 2026)
 
+> **Changed later the same day: stalls and the early end go by what each side gained during the fight, not by the lead at the end**
+> ([autochess-gain](2026-10-21-autochess-gain.md); Eric: "I shouldn't get rewarded just because I play more pieces"). The result
+> lines below were reworded to match. The rest stands.
+
 ## What Eric asked for
 
 Eric watched HunChess fights ([the engine](2026-10-21-hunchess-engine.md), merged the same day) and wants them to end cleaner:
