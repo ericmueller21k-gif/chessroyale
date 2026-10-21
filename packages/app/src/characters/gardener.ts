@@ -10,21 +10,26 @@
  * it). Drawn three-quarters on, facing our left (as Alfil, Sawyer, Chub & Chirp, Smudgy and Moo), so he sprays toward the
  * board; light from the top left.
  *
- * This is his still only (docs/decisions/2026-10-20-gardener-still.md): the first frame of `idle`, nothing else; his powers and
- * his animations come later. He isn't in `CHARACTERS`, `BOSS_KITS` or the roster, and nothing in the game draws him yet; the
- * preview draws him with its `extra=` option.
+ * His still is the first frame of `idle` (docs/decisions/2026-10-20-gardener-still.md, approved by Eric: a test keeps its pixels), and
+ * his animation pack is below (docs/decisions/2026-10-21-gardener-animations.md): every animation the other bosses have, his own
+ * moments (planting, the watering, a cheer, a bigger cheer and a shrug for the lottery) and his attack on a king (`GARDENER_ATTACK`).
+ * He isn't in `CHARACTERS`, `BOSS_KITS` or the roster, and nothing in the game draws him yet; the preview draws him with its `extra=`
+ * option. His board art (the seeds, the watering, the sprout and what it turns into) is `effects/gardener.ts`.
  *
  * Rigging, so the poses that follow are numbers (`GardenerPose`), as the other bosses':
- * - the nozzle hand (`fist`, `elbowN`, `nozzle`: it aims) and the water spray, a part of its own (`spray`: its length, droop
- *   and flicker: it turns on and off and arcs over the board);
- * - the other arm (`hand`, `elbowF`: it holds the hose, lets go, reaches for seeds and tosses them), and the hose, which is
- *   redrawn from the nozzle through that hand wherever they go (`sag`: how far it hangs across his belly), with the spare
- *   behind him (`BACK_LOOP`);
+ * - the nozzle hand (`fist`, `elbowN`, `nozzle`: it aims; `grab`: the hand open off the nozzle, which then hangs on its hose) and the
+ *   water spray, a part of its own (`spray`: its length, droop and flicker: it turns on and off and arcs over the board, up from a
+ *   raised nozzle and down from a lowered one);
+ * - the other arm (`hand`, `elbowF`: it holds the hose, hauls it out, lets go, shrugs; `lift`: both shoulders up), and the hose,
+ *   which is redrawn from the nozzle through that hand to his hip wherever they go (`sag`: how far it hangs across his belly), with
+ *   the spare behind him (`BACK_LOOP`, `loop`: how much of it is still looped there, the rest fed out);
  * - the head moves as one (`head`), with the jaw a part of its own (`jaw`: degrees open, a great yawn or roar), the ears
  *   (`earN`, `earF`: they flick), the eyes (`eyes`) and the tail (`tail`);
  * - his legs step (`stepN`, `stepF`) and he breathes (`bob`).
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
+import { KING_ATTACK } from "@chessroyale/chess";
+import { groundShadow, moved } from "./attack-frame.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 export const GARDENER_PALETTE: Record<string, string> = {
@@ -63,6 +68,9 @@ export const GARDENER_PALETTE: Record<string, string> = {
   "2": "#4fa3ee",
   "3": "#8bcdfb",
   "4": "#d4f0ff",
+  "5": "#4a2f1a", // seeds and dirt: dark, mid, light
+  "6": "#8a5a2c",
+  "7": "#d8a85a",
   z: "#0d0e12", // ground shadow
   "9": "#4d4538", // dust, dark and light
   "0": "#7d705a",
@@ -180,8 +188,8 @@ function stroke(pts: readonly Pt[], r: readonly number[], key: (light: number, s
 // ---- Where things are. The scene's ground is at y `GROUND`; the frame adds `OX`, `OY` (room for his poses).
 
 const GROUND = 66;
-const OX = 14;
-const OY = 16;
+const OX = 20;
+const OY = 30;
 const W = OX + 70;
 const H = OY + GROUND + 6;
 /** The ground point he is placed by (x): between his feet, a little toward his front so the muzzle and the nozzle reach no farther one side than his tail and back do the other. */
@@ -325,7 +333,7 @@ function ear(x0: number, y0: number, tilt: number): { part: Part; at: Pt } {
   });
 }
 
-export type Eyes = "open" | "half" | "shut" | "wide";
+export type Eyes = "open" | "half" | "shut" | "wide" | "joy";
 /** An eye: a round dark one with a glint (a pale pixel up and to the left); `w` its width (the far eye, seen at an angle, is narrower). */
 function eye(x0: number, y0: number, w: number, lid: Eyes): { part: Part; at: Pt } {
   const rows: Record<Eyes, string[]> = {
@@ -333,8 +341,17 @@ function eye(x0: number, y0: number, w: number, lid: Eyes): { part: Part; at: Pt
     half: w >= 4 ? ["xxxx", ".xx."] : ["xxx", ".xx"],
     shut: w >= 4 ? ["xxxx"] : ["xxx"],
     wide: w >= 4 ? [".xxx.", "xwwxx", "xwxxx", ".xxx."] : [".xx.", "xwx.", ".xx."],
+    joy: w >= 4 ? [".xx.", "x..x"] : [".x.", "x.x"],
   };
   return painted(x0, y0, 5, 5, (_F, S) => S(rows[lid], x0, y0), false);
+}
+
+export type Brows = "none" | "angry" | "worry" | "up";
+/** His brows over the eyes (the face has none at rest): slanted down toward his nose (angry), up in the middle (worry), or raised. */
+function brows(kind: Exclude<Brows, "none">): { part: Part; at: Pt } {
+  const near: Record<typeof kind, Pt[]> = { angry: [[33, 8], [34, 8], [35, 7], [36, 7]], worry: [[33, 7], [34, 7], [35, 8], [36, 8]], up: [[33, 6], [34, 6], [35, 6], [36, 6]] };
+  const far: Record<typeof kind, Pt[]> = { angry: [[25, 7], [26, 6], [27, 6]], worry: [[25, 6], [26, 6], [27, 7]], up: [[25, 5], [26, 5], [27, 5]] };
+  return painted(24, 4, 15, 6, (_F, S) => [...near[kind], ...far[kind]].forEach(([x, y]) => S(["y"], x, y)), false);
 }
 
 // ---- His arms, the hose and the nozzle, the water.
@@ -352,6 +369,11 @@ function armF(s: Pt, e: Pt, f: Pt): { part: Part; at: Pt } {
 /** His hand: dark knuckles on top, the fingers curling under. */
 function fist(): Part {
   return { grid: ["abbbb.", "bcdccb", "bccccb", "abccba", ".uvvu."] };
+}
+
+/** His hand open (the toss): the fingers spread, the palm up. */
+function palm(): Part {
+  return { grid: ["a.a.a.", "bcdcdb", "bccccb", "abccba", ".uvvu."] };
 }
 
 /** The nozzle's axis from `butt` to `tip`: a brass hose fitting, a green grip, a brass collar, a green head, a flared brass cap. */
@@ -475,6 +497,7 @@ function shadow(w: number): Part {
 
 const { parts: PARTS, add } = lazyParts();
 add("fist", () => fist());
+add("palm", () => palm());
 add("shadow", () => shadow(54));
 
 type Placed = { name: string; at: Pt };
@@ -508,6 +531,8 @@ export interface GardenerPose {
   earN?: number;
   earF?: number;
   eyes?: Eyes;
+  /** His brows (none at rest). */
+  brows?: Brows;
   /** The nozzle arm: the fist and the elbow (bent by itself when left out), and the nozzle's tilt (degrees, positive: its tip up). */
   fist?: Pt;
   elbowN?: Pt;
@@ -519,8 +544,20 @@ export interface GardenerPose {
   /** The other hand (out at his right side, on the hose) and its elbow (bent by itself when the hand is given, else as it stands). */
   hand?: Pt;
   elbowF?: Pt;
+  /** His other hand open (a toss), and not on the hose (it hangs from the nozzle to his hip by itself). */
+  open?: boolean;
+  free?: boolean;
   /** The hose from the nozzle through his other hand and behind him: how far it hangs below the line between the hands. */
   sag?: number;
+  /** The spare hose behind his hip: 1 as it rests, 0 all fed out (nothing shows), more of it showing above 1. */
+  loop?: number;
+  /** Both shoulders raised this many pixels (a shrug). */
+  lift?: number;
+  /**
+   * His near hand off the nozzle, open (a toss): where it is. The nozzle then hangs where `fist` puts it, on its hose, and the
+   * arm goes to this hand instead.
+   */
+  grab?: Pt;
   /** The tail's tip, up or down. */
   tail?: number;
   /** The feet's lift (a step). */
@@ -537,12 +574,17 @@ const REST = {
   earN: 0,
   earF: 0,
   eyes: "open" as Eyes,
+  brows: "none" as Brows,
   fist: [16.5, 33] as Pt,
   nozzle: 8,
   spray: 16,
   droop: 6,
   seed: 3,
   sag: 9,
+  loop: 1,
+  open: false,
+  free: false,
+  lift: 0,
   hand: [47.5, 48.5] as Pt,
   tail: 0,
   stepN: 0,
@@ -555,6 +597,12 @@ const SHOULDER_F: Pt = [51.5, 28.5];
 const BONES_N: Pt = [5.2, 5.2];
 const BONES_F: Pt = [11, 11];
 const NOZZLE_LEN = 12;
+/**
+ * The water's launch direction (degrees, 180 is level toward our left, 90 down) is the nozzle's own tilt plus this: it leaves a little
+ * below the nozzle's axis, then arcs (`droop`). The still's nozzle (8 degrees up) gives 172, as it was drawn; a nozzle raised higher
+ * sends it up (a fountain), a lowered one down (the near squares).
+ */
+const SPRAY_ANG = 164;
 /** How far behind the fist the nozzle's fitting is, and the hose's end behind that. */
 const GRIP = 3.5;
 
@@ -582,21 +630,21 @@ const BACK_LOOP: readonly Pt[] = [[50.4, 51.6], [55.2, 52.1], [57.8, 54.4], [56.
 const bez = (a: Pt, c: Pt, b: Pt, t: number): Pt => [(1 - t) ** 2 * a[0] + 2 * (1 - t) * t * c[0] + t * t * b[0], (1 - t) ** 2 * a[1] + 2 * (1 - t) * t * c[1] + t * t * b[1]];
 
 /**
- * The hose in front of him: from the nozzle's fitting `butt` sagging `sag` pixels across his belly to his other hand, and from
- * there to where it goes behind him (`WRAP`). It ends just inside his side, so it looks to pass behind.
+ * The hose in front of him: from the nozzle's fitting `butt` sagging `sag` pixels across his belly to his other hand (if it
+ * holds the hose), and from there to where it goes behind him (`WRAP`). It ends just inside his side, so it looks to pass behind.
  */
-function hoseFront(butt: Pt, hand: Pt, sag: number): { part: Part; at: Pt } {
-  const control: Pt = [(butt[0] + hand[0]) / 2 - 2, Math.max(butt[1], hand[1]) + sag];
-  const pts: Pt[] = [
-    ...Array.from({ length: 13 }, (_, i) => bez(butt, control, hand, i / 12)),
-    ...Array.from({ length: 4 }, (_, i): Pt => [hand[0] + ((WRAP[0] - hand[0]) * (i + 1)) / 4, hand[1] + ((WRAP[1] - hand[1]) * (i + 1)) / 4]),
-  ];
+function hoseFront(butt: Pt, hand: Pt | null, sag: number, wrap: Pt = WRAP): { part: Part; at: Pt } {
+  const to = hand ?? wrap;
+  const control: Pt = [(butt[0] + to[0]) / 2 - 2, Math.max(butt[1], to[1]) + sag];
+  const pts: Pt[] = [...Array.from({ length: 13 }, (_, i) => bez(butt, control, to, i / 12))];
+  if (hand) pts.push(...Array.from({ length: 4 }, (_, i): Pt => [hand[0] + ((wrap[0] - hand[0]) * (i + 1)) / 4, hand[1] + ((wrap[1] - hand[1]) * (i + 1)) / 4]));
   return stroke(pts, pts.map(() => 1.05), (l, _s, across) => (across < -0.3 && l > 0.55 ? "G" : ramp(HOSE, l - 0.18)));
 }
 
-/** The spare hose behind him, past his hip. */
-function hoseBack(): { part: Part; at: Pt } {
-  return stroke(BACK_LOOP, BACK_LOOP.map(() => 1.05), (l, _s, across) => (across < -0.3 && l > 0.55 ? "G" : ramp(HOSE, l - 0.18)));
+/** The spare hose behind him, past his hip, `loop` of the way out (see `GardenerPose.loop`). */
+function hoseBack(loop: number): { part: Part; at: Pt } {
+  const pts = BACK_LOOP.map(([x, y], i): Pt => (i === 0 || i === BACK_LOOP.length - 1 ? [x, y] : [BACK_LOOP[0]![0] + (x - BACK_LOOP[0]![0]) * loop, y]));
+  return stroke(pts, pts.map(() => 1.05), (l, _s, across) => (across < -0.3 && l > 0.55 ? "G" : ramp(HOSE, l - 0.18)));
 }
 
 /** The layers of a pose, back to front. */
@@ -608,11 +656,12 @@ export function gardenerLayers(pose: GardenerPose = {}): Layer[] {
   /** A part of his head: it moves with it. */
   const H = (pl: Placed, dy = 0, dx = 0) => L(pl, b + HEAD_UP + p.head[1] + dy, p.head[0] + dx);
   const up = (q: Pt, dy: number): Pt => [q[0], q[1] + dy];
-  const shoulderN = up(SHOULDER_N, b);
-  const shoulderF = up(SHOULDER_F, b);
+  const shoulderN = up(SHOULDER_N, b - p.lift);
+  const shoulderF = up(SHOULDER_F, b - p.lift);
   const fistN: Pt = up(p.fist, b);
   const handF: Pt = up(p.hand, b);
-  const elbowN = pose.elbowN ? up(pose.elbowN, b) : elbowOf(shoulderN, fistN, BONES_N);
+  const grabN: Pt | null = pose.grab ? up(pose.grab, b) : null;
+  const elbowN = pose.elbowN ? up(pose.elbowN, b) : elbowOf(shoulderN, grabN ?? fistN, BONES_N);
   const elbowF = pose.elbowF ? up(pose.elbowF, b) : pose.hand ? elbowOf(shoulderF, handF, BONES_F, true) : up([55.5, 40], b);
   // The nozzle's axis, from its fitting behind his fist out to its cap, tilted `nozzle` degrees up from level (toward our left).
   const th = rad(p.nozzle);
@@ -624,7 +673,7 @@ export function gardenerLayers(pose: GardenerPose = {}): Layer[] {
     L(placed(`tail:${r2(p.tail)}`, () => tail(p.tail)), b),
     L(placed(`leg:${LEG_F}:${r2(p.stepF)}`, () => leg(LEG_F, p.stepF))),
     L(placed(`leg:${LEG_N}:${r2(p.stepN)}`, () => leg(LEG_N, p.stepN))),
-    L(placed("hoseBack", hoseBack), b),
+    ...(p.loop > 0.05 ? [L(placed(`hoseBack:${r2(p.loop)}`, () => hoseBack(r2(p.loop))), b)] : []),
     L(placed("torso", torso), b),
     H(placed(`mouthIn:${p.jaw}`, () => mouthIn(p.jaw))),
     H(placed(`jaw:${p.jaw}`, () => jaw(p.jaw))),
@@ -633,19 +682,402 @@ export function gardenerLayers(pose: GardenerPose = {}): Layer[] {
     H(placed(`earN:${p.earN}`, () => ear(EAR_N[0], EAR_N[1], p.earN))),
     H(placed(`eyeF:${p.eyes}`, () => eye(EYE_F[0], EYE_F[1], 3, p.eyes))),
     H(placed(`eyeN:${p.eyes}`, () => eye(EYE_N[0], EYE_N[1], 4, p.eyes))),
+    ...(p.brows !== "none" ? [H(placed(`brows:${p.brows}`, () => brows(p.brows as Exclude<Brows, "none">)))] : []),
     L(placed(`armF:${key([shoulderF, elbowF, handF])}`, () => armF(shoulderF, elbowF, handF))),
-    L(placed(`armN:${key([shoulderN, elbowN, fistN])}`, () => armN(shoulderN, elbowN, fistN))),
-    L(placed(`hose:${key([hoseEnd, handF])}:${r2(p.sag)}`, () => hoseFront(hoseEnd, handF, p.sag))),
+    L(placed(`armN:${key([shoulderN, elbowN, grabN ?? fistN])}`, () => armN(shoulderN, elbowN, grabN ?? fistN))),
+    L(placed(`hose:${key([hoseEnd, handF])}:${r2(p.sag)}:${p.free ? 1 : 0}:${b}`, () => hoseFront(hoseEnd, p.free ? null : handF, p.sag, up(WRAP, b)))),
     L(placed(`nozzle:${key([butt, tip])}`, () => nozzle(butt, tip))),
-    at("fist", handF[0] - 3, handF[1] - 2),
-    at("fist", fistN[0] - 3, fistN[1] - 2.5),
+    at(p.open ? "palm" : "fist", handF[0] - 3, handF[1] - 2),
+    ...(grabN ? [at("palm", grabN[0] - 3, grabN[1] - 2)] : [at("fist", fistN[0] - 3, fistN[1] - 2.5)]),
   ];
-  if (p.spray > 0) layers.push(L(placed(`spray:${key([tip])}:${p.nozzle}:${p.spray}:${p.droop}:${p.seed}`, () => spray([tip[0] - 1.5, tip[1]], 180 - p.nozzle, p.spray, p.droop, p.seed))));
+  if (p.spray > 0) layers.push(L(placed(`spray:${key([tip])}:${p.nozzle}:${p.spray}:${p.droop}:${p.seed}`, () => spray([tip[0] - 1.5, tip[1]], SPRAY_ANG + p.nozzle, p.spray, p.droop, p.seed))));
   // The whole of him moved: sideways, and up (his shadow stays on the ground).
   return p.dx || p.air ? layers.map((l) => (l.part === "shadow" ? { ...l, x: l.x + p.dx } : { ...l, x: l.x + p.dx, y: l.y - p.air })) : layers;
 }
 
-const idle: Anim = { loop: true, frames: [{ ms: 1000, layers: gardenerLayers() }] };
+// ---- Things drawn on his frames: sparkles, dust, sweat, drips, thoughts, seeds in the air, the jet at a king.
+
+/** A speck at a scene point (the frame adds its own margins). */
+const sp = (x: number, y: number, k: string): Speck => [OX + Math.round(x), OY + Math.round(y), k];
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+/** A gold four-point sparkle, white at its heart. */
+const sparkle = (x: number, y: number, big = false): Speck[] => [
+  sp(x, y, "w"), sp(x - 1, y, "M"), sp(x + 1, y, "M"), sp(x, y - 1, "M"), sp(x, y + 1, "M"),
+  ...(big ? [sp(x - 2, y, "L"), sp(x + 2, y, "L"), sp(x, y - 2, "L"), sp(x, y + 2, "L")] : []),
+];
+/** Dust kicked up either side of his feet (`t` frames after he lands): `n` puffs a side rolling outward and up. */
+const dust = (t: number, n = 3, cx = FEET_X, spread = 24): Speck[] => {
+  const out: Speck[] = [];
+  for (let side = -1; side <= 1; side += 2)
+    for (let i = 0; i < n; i++) {
+      const x = Math.round(cx + side * (spread * 0.5 + i * 3.5 + t * (2 + (i % 2))));
+      const y = GROUND - 1 - Math.round(t * (0.6 + (i % 3) * 0.5) + (i % 2));
+      const cloud: [number, number, string][] = t < 2 ? [[0, 0, "0"], [side, 0, "0"], [0, -1, "9"], [side, -1, "9"]] : [[0, 0, "9"], [side, -1, "0"]];
+      for (const [ox, oy, k] of cloud) out.push(sp(x + ox, y + oy, k));
+    }
+  return out;
+};
+/** His shadow alone on the ground (he's above the frame, or about to come down), `r` its half-width. */
+const shadowOnly = (r: number): Speck[] => groundShadow(OX + FEET_X, OY + GROUND - 1, r);
+/** Sweat flying off his head, both ways. */
+const sweat = (i: number): Speck[] => {
+  const t = i % 4;
+  return [sp(8 - t, 12 + t * 2, "~"), sp(44 + t, 11 + t * 2, "~")];
+};
+/** Where his nozzle's cap is (scene pixels), for a pose. */
+function nozzleTip(pose: GardenerPose = {}): Pt {
+  const p = { ...REST, ...pose };
+  const th = rad(p.nozzle);
+  return [p.fist[0] + Math.cos(th) * GRIP - Math.cos(th) * NOZZLE_LEN, p.fist[1] + p.bob + Math.sin(th) * GRIP - Math.sin(th) * NOZZLE_LEN];
+}
+/** A drop forming at the nozzle's cap, then falling (`i` 0 to 2): the cap's own drip. */
+const drip = (i: number, pose: GardenerPose = {}): Speck[] => {
+  const [x, y] = nozzleTip(pose);
+  return i === 0 ? [sp(x, y + 2, "3"), sp(x, y + 3, "2")] : i === 1 ? [sp(x, y + 9, "3"), sp(x, y + 10, "2")] : [sp(x, y + 21, "2"), sp(x, y + 22, "1")];
+};
+/** Thought bubbles rising off his head, one more each beat (`n` 1 to 3). */
+const bubbles = (n: number): Speck[] =>
+  ([[47, 1], [51, -5], [56, -12]] as Pt[]).slice(0, n).flatMap(([x, y], i): Speck[] => (i === 2 ? [sp(x, y, "3"), sp(x + 1, y, "4"), sp(x + 2, y, "3"), sp(x, y + 1, "2"), sp(x + 1, y + 1, "3"), sp(x + 2, y + 1, "2"), sp(x, y + 2, "1"), sp(x + 1, y + 2, "2"), sp(x + 2, y + 2, "1")] : [sp(x, y, "4"), sp(x + 1, y, "3"), sp(x, y + 1, "2"), sp(x + 1, y + 1, "2")]));
+/** Drops of water thrown up and falling round his head and hands (a cheer), `t` a frame number. */
+const splashes = (t: number, n = 5): Speck[] =>
+  Array.from({ length: n }, (_, i): Speck => {
+    const x = 4 + ((i * 11 + t * 7) % 40);
+    const y = -2 + ((i * 7 + t * 5) % 22);
+    return sp(x, y, i % 3 === 0 ? "4" : i % 3 === 1 ? "3" : "2");
+  });
+/** A seed: two pixels across, tan on top and brown below (they have no outline, so they carry on the dark ground and the light). */
+const seedAt = (px: number, py: number): Speck[] => [sp(px, py, "7"), sp(px + 1, py, "7"), sp(px, py + 1, "6"), sp(px + 1, py + 1, "5")];
+/** Seeds just leaving the packet's mouth at (`x`, `y`): `n` of them in a short arch up and over toward the board (to our left). */
+const seedsFrom = (x: number, y: number, n: number): Speck[] =>
+  Array.from({ length: n }, (_, i): Speck[] => seedAt(Math.round(x - 3 * (i + 1) - (i % 2)), Math.round(y - 6 * Math.sin((Math.PI * (i + 0.7)) / (n + 0.4)) + (i % 2) * 2))).flat();
+
+/** A hit: every color goes pale. */
+const FLASH: Record<string, string> = Object.fromEntries(
+  Object.entries(GARDENER_PALETTE)
+    .filter(([k]) => !["k", "z", "~", "9", "0", "w"].includes(k))
+    .map(([k, c]) => {
+      const n = parseInt(c.slice(1), 16);
+      const mix = (v: number) => Math.round(v + (255 - v) * 0.55).toString(16).padStart(2, "0");
+      return [k, `#${mix((n >> 16) & 255)}${mix((n >> 8) & 255)}${mix(n & 255)}`];
+    }),
+);
+
+// ---- His animations. Frame counts and times follow the other bosses' (Moo's, Alfil's, Smudgy's); every frame is a pose, so the
+// hose, the hands and the loop behind his hip stay together in each.
+
+const F = (ms: number, pose: GardenerPose = {}, extra: Partial<Frame> = {}): Frame => ({ ms, layers: gardenerLayers(pose), ...extra });
+const TAU = Math.PI * 2;
+const rnd = Math.round;
+/** The spray at a length, drooping in proportion, a seed of its own (a different one each frame: it shimmers). */
+const jet = (len: number, seed: number, droop = Math.round(len * 0.375)): Pick<GardenerPose, "spray" | "droop" | "seed"> => ({ spray: len, droop, seed });
+/** The water from a raised nozzle: it leaves upward and falls back, so it droops a good deal. */
+const fount = (len: number, seed: number): Pick<GardenerPose, "spray" | "droop" | "seed"> => jet(len, seed, Math.round(len * 0.62));
+/** His nozzle arm raised, the nozzle up: a fountain (a cheer, a call to the board). */
+const UP: GardenerPose = { fist: [17.5, 29], nozzle: 40 };
+/** The nozzle arm lowered, the water off (thinking, smug, tired). */
+const DOWN: GardenerPose = { fist: [16.5, 35], nozzle: -4, spray: 0 };
+
+/**
+ * Idle: he breathes slowly, the water from the nozzle runs, thins to a drip, drips, and comes back; an ear flicks, he blinks.
+ * Frame 1 is the approved still (the spray at its length 16, drops seed 3).
+ */
+const IDLE_SPRAY = [16, 16, 16, 16, 16, 12, 8, 4, 0, 0, 0, 0, 4, 8, 12, 15] as const;
+const idle: Anim = {
+  loop: true,
+  frames: Array.from({ length: 16 }, (_, i) =>
+    F(125, {
+      bob: i >= 5 && i <= 12 ? 1 : 0,
+      ...jet(IDLE_SPRAY[i]!, i === 0 ? 3 : 3 + i),
+      earN: i === 3 ? -2 : i === 4 ? -1 : 0,
+      earF: i === 3 ? -1 : 0,
+      tail: i >= 9 && i <= 11 ? 2 : 0,
+      eyes: i === 11 ? "shut" : i === 12 ? "half" : "open",
+      head: [0, i >= 6 && i <= 9 ? 1 : 0],
+      nozzle: 8 + (i >= 6 && i <= 8 ? 1 : 0) - (i >= 10 && i <= 11 ? 1 : 0),
+      sag: 9 + (i >= 5 && i <= 12 ? 0.5 : 0),
+    }, { specks: i >= 8 && i <= 11 ? drip(i - 8, { nozzle: 8 }) : [] }),
+  ),
+};
+
+/** Entrance: his shadow spreads, he drops in with the hose swinging and lands with a heavy thump, shakes it off, and booms a happy yawn. */
+const entrance: Anim = {
+  loop: false,
+  frames: [
+    { ms: 100, layers: [], specks: shadowOnly(8), cue: "drop" },
+    { ms: 100, layers: [], specks: shadowOnly(18) },
+    F(70, { air: 18, eyes: "wide", jaw: 12, earN: -3, earF: -3, tail: 4, spray: 0, loop: 1.3, sag: 13, ...UP }),
+    F(70, { air: 6, eyes: "wide", jaw: 8, earN: -2, earF: -2, spray: 0, loop: 1.2, sag: 12 }),
+    F(130, { bob: 3, eyes: "shut", earN: 3, earF: 3, spray: 0, loop: 1.3, sag: 13 }, { cue: "thump", shake: [0, 2], specks: dust(0, 3) }),
+    F(110, { bob: 1, earN: 1, earF: 1, ...jet(5, 5), sag: 11 }, { specks: dust(1, 3) }),
+    F(110, { bob: 0, ...jet(10, 6) }, { specks: dust(2, 3) }),
+    F(170, { head: [0, -1], jaw: 22, eyes: "joy", earN: -2, earF: -2, tail: 3, ...UP, ...fount(20, 7) }, { cue: "grunt", specks: [...sparkle(8, 22), ...sparkle(46, 20)] }),
+    F(160, { head: [-1, 1], eyes: "shut", jaw: 4, ...jet(14, 8) }),
+    F(290, {}),
+  ],
+};
+
+/** Thinking: he lowers the nozzle, chews, looks at the board; now and then scratches his chin with his free hand; bubbles rise (one, two, three). */
+const thinking: Anim = {
+  loop: true,
+  frames: [0, 1, 2, 3].flatMap((n) =>
+    [0, 1, 2, 3].map((i) =>
+      F(130, {
+        ...DOWN,
+        head: [-1, i % 2 ? 0 : -1],
+        jaw: i % 2 ? 0 : 3,
+        eyes: i === 3 ? "half" : "open",
+        earN: [0, 1, 0, -1][i]!,
+        earF: [0, -1, 0, 1][i]!,
+        tail: [0, 2, 3, 2][i]!,
+        sag: 11,
+        ...(n === 2 ? { free: true, open: false, hand: [37 + (i % 2), 31] as Pt, elbowF: undefined } : {}),
+      }, { specks: bubbles(Math.min(3, n + 1)) }),
+    ),
+  ),
+};
+
+/** His move: a crouch, a heavy step (the near foot, then the far one), each with a thump and a puff of dust, and a settle. */
+const move: Anim = {
+  loop: false,
+  frames: [
+    F(100, { bob: 2, earN: 3, earF: 3, ...jet(8, 4) }),
+    F(90, { stepN: 3, bob: 1, head: [-1, 0], earN: -1, earF: -1, ...jet(12, 5) }),
+    F(110, { stepN: 0, bob: 2, ...jet(10, 6) }, { cue: "thump", shake: [0, 1], specks: dust(0, 2) }),
+    F(130, { stepF: 3, bob: 1, head: [-1, 0], tail: 2, ...jet(12, 7) }),
+    F(120, { stepF: 0, bob: 2, ...jet(8, 8) }, { cue: "thump", shake: [0, 1], specks: dust(1, 2) }),
+    F(160, {}),
+  ],
+};
+
+/** A capture: he cheers, the nozzle up and the water fountaining, his jaw wide, his ears flapping, drops falling, a hop. */
+const capture: Anim = {
+  loop: false,
+  frames: [
+    F(90, { bob: 1, earN: 3, earF: 3, ...jet(10, 3) }),
+    ...Array.from({ length: 10 }, (_, i) => {
+      const odd = i % 2 === 1;
+      return F(85, {
+        ...UP,
+        ...fount(20, 4 + i),
+        air: odd ? 0 : 2,
+        bob: odd ? 1 : 0,
+        head: [0, odd ? 0 : -1],
+        jaw: odd ? 8 : 16,
+        eyes: "joy",
+        earN: odd ? 2 : -3,
+        earF: odd ? 2 : -3,
+        tail: odd ? 1 : 4,
+        sag: odd ? 7 : 11,
+      }, { cue: i === 4 ? "grunt" : undefined, specks: [...splashes(i, 4), ...(i < 8 && i % 3 === 0 ? sparkle(46 - ((i * 5) % 14), 8 - (i % 2) * 4, i % 6 === 0) : [])] });
+    }),
+    F(160, { eyes: "half" }),
+  ],
+};
+
+/** Hurt: a flash, knocked back with his eyes shut and the nozzle flung up, the water sputtering out; then he glares. */
+const hurt: Anim = {
+  loop: false,
+  frames: [
+    F(70, { bob: 2, dx: 1, eyes: "shut", jaw: 18, brows: "worry", earN: -3, earF: -3, tail: 4, ...UP, spray: 0, sag: 12, loop: 1.2 }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: sweat(0) }),
+    F(80, { bob: 2, dx: 1, eyes: "shut", jaw: 14, brows: "worry", earN: -2, earF: -2, fist: [16.5, 36], nozzle: -10, ...jet(5, 4), sag: 12 }, { shake: [-1, 0], specks: sweat(1) }),
+    F(90, { bob: 1, dx: 2, jaw: 6, eyes: "half", brows: "worry", earN: 3, earF: 3, ...jet(4, 5) }, { specks: sweat(2) }),
+    F(90, { bob: 1, dx: 1, brows: "worry", ...jet(8, 6) }),
+    F(110, { head: [0, 1], eyes: "half", brows: "worry", jaw: 2, ...jet(10, 7) }),
+    F(120, { eyes: "half", brows: "angry", ...jet(12, 8) }),
+    F(160, {}),
+  ],
+};
+
+/** Check: he points the nozzle at the king and sends a hard jet toward the board, grunting, brows down; twice. */
+const AIM: GardenerPose = { fist: [17.5, 31], nozzle: 18, brows: "angry", head: [-1, 0] };
+const check: Anim = {
+  loop: false,
+  frames: [
+    F(100, { bob: 2, head: [1, 1], earN: 3, earF: 3, spray: 0 }),
+    F(120, { ...AIM, ...jet(22, 3), jaw: 6, earN: -1, earF: -1, tail: 3 }, { cue: "grunt", specks: sparkle(2, 28) }),
+    F(100, { ...AIM, ...jet(22, 4), jaw: 4, bob: 1 }),
+    F(100, { ...AIM, spray: 0, eyes: "half", jaw: 0 }),
+    F(120, { ...AIM, ...jet(22, 5), jaw: 6, earN: -1, earF: -1, tail: 3 }, { specks: sparkle(2, 28, true) }),
+    F(100, { ...AIM, ...jet(22, 6), jaw: 4, bob: 1 }),
+    F(100, { ...AIM, ...jet(6, 7), jaw: 0 }),
+    F(210, {}),
+  ],
+};
+
+/** Smug (loop): head back, heavy-lidded, a lazy trickle from the nozzle, his free hand on his belly, an ear flicking now and then. */
+const smug: Anim = {
+  loop: true,
+  frames: Array.from({ length: 8 }, (_, i) =>
+    F(150, {
+      ...DOWN,
+      ...(i % 4 === 1 ? jet(4, i) : {}),
+      head: [1, -1],
+      eyes: i === 5 ? "shut" : "half",
+      jaw: 2,
+      free: true,
+      hand: [44, 46],
+      earN: i === 2 ? -2 : 0,
+      earF: i === 3 ? -1 : 0,
+      tail: [0, 1, 2, 3, 2, 1, 0, 0][i]!,
+      bob: i >= 3 && i <= 6 ? 1 : 0,
+      sag: 11,
+    }, { specks: i === 2 ? drip(0, DOWN) : i === 3 ? drip(1, DOWN) : [] }),
+  ),
+};
+
+/** Rattled (loop): shaking, eyes wide, sweat flying, the water wobbling, the hose jiggling. */
+const rattled: Anim = {
+  loop: true,
+  frames: Array.from({ length: 8 }, (_, i) =>
+    F(80, {
+      dx: i % 2 ? 1 : -1,
+      bob: 1,
+      eyes: "wide",
+      brows: "worry",
+      jaw: 8,
+      earN: 3,
+      earF: 3,
+      ...jet([6, 14, 5, 12, 8, 15, 4, 10][i]!, 20 + i),
+      nozzle: 8 + (i % 2 ? 4 : -4),
+      sag: i % 2 ? 7 : 11,
+      loop: i % 2 ? 1.15 : 0.9,
+    }, { specks: sweat(i) }),
+  ),
+};
+
+/** Defeat: flashes and reels back, the hose goes slack, the nozzle drops to the ground, he sinks onto his haunches, head down, ears limp; held. */
+const defeat: Anim = {
+  loop: false,
+  frames: [
+    F(90, { bob: 2, dx: 1, eyes: "shut", jaw: 16, brows: "worry", earN: -3, earF: -3, ...UP, spray: 0, sag: 12, loop: 1.2 }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: sweat(0) }),
+    F(160, { bob: 2, dx: 2, eyes: "shut", jaw: 10, brows: "worry", fist: [17.5, 37], nozzle: -25, ...jet(4, 9), free: true, hand: [47.5, 52], sag: 13, earN: 3, earF: 3 }, { specks: sweat(2) }),
+    F(210, { bob: 4, dx: 1, head: [1, 2], eyes: "half", brows: "worry", fist: [18, 46], nozzle: -50, spray: 0, free: true, hand: [47.5, 54], sag: 15, loop: 0.6, earN: 3, earF: 3 }, { cue: "flop", shake: [0, 1], specks: dust(0, 2) }),
+    F(260, { bob: 5, head: [1, 3], eyes: "shut", jaw: 0, brows: "worry", fist: [18, 48], nozzle: -55, spray: 0, free: true, hand: [47.5, 55], sag: 15, loop: 0.4, earN: 4, earF: 4, tail: -2 }, { specks: dust(1, 2) }),
+    F(100, { bob: 5, head: [1, 3], eyes: "shut", fist: [18, 48], nozzle: -55, spray: 0, free: true, hand: [47.5, 55], sag: 15, loop: 0.4, earN: 4, earF: 4 }, { specks: drip(0, { fist: [18, 48], nozzle: -55 }) }),
+    F(730, { bob: 5, head: [1, 3], eyes: "shut", brows: "worry", fist: [18, 48], nozzle: -55, spray: 0, free: true, hand: [47.5, 55], sag: 15, loop: 0.4, earN: 4, earF: 4 }, { specks: drip(1, { fist: [18, 48], nozzle: -55 }) }),
+  ],
+};
+
+/** Victory (loop): both arms up, the nozzle fountaining, his free hand open over his head, hopping, his jaw wide. */
+const victory: Anim = {
+  loop: true,
+  frames: Array.from({ length: 12 }, (_, i) => {
+    const up = i % 2 === 0;
+    return F(110, {
+      fist: [17.5, 29],
+      nozzle: 50,
+      ...fount(20, 30 + i),
+      free: true,
+      open: true,
+      hand: [46, up ? 21 : 24],
+      air: up ? 3 : 0,
+      bob: up ? 0 : 1,
+      jaw: up ? 16 : 8,
+      eyes: "joy",
+      earN: up ? -3 : 2,
+      earF: up ? -3 : 2,
+      tail: up ? 4 : 1,
+      sag: up ? 8 : 12,
+    }, { cue: i === 2 ? "grunt" : i === 8 ? "thump" : undefined, specks: [...splashes(i, 5), ...(i % 4 === 1 ? sparkle(44, 4 + (i % 3) * 3) : [])] });
+  }),
+};
+
+// ---- His own moments.
+
+/** The far hand, free of the hose, open, at a place; the hose then hangs from the nozzle to his hip by itself. */
+const HAND = (at: Pt): GardenerPose => ({ free: true, open: true, hand: at });
+/** The seeds in his open hand at (`x`, `y`): `n` of them, in a pile. */
+const seedsIn = (x: number, y: number, n: number): Speck[] => Array.from({ length: n }, (_, i): Speck[] => seedAt(x - 3 + (i % 3) * 2, y - 2 - Math.floor(i / 3) * 2 - (i % 2))).flat();
+/** His near hand off the nozzle, which hangs at his side on its hose, and the other hand holding the hose at his hip. */
+const HANGING: GardenerPose = { fist: [18, 41], nozzle: -75, spray: 0, hand: [50, 49], sag: 13 };
+/**
+ * Planting: he lets the nozzle drop and hang on its hose (the other hand keeps the hose at his hip), shows a handful of seeds in his
+ * near hand, draws it back and tosses the seeds out toward the board (cue `toss`: the seeds leave his hand, where the board's seeds
+ * start), follows through, and takes the nozzle up again. `n` seeds in the handful (three; five for the game's opening). The seeds are
+ * drawn on his frames only while they are in his hand and as they leave it; after the cue the board's seeds fly on their own.
+ */
+const planting = (n: number, ms: readonly number[]): Anim => ({
+  loop: false,
+  frames: [
+    F(ms[0]!, { ...HANGING, grab: [22, 37], head: [-1, 0], bob: 1 }, { specks: seedsIn(22, 37 + 1, n) }),
+    F(ms[1]!, { ...HANGING, grab: [23, 36], head: [-1, 1], eyes: "half", bob: 1 }, { specks: seedsIn(23, 36 + 1, n) }),
+    F(ms[2]!, { ...HANGING, grab: [25, 39], head: [-1, 0], bob: 2, earN: 3, earF: 3 }, { specks: seedsIn(25, 39 + 2, n) }),
+    F(ms[3]!, { ...HANGING, grab: [15.5, 31], head: [-2, 0], jaw: 4, eyes: "joy", earN: -2, earF: -2, tail: 3, bob: 1 }, { cue: "toss", shake: [-1, 0], specks: seedsFrom(11, 28, n) }),
+    F(ms[4]!, { ...HANGING, grab: [14, 30], head: [-1, 0], jaw: 2, bob: 1 }),
+    F(ms[5]!, { fist: [16.5, 38], nozzle: -25, spray: 0, head: [-1, 0], sag: 11 }),
+    F(ms[6]!, { fist: [16.5, 33], nozzle: 8, spray: 0, eyes: "joy", head: [0, 0] }),
+  ],
+});
+const plant = planting(3, [90, 90, 100, 110, 100, 120, 130]);
+const plantMany = planting(5, [110, 100, 120, 110, 100, 120, 140]);
+
+/**
+ * Watering (the ultimate's cast): he takes the hose in his other hand at his hip and hauls it out hand over hand (cue `tug`: the spare
+ * hose behind his hip feeds out and its loop shrinks to nothing), braces, brings the nozzle up, the water starts (cue `spray`), and he
+ * sweeps it from the near squares to the far (cue `sweep`: the board's sweep starts here and runs about as long as the three sweeping
+ * frames), the water stops (cue `stop`), and he breathes out as the hose goes slack and the spare hose returns behind him.
+ * The hose stays in his hand through the pull: the hose runs from the nozzle through his hand to his hip.
+ */
+const water: Anim = {
+  loop: false,
+  frames: [
+    F(100, { ...DOWN, hand: [50.5, 49.5], head: [-1, 0], brows: "angry", sag: 11 }),
+    F(130, { ...DOWN, hand: [44, 48], head: [-1, 1], brows: "angry", loop: 0.5, sag: 12, bob: 1, jaw: 4 }, { cue: "tug", shake: [1, 0] }),
+    F(110, { ...DOWN, hand: [38, 47], head: [-1, 1], eyes: "shut", brows: "angry", loop: 0.1, sag: 14, bob: 2, earN: 3, earF: 3 }, { shake: [-1, 0] }),
+    F(120, { fist: [17, 31], nozzle: 10, spray: 0, hand: [40, 47], head: [-1, 0], brows: "angry", loop: 0, sag: 3, bob: 2, jaw: 8 }),
+    F(130, { fist: [17, 31], nozzle: 10, ...jet(12, 3), hand: [40, 47], head: [-1, 0], brows: "angry", loop: 0, sag: 4, bob: 2, jaw: 8, earN: -1, earF: -1 }, { cue: "spray" }),
+    F(140, { fist: [16.5, 36], nozzle: -12, ...jet(23, 4, 6), hand: [40, 47], head: [-1, 1], brows: "angry", loop: 0, sag: 4, bob: 2, jaw: 6 }, { cue: "sweep", shake: [1, 0] }),
+    F(140, { fist: [17, 31], nozzle: 14, ...jet(24, 5, 8), hand: [40, 47], head: [-1, 0], brows: "angry", loop: 0, sag: 4, bob: 2, jaw: 6 }, { shake: [-1, 0] }),
+    F(140, { fist: [17.5, 29], nozzle: 36, ...jet(24, 6, 15), hand: [40, 47], head: [-1, -1], brows: "angry", loop: 0, sag: 4, bob: 2, jaw: 6 }, { shake: [1, 0] }),
+    F(150, { fist: [17, 31], nozzle: 20, ...jet(6, 7), hand: [47.5, 48.5], head: [0, 0], loop: 0.3, sag: 8, bob: 1, jaw: 10 }, { cue: "stop", specks: drip(0, { nozzle: 20, fist: [17, 31] }) }),
+    F(180, { spray: 0, loop: 1, eyes: "half", jaw: 14, bob: 0, head: [0, 1], earN: 2, earF: 2 }, { specks: sweat(1) }),
+  ],
+};
+
+/** A small cheer (the watering grew him a piece): the nozzle up and a quick fountain, his jaw wide, eyes happy, a hop. */
+const cheer: Anim = {
+  loop: false,
+  frames: [
+    F(80, { ...UP, ...fount(14, 3), jaw: 10, eyes: "joy", bob: 1, earN: 2, earF: 2 }),
+    ...Array.from({ length: 6 }, (_, i) =>
+      F(80, { ...UP, ...fount(20, 4 + i), jaw: i % 2 ? 8 : 16, eyes: "joy", air: i % 2 ? 0 : 2, bob: i % 2 ? 1 : 0, earN: i % 2 ? 2 : -3, earF: i % 2 ? 2 : -3, tail: i % 2 ? 1 : 4 }, { cue: i === 0 ? "cheer" : undefined, specks: [...splashes(i, 4), ...(i === 1 ? sparkle(44, 6) : [])] }),
+    ),
+    F(160, { jaw: 6, eyes: "joy", ...jet(12, 12) }),
+  ],
+};
+
+/** A big cheer (the watering grew him a queen): both hands up, the nozzle fountaining high, bigger hops, gold sparkles all round. */
+const bigCheer: Anim = {
+  loop: false,
+  frames: [
+    F(90, { ...UP, ...fount(14, 3), jaw: 12, eyes: "wide", bob: 2, earN: -2, earF: -2, ...HAND([46, 24]) }),
+    ...Array.from({ length: 9 }, (_, i) => {
+      const up = i % 2 === 0;
+      return F(90, { fist: [17.5, 29], nozzle: 50, ...fount(22, 4 + i), ...HAND([46, up ? 20 : 24]), air: up ? 4 : 0, bob: up ? 0 : 2, jaw: up ? 20 : 10, eyes: "joy", earN: up ? -3 : 2, earF: up ? -3 : 2, tail: up ? 5 : 1, sag: up ? 8 : 12 },
+        { cue: i === 0 ? "cheer" : i === 4 ? "whoop" : undefined, shake: i === 0 ? [0, 1] : undefined, specks: [...splashes(i, 6), ...sparkle(10 + ((i * 9) % 36), 2 + (i % 3) * 5, true), ...sparkle(46 - ((i * 7) % 30), 12 - (i % 2) * 6)] });
+    }),
+    F(100, { eyes: "joy", jaw: 8, ...jet(14, 14) }, { specks: sparkle(40, 8) }),
+    F(200, { eyes: "joy", jaw: 4 }),
+  ],
+};
+
+/**
+ * A shrug (the watering grew nothing): he looks at the wet board, then both shoulders go up, his head sinks and his free hand turns out
+ * palm up at his side, the nozzle drooping to a drip; he lets it go.
+ */
+const SHRUG: GardenerPose = { ...DOWN, lift: 2, head: [0, 2], eyes: "half", brows: "worry", earN: 3, earF: 3, ...HAND([62, 35]), elbowF: [55, 39], fist: [16.5, 34], nozzle: 12, sag: 11 };
+const shrug: Anim = {
+  loop: false,
+  frames: [
+    F(90, { ...DOWN, head: [-1, 0], eyes: "wide", brows: "up", sag: 11 }),
+    F(90, { ...DOWN, lift: 1, head: [-1, 1], eyes: "half", brows: "worry", sag: 11, ...HAND([56, 38]), elbowF: [54, 38] }),
+    F(120, { ...SHRUG, bob: 1, jaw: 3 }, { specks: sweat(0) }),
+    F(150, { ...SHRUG, bob: 0, jaw: 5 }, { cue: "shrug" }),
+    F(120, { ...SHRUG, lift: 1, bob: 1, eyes: "shut", jaw: 0 }, { specks: drip(0, SHRUG) }),
+    F(100, { ...DOWN, head: [0, 1], eyes: "half", sag: 11 }, { specks: drip(1, DOWN) }),
+    F(130, { eyes: "half", jaw: 0 }),
+  ],
+};
 
 export const GARDENER: Character = {
   id: "gardener",
@@ -656,7 +1088,116 @@ export const GARDENER: Character = {
   palette: GARDENER_PALETTE,
   halo: "#2c2430",
   parts: PARTS,
-  anims: { idle },
+  anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory, plant, plantMany, water, cheer, bigCheer, shrug },
+};
+
+// ---- His attack on a king (for his kit's `kingAttack` once he's wired in: perSquare 36, stand 1.8, facesLeft).
+
+/** Room ahead of him (to our left, where he faces) for the jet's reach to the king. */
+const ATTACK_REACH = 40;
+const AW = W + ATTACK_REACH;
+const STAND = 1.8 * 36;
+/** Where each jet lands on the king (scene pixels): at his head, or a little lower, in turn. */
+const KING_AT = (i: number): Pt => [FOOT_X - STAND - 4, GROUND - 1 - (i % 2 ? 21 : 27)];
+/** A frame of his in the attack's wider frame (his own frames already have headroom to drop in from). */
+const fa = (fr: Frame): Frame => moved(fr, ATTACK_REACH, 0, AW, H);
+const landShadow = (r: number): Speck[] => shadowOnly(r).map(([x, y, k]): Speck => [x + ATTACK_REACH, y, k]);
+
+/**
+ * A jet of water from the nozzle at `from` to the king at `to` (scene pixels): a stream two pixels thick on a flat arc, mid blue with a
+ * deep edge and a pale glint, drops thrown off it, a splash at the end; `reach` (0 to 1) how far along it has got (a sputter is short
+ * and broken: `gaps`). Water has no outline, so the mid and deep blues carry it over the light squares.
+ */
+function jetAt(from: Pt, to: Pt, i: number, reach = 1, gaps = false): Speck[] {
+  const cells = new Map<string, Speck>();
+  const put = (x: number, y: number, k: string, rank: number) => {
+    const id = `${Math.round(x)},${Math.round(y)}`;
+    const old = cells.get(id);
+    const oldRank = old ? ["4", "3", "2", "1"].indexOf(old[2]) : 9;
+    if (!old || rank < oldRank) cells.set(id, sp(x, y, k));
+  };
+  const len = Math.hypot(to[0] - from[0], to[1] - from[1]);
+  const pos = (u: number): Pt => [lerp(from[0], to[0], u), lerp(from[1], to[1], u) - 6 * 4 * u * (1 - u)];
+  for (let s = 0; s <= len * reach; s += 0.6) {
+    if (gaps && Math.floor(s / 3) % 2) continue;
+    const [x, y] = pos(s / len);
+    put(x, y, Math.round(s) % 7 === 0 ? "4" : "3", Math.round(s) % 7 === 0 ? 0 : 1);
+    put(x, y + 1, "2", 2);
+    put(x, y - 1, "2", 2);
+    put(x, y + 2, "1", 3);
+  }
+  // Drops thrown off the stream, falling a little.
+  for (let d = 0; d < 9; d++) {
+    const u = (0.12 + ((d * 0.37 + i * 0.11) % 0.86)) * reach;
+    const [x, y] = pos(u);
+    put(x + ((d * 5 + i) % 3) - 1, y + 3 + ((d * 3 + i * 2) % 5), d % 3 === 0 ? "4" : d % 2 ? "3" : "2", 2);
+  }
+  // The splash where it lands.
+  if (reach >= 1)
+    for (const [dx, dy, k] of [[0, 0, "4"], [-1, -1, "3"], [1, -1, "3"], [-1, 1, "2"], [1, 1, "2"], [-3, -2, "3"], [3, -3, "3"], [-4, 1, "2"], [3, 3, "1"], [0, -4, "4"]] as const) put(to[0] + dx, to[1] + dy, k, k === "4" ? 0 : 2);
+  return [...cells.values()];
+}
+
+/** In the attack he stares at the king, brows down, jaw set, the nozzle on him. */
+const ON_KING: GardenerPose = { fist: [16.5, 34], nozzle: -3, brows: "angry", head: [-1, 0], eyes: "open", spray: 0 };
+/** A beat: a jet of water at the king (the cue frame is where the board splashes his square). */
+const jetBeat = (i: number): Frame => {
+  const pose: GardenerPose = { ...ON_KING, fist: [16.5 + (i % 2 ? 1 : 0), 34], bob: 1, jaw: 4, earN: -1, earF: -1, tail: i % 2 ? 3 : -1 };
+  const fr = fa(F(90, pose, { cue: i % 2 ? "spurt" : "jet", shake: [i % 2 ? -1 : 1, 0] }));
+  const [tx, ty] = KING_AT(i);
+  const tip = nozzleTip(pose);
+  return { ...fr, specks: [...(fr.specks ?? []), ...jetAt([tip[0] - 1, tip[1]], [tx, ty], i).map(([x, y, k]): Speck => [x + ATTACK_REACH, y, k])] };
+};
+/** Between beats: the water sputters, the stare holds. */
+const easeBeat = (i: number): Frame => {
+  const pose: GardenerPose = { ...ON_KING, fist: [16.5, 34], bob: 0, jaw: 0, earN: 1, earF: 1, tail: i % 2 ? -1 : 2 };
+  const fr = fa(F(80, pose));
+  const [tx, ty] = KING_AT(i);
+  const tip = nozzleTip(pose);
+  return { ...fr, specks: [...(fr.specks ?? []), ...jetAt([tip[0] - 1, tip[1]], [tx, ty], i + 3, 0.45, true).map(([x, y, k]): Speck => [x + ATTACK_REACH, y, k])] };
+};
+
+/**
+ * His attack on a king, the king to our left (where he faces; the board mirrors him when it's to his right), on the shared beats
+ * (KING_ATTACK, boss-timing.ts): his shadow spreads, he drops in (`drop`), lands (`land`), then sprays a jet of water at the king nonstop,
+ * ten of them, cues `jet` and `spurt` in turn (the cue frame is where the board splashes the king's square), staring at him, relentless; he
+ * grunts once, satisfied (`grunt`), and drops out of the frame. The last frame is empty.
+ */
+const kingAttack: Anim = (() => {
+  const A = KING_ATTACK;
+  const frames: Frame[] = [
+    { ms: 100, layers: [], specks: landShadow(8) },
+    { ms: 100, layers: [], specks: landShadow(18) },
+    fa(F(80, { air: 24, eyes: "wide", jaw: 12, earN: -3, earF: -3, tail: 4, spray: 0, sag: 13, loop: 1.3, ...UP }, { cue: "drop" })),
+    fa(F(80, { air: 9, eyes: "wide", jaw: 8, earN: -2, earF: -2, spray: 0, sag: 12, loop: 1.2 })),
+    fa(F(A.landAt - 360, { bob: 3, eyes: "shut", earN: 3, earF: 3, spray: 0, sag: 13, loop: 1.3 }, { cue: "land", shake: [0, 2], specks: dust(0, 3) })),
+    fa(F(A.lashAt - A.landAt, { ...ON_KING, jaw: 0, earN: 1, earF: 1 }, { specks: dust(1, 3) })),
+  ];
+  for (let i = 0; i < A.lashes; i++) frames.push(jetBeat(i), easeBeat(i));
+  const done = A.leaveAt - (A.lashAt + A.lashes * A.lashEveryMs);
+  frames.push(fa(F(done, { head: [-1, -1], jaw: 14, eyes: "joy", earN: -2, earF: -2, tail: 4, ...UP, spray: 0 }, { cue: "grunt", specks: sparkle(8, 22) })));
+  const leave = A.ms - A.leaveAt;
+  frames.push(
+    fa(F(leave - 300, { bob: 3, eyes: "half", earN: 3, earF: 3, spray: 0 })),
+    fa(F(80, { air: 8, eyes: "joy", jaw: 8, earN: -2, earF: -2, spray: 0, sag: 12 }, { cue: "drop" })),
+    fa(F(80, { air: 24, eyes: "joy", jaw: 8, earN: -3, earF: -3, tail: 4, spray: 0, sag: 13, loop: 1.3 })),
+    { ms: 80, layers: [], specks: landShadow(10) },
+    { ms: 60, layers: [] },
+  );
+  return { loop: false, frames };
+})();
+
+/**
+ * The hippo for his attack on a king: the same drawing, parts and palette, facing our left as always (as Moo), in a frame
+ * `ATTACK_REACH` wider on the left (the jet's reach). Its `idle`, one still, is for the preview, which starts every reel from one.
+ */
+export const GARDENER_ATTACK: Character = {
+  ...GARDENER,
+  id: "gardener-attack",
+  name: "The Hippo (his attack)",
+  w: AW,
+  foot: [GARDENER.foot[0] + ATTACK_REACH, GARDENER.foot[1]],
+  anims: { idle: { loop: true, frames: [fa(F(1000))] }, kingAttack },
 };
 
 /** The part of him a portrait shows (his head, muzzle and ears, and a bit of his shoulders), in frame pixels. */

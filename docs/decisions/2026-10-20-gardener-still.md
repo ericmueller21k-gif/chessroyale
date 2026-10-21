@@ -56,7 +56,7 @@ The jaw hangs over his chest when it opens: a yawn needs the head raised or the 
 - **Colors:** pinkish-grey skin in five tones, a salmon pink in four for his belly, throat, cheek and ears, a greyer lilac for
   the muzzle; a teal hose, brass (the game's gold at its top) for the nozzle, water in four blues. Outline `#1d1019`, halo
   `#2c2430`, light from the top left, so he reads on light and dark grounds.
-- **Size:** a 84 x 88 frame, foot at (49, 82); 69 px from the halo over his ears to his feet, inside the select stage's 70
+- **Size:** a 84 x 88 frame, foot at (49, 82) (the animation pack's frame is 90 x 102, foot at (55, 96), the same pixels moved: `2026-10-21-gardener-animations.md`); 69 px from the halo over his ears to his feet, inside the select stage's 70
   (`TALLEST / PX` in `BossSelect.tsx`), so he is drawn at the usual 0.8. The frame has room to the left for the spray only as it
   is in the still; a longer spray (his ultimate) wants a wider copy of him, as Smudgy's and Moo's attack frames.
 - **The phone's boss bar: he needs the `wide` box.** From his feet (outline, halo one more): 28 left (the muzzle's tip and the
