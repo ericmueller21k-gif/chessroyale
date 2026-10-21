@@ -110,7 +110,15 @@ seed meter) is the next lane's. Until then he stays **not playable** (`kit: null
 
 ## The numbers (the raid sim)
 
-See [reports/gardener-sim.md](../../reports/gardener-sim.md). SIM_SUMMARY
+See [reports/gardener-sim.md](../../reports/gardener-sim.md). **Shipped at offset −250 and `rageSpeed` 1.2:** with a
+crowd that takes 10 s to pick, the crowd scores **0.38** (± 0.09, 26 battles) in **49** crowd moves, with **3.4
+waterings** a battle of 6.9 seeds each, inside the pack. A fast crowd (5 s a pick) scored 0.54 with 5.1 seeds a watering,
+a slow one (20 s, the raid's whole clock) 0.19 with 8.9 (13 battles each): the slower the crowd, the more seeds. At
+`rageSpeed` 1 (13 battles) he waters 2.7 times and the crowd scores 0.23; 1.2 is the nearer to "about 3". −250 is the
+pack's usual offset (Moo & Moon, Big Boy, Alfil, Chub & Chirp); no sweep was needed, the first run landing in the pack.
+His gain: never over the band's top bar the jackpot; under its bottom in about a third of the waterings the engine
+doesn't already call decided (small ones: plain plants and nothing); 2 killer plants of 65 on his own pieces; 2 queens in
+65 battles.
 
 ## Not done here (the wiring lane)
 
