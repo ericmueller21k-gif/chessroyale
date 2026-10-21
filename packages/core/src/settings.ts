@@ -208,6 +208,12 @@ export interface Settings {
    * 2026). Empty: every move gets moveClockSeconds. Read the clock with moveClockAt, never one of these two directly.
    */
   moveClockSteps: readonly ClockStep[];
+  /**
+   * Boss alone (a raid with nobody else in the crowd): no move clock (Eric, Oct 21: "it can just be infinite time when
+   * you're playing by yourself"): nothing counts down and no move is ever played for you. Not under the Hidden Boss's
+   * bullet clock (his ultimate is the clock). A test link's ?clock= turns it off.
+   */
+  bossAloneUntimed?: boolean;
   /** Pre-game votes: whether a player may move their pawn to another zone after voting (Eric: one vote each, for now). */
   voteChangeAllowed: boolean;
   /**
@@ -528,6 +534,7 @@ export const RAID_SETTINGS: Partial<Settings> = {
   knockoutsPerStage: [],
   openingMoves: 5,
   powerUpsAtStart: 0,
+  bossAloneUntimed: true,
 };
 
 /**

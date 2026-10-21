@@ -221,7 +221,7 @@ function modes(src: FaqSources): FaqSection {
 - **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} it knocks out the player who gave away the most points since its last strike (after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
 - **The God King** fights on your side, with ${n(S.kingChargesMax, "charge")} ([more on him](#god-king)).
 - The battle ends in checkmate or a draw, or after ${n(S.bossMaxMoves, "crowd move")}, when the engine judges the position.
-- **Boss alone** (on the Boss raid screen): just you against the boss you picked there, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move.
+- **Boss alone** (on the Boss raid screen): just you against the boss you picked there, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move, and there's no clock: take as long as you like.
 - **The Crowd's boss final** is ${finalBoss ? `always ${finalFoe}, for` : "the same fight for"} the last ${left(src.crowdKnockouts.boss)} of a 50 v 50.${finalBoss ? " He's met nowhere else." : ""}
 
 ### Squads {#mode-squads}
