@@ -127,16 +127,19 @@ export type AdjustBlock = "used" | "none" | "kingfixed" | "notpicked" | "nomove"
 export function adjustBlock(state: Adjusted, from: string, to: string, cfg: AutoChessSettings = AUTOCHESS): AdjustBlock | null {
   const { army } = state;
   if (army.king === from) return "kingfixed";
-  const kind = army.board[from];
-  if (!kind) return "none";
   if (cfg.adjustMode === "legal") {
     if (!state.pick) return "nomove";
+    // (Once the move is made the lit piece stands elsewhere: the move is used, whatever square is asked about.)
     if (movesUsed(state) >= cfg.adjustMoves) return "used";
+    const kind = army.board[from];
+    if (!kind) return "none";
     if (state.pick.square !== from) return "notpicked";
     const square = squareBlock(army, kind, to, from, cfg);
     if (square) return square;
     return state.pick.targets.includes(to) ? null : "illegal";
   }
+  const kind = army.board[from];
+  if (!kind) return "none";
   if (movesUsed(state) >= cfg.adjustMoves) return "used";
   return squareBlock(army, kind, to, from, cfg);
 }

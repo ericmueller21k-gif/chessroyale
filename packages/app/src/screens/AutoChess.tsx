@@ -169,15 +169,17 @@ function newGame(seed: number, cfg: AutoChessSettings): Game {
 /**
  * A phone's short steps for tests (`?quick=1`, a test switch): the same game in a few seconds a step. `?gold=N`: N more gold at the
  * start of round 1, to try a big army; `?adjust=0`: no adjust step, straight to the fight; `?lockin=1`: lock-in on (off since v7);
- * `?adjustmode=teleport`: the v6 adjust step in place of the move step.
+ * `?adjustmode=teleport`: the v6 adjust step in place of the move step; `?level=N` (5 to 10): both sides start at level N (to see
+ * rooks and queens in the shop at once: the XP to each next level shifts with it).
  */
-function settingsFor(quick: boolean, gold: number, adjust: boolean, lockIn: boolean, teleport: boolean): AutoChessSettings {
+function settingsFor(quick: boolean, gold: number, adjust: boolean, lockIn: boolean, teleport: boolean, level: number): AutoChessSettings {
   // (Two seconds locked, so a test has time to try buying in the lock before the reveal.)
   const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, revealSeconds: 1.5, fightMoveMs: 60, fightFastMoveMs: 30 } : AUTOCHESS;
   let out = gold > 0 ? { ...base, startGold: base.startGold + gold } : base;
   if (!adjust) out = { ...out, adjustStep: false };
   if (lockIn) out = { ...out, lockIn: true };
   if (teleport) out = { ...out, adjustMode: "teleport" };
+  if (level > out.levels.start && level <= out.levels.max) out = { ...out, levels: { ...out.levels, start: level, xpToNext: out.levels.xpToNext.slice(level - out.levels.start) } };
   return out;
 }
 
@@ -265,7 +267,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const params = testParams();
   const quick = params.get("quick") === "1";
   const extraGold = Math.max(0, Math.floor(Number(params.get("gold")) || 0));
-  const cfg = useMemo(() => settingsFor(quick, extraGold, params.get("adjust") !== "0", params.get("lockin") === "1", params.get("adjustmode") === "teleport"), []);
+  const cfg = useMemo(() => settingsFor(quick, extraGold, params.get("adjust") !== "0", params.get("lockin") === "1", params.get("adjustmode") === "teleport", Math.floor(Number(params.get("level")) || 0)), []);
   const legal = cfg.adjustMode === "legal";
   const seedParam = Number(params.get("seed"));
   // (Test switches for the fight: `?stall=1` the engine never answers, so stand-in moves play; `?fightfen=` the fight starts from that position.)
@@ -324,7 +326,6 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const orientation = mine === "w" ? "white" : "black";
   // (Never negative: the clock was read a moment before this step began.)
   const elapsed = Math.max(0, now - g.phaseStart);
-  const lockedAt = (cfg.buySeconds - cfg.lockSeconds) * 1000;
   // Frozen: the step's last seconds, or you locked in (your board, bench and shop stay as they are).
   const youLocked = g.phase === "buy" && g.round.locks.you !== null;
   const locked = g.phase === "buy" && buyFreeze(g.round.locks, elapsed, cfg) !== null;

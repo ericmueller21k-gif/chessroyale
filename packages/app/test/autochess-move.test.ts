@@ -207,6 +207,8 @@ describe("auto chess: playing the move (legal mode)", () => {
     expect(pickTargets(s)).toEqual([]);
     expect(adjustBlock(s, to, p.targets[1] ?? "h3")).toBe("used");
     expect(adjustBlock(s, "a2", "a3")).toBe("used");
+    // (The square the piece left is empty now: still "used", not "no piece there", for a tap on it.)
+    expect(adjustBlock(s, p.square, p.targets[1] ?? "h2")).toBe("used");
     expect(undoBlock(s, to)).toBeNull();
     const undone = undoAction(s, to);
     expect(undone.army).toEqual(w);

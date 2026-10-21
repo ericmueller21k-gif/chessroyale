@@ -18281,6 +18281,7 @@ button.sq-tiny {
   bottom: 0;
   transform: translateX(-50%);
   min-width: 84px;
+  max-width: 100%;
   height: 44px;
   padding: 0 14px;
   border: 0;
@@ -18666,18 +18667,18 @@ button.sq-tiny {
   filter: brightness(0.93);
   transition-duration: 40ms;
 }
-.ac-btn:active,
-.ac-buy:active,
-.ac-lock:active {
+.ac-root .ac-btn:active,
+.ac-root .ac-buy:active,
+.ac-root .ac-lock:active {
   transform: translateY(3px);
   box-shadow: 0 0 0 transparent;
   filter: brightness(0.92);
 }
-.ac-sell:active {
+.ac-root .ac-sell:active {
   transform: translateX(-50%) translateY(3px);
   box-shadow: 0 0 0 transparent;
 }
-.ac-reroll:active {
+.ac-root .ac-reroll:active {
   transform: translateY(3px) scale(0.97);
 }
 @media (prefers-reduced-motion: reduce) {
@@ -18703,6 +18704,10 @@ button.sq-tiny {
   display: block;
 }
 
+/* With lock-in on (off by default) its bar is one more row under the shop: the board gives the room, so nothing scrolls. */
+.ac-root[data-lockin] .ac-col {
+  --chrome: calc(392px + var(--shop-h));
+}
 /* ---- A short phone (320 x 568, 360 x 640, 375 x 667): smaller pawns, tighter rows ---- */
 @media (max-height: 760px) {
   .ac-root {
@@ -18717,6 +18722,9 @@ button.sq-tiny {
     --fm: 5px;
     --shop-h: max(92px, calc((var(--colw) - 94px) / 4 + 39px));
     --chrome: calc(262px + var(--shop-h));
+  }
+  .ac-root[data-lockin] .ac-col {
+    --chrome: calc(298px + var(--shop-h));
   }
   .ac-top {
     row-gap: 2px;
@@ -18797,6 +18805,11 @@ button.sq-tiny {
   }
   .ac-timer span {
     font-size: 10.5px;
+  }
+  .ac-sell {
+    min-width: 56px;
+    padding: 0 6px;
+    font-size: 13px;
   }
   .ac-bench {
     gap: 2px;
@@ -18965,17 +18978,17 @@ button.sq-tiny {
     padding: 4px 11px;
   }
   .ac-odds {
-    padding: 4px 9px 3px;
+    padding: 3px 9px 2px;
   }
   .ac-od {
-    min-width: 34px;
+    min-width: 32px;
     margin: 0 3px;
   }
   .ac-od .ac-pc {
-    width: 24px;
+    width: 22px;
   }
   .ac-od b {
-    font-size: 12.5px;
+    font-size: 12px;
   }
   .ac-shop,
   .ac-card {
@@ -19011,6 +19024,20 @@ button.sq-tiny {
   }
   .ac-card {
     min-height: 119px;
+  }
+}
+
+/* A laptop's short window (1280 x 600): the rows around the board are tighter (a smaller pawn, narrower bench tiles), so the board keeps room and their bench, name and pawn still fit its width. */
+@media (min-width: 900px) and (min-height: 540px) and (max-height: 700px) {
+  .ac-col {
+    --zone: 100px;
+    --pawn: 60px;
+    --hop: 9px;
+    --tw: 38px;
+    --sidew: 92px;
+  }
+  .ac-who {
+    transform: translateY(-26px);
   }
 }
 
