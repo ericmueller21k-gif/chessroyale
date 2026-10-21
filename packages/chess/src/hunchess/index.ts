@@ -1,17 +1,17 @@
 /**
  * The HunChess engine: our own chess engine for Auto chess, written from scratch, that knows every rule of a fight (no
- * promotion: a pawn on its last rank cashes in; 5 checks in a row win; a side left with only its king loses; the quiet and move
- * caps decide by material) and plays the ordinary game too (to measure it against Stockfish).
- * docs/decisions/2026-10-21-hunchess-engine.md.
+ * promotion: a pawn on its last rank cashes in; a side left with only its king loses; a stall (a repetition, the quiet cap, the
+ * move cap) goes to the side the engine's score favors by a pawn) and plays the ordinary game too (to measure it against
+ * Stockfish). docs/decisions/2026-10-21-hunchess-engine.md, docs/decisions/2026-10-21-autochess-endings.md.
  */
 
-import { CHESS_RULES, moveUci, Position, type HunResult, type HunRules } from "./board.ts";
+import { BLACK, CHESS_RULES, moveUci, Position, WHITE, type HunResult, type HunRules } from "./board.ts";
 import { DEFAULT_EVAL, evaluate, type EvalOptions } from "./eval.ts";
-import { Searcher, WIN } from "./search.ts";
+import { RULE_WIN, Searcher, WIN } from "./search.ts";
 
 export * from "./board.ts";
 export { evaluate, DEFAULT_EVAL, type EvalOptions } from "./eval.ts";
-export { Searcher, WIN, type SearchOptions, type SearchResult } from "./search.ts";
+export { RULE_WIN, Searcher, WIN, type SearchOptions, type SearchResult } from "./search.ts";
 
 /** A game so far: where it started, the moves since (UCI), and the rules it is played by. */
 export interface HunGame {
@@ -35,9 +35,48 @@ export function gameMoves(game: HunGame): string[] {
   return pos.legalMoves().map(moveUci);
 }
 
-/** The game's result if it is over, else null. */
-export function gameResult(game: HunGame): HunResult | null {
-  return replay(game).result();
+/** A game's result, with a stall's judged score (centipawns, White's view) when it was one. */
+export type JudgedResult = HunResult & { score?: number };
+
+/** One stall judge per cash-in value (the evaluation counts cash-ins), each searched from a clean slate every time. */
+const judges = new Map<number, Searcher>();
+
+/** The engine's score that decides a stall in this position, White's view (deterministic: the same on any device). */
+export function stallScore(pos: Position, cashInValue = DEFAULT_EVAL.cashInValue): number {
+  let judge = judges.get(cashInValue);
+  if (!judge) judges.set(cashInValue, (judge = new Searcher({ ...DEFAULT_EVAL, cashInValue }, 4)));
+  return judge.stallScore(pos);
+}
+
+/**
+ * The result if the game is over now, else null; a fight's stall is judged: the side the engine's score favors by `stallWinMargin`
+ * wins, closer is a draw.
+ */
+export function judgedResult(pos: Position, cashInValue = DEFAULT_EVAL.cashInValue): JudgedResult | null {
+  const r = pos.result();
+  if (!r?.stall) return r;
+  const score = stallScore(pos, cashInValue);
+  const m = pos.rules.stallWinMargin;
+  return { ...r, winner: score >= m ? WHITE : score <= -m ? BLACK : -1, score };
+}
+
+/** The game's result if it is over, else null (a stall judged). */
+export function gameResult(game: HunGame, cashInValue = DEFAULT_EVAL.cashInValue): JudgedResult | null {
+  return judgedResult(replay(game), cashInValue);
+}
+
+/** The moves to a forced mate a search's score says the side to move has (a mate, not another rule's win), or null. */
+export function mateMoves(score: number): number | null {
+  return score > RULE_WIN ? Math.ceil((WIN - score) / 2) : null;
+}
+
+/**
+ * The moves to a forced win a search's score says the side to move has found: a mate, or a fight's win by another rule (a bare
+ * king, a stall the score decides); null if it has found none.
+ */
+export function winMoves(score: number): number | null {
+  if (score > RULE_WIN) return Math.ceil((WIN - score) / 2);
+  return score >= WIN - 1000 ? Math.ceil((RULE_WIN - score) / 2) : null;
 }
 
 /** A score in centipawns as an expected result, 0 to 1 (a win is 1). */

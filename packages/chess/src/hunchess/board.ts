@@ -4,9 +4,10 @@
  *
  * Two rule sets:
  * - "fight" (Auto chess): no castling at the start, no promotion: a pawn that moves onto its last rank **cashes in** (it leaves
- *   the board; its owner gets gold after the round); 5 checks in a row by one side win; a side left with only its king loses (both:
- *   a draw); 10 moves a side with no capture or check, or 60 moves a side: material decides; mate, stalemate, threefold
- *   repetition, the fifty-move rule and too little material to mate as in chess.
+ *   the board; its owner gets gold after the round); a side left with only its king loses (both: a draw); a stall (threefold
+ *   repetition, 10 moves a side with no capture or cash-in, or 60 moves a side) is decided by the engine's score of the final
+ *   position (`result()` marks it `stall`; index.ts judges it); mate, stalemate, the fifty-move rule and too little material to
+ *   mate as in chess. (Docs: docs/decisions/2026-10-21-autochess-endings.md.)
  * - "chess": the ordinary game (castling, promotion), used to measure the engine against Stockfish.
  *
  * Pure TypeScript, no DOM: it runs in a Web Worker, in Node and in tests alike. Written from scratch for HunChess.
@@ -77,33 +78,32 @@ export function moveUci(m: number): string {
 export interface HunRules {
   /** "fight": Auto chess's rules (cash-in, the counters); "chess": the ordinary game. */
   variant: "fight" | "chess";
-  /** Checks in a row by one side that win (fight). */
-  checksToWin: number;
-  /** Moves a side with no capture or check before material decides (fight). */
+  /** Moves a side with no capture or cash-in before the fight stalls (fight). */
   quietCap: number;
-  /** Moves a side before material decides (fight). */
+  /** Moves a side before the fight stalls (fight). */
   moveCap: number;
+  /** A stall goes to the side the engine's score of the final position favors by at least this much (centipawns); closer is a draw (fight). */
+  stallWinMargin: number;
 }
 
-export const CHESS_RULES: HunRules = { variant: "chess", checksToWin: 0, quietCap: 0, moveCap: 0 };
-export const fightRules = (cfg: { checksToWin: number; quietCap: number; moveCap: number }): HunRules => ({
+export const CHESS_RULES: HunRules = { variant: "chess", quietCap: 0, moveCap: 0, stallWinMargin: 0 };
+export const fightRules = (cfg: { quietCap: number; moveCap: number; stallWinMargin: number }): HunRules => ({
   variant: "fight",
-  checksToWin: cfg.checksToWin,
   quietCap: cfg.quietCap,
   moveCap: cfg.moveCap,
+  stallWinMargin: cfg.stallWinMargin,
 });
 
-/** How a game ended. */
-export type HunEnd = "checkmate" | "checks" | "stalemate" | "repetition" | "fifty_moves" | "insufficient_material" | "cap" | "quiet" | "king_alone";
+/** How a game ended. "decided": a fight's side too far ahead for too long (the referee's rule, not the board's). */
+export type HunEnd = "checkmate" | "decided" | "stalemate" | "repetition" | "fifty_moves" | "insufficient_material" | "cap" | "quiet" | "king_alone";
 
 export interface HunResult {
   end: HunEnd;
+  /** A fight's stall (a repetition, the quiet cap, the move cap): the winner is the engine's score's to decide (`winner` -1 until judged). */
+  stall?: boolean;
   /** WHITE, BLACK, or -1 for a draw. */
   winner: number;
 }
-
-/** Material by the usual values (pawn 1, knight 3, bishop 3, rook 5, queen 9): what decides a fight at its caps. */
-export const CAP_VALUE = [0, 1, 3, 3, 5, 9, 0];
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Zobrist keys (two 32-bit halves), from a fixed seed so every run hashes alike
@@ -134,9 +134,7 @@ const Z_CASTLE_LO = table(16);
 const Z_CASTLE_HI = table(16);
 const Z_EP_LO = table(8);
 const Z_EP_HI = table(8);
-/** The fight's counters (only in the search's table key, never in the repetition key): checks in a row by each side, quiet plies, plies. */
-const Z_CHECKS_LO = table(2 * 16);
-const Z_CHECKS_HI = table(2 * 16);
+/** The fight's counters (only in the search's table key, never in the repetition key): quiet plies, plies. */
 const Z_QUIET_LO = table(256);
 const Z_QUIET_HI = table(256);
 const Z_PLY_LO = table(512);
@@ -186,8 +184,7 @@ export class Position {
   phase = 0;
 
   rules: HunRules;
-  /** The fight's counters: each side's checks in a row (moves that gave check, none between that didn't), plies since the last capture or check, plies played. */
-  checks = new Int32Array(2);
+  /** The fight's counters: plies since the last capture or cash-in, plies played. */
   quiet = 0;
   plies = 0;
   /** Pawns each side has cashed in so far (fight). */
@@ -202,7 +199,6 @@ export class Position {
   private uCastling = new Int8Array(MAX_PLY);
   private uEp = new Int16Array(MAX_PLY);
   private uHalf = new Int32Array(MAX_PLY);
-  private uChecks = new Int32Array(MAX_PLY * 2);
   private uQuiet = new Int32Array(MAX_PLY);
   private uInCheck = new Uint8Array(MAX_PLY);
   private uMg = new Int32Array(MAX_PLY);
@@ -259,7 +255,6 @@ export class Position {
     if (this.ep >= 0 && !this.epCapturable(this.ep)) this.ep = -1;
     this.halfmove = Number(parts[4] ?? 0) || 0;
     this.fullmove = Number(parts[5] ?? 1) || 1;
-    this.checks.fill(0);
     this.cashed.fill(0);
     this.quiet = 0;
     this.plies = 0;
@@ -360,11 +355,11 @@ export class Position {
   /** The search table's key: the position's key plus the fight's counters (which change what a position is worth). */
   ttLo(): number {
     if (this.rules.variant !== "fight") return this.keyLo;
-    return this.keyLo ^ Z_CHECKS_LO[this.checks[0]! & 15]! ^ Z_CHECKS_LO[16 + (this.checks[1]! & 15)]! ^ Z_QUIET_LO[this.quiet & 255]! ^ Z_PLY_LO[this.plies & 511]!;
+    return this.keyLo ^ Z_QUIET_LO[this.quiet & 255]! ^ Z_PLY_LO[this.plies & 511]!;
   }
   ttHi(): number {
     if (this.rules.variant !== "fight") return this.keyHi;
-    return this.keyHi ^ Z_CHECKS_HI[this.checks[0]! & 15]! ^ Z_CHECKS_HI[16 + (this.checks[1]! & 15)]! ^ Z_QUIET_HI[this.quiet & 255]! ^ Z_PLY_HI[this.plies & 511]!;
+    return this.keyHi ^ Z_QUIET_HI[this.quiet & 255]! ^ Z_PLY_HI[this.plies & 511]!;
   }
 
   /** Whether a pawn of the side to move could take en passant on `ep` (only then is the square kept, as in chess.js). */
@@ -598,8 +593,6 @@ export class Position {
     this.uCastling[sp] = this.castling;
     this.uEp[sp] = this.ep;
     this.uHalf[sp] = this.halfmove;
-    this.uChecks[sp * 2] = this.checks[0]!;
-    this.uChecks[sp * 2 + 1] = this.checks[1]!;
     this.uQuiet[sp] = this.quiet;
     this.uInCheck[sp] = this.inCheck ? 1 : 0;
     this.uMg[sp] = this.mg;
@@ -666,9 +659,9 @@ export class Position {
     if (us === BLACK) this.fullmove++;
     const check = this.attacked(this.kings[us ^ 1]!, us);
     this.inCheck = check;
-    this.checks[us] = check ? this.checks[us]! + 1 : 0;
-    // (A cash-in takes a piece off the board for good, like a capture, so it restarts the quiet count too.)
-    this.quiet = check || captured || flags & F_CASHIN ? 0 : this.quiet + 1;
+    // (Only a capture or a cash-in restarts the quiet count: a cash-in takes a piece off the board for good, like a capture. A check
+    // doesn't: Eric, Oct 21.)
+    this.quiet = captured || flags & F_CASHIN ? 0 : this.quiet + 1;
     this.plies++;
     this.histLo[this.sp] = this.keyLo;
     this.histHi[this.sp] = this.keyHi;
@@ -735,8 +728,6 @@ export class Position {
     this.keyHi ^= Z_SIDE_HI;
     if (this.side === BLACK) this.fullmove--;
     this.halfmove = this.uHalf[sp]!;
-    this.checks[0] = this.uChecks[sp * 2]!;
-    this.checks[1] = this.uChecks[sp * 2 + 1]!;
     this.quiet = this.uQuiet[sp]!;
     this.inCheck = this.uInCheck[sp] === 1;
     this.plies--;
@@ -750,16 +741,12 @@ export class Position {
     this.uEp[sp] = this.ep;
     this.uHalf[sp] = this.halfmove;
     this.uQuiet[sp] = this.quiet;
-    this.uChecks[sp * 2] = this.checks[0]!;
-    this.uChecks[sp * 2 + 1] = this.checks[1]!;
     this.uInCheck[sp] = 0;
     if (this.ep >= 0) {
       this.keyLo ^= Z_EP_LO[fileOf(this.ep)]!;
       this.keyHi ^= Z_EP_HI[fileOf(this.ep)]!;
       this.ep = -1;
     }
-    // (Passing is a move that gives no check: the passer's streak ends.)
-    this.checks[this.side] = 0;
     this.side ^= 1;
     this.keyLo ^= Z_SIDE_LO;
     this.keyHi ^= Z_SIDE_HI;
@@ -784,8 +771,6 @@ export class Position {
     }
     this.halfmove = this.uHalf[sp]!;
     this.quiet = this.uQuiet[sp]!;
-    this.checks[0] = this.uChecks[sp * 2]!;
-    this.checks[1] = this.uChecks[sp * 2 + 1]!;
     this.inCheck = false;
     this.plies--;
   }
@@ -925,16 +910,10 @@ export class Position {
     return false;
   }
 
-  /** Material by the cap values, White and Black. */
-  capMaterial(): [number, number] {
+  /** Whether a side has only its king and pawns left (no knight, bishop, rook or queen). */
+  kingAndPawns(side: number): boolean {
     const c = this.counts;
-    let w = 0;
-    let bl = 0;
-    for (let t = PAWN; t <= QUEEN; t++) {
-      w += c[pieceOf(WHITE, t)]! * CAP_VALUE[t]!;
-      bl += c[pieceOf(BLACK, t)]! * CAP_VALUE[t]!;
-    }
-    return [w, bl];
+    return !(c[pieceOf(side, KNIGHT)]! + c[pieceOf(side, BISHOP)]! + c[pieceOf(side, ROOK)]! + c[pieceOf(side, QUEEN)]!);
   }
 
   /** All legal moves of the side to move. */
@@ -967,7 +946,8 @@ export class Position {
 
   /**
    * The game's result if it is over now, by the rules in their order (the fight's first: a side with only its king loses, then
-   * mate and stalemate, then 5 checks in a row, then the draws by the rules, then the caps); null if it goes on.
+   * mate and stalemate, then the repetition, the fifty-move rule, too little material, then the caps); null if it goes on. A
+   * fight's stall (a repetition or a cap) comes back marked `stall`, its winner -1: the engine's score decides it (index.ts).
    */
   result(): HunResult | null {
     const fight = this.rules.variant === "fight";
@@ -975,16 +955,12 @@ export class Position {
       return { end: "king_alone", winner: this.pieces[0] ? WHITE : this.pieces[1] ? BLACK : -1 };
     }
     if (!this.hasLegalMove()) return this.inCheck ? { end: "checkmate", winner: this.side ^ 1 } : { end: "stalemate", winner: -1 };
-    if (fight && this.checks[this.side ^ 1]! >= this.rules.checksToWin) return { end: "checks", winner: this.side ^ 1 };
-    if (this.repetitions(2) >= 2) return { end: "repetition", winner: -1 };
+    if (this.repetitions(2) >= 2) return fight ? { end: "repetition", winner: -1, stall: true } : { end: "repetition", winner: -1 };
     if (this.halfmove >= 100) return { end: "fifty_moves", winner: -1 };
     if (this.insufficient()) return { end: "insufficient_material", winner: -1 };
     if (fight) {
       const cap = this.plies >= 2 * this.rules.moveCap;
-      if (cap || this.quiet >= 2 * this.rules.quietCap) {
-        const [w, b] = this.capMaterial();
-        return { end: cap ? "cap" : "quiet", winner: w > b ? WHITE : b > w ? BLACK : -1 };
-      }
+      if (cap || this.quiet >= 2 * this.rules.quietCap) return { end: cap ? "cap" : "quiet", winner: -1, stall: true };
     }
     return null;
   }

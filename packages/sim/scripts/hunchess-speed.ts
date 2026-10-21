@@ -86,7 +86,7 @@ for (const nodes of NODES) {
         }
         return out;
       },
-      { games, nodes, cfg: { checksToWin: AUTOCHESS.checksToWin, quietCap: AUTOCHESS.quietCap, moveCap: AUTOCHESS.moveCap, cashInValue: AUTOCHESS.cashInValue } },
+      { games, nodes, cfg: { quietCap: AUTOCHESS.quietCap, moveCap: AUTOCHESS.moveCap, stallWinMargin: AUTOCHESS.stallWinMargin, cashInValue: AUTOCHESS.cashInValue } },
     );
     row[`chromium x${throttle}`] = { ...stats(ms), over350: ms.filter((v) => v > 350).length, over175: ms.filter((v) => v > 175).length };
     await page.close();

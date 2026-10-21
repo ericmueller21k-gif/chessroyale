@@ -33,7 +33,7 @@ import { buyFromSlot, holdFromSlot, newShop, replaceTaken, rerollFor, rerollWord
 import { playFight, withPiece } from "../autochess/fight.ts";
 import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn } from "../autochess/position.ts";
 import { KIND_NAME, other, type Army, type Color, type Kind, type Offer } from "../autochess/types.ts";
-import { clockWords, damageWords, endWords, goldWords, headline, matchWords, moveWords, type EndKind } from "../autochess/words.ts";
+import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline, matchWords, moveWords, type EndDetail, type EndKind } from "../autochess/words.ts";
 
 /**
  * Auto chess, the demo (/autochess; docs/decisions/2026-10-19-autochess-demo.md, docs/areas/autochess.md): you against a
@@ -76,6 +76,8 @@ interface RoundState {
 interface Outcome {
   result: RoundResult;
   end: EndKind;
+  /** Who won the fight, your color and, for a stall, the engine's deciding score (for the result's words). */
+  detail: EndDetail;
   /** Next round's gold, line by line (null when the match is over). */
   next: GoldBreakdown | null;
 }
@@ -136,6 +138,12 @@ function settingsFor(quick: boolean, gold: number, adjust: boolean): AutoChessSe
 }
 
 const colorName = (c: Color) => (c === "w" ? "White" : "Black");
+/** Whether either side of a fight's position is down to its king and pawns (the moves then play fast). */
+const thinFight = (fen: string | undefined) => {
+  if (!fen) return false;
+  const on = piecesOn(fen);
+  return on.w.every((k) => k === "p") || on.b.every((k) => k === "p");
+};
 /** The sounds this screen plays, made ahead (off the page's thread) once the audio is awake. */
 const SOUNDS_USED = ["acPlace", "acHold", "acReroll", "sell", "acXp", "acLevel", "acLock", "acReveal", "acCash"] as const;
 /** What the opponent is called: the same word as a bot in a 1 v 1. */
@@ -346,11 +354,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       },
       cfg,
     });
-    if (res) finish(res.winner, res.end, res.fen, res.cashIns);
+    if (res) finish(res.winner, res.end, res.fen, res.cashIns, res.score);
   }
 
   /** The fight is over: the loser loses HP, the refunds (and the cash-ins' gold) wait for the next round, and the result shows. */
-  function finish(winner: Color | null, end: EndKind, fen: string, cashIns: { w: number; b: number } = { w: 0, b: 0 }) {
+  function finish(winner: Color | null, end: EndKind, fen: string, cashIns: { w: number; b: number } = { w: 0, b: 0 }, score?: number) {
     const cur = gref.current;
     const color = youColor(cur.match.round);
     const on = piecesOn(fen);
@@ -358,7 +366,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const { match, result } = settleRound(cur.match, who, { you: on[color], bot: on[other(color)] }, cfg, { you: cashIns[color], bot: cashIns[other(color)] });
     const won = matchWinner(match);
     const next = won ? null : goldBreakdown(match.round + 1, match.you, cfg);
-    commit({ ...cur, match, phase: won ? "over" : "result", phaseStart: performance.now(), outcome: { result, end, next } });
+    commit({ ...cur, match, phase: won ? "over" : "result", phaseStart: performance.now(), outcome: { result, end, next, detail: { winner, you: color, ...(score !== undefined ? { score } : {}) } } });
   }
 
   function nextRound() {
@@ -753,7 +761,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       : g.phase === "adjust"
         ? "Move one piece to any empty square of your half. Tap a piece, then a square."
         : g.phase === "fight"
-          ? moveWords(g.fight?.plies ?? 0, cfg)
+          ? moveWords(g.fight?.plies ?? 0, cfg, thinFight(g.fight?.fen))
           : "";
 
   const outcome = g.outcome;
@@ -996,17 +1004,14 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
             {g.phase === "fight" && (
               <>
                 <p class="ac-card-say">{hint}</p>
-                <p class="ac-card-text">
-                  The engine plays both armies at the same strength until mate or {cfg.checksToWin} checks in a row, a draw, {cfg.moveCap} moves each, or {cfg.quietCap} each with no capture or check. A side left with only its king loses. After {cfg.fightFastAfter} moves each, moves play twice as fast.
-                  A pawn that reaches the far end cashes in for +{cfg.cashInGold} gold.
-                </p>
+                <p class="ac-card-text">{fightRulesWords(cfg)}</p>
               </>
             )}
             {(g.phase === "result" || g.phase === "over") && outcome && (
               <>
                 <p class="ac-card-head">{matchEnd ? matchEnd.head : headline(outcome.result)}</p>
                 <p class="ac-card-text">
-                  {endWords(outcome.end, outcome.result.outcome === "draw", cfg)} {damageWords(outcome.result)}
+                  {endWords(outcome.end, outcome.result.outcome === "draw", cfg, outcome.detail)} {damageWords(outcome.result)}
                   {matchEnd ? ` ${matchEnd.sub}` : ""}
                 </p>
                 {outcome.next && <p class="ac-card-gold">{goldWords(outcome.next)}</p>}

@@ -43,13 +43,19 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
   put it. A refused square says why in the placement rules' words. `adjustStep` false skips the step (straight to the fight); testers
   add `?adjust=0`.
 - **Fight:** **the HunChess engine** (our own, `packages/chess/src/hunchess/`, in a Web Worker: [the decision](../decisions/2026-10-21-hunchess-engine.md))
-  plays both armies at the same fixed node budget (`fightNodes`), a move about every 0.35 s and **twice as fast (0.175 s) after 30 moves
-  a side**, to mate or 5 checks in a row by one side (a win either way), stalemate, a draw by the rules, 60 moves a side or 10 a side
-  with no capture, cash-in or check (then material decides). **A side left with only its king loses at once** (both: a draw), and so does
-  a side that starts the fight with only its king. **No promotion: a pawn that moves onto its last rank cashes in:** it lands there, a
+  plays both armies at the same fixed node budget (`fightNodes`), a move about every 0.6 s and **twice as fast (0.3 s) after 30 moves
+  a side, or once either side is down to its king and pawns**, to mate, stalemate or too little material to mate (draws), or a
+  **stall**: a threefold repetition, 10 moves a side with no capture or cash-in (a check doesn't count), or 60 moves a side. **A stall
+  goes to the side the engine's score of the final position (material and position) favors by a pawn** (`stallWinMargin`); closer is a
+  draw. **Too far ahead:** a side the engine's score favors by 5 pawns (`decisiveMargin`) for 6 of its own moves in a row
+  (`decisiveMoves`) wins at once, unless the engine has found it a forced win within 5 moves (`mateShowMoves`), which plays out. Checks
+  in a row count for nothing (until Oct 21, 5 of them won). The result line says why, naming the sides "you" and "your opponent" ("Fight
+  stalled (60 moves each): you're 2 pawns up.", "Your opponent is too far ahead: 5+ pawns for 6 moves."; [the decision](../decisions/2026-10-21-autochess-endings.md)). **A side left
+  with only its king loses at once** (both: a draw), and so does a side that starts the fight with only its king. **No promotion: a pawn that moves onto its last rank cashes in:** it lands there, a
   coin sounds, a "+5" floats up from the square, and it leaves the board; its owner gets **5 gold** (`cashInGold`) with the next round's
   pay ("+ 5 from cash-ins" in the result's gold line). The engine knows every one of these rules inside its search (the counters are part
-  of its position), and the fight plays by the engine's own rules code, so the two never disagree. Stockfish isn't loaded on this screen.
+  of its position, and it judges a stall as the fight does) but the early end, which only stops a fight it is winning anyway; the fight
+  plays by the engine's own rules code, so the two never disagree. Stockfish isn't loaded on this screen.
   If the engine doesn't answer within 4 s a stand-in move is played (a capture if there is one); after three misses in a row the rest of
   the visit plays stand-ins, so a fight always ends. **Result:** the loser loses
   2 + 1 per enemy piece left; 20 HP each. **Nothing carries over but gold, HP, the win streak, the bench and each side's level and XP:**

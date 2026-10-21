@@ -2743,7 +2743,9 @@ export interface AutoChessSettings {
   readonly kingRanks: number;
   /**
    * The fight: one move about this often, each searched by the HunChess engine to this many nodes (the same for both sides,
-   * deterministic; docs/decisions/2026-10-21-hunchess-engine.md).
+   * deterministic; docs/decisions/2026-10-21-hunchess-engine.md). 600 ms since Oct 21 (was 350; Eric: "for fights, they should
+   * take a little bit longer"; the fast pace 175 to 300 ms with it): the node budget was sized for 350 ms on a 4x-slowed phone, so
+   * the engine now has room to spare. docs/decisions/2026-10-21-autochess-endings.md.
    */
   readonly fightMoveMs: number;
   readonly fightNodes: number;
@@ -2754,18 +2756,32 @@ export interface AutoChessSettings {
    */
   readonly cashInGold: number;
   readonly cashInValue: number;
-  /** After this many moves a side, moves play at `fightFastMoveMs` instead (v5, Eric Oct 20: twice as fast). */
+  /**
+   * Moves play at `fightFastMoveMs` (twice as fast) after this many moves a side (v5, Eric Oct 20), and also once either side is
+   * down to its king and pawns (Eric, Oct 21: "the last thing we want to see is just the king moving around").
+   */
   readonly fightFastAfter: number;
   readonly fightFastMoveMs: number;
-  /** A fight stops after this many moves a side; the side with more material (P1 N3 B3 R5 Q9) wins, equal is a draw. */
-  readonly moveCap: number;
   /**
-   * It also stops, the same way, after this many moves a side with no capture or check (Eric, Oct 19: a stuck fight
-   * fizzles out; a check keeps an attack going).
+   * A fight stalls after this many moves a side, or this many moves a side with no capture or cash-in (a check doesn't count:
+   * Eric, Oct 21), or at a threefold repetition. A stall goes to the side the HunChess engine's score of the final position
+   * favors by at least `stallWinMargin` centipawns (100 = a pawn); closer is a draw (Eric, Oct 21: the engine's score, material
+   * and position, not counted material). docs/decisions/2026-10-21-autochess-endings.md.
    */
+  readonly moveCap: number;
   readonly quietCap: number;
-  /** A side that gives this many checks in a row wins, as by mate (Eric, Oct 19: "they're both a win"). */
-  readonly checksToWin: number;
+  readonly stallWinMargin: number;
+  /**
+   * The clean-up ends early (Eric, Oct 21): a side the engine's score favors by `decisiveMargin` centipawns or more after
+   * `decisiveMoves` of its own moves in a row wins at once ("too far ahead"), unless the engine has found it a forced mate (or a
+   * forced win by another rule: a bare king, a won stall) within `mateShowMoves` moves, which plays out. The score is the engine's
+   * own for the move it played (its fixed node budget: the same on any device); a stand-in move counts for nothing. Eric's brief said
+   * 3 moves; 6 since the sim (Oct 21, the director's call on PR #305): with 3, 31 of 80 fights were over after 3 moves a side (about
+   * 2 s); 6 gives the same winners and draw rate. reports/autochess-endings.md.
+   */
+  readonly decisiveMargin: number;
+  readonly decisiveMoves: number;
+  readonly mateShowMoves: number;
   /** Hit points each; the first to 0 loses. A lost round costs `damageBase` plus `damagePerPiece` for every enemy piece (not the king) left. */
   readonly hp: number;
   readonly damageBase: number;
@@ -2834,15 +2850,18 @@ export const AUTOCHESS: AutoChessSettings = {
   adjustMoves: 1,
   levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
   kingRanks: 2,
-  fightMoveMs: 350,
+  fightMoveMs: 600,
   fightNodes: 30000,
   cashInGold: 5,
   cashInValue: 20,
   fightFastAfter: 30,
-  fightFastMoveMs: 175,
+  fightFastMoveMs: 300,
   moveCap: 60,
   quietCap: 10,
-  checksToWin: 5,
+  stallWinMargin: 100,
+  decisiveMargin: 500,
+  decisiveMoves: 6,
+  mateShowMoves: 5,
   hp: 20,
   damageBase: 2,
   damagePerPiece: 1,
