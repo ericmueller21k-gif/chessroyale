@@ -1211,7 +1211,8 @@ test("the phase banners on the board: ACTION PHASE as buying begins, the big 3-2
   const box = (await action.boundingBox())!;
   expect(box.x).toBeGreaterThan(board.x);
   expect(box.x + box.width).toBeLessThan(board.x + board.width);
-  expect(Math.abs(box.x + box.width / 2 - (board.x + board.width / 2)), "centered").toBeLessThan(3);
+  // (The banner is centered on the board's wrap, which is up to 8 device pixels wider than its squares: half of that at most.)
+  expect(Math.abs(box.x + box.width / 2 - (board.x + board.width / 2)), "centered").toBeLessThan(4.5);
   expect(Math.abs(box.y + box.height / 2 - (board.y + board.height / 2)), "in the middle").toBeLessThan(board.height * 0.14);
   const style = await action.evaluate((el) => {
     const s = getComputedStyle(el);
