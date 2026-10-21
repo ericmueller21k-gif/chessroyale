@@ -172,6 +172,14 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - When a turn has more than one screen of the same kind (a thinking before a power and one after it), check
     everything drawn from that state on each of them.
 
+- **A drag that outlived its step** (Oct 21, [story](../docs/history/lessons.md#a-drag-that-outlived-its-step-oct-21-2026)):
+  - A press, its drag's ghost and a selection end in one function (`cancelGesture()` in `AutoChess.tsx`) that every step change,
+    lock, round turn, blur, cancelled pointer and lost capture calls.
+  - A sale, a place or a buy from a "hold" checks what the hold points at is there now, of that kind, before it pays or changes
+    anything (`sellPiece(army, square, kind)` returns null otherwise).
+  - A drag test holds the drag through each moment that can cut it off (the lock, the step's end, lock in, a cancelled pointer),
+    and asserts no ghost, gold or piece changed; and a finger's drag is tested with real touch events, not only a mouse.
+
 ## Servers: everything ends
 
 - **A lobby that never closed** (Oct 7, [story](../docs/history/lessons.md#a-lobby-that-never-closed-oct-7-2026)):

@@ -847,3 +847,28 @@ minimized. docs/decisions/2026-10-18-phase-change-board-size.md.
   on: when the next screen lacks that thing, it carries the state itself.
 - Measure a board handed between screens with each setting that changes its size (the scoreboard minimized), in a
   window short enough that the height sizes it.
+
+## A drag that outlived its step (Oct 21, 2026)
+
+**What Eric saw:** in Auto chess, "I dropped my queen in and then it froze. So it looked like I had two queens". A white queen
+stood on g1 through the whole fight and the result, never moving; the real one played on from d6. He also dragged a glowing
+offer on the board toward the sell spot and "it just sold a piece that didn't exist".
+
+**The cause:** a piece being dragged is drawn twice: the real piece stays on the board and a ghost follows the pointer. The
+adjust step (5 s) can end under a finger still moving its piece, and the step's end cleared the press but not the drag, so the
+ghost stayed where the finger was through the fight, the result and into the next round (where "Drop to sell for N" lit over the
+shop with nothing dragged). The buy step's ends had been covered one by one; the next step's weren't. Separately, a sale paid
+`sellValue(board[square]!)` without checking a piece was there (a second sale of a piece already sold paid `NaN`), and a finger's
+drag from a shop card was cancelled by the browser (no `touch-action`), which no test saw because every drag test used a mouse
+or the board's own layer. No test held a drag through anything.
+
+**The fix:** one `cancelGesture()` for a press, its capture, the ghost and the selection, run at every step's end, the lock, the
+round turning, a window blur, a cancelled pointer and a lost capture; a sale checks the piece is there and is the kind the hold
+says; silhouettes on the board are tap only. Tests hold a drag through each moment. docs/decisions/2026-10-21-autochess-drag-fixes.md.
+
+**The rule:**
+- State that follows a pointer (a press, a drag, a ghost, a selection) ends in one function that every step change, lock and
+  pointer event calls, not in each handler that thought of it.
+- An action on a "hold" re-checks what it points at now (the piece is there, of that kind) before it pays or changes anything.
+- A drag test holds the drag through every moment that can cut it off, and checks the ghost is gone within a moment of each, with
+  nothing bought, held or sold; and a gesture tested with a mouse is tested with a finger too (`touch-action`).
