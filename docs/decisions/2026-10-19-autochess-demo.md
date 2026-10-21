@@ -303,3 +303,11 @@ them and has its own tests). How it works now: [docs/areas/autochess.md](../area
 - Strips: "Bot" (was "Opponent"), your account's name (was "You"), "Lv 4 · 2/4 XP", "Lv 10 · max", "HP", "Gold", "Income +100", "Locked in".
 - Adjust: "Move one piece to any empty square of your half. Tap a piece, then a square." (was "One move and one drop (25 gold). Tap a piece, then a square."), "Their pieces stay shown; yours stay hidden until the fight. Tap ↩ to take your move back." (was "... Tap ↩ to take a change back. Bench pieces left over are refunded."), "Your opponent is moving their pieces…", "You've made your move. Tap the piece you moved (↩) to take it back.", "Pick one of your pieces.", "Your king stays where the game put it.", "Pieces go on your half of the board.", "That's your king's square.", "That square is taken.", "Pawns can't stand on your back rank.", "3 pawns a file at most." (was, for a piece that can't go there: "That piece can't move there: one chess move, onto an empty square of your half.").
 - Gone (they went with v5's drop, auto-drop and pawn pick-up): "You've made your drop. Tap the piece you dropped (↩) to take it back.", "Not enough gold: a drop costs 25 and you have N.", "Pick a piece from your bench.", "3 bench pieces dropped onto your board.", "This pawn can't move again. You can still sell it.".
+
+## Oct 21: the HunChess engine plays the fights; pawns cash in
+
+Stockfish can't be told Auto chess's rules, so the fight now uses our own engine, **the HunChess engine**, which knows all of them.
+With it, a pawn that reaches its last rank no longer stops one short: it **cashes in** (it leaves the board; its owner gets 5 gold
+with the next round's pay, "+ 5 from cash-ins"), shown with a coin's clink and a floating "+5" over the square. The calls and the
+measurements: [2026-10-21-hunchess-engine.md](2026-10-21-hunchess-engine.md) and [reports/hunchess-engine.md](../../reports/hunchess-engine.md).
+"Pawns don't promote." in the fight's box became "A pawn that reaches the far end cashes in for +5 gold."

@@ -36,6 +36,9 @@ describe("auto chess: what the result says", () => {
     expect(goldWords(g)).toBe("Next round: 120 saved + 140 income + 10 interest + 10 streak + 11 survivors = 291 gold");
     const plain = goldBreakdown(2, { gold: 0, hp: 20, wins: 0, losses: 1, refund: { survivors: 0 } });
     expect(goldWords(plain)).toBe("Next round: 0 saved + 120 income = 120 gold");
+    // A fight's cash-ins (5 gold a pawn) get their own part.
+    const cashed = goldBreakdown(2, { gold: 20, hp: 20, wins: 0, losses: 0, refund: { survivors: 2, cashIns: 10 } } as never);
+    expect(goldWords(cashed)).toBe("Next round: 20 saved + 120 income + 2 survivors + 10 from cash-ins = 152 gold");
   });
 
   it("a clock counts down in whole seconds, rounded up", () => {
@@ -43,9 +46,9 @@ describe("auto chess: what the result says", () => {
   });
 });
 
-describe("auto chess: survivors and promotions", () => {
-  it("counts what is on the board when the fight ends, a promoted pawn as the piece it became", () => {
-    // White's pawn became a queen on a8; Black has a rook and a pawn.
+describe("auto chess: survivors", () => {
+  it("counts what is on the board when the fight ends", () => {
+    // White has a queen on a8; Black has a rook and a pawn.
     const fen = "Q3k3/8/8/8/8/8/p7/r3K3 w - - 0 1";
     expect(piecesOn(fen)).toEqual({ w: ["q"], b: ["p", "r"] });
     expect(refundFor(piecesOn(fen).w)).toEqual({ survivors: Math.floor(90 * AUTOCHESS.survivorRefund) });
@@ -70,6 +73,7 @@ describe("auto chess: survivors and promotions", () => {
       levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
       kingRanks: 2,
       fightMoveMs: 350,
+      cashInGold: 5,
       fightFastAfter: 30,
       fightFastMoveMs: 175,
       moveCap: 60,

@@ -4,7 +4,7 @@ Lane: the director. A TFT-style auto battler with chess pieces, against a bot, a
 feel it ("it might just be terrible"): nothing is recorded, rewarded or sent. **Shelved** (Eric, Oct 19: "it's going to take
 more work than I realized to make this balanced and fun"): no button on home; admins open it from Settings → TESTING ("Auto
 chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-autochess-demo.md](../decisions/2026-10-19-autochess-demo.md)
-(v6 is its last section).
+(v6 is its last design section; the HunChess engine, Oct 21, after it).
 
 ## How it works today (v6)
 
@@ -42,10 +42,16 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
   rank), hidden from them until the fight; tap the moved piece (↩) to take it back while the step lasts. The king stays where the game
   put it. A refused square says why in the placement rules' words. `adjustStep` false skips the step (straight to the fight); testers
   add `?adjust=0`.
-- **Fight:** the engine plays both armies at the same strength, a move about every 0.35 s and **twice as fast (0.175 s) after 30 moves
+- **Fight:** **the HunChess engine** (our own, `packages/chess/src/hunchess/`, in a Web Worker: [the decision](../decisions/2026-10-21-hunchess-engine.md))
+  plays both armies at the same fixed node budget (`fightNodes`), a move about every 0.35 s and **twice as fast (0.175 s) after 30 moves
   a side**, to mate or 5 checks in a row by one side (a win either way), stalemate, a draw by the rules, 60 moves a side or 10 a side
-  with no capture or check (then material decides). **A side left with only its king loses at once** (both: a draw), and so does a side
-  that starts the fight with only its king. **Pawns don't promote:** a pawn never moves onto its last rank. **Result:** the loser loses
+  with no capture, cash-in or check (then material decides). **A side left with only its king loses at once** (both: a draw), and so does
+  a side that starts the fight with only its king. **No promotion: a pawn that moves onto its last rank cashes in:** it lands there, a
+  coin sounds, a "+5" floats up from the square, and it leaves the board; its owner gets **5 gold** (`cashInGold`) with the next round's
+  pay ("+ 5 from cash-ins" in the result's gold line). The engine knows every one of these rules inside its search (the counters are part
+  of its position), and the fight plays by the engine's own rules code, so the two never disagree. Stockfish isn't loaded on this screen.
+  If the engine doesn't answer within 4 s a stand-in move is played (a capture if there is one); after three misses in a row the rest of
+  the visit plays stand-ins, so a fight always ends. **Result:** the loser loses
   2 + 1 per enemy piece left; 20 HP each. **Nothing carries over but gold, HP, the win streak, the bench and each side's level and XP:**
   each round starts with the two kings only. Each side gets back 25% of the price of its pieces still on the board; income 100 then +20
   a round (max 200), interest, win streak gold; the result line shows the next round's gold.
@@ -63,7 +69,8 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
   weights, minor pieces and rooks over pawns, a queen when rich; rerolling now and then, at most 4 a round); buys XP now and then when
   that gives it a level or it is rich; with its board full holds a good piece (never a pawn) on its bench, at most 2 a round; puts its
   pieces down evenly over the first 70% of the open step; in the adjust step picks its one change greedily with the engine (a small
-  search per try, at most 16 tries, a few random squares for each of some pieces). It sells nothing.
+  search per try with the HunChess engine (`bot.adjustNodes`), at most 16 tries, a few random squares for each of some pieces). It sells
+  nothing.
 - **The board** is the shared `Board` (colors, sizes, knocks). In the buy and adjust steps it draws a position and the screen puts its
   own layer over it (taps, drags, dots, the circles, the silhouettes, the marks, the floating gold: in eighths of `--board-size`); in
   the fight it is an ordinary board with the engine's moves.
@@ -73,9 +80,10 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
 | What | Where |
 | --- | --- |
 | The screen (steps, timers, taps and drags) | `packages/app/src/screens/AutoChess.tsx`; styles `styles.css`, "Auto chess" (`ac-`) |
-| The rules, pure and tested | `packages/app/src/autochess/`: `army.ts` (squares, kings, the buy, hold, place and sell checks and words, the bench's carry-over), `shop.ts` (the five offers, rolls, refills, rerolls, buying and holding from a slot), `level.ts` (XP and levels), `lockin.ts`, `adjust.ts` (the one change, taking it back, the step switch), `reveal.ts` (what shows of their board while you buy), `economy.ts` (gold, streaks, refunds, HP, levels, the match), `position.ts` (FEN, who moves first, material), `bot.ts`, `fight.ts`, `words.ts`, `sounds.ts` (the eight sounds), `engine.ts` (the browser's Stockfish for the fight and the bot) |
+| The rules, pure and tested | `packages/app/src/autochess/`: `army.ts` (squares, kings, the buy, hold, place and sell checks and words, the bench's carry-over), `shop.ts` (the five offers, rolls, refills, rerolls, buying and holding from a slot), `level.ts` (XP and levels), `lockin.ts`, `adjust.ts` (the one change, taking it back, the step switch), `reveal.ts` (what shows of their board while you buy), `economy.ts` (gold, streaks, refunds and cash-ins, HP, levels, the match), `position.ts` (FEN, who moves first, material), `bot.ts`, `fight.ts` (the fight, refereed by the HunChess engine's rules), `words.ts`, `sounds.ts` (the nine sounds), `engine.ts` (the link to the engine's worker), `hunchess-worker.ts` (the worker) |
+| The HunChess engine | `packages/chess/src/hunchess/` (`@chessroyale/chess/hunchess`): `board.ts` (the board, moves, every fight rule), `search.ts`, `eval.ts`, `pst.ts`; its strength and speed: `reports/hunchess-engine.md`, scripts `packages/sim/scripts/hunchess-*.ts` |
 | The floating gold | `components/FloatGold.tsx` |
-| The sounds' play names | `sound.ts` (`acReroll`, `acPlace`, `acHold`, `sell`, `acXp`, `acLevel`, `acLock`, `acReveal`); made ahead by the sound worker through `characters/boss-sounds.ts` (`autochess`) |
+| The sounds' play names | `sound.ts` (`acReroll`, `acPlace`, `acHold`, `sell`, `acXp`, `acLevel`, `acLock`, `acReveal`, `acCash`); made ahead by the sound worker through `characters/boss-sounds.ts` (`autochess`) |
 | Home's button, the route | `screens/Home.tsx` (`onAutoChess`), `App.tsx` (`/autochess`) |
 
 ## Settings
@@ -83,10 +91,11 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
 `AUTOCHESS` in `packages/core/src/settings.ts`: prices, the shop (slots, odds, reroll cost), sell back, the bench's slots, the lock-in
 bonus, the steps' seconds, the reveal's interval, the adjust step (on or off, seconds, changes), the levels (start, top, free XP, XP
 bought and its price, the XP to each level), the king ranks, the fight's pace and search (`fightMoveMs`, `fightFastAfter`,
-`fightFastMoveMs`, `fightNodes`), the move cap, HP and damage, start gold, income, interest, the survivors' refund, the streak tables,
+`fightFastMoveMs`, `fightNodes`), the cash-in (`cashInGold`, and `cashInValue`: what the engine counts a cash-in's gold as, in centipawns), the move cap, HP and damage, start gold, income, interest, the survivors' refund, the streak tables,
 the legal-position limits, the bot's numbers (lock-in times, rerolls, holds, XP, how early it places, saving, the adjust search).
 Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2 locked, a reveal every 1.5 s, adjust 8 s), `?seed=N`,
-`?gold=N` (N more gold at the start of round 1), `?adjust=0` (no adjust step).
+`?gold=N` (N more gold at the start of round 1), `?adjust=0` (no adjust step), `?fightfen=FEN` (the fight starts from that position),
+`?stall=1` (the engine never answers: stand-in moves).
 
 ## Tests and tools
 
@@ -95,11 +104,14 @@ Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2
   `autochess-reveal.test.ts` (the reveal times, what shows when), `autochess-rules.test.ts` (the shop's reasons, selling at 75%, the
   bench, the kings, placing, the adjust step's change and its off switch), `autochess-match.test.ts` (the economy, the bench through the
   rounds, the bot's buys, holds, XP, rerolls and adjust staying legal over hundreds of seeds and a whole match, fights ending within the
-  cap), `autochess-sounds.test.ts` (peak, loudness, different from each other), `autochess-words.test.ts` (the words, the settings'
+  cap; the fight's rules, cash-ins and their gold), `autochess-engine.test.ts` (the worker link: answers, the bot's look, the timeout's
+  stand-ins), `autochess-sounds.test.ts` (peak, loudness, different from each other), `autochess-words.test.ts` (the words, the settings'
   numbers).
+- Engine: `packages/chess/test/hunchess-board.test.ts` (perft against known counts and chess.js, a fight's moves, every rule),
+  `hunchess-search.test.ts` (wins and losses by the fight's rules, determinism, the node budget).
 - e2e: `e2e/autochess.spec.ts` (phone and computer; seeds are listed at its top): the shop and its silhouettes, a reroll, buying by tap,
   the reasons, selling by tap and drag, the bench, levels, the lock in, the reveals, the adjust change and its off switch, the avatars,
-  the button feel, the floating gold, mute, a fight to a result and the next round, layouts. `e2e/home-layout.spec.ts` (home).
+  the button feel, the floating gold, mute, a fight to a result and the next round, a cash-in's "+5", a fight with a silent engine, layouts. `e2e/home-layout.spec.ts` (home).
 
 ## Rules for this area
 

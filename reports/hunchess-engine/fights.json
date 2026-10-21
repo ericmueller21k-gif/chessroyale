@@ -1,0 +1,22 @@
+{
+  "fights": 80,
+  "nodes": 30000,
+  "ends": {
+    "king_alone": 28,
+    "checks": 25,
+    "quiet": 10,
+    "checkmate": 6,
+    "cap": 6,
+    "repetition": 5
+  },
+  "winners": {
+    "white": 37,
+    "black": 35,
+    "draws": 8
+  },
+  "pliesPerFight": 54,
+  "secondsPerFight": 16.7,
+  "cashInsPerFight": 0.14,
+  "fightsWithACashIn": 9,
+  "engineMsPerMove": 39
+}

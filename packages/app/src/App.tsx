@@ -425,10 +425,11 @@ export function App() {
     });
   }, [config, profile]);
 
-  // Warm the engine up in the background so play starts instantly.
+  // Warm the engine up in the background so play starts instantly (not on Auto chess, whose fights use the HunChess engine:
+  // Stockfish isn't loaded there; it warms when you leave it).
   useEffect(() => {
-    void enginePool();
-  }, []);
+    if (!showAutoChess) void enginePool();
+  }, [showAutoChess]);
 
   // Back on a lobby link this device already has a seat in (a reload, the app reopened, a dropped connection):
   // rejoin straight away (if the lobby has closed since, the connection is refused and the note shows). Otherwise
