@@ -52,12 +52,15 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
   plays both armies at the same fixed node budget (`fightNodes`), a move about every 0.6 s and **twice as fast (0.3 s) after 30 moves
   a side, once either side is down to its king and pawns, or once 5 or fewer pieces are left besides the kings
   (`fightFastPieces`, `thinFight`)**, to mate, stalemate or too little material to mate (draws), or a
-  **stall**: a threefold repetition, 10 moves a side with no capture or cash-in (a check doesn't count), or 60 moves a side. **A stall
-  goes to the side the engine's score of the final position (material and position) favors by a pawn** (`stallWinMargin`); closer is a
-  draw. **Too far ahead:** a side the engine's score favors by 5 pawns (`decisiveMargin`) for 6 of its own moves in a row
-  (`decisiveMoves`) wins at once, unless the engine has found it a forced win within 5 moves (`mateShowMoves`), which plays out. Checks
-  in a row count for nothing (until Oct 21, 5 of them won). The result line says why, naming the sides "you" and "your opponent" ("Fight
-  stalled (60 moves each): you're 2 pawns up.", "Your opponent is too far ahead: 5+ pawns for 6 moves."; [the decision](../decisions/2026-10-21-autochess-endings.md)). **A side left
+  **stall**: a threefold repetition, 10 moves a side with no capture or cash-in (a check doesn't count), or 60 moves a side. **What decides
+  a fight that isn't won outright is what each side gained during it, not the bigger army** (Eric, Oct 21: "I shouldn't get rewarded
+  just because I play more pieces"): the stall judge's score (material and position, a clean quiescence search) of the position now,
+  less its score of the fight's start. **A stall goes to the side that gained half a pawn or more** (`stallWinMargin` 50); closer is a draw. **Too far
+  ahead:** a side that has gained 3 pawns (`decisiveMargin` 300) after each of 6 of its own moves in a row (`decisiveMoves`) wins at once,
+  unless the engine has found it a forced win within 5 moves (`mateShowMoves`), which plays out. Mate, a bare king, stalemate and too
+  little material stay absolute. Checks in a row count for nothing (until Oct 21, 5 of them won). The result line says why, naming
+  the sides "you" and "your opponent" ("Fight stalled (60 moves each): you gained 2 pawns." or "... the edge." under a pawn, "Your opponent gained 3+ pawns
+  and held it for 6 moves."; the decisions: [endings](../decisions/2026-10-21-autochess-endings.md), [gains](../decisions/2026-10-21-autochess-gain.md)). **A side left
   with only its king loses at once** (both: a draw), and so does a side that starts the fight with only its king. **No promotion: a pawn that moves onto its last rank cashes in:** it lands there, a
   coin sounds, a "+5" floats up from the square, and it leaves the board; its owner gets **5 gold** (`cashInGold`) with the next round's
   pay ("+ 5 from cash-ins" in the result's gold line). The engine knows every one of these rules inside its search (the counters are part

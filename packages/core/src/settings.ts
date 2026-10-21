@@ -2779,20 +2779,21 @@ export interface AutoChessSettings {
   readonly fightFastPieces: number;
   /**
    * A fight stalls after this many moves a side, or this many moves a side with no capture or cash-in (a check doesn't count:
-   * Eric, Oct 21), or at a threefold repetition. A stall goes to the side the HunChess engine's score of the final position
-   * favors by at least `stallWinMargin` centipawns (100 = a pawn); closer is a draw (Eric, Oct 21: the engine's score, material
-   * and position, not counted material). docs/decisions/2026-10-21-autochess-endings.md.
+   * Eric, Oct 21), or at a threefold repetition. A stall goes to the side that **gained** at least `stallWinMargin` centipawns
+   * (50 = half a pawn; 100 until the gains sim on PR #310: it cut draws from 18.8% to 15%) during the fight: the stall judge's score of the final position less its score of the start (Eric, Oct 21: "I
+   * shouldn't get rewarded just because I play more pieces"); closer is a draw. docs/decisions/2026-10-21-autochess-endings.md,
+   * docs/decisions/2026-10-21-autochess-gain.md.
    */
   readonly moveCap: number;
   readonly quietCap: number;
   readonly stallWinMargin: number;
   /**
-   * The clean-up ends early (Eric, Oct 21): a side the engine's score favors by `decisiveMargin` centipawns or more after
-   * `decisiveMoves` of its own moves in a row wins at once ("too far ahead"), unless the engine has found it a forced mate (or a
-   * forced win by another rule: a bare king, a won stall) within `mateShowMoves` moves, which plays out. The score is the engine's
-   * own for the move it played (its fixed node budget: the same on any device); a stand-in move counts for nothing. Eric's brief said
-   * 3 moves; 6 since the sim (Oct 21, the director's call on PR #305): with 3, 31 of 80 fights were over after 3 moves a side (about
-   * 2 s); 6 gives the same winners and draw rate. reports/autochess-endings.md.
+   * The clean-up ends early (Eric, Oct 21): a side that has **gained** `decisiveMargin` centipawns or more since the start, after
+   * each of `decisiveMoves` of its own moves in a row, wins at once, unless the engine has found it a forced mate (or a forced win
+   * by another rule: a bare king, a won stall) within `mateShowMoves` moves, which plays out. The gain is the stall's measure (the
+   * judge's score after the move less the start's: the same on any device); a side that only keeps its starting edge never ends a
+   * fight this way. 6 moves since PR #305's sim (Eric's brief said 3); 300 (3 pawns) since PR #310's sim (was 500: with gains,
+   * a side rarely gains 5, and the hunt for the last pieces brought back long king walks). reports/autochess-endings.md, reports/autochess-gain.md.
    */
   readonly decisiveMargin: number;
   readonly decisiveMoves: number;
@@ -2874,8 +2875,8 @@ export const AUTOCHESS: AutoChessSettings = {
   fightFastPieces: 5,
   moveCap: 60,
   quietCap: 10,
-  stallWinMargin: 100,
-  decisiveMargin: 500,
+  stallWinMargin: 50,
+  decisiveMargin: 300,
   decisiveMoves: 6,
   mateShowMoves: 5,
   hp: 20,

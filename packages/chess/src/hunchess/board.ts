@@ -5,9 +5,10 @@
  * Two rule sets:
  * - "fight" (Auto chess): no castling at the start, no promotion: a pawn that moves onto its last rank **cashes in** (it leaves
  *   the board; its owner gets gold after the round); a side left with only its king loses (both: a draw); a stall (threefold
- *   repetition, 10 moves a side with no capture or cash-in, or 60 moves a side) is decided by the engine's score of the final
- *   position (`result()` marks it `stall`; index.ts judges it); mate, stalemate, the fifty-move rule and too little material to
- *   mate as in chess. (Docs: docs/decisions/2026-10-21-autochess-endings.md.)
+ *   repetition, 10 moves a side with no capture or cash-in, or 60 moves a side) is decided by what each side gained over the fight:
+ *   the engine's score of the final position less its score of the start (`gainBase`; `result()` marks it `stall`; index.ts
+ *   judges it); mate, stalemate, the fifty-move rule and too little material to
+ *   mate as in chess. (Docs: docs/decisions/2026-10-21-autochess-endings.md, docs/decisions/2026-10-21-autochess-gain.md.)
  * - "chess": the ordinary game (castling, promotion), used to measure the engine against Stockfish.
  *
  * Pure TypeScript, no DOM: it runs in a Web Worker, in Node and in tests alike. Written from scratch for HunChess.
@@ -187,6 +188,12 @@ export class Position {
   /** The fight's counters: plies since the last capture or cash-in, plies played. */
   quiet = 0;
   plies = 0;
+  /**
+   * A fight's yardstick for gains: the stall judge's score of the position the fight started from (centipawns, White's view). A
+   * stall goes to the side whose score improved on it by `stallWinMargin` (Eric, Oct 21: what each side gained, not the bigger
+   * army's lead). Set by whoever starts the fight (index.ts `replay`, the fight); 0 otherwise.
+   */
+  gainBase = 0;
   /** Pawns each side has cashed in so far (fight). */
   cashed = new Int32Array(2);
   /** Whether the side to move is in check. */
@@ -355,11 +362,12 @@ export class Position {
   /** The search table's key: the position's key plus the fight's counters (which change what a position is worth). */
   ttLo(): number {
     if (this.rules.variant !== "fight") return this.keyLo;
-    return this.keyLo ^ Z_QUIET_LO[this.quiet & 255]! ^ Z_PLY_LO[this.plies & 511]!;
+    // (The gain's yardstick too: the same position is worth something else in a fight that started elsewhere.)
+    return this.keyLo ^ Z_QUIET_LO[this.quiet & 255]! ^ Z_PLY_LO[this.plies & 511]! ^ Math.imul(this.gainBase, 0x9e3779b1);
   }
   ttHi(): number {
     if (this.rules.variant !== "fight") return this.keyHi;
-    return this.keyHi ^ Z_QUIET_HI[this.quiet & 255]! ^ Z_PLY_HI[this.plies & 511]!;
+    return this.keyHi ^ Z_QUIET_HI[this.quiet & 255]! ^ Z_PLY_HI[this.plies & 511]! ^ Math.imul(this.gainBase, 0x85ebca6b);
   }
 
   /** Whether a pawn of the side to move could take en passant on `ep` (only then is the square kept, as in chess.js). */

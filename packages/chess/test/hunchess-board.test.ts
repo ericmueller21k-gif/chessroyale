@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
 import { mulberry32 } from "@chessroyale/core";
 import { CHESS_RULES, fightRules, moveUci, perft, Position, type HunRules } from "../src/hunchess/board.ts";
-import { judgedResult, stallScore } from "../src/hunchess/index.ts";
+import { judgedResult, replay, stallScore, startScore } from "../src/hunchess/index.ts";
 
 /** The HunChess engine's board: its move generator against chess.js and known counts, and every rule of a fight. */
 
@@ -148,7 +148,7 @@ describe("HunChess board: the fight's rules", () => {
     expect(pos.quiet).toBe(9);
   });
 
-  it("10 moves a side with no capture or cash-in: a stall, which the engine's score decides (a pawn's lead wins)", () => {
+  it("10 moves a side with no capture or cash-in: a stall, which the engine's score decides by what each side gained since the start", () => {
     // The kings walk (never repeating a position), the pawns are blocked; White has a knight more.
     const pos = new Position("k7/8/p7/P7/8/8/8/1N5K w - - 0 1", FIGHT);
     const white = ["h1h2", "h2h3", "h3g3", "g3g2", "g2f2", "f2f3", "f3e3", "e3e2", "e2d2", "d2d3"];
@@ -169,6 +169,15 @@ describe("HunChess board: the fight's rules", () => {
     expect(stallScore(pos)).toBe(judged.score);
     stallScore(new Position("4k3/7r/8/8/8/8/8/R3K3 w - - 0 1", FIGHT));
     expect(stallScore(pos)).toBe(judged.score);
+    // By the gains (Eric, Oct 21): White had that knight from the start, so measured from the start's score (the fight sets it as
+    // `gainBase`, as replay does) it has gained nothing, and the stall is a draw.
+    const fromStart = replay({ startFen: "k7/8/p7/P7/8/8/8/1N5K w - - 0 1", moves: white.flatMap((m, k) => [m, black[k]!]), rules: FIGHT });
+    expect(fromStart.gainBase).toBe(startScore("k7/8/p7/P7/8/8/8/1N5K w - - 0 1", FIGHT));
+    expect(fromStart.gainBase).toBeGreaterThan(200);
+    const even = judgedResult(fromStart)!;
+    expect(even).toMatchObject({ end: "quiet", winner: -1, stall: true });
+    expect(even.gain).toBe(even.score! - fromStart.gainBase);
+    expect(Math.abs(even.gain!)).toBeLessThan(100);
     // A capture starts the count again; a check doesn't.
     const capture = new Position("k7/8/8/8/8/8/1R4n1/7K w - - 7 1", FIGHT);
     capture.quiet = 15;

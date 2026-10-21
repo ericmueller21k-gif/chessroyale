@@ -78,7 +78,7 @@ interface RoundState {
 interface Outcome {
   result: RoundResult;
   end: EndKind;
-  /** Who won the fight, your color and, for a stall, the engine's deciding score (for the result's words). */
+  /** Who won the fight, your color and, for a stall or "too far ahead", what White gained during it (for the result's words). */
   detail: EndDetail;
   /** Next round's gold, line by line (null when the match is over). */
   next: GoldBreakdown | null;
@@ -369,11 +369,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       },
       cfg,
     });
-    if (res) finish(res.winner, res.end, res.fen, res.cashIns, res.score);
+    if (res) finish(res.winner, res.end, res.fen, res.cashIns, res.gain);
   }
 
   /** The fight is over: the loser loses HP, the refunds (and the cash-ins' gold) wait for the next round, and the result shows. */
-  function finish(winner: Color | null, end: EndKind, fen: string, cashIns: { w: number; b: number } = { w: 0, b: 0 }, score?: number) {
+  function finish(winner: Color | null, end: EndKind, fen: string, cashIns: { w: number; b: number } = { w: 0, b: 0 }, gain?: number) {
     const cur = gref.current;
     const color = youColor(cur.match.round);
     const on = piecesOn(fen);
@@ -381,7 +381,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const { match, result } = settleRound(cur.match, who, { you: on[color], bot: on[other(color)] }, cfg, { you: cashIns[color], bot: cashIns[other(color)] });
     const won = matchWinner(match);
     const next = won ? null : goldBreakdown(match.round + 1, match.you, cfg);
-    commit({ ...cur, match, phase: won ? "over" : "result", phaseStart: performance.now(), outcome: { result, end, next, detail: { winner, you: color, ...(score !== undefined ? { score } : {}) } } });
+    commit({ ...cur, match, phase: won ? "over" : "result", phaseStart: performance.now(), outcome: { result, end, next, detail: { winner, you: color, ...(gain !== undefined ? { gain } : {}) } } });
   }
 
   function nextRound() {

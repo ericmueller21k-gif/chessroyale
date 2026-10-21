@@ -432,16 +432,16 @@ const quickPick = (rng: () => number) => byFen(async (fen: string) => standInMov
 describe("auto chess: the fight", () => {
   const noWait = async () => undefined;
 
-  it("stops at the move cap (60 moves a side) and the side with more material wins", async () => {
+  it("stops at the move cap (60 moves a side): a stall, and the side with more material doesn't win it by holding its edge", async () => {
     expect(AUTOCHESS.moveCap).toBe(60);
-    // A rook against nothing, both kings stepping about: the cap (3 moves a side here) decides, by material.
+    // A rook against a pawn, both kings stepping about: the cap (3 moves a side here) is a stall; nothing was gained, so a draw.
     const cfg = { ...AUTOCHESS, moveCap: 3 };
     const w: Army = { color: "w", king: "e1", board: { a2: "r" }, bench: [] };
     const b: Army = { color: "b", king: "e8", board: { h7: "p" }, bench: [] };
     const start = fightStart(w, b);
     const kingOnly = async (fen: string) => legalMoves(fen).find((m) => (fen.split(" ")[1] === "w" ? m.startsWith("e1") || m.startsWith("d1") || m.startsWith("d2") : m.startsWith("e8") || m.startsWith("d8"))) ?? null;
     const res = await playFight(start.fen, { pick: byFen(kingOnly), wait: noWait, rng: mulberry32(1), cfg });
-    expect(res).toMatchObject({ end: "cap", winner: "w" });
+    expect(res).toMatchObject({ end: "cap", winner: null });
     expect(res!.moves).toHaveLength(6);
   });
 
@@ -554,107 +554,92 @@ describe("auto chess: the fight", () => {
   it("checks count for nothing (Eric, Oct 21): five checks in a row play on", async () => {
     expect("checksToWin" in AUTOCHESS).toBe(false);
     // A queen against a king (and a far-off pawn, so it isn't a lone king): five checks, none of them mate, and the fight goes on to
-    // its (shortened) move cap, where the queen's side is far ahead by the score.
+    // its (shortened) move cap.
     const fen = "7k/8/8/8/p7/8/8/K2Q4 w - - 0 1";
     const fiveChecks = ["d1d4", "h8h7", "d4a7", "h7g8", "a7a8", "g8h7", "a8b7", "h7g8", "b7a8"];
     const res = await playFight(fen, { pick: script(fiveChecks), wait: noWait, rng: mulberry32(1), cfg: { ...AUTOCHESS, moveCap: 5 } });
-    expect(res).toMatchObject({ end: "cap", winner: "w" });
+    expect(res).toMatchObject({ end: "cap" });
     expect(res!.moves.slice(0, 9)).toEqual(fiveChecks);
-    expect(res!.score).toBeGreaterThan(500);
   });
 
-  it("10 moves each with no capture or cash-in stall the fight (a check in them counts for nothing): the engine's score decides", async () => {
-    expect([AUTOCHESS.quietCap, AUTOCHESS.stallWinMargin]).toEqual([10, 100]);
-    // A rook against a pawn: 10 quiet moves each (White's last one a check), then the score (a rook against a pawn) decides.
+  it("a stall goes to the side that gained a pawn during the fight, not to the bigger army (Eric, Oct 21); a check doesn't restart the count", async () => {
+    expect([AUTOCHESS.quietCap, AUTOCHESS.stallWinMargin]).toEqual([10, 50]);
+    // A rook against a pawn from the start: 10 quiet moves each (White's last one a check), and nothing gained, so a draw. (Before,
+    // the rook's side won: "I shouldn't get rewarded just because I play more pieces.")
     const w: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
     const b: Army = { color: "b", king: "a8", board: { e7: "p" }, bench: [] };
     const white = ["a1b1", "b1c1", "c1d1", "d1e1", "e1f1", "f1g1", "h2h3", "h3h4", "h4h5", "h5g5"];
     const black = ["a8b8", "b8c8", "c8d8", "d8e8", "e8f8", "f8g8", "e7e6", "e6e5", "e5e4", "g8f8"];
     const plies = white.flatMap((m, k) => [m, black[k]!]);
     const res = await playFight(fightStart(w, b).fen, { pick: script(plies), wait: noWait, rng: mulberry32(1) });
-    expect(res).toMatchObject({ end: "quiet", winner: "w", moves: plies });
+    expect(res).toMatchObject({ end: "quiet", winner: null, moves: plies });
+    expect(Math.abs(res!.gain!)).toBeLessThan(50);
+    // (The rook's lead is still there at the end: the score of the position, not the gain, is the rook's.)
     expect(res!.score).toBeGreaterThan(300);
-    expect(endWords("quiet", false, AUTOCHESS, { winner: res!.winner, score: res!.score!, you: "w" })).toMatch(/^Fight stalled \(10 moves each, no capture\): you're \d+ pawns up\.$/);
-    // A capture starts the count again: the rook takes the knight first, then 10 quiet moves each.
+    expect(endWords("quiet", true, AUTOCHESS, { winner: null, gain: res!.gain!, you: "w" })).toBe("Fight stalled (10 moves each, no capture): neither side gained the edge, a draw.");
+    // A capture is a gain (and starts the count again): Black's knight steps onto the rook's file and the rook takes it, then 10 quiet
+    // moves each. (A piece hanging at the start is no gain: the start's score already counts its capture.)
     const w2: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
-    const b2: Army = { color: "b", king: "a8", board: { h7: "n", e7: "p" }, bench: [] };
-    const white2 = ["h2h7", "a1b1", "b1c1", "c1d1", "d1e1", "e1f1", "f1g1", "g1g2", "g2g3", "g3g4", "g4g5"];
-    const black2 = ["a8b8", "b8c8", "c8d8", "d8e8", "e8f8", "f8e8", "e8d8", "d8c8", "c8b8", "b8a8"];
+    const b2: Army = { color: "b", king: "a8", board: { g8: "n", e7: "p" }, bench: [] };
+    const white2 = ["a1b1", "h2h6", "b1c1", "c1d1", "d1e1", "e1f1", "f1g1", "g1g2", "g2g3", "g3g4", "g4g5", "g5f5"];
+    const black2 = ["g8h6", "a8b8", "b8c8", "c8d8", "d8e8", "e8f8", "f8e8", "e8d8", "d8c8", "c8b8", "b8a8"];
     const res2 = await playFight(fightStart(w2, b2).fen, { pick: script(white2.flatMap((m, k) => (black2[k] ? [m, black2[k]!] : [m]))), wait: noWait, rng: mulberry32(1) });
     expect(res2).toMatchObject({ end: "quiet", winner: "w" });
-    expect(res2!.moves).toHaveLength(21);
-    // Rook against rook when it stalls: less than a pawn apart by the score, a draw.
-    const w3: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
-    const b3: Army = { color: "b", king: "a8", board: { a7: "r" }, bench: [] };
-    const white3 = ["a1b1", "b1c1", "c1d1", "d1e1", "e1f1", "f1g1", "h2h3", "h3h4", "h4h5", "h5h6"];
-    const black3 = ["a8b8", "b8c8", "c8d8", "a7a6", "a6a5", "a5a4", "a4a3", "d8e8", "e8f8", "f8e8"];
-    const res3 = await playFight(fightStart(w3, b3).fen, { pick: script(white3.flatMap((m, k) => [m, black3[k]!])), wait: noWait, rng: mulberry32(1) });
-    expect(res3).toMatchObject({ end: "quiet", winner: null });
-    expect(Math.abs(res3!.score!)).toBeLessThan(100);
+    expect(res2!.moves).toHaveLength(23);
+    expect(res2!.gain).toBeGreaterThan(200);
+    expect(endWords("quiet", false, AUTOCHESS, { winner: "w", gain: res2!.gain!, you: "w" })).toMatch(/^Fight stalled \(10 moves each, no capture\): you gained \d+ pawns?\.$/);
+    expect(endWords("quiet", false, AUTOCHESS, { winner: "w", gain: res2!.gain!, you: "b" })).toMatch(/^Fight stalled \(10 moves each, no capture\): your opponent gained \d+ pawns?\.$/);
   });
 
-  it("a threefold repetition stalls the fight too: the side the score favors by a pawn wins (no longer a draw)", async () => {
-    // A rook against a knight; the kings step back and forth until the position stands a third time.
+  it("a threefold repetition is a stall too: the bigger army that only kept its edge doesn't win it", async () => {
+    // A rook against a knight from the start; the kings step back and forth until the position stands a third time.
     const w: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
-    const b: Army = { color: "b", king: "a8", board: { h7: "n" }, bench: [] };
+    const b: Army = { color: "b", king: "a8", board: { g7: "n" }, bench: [] };
     const steps = ["a1a2", "a8b8", "a2a1", "b8a8", "a1a2", "a8b8", "a2a1", "b8a8"];
     const res = await playFight(fightStart(w, b).fen, { pick: script(steps), wait: noWait, rng: mulberry32(1) });
-    expect(res).toMatchObject({ end: "repetition", winner: "w", moves: steps });
-    expect(res!.score).toBeGreaterThanOrEqual(100);
+    expect(res).toMatchObject({ end: "repetition", winner: null, moves: steps });
+    expect(Math.abs(res!.gain!)).toBeLessThan(50);
   });
 
-  it("too far ahead: a side the engine scores 5 pawns up after 6 of its own moves in a row wins at once, unless it has found a quick win", async () => {
-    expect([AUTOCHESS.decisiveMargin, AUTOCHESS.decisiveMoves, AUTOCHESS.mateShowMoves]).toEqual([500, 6, 5]);
-    const w: Army = { color: "w", king: "a1", board: { h2: "r", g2: "r" }, bench: [] };
-    const b: Army = { color: "b", king: "a8", board: { e7: "p", d7: "p" }, bench: [] };
-    const fen = fightStart(w, b).fen;
-    const white = ["a1b1", "b1c1", "c1d1", "d1e1", "e1f1", "f1g1", "g1h1"];
-    const black = ["a8b8", "b8c8", "c8b8", "b8c8", "c8b8", "b8c8", "c8b8"];
-    const behind = Array(7).fill(-600);
-    /** White's moves with this score, Black's with its own (the side moving's view). */
-    const scored = (ws: number[], bs: number[] = behind) => async (g: FightSoFar) => {
-      const k = Math.floor(g.moves.length / 2);
-      return g.moves.length % 2 ? { move: black[k]!, score: bs[k]! } : { move: white[k]!, score: ws[k]! };
-    };
-    const short = { ...AUTOCHESS, moveCap: 7 };
-    // Six of White's moves at 5 pawns or more: the fight ends after White's sixth, before Black answers it.
-    const res = await playFight(fen, { pick: scored([520, 700, 510, 900, 600, 530, 999]), wait: noWait, rng: mulberry32(1) });
-    expect(res).toMatchObject({ end: "decided", winner: "w", score: 530 });
-    expect(res!.moves).toEqual(white.slice(0, 6).flatMap((m, k) => (k < 5 ? [m, black[k]!] : [m])));
-    expect(endWords("decided", false, AUTOCHESS, { winner: "w", you: "w" })).toBe("You're too far ahead: 5+ pawns for 6 moves.");
-    expect(endWords("decided", false, AUTOCHESS, { winner: "w", you: "b" })).toBe("Your opponent is too far ahead: 5+ pawns for 6 moves.");
-    // A move under the margin starts the count again (and a bare move, a stand-in's, counts for nothing).
-    const broken = await playFight(fen, { pick: scored([520, 700, 510, 900, 499, 700, 700]), wait: noWait, rng: mulberry32(1), cfg: short });
-    expect(broken!.end).not.toBe("decided");
-    expect(broken!.moves).toHaveLength(14);
+  it("too far ahead, by the gains: a side that has gained 3 pawns after 6 of its own moves in a row wins at once, unless it has found a quick win", async () => {
+    expect([AUTOCHESS.decisiveMargin, AUTOCHESS.decisiveMoves, AUTOCHESS.mateShowMoves]).toEqual([300, 6, 5]);
+    // Black, to move, puts its queen where White's rook takes it; then the kings walk. White has gained a queen.
+    const fen = "k7/p7/8/3q4/8/7R/4R3/K7 b - - 0 1";
+    const plies = ["d5d2", "e2d2", "a8b8", "a1b1", "b8a8", "b1c1", "a8b8", "c1d1", "b8a8", "d1e1", "a8b8", "e1f1", "b8a8", "f1g1"];
+    const res = await playFight(fen, { pick: script(plies), wait: noWait, rng: mulberry32(1) });
+    // White's sixth move with the gain (the capture was the first): it ends there, before Black answers.
+    expect(res).toMatchObject({ end: "decided", winner: "w", moves: plies.slice(0, 12) });
+    expect(res!.gain).toBeGreaterThan(500);
+    expect(endWords("decided", false, AUTOCHESS, { winner: "w", you: "w" })).toBe("You gained 3+ pawns and held it for 6 moves.");
+    expect(endWords("decided", false, AUTOCHESS, { winner: "w", you: "b" })).toBe("Your opponent gained 3+ pawns and held it for 6 moves.");
     // A found mate within 5 moves plays out (a quick mate is fun to watch): no early end while the engine sees it.
-    const mating = await playFight(fen, { pick: scored([WIN - 9, WIN - 9, WIN - 7, WIN - 7, WIN - 5, WIN - 5, WIN - 3]), wait: noWait, rng: mulberry32(1), cfg: short });
+    const mateSeen = async (g: FightSoFar) => {
+      const m = plies[g.moves.length];
+      return m ? { move: m, score: g.moves.length % 2 ? WIN - 9 : 0 } : null;
+    };
+    const mating = await playFight(fen, { pick: mateSeen, wait: noWait, rng: mulberry32(1), cfg: { ...AUTOCHESS, moveCap: 7 } });
     expect(mating!.end).not.toBe("decided");
-    // One further off is decided all the same.
-    const far = await playFight(fen, { pick: scored(Array(7).fill(WIN - 13)), wait: noWait, rng: mulberry32(1) });
-    expect(far).toMatchObject({ end: "decided", winner: "w" });
-    // The losing side's view counts for it too: Black scored 5 pawns up wins the same way, after its own sixth move.
-    const black5 = await playFight(fen, { pick: scored(behind, Array(7).fill(600)), wait: noWait, rng: mulberry32(1) });
-    expect(black5).toMatchObject({ end: "decided", winner: "b" });
-    expect(black5!.moves).toHaveLength(12);
+    // A side that started 3 pawns up (here 10) and only kept it doesn't end the fight (Eric, Oct 21): the same walk, the queen gone from the start.
+    const start = "k7/p7/8/8/8/7R/3R4/K7 b - - 0 1";
+    const kept = await playFight(start, { pick: script(plies.slice(2)), wait: noWait, rng: mulberry32(1), cfg: { ...AUTOCHESS, moveCap: 6 } });
+    expect(kept!.end).not.toBe("decided");
+    expect(kept!.moves.slice(0, 12)).toEqual(plies.slice(2));
     // The count is a setting.
-    const three = await playFight(fen, { pick: scored(Array(7).fill(600)), wait: noWait, rng: mulberry32(1), cfg: { ...AUTOCHESS, decisiveMoves: 3 } });
+    const three = await playFight(fen, { pick: script(plies), wait: noWait, rng: mulberry32(1), cfg: { ...AUTOCHESS, decisiveMoves: 3 } });
     expect(three).toMatchObject({ end: "decided", winner: "w" });
-    expect(three!.moves).toHaveLength(5);
+    expect(three!.moves).toHaveLength(6);
   });
 
-  it("with the real engine, a side far ahead ends the fight early (or mates, or takes the last piece) instead of walking its king about", async () => {
-    // Two rooks and a queen against a knight and two blocked pawns.
-    const fen = "7k/8/3n4/p7/P7/8/1R6/QR5K w - - 0 1";
+  it("with the real engine, a bigger army still wins outright, by mate or by taking every piece (those stay absolute)", async () => {
+    // A rook more than Black from the start: holding that edge wins no stall, but the engine plays on to take everything.
+    const fen = "6k1/5ppp/8/3n4/8/2N5/5PPP/3R2K1 w - - 0 1";
     const engine = new HunchessEngine({ nodes: 6000, cashInValue: AUTOCHESS.cashInValue });
     const pick = async (g: FightSoFar) => {
       const r = engine.best({ ...g, rules: rulesFor() });
       return r.move ? { move: r.move, score: r.score } : null;
     };
     const res = await playFight(fen, { pick, wait: noWait, rng: mulberry32(1) });
-    expect(["decided", "checkmate", "king_alone"]).toContain(res!.end);
-    expect(res!.winner).toBe("w");
-    expect(res!.moves.length).toBeLessThanOrEqual(30);
+    expect(res).toMatchObject({ end: "king_alone", winner: "w" });
   });
 
   it("a side left with only its king loses at once; both kings alone is a draw; a side that starts the fight so loses (v5)", async () => {

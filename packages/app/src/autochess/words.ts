@@ -9,44 +9,50 @@ import type { Color } from "./types.ts";
 export type EndKind = FightEnd | "both_checked";
 
 /**
- * A fight's end in detail: who won, a stall's deciding score (the engine's, centipawns, White's view), and the player's color (the
- * sides are named "you" and "your opponent", as the rest of the screen names them; without it, White and Black).
+ * A fight's end in detail: who won, what White gained during the fight by the judge (centipawns, Black's gain the negative: a
+ * stall's or "too far ahead"'s), and the player's color (the sides are named "you" and "your opponent", as the rest of the screen
+ * names them; without it, White and Black).
  */
 export interface EndDetail {
   winner?: Color | null;
-  score?: number;
+  gain?: number;
   you?: Color;
 }
 
 const SIDE: Record<Color, string> = { w: "White", b: "Black" };
 
-/** A stall's winner's lead by the engine's score: "2 pawns up" (whole pawns, never under 1 for a win), "far ahead" for a mate it saw. */
-function lead(score: number): string {
-  if (Math.abs(score) >= 10000) return "far ahead";
-  const pawns = Math.max(1, Math.round(Math.abs(score) / 100));
-  return `${pawns} ${pawns === 1 ? "pawn" : "pawns"} up`;
+/**
+ * A side's gain as players read it: whole pawns from 1 up ("2 pawns", "1 pawn"), "the edge" under a pawn (a stall can be won by half
+ * a pawn: never "0 pawns"), "a winning edge" for a mate the judge saw.
+ */
+function gainWords(gain: number): string {
+  const g = Math.abs(gain);
+  if (g >= 10000) return "a winning edge";
+  if (g < 100) return "the edge";
+  const pawns = Math.round(g / 100);
+  return `${pawns} ${pawns === 1 ? "pawn" : "pawns"}`;
 }
 
-/** The winning side with its verb: "you're", "your opponent is" (or "White is" when the player's color isn't given). */
-function whoIs(winner: Color, you: Color | undefined): string {
-  if (!you) return `${SIDE[winner]} is`;
-  return winner === you ? "you're" : "your opponent is";
+/** A side by name: "you", "your opponent" (or "White" when the player's color isn't given). */
+function who(side: Color, you: Color | undefined): string {
+  if (!you) return SIDE[side];
+  return side === you ? "you" : "your opponent";
 }
 
 const capital = (s: string) => s[0]!.toUpperCase() + s.slice(1);
 
 export function endWords(end: EndKind, draw: boolean, cfg: AutoChessSettings = AUTOCHESS, detail: EndDetail = {}): string {
-  /** A stall: why it stalled, then the side the engine's score favors and by how much, or that it's less than a pawn either way. */
+  /** A stall: why it stalled, then who gained since the start and how much (Eric, Oct 21: gains count, not army size), or that nobody gained enough. */
   const stall = (why: string) => {
-    if (draw || detail.score === undefined) return `Fight stalled (${why}): less than a pawn apart, a draw.`;
-    const winner = detail.winner ?? (detail.score > 0 ? "w" : "b");
-    return `Fight stalled (${why}): ${whoIs(winner, detail.you)} ${lead(detail.score)}.`;
+    if (draw || detail.gain === undefined) return `Fight stalled (${why}): neither side gained the edge, a draw.`;
+    const winner = detail.winner ?? (detail.gain > 0 ? "w" : "b");
+    return `Fight stalled (${why}): ${who(winner, detail.you)} gained ${gainWords(detail.gain)}.`;
   };
   switch (end) {
     case "checkmate":
       return "Checkmate.";
     case "decided":
-      return detail.winner ? `${capital(whoIs(detail.winner, detail.you))} too far ahead: ${cfg.decisiveMargin / 100}+ pawns for ${cfg.decisiveMoves} moves.` : "One side too far ahead.";
+      return detail.winner ? `${capital(who(detail.winner, detail.you))} gained ${cfg.decisiveMargin / 100}+ pawns and held it for ${cfg.decisiveMoves} moves.` : "One side gained too much to catch.";
     case "stalemate":
       return "Stalemate.";
     case "repetition":
@@ -66,16 +72,13 @@ export function endWords(end: EndKind, draw: boolean, cfg: AutoChessSettings = A
   }
 }
 
-/** Centipawns as players read them: "a pawn", "5 pawns". */
-const pawnsWords = (cp: number) => (cp === 100 ? "a pawn" : `${cp / 100} pawns`);
-
 /**
  * The fight's rules, in the box while it plays (short: it must fit a 320 px phone; the speed-up shows in the move counter, "twice as
  * fast", so it isn't repeated here).
  */
 export const fightRulesWords = (cfg: AutoChessSettings = AUTOCHESS) =>
-  `The engine plays both armies at the same strength. A side loses with only its king left, or when the engine sees it ${pawnsWords(cfg.decisiveMargin)} down for ${cfg.decisiveMoves} moves. ` +
-  `A stall (repeats, ${cfg.quietCap} moves each with no capture, or ${cfg.moveCap}) goes to the side ${pawnsWords(cfg.stallWinMargin)} up. A pawn that reaches the far end cashes in for +${cfg.cashInGold} gold.`;
+  `One engine plays both armies. A side left with only its king loses. Gains count, not army size: ${cfg.decisiveMargin / 100} pawns gained for ${cfg.decisiveMoves} moves wins, ` +
+  `and a stall (repeats, ${cfg.quietCap} moves each with no capture, or ${cfg.moveCap}) goes to the side that gained more. A pawn at the far end cashes in for +${cfg.cashInGold} gold.`;
 
 /** The fight's move counter: "Move 12 of 60", and "twice as fast" once the moves speed up (after 30 moves each, or once the fight has thinned out: `thin`, thinFight). */
 export const moveWords = (plies: number, cfg: AutoChessSettings = AUTOCHESS, thin = false) =>
