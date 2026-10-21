@@ -403,7 +403,7 @@ export class MatchRunner {
     if (this.settings.raid) this.startRaid();
   }
 
-  /** Boss raid: the boss is there from the start, on a named opening; strikes stop at half the group; the King has every charge. */
+  /** Boss raid: the boss is there from the start, from the starting position; strikes stop at half the group; the King has every charge. */
   private startRaid() {
     const id = this.state.boards[0]!;
     const board = this.boards.get(id)!;
@@ -415,11 +415,14 @@ export class MatchRunner {
     // (Never a boss that's resting: a kill switch, rosterWithout.)
     const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, rosterWithout(this.settings.bossesOff), this.settings.bossUnfinished, !!this.settings.bossHidden);
     let crowdSide = sideToMove(board.fen);
-    // A boss whose battle starts from the starting position (no opening moves), and one who always plays Black (Hollow):
-    // if the usual pick made the crowd Black, he claims the dark side before move 1.
+    // Every raid starts from the starting position, no opening moves (Eric, Oct 21: "Everything starts from the starting
+    // position... the more I play it, the more it's a must"), but with `raidOpening` (tests that need a book position) only
+    // a boss marked `fromStart`. The crowd keeps the side the usual pick gave it, so against a crowd that's Black the boss
+    // moves first. A boss who always plays Black (Hollow): if the usual pick made the crowd Black, he claims the dark side
+    // before move 1.
     const opening = bossRules(def)?.opening;
     const claimed = !!opening?.crowdWhite && crowdSide === "b" && !this.settings.bossMateTest && !this.settings.bossWinTest;
-    if (opening?.fromStart) this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
+    if (!this.settings.raidOpening || opening?.fromStart) this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
     if (opening?.crowdWhite) crowdSide = "w";
     // Anything else the boss does to the board before move 1 (Big Boy eats one of the crowd's center pawns).
     let setUp = opening?.setUp?.(this.battle, { boardId: id, seed, crowdSide, generation: board.generation }) ?? null;

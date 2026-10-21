@@ -70,7 +70,7 @@ export interface Settings {
   bossEloRange: readonly [number, number];
   /** Boss battle: the boss's search budget per move. */
   bossNodes: number;
-  /** Boss raid (a mode of its own): up to 50 players against a boss, no bots, from a named opening. */
+  /** Boss raid (a mode of its own): up to 50 players against a boss, no bots, from the starting position. */
   raid: boolean;
   /** Boss raid: the boss's strength, set from the lobby's ratings when it starts (0: from the crowd, as in 50 v 50). */
   bossFixedElo: number;
@@ -258,6 +258,11 @@ export interface Settings {
   drawWeightPoints: number;
   /** Opening moves per side played on each board before the first round (0-10, a lobby setting). Boards where Black starts get one ply more. */
   openingMoves: number;
+  /**
+   * Boss raid: from a named opening `openingMoves` in, as raids were until Oct 21 (tests that need a book position use it;
+   * a boss whose gimmick is openings may later). Off: every raid starts from the starting position (Eric, Oct 21).
+   */
+  raidOpening?: boolean;
   /** A line qualifies if the side to move's expected score at its end is inside this window. */
   openingBalance: readonly [number, number];
   engineNodes: number;
@@ -510,8 +515,8 @@ export function crowdFinalists(format: FinalFormat, knockouts: Readonly<Record<F
 
 /**
  * Boss raid: everyone (up to 50, no bots) picks the crowd's moves together
- * against a boss, from a named opening 5 moves in. The boss strikes down to
- * half the group; the King has 3 charges.
+ * against a boss, from the starting position (Eric, Oct 21: the runner's
+ * startRaid). The boss strikes down to half the group; the King has 3 charges.
  */
 export const RAID_SETTINGS: Partial<Settings> = {
   ...CROWD_SETTINGS,

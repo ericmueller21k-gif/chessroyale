@@ -216,7 +216,7 @@ function modes(src: FaqSources): FaqSection {
 
 ### Boss raid and Boss alone {#mode-boss}
 
-- **Boss raid:** up to ${R.lobbySize} players pick the crowd's moves together against a [boss](#boss-brain); the most popular pick is played. Most bosses start from a named opening, ${n(R.openingMoves, "move")} in.
+- **Boss raid:** up to ${R.lobbySize} players pick the crowd's moves together against a [boss](#boss-brain); the most popular pick is played. Every boss starts from the starting position.
 - **Where:** tap **Boss raid** on the home screen. The bosses are at the top: tap one to see it on the stage below (its name and strength), or **?** for a random one. Under them, every way to play: **Join a raid** (bots fill any empty seats after a short wait) and **People only** (no bots) always meet a random boss; **Raid with bots** (you and ${R.lobbySize - 1} bots, at once), **Boss alone** and **Play with friends** (make a raid and share its code) meet the one you picked.
 - **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} it knocks out the player who gave away the most points since its last strike (after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
 - **The God King** fights on your side, with ${n(S.kingChargesMax, "charge")} ([more on him](#god-king)).

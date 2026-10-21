@@ -12,7 +12,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
     Bots fill empty seats (see [matchmaking.md](matchmaking.md)). Always team turns (`crowdTeams` in
     `CROWD_SETTINGS`): the "everyone moves" choice went on Oct 15, 2026 (DECISIONS.md).
   - **Boss raid** (`RAID_SETTINGS`, `crowdTeams: false`): up to 50 people (no bots online) pick the crowd's moves
-    together against a boss, from a named opening 5 moves in. Solo's "Boss alone" is a raid with a crowd of one. See
+    together against a boss, from the starting position. Solo's "Boss alone" is a raid with a crowd of one. See
     [bosses.md](bosses.md).
 - **Scoring.** Every pick is scored by how much expected score it gives away against the best move (1 point = 0.01 of
   expected score), from the judge's numbers. A miss scores `missedMoveScore`. Scores carry over all game in Crowd. A

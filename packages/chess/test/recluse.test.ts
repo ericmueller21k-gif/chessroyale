@@ -118,8 +118,10 @@ describe("who meets him: hidden from players, an admin's Boss alone, and the Cro
     expect(r.boards.get(0)!.fen).toBe(START);
     expect(r.boards.get(0)!.history).toEqual([]);
     expect(r.boss!.crowdSide).toBe("w");
-    // (Another boss still gets the book opening.)
-    expect(alone({ bossId: "clown", bossHidden: false }).boards.get(0)!.history.length).toBeGreaterThan(0);
+    // (Every raid starts there now, Eric, Oct 21; with raidOpening another boss gets the book opening, he never does.)
+    expect(alone({ bossId: "clown", bossHidden: false }).boards.get(0)!.history).toEqual([]);
+    expect(alone({ bossId: "clown", bossHidden: false, raidOpening: true }).boards.get(0)!.history.length).toBeGreaterThan(0);
+    expect(alone({ raidOpening: true }).boards.get(0)!.history).toEqual([]);
     const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1400, bossId: "recluse", bossHidden: true } as Settings;
     const white = new MatchRunner({ settings, rng: mulberry32(5), engines: [fakeEngine()], library: [opening(sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1"]))], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "b" });
     expect(white.boards.get(0)!.fen).toBe(START);
