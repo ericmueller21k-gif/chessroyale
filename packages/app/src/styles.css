@@ -17815,8 +17815,8 @@ button.sq-tiny {
 /*
  * The shop's offers on the board (v6): each a glowing silhouette of its piece, on its square. A soft green with a dark green edge
  * and a green glow, so it reads on the classic, green and gold squares alike. The shape is the board's own white piece used as a
- * mask (the glow is on the box around it, as a filter on the masked element itself would be masked away). Two or more offers on
- * one square sit side by side, each a share of the square's width (--n offers, this one the --i-th).
+ * mask (the glow is on the box around it, as a filter on the masked element itself would be masked away). One offer to a square,
+ * filling it (Eric, Oct 21: the shop never puts two offers on one square).
  */
 .ac-offers {
   position: absolute;
@@ -17829,8 +17829,8 @@ button.sq-tiny {
 .ac-sil {
   position: absolute;
   top: 50%;
-  left: calc(100% * var(--i, 0) / var(--n, 1));
-  width: calc(100% / var(--n, 1));
+  left: 0;
+  width: 100%;
   aspect-ratio: 1;
   transform: translateY(-50%);
   filter: drop-shadow(0 0 0.7px #04361a) drop-shadow(0 0 0.7px #04361a) drop-shadow(0 0 5px rgba(64, 255, 120, 0.95));
@@ -17945,7 +17945,7 @@ button.sq-tiny {
   font-size: 13px;
   cursor: pointer;
 }
-/* The bench (v6): four slots, each a held piece and the square it will land on. Drag an offer onto the row to hold it. */
+/* The bench (v6): four slots, each a held piece and the square it will land on. Drag an offer from the shop onto the row to hold it. */
 .ac-bench {
   position: relative;
   height: 44px;
@@ -18034,6 +18034,8 @@ button.sq-tiny {
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
+  /* A card is tapped to buy and dragged to the bench to hold: a finger's drag is ours (without this the browser takes it for a pan and cancels it). */
+  touch-action: none;
 }
 .ac-buy .ac-icon {
   height: 34px;

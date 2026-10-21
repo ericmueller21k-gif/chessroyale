@@ -4,7 +4,7 @@ Lane: the director. A TFT-style auto battler with chess pieces, against a bot, a
 feel it ("it might just be terrible"): nothing is recorded, rewarded or sent. **Shelved** (Eric, Oct 19: "it's going to take
 more work than I realized to make this balanced and fun"): no button on home; admins open it from Settings → TESTING ("Auto
 chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-autochess-demo.md](../decisions/2026-10-19-autochess-demo.md)
-(v6 is its last design section; the HunChess engine, Oct 21, after it).
+(v6 is its last design section; the HunChess engine, Oct 21, after it; [drags, silhouettes and one offer to a square](../decisions/2026-10-21-autochess-drag-fixes.md), Oct 21, after that).
 
 ## How it works today (v6)
 
@@ -14,19 +14,25 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
 - **The shop decides where pieces go.** Five **offers**, each a piece and a square of your half ("Bishop c2" under the piece and
   its price). The odds are pawn 75, knight 10, bishop 8, rook 5, queen 2 (prices pawn 10, knight 30, bishop 32, rook 50, queen 90,
   one queen at most). A pawn is offered on your 2nd to 4th rank, any other piece anywhere on your half; only squares you could use
-  (empty, not your king's, the legal-position limits). **On the board each offer is a glowing green silhouette** of its piece on its
-  square (two or more on one square are smaller, side by side). **Tap an offer, in the shop or its silhouette, to buy it:** it lands
-  on its square and a new offer rolls into the slot; another offer on that square rolls again ("Another offer was on b4: it rolled
-  again."). **Reroll** costs 2 and rolls all five; a round starts with a fresh shop, free. An offer you can't buy is greyed with its
+  (empty, not your king's, the legal-position limits). **One offer to a square** (Eric, Oct 21: "pieces should never be duplicate on
+  one spot"): a roll draws its square from the squares no piece of yours, your king or another current offer is on, in the first roll,
+  a reroll, a refill after a buy and `replaceTaken` alike, so the five offers always stand on five squares. **On the board each offer
+  is a glowing green silhouette** of its piece on its square, filling it. **Tap an offer, in the shop or its silhouette, to buy it:**
+  it lands on its square and a new offer rolls into the slot. **A silhouette on the board is only ever tapped** (Eric, Oct 21): it is
+  never picked up, dragged or dropped, so a drag that starts on one does nothing (a tap is the pointer staying within 10 px,
+  `TAP_SLOP_PX`); the shop's cards still drag (to the bench). An offer that can no longer use its square (a held piece placed on it,
+  the third pawn of a file bought) rolls again, and the line names the square it was on ("Another offer was on d3: it rolled again."). **Reroll** costs 2 and rolls all five; a round starts with a fresh shop, free. An offer you can't buy is greyed with its
   reason under the price (no gold, one queen at most, 8 pawns, too many pieces, locked); when only your level has no room it says
   "Level full" and can still be held. Every roll is seeded by the round, the reroll count and the refill count, so a test repeats.
   There is no free placing or dragging pieces about.
 - **The bench** holds 4 pieces and **stays from round to round** (the board's pieces still go home each round). **Drag an offer
-  (its card or its silhouette) onto the bench row to hold it:** you pay now, the piece keeps the square it was offered on, and tapping
+  from the shop (its card) onto the bench row to hold it:** you pay now, the piece keeps the square it was offered on, and tapping
   it places it there when that square is free and your level allows ("b4 is taken.", "c2 is your king's square."). Because the colors
   turn each round, a held piece's square turns with them (same file, rank mirrored, as the kings are). What is held counts as owned for
   the shop's limits. **Selling gives back 75%** (P7 N22 B24 R37 Q67): tap a piece on the board then "Sell N", or drag a piece from the
-  board or the bench onto the shop row; a "+N" floats up from the square or bench slot it was sold from.
+  board or the bench onto the shop row; a "+N" floats up from the square or bench slot it was sold from. **A sale only ever pays for a
+  piece of yours that is there now, of the kind the hold says** (`sellPiece` and `sellHeld` return null otherwise: no gold, never for
+  the king or an offer); the Sell button only shows for a piece that is really there.
 - **Levels:** your level is how many pieces (not the king) you may have on the board. Start at 4, top 10. **+2 XP free at each round's
   start** (round 1 too); **Buy XP gives 4 XP for 20 gold**; XP to the next level 4, 8, 12, 16, 20, 24 (4 to 5 ... 9 to 10), the extra
   carrying over. Placing past your level is refused ("Your level allows 4 pieces on the board. Buy XP to level up."). Each side's strip
@@ -71,6 +77,11 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
 - **Legal positions only** (the engine refuses others): pawns not on your back rank, at most 8, extras beyond the starting set at most
   8 minus your pawns; the limits count what you own (board and bench).
 - **Who moves first:** White, unless a king is attacked as the fight starts (that side first); both attacked: a drawn round.
+- **Gestures end with their step** (Oct 21): a press, a drag (its ghost) and a selection are one thing, `cancelGesture()`, and every
+  moment that stops them ends them with no action: the last seconds locking the step, lock in, the step changing (the reveal, the
+  adjust step's end under a finger most of all), the round turning, the window losing focus, and a pointer that is cancelled or
+  loses its capture (also when its element left the screen: a window listener catches that one). Nothing is picked up once the step
+  is locked, and the ghost only draws in the buy and adjust steps. The shop's cards take a finger's drag (`touch-action: none`).
 - **The bot** (`autochess/bot.ts`): places what it held first, for nothing; buys from its own seeded shop (picking among what it sees by
   weights, minor pieces and rooks over pawns, a queen when rich; rerolling now and then, at most 4 a round); buys XP now and then when
   that gives it a level or it is rich; with its board full holds a good piece (never a pawn) on its bench, at most 2 a round; puts its
@@ -105,7 +116,9 @@ Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2
 
 ## Tests and tools
 
-- Unit: `packages/app/test/autochess-shop.test.ts` (the odds, usable squares, buying and holding from a slot, refills, rerolls),
+- Unit: `packages/app/test/autochess-shop.test.ts` (the odds, usable squares, buying and holding from a slot, refills, rerolls, one offer to a square),
+  `autochess-odds.test.ts` (the five slots roll independently, at the odds: chi-square over tens of thousands of shops, rerolls,
+  refills, rounds and match seeds; two queens in a first shop is 1 in 260),
   `autochess-lockin.test.ts`, `autochess-level.test.ts` (levels, XP, the room a level gives, the bot's levels),
   `autochess-reveal.test.ts` (the reveal times, what shows when), `autochess-rules.test.ts` (the shop's reasons, selling at 75%, the
   bench, the kings, placing, the adjust step's change and its off switch), `autochess-match.test.ts` (the economy, the bench through the
@@ -115,8 +128,9 @@ Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2
   numbers).
 - Engine: `packages/chess/test/hunchess-board.test.ts` (perft against known counts and chess.js, a fight's moves, every rule),
   `hunchess-search.test.ts` (wins and losses by the fight's rules, determinism, the node budget).
-- e2e: `e2e/autochess.spec.ts` (phone and computer; seeds are listed at its top): the shop and its silhouettes, a reroll, buying by tap,
-  the reasons, selling by tap and drag, the bench, levels, the lock in, the reveals, the adjust change and its off switch, the avatars,
+- e2e: `e2e/autochess.spec.ts` (phone and computer; seeds are listed at its top): the shop and its silhouettes (one to a square), a reroll, buying by tap,
+  the reasons, selling by tap and drag, the bench, drags cut off by a step's end, the lock, lock in, a cancelled pointer or lost capture,
+  silhouettes that are only tapped, a sale of a piece that is gone, levels, the lock in, the reveals, the adjust change and its off switch, the avatars,
   the button feel, the floating gold, mute, a fight to a result and the next round, a cash-in's "+5", a fight with a silent engine, layouts. `e2e/home-layout.spec.ts` (home).
 
 ## Rules for this area
@@ -127,6 +141,10 @@ Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2
 - The board never moves between steps: the box under it is the same height in every step (the message line, the bench, the shop and
   the buttons together: 186 px), with your strip just under the board and theirs just above.
 - A seed in an e2e test fixes the shop, the kings and the bot's lock time; changing how a roll is made (the shop's seeding) changes
-  every seed's fixture: re-pick them (a small script over the pure code finds one). The bot's lock-in time comes from a draw of its own,
+  every seed's fixture: re-pick them (a small script over the pure code finds one). One offer to a square (Oct 21) keeps every roll
+  that collided with nothing and redraws only a colliding square, so only the shops that had two offers on one square (a third of
+  them) changed; the seeds at the top of the spec are the new ones.
+- A gesture never outlives the moment it can act: a new step, round or lock goes through `cancelGesture()`, and a test holds a drag
+  through every one of them (the ghost must be gone within a moment, with no gold, piece or bench change). The bot's lock-in time comes from a draw of its own,
   so changing how the bot buys doesn't move it.
 - A sound's play name goes in `SoundName` and `MAKE` (sound.ts); a sound is added with its peak and loudness test.

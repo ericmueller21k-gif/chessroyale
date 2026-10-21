@@ -176,18 +176,25 @@ export const usableSquares = (army: Army, kind: Kind, cfg: AutoChessSettings = A
 /** Buys an offer: the piece lands on its square (the caller checked `buyBlock`). */
 export const buyOffer = (army: Army, offer: Offer): Army => ({ ...army, board: { ...army.board, [offer.square]: offer.kind } });
 
-/** Sells a piece standing on the board: the army without it, and the gold it gives. */
-export function sellPiece(army: Army, square: string, cfg: AutoChessSettings = AUTOCHESS): { army: Army; gold: number } {
-  const { [square]: kind, ...rest } = army.board;
-  return { army: { ...army, board: rest }, gold: sellValue(kind!, cfg) };
+/**
+ * Sells a piece standing on the board: the army without it, and the gold it gives. Only a piece of yours that is there now, of the
+ * kind the seller says, is sold; anything else (a square that has emptied, another kind there now, the king, an offer) is null and
+ * pays nothing.
+ */
+export function sellPiece(army: Army, square: string, kind: Kind | "k", cfg: AutoChessSettings = AUTOCHESS): { army: Army; gold: number } | null {
+  if (kind === "k" || army.board[square] !== kind) return null;
+  const board = { ...army.board };
+  delete board[square];
+  return { army: { ...army, board }, gold: sellValue(kind, cfg) };
 }
 
 /** Buys an offer to hold: it goes on the bench, keeping its square (the caller checked `holdBlock`). */
 export const holdOffer = (army: Army, offer: Offer): Army => ({ ...army, bench: [...army.bench, offer] });
 
-/** Sells a held piece (the bench's `index`th): the army without it, and the gold it gives. */
-export function sellHeld(army: Army, index: number, cfg: AutoChessSettings = AUTOCHESS): { army: Army; gold: number } {
-  const held = army.bench[index]!;
+/** Sells a held piece (the bench's `index`th): the army without it, and the gold it gives; null, no gold, unless that kind of piece is held in that slot now. */
+export function sellHeld(army: Army, index: number, kind: Kind | "k", cfg: AutoChessSettings = AUTOCHESS): { army: Army; gold: number } | null {
+  const held = army.bench[index];
+  if (!held || held.kind !== kind) return null;
   return { army: { ...army, bench: army.bench.filter((_, i) => i !== index) }, gold: sellValue(held.kind, cfg) };
 }
 
