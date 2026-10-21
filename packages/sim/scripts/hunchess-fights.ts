@@ -62,8 +62,10 @@ interface Fight {
   ahead: "w" | "b" | null;
   /** The longest run of plies in which only kings moved. */
   kingWalk: number;
-  /** The longest run of one side's own moves that were all its king's. */
+  /** The longest run of one side's own moves that were all its king's, its seconds at the real pace, and its plies at the fast pace. */
   kingSteps: number;
+  kingStepsSeconds: number;
+  kingStepsFast: number;
   /** A stall's judged score of the final position (centipawns, White's view). */
   score?: number;
   /** What White gained since the start by the judge (a stall's, or "too far ahead"'s). */
@@ -84,6 +86,14 @@ for (const [i, s] of starts.entries()) {
   // (One side's own moves in a row that were all its king's, by side: the king walking about while the other side plays on.)
   const sideWalk = { w: 0, b: 0 };
   let kingSteps = 0;
+  // (How long the longest such walk lasts at the real pace, from its first king move to its last, the other side's moves between
+  // included, and how many of those plies were at the fast pace.)
+  const walkFrom = { w: 0, b: 0 };
+  const walkFast = { w: 0, b: 0 };
+  let kingStepsSeconds = 0;
+  let kingStepsFast = 0;
+  let lastMs = 0;
+  let fastPlies = 0;
   const res = (await playFight(s.fen, {
     pick: async (game) => {
       const t0 = performance.now();
@@ -94,22 +104,34 @@ for (const [i, s] of starts.entries()) {
       return r.move ? { move: r.move, score: r.score } : null;
     },
     // (The real pace: the fight asks for each move's wait.)
-    wait: async (ms) => void (seconds += ms / 1000),
+    wait: async (ms) => {
+      seconds += ms / 1000;
+      lastMs = ms;
+      if (ms === cfg.fightFastMoveMs) fastPlies++;
+    },
     onStep: (step) => {
       const moved = pieceAt(before, step.move.slice(0, 2));
       const king = moved.toLowerCase() === "k";
       walk = king ? walk + 1 : 0;
       kingWalk = Math.max(kingWalk, walk);
       const side = moved === moved.toUpperCase() ? "w" : "b";
+      if (king && !sideWalk[side]) {
+        walkFrom[side] = seconds - lastMs / 1000;
+        walkFast[side] = fastPlies - (lastMs === cfg.fightFastMoveMs ? 1 : 0);
+      }
       sideWalk[side] = king ? sideWalk[side] + 1 : 0;
-      kingSteps = Math.max(kingSteps, sideWalk[side]);
+      if (king && sideWalk[side] >= kingSteps) {
+        kingSteps = sideWalk[side];
+        kingStepsSeconds = seconds - walkFrom[side];
+        kingStepsFast = fastPlies - walkFast[side];
+      }
       before = step.fen;
     },
     rng: mulberry32(i),
     cfg,
   }))!;
   const m = material(s.fen);
-  const f: Fight = { name: s.name, end: res.end, winner: res.winner, plies: res.moves.length, seconds, cashIns: res.cashIns.w + res.cashIns.b, ahead: m.w > m.b ? "w" : m.b > m.w ? "b" : null, kingWalk, kingSteps, ...(res.score !== undefined ? { score: res.score } : {}), ...(res.gain !== undefined ? { gain: res.gain } : {}) };
+  const f: Fight = { name: s.name, end: res.end, winner: res.winner, plies: res.moves.length, seconds, cashIns: res.cashIns.w + res.cashIns.b, ahead: m.w > m.b ? "w" : m.b > m.w ? "b" : null, kingWalk, kingSteps, kingStepsSeconds: +kingStepsSeconds.toFixed(2), kingStepsFast, ...(res.score !== undefined ? { score: res.score } : {}), ...(res.gain !== undefined ? { gain: res.gain } : {}) };
   fights.push(f);
   process.stdout.write(`${i + 1}/${starts.length} ${s.name}: ${res.end} ${res.winner ?? "draw"} in ${f.plies} plies (${f.seconds.toFixed(1)} s), king walk ${kingWalk} plies (one side ${kingSteps} moves), ${f.cashIns} cash-ins\n`);
 }
@@ -149,6 +171,8 @@ const summary = {
   },
   kingWalkPlies: { average: avg(kingWalks), median: median(kingWalks), longest: Math.max(...kingWalks), fightsWith6Plus: kingWalks.filter((k) => k >= 6).length },
   oneSideKingMoves: { average: avg(kingSteps), median: median(kingSteps), longest: Math.max(...kingSteps), fightsWith5Plus: kingSteps.filter((k) => k >= 5).length, fightsWith10Plus: kingSteps.filter((k) => k >= 10).length },
+  // (The walks of 10 moves or more: moves, seconds at the real pace, and plies at the fast pace out of the walk's plies.)
+  longKingWalks: fights.filter((f) => f.kingSteps >= 10).map((f) => ({ fight: f.name, moves: f.kingSteps, seconds: f.kingStepsSeconds, fastPlies: f.kingStepsFast, plies: 2 * f.kingSteps - 1 })),
   cashInsPerFight: +(fights.reduce((a, f) => a + f.cashIns, 0) / n).toFixed(2),
   fightsWithACashIn: fights.filter((f) => f.cashIns).length,
   engineMsPerMove: +(engineMs / engineMoves).toFixed(1),

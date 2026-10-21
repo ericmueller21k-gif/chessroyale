@@ -563,7 +563,7 @@ describe("auto chess: the fight", () => {
   });
 
   it("a stall goes to the side that gained a pawn during the fight, not to the bigger army (Eric, Oct 21); a check doesn't restart the count", async () => {
-    expect([AUTOCHESS.quietCap, AUTOCHESS.stallWinMargin]).toEqual([10, 100]);
+    expect([AUTOCHESS.quietCap, AUTOCHESS.stallWinMargin]).toEqual([10, 50]);
     // A rook against a pawn from the start: 10 quiet moves each (White's last one a check), and nothing gained, so a draw. (Before,
     // the rook's side won: "I shouldn't get rewarded just because I play more pieces.")
     const w: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
@@ -573,10 +573,10 @@ describe("auto chess: the fight", () => {
     const plies = white.flatMap((m, k) => [m, black[k]!]);
     const res = await playFight(fightStart(w, b).fen, { pick: script(plies), wait: noWait, rng: mulberry32(1) });
     expect(res).toMatchObject({ end: "quiet", winner: null, moves: plies });
-    expect(Math.abs(res!.gain!)).toBeLessThan(100);
+    expect(Math.abs(res!.gain!)).toBeLessThan(50);
     // (The rook's lead is still there at the end: the score of the position, not the gain, is the rook's.)
     expect(res!.score).toBeGreaterThan(300);
-    expect(endWords("quiet", true, AUTOCHESS, { winner: null, gain: res!.gain!, you: "w" })).toBe("Fight stalled (10 moves each, no capture): neither side gained a pawn, a draw.");
+    expect(endWords("quiet", true, AUTOCHESS, { winner: null, gain: res!.gain!, you: "w" })).toBe("Fight stalled (10 moves each, no capture): neither side gained the edge, a draw.");
     // A capture is a gain (and starts the count again): Black's knight steps onto the rook's file and the rook takes it, then 10 quiet
     // moves each. (A piece hanging at the start is no gain: the start's score already counts its capture.)
     const w2: Army = { color: "w", king: "a1", board: { h2: "r" }, bench: [] };
@@ -598,11 +598,11 @@ describe("auto chess: the fight", () => {
     const steps = ["a1a2", "a8b8", "a2a1", "b8a8", "a1a2", "a8b8", "a2a1", "b8a8"];
     const res = await playFight(fightStart(w, b).fen, { pick: script(steps), wait: noWait, rng: mulberry32(1) });
     expect(res).toMatchObject({ end: "repetition", winner: null, moves: steps });
-    expect(Math.abs(res!.gain!)).toBeLessThan(100);
+    expect(Math.abs(res!.gain!)).toBeLessThan(50);
   });
 
-  it("too far ahead, by the gains: a side that has gained 5 pawns after 6 of its own moves in a row wins at once, unless it has found a quick win", async () => {
-    expect([AUTOCHESS.decisiveMargin, AUTOCHESS.decisiveMoves, AUTOCHESS.mateShowMoves]).toEqual([500, 6, 5]);
+  it("too far ahead, by the gains: a side that has gained 3 pawns after 6 of its own moves in a row wins at once, unless it has found a quick win", async () => {
+    expect([AUTOCHESS.decisiveMargin, AUTOCHESS.decisiveMoves, AUTOCHESS.mateShowMoves]).toEqual([300, 6, 5]);
     // Black, to move, puts its queen where White's rook takes it; then the kings walk. White has gained a queen.
     const fen = "k7/p7/8/3q4/8/7R/4R3/K7 b - - 0 1";
     const plies = ["d5d2", "e2d2", "a8b8", "a1b1", "b8a8", "b1c1", "a8b8", "c1d1", "b8a8", "d1e1", "a8b8", "e1f1", "b8a8", "f1g1"];
@@ -610,8 +610,8 @@ describe("auto chess: the fight", () => {
     // White's sixth move with the gain (the capture was the first): it ends there, before Black answers.
     expect(res).toMatchObject({ end: "decided", winner: "w", moves: plies.slice(0, 12) });
     expect(res!.gain).toBeGreaterThan(500);
-    expect(endWords("decided", false, AUTOCHESS, { winner: "w", you: "w" })).toBe("You gained 5+ pawns and held it for 6 moves.");
-    expect(endWords("decided", false, AUTOCHESS, { winner: "w", you: "b" })).toBe("Your opponent gained 5+ pawns and held it for 6 moves.");
+    expect(endWords("decided", false, AUTOCHESS, { winner: "w", you: "w" })).toBe("You gained 3+ pawns and held it for 6 moves.");
+    expect(endWords("decided", false, AUTOCHESS, { winner: "w", you: "b" })).toBe("Your opponent gained 3+ pawns and held it for 6 moves.");
     // A found mate within 5 moves plays out (a quick mate is fun to watch): no early end while the engine sees it.
     const mateSeen = async (g: FightSoFar) => {
       const m = plies[g.moves.length];
@@ -619,7 +619,7 @@ describe("auto chess: the fight", () => {
     };
     const mating = await playFight(fen, { pick: mateSeen, wait: noWait, rng: mulberry32(1), cfg: { ...AUTOCHESS, moveCap: 7 } });
     expect(mating!.end).not.toBe("decided");
-    // A side that started 5 pawns up and only kept it doesn't end the fight (Eric, Oct 21): the same walk, the queen gone from the start.
+    // A side that started 3 pawns up (here 10) and only kept it doesn't end the fight (Eric, Oct 21): the same walk, the queen gone from the start.
     const start = "k7/p7/8/8/8/7R/3R4/K7 b - - 0 1";
     const kept = await playFight(start, { pick: script(plies.slice(2)), wait: noWait, rng: mulberry32(1), cfg: { ...AUTOCHESS, moveCap: 6 } });
     expect(kept!.end).not.toBe("decided");

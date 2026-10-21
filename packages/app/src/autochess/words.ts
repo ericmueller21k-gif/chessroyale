@@ -21,10 +21,15 @@ export interface EndDetail {
 
 const SIDE: Record<Color, string> = { w: "White", b: "Black" };
 
-/** A side's gain in whole pawns as players read it: "2 pawns", "1 pawn" (never under 1 for a win), "a winning edge" for a mate the judge saw. */
+/**
+ * A side's gain as players read it: whole pawns from 1 up ("2 pawns", "1 pawn"), "the edge" under a pawn (a stall can be won by half
+ * a pawn: never "0 pawns"), "a winning edge" for a mate the judge saw.
+ */
 function gainWords(gain: number): string {
-  if (Math.abs(gain) >= 10000) return "a winning edge";
-  const pawns = Math.max(1, Math.round(Math.abs(gain) / 100));
+  const g = Math.abs(gain);
+  if (g >= 10000) return "a winning edge";
+  if (g < 100) return "the edge";
+  const pawns = Math.round(g / 100);
   return `${pawns} ${pawns === 1 ? "pawn" : "pawns"}`;
 }
 
@@ -36,13 +41,10 @@ function who(side: Color, you: Color | undefined): string {
 
 const capital = (s: string) => s[0]!.toUpperCase() + s.slice(1);
 
-/** Centipawns as players read them: "a pawn", "5 pawns". */
-const pawnsWords = (cp: number) => (cp === 100 ? "a pawn" : `${cp / 100} pawns`);
-
 export function endWords(end: EndKind, draw: boolean, cfg: AutoChessSettings = AUTOCHESS, detail: EndDetail = {}): string {
   /** A stall: why it stalled, then who gained since the start and how much (Eric, Oct 21: gains count, not army size), or that nobody gained enough. */
   const stall = (why: string) => {
-    if (draw || detail.gain === undefined) return `Fight stalled (${why}): neither side gained ${pawnsWords(cfg.stallWinMargin)}, a draw.`;
+    if (draw || detail.gain === undefined) return `Fight stalled (${why}): neither side gained the edge, a draw.`;
     const winner = detail.winner ?? (detail.gain > 0 ? "w" : "b");
     return `Fight stalled (${why}): ${who(winner, detail.you)} gained ${gainWords(detail.gain)}.`;
   };
@@ -76,7 +78,7 @@ export function endWords(end: EndKind, draw: boolean, cfg: AutoChessSettings = A
  */
 export const fightRulesWords = (cfg: AutoChessSettings = AUTOCHESS) =>
   `One engine plays both armies. A side left with only its king loses. Gains count, not army size: ${cfg.decisiveMargin / 100} pawns gained for ${cfg.decisiveMoves} moves wins, ` +
-  `and a stall (repeats, ${cfg.quietCap} moves each with no capture, or ${cfg.moveCap}) goes to a side that gained ${pawnsWords(cfg.stallWinMargin)}. A pawn at the far end cashes in for +${cfg.cashInGold} gold.`;
+  `and a stall (repeats, ${cfg.quietCap} moves each with no capture, or ${cfg.moveCap}) goes to the side that gained more. A pawn at the far end cashes in for +${cfg.cashInGold} gold.`;
 
 /** The fight's move counter: "Move 12 of 60", and "twice as fast" once the moves speed up (after 30 moves each, or once the fight has thinned out: `thin`, thinFight). */
 export const moveWords = (plies: number, cfg: AutoChessSettings = AUTOCHESS, thin = false) =>
