@@ -77,7 +77,7 @@ export const fightRulesWords = (cfg: AutoChessSettings = AUTOCHESS) =>
   `The engine plays both armies at the same strength. A side loses with only its king left, or when the engine sees it ${pawnsWords(cfg.decisiveMargin)} down for ${cfg.decisiveMoves} moves. ` +
   `A stall (repeats, ${cfg.quietCap} moves each with no capture, or ${cfg.moveCap}) goes to the side ${pawnsWords(cfg.stallWinMargin)} up. A pawn that reaches the far end cashes in for +${cfg.cashInGold} gold.`;
 
-/** The fight's move counter: "Move 12 of 60", and "twice as fast" once the moves speed up (after 30 moves each, or a side down to king and pawns: `thin`). */
+/** The fight's move counter: "Move 12 of 60", and "twice as fast" once the moves speed up (after 30 moves each, or once the fight has thinned out: `thin`, thinFight). */
 export const moveWords = (plies: number, cfg: AutoChessSettings = AUTOCHESS, thin = false) =>
   `Move ${Math.max(1, Math.ceil((plies + 1) / 2))} of ${cfg.moveCap}${thin || plies >= 2 * cfg.fightFastAfter ? " · twice as fast" : ""}`;
 

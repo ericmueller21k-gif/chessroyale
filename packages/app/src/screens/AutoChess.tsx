@@ -30,7 +30,7 @@ import { addXp, buyXp, levelWords, xpBlock, xpToNext, xpWords } from "../autoche
 import { bonusFor, botLocked, bothLocked, buyFreeze, freezeWords, noLocks, tickLocks, youLock, type Locks } from "../autochess/lockin.ts";
 import { botSeen } from "../autochess/reveal.ts";
 import { buyFromSlot, holdFromSlot, newShop, replaceTaken, rerollFor, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
-import { playFight, withPiece } from "../autochess/fight.ts";
+import { playFight, thinFight, withPiece } from "../autochess/fight.ts";
 import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn } from "../autochess/position.ts";
 import { KIND_NAME, other, type Army, type Color, type Kind, type Offer } from "../autochess/types.ts";
 import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline, matchWords, moveWords, type EndDetail, type EndKind } from "../autochess/words.ts";
@@ -138,12 +138,6 @@ function settingsFor(quick: boolean, gold: number, adjust: boolean): AutoChessSe
 }
 
 const colorName = (c: Color) => (c === "w" ? "White" : "Black");
-/** Whether either side of a fight's position is down to its king and pawns (the moves then play fast). */
-const thinFight = (fen: string | undefined) => {
-  if (!fen) return false;
-  const on = piecesOn(fen);
-  return on.w.every((k) => k === "p") || on.b.every((k) => k === "p");
-};
 /** The sounds this screen plays, made ahead (off the page's thread) once the audio is awake. */
 const SOUNDS_USED = ["acPlace", "acHold", "acReroll", "sell", "acXp", "acLevel", "acLock", "acReveal", "acCash"] as const;
 /** What the opponent is called: the same word as a bot in a 1 v 1. */
@@ -761,7 +755,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       : g.phase === "adjust"
         ? "Move one piece to any empty square of your half. Tap a piece, then a square."
         : g.phase === "fight"
-          ? moveWords(g.fight?.plies ?? 0, cfg, thinFight(g.fight?.fen))
+          ? moveWords(g.fight?.plies ?? 0, cfg, !!g.fight && thinFight(g.fight.fen, cfg))
           : "";
 
   const outcome = g.outcome;

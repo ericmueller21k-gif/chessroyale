@@ -1,5 +1,6 @@
 import { AUTOCHESS, type AutoChessSettings, type Rng } from "@chessroyale/core";
-import { BLACK, F_CASHIN, fightRules, judgedResult, moveFlags, moveUci, parseSquare, Position, WHITE, winMoves, type HunEnd } from "@chessroyale/chess/hunchess";
+import { F_CASHIN, fightRules, judgedResult, moveFlags, moveUci, parseSquare, Position, winMoves, type HunEnd } from "@chessroyale/chess/hunchess";
+import { piecesOn } from "./position.ts";
 import type { Color } from "./types.ts";
 
 /**
@@ -24,8 +25,18 @@ export const rulesFor = (cfg: AutoChessSettings = AUTOCHESS) => fightRules(cfg);
 export const fightMoves = (fen: string, cfg: AutoChessSettings = AUTOCHESS): string[] => new Position(fen, rulesFor(cfg)).legalMoves().map(moveUci);
 
 /**
+ * Whether a fight has thinned out, so its moves play fast: either side down to its king and pawns, or `fightFastPieces` or fewer
+ * pieces left on the whole board besides the kings, pawns included (Eric, Oct 21: a pawn and a rook against two knights "should
+ * have gone about twice as fast").
+ */
+export function thinFight(fen: string, cfg: AutoChessSettings = AUTOCHESS): boolean {
+  const on = piecesOn(fen);
+  return on.w.every((k) => k === "p") || on.b.every((k) => k === "p") || on.w.length + on.b.length <= cfg.fightFastPieces;
+}
+
+/**
  * How long a move takes: `fightMoveMs`; `fightFastMoveMs` after `fightFastAfter` moves a side (this many plies so far, two to a
- * move) or once either side is down to its king and pawns (`thin`).
+ * move) or once the fight has thinned out (`thin`: thinFight).
  */
 export const moveMs = (plies: number, cfg: AutoChessSettings = AUTOCHESS, thin = false) => (thin || plies >= 2 * cfg.fightFastAfter ? cfg.fightFastMoveMs : cfg.fightMoveMs);
 
@@ -113,7 +124,7 @@ export async function playFight(startFen: string, opts: FightOptions): Promise<F
     if (decided) return { winner: decided.winner, end: "decided", fen: pos.fen(), moves, cashIns, score: decided.score };
     const allowed = pos.legalMoves().map(moveUci);
     // (The engine thinks while the move's time runs, so a move takes about `fightMoveMs`, not that plus the search.)
-    const thin = pos.kingAndPawns(WHITE) || pos.kingAndPawns(BLACK);
+    const thin = thinFight(pos.fen(), cfg);
     const [asked] = await Promise.all([opts.pick({ startFen, moves: [...moves] }, allowed).catch(() => null), wait(moveMs(moves.length, cfg, thin))]);
     if (opts.cancelled?.()) return null;
     const answer = typeof asked === "string" ? { move: asked, score: null } : asked ? { move: asked.move, score: asked.score } : null;
