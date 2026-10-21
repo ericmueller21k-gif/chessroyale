@@ -28,8 +28,13 @@ const moveFlags = (m: number) => m >> 17;
 const typeOf = (p: number) => p & 7;
 const pieceOf = (color: number, type: number) => (color << 3) | type;
 
-/** A win (mate, or a win by the fight's rules) in `ply` plies scores WIN - ply. */
+/** A mate in `ply` plies scores WIN - ply. */
 export const WIN = 30000;
+/**
+ * A fight won by a rule other than mate (a bare king, a stall the score decides) in `ply` plies scores RULE_WIN - ply: below any
+ * mate (so a found mate is told apart, and preferred), above every ordinary score.
+ */
+export const RULE_WIN = WIN - 500;
 const WIN_BOUND = WIN - 1000;
 const INF = 32000;
 const MAX_PLY = 128;
@@ -85,6 +90,8 @@ export class Searcher {
   private limit = 0;
   private stopped = false;
   private rootDepth = 0;
+  /** Inside a stall's judgment: no rule ends the line. */
+  private judging = false;
   private pos!: Position;
 
   /** `ttBits`: the table holds 2^ttBits entries (16 bytes... three 32-bit numbers each). */
@@ -112,6 +119,7 @@ export class Searcher {
     this.nodes = 0;
     this.limit = opts.nodes;
     this.stopped = false;
+    this.judging = false;
     this.killers.fill(0);
     // (History from earlier searches, halved: still a hint, never a habit.)
     for (let i = 0; i < this.history.length; i++) this.history[i] = this.history[i]! >> 1;
@@ -172,30 +180,58 @@ export class Searcher {
     return out;
   }
 
-  /** The fight's rules at a node: a score if the game is over here by them, else null. Mate and stalemate are found by the move loop. */
+  /**
+   * The rules at a node: a score if the game is over here by them, else null. Mate and stalemate are found by the move loop. A
+   * fight's stall (a repetition, the quiet cap, the move cap) goes to the side the engine's score of the position favors by
+   * `stallWinMargin`, the same judgment the fight's referee makes (`judge`); a repetition inside the search counts as one (two-fold,
+   * as in chess: nothing can be won by repeating now but the stall itself).
+   */
   private ruleScore(ply: number): number | null {
     const pos = this.pos;
-    const us = pos.side;
+    if (this.judging) return null;
     if (pos.rules.variant === "fight") {
-      const mine = pos.pieces[us]!;
-      const theirs = pos.pieces[us ^ 1]!;
-      if (!mine || !theirs) return !mine && !theirs ? 0 : mine ? WIN - ply : -(WIN - ply);
-      // (The side that just moved has given its 5th check: as mate, since a mated side would have lost too.)
-      if (pos.checks[us ^ 1]! >= pos.rules.checksToWin) return -(WIN - ply);
-      if (pos.repetitions(2) >= 2) return 0;
+      const mine = pos.pieces[pos.side]!;
+      const theirs = pos.pieces[pos.side ^ 1]!;
+      if (!mine || !theirs) return !mine && !theirs ? 0 : mine ? RULE_WIN - ply : -(RULE_WIN - ply);
+      if (pos.repeatedInSearch() || pos.repetitions(2) >= 2) return this.stall(ply);
     } else if (pos.repeatedInSearch() || pos.repetitions(2) >= 2) return 0;
     if (pos.halfmove >= 100 || pos.insufficient()) return pos.inCheck && !pos.hasLegalMove() ? -(WIN - ply) : 0;
-    if (pos.rules.variant === "fight") {
-      if (pos.plies >= 2 * pos.rules.moveCap || pos.quiet >= 2 * pos.rules.quietCap) {
-        // (Mate and stalemate come first.)
-        if (!pos.hasLegalMove()) return pos.inCheck ? -(WIN - ply) : 0;
-        const [w, b] = pos.capMaterial();
-        const mineMat = us === WHITE ? w : b;
-        const theirMat = us === WHITE ? b : w;
-        return mineMat > theirMat ? WIN - ply : mineMat < theirMat ? -(WIN - ply) : 0;
-      }
-    }
+    if (pos.rules.variant === "fight" && (pos.plies >= 2 * pos.rules.moveCap || pos.quiet >= 2 * pos.rules.quietCap)) return this.stall(ply);
     return null;
+  }
+
+  /** A fight's stall here: mate and stalemate first, then the judged score (a win, a loss, or a draw when it's closer than the margin). */
+  private stall(ply: number): number {
+    const pos = this.pos;
+    if (!pos.hasLegalMove()) return pos.inCheck ? -(WIN - ply) : 0;
+    const s = this.judge(ply);
+    const m = pos.rules.stallWinMargin;
+    return s >= m ? RULE_WIN - ply : s <= -m ? -(RULE_WIN - ply) : 0;
+  }
+
+  /** The engine's score of the position as a stall's judge sees it: a full-window quiescence search, with no rule ending it (side to move's view). */
+  private judge(ply: number): number {
+    const was = this.judging;
+    this.judging = true;
+    const s = this.quiesce(-INF, INF, ply);
+    this.judging = was;
+    return s;
+  }
+
+  /**
+   * The score that decides a fight's stall, from White's point of view (centipawns): a quiescence search of the position (captures
+   * and cash-ins to the end, with no node limit or clock) from a clean slate (nothing remembered from earlier searches), so the same
+   * position gets the same score on any device. The search values stalls the same way.
+   */
+  stallScore(pos: Position): number {
+    this.clear();
+    this.pos = pos;
+    this.nodes = 0;
+    this.limit = Number.MAX_SAFE_INTEGER;
+    this.stopped = false;
+    this.rootDepth = 0;
+    const s = this.judge(0);
+    return pos.side === WHITE ? s : -s;
   }
 
   private nonPawnPieces(side: number): number {

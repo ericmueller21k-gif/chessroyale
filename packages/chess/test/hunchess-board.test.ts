@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
 import { mulberry32 } from "@chessroyale/core";
 import { CHESS_RULES, fightRules, moveUci, perft, Position, type HunRules } from "../src/hunchess/board.ts";
+import { judgedResult, stallScore } from "../src/hunchess/index.ts";
 
 /** The HunChess engine's board: its move generator against chess.js and known counts, and every rule of a fight. */
 
-const FIGHT: HunRules = fightRules({ checksToWin: 5, quietCap: 10, moveCap: 60 });
+const FIGHT: HunRules = fightRules({ quietCap: 10, moveCap: 60, stallWinMargin: 100 });
 
 const KNOWN: [string, number[]][] = [
   ["rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", [20, 400, 8902, 197281]],
@@ -92,11 +93,11 @@ describe("HunChess board: the move generator", () => {
 
   it("make and unmake restore the position, its key and the fight's counters", () => {
     const pos = new Position("4k3/1P4P1/8/2n5/5N2/8/1p4p1/4K3 w - - 0 1", FIGHT);
-    const before = { fen: pos.fen(), lo: pos.keyLo, hi: pos.keyHi, mg: pos.mg, eg: pos.eg, checks: [...pos.checks], quiet: pos.quiet, plies: pos.plies };
+    const before = { fen: pos.fen(), lo: pos.keyLo, hi: pos.keyHi, mg: pos.mg, eg: pos.eg, quiet: pos.quiet, plies: pos.plies };
     for (const m of pos.legalMoves()) {
       pos.make(m);
       pos.unmake();
-      expect({ fen: pos.fen(), lo: pos.keyLo, hi: pos.keyHi, mg: pos.mg, eg: pos.eg, checks: [...pos.checks], quiet: pos.quiet, plies: pos.plies }).toEqual(before);
+      expect({ fen: pos.fen(), lo: pos.keyLo, hi: pos.keyHi, mg: pos.mg, eg: pos.eg, quiet: pos.quiet, plies: pos.plies }).toEqual(before);
     }
   });
 });
@@ -137,25 +138,17 @@ describe("HunChess board: the fight's rules", () => {
     expect(pos.result()).toEqual({ end: "king_alone", winner: 0 });
   });
 
-  it("5 checks in a row by one side win; a move that gives no check starts the count again", () => {
-    // White's queen checks from five squares in turn while Black's king walks; Black keeps a rook so no bare king.
+  it("checks in a row win nothing (Eric, Oct 21), and a check doesn't restart the quiet count", () => {
+    // White's queen checks five times in a row while Black's king walks: the fight goes on.
     const pos = new Position("7r/8/8/8/3k4/8/8/Q3K3 w - - 0 1", FIGHT);
-    const line = ["a1a4", "d4e5", "a4e8", "e5d6", "e8d8", "d6e6", "d8d5", "e6f6", "d5f5"];
-    for (const m of line.slice(0, 8)) {
+    for (const m of ["a1a4", "d4e5", "a4e8", "e5d6", "e8d8", "d6e6", "d8d5", "e6f6", "d5f5"]) {
       pos.play(m);
       expect(pos.result()).toBeNull();
     }
-    expect(pos.checks[0]).toBe(4);
-    pos.play(line[8]!);
-    expect(pos.checks[0]).toBe(5);
-    expect(pos.result()).toEqual({ end: "checks", winner: 0 });
-    // A quiet move in between resets White's count.
-    const reset = new Position("7r/8/8/8/3k4/8/8/Q3K3 w - - 0 1", FIGHT);
-    for (const m of ["a1a4", "d4e5", "e1e2"]) reset.play(m);
-    expect(reset.checks[0]).toBe(0);
+    expect(pos.quiet).toBe(9);
   });
 
-  it("10 moves a side with no capture, cash-in or check: material decides (equal: a draw)", () => {
+  it("10 moves a side with no capture or cash-in: a stall, which the engine's score decides (a pawn's lead wins)", () => {
     // The kings walk (never repeating a position), the pawns are blocked; White has a knight more.
     const pos = new Position("k7/8/p7/P7/8/8/8/1N5K w - - 0 1", FIGHT);
     const white = ["h1h2", "h2h3", "h3g3", "g3g2", "g2f2", "f2f3", "f3e3", "e3e2", "e2d2", "d2d3"];
@@ -168,34 +161,52 @@ describe("HunChess board: the fight's rules", () => {
     pos.play(white[9]!);
     pos.play(black[9]!);
     expect(pos.quiet).toBe(20);
-    expect(pos.result()).toEqual({ end: "quiet", winner: 0 });
-    // A capture or a check starts the count again.
-    const check = new Position("k7/8/8/8/8/8/1R6/7K w - - 7 1", FIGHT);
+    expect(pos.result()).toEqual({ end: "quiet", winner: -1, stall: true });
+    const judged = judgedResult(pos)!;
+    expect(judged).toMatchObject({ end: "quiet", winner: 0, stall: true });
+    expect(judged.score).toBeGreaterThan(200);
+    // The same position, the same score, every time (no randomness, no clock, nothing kept from judging another position).
+    expect(stallScore(pos)).toBe(judged.score);
+    stallScore(new Position("4k3/7r/8/8/8/8/8/R3K3 w - - 0 1", FIGHT));
+    expect(stallScore(pos)).toBe(judged.score);
+    // A capture starts the count again; a check doesn't.
+    const capture = new Position("k7/8/8/8/8/8/1R4n1/7K w - - 7 1", FIGHT);
+    capture.quiet = 15;
+    capture.play("b2g2");
+    expect(capture.quiet).toBe(0);
+    const check = new Position("k7/8/8/8/8/8/1R4n1/7K w - - 7 1", FIGHT);
     check.quiet = 15;
     check.play("b2a2");
-    expect(check.quiet).toBe(0);
+    expect(check.quiet).toBe(16);
   });
 
-  it("60 moves a side: material decides; mate on the last move still counts as mate", () => {
-    const pos = new Position("4k3/8/8/8/8/8/7r/R3K3 w - - 0 1", FIGHT);
+  it("60 moves a side: a stall the score decides (even: a draw); mate on the last move still counts as mate", () => {
+    const pos = new Position("4k3/7r/8/8/8/8/8/R3K3 w - - 0 1", FIGHT);
     pos.plies = 119;
     pos.quiet = 0;
     pos.play("a1a2");
-    expect(pos.result()).toEqual({ end: "cap", winner: -1 });
+    expect(pos.result()).toEqual({ end: "cap", winner: -1, stall: true });
+    expect(judgedResult(pos)).toMatchObject({ end: "cap", winner: -1 });
+    expect(Math.abs(judgedResult(pos)!.score!)).toBeLessThan(100);
     const mate = new Position("6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1", FIGHT);
     mate.plies = 119;
     mate.play("a1a8");
     expect(mate.result()).toEqual({ end: "checkmate", winner: 0 });
   });
 
-  it("threefold repetition, the fifty-move rule and too little material are draws, as chess.js counts them", () => {
+  it("threefold repetition is a stall (the score decides); the fifty-move rule and too little material are draws, as chess.js counts them", () => {
     const pos = new Position("4k3/4p3/7r/8/8/R7/4P3/4K3 w - - 0 1", FIGHT);
     for (const m of ["a3a4", "h6h5", "a4a3", "h5h6", "a3a4", "h6h5", "a4a3"]) {
       pos.play(m);
       expect(pos.result()).toBeNull();
     }
     pos.play("h5h6");
-    expect(pos.result()).toEqual({ end: "repetition", winner: -1 });
+    expect(pos.result()).toEqual({ end: "repetition", winner: -1, stall: true });
+    expect(judgedResult(pos)).toMatchObject({ end: "repetition", winner: -1 });
+    // Ordinary chess: a plain draw.
+    const chess = new Position("4k3/4p3/7r/8/8/R7/4P3/4K3 w - - 0 1");
+    for (const m of ["a3a4", "h6h5", "a4a3", "h5h6", "a3a4", "h6h5", "a4a3", "h5h6"]) chess.play(m);
+    expect(chess.result()).toEqual({ end: "repetition", winner: -1 });
     // Bishops all on one color: insufficient (and both still have a piece, so no bare king).
     expect(new Position("4k3/8/3b4/8/8/2B5/8/4K3 w - - 0 1", FIGHT).result()).toEqual({ end: "insufficient_material", winner: -1 });
     expect(new Position("4k3/8/2b5/8/8/2B5/8/4K3 w - - 0 1", FIGHT).result()).toBeNull();

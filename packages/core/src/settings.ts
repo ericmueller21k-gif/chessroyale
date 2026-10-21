@@ -2754,18 +2754,29 @@ export interface AutoChessSettings {
    */
   readonly cashInGold: number;
   readonly cashInValue: number;
-  /** After this many moves a side, moves play at `fightFastMoveMs` instead (v5, Eric Oct 20: twice as fast). */
+  /**
+   * Moves play at `fightFastMoveMs` after this many moves a side (v5, Eric Oct 20: twice as fast), and also once either side is
+   * down to its king and pawns (Eric, Oct 21: "the last thing we want to see is just the king moving around").
+   */
   readonly fightFastAfter: number;
   readonly fightFastMoveMs: number;
-  /** A fight stops after this many moves a side; the side with more material (P1 N3 B3 R5 Q9) wins, equal is a draw. */
-  readonly moveCap: number;
   /**
-   * It also stops, the same way, after this many moves a side with no capture or check (Eric, Oct 19: a stuck fight
-   * fizzles out; a check keeps an attack going).
+   * A fight stalls after this many moves a side, or this many moves a side with no capture or cash-in (a check doesn't count:
+   * Eric, Oct 21), or at a threefold repetition. A stall goes to the side the HunChess engine's score of the final position
+   * favors by at least `stallWinMargin` centipawns (100 = a pawn); closer is a draw (Eric, Oct 21: the engine's score, material
+   * and position, not counted material). docs/decisions/2026-10-21-autochess-endings.md.
    */
+  readonly moveCap: number;
   readonly quietCap: number;
-  /** A side that gives this many checks in a row wins, as by mate (Eric, Oct 19: "they're both a win"). */
-  readonly checksToWin: number;
+  readonly stallWinMargin: number;
+  /**
+   * The clean-up ends early: a side the engine's score favors by `decisiveMargin` centipawns or more after `decisiveMoves` of its
+   * own moves in a row wins at once ("too far ahead"), unless the engine has found it a forced mate within `mateShowMoves` moves,
+   * which plays out.
+   */
+  readonly decisiveMargin: number;
+  readonly decisiveMoves: number;
+  readonly mateShowMoves: number;
   /** Hit points each; the first to 0 loses. A lost round costs `damageBase` plus `damagePerPiece` for every enemy piece (not the king) left. */
   readonly hp: number;
   readonly damageBase: number;
@@ -2842,7 +2853,10 @@ export const AUTOCHESS: AutoChessSettings = {
   fightFastMoveMs: 175,
   moveCap: 60,
   quietCap: 10,
-  checksToWin: 5,
+  stallWinMargin: 100,
+  decisiveMargin: 500,
+  decisiveMoves: 3,
+  mateShowMoves: 5,
   hp: 20,
   damageBase: 2,
   damagePerPiece: 1,

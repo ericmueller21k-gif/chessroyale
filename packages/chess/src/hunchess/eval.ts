@@ -3,8 +3,7 @@
  * by the board as moves are made), blended from middlegame to endgame by the pieces left; the bishop pair; pawn structure
  * (doubled, isolated, passed: in a fight a passed pawn is worth little, since it never queens: it only cashes in); mobility;
  * rooks on open files; king safety (the pawn shelter and pieces bearing on the king's squares); and the fight's own rules: a
- * side down to its last piece is one capture from losing, checks in a row count toward a win, and a cashed-in pawn is a
- * little gold.
+ * side down to its last piece is one capture from losing, and a cashed-in pawn is a little gold.
  */
 
 import type { Position } from "./board.ts";
@@ -59,8 +58,6 @@ const SAFETY = (units: number) => Math.min(500, Math.round((units * units) / 2.2
 
 /** The fight: a side with this many pieces left (not the king) is close to losing them all. */
 const LAST_PIECE = [0, 70, 20];
-/** The fight: a side's checks in a row so far (toward the win at 5). */
-const STREAK = [0, 6, 18, 45, 110, 200, 200, 200];
 
 const pawnFiles = [new Int32Array(10), new Int32Array(10)];
 /** Per file (1..8): White's lowest pawn rank and Black's highest (each side's rearmost pawn), for passed pawns. */
@@ -279,10 +276,6 @@ export function evaluate(pos: Position, opts: EvalOptions = DEFAULT_EVAL): numbe
       mg += LAST_PIECE[lb]!;
       eg += LAST_PIECE[lb]!;
     }
-    const sw = STREAK[Math.min(7, pos.checks[WHITE]!)]!;
-    const sb = STREAK[Math.min(7, pos.checks[BLACK]!)]!;
-    mg += sw - sb;
-    eg += sw - sb;
     const cash = opts.cashInValue * (pos.cashed[WHITE]! - pos.cashed[BLACK]!);
     mg += cash;
     eg += cash;
