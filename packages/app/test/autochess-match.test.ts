@@ -16,7 +16,7 @@ import {
   youColor,
   type MatchState,
 } from "../src/autochess/economy.ts";
-import { botAdjust, botAt, botBuys, botPlan } from "../src/autochess/bot.ts";
+import { botAdjust, botAt, botBenchAt, botBuys, botPlan } from "../src/autochess/bot.ts";
 import { addXp } from "../src/autochess/level.ts";
 import { newShop } from "../src/autochess/shop.ts";
 import { buyBlock, carryBench, emptyArmy, extras, halfSquares, kingSquares, legalCounts, owned, placeBlock } from "../src/autochess/army.ts";
@@ -305,9 +305,55 @@ describe("auto chess: the bot", () => {
       expect(buys.reduce((sum, b) => sum + b.price, 0)).toBeLessThanOrEqual(300);
       held += holds.length;
     }
-    // "Now and then": it holds, but not every time.
-    expect(held).toBeGreaterThan(100);
+    // "Now and then": it holds, but not every time. (At level 4 the shop has no rooks or queens and four slots, so a good piece is rarer: about a third of the rounds.)
+    expect(held).toBeGreaterThan(50);
     expect(held).toBeLessThan(500);
+  });
+
+  it("rolls its shop by its own level (v7): no rook or queen below levels 5 and 7, and both once it is high", () => {
+    const kindsAt = (level: number, round: number, cfg: typeof AUTOCHESS) => {
+      const kinds = new Set<string>();
+      for (let seed = 0; seed < 200; seed++) {
+        const { buys } = botBuys(emptyArmy("b", "e8"), 400, round, mulberry32(seed), cfg, { level, xp: 0 });
+        for (const b of buys) if (b.type === "buy" || b.type === "hold") kinds.add(b.kind);
+      }
+      return kinds;
+    };
+    // (No XP bought, so the level it starts at is the level it rolls at all the way through.)
+    expect(kindsAt(4, 6, noXp)).not.toContain("r");
+    expect(kindsAt(4, 6, noXp)).not.toContain("q");
+    expect(kindsAt(6, 6, noXp)).toContain("r");
+    expect(kindsAt(6, 6, noXp)).not.toContain("q");
+    const high = kindsAt(10, 6, noXp);
+    expect(high).toContain("r");
+    expect(high).toContain("q");
+    // A level bought in the step moves its rolls on: starting at 4 with a lot of gold and a fondness for XP it reaches rooks.
+    const xpFond = { ...AUTOCHESS, bot: { ...AUTOCHESS.bot, xpChance: 1, xpChanceFull: 1, maxXpBuys: 3, xpGold: 0 } };
+    expect(kindsAt(4, 6, xpFond)).toContain("r");
+  });
+
+  it("shows its bench by a time (both benches are always visible, v7): what it came in with, less what it has placed, plus what it has held; at the end, the bench of its plan", () => {
+    const held = [{ kind: "n" as Kind, square: "c6" }, { kind: "q" as Kind, square: "d8" }];
+    let sawHold = 0;
+    for (let seed = 0; seed < 200; seed++) {
+      const plan = botPlan("b", "e8", 300, 1 + (seed % 8), mulberry32(seed), AUTOCHESS, held);
+      // Before anything: what it came in with.
+      expect(botBenchAt(plan.events, held, 0)).toEqual(held.filter((h) => !plan.events.some((e) => e.at <= 0 && e.type === "place" && e.kind === h.kind && e.square === h.square)));
+      // At the end: the plan's own bench.
+      const end = botBenchAt(plan.events, held, 99);
+      expect([...end].sort((a, b) => (a.square < b.square ? -1 : 1))).toEqual([...plan.army.bench].sort((a, b) => (a.square < b.square ? -1 : 1)));
+      // A held piece appears when it is bought, and the bench never shrinks but by a placing.
+      let last = botBenchAt(plan.events, held, 0).length;
+      for (const e of plan.events) {
+        const now = botBenchAt(plan.events, held, e.at).length;
+        if (e.type === "hold") {
+          expect(now).toBe(last + 1);
+          sawHold++;
+        }
+        last = now;
+      }
+    }
+    expect(sawHold).toBeGreaterThan(20);
   });
 
   it("shows what it has done by a time (the circles are drawn from this, 2 s behind): pieces on squares, and what it has spent, rerolls too", () => {

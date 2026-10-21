@@ -42,8 +42,9 @@ export function xpBlock(from: Level, gold: number, cfg: AutoChessSettings = AUTO
 /** Buys XP: the new level and the gold left (the caller checked `xpBlock`). */
 export const buyXp = (from: Level, gold: number, cfg: AutoChessSettings = AUTOCHESS): Level & { gold: number } => ({ ...addXp(from, cfg.levels.buyXp, cfg), gold: gold - cfg.levels.buyXpCost });
 
+/** (Short: they show in the small spot under the board, about 15 characters a line.) */
 export function xpWords(block: XpBlock, gold: number, cfg: AutoChessSettings = AUTOCHESS): string {
-  return block === "max" ? `You are at the top level, ${cfg.levels.max}.` : `Not enough gold: ${cfg.levels.buyXp} XP cost ${cfg.levels.buyXpCost} and you have ${gold}.`;
+  return block === "max" ? `Top level (${cfg.levels.max})` : `Need ${cfg.levels.buyXpCost - gold} more`;
 }
 
 /** What a level reads as: "Lv 4 · 2/4 XP", and "Lv 10 · max" at the top. */
