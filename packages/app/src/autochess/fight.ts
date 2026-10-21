@@ -1,5 +1,5 @@
 import { AUTOCHESS, type AutoChessSettings, type Rng } from "@chessroyale/core";
-import { F_CASHIN, fightRules, judgedResult, moveFlags, moveUci, parseSquare, Position, winMoves, type HunEnd } from "@chessroyale/chess/hunchess";
+import { F_CASHIN, fightRules, gainScore, judgedResult, moveFlags, moveUci, parseSquare, Position, startScore, winMoves, type HunEnd } from "@chessroyale/chess/hunchess";
 import { piecesOn } from "./position.ts";
 import type { Color } from "./types.ts";
 
@@ -7,13 +7,16 @@ import type { Color } from "./types.ts";
  * The fight: the HunChess engine plays both sides, the same search for each, a move about every 0.6 s, until mate (a win), a side
  * left with only its king (it loses at once; both kings alone: a draw; also a side that starts the fight so: Eric, Oct 20: "boring
  * moving around... makes it go faster"), stalemate or too little material (draws), or a **stall**: a threefold repetition, 10 moves a
- * side with no capture or cash-in, or 60 moves a side. A stall goes to the side the engine's score of the final position favors by a
- * pawn (`stallWinMargin`); closer is a draw. **Too far ahead:** a side the engine's score favors by 5 pawns (`decisiveMargin`) after 6
- * of its own moves in a row (`decisiveMoves`) wins at once, unless the engine has found it a forced mate (or a forced win by another
- * rule) within 5 moves (`mateShowMoves`), which plays out. Checks count for nothing (Eric, Oct 21: no more "5 checks in a row").
+ * side with no capture or cash-in, or 60 moves a side. **What decides a fight that isn't won outright is what each side gained
+ * during it** (Eric, Oct 21: "I shouldn't get rewarded just because I play more pieces"): the stall judge's score (a clean quiescence
+ * search, `stallScore`) of the position now, less its score of the fight's start (`gainBase`). A stall goes to the side that has
+ * gained a pawn (`stallWinMargin`); closer is a draw. **Too far ahead:** a side that has gained 5 pawns (`decisiveMargin`) after each
+ * of 6 of its own moves in a row (`decisiveMoves`) wins at once, unless the engine has found it a forced mate (or a forced win by
+ * another rule) within 5 moves (`mateShowMoves`), which plays out. Checks count for nothing (Eric, Oct 21: no more "5 checks in a row").
  * No promotion (Eric, Oct 20): a pawn that moves onto its last rank cashes in, leaving the board, and its owner gets `cashInGold` at the round's end. Moves play twice as fast after 30 moves a side, or once either side is down to
  * its king and pawns. The rules are the engine's own (`@chessroyale/chess/hunchess`), so what the engine searches and what the fight
- * plays are the same thing (docs/decisions/2026-10-21-hunchess-engine.md, docs/decisions/2026-10-21-autochess-endings.md).
+ * plays are the same thing (docs/decisions/2026-10-21-hunchess-engine.md, docs/decisions/2026-10-21-autochess-endings.md,
+ * docs/decisions/2026-10-21-autochess-gain.md).
  */
 
 export type FightEnd = HunEnd;
@@ -49,8 +52,10 @@ export interface FightResult {
   moves: string[];
   /** How many pawns of each color cashed in. */
   cashIns: { w: number; b: number };
-  /** A stall's deciding score (the engine's, centipawns, White's view), or for "decided" the winner's last score (its own view). */
+  /** A stall's judged score of the final position (centipawns, White's view). */
   score?: number;
+  /** What White gained since the fight's start by the judge (centipawns; Black's gain is the negative), for a stall or "too far ahead". */
+  gain?: number;
 }
 
 /** One move as played: what the screen shows (the position after it, the move, how many plies so far, and whose pawn cashed in with it). */
@@ -76,8 +81,8 @@ export interface PickAnswer {
 
 export interface FightOptions {
   /**
-   * The engine's move for the fight so far, one of `allowed` (null when it has none to give: a stand-in is played). With its score,
-   * it counts toward "too far ahead"; a bare move (or a stand-in) doesn't, and starts that side's count again.
+   * The engine's move for the fight so far, one of `allowed` (null when it has none to give: a stand-in is played). Its score, if
+   * given, only tells a forced win the engine has found (which plays out instead of "too far ahead"); the gains are the judge's.
    */
   pick: (game: FightSoFar, allowed: readonly string[]) => Promise<string | PickAnswer | null>;
   /** Shown after every move; the next move waits for it, and for the move's time (`wait`). */
@@ -112,16 +117,21 @@ export async function playFight(startFen: string, opts: FightOptions): Promise<F
   const wait = opts.wait ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   // (One board for the whole fight, a move made on it at a time: never replayed from the start.)
   const pos = new Position(startFen, rulesFor(cfg));
+  // (The gains' yardstick: the judge's score of the start. The engine's replay sets the same one, so the two never disagree.)
+  pos.gainBase = startScore(startFen, pos.rules, cfg.cashInValue);
   const moves: string[] = [];
   const cashIns = { w: 0, b: 0 };
-  /** Each side's own moves in a row after which the engine's score had it `decisiveMargin` or more ahead. */
+  /** Each side's own moves in a row after which it had gained `decisiveMargin` or more since the start. */
   const ahead = { w: 0, b: 0 };
-  let decided: { winner: Color; score: number } | null = null;
+  let decided: { winner: Color; gain: number } | null = null;
   for (;;) {
     // (The rules in their order: a bare king first, then mate and stalemate, the stalls and draws; then "too far ahead".)
     const over = judgedResult(pos, cfg.cashInValue);
-    if (over) return { winner: over.winner < 0 ? null : COLOR[over.winner]!, end: over.end, fen: pos.fen(), moves, cashIns, ...(over.score !== undefined ? { score: over.score } : {}) };
-    if (decided) return { winner: decided.winner, end: "decided", fen: pos.fen(), moves, cashIns, score: decided.score };
+    if (over) {
+      const judged = over.score !== undefined ? { score: over.score, gain: over.gain! } : {};
+      return { winner: over.winner < 0 ? null : COLOR[over.winner]!, end: over.end, fen: pos.fen(), moves, cashIns, ...judged };
+    }
+    if (decided) return { winner: decided.winner, end: "decided", fen: pos.fen(), moves, cashIns, gain: decided.gain };
     const allowed = pos.legalMoves().map(moveUci);
     // (The engine thinks while the move's time runs, so a move takes about `fightMoveMs`, not that plus the search.)
     const thin = thinFight(pos.fen(), cfg);
@@ -131,17 +141,20 @@ export async function playFight(startFen: string, opts: FightOptions): Promise<F
     const engineMove = answer && allowed.includes(answer.move) ? answer : null;
     const move = engineMove ? engineMove.move : pickStandIn(pos, allowed, opts.rng)!;
     const mover = COLOR[pos.side]!;
-    const score = engineMove?.score ?? null;
-    ahead[mover] = score !== null && score >= cfg.decisiveMargin ? ahead[mover] + 1 : 0;
-    if (score !== null && ahead[mover] >= cfg.decisiveMoves) {
-      // (A forced win the engine has found soon plays out: a quick mate is fun to watch. So does a win by another rule it has
-      // found, a bare king or a won stall: its score is a win's, not a lead of so many pawns, and it ends the fight in a few moves.)
-      const win = winMoves(score);
-      if (win === null || win > cfg.mateShowMoves) decided = { winner: mover, score };
-    }
     const played = pos.play(move);
     const cashIn = moveFlags(played) & F_CASHIN ? mover : null;
     if (cashIn) cashIns[cashIn]++;
+    // Too far ahead, by the gains: the judge's score after the move less the start's, from the mover's side (the same measure as a
+    // stall's, so the same on any device, whoever or whatever chose the move).
+    const white = gainScore(pos, cfg.cashInValue);
+    const gained = mover === "w" ? white : -white;
+    ahead[mover] = gained >= cfg.decisiveMargin ? ahead[mover] + 1 : 0;
+    if (ahead[mover] >= cfg.decisiveMoves) {
+      // (A forced win the engine has found soon plays out: a quick mate is fun to watch. So does a win by another rule it has
+      // found, a bare king or a won stall: it ends the fight in a few moves anyway.)
+      const win = engineMove?.score != null ? winMoves(engineMove.score) : null;
+      if (win === null || win > cfg.mateShowMoves) decided = { winner: mover, gain: white };
+    }
     moves.push(move);
     opts.onStep?.({ fen: pos.fen(), move, ply: moves.length, cashIn });
   }

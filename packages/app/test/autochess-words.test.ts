@@ -5,40 +5,42 @@ import { piecesOn } from "../src/autochess/position.ts";
 import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline, matchWords } from "../src/autochess/words.ts";
 
 describe("auto chess: what the result says", () => {
-  it("the fight's rules, in the box while it plays, from the settings", () => {
+  it("the fight's rules, in the box while it plays, from the settings (short enough for a 320 px phone)", () => {
     expect(fightRulesWords()).toBe(
-      "The engine plays both armies at the same strength. A side loses with only its king left, or when the engine sees it 5 pawns down for 6 moves. " +
-        "A stall (repeats, 10 moves each with no capture, or 60) goes to the side a pawn up. A pawn that reaches the far end cashes in for +5 gold.",
+      "One engine plays both armies. A side left with only its king loses. Gains count, not army size: 5 pawns gained for 6 moves wins, " +
+        "and a stall (repeats, 10 moves each with no capture, or 60) goes to a side that gained a pawn. A pawn at the far end cashes in for +5 gold.",
     );
-    expect(fightRulesWords({ ...AUTOCHESS, stallWinMargin: 200 })).toContain("goes to the side 2 pawns up.");
+    expect(fightRulesWords().length).toBeLessThanOrEqual(280);
+    expect(fightRulesWords({ ...AUTOCHESS, stallWinMargin: 200 })).toContain("goes to a side that gained 2 pawns.");
   });
 
-  it("names how the fight ended; a stall says why and who the engine's score favors, in whole pawns", () => {
+  it("names how the fight ended; a stall says why and who gained since the start, in whole pawns", () => {
     expect(endWords("checkmate", false)).toBe("Checkmate.");
     expect(endWords("stalemate", true)).toBe("Stalemate.");
     expect(endWords("fifty_moves", true)).toBe("Draw by the fifty-move rule.");
     expect(endWords("insufficient_material", true)).toBe("Draw: not enough pieces left to mate.");
-    // The sides are "you" and "your opponent", as the rest of the screen names them (your color changes every round).
-    expect(endWords("repetition", false, AUTOCHESS, { winner: "w", score: 213, you: "w" })).toBe("Fight stalled (moves repeated): you're 2 pawns up.");
-    expect(endWords("repetition", true, AUTOCHESS, { winner: null, score: 40, you: "w" })).toBe("Fight stalled (moves repeated): less than a pawn apart, a draw.");
-    expect(endWords("quiet", false, AUTOCHESS, { winner: "b", score: -104, you: "w" })).toBe("Fight stalled (10 moves each, no capture): your opponent is 1 pawn up.");
-    expect(endWords("quiet", false, AUTOCHESS, { winner: "b", score: -104, you: "b" })).toBe("Fight stalled (10 moves each, no capture): you're 1 pawn up.");
-    expect(endWords("quiet", true, AUTOCHESS, { winner: null, score: -99, you: "b" })).toBe("Fight stalled (10 moves each, no capture): less than a pawn apart, a draw.");
-    expect(endWords("cap", false, AUTOCHESS, { winner: "w", score: 649, you: "b" })).toBe("Fight stalled (60 moves each): your opponent is 6 pawns up.");
-    expect(endWords("cap", false, AUTOCHESS, { winner: "w", score: 150, you: "w" })).toBe("Fight stalled (60 moves each): you're 2 pawns up.");
-    expect(endWords("cap", true, AUTOCHESS, { winner: null, score: 0, you: "w" })).toBe("Fight stalled (60 moves each): less than a pawn apart, a draw.");
-    expect(endWords("cap", false, AUTOCHESS, { winner: "b", score: -29900, you: "w" })).toBe("Fight stalled (60 moves each): your opponent is far ahead.");
-    expect(endWords("decided", false, AUTOCHESS, { winner: "b", score: 720, you: "b" })).toBe("You're too far ahead: 5+ pawns for 6 moves.");
-    expect(endWords("decided", false, AUTOCHESS, { winner: "b", score: 720, you: "w" })).toBe("Your opponent is too far ahead: 5+ pawns for 6 moves.");
+    // The sides are "you" and "your opponent", as the rest of the screen names them (your color changes every round); the gain is White's.
+    expect(endWords("repetition", false, AUTOCHESS, { winner: "w", gain: 213, you: "w" })).toBe("Fight stalled (moves repeated): you gained 2 pawns.");
+    expect(endWords("repetition", true, AUTOCHESS, { winner: null, gain: 40, you: "w" })).toBe("Fight stalled (moves repeated): neither side gained a pawn, a draw.");
+    expect(endWords("quiet", false, AUTOCHESS, { winner: "b", gain: -104, you: "w" })).toBe("Fight stalled (10 moves each, no capture): your opponent gained 1 pawn.");
+    expect(endWords("quiet", false, AUTOCHESS, { winner: "b", gain: -104, you: "b" })).toBe("Fight stalled (10 moves each, no capture): you gained 1 pawn.");
+    expect(endWords("quiet", true, AUTOCHESS, { winner: null, gain: -99, you: "b" })).toBe("Fight stalled (10 moves each, no capture): neither side gained a pawn, a draw.");
+    expect(endWords("cap", false, AUTOCHESS, { winner: "w", gain: 649, you: "b" })).toBe("Fight stalled (60 moves each): your opponent gained 6 pawns.");
+    expect(endWords("cap", false, AUTOCHESS, { winner: "w", gain: 150, you: "w" })).toBe("Fight stalled (60 moves each): you gained 2 pawns.");
+    expect(endWords("cap", true, AUTOCHESS, { winner: null, gain: 0, you: "w" })).toBe("Fight stalled (60 moves each): neither side gained a pawn, a draw.");
+    expect(endWords("cap", false, AUTOCHESS, { winner: "b", gain: -29900, you: "w" })).toBe("Fight stalled (60 moves each): your opponent gained a winning edge.");
+    expect(endWords("decided", false, AUTOCHESS, { winner: "b", gain: -720, you: "b" })).toBe("You gained 5+ pawns and held it for 6 moves.");
+    expect(endWords("decided", false, AUTOCHESS, { winner: "b", gain: -720, you: "w" })).toBe("Your opponent gained 5+ pawns and held it for 6 moves.");
     // Without your color (no player): White and Black.
-    expect(endWords("cap", false, AUTOCHESS, { winner: "w", score: 649 })).toBe("Fight stalled (60 moves each): White is 6 pawns up.");
-    expect(endWords("decided", false, AUTOCHESS, { winner: "b" })).toBe("Black is too far ahead: 5+ pawns for 6 moves.");
+    expect(endWords("cap", false, AUTOCHESS, { winner: "w", gain: 649 })).toBe("Fight stalled (60 moves each): White gained 6 pawns.");
+    expect(endWords("decided", false, AUTOCHESS, { winner: "b" })).toBe("Black gained 5+ pawns and held it for 6 moves.");
     // The words follow the settings.
-    expect(endWords("quiet", false, { ...AUTOCHESS, quietCap: 8 }, { winner: "w", score: 300, you: "w" })).toBe("Fight stalled (8 moves each, no capture): you're 3 pawns up.");
-    expect(endWords("decided", false, { ...AUTOCHESS, decisiveMargin: 800, decisiveMoves: 2 }, { winner: "w", you: "w" })).toBe("You're too far ahead: 8+ pawns for 2 moves.");
+    expect(endWords("quiet", false, { ...AUTOCHESS, quietCap: 8 }, { winner: "w", gain: 300, you: "w" })).toBe("Fight stalled (8 moves each, no capture): you gained 3 pawns.");
+    expect(endWords("quiet", true, { ...AUTOCHESS, stallWinMargin: 200 }, { winner: null, gain: 150, you: "w" })).toBe("Fight stalled (10 moves each, no capture): neither side gained 2 pawns, a draw.");
+    expect(endWords("decided", false, { ...AUTOCHESS, decisiveMargin: 800, decisiveMoves: 2 }, { winner: "w", you: "w" })).toBe("You gained 8+ pawns and held it for 2 moves.");
     // No word of checks in a row any more.
     for (const end of ["checkmate", "decided", "stalemate", "repetition", "fifty_moves", "insufficient_material", "cap", "quiet", "king_alone", "both_checked"] as const) {
-      expect(endWords(end, false, AUTOCHESS, { winner: "w", score: 300 })).not.toMatch(/check(s| in a row)/i);
+      expect(endWords(end, false, AUTOCHESS, { winner: "w", gain: 300 })).not.toMatch(/check(s| in a row)/i);
     }
     expect(endWords("king_alone", false)).toBe("A side left with only its king loses at once.");
     expect(endWords("king_alone", true)).toBe("Both sides are down to a king: a draw.");
