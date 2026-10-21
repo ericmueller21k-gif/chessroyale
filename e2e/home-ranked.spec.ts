@@ -216,8 +216,13 @@ test("home keeps still: no click on a mode, an option or the ⓘ moves or resize
     await page.setViewportSize({ width: w!, height: h! });
     await page.goto("/");
     await expect(radio(/^50 v 50/)).toHaveAttribute("aria-checked", "false");
-    // (The live window's board: on screen at these computer sizes, a real square.)
-    if (desktop()) expect((await box(page, ".fd-livewin-sq")).width, `${w}`).toBeGreaterThan(150);
+    // (The live window's board: on screen at these computer sizes, a real square. Waited for: the window can still be
+    // settling as the page loads, a live match from the home's live poll replacing the recording, and a board not yet
+    // laid out has no box: boundingBox's null, which read as a TypeError in a shard where another spec's match was live.)
+    if (desktop()) {
+      await expect(page.locator(".fd-livewin-sq").first()).toBeVisible();
+      expect((await box(page, ".fd-livewin-sq")).width, `${w}`).toBeGreaterThan(150);
+    }
     const first = await measure();
     for (const [step, act] of steps) {
       await act();
