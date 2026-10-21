@@ -17570,25 +17570,66 @@ button.sq-tiny {
 }
 
 /* -- Auto chess, the demo (screens/AutoChess.tsx; docs/areas/autochess.md; ac- for auto chess) -- */
+/*
+ * v7's screen (docs/decisions/2026-10-21-autochess-v7.md), built from Eric's approved round-4 mock. Kitty-corner: at the top their bench
+ * (left) and their custom pawn (right), under the board your pawn (left), the clock's small numbers in the gap and your bench (right).
+ * The move clock is the app's own bar (components/Countdown.tsx TimerBar, .timer-bar) along the board's top and bottom edges. Under the
+ * board, the dock: gold with the shop's odds in a small pill, Buy XP and Reroll beside the four square cards.
+ */
 .ac-root {
+  --ac-card: var(--fd-panel-2);
+  --ac-frame: var(--fd-panel-2);
+  --ac-lip: rgba(0, 0, 0, 0.4);
+  --ac-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+  --ac-xp: #5b7be8;
   display: flex;
   justify-content: center;
-  padding: calc(env(safe-area-inset-top) + 4px) calc(12px + env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 4px) calc(12px + env(safe-area-inset-left));
+  align-items: flex-start;
+  padding: calc(env(safe-area-inset-top) + 6px) calc(12px + env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 8px) calc(12px + env(safe-area-inset-left));
+}
+:root[data-theme="light"] .ac-root {
+  --ac-card: #ffffff;
+  --ac-frame: #ffffff;
+  --ac-lip: rgba(0, 0, 0, 0.16);
+  --ac-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
 }
 /*
- * One column as wide as the board. The board is as wide as the screen allows, or as tall as the room under the rows around it
- * (the top line 44, the opponent's row 32, the message line 32, the bench 44, the shop 64, the buttons 34, your row 32, seven
- * gaps of 4 and the page's padding: 324 px).
+ * One column. Every row has a fixed height but the board (as wide as the column, or as tall as the room left) and the dock under it.
+ * The board's frame to its benches is the move clock's bar (6 px) and 4 px of air, the same above and below (`--fm`).
  */
 .ac-col {
-  width: min(100%, calc(var(--app-h) - 324px), 560px);
+  position: relative;
+  width: 100%;
+  max-width: 560px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
+  --pawn: 82px;
+  --hop: 12px;
+  --tw: 40px;
+  --tile: 44px;
+  --sidew: 92px;
+  --fm: 4px;
+  /* The column's width, and the shop's height from it (the cards' tiles are square: a card's tile is its width less 6 px). */
+  --colw: min(calc(100vw - 24px), 560px);
+  --shop-h: max(94px, calc((var(--colw) - 102px) / 4 + 39px));
+  /* Everything but the board and the shop that sets the board's size: the top and bottom rows (122 each), the gold row and its gap, the gaps and the padding. */
+  --chrome: calc(362px + var(--shop-h));
 }
+/* ---- The top: the title row over their bench (left), their name and pawn (right) ---- */
 .ac-top {
-  height: 44px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) var(--sidew);
+  grid-template-rows: 44px 1fr;
+  column-gap: 8px;
+  row-gap: 4px;
+  align-items: end;
+}
+.ac-titlebar {
+  grid-area: 1 / 1 / 2 / 4;
+  align-self: center;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -17603,124 +17644,376 @@ button.sq-tiny {
 .ac-title strong {
   font-family: "Archivo Black", Archivo, sans-serif;
   font-weight: 400;
-  font-size: 17px;
+  font-size: 18px;
   white-space: nowrap;
 }
 .ac-title span {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--fd-sub);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ac-clock {
-  flex: none;
+.ac-top > .ac-bench {
+  grid-area: 2 / 1;
+}
+.ac-top > .ac-opp {
+  grid-area: 1 / 3 / 3 / 4;
+}
+/* Their name and level: small, beside their pawn, level with its feet (the middle of the top row is free). */
+.ac-who {
+  grid-area: 2 / 2;
+  justify-self: end;
+  min-width: 0;
+  transform: translateY(-30px);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  line-height: 1.15;
-}
-.ac-clock b {
-  font-family: "Archivo Black", Archivo, sans-serif;
-  font-weight: 400;
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
-  min-height: 23px;
-}
-.ac-clock span {
-  font-size: 12px;
-  color: var(--fd-sub);
+  line-height: 1.2;
   white-space: nowrap;
-}
-.ac-clock.locked span {
-  color: var(--fd-gold-text);
-  font-weight: 800;
-}
-/* A side's strip (v6): its pawn avatar, its name over its level and XP, and its numbers at the right over a second line. The opponent's is above the board and yours just under it. */
-.ac-side {
-  height: 32px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  min-width: 0;
-  white-space: nowrap;
-}
-.ac-side strong {
-  font-size: 13px;
-  line-height: 1.15;
-}
-.ac-who {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
 }
 .ac-who strong {
+  font-size: 14px;
+  max-width: 80px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ac-stats {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
-  line-height: 1.15;
-}
-.ac-line {
-  display: flex;
-  gap: 8px;
-}
 .ac-lv {
-  align-self: flex-start;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--fd-sub);
-  font-variant-numeric: tabular-nums;
-  /* The XP toward the next level, a thin gold line under the words (--xp: 0 to 1). */
-  background: linear-gradient(var(--fd-gold), var(--fd-gold)) 0 100% / calc(var(--xp, 0) * 100%) 2px no-repeat;
-  padding-bottom: 1px;
 }
 .ac-lv b {
-  display: inline-block;
+  font-weight: 800;
   color: var(--fd-text);
+}
+/* "Locked in" by their name (lock-in on): the opponent's buying is over. */
+.ac-tag {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font-size: 10.5px;
   font-weight: 800;
 }
-/* A level-up pops the number: it jumps up, big and gold, and settles. */
-.ac-lv b.pop {
+
+/* ---- A custom pawn: the app's dressed pawn, hopping on its shadow ---- */
+.ac-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: var(--sidew);
+}
+.ac-stage {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-top: var(--hop);
+}
+.ac-pawn {
+  position: relative;
+  display: block;
+  flex: none;
+  width: calc(var(--pawn) * 1.107);
+  height: var(--pawn);
+}
+.ac-hop {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 92%;
+  animation: ac-hop var(--dur, 1.8s) linear var(--delay, 0s) infinite;
+}
+.ac-shadow {
+  position: absolute;
+  left: 50%;
+  top: 87%;
+  width: 52%;
+  height: 11%;
+  margin-left: -26%;
+  border-radius: 50%;
+  background: #000;
+  opacity: 0.22;
+  animation: ac-shade var(--dur, 1.8s) linear var(--delay, 0s) infinite;
+}
+/* A small hop: a crouch, up (slowing), down (speeding up), a squash on landing and a settle, then a rest. */
+@keyframes ac-hop {
+  0%,
+  8% {
+    transform: translateY(0) scale(1, 1);
+    animation-timing-function: ease-out;
+  }
+  17% {
+    transform: translateY(0) scale(1.07, 0.91);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  37% {
+    transform: translateY(calc(var(--hop) * -1)) scale(0.95, 1.07);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.5);
+  }
+  55% {
+    transform: translateY(0) scale(1.13, 0.85);
+    animation-timing-function: ease-out;
+  }
+  67% {
+    transform: translateY(0) scale(0.97, 1.04);
+    animation-timing-function: ease-in-out;
+  }
+  78%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+/* Its shadow on the ground: it shrinks and fades as the pawn rises, and grows back as it lands. */
+@keyframes ac-shade {
+  0%,
+  8% {
+    transform: scale(1, 1);
+    opacity: 0.22;
+    animation-timing-function: ease-out;
+  }
+  17% {
+    transform: scale(1.06, 1);
+    opacity: 0.24;
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  37% {
+    transform: scale(0.55, 0.7);
+    opacity: 0.08;
+    animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.5);
+  }
+  55% {
+    transform: scale(1.14, 1.05);
+    opacity: 0.27;
+    animation-timing-function: ease-out;
+  }
+  67% {
+    transform: scale(0.98, 1);
+    opacity: 0.23;
+    animation-timing-function: ease-in-out;
+  }
+  78%,
+  100% {
+    transform: scale(1, 1);
+    opacity: 0.22;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-hop,
+  .ac-shadow {
+    animation: none;
+  }
+}
+/* Your level, a small round gold badge on your pawn's corner; the number pops when the level goes up. */
+.ac-badge {
+  position: absolute;
+  right: -4px;
+  bottom: 2px;
+  z-index: 3;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 10px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font: 400 12px/20px "Archivo Black", Archivo, sans-serif;
+  font-style: normal;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--fd-bg);
+}
+.ac-badge.pop {
   animation: ac-pop 700ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 @keyframes ac-pop {
   0% {
     transform: scale(1);
-    color: var(--fd-text);
   }
   30% {
-    transform: scale(2.1) translateY(-2px);
-    color: var(--fd-gold-text);
+    transform: scale(1.7) translateY(-2px);
   }
   100% {
     transform: scale(1);
-    color: var(--fd-text);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ac-lv b.pop {
+  .ac-badge.pop {
     animation: none;
   }
 }
-.ac-stat {
-  color: var(--fd-sub);
+/* Thin bars under a pawn: HP (green fading to red as it drops: the move clock's own colors) and XP, each with a small number. */
+.ac-bars {
+  display: grid;
+  gap: 3px;
+  margin-top: 4px;
 }
-.ac-stat b {
-  color: var(--fd-text);
+.ac-bar {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  line-height: 1;
+}
+.ac-bar small {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--fd-muted);
+}
+.ac-bar i {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--fd-panel-2);
+  box-shadow: inset 0 0 0 1px var(--fd-line);
+  overflow: hidden;
+}
+.ac-bar i::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: calc(var(--f, 1) * 100%);
+  border-radius: 3px;
+  background: var(--fill);
+}
+.ac-bar.hp {
+  --fill: hsl(calc(var(--f) * 135) 70% calc(42% - var(--f) * 6%));
+}
+.ac-bar.xp {
+  --fill: var(--ac-xp);
+}
+.ac-bar b {
+  min-width: 22px;
+  font-size: 10.5px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
-.ac-avatar {
+
+/* ---- Benches: the same size and style, bare pieces on small tiles in the color of the square each keeps, close together; a free slot is a faint tile outline ---- */
+.ac-bench {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--tw);
+  gap: 3px;
+  align-items: start;
+}
+.ac-slot {
+  position: relative;
+  height: var(--tile);
+  min-width: 0;
+  padding: 2px 0 0;
+  border: 0;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  align-content: start;
+  container-type: size;
+  color: var(--fd-text);
+  font-family: inherit;
+  touch-action: none;
+}
+.ac-slot.l {
+  background: var(--sq-light);
+  --lab: var(--sq-coord-on-light);
+}
+.ac-slot.d {
+  background: var(--sq-dark);
+  --lab: var(--sq-coord-on-dark);
+}
+.ac-slot.empty {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px rgba(128, 132, 140, 0.32);
+}
+.ac-slot .ac-pc {
+  width: min(88cqw, 86cqh);
+}
+.ac-slot em {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  font: 700 8.5px/1.1 sans-serif;
+  font-style: normal;
+  color: var(--lab);
+}
+/* Yours are held down on, tapped to place and dragged to sell; theirs are only tapped. A tile you can't use now is dim; one in a drag is faint. */
+.ac-bench.you .ac-slot.has {
+  cursor: pointer;
+}
+.ac-slot.has.off {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+}
+.ac-slot.lifted {
+  opacity: 0.35;
+}
+/* Tap one of their bench pieces: its tile gets a red ring and its landing square lights red on their half. */
+.ac-bench.them .ac-slot.has {
+  cursor: pointer;
+}
+.ac-slot.tapped {
+  box-shadow: 0 0 0 2.5px #dc2626;
+  z-index: 1;
+}
+.ac-red {
+  background: rgba(220, 38, 38, 0.58);
+  box-shadow: inset 0 0 0 3px #b91c1c;
+  z-index: 3;
+}
+/* While you drag an offer, the whole bench row lights up (the app's own gold ring for a drop place). */
+.ac-bench.lit {
+  border-radius: 10px;
+  outline: 2px solid var(--fd-gold);
+  outline-offset: 4px;
+  box-shadow: 0 0 0 4px rgba(242, 193, 78, 0.22);
+  background: rgba(242, 193, 78, 0.16);
+}
+.ac-bench.lit .ac-slot.empty {
+  box-shadow: inset 0 0 0 1.5px rgba(154, 106, 6, 0.55);
+}
+
+/* A piece's picture: the board's own art in a box that sizes it. */
+.ac-pc {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+}
+.ac-pc piece {
+  position: static;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ac-coin {
+  display: inline-block;
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--fd-gold);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.18);
+}
+
+/* ---- The board in its frame: the white frame (the app's curved board) with the move clock's bars along its top and bottom edges ---- */
+.ac-frame {
+  position: relative;
+  align-self: center;
+  width: min(100%, calc(var(--app-h) - var(--chrome)));
+  margin: var(--fm) 0;
+  padding: 3px;
+  border-radius: 13px;
+  background: var(--ac-frame);
+  box-shadow: var(--ac-shadow);
+}
+.ac-frame .ac-board {
+  border-radius: 9px;
+  overflow: hidden;
+}
+/* The move clock, the app's own bar (components/Countdown.tsx TimerBar: 6 px, full at the start, shrinking from both ends to the middle, dark green through yellow to red), along the board's top edge and mirrored along its bottom. In the app it sits behind the board's row (z-index -1); here it has the frame. */
+.ac-frame > .timer-bar {
+  z-index: 0;
+  width: 100%;
+}
+.ac-frame > .timer-bar.below {
+  top: 100%;
 }
 .ac-circle.w::after {
   background: #fff;
@@ -17812,6 +18105,22 @@ button.sq-tiny {
 .ac-picked {
   background: var(--sq-select);
 }
+/* The move step: the piece picked for you glows, with its legal squares as dots. */
+.ac-pick {
+  box-shadow: inset 0 0 0 3px var(--fd-gold);
+  background: rgba(242, 193, 78, 0.3);
+  animation: ac-pulse 1.1s ease-in-out infinite;
+}
+@keyframes ac-pulse {
+  50% {
+    background: rgba(242, 193, 78, 0.12);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-pick {
+    animation: none;
+  }
+}
 /*
  * The shop's offers on the board (v6): each a glowing silhouette of its piece, on its square. A soft green with a dark green edge
  * and a green glow, so it reads on the classic, green and gold squares alike. The shape is the board's own white piece used as a
@@ -17897,233 +18206,313 @@ button.sq-tiny {
   font-size: calc(var(--board-size, 100%) / 8 * 0.3);
   line-height: 1;
 }
-.ac-theirs-line {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  top: calc(var(--board-size, 100%) / 4);
-  transform: translateY(-50%);
-  padding: 7px 10px;
+/*
+ * The phase banners: the 3-2-1 is the app's own (.center-count, .cc-num: components/Countdown.tsx). The phase words ("ACTION PHASE", "MOVE PHASE",
+ * "BATTLE PHASE") are the same style at about half the size, in a rounded frosted box fitted round them (a backdrop blur and a light gray
+ * tint), the board sharp around it. Sized in the board's own width (cqw).
+ */
+.ac-phase {
+  top: 50%;
+  width: auto;
+  white-space: nowrap;
   text-align: center;
-  font-size: 14px;
-  font-weight: 700;
-  color: #fff;
-  background: rgba(14, 16, 21, 0.78);
-  pointer-events: none;
+  font-size: 8.4cqw;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  -webkit-text-stroke-width: 0.5cqw;
+  animation-duration: 1.6s;
+  padding: 3.2cqw 6.4cqw 3.4cqw;
+  border-radius: 7cqw;
+  -webkit-backdrop-filter: blur(10px) grayscale(0.4);
+  backdrop-filter: blur(10px) grayscale(0.4);
+  background: rgba(236, 233, 226, 0.6);
+  box-shadow: 0 1.4cqw 5cqw rgba(0, 0, 0, 0.22), inset 0 0 0 0.5cqw rgba(255, 255, 255, 0.65);
+  text-shadow: none;
 }
-.ac-msg {
-  height: 32px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+
+/* ---- Under the board: your pawn (left), the clock's numbers (the gap), your bench (right, up against the board like theirs) ---- */
+.ac-bottom {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--sidew) minmax(0, 1fr) auto;
+  column-gap: 8px;
+  align-items: start;
 }
-.ac-msg-text,
-.ac-card-say {
-  flex: 1 1 auto;
+.ac-bottom > .ac-bench {
+  align-self: start;
+}
+/* The numbers: small, straight on the page, no box: the time, and the step's name under it (a message takes the name's place for a moment). */
+.ac-timer {
+  position: relative;
+  align-self: stretch;
   min-width: 0;
-  font-size: 12.5px;
-  line-height: 1.25;
+  text-align: center;
+  line-height: 1.15;
+}
+.ac-timer b {
+  display: block;
+  font: 400 17px/1.15 "Archivo Black", Archivo, sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.ac-timer span {
+  display: block;
+  margin-top: 1px;
+  font-size: 11.5px;
+  font-weight: 700;
   color: var(--fd-sub);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
 }
-.ac-card-say {
-  flex: none;
-  min-height: 31px;
+.ac-timer.low b,
+.ac-timer.low span {
+  color: #c0372f;
 }
+.ac-timer.quiet b {
+  color: var(--fd-dim);
+}
+.ac-timer span.say {
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--fd-text);
+}
+/* Sell (a piece of yours is selected on the board): a gold button low in the gap, over the free room beside the pawn (it never moves a row). */
 .ac-sell {
-  flex: none;
-  height: 30px;
-  padding: 0 12px;
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  min-width: 84px;
+  height: 44px;
+  padding: 0 14px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--fd-gold);
   color: var(--fd-gold-ink);
   font-weight: 800;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
+  box-shadow: 0 3px 0 var(--ac-lip);
 }
-/* The bench (v6): four slots, each a held piece and the square it will land on. Drag an offer from the shop onto the row to hold it. */
-.ac-bench {
-  position: relative;
-  height: 44px;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  touch-action: none;
-}
-.ac-bench.holding {
-  box-shadow: 0 0 0 2px var(--fd-gold);
-  border-radius: 11px;
-}
-.ac-slot {
-  position: relative;
-  min-width: 0;
-  padding: 0;
-  border: 1px dashed var(--fd-line);
-  border-radius: 9px;
-  background: transparent;
-  color: var(--fd-text);
-  font-family: inherit;
+
+/* ---- The dock: gold (with the shop's odds in a small pill), then Buy XP and Reroll beside the four shop cards (square around the pieces) ---- */
+.ac-dock {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  touch-action: none;
+  flex-direction: column;
+  gap: 8px;
 }
-.ac-slot.has {
-  border-style: solid;
+/* The gold row: gold, income, then (at the right) the odds pill and the win streak, all on one text baseline: the % under each icon and the gold number sit on the same line. */
+.ac-goldrow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 30px;
+}
+.ac-purse {
+  display: block;
+  white-space: nowrap;
+}
+.ac-gold-you {
+  display: inline;
+}
+.ac-gold-you .ac-coin {
+  width: 15px;
+  height: 15px;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+.ac-gold-you b {
+  font: 400 18px/1 "Archivo Black", Archivo, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.ac-income {
+  margin-left: 12px;
+  font-size: 11.5px;
+  color: var(--fd-muted);
+}
+.ac-income b {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--fd-gold-text);
+}
+/* The odds pill, small, like the streak's: each piece's icon with its percent under it. The pill is a block of inline blocks, so its baseline is the percents' line. */
+.ac-odds {
+  display: block;
+  margin-left: auto;
+  padding: 3px 7px 2px;
+  border-radius: 999px;
   background: var(--fd-panel-2);
-  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 0;
 }
-.ac-slot small {
+.ac-od {
+  display: inline-block;
+  vertical-align: baseline;
+  min-width: 26px;
+  margin: 0 2px;
+}
+.ac-od .ac-pc {
+  width: 20px;
+  margin: 0 auto;
+}
+.ac-od b {
+  display: block;
+  font-size: 10.5px;
+  line-height: 1.15;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.ac-od.none {
+  opacity: 0.4;
+}
+.ac-streak {
+  padding: 3px 9px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 800;
-  line-height: 1;
-  color: var(--fd-sub);
-}
-.ac-slot.has.off {
-  opacity: 0.5;
-  filter: grayscale(0.7);
-}
-.ac-slot.picked {
-  box-shadow: inset 0 0 0 2px var(--fd-gold);
-}
-.ac-slot.lifted {
-  opacity: 0.35;
-}
-.ac-icon {
-  display: block;
-  width: 100%;
-  max-width: 44px;
-  aspect-ratio: 1;
-}
-.ac-slot .ac-icon {
-  width: 30px;
-  flex: none;
-}
-.ac-icon piece {
-  position: static;
-  display: block;
-  width: 100%;
-  height: 100%;
+  line-height: 1.2;
+  color: var(--fd-green);
+  background: color-mix(in srgb, var(--fd-green) 16%, transparent);
 }
 .ac-shop {
   position: relative;
-  height: 64px;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: 78px minmax(0, 1fr);
   gap: 6px;
 }
 .ac-shop.selling {
   box-shadow: 0 0 0 2px var(--fd-gold);
   border-radius: 12px;
 }
+/* The shop is shut (the last seconds, the move step): the buttons and the cards dim, as the app dims what you can't buy. */
+.ac-shop.shut {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+}
+.ac-btns {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 6px;
+}
+.ac-btn,
 .ac-buy {
-  min-width: 0;
-  padding: 3px 2px 2px;
   border: 0;
-  border-radius: 12px;
-  background: var(--fd-panel);
+  background: var(--ac-card);
   color: var(--fd-text);
   font-family: inherit;
+  box-shadow: 0 3px 0 var(--ac-lip);
+}
+.ac-btn {
+  min-height: 44px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  /* A card is tapped to buy and dragged to the bench to hold: a finger's drag is ours (without this the browser takes it for a pan and cancels it). */
-  touch-action: none;
-}
-.ac-buy .ac-icon {
-  height: 34px;
-  width: 34px;
-  flex: none;
-}
-.ac-buy b {
+  justify-content: center;
+  gap: 3px;
   font-size: 14px;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-.ac-buy small {
-  min-height: 11px;
-  font-size: 10px;
+  font-weight: 800;
   line-height: 1.1;
-  color: var(--fd-muted);
-  white-space: nowrap;
+  word-spacing: 0.06em;
+  cursor: pointer;
 }
+.ac-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ac-cost b {
+  font: 400 14px/1 "Archivo Black", Archivo, sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: var(--fd-gold-text);
+}
+.ac-btn.off,
 .ac-buy.off {
   opacity: 0.5;
   filter: grayscale(0.7);
 }
-/* An offer the board has no room for: still holdable, so not greyed; its reason shows in gold. */
-.ac-buy.hold-only small {
+.ac-shop.shut .ac-btn.off,
+.ac-shop.shut .ac-buy.off {
+  opacity: 1;
+  filter: none;
+}
+.ac-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.ac-buy {
+  min-width: 0;
+  padding: 4px 3px 6px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  /* A card is tapped to buy and dragged to the bench to hold: a finger's drag is ours (without this the browser takes it for a pan and cancels it). */
+  touch-action: none;
+}
+/* The piece sits on a square tile (the square it lands on), never a tall one. */
+.ac-tile {
+  flex: none;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+.ac-tile.l {
+  background: var(--sq-light);
+}
+.ac-tile.d {
+  background: var(--sq-dark);
+}
+.ac-tile .ac-pc {
+  width: 92cqw;
+}
+.ac-nm {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.ac-nm em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--fd-sub);
+}
+/* An offer the board has no room for: still holdable, so not greyed; its square shows in gold. */
+.ac-buy.hold-only .ac-nm em {
   color: var(--fd-gold-text);
   font-weight: 700;
 }
-/* Reroll, Buy XP and Lock in under the shop. */
-.ac-ctl {
-  height: 34px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-.ac-ctl button {
-  min-width: 0;
+/* Lock in (off since v7; with `lockIn` on it is a bar under the shop). */
+.ac-lock {
+  min-height: 44px;
   border: 0;
   border-radius: 12px;
-  background: var(--fd-panel);
-  color: var(--fd-text);
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
   font-family: inherit;
   font-weight: 800;
   font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  white-space: nowrap;
+  box-shadow: 0 3px 0 var(--ac-lip);
   cursor: pointer;
 }
-.ac-ctl button b {
-  font-variant-numeric: tabular-nums;
-  color: var(--fd-gold-text);
-}
-.ac-ctl button.off {
-  opacity: 0.5;
-  filter: grayscale(0.7);
-}
-.ac-ctl .ac-lock {
-  background: var(--fd-gold);
-  color: var(--fd-gold-ink);
-}
-.ac-ctl .ac-lock small {
+.ac-lock small {
+  margin-left: 6px;
   font-size: 12px;
   font-weight: 700;
 }
-/* While the first-lock bonus is open the button is two lines (the bonus under its name), so the three buttons fit at 320 px. */
-.ac-ctl .ac-lock.bonus {
-  flex-direction: column;
-  gap: 0;
-  line-height: 1.1;
+.ac-lock.off {
+  opacity: 0.5;
+  filter: grayscale(0.7);
 }
-.ac-ctl .ac-lock.bonus small {
-  font-size: 10.5px;
-}
-.ac-ctl .ac-lock.done {
-  background: var(--fd-panel);
+.ac-lock.done {
+  background: var(--ac-card);
   color: var(--fd-gold-text);
   cursor: default;
-}
-/* "Locked in" by their name: the opponent's buying is over. */
-.ac-tag {
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--fd-gold);
-  color: var(--fd-gold-ink);
-  font-size: 10.5px;
-  font-weight: 800;
 }
 .ac-sell-drop {
   position: absolute;
@@ -18137,16 +18526,33 @@ button.sq-tiny {
   font-size: 15px;
   pointer-events: none;
 }
-/* The other steps' box, in the place of the message line, the bench, the shop and the buttons (32 + 4 + 44 + 4 + 64 + 4 + 34 px). */
+/*
+ * The fight's and the result's box, in the shop's place: the same two columns as the shop (the buttons at the left, Next round or
+ * Play again and Home, as tall as Buy XP and Reroll; the words at the right). The result's box also takes the gold row's room (its line says
+ * the next round's gold), so on a 320 x 568 phone it holds the longest result.
+ */
 .ac-card {
-  height: 186px;
+  min-height: var(--shop-h);
   padding: 8px 10px;
   border-radius: 14px;
   background: var(--fd-panel);
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+}
+.ac-card-fight {
+  grid-template-columns: minmax(0, 1fr);
+}
+.ac-card-result,
+.ac-card-over {
+  min-height: calc(var(--shop-h) + 40px);
+}
+.ac-card-body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  overflow: hidden;
+  min-width: 0;
 }
 .ac-card-head {
   font-family: "Archivo Black", Archivo, sans-serif;
@@ -18163,20 +18569,24 @@ button.sq-tiny {
   color: var(--fd-text);
 }
 .ac-card-buttons {
-  margin-top: auto;
-  display: flex;
-  gap: 8px;
+  align-self: stretch;
+  display: grid;
+  grid-auto-rows: minmax(44px, 1fr);
+  gap: 6px;
 }
 .ac-go {
-  flex: 1 1 0;
-  height: 38px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 4px;
   border: 0;
   border-radius: 12px;
   background: var(--fd-gold);
   color: var(--fd-gold-ink);
   font-family: "Archivo Black", Archivo, sans-serif;
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1.1;
   cursor: pointer;
+  box-shadow: 0 3px 0 var(--ac-lip);
 }
 .ac-go-2 {
   background: var(--fd-panel-2);
@@ -18201,10 +18611,10 @@ button.sq-tiny {
   height: calc(var(--board-size, 100%) / 8);
 }
 .ac-float.on-bench {
-  left: calc((100% - 12px) / 4 * var(--slot, 0) + 4px * var(--slot, 0));
+  left: calc((var(--tw) + 3px) * var(--slot, 0));
   top: 0;
-  width: calc((100% - 12px) / 4);
-  height: 100%;
+  width: var(--tw);
+  height: var(--tile);
 }
 .ac-float b {
   font-family: "Archivo Black", Archivo, sans-serif;
@@ -18246,8 +18656,7 @@ button.sq-tiny {
 }
 /*
  * Every button here presses down (Eric, Oct 20: "every button gets the pressed-down feel", from TFT): while it is held it sinks a couple
- * of pixels and shrinks a hair, and comes back up with a short spring. The Reroll button is a thicker key that visibly drops onto its
- * shadow.
+ * of pixels and shrinks a hair, and comes back up with a short spring. Reroll and the others with a lip drop onto their shadow.
  */
 .ac-root button {
   transition: transform 120ms cubic-bezier(0.3, 1.5, 0.5, 1), box-shadow 120ms ease-out, filter 120ms ease-out;
@@ -18257,17 +18666,18 @@ button.sq-tiny {
   filter: brightness(0.93);
   transition-duration: 40ms;
 }
-.ac-ctl button {
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.16);
-  margin-bottom: 3px;
-  height: 31px;
-}
-.ac-ctl button:active {
+.ac-btn:active,
+.ac-buy:active,
+.ac-lock:active {
   transform: translateY(3px);
-  box-shadow: 0 0 0 rgba(0, 0, 0, 0.16);
+  box-shadow: 0 0 0 transparent;
   filter: brightness(0.92);
 }
-.ac-ctl .ac-reroll:active {
+.ac-sell:active {
+  transform: translateX(-50%) translateY(3px);
+  box-shadow: 0 0 0 transparent;
+}
+.ac-reroll:active {
   transform: translateY(3px) scale(0.97);
 }
 @media (prefers-reduced-motion: reduce) {
@@ -18291,6 +18701,317 @@ button.sq-tiny {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+/* ---- A short phone (320 x 568, 360 x 640, 375 x 667): smaller pawns, tighter rows ---- */
+@media (max-height: 760px) {
+  .ac-root {
+    padding-top: 4px;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 6px);
+  }
+  .ac-col {
+    gap: 4px;
+    --pawn: 46px;
+    --hop: 8px;
+    --sidew: 80px;
+    --fm: 5px;
+    --shop-h: max(92px, calc((var(--colw) - 94px) / 4 + 39px));
+    --chrome: calc(262px + var(--shop-h));
+  }
+  .ac-top {
+    row-gap: 2px;
+  }
+  .ac-who {
+    transform: translateY(-24px);
+  }
+  .ac-dock {
+    gap: 4px;
+  }
+  .ac-goldrow {
+    min-height: 24px;
+  }
+  .ac-shop,
+  .ac-card {
+    grid-template-columns: 70px minmax(0, 1fr);
+  }
+  .ac-card-fight {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ac-btns {
+    gap: 4px;
+  }
+  .ac-badge {
+    min-width: 17px;
+    height: 17px;
+    font-size: 10.5px;
+    line-height: 17px;
+    right: -5px;
+    bottom: 0;
+  }
+  .ac-timer b {
+    font-size: 16px;
+  }
+  .ac-timer span {
+    font-size: 11px;
+  }
+}
+
+/* ---- A narrow phone (320) ---- */
+@media (max-width: 350px) {
+  .ac-root {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .ac-col {
+    --sidew: 84px;
+    --tw: 34px;
+    --colw: calc(100vw - 16px);
+    --shop-h: 92px;
+  }
+  .ac-titlebar {
+    gap: 6px;
+  }
+  .ac-title strong {
+    font-size: 16px;
+  }
+  .ac-title span {
+    font-size: 11px;
+  }
+  .ac-who strong {
+    font-size: 12.5px;
+    max-width: 44px;
+  }
+  .ac-lv {
+    font-size: 10.5px;
+  }
+  .ac-bar {
+    grid-template-columns: 13px minmax(0, 1fr) auto;
+    gap: 3px;
+  }
+  .ac-bottom,
+  .ac-top {
+    column-gap: 6px;
+  }
+  .ac-timer b {
+    font-size: 15px;
+  }
+  .ac-timer span {
+    font-size: 10.5px;
+  }
+  .ac-bench {
+    gap: 2px;
+  }
+  .ac-goldrow {
+    gap: 6px;
+  }
+  .ac-income-word {
+    display: none;
+  }
+  .ac-income {
+    margin-left: 8px;
+  }
+  .ac-odds {
+    padding: 3px 4px 2px;
+  }
+  .ac-od {
+    min-width: 24px;
+    margin: 0 1px;
+  }
+  .ac-od .ac-pc {
+    width: 19px;
+  }
+  .ac-od b {
+    font-size: 10px;
+  }
+  .ac-shop {
+    grid-template-columns: 62px minmax(0, 1fr);
+    gap: 5px;
+  }
+  .ac-btns {
+    gap: 4px;
+  }
+  .ac-btn {
+    font-size: 12.5px;
+  }
+  .ac-cards {
+    gap: 4px;
+  }
+  .ac-buy {
+    padding: 3px 2px 4px;
+    gap: 2px;
+  }
+  .ac-tile {
+    width: 92%;
+  }
+  .ac-nm {
+    font-size: 10.5px;
+    text-align: center;
+  }
+  .ac-cost b {
+    font-size: 12.5px;
+  }
+  .ac-card {
+    grid-template-columns: 62px minmax(0, 1fr);
+    column-gap: 8px;
+  }
+  .ac-card-fight {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ac-go {
+    font-size: 12.5px;
+  }
+  .ac-card-text,
+  .ac-card-gold {
+    font-size: 12px;
+  }
+}
+
+/* ---- A computer (1280 x 800): the board with the rows around it at the left, the dock at the right ---- */
+@media (min-width: 900px) and (min-height: 540px) {
+  .ac-root {
+    justify-content: center;
+    padding: 14px 24px;
+  }
+  .ac-col {
+    --zone: 126px;
+    --pawn: 80px;
+    --hop: 13px;
+    --tw: 54px;
+    --tile: 52px;
+    --sidew: 116px;
+    --fm: 4px;
+    --bw: min(560px, calc(var(--app-h) - 28px - 2 * var(--zone) - 20px - 2 * var(--fm)));
+    width: calc(var(--bw) + 32px + 440px);
+    max-width: 100%;
+    display: grid;
+    grid-template-columns: var(--bw) 440px;
+    grid-auto-rows: auto;
+    column-gap: 32px;
+    row-gap: 10px;
+    align-content: start;
+  }
+  .ac-top {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .ac-frame {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+  }
+  .ac-bottom {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .ac-dock {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+    margin-top: var(--fm);
+    gap: 10px;
+  }
+  .ac-title strong {
+    font-size: 20px;
+  }
+  .ac-title span {
+    font-size: 13.5px;
+  }
+  .ac-who {
+    transform: translateY(-34px);
+  }
+  .ac-who strong {
+    font-size: 15px;
+    max-width: 90px;
+  }
+  .ac-lv {
+    font-size: 12.5px;
+  }
+  .ac-bar small {
+    font-size: 10px;
+  }
+  .ac-bar i {
+    height: 7px;
+  }
+  .ac-bar b {
+    font-size: 12px;
+  }
+  .ac-timer b {
+    font-size: 22px;
+  }
+  .ac-timer span {
+    font-size: 13px;
+  }
+  .ac-slot em {
+    font-size: 10px;
+  }
+  .ac-goldrow {
+    min-height: 36px;
+  }
+  .ac-gold-you b {
+    font-size: 24px;
+  }
+  .ac-gold-you .ac-coin {
+    width: 19px;
+    height: 19px;
+  }
+  .ac-income {
+    font-size: 13.5px;
+  }
+  .ac-income b {
+    font-size: 16px;
+  }
+  .ac-streak {
+    font-size: 14px;
+    padding: 4px 11px;
+  }
+  .ac-odds {
+    padding: 4px 9px 3px;
+  }
+  .ac-od {
+    min-width: 34px;
+    margin: 0 3px;
+  }
+  .ac-od .ac-pc {
+    width: 24px;
+  }
+  .ac-od b {
+    font-size: 12.5px;
+  }
+  .ac-shop,
+  .ac-card {
+    grid-template-columns: 92px minmax(0, 1fr);
+  }
+  .ac-card-fight {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ac-shop {
+    gap: 8px;
+  }
+  .ac-btns {
+    gap: 8px;
+  }
+  .ac-btn {
+    font-size: 14px;
+    border-radius: 12px;
+    gap: 2px;
+  }
+  .ac-cost b {
+    font-size: 14px;
+  }
+  .ac-cards {
+    gap: 8px;
+  }
+  .ac-buy {
+    padding: 5px 4px 7px;
+    gap: 4px;
+    border-radius: 12px;
+  }
+  .ac-nm {
+    font-size: 13px;
+  }
+  .ac-card {
+    min-height: 119px;
+  }
 }
 
 /* ---- Moo & Moon (components/Moo.tsx; mo- for Moo) ---- */

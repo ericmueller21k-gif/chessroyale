@@ -197,6 +197,25 @@ export function botAt(events: readonly BotEvent[], seconds: number): { squares: 
 }
 
 /**
+ * What the bot holds on its bench `seconds` into the step: what it came in with (`start`), less the held pieces it has placed by then
+ * (it places them first, for nothing), plus the pieces it has bought to hold. Both benches are always visible, real pieces and the
+ * square each keeps (Eric, Oct 21: "intentional"); the screen draws theirs 2 s behind, as it draws their circles.
+ */
+export function botBenchAt(events: readonly BotEvent[], start: readonly Offer[], seconds: number): Offer[] {
+  const bench = [...start];
+  for (const e of events) {
+    if (e.at > seconds) break;
+    if (e.kind === "reroll" || e.kind === "xp" || !e.square) continue;
+    if (e.type === "hold") bench.push({ kind: e.kind, square: e.square });
+    else if (e.type === "place") {
+      const i = bench.findIndex((o) => o.kind === e.kind && o.square === e.square);
+      if (i >= 0) bench.splice(i, 1);
+    }
+  }
+  return bench;
+}
+
+/**
  * The bot's adjust step: its one change (one of its pieces to any legal empty square of its half), picked greedily with `evaluate`
  * (its chance of winning, 0 to 1, from a small engine search of the position the fight would start from): it tries a few changes
  * (a few random squares for each of some pieces) and keeps the best only if it beats standing still. A small search by design: it shouldn't be unbeatable. `stop` ends it early (the
