@@ -135,11 +135,8 @@ export function bossInText(name: string, start = false, roster: readonly BossDef
 /** The hopper's name wherever it shows (Eric, Oct 18): Chub the rabbit riding Chirp the grasshopper. Its id stays "hopper". */
 export const HOPPER_NAME = "Chub & Chirp";
 
-/**
- * The hippo gardener's name wherever it shows: a placeholder until Eric names him (asked Oct 21), one string so the name
- * is one edit later. His id stays "gardener".
- */
-export const GARDENER_NAME = "The Gardener";
+/** The hippo gardener's name wherever it shows (Eric, Oct 21): a plain name, like Smudgy's. His id stays "gardener". */
+export const GARDENER_NAME = "Puddles";
 
 /**
  * Every boss, complete or not. Only a playable one (isPlayable: a complete character and powers) is ever chosen,
@@ -195,13 +192,13 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // weaker underneath than every playable boss not named in it, and a tie at −250 failed it; Moo plays at Stockfish's strength
   // floor (about 1320 to 1350), so 10 points change nothing in play (the director's call, Oct 20; docs/decisions/2026-10-20-moo-wired.md).
   { id: "moo", name: "Moo & Moon", icon: "🐄", kit: "Moo", offset: -240, powers: { passive: "moonbeam", ultimate: "fullmoon" } },
-  // The hippo gardener (GARDENER_NAME, a placeholder; Eric, Oct 20): Seeds, a public count on a real-time meter (5 as the
+  // Puddles, the hippo gardener (GARDENER_NAME; Eric, Oct 20, named Oct 21): Seeds, a public count on a real-time meter (5 as the
   // battle begins, one every 30 s, up to 10), and Watering, his whole turn: every seed rolls nothing, a plain plant that
   // blocks a square for 3 crowd turns, a killer plant that eats a piece of either side, a piece grown for him, or the queen
   // jackpot, placed by the host's engines so his gain stays in a fair band (bosses/gardener.ts;
   // docs/decisions/2026-10-21-gardener-rules.md). Not playable until his art is wired in (`kit: null`; the test links
   // `?boss=gardener&wip=1`, `&power=water`, `&seeds=10`). His offset from the raid sim: the usual −250, with
-  // rageSpeed 1.2 the crowd scores 0.38 in 49 moves with 3.4 waterings a battle, inside the pack (reports/gardener-sim.md).
+  // rageSpeed 1.2 the crowd scores 0.17 in 46 moves with 3.0 waterings a battle, inside the pack (reports/gardener-sim.md).
   { id: "gardener", name: GARDENER_NAME, icon: "🦛", kit: null, offset: -250, powers: { passive: "seeds", ultimate: "water" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },

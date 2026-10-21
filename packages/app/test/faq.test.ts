@@ -83,7 +83,10 @@ describe("the FAQ's contents", () => {
     expect(words).toContain(`nothing (${o.nothing}%), a plain plant (${o.plant}%), a killer plant (${o.killer}%), a pawn for him (${o.pawn}%), a knight, bishop or rook for him (${o.piece}%), or a queen for him (${o.queen}%)`);
     expect(words).toContain(`blocks it for ${BOSS_POWERS.plantTurns} turns of yours`);
     expect(words).toContain(`about ${BOSS_POWERS.waterTarget} pawns (at most ${BOSS_POWERS.waterBand[1]})`);
-    expect(words).toContain(`worth up to ${BOSS_POWERS.jackpotMax} pawns`);
+    expect(words).toContain("A queen is his jackpot, and it has no cap");
+    expect(words).toContain(`no further than ${BOSS_POWERS.jackpotMax} pawns, or than the queen alone did`);
+    expect(words).toContain("he can't grow a piece he still has a full set of");
+    expect(words).not.toContain("worth up to");
     expect(Object.values(o).reduce((a, b) => a + b, 0)).toBe(100);
     expect(words).toContain(def.offset === 0 ? "at the usual strength" : `${Math.abs(def.offset)} ${def.offset < 0 ? "under" : "over"} the usual strength`);
     expect(words).not.toMatch(/undefined|NaN|\$\{/);

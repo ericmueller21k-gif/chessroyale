@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
 import { PASS_WAIT, legalMoves, sanLineToUci, seedsAt, sideToMove, waterAnswer, waterCheck, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { fakeEngine } from "../../chess/test/boss-kit-lib.ts";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
@@ -19,12 +19,12 @@ const hash = (s: string) => {
 const line = sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1", "b5", "Bb3", "d6", "c3", "O-O"]);
 const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({ id: `o${i}`, eco: "C88", name: `O${i}`, family: `F${i}`, unusual: false, moves: line, namedPlies: line.length, expected: Object.fromEntries(line.map((_, n) => [n, 0.5])) }));
 
-function gardener(patch: Partial<Settings> = {}) {
+function gardener(patch: Partial<Settings> = {}, players = ["P1", "P2"]) {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
   const settings = { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...RAID_SETTINGS, lastStandFrom: 999, bossId: "gardener", bossUnfinished: true, bossStumbleBelow: 0, bossPowerTest: "water", ...patch } as Settings;
   const core = new LobbyCore(newLobbyRecord("GARDN", now), { now: () => now, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), msg as Msg]), icon: () => undefined }, library, mulberry32(7), settings);
-  for (const [i, id] of ["P1", "P2"].entries()) core.connect(undefined, id, i ? "phone" : "computer", false, 1500);
+  for (const [i, id] of players.entries()) core.connect(undefined, id, i ? "phone" : "computer", false, 1500);
   core.message("p1", { t: "start" });
   const last = <T extends Msg["t"]>(id: string, t: T) => [...(inbox.get(id) ?? [])].reverse().find((m) => m.t === t) as Extract<Msg, { t: T }> | undefined;
   const advance = (ms: number) => {
@@ -57,7 +57,7 @@ function gardener(patch: Partial<Settings> = {}) {
     const r = toRound();
     const ok = r.boss?.powers?.allowed ?? legalMoves(r.board!.fen);
     const m = ok.find((x) => x === "b1c3" || x === "g1f3" || x === "b8c6" || x === "g8f6") ?? ok[0]!;
-    for (const id of ["p1", "p2"]) core.message(id, { t: "pick", key: last(id, "round")!.key, move: m });
+    for (const id of players.map((x) => x.toLowerCase())) core.message(id, { t: "pick", key: last(id, "round")!.key, move: m });
     expect(hostScores()).toBe(true);
     inbox.set("p1", (inbox.get("p1") ?? []).filter((x) => x.t !== "bossRequest"));
   };
@@ -68,7 +68,8 @@ function gardener(patch: Partial<Settings> = {}) {
   };
   advance(1000);
   advance(60_000);
-  return { core, inbox, last, advance, runner, asked, toRound, crowdPlays, answer, now: () => now };
+  const io = { now: () => now, send: (id: string, msg: unknown) => inbox.set(id, [...(inbox.get(id) ?? []), msg as Msg]), icon: () => undefined };
+  return { core, inbox, last, advance, runner, asked, toRound, crowdPlays, answer, now: () => now, io, settings };
 }
 
 /** Plays on (his ordinary moves answered with the first allowed) until the watering is asked of the host. */
@@ -140,4 +141,55 @@ describe("the hippo gardener online", () => {
       expect(L.asked()!.water?.kinds).toHaveLength(4);
     }
   });
+
+  it("no host answers in time (the request's timeout, no other host): no watering now, and his move", () => {
+    const L = gardener({ bossSeedTest: 3 }, ["P1"]);
+    const req = untilWater(L);
+    expect(req.water!.kinds).toHaveLength(3);
+    L.inbox.set("p1", []);
+    // (The host never answers: past the timeout, the server's own fallback, "", and the watering waits a turn.)
+    L.advance(16_000);
+    expect(L.runner().boss!.powers!.garden!.wait).toBe(L.runner().boss!.crowdMoves);
+    expect(L.runner().boss!.powers!.garden!.waterings).toBe(0);
+    const move = L.last("p1", "bossRequest");
+    expect(move?.water).toBeUndefined();
+  });
+
+  it("a lobby restored mid-watering (the Durable Object woken) keeps the roll: the host's answer to it is played", async () => {
+    const L = gardener({ bossSeedTest: 6 });
+    const req = untilWater(L);
+    const record = structuredClone(L.core.save());
+    const restored = new LobbyCore(record, L.io, library, mulberry32(8), L.settings);
+    const runner = (restored as unknown as { runner: MatchRunner }).runner;
+    expect(runner.waterAsk()!.kinds).toEqual(req.water!.kinds);
+    expect(runner.boss!.powers!.garden!.roll!.clock).toBe(req.at);
+    const { answer } = await waterAnswer([fakeEngine()], req.fen, req.water!, true);
+    restored.message("p1", { t: "bossMove", key: req.key, move: answer });
+    expect(runner.boss!.powers!.garden!.waterings).toBe(1);
+    expect(runner.boss!.powers!.garden!.water!.rolled).toEqual(req.water!.kinds);
+  });
+
+  it("a roll with queens: asked and checked as any other; with all eight of his pawns on the board none can grow (nothing, dropped)", async () => {
+    const odds = BOSS_POWERS.waterOdds;
+    (BOSS_POWERS as { waterOdds: unknown }).waterOdds = { nothing: 0, plant: 0, killer: 0, pawn: 0, piece: 0, queen: 100 };
+    try {
+      const L = gardener({ bossSeedTest: 2 });
+      const req = untilWater(L);
+      expect(req.water!.kinds).toEqual(["q", "q"]);
+      const { answer } = await waterAnswer([fakeEngine()], req.fen, req.water!, true);
+      // (His queen and his eight pawns: a second queen is more than promotions could make.)
+      expect(answer).toBe("none");
+      expect(waterCheck(req.fen, req.water!, "qe4")).toBeNull();
+      L.answer(answer);
+      const w = L.toRound().boss!.powers!.garden!.water!;
+      expect(w.growth.map((g) => [g.kind, g.dropped])).toEqual([
+        ["nothing", "q"],
+        ["nothing", "q"],
+      ]);
+      expect(w.jackpot).toBeUndefined();
+    } finally {
+      (BOSS_POWERS as { waterOdds: unknown }).waterOdds = odds;
+    }
+  });
 });
+

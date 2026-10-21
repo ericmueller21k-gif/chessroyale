@@ -1,5 +1,5 @@
 /**
- * The hippo gardener (BOSS_ROSTER "gardener", GARDENER_NAME a placeholder; Eric, Oct 20; docs/decisions/2026-10-21-gardener-rules.md).
+ * Puddles, the hippo gardener (BOSS_ROSTER "gardener", GARDENER_NAME; Eric, Oct 20, named Oct 21; docs/decisions/2026-10-21-gardener-rules.md).
  * He starts from the starting position, as every raid does.
  *
  * His passive, Seeds:
@@ -40,7 +40,7 @@ import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type GardenPl
 import { kingAttacked, legalMoves, mateInOne, pieceAt, sideToMove, withPiece, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { stockfishRefuses } from "../uci.ts";
-import { PASS_WAIT, eachOn, logit, meterFull, other, passLoses, powerRoll, testSwitch, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { PASS_WAIT, eachOn, logit, meterFull, moveSquares, other, passLoses, powerRoll, testSwitch, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 import { blockedBy } from "./bigboy.ts";
 import { passTurn } from "./hollow.ts";
 
@@ -87,16 +87,19 @@ export function waterMs(growth: readonly Pick<WaterGrowth, "kind">[] | null | un
 export const GARDENER_FX = { plantMany: 0, plant: 0, water: GARDENER_ANIM.water, cheer: GARDENER_ANIM.cheer, bigCheer: GARDENER_ANIM.bigCheer, shrug: GARDENER_ANIM.shrug } as const;
 
 type SeedSettings = Pick<BossPowerSettings, "seedsAtStart" | "seedEverySec" | "seedMax">;
-type WaterSettings = Pick<BossPowerSettings, "waterBand" | "waterTarget" | "jackpotMax" | "waterLooks" | "waterNodes" | "waterBudget" | "bouncePawnLogit" | "passGuardPawns">;
+type WaterSettings = Pick<BossPowerSettings, "waterBand" | "waterTarget" | "jackpotMax" | "waterLooks" | "waterNodes" | "waterBudget" | "waterTimeMs" | "bouncePawnLogit" | "passGuardPawns">;
 
 // ---------------- Seeds ----------------
 
 /**
  * The seeds waiting at clock time `now` (ms, the garden's clock: the server's online, the page's visible time solo) and
  * when the next one lands (null: the meter is at seedMax). A pure function of the meter's two numbers, so the server and
- * every device agree. `fixed`: the test switch's set count (?seeds=N), whatever the clock says.
+ * every device agree. `fixed`: the test switch's set count (?seeds=N), whatever the clock says. `taken` (the view's): a
+ * watering's count taken and its placement still to come: the count is held there, no seed landing, until it's done.
  */
-export function seedsAt(g: Pick<GardenState, "since" | "base"> & { fixed?: number | null }, now: number, s: SeedSettings = BOSS_POWERS): { count: number; next: number | null } {
+export function seedsAt(g: Pick<GardenState, "since" | "base"> & { fixed?: number | null; taken?: { seeds: number } | null }, now: number, s: SeedSettings = BOSS_POWERS): { count: number; next: number | null } {
+  // (A watering's count taken, the host still placing it: the meter holds there; no seed lands on it until it's done.)
+  if (g.taken) return { count: g.taken.seeds, next: null };
   if (g.fixed !== undefined && g.fixed !== null) return { count: g.fixed, next: null };
   const every = s.seedEverySec * 1000;
   const grown = Math.floor(Math.max(0, now - g.since) / every);
@@ -105,7 +108,7 @@ export function seedsAt(g: Pick<GardenState, "since" | "base"> & { fixed?: numbe
 }
 
 /** The meter's fill toward the next seed (0-1; 1 at seedMax) at clock time `now`: what the app's meter draws. */
-export function seedFill(g: Pick<GardenState, "since" | "base"> & { fixed?: number | null }, now: number, s: SeedSettings = BOSS_POWERS): number {
+export function seedFill(g: Pick<GardenState, "since" | "base"> & { fixed?: number | null; taken?: { seeds: number } | null }, now: number, s: SeedSettings = BOSS_POWERS): number {
   const { next } = seedsAt(g, now, s);
   if (next === null) return 1;
   const every = s.seedEverySec * 1000;
@@ -204,8 +207,35 @@ function placeOne(pos: string, kind: PlacedKind, sq: string, boss: Side, plants:
   return withPiece(pos, sq, { color: boss, type: kind });
 }
 
-/** A step's options: up to `max` squares for this outcome, in a seeded order, each passing every guard. */
-function stepOptions(pos: string, plants: readonly string[], used: ReadonlySet<string>, kind: PlacedKind, boss: Side, order: number, step: number, tier: "crowd" | "his" | undefined, max: number) {
+/**
+ * The search's own clock: the time left before its limit (waterTimeMs), and a breath between squares so no stretch of the
+ * guards' work holds the page for long (a yield to the event loop once BREATH_MS has passed since the last).
+ */
+interface Pace {
+  now(): number;
+  over(): boolean;
+  breathe(): Promise<void>;
+}
+const BREATH_MS = 12;
+function pace(now: () => number, limitMs: number): Pace {
+  const end = now() + limitMs;
+  let last = now();
+  return {
+    now,
+    over: () => now() >= end,
+    async breathe() {
+      if (now() - last < BREATH_MS) return;
+      await new Promise((r) => setTimeout(r, 0));
+      last = now();
+    },
+  };
+}
+
+/**
+ * A step's options: up to `max` squares for this outcome, in a seeded order, each passing every guard. Stops early (with
+ * what it has) once the search's time is up.
+ */
+async function stepOptions(pos: string, plants: readonly string[], used: ReadonlySet<string>, kind: PlacedKind, boss: Side, order: number, step: number, tier: "crowd" | "his" | undefined, max: number, p: Pace) {
   // (A plain plant goes where the crowd could move now, when it can: a plant on a square nobody can use changes nothing.)
   let squares = SQUARES;
   if (kind === "plant") {
@@ -218,7 +248,8 @@ function stepOptions(pos: string, plants: readonly string[], used: ReadonlySet<s
   const ranked = squares.map((sq) => ({ sq, k: pawnFirst(sq) + powerRoll(order, "water-square", step, tier ?? "", sq) })).sort((a, b) => a.k - b.k);
   const out: { square: string; fen: string; plants: string[] }[] = [];
   for (const { sq } of ranked) {
-    if (out.length >= max) break;
+    if (out.length >= max || p.over()) break;
+    await p.breathe();
     const after = placeOne(pos, kind, sq, boss, plants, used, tier);
     if (!after) continue;
     const pl = kind === "plant" ? [...plants, sq] : [...plants];
@@ -227,25 +258,24 @@ function stepOptions(pos: string, plants: readonly string[], used: ReadonlySet<s
   return out;
 }
 
-/** The squares a move needs free (where it lands and what it passes over). */
-function blockedSquares(move: string, fen: string): string[] {
-  return SQUARES.filter((sq) => blockedBy(move, sq, fen));
-}
+/** The squares a move needs free (where it lands and what it passes over): those a plant there would stop it on. */
+const blockedSquares = (move: string, fen: string): string[] => moveSquares(move, fen).slice(1);
 
 /**
- * The side to move's expected score (0-1) at `nodes`, over its moves no plant stops (all of them: its top move; some:
- * those scored), on one engine. Null: no move, or no answer.
+ * The side to move's expected score (0-1): its best move at `nodes`, over its moves no plant stops, on one engine. Every
+ * position of a watering, the one before it included, is searched the same way (one line, `nodes`, the plants' moves
+ * left out with searchmoves), so the gain compares like with like. Null: no move, or no answer. (An engine without
+ * topMovesAt, a test's: its top move, or the best of the moves no plant stops.)
  */
 async function sideBest(engine: EngineLike, fen: string, plants: readonly string[], nodes: number): Promise<number | null> {
   const all = legalMoves(fen);
   const ok = all.filter((m) => !plantStops(m, plants, fen));
   if (!ok.length) return null;
-  if (ok.length < all.length) {
-    const scored = engine.scoreMovesAt ? await engine.scoreMovesAt(fen, ok, nodes) : await engine.scoreMoves(fen, ok);
-    return scored.length ? Math.max(...scored.map((m) => m.expected)) : null;
-  }
-  const top = engine.topMovesAt ? await engine.topMovesAt(fen, 1, nodes) : await engine.topMoves(fen, 1);
-  return top[0]?.expected ?? null;
+  const only = ok.length < all.length ? ok : undefined;
+  if (engine.topMovesAt) return (await engine.topMovesAt(fen, 1, nodes, only))[0]?.expected ?? null;
+  if (!only) return (await engine.topMoves(fen, 1))[0]?.expected ?? null;
+  const scored = await engine.scoreMoves(fen, only);
+  return scored.length ? Math.max(...scored.map((m) => m.expected)) : null;
 }
 
 /** The engines' placement of a watering (waterFrom), with what it gained him and what the search spent. */
@@ -256,6 +286,8 @@ export interface WaterPick {
   /** Positions searched (beyond the one before), and the killer plants that ate one of his own pieces. */
   looks: number;
   ownKills: number;
+  /** It reached waterTimeMs: the outcomes left were dropped (what's placed is a whole watering, as every step is). */
+  late?: true;
 }
 
 /**
@@ -270,12 +302,14 @@ export interface WaterPick {
  * outcome with no option under the top is dropped (it comes up as nothing). The gain is his evaluation after (the crowd
  * to move) against his before (him to move), in pawns of log-odds (bouncePawnLogit), each over the moves no plant stops.
  * Every step's position is a whole watering that passes the guards, so the last one placed is the answer. The search
- * stops at waterBudget positions (the outcomes left are dropped): ten seeds never stall a phone. Null: no engine, no
- * answer, or he can't pass (in check).
+ * stops at waterBudget positions or after waterTimeMs (its own clock, `now`; the outcomes left are dropped, `late`),
+ * breathing between squares (Pace), so ten seeds never stall a phone nor run a host past the server's timeout. Null: no
+ * engine, no answer, or he can't pass (in check).
  */
-export async function waterFrom(engines: readonly EngineLike[], fen: string, ask: WaterAsk, s: WaterSettings = BOSS_POWERS): Promise<WaterPick | null> {
+export async function waterFrom(engines: readonly EngineLike[], fen: string, ask: WaterAsk, s: WaterSettings = BOSS_POWERS, now: () => number = () => performance.now()): Promise<WaterPick | null> {
   const passed = passTurn(fen);
   if (!passed || !engines.length) return null;
+  const p = pace(now, s.waterTimeMs);
   const boss = sideToMove(fen);
   const before = await sideBest(engines[0]!, fen, ask.plants, s.waterNodes);
   if (before === null) return null;
@@ -290,8 +324,9 @@ export async function waterFrom(engines: readonly EngineLike[], fen: string, ask
   let jackpot = false;
   let looks = 0;
   let ownKills = 0;
-  for (let i = 0; i < kinds.length && budget > 0; i++) {
+  for (let i = 0; i < kinds.length && budget > 0 && !p.over(); i++) {
     const kind = kinds[i]!;
+    await p.breathe();
     const rest = kinds.slice(i + 1).reduce((t, k) => t + NOMINAL[k], 0);
     // (The jackpot: the queen on the square nearest jackpotMax, however far over it (the engine's win chances saturate
     // near 7 from an even position, so a queen that stays on the board often measures over 6: never one left hanging to
@@ -300,12 +335,12 @@ export async function waterFrom(engines: readonly EngineLike[], fen: string, ask
     const target = kind === "q" ? s.jackpotMax : (jackpot ? s.jackpotMax : s.waterTarget) - rest;
     let chosen: { square: string; fen: string; plants: string[]; gain: number } | null = null;
     for (const tier of kind === "killer" ? (["crowd", "his"] as const) : ([undefined] as const)) {
-      if (budget <= 0) break;
-      const options = stepOptions(pos, plants, used, kind, boss, ask.order, i, tier, Math.min(s.waterLooks, budget));
+      if (budget <= 0 || p.over()) break;
+      const options = await stepOptions(pos, plants, used, kind, boss, ask.order, i, tier, Math.min(s.waterLooks, budget), p);
       if (!options.length) continue;
       budget -= options.length;
       looks += options.length;
-      const scores = await eachOn(engines, options, (e, o) => sideBest(e, o.fen, o.plants, s.waterNodes));
+      const scores = await eachOn(engines, options, async (e, o) => (await p.breathe(), sideBest(e, o.fen, o.plants, s.waterNodes)));
       options.forEach((o, j) => {
         const crowd = scores[j];
         if (crowd === null || crowd === undefined) return;
@@ -336,7 +371,7 @@ export async function waterFrom(engines: readonly EngineLike[], fen: string, ask
     gain = gainOf(crowd);
     looks++;
   }
-  return { placed, fen: pos, gain: Math.round(gain * 100) / 100, looks, ownKills };
+  return { placed, fen: pos, gain: Math.round(gain * 100) / 100, looks, ownKills, ...(p.over() ? { late: true as const } : {}) };
 }
 
 /**
@@ -344,8 +379,8 @@ export async function waterFrom(engines: readonly EngineLike[], fen: string, ask
  * material and it isn't the test switch's or the admins' trigger's (`any`: the pass guard, passLoses), or "" with no
  * engine or no answer (it waits).
  */
-export async function waterAnswer(engines: readonly EngineLike[], fen: string, ask: WaterAsk, any = false, s: WaterSettings = BOSS_POWERS): Promise<{ answer: string; pick: WaterPick | null }> {
-  const pick = await waterFrom(engines, fen, ask, s).catch(() => null);
+export async function waterAnswer(engines: readonly EngineLike[], fen: string, ask: WaterAsk, any = false, s: WaterSettings = BOSS_POWERS, now?: () => number): Promise<{ answer: string; pick: WaterPick | null }> {
+  const pick = await waterFrom(engines, fen, ask, s, now).catch(() => null);
   if (!pick) return { answer: "", pick: null };
   if (!any && passLoses(pick.gain, s)) return { answer: PASS_WAIT, pick };
   return { answer: waterCode(pick.placed), pick };
@@ -507,6 +542,11 @@ export interface GardenView {
   since: number;
   base: number;
   fixed: number | null;
+  /**
+   * A watering's count taken (its clock and the seeds), while the host places it: the meter holds on it and plays no
+   * toss after it (seedsAt); null otherwise. What the seeds rolled is never in the view.
+   */
+  taken: { clock: number; seeds: number } | null;
   plants: (GardenPlant & { left: number })[];
   water: WaterResult | null;
   waterings: number;
@@ -519,6 +559,7 @@ export function gardenView(p: BossPowerState): GardenView | null {
     since: g.since,
     base: g.base,
     fixed: g.fixed ?? null,
+    taken: g.roll ? { clock: g.roll.clock, seeds: g.roll.seeds } : null,
     plants: g.plants.map((x) => ({ ...x, left: Math.max(0, x.until - p.turn + 1) })),
     water: g.water ? { ...g.water, rolled: [...g.water.rolled], growth: g.water.growth.map((x) => ({ ...x })) } : null,
     waterings: g.waterings,

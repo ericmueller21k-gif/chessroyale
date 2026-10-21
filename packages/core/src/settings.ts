@@ -1049,6 +1049,12 @@ export const BOSS_POWERS = {
   waterLooks: 4,
   waterNodes: 20_000,
   waterBudget: 48,
+  /**
+   * The placement's time limit on the host (ms from when it starts): past it, it answers with what it has placed so far
+   * (every step is a whole watering that passes the guards), well inside the boss request's 15 s timeout, so a slow phone
+   * never runs past it and the watering is never asked of host after host.
+   */
+  waterTimeMs: 8_000,
 } as const;
 
 /**

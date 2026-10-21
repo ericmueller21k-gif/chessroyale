@@ -144,8 +144,8 @@ export interface EngineLike {
   playAtElo?(fen: string, elo: number, nodes?: number, moveMs?: number): Promise<string>;
   /** A deeper search over a few moves (the re-check); engines without it skip the re-check. */
   scoreMovesAt?(fen: string, moves: readonly string[], nodes: number): Promise<MoveScore[]>;
-  /** Top moves at another budget (the Big Bounce's quick look at a few positions); engines without it use topMoves. */
-  topMovesAt?(fen: string, n: number, nodes: number): Promise<MoveScore[]>;
+  /** Top moves at another budget (the Big Bounce's quick look at a few positions; `moves`: only those, searchmoves); engines without it use topMoves. */
+  topMovesAt?(fen: string, n: number, nodes: number, moves?: readonly string[]): Promise<MoveScore[]>;
 }
 
 /** The re-check's settings (see recheckLoss, recheckMax, recheckNodes and recheckCut* in settings). */

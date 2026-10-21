@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, BOSS_ROSTER, GARDENER_NAME, isPlayable, mulberry32, type BossPowerSettings, type WaterKind } from "@chessroyale/core";
+import { BOSS_POWERS, BOSS_ROSTER, GARDENER_NAME, bossInText, isPlayable, mulberry32, type BossPowerSettings, type WaterKind } from "@chessroyale/core";
 import {
   GARDENER_ANIM,
   GARDENER_FX,
@@ -131,10 +131,14 @@ function onPosition(r: MatchRunner, fen: string, kinds: WaterKind[], plants: str
 }
 
 describe("the hippo gardener: his sheet", () => {
-  it("is on the roster with his placeholder name, a hippo, not playable until wired, with Seeds and Watering", () => {
+  it("is on the roster as Puddles, a hippo, not playable until wired, with Seeds and Watering", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "gardener")!;
     expect(def).toMatchObject({ name: GARDENER_NAME, icon: "🦛", kit: null, powers: { passive: "seeds", ultimate: "water" } });
-    expect(GARDENER_NAME).toBe("The Gardener");
+    expect(GARDENER_NAME).toBe("Puddles");
+    // (A plain name: no "the", at a sentence's start or in its middle.)
+    expect(def.the).toBeUndefined();
+    expect(bossInText(def.name, true)).toBe("Puddles");
+    expect(bossInText(def.name)).toBe("Puddles");
     expect(isPlayable(def)).toBe(false);
     expect(bossRules({ id: "gardener" })?.id).toBe("gardener");
   });
@@ -212,17 +216,6 @@ describe("Seeds: the count as a pure function of the clock", () => {
     expect(gardenOf(r)).toMatchObject({ since: takenAt, base: 0, waterings: 1 });
     expect(seedsAt(gardenOf(r), now).count).toBe(2);
     expect(r.bossView()!.powers!.garden).toMatchObject({ since: takenAt, base: 0, fixed: null, waterings: 1 });
-  });
-
-  it("solo's clock stands still while the page is hidden (the app's garden clock): the meter counts only time in view", () => {
-    // (The runner reads whatever clock it's given; the app's, garden-clock.ts, is tested in packages/app.)
-    let visible = 0;
-    const r = battle(4, { clock: () => visible });
-    expect(gardenOf(r).since).toBe(0);
-    visible += 2 * EVERY; // in view
-    expect(seedsAt(gardenOf(r), visible).count).toBe(7);
-    // hidden for an hour: the page's clock doesn't move, nor does the meter
-    expect(seedsAt(gardenOf(r), visible).count).toBe(7);
   });
 
   it("without a clock (tests, the sims), each crowd move counts as one seed's time", async () => {
@@ -374,6 +367,29 @@ describe("Watering: the engine's placement within the band", () => {
     expect(pieceAt(noPawns, own.placed[0]!.square)?.color).toBe("b");
   });
 
+  it("past waterTimeMs it answers in time with the outcomes placed so far: a whole watering the server's check accepts", async () => {
+    // (An engine whose every search takes 1.5 s of the search's own clock.)
+    let clock = 0;
+    const slow = materialEngine();
+    const timed: EngineLike = {
+      topMoves: (f, n) => ((clock += 1500), slow.topMoves(f, n)),
+      topMovesAt: (f, n, nodes, moves) => ((clock += 1500), slow.topMovesAt!(f, n, nodes, moves)),
+      scoreMoves: (f, m) => ((clock += 1500), slow.scoreMoves(f, m)),
+    };
+    const kinds: WaterKind[] = ["killer", "p", "plant", "plant", "plant", "plant", "plant", "plant", "plant", "plant"];
+    const pick = (await waterFrom([timed], QUIET, ask(kinds), S, () => clock))!;
+    expect(pick.late).toBe(true);
+    // (The step under way when the time ran out finishes: at most waterLooks more searches.)
+    expect(clock).toBeLessThanOrEqual(S.waterTimeMs + S.waterLooks * 1500);
+    expect(pick.placed.length).toBeGreaterThan(0);
+    expect(pick.placed.length).toBeLessThan(kinds.length);
+    const answer = (await waterAnswer([timed], QUIET, ask(kinds), true, S, ((clock = 0), () => clock))).answer;
+    expect(waterCheck(QUIET, ask(kinds), answer)?.placed.length).toBe(pick.placed.length);
+    // (In time: no search runs past it, and no limit is reported.)
+    const quick = (await waterFrom([materialEngine()], QUIET, ask(kinds)))!;
+    expect(quick.late).toBeUndefined();
+  });
+
   it("searches at most waterBudget positions (besides the one before), however many seeds", async () => {
     const tenPlants: WaterKind[] = Array(10).fill("plant");
     const pick = (await waterFrom(engines, QUIET, ask(tenPlants), { ...S, waterBudget: 9 }))!;
@@ -426,6 +442,29 @@ describe("Watering in a battle", () => {
     expect(r.boss!.powers!.warnAt).toBeUndefined();
     expect(r.waterDue()).toBe(false);
     expect(powerTurn(r.state.boss!)).toBe(true);
+  });
+
+  it("the meter holds on the count taken while the host places it (the view's `taken`), and starts again once it's played", async () => {
+    let now = 0;
+    const r = battle(16, { test: "water", clock: () => now });
+    for (let i = 0; i < 20 && !r.waterDue(); i++) {
+      now += 20_000;
+      await step(r);
+    }
+    expect(r.bossView()!.powers!.garden!.taken).toBeNull();
+    const ask = r.waterAsk()!;
+    const view = r.bossView()!.powers!.garden!;
+    expect(view.taken).toEqual({ clock: now, seeds: ask.kinds.length });
+    // (No kinds in the view: what the seeds rolled stays off the screens until it comes up.)
+    expect(JSON.stringify(view)).not.toContain("kinds");
+    // A seed's time passes while the host searches: the meter shows no new seed land.
+    now += 2 * EVERY;
+    expect(seedsAt(view, now)).toEqual({ count: ask.kinds.length, next: null });
+    await r.playWater([fakeEngine()]);
+    const after = r.bossView()!.powers!.garden!;
+    expect(after.taken).toBeNull();
+    // (Then the seeds that landed while it searched: counted from the moment the count was taken.)
+    expect(seedsAt(after, now).count).toBe(2);
   });
 
   it("his reactions: a queen's big cheer, a piece's cheer, a shrug for nothing at all, none for plants and kills only", () => {

@@ -1,8 +1,8 @@
-# The hippo gardener in the rules: Seeds and Watering (Oct 21, 2026)
+# Puddles, the hippo gardener, in the rules: Seeds and Watering (Oct 21, 2026)
 
-A new raid boss (Eric, Oct 20): **the hippo gardener** (id `gardener`), a realistic hippo with a garden hose. His name
-isn't chosen yet: it's one placeholder string, `GARDENER_NAME = "The Gardener"` (core `boss.ts`), so naming him is one
-edit. This builds his rules, the server side, the raid sim, the tests and the FAQ block. His art and animations are on
+A new raid boss (Eric, Oct 20): **Puddles, the hippo gardener** (id `gardener`), a realistic hippo with a garden hose.
+His name (Eric, Oct 21) is one string, `GARDENER_NAME = "Puddles"` (core `boss.ts`): a plain name like Smudgy's, so no
+`the` on his roster line ("Puddles" at a sentence's start and in its middle: `bossInText`). The code id stays `gardener`. This builds his rules, the server side, the raid sim, the tests and the FAQ block. His art and animations are on
 `claude/hippo-sprite` (docs/decisions/2026-10-21-gardener-animations.md there); the wiring (kit, sprite, board art, the
 seed meter) is the next lane's. Until then he stays **not playable** (`kit: null`; the test links
 `?boss=gardener&wip=1`, `&power=water` for his ultimate early, `&seeds=N` for a set count). How it works now:
@@ -44,8 +44,10 @@ seed meter) is the next lane's. Until then he stays **not playable** (`kit: null
    seconds early, less than one seed's time; simpler than a second start.
 4. **The watering's roll is taken the first time it's asked for and kept** (`garden.roll`: the clock then, the count, each
    seed's outcome), so the server's request, the host's answer and the server's check agree even if a seed lands while
-   the host searches. The meter then restarts from none **from that moment** (`since` = the roll's clock, `base` 0): the
-   seeds that land during the search aren't lost.
+   the host searches. While it's pending the view carries the count taken (`garden.taken`: its clock and the seeds, never
+   what they rolled), and `seedsAt` holds the meter there: no seed shows landing during the search only to vanish (the
+   review, Oct 21). Once it's played the meter restarts from none **from that moment** (`since` = the roll's clock, `base`
+   0), so a seed whose time came during the search counts toward the next watering and shows then.
 5. **The rolls:** `powerRoll(seed, "water", watering, i)` against `waterOdds` in percent; the piece outcome's kind
    (knight, bishop, rook) a third each from its own roll. Seeded, so the same everywhere.
 6. **`plant` is a moment kind no turn's events carry.** Seeds land in real time, mid-turn: the screens play his toss as
@@ -55,7 +57,10 @@ seed meter) is the next lane's. Until then he stays **not playable** (`kit: null
    knight, killer plant, pawn, plain plant). Each outcome weighs at most `waterLooks` (4) squares, in a seeded order among
    those its rules and every guard allow (`waterGuard` on the whole position so far: so every step's position is a whole
    watering that could stand, and the last one placed is the answer), each searched at `waterNodes` (20,000) over the
-   moves no plant stops; it takes the one whose gain is nearest the step's target (`waterTarget` less what the outcomes
+   moves no plant stops. **Every position is searched the same way, the one before it included** (the review, Oct 21):
+   one line at `waterNodes`, the plants' moves left out with searchmoves (`topMovesAt` takes an optional move list now),
+   never a MultiPV over the allowed moves, which spread the same nodes over every line and measured the after-position
+   shallower and noisier than the before (and went to the engine server solo); the same budget either way; it takes the one whose gain is nearest the step's target (`waterTarget` less what the outcomes
    still to come are reckoned to add, `NOMINAL`) and never above the band's top. **An outcome with no square under the top
    is dropped on the spot** (it comes up as nothing, `dropped` on its growth): that's the greedy form of "drop the biggest
    and try again" (the biggest are placed first, so the one that can't fit is the biggest left), and it costs no second
@@ -102,23 +107,36 @@ seed meter) is the next lane's. Until then he stays **not playable** (`kit: null
     piece) or `shrug` (nothing came up at all; none for plants and kills only). Its length (`waterMs`): the 1340 ms cast,
     then each outcome from 1340 ms, 250 ms apart, for its art's length (kill 870, bud 550, the queen's 630, grow 290, wilt
     490); `POWER_FX_EXTRA` adds it, so the server waits for the watering and his reaction, never for a seed.
-16. **His search budget:** at most `waterBudget` (48) positions besides the one before (the outcomes left are dropped once
-    it's spent), each at 20,000 nodes: about 0.96 million nodes in the worst case, Repaint's own worst case (32 pairs at
-    30,000), inside the boss request's 15 s timeout as Repaint's is. Measured in the sim on native Stockfish: see the
-    report (mean and worst ms a watering).
+16. **His search budget, and a time limit** (the review, Oct 21: the node budget alone didn't bound the guards' own work,
+    so a slow phone could run past the boss request's 15 s timeout, and a late answer from a host the server had moved on
+    from is dropped: a watering could be asked of host after host). At most `waterBudget` (48) positions besides the one
+    before, each at 20,000 nodes (about 0.96 million nodes, Repaint's own worst case), **and at most `waterTimeMs` (8 s)
+    from when the host starts**: past it, it answers with the outcomes placed so far (the outcomes left come up as
+    nothing, `late` on the pick): every step's position is a whole watering that passes the guards, so that answer is
+    always one the server's check accepts. Between squares it breathes (a yield to the event loop once 12 ms have passed
+    since the last), so no stretch of the guards' work holds the page. In the sim on native Stockfish: a mean of 1.2 s,
+    at most 3.8 s (with three sims sharing the machine).
 17. **Numbers:** `rageSpeed.gardener` and his offset from the sim (below and the report).
+18. **The rage meter and his garden** (no rule of its own, the director's call): a killer plant that eats one of his own
+    pieces adds to his meter as any piece he loses does, and a grown piece shields him: the meter counts the most material
+    he has been under his start (`lost`), so his next losses up to a grown piece's worth add nothing. Both are small and
+    rare (2 own pieces in 65 battles; a few grown pieces a battle) and left to the meter's usual rule.
+19. **`garden.water` stays in the view until his next watering** (as Smudgy's `repaint`): the screens play the watering's
+    moments from the turn's events (`water`, then the reaction), never from this field, or a reload would play it again.
 
 ## The numbers (the raid sim)
 
 See [reports/gardener-sim.md](../../reports/gardener-sim.md). **Shipped at offset −250 and `rageSpeed` 1.2:** with a
-crowd that takes 10 s to pick, the crowd scores **0.38** (± 0.09, 26 battles) in **49** crowd moves, with **3.4
-waterings** a battle of 6.9 seeds each, inside the pack. A fast crowd (5 s a pick) scored 0.54 with 5.1 seeds a watering,
-a slow one (20 s, the raid's whole clock) 0.19 with 8.9 (13 battles each): the slower the crowd, the more seeds. At
-`rageSpeed` 1 (13 battles) he waters 2.7 times and the crowd scores 0.23; 1.2 is the nearer to "about 3". −250 is the
-pack's usual offset (Moo & Moon, Big Boy, Alfil, Chub & Chirp); no sweep was needed, the first run landing in the pack.
-His gain: never over the band's top bar the jackpot; under its bottom in about a third of the waterings the engine
-doesn't already call decided (small ones: plain plants and nothing); 2 killer plants of 65 on his own pieces; 2 queens in
-65 battles.
+crowd that takes 10 s to pick, after the review's fixes (every position searched the same way; the time limit), the crowd
+scores **0.17** (± 0.05, 26 battles) in **46** crowd moves, with **3.0 waterings** a battle of 7.4 seeds each, inside
+the pack at its stronger end; before those fixes the same run scored 0.38 (± 0.09) with 3.4 waterings (a plant's position
+measured as deeply as the one before it, the plants he places matter more). No sweep: in the range. Before the fixes, a fast crowd (5 s a
+pick) scored 0.54 with 5.1 seeds a watering, a slow one (20 s, the raid's whole clock) 0.19 with 8.9 (13 battles each): the
+slower the crowd, the more seeds; and at `rageSpeed` 1 (13 battles) he watered 2.7 times (the crowd 0.23) against 3.4 at
+1.2: 1.2 is the nearer to "about 3" (3.0 after the fixes). −250 is the pack's usual offset (Moo & Moon, Big Boy, Alfil,
+Chub & Chirp). His gain (after the fixes): never over the band's top bar the jackpot; under its bottom in 15 of the 56
+waterings the engine doesn't already call decided (small ones: plain plants and nothing); 1 killer plant of 52 on his own
+pieces; 3 queens in 26 battles.
 
 ## Not done here (the wiring lane)
 
@@ -126,4 +144,4 @@ His kit (sprite, lines, sounds), `CHARACTERS` and `BOSS_KITS`, the board art in 
 views (now placeholders that only hold their time), the seed meter by the rage meter (from the view's `garden`:
 `seedsAt`/`seedFill` with `gardenClock()` solo and the server's clock online), the plants on the board from `left`, each
 outcome's art at its cue (`snap`: the piece off; `pop`: the piece on), the toss as the count rises, his king attack, his
-tile, the visual e2e, and his name (Eric's).
+tile and the visual e2e.
