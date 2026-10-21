@@ -12,17 +12,22 @@ test.use({ actionTimeout: 15_000 });
 
 // Seeds (each fixes round 1's kings, its five offers and the bot; the bot's lock-in time comes from a draw of its own, so it holds
 // whatever else the bot's buying becomes). `quick` = the steps' short times.
-//  9: rook b4, pawn d4, pawn g3, pawn d4, pawn b4 (two offers share b4 and d4); king d2; the bot never locks in.
-//  5: pawn f2, pawn g2, pawn f2, pawn g3, pawn c4; king c1; the bot locks in at 3.79 s (of the 4 s open).
+// (One offer to a square since Oct 21: the shop never rolls two offers onto one square, so these are the seeds' shops since then.)
+//  9: rook b4, pawn d4, pawn g3, pawn h3, pawn a3; king d2; the bot never locks in.
+//  5: pawn f2, pawn g2, pawn h3, pawn b2, knight g1; king c1; the bot locks in at 3.79 s (of the 4 s open).
 // 11: pawn b2, pawn c4, pawn b3, pawn f4, knight e3; king h1; the bot locks in at 1.33 s.
-// 60: queen g3, rook e3, pawn e3, queen f3, pawn b3; king h1.
+// 60: queen g3, rook e3, pawn h4, pawn a3, pawn f4; king h1.
 //  3: pawn g3, pawn b4, pawn h3, rook e4, pawn c4; king e2.
-const DUP = "/autochess?quick=1&seed=9";
+// 3328: queen c2, bishop b3, pawn c4, queen c1, pawn d4; king d1 (two queens, to show the limit and the reasons).
+// 10412: rook f4, pawn f2, bishop g4, pawn c3, pawn d3; king b2. Holding the rook, the slot rolls a pawn onto f4 (the held piece's square);
+//        holding the pawn for d3, the slot rolls a pawn onto d3 too: the two ways an offer can meet a held piece's square.
+const PLAIN = "/autochess?quick=1&seed=9";
 const LATE = "/autochess?quick=1&seed=5";
 const EARLY = "/autochess?quick=1&seed=11";
 const POOR = "/autochess?quick=1&seed=60";
+const TWOQ = "/autochess?quick=1&seed=3328";
 const FIGHT = "/autochess?quick=1&seed=3";
-const NEVER = DUP;
+const NEVER = PLAIN;
 /** Every way a fight's result line can begin (the reason it ended), then the HP line. */
 const RESULT_WHY =
   /^(Checkmate\.|Stalemate\.|(You're|Your opponent is) too far ahead: 5\+ pawns for 6 moves\.|Fight stalled \((moves repeated|10 moves each, no capture|60 moves each)\): ((you're|your opponent is) (\d+ pawns? up|far ahead)|less than a pawn apart, a draw)\.|Draw by the fifty-move rule\.|Draw: not enough pieces left to mate\.|A side left with only its king loses at once\.|Both sides are down to a king: a draw\.) /;
@@ -176,9 +181,9 @@ test("shelved (Eric, Oct 19): no button on home or in a player's Settings; an ad
   expect(errors).toEqual([]);
 });
 
-test("the shop: five offers, each a piece and a square of your half, drawn as glowing silhouettes on the board (two on one square smaller, side by side)", async ({ page }) => {
+test("the shop: five offers, each a piece and a square of your own, drawn as glowing silhouettes on the board, one to a square, each filling it", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto(DUP);
+  await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const king = (await root(page).getAttribute("data-king"))!;
   expect(king).toBe("d2");
@@ -187,8 +192,8 @@ test("the shop: five offers, each a piece and a square of your half, drawn as gl
     { kind: "r", square: "b4" },
     { kind: "p", square: "d4" },
     { kind: "p", square: "g3" },
-    { kind: "p", square: "d4" },
-    { kind: "p", square: "b4" },
+    { kind: "p", square: "h3" },
+    { kind: "p", square: "a3" },
   ]);
   // Each card: the piece, its price, and its square under it ("Rook b4"). All on your half, none on your king; pawns on your 2nd to 4th rank.
   await expect(page.locator(".ac-buy b")).toHaveText(shown.map((o) => String(PRICES[o.kind])));
@@ -198,7 +203,8 @@ test("the shop: five offers, each a piece and a square of your half, drawn as gl
     expect(o.square).not.toBe(king);
     if (o.kind === "p") expect(Number(o.square[1])).toBeGreaterThanOrEqual(2);
   }
-  // On the board: five silhouettes, each on its own square. A square's single offer fills it; two on one square are half a square wide, side by side.
+  // On the board: five silhouettes, each on its own square (never two on one: Eric, Oct 21), and each fills its square.
+  expect(new Set(shown.map((o) => o.square)).size).toBe(5);
   await expect(page.locator(".ac-sil")).toHaveCount(5);
   const boardBox = (await page.locator(".ac-layer").boundingBox())!;
   const sq = boardBox.width / 8;
@@ -207,14 +213,9 @@ test("the shop: five offers, each a piece and a square of your half, drawn as gl
     const c = await center(page, o.square);
     const b = boxes[slot]!;
     expect(Math.abs(b.y + b.height / 2 - c.y), `${o.square}: vertically on its square`).toBeLessThan(1.5);
-    expect(Math.abs(b.x + b.width / 2 - c.x), `${o.square}: horizontally within its square`).toBeLessThanOrEqual(sq / 4 + 1.5);
-  }
-  expect(boxes[2]!.width, "g3 alone: a whole square").toBeGreaterThan(sq - 2);
-  for (const [a, b] of [[1, 3], [0, 4]] as const) {
-    expect(boxes[a]!.width, `slot ${a}: half a square`).toBeLessThan(sq / 2 + 2);
-    expect(boxes[b]!.width, `slot ${b}: half a square`).toBeLessThan(sq / 2 + 2);
-    expect(boxes[b]!.x - boxes[a]!.x, `slots ${a} and ${b}: side by side`).toBeGreaterThan(sq / 2 - 2);
-    expect(Math.abs(boxes[b]!.y - boxes[a]!.y)).toBeLessThan(1);
+    expect(Math.abs(b.x + b.width / 2 - c.x), `${o.square}: horizontally on its square`).toBeLessThan(1.5);
+    expect(b.width, `${o.square}: a whole square wide`).toBeGreaterThan(sq - 2);
+    expect(b.width, `${o.square}: and no wider`).toBeLessThan(sq + 1);
   }
   // Soft green: the silhouette's fill is green-led (red and blue lower), on the classic board's squares.
   const [r, g, b] = (await page.locator(".ac-sil-shape").first().evaluate((el) => getComputedStyle(el).backgroundColor.match(/\d+/g)!.map(Number))) as number[];
@@ -229,7 +230,7 @@ test("the shop: five offers, each a piece and a square of your half, drawn as gl
 
 test("the shop: a reroll costs 2 and rolls all five offers (the same for the same seed), and is refused without the gold", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto(DUP);
+  await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const first = await offers(page);
   expect(await goldOf(page)).toBe(100);
@@ -245,7 +246,7 @@ test("the shop: a reroll costs 2 and rolls all five offers (the same for the sam
   await expect(page.locator(".ac-sil")).toHaveCount(5);
   await expect(page.locator(".ac-buy b")).toHaveText(rolled.map((o) => String(PRICES[o.kind])));
   // Seeded by the round and the reroll count: a fresh start rerolled once shows the same five.
-  await page.goto(DUP);
+  await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   expect(await offers(page)).toEqual(first);
   await tap(page, reroll(page));
@@ -265,9 +266,45 @@ test("the shop: a reroll costs 2 and rolls all five offers (the same for the sam
   expect(errors).toEqual([]);
 });
 
-test("buying: tap an offer's silhouette or its shop card, and it lands on its square; a new offer rolls into the slot, and another offer on that square rolls again", async ({ page }) => {
+test("one offer to a square (Eric, Oct 21): over several seeds, rerolls and buys, no two offers share a square, none is on your king or a piece of yours, and each square shows one silhouette", async ({ page }) => {
+  test.setTimeout(120_000);
   const errors = watchErrors(page);
-  await page.goto(DUP);
+  const check = async (where: string) => {
+    const shown = await offers(page);
+    expect(shown, `${where}: five offers`).toHaveLength(5);
+    const squares = shown.map((o) => o.square);
+    expect(new Set(squares).size, `${where}: ${squares}`).toBe(5);
+    const mine = await page.locator(`${BOARD_SEL.piece}.white`).evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.square!));
+    for (const sqr of squares) expect(mine, `${where}: ${sqr} is free`).not.toContain(sqr);
+    await expect(page.locator(".ac-sil")).toHaveCount(5);
+    const centers = await page.locator(".ac-sil").evaluateAll((els) =>
+      els.map((e) => {
+        const r = e.getBoundingClientRect();
+        return `${Math.round(r.x + r.width / 2)},${Math.round(r.y + r.height / 2)}`;
+      }),
+    );
+    expect(new Set(centers).size, `${where}: five silhouettes, each on its own square`).toBe(5);
+  };
+  // (Seeds 9, 5 and 60 had two offers on one square before; the rest are a spread. `gold=900` pays for the rerolls and the buys.)
+  for (const seed of [9, 5, 60, 3, 11, 3328, 21, 33]) {
+    await page.goto(`/autochess?seed=${seed}&gold=900`);
+    await expect(root(page)).toHaveAttribute("data-phase", "buy");
+    await check(`seed ${seed}`);
+    for (let i = 0; i < 4; i++) {
+      await tap(page, reroll(page));
+      await check(`seed ${seed}, reroll ${i + 1}`);
+    }
+    for (let i = 0; i < 3; i++) {
+      await tap(page, page.locator(".ac-buy:not(.off)").first());
+      await check(`seed ${seed}, buy ${i + 1}`);
+    }
+  }
+  expect(errors).toEqual([]);
+});
+
+test("buying: tap an offer's silhouette or its shop card, and it lands on its square; a new offer rolls into the slot, on a square no piece or other offer is on", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   // Round 1: no start gold, an income of 100; the kings are placed by the game, mirrored; you are White, at the bottom.
   expect(await goldOf(page)).toBe(100);
@@ -281,32 +318,34 @@ test("buying: tap an offer's silhouette or its shop card, and it lands on its sq
   await expect(page.locator(BOARD_SEL.wrap)).toHaveClass(/orientation-white/);
   await expect(page.locator(".ac-msg")).toContainText("Tap an offer to buy it: it lands on its square.");
 
-  // The rook on b4 (slot 0) by its silhouette: it lands on b4, 50 gold, and the pawn offered on b4 too (slot 4) rolls again.
+  // The rook on b4 (slot 0) by its silhouette: it lands on b4, 50 gold. No other offer was on b4, so none rolls again and nothing says so.
   const before = await offers(page);
   await tapSilhouette(page, 0);
   await expect(piece(page, "white", "rook", "b4")).toBeVisible();
   expect(await goldOf(page)).toBe(50);
-  await expect(page.locator(".ac-msg")).toContainText("Another offer was on b4: it rolled again.");
+  await expect(page.locator(".ac-msg")).not.toContainText("Another offer was on");
   // (A solid thunk as it lands: one place sound for each piece bought onto its square.)
   expect(await soundCount(page, "acPlace")).toBe(1);
   const after = await offers(page);
   expect(after).toHaveLength(5);
-  expect(after.map((o) => o.square)).not.toContain("b4");
-  expect([after[1], after[2], after[3]]).toEqual([before[1], before[2], before[3]]);
+  // The new offer in slot 0 is on a free square: not b4 (the rook), and none of the other four offers' squares.
+  expect(after[0]!.square).not.toBe("b4");
+  expect(new Set(after.map((o) => o.square)).size).toBe(5);
+  expect(after.slice(1)).toEqual(before.slice(1));
   // The pawn on g3 (slot 2) by its shop card: it lands on g3, 10 gold.
   await tap(page, card(page, 2));
   await expect(piece(page, "white", "pawn", "g3")).toBeVisible();
   expect(await goldOf(page)).toBe(40);
   expect(await soundCount(page, "acPlace")).toBe(2);
   await expect(piece(page, "white", "rook", "b4")).toBeVisible();
-  // Two pawns share d4 (slots 1 and 3, side by side): tap the right one's silhouette (slot 3) and a pawn stands on d4; the left one rolled again.
-  const right = await silhouette(page, 3).boundingBox();
-  const left = await silhouette(page, 1).boundingBox();
-  expect(right!.x).toBeGreaterThan(left!.x);
-  await tapSilhouette(page, 3);
+  // The pawn on d4 (slot 1) by its silhouette: a pawn stands on d4, 30 gold left.
+  await tapSilhouette(page, 1);
   await expect(piece(page, "white", "pawn", "d4")).toBeVisible();
   expect(await goldOf(page)).toBe(30);
-  expect((await offers(page)).map((o) => o.square)).not.toContain("d4");
+  // After every buy the five offers are on five squares, none of them the king's or a piece's.
+  const squares = (await offers(page)).map((o) => o.square);
+  expect(new Set(squares).size).toBe(5);
+  for (const sqr of ["d2", "b4", "g3", "d4"]) expect(squares).not.toContain(sqr);
   // Nothing was placed for free, and nothing of yours on the board but what was bought: the king, a rook and two pawns.
   await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(4);
   expect(errors).toEqual([]);
@@ -314,27 +353,27 @@ test("buying: tap an offer's silhouette or its shop card, and it lands on its sq
 
 test("buying: a greyed offer says why (gold, the one-queen limit), whole when it is tapped; selling by tap and by drag; the lock", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto(POOR);
+  await page.goto(TWOQ);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   expect(await offers(page)).toEqual([
-    { kind: "q", square: "g3" },
-    { kind: "r", square: "e3" },
-    { kind: "p", square: "e3" },
-    { kind: "q", square: "f3" },
-    { kind: "p", square: "b3" },
+    { kind: "q", square: "c2" },
+    { kind: "b", square: "b3" },
+    { kind: "p", square: "c4" },
+    { kind: "q", square: "c1" },
+    { kind: "p", square: "d4" },
   ]);
-  // The queen on g3: 90 gold. Then 10 are left: the rook can't be had (greyed, "No gold", whole when tapped), and the second queen is over the limit.
+  // The queen on c2: 90 gold. Then 10 are left: the bishop can't be had (greyed, "No gold", whole when tapped), and the second queen is over the limit.
   await tap(page, card(page, 0));
-  await expect(piece(page, "white", "queen", "g3")).toBeVisible();
+  await expect(piece(page, "white", "queen", "c2")).toBeVisible();
   expect(await goldOf(page)).toBe(10);
   await expect(card(page, 1)).toHaveAttribute("aria-disabled", "true");
   await expect(card(page, 1)).toContainText("No gold");
   await card(page, 1).click({ force: true });
-  await expect(page.locator(".ac-msg")).toContainText("Not enough gold: a rook costs 50 and you have 10.");
+  await expect(page.locator(".ac-msg")).toContainText("Not enough gold: a bishop costs 32 and you have 10.");
   await expect(card(page, 3)).toContainText("Max 1");
   await card(page, 3).click({ force: true });
   await expect(page.locator(".ac-msg")).toContainText("One queen at most.");
-  await expect(piece(page, "white", "rook", "e3")).toHaveCount(0);
+  await expect(piece(page, "white", "bishop", "b3")).toHaveCount(0);
   expect(await goldOf(page)).toBe(10);
   // Buy XP (4 XP for 20 gold) is greyed too, with its reason.
   await expect(xpButton(page)).toHaveAttribute("aria-disabled", "true");
@@ -342,13 +381,13 @@ test("buying: a greyed offer says why (gold, the one-queen limit), whole when it
   await expect(page.locator(".ac-msg")).toContainText("Not enough gold: 4 XP cost 20 and you have 10.");
   expect(await goldOf(page)).toBe(10);
   // The king is the game's: tapping it says so.
-  await tapSquare(page, "h1");
+  await tapSquare(page, "d1");
   await expect(page.locator(".ac-msg")).toContainText("Your king is placed by the game.");
   // Sell by tapping your queen: it says what it gives, "Sell 67" (75% of 90, rounded down), and the sell sound plays.
-  await tapSquare(page, "g3");
+  await tapSquare(page, "c2");
   await expect(page.locator(".ac-msg")).toContainText("Queen selected. Tap Sell to sell it for 67.");
   await tap(page, page.getByRole("button", { name: "Sell 67", exact: true }));
-  await expect(piece(page, "white", "queen", "g3")).toHaveCount(0);
+  await expect(piece(page, "white", "queen", "c2")).toHaveCount(0);
   expect(await goldOf(page)).toBe(77);
   expect(await soundCount(page, "sell")).toBe(1);
   // Buy a pawn (10) and sell it by dragging it onto the shop row: 75% of 10 is 7.
@@ -375,46 +414,51 @@ test("buying: a greyed offer says why (gold, the one-queen limit), whole when it
 
 test("the bench: drag an offer onto it to hold it (it keeps its square), tap it to place it when its square is free, sell it by dragging it onto the shop", async ({ page }) => {
   const errors = watchErrors(page);
-  // (The full 30 s step: a drag takes a while, and the quick step's 5 open seconds are a tap-test's.)
-  await page.goto("/autochess?seed=9");
+  // (The full 30 s step: a drag takes a while, and the quick step's 5 open seconds are a tap-test's. Seed 10412: see the list at the top.)
+  await page.goto("/autochess?seed=10412");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const before = await offers(page);
-  // The rook for b4 (slot 0) is dragged from its shop card onto the bench: 50 gold, it waits there with its square, nothing lands on the board.
+  expect(before.map((o) => `${o.kind}${o.square}`)).toEqual(["rf4", "pf2", "bg4", "pc3", "pd3"]);
+  // The rook for f4 (slot 0) is dragged from its shop card onto the bench: 50 gold, it waits there with its square, nothing lands on the board.
   await dragMouse(page, middle((await card(page, 0).boundingBox())!), await benchMiddle(page));
   await expect(held(page)).toHaveCount(1);
   await expect(held(page).first()).toHaveAttribute("data-kind", "r");
-  await expect(held(page).first()).toHaveAttribute("data-square", "b4");
-  await expect(held(page).first().locator("small")).toHaveText("b4");
+  await expect(held(page).first()).toHaveAttribute("data-square", "f4");
+  await expect(held(page).first().locator("small")).toHaveText("f4");
   expect(await goldOf(page)).toBe(50);
-  await expect(page.locator(".ac-msg")).toContainText("Held the rook for b4. Tap it on the bench to place it.");
+  await expect(page.locator(".ac-msg")).toContainText("Held the rook for f4. Tap it on the bench to place it.");
   // (A soft pop for a hold, not the thunk of a piece landing.)
   expect(await soundCount(page, "acHold")).toBe(1);
   expect(await soundCount(page, "acPlace")).toBe(0);
   await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(1);
-  // A new offer rolled into slot 0; the others stay, the pawn offered for b4 too (nothing stands on b4).
+  // A new offer rolled into slot 0 (a pawn, and on f4 itself: the rook only waits there, so f4 is empty); the others stay.
   const after = await offers(page);
   expect(after).toHaveLength(5);
   expect(after.slice(1)).toEqual(before.slice(1));
-  // A second offer is dragged the same way, from its shop card (a silhouette on the board is only tapped): the pawn for d4 (slot 3).
-  await dragMouse(page, middle((await card(page, 3).boundingBox())!), await benchMiddle(page));
+  expect(after[0]).toEqual({ kind: "p", square: "f4" });
+  // The pawn for d3 (slot 4) is dragged from its card the same way (a silhouette on the board is only tapped, never dragged); its slot rolls a pawn onto d3 too.
+  await dragMouse(page, middle((await card(page, 4).boundingBox())!), await benchMiddle(page));
   await expect(held(page)).toHaveCount(2);
   expect(await goldOf(page)).toBe(40);
   expect(await soundCount(page, "acHold")).toBe(2);
-  // Tapping the held pawn places it on d4 (free): the bench slot empties, and the other offer on d4 (slot 1) rolls again.
+  expect((await offers(page))[4]).toEqual({ kind: "p", square: "d3" });
+  // Tapping the held pawn places it on d3 (free): the bench slot empties, and the offer on d3 (slot 4) rolls again, onto a square that is free.
   await tap(page, held(page).nth(1));
-  await expect(piece(page, "white", "pawn", "d4")).toBeVisible();
+  await expect(piece(page, "white", "pawn", "d3")).toBeVisible();
   expect(await soundCount(page, "acPlace")).toBe(1);
   await expect(held(page)).toHaveCount(1);
   expect(await goldOf(page)).toBe(40);
-  await expect(page.locator(".ac-msg")).toContainText("Another offer was on d4: it rolled again.");
-  expect((await offers(page)).map((o) => o.square)).not.toContain("d4");
-  // The pawn offered for b4 (slot 4) is bought onto b4: the held rook's square is taken, so tapping the rook says so and nothing happens.
-  await tap(page, card(page, 4));
-  await expect(piece(page, "white", "pawn", "b4")).toBeVisible();
+  await expect(page.locator(".ac-msg")).toContainText("Another offer was on d3: it rolled again.");
+  const rolled = (await offers(page)).map((o) => o.square);
+  expect(rolled).not.toContain("d3");
+  expect(new Set(rolled).size).toBe(5);
+  // The pawn offered for f4 (slot 0) is bought onto f4: the held rook's square is taken, so tapping the rook says so and nothing happens.
+  await tap(page, card(page, 0));
+  await expect(piece(page, "white", "pawn", "f4")).toBeVisible();
   expect(await goldOf(page)).toBe(30);
   await expect(held(page).first()).toHaveClass(/off/);
   await tapGreyed(page, held(page).first());
-  await expect(page.locator(".ac-msg")).toContainText("b4 is taken.");
+  await expect(page.locator(".ac-msg")).toContainText("f4 is taken.");
   await expect(held(page)).toHaveCount(1);
   // Sell the held rook by dragging it onto the shop row: 75% of 50, rounded down, is 37.
   const slotBox = (await held(page).first().boundingBox())!;
@@ -525,7 +569,7 @@ test("levels: you start at level 4 (4 pieces on the board), the 5th is refused w
 
 test("avatars: your pawn sits under your side of the board and theirs above theirs, each with its name, level and XP", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto(DUP);
+  await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const board = (await page.locator(".hb-board").boundingBox())!;
   const me = (await page.locator(".ac-me").boundingBox())!;
@@ -563,7 +607,7 @@ test("avatars: your pawn sits under your side of the board and theirs above thei
 
 test("feel: every button presses down while it is held (Reroll sinks onto its shadow) and comes back up", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto(DUP);
+  await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const sunk = (loc: Locator) => loc.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform === "none" ? undefined : getComputedStyle(el).transform).m42);
   const buttons: [string, Locator, number][] = [
@@ -799,9 +843,9 @@ test("a drag with a finger: a placed piece onto the shop row sells it", async ({
   await page.goto(POOR);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await card(page, 4).tap();
-  await expect(piece(page, "white", "pawn", "b3")).toBeVisible();
-  await dragTouch(page, await center(page, "b3"), await shopMiddle(page));
-  await expect(piece(page, "white", "pawn", "b3")).toHaveCount(0);
+  await expect(piece(page, "white", "pawn", "f4")).toBeVisible();
+  await dragTouch(page, await center(page, "f4"), await shopMiddle(page));
+  await expect(piece(page, "white", "pawn", "f4")).toHaveCount(0);
   expect(await goldOf(page)).toBe(97);
   expect(errors).toEqual([]);
 });
@@ -810,7 +854,7 @@ test("the reveal: their full board shows and stays through the adjust step; one 
   const errors = watchErrors(page);
   await page.goto(LATE);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  // Two pawns on their start rank: f2 and g2 (the second f2 offer rolled again).
+  // Two pawns on their start rank: f2 and g2.
   await tap(page, card(page, 0));
   await tap(page, card(page, 1));
   await expect(piece(page, "white", "pawn", "f2")).toBeVisible();
@@ -1400,7 +1444,7 @@ test("a silhouette on the board is only tapped: pressing it and dragging it pick
   const before = await holdings(page);
   const offersBefore = await offers(page);
   const at = middle((await silhouette(page, second).boundingBox())!);
-  const targets = { "the sell zone": await shopMiddle(page), "the bench": await benchMiddle(page), "the board": await center(page, "g3"), "the shop's edge": { x: at.x, y: (await page.locator(".ac-shop").boundingBox())!.y + 2 } };
+  const targets = { "the sell zone": await shopMiddle(page), "the bench": await benchMiddle(page), "the board": await center(page, "e3"), "the shop's edge": { x: at.x, y: (await page.locator(".ac-shop").boundingBox())!.y + 2 } };
   for (const [name, to] of Object.entries(targets)) {
     await pickUp(page, at, { x: 8, y: -8 });
     await page.mouse.move(to.x, to.y, { steps: 8 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AUTOCHESS, mulberry32 } from "@chessroyale/core";
-import { buyOffer, emptyArmy, halfSquares, kindBlock, placeBlock, squareBlock } from "../src/autochess/army.ts";
+import { buyOffer, emptyArmy, halfSquares, heldBlock, kindBlock, placeBlock, placeHeld, squareBlock, usableSquares } from "../src/autochess/army.ts";
 import { beginRound, newMatch, roundSeed } from "../src/autochess/economy.ts";
 import { buyFromSlot, holdFromSlot, newShop, refillSlot, replaceTaken, rerollBlock, rerollFor, rerollShop, rerollWords, rollOffer, shopSeed, type Shop } from "../src/autochess/shop.ts";
 import { KINDS, type Army, type Kind, type Offer } from "../src/autochess/types.ts";
@@ -213,3 +213,134 @@ describe("auto chess: the shop (v6)", () => {
     expect(buyOffer(king(), offer("p", "a2")).board).toEqual({ a2: "p" });
   });
 });
+
+describe("auto chess: one offer to a square (Eric, Oct 21: 'pieces should never be duplicate on one spot')", () => {
+  const squares = (shop: Shop) => shop.slots.map((o) => o.square);
+  /** The whole rule, after any change: five offers, each on its own square, on a square you could use (so not your pieces', not your king's). */
+  const expectOneEach = (shop: Shop, army: Army, where: string) => {
+    expect(shop.slots, `${where}: a full shop`).toHaveLength(AUTOCHESS.shop.slots);
+    expect(new Set(squares(shop)).size, `${where}: ${squares(shop)}`).toBe(shop.slots.length);
+    for (const o of shop.slots) expect(usableSquares(army, o.kind), `${where}: ${o.kind} ${o.square}`).toContain(o.square);
+  };
+
+  it("no two offers share a square: over many seeds, rounds, rerolls, buys, holds and placings, for either color and from a bare board to a full one", () => {
+    const starts: Army[] = [
+      king(),
+      king("b"),
+      { ...king(), board: { a2: "p", b2: "p", c2: "n", d1: "q", h4: "r" } },
+      { ...king("b"), board: { a7: "p", b7: "p", c7: "n", d8: "q", h5: "r" } },
+    ];
+    let steps = 0;
+    for (const [n, start] of starts.entries()) {
+      for (let seed = 0; seed < 220; seed++) {
+        const shopSeed0 = shopSeed(seed * 7919 + n);
+        let army = start;
+        let shop = newShop(shopSeed0, army);
+        expectOneEach(shop, army, `seed ${seed}, first roll`);
+        const rng = mulberry32(seed * 31 + n);
+        for (let i = 0; i < 24; i++) {
+          const roll = rng();
+          if (roll < 0.15) {
+            // A reroll (more than one in a row now and then).
+            shop = rerollShop(shop, shopSeed0, army);
+            expectOneEach(shop, army, `seed ${seed}, reroll`);
+          } else if (roll < 0.75) {
+            // A buy onto the board: the slot refills and anything that can't use its square rolls again.
+            const bought = buyFromSlot({ army, gold: 1000, shop }, Math.floor(rng() * shop.slots.length), shopSeed0);
+            if ("block" in bought) continue;
+            ({ army, shop } = bought);
+            expectOneEach(shop, army, `seed ${seed}, buy`);
+          } else if (roll < 0.9) {
+            // A hold: the offer waits on the bench with its square.
+            const held = holdFromSlot({ army, gold: 1000, shop }, Math.floor(rng() * shop.slots.length), shopSeed0);
+            if ("block" in held) continue;
+            ({ army, shop } = held);
+            expectOneEach(shop, army, `seed ${seed}, hold`);
+          } else if (army.bench.length) {
+            // A held piece placed on its square: any offer on it rolls again.
+            const index = Math.floor(rng() * army.bench.length);
+            if (heldBlock(army, index)) continue;
+            army = placeHeld(army, index);
+            shop = replaceTaken(shop, shopSeed0, army).shop;
+            expectOneEach(shop, army, `seed ${seed}, a held piece placed`);
+          }
+          steps++;
+        }
+      }
+    }
+    expect(steps).toBeGreaterThan(10000);
+  });
+
+  it("the roll draws its square from those free of the other offers: with every other square taken it is the last one, and a kind with none free gives way to another", () => {
+    const army = king();
+    const usable = usableSquares(army, "n");
+    const taken = new Set(usable.slice(1));
+    for (let seed = 0; seed < 50; seed++) {
+      const only = { ...AUTOCHESS, shop: { ...AUTOCHESS.shop, odds: { p: 0, n: 1, b: 0, r: 0, q: 0 } } };
+      expect(rollOffer(mulberry32(seed), army, only, taken)).toEqual({ kind: "n", square: usable[0] });
+    }
+    // Every square of the half is taken: nothing can be offered.
+    const only = { ...AUTOCHESS, shop: { ...AUTOCHESS.shop, odds: { p: 0, n: 1, b: 0, r: 0, q: 0 } } };
+    expect(rollOffer(mulberry32(1), army, only, new Set(usable))).toBeNull();
+    expect(rollOffer(mulberry32(1), army, AUTOCHESS, new Set(usable))).toBeNull();
+    // Every square a pawn could take is taken (ranks 2 to 4): no pawn is offered, the others are, on the squares left (the back rank).
+    const pawnSquares = new Set(usableSquares(army, "p"));
+    for (let seed = 0; seed < 300; seed++) {
+      const o = rollOffer(mulberry32(seed), army, AUTOCHESS, pawnSquares)!;
+      expect(o).not.toBeNull();
+      expect(o.kind).not.toBe("p");
+      expect(pawnSquares.has(o.square)).toBe(false);
+      expect(o.square[1]).toBe("1");
+    }
+  });
+
+  it("a shop that was built with two offers on one square is put right by replaceTaken (the later one rolls again), and one with none changes nothing", () => {
+    const army = king();
+    const doubled = shopOf([offer("p", "c2"), offer("b", "c2"), offer("r", "h1"), offer("p", "d4"), offer("n", "d4")]);
+    const fixed = replaceTaken(doubled, 11, army);
+    expect(fixed.replaced).toBe(2);
+    expect(fixed.from).toEqual(["c2", "d4"]);
+    expectOneEach(fixed.shop, army, "after replaceTaken");
+    // The earlier offer of each pair, and the one that wasn't doubled, stayed.
+    expect([fixed.shop.slots[0], fixed.shop.slots[2], fixed.shop.slots[3]]).toEqual([offer("p", "c2"), offer("r", "h1"), offer("p", "d4")]);
+    const fine = shopOf([offer("p", "c2"), offer("b", "d2"), offer("r", "h1"), offer("p", "d4"), offer("n", "g3")]);
+    expect(replaceTaken(fine, 11, army)).toEqual({ shop: fine, replaced: 0, from: [] });
+  });
+
+  it("the squares an offer is rolled for are as evenly spread as ever: a pawn lands on each of its 24 squares about as often (the first roll, and a refill beside four others)", () => {
+    const only = { ...AUTOCHESS, shop: { ...AUTOCHESS.shop, odds: { p: 1, n: 0, b: 0, r: 0, q: 0 } } };
+    const army = king();
+    const counts = new Map<string, number>();
+    const N = 6000;
+    for (let seed = 0; seed < N; seed++) {
+      const shop = refillSlot(newShop(seed, army, only), 2, seed, army, only);
+      expectOneEach(shop, army, `seed ${seed}`);
+      const o = shop.slots[2]!;
+      counts.set(o.square, (counts.get(o.square) ?? 0) + 1);
+    }
+    // (Ranks 2 to 4, minus the king's e1 which isn't among them: 24 squares, each 1/24 of 6000 = 250, give or take.)
+    expect(counts.size).toBe(24);
+    for (const [square, n] of counts) expect(Math.abs(n - N / 24), square).toBeLessThan(70);
+  });
+
+  it("an offer rolled where nothing else was keeps its roll: a first shop with no doubled square is the shop of old (so seeded fixtures hold where nothing collided)", () => {
+    const army = king();
+    let same = 0;
+    let collided = 0;
+    for (let seed = 0; seed < 600; seed++) {
+      // The roll as it was before: five offers one after another from the round's stream, squares drawn from every usable one.
+      const rng = mulberry32((seed ^ Math.imul(1, 0x9e3779b1) ^ Math.imul(1, 0x85ebca6b)) >>> 0);
+      const old = Array.from({ length: 5 }, () => rollOffer(rng, army)!);
+      if (new Set(old.map((o) => o.square)).size < 5) {
+        collided++;
+        continue;
+      }
+      expect(newShop(seed, army).slots, `seed ${seed}`).toEqual(old);
+      same++;
+    }
+    // (About a third of first shops had two offers on a square: those are the ones that change.)
+    expect(collided).toBeGreaterThan(100);
+    expect(same).toBeGreaterThan(300);
+  });
+});
+

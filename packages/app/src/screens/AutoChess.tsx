@@ -446,8 +446,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     }
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: bought.gold } }, round: { ...cur.round, you: bought.army, shop: bought.shop } });
     setSel(null);
-    // (Another offer on the same square rolled again: the player is told, so an offer doesn't change under their finger unexplained.)
-    if (bought.replaced) say(`Another offer was on ${offer.square}: it rolled again.`);
+    // (Another offer that could no longer use its square rolled again: the player is told, so an offer doesn't change under their finger unexplained.)
+    if (bought.replaced) say(`Another offer was on ${bought.from[0]}: it rolled again.`);
     else setMsg("");
     play("acPlace");
   }
@@ -476,10 +476,10 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if (block) return say(heldWords(block, held.square, cfg, boardRoom()));
     const army = placeHeld(cur.round.you, index);
     // (Offers on that square roll again, as when an offer is bought onto it.)
-    const { shop, replaced } = replaceTaken(cur.round.shop, shopSeed(roundSeed(cur.match)), army, cfg);
+    const { shop, replaced, from } = replaceTaken(cur.round.shop, shopSeed(roundSeed(cur.match)), army, cfg);
     commit({ ...cur, round: { ...cur.round, you: army, shop } });
     setSel(null);
-    if (replaced) say(`Another offer was on ${held.square}: it rolled again.`);
+    if (replaced) say(`Another offer was on ${from[0]}: it rolled again.`);
     else setMsg("");
     play("acPlace");
   }
@@ -703,8 +703,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     } else if (!cancel && !p.wandered) tapPiece(p.hold);
   }
 
-  /** The offers standing on a square, left to right on the screen (by shop slot). */
-  const offersOn = (square: string) => gref.current.round.shop.slots.flatMap((o, slot) => (o.square === square ? [slot] : []));
+  /** The offer on a square (a shop slot), or -1: one offer to a square, and never on a square one of your pieces stands on. */
+  const offerOn = (square: string) => (pieceOf(square) ? -1 : gref.current.round.shop.slots.findIndex((o) => o.square === square));
 
   function layerDown(e: PointerEvent) {
     const cur = gref.current;
@@ -713,16 +713,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const box = boxOf();
     const square = squareAtPoint(e.clientX, e.clientY, box, orientation);
     if (!square) return;
-    if (cur.phase === "buy") {
-      // An offer's silhouette: a tap buys it, and that is all it does: it is never picked up, dragged or sold. (Two on one square sit side by side: the half of the square the finger is on.)
-      const slots = offersOn(square);
-      if (slots.length) {
-        const { col } = cellOf(square, orientation);
-        const within = (e.clientX - box.left) / (box.width / 8) - col;
-        const slot = slots[Math.min(slots.length - 1, Math.max(0, Math.floor(within * slots.length)))]!;
-        return startPress(e, { kind: cur.round.shop.slots[slot]!.kind, at: { offer: slot }, tapOnly: true });
-      }
-    }
+    // An offer's silhouette: a tap buys it, and that is all it does: it is never picked up, dragged or sold.
+    const slot = cur.phase === "buy" ? offerOn(square) : -1;
+    if (slot >= 0) return startPress(e, { kind: cur.round.shop.slots[slot]!.kind, at: { offer: slot }, tapOnly: true });
     const kind = pieceOf(square);
     if (kind) return startPress(e, { kind, at: { square } });
     tapSquare(square);
@@ -778,12 +771,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const dots: string[] = [];
   if (sel && g.phase === "adjust" && g.round.adj && isSquare(sel) && movesUsed(g.round.adj) < cfg.adjustMoves) dots.push(...adjustTargets(g.round.adj.army, sel.at.square));
 
-  // The offers: each a glowing silhouette on its square, grouped by square (two on one square sit side by side, smaller).
+  // The offers: each a glowing silhouette on its own square (one offer to a square).
   const offers = g.phase === "buy" ? g.round.shop.slots : [];
   const offerBlocks = offers.map((o) => buyBlock(g.round.you, g.match.you.gold, o, cfg, g.match.you.level));
   // (An offer the board has no room for can still be held: its card isn't greyed, it says why it can't be tapped.)
   const holdOnly = offers.map((o, slot) => offerBlocks[slot] === "limit" && !holdBlock(g.round.you, g.match.you.gold, o, cfg));
-  const squaresWithOffers = [...new Set(offers.map((o) => o.square))];
 
   const interactiveLayer = (g.phase === "buy" && !locked) || (g.phase === "adjust" && elapsed < cfg.adjustSeconds * 1000);
   // A press, drag or selection never outlives the moment it can act: when the step changes, the round turns, or the board stops taking presses (the last seconds of buying locked, the adjust step's time up) it is over, with no action.
@@ -893,18 +885,13 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               {(seen?.revealed ?? []).map((r) => (
                 <span key={r.square} class="ac-ping" data-square={r.square} style={sq(r.square)} />
               ))}
-              {squaresWithOffers.map((square) => {
-                const slots = offers.flatMap((o, slot) => (o.square === square ? [slot] : []));
-                return (
-                  <span key={square} class="ac-offers" data-square={square} style={sq(square)}>
-                    {slots.map((slot, i) => (
-                      <span key={slot} class={`ac-sil${offerBlocks[slot] || locked ? " off" : ""}`} data-slot={slot} data-kind={offers[slot]!.kind} style={{ "--n": slots.length, "--i": i } as Record<string, number>}>
-                        <i class={`ac-sil-shape ${KIND_NAME[offers[slot]!.kind]}`} />
-                      </span>
-                    ))}
+              {offers.map((o, slot) => (
+                <span key={`${slot}${o.kind}${o.square}`} class="ac-offers" data-square={o.square} style={sq(o.square)}>
+                  <span class={`ac-sil${offerBlocks[slot] || locked ? " off" : ""}`} data-slot={slot} data-kind={o.kind}>
+                    <i class={`ac-sil-shape ${KIND_NAME[o.kind]}`} />
                   </span>
-                );
-              })}
+                </span>
+              ))}
               {held && isSquare(held) && <span class="ac-cell ac-picked" style={sq(held.at.square)} />}
               {floats.filter((f) => "col" in f.at).map((f) => (
                 <FloatGold key={f.id} amount={f.amount} at={f.at} />
