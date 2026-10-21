@@ -64,8 +64,10 @@ interface Fight {
   kingWalk: number;
   /** The longest run of one side's own moves that were all its king's. */
   kingSteps: number;
-  /** A stall's deciding score, or an early end's winning score (centipawns). */
+  /** A stall's judged score of the final position (centipawns, White's view). */
   score?: number;
+  /** What White gained since the start by the judge (a stall's, or "too far ahead"'s). */
+  gain?: number;
 }
 
 const fights: Fight[] = [];
@@ -88,7 +90,7 @@ for (const [i, s] of starts.entries()) {
       const r = engine.best({ ...game, rules });
       engineMs += performance.now() - t0;
       engineMoves++;
-      // (With its score, as the screen's engine gives it: it counts toward "too far ahead".)
+      // (With its score, as the screen's engine gives it: it tells a forced win the engine has found.)
       return r.move ? { move: r.move, score: r.score } : null;
     },
     // (The real pace: the fight asks for each move's wait.)
@@ -107,7 +109,7 @@ for (const [i, s] of starts.entries()) {
     cfg,
   }))!;
   const m = material(s.fen);
-  const f: Fight = { name: s.name, end: res.end, winner: res.winner, plies: res.moves.length, seconds, cashIns: res.cashIns.w + res.cashIns.b, ahead: m.w > m.b ? "w" : m.b > m.w ? "b" : null, kingWalk, kingSteps, ...(res.score !== undefined ? { score: res.score } : {}) };
+  const f: Fight = { name: s.name, end: res.end, winner: res.winner, plies: res.moves.length, seconds, cashIns: res.cashIns.w + res.cashIns.b, ahead: m.w > m.b ? "w" : m.b > m.w ? "b" : null, kingWalk, kingSteps, ...(res.score !== undefined ? { score: res.score } : {}), ...(res.gain !== undefined ? { gain: res.gain } : {}) };
   fights.push(f);
   process.stdout.write(`${i + 1}/${starts.length} ${s.name}: ${res.end} ${res.winner ?? "draw"} in ${f.plies} plies (${f.seconds.toFixed(1)} s), king walk ${kingWalk} plies (one side ${kingSteps} moves), ${f.cashIns} cash-ins\n`);
 }
