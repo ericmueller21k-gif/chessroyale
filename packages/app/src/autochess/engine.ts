@@ -1,5 +1,5 @@
 import { AUTOCHESS, type AutoChessSettings } from "@chessroyale/core";
-import type { FightSoFar } from "./fight.ts";
+import type { FightSoFar, PickAnswer } from "./fight.ts";
 import { rulesFor } from "./fight.ts";
 import type { HunReply, HunRequest } from "./hunchess-worker.ts";
 import { fightStart } from "./position.ts";
@@ -75,17 +75,17 @@ function ask(game: FightSoFar, nodes: number, cfg: AutoChessSettings, timeoutMs:
 }
 
 /**
- * The engine's move for the fight so far, one of the fight's `allowed` moves, or null if it gives none in time (the fight plays a
- * stand-in then; three misses in a row and the rest of the visit plays stand-ins).
+ * The engine's move for the fight so far (one of the fight's `allowed` moves) and its score for the side moving, or null if it gives
+ * none in time (the fight plays a stand-in then; three misses in a row and the rest of the visit plays stand-ins).
  */
-export async function enginePick(game: FightSoFar, allowed: readonly string[], cfg: AutoChessSettings = AUTOCHESS, timeoutMs = 4000): Promise<string | null> {
+export async function enginePick(game: FightSoFar, allowed: readonly string[], cfg: AutoChessSettings = AUTOCHESS, timeoutMs = 4000): Promise<PickAnswer | null> {
   const r = await ask(game, cfg.fightNodes, cfg, timeoutMs);
   if (!r || !r.move) {
     failures++;
     return null;
   }
   failures = 0;
-  return allowed.includes(r.move) ? r.move : null;
+  return allowed.includes(r.move) ? { move: r.move, score: r.score } : null;
 }
 
 /**

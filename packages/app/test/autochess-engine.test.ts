@@ -38,10 +38,13 @@ const cfg = { ...AUTOCHESS, fightNodes: 2000 };
 describe("auto chess: the engine in its worker", () => {
   it("answers with one of the fight's moves, searched at the fight's node budget with the fight's rules", async () => {
     newFight();
-    const move = await enginePick({ startFen: START, moves: [] }, fightMoves(START), cfg, 2000);
-    expect(fightMoves(START)).toContain(move);
+    const answer = await enginePick({ startFen: START, moves: [] }, fightMoves(START), cfg, 2000);
+    expect(fightMoves(START)).toContain(answer!.move);
+    // (With its score for the side moving, which counts toward "too far ahead".)
+    expect(typeof answer!.score).toBe("number");
     const req = asked.find((r) => r.type === "move")!;
-    expect(req).toMatchObject({ nodes: 2000, rules: { variant: "fight", checksToWin: 5, quietCap: 10, moveCap: 60 }, cashInValue: AUTOCHESS.cashInValue });
+    expect(req).toMatchObject({ nodes: 2000, rules: { variant: "fight", quietCap: 10, moveCap: 60, stallWinMargin: 100 }, cashInValue: AUTOCHESS.cashInValue });
+    expect(req.type === "move" && "checksToWin" in req.rules).toBe(false);
     expect(asked[0]!.type).toBe("new");
   });
 
