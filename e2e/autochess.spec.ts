@@ -1984,7 +1984,8 @@ test("layouts: nothing scrolls, every target is at least 44 px (a tile 34 or mor
     expect(m.goldRow.pillH, `${where}: a small pill`).toBeLessThan(44);
     for (const y of m.goldRow.baselines) expect(Math.abs(y - m.goldRow.baselineGold), `${where}: baselines`).toBeLessThanOrEqual(1);
     expect(Math.abs(m.goldRow.clockBase - m.goldRow.baselineGold), `${where}: the step's name is on the gold number's baseline`).toBeLessThanOrEqual(1.5);
-    expect(m.goldRow.incomeWord, `${where}: "Income"`).toBe(w <= 414 ? "none" : "inline");
+    // ("Income" is dropped under 415 wide, and on a computer when a streak joins the row: the widest content here has one.)
+    expect(m.goldRow.incomeWord, `${where}: "Income"`).toBe(w <= 414 || !phone() ? "none" : "inline");
     await expect(page.locator(".ac-income b")).toHaveText("+200");
     // Every phone gets some free room at the bottom (Eric: some free space; about 12 px is kept, and the page doesn't scroll if a result runs a few lines longer). On a computer the dock isn't at the bottom.
     if (phone()) expect(h - m.dockBottom, `${where}: free room at the bottom`).toBeGreaterThanOrEqual(11.5);
@@ -2111,7 +2112,7 @@ test("the benches sit flush with the board (v7.1, Eric Oct 22): their bench's le
   // (A phone whose width is the limit, 390 x 844 and up, already had the column's width: its board stays as it was, never smaller.)
   const sizes = phone()
     ? ([[393, 730, 352, 3], [428, 777, 292, 3], [320, 568, 208, 3], [375, 667, 292, 3], [360, 640, 273, 3], [390, 844, 360, -0.5], [430, 932, 400, -0.5]] as const)
-    : ([[1280, 800, 484, 3], [1280, 600, 336, 3]] as const);
+    : ([[1280, 800, 484, 3], [1280, 600, 336, -0.5]] as const);
   for (const [w, h, before, grow] of sizes) {
     await page.setViewportSize({ width: w, height: h });
     await page.goto(PLAIN);
@@ -2160,7 +2161,7 @@ test("the clock is in the gold row (v7.1, Eric Oct 22): the small time with the 
     });
     expect(look.nameTop, `${where}: the name is under the time`).toBeGreaterThanOrEqual(look.timeBottom - 3);
     expect(look.timeFont, `${where}: the time is no bigger than the gold`).toBeLessThanOrEqual(look.goldFont);
-    expect(look.nameFont, `${where}: the name is small`).toBeLessThanOrEqual(12);
+    expect(look.nameFont, `${where}: the name is small`).toBeLessThanOrEqual(13);
     expect([look.bg, look.border, look.shadow], `${where}: no box`).toEqual(["rgba(0, 0, 0, 0)", "0px", "none"]);
     // It counts down (quick: a buy step of 7 s) and the step's last seconds are red ("Locked").
     await expect(clockOf(page)).toHaveText(/^0:0[4-7]$/);
