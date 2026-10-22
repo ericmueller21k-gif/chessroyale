@@ -75,9 +75,27 @@ swelling major chord, a bright bell-like hit and a sparkle of small high bells f
 
 ## Counts
 
-(The numbers are in the PR; the script is the screen's own pure code in a loop.)
+(The script is the screen's own pure code in a loop, `rollOffer`, `newShop`, `botPlan` and `settleRound`; it is not in the repo.)
 
-COUNTS_HERE
+**How often a star-up shows** (20,000 seeded shops each; four offers; level 4's odds; the pieces that can star up are plain knights, bishops and rooks on random squares of the half, nothing else on the board):
+
+| Pieces that can star up | Shops with a star-up | Star-ups per shop | Share of offers |
+| --- | --- | --- | --- |
+| 1 | 12.9% | 0.13 | 3.2% |
+| 2 | 24.5% | 0.26 | 6.4% |
+| 3 | 35.1% | 0.39 | 9.7% |
+| 4 | 43.7% | 0.51 | 12.7% |
+| 5 | 52.3% | 0.65 | 16.2% |
+| 6 | 59.4% | 0.77 | 19.2% |
+
+(With three pawns standing as well the rates are a little higher: the pawns' squares offer nothing, so a draw lands on the other squares more: 2 pieces 27.4%, 3 pieces 38.3%.) A round's shop is
+rolled again after every buy and every reroll, so over a round the star-ups come far more often than in one shop: they are found by rolling, as Eric said, but not rarely.
+
+**How often stars happen in bot-against-bot rounds** (400 matches of 8 rounds, both sides the bot's own plan with its gold, level, XP and bench carried round to round, a coin flip for each round's winner, no fights, so the
+economy is a little off the real one; 6,400 side-rounds): at the end of the buying **39.7% of side-rounds have a starred piece on the board, and 7.7% a 3-star** (3-stars: 540 of 3,520 starred pieces). By round: round 1 13.9% / 1.0%, round 2 20.0% / 2.3%, round 3 30.3% / 3.3%,
+round 4 38.4% / 6.5%, round 5 43.3% / 8.1%, round 6 52.9% / 10.0%, round 7 57.5% / 15.3%, round 8 61.1% / 15.5% (starred / 3-star). The bot bought 0.64 star-ups a side-round: 3,529 second stars and 540 third stars; 4,018 on its board and 51 on a held piece (it places what it held for
+nothing at the start of a round, so a held piece is starred up only when it was held that round: 42 starred bench pieces came into a round). A board's stars are gone at each round's end, so these 3-stars are all made in one round (two star-ups of one piece), or on the bench.
+The bot takes every one it is offered (95%), so a human's rate is lower; the numbers are the ceiling of what the rules give.
 
 ## Player-visible text changes
 

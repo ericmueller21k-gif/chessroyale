@@ -156,23 +156,27 @@ Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2
 
 ## Tests and tools
 
-- Unit: `packages/app/test/autochess-shop.test.ts` (four slots, rolling by level, usable squares, buying and holding from a slot, refills, rerolls and their climbing price, one offer to a square),
+- Unit: `packages/app/test/autochess-stars.test.ts` (v8: the offer rule: a square's candidates, the redraw, star-ups ignoring the limits, one offer to a square, seeded, the new pieces still at the level's odds; the merge on the board, the bench and a new-piece roll
+  that matches a held piece; prices, selling and the refund; the stars through the fight's moves; the move step's length and each star's moves, taking back; the bot's buys and its starred pieces' moves),
+  `packages/app/test/autochess-shop.test.ts` (four slots, rolling by level, usable squares, buying and holding from a slot, refills, rerolls and their climbing price, one offer to a square),
   `autochess-odds.test.ts` (the odds table: every level's row, sums, no rook before 5 and no queen before 7; the four slots roll independently, at the level's odds, at levels 4, 7 and 10: chi-square over tens of
   thousands of shops, rerolls, refills, rounds and match seeds; two queens in a level-10 shop is 2.7%),
-  `autochess-move.test.ts` (the move step: legal moves staying on your half, pins and check, the random seeded pick, no piece able to move, taking back, the bot's pick and move),
+  `autochess-move.test.ts` (v7's move step, behind `adjustMode: "legal"`: legal moves staying on your half, pins and check, the random seeded pick, no piece able to move, taking back, the bot's pick and move),
   `autochess-lockin.test.ts` (off: no bonus, no lock, the full time; on: v5's rules), `autochess-level.test.ts` (levels, XP, the room a level gives, the bot's levels),
   `autochess-reveal.test.ts` (the reveal times, what shows when), `autochess-rules.test.ts` (the shop's reasons, selling at 75%, the
   bench, the kings, placing, the teleport step's change and its off switch), `autochess-match.test.ts` (the economy, the bench through the
   rounds, the bot's buys, holds, XP, rerolls and adjust staying legal over hundreds of seeds and a whole match, fights ending within the
   cap; the fight's rules, cash-ins and their gold; the damage of a lost round and the game length: a Monte Carlo, median 8 rounds), `autochess-hop.test.ts` (the hops' random 7 to 10 s waits, each pawn on its own draws), `autochess-engine.test.ts` (the worker link: answers, the bot's look, the timeout's
-  stand-ins), `autochess-sounds.test.ts` (peak, loudness, different from each other), `autochess-words.test.ts` (the words, the settings'
+  stand-ins), `autochess-sounds.test.ts` (peak, loudness, different from each other, the two star-up sounds' lengths), `autochess-words.test.ts` (the words, the settings'
   numbers).
 - Engine: `packages/chess/test/hunchess-board.test.ts` (perft against known counts and chess.js, a fight's moves, every rule),
   `hunchess-search.test.ts` (wins and losses by the fight's rules, determinism, the node budget).
-- e2e: `e2e/autochess.spec.ts` (phone and computer; seeds are listed at its top): the four-card shop and its silhouettes (one to a square), a reroll, buying by tap,
+- e2e: `e2e/autochess.spec.ts` (phone and computer; seeds are listed at its top): **v8's stars:** a star-up offer's gold and rainbow cards (the price 5, the stars on its piece, the ring on the piece it merges into, no silhouette), buying them (5 gold, no piece added on a full board, the stars on the piece, the
+  sound hook, the merge's pop), a star-up card never dragged and the "Need 5 more" line, a bench piece's star-up kept into the next round, the stars move step (every starred piece glows, a 2-star's legal squares, a 3-star's every empty square, "Not starred", each moved once and taken back, 11 s for two stars), the 5 s step with nobody starred,
+  the bot's stars (shown once revealed, 5 s + 3 s each), stars following their pieces through the fight and the refund counting them, the stars' places at 320 to 428 and on a computer, reduced motion and mute; and, as before: the four-card shop and its silhouettes (one to a square), a reroll, buying by tap,
   the reasons, selling by tap and drag, the bench (and your whole row lighting while you drag), drags cut off by a step's end, lock-in off for the whole 30 s (and its tests behind `?lockin=1`), a cancelled pointer or lost capture,
   silhouettes that are only tapped, a sale of a piece that is gone, levels, the odds pill at level 4 and after a level-up, the reveals, their bench tapped (the red square), the phase banners and the clock's bars,
-  the move step (the lit piece, its 7 s, the refusals, taking back, no piece able to move, the step off, the teleport step behind its setting), the kitty-corner layout, the benches on the board's edges (393 x 730, 428 x 777, 320 x 568 and the sizes between: measured boxes, and the board bigger than v7's), the clock in the gold row, the hopping pawns
+  v7's move step behind `?adjustmode=legal` (the lit piece, its 7 s, the refusals, taking back, no piece able to move), the step off, the teleport step behind its setting, the kitty-corner layout, the benches on the board's edges (393 x 730, 428 x 777, 320 x 568 and the sizes between: measured boxes, and the board bigger than v7's), the clock in the gold row, the hopping pawns
   (on a fake clock: one hop, then 7 to 10 s, each pawn its own; still under reduced motion), one shadow under each pawn, the reroll price climbing 5, 6, 7 ... 10 and back to 5 next round, the button feel, the floating
   gold, mute, a fight to a result and the next round, the damage of a lost round 1, a cash-in's "+5", a fight with a silent engine, layouts (320 to 430 and 1280 to 1920: nothing scrolls, every target 44 px, both benches' gaps equal and on the board's edges, the gold row at its widest content,
   the odds pill's baseline, every short message under the bench's row, the board as big as fits, the board never moving from step to step). `e2e/home-layout.spec.ts` (home).
@@ -195,3 +199,6 @@ Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2
   through every one of them (the ghost must be gone within a moment, with no gold, piece or bench change). The bot's lock-in time comes from a draw of its own,
   so changing how the bot buys doesn't move it.
 - A sound's play name goes in `SoundName` and `MAKE` (sound.ts); a sound is added with its peak and loudness test.
+- **Stars (v8):** `Army.stars` (the board's, by square) and a bench piece's `stars` are the only places stars live, and every function that moves, sells, places or carries a piece moves its stars (`withStars`, `sellPiece`, `placeHeld`, `carryBench`, `adjust.ts`' `play`, `moveStars` in the fight): a new one
+  goes with a test that the stars come along. An offer is a star-up by what it matches (`starUpTarget`), never by a flag; every price shown or taken for an offer comes from `offerPrice`. The roll for an army with nothing that can star up is the old roll, so a seed's first shop and the odds tests don't move; with a piece that can, the roll
+  takes a different path, so a test that buys one and then reads a refill needs a seed found again by the pure code (the spec's header says what each is).

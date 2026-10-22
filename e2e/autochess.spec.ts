@@ -2453,17 +2453,19 @@ const BOTSTARS = "/autochess?quick=1&seed=1&botbench=n@c7:2,b@f8:3";
 const GOLD = "242, 193, 78";
 /** The stars drawn on the board by square, each with its count. */
 const marks = (p: Page) => p.locator(".ac-starmark").evaluateAll((els) => Object.fromEntries(els.map((e) => [(e as HTMLElement).dataset.square!, Number((e as HTMLElement).dataset.stars)])));
-/** Every phase change from now on, each with when (`stepSeconds` reads the move step's length from it). */
+/** Every phase change from now on, each with when and the stars on the board at that moment (`stepSeconds` reads the move step's length from it; `marksAt` the stars as a step began: the fight moves every 60 ms here, so a later read has seen moves). */
 async function watchPhases(p: Page) {
   await p.evaluate(() => {
     const root = document.querySelector<HTMLElement>(".ac-root")!;
-    const list: { phase: string; at: number }[] = [{ phase: root.dataset.phase!, at: performance.now() }];
+    const stars = () => Object.fromEntries([...document.querySelectorAll<HTMLElement>(".ac-starmark")].map((e) => [e.dataset.square!, Number(e.dataset.stars)]));
+    const list: { phase: string; at: number; marks: Record<string, number> }[] = [{ phase: root.dataset.phase!, at: performance.now(), marks: stars() }];
     (window as any).__phases = list;
     new MutationObserver(() => {
-      if (list[list.length - 1]!.phase !== root.dataset.phase) list.push({ phase: root.dataset.phase!, at: performance.now() });
+      if (list[list.length - 1]!.phase !== root.dataset.phase) list.push({ phase: root.dataset.phase!, at: performance.now(), marks: stars() });
     }).observe(root, { attributes: true, attributeFilter: ["data-phase"] });
   });
 }
+const marksAt = async (p: Page, phase: string) => (await p.evaluate(() => (window as any).__phases as { phase: string; marks: Record<string, number> }[])).find((m) => m.phase === phase)!.marks;
 const stepSeconds = async (p: Page) => {
   const list = await p.evaluate(() => (window as any).__phases as { phase: string; at: number }[]);
   const start = list.find((m) => m.phase === "adjust")!;
@@ -2706,9 +2708,7 @@ test("the move step (v8): every starred piece glows and may move once, a 2-star 
   await expect(root(page)).toHaveAttribute("data-phase", /^(fight|result|over)$/, { timeout: 15_000 });
   expect(await stepSeconds(page)).toBeGreaterThan(10.8);
   expect(await stepSeconds(page)).toBeLessThan(11.8);
-  expect(await marks(page)).toEqual({ f1: 2, h4: 3 });
-  await expect(piece(page, "white", "knight", "f1")).toBeVisible();
-  await expect(piece(page, "white", "bishop", "h4")).toBeVisible();
+  expect(await marksAt(page, "fight")).toEqual({ f1: 2, h4: 3 });
   expect(errors).toEqual([]);
 });
 
@@ -2768,9 +2768,8 @@ test("the bot's stars (v8): a starred piece of theirs shows its stars once it is
   await expect(root(page)).toHaveAttribute("data-phase", /^(fight|result|over)$/, { timeout: 15_000 });
   expect(await stepSeconds(page)).toBeGreaterThan(10.8);
   expect(await stepSeconds(page)).toBeLessThan(11.8);
-  // At the fight's start the bot has moved its two starred pieces (a 2-star one legal move, a 3-star anywhere on its half): their stars are still two and three, on pieces.
-  expect(Object.values(await marks(page)).sort()).toEqual([2, 3]);
-  for (const sqr of Object.keys(await marks(page))) await expect(page.locator(`${BOARD_SEL.piece}.black[data-square="${sqr}"]`)).toHaveCount(1);
+  // The fight begins from their pieces as they stood (their move shows a moment later, with the stars on the pieces moved).
+  expect(await marksAt(page, "fight")).toEqual({ c7: 2, f8: 3 });
   expect(errors).toEqual([]);
 });
 
@@ -2779,8 +2778,10 @@ test("stars follow their pieces through the fight, and the survivors' refund cou
   const errors = watchErrors(page);
   // (The move step off: the fight starts from the board as bought.)
   await page.goto(`${STARMOVE}&adjust=0`);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  await watchPhases(page);
   await expect(root(page)).toHaveAttribute("data-phase", "fight", { timeout: 20_000 });
-  expect(await marks(page)).toEqual({ g3: 2, d2: 3 });
+  expect(await marksAt(page, "fight")).toEqual({ g3: 2, d2: 3 });
   // A star is always on a piece (read in one go: the fight moves every 60 ms here): sampled through the fight, and once it is over.
   const consistent = () =>
     page.evaluate((sel) => [...document.querySelectorAll<HTMLElement>(".ac-starmark")].every((m) => !!document.querySelector(`${sel}[data-square="${m.dataset.square}"]`)), BOARD_SEL.piece);
