@@ -1,5 +1,5 @@
 import { AUTOCHESS, mulberry32, weightedIndex, type AutoChessSettings, type Rng, type ShopOdds } from "@chessroyale/core";
-import { buyBlock, buyOffer, holdBlock, holdOffer, kindBlock, priceOf, usableSquares, type BuyBlock, type HoldBlock } from "./army.ts";
+import { buyBlock, buyOffer, halfSquares, holdBlock, holdOffer, kindBlock, priceOf, starUp, starUpTarget, starrablePieces, usableSquares, type BuyBlock, type HoldBlock, type StarTarget } from "./army.ts";
 import { KINDS, type Army, type Kind, type Offer } from "./types.ts";
 
 /**
@@ -11,6 +11,14 @@ import { KINDS, type Army, type Kind, type Offer } from "./types.ts";
  * does an offer's square being taken by another purchase. A reroll rolls all the offers again for gold (a price that climbs with each one in a round); a round starts with a
  * fresh shop, free, and the first reroll's price again. Pure data, and every roll is seeded by the round, how many rerolls so far and how many refills since, so a
  * round played the same way shows the same offers (tests rely on that).
+ *
+ * **Star-up offers** (v8, Eric Oct 22: "When you have a piece on a tile only that piece can appear there"; a bishop on the bench "F2, but you already have a rook on F2,
+ * your shop can still find both"): an offer's square is drawn first, evenly among the squares of your half that aren't your king's and no other current offer is on; the
+ * square's candidates are every piece of yours that can star up and stands on it (the board) or is held for it (the bench), plus, when the board square is empty, a new
+ * piece rolled by the level's odds; the offer is one candidate, evenly. A square with no candidate (a pawn, a 3-star, and nothing held for it) offers nothing: it is
+ * drawn again. An offer is a star-up when its kind and square match a piece of yours that can star up (`starUpTarget`), however it was rolled: it costs `starUpCost`
+ * and merges into that piece, ignoring every limit on new pieces. With nothing of yours that can star up the roll is the old one (a kind by the odds, then a square),
+ * and with something it is the same odds for the new piece (a kind the square can't take goes to a square it can).
  */
 
 export interface Shop {
@@ -42,6 +50,27 @@ export function oddsFor(level: number, cfg: AutoChessSettings = AUTOCHESS): Shop
  * the free ones only when it was taken, so a roll that collides with nothing is the same as ever.)
  */
 export function rollOffer(rng: Rng, army: Army, cfg: AutoChessSettings = AUTOCHESS, taken: ReadonlySet<string> = new Set(), level: number = cfg.levels.start): Offer | null {
+  const ups = starrablePieces(army, cfg).filter((p) => p.square !== army.king && !taken.has(p.square));
+  if (!ups.length) return rollNewPiece(rng, army, cfg, taken, level);
+  const odds = oddsFor(level, cfg);
+  // The new pieces the odds and the limits allow, each with a square no other offer is on.
+  const fresh = KINDS.filter((k) => odds[k] > 0 && !kindBlock(army, k, cfg) && usableSquares(army, k, cfg).some((sq) => !taken.has(sq)));
+  // Each square with something to offer on it: the star-ups there, and a new piece when no piece of yours stands on it.
+  const choices = halfSquares(army.color)
+    .filter((sq) => sq !== army.king && !taken.has(sq))
+    .map((square) => ({ square, ups: ups.filter((p) => p.square === square).map((p) => p.kind), fresh: fresh.length > 0 && !army.board[square] }))
+    .filter((c) => c.ups.length > 0 || c.fresh);
+  if (!choices.length) return null;
+  const at = choices[Math.floor(rng() * choices.length)]!;
+  const pick = Math.floor(rng() * (at.ups.length + (at.fresh ? 1 : 0)));
+  if (pick < at.ups.length) return { kind: at.ups[pick]!, square: at.square };
+  const kind = fresh[weightedIndex(rng, fresh.map((k) => odds[k]))]!;
+  const squares = usableSquares(army, kind, cfg).filter((sq) => !taken.has(sq));
+  return { kind, square: squares.includes(at.square) ? at.square : squares[Math.floor(rng() * squares.length)]! };
+}
+
+/** The old roll, for an army with nothing that can star up: a kind by the odds of `level`, then a square it could use. */
+function rollNewPiece(rng: Rng, army: Army, cfg: AutoChessSettings, taken: ReadonlySet<string>, level: number): Offer | null {
   const odds = oddsFor(level, cfg);
   const kinds = KINDS.filter((k) => odds[k] > 0 && !kindBlock(army, k, cfg));
   while (kinds.length) {
@@ -103,7 +132,8 @@ export function replaceTaken(shop: Shop, seed: number, army: Army, cfg: AutoChes
   for (let slot = 0; slot < cur.slots.length; slot++) {
     const offer = cur.slots[slot]!;
     const doubled = cur.slots.slice(0, slot).some((o) => o.square === offer.square);
-    if (doubled || !usableSquares(army, offer.kind, cfg).includes(offer.square)) {
+    // (A star-up stands on a square a piece of yours holds: that is no reason to roll it again.)
+    if (doubled || !(starUpTarget(army, offer, cfg) || usableSquares(army, offer.kind, cfg).includes(offer.square))) {
       const before = cur.slots.length;
       cur = refillSlot(cur, slot, seed, army, cfg, level);
       from.push(offer.square);
@@ -140,15 +170,17 @@ export function buyFromSlot(
   seed: number,
   cfg: AutoChessSettings = AUTOCHESS,
   limit: number = cfg.levels.max,
-): { army: Army; gold: number; shop: Shop; replaced: number; from: string[] } | { block: BuyBlock } {
+): { army: Army; gold: number; shop: Shop; replaced: number; from: string[]; starUp?: StarTarget } | { block: BuyBlock } {
   const offer = side.shop.slots[slot];
   if (!offer) return { block: "gold" };
   const block = buyBlock(side.army, side.gold, offer, cfg, limit);
   if (block) return { block };
-  const army = buyOffer(side.army, offer);
+  // A star-up (an offer that matches a piece of yours that can star up) merges into that piece for `starUpCost`; any other offer lands on its square.
+  const target = starUpTarget(side.army, offer, cfg);
+  const army = target ? starUp(side.army, target) : buyOffer(side.army, offer);
   const refilled = refillSlot(side.shop, slot, seed, army, cfg, side.level);
   const { shop, replaced, from } = replaceTaken(refilled, seed, army, cfg, side.level);
-  return { army, gold: side.gold - priceOf(offer.kind, cfg), shop, replaced, from };
+  return { army, gold: side.gold - (target ? cfg.starUpCost : priceOf(offer.kind, cfg)), shop, replaced, from, ...(target ? { starUp: target } : {}) };
 }
 
 /**

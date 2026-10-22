@@ -1,7 +1,7 @@
 import { AUTOCHESS, type AutoChessSettings, type Rng } from "@chessroyale/core";
 import { F_CASHIN, fightRules, gainScore, judgedResult, moveFlags, moveUci, parseSquare, Position, startScore, winMoves, type HunEnd } from "@chessroyale/chess/hunchess";
 import { piecesOn } from "./position.ts";
-import type { Color } from "./types.ts";
+import type { Color, StarCount } from "./types.ts";
 
 /**
  * The fight: the HunChess engine plays both sides, the same search for each, a move about every 0.6 s, until mate (a win), a side
@@ -167,3 +167,22 @@ export function withPiece(fen: string, square: string, piece: string): string {
   rows[8 - Number(square[1])]![square.charCodeAt(0) - 97] = piece;
   return [rows.map((r) => r.join("").replace(/\.+/g, (dots) => String(dots.length))).join("/"), ...rest].join(" ");
 }
+
+/**
+ * The stars on the board after a move of the fight (v8): a starred piece keeps its stars as it moves (they are the piece's), and the stars of a piece it captures
+ * go with that piece. A star changes nothing in the fight; this only follows the stars for the screen (drawn on the piece) and for the survivors' refund.
+ * (A move is the engine's UCI text, "e2e4"; only a piece with stars matters, and neither a pawn's en passant nor a cash-in ever touches one.)
+ */
+export function moveStars(stars: Readonly<Record<string, StarCount>>, move: string): Record<string, StarCount> {
+  const from = move.slice(0, 2);
+  const to = move.slice(2, 4);
+  const next = { ...stars };
+  const mover = next[from];
+  delete next[from];
+  delete next[to];
+  if (mover) next[to] = mover;
+  return next;
+}
+
+/** The stars after all of a fight's moves from the start. */
+export const starsAfter = (stars: Readonly<Record<string, StarCount>>, moves: readonly string[]): Record<string, StarCount> => moves.reduce((acc, m) => moveStars(acc, m), { ...stars });

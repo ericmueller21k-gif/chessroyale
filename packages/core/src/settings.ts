@@ -2770,18 +2770,20 @@ export interface AutoChessSettings {
    * you level you have slightly higher chances for better pieces and pawn odds slightly decrease... [queens] shouldn't even appear
    * till level 7 like in TFT"): `oddsByLevel[level - 1]` is the percent of each kind for a shop rolled at that level, level 1 first
    * (play starts at `levels.start`, 4, and tops at `levels.max`, 10); each row adds up to 100. No rooks before level 5, no queens
-   * before 7 (Eric: "Rooks should start at level 5"). The bot rolls by its own level.
+   * before 7 (Eric: "Rooks should start at level 5"). The bot rolls by its own level. **Star-ups** (v8): an offer's square is drawn first and its candidates are
+   * the pieces of yours that can star up on it (board or bench) and, on an empty board square, a new piece by these odds: the odds are the odds of a *new* piece
+   * (see `starUpCost`, `autochess/shop.ts` `rollOffer`).
    */
   readonly shop: {
     readonly slots: number;
     readonly oddsByLevel: readonly ShopOdds[];
     readonly reroll: { readonly first: number; readonly step: number; readonly max: number };
   };
-  /** Selling a piece, from the board or the bench, gives back this share of its price, rounded down (v6, Eric Oct 20: 75%: P7 N22 B24 R37 Q67). */
+  /** Selling a piece, from the board or the bench, gives back this share of what was paid for it (its price, and `starUpCost` for each star above the first, v8), rounded down (v6, Eric Oct 20: 75%: P7 N22 B24 R37 Q67). */
   readonly sellBack: number;
   /**
    * The bench (v6, Eric Oct 20: "the bench is going to be a massive strategy"): this many held pieces, each keeping the square it
-   * was offered on. Held pieces stay from round to round (the board's pieces still don't).
+   * was offered on. Held pieces stay from round to round (the board's pieces still don't), and so do their stars (v8).
    */
   readonly benchSlots: number;
   /**
@@ -2808,11 +2810,28 @@ export interface AutoChessSettings {
    * your half; picked at random, seeded by the round) is lit, and you play one legal chess move with it that stays on your half, or
    * skip; with no such piece you have no move that round. The bot gets the same: its own random piece and the engine's best such move.
    * `"teleport"` (the v6 step, kept in code, off): move any one piece of yours to any empty square of your half.
+   * **`"stars"`** (v8, Eric Oct 22; the default): no piece is picked for you; only your **starred** pieces on the board move (see `starUpCost`),
+   * each at most once, in any order: a 2-star one legal chess move that stays on your half, a 3-star to any empty square of your half. The step
+   * lasts `moveBase` seconds plus `movePerStar` for each starred piece of the side with more of them on the board (`adjustSeconds` and
+   * `adjustMoves` are the other two modes'), always runs, and is `moveBase` seconds just to look at the board when nobody has a star.
    */
   readonly adjustStep: boolean;
-  readonly adjustMode: "legal" | "teleport";
+  readonly adjustMode: "legal" | "teleport" | "stars";
   readonly adjustSeconds: number;
   readonly adjustMoves: number;
+  /**
+   * Stars (v8, Eric Oct 22: "pieces can now be 2 starred which lets you move the piece once legally during the action phase... 3 star pieces can
+   * move anywhere... Pawns can't be starred up"). Every piece but a pawn or the king has 1 (plain), 2 or 3 (`maxStars`) stars. A star changes
+   * nothing in the fight (a 3-star rook is a rook); it only lets the piece move in the move step. **A star-up costs a flat `starUpCost` gold**
+   * (Eric: "5 cost to upgrade every time... having it be 5 is already generous"), whatever the piece and its stars, and merges into the piece
+   * where it is (board or bench). Selling a piece, and the survivors' refund, count everything paid for it: its price plus `starUpCost` for
+   * each star above the first. The move step's length is above (`moveBase`, `movePerStar`; Eric: "a flat 5 seconds no matter what... if you
+   * have two and your opponent has two starred up pieces, that's still just... an extra 6 seconds total").
+   */
+  readonly starUpCost: number;
+  readonly maxStars: number;
+  readonly moveBase: number;
+  readonly movePerStar: number;
   /**
    * Levels (v6, Eric Oct 20: "the board's piece limit is your level"): your level is how many pieces (not the king) you may have
    * on the board. You start at `start`, the top is `max`; each round's start gives `freeXp` XP; `buyXp` XP cost `buyXpCost` gold;
@@ -2895,7 +2914,7 @@ export interface AutoChessSettings {
   readonly income: { readonly first: number; readonly step: number; readonly max: number };
   /** Interest on gold banked before the income: `gold` for every full `per` banked, up to `max`. */
   readonly interest: { readonly per: number; readonly gold: number; readonly max: number };
-  /** After a fight each side gets this share (rounded down) of the summed price of its pieces still on the board, win or lose; bench pieces get all of theirs back. */
+  /** After a fight each side gets this share (rounded down) of everything paid for its pieces still on the board (their prices and their star-ups, v8), win or lose; bench pieces get all of theirs back. */
   readonly survivorRefund: number;
   /**
    * Gold for a streak, at the start of the next round: from `n` rounds in a row, `gold` (the highest row that fits). A draw
@@ -2935,6 +2954,8 @@ export interface AutoChessSettings {
     readonly xpChance: number;
     readonly xpChanceFull: number;
     readonly saveChance: number;
+    /** Whenever one of its offers is a star-up it can pay for, it buys it this often (Eric: "buys star-ups as a player would", nearly always). */
+    readonly starUpChance: number;
     readonly adjustTries: number;
     readonly adjustDestinations: number;
     readonly adjustNodes: number;
@@ -2970,9 +2991,13 @@ export const AUTOCHESS: AutoChessSettings = {
   circlesDelaySeconds: 2,
   revealSeconds: 5,
   adjustStep: true,
-  adjustMode: "legal",
+  adjustMode: "stars",
   adjustSeconds: 7,
   adjustMoves: 1,
+  starUpCost: 5,
+  maxStars: 3,
+  moveBase: 5,
+  movePerStar: 3,
   levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
   kingRanks: 2,
   hopEvery: [7, 10],
@@ -3010,5 +3035,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 70, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7, saveChance: 0.3, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 70, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7, saveChance: 0.3, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
 };
