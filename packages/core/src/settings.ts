@@ -2833,6 +2833,12 @@ export interface AutoChessSettings {
   readonly moveBase: number;
   readonly movePerStar: number;
   /**
+   * The star look (v8, Eric Oct 22: "a gold border for the 2-star units on the board... when the chess actually starts to play, can we get rid of the glowing effects of the
+   * pieces? It's fine to keep the little stars"). A starred piece has its tiny stars inside it always, and a colored outline round it (gold for 2 stars, prismatic for 3) while you
+   * buy, place and move. In the fight and the result the outlines are off, unless this is on (the test switch `?fightglow=1`): a setting so Eric can compare the two.
+   */
+  readonly fightGlow: boolean;
+  /**
    * Levels (v6, Eric Oct 20: "the board's piece limit is your level"): your level is how many pieces (not the king) you may have
    * on the board. You start at `start`, the top is `max`; each round's start gives `freeXp` XP; `buyXp` XP cost `buyXpCost` gold;
    * the XP to the next level is `xpToNext[level - start]` (4 to 5: 4, 5 to 6: 8, ... 9 to 10: 24).
@@ -2998,6 +3004,7 @@ export const AUTOCHESS: AutoChessSettings = {
   maxStars: 3,
   moveBase: 5,
   movePerStar: 3,
+  fightGlow: false,
   levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
   kingRanks: 2,
   hopEvery: [7, 10],

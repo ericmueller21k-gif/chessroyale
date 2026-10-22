@@ -435,10 +435,12 @@ describe("when the board draws again (boardInputs)", () => {
     dark: ["e7"],
     onDarkTry: () => {},
     turn: 90 as const,
+    // (What a screen draws on its pieces: the board draws again only when its key changes, not for a fresh `of` each frame.)
+    decor: { key: "s", of: () => null },
   };
 
   it("the same board from fresh lists, objects and handlers, as a screen drawing a frame passes it: nothing to draw", () => {
-    const again = { ...base, moves: [...base.moves], arrows: base.arrows.map((a) => ({ ...a })), marks: { ...base.marks }, dark: [...base.dark], onDarkTry: () => {} };
+    const again = { ...base, moves: [...base.moves], arrows: base.arrows.map((a) => ({ ...a })), marks: { ...base.marks }, dark: [...base.dark], onDarkTry: () => {}, decor: { key: base.decor.key, of: () => null } };
     expect(boardInputs(again)).toEqual(boardInputs(base));
     // (Plain values, so a hook's dependency list compares them one by one.)
     for (const v of boardInputs(base)) expect(["string", "number", "boolean"].includes(typeof v) || v === null).toBe(true);
@@ -467,6 +469,7 @@ describe("when the board draws again (boardInputs)", () => {
       { onDarkTry: undefined },
       { turn: 0 },
       { turn: 270 },
+      { decor: { key: "o", of: () => null } },
     ];
     const before = JSON.stringify(boardInputs(base));
     for (const c of changes) expect(JSON.stringify(boardInputs({ ...base, ...c } as typeof base)), JSON.stringify(c)).not.toBe(before);

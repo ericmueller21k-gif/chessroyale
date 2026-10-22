@@ -16,7 +16,9 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   whose-turn locking (`interactive`, `moves`), the promotion picker, arrows with labels (power-up hints, the Last
   Stand's, Squads' picks and blocks), square marks (`marks`), Hollow's dark (`dark`, `onDarkTry`), a move tried that
   chess allows but `moves` doesn't (`onRefused`: a boss power stops it, so the screen can say why; `refusedMove` in
-  logic.ts, worked out only when the board has an `onRefused`; Oct 17), and a knock for every move that appears (`components/Board.tsx` plays it).
+  logic.ts, worked out only when the board has an `onRefused`; Oct 17), a knock for every move that appears (`components/Board.tsx` plays it), and
+  what a screen draws on its pieces as part of each (`decor`, a `PieceDecor`: for the piece on a square a class and what goes inside its element, so it slides, is dragged and
+  follows like the piece: Auto chess's stars and their outline, Oct 22; not on a piece fading away).
 - **Board colors** (Settings → Board, Oct 18; docs/decisions/2026-10-18-board-colors.md): Classic (the board as it always
   was), Green or Gold for the dark squares, picked per device (`brc.boardColors`; `boardColors()` in `prefs.ts`, never
   sent anywhere, other players see their own). `<html data-board-colors>` carries it (set at start-up, `main.tsx`, and by
@@ -53,7 +55,7 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
     effect plays). Its drawing layer (`BoardLayer`: the squares and highlights, the pieces, the arrows, the coordinates,
     taps and drags) is drawn again only when what it shows changes: `boardInputs` (logic.ts) lists those, as plain
     values (the position, the way up and turn, the last move, the moves allowed, the arrows, the marks, the dark,
-    `interactive`, `small`, `animate`); lists and objects count by what's in them, so a screen building fresh ones each
+    `interactive`, `small`, `animate`, the `decor`'s `key`: the text of everything its `of` depends on); lists and objects count by what's in them, so a screen building fresh ones each
     time changes nothing. Or by itself: a tap, a drag, a slide or a fade ending (its own timer), a move you made. A move
     you made still goes back as before: the first time the screen hands the board anything new (`arrows` by identity
     too), it's let go and the layer draws again. The layer counts its drawings on `.hb-board` (`hbDraws`, read by

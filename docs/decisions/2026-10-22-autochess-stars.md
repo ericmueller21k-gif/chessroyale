@@ -40,7 +40,7 @@ step lasts. Every starred piece glows at the step's start; the random lit piece 
 room is (the one giving the most stars first, then the dearest piece); its bench's too, as it is the same rule. In the move step it moves each of its starred pieces (`botStarMoves`): a
 2-star the engine's best legal move, a 3-star the best of a sample of the empty squares of its half; the search is no bigger than v7's (see the calls).
 
-**On screen** (`AutoChess.tsx`, `styles.css`). Two or three small gold stars with a dark edge over the piece's lower edge: on the board (yours; theirs once shown), the benches, and a
+**On screen** (`AutoChess.tsx`, `styles.css`). *(Changed later the same day: tiny stars inside the piece, an outline round it and a clean board, [2026-10-22-autochess-star-look.md](2026-10-22-autochess-star-look.md); what follows is the first look.)* Two or three small gold stars with a dark edge over the piece's lower edge: on the board (yours; theirs once shown), the benches, and a
 shop card's piece (what it becomes). A star-up card has a gold border and glow, a rainbow one for a third star, and its price says 5; the piece it merges into (or its bench tile) has the
 same ring. A merge pops the piece and flashes it where it is, its new star pops in, and a sound plays. Reduced motion: no animation, the borders stay.
 
