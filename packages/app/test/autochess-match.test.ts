@@ -18,7 +18,7 @@ import {
 } from "../src/autochess/economy.ts";
 import { botAdjust, botAt, botBenchAt, botBuys, botPlan } from "../src/autochess/bot.ts";
 import { addXp } from "../src/autochess/level.ts";
-import { newShop } from "../src/autochess/shop.ts";
+import { newShop, rerollPrice } from "../src/autochess/shop.ts";
 import { buyBlock, carryBench, emptyArmy, extras, halfSquares, kingSquares, legalCounts, owned, placeBlock } from "../src/autochess/army.ts";
 import { fightStart, armiesFen, material } from "../src/autochess/position.ts";
 import { fightMoves, moveMs, playFight, rulesFor, standInMove, thinFight, withPiece, type FightSoFar } from "../src/autochess/fight.ts";
@@ -81,13 +81,18 @@ describe("auto chess: the economy", () => {
     expect([1, 2, 3, 4, 5].map(youColor)).toEqual(["w", "b", "w", "b", "w"]);
   });
 
-  it("the loser loses 2 + 1 per enemy piece left; a draw costs nothing; a win ends the other side's streak", () => {
-    expect([0, 1, 5, 12].map((n) => damageFor(n))).toEqual([2, 3, 7, 14]);
+  it("the loser loses the round's number plus 1 for every 3 enemy pieces left (rounded down); a draw costs nothing; a win ends the other side's streak", () => {
+    expect(AUTOCHESS).toMatchObject({ hp: 24, damagePerRound: 1, piecesPerDamage: 3 });
+    // Round 1 costs 1 to 3 (0 to 8 pieces left), the round's number is the base: round 5 costs 5 to 7.
+    expect([0, 1, 2, 3, 5, 6, 8].map((n) => damageFor(1, n))).toEqual([1, 1, 1, 2, 2, 3, 3]);
+    expect([0, 3, 8, 12].map((n) => damageFor(5, n))).toEqual([5, 6, 7, 9]);
+    expect([1, 2, 3, 8].map((round) => damageFor(round, 0))).toEqual([1, 2, 3, 8]);
     let m: MatchState = beginRound(newMatch(7)).match;
+    // (Round 1: you won with 3 pieces left: the bot loses 1 + 1.)
     let r = settleRound(m, "you", { you: ["p", "p", "n"], bot: [] });
-    expect(r.result).toMatchObject({ outcome: "you", damage: 5, piecesLeft: 3 });
-    expect(r.match.bot.hp).toBe(15);
-    expect(r.match.you.hp).toBe(20);
+    expect(r.result).toMatchObject({ outcome: "you", damage: 2, piecesLeft: 3 });
+    expect(r.match.bot.hp).toBe(22);
+    expect(r.match.you.hp).toBe(24);
     expect(r.match.you).toMatchObject({ wins: 1, losses: 0, refund: { survivors: 12 } });
     expect(r.match.bot).toMatchObject({ wins: 0, losses: 1, refund: { survivors: 0 } });
     m = beginRound(r.match).match;
@@ -98,12 +103,36 @@ describe("auto chess: the economy", () => {
     // A draw: nobody loses HP, and both streaks end.
     r = settleRound(m, "draw", { you: ["p"], bot: ["p", "p"] });
     expect(r.result).toMatchObject({ outcome: "draw", damage: 0 });
-    expect(r.match.you).toMatchObject({ hp: 20, wins: 0, losses: 0 });
-    expect(r.match.bot).toMatchObject({ hp: 15, wins: 0, losses: 0 });
-    // The bot wins: you lose 2 + its pieces left.
+    expect(r.match.you).toMatchObject({ hp: 24, wins: 0, losses: 0 });
+    expect(r.match.bot).toMatchObject({ hp: 22, wins: 0, losses: 0 });
+    // The bot wins in round 2 with 4 pieces left: you lose 2 (the round's number) + 1.
     r = settleRound(m, "bot", { you: [], bot: ["r", "r", "p", "p"] });
-    expect(r.match.you.hp).toBe(20 - 6);
+    expect(r.result).toMatchObject({ outcome: "bot", damage: 3, piecesLeft: 4 });
+    expect(r.match.you.hp).toBe(24 - 3);
     expect(r.match.you.losses).toBe(1);
+  });
+
+  it("a game lasts about 8 rounds: over thousands of games (draws 15%, 2 to 8 enemy pieces left) the median is 8 and most games end in 7 to 10 rounds, whether you win half the rounds or 65%", () => {
+    for (const winShare of [0.5, 0.65]) {
+      const rng = mulberry32(2026);
+      const rounds: number[] = [];
+      for (let game = 0; game < 5000; game++) {
+        let you = AUTOCHESS.hp;
+        let bot = AUTOCHESS.hp;
+        let round = 0;
+        while (you > 0 && bot > 0) {
+          round++;
+          if (rng() < 0.15) continue;
+          const left = 2 + Math.floor(rng() * 7);
+          if (rng() < winShare) bot -= damageFor(round, left);
+          else you -= damageFor(round, left);
+        }
+        rounds.push(round);
+      }
+      rounds.sort((a, b) => a - b);
+      expect(rounds[rounds.length >> 1], `median at ${winShare}`).toBe(8);
+      expect(rounds.filter((r) => r >= 7 && r <= 10).length / rounds.length, `7 to 10 rounds at ${winShare}`).toBeGreaterThan(0.82);
+    }
   });
 
   it("the first side at 0 HP loses the match", () => {
@@ -243,22 +272,23 @@ describe("auto chess: the bot", () => {
     expect(kept).toBeLessThan(100);
   });
 
-  it("rerolls its shop now and then when it has gold to spare: at most 4 a round, never when it is poor, and every reroll costs 2", () => {
+  it("rerolls its shop now and then when it has gold to spare: at most 3 a round, never when it is poor, and every reroll costs the climbing price (5, 6, 7)", () => {
     let withReroll = 0;
     let rerolls = 0;
     for (let seed = 0; seed < 300; seed++) {
       const { buys } = botBuys(emptyArmy("w", "e1"), 100 + (seed % 4) * 40, 1 + (seed % 6), mulberry32(seed));
       const n = buys.filter((b) => b.kind === "reroll").length;
       expect(n).toBeLessThanOrEqual(AUTOCHESS.bot.maxRerolls);
-      for (const b of buys) expect(b.price).toBe(b.kind === "reroll" ? AUTOCHESS.shop.rerollCost : b.kind === "xp" ? AUTOCHESS.levels.buyXpCost : b.type === "place" ? 0 : AUTOCHESS.prices[b.kind]);
+      let done = 0;
+      for (const b of buys) expect(b.price).toBe(b.kind === "reroll" ? rerollPrice(done++) : b.kind === "xp" ? AUTOCHESS.levels.buyXpCost : b.type === "place" ? 0 : AUTOCHESS.prices[b.kind]);
       if (n) withReroll++;
       rerolls += n;
       // Poor: under the gold it likes to keep, it never rerolls.
       expect(botBuys(emptyArmy("w", "e1"), 30, 1, mulberry32(seed)).buys.filter((b) => b.kind === "reroll")).toHaveLength(0);
     }
-    // "Now and then": some plans, not most.
-    expect(withReroll).toBeGreaterThan(40);
-    expect(withReroll).toBeLessThan(240);
+    // "Now and then": some plans, not most (about a third of rounds; it was 63% at 2 gold a roll).
+    expect(withReroll).toBeGreaterThan(25);
+    expect(withReroll).toBeLessThan(150);
     expect(rerolls).toBeGreaterThan(withReroll - 1);
     // It never puts more on its board than the board holds, nor more on its bench than the bench holds.
     for (let seed = 0; seed < 300; seed++) {
@@ -421,7 +451,8 @@ describe("auto chess: the bot", () => {
         const plan = botPlan(color, king, gold, round, mulberry32(seed * 100 + round), AUTOCHESS, carried, level);
         // Gold: never spends what it hasn't (a placed held piece is free).
         expect(plan.spent).toBeLessThanOrEqual(gold);
-        for (const e of plan.events) expect(e.price).toBe(e.type === "place" ? 0 : e.type === "reroll" ? AUTOCHESS.shop.rerollCost : e.type === "xp" ? AUTOCHESS.levels.buyXpCost : AUTOCHESS.prices[e.kind as Kind]);
+        let rerolled = 0;
+        for (const e of plan.events) expect(e.price).toBe(e.type === "place" ? 0 : e.type === "reroll" ? rerollPrice(rerolled++) : e.type === "xp" ? AUTOCHESS.levels.buyXpCost : AUTOCHESS.prices[e.kind as Kind]);
         // Level: only what it bought (the free XP came before), and the board never holds more than the level.
         expect(plan.level).toEqual(addXp(level, plan.events.filter((e) => e.type === "xp").length * AUTOCHESS.levels.buyXp));
         expect(Object.keys(plan.army.board).length).toBeLessThanOrEqual(plan.level.level);

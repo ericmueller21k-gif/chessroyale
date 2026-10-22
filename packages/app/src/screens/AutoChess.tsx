@@ -47,12 +47,13 @@ import {
 import { botEvaluator, enginePick, newFight, stallEngine, warmEngine } from "../autochess/engine.ts";
 import { addXp, buyXp, xpBlock, xpToNext, xpWords } from "../autochess/level.ts";
 import { bonusFor, botLocked, bothLocked, buyFreeze, freezeWords, noLocks, tickLocks, youLock, type Locks } from "../autochess/lockin.ts";
+import { firstHopMs, hopWaitMs } from "../autochess/hop.ts";
 import { botSeen } from "../autochess/reveal.ts";
-import { buyFromSlot, holdFromSlot, newShop, oddsFor, replaceTaken, rerollFor, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
+import { buyFromSlot, holdFromSlot, newShop, oddsFor, replaceTaken, rerollFor, rerollPrice, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
 import { playFight, thinFight, withPiece } from "../autochess/fight.ts";
 import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn } from "../autochess/position.ts";
 import { KIND_NAME, KINDS, other, type Army, type Color, type Kind, type Offer } from "../autochess/types.ts";
-import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline, matchWords, moveWords, type EndDetail, type EndKind } from "../autochess/words.ts";
+import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline, matchWords, moveCount, moveWords, type EndDetail, type EndKind } from "../autochess/words.ts";
 
 /**
  * Auto chess, the demo (/autochess; docs/decisions/2026-10-19-autochess-demo.md, docs/areas/autochess.md): you against a
@@ -61,10 +62,11 @@ import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline
  * one move (7 s: one legal chess move with the piece picked for you, on your half); then the engine plays both armies out. The rules are
  * in `autochess/` (pure, tested); this draws them. Nothing is recorded, rewarded or sent anywhere.
  *
- * The screen is v7's (docs/decisions/2026-10-21-autochess-v7.md): their bench at the top left and their pawn (name, level, thin HP and XP
- * bars) at the top right, the board in its frame with the move clock's bars along its edges, your pawn under it at the left, the clock's
- * small numbers in the middle and your bench at the right, then a dock of gold (and the shop's odds in a pill), Buy XP, Reroll and the
- * four cards. Both pawns hop. The step's name comes as a banner on the board ("ACTION PHASE", the 3-2-1, "MOVE PHASE", "BATTLE PHASE").
+ * The screen is v7's (docs/decisions/2026-10-21-autochess-v7.md), as v7.1 changed it (docs/decisions/2026-10-22-autochess-v7-1.md): their bench at the
+ * top left and their pawn (name, level, thin HP and XP bars) at the top right, the board in its frame with the move clock's bars along its edges, your
+ * pawn under it at the left and your bench at the right (each bench's outer edge on the board's), then a dock of gold, income, the clock (small, with the
+ * step's name under it), the shop's odds in a pill, Buy XP, Reroll and the four cards. The Sell button sits in the gap beside your bench and a short
+ * message under the bench's row. Both pawns hop now and then (hop.ts). The step's name comes as a banner on the board ("ACTION PHASE", the 3-2-1, "MOVE PHASE", "BATTLE PHASE").
  */
 
 /** How often the clock is read: the countdown, the circles 2 s behind and the end of each step. Nothing is drawn per frame but the move clock's bars (their own small component). */
@@ -204,13 +206,32 @@ function PieceIcon({ color, kind }: { color: Color; kind: Kind | "k" }) {
 }
 
 /**
- * A custom pawn (v7: the dressed pawn, big, with its shadow) hopping in place: a crouch, a rise, a squash on landing and a settle, the
- * shadow shrinking and fading as it rises (CSS animations of transforms and opacity on two boxes; off under reduced motion). `dur`
- * and `delay` put the two pawns out of step. `badge`: the level, on yours.
+ * A custom pawn (v7: the dressed pawn, big, with its shadow) that hops now and then: a crouch, a rise, a squash on landing and a settle, the
+ * shadow shrinking and fading as it rises (CSS animations of transforms and opacity on two boxes, run once each time the `hopping` class is
+ * put on; none under reduced motion). v7.1 (Eric Oct 22: "The bouncing is too much, should be randomly once every 7-10 seconds"): one hop,
+ * then a random wait (`AUTOCHESS.hopEvery`, hop.ts) from its start to the next one's, each pawn on its own draws so the two never fall into
+ * step. The dressed pawn's own ground shadow (a skin's art draws one) is hidden here: `.ac-shadow` is the one shadow. `badge`: the level, on yours.
  */
-function HopPawn({ look, side, dur, delay, badge }: { look?: Parameters<typeof Avatar>[0]["look"]; side: Color; dur: number; delay: number; badge?: ComponentChildren }) {
+function HopPawn({ look, side, cfg, badge }: { look?: Parameters<typeof Avatar>[0]["look"]; side: Color; cfg: AutoChessSettings; badge?: ComponentChildren }) {
+  const pawn = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    // (Reduced motion: the pawn stays still.)
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    let next: ReturnType<typeof setTimeout>;
+    let land: ReturnType<typeof setTimeout>;
+    const hop = () => {
+      pawn.current?.classList.add("hopping");
+      land = setTimeout(() => pawn.current?.classList.remove("hopping"), cfg.hopSeconds * 1000);
+      next = setTimeout(hop, hopWaitMs(Math.random, cfg));
+    };
+    next = setTimeout(hop, firstHopMs(Math.random, cfg));
+    return () => {
+      clearTimeout(next);
+      clearTimeout(land);
+    };
+  }, []);
   return (
-    <span class="fd-pawn ac-pawn" style={{ "--dur": `${dur}s`, "--delay": `${delay}s` } as Record<string, string>}>
+    <span ref={pawn} class="fd-pawn ac-pawn" style={{ "--dur": `${cfg.hopSeconds}s` } as Record<string, string>}>
       <span class="ac-shadow" aria-hidden="true" />
       <span class="ac-hop">
         <span class="fd-pawn-box">
@@ -599,7 +620,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if (!buying()) return;
     const cur = gref.current;
     const next = rerollFor({ gold: cur.match.you.gold, shop: cur.round.shop, army: cur.round.you, level: boardRoom() }, shopSeed(roundSeed(cur.match)), cfg);
-    if ("block" in next) return say(rerollWords(cur.match.you.gold, cfg));
+    if ("block" in next) return say(rerollWords(cur.match.you.gold, cur.round.shop.rerolls, cfg));
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: next.gold } }, round: { ...cur.round, shop: next.shop } });
     setMsg("");
     play("acReroll");
@@ -894,22 +915,25 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   }, [g.phase, g.match.round]);
   const goldNow = g.match.you.gold;
 
-  // The clock's numbers under the board, and the step's name under them (a message takes the name's place for a moment).
+  // The clock's numbers in the gold row (v7.1, Eric Oct 22: "the clock moves down between the income and odds"), and the step's name under them.
+  // (The result's box takes the gold row's room, so there is no clock then.)
   const remaining = g.phase === "buy" ? cfg.buySeconds * 1000 - elapsed : g.phase === "adjust" ? cfg.adjustSeconds * 1000 - elapsed : 0;
   let clock = "";
   let label = "";
+  let clockWordsFull = "";
   if (g.phase === "buy") {
     clock = clockWords(remaining);
     label = youLocked ? "Locked in" : locked ? "Locked" : "Buy";
+    clockWordsFull = `${label}, ${clock} left`;
   } else if (g.phase === "adjust") {
     clock = clockWords(remaining);
     label = "Move";
+    clockWordsFull = `Move step, ${clock} left`;
   } else if (g.phase === "fight") {
+    // (The fight's counter is short here: "12/60"; the full words, with "twice as fast", are the clock's spoken label.)
     clock = "Fight";
-    label = moveWords(g.fight?.plies ?? 0, cfg, !!g.fight && thinFight(g.fight.fen, cfg));
-  } else {
-    clock = g.phase === "over" ? "Match" : "Round";
-    label = "Over";
+    label = moveCount(g.fight?.plies ?? 0, cfg);
+    clockWordsFull = moveWords(g.fight?.plies ?? 0, cfg, !!g.fight && thinFight(g.fight.fen, cfg));
   }
   const timerBars = g.phase === "buy" || (g.phase === "adjust" && adj !== null && !adjOver);
 
@@ -941,6 +965,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const oddsWordsLine = KINDS.map((k) => `${KIND_NAME[k]} ${odds[k]}%`).join(", ");
   const shopShut = g.phase !== "buy" || locked;
   const wins = g.match.you.wins;
+  // The next reroll's price (v7.1: 5, then 1 more each time, up to 10; back to 5 each round).
+  const rerollNow = rerollPrice(g.round.shop.rerolls, cfg);
 
   return (
     <div
@@ -1006,7 +1032,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
           </span>
           <div class="ac-side ac-opp" aria-label="Your opponent's pawn">
             <div class="ac-stage">
-              <HopPawn look={theirLook} side={theirs} dur={2.1} delay={-0.8} />
+              <HopPawn look={theirLook} side={theirs} cfg={cfg} />
             </div>
             <div class="ac-bars">
               <Bar kind="hp" cls="ac-hp-bot" frac={botHp / cfg.hp} text={String(botHp)} label="Opponent's HP" />
@@ -1078,22 +1104,15 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
         <section class="ac-bottom">
           <div class="ac-side ac-me" aria-label="You">
             <div class="ac-stage">
-              <HopPawn look={myLook} side={mine} dur={1.8} delay={0} badge={<LevelBadge level={g.match.you.level} xp={g.match.you.xp} cfg={cfg} />} />
+              <HopPawn look={myLook} side={mine} cfg={cfg} badge={<LevelBadge level={g.match.you.level} xp={g.match.you.xp} cfg={cfg} />} />
             </div>
             <div class="ac-bars" title={myName}>
               <Bar kind="hp" cls="ac-hp-you" frac={myHp / cfg.hp} text={String(myHp)} label="Your HP" />
               <Bar kind="xp" cls="ac-xp-you" frac={myNeed === null ? 1 : g.match.you.xp / myNeed} text={myNeed === null ? "max" : `${g.match.you.xp}/${myNeed}`} label="Your XP" />
             </div>
           </div>
-          <div class={`ac-timer${locked ? " low" : ""}${g.phase === "fight" || g.phase === "result" || g.phase === "over" ? " quiet" : ""}`}>
-            <b>{clock}</b>
-            {msg ? (
-              <span class="say" role="status" aria-live="polite">
-                {msg}
-              </span>
-            ) : (
-              <span>{label}</span>
-            )}
+          {/* (The Sell button sits in the gap between your pawn and your bench, level with the bench; a short message is under it, beside your pawn: the clock moved to the gold row.) */}
+          <div class="ac-spot">
             {g.phase === "buy" && !locked && held && isSquare(held) && held.kind !== "k" && g.round.you.board[held.at.square] === held.kind && (
               <button type="button" class="ac-sell" onClick={() => sell(held)}>
                 Sell {sellValue(held.kind, cfg)}
@@ -1140,6 +1159,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               <FloatGold key={f.id} amount={f.amount} at={f.at} />
             ))}
           </div>
+          {msg && (
+            <span class="say" role="status" aria-live="polite">
+              {msg}
+            </span>
+          )}
         </section>
 
         <section class="ac-dock" aria-label="Shop">
@@ -1155,6 +1179,14 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 <span class="ac-income-word">Income</span> <b>+{incomeFor(g.match.round, cfg)}</b>
               </span>
             </div>
+            {clock && (
+              <div class={`ac-clock${locked ? " low" : ""}${g.phase === "fight" ? " quiet" : ""}`} role="timer" aria-label={clockWordsFull}>
+                <span class="ac-clock-in">
+                  <b>{clock}</b>
+                  <span class="ac-step">{label}</span>
+                </span>
+              </div>
+            )}
             <div class="ac-odds" role="img" aria-label={`Chance of each piece in the shop at level ${g.match.you.level}: ${oddsWordsLine}`} data-level={g.match.you.level}>
               {KINDS.map((k) => (
                 <span key={k} class={`ac-od${odds[k] === 0 ? " none" : ""}`} data-kind={k} data-odds={odds[k]}>
@@ -1183,15 +1215,15 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 </button>
                 <button
                   type="button"
-                  class={`ac-btn ac-reroll${shopShut || goldNow < cfg.shop.rerollCost ? " off" : ""}`}
-                  aria-disabled={shopShut || goldNow < cfg.shop.rerollCost}
-                  aria-label={`Reroll the shop, ${cfg.shop.rerollCost} gold`}
+                  class={`ac-btn ac-reroll${shopShut || goldNow < rerollNow ? " off" : ""}`}
+                  aria-disabled={shopShut || goldNow < rerollNow}
+                  aria-label={`Reroll the shop, ${rerollNow} gold`}
                   onClick={reroll}
                 >
                   <span>Reroll</span>
                   <span class="ac-cost">
                     <i class="ac-coin" />
-                    <b>{cfg.shop.rerollCost}</b>
+                    <b>{rerollNow}</b>
                   </span>
                 </button>
               </div>

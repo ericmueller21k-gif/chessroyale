@@ -5,9 +5,10 @@ feel it ("it might just be terrible"): nothing is recorded, rewarded or sent. **
 more work than I realized to make this balanced and fun"): no button on home; admins open it from Settings → TESTING ("Auto
 chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-autochess-demo.md](../decisions/2026-10-19-autochess-demo.md)
 (v6 is its last design section; the HunChess engine, Oct 21, after it; [drags, silhouettes and one offer to a square](../decisions/2026-10-21-autochess-drag-fixes.md), Oct 21, after that;
-[v7: the new screen, the move step, odds by level, four slots, no lock-in](../decisions/2026-10-21-autochess-v7.md), Oct 21, last).
+[v7: the new screen, the move step, odds by level, four slots, no lock-in](../decisions/2026-10-21-autochess-v7.md), Oct 21, after that;
+[v7.1: benches on the board's edges, a bigger board, the clock in the gold row, calmer hops, the reroll price, the damage](../decisions/2026-10-22-autochess-v7-1.md), Oct 22, last).
 
-## How it works today (v7)
+## How it works today (v7.1)
 
 - **A round:** the game puts both kings on mirrored squares (the same file, the rank mirrored) on a random square of each side's
   back two ranks. **Buy** 30 s (the last 3 locked, "Locked" under the clock; the whole 30 s runs: no lock-in), the full reveal and the **move step** 7 s, the fight, the
@@ -21,7 +22,7 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
   always stand on four squares (a shop the limits leave nothing to offer is shorter). **On the board each offer is a glowing green silhouette** of its piece on its square, filling it.
   **Tap an offer, in the shop or its silhouette, to buy it:** it lands on its square and a new offer rolls into the slot. **A silhouette on the board is only ever tapped** (Eric, Oct 21): it is
   never picked up, dragged or dropped, so a drag that starts on one does nothing (a tap is the pointer staying within 10 px, `TAP_SLOP_PX`); the shop's cards still drag (to the bench). An offer that can no longer use its square (a held piece placed on it,
-  the third pawn of a file bought) rolls again, and the small spot says the square it was on ("h4 rolled again"). **Reroll** costs 2 and rolls all four; a round starts with a fresh shop, free. An offer you can't
+  the third pawn of a file bought) rolls again, and the small spot says the square it was on ("h4 rolled again"). **Reroll** costs 5 the first time in a round and 1 more each time after it, up to 10 (5, 6, 7, 8, 9, 10, 10, ...: `shop.reroll { first, step, max }`; the button shows the price of the next one, and it is back to 5 at each round's start) and rolls all four; a round starts with a fresh shop, free. An offer you can't
   buy is dimmed with its reason in a few words when it is tapped ("Need 22 more", "One queen max", "8 pawns max", "Too many pieces"); when only your level has no room it
   isn't dimmed (its square shows in gold) and a tap says "Board full. Drag to bench". Every roll is seeded by the round, the reroll count and the refill count, so a test repeats.
   There is no free placing or dragging pieces about.
@@ -29,7 +30,7 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
   from the shop (its card) onto the bench row to hold it:** you pay now, the piece keeps the square it was offered on, and tapping
   it places it there when that square is free and your level allows ("b4 is taken.", "c2 is your king's square."). Because the colors
   turn each round, a held piece's square turns with them (same file, rank mirrored, as the kings are). What is held counts as owned for
-  the shop's limits. **Both benches are always on screen** (v7): theirs at the top left with real pieces and each piece's square (Eric: intentional; drawn 2 s behind, as their circles are),
+  the shop's limits. **Both benches are always on screen** (v7; v7.1: each bench's outer edge is on the board's, theirs on its left edge and yours on its right, at every size of the board): theirs at the top left with real pieces and each piece's square (Eric: intentional; drawn 2 s behind, as their circles are),
   tap one and its tile gets a red ring and its landing square lights red on their half (a second tap or another piece clears it; it clears when the fight begins), and theirs never drags. **Selling gives back 75%** (P7 N22 B24 R37 Q67): tap a piece on the board then "Sell N", or drag a piece from the
   board or the bench onto the shop row; a "+N" floats up from the square or bench slot it was sold from. **A sale only ever pays for a
   piece of yours that is there now, of the kind the hold says** (`sellPiece` and `sellHeld` return null otherwise: no gold, never for
@@ -72,17 +73,23 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
   plays by the engine's own rules code, so the two never disagree. Stockfish isn't loaded on this screen.
   If the engine doesn't answer within 4 s a stand-in move is played (a capture if there is one); after three misses in a row the rest of
   the visit plays stand-ins, so a fight always ends. **Result:** the loser loses
-  2 + 1 per enemy piece left; 20 HP each. **Nothing carries over but gold, HP, the win streak, the bench and each side's level and XP:**
+  the round's number plus 1 for every 3 of their pieces left (not the king), rounded down (v7.1: round 1 costs 1 to 3, round 5 costs 5 to 7; a draw costs nothing); 24 HP each, so a game lasts about 8 rounds
+  (`damagePerRound`, `piecesPerDamage`, `hp`; the Monte Carlo behind it is a unit test). **Nothing carries over but gold, HP, the win streak, the bench and each side's level and XP:**
   each round starts with the two kings only. Each side gets back 25% of the price of its pieces still on the board; income 100 then +20
   a round (max 200), interest, win streak gold; the result line shows the next round's gold.
-- **The screen** (v7, from Eric's approved round-4 mock): kitty-corner. At the top, the title row, **their bench** (left) and **their custom pawn** (right: its name and level beside it, thin HP and XP
+- **The screen** (v7, from Eric's approved round-4 mock; v7.1 below): kitty-corner. At the top, the title row, **their bench** (left) and **their custom pawn** (right: its name and level beside it, thin HP and XP
   bars); the board in its curved frame with **the move clock's bars** (the app's own `TimerBar`, quiet, along its top and bottom in the buy and move steps); under it **your pawn** (left, the dressed pawn of
-  your profile, a gold level badge, thin HP and XP bars), **the clock's small numbers** in the gap ("0:28", the step's name under it: "Buy", "Locked", "Move", "Fight"; a short message takes the name's place for 4.2 s)
-  and **your bench** (right, the same distance from the board as theirs). Both pawns hop, out of step (1.8 s and 2.1 s loops, transforms and opacity only, off under reduced motion). **Phase banners** on
+  your profile, a gold level badge, thin HP and XP bars) and **your bench** (right, the same distance from the board as theirs). **Benches on the board's edges** (v7.1, Eric Oct 22): their bench's left edge is the
+  frame's left edge and your bench's right edge is its right edge, at every size (`--gut`, the room between the column's edge and the frame's, moves them); the pawns stay by the column's edges. **The clock is in the gold row**
+  (v7.1), between "Income +N" and the odds pill: the small time ("0:17") with the step's name under it ("Buy", "Locked", "Move"; in the fight "Fight" over the move count "12/60", its spoken label the full "Move 12 of 60 · twice as fast"),
+  no box, the name on the row's baseline like the pill's percents; there is none while the result's box has the gold row's room. **Messages and the Sell button** keep their place under the board: the Sell button in the gap between your pawn and your bench, level with the bench
+  (44 px tall, as wide as the gap up to 84), a short message (4.2 s) under the bench's row, beside your pawn, on one or two lines. **Both pawns hop** (v7.1) once, then wait a random 7 to 10 s (`hopEvery`, each pawn its own draws) before the next single hop (`hopSeconds` 1.8; transforms and opacity
+  only, still under reduced motion); each has one shadow, `.ac-shadow`, that shrinks and fades as it rises (a dressed pawn's own ground shadow, which three skins draw in their art, is hidden on this screen: `.skin-shadow`). **Phase banners** on
   the board: "ACTION PHASE" for the first 1.6 s of buying, the big 3-2-1 for its last three seconds, "MOVE PHASE", "BATTLE PHASE": the words in a rounded frosted box, about half the 3's size. No hint text.
-  Then **the dock**: the gold row (gold, income, the **odds pill**: each kind's percent at your level under its icon, on the gold number's baseline, faded at 0%; the win streak "W2" from two wins), then Buy XP and Reroll
-  (stacked) beside the four square cards. The fight's and the result's boxes take the shop's place. **Sell** is a gold button in the gap under the clock when a piece of yours is selected. On a computer the board is
-  at the left and the dock at the right, level with the board's top. Every button and card is 44 px tall or more (a bench tile 44 tall, 34 to 54 wide); nothing scrolls, at 320 x 568 up to a computer.
+  Then **the dock**: the gold row (gold, income, the clock, the **odds pill**: each kind's percent at your level under its icon, on the gold number's baseline, faded at 0%; the win streak "W2" from two wins), then Buy XP and Reroll
+  (stacked) beside the four square cards. The fight's and the result's boxes take the shop's place. **A bigger board** (v7.1): every row has a set height but the board and the shop, and the board takes everything left but about 12 px
+  at the bottom (`--free`): as wide as the column or as tall as the room, pawns 72 px where the height is the limit, up to 82 where the board is the column's width anyway (46 on a short phone), gaps trimmed; on a computer the board is at the left and the dock at the right, level with the board's top.
+  Every button and card is 44 px tall or more (a bench tile 44 tall, 34 to 54 wide); nothing scrolls, at 320 x 568 up to a computer. Under 415 wide the gold row drops the word "Income" and tightens the pill; at 320 it has a smaller coin and numbers and smaller icons in the pill.
 - **Sounds and feel** (all synthesized, `autochess/sounds.ts`, each under a move's peak and loudness, muted with the rest): reroll (a
   riffle and a coin's clink), place (a thunk), hold (a soft pop), sell (a coin cascade), buy XP (a small rising chime), level up (a
   bigger chime), lock in (a latch click), a reveal (a ping). Every button presses down while held; Reroll is a thicker key that drops
@@ -97,7 +104,7 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
   loses its capture (also when its element left the screen: a window listener catches that one). Nothing is picked up once the step
   is locked, and the ghost only draws in the buy and adjust steps. The shop's cards take a finger's drag (`touch-action: none`).
 - **The bot** (`autochess/bot.ts`): places what it held first, for nothing; buys from its own seeded shop (rolled by its own level; picking among what it sees by
-  weights, minor pieces and rooks over pawns, a queen when rich; rerolling now and then, at most 4 a round); buys XP now and then when
+  weights, minor pieces and rooks over pawns, a queen when rich; rerolling now and then, at most 3 a round, in about a third of its rounds, at the same climbing price); buys XP now and then when
   that gives it a level or it is rich; with its board full holds a good piece (never a pawn) on its bench, at most 2 a round; puts its
   pieces down evenly over the first 70% of the open step; in the move step picks a random piece of its own (`botMoveSeed`, the same rule as yours) and plays the engine's best legal move with it
   (a small search per try with the HunChess engine (`bot.adjustNodes`), at most 16 tries), or skips if none beats standing still (`bot.adjustMargin`). It sells
@@ -119,10 +126,10 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
 
 ## Settings
 
-`AUTOCHESS` in `packages/core/src/settings.ts`: prices, the shop (slots, the odds by level `oddsByLevel`, reroll cost), sell back, the bench's slots, lock-in (`lockIn` off, its
+`AUTOCHESS` in `packages/core/src/settings.ts`: prices, the shop (slots, the odds by level `oddsByLevel`, the reroll price `reroll` first/step/max), sell back, the bench's slots, lock-in (`lockIn` off, its
 bonus), the steps' seconds, the reveal's interval, the adjust step (on or off, `adjustMode` legal or teleport, seconds 7, changes), the levels (start, top, free XP, XP
 bought and its price, the XP to each level), the king ranks, the fight's pace and search (`fightMoveMs`, `fightFastAfter`,
-`fightFastMoveMs`, `fightNodes`), the cash-in (`cashInGold`, and `cashInValue`: what the engine counts a cash-in's gold as, in centipawns), the move cap, HP and damage, start gold, income, interest, the survivors' refund, the streak tables,
+`fightFastMoveMs`, `fightNodes`), the cash-in (`cashInGold`, and `cashInValue`: what the engine counts a cash-in's gold as, in centipawns), the move cap, HP and damage (`hp`, `damagePerRound`, `piecesPerDamage`), the pawns' hops (`hopEvery`, `hopSeconds`), start gold, income, interest, the survivors' refund, the streak tables,
 the legal-position limits, the bot's numbers (lock-in times, rerolls, holds, XP, how early it places, saving, the adjust search).
 Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2 locked, a reveal every 1.5 s, the move step 7 s), `?seed=N`,
 `?gold=N` (N more gold at the start of round 1), `?adjust=0` (no adjust step), `?fightfen=FEN` (the fight starts from that position),
@@ -130,7 +137,7 @@ Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2
 
 ## Tests and tools
 
-- Unit: `packages/app/test/autochess-shop.test.ts` (four slots, rolling by level, usable squares, buying and holding from a slot, refills, rerolls, one offer to a square),
+- Unit: `packages/app/test/autochess-shop.test.ts` (four slots, rolling by level, usable squares, buying and holding from a slot, refills, rerolls and their climbing price, one offer to a square),
   `autochess-odds.test.ts` (the odds table: every level's row, sums, no rook before 5 and no queen before 7; the four slots roll independently, at the level's odds, at levels 4, 7 and 10: chi-square over tens of
   thousands of shops, rerolls, refills, rounds and match seeds; two queens in a level-10 shop is 2.7%),
   `autochess-move.test.ts` (the move step: legal moves staying on your half, pins and check, the random seeded pick, no piece able to move, taking back, the bot's pick and move),
@@ -138,7 +145,7 @@ Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2
   `autochess-reveal.test.ts` (the reveal times, what shows when), `autochess-rules.test.ts` (the shop's reasons, selling at 75%, the
   bench, the kings, placing, the teleport step's change and its off switch), `autochess-match.test.ts` (the economy, the bench through the
   rounds, the bot's buys, holds, XP, rerolls and adjust staying legal over hundreds of seeds and a whole match, fights ending within the
-  cap; the fight's rules, cash-ins and their gold), `autochess-engine.test.ts` (the worker link: answers, the bot's look, the timeout's
+  cap; the fight's rules, cash-ins and their gold; the damage of a lost round and the game length: a Monte Carlo, median 8 rounds), `autochess-hop.test.ts` (the hops' random 7 to 10 s waits, each pawn on its own draws), `autochess-engine.test.ts` (the worker link: answers, the bot's look, the timeout's
   stand-ins), `autochess-sounds.test.ts` (peak, loudness, different from each other), `autochess-words.test.ts` (the words, the settings'
   numbers).
 - Engine: `packages/chess/test/hunchess-board.test.ts` (perft against known counts and chess.js, a fight's moves, every rule),
@@ -146,9 +153,10 @@ Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2
 - e2e: `e2e/autochess.spec.ts` (phone and computer; seeds are listed at its top): the four-card shop and its silhouettes (one to a square), a reroll, buying by tap,
   the reasons, selling by tap and drag, the bench (and your whole row lighting while you drag), drags cut off by a step's end, lock-in off for the whole 30 s (and its tests behind `?lockin=1`), a cancelled pointer or lost capture,
   silhouettes that are only tapped, a sale of a piece that is gone, levels, the odds pill at level 4 and after a level-up, the reveals, their bench tapped (the red square), the phase banners and the clock's bars,
-  the move step (the lit piece, its 7 s, the refusals, taking back, no piece able to move, the step off, the teleport step behind its setting), the kitty-corner layout and the hopping pawns, the button feel, the floating
-  gold, mute, a fight to a result and the next round, a cash-in's "+5", a fight with a silent engine, layouts (320 to 430 and 1280 to 1920: nothing scrolls, every target 44 px, both benches' gaps equal, the odds pill's
-  baseline, every short message in the small spot, the board never moving from step to step). `e2e/home-layout.spec.ts` (home).
+  the move step (the lit piece, its 7 s, the refusals, taking back, no piece able to move, the step off, the teleport step behind its setting), the kitty-corner layout, the benches on the board's edges (393 x 730, 428 x 777, 320 x 568 and the sizes between: measured boxes, and the board bigger than v7's), the clock in the gold row, the hopping pawns
+  (on a fake clock: one hop, then 7 to 10 s, each pawn its own; still under reduced motion), one shadow under each pawn, the reroll price climbing 5, 6, 7 ... 10 and back to 5 next round, the button feel, the floating
+  gold, mute, a fight to a result and the next round, the damage of a lost round 1, a cash-in's "+5", a fight with a silent engine, layouts (320 to 430 and 1280 to 1920: nothing scrolls, every target 44 px, both benches' gaps equal and on the board's edges, the gold row at its widest content,
+  the odds pill's baseline, every short message under the bench's row, the board as big as fits, the board never moving from step to step). `e2e/home-layout.spec.ts` (home).
 
 ## Rules for this area
 
@@ -157,7 +165,10 @@ Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2
   gold, the level pop, the pawns' hops and the banners are CSS animations on still boxes. The one thing that updates every frame is the move clock's bars (`TimerBar`, its own small component).
 - The board never moves between steps (nothing above or beside it changes size with the step), and nothing scrolls: the fight's and the result's boxes take the shop's place (the result's
   also the gold row's), and a test measures the board, your row and the dock's top in every step at 320 x 568, 390 x 844 and 1280 x 800.
-- Every message in the small spot under the board is a few words (about 15 characters a line, 11 at 320 over three lines): a test lays each one into the spot at 320 and measures it. A new message goes in that test's list.
+- Every row of the screen has a set height but the board and the shop (`--top-h`, `--bot-h`, `--gold-h`, the gaps and `--free` in `.ac-root`), and `--chrome` adds them all up (the safe areas too): the board is `--fw` wide, the column or the height
+  that is left. Change a row's height and you change its token, or the board stops being as big as fits (or the page scrolls): the layouts test checks the frame is the column's width or the free room is about 12 px. The result's box may use that
+  free room, a few lines at most.
+- Every message under the bench's row is a few words on one or two lines (about 30 characters a line at 320): a test lays each one in at 320 and measures it. A new message goes in that test's list. The gold row is tested at its widest content (3 digits of gold, +200, W10) at every phone width.
 - A seed in an e2e test fixes the shop, the kings and the bot's lock time (with lock-in on); changing how a roll is made (the shop's seeding, its odds or its slots) changes
   every seed's fixture: re-pick them (a small script over the pure code finds one: the spec's header says what each is). The shop rolls by level, so a test that needs a rook or a queen in
   the first shop starts at `?level=N`. Taking out the odds' fifth slot and rolling by level (v7) changed every seed's kinds, not its squares.

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AUTOCHESS } from "@chessroyale/core";
 import { beginRound, goldBreakdown, newMatch, refundFor, settleRound } from "../src/autochess/economy.ts";
 import { piecesOn } from "../src/autochess/position.ts";
-import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline, matchWords } from "../src/autochess/words.ts";
+import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline, matchWords, moveCount, moveWords } from "../src/autochess/words.ts";
 
 describe("auto chess: what the result says", () => {
   it("the fight's rules, in the box while it plays, from the settings (short enough for a 320 px phone)", () => {
@@ -72,6 +72,9 @@ describe("auto chess: what the result says", () => {
 
   it("a clock counts down in whole seconds, rounded up", () => {
     expect([30000, 29001, 1, 0, -5, 61000].map(clockWords)).toEqual(["0:30", "0:30", "0:01", "0:00", "0:00", "1:01"]);
+    // The fight's counter in the gold row's clock: short ("12/60"); the full words say the speed-up too.
+    expect([0, 1, 2, 23, 59, 118].map((plies) => moveCount(plies))).toEqual(["1/60", "1/60", "2/60", "12/60", "30/60", "60/60"]);
+    expect(moveWords(23)).toBe("Move 12 of 60");
   });
 });
 
@@ -82,14 +85,14 @@ describe("auto chess: survivors", () => {
     expect(piecesOn(fen)).toEqual({ w: ["q"], b: ["p", "r"] });
     expect(refundFor(piecesOn(fen).w)).toEqual({ survivors: Math.floor(90 * AUTOCHESS.survivorRefund) });
     const { match, result } = settleRound(beginRound(newMatch(1)).match, "you", { you: piecesOn(fen).w, bot: piecesOn(fen).b });
-    // You won with one piece left: the bot loses 2 + 1.
-    expect(result.damage).toBe(3);
-    expect(match.bot.hp).toBe(17);
+    // You won in round 1 with one piece left: the bot loses 1 (the round's number) and nothing for the piece (1 for every 3).
+    expect(result.damage).toBe(1);
+    expect(match.bot.hp).toBe(23);
   });
 
   it("the settings hold the design's numbers (v4, v5, v6, v7): tune them here, nowhere else", () => {
     expect(AUTOCHESS).toMatchObject({
-      shop: { slots: 4, rerollCost: 2 },
+      shop: { slots: 4, reroll: { first: 5, step: 1, max: 10 } },
       sellBack: 0.75,
       benchSlots: 4,
       lockIn: false,
@@ -103,6 +106,7 @@ describe("auto chess: survivors", () => {
       adjustMoves: 1,
       levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
       kingRanks: 2,
+      hopEvery: [7, 10],
       fightMoveMs: 600,
       cashInGold: 5,
       fightFastAfter: 30,
@@ -113,15 +117,15 @@ describe("auto chess: survivors", () => {
       decisiveMargin: 300,
       decisiveMoves: 6,
       mateShowMoves: 5,
-      hp: 20,
-      damageBase: 2,
-      damagePerPiece: 1,
+      hp: 24,
+      damagePerRound: 1,
+      piecesPerDamage: 3,
       startGold: 0,
       income: { first: 100, step: 20, max: 200 },
       interest: { per: 100, gold: 10, max: 30 },
       survivorRefund: 0.25,
       queenLimit: 1,
-      bot: expect.objectContaining({ lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7 }),
+      bot: expect.objectContaining({ lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 70, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7 }),
       maxPawns: 8,
       pawnsPerFile: 3,
     });

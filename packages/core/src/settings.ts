@@ -2764,8 +2764,9 @@ export interface AutoChessSettings {
   readonly prices: { readonly p: number; readonly n: number; readonly b: number; readonly r: number; readonly q: number };
   /**
    * The shop (v5, Eric Oct 20; v6 Oct 20 evening; v7 Oct 21): this many offers (4 since v7, was 5), each a piece and a square on
-   * your half where it will land; buying an offer rolls a new one into its slot; one reroll of all the offers costs `rerollCost`
-   * gold. The shop refills free at each round's start. **The odds follow the level of whoever's shop it is** (v7, Eric Oct 21: "when
+   * your half where it will land; buying an offer rolls a new one into its slot; one reroll of all the offers costs `reroll.first`
+   * gold the first time in a round and `reroll.step` more each time after it, up to `reroll.max` (v7.1, Eric Oct 22: "5+1 per roll up
+   * to 10 max per round": 5, 6, 7, 8, 9, 10, 10, ...), back to the first price at each round's start. The shop refills free at each round's start. **The odds follow the level of whoever's shop it is** (v7, Eric Oct 21: "when
    * you level you have slightly higher chances for better pieces and pawn odds slightly decrease... [queens] shouldn't even appear
    * till level 7 like in TFT"): `oddsByLevel[level - 1]` is the percent of each kind for a shop rolled at that level, level 1 first
    * (play starts at `levels.start`, 4, and tops at `levels.max`, 10); each row adds up to 100. No rooks before level 5, no queens
@@ -2774,7 +2775,7 @@ export interface AutoChessSettings {
   readonly shop: {
     readonly slots: number;
     readonly oddsByLevel: readonly ShopOdds[];
-    readonly rerollCost: number;
+    readonly reroll: { readonly first: number; readonly step: number; readonly max: number };
   };
   /** Selling a piece, from the board or the bench, gives back this share of its price, rounded down (v6, Eric Oct 20: 75%: P7 N22 B24 R37 Q67). */
   readonly sellBack: number;
@@ -2828,6 +2829,14 @@ export interface AutoChessSettings {
   /** The kings stand on a random square of each side's back this-many ranks. */
   readonly kingRanks: number;
   /**
+   * The two custom pawns on the screen each hop once, then wait a random time between these two numbers (seconds) before their next single
+   * hop (counted from the start of one hop to the start of the next), each pawn on its own draw so the two never fall into step (v7.1, Eric
+   * Oct 22: "The bouncing is too much, should be randomly once every 7-10 seconds"). One hop (a crouch, a rise, a squash and a settle) lasts
+   * `hopSeconds`. Off under reduced motion.
+   */
+  readonly hopEvery: readonly [number, number];
+  readonly hopSeconds: number;
+  /**
    * The fight: one move about this often, each searched by the HunChess engine to this many nodes (the same for both sides,
    * deterministic; docs/decisions/2026-10-21-hunchess-engine.md). 600 ms since Oct 21 (was 350; Eric: "for fights, they should
    * take a little bit longer"; the fast pace 175 to 300 ms with it): the node budget was sized for 350 ms on a 4x-slowed phone, so
@@ -2872,10 +2881,14 @@ export interface AutoChessSettings {
   readonly decisiveMargin: number;
   readonly decisiveMoves: number;
   readonly mateShowMoves: number;
-  /** Hit points each; the first to 0 loses. A lost round costs `damageBase` plus `damagePerPiece` for every enemy piece (not the king) left. */
+  /**
+   * Hit points each; the first to 0 loses. A lost round costs the round's number times `damagePerRound` (round 1: 1) plus 1 for every
+   * `piecesPerDamage` enemy pieces (not the king) left, rounded down (v7.1, Eric Oct 22: "like TFT where each round is like say dmg+1...
+   * each game is about 7-10 rounds ish"): round 1 costs 1 to 3, and games last about 8 rounds. A draw costs nothing.
+   */
   readonly hp: number;
-  readonly damageBase: number;
-  readonly damagePerPiece: number;
+  readonly damagePerRound: number;
+  readonly piecesPerDamage: number;
   /** Gold at the start of round 1, before its income. */
   readonly startGold: number;
   /** A round's income: `first` in round 1, `step` more each round, up to `max`. */
@@ -2900,7 +2913,11 @@ export interface AutoChessSettings {
     readonly lockFrom: number;
     readonly lockTo: number;
     readonly neverLockChance: number;
-    /** Its shop rerolls (2 gold): at most this many a round, only with this much gold, this often (more often when the shop shows nothing but pawns). */
+    /**
+     * Its shop rerolls (the same climbing price as yours, `shop.reroll`): at most this many a round, only with this much gold, this often
+     * (more often when the shop shows nothing but pawns). v7.1: 4 / 40 / 0.15 / 0.4 became 3 / 70 / 0.06 / 0.2, so the bot rerolls in about a third
+     * of rounds (63% before, at 2 gold a roll) and spends about what it did on rerolls (2 gold a round).
+     */
     readonly maxRerolls: number;
     readonly rerollGold: number;
     readonly rerollChance: number;
@@ -2942,7 +2959,7 @@ export const AUTOCHESS: AutoChessSettings = {
       { p: 42, n: 20, b: 19, r: 14, q: 5 },
       { p: 36, n: 21, b: 20, r: 16, q: 7 },
     ],
-    rerollCost: 2,
+    reroll: { first: 5, step: 1, max: 10 },
   },
   sellBack: 0.75,
   benchSlots: 4,
@@ -2958,6 +2975,8 @@ export const AUTOCHESS: AutoChessSettings = {
   adjustMoves: 1,
   levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
   kingRanks: 2,
+  hopEvery: [7, 10],
+  hopSeconds: 1.8,
   fightMoveMs: 600,
   fightNodes: 30000,
   cashInGold: 5,
@@ -2971,9 +2990,9 @@ export const AUTOCHESS: AutoChessSettings = {
   decisiveMargin: 300,
   decisiveMoves: 6,
   mateShowMoves: 5,
-  hp: 20,
-  damageBase: 2,
-  damagePerPiece: 1,
+  hp: 24,
+  damagePerRound: 1,
+  piecesPerDamage: 3,
   startGold: 0,
   income: { first: 100, step: 20, max: 200 },
   interest: { per: 100, gold: 10, max: 30 },
@@ -2991,5 +3010,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 4, rerollGold: 40, rerollChance: 0.15, rerollChanceBare: 0.4, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7, saveChance: 0.3, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 70, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7, saveChance: 0.3, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
 };

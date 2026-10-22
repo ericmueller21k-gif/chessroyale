@@ -2,7 +2,7 @@ import { AUTOCHESS, mulberry32, shuffle, weightedIndex, type AutoChessSettings, 
 import { adjustBlock, adjustMove, adjustTargets, startAdjust, startMove } from "./adjust.ts";
 import { boardCount, buyBlock, buyOffer, emptyArmy, heldBlock, holdBlock, holdOffer, placeHeld, priceOf } from "./army.ts";
 import { addXp, buyXp, xpBlock, type Level } from "./level.ts";
-import { newShop, refillSlot, replaceTaken, rerollShop } from "./shop.ts";
+import { newShop, refillSlot, replaceTaken, rerollPrice, rerollShop } from "./shop.ts";
 import { type Army, type Color, type Kind, type Offer } from "./types.ts";
 
 /**
@@ -100,22 +100,23 @@ export function botBuys(
         return !(offer.kind === "q" && budget < priceOf("q", cfg) + QUEEN_CHANGE);
       });
     const bare = options.every((o) => o.offer.kind === "p");
-    // Gold to spare: a reroll leaves enough for a knight and the bot has the gold it likes to keep.
-    const spare = rerolls < cfg.bot.maxRerolls && budget >= cfg.bot.rerollGold && budget - cfg.shop.rerollCost >= priceOf("n", cfg);
+    // Gold to spare: a reroll (at the same climbing price as yours, `rerollPrice`) leaves enough for a knight and the bot has the gold it likes to keep.
+    const price = rerollPrice(rerolls, cfg);
+    const spare = rerolls < cfg.bot.maxRerolls && budget >= cfg.bot.rerollGold && budget - price >= priceOf("n", cfg);
     if (spare && rng() < (bare && boardRoom ? cfg.bot.rerollChanceBare : cfg.bot.rerollChance)) {
       shop = rerollShop(shop, seed, army, cfg, level.level);
       rerolls++;
-      budget -= cfg.shop.rerollCost;
-      out.push({ type: "reroll", kind: "reroll", price: cfg.shop.rerollCost, square: null });
+      budget -= price;
+      out.push({ type: "reroll", kind: "reroll", price, square: null });
       continue;
     }
     if (!options.length) break;
     // (A held piece is a choice, not the rule: it keeps its gold, now and then, for the interest.)
     if (holding && rng() >= cfg.bot.holdChance) break;
     const pick = options[weightedIndex(rng, options.map(({ offer }) => WEIGHTS[offer.kind][0] + (WEIGHTS[offer.kind][1] - WEIGHTS[offer.kind][0]) * t))]!;
-    const price = priceOf(pick.offer.kind, cfg);
-    out.push({ type: holding ? "hold" : "buy", kind: pick.offer.kind, price, square: pick.offer.square });
-    budget -= price;
+    const cost = priceOf(pick.offer.kind, cfg);
+    out.push({ type: holding ? "hold" : "buy", kind: pick.offer.kind, price: cost, square: pick.offer.square });
+    budget -= cost;
     if (holding) {
       army = holdOffer(army, pick.offer);
       holds++;
@@ -178,6 +179,9 @@ export function botPlan(
     return { at: Math.min(span, Math.max(0.5, at + (rng() - 0.5) * 0.04 * span)), type: buy.type, kind: buy.kind, square: buy.square, price: buy.price };
   });
   events.sort((a, b) => a.at - b.at);
+  // (Two rerolls in a row come at a jittered time each, so they can swap places: the prices climb in the order they show, as yours do. The same prices, the same gold.)
+  let rerolled = 0;
+  for (const e of events) if (e.type === "reroll") e.price = rerollPrice(rerolled++, cfg);
   return { events, army, level, spent: events.reduce((sum, e) => sum + e.price, 0), lockAt };
 }
 
