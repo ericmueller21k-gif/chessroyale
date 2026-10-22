@@ -45,7 +45,7 @@ shop card's piece (what it becomes). A star-up card has a gold border and glow, 
 same ring. A merge pops the piece and flashes it where it is, its new star pops in, and a sound plays. Reduced motion: no animation, the borders stay.
 
 **Sounds** (`sounds.ts`): `star2` (a soft low thump, a quick shimmer rising from 500 Hz to 2 kHz, a bright two-note bell tail, 0.62 s) and `star3` (a deeper thump, a longer shimmer into a
-swelling major chord, a bright bell-like hit and a sparkle of small high bells falling away, 1.0 s). Both under the move's peak and loudness like the others.
+swelling major chord, a bright bell-like hit and a sparkle of small high bells falling away, 1.0 s). Both under the move's peak and loudness like the others. They are made at half the sample rate and doubled (linear interpolation; every partial is under 6 kHz, so the top loses at most 1.5 dB): the third star's first version took 134 ms on CI against the sounds test's 120 ms limit (a sound is made ahead of its cue), and is now about half that; a rate under 32 kHz is made at its own rate.
 
 ## Judgment calls
 

@@ -19,7 +19,7 @@
  *
  * (The play names in sound.ts: acReroll, acPlace, acHold, sell, acXp, acLevel, acLock, acReveal, acCash, acStar2, acStar3.)
  */
-import { bandpass, lowpass, noise, osc, render, sine, soft, soundCache } from "../characters/synth.ts";
+import { bandpass, lowpass, noise, osc, render, sine, soft, soundCache, type Voice } from "../characters/synth.ts";
 
 export type AutochessSound = "reroll" | "place" | "hold" | "sell" | "xp" | "level" | "lock" | "reveal" | "cash" | "star2" | "star3";
 
@@ -27,15 +27,30 @@ export type AutochessSound = "reroll" | "place" | "hold" | "sell" | "xp" | "leve
 const strike = (t: number, at: number, tau: number, attack = 0.002) => (t < at ? 0 : Math.min(1, (t - at) / attack) * Math.exp(-(t - at) / tau));
 
 /** A bell-like note: a fundamental with inharmonic partials, each ringing less long, struck at `at`. */
-function bell(rate: number, freq: number, partials: readonly (readonly [number, number, number])[]) {
+function bell(rate: number, freq: number, partials: readonly (readonly [number, number, number])[], reach = 9) {
   const voices = partials.map(([mult, amp, tau]) => ({ amp, tau, o: osc(rate, () => freq * mult, sine) }));
   return (t: number, at: number, level = 1) => {
     if (t < at) return 0;
     let sum = 0;
-    // (A partial that has rung out for nine time constants is skipped: it is under a thousandth of its start. Each starts at zero phase when struck.)
-    for (const v of voices) if (t - at < v.tau * 9) sum += level * v.amp * strike(t, at, v.tau) * v.o(t);
+    // (A partial that has rung out for `reach` time constants (nine: under a thousandth of its start) is skipped. Each starts at zero phase when struck.)
+    for (const v of voices) if (t - at < v.tau * reach) sum += level * v.amp * strike(t, at, v.tau) * v.o(t);
     return sum;
   };
+}
+
+/**
+ * Renders a sound at half the sample rate and doubles it (linear interpolation): the star-ups' partials all sit under about 6 kHz, so they lose at most 1.5 dB at the top
+ * and cost half as much to make, which matters for the longest of them (a sound is made ahead of its cue, within 120 ms: test/autochess-sounds.test.ts).
+ */
+function renderHalf(rate: number, dur: number, make: (rate: number) => Voice): Float32Array {
+  const lo = render(rate / 2, dur, make(rate / 2));
+  const out = new Float32Array(Math.ceil(rate * dur));
+  const last = lo.length - 1;
+  for (let i = 0; i < out.length; i++) {
+    const k = i >> 1;
+    out[i] = i & 1 ? (lo[k]! + lo[Math.min(last, k + 1)]!) / 2 : lo[k]!;
+  }
+  return out;
 }
 
 /**
@@ -132,28 +147,39 @@ const SOUNDS: Record<AutochessSound, (rate: number) => Float32Array> = {
     return render(rate, 0.62, (t) => 0.5 * strike(t, 0, 0.1, 0.004) * thump(t) + rise(t) + tail[0]!(t, 0.19, 0.2) + tail[1]!(t, 0.235, 0.16));
   },
   // The third star: a deeper thump, a longer shimmer up into a major chord (C, E, G, C, D) that swells in, a bright bell-like hit, and a sparkle of small high bells falling away.
-  star3: (rate) => {
-    const thump = osc(rate, (t) => 44 + 80 * Math.exp(-t / 0.07), sine);
-    const rise = shimmer(rate, 420, 2600, 0.3, 77);
-    const chord = [261.63, 329.63, 392, 523.25, 587.33].map((f) => bell(rate, f, [[1, 1, 0.5], [2, 0.3, 0.3]]));
-    const hit = bell(rate, 2093, [[1, 1, 0.3], [2.76, 0.4, 0.14]]);
-    const hit2 = bell(rate, 3136, [[1, 1, 0.12], [1.51, 0.4, 0.06]]);
-    const sparkleAt = [0.4, 0.46, 0.52, 0.57, 0.63, 0.68, 0.74, 0.8, 0.86];
-    const sparklePitch = [4186, 3136, 5274, 3951, 4699, 3520, 5588, 4186, 4699];
-    const sparkle = sparklePitch.map((f) => bell(rate, f, [[1, 1, 0.1]]));
-    const sparkleLevel = sparkleAt.map((_, i) => 0.2 * Math.pow(0.88, i));
-    return render(rate, 1.0, (t) => {
-      let v = 0.55 * strike(t, 0, 0.16, 0.004) * thump(t) + rise(t);
-      // The chord swells in over the shimmer's climb (slow attack, then it rings and falls away).
-      if (t >= 0.14) {
-        const swell = Math.min(1, (t - 0.14) / 0.18);
-        for (let i = 0; i < chord.length; i++) v += chord[i]!(t, 0.14 + i * 0.012, 0.11) * swell;
-      }
-      v += hit(t, 0.3, 0.2) + hit2(t, 0.32, 0.12);
-      for (let i = 0; i < sparkle.length; i++) v += sparkle[i]!(t, sparkleAt[i]!, sparkleLevel[i]!);
-      return soft(v, 0.34);
-    });
-  },
+  star3: (rate) =>
+    renderHalf(rate, 1.0, (r) => {
+      const thump = osc(r, (t) => 44 + 80 * Math.exp(-t / 0.07), sine);
+      const rise = shimmer(r, 420, 2600, 0.3, 77);
+      // (The chord is one pad: every note a sine and its octave under one ring-out each, so it costs a few sines a sample, not a bell's worth of them.)
+      const chordLow = [261.63, 329.63, 392, 523.25, 587.33].map((f) => osc(r, () => f, sine));
+      const chordHigh = [523.25, 784].map((f) => osc(r, () => f, sine));
+      const hit = bell(r, 2093, [[1, 1, 0.22], [2.76, 0.4, 0.1]], 4);
+      const hit2 = bell(r, 3136, [[1, 1, 0.12]], 5);
+      const sparkleAt = [0.4, 0.47, 0.54, 0.6, 0.67, 0.74, 0.82];
+      const sparklePitch = [4186, 3136, 5274, 3951, 4699, 3520, 5588];
+      const sparkle = sparklePitch.map((f) => bell(r, f, [[1, 1, 0.08]], 5));
+      const sparkleLevel = sparkleAt.map((_, i) => 0.2 * Math.pow(0.88, i));
+      return (t) => {
+        let v = 0.55 * strike(t, 0, 0.16, 0.004) * thump(t) + rise(t);
+        // The chord swells in over the shimmer's climb (slow attack, then it rings and falls away).
+        if (t >= 0.14) {
+          const x = t - 0.14;
+          const ring = Math.exp(-x / 0.5);
+          const ringHigh = 0.3 * Math.exp(-x / 0.3);
+          for (let i = 0; i < chordLow.length; i++) {
+            // (Each note swells in over 0.18 s, a hair after the one below it.)
+            const swell = Math.min(1, Math.max(0, (x - i * 0.012) / 0.18));
+            v += 0.11 * swell * ring * chordLow[i]!(t);
+          }
+          for (let i = 0; i < chordHigh.length; i++) v += 0.11 * Math.min(1, x / 0.18) * ringHigh * chordHigh[i]!(t);
+        }
+        v += hit(t, 0.3, 0.2) + hit2(t, 0.32, 0.12);
+        for (let i = 0; i < sparkle.length; i++) v += sparkle[i]!(t, sparkleAt[i]!, sparkleLevel[i]!);
+        return soft(v, 0.34);
+      };
+    }),
+
 };
 
 /** Trims each so it sits a little under a move's loudness (peak well under the move's; mean a few dB under it). */
