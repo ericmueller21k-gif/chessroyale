@@ -81,7 +81,7 @@ interface BoardActs {
  * when what it shows changes (`boardInputs` in logic.ts), or by itself (a tap, a drag, a slide or a fade ending).
  */
 export function OwnBoard(props: BoardProps) {
-  const { fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry, turn = 0, elephants } = props;
+  const { fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry, turn = 0, elephants, decor } = props;
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
   const onDarkRef = useRef(onDarkTry);
@@ -114,7 +114,7 @@ export function OwnBoard(props: BoardProps) {
   const acts = useMemo<BoardActs>(() => ({ move: (uci) => onMoveRef.current?.(uci), darkTry: (uci) => onDarkRef.current?.(uci), refused: onRefusedRef, stopped: stoppedRef, promote: setPromotion, selectDark: setDarkSel, local }), []);
   // (The same element while nothing it shows has changed: Preact leaves it, and everything in it, alone.)
   const layer = useMemo(
-    () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} elephants={elephants} acts={acts} />,
+    () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} elephants={elephants} decor={decor} acts={acts} />,
     [...boardInputs(props), darkOn, darkSel, cleared.current],
   );
   const promoWhite = sideToMove(fen) === "w";
@@ -155,7 +155,7 @@ type LayerProps = Omit<BoardProps, "children" | "silent" | "onMove" | "onDarkTry
  * The board's drawing: the squares and their highlights, the pieces (sliding, fading, following a drag), the arrows and
  * the coordinates, and the taps and drags on them. Drawn again only when what it shows changes (see OwnBoard).
  */
-function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, small, animate = true, marks, dark, darkOn, darkSel, turn = 0, elephants, acts }: LayerProps) {
+function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, small, animate = true, marks, dark, darkOn, darkSel, turn = 0, elephants, decor, acts }: LayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -508,18 +508,23 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
           {fading.map(({ piece }) => (
             <piece key={`f${piece.id}`} class={`${look(piece)} fading`} style={{ transform: place(piece.square, orientation, turn) }} />
           ))}
-          {tr.pieces.map((p) => (
-            <piece
-              key={p.id}
-              ref={(el: HTMLElement | null) => {
-                if (el) pieceEls.current.set(p.id, el);
-                else pieceEls.current.delete(p.id);
-              }}
-              data-square={p.square}
-              class={`${look(p)}${tr.sliding.has(p.id) ? " anim" : ""}${p.id === dragId ? " dragging" : ""}`}
-              style={{ transform: place(p.square, orientation, turn) }}
-            />
-          ))}
+          {tr.pieces.map((p) => {
+            const extra = decor?.of(p.square, p.code);
+            return (
+              <piece
+                key={p.id}
+                ref={(el: HTMLElement | null) => {
+                  if (el) pieceEls.current.set(p.id, el);
+                  else pieceEls.current.delete(p.id);
+                }}
+                data-square={p.square}
+                class={`${look(p)}${tr.sliding.has(p.id) ? " anim" : ""}${p.id === dragId ? " dragging" : ""}${extra?.cls ? ` ${extra.cls}` : ""}`}
+                style={{ transform: place(p.square, orientation, turn) }}
+              >
+                {extra?.kids}
+              </piece>
+            );
+          })}
         </div>
         {drawn.length > 0 && (
           <svg class="hb-shapes" viewBox="-4 -4 8 8" preserveAspectRatio="xMidYMid slice" aria-hidden="true">

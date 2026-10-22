@@ -4,9 +4,11 @@ import { AUTOCHESS, botLook, mulberry32, type AutoChessSettings } from "@chessro
 import { account } from "../account.ts";
 import { useAccount } from "./Profile.tsx";
 import { Board } from "../components/Board.tsx";
+import type { PieceDecor } from "../board/types.ts";
 import { COUNT_FROM_SECONDS, TimerBar } from "../components/Countdown.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { Avatar } from "../components/Items.tsx";
+import { StarArt } from "../components/AcStarArt.tsx";
 import { cellOf, dragStarted, squareAtPoint } from "../board/logic.ts";
 import { play, unlockAudio, warmSounds } from "../sound.ts";
 import { FLOAT_MS, FloatGold, type FloatAt } from "../components/FloatGold.tsx";
@@ -23,7 +25,6 @@ import {
   movesUsed,
   pickTargets,
   starTargets,
-  starredToMove,
   startAdjust,
   startMove,
   startStars,
@@ -244,15 +245,17 @@ function newGame(seed: number, cfg: AutoChessSettings, presets?: Presets): Game 
  * `?adjustmode=legal` (v7's move step: one piece lit at random, 7 s) or `=teleport` (the v6 step) in place of the stars step; `?level=N` (5 to 10): both sides
  * start at level N (to see rooks and queens in the shop at once: the XP to each next level shifts with it). `?stars=n@c2:2,r@e3:3` puts those pieces on your
  * board at the start of round 1 (kind, square, stars 1 to 3; 1 is a plain piece), `?benchstars=b@f2:2` holds them for you on your bench, `?botbench=n@c7:2` holds
- * them for the bot (it places them for nothing as the round begins): the shop then rolls for that army, so a seed can be found that shows a star-up.
+ * them for the bot (it places them for nothing as the round begins): the shop then rolls for that army, so a seed can be found that shows a star-up. `?fightglow=1`: the stars'
+ * outlines stay on through the fight and the result (`fightGlow`; off by default: only the tiny stars stay).
  */
-function settingsFor(quick: boolean, gold: number, adjust: boolean, lockIn: boolean, mode: AutoChessSettings["adjustMode"] | null, level: number): AutoChessSettings {
+function settingsFor(quick: boolean, gold: number, adjust: boolean, lockIn: boolean, mode: AutoChessSettings["adjustMode"] | null, level: number, fightGlow: boolean): AutoChessSettings {
   // (Two seconds locked, so a test has time to try buying in the lock before the reveal.)
   const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, revealSeconds: 1.5, fightMoveMs: 60, fightFastMoveMs: 30 } : AUTOCHESS;
   let out = gold > 0 ? { ...base, startGold: base.startGold + gold } : base;
   if (!adjust) out = { ...out, adjustStep: false };
   if (lockIn) out = { ...out, lockIn: true };
   if (mode) out = { ...out, adjustMode: mode };
+  if (fightGlow) out = { ...out, fightGlow: true };
   if (level > out.levels.start && level <= out.levels.max) out = { ...out, levels: { ...out.levels, start: level, xpToNext: out.levels.xpToNext.slice(level - out.levels.start) } };
   return out;
 }
@@ -268,32 +271,15 @@ const revealSeed = (match: MatchState) => (roundSeed(match) ^ 0x6b43a9b5) >>> 0;
 const squareDark = (square: string) => (square.charCodeAt(0) - 96 + Number(square[1])) % 2 === 0;
 const capital = (s: string) => s[0]!.toUpperCase() + s.slice(1);
 
-/** A piece's picture: the board's own art, in a box that sizes it. */
-function PieceIcon({ color, kind }: { color: Color; kind: Kind | "k" }) {
+/**
+ * A piece's picture: the board's own art, in a box that sizes it. A starred piece (`n` 2 or 3) has its tiny stars and, while `ring` is on, its outline (components/AcStarArt.tsx), which
+ * draws the whole piece then; `shift`: the prismatic outline's colors move (the shop card's).
+ */
+function PieceIcon({ color, kind, n = 1, ring = false, shift = false }: { color: Color; kind: Kind | "k"; n?: number; ring?: boolean; shift?: boolean }) {
   return (
     <span class="hb-pieces ac-pc" aria-hidden="true">
-      <piece class={`${color === "w" ? "white" : "black"} ${KIND_NAME[kind]}`} />
-    </span>
-  );
-}
-
-/** A five-pointed star (a 24 x 24 box). */
-const STAR_PATH = "M12 1.6l3.2 6.7 7.3.9-5.4 5.1 1.4 7.3L12 18l-6.5 3.6 1.4-7.3L1.5 9.2l7.3-.9z";
-
-/**
- * A piece's stars (v8): two or three small gold stars with a dark edge, so they read on a light or a dark square, on any board color and over a white or a black piece. It
- * sits over the lower edge of the piece, in whatever box holds it (the board's square, a bench tile, a shop card's tile); a plain piece has none. `fresh`: the
- * newest star pops in (a merge).
- */
-function Stars({ n, fresh }: { n: number; fresh?: boolean }) {
-  if (n < 2) return null;
-  return (
-    <span class={`ac-stars s${n}${fresh ? " fresh" : ""}`} aria-hidden="true">
-      {Array.from({ length: n }, (_, i) => (
-        <svg key={i} viewBox="0 0 24 24" focusable="false">
-          <path d={STAR_PATH} />
-        </svg>
-      ))}
+      {!(n >= 2 && ring) && <piece class={`${color === "w" ? "white" : "black"} ${KIND_NAME[kind]}`} />}
+      {n >= 2 && <StarArt color={color} kind={kind} n={n} outline={ring} shift={shift} />}
     </span>
   );
 }
@@ -383,7 +369,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const extraGold = Math.max(0, Math.floor(Number(params.get("gold")) || 0));
   const modeParam = params.get("adjustmode");
   const cfg = useMemo(
-    () => settingsFor(quick, extraGold, params.get("adjust") !== "0", params.get("lockin") === "1", modeParam === "legal" || modeParam === "teleport" || modeParam === "stars" ? modeParam : null, Math.floor(Number(params.get("level")) || 0)),
+    () => settingsFor(quick, extraGold, params.get("adjust") !== "0", params.get("lockin") === "1", modeParam === "legal" || modeParam === "teleport" || modeParam === "stars" ? modeParam : null, Math.floor(Number(params.get("level")) || 0), params.get("fightglow") === "1"),
     [],
   );
   const legal = cfg.adjustMode === "legal";
@@ -1031,9 +1017,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     else if (legal) dots.push(...pickTargets(adj, cfg));
     else if (sel && isSquare(sel) && movesUsed(adj) < cfg.adjustMoves) dots.push(...adjustTargets(adj.army, sel.at.square));
   }
-  // The piece picked for you glows while its move is still to make (v7); in the stars step every starred piece that hasn't moved glows.
+  // The piece picked for you glows while its move is still to make (v7). (In the stars step the starred pieces carry their own outline instead: no box.)
   const lit = legal && adj && !adjOver && adj.pick && movesUsed(adj) < cfg.adjustMoves ? adj.pick.square : null;
-  const glowing = starMode && adj && !adjOver ? starredToMove(adj) : [];
 
   // The offers: each a glowing silhouette on its own square (one offer to a square).
   const offers = g.phase === "buy" ? g.round.shop.slots : [];
@@ -1086,6 +1071,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   // What is being dragged while buying: an offer (to the bench) or a piece of yours (to the shop, to sell it).
   const dragOffer = g.phase === "buy" && drag && isOffer(drag) ? (g.round.shop.slots[drag.at.offer] ?? null) : null;
   const dragPiece = g.phase === "buy" && drag && drag.kind !== "k" && !isOffer(drag) ? drag : null;
+  // The stars of the piece being dragged (a piece of yours, on the board or the bench).
+  const dragStars = drag ? (isSquare(drag) ? starsAt(you, drag.at.square) : isHeld(drag) ? heldStars(g.round.you.bench[drag.at.held] ?? { kind: "p", square: "" }) : 1) : 1;
 
   const outcome = g.outcome;
   const matchEnd = g.phase === "over" && outcome ? matchWords(outcome.result.outcome === "you") : null;
@@ -1097,17 +1084,27 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const myHp = Math.max(0, g.match.you.hp);
   const myNeed = xpToNext(g.match.you.level, cfg);
   const botNeed = xpToNext(botLevelNow.level, cfg);
-  // The stars on the board (v8), drawn on their pieces: yours, and theirs once shown (the pieces revealed while you buy, all of them in the move step), and through the fight.
-  const marks: { square: string; n: number }[] = [];
+  // The stars on the board (v8), drawn in their pieces' own elements (so they slide with them): yours, and theirs once shown (the pieces revealed while you buy, all of them in the move
+  // step, and through the fight).
+  const starMap: Record<string, number> = {};
   if (g.phase === "buy" || g.phase === "adjust") {
-    for (const [square, n] of Object.entries(you.stars ?? {})) marks.push({ square, n });
-    if (g.phase === "buy") for (const r of seen?.revealed ?? []) if (r.stars) marks.push({ square: r.square, n: r.stars });
-    if (g.phase === "adjust") for (const [square, n] of Object.entries(botArmy.stars ?? {})) marks.push({ square, n });
-  } else if (g.fight) for (const [square, n] of Object.entries(g.fight.stars)) marks.push({ square, n });
+    for (const [square, n] of Object.entries(you.stars ?? {})) starMap[square] = n;
+    if (g.phase === "buy") for (const r of seen?.revealed ?? []) if (r.stars) starMap[r.square] = r.stars;
+    if (g.phase === "adjust") for (const [square, n] of Object.entries(botArmy.stars ?? {})) starMap[square] = n;
+  } else if (g.fight) for (const [square, n] of Object.entries(g.fight.stars)) starMap[square] = n;
   // (The fight has begun but waits a moment for the bot's last look: the stars are where the armies are.)
-  else if (g.phase === "fight") for (const [square, n] of Object.entries({ ...you.stars, ...(g.round.botFinal ?? botArmy).stars })) marks.push({ square, n: n as number });
-  // The star-ups on offer: the piece of yours each would merge into (a gold ring on it, a rainbow one for a third star) and the stars it will have.
+  else if (g.phase === "fight") for (const [square, n] of Object.entries({ ...you.stars, ...(g.round.botFinal ?? botArmy).stars })) starMap[square] = n as number;
+  // The star-ups on offer (their cards say what they merge into: nothing is drawn on the board for one).
   const upTargets = offers.map((o) => starUpTarget(g.round.you, o, cfg));
+  // The outlines of the starred pieces show while you buy, place and move; through the fight and the result only the tiny stars stay (`fightGlow`, `?fightglow=1`, keeps the outlines).
+  const ringOn = g.phase === "buy" || g.phase === "adjust" || cfg.fightGlow;
+  const starDecor: PieceDecor = {
+    key: `${ringOn ? "o" : "s"}${Object.entries(starMap).map(([sq, n]) => `${sq}${n}`).join(",")}`,
+    of: (square, code) => {
+      const n = starMap[square];
+      return n ? { cls: ringOn ? "ac-drawn" : undefined, kids: <StarArt color={code[0] as Color} kind={code[1] as Kind} n={n} outline={ringOn} /> } : null;
+    },
+  };
   // The shop's odds at your level (v7): each kind's percent, in a small pill in the gold row.
   const odds = oddsFor(g.match.you.level, cfg);
   const oddsWordsLine = KINDS.map((k) => `${KIND_NAME[k]} ${odds[k]}%`).join(", ");
@@ -1161,8 +1158,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                     setTheirTap(tapped ? null : { index: i, kind: h.kind, square: h.square });
                   }}
                 >
-                  <PieceIcon color={theirs} kind={h.kind} />
-                  <Stars n={heldStars(h)} />
+                  <PieceIcon color={theirs} kind={h.kind} n={heldStars(h)} ring={ringOn} />
                   <em>{h.square}</em>
                 </button>
               );
@@ -1193,7 +1189,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
         <div class="ac-frame">
           {timerBars && <TimerBar key={`${g.match.round}-${g.phase}`} startsAt={g.wallStart} deadline={g.wallStart + stepMs} total={stepMs} quiet />}
           <div class="ac-board">
-            <Board fen={fen} orientation={orientation} lastMove={lastMove} animate={g.phase === "adjust" || g.phase === "fight"} silent={g.phase !== "fight"}>
+            <Board fen={fen} orientation={orientation} lastMove={lastMove} animate={g.phase === "adjust" || g.phase === "fight"} silent={g.phase !== "fight"} decor={starDecor}>
               <div
                 ref={layerRef}
                 class={`ac-layer${interactiveLayer ? " live" : ""}`}
@@ -1211,18 +1207,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                   <span key={r.square} class="ac-ping" data-square={r.square} style={sq(r.square)} />
                 ))}
                 {theirTapped && <span class="ac-cell ac-red" data-square={theirTapped.square} style={sq(theirTapped.square)} />}
-                {marks.map(({ square, n }) => (
-                  <span key={`${square}${n}`} class="ac-cell ac-starmark" data-square={square} data-stars={n} style={sq(square)}>
-                    <Stars n={n} fresh={!!merged && "square" in merged.at && merged.at.square === square && merged.stars === n} />
-                  </span>
-                ))}
                 {offers.map((o, slot) =>
-                  upTargets[slot] ? (
-                    // (A star-up lands nowhere: a gold ring on the piece it would merge into, a rainbow one for a third star; a piece held on the bench has its tile ringed instead.)
-                    upTargets[slot]!.where === "board" ? (
-                      <span key={`${slot}${o.kind}${o.square}`} class={`ac-cell ac-uptarget u${upTargets[slot]!.becomes}${offerBlocks[slot] || locked ? " off" : ""}`} data-square={o.square} data-slot={slot} style={sq(o.square)} />
-                    ) : null
-                  ) : (
+                  // (A star-up lands nowhere and shows nothing on the board: its card is where it is.)
+                  upTargets[slot] ? null : (
                     <span key={`${slot}${o.kind}${o.square}`} class="ac-offers" data-square={o.square} style={sq(o.square)}>
                       <span class={`ac-sil${offerBlocks[slot] || locked ? " off" : ""}`} data-slot={slot} data-kind={o.kind}>
                         <i class={`ac-sil-shape ${KIND_NAME[o.kind]}`} />
@@ -1236,9 +1223,6 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                   </span>
                 )}
                 {lit && <span class="ac-cell ac-pick" data-square={lit} style={sq(lit)} />}
-                {glowing.map((square) => (
-                  <span key={square} class="ac-cell ac-pick" data-square={square} style={sq(square)} />
-                ))}
                 {held && isSquare(held) && (g.phase === "buy" || !legal) && <span class="ac-cell ac-picked" style={sq(held.at.square)} />}
                 {floats.filter((f) => "col" in f.at).map((f) => (
                   <FloatGold key={f.id} amount={f.amount} at={f.at} />
@@ -1305,21 +1289,17 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                     data-stars={heldStars(h)}
                     aria-label={`Held ${KIND_NAME[h.kind]}${heldStars(h) > 1 ? `, ${heldStars(h)} stars,` : ""} for ${h.square}`}
                   >
-                    <PieceIcon color={mine} kind={h.kind} />
-                    <Stars n={heldStars(h)} />
+                    <PieceIcon color={mine} kind={h.kind} n={heldStars(h)} ring={ringOn} />
                     <em>{h.square}</em>
                   </div>
                 );
-              // (A star-up on offer for this held piece rings its tile.)
-              const upRing = upTargets.findIndex((t) => t?.where === "bench" && t.index === i);
-              const ringStars = upRing >= 0 ? upTargets[upRing]!.becomes : 0;
               const block = heldBlock(g.round.you, i, cfg, g.match.you.level);
               const lifted = !!drag && isHeld(drag) && drag.at.held === i;
               return (
                 <button
                   key={`${i}${h.kind}${h.square}`}
                   type="button"
-                  class={`ac-slot has ${tone}${block || locked ? " off" : ""}${lifted ? " lifted" : ""}${popping ? " merged" : ""}${ringStars ? ` ac-uptile u${ringStars}${offerBlocks[upRing] || locked ? " ring-off" : ""}` : ""}`}
+                  class={`ac-slot has ${tone}${block || locked ? " off" : ""}${lifted ? " lifted" : ""}${popping ? " merged" : ""}`}
                   data-held={i}
                   data-kind={h.kind}
                   data-square={h.square}
@@ -1333,8 +1313,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                   onLostPointerCapture={(e) => endPress(e, true)}
                   onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), placeHeldAt(i))}
                 >
-                  <PieceIcon color={mine} kind={h.kind} />
-                  <Stars n={heldStars(h)} fresh={popping} />
+                  <PieceIcon color={mine} kind={h.kind} n={heldStars(h)} ring={ringOn} />
                   <em>{h.square}</em>
                 </button>
               );
@@ -1439,8 +1418,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), buySlot(slot))}
                     >
                       <span class={`ac-tile ${squareDark(offer.square) ? "d" : "l"}`}>
-                        <PieceIcon color={mine} kind={offer.kind} />
-                        {up && <Stars n={up.becomes} />}
+                        <PieceIcon color={mine} kind={offer.kind} n={up ? up.becomes : 1} ring shift />
                       </span>
                       <span class="ac-nm">
                         {capital(KIND_NAME[offer.kind])} <em>{offer.square}</em>
@@ -1510,7 +1488,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       </div>
       {drag && (g.phase === "buy" || g.phase === "adjust") && (
         <div ref={ghostRef} class="hb-pieces ac-ghost" style={{ width: `${boxOf().width / 8}px`, height: `${boxOf().width / 8}px` }} aria-hidden="true">
-          <piece class={`${mine === "w" ? "white" : "black"} ${KIND_NAME[drag.kind]}`} />
+          {/* (A starred piece carries its stars and, while outlines are on, its outline; the piece it left behind stays as it was, as a plain piece's does.) */}
+          {dragStars >= 2 && ringOn ? <StarArt color={mine} kind={drag.kind} n={dragStars} outline /> : <piece class={`${mine === "w" ? "white" : "black"} ${KIND_NAME[drag.kind]}`} />}
+          {dragStars >= 2 && !ringOn && <StarArt color={mine} kind={drag.kind} n={dragStars} outline={false} />}
         </div>
       )}
     </div>

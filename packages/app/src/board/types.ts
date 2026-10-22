@@ -9,6 +9,16 @@ export interface Arrow {
   label?: string;
 }
 
+/**
+ * What a screen draws on its pieces, as part of each piece's own element, so it slides, fades and is read with the piece (Auto chess's stars and their outline). `key` is
+ * everything `of` depends on, as text: the board's drawing layer is drawn again when it changes (the same contract as `marks`).
+ */
+export interface PieceDecor {
+  key: string;
+  /** For the piece on `square` (`code`: color then role, "wr", "bn"): a class for its element and what is drawn inside it, or nothing. */
+  of(square: string, code: string): { cls?: string; kids: ComponentChildren } | null | undefined;
+}
+
 /** The board's props (components/Board.tsx, board/OwnBoard.tsx). */
 export interface BoardProps {
   fen: string;
@@ -63,6 +73,8 @@ export interface BoardProps {
    * `elephants`). A piece that was one keeps its art as it fades.
    */
   elephants?: readonly string[];
+  /** Drawn on each piece, inside its element (see `PieceDecor`). Not on a piece that is fading away. */
+  decor?: PieceDecor;
 }
 
 // The board's own elements: a piece (also drawn over the board, and in the promotion picker) and a square's highlight.
