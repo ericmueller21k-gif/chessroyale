@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AUTOCHESS, mulberry32, type AutoChessSettings } from "@chessroyale/core";
-import { buyOffer, emptyArmy, halfSquares, heldBlock, kindBlock, placeBlock, placeHeld, squareBlock, usableSquares } from "../src/autochess/army.ts";
+import { buyOffer, emptyArmy, halfSquares, heldBlock, kindBlock, placeBlock, placeHeld, squareBlock, starUpTarget, usableSquares } from "../src/autochess/army.ts";
 import { beginRound, newMatch, roundSeed } from "../src/autochess/economy.ts";
 import { buyFromSlot, holdFromSlot, newShop, oddsFor, refillSlot, replaceTaken, rerollBlock, rerollFor, rerollPrice, rerollShop, rerollWords, rollOffer, shopSeed, type Shop } from "../src/autochess/shop.ts";
 import { KINDS, type Army, type Kind, type Offer } from "../src/autochess/types.ts";
@@ -86,6 +86,11 @@ describe("auto chess: the shop (v6)", () => {
       const a: Army = { ...king(color), board: color === "w" ? { a2: "p", c3: "n", d1: "q" } : { a7: "p", c6: "n", d8: "q" } };
       for (let seed = 0; seed < 400; seed++) {
         for (const o of newShop(seed, a).slots) {
+          // (v8: a star-up stands on the square of the piece it would star up, and is of its kind; every other offer lands on a square you could use.)
+          if (starUpTarget(a, o)) {
+            expect(a.board[o.square], `a star-up of ${o.kind} ${o.square}`).toBe(o.kind);
+            continue;
+          }
           expect(squareBlock(a, o.kind, o.square), `${o.kind} ${o.square}`).toBeNull();
           expect(halfSquares(color)).toContain(o.square);
           if (o.kind === "p") expect(color === "w" ? ["2", "3", "4"] : ["7", "6", "5"]).toContain(o.square[1]);
@@ -108,7 +113,10 @@ describe("auto chess: the shop (v6)", () => {
     expect(kindBlock(eight, "p")).toBe("pawns");
     const withQueen: Army = { ...king(), board: { d1: "q" } };
     const rng2 = mulberry32(10);
-    const after = Array.from({ length: 6000 }, () => rollOffer(rng2, withQueen, AUTOCHESS, new Set(), 10)!.kind);
+    // (The queen's own star-up is no new queen: it merges into the one you have.)
+    const after = Array.from({ length: 6000 }, () => rollOffer(rng2, withQueen, AUTOCHESS, new Set(), 10)!)
+      .filter((o) => !starUpTarget(withQueen, o))
+      .map((o) => o.kind);
     expect(after).not.toContain("q");
     // (Level 10's odds of the others, renormalized: pawn 36 of 93.)
     expect(Math.abs(share(after).p - (36 / 93) * 100)).toBeLessThan(2);
@@ -175,7 +183,7 @@ describe("auto chess: the shop (v6)", () => {
     expect(holdFromSlot({ army: { ...army, bench: [offer("q", "d1")] }, gold: 500, shop: shopOf([offer("q", "d2")]) }, 0, 77)).toEqual({ block: "queen" });
     // What is held counts as owned when the shop rolls: with a queen on the bench no queen is offered.
     const withQueen = { ...army, bench: [offer("q", "d1")] };
-    for (let seed = 0; seed < 300; seed++) for (const o of newShop(seed, withQueen).slots) expect(o.kind).not.toBe("q");
+    for (let seed = 0; seed < 300; seed++) for (const o of newShop(seed, withQueen).slots) if (!starUpTarget(withQueen, o)) expect(o.kind).not.toBe("q");
     // A bought offer has no hold left to give: a full board still takes a hold.
     const fullBoard: Army = { ...army, board: { a3: "p", b3: "p", c3: "p", d3: "p", e3: "p", f3: "p", g3: "p", h3: "p", b1: "n", g1: "n" } };
     expect(buyFromSlot({ army: fullBoard, gold: 100, shop }, 1, 77)).toEqual({ block: "limit" });
@@ -278,7 +286,9 @@ describe("auto chess: the shop (v6)", () => {
           if (bought.block === "limit") break;
           continue;
         }
-        expect(placeBlock(army, shop.slots[slot]!.kind, shop.slots[slot]!.square)).toBeNull();
+        // (A star-up lands nowhere: it merges into the piece, for 5; any other offer lands on a square you could use.)
+        if (bought.starUp) expect(bought.gold).toBe(gold - AUTOCHESS.starUpCost);
+        else expect(placeBlock(army, shop.slots[slot]!.kind, shop.slots[slot]!.square)).toBeNull();
         ({ army, gold, shop } = bought);
         expect(Object.keys(army.board).length).toBeLessThanOrEqual(AUTOCHESS.levels.max);
       }
@@ -299,7 +309,8 @@ describe("auto chess: one offer to a square (Eric, Oct 21: 'pieces should never 
   const expectOneEach = (shop: Shop, army: Army, where: string) => {
     expect(shop.slots, `${where}: a full shop`).toHaveLength(AUTOCHESS.shop.slots);
     expect(new Set(squares(shop)).size, `${where}: ${squares(shop)}`).toBe(shop.slots.length);
-    for (const o of shop.slots) expect(usableSquares(army, o.kind), `${where}: ${o.kind} ${o.square}`).toContain(o.square);
+    // (v8: an offer is a star-up of a piece of yours that can star up, or a new piece on a square you could use.)
+    for (const o of shop.slots) if (!starUpTarget(army, o)) expect(usableSquares(army, o.kind), `${where}: ${o.kind} ${o.square}`).toContain(o.square);
   };
 
   it("no two offers share a square: over many seeds, rounds, rerolls, buys, holds and placings, for either color and from a bare board to a full one", () => {

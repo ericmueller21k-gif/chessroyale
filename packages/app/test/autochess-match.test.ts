@@ -246,7 +246,8 @@ describe("auto chess: the bot", () => {
   it("buys a mix (not pawns first: Eric, Oct 19), rooks and a queen as income grows, and never sells", () => {
     // Round 1, 100 gold: some pawns, more pieces than a random shop's 25%, never a queen.
     const kinds = { p: 0, n: 0, b: 0, r: 0, q: 0 };
-    for (let seed = 0; seed < 200; seed++) for (const b of botBuys(emptyArmy("w", "e1"), 100, 1, mulberry32(seed)).buys) if (b.kind !== "reroll" && b.kind !== "xp") kinds[b.kind]++;
+    // (A star-up is no new piece: v8.)
+    for (let seed = 0; seed < 200; seed++) for (const b of botBuys(emptyArmy("w", "e1"), 100, 1, mulberry32(seed)).buys) if (b.kind !== "reroll" && b.kind !== "xp" && b.type !== "starup") kinds[b.kind]++;
     const total = kinds.p + kinds.n + kinds.b + kinds.r + kinds.q;
     expect(kinds.q).toBe(0);
     expect(kinds.p).toBeGreaterThan(0);
@@ -254,7 +255,7 @@ describe("auto chess: the bot", () => {
     let queens = 0;
     let rooks = 0;
     for (let seed = 0; seed < 200; seed++) {
-      const late = botBuys(emptyArmy("w", "e1"), 200, 8, mulberry32(seed), AUTOCHESS, { level: 9, xp: 0 }).buys.flatMap((b) => (b.kind === "reroll" || b.kind === "xp" ? [] : [b.kind]));
+      const late = botBuys(emptyArmy("w", "e1"), 200, 8, mulberry32(seed), AUTOCHESS, { level: 9, xp: 0 }).buys.flatMap((b) => (b.kind === "reroll" || b.kind === "xp" || b.type === "starup" ? [] : [b.kind]));
       queens += late.filter((k) => k === "q").length;
       rooks += late.filter((k) => k === "r").length;
       expect(late.filter((k) => k === "q").length).toBeLessThanOrEqual(1);
@@ -280,7 +281,7 @@ describe("auto chess: the bot", () => {
       const n = buys.filter((b) => b.kind === "reroll").length;
       expect(n).toBeLessThanOrEqual(AUTOCHESS.bot.maxRerolls);
       let done = 0;
-      for (const b of buys) expect(b.price).toBe(b.kind === "reroll" ? rerollPrice(done++) : b.kind === "xp" ? AUTOCHESS.levels.buyXpCost : b.type === "place" ? 0 : AUTOCHESS.prices[b.kind]);
+      for (const b of buys) expect(b.price).toBe(b.kind === "reroll" ? rerollPrice(done++) : b.kind === "xp" ? AUTOCHESS.levels.buyXpCost : b.type === "place" ? 0 : b.type === "starup" ? AUTOCHESS.starUpCost : AUTOCHESS.prices[b.kind]);
       if (n) withReroll++;
       rerolls += n;
       // Poor: under the gold it likes to keep, it never rerolls.
@@ -328,7 +329,13 @@ describe("auto chess: the bot", () => {
       const holds = buys.filter((b) => b.type === "hold");
       expect(holds.length).toBeLessThanOrEqual(AUTOCHESS.bot.maxHolds);
       expect(holds.every((b) => b.kind !== "p" && b.price === AUTOCHESS.prices[b.kind as Kind] && b.square !== null)).toBe(true);
-      expect(army.bench).toEqual(holds.map((b) => ({ kind: b.kind, square: b.square })));
+      // (A held piece the shop later offers a star-up of gains its star where it is, v8: the bench is what it held, with those stars.)
+      expect(army.bench).toEqual(
+        holds.map((b) => {
+          const ups = buys.filter((u) => u.type === "starup" && u.where === "bench" && u.kind === b.kind && u.square === b.square).length;
+          return { kind: b.kind, square: b.square, ...(ups ? { stars: 1 + ups } : {}) };
+        }),
+      );
       // A hold only comes once the board is full.
       const firstHold = buys.findIndex((b) => b.type === "hold");
       if (firstHold >= 0) expect(buys.slice(0, firstHold).filter((b) => b.type === "buy" || b.type === "place")).toHaveLength(4);
@@ -389,9 +396,10 @@ describe("auto chess: the bot", () => {
   it("shows what it has done by a time (the circles are drawn from this, 2 s behind): pieces on squares, and what it has spent, rerolls too", () => {
     for (let seed = 0; seed < 40; seed++) {
       const plan = botPlan("b", "e8", 100 + (seed % 3) * 60, 1 + (seed % 5), mulberry32(seed));
-      expect(botAt(plan.events, 0)).toEqual({ squares: {}, spent: 0, xpBuys: 0 });
+      expect(botAt(plan.events, 0)).toEqual({ squares: {}, stars: {}, spent: 0, xpBuys: 0 });
       const all = botAt(plan.events, 99);
       expect(all.squares).toEqual(plan.army.board);
+      expect(all.stars).toEqual(plan.army.stars ?? {});
       expect(all.spent).toBe(plan.spent);
       const t = plan.events[Math.floor(plan.events.length / 2)]!.at;
       const done = plan.events.filter((e) => e.at <= t);
@@ -452,7 +460,7 @@ describe("auto chess: the bot", () => {
         // Gold: never spends what it hasn't (a placed held piece is free).
         expect(plan.spent).toBeLessThanOrEqual(gold);
         let rerolled = 0;
-        for (const e of plan.events) expect(e.price).toBe(e.type === "place" ? 0 : e.type === "reroll" ? rerollPrice(rerolled++) : e.type === "xp" ? AUTOCHESS.levels.buyXpCost : AUTOCHESS.prices[e.kind as Kind]);
+        for (const e of plan.events) expect(e.price).toBe(e.type === "place" ? 0 : e.type === "reroll" ? rerollPrice(rerolled++) : e.type === "xp" ? AUTOCHESS.levels.buyXpCost : e.type === "starup" ? AUTOCHESS.starUpCost : AUTOCHESS.prices[e.kind as Kind]);
         // Level: only what it bought (the free XP came before), and the board never holds more than the level.
         expect(plan.level).toEqual(addXp(level, plan.events.filter((e) => e.type === "xp").length * AUTOCHESS.levels.buyXp));
         expect(Object.keys(plan.army.board).length).toBeLessThanOrEqual(plan.level.level);

@@ -362,12 +362,12 @@ describe("auto chess: the teleport adjust step (v6, kept behind `adjustMode`): o
     expect(adjustBlock(s, "h4", "h3", TELE)).toBe("used");
     expect(adjustWords("used")).toBe("Moved. Tap ↩ to undo.");
     // Taken back, the change is free again, for any piece.
-    expect(undoBlock(s, "h4")).toBeNull();
-    const undone = undoAction(s, "h4");
+    expect(undoBlock(s, "h4", TELE)).toBeNull();
+    const undone = undoAction(s, "h4", TELE);
     expect(undone.army).toEqual(w);
     expect(undone.actions).toEqual([]);
     expect(adjustBlock(undone, "b2", "b4", TELE)).toBeNull();
-    expect(undoBlock(s, "h3")).toBe("none");
+    expect(undoBlock(s, "h3", TELE)).toBe("none");
     // The number is a setting.
     const two = { ...TELE, adjustMoves: 2 };
     expect(adjustBlock(adjustMove(startAdjust(w), "c3", "h4"), "b2", "b4", two)).toBeNull();
@@ -375,15 +375,15 @@ describe("auto chess: the teleport adjust step (v6, kept behind `adjustMode`): o
     // Two changes, the first taken back needs a later change that stands on its square to come first.
     const chain = adjustMove(adjustMove(startAdjust(army("w", "e1", { a2: "p" })), "a2", "a3"), "a3", "a4");
     expect(adjustMarks(chain)).toEqual([{ square: "a4", action: "move" }]);
-    expect(undoBlock(chain, "a3")).toBe("none");
+    expect(undoBlock(chain, "a3", TELE)).toBe("none");
     expect(undoWords("needed")).toBe("Undo the other first");
     expect(undoWords("none")).toBe("Nothing to undo");
   });
 
-  it("the step can be turned off: with `adjustStep` false the buy step leads straight to the fight, with it on to the adjust step; 7 seconds long, in the legal move mode, the old step behind the setting", () => {
+  it("the step can be turned off: with `adjustStep` false the buy step leads straight to the fight, with it on to the adjust step; the stars mode is the default (v8), the 7-second modes behind the setting", () => {
     expect(AUTOCHESS.adjustStep).toBe(true);
     expect(AUTOCHESS.adjustSeconds).toBe(7);
-    expect(AUTOCHESS.adjustMode).toBe("legal");
+    expect(AUTOCHESS.adjustMode).toBe("stars");
     expect(stepAfterBuy()).toBe("adjust");
     expect(stepAfterBuy({ ...AUTOCHESS, adjustStep: false })).toBe("fight");
   });

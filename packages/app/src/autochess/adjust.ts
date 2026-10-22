@@ -1,12 +1,17 @@
 import { AUTOCHESS, mulberry32, type AutoChessSettings } from "@chessroyale/core";
-import { halfSquares, inHalf, placeWords, squareBlock, type SquareBlock } from "./army.ts";
+import { halfSquares, inHalf, placeWords, squareBlock, starredCount, starsAt, withStars, type SquareBlock } from "./army.ts";
 import { fightMoves } from "./fight.ts";
 import { armiesFen } from "./position.ts";
 import type { Army, Kind } from "./types.ts";
 
 /**
- * The adjust step, shown to players as the **move step**. Two modes (`AUTOCHESS.adjustMode`):
+ * The adjust step, shown to players as the **move step**. Three modes (`AUTOCHESS.adjustMode`):
  *
+ * - **"stars"** (v8, Eric Oct 22: "No moving pieces period during action phase but a twist, pieces can now be 2 starred which lets you move the piece once legally
+ *   during the action phase... 3 star pieces can move anywhere"; the default): no piece is picked for you. Every **starred** piece of yours on the board may move, each at most
+ *   once, in any order: a **2-star** one legal chess move that stays on your half (the fight's own move generator, in the position as the step has made it so far, your army
+ *   against theirs), a **3-star** to any empty square of your half where it may stand. Any other piece doesn't move. The step lasts `moveBase` seconds plus `movePerStar` for
+ *   each starred piece of the side with more of them on the board (`moveSeconds`), and runs even when nobody has a star (then it is a few seconds to look at the board).
  * - **"legal"** (v7, Eric Oct 21: "it highlights one piece at random of yours and you get 7 seconds to do a LEGAL move on your half
  *   of the board"; the default): one of your pieces is picked for you at random (seeded by the round; never the king; only a piece
  *   with at least one legal chess move that stays on your half), and you play one legal chess move with it that stays on your half,
@@ -18,7 +23,7 @@ import type { Army, Kind } from "./types.ts";
  *   legal empty square of your half. It is not a chess move: a knight may go to the far corner. "Legal" is the placement rules'
  *   (`squareBlock`): a pawn never on your back rank, the square empty and yours.
  *
- * Either way the change can be taken back while the step lasts, and stays hidden from the opponent until the fight.
+ * In every mode a move can be taken back while the step lasts, and stays hidden from the opponent until the fight.
  */
 
 /** Where the piece on `from` may go in the teleport step: the empty squares of its own half where it may stand, or [] if there is no piece of this army there (the king isn't moved). */
@@ -39,6 +44,16 @@ export interface MovePick {
   square: string;
   kind: Kind;
   targets: string[];
+}
+
+/** The squares the piece on `from` may legally go to while staying on its half, in this position (this army to move against `opponent`'s): sorted, none if there is no such piece or it can't move. */
+export function legalTargetsFrom(army: Army, opponent: Army, from: string, cfg: AutoChessSettings = AUTOCHESS): string[] {
+  const targets = new Set<string>();
+  for (const m of fightMoves(armiesFen(army, opponent, army.color), cfg)) {
+    const to = m.slice(2, 4);
+    if (m.startsWith(from) && inHalf(to, army.color)) targets.add(to);
+  }
+  return [...targets].sort();
 }
 
 /**
@@ -89,6 +104,8 @@ export interface Adjusted {
   army: Army;
   actions: AdjustAction[];
   pick: MovePick | null;
+  /** Their army as it stood when the buying ended (the stars step checks a 2-star's moves against it, in the position as it is after each of your moves); not needed in the other modes. */
+  opponent?: Army;
 }
 
 /** The teleport step's start: nothing picked, any piece may go. */
@@ -97,24 +114,60 @@ export const startAdjust = (army: Army): Adjusted => ({ start: army, army, actio
 /** The legal move step's start: this army against theirs, with its piece picked at random by `seed` (null if none can move). */
 export const startMove = (army: Army, opponent: Army, seed: number, cfg: AutoChessSettings = AUTOCHESS): Adjusted => ({ start: army, army, actions: [], pick: movePick(army, opponent, seed, cfg) });
 
+/** The stars step's start (v8): nothing picked, every starred piece may move once; `opponent`: their army as it stood when the buying ended. */
+export const startStars = (army: Army, opponent: Army): Adjusted => ({ start: army, army, actions: [], pick: null, opponent });
+
 export const movesUsed = (state: Adjusted) => state.actions.length;
+
+/** How long the move step lasts, in seconds: in the stars mode `moveBase` plus `movePerStar` for each starred piece (on the board) of the side with more of them; else `adjustSeconds`. */
+export function adjustSecondsFor(you: Army, bot: Army, cfg: AutoChessSettings = AUTOCHESS): number {
+  return cfg.adjustMode === "stars" ? cfg.moveBase + cfg.movePerStar * Math.max(starredCount(you), starredCount(bot)) : cfg.adjustSeconds;
+}
+
+/** The squares where pieces that have moved in the step stand now (each piece moves once, so a piece that is on one of them has used its move). */
+export const movedSquares = (state: Adjusted): Set<string> => new Set(state.actions.map((a) => a.to));
+
+/** The squares of the starred pieces whose move is still to make (the stars step lights them all at its start). */
+export const starredToMove = (state: Adjusted): string[] => {
+  const moved = movedSquares(state);
+  return Object.keys(state.army.stars ?? {})
+    .filter((sq) => state.army.board[sq] && !moved.has(sq))
+    .sort();
+};
+
+/** Where the starred piece on `from` may go now (the stars step): a 2-star its legal chess moves that stay on your half, a 3-star every empty square of your half it may stand on; none for any other piece. */
+export function starTargets(state: Adjusted, from: string, cfg: AutoChessSettings = AUTOCHESS): string[] {
+  const stars = starsAt(state.army, from);
+  if (!state.army.board[from] || stars < 2) return [];
+  if (stars >= 3) return adjustTargets(state.army, from, cfg).sort();
+  // (Without their army to check against, a 2-star has no moves: the step is always started with it, `startStars`.)
+  return state.opponent ? legalTargetsFrom(state.army, state.opponent, from, cfg) : [];
+}
 
 /** Plays one action on an army, or null if it isn't a possible one there (every legal move onto an empty square of your half is also a teleport target, so this holds for both modes). */
 function play(army: Army, a: AdjustAction): Army | null {
   const kind = army.board[a.from];
   if (!kind || !adjustTargets(army, a.from).includes(a.to)) return null;
   const { [a.from]: _gone, ...rest } = army.board;
-  return { ...army, board: { ...rest, [a.to]: kind } };
+  const moved: Army = { ...army, board: { ...rest, [a.to]: kind } };
+  // (The piece's stars go with it.)
+  const stars = army.stars?.[a.from];
+  if (!stars) return moved;
+  const { [a.from]: _star, ...others } = army.stars!;
+  return withStars(moved, { ...others, [a.to]: stars });
 }
 
-/** The army after these actions from `start`, or null if one of them isn't legal in that order. */
-function replay(start: Army, actions: readonly AdjustAction[]): Army | null {
-  let army: Army | null = start;
+/**
+ * The army after these actions from `start`, or null if one of them isn't legal in that order (each is checked as it was made: in the position the earlier ones
+ * left, so taking one move back can't leave a later 2-star move that is no longer legal).
+ */
+function replay(state: Adjusted, actions: readonly AdjustAction[], cfg: AutoChessSettings): Army | null {
+  let cur: Adjusted = { ...state, army: state.start, actions: [] };
   for (const a of actions) {
-    army = army && play(army, a);
-    if (!army) return null;
+    if (adjustBlock(cur, a.from, a.to, cfg)) return null;
+    cur = adjustMove(cur, a.from, a.to);
   }
-  return army;
+  return cur.army;
 }
 
 /**
@@ -122,11 +175,21 @@ function replay(start: Army, actions: readonly AdjustAction[]): Army | null {
  * isn't the lit piece, or the square is no legal move of it; or the change is used; or the square's rules (a square not on your
  * half, taken, your king's, a pawn on your back rank, a fourth pawn in a file).
  */
-export type AdjustBlock = "used" | "none" | "kingfixed" | "notpicked" | "nomove" | "illegal" | SquareBlock;
+export type AdjustBlock = "used" | "none" | "kingfixed" | "notpicked" | "nomove" | "illegal" | "plain" | SquareBlock;
 
 export function adjustBlock(state: Adjusted, from: string, to: string, cfg: AutoChessSettings = AUTOCHESS): AdjustBlock | null {
   const { army } = state;
   if (army.king === from) return "kingfixed";
+  if (cfg.adjustMode === "stars") {
+    // (The stars step: only a starred piece moves, once; a 2-star by the fight's moves in the position as it is now, a 3-star to any empty square of your half.)
+    const piece = army.board[from];
+    if (!piece) return "none";
+    if (starsAt(army, from) < 2) return "plain";
+    if (movedSquares(state).has(from)) return "used";
+    const square = squareBlock(army, piece, to, from, cfg);
+    if (square) return square;
+    return starTargets(state, from, cfg).includes(to) ? null : "illegal";
+  }
   if (cfg.adjustMode === "legal") {
     if (!state.pick) return "nomove";
     // (Once the move is made the lit piece stands elsewhere: the move is used, whatever square is asked about.)
@@ -170,18 +233,18 @@ const actionAt = (state: Adjusted, square: string) => {
   return -1;
 };
 
-/** Why a move can't be taken back, or null: nothing moved there, or a later move of yours stands on it. */
-export function undoBlock(state: Adjusted, square: string): "none" | "needed" | null {
+/** Why a move can't be taken back, or null: nothing moved there, or a later move of yours stands on it (or needs it). */
+export function undoBlock(state: Adjusted, square: string, cfg: AutoChessSettings = AUTOCHESS): "none" | "needed" | null {
   const i = actionAt(state, square);
   if (i < 0) return "none";
-  return replay(state.start, state.actions.filter((_, j) => j !== i)) ? null : "needed";
+  return replay(state, state.actions.filter((_, j) => j !== i), cfg) ? null : "needed";
 }
 
 /** Takes the move on this square back (the caller checked `undoBlock`). */
-export function undoAction(state: Adjusted, square: string): Adjusted {
+export function undoAction(state: Adjusted, square: string, cfg: AutoChessSettings = AUTOCHESS): Adjusted {
   const i = actionAt(state, square);
   const actions = state.actions.filter((_, j) => j !== i);
-  return { ...state, army: replay(state.start, actions)!, actions };
+  return { ...state, army: replay(state, actions, cfg)!, actions };
 }
 
 /**
@@ -205,6 +268,8 @@ export function adjustWords(block: AdjustBlock, cfg: AutoChessSettings = AUTOCHE
       return "No piece can move";
     case "illegal":
       return "Not a legal move";
+    case "plain":
+      return "Not starred";
     default:
       return placeWords(block, cfg);
   }

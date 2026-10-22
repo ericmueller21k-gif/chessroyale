@@ -1,6 +1,6 @@
 import { AUTOCHESS, type AutoChessSettings } from "@chessroyale/core";
 import { addXp } from "./level.ts";
-import type { Army, Color, Kind, Offer } from "./types.ts";
+import type { Army, Color, Held, Kind } from "./types.ts";
 
 /**
  * Gold, streaks and hit points between rounds. Nothing carries over between rounds but gold, HP, the win streak and the bench
@@ -35,8 +35,8 @@ export interface SideState {
   losses: number;
   /** From the last fight; paid out with the next round's income. */
   refund: Refund;
-  /** The pieces held on the bench (v6), each with the square it will land on; they stay from round to round. */
-  bench: Offer[];
+  /** The pieces held on the bench (v6), each with the square it will land on (and its stars, v8); they stay from round to round. */
+  bench: Held[];
   /** Your level (how many pieces the board may hold) and the XP toward the next one (v6); they stay for the whole match. */
   level: number;
   xp: number;
@@ -99,12 +99,12 @@ export function beginRound(match: MatchState, cfg: AutoChessSettings = AUTOCHESS
  */
 export const damageFor = (round: number, enemyPiecesLeft: number, cfg: AutoChessSettings = AUTOCHESS) => cfg.damagePerRound * round + Math.floor(Math.max(0, enemyPiecesLeft) / cfg.piecesPerDamage);
 
-/** The summed price of some pieces. */
-export const worth = (kinds: readonly Kind[], cfg: AutoChessSettings = AUTOCHESS) => kinds.reduce((sum, k) => sum + cfg.prices[k], 0);
+/** The summed price of some pieces, and `starUps` star-ups (`starUpCost` each) paid on them (v8). */
+export const worth = (kinds: readonly Kind[], cfg: AutoChessSettings = AUTOCHESS, starUps = 0) => kinds.reduce((sum, k) => sum + cfg.prices[k], 0) + starUps * cfg.starUpCost;
 
-/** What a side gets back after a fight: 25% (rounded down) of the summed price of what's still on the board. */
-export function refundFor(onBoard: readonly Kind[], cfg: AutoChessSettings = AUTOCHESS): Refund {
-  return { survivors: Math.floor(worth(onBoard, cfg) * cfg.survivorRefund) };
+/** What a side gets back after a fight: 25% (rounded down) of everything paid for what's still on the board (the prices, and `starUps` star-ups at `starUpCost` each). */
+export function refundFor(onBoard: readonly Kind[], cfg: AutoChessSettings = AUTOCHESS, starUps = 0): Refund {
+  return { survivors: Math.floor(worth(onBoard, cfg, starUps) * cfg.survivorRefund) };
 }
 
 export type RoundOutcome = "you" | "bot" | "draw";
@@ -122,7 +122,8 @@ export interface RoundResult {
 /**
  * Settles a round: the loser loses HP, the win and loss streaks move on (a draw ends both), and each side's refund (its
  * survivors' share and its cash-ins' gold) waits for the next round's pay. `left`: the pieces on the board when the fight ended,
- * by side; `cashIns`: how many of each side's pawns cashed in during the fight.
+ * by side; `cashIns`: how many of each side's pawns cashed in during the fight; `starUps`: how many star-ups were paid for the survivors of each side
+ * (a 2-star counts one, a 3-star two), which the refund counts as part of what was paid.
  */
 export function settleRound(
   match: MatchState,
@@ -130,11 +131,12 @@ export function settleRound(
   left: { you: readonly Kind[]; bot: readonly Kind[] },
   cfg: AutoChessSettings = AUTOCHESS,
   cashIns: { you: number; bot: number } = { you: 0, bot: 0 },
+  starUps: { you: number; bot: number } = { you: 0, bot: 0 },
 ): { match: MatchState; result: RoundResult } {
   const piecesLeft = outcome === "you" ? left.you.length : outcome === "bot" ? left.bot.length : 0;
   const damage = outcome === "draw" ? 0 : damageFor(match.round, piecesLeft, cfg);
   const withCash = (r: Refund, n: number): Refund => (n ? { ...r, cashIns: n * cfg.cashInGold } : r);
-  const refund = { you: withCash(refundFor(left.you, cfg), cashIns.you), bot: withCash(refundFor(left.bot, cfg), cashIns.bot) };
+  const refund = { you: withCash(refundFor(left.you, cfg, starUps.you), cashIns.you), bot: withCash(refundFor(left.bot, cfg, starUps.bot), cashIns.bot) };
   const next = (s: SideState, won: boolean, lost: boolean, r: Refund): SideState => ({
     ...s,
     hp: lost ? s.hp - damage : s.hp,

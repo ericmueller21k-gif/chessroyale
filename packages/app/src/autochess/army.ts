@@ -1,5 +1,5 @@
 import { AUTOCHESS, mulberry32, type AutoChessSettings } from "@chessroyale/core";
-import { KIND_NAME, KINDS, other, type Army, type Color, type Kind, type Offer } from "./types.ts";
+import { KIND_NAME, KINDS, other, type Army, type Color, type Held, type Kind, type Offer, type StarCount } from "./types.ts";
 
 /**
  * The squares, the shop's and the board's limits, and the buying, placing and selling that follow them. Every check
@@ -34,7 +34,7 @@ export function kingSquares(seed: number, cfg: AutoChessSettings = AUTOCHESS): {
   return { w: squareOf(file, rank), b: squareOf(file, 9 - rank) };
 }
 
-export const emptyArmy = (color: Color, king: string, bench: Offer[] = []): Army => ({ color, king, board: {}, bench });
+export const emptyArmy = (color: Color, king: string, bench: Held[] = []): Army => ({ color, king, board: {}, bench });
 
 /** How many of each kind a side owns (on the board and held on the bench). */
 export function owned(army: Army): Record<Kind, number> {
@@ -53,8 +53,65 @@ export function extras(n: Record<Kind, number>): number {
 export const legalCounts = (n: Record<Kind, number>, cfg: AutoChessSettings = AUTOCHESS) => n.p <= cfg.maxPawns && n.p + extras(n) <= cfg.maxPawns;
 
 export const priceOf = (kind: Kind, cfg: AutoChessSettings = AUTOCHESS) => cfg.prices[kind];
-/** What selling gives back: a share (`sellBack`) of the price, rounded down. */
-export const sellValue = (kind: Kind, cfg: AutoChessSettings = AUTOCHESS) => Math.floor(cfg.prices[kind] * cfg.sellBack);
+/** What a piece has cost in all: its price, and `starUpCost` for each star above the first (v8). */
+export const paidFor = (kind: Kind, stars = 1, cfg: AutoChessSettings = AUTOCHESS) => cfg.prices[kind] + cfg.starUpCost * Math.max(0, stars - 1);
+/** What selling gives back: a share (`sellBack`) of everything paid for the piece (its price and its star-ups), rounded down. */
+export const sellValue = (kind: Kind, cfg: AutoChessSettings = AUTOCHESS, stars = 1) => Math.floor(paidFor(kind, stars, cfg) * cfg.sellBack);
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Stars (v8, Eric Oct 22)
+
+/** The stars of the piece on this square of the board: 1 (plain), 2 or 3. */
+export const starsAt = (army: Army, square: string): number => army.stars?.[square] ?? 1;
+/** The stars of a held piece: 1 (plain), 2 or 3. */
+export const heldStars = (h: Held): number => h.stars ?? 1;
+
+/** Whether a piece of this kind with this many stars can star up: not a pawn (nor the king), and not yet at the top. */
+export const canStarUp = (kind: Kind | "k", stars: number, cfg: AutoChessSettings = AUTOCHESS) => kind !== "p" && kind !== "k" && stars < cfg.maxStars;
+
+/** An army with these stars on its board (the key is left off when nothing is starred, so a plain army stays plain data). */
+export function withStars(army: Army, stars: Record<string, StarCount>): Army {
+  const { stars: _old, ...rest } = army;
+  return Object.keys(stars).length ? { ...rest, stars } : rest;
+}
+
+/** The star-up an offer would be, for this army: the piece it merges into and the stars it will have. */
+export type StarTarget = { where: "board"; square: string; becomes: StarCount } | { where: "bench"; index: number; becomes: StarCount };
+
+/**
+ * The piece of yours an offer would star up, or null if it is an ordinary new piece. **Any offer whose kind and square match a piece of
+ * yours that can star up merges into it** (v8, Eric Oct 22), whether the shop meant it as a star-up or rolled a new piece that happens to match:
+ * the piece standing on the square (the board's first), else a piece held on the bench for that square.
+ */
+export function starUpTarget(army: Army, offer: Offer, cfg: AutoChessSettings = AUTOCHESS): StarTarget | null {
+  const onBoard = army.board[offer.square];
+  if (onBoard === offer.kind && canStarUp(onBoard, starsAt(army, offer.square), cfg)) return { where: "board", square: offer.square, becomes: (starsAt(army, offer.square) + 1) as StarCount };
+  const index = army.bench.findIndex((h) => h.kind === offer.kind && h.square === offer.square && canStarUp(h.kind, heldStars(h), cfg));
+  return index >= 0 ? { where: "bench", index, becomes: (heldStars(army.bench[index]!) + 1) as StarCount } : null;
+}
+
+/** The star-up done: the piece gains a star where it is (the caller checked the gold). */
+export function starUp(army: Army, target: StarTarget): Army {
+  if (target.where === "board") return withStars(army, { ...army.stars, [target.square]: target.becomes });
+  return { ...army, bench: army.bench.map((h, i) => (i === target.index ? { ...h, stars: target.becomes } : h)) };
+}
+
+/** Every piece of yours that can star up, by the square it stands on or is held for (the board's and the bench's, one entry each): where the shop may offer a star-up. */
+export function starrablePieces(army: Army, cfg: AutoChessSettings = AUTOCHESS): { square: string; kind: Kind }[] {
+  const out: { square: string; kind: Kind }[] = [];
+  for (const [square, kind] of Object.entries(army.board)) if (canStarUp(kind, starsAt(army, square), cfg)) out.push({ square, kind });
+  for (const h of army.bench) if (canStarUp(h.kind, heldStars(h), cfg)) out.push({ square: h.square, kind: h.kind });
+  return out;
+}
+
+/** What buying this offer costs now: `starUpCost` for a star-up, else the piece's price. */
+export const offerPrice = (army: Army, offer: Offer, cfg: AutoChessSettings = AUTOCHESS) => (starUpTarget(army, offer, cfg) ? cfg.starUpCost : cfg.prices[offer.kind]);
+
+/** The number of star-ups paid for in a set of stars (a 2-star is one, a 3-star two): what the survivors' refund counts besides the prices. */
+export const starUpsIn = (stars: Readonly<Record<string, number>> | undefined): number => Object.values(stars ?? {}).reduce((n, s) => n + (s - 1), 0);
+
+/** How many starred pieces stand on the board. */
+export const starredCount = (army: Army): number => Object.keys(army.stars ?? {}).filter((sq) => army.board[sq]).length;
 
 /** Why a piece of this kind can't be owned now (the legal-position limits count what you own): a limit, or null. */
 export type KindBlock = "queen" | "pawns" | "extras";
@@ -78,6 +135,8 @@ export type BuyBlock = KindBlock | "limit" | "taken" | "gold";
  * the board's room (`limit`: how many pieces it may hold), then gold.
  */
 export function buyBlock(army: Army, gold: number, offer: Offer, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.levels.max): BuyBlock | null {
+  // A star-up adds no piece, so no limit applies to it (a queen's with your one queen out, a full board's): only the gold.
+  if (starUpTarget(army, offer, cfg)) return gold < cfg.starUpCost ? "gold" : null;
   const kind = kindBlock(army, offer.kind, cfg);
   if (kind) return kind;
   // (An offer is rolled onto a usable square; if it has stopped being one, a piece stands on it now.)
@@ -87,10 +146,12 @@ export function buyBlock(army: Army, gold: number, offer: Offer, cfg: AutoChessS
   return null;
 }
 
-export type HoldBlock = KindBlock | "bench" | "gold";
+export type HoldBlock = KindBlock | "bench" | "gold" | "starup";
 
 /** Why this offer can't be bought to be held on the bench, or null: the limits, then the bench's room, then gold. */
 export function holdBlock(army: Army, gold: number, offer: Offer, cfg: AutoChessSettings = AUTOCHESS): HoldBlock | null {
+  // (A star-up merges where the piece is: there is nothing to hold.)
+  if (starUpTarget(army, offer, cfg)) return "starup";
   const kind = kindBlock(army, offer.kind, cfg);
   if (kind) return kind;
   if (army.bench.length >= cfg.benchSlots) return "bench";
@@ -105,10 +166,19 @@ export const offerLabel = (offer: Offer) => `${KIND_NAME[offer.kind][0]!.toUpper
  * The shop's words for an offer that can't be bought: `short` (a card's reason, for its label) and `line` (what the small spot under
  * the board says when it is tapped: short words, about 15 characters a line, never an explanation).
  */
-export function buyWords(block: BuyBlock | "bench", offer: Offer, gold: number, cfg: AutoChessSettings = AUTOCHESS, limit: number = cfg.levels.max): { short: string; line: string } {
+export function buyWords(
+  block: BuyBlock | HoldBlock,
+  offer: Offer,
+  gold: number,
+  cfg: AutoChessSettings = AUTOCHESS,
+  limit: number = cfg.levels.max,
+  price: number = cfg.prices[offer.kind],
+): { short: string; line: string } {
   switch (block) {
+    case "starup":
+      return { short: "Star up", line: "Tap to star up" };
     case "gold":
-      return { short: "No gold", line: `Need ${cfg.prices[offer.kind] - gold} more` };
+      return { short: "No gold", line: `Need ${price - gold} more` };
     case "limit":
       return { short: "Level full", line: placeWords("limit", cfg, limit) };
     case "bench":
@@ -187,7 +257,8 @@ export function sellPiece(army: Army, square: string, kind: Kind | "k", cfg: Aut
   if (kind === "k" || army.board[square] !== kind) return null;
   const board = { ...army.board };
   delete board[square];
-  return { army: { ...army, board }, gold: sellValue(kind, cfg) };
+  const { [square]: _gone, ...stars } = army.stars ?? {};
+  return { army: withStars({ ...army, board }, stars), gold: sellValue(kind, cfg, starsAt(army, square)) };
 }
 
 /** Buys an offer to hold: it goes on the bench, keeping its square (the caller checked `holdBlock`). */
@@ -197,7 +268,7 @@ export const holdOffer = (army: Army, offer: Offer): Army => ({ ...army, bench: 
 export function sellHeld(army: Army, index: number, kind: Kind | "k", cfg: AutoChessSettings = AUTOCHESS): { army: Army; gold: number } | null {
   const held = army.bench[index];
   if (!held || held.kind !== kind) return null;
-  return { army: { ...army, bench: army.bench.filter((_, i) => i !== index) }, gold: sellValue(held.kind, cfg) };
+  return { army: { ...army, bench: army.bench.filter((_, i) => i !== index) }, gold: sellValue(held.kind, cfg, heldStars(held)) };
 }
 
 /** Why a held piece can't be placed now, or null: its square isn't free (taken, the king's), or the board has no room (`limit`). */
@@ -209,7 +280,9 @@ export function heldBlock(army: Army, index: number, cfg: AutoChessSettings = AU
 /** Places a held piece on the square it kept (the caller checked `heldBlock`). */
 export function placeHeld(army: Army, index: number): Army {
   const held = army.bench[index]!;
-  return { ...army, board: { ...army.board, [held.square]: held.kind }, bench: army.bench.filter((_, i) => i !== index) };
+  const placed: Army = { ...army, board: { ...army.board, [held.square]: held.kind }, bench: army.bench.filter((_, i) => i !== index) };
+  // (Its stars go down with it.)
+  return held.stars ? withStars(placed, { ...army.stars, [held.square]: held.stars }) : placed;
 }
 
 /** The words for a held piece that can't be placed, with its square named (short, as the others). */
@@ -223,7 +296,7 @@ export function heldWords(block: PlaceBlock, square: string, cfg: AutoChessSetti
  * A bench carried into the next round. The colors turn each round, so a held piece's square is turned with them: the same file,
  * the rank mirrored (as the kings are), so it is still on its owner's half, the same way round.
  */
-export const carryBench = (bench: readonly Offer[]): Offer[] => bench.map((o) => ({ kind: o.kind, square: `${o.square[0]}${9 - rankOf(o.square)}` }));
+export const carryBench = (bench: readonly Held[]): Held[] => bench.map((o) => ({ kind: o.kind, square: `${o.square[0]}${9 - rankOf(o.square)}`, ...(o.stars ? { stars: o.stars } : {}) }));
 
 /** The pieces standing on the board, in a steady order (square names sorted). */
 export const boardPieces = (army: Army): { square: string; kind: Kind }[] =>

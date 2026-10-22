@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AUTOCHESS, mulberry32, type AutoChessSettings } from "@chessroyale/core";
 import { buyOffer, emptyArmy, inHalf, kingSquares, usableSquares } from "../src/autochess/army.ts";
 import {
-  adjustBlock,
+  adjustBlock as adjustBlockIn,
   adjustMarks,
   adjustMove,
   adjustWords,
@@ -11,34 +11,43 @@ import {
   movablePieces,
   movePick,
   movesUsed,
-  pickTargets,
+  pickTargets as pickTargetsIn,
   startAdjust,
   startMove,
-  undoAction,
-  undoBlock,
+  undoAction as undoActionIn,
+  undoBlock as undoBlockIn,
   youMoveSeed,
+  type Adjusted,
 } from "../src/autochess/adjust.ts";
-import { botMove } from "../src/autochess/bot.ts";
+import { botMove as botMoveIn } from "../src/autochess/bot.ts";
 import { fightStart } from "../src/autochess/position.ts";
 import type { Army, Kind } from "../src/autochess/types.ts";
 
 /**
- * The move step (v7, Eric Oct 21: "it highlights one piece at random of yours and you get 7 seconds to do a LEGAL move on your half
- * of the board"): the piece picked at random (seeded; never the king; only one with a legal chess move that stays on your half), the
- * moves it may make, skipping, no piece qualifying, and the bot's own pick and best move. The old step (teleport) is in
- * autochess-rules.test.ts.
+ * The move step of v7 (Eric Oct 21: "it highlights one piece at random of yours and you get 7 seconds to do a LEGAL move on your half
+ * of the board"), kept behind `adjustMode: "legal"` since v8 made the stars its default (autochess-stars.test.ts): the piece picked at
+ * random (seeded; never the king; only one with a legal chess move that stays on your half), the moves it may make, skipping, no piece
+ * qualifying, and the bot's own pick and best move. The old step (teleport) is in autochess-rules.test.ts.
  */
 
 const army = (color: "w" | "b", king: string, board: Record<string, Kind> = {}): Army => ({ color, king, board, bench: [] });
 const them = (board: Record<string, Kind> = {}) => army("b", "g8", board);
 const TELE: AutoChessSettings = { ...AUTOCHESS, adjustMode: "teleport" };
+/** The v7 step, behind the setting since v8: every test here that depends on the mode runs in it. */
+const LEGAL: AutoChessSettings = { ...AUTOCHESS, adjustMode: "legal" };
+const adjustBlock = (s: Adjusted, from: string, to: string) => adjustBlockIn(s, from, to, LEGAL);
+const pickTargets = (s: Adjusted) => pickTargetsIn(s, LEGAL);
+const undoBlock = (s: Adjusted, sq: string) => undoBlockIn(s, sq, LEGAL);
+const undoAction = (s: Adjusted, sq: string) => undoActionIn(s, sq, LEGAL);
+const botMove = (a: Army, o: Army, seed: number, ev: (a: Army) => Promise<number>, stop: () => boolean, cfg: AutoChessSettings = LEGAL, on?: (a: Army) => void) => botMoveIn(a, o, seed, ev, stop, cfg, on);
 
-describe("auto chess: the move step's numbers (v7)", () => {
-  it("is the legal mode with 7 seconds, one move, and the old step kept behind the setting", () => {
-    expect(AUTOCHESS.adjustMode).toBe("legal");
+describe("auto chess: the move step's numbers (v7, v8)", () => {
+  it("is the stars mode since v8, with the v7 step (7 seconds, one move) and the v6 one kept behind the setting", () => {
+    expect(AUTOCHESS.adjustMode).toBe("stars");
     expect(AUTOCHESS.adjustSeconds).toBe(7);
     expect(AUTOCHESS.adjustMoves).toBe(1);
     expect(AUTOCHESS.adjustStep).toBe(true);
+    expect(LEGAL.adjustMode).toBe("legal");
     expect(TELE.adjustMode).toBe("teleport");
   });
 });
@@ -278,7 +287,7 @@ describe("auto chess: the bot's move step (v7: its own random piece, and the eng
       return a.board[favorite] === pick.kind ? 0.9 : 0.5;
     };
     let told: Army | null = null;
-    const out = await botMove(mine, you, seed, evaluate, () => false, AUTOCHESS, (a) => (told = a));
+    const out = await botMove(mine, you, seed, evaluate, () => false, LEGAL, (a) => (told = a));
     expect(out.board[favorite]).toBe(pick.kind);
     expect(out.board[pick.square]).toBeUndefined();
     expect(told).toEqual(out);

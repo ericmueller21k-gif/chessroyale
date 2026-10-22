@@ -1,6 +1,6 @@
 import { AUTOCHESS, mulberry32, type AutoChessSettings } from "@chessroyale/core";
 import { botAt, type BotEvent } from "./bot.ts";
-import type { Kind } from "./types.ts";
+import type { Kind, StarCount } from "./types.ts";
 
 /**
  * What you see of the opponent's board while you buy (v6, Eric Oct 20): every piece as a plain circle (pawns too), 2 s behind;
@@ -21,6 +21,8 @@ export interface Revealed {
   kind: Kind;
   /** When it was revealed (seconds into the step). */
   at: number;
+  /** Its stars as they are now (v8): a revealed piece shows them, and a star it gains after it was revealed shows too; none for a plain piece. */
+  stars?: StarCount;
 }
 
 /**
@@ -42,8 +44,8 @@ export function revealedAt(events: readonly BotEvent[], seed: number, seconds: n
     const square = open[Math.floor(mulberry32((seed ^ Math.imul(k + 1, 0x9e3779b1)) >>> 0)() * open.length)]!;
     out.push({ square, kind: circles[square]!, at });
   });
-  const board = botAt(events, seconds).squares;
-  return out.filter((r) => board[r.square] === r.kind);
+  const now = botAt(events, seconds);
+  return out.filter((r) => now.squares[r.square] === r.kind).map((r) => (now.stars[r.square] ? { ...r, stars: now.stars[r.square]! } : r));
 }
 
 /** What shows of their board `seconds` into the buy step: circles (all but the revealed), the revealed pieces, and what they have spent and the XP they have bought (2 s behind). */
