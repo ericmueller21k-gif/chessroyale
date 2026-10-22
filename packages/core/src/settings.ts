@@ -2770,18 +2770,20 @@ export interface AutoChessSettings {
    * you level you have slightly higher chances for better pieces and pawn odds slightly decrease... [queens] shouldn't even appear
    * till level 7 like in TFT"): `oddsByLevel[level - 1]` is the percent of each kind for a shop rolled at that level, level 1 first
    * (play starts at `levels.start`, 4, and tops at `levels.max`, 10); each row adds up to 100. No rooks before level 5, no queens
-   * before 7 (Eric: "Rooks should start at level 5"). The bot rolls by its own level.
+   * before 7 (Eric: "Rooks should start at level 5"). The bot rolls by its own level. **Star-ups** (v8): an offer's square is drawn first and its candidates are
+   * the pieces of yours that can star up on it (board or bench) and, on an empty board square, a new piece by these odds: the odds are the odds of a *new* piece
+   * (see `starUpCost`, `autochess/shop.ts` `rollOffer`).
    */
   readonly shop: {
     readonly slots: number;
     readonly oddsByLevel: readonly ShopOdds[];
     readonly reroll: { readonly first: number; readonly step: number; readonly max: number };
   };
-  /** Selling a piece, from the board or the bench, gives back this share of its price, rounded down (v6, Eric Oct 20: 75%: P7 N22 B24 R37 Q67). */
+  /** Selling a piece, from the board or the bench, gives back this share of what was paid for it (its price, and `starUpCost` for each star above the first, v8), rounded down (v6, Eric Oct 20: 75%: P7 N22 B24 R37 Q67). */
   readonly sellBack: number;
   /**
    * The bench (v6, Eric Oct 20: "the bench is going to be a massive strategy"): this many held pieces, each keeping the square it
-   * was offered on. Held pieces stay from round to round (the board's pieces still don't).
+   * was offered on. Held pieces stay from round to round (the board's pieces still don't), and so do their stars (v8).
    */
   readonly benchSlots: number;
   /**
@@ -2912,7 +2914,7 @@ export interface AutoChessSettings {
   readonly income: { readonly first: number; readonly step: number; readonly max: number };
   /** Interest on gold banked before the income: `gold` for every full `per` banked, up to `max`. */
   readonly interest: { readonly per: number; readonly gold: number; readonly max: number };
-  /** After a fight each side gets this share (rounded down) of the summed price of its pieces still on the board, win or lose; bench pieces get all of theirs back. */
+  /** After a fight each side gets this share (rounded down) of everything paid for its pieces still on the board (their prices and their star-ups, v8), win or lose; bench pieces get all of theirs back. */
   readonly survivorRefund: number;
   /**
    * Gold for a streak, at the start of the next round: from `n` rounds in a row, `gold` (the highest row that fits). A draw

@@ -15,13 +15,18 @@ import {
   adjustBlock,
   adjustMarks,
   adjustMove,
+  adjustSecondsFor,
   adjustTargets,
   adjustWords,
   botMoveSeed,
+  movedSquares,
   movesUsed,
   pickTargets,
+  starTargets,
+  starredToMove,
   startAdjust,
   startMove,
+  startStars,
   stepAfterBuy,
   undoAction,
   undoBlock,
@@ -29,8 +34,30 @@ import {
   youMoveSeed,
   type Adjusted,
 } from "../autochess/adjust.ts";
-import { botAdjust, botBenchAt, botMove, botPlan } from "../autochess/bot.ts";
-import { buyBlock, buyWords, carryBench, emptyArmy, heldBlock, heldWords, holdBlock, kingSquares, placeHeld, priceOf, sellHeld, sellPiece, sellValue } from "../autochess/army.ts";
+import { botAdjust, botBenchAt, botMove, botPlan, botStarMoves } from "../autochess/bot.ts";
+import {
+  buyBlock,
+  buyOffer,
+  buyWords,
+  carryBench,
+  emptyArmy,
+  heldBlock,
+  heldStars,
+  heldWords,
+  holdBlock,
+  inHalf,
+  kingSquares,
+  offerPrice,
+  placeHeld,
+  priceOf,
+  sellHeld,
+  sellPiece,
+  sellValue,
+  starUpTarget,
+  starsAt,
+  withStars,
+  type StarTarget,
+} from "../autochess/army.ts";
 import {
   beginRound,
   goldBreakdown,
@@ -50,9 +77,9 @@ import { bonusFor, botLocked, bothLocked, buyFreeze, freezeWords, noLocks, tickL
 import { firstHopMs, hopWaitMs } from "../autochess/hop.ts";
 import { botSeen } from "../autochess/reveal.ts";
 import { buyFromSlot, holdFromSlot, newShop, oddsFor, replaceTaken, rerollFor, rerollPrice, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
-import { playFight, thinFight, withPiece } from "../autochess/fight.ts";
-import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn } from "../autochess/position.ts";
-import { KIND_NAME, KINDS, other, type Army, type Color, type Kind, type Offer } from "../autochess/types.ts";
+import { moveStars, playFight, thinFight, withPiece } from "../autochess/fight.ts";
+import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn, starUpsByColor } from "../autochess/position.ts";
+import { KIND_NAME, KINDS, other, type Army, type Color, type Held, type Kind, type Offer, type StarCount } from "../autochess/types.ts";
 import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline, matchWords, moveCount, moveWords, type EndDetail, type EndKind } from "../autochess/words.ts";
 
 /**
@@ -61,6 +88,11 @@ import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline
  * (30 s, the last 3 locked) while the bot's pieces show as plain circles 2 s behind; then their real pieces show and you get
  * one move (7 s: one legal chess move with the piece picked for you, on your half); then the engine plays both armies out. The rules are
  * in `autochess/` (pure, tested); this draws them. Nothing is recorded, rewarded or sent anywhere.
+ *
+ * v8 (docs/decisions/2026-10-22-autochess-stars.md) adds stars: a piece but a pawn or the king can have 2 or 3 (small gold stars drawn on it, on the board, the benches,
+ * their revealed pieces and the shop cards), a star-up offer is a card with a gold glow (a rainbow one for a third star) that costs 5 and merges into the piece, and the
+ * move step is for the starred pieces only: each moves once (a 2-star one legal move, a 3-star to any empty square of your half), in 5 s plus 3 s a starred piece of
+ * the side with more.
  *
  * The screen is v7's (docs/decisions/2026-10-21-autochess-v7.md), as v7.1 changed it (docs/decisions/2026-10-22-autochess-v7-1.md): their bench at the
  * top left and their pawn (name, level, thin HP and XP bars) at the top right, the board in its frame with the move clock's bars along its edges, your
@@ -81,6 +113,8 @@ const CASH_LEAVE_MS = 220;
 const TAP_SLOP_PX = 10;
 /** A phase banner ("ACTION PHASE", "MOVE PHASE", "BATTLE PHASE") stays this long: its pop's length (styles.css, `.ac-phase`). */
 const BANNER_MS = 1600;
+/** A merge (a star-up) pops and flashes its piece this long, and its new star pops in (styles.css, `.ac-merge`). */
+const MERGE_MS = 700;
 
 type Phase = "buy" | "adjust" | "fight" | "result" | "over";
 
@@ -93,8 +127,10 @@ interface RoundState {
   shop: Shop;
   /** Lock in (end your buying, first gets the bonus; off since v7): when you locked, and who got the bonus. */
   locks: Locks;
-  /** Your adjust step: where your pieces stand, the piece picked for you (the move step) and what you did (one move). */
+  /** Your adjust step: where your pieces stand, the piece picked for you (the v7 move step) and what you did (one move; in the stars mode one for each starred piece). */
   adj: Adjusted | null;
+  /** How long this round's move step lasts, in ms: the stars mode's 5 s and 3 s for each starred piece of the side with more (known when the buying ends), else the setting's. */
+  adjustMs: number;
   /** The bot's army when buying ended. */
   botStart: Army | null;
   /** What the bot held when the round began (its bench, with the squares turned to this round's colors); its holds and placings come on top, by time. */
@@ -121,7 +157,8 @@ interface Game {
   phaseStart: number;
   wallStart: number;
   round: RoundState;
-  fight: { fen: string; last: string | null; plies: number } | null;
+  /** The fight: the position, the last move, the plies so far and the stars on the board by square (they move with their pieces; a star changes nothing in the fight). */
+  fight: { fen: string; last: string | null; plies: number; stars: Record<string, StarCount> } | null;
   outcome: Outcome | null;
 }
 
@@ -160,34 +197,69 @@ function startRound(prev: MatchState, cfg: AutoChessSettings): { match: MatchSta
   const plan = botPlan(theirs, kings[theirs], match.bot.gold, match.round, mulberry32(seed ^ 0x9e3779b9), cfg, botBench, { level: match.bot.level, xp: match.bot.xp });
   const you = emptyArmy(mine, kings[mine], carryBench(match.you.bench));
   // (The shop rolls by the level you have now, the free XP of this round's start counted.)
-  return { match, round: { you, shop: newShop(shopSeed(seed), you, cfg, match.you.level), locks: noLocks, adj: null, botStart: null, botBench, plan, botFinal: null, gold } };
+  return { match, round: { you, shop: newShop(shopSeed(seed), you, cfg, match.you.level), locks: noLocks, adj: null, adjustMs: cfg.adjustSeconds * 1000, botStart: null, botBench, plan, botFinal: null, gold } };
 }
 
-function newGame(seed: number, cfg: AutoChessSettings): Game {
-  const { match, round } = startRound(newMatch(seed, cfg), cfg);
+/** Pieces a test starts with (`?stars=`, `?benchstars=`, `?botbench=`): a kind, the square it stands on or is held for, and its stars (1: plain). */
+interface Preset {
+  kind: Kind;
+  square: string;
+  stars: 1 | StarCount;
+}
+type Presets = { board: Preset[]; bench: Preset[]; bot: Preset[] };
+
+/** `n@c2:2,r@e3:3` (kind, `@`, square, `:`, stars 1 to 3), skipping anything that isn't one. */
+function parsePresets(text: string | null): Preset[] {
+  const out: Preset[] = [];
+  for (const part of (text ?? "").split(",")) {
+    const m = /^([nbrq])@([a-h][1-8]):([123])$/.exec(part.trim());
+    if (m) out.push({ kind: m[1] as Kind, square: m[2]!, stars: Number(m[3]) as 1 | StarCount });
+  }
+  return out;
+}
+
+function newGame(seed: number, cfg: AutoChessSettings, presets?: Presets): Game {
+  let start = newMatch(seed, cfg);
+  // (The bot's presets are held pieces it places for nothing as the round begins: stored turned, so they come in on the squares given.)
+  if (presets?.bot.length) start = { ...start, bot: { ...start.bot, bench: presets.bot.slice(0, cfg.benchSlots).map((p) => ({ kind: p.kind, square: `${p.square[0]}${9 - Number(p.square[1])}`, ...(p.stars > 1 ? { stars: p.stars as StarCount } : {}) })) } };
+  const { match, round } = startRound(start, cfg);
+  if (presets && (presets.board.length || presets.bench.length)) {
+    let you = round.you;
+    for (const p of presets.board) {
+      if (!inHalf(p.square, you.color) || p.square === you.king || you.board[p.square]) continue;
+      you = buyOffer(you, { kind: p.kind, square: p.square });
+      if (p.stars > 1) you = withStars(you, { ...you.stars, [p.square]: p.stars as StarCount });
+    }
+    const bench: Held[] = presets.bench.filter((p) => inHalf(p.square, you.color)).slice(0, cfg.benchSlots).map((p) => ({ kind: p.kind, square: p.square, ...(p.stars > 1 ? { stars: p.stars as StarCount } : {}) }));
+    you = { ...you, bench };
+    // (The shop rolls again for the army it has now, so a test can find the seed that shows a star-up.)
+    return { match, phase: "buy", ...stamp(), round: { ...round, you, shop: newShop(shopSeed(roundSeed(match)), you, cfg, match.you.level) }, fight: null, outcome: null };
+  }
   return { match, phase: "buy", ...stamp(), round, fight: null, outcome: null };
 }
 
 /**
  * A phone's short steps for tests (`?quick=1`, a test switch): the same game in a few seconds a step. `?gold=N`: N more gold at the
  * start of round 1, to try a big army; `?adjust=0`: no adjust step, straight to the fight; `?lockin=1`: lock-in on (off since v7);
- * `?adjustmode=teleport`: the v6 adjust step in place of the move step; `?level=N` (5 to 10): both sides start at level N (to see
- * rooks and queens in the shop at once: the XP to each next level shifts with it).
+ * `?adjustmode=legal` (v7's move step: one piece lit at random, 7 s) or `=teleport` (the v6 step) in place of the stars step; `?level=N` (5 to 10): both sides
+ * start at level N (to see rooks and queens in the shop at once: the XP to each next level shifts with it). `?stars=n@c2:2,r@e3:3` puts those pieces on your
+ * board at the start of round 1 (kind, square, stars 1 to 3; 1 is a plain piece), `?benchstars=b@f2:2` holds them for you on your bench, `?botbench=n@c7:2` holds
+ * them for the bot (it places them for nothing as the round begins): the shop then rolls for that army, so a seed can be found that shows a star-up.
  */
-function settingsFor(quick: boolean, gold: number, adjust: boolean, lockIn: boolean, teleport: boolean, level: number): AutoChessSettings {
+function settingsFor(quick: boolean, gold: number, adjust: boolean, lockIn: boolean, mode: AutoChessSettings["adjustMode"] | null, level: number): AutoChessSettings {
   // (Two seconds locked, so a test has time to try buying in the lock before the reveal.)
   const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, revealSeconds: 1.5, fightMoveMs: 60, fightFastMoveMs: 30 } : AUTOCHESS;
   let out = gold > 0 ? { ...base, startGold: base.startGold + gold } : base;
   if (!adjust) out = { ...out, adjustStep: false };
   if (lockIn) out = { ...out, lockIn: true };
-  if (teleport) out = { ...out, adjustMode: "teleport" };
+  if (mode) out = { ...out, adjustMode: mode };
   if (level > out.levels.start && level <= out.levels.max) out = { ...out, levels: { ...out.levels, start: level, xpToNext: out.levels.xpToNext.slice(level - out.levels.start) } };
   return out;
 }
 
 const colorName = (c: Color) => (c === "w" ? "White" : "Black");
 /** The sounds this screen plays, made ahead (off the page's thread) once the audio is awake. */
-const SOUNDS_USED = ["acPlace", "acHold", "acReroll", "sell", "acXp", "acLevel", "acLock", "acReveal", "acCash"] as const;
+const SOUNDS_USED = ["acPlace", "acHold", "acReroll", "sell", "acXp", "acLevel", "acLock", "acReveal", "acCash", "acStar2", "acStar3"] as const;
 /** What the opponent is called: the same word as a bot in a 1 v 1. */
 const BOT_NAME = "Bot";
 /** The seed of a round's reveals (which of their pieces shows, and when: reveal.ts). */
@@ -201,6 +273,27 @@ function PieceIcon({ color, kind }: { color: Color; kind: Kind | "k" }) {
   return (
     <span class="hb-pieces ac-pc" aria-hidden="true">
       <piece class={`${color === "w" ? "white" : "black"} ${KIND_NAME[kind]}`} />
+    </span>
+  );
+}
+
+/** A five-pointed star (a 24 x 24 box). */
+const STAR_PATH = "M12 1.6l3.2 6.7 7.3.9-5.4 5.1 1.4 7.3L12 18l-6.5 3.6 1.4-7.3L1.5 9.2l7.3-.9z";
+
+/**
+ * A piece's stars (v8): two or three small gold stars with a dark edge, so they read on a light or a dark square, on any board color and over a white or a black piece. It
+ * sits over the lower edge of the piece, in whatever box holds it (the board's square, a bench tile, a shop card's tile); a plain piece has none. `fresh`: the
+ * newest star pops in (a merge).
+ */
+function Stars({ n, fresh }: { n: number; fresh?: boolean }) {
+  if (n < 2) return null;
+  return (
+    <span class={`ac-stars s${n}${fresh ? " fresh" : ""}`} aria-hidden="true">
+      {Array.from({ length: n }, (_, i) => (
+        <svg key={i} viewBox="0 0 24 24" focusable="false">
+          <path d={STAR_PATH} />
+        </svg>
+      ))}
     </span>
   );
 }
@@ -288,13 +381,20 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const params = testParams();
   const quick = params.get("quick") === "1";
   const extraGold = Math.max(0, Math.floor(Number(params.get("gold")) || 0));
-  const cfg = useMemo(() => settingsFor(quick, extraGold, params.get("adjust") !== "0", params.get("lockin") === "1", params.get("adjustmode") === "teleport", Math.floor(Number(params.get("level")) || 0)), []);
+  const modeParam = params.get("adjustmode");
+  const cfg = useMemo(
+    () => settingsFor(quick, extraGold, params.get("adjust") !== "0", params.get("lockin") === "1", modeParam === "legal" || modeParam === "teleport" || modeParam === "stars" ? modeParam : null, Math.floor(Number(params.get("level")) || 0)),
+    [],
+  );
   const legal = cfg.adjustMode === "legal";
+  /** The stars mode (v8, the default): only starred pieces move; no piece is picked for you. */
+  const starMode = cfg.adjustMode === "stars";
   const seedParam = Number(params.get("seed"));
   // (Test switches for the fight: `?stall=1` the engine never answers, so stand-in moves play; `?fightfen=` the fight starts from that position.)
   stallEngine(params.get("stall") === "1");
   const fightFen = params.get("fightfen");
-  const [game, setGame] = useState<Game>(() => newGame(Number.isFinite(seedParam) && params.get("seed") ? seedParam : (Math.random() * 2 ** 31) | 0, cfg));
+  const presets: Presets = { board: parsePresets(params.get("stars")), bench: parsePresets(params.get("benchstars")), bot: parsePresets(params.get("botbench")) };
+  const [game, setGame] = useState<Game>(() => newGame(Number.isFinite(seedParam) && params.get("seed") ? seedParam : (Math.random() * 2 ** 31) | 0, cfg, presets));
   const gref = useRef(game);
   const commit = (g: Game) => {
     gref.current = g;
@@ -310,6 +410,10 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const [drag, setDrag] = useState<Hold | null>(null);
   /** One of their bench pieces tapped (v7: a red ring on it, and its landing square lights red on their half): which one. Theirs never drag. */
   const [theirTap, setTheirTap] = useState<{ index: number; kind: Kind; square: string } | null>(null);
+  /** A star-up just made (v8): the piece pops and flashes where it is and its new star pops in, for `MERGE_MS`. `at`: the board's square or the bench's slot. */
+  const [merged, setMerged] = useState<{ id: number; at: { square: string } | { held: number }; kind: Kind; stars: StarCount } | null>(null);
+  const mergeId = useRef(0);
+  const mergeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [floats, setFloats] = useState<{ id: number; amount: number; at: FloatAt }[]>([]);
   const floatId = useRef(0);
   const floatTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -366,7 +470,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
         const locks = tickLocks(cur.round.locks, at, cur.round.plan.lockAt, cfg);
         if (locks !== cur.round.locks) commit({ ...cur, round: { ...cur.round, locks } });
         if (at >= cfg.buySeconds * 1000 || bothLocked(locks, at, cur.round.plan.lockAt, cfg)) toAdjust();
-      } else if (cur.phase === "adjust" && t - cur.phaseStart >= cfg.adjustSeconds * 1000) void toFight();
+      } else if (cur.phase === "adjust" && t - cur.phaseStart >= cur.round.adjustMs) void toFight();
     }, TICK_MS);
     // A press ends with its pointer, whatever the element it began on has become (a card that left the screen with its step, a layer that stopped taking taps): the
     // pointer let go, cancelled, or lost its capture (a drag then ends with no action), and the window losing the pointer ends it too.
@@ -388,6 +492,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       cancelled.current = true;
       botRun.current.stop = true;
       if (msgTimer.current) clearTimeout(msgTimer.current);
+      if (mergeTimer.current) clearTimeout(mergeTimer.current);
       floatTimers.current.forEach(clearTimeout);
     };
   }, []);
@@ -415,10 +520,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     };
     const seed = roundSeed(match);
     const botColor = other(youColor(match.round));
-    // The move step picks a piece at random for each side (seeded by the round), out of sight of the other; none that can move, no move for that side.
-    const adj = legal ? startMove(you, botStart, youMoveSeed(seed), cfg) : startAdjust(you);
+    // The stars step (v8): every starred piece may move once, for 5 s and 3 s a starred piece of the side with more; the v7 step picks a piece at random for each side (seeded by the round), out of
+    // sight of the other (none that can move, no move for that side).
+    const adj = starMode ? startStars(you, botStart) : legal ? startMove(you, botStart, youMoveSeed(seed), cfg) : startAdjust(you);
     const botCanMove = !legal || !!startMove(botStart, you, botMoveSeed(seed), cfg).pick;
-    commit({ ...cur, match, phase: "adjust", ...stamp(), round: { ...cur.round, locks, adj, botStart } });
+    commit({ ...cur, match, phase: "adjust", ...stamp(), round: { ...cur.round, locks, adj, botStart, adjustMs: adjustSecondsFor(you, botStart, cfg) * 1000 } });
     // The bot moves out of sight, from your army as it stood when it locked, and its move shows at the fight.
     const run: BotRun = { stop: false, done: null, latest: botStart };
     botRun.current = run;
@@ -427,10 +533,15 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       return;
     }
     if (legal && !adj.pick) say(adjustWords("nomove"));
-    else if (!legal) say("Tap a piece, then a square");
+    else if (!legal && !starMode) say("Tap a piece, then a square");
     const evaluate = botEvaluator(you, botColor, cfg);
     const stop = () => run.stop || cancelled.current;
-    const look = legal ? botMove(botStart, you, botMoveSeed(seed), evaluate, stop, cfg, (army) => (run.latest = army)) : botAdjust(botStart, evaluate, mulberry32(seed ^ 0x51ed270b), stop, cfg, (army) => (run.latest = army));
+    const onChange = (army: Army) => (run.latest = army);
+    const look = starMode
+      ? botStarMoves(botStart, you, botMoveSeed(seed), evaluate, stop, cfg, onChange)
+      : legal
+        ? botMove(botStart, you, botMoveSeed(seed), evaluate, stop, cfg, onChange)
+        : botAdjust(botStart, evaluate, mulberry32(seed ^ 0x51ed270b), stop, cfg, onChange);
     run.done = look.then(
       () => undefined,
       () => undefined,
@@ -453,7 +564,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const you = at.round.adj?.army ?? at.round.you;
     const color = youColor(at.match.round);
     const start = fightFen ? { fen: fightFen, mover: "w" as Color, draw: false } : color === "w" ? fightStart(you, botFinal) : fightStart(botFinal, you);
-    commit({ ...at, round: { ...at.round, botFinal }, fight: { fen: start.fen, last: null, plies: 0 } });
+    // (The stars on the board, both sides' on their squares, go with their pieces through the fight: drawn on them, and counted in the survivors' refund.)
+    commit({ ...at, round: { ...at.round, botFinal }, fight: { fen: start.fen, last: null, plies: 0, stars: fightFen ? {} : { ...you.stars, ...botFinal.stars } } });
     if (start.draw) return finish(null, "both_checked", start.fen);
     newFight();
     const res = await playFight(start.fen, {
@@ -461,10 +573,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       rng: mulberry32(roundSeed(at.match) ^ 0x2545f491),
       cancelled: () => cancelled.current,
       onStep: (s) => {
-        if (!s.cashIn) return commit({ ...gref.current, fight: { fen: s.fen, last: s.move, plies: s.ply } });
+        const stars = moveStars(gref.current.fight?.stars ?? {}, s.move);
+        if (!s.cashIn) return commit({ ...gref.current, fight: { fen: s.fen, last: s.move, plies: s.ply, stars } });
         // A cash-in: the pawn lands on the last rank, a coin sounds and "+5" floats up from the square; then it leaves the board.
         const square = s.move.slice(2, 4);
-        commit({ ...gref.current, fight: { fen: withPiece(s.fen, square, s.cashIn === "w" ? "P" : "p"), last: s.move, plies: s.ply } });
+        commit({ ...gref.current, fight: { fen: withPiece(s.fen, square, s.cashIn === "w" ? "P" : "p"), last: s.move, plies: s.ply, stars } });
         play("acCash");
         // (From the round's own colors: this runs from the timer made on the first render, whose `orientation` is round 1's.)
         addFloat(cfg.cashInGold, cellOf(square, color === "w" ? "white" : "black"));
@@ -484,7 +597,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const color = youColor(cur.match.round);
     const on = piecesOn(fen);
     const who = winner === null ? "draw" : winner === color ? "you" : "bot";
-    const { match, result } = settleRound(cur.match, who, { you: on[color], bot: on[other(color)] }, cfg, { you: cashIns[color], bot: cashIns[other(color)] });
+    // (What was paid for the survivors' stars counts in their refund.)
+    const ups = starUpsByColor(fen, cur.fight?.stars ?? {});
+    const { match, result } = settleRound(cur.match, who, { you: on[color], bot: on[other(color)] }, cfg, { you: cashIns[color], bot: cashIns[other(color)] }, { you: ups[color], bot: ups[other(color)] });
     const won = matchWinner(match);
     const next = won ? null : goldBreakdown(match.round + 1, match.you, cfg);
     setTheirTap(null);
@@ -544,7 +659,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if (!offer) return;
     const bought = buyFromSlot({ army: cur.round.you, gold: cur.match.you.gold, shop: cur.round.shop, level: boardRoom() }, slot, shopSeed(roundSeed(cur.match)), cfg, boardRoom());
     if ("block" in bought) {
-      const line = buyWords(bought.block, offer, cur.match.you.gold, cfg, boardRoom()).line;
+      const line = buyWords(bought.block, offer, cur.match.you.gold, cfg, boardRoom(), offerPrice(cur.round.you, offer, cfg)).line;
       // (A board with no room still takes it on the bench: say so.)
       return say(bought.block === "limit" && !holdBlock(cur.round.you, cur.match.you.gold, offer, cfg) ? "Board full. Drag to bench" : line);
     }
@@ -553,7 +668,18 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     // (Another offer that could no longer use its square rolled again: the player is told, so an offer doesn't change under their finger unexplained.)
     if (bought.replaced) say(`${bought.from[0]} rolled again`);
     else setMsg("");
+    if (bought.starUp) return merge(bought.starUp, offer);
     play("acPlace");
+  }
+
+  /** A star-up was bought: the piece pops and flashes where it is, its new star pops in, a level-up sound plays (a bigger one for the third star), and a short line says the stars. */
+  function merge(target: StarTarget, offer: Offer) {
+    const id = ++mergeId.current;
+    setMerged({ id, at: target.where === "board" ? { square: target.square } : { held: target.index }, kind: offer.kind, stars: target.becomes });
+    if (mergeTimer.current) clearTimeout(mergeTimer.current);
+    mergeTimer.current = setTimeout(() => setMerged((m) => (m?.id === id ? null : m)), MERGE_MS);
+    play(target.becomes === 3 ? "acStar3" : "acStar2");
+    say(`${offer.square} is ${target.becomes} stars`);
   }
 
   /** Buys the offer in a shop slot to hold it on the bench: it keeps its square, and a new offer is rolled into the slot. */
@@ -563,7 +689,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     const offer = cur.round.shop.slots[slot];
     if (!offer) return;
     const held = holdFromSlot({ army: cur.round.you, gold: cur.match.you.gold, shop: cur.round.shop, level: boardRoom() }, slot, shopSeed(roundSeed(cur.match)), cfg);
-    if ("block" in held) return say(buyWords(held.block, offer, cur.match.you.gold, cfg).line);
+    if ("block" in held) return say(buyWords(held.block, offer, cur.match.you.gold, cfg, boardRoom(), offerPrice(cur.round.you, offer, cfg)).line);
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: held.gold } }, round: { ...cur.round, you: held.army, shop: held.shop } });
     setSel(null);
     say(`Held ${offer.square}`);
@@ -654,9 +780,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
 
   // ---------------- Adjusting ----------------
 
-  const adjusting = () => gref.current.phase === "adjust" && performance.now() - gref.current.phaseStart < cfg.adjustSeconds * 1000;
+  const adjusting = () => gref.current.phase === "adjust" && performance.now() - gref.current.phaseStart < gref.current.round.adjustMs;
 
-  /** Your one change: the lit piece one legal chess move, or (the v6 step) a piece of yours to any legal empty square of your half. */
+  /** Your change: a starred piece's move (a 2-star one legal chess move, a 3-star any empty square of your half; the stars step), the lit piece one legal chess move (v7), or (the v6 step) a piece of yours to any legal empty square of your half. */
   function adjustTo(from: string, to: string) {
     if (!adjusting()) return;
     const cur = gref.current;
@@ -675,10 +801,10 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if (!adjusting()) return;
     const cur = gref.current;
     const adj = cur.round.adj!;
-    const block = undoBlock(adj, at);
+    const block = undoBlock(adj, at, cfg);
     if (block === "needed") return say(undoWords(block));
     if (block) return;
-    commit({ ...cur, round: { ...cur.round, adj: undoAction(adj, at) } });
+    commit({ ...cur, round: { ...cur.round, adj: undoAction(adj, at, cfg) } });
     setSel(null);
     setMsg("");
   }
@@ -709,6 +835,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       const adj = gref.current.round.adj!;
       // (A piece you moved takes its move back when tapped.)
       if (isSquare(hold) && adjustMarks(adj).some((m) => m.square === (hold.at as { square: string }).square)) return takeBack(hold.at.square);
+      // (The stars step: a starred piece is selected, with its squares lit; any other piece says it isn't starred.)
+      if (starMode && isSquare(hold) && starsAt(adj.army, hold.at.square) < 2) return say(adjustWords("plain", cfg));
       // (The move step: the lit piece is already the one to move, and any other piece of yours says so.)
       if (legal) return isSquare(hold) && adj.pick?.square === hold.at.square ? undefined : say(adjustWords(adj.pick ? "notpicked" : "nomove", cfg));
     }
@@ -815,8 +943,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     } else if (!cancel && !p.wandered) tapPiece(p.hold);
   }
 
-  /** The offer on a square (a shop slot), or -1: one offer to a square, and never on a square one of your pieces stands on. */
-  const offerOn = (square: string) => (pieceOf(square) ? -1 : gref.current.round.shop.slots.findIndex((o) => o.square === square));
+  /** The offer on a square (a shop slot), or -1: one offer to a square, and never on a square one of your pieces stands on. A star-up has no silhouette (nothing lands): it is bought from its card. */
+  const offerOn = (square: string) => (pieceOf(square) ? -1 : gref.current.round.shop.slots.findIndex((o) => o.square === square && !starUpTarget(gref.current.round.you, o, cfg)));
 
   function layerDown(e: PointerEvent) {
     const cur = gref.current;
@@ -832,15 +960,18 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if (kind) {
       // In the move step only the lit piece (while its move is unused) is picked up and dragged; any other piece is only tapped (it says so), and a piece you moved is tapped to take the move back.
       const adj = cur.phase === "adjust" ? cur.round.adj : null;
-      const movable = !legal || !adj || (adj.pick?.square === square && movesUsed(adj) < cfg.adjustMoves);
+      const movable = starMode ? !adj || (starsAt(adj.army, square) >= 2 && !movedSquares(adj).has(square)) : !legal || !adj || (adj.pick?.square === square && movesUsed(adj) < cfg.adjustMoves);
       return startPress(e, { kind, at: { square }, ...(movable ? {} : { tapOnly: true }) });
     }
     tapSquare(square);
   }
 
   function offerDown(e: PointerEvent, slot: number, kind: Kind) {
-    if (gref.current.phase !== "buy") return;
-    startPress(e, { kind, at: { offer: slot } });
+    const cur = gref.current;
+    if (cur.phase !== "buy") return;
+    // (A star-up merges where the piece is: its card is only tapped, never dragged to the bench.)
+    const offer = cur.round.shop.slots[slot];
+    startPress(e, { kind, at: { offer: slot }, ...(offer && starUpTarget(cur.round.you, offer, cfg) ? { tapOnly: true } : {}) });
   }
 
   function heldDown(e: PointerEvent, index: number, kind: Kind) {
@@ -863,7 +994,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   // While buying you see every piece of theirs (pawns too) as a plain circle, 2 s behind, and every few seconds one of them is revealed at random and stays shown.
   const seen = g.phase === "buy" ? botSeen(g.round.plan.events, revealSeed(g.match), elapsed / 1000, cfg) : null;
   // Their bench shows real pieces, each with the square it keeps (Eric, Oct 21: intentional): what it came in with and what it has held since, 2 s behind as the circles are.
-  const theirBench: Offer[] = g.phase === "buy" ? botBenchAt(g.round.plan.events, g.round.botBench, Math.max(0, elapsed / 1000 - cfg.circlesDelaySeconds)) : (g.round.botStart ?? g.round.plan.army).bench;
+  const theirBench: Held[] = g.phase === "buy" ? botBenchAt(g.round.plan.events, g.round.botBench, Math.max(0, elapsed / 1000 - cfg.circlesDelaySeconds)) : (g.round.botStart ?? g.round.plan.army).bench;
   // (A tap on one of their bench pieces holds only while that piece is still there, in that slot.)
   const theirTapped = theirTap && theirBench[theirTap.index]?.kind === theirTap.kind && theirBench[theirTap.index]?.square === theirTap.square && (g.phase === "buy" || g.phase === "adjust") ? theirTap : null;
 
@@ -888,16 +1019,21 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     return { "--sq-x": col, "--sq-y": row } as Record<string, number>;
   };
 
-  // The squares to light in the adjust step: the lit piece's legal moves (the move step), or where the tapped piece may go (the v6 step).
+  // The squares to light in the adjust step: where the tapped starred piece may go (the stars step), the lit piece's legal moves (v7's move step), or where the tapped piece may go (the v6 step).
   const adj = g.phase === "adjust" ? g.round.adj : null;
-  const adjOver = g.phase === "adjust" && elapsed >= cfg.adjustSeconds * 1000;
+  const adjOver = g.phase === "adjust" && elapsed >= g.round.adjustMs;
+  const selSquare = sel && isSquare(sel) ? sel.at.square : null;
+  // (A 2-star's squares are the fight's moves in the position as it is now: found once for the position and the piece, not at every tick.)
+  const starDots = useMemo(() => (starMode && adj && selSquare && !adjOver && !movedSquares(adj).has(selSquare) ? starTargets(adj, selSquare, cfg) : []), [adj, selSquare, adjOver]);
   const dots: string[] = [];
   if (adj && !adjOver) {
-    if (legal) dots.push(...pickTargets(adj, cfg));
+    if (starMode) dots.push(...starDots);
+    else if (legal) dots.push(...pickTargets(adj, cfg));
     else if (sel && isSquare(sel) && movesUsed(adj) < cfg.adjustMoves) dots.push(...adjustTargets(adj.army, sel.at.square));
   }
-  // The piece picked for you glows while its move is still to make.
+  // The piece picked for you glows while its move is still to make (v7); in the stars step every starred piece that hasn't moved glows.
   const lit = legal && adj && !adjOver && adj.pick && movesUsed(adj) < cfg.adjustMoves ? adj.pick.square : null;
+  const glowing = starMode && adj && !adjOver ? starredToMove(adj) : [];
 
   // The offers: each a glowing silhouette on its own square (one offer to a square).
   const offers = g.phase === "buy" ? g.round.shop.slots : [];
@@ -905,7 +1041,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   // (An offer the board has no room for can still be held: its card isn't greyed, it says why it can't be tapped.)
   const holdOnly = offers.map((o, slot) => offerBlocks[slot] === "limit" && !holdBlock(g.round.you, g.match.you.gold, o, cfg));
 
-  const interactiveLayer = (g.phase === "buy" && !locked) || (g.phase === "adjust" && elapsed < cfg.adjustSeconds * 1000);
+  const interactiveLayer = (g.phase === "buy" && !locked) || (g.phase === "adjust" && elapsed < g.round.adjustMs);
   // A press, drag or selection never outlives the moment it can act: when the step changes, the round turns, or the board stops taking presses (the last seconds of buying locked, the adjust step's time up) it is over, with no action.
   useLayoutEffect(() => {
     if (!interactiveLayer) cancelGesture();
@@ -917,7 +1053,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
 
   // The clock's numbers in the gold row (v7.1, Eric Oct 22: "the clock moves down between the income and odds"), and the step's name under them.
   // (The result's box takes the gold row's room, so there is no clock then.)
-  const remaining = g.phase === "buy" ? cfg.buySeconds * 1000 - elapsed : g.phase === "adjust" ? cfg.adjustSeconds * 1000 - elapsed : 0;
+  const remaining = g.phase === "buy" ? cfg.buySeconds * 1000 - elapsed : g.phase === "adjust" ? g.round.adjustMs - elapsed : 0;
   let clock = "";
   let label = "";
   let clockWordsFull = "";
@@ -936,6 +1072,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     clockWordsFull = moveWords(g.fight?.plies ?? 0, cfg, !!g.fight && thinFight(g.fight.fen, cfg));
   }
   const timerBars = g.phase === "buy" || (g.phase === "adjust" && adj !== null && !adjOver);
+  const stepMs = g.phase === "buy" ? cfg.buySeconds * 1000 : g.round.adjustMs;
 
   // The banner on the board's middle: "ACTION PHASE" as buying begins, the big 3-2-1 for its last seconds, "MOVE PHASE", "BATTLE PHASE".
   let banner: { words: string } | { n: number } | null = null;
@@ -960,6 +1097,17 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const myHp = Math.max(0, g.match.you.hp);
   const myNeed = xpToNext(g.match.you.level, cfg);
   const botNeed = xpToNext(botLevelNow.level, cfg);
+  // The stars on the board (v8), drawn on their pieces: yours, and theirs once shown (the pieces revealed while you buy, all of them in the move step), and through the fight.
+  const marks: { square: string; n: number }[] = [];
+  if (g.phase === "buy" || g.phase === "adjust") {
+    for (const [square, n] of Object.entries(you.stars ?? {})) marks.push({ square, n });
+    if (g.phase === "buy") for (const r of seen?.revealed ?? []) if (r.stars) marks.push({ square: r.square, n: r.stars });
+    if (g.phase === "adjust") for (const [square, n] of Object.entries(botArmy.stars ?? {})) marks.push({ square, n });
+  } else if (g.fight) for (const [square, n] of Object.entries(g.fight.stars)) marks.push({ square, n });
+  // (The fight has begun but waits a moment for the bot's last look: the stars are where the armies are.)
+  else if (g.phase === "fight") for (const [square, n] of Object.entries({ ...you.stars, ...(g.round.botFinal ?? botArmy).stars })) marks.push({ square, n: n as number });
+  // The star-ups on offer: the piece of yours each would merge into (a gold ring on it, a rainbow one for a third star) and the stars it will have.
+  const upTargets = offers.map((o) => starUpTarget(g.round.you, o, cfg));
   // The shop's odds at your level (v7): each kind's percent, in a small pill in the gold row.
   const odds = oddsFor(g.match.you.level, cfg);
   const oddsWordsLine = KINDS.map((k) => `${KIND_NAME[k]} ${odds[k]}%`).join(", ");
@@ -978,7 +1126,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       data-bot-locked={botIsLocked ? "1" : undefined}
       data-bonus={cfg.lockIn ? (g.round.locks.bonus ?? undefined) : undefined}
       data-lockin={cfg.lockIn ? "1" : undefined}
-      data-move={legal ? "legal" : "teleport"}
+      data-move={cfg.adjustMode}
       data-you={mine}
       data-king={g.round.you.king}
       data-bot-king={botKing}
@@ -1007,13 +1155,14 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                   data-kind={h.kind}
                   data-square={h.square}
                   aria-pressed={tapped}
-                  aria-label={`Their ${KIND_NAME[h.kind]}, held for ${h.square}. Tap to light ${h.square}`}
+                  aria-label={`Their ${KIND_NAME[h.kind]}${heldStars(h) > 1 ? `, ${heldStars(h)} stars,` : ""} held for ${h.square}. Tap to light ${h.square}`}
                   onClick={() => {
                     if (g.phase !== "buy" && g.phase !== "adjust") return;
                     setTheirTap(tapped ? null : { index: i, kind: h.kind, square: h.square });
                   }}
                 >
                   <PieceIcon color={theirs} kind={h.kind} />
+                  <Stars n={heldStars(h)} />
                   <em>{h.square}</em>
                 </button>
               );
@@ -1042,7 +1191,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
         </section>
 
         <div class="ac-frame">
-          {timerBars && <TimerBar key={`${g.match.round}-${g.phase}`} startsAt={g.wallStart} deadline={g.wallStart + (g.phase === "buy" ? cfg.buySeconds : cfg.adjustSeconds) * 1000} total={(g.phase === "buy" ? cfg.buySeconds : cfg.adjustSeconds) * 1000} quiet />}
+          {timerBars && <TimerBar key={`${g.match.round}-${g.phase}`} startsAt={g.wallStart} deadline={g.wallStart + stepMs} total={stepMs} quiet />}
           <div class="ac-board">
             <Board fen={fen} orientation={orientation} lastMove={lastMove} animate={g.phase === "adjust" || g.phase === "fight"} silent={g.phase !== "fight"}>
               <div
@@ -1062,14 +1211,34 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                   <span key={r.square} class="ac-ping" data-square={r.square} style={sq(r.square)} />
                 ))}
                 {theirTapped && <span class="ac-cell ac-red" data-square={theirTapped.square} style={sq(theirTapped.square)} />}
-                {offers.map((o, slot) => (
-                  <span key={`${slot}${o.kind}${o.square}`} class="ac-offers" data-square={o.square} style={sq(o.square)}>
-                    <span class={`ac-sil${offerBlocks[slot] || locked ? " off" : ""}`} data-slot={slot} data-kind={o.kind}>
-                      <i class={`ac-sil-shape ${KIND_NAME[o.kind]}`} />
-                    </span>
+                {marks.map(({ square, n }) => (
+                  <span key={`${square}${n}`} class="ac-cell ac-starmark" data-square={square} data-stars={n} style={sq(square)}>
+                    <Stars n={n} fresh={!!merged && "square" in merged.at && merged.at.square === square && merged.stars === n} />
                   </span>
                 ))}
+                {offers.map((o, slot) =>
+                  upTargets[slot] ? (
+                    // (A star-up lands nowhere: a gold ring on the piece it would merge into, a rainbow one for a third star; a piece held on the bench has its tile ringed instead.)
+                    upTargets[slot]!.where === "board" ? (
+                      <span key={`${slot}${o.kind}${o.square}`} class={`ac-cell ac-uptarget u${upTargets[slot]!.becomes}${offerBlocks[slot] || locked ? " off" : ""}`} data-square={o.square} data-slot={slot} style={sq(o.square)} />
+                    ) : null
+                  ) : (
+                    <span key={`${slot}${o.kind}${o.square}`} class="ac-offers" data-square={o.square} style={sq(o.square)}>
+                      <span class={`ac-sil${offerBlocks[slot] || locked ? " off" : ""}`} data-slot={slot} data-kind={o.kind}>
+                        <i class={`ac-sil-shape ${KIND_NAME[o.kind]}`} />
+                      </span>
+                    </span>
+                  ),
+                )}
+                {merged && "square" in merged.at && (
+                  <span key={merged.id} class="ac-cell ac-merge" data-square={merged.at.square} data-stars={merged.stars} style={sq(merged.at.square)}>
+                    <PieceIcon color={mine} kind={merged.kind} />
+                  </span>
+                )}
                 {lit && <span class="ac-cell ac-pick" data-square={lit} style={sq(lit)} />}
+                {glowing.map((square) => (
+                  <span key={square} class="ac-cell ac-pick" data-square={square} style={sq(square)} />
+                ))}
                 {held && isSquare(held) && (g.phase === "buy" || !legal) && <span class="ac-cell ac-picked" style={sq(held.at.square)} />}
                 {floats.filter((f) => "col" in f.at).map((f) => (
                   <FloatGold key={f.id} amount={f.amount} at={f.at} />
@@ -1115,7 +1284,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
           <div class="ac-spot">
             {g.phase === "buy" && !locked && held && isSquare(held) && held.kind !== "k" && g.round.you.board[held.at.square] === held.kind && (
               <button type="button" class="ac-sell" onClick={() => sell(held)}>
-                Sell {sellValue(held.kind, cfg)}
+                Sell {sellValue(held.kind, cfg, starsAt(g.round.you, held.at.square))}
               </button>
             )}
           </div>
@@ -1124,25 +1293,39 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               const h = g.round.you.bench[i];
               if (!h) return <div key={`empty${i}`} class="ac-slot empty" aria-hidden="true" />;
               const tone = squareDark(h.square) ? "d" : "l";
+              const popping = !!merged && "held" in merged.at && merged.at.held === i;
               if (g.phase !== "buy")
                 return (
-                  <div key={`${i}${h.kind}${h.square}`} class={`ac-slot has ${tone}`} data-held={i} data-kind={h.kind} data-square={h.square} aria-label={`Held ${KIND_NAME[h.kind]} for ${h.square}`}>
+                  <div
+                    key={`${i}${h.kind}${h.square}`}
+                    class={`ac-slot has ${tone}`}
+                    data-held={i}
+                    data-kind={h.kind}
+                    data-square={h.square}
+                    data-stars={heldStars(h)}
+                    aria-label={`Held ${KIND_NAME[h.kind]}${heldStars(h) > 1 ? `, ${heldStars(h)} stars,` : ""} for ${h.square}`}
+                  >
                     <PieceIcon color={mine} kind={h.kind} />
+                    <Stars n={heldStars(h)} />
                     <em>{h.square}</em>
                   </div>
                 );
+              // (A star-up on offer for this held piece rings its tile.)
+              const upRing = upTargets.findIndex((t) => t?.where === "bench" && t.index === i);
+              const ringStars = upRing >= 0 ? upTargets[upRing]!.becomes : 0;
               const block = heldBlock(g.round.you, i, cfg, g.match.you.level);
               const lifted = !!drag && isHeld(drag) && drag.at.held === i;
               return (
                 <button
                   key={`${i}${h.kind}${h.square}`}
                   type="button"
-                  class={`ac-slot has ${tone}${block || locked ? " off" : ""}${lifted ? " lifted" : ""}`}
+                  class={`ac-slot has ${tone}${block || locked ? " off" : ""}${lifted ? " lifted" : ""}${popping ? " merged" : ""}${ringStars ? ` ac-uptile u${ringStars}${offerBlocks[upRing] || locked ? " ring-off" : ""}` : ""}`}
                   data-held={i}
                   data-kind={h.kind}
                   data-square={h.square}
+                  data-stars={heldStars(h)}
                   aria-disabled={!!block || locked}
-                  aria-label={`Place the ${KIND_NAME[h.kind]} held for ${h.square}${locked ? ", locked" : block ? `, ${heldWords(block, h.square, cfg, g.match.you.level)}` : ""}`}
+                  aria-label={`Place the ${KIND_NAME[h.kind]}${heldStars(h) > 1 ? ` (${heldStars(h)} stars)` : ""} held for ${h.square}${locked ? ", locked" : block ? `, ${heldWords(block, h.square, cfg, g.match.you.level)}` : ""}`}
                   onPointerDown={(e) => heldDown(e, i, h.kind)}
                   onPointerMove={movePress}
                   onPointerUp={(e) => endPress(e)}
@@ -1151,6 +1334,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                   onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), placeHeldAt(i))}
                 >
                   <PieceIcon color={mine} kind={h.kind} />
+                  <Stars n={heldStars(h)} fresh={popping} />
                   <em>{h.square}</em>
                 </button>
               );
@@ -1230,18 +1414,23 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               <div class="ac-cards">
                 {g.round.shop.slots.map((offer, slot) => {
                   const block = g.phase === "buy" ? (offerBlocks[slot] ?? null) : null;
-                  const words = block ? buyWords(block, offer, goldNow, cfg, g.match.you.level) : null;
+                  // A star-up (v8): a gold card for a second star, a rainbow one for a third, at the flat price, its piece drawn with the stars it will have.
+                  const up = starUpTarget(g.round.you, offer, cfg);
+                  const price = up ? cfg.starUpCost : priceOf(offer.kind);
+                  const words = block ? buyWords(block, offer, goldNow, cfg, g.match.you.level, price) : null;
                   const dim = (!!block && !holdOnly[slot]) || shopShut;
                   return (
                     <button
                       key={slot}
                       type="button"
-                      class={`ac-buy${dim ? " off" : ""}${holdOnly[slot] && !shopShut ? " hold-only" : ""}`}
+                      class={`ac-buy${dim ? " off" : ""}${holdOnly[slot] && !shopShut ? " hold-only" : ""}${up ? ` up up${up.becomes}` : ""}`}
                       data-slot={slot}
                       data-kind={offer.kind}
                       data-square={offer.square}
+                      data-up={up ? up.becomes : undefined}
+                      data-price={price}
                       aria-disabled={!!block || shopShut}
-                      aria-label={`Buy a ${KIND_NAME[offer.kind]} on ${offer.square}, ${priceOf(offer.kind)} gold${shopShut ? (locked ? ", locked" : "") : words ? `, ${words.short}` : ""}`}
+                      aria-label={`${up ? `Star up your ${KIND_NAME[offer.kind]} on ${offer.square} to ${up.becomes} stars` : `Buy a ${KIND_NAME[offer.kind]} on ${offer.square}`}, ${price} gold${shopShut ? (locked ? ", locked" : "") : words ? `, ${words.short}` : ""}`}
                       onPointerDown={(e) => offerDown(e, slot, offer.kind)}
                       onPointerMove={movePress}
                       onPointerUp={(e) => endPress(e)}
@@ -1251,19 +1440,20 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                     >
                       <span class={`ac-tile ${squareDark(offer.square) ? "d" : "l"}`}>
                         <PieceIcon color={mine} kind={offer.kind} />
+                        {up && <Stars n={up.becomes} />}
                       </span>
                       <span class="ac-nm">
                         {capital(KIND_NAME[offer.kind])} <em>{offer.square}</em>
                       </span>
                       <span class="ac-cost">
                         <i class="ac-coin" />
-                        <b>{priceOf(offer.kind)}</b>
+                        <b>{price}</b>
                       </span>
                     </button>
                   );
                 })}
               </div>
-              {dragPiece && <div class="ac-sell-drop">Drop to sell for {sellValue(dragPiece.kind as Kind, cfg)}</div>}
+              {dragPiece && <div class="ac-sell-drop">Drop to sell for {sellValue(dragPiece.kind as Kind, cfg, isSquare(dragPiece) ? starsAt(g.round.you, dragPiece.at.square) : isHeld(dragPiece) ? heldStars(g.round.you.bench[dragPiece.at.held] ?? { kind: "p", square: "" }) : 1)}</div>}
             </div>
           ) : (
             <div class={`ac-card ac-card-${g.phase}`}>

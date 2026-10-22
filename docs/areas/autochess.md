@@ -6,12 +6,23 @@ more work than I realized to make this balanced and fun"): no button on home; ad
 chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-autochess-demo.md](../decisions/2026-10-19-autochess-demo.md)
 (v6 is its last design section; the HunChess engine, Oct 21, after it; [drags, silhouettes and one offer to a square](../decisions/2026-10-21-autochess-drag-fixes.md), Oct 21, after that;
 [v7: the new screen, the move step, odds by level, four slots, no lock-in](../decisions/2026-10-21-autochess-v7.md), Oct 21, after that;
-[v7.1: benches on the board's edges, a bigger board, the clock in the gold row, calmer hops, the reroll price, the damage](../decisions/2026-10-22-autochess-v7-1.md), Oct 22, last).
+[v7.1: benches on the board's edges, a bigger board, the clock in the gold row, calmer hops, the reroll price, the damage](../decisions/2026-10-22-autochess-v7-1.md), Oct 22, after that;
+[v8: stars](../decisions/2026-10-22-autochess-stars.md), Oct 22, last).
 
-## How it works today (v7.1)
+## How it works today (v8)
+
+- **Stars (v8, Eric Oct 22).** Every piece but a pawn or the king has 1 (plain, no mark), 2 or 3 stars (`maxStars`). **A star changes nothing in the fight** (a 3-star rook is a rook); it only decides whether the piece moves in the move step (below). They are two or three
+  small gold stars with a dark edge over the piece's lower edge, drawn on the board (yours; theirs once shown: the pieces revealed while you buy, all of them in the move step, and through the fight, following their pieces), on both benches' tiles and on a shop card's tile (what the piece
+  becomes); the piece itself keeps its color. **Star-up offers:** an offer's square is drawn first, evenly among the squares of your half that aren't your king's and no other current offer is on; the square's candidates are every piece of yours that can star up (not a pawn, under 3 stars)
+  and stands on it (the board) or is held for it (the bench: "if you have a bishop on your bench... F2, but you already have a rook on F2, your shop can still find both the rook and the bishop"), plus, when the board square is empty, a new piece rolled by the level's odds (the limits apply);
+  the offer is one candidate, evenly; a square whose piece can't star up (a pawn, a 3-star) and no bench piece holds offers nothing and is drawn again (`rollOffer`). An offer **is a star-up when its kind and square match a piece of yours that can star up** (`starUpTarget`: the board's piece first, then the
+  bench's), however it was rolled. **It costs a flat 5** (`starUpCost`), merges into that piece where it is and ignores every limit on new pieces (a queen's with your one queen out, with a full board): a merge never adds a piece. The card of a star-up has a **gold border and glow** (a **rainbow,
+  prismatic** one when it makes a third star), the price on it says 5, its piece is drawn with the stars it will have, and the piece it merges into (or its bench tile) has the same ring; it is only tapped, never dragged to the bench ("Tap to star up"). A merge pops the piece and flashes it where it is, its
+  new star pops in, and a level-up sound plays (`acStar2`, a bigger `acStar3` for a third star; "a2 is 2 stars" under the bench's row). **Selling and the survivors' refund count everything paid:** a piece costs its price and 5 for each star above the first, selling gives back 75% of that and the refund 25% of
+  it. **A starred piece on the bench keeps its stars between rounds** (the board's pieces still go home each round). The odds pill is still the odds of a *new* piece (an army with nothing that can star up rolls exactly as before).
 
 - **A round:** the game puts both kings on mirrored squares (the same file, the rank mirrored) on a random square of each side's
-  back two ranks. **Buy** 30 s (the last 3 locked, "Locked" under the clock; the whole 30 s runs: no lock-in), the full reveal and the **move step** 7 s, the fight, the
+  back two ranks. **Buy** 30 s (the last 3 locked, "Locked" under the clock; the whole 30 s runs: no lock-in), the full reveal and the **move step** (v8: 5 s plus 3 s for each starred piece of the side with more of them on the board), the fight, the
   result. Every board starts with only its king.
 - **The shop decides where pieces go.** Four **offers** (v7: was five), each a piece and a square of your half ("Bishop c2" on its card, with its price). **The odds follow the
   level of whoever's shop it is** (`shop.oddsByLevel`, percent P/N/B/R/Q, levels 1 to 10: L1 82/10/8/0/0, L4 74/14/12/0/0, L5 66/14/13/7/0, L7 54/18/16/11/1, L10 36/21/20/16/7; no rooks before
@@ -45,7 +56,13 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
 - **The opponent's board while you buy:** every piece of theirs is a plain circle, **pawns too**, 2 s behind; **every 5 s of the 30 one
   piece is revealed at random** (5, 10, 15, 20 and 25 s: five) and stays shown as the piece it is, a gold ring opening on its square
   and a ping. Their HP, level and XP show by their pawn (the level 2 s behind, as the circles are); the gold is no longer shown (v7).
-- **The move step** (the old "adjust" step; `adjustMode: "legal"`, `adjustSeconds: 7`; the full reveal: their real pieces show and stay shown): **one of your pieces is lit at random** (a pulsing gold box,
+- **The move step, v8** (the old "adjust" step; `adjustMode: "stars"`, the default; the full reveal: their real pieces show and stay shown): **no piece is lit for you.** It runs every round, **`moveBase` 5 s plus `movePerStar` 3 s for each starred piece on the board of the side
+  with more of them** ("if you have two and your opponent has two starred up pieces, that's still just... an extra 6 seconds total"; the bench's stars don't count); with no starred piece it is 5 s to look at the board. Both sides move at once, hidden from each other until the fight. **Only starred pieces on the board move, each
+  at most once, in any order:** every starred piece glows at the step's start (a pulsing gold box); tap one (or pick it up) and its squares light as dots, then tap a dot or drop it there. **A 2-star** makes one legal chess move that stays on your half (the fight's own move generator, `fightMoves`, in the position as the earlier moves
+  of the step left it, your army against theirs: pins, check and blockers count); **a 3-star** goes to any empty square of your half where a piece of its kind may stand (every empty square but your king's; the stars follow the piece). Any other piece says "Not starred", the king "King stays put", a square it can't reach "Not a legal move", a
+  piece that has moved "Moved. Tap ↩ to undo.". Each moved piece shows ↩ and a tap takes its move back while the step lasts (the whole rest of the step is replayed, so taking one back can't leave a later 2-star move that is no longer legal: "Undo the other first"). v7's step (below), v6's (`adjustMode: "teleport"`) stay in code behind
+  `adjustMode` (`?adjustmode=legal`, `?adjustmode=teleport`). `adjustStep` false skips the step (straight to the fight); testers add `?adjust=0`.
+- **The v7 move step** (`adjustMode: "legal"`, `adjustSeconds: 7`, kept behind the setting): **one of your pieces is lit at random** (a pulsing gold box,
   its legal squares as dots), picked by a draw seeded by the round (`youMoveSeed`): never the king, only a piece with at least one legal chess move that stays on your half. You play **one
   legal chess move with it that stays on your half**, or skip (just don't move): tap a dot or drag the piece to it; tap the moved piece (↩) to take it back while the step lasts. Hidden
   from them until the fight. "Legal" is the fight's own rules (the HunChess engine's move generator, `fightMoves`) on the position as the step shows it: a pawn steps one square (two from its
@@ -103,11 +120,12 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
   adjust step's end under a finger most of all), the round turning, the window losing focus, and a pointer that is cancelled or
   loses its capture (also when its element left the screen: a window listener catches that one). Nothing is picked up once the step
   is locked, and the ghost only draws in the buy and adjust steps. The shop's cards take a finger's drag (`touch-action: none`).
-- **The bot** (`autochess/bot.ts`): places what it held first, for nothing; buys from its own seeded shop (rolled by its own level; picking among what it sees by
+- **The bot** (`autochess/bot.ts`): places what it held first, for nothing; **buys every star-up it is offered and can pay for, `bot.starUpChance` (95%) of the time a look finds one, before anything else and whatever its board's room** (the most stars first, then the dearest piece; its bench's too, when it holds a piece); buys from its own seeded shop (rolled by its own level; picking among what it sees by
   weights, minor pieces and rooks over pawns, a queen when rich; rerolling now and then, at most 3 a round, in about a third of its rounds, at the same climbing price); buys XP now and then when
   that gives it a level or it is rich; with its board full holds a good piece (never a pawn) on its bench, at most 2 a round; puts its
   pieces down evenly over the first 70% of the open step; in the move step picks a random piece of its own (`botMoveSeed`, the same rule as yours) and plays the engine's best legal move with it
-  (a small search per try with the HunChess engine (`bot.adjustNodes`), at most 16 tries), or skips if none beats standing still (`bot.adjustMargin`). It sells
+  (a small search per try with the HunChess engine (`bot.adjustNodes`), at most 16 tries), or skips if none beats standing still (`bot.adjustMargin`). **In the stars step it moves each of its starred pieces once** (`botStarMoves`; the 3-stars first, each in square order, a move judged in the position the earlier ones made):
+  a 2-star the best of its legal moves by the engine, a 3-star the best of a sample of the empty squares of its half, each only if it beats standing still by the margin; the whole search is no bigger than the v7 step's: `bot.adjustTries` (16) evaluations in all, shared evenly by its starred pieces, and one for the start. It sells
   nothing, and never locks in (lock-in is off).
 - **The board** is the shared `Board` (colors, sizes, knocks). In the buy and adjust steps it draws a position and the screen puts its
   own layer over it (taps, drags, dots, the circles, the silhouettes, the marks, the floating gold: in eighths of `--board-size`); in
@@ -118,22 +136,23 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
 | What | Where |
 | --- | --- |
 | The screen (steps, timers, taps and drags) | `packages/app/src/screens/AutoChess.tsx`; styles `styles.css`, "Auto chess" (`ac-`) |
-| The rules, pure and tested | `packages/app/src/autochess/`: `army.ts` (squares, kings, the buy, hold, place and sell checks and words, the bench's carry-over), `shop.ts` (the four offers, the odds by level, rolls, refills, rerolls, buying and holding from a slot), `level.ts` (XP and levels), `lockin.ts` (off since v7), `adjust.ts` (the move step: the legal moves, the random pick, the one move, taking it back, the step switch; the v6 teleport step), `reveal.ts` (what shows of their board while you buy), `economy.ts` (gold, streaks, refunds and cash-ins, HP, levels, the match), `position.ts` (FEN, who moves first, material), `bot.ts`, `fight.ts` (the fight, refereed by the HunChess engine's rules), `words.ts`, `sounds.ts` (the nine sounds), `engine.ts` (the link to the engine's worker), `hunchess-worker.ts` (the worker) |
+| The rules, pure and tested | `packages/app/src/autochess/`: `army.ts` (squares, kings, the buy, hold, place and sell checks and words, the bench's carry-over; stars: `starUpTarget`, `starUp`, `paidFor`, `sellValue`), `shop.ts` (the four offers, the odds by level, rolls and the star-up draw, refills, rerolls, buying and holding from a slot), `level.ts` (XP and levels), `lockin.ts` (off since v7), `adjust.ts` (the move step: the stars step, `adjustSecondsFor`, `starTargets`; v7's legal moves, the random pick; the one move, taking it back, the step switch; the v6 teleport step), `reveal.ts` (what shows of their board while you buy), `economy.ts` (gold, streaks, refunds and cash-ins, HP, levels, the match), `position.ts` (FEN, who moves first, material), `bot.ts`, `fight.ts` (the fight, refereed by the HunChess engine's rules), `words.ts`, `sounds.ts` (the eleven sounds), `engine.ts` (the link to the engine's worker), `hunchess-worker.ts` (the worker) |
 | The HunChess engine | `packages/chess/src/hunchess/` (`@chessroyale/chess/hunchess`): `board.ts` (the board, moves, every fight rule), `search.ts`, `eval.ts`, `pst.ts`; its strength and speed: `reports/hunchess-engine.md`, scripts `packages/sim/scripts/hunchess-*.ts` |
 | The floating gold | `components/FloatGold.tsx` |
-| The sounds' play names | `sound.ts` (`acReroll`, `acPlace`, `acHold`, `sell`, `acXp`, `acLevel`, `acLock`, `acReveal`, `acCash`); made ahead by the sound worker through `characters/boss-sounds.ts` (`autochess`) |
+| The sounds' play names | `sound.ts` (`acReroll`, `acPlace`, `acHold`, `sell`, `acXp`, `acLevel`, `acLock`, `acReveal`, `acCash`, `acStar2`, `acStar3`); made ahead by the sound worker through `characters/boss-sounds.ts` (`autochess`) |
 | Home's button, the route | `screens/Home.tsx` (`onAutoChess`), `App.tsx` (`/autochess`) |
 
 ## Settings
 
 `AUTOCHESS` in `packages/core/src/settings.ts`: prices, the shop (slots, the odds by level `oddsByLevel`, the reroll price `reroll` first/step/max), sell back, the bench's slots, lock-in (`lockIn` off, its
-bonus), the steps' seconds, the reveal's interval, the adjust step (on or off, `adjustMode` legal or teleport, seconds 7, changes), the levels (start, top, free XP, XP
+bonus), the steps' seconds, the reveal's interval, the adjust step (on or off, `adjustMode` stars, legal or teleport, seconds 7 and moves for the last two, changes), stars (`starUpCost` 5, `maxStars` 3, the stars step's `moveBase` 5 and `movePerStar` 3), the levels (start, top, free XP, XP
 bought and its price, the XP to each level), the king ranks, the fight's pace and search (`fightMoveMs`, `fightFastAfter`,
 `fightFastMoveMs`, `fightNodes`), the cash-in (`cashInGold`, and `cashInValue`: what the engine counts a cash-in's gold as, in centipawns), the move cap, HP and damage (`hp`, `damagePerRound`, `piecesPerDamage`), the pawns' hops (`hopEvery`, `hopSeconds`), start gold, income, interest, the survivors' refund, the streak tables,
-the legal-position limits, the bot's numbers (lock-in times, rerolls, holds, XP, how early it places, saving, the adjust search).
+the legal-position limits, the bot's numbers (lock-in times, rerolls, holds, XP, how early it places, saving, `starUpChance`, the adjust search).
 Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2 locked, a reveal every 1.5 s, the move step 7 s), `?seed=N`,
 `?gold=N` (N more gold at the start of round 1), `?adjust=0` (no adjust step), `?fightfen=FEN` (the fight starts from that position),
-`?stall=1` (the engine never answers: stand-in moves), `?lockin=1` (lock-in on), `?adjustmode=teleport` (the v6 adjust step), `?level=N` (5 to 10: both sides start at level N: rooks and queens in the first shop).
+`?stall=1` (the engine never answers: stand-in moves), `?lockin=1` (lock-in on), `?adjustmode=legal` (v7's move step) or `=teleport` (the v6 adjust step), `?level=N` (5 to 10: both sides start at level N: rooks and queens in the first shop),
+`?stars=n@c2:1,b@d2:2` (those pieces stand on your board at the start of round 1: kind, square, stars 1 to 3, 1 being a plain piece; the shop rolls for that army, so a seed can be found that shows a star-up), `?benchstars=b@f3:2` (held for you) and `?botbench=n@c7:2` (held for the bot, which places them for nothing).
 
 ## Tests and tools
 

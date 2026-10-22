@@ -1,5 +1,5 @@
 import { kingAttacked } from "@chessroyale/chess";
-import type { Army, Color, Kind } from "./types.ts";
+import type { Army, Color, Kind, StarCount } from "./types.ts";
 
 /** The armies as a chess position, who moves first, and what is left standing. */
 
@@ -71,4 +71,28 @@ export function material(fen: string): { w: number; b: number } {
   const on = piecesOn(fen);
   const sum = (kinds: Kind[]) => kinds.reduce((s, k) => s + VALUE[k], 0);
   return { w: sum(on.w), b: sum(on.b) };
+}
+
+/**
+ * The star-ups paid for the pieces standing in a position, by color (v8): a 2-star counts one, a 3-star two. `stars` has the stars by square; a star on a square
+ * with no piece in the FEN (it was captured) counts for nobody. What the survivors' refund counts besides their prices.
+ */
+export function starUpsByColor(fen: string, stars: Readonly<Record<string, StarCount>>): { w: number; b: number } {
+  const out = { w: 0, b: 0 };
+  fen
+    .split(" ")[0]!
+    .split("/")
+    .forEach((row, i) => {
+      let file = 0;
+      for (const ch of row) {
+        if (/\d/.test(ch)) file += Number(ch);
+        else {
+          const square = `${"abcdefgh"[file]}${8 - i}`;
+          const star = stars[square];
+          if (star && "pnbrq".includes(ch.toLowerCase())) out[ch === ch.toLowerCase() ? "b" : "w"] += star - 1;
+          file++;
+        }
+      }
+    });
+  return out;
 }

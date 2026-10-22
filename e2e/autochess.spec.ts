@@ -6,7 +6,8 @@ import { BOARD_SEL, asAdmin, named, test } from "./helpers.ts";
  * round is played from buying to the fight's end, on a phone and a computer. `?quick=1` (a test switch) shortens the steps (buy 7 s with the last
  * 2 locked, circles half a second behind, a reveal every 1.5 s, the move step still 7 s, a fight move every 60 ms); `?adjust=0` turns the move step
  * off; `?seed=` fixes the kings, the shop and the bot; `?gold=N` adds gold; `?level=N` starts both sides at level N (rooks and queens in the shop at
- * once); `?lockin=1` turns lock-in on (it is off since v7) and `?adjustmode=teleport` the v6 adjust step.
+ * once); `?lockin=1` turns lock-in on (it is off since v7), `?adjustmode=legal` brings back v7's move step (one piece lit at random, 7 s) and `=teleport` the v6 adjust step; v8's
+ * stars: `?stars=n@c2:1,b@d2:2` puts pieces on your board (kind, square, stars 1 to 3), `?benchstars=b@f3:2` holds them for you and `?botbench=n@c7:2` for the bot.
  *
  * The screen is v7's (docs/decisions/2026-10-21-autochess-v7.md): their bench top left, their pawn top right, the board in its frame with the move clock's
  * bars, your pawn bottom left, the clock's small numbers and your bench bottom right, then the dock (gold and the odds pill, Buy XP, Reroll, four cards).
@@ -22,10 +23,10 @@ test.use({ actionTimeout: 15_000 });
 // 11: pawn b2, pawn c4, pawn b3, pawn f4; king h1. With lock-in on the bot locks in at 1.33 s.
 //  3: pawn g3, pawn b4, pawn h3, bishop e4; king e2.
 // 60 with `level=10`: queen g3, queen e3, pawn h4, bishop d3; king h1 (two queens, to show the limit and the reasons).
-// 6298: bishop f3, pawn f2, pawn h2, pawn h4; king b1. Holding the bishop rolls a pawn onto f3 (the held piece's square); holding the pawn for h4 rolls a pawn
-//       onto h4 too: the two ways an offer can meet a held piece's square.
-// 24 (quick): knight e2, pawn a3, pawn h3, bishop a1; king d1. Buying the first three, the move step lights the knight on e2 (c1, c3, d4, f4, g1, g3).
-// 316 (quick, gold=600): the bot (king g8, yours g1) holds a rook for e7 and a bishop for c8 by 3 s, and nothing more (v7.1: the bot's reroll habits moved seed 25's holds).
+// 19512: bishop b4, pawn h4, pawn g2, pawn e2; king c1. Holding the bishop rolls a pawn onto b4 (the held piece's square); holding the pawn for e2 rolls a pawn
+//       onto e2 too: the two ways an offer can meet a held piece's square (v8: the roll with a starrable piece held is the new one, so the seed was found again: 6298 before).
+// 24 (quick): knight e2, pawn a3, pawn h3, bishop a1; king d1. Buying the first three, the move step lights the knight on e2 (c1, c3, d4, f4, g1, g3) with `?adjustmode=legal`.
+// 1291 (quick, gold=600): the bot (king f8, yours f1) holds a bishop for f6 and a rook for b5 by 3 s, and nothing more (v8: the star-ups changed its rolls; 316 before).
 const PLAIN = "/autochess?quick=1&seed=9";
 const NEVER = PLAIN;
 const LATE = "/autochess?quick=1&seed=5";
@@ -33,7 +34,7 @@ const EARLY = "/autochess?quick=1&seed=11";
 const FIGHT = "/autochess?quick=1&seed=3";
 const TWOQ = "/autochess?quick=1&seed=60&level=10";
 const MOVE = "/autochess?quick=1&seed=24";
-const HELD = "/autochess?quick=1&seed=316&gold=600";
+const HELD = "/autochess?quick=1&seed=1291&gold=600";
 /** Every way a fight's result line can begin (the reason it ended), then the HP line. */
 const RESULT_WHY =
   /^(Checkmate\.|Stalemate\.|(You|Your opponent) gained 3\+ pawns and held it for 6 moves\.|Fight stalled \((moves repeated|10 moves each, no capture|60 moves each)\): ((you|your opponent) gained (\d+ pawns?|the edge|a winning edge)|neither side gained the edge, a draw)\.|Draw by the fifty-move rule\.|Draw: not enough pieces left to mate\.|A side left with only its king loses at once\.|Both sides are down to a king: a draw\.) /;
@@ -350,7 +351,7 @@ test("the reroll's price climbs 5, 6, 7 ... up to 10 as the Reroll button shows 
   expect(errors).toEqual([]);
 });
 
-test("one offer to a square (Eric, Oct 21): over several seeds, rerolls and buys, no two offers share a square, none is on your king or a piece of yours, and each square shows one silhouette", async ({ page }) => {
+test("one offer to a square (Eric, Oct 21): over several seeds, rerolls and buys, no two offers share a square, none is on your king or a piece of yours (but a star-up, v8, which is on the piece it merges into), and each other square shows one silhouette", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   const check = async (where: string) => {
@@ -358,16 +359,21 @@ test("one offer to a square (Eric, Oct 21): over several seeds, rerolls and buys
     expect(shown, `${where}: four offers`).toHaveLength(4);
     const squares = shown.map((o) => o.square);
     expect(new Set(squares).size, `${where}: ${squares}`).toBe(4);
-    const mine = await page.locator(`${BOARD_SEL.piece}.white`).evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.square!));
-    for (const sqr of squares) expect(mine, `${where}: ${sqr} is free`).not.toContain(sqr);
-    await expect(page.locator(".ac-sil")).toHaveCount(4);
+    const mine = await page.locator(`${BOARD_SEL.piece}.white`).evaluateAll((els) => els.map((e) => `${(e as HTMLElement).dataset.square!}${(e as HTMLElement).className.split(" ").find((c) => /^(pawn|knight|bishop|rook|queen|king)$/.test(c)) ?? ""}`));
+    // A star-up (its card has `data-up`) is on a piece of yours of its own kind and has no silhouette; every other offer is on a free square.
+    const ups = await page.locator(".ac-buy").evaluateAll((els) => els.map((e) => e.hasAttribute("data-up")));
+    shown.forEach((o, i) => {
+      if (ups[i]) expect(mine, `${where}: the star-up ${o.kind} ${o.square} is on its piece`).toContain(`${o.square}${NAMES[o.kind]!.toLowerCase()}`);
+      else expect(mine.map((m) => m.slice(0, 2)), `${where}: ${o.square} is free`).not.toContain(o.square);
+    });
+    await expect(page.locator(".ac-sil")).toHaveCount(4 - ups.filter(Boolean).length);
     const centers = await page.locator(".ac-sil").evaluateAll((els) =>
       els.map((e) => {
         const r = e.getBoundingClientRect();
         return `${Math.round(r.x + r.width / 2)},${Math.round(r.y + r.height / 2)}`;
       }),
     );
-    expect(new Set(centers).size, `${where}: four silhouettes, each on its own square`).toBe(4);
+    expect(new Set(centers).size, `${where}: each silhouette on its own square`).toBe(centers.length);
   };
   // (`gold=900` pays for the rerolls and the buys.)
   for (const seed of [9, 5, 60, 3, 11, 3328, 21, 33]) {
@@ -514,53 +520,53 @@ test("buying: a greyed offer says why (gold, the one-queen limit), in a few word
 
 test("the bench: drag an offer onto it to hold it (it keeps its square), tap it to place it when its square is free, sell it by dragging it onto the shop", async ({ page }) => {
   const errors = watchErrors(page);
-  // (The full 30 s step: a drag takes a while, and the quick step's 5 open seconds are a tap-test's. Seed 6298: see the list at the top.)
-  await page.goto("/autochess?seed=6298");
+  // (The full 30 s step: a drag takes a while, and the quick step's 5 open seconds are a tap-test's. Seed 19512: see the list at the top.)
+  await page.goto("/autochess?seed=19512");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const before = await offers(page);
-  expect(before.map((o) => `${o.kind}${o.square}`)).toEqual(["bf3", "pf2", "ph2", "ph4"]);
-  // The bishop for f3 (slot 0) is dragged from its shop card onto the bench: 32 gold, it waits there with its square, nothing lands on the board.
+  expect(before.map((o) => `${o.kind}${o.square}`)).toEqual(["bb4", "ph4", "pg2", "pe2"]);
+  // The bishop for b4 (slot 0) is dragged from its shop card onto the bench: 32 gold, it waits there with its square, nothing lands on the board.
   await dragMouse(page, middle((await card(page, 0).boundingBox())!), await benchMiddle(page));
   await expect(held(page)).toHaveCount(1);
   await expect(held(page).first()).toHaveAttribute("data-kind", "b");
-  await expect(held(page).first()).toHaveAttribute("data-square", "f3");
-  await expect(held(page).first().locator("em")).toHaveText("f3");
-  // (The tile is the color of the square the piece keeps: f3 is a light square.)
-  await expect(held(page).first()).toHaveClass(isDark("f3") ? /\bd\b/ : /\bl\b/);
+  await expect(held(page).first()).toHaveAttribute("data-square", "b4");
+  await expect(held(page).first().locator("em")).toHaveText("b4");
+  // (The tile is the color of the square the piece keeps.)
+  await expect(held(page).first()).toHaveClass(isDark("b4") ? /\bd\b/ : /\bl\b/);
   expect(await goldOf(page)).toBe(68);
-  await expect(say(page)).toHaveText("Held f3");
+  await expect(say(page)).toHaveText("Held b4");
   // (A soft pop for a hold, not the thunk of a piece landing.)
   expect(await soundCount(page, "acHold")).toBe(1);
   expect(await soundCount(page, "acPlace")).toBe(0);
   await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(1);
-  // A new offer rolled into slot 0 (a pawn, and on f3 itself: the bishop only waits there, so f3 is empty); the others stay.
+  // A new offer rolled into slot 0 (a pawn, and on b4 itself: the bishop only waits there, so b4 is empty); the others stay.
   const after = await offers(page);
   expect(after).toHaveLength(4);
   expect(after.slice(1)).toEqual(before.slice(1));
-  expect(after[0]).toEqual({ kind: "p", square: "f3" });
-  // The pawn for h4 (slot 3) is dragged from its card the same way (a silhouette on the board is only tapped, never dragged); its slot rolls a pawn onto h4 too.
+  expect(after[0]).toEqual({ kind: "p", square: "b4" });
+  // The pawn for e2 (slot 3) is dragged from its card the same way (a silhouette on the board is only tapped, never dragged); its slot rolls a pawn onto e2 too.
   await dragMouse(page, middle((await card(page, 3).boundingBox())!), await benchMiddle(page));
   await expect(held(page)).toHaveCount(2);
   expect(await goldOf(page)).toBe(58);
   expect(await soundCount(page, "acHold")).toBe(2);
-  expect((await offers(page))[3]).toEqual({ kind: "p", square: "h4" });
-  // Tapping the held pawn places it on h4 (free): the bench slot empties, and the offer on h4 (slot 3) rolls again, onto a square that is free.
+  expect((await offers(page))[3]).toEqual({ kind: "p", square: "e2" });
+  // Tapping the held pawn places it on e2 (free): the bench slot empties, and the offer on e2 (slot 3) rolls again, onto a square that is free.
   await tap(page, held(page).nth(1));
-  await expect(piece(page, "white", "pawn", "h4")).toBeVisible();
+  await expect(piece(page, "white", "pawn", "e2")).toBeVisible();
   expect(await soundCount(page, "acPlace")).toBe(1);
   await expect(held(page)).toHaveCount(1);
   expect(await goldOf(page)).toBe(58);
-  await expect(say(page)).toHaveText("h4 rolled again");
+  await expect(say(page)).toHaveText("e2 rolled again");
   const rolled = (await offers(page)).map((o) => o.square);
-  expect(rolled).not.toContain("h4");
+  expect(rolled).not.toContain("e2");
   expect(new Set(rolled).size).toBe(4);
-  // The pawn offered for f3 (slot 0) is bought onto f3: the held bishop's square is taken, so tapping the bishop says so and nothing happens.
+  // The pawn offered for b4 (slot 0) is bought onto b4: the held bishop's square is taken, so tapping the bishop says so and nothing happens.
   await tap(page, card(page, 0));
-  await expect(piece(page, "white", "pawn", "f3")).toBeVisible();
+  await expect(piece(page, "white", "pawn", "b4")).toBeVisible();
   expect(await goldOf(page)).toBe(48);
   await expect(held(page).first()).toHaveClass(/off/);
   await tapGreyed(page, held(page).first());
-  await expect(say(page)).toHaveText("f3 is taken");
+  await expect(say(page)).toHaveText("b4 is taken");
   await expect(held(page)).toHaveCount(1);
   // Sell the held bishop by dragging it onto the shop: 75% of 32, rounded down, is 24.
   const slotBox = (await held(page).first().boundingBox())!;
@@ -1273,16 +1279,16 @@ test("tap one of their bench pieces: a red ring on it and its landing square lig
   const errors = watchErrors(page);
   await page.goto(HELD);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  // Their bench shows real pieces (a rook for e7 and a bishop for c8 here), each with its square, on the color of that square, and the pieces are drawn black.
+  // Their bench shows real pieces (a bishop for f6 and a rook for b5 here), each with its square, on the color of that square, and the pieces are drawn black.
   const tiles = theirBench(page).locator(".ac-slot.has");
   await expect(tiles).toHaveCount(2, { timeout: 8000 });
-  await expect(tiles.nth(0)).toHaveAttribute("data-kind", "r");
-  await expect(tiles.nth(0)).toHaveAttribute("data-square", "e7");
-  await expect(tiles.nth(0).locator("em")).toHaveText("e7");
-  await expect(tiles.nth(0)).toHaveClass(isDark("e7") ? /\bd\b/ : /\bl\b/);
+  await expect(tiles.nth(0)).toHaveAttribute("data-kind", "b");
+  await expect(tiles.nth(0)).toHaveAttribute("data-square", "f6");
+  await expect(tiles.nth(0).locator("em")).toHaveText("f6");
+  await expect(tiles.nth(0)).toHaveClass(isDark("f6") ? /\bd\b/ : /\bl\b/);
   await expect(tiles.nth(0).locator("piece")).toHaveClass(/black/);
-  await expect(tiles.nth(1)).toHaveAttribute("data-kind", "b");
-  await expect(tiles.nth(1)).toHaveAttribute("data-square", "c8");
+  await expect(tiles.nth(1)).toHaveAttribute("data-kind", "r");
+  await expect(tiles.nth(1)).toHaveAttribute("data-square", "b5");
   // A tile is a real target: 44 px tall.
   expect((await tiles.nth(0).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await expect(page.locator(".ac-red")).toHaveCount(0);
@@ -1291,9 +1297,9 @@ test("tap one of their bench pieces: a red ring on it and its landing square lig
   await tap(page, tiles.nth(0));
   await expect(tiles.nth(0)).toHaveClass(/tapped/);
   await expect(page.locator(".ac-red")).toHaveCount(1);
-  await expect(page.locator(".ac-red")).toHaveAttribute("data-square", "e7");
+  await expect(page.locator(".ac-red")).toHaveAttribute("data-square", "f6");
   const red = (await page.locator(".ac-red").boundingBox())!;
-  const rookSq = await center(page, "e7");
+  const rookSq = await center(page, "f6");
   expect(Math.abs(red.x + red.width / 2 - rookSq.x)).toBeLessThan(1.5);
   expect(Math.abs(red.y + red.height / 2 - rookSq.y)).toBeLessThan(1.5);
   expect(await page.locator(".ac-red").evaluate((el) => getComputedStyle(el).backgroundColor)).toMatch(/^rgba\(220, 38, 38/);
@@ -1307,7 +1313,7 @@ test("tap one of their bench pieces: a red ring on it and its landing square lig
   await expect(tiles.nth(0)).not.toHaveClass(/tapped/);
   await expect(tiles.nth(1)).toHaveClass(/tapped/);
   await expect(page.locator(".ac-red")).toHaveCount(1);
-  await expect(page.locator(".ac-red")).toHaveAttribute("data-square", "c8");
+  await expect(page.locator(".ac-red")).toHaveAttribute("data-square", "b5");
   // A second tap on the same one clears it.
   await tap(page, tiles.nth(1));
   await expect(page.locator(".ac-red")).toHaveCount(0);
@@ -1424,10 +1430,10 @@ test("the phase banners on the board: ACTION PHASE as buying begins, the big 3-2
   expect(errors).toEqual([]);
 });
 
-test("the move step (v7): one piece of yours is lit at random and you get 7 seconds for one legal chess move with it that stays on your half; the refusals say why; it can be taken back", async ({ page }) => {
+test("the v7 move step (behind `?adjustmode=legal` since v8): one piece of yours is lit at random and you get 7 seconds for one legal chess move with it that stays on your half; the refusals say why; it can be taken back", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
-  await page.goto(MOVE);
+  await page.goto(`${MOVE}&adjustmode=legal`);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   // The knight for e2, the pawns for a3 and h3.
   await tap(page, card(page, 0));
@@ -1515,10 +1521,10 @@ test("the move step (v7): one piece of yours is lit at random and you get 7 seco
   expect(errors).toEqual([]);
 });
 
-test("the move step with no piece of yours able to move: a short line says so, nothing is lit, and the step still runs (the bot may move) before the fight", async ({ page }) => {
+test("the v7 move step (`?adjustmode=legal`) with no piece of yours able to move: a short line says so, nothing is lit, and the step still runs (the bot may move) before the fight", async ({ page }) => {
   test.setTimeout(90_000);
   const errors = watchErrors(page);
-  await page.goto(NEVER);
+  await page.goto(`${NEVER}&adjustmode=legal`);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   // Buy nothing: only your king. The step still runs for the bot's move.
   await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
@@ -2215,13 +2221,15 @@ async function holdTouch(p: Page, from: { x: number; y: number }, to: { x: numbe
   return { end: () => finish("touchEnd"), cancel: () => finish("touchCancel") };
 }
 
-test("a drag cut off by the end of the move step ends with it: no frozen ghost over the fight, the result or the next round (Eric's second queen on g1)", async ({ page }) => {
+// (The stars step, the default since v8, with a 2-star knight on e2 to pick up; and v7's, behind its setting, with the knight bought on e2 and lit.)
+for (const mode of ["stars", "legal"] as const) {
+test(`a drag cut off by the end of the move step ends with it: no frozen ghost over the fight, the result or the next round (Eric's second queen on g1; ${mode} step)`, async ({ page }) => {
   test.setTimeout(240_000);
   const errors = watchErrors(page);
-  await page.goto(MOVE);
+  await page.goto(mode === "stars" ? `${MOVE}&stars=n@e2:2` : `${MOVE}&adjustmode=legal`);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  // The knight for e2 (the lit piece of the move step, seed 24).
-  await tap(page, card(page, 0));
+  // The knight on e2: the lit piece of v7's move step (seed 24), or a 2-star's.
+  if (mode === "legal") await tap(page, card(page, 0));
   await expect(piece(page, "white", "knight", "e2")).toBeVisible();
   await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
   // Pick the knight up, as Eric picked up his queen, and keep holding: the drag is live, its ghost under the pointer.
@@ -2254,6 +2262,7 @@ test("a drag cut off by the end of the move step ends with it: no frozen ghost o
   expect(await goldOf(page)).toBe(gold - price);
   expect(errors).toEqual([]);
 });
+}
 
 for (const via of ["a shop card", "a piece on the board", "a held piece"] as const) {
   test(`a drag from ${via} that is still held when the buy step locks ends there with no action, and stays ended through the end of the step`, async ({ page }) => {
@@ -2425,5 +2434,454 @@ test("a sale only pays for a piece of yours that is there: selling a piece the p
   expect(await soundCount(page, "sell")).toBe(1);
   await expect(page.locator(".ac-float")).toHaveCount(1);
   await expect(say(page)).toHaveText("Sold for 7");
+  expect(errors).toEqual([]);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Stars (v8, Eric Oct 22; docs/decisions/2026-10-22-autochess-stars.md)
+//
+// The seeds below are found by the pure code (the same rolls) with the test switches `?stars=` (your board), `?benchstars=` (your bench) and `?botbench=` (the bot's, which it places
+// for nothing): the shop rolls for the army that is there, so a test never leans on luck. A star after a piece in a shop is the stars its star-up would make.
+// 43, `stars=n@c2:1,b@d2:2,r@a1:1,n@g3:2` (a full board at level 4): king b1; shop bishop a4, knight c2*2, pawn e3, bishop d2*3: a gold card and a rainbow one. The bot (king b8) has no star.
+// 43, `stars=n@g3:2,b@d2:3,r@a1:1,n@c2:1`: the move step with a 2-star knight on g3 (its squares e2, e4, f1, h1), a 3-star bishop on d2, a plain rook and a plain knight; nobody else is starred, so 5 s + 3 s x 2.
+// 16, `benchstars=b@f3:1` (a bishop held for f3): king a2; shop pawn b3, knight c4, bishop f3*2, pawn e3: a gold card for the held bishop. The bot (king a7) has no star.
+// 1, `botbench=n@c7:2,b@f8:3`: the bot (king b7) places a 2-star knight on c7 (shown at 1.5 s) and a 3-star bishop on f8 (shown at 4.5 s) for nothing, and buys nothing starred; you (king b2) have none.
+const STARS = "/autochess?quick=1&seed=43&stars=n@c2:1,b@d2:2,r@a1:1,n@g3:2";
+const STARMOVE = "/autochess?quick=1&seed=43&stars=n@g3:2,b@d2:3,r@a1:1,n@c2:1";
+const STARBENCH = "/autochess?quick=1&seed=16&benchstars=b@f3:1";
+const BOTSTARS = "/autochess?quick=1&seed=1&botbench=n@c7:2,b@f8:3";
+const GOLD = "242, 193, 78";
+/** The stars drawn on the board by square, each with its count. */
+const marks = (p: Page) => p.locator(".ac-starmark").evaluateAll((els) => Object.fromEntries(els.map((e) => [(e as HTMLElement).dataset.square!, Number((e as HTMLElement).dataset.stars)])));
+/** Every phase change from now on, each with when (`stepSeconds` reads the move step's length from it). */
+async function watchPhases(p: Page) {
+  await p.evaluate(() => {
+    const root = document.querySelector<HTMLElement>(".ac-root")!;
+    const list: { phase: string; at: number }[] = [{ phase: root.dataset.phase!, at: performance.now() }];
+    (window as any).__phases = list;
+    new MutationObserver(() => {
+      if (list[list.length - 1]!.phase !== root.dataset.phase) list.push({ phase: root.dataset.phase!, at: performance.now() });
+    }).observe(root, { attributes: true, attributeFilter: ["data-phase"] });
+  });
+}
+const stepSeconds = async (p: Page) => {
+  const list = await p.evaluate(() => (window as any).__phases as { phase: string; at: number }[]);
+  const start = list.find((m) => m.phase === "adjust")!;
+  const end = list.find((m) => m.at > start.at && m.phase !== "adjust")!;
+  return (end.at - start.at) / 1000;
+};
+const dotSquares = (p: Page) => p.locator(".ac-dot").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.square!).sort());
+const glowSquares = (p: Page) => p.locator(".ac-pick").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.square!).sort());
+
+test("a star-up offer (v8): a gold card for a second star, a rainbow one for a third, the price 5, the piece drawn with its stars, a ring on the piece it merges into and no silhouette; buying one adds no piece, takes 5, and the stars show on the piece", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto(STARS);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  // A full board (level 4: four pieces) and four offers: a bishop, the knight's star-up, a pawn, the bishop's star-up.
+  expect(await offers(page)).toEqual([
+    { kind: "b", square: "a4" },
+    { kind: "n", square: "c2" },
+    { kind: "p", square: "e3" },
+    { kind: "b", square: "d2" },
+  ]);
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(5);
+  expect(await marks(page)).toEqual({ g3: 2, d2: 2 });
+  // The cards: gold for the knight (it would be a 2-star), rainbow for the bishop (a 3-star), the others plain; a star-up costs 5, whatever the piece.
+  await expect(card(page, 1)).toHaveAttribute("data-up", "2");
+  await expect(card(page, 1)).toHaveClass(/\bup2\b/);
+  await expect(card(page, 3)).toHaveAttribute("data-up", "3");
+  await expect(card(page, 3)).toHaveClass(/\bup3\b/);
+  for (const slot of [0, 2]) await expect(card(page, slot)).not.toHaveClass(/\bup\b/);
+  await expect(card(page, 1).locator(".ac-cost b")).toHaveText("5");
+  await expect(card(page, 3).locator(".ac-cost b")).toHaveText("5");
+  await expect(card(page, 0).locator(".ac-cost b")).toHaveText("32");
+  await expect(card(page, 1)).toHaveAttribute("aria-label", /^Star up your knight on c2 to 2 stars, 5 gold/);
+  // The piece on a card is drawn with the stars it will become (2, then 3); a plain card has none.
+  await expect(card(page, 1).locator(".ac-stars.s2 svg")).toHaveCount(2);
+  await expect(card(page, 3).locator(".ac-stars.s3 svg")).toHaveCount(3);
+  await expect(card(page, 0).locator(".ac-stars")).toHaveCount(0);
+  // Gold: a gold border (a ring) and a glow that pulses (an animation on a box of its own); rainbow: a masked gradient ring that turns through the colors, and a glow.
+  const gold = await card(page, 1).evaluate((el) => ({ ring: getComputedStyle(el).boxShadow, glow: getComputedStyle(el, "::after").boxShadow, anim: getComputedStyle(el, "::after").animationName }));
+  expect(gold.ring).toContain(GOLD);
+  expect(gold.glow).not.toBe("none");
+  expect(gold.anim).toContain("ac-aura");
+  const rainbow = await card(page, 3).evaluate((el) => ({ bg: getComputedStyle(el, "::before").backgroundImage, anim: getComputedStyle(el, "::before").animationName, glow: getComputedStyle(el, "::after").boxShadow }));
+  expect(rainbow.bg).toContain("linear-gradient");
+  expect(rainbow.bg).toContain("255, 77, 109");
+  expect(rainbow.bg).toContain("63, 210, 255");
+  expect(rainbow.anim).toContain("ac-prism");
+  expect(rainbow.glow).not.toBe("none");
+  // On the board: a ring on the piece each would merge into (gold, rainbow) and no silhouette (nothing lands there); the other two offers have theirs.
+  await expect(page.locator(".ac-uptarget")).toHaveCount(2);
+  await expect(page.locator('.ac-uptarget.u2[data-square="c2"]')).toBeVisible();
+  await expect(page.locator('.ac-uptarget.u3[data-square="d2"]')).toBeVisible();
+  const ring = (await page.locator('.ac-uptarget.u2[data-square="c2"]').boundingBox())!;
+  const c2 = await center(page, "c2");
+  expect(Math.abs(ring.x + ring.width / 2 - c2.x)).toBeLessThan(1.5);
+  expect(Math.abs(ring.y + ring.height / 2 - c2.y)).toBeLessThan(1.5);
+  await expect(page.locator(".ac-sil")).toHaveCount(2);
+  await expect(silhouette(page, 1)).toHaveCount(0);
+  await expect(silhouette(page, 3)).toHaveCount(0);
+  // The odds pill is still the odds of a new piece.
+  await expect(page.locator(".ac-od[data-kind=p]")).toHaveAttribute("data-odds", "74");
+  // Buy the gold one: 5 gold, no piece added (the board was full, and a merge adds none), the knight stays on c2 and gains its stars; the level-up sound, a short line.
+  const before = await goldOf(page);
+  await tap(page, card(page, 1));
+  expect(await goldOf(page)).toBe(before - 5);
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(5);
+  await expect(piece(page, "white", "knight", "c2")).toBeVisible();
+  await expect.poll(() => marks(page)).toEqual({ g3: 2, d2: 2, c2: 2 });
+  await expect(page.locator('.ac-starmark[data-square="c2"] .ac-stars svg')).toHaveCount(2);
+  await expect(say(page)).toHaveText("c2 is 2 stars");
+  expect(await soundCount(page, "acStar2")).toBe(1);
+  expect(await soundCount(page, "acPlace")).toBe(0);
+  // The merge: a copy of the piece pops over it with a flash behind it, for a moment.
+  await expect(page.locator('.ac-merge[data-square="c2"]')).toHaveCount(1);
+  await expect(page.locator('.ac-merge[data-square="c2"]')).toHaveCount(0, { timeout: 3000 });
+  // The rainbow card is still there; buying it gives the bishop its third star, with the bigger sound, and the board still holds the same five.
+  await expect(card(page, 3)).toHaveAttribute("data-up", "3");
+  await tap(page, card(page, 3));
+  expect(await goldOf(page)).toBe(before - 10);
+  await expect.poll(() => marks(page)).toMatchObject({ d2: 3, c2: 2, g3: 2 });
+  await expect(page.locator('.ac-starmark[data-square="d2"] .ac-stars svg')).toHaveCount(3);
+  await expect(say(page)).toHaveText("d2 is 3 stars");
+  expect(await soundCount(page, "acStar3")).toBe(1);
+  expect(await soundCount(page, "acStar2")).toBe(1);
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(5);
+  // A 3-star can't star up again: nothing is offered on its square (the pawn-like case of a piece that can't star up).
+  for (const o of await offers(page)) expect(o.square).not.toBe("d2");
+  expect(errors).toEqual([]);
+});
+
+test("a star-up card is only tapped, never dragged to the bench, and with too little gold it says what is missing", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto(STARS);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  // Pressed and dragged to the bench: no ghost, nothing held, nothing paid, the card still there.
+  const from = middle((await card(page, 1).boundingBox())!);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 8, from.y - 8, { steps: 2 });
+  const to = await benchMiddle(page);
+  await page.mouse.move(to.x, to.y, { steps: 8 });
+  await expect(ghosts(page)).toHaveCount(0);
+  await page.mouse.up();
+  expect(await goldOf(page)).toBe(100);
+  await expect(held(page)).toHaveCount(0);
+  await expect(card(page, 1)).toHaveAttribute("data-up", "2");
+  // Five Buy XPs spend the 100 gold; then a tap on the star-up says what is missing (the 5, less the gold).
+  for (let i = 0; i < 5; i++) await tap(page, xpButton(page));
+  expect(await goldOf(page)).toBe(0);
+  await tapGreyed(page, card(page, 1));
+  await expect(say(page)).toHaveText("Need 5 more");
+  await expect(card(page, 1)).toHaveClass(/\boff\b/);
+  expect(await soundCount(page, "acStar2")).toBe(0);
+  await expect.poll(() => marks(page)).toEqual({ g3: 2, d2: 2 });
+  expect(errors).toEqual([]);
+});
+
+test("a star-up for a held piece merges on the bench (5 gold, no piece added, its tile rings and then shows its stars), and the stars stay through the round turn (Eric: stars up on the bench too)", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await page.goto(STARBENCH);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const tile = held(page).first();
+  await expect(held(page)).toHaveCount(1);
+  await expect(tile).toHaveAttribute("data-square", "f3");
+  await expect(tile).toHaveAttribute("data-stars", "1");
+  await expect(tile.locator(".ac-stars")).toHaveCount(0);
+  // The offer for the held bishop is a gold card (it would be a 2-star), the held piece's tile is ringed, and nothing is drawn on the board for it (nothing lands).
+  expect((await offers(page))[2]).toEqual({ kind: "b", square: "f3" });
+  await expect(card(page, 2)).toHaveAttribute("data-up", "2");
+  await expect(card(page, 2).locator(".ac-cost b")).toHaveText("5");
+  await expect(tile).toHaveClass(/\bac-uptile\b.*\bu2\b/);
+  expect(await tile.evaluate((el) => getComputedStyle(el).boxShadow)).toContain(GOLD);
+  await expect(page.locator(".ac-uptarget")).toHaveCount(0);
+  await expect(silhouette(page, 2)).toHaveCount(0);
+  await expect(page.locator(".ac-sil")).toHaveCount(3);
+  // Buy it: 5 gold, the tile gains two stars (the newest pops in), the board still has only the king, the bench still holds one piece, the sound and the line.
+  const before = await goldOf(page);
+  await tap(page, card(page, 2));
+  expect(await goldOf(page)).toBe(before - 5);
+  await expect(tile).toHaveAttribute("data-stars", "2");
+  await expect(tile.locator(".ac-stars.s2 svg")).toHaveCount(2);
+  await expect(tile).toHaveAttribute("data-square", "f3");
+  await expect(tile).toHaveClass(/\bmerged\b/);
+  await expect(tile).not.toHaveClass(/\bmerged\b/, { timeout: 3000 });
+  await expect(held(page)).toHaveCount(1);
+  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(1);
+  await expect(say(page)).toHaveText("f3 is 2 stars");
+  expect(await soundCount(page, "acStar2")).toBe(1);
+  expect(await soundCount(page, "acPlace")).toBe(0);
+  // A held piece is not on the board: its stars don't count in the move step (5 s), and nothing glows.
+  await watchPhases(page);
+  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
+  await expect(page.locator(".ac-pick")).toHaveCount(0);
+  await expect(held(page).first().locator(".ac-stars.s2 svg")).toHaveCount(2);
+  // Through the round (a side with only its king loses at once): the next round's bench holds it on the square turned with the colors, still with its two stars.
+  await expect(root(page)).toHaveAttribute("data-phase", "result", { timeout: 60_000 });
+  expect(await stepSeconds(page)).toBeLessThan(5.8);
+  await tap(page, page.getByRole("button", { name: "Next round" }));
+  await expect(root(page)).toHaveAttribute("data-round", "2");
+  await expect(held(page)).toHaveCount(1);
+  await expect(held(page).first()).toHaveAttribute("data-kind", "b");
+  await expect(held(page).first()).toHaveAttribute("data-square", "f6");
+  await expect(held(page).first()).toHaveAttribute("data-stars", "2");
+  await expect(held(page).first().locator(".ac-stars.s2 svg")).toHaveCount(2);
+  expect(errors).toEqual([]);
+});
+
+test("the move step (v8): every starred piece glows and may move once, a 2-star one legal move and a 3-star to any empty square of your half; any other piece says 'Not starred'; a moved piece is taken back by a tap; 5 s and 3 s for each starred piece", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await page.goto(STARMOVE);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  await watchPhases(page);
+  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
+  await expect(stepLabel(page)).toHaveText("Move");
+  // Two starred pieces of yours and none of theirs: 5 s + 3 s x 2 = 11 s.
+  await expect(clockOf(page)).toHaveText(/^0:1[01]$/);
+  // Every starred piece glows (a pulsing gold box), no other does, and no square is lit until one is picked. Their pieces show for real.
+  expect(await glowSquares(page)).toEqual(["d2", "g3"]);
+  await expect(page.locator(".ac-dot")).toHaveCount(0);
+  expect(await page.locator(".ac-pick").first().evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
+  await expect(page.locator(".ac-circle")).toHaveCount(0);
+  await expect(page.locator(".ac-shop")).toHaveClass(/shut/);
+  // Any other piece of yours: "Not starred" (a plain rook, a plain knight); the king stays put; nothing lights.
+  await tapSquare(page, "a1");
+  await expect(say(page)).toHaveText("Not starred");
+  await tapSquare(page, "c2");
+  await expect(say(page)).toHaveText("Not starred");
+  await tapSquare(page, "b1");
+  await expect(say(page)).toHaveText("King stays put");
+  await expect(page.locator(".ac-dot")).toHaveCount(0);
+  // The 2-star knight on g3: tapped, its legal squares light (e2, e4, f1, h1: the knight's jumps that stay on your half), and it is the picked piece.
+  await tapSquare(page, "g3");
+  expect(await dotSquares(page)).toEqual(["e2", "e4", "f1", "h1"]);
+  await expect(page.locator(".ac-picked")).toHaveCount(1);
+  // Refused, with the reason: their half, a square it can't reach (a drag onto a taken square too); nothing is used up.
+  await tapSquare(page, "e5");
+  await expect(say(page)).toHaveText("Your half only");
+  await tapSquare(page, "g4");
+  await expect(say(page)).toHaveText("Not a legal move");
+  await dragMouse(page, await center(page, "g3"), await center(page, "c2"));
+  await expect(say(page)).toHaveText("Square taken");
+  await expect(piece(page, "white", "knight", "g3")).toBeVisible();
+  await expect(page.locator(".ac-moved")).toHaveCount(0);
+  expect(await dotSquares(page)).toEqual(["e2", "e4", "f1", "h1"]);
+  // One legal move, by a tap on its dot: the knight lands on e2 with its stars, is marked (tap ↩ to take it back), the glow and the dots go from it, the move sound plays.
+  await tapSquare(page, "e2");
+  await expect(piece(page, "white", "knight", "e2")).toBeVisible();
+  await expect(piece(page, "white", "knight", "g3")).toHaveCount(0);
+  await expect(page.locator('.ac-moved[data-square="e2"]')).toBeVisible();
+  await expect(page.locator(".ac-dot")).toHaveCount(0);
+  expect(await glowSquares(page)).toEqual(["d2"]);
+  expect(await marks(page)).toEqual({ e2: 2, d2: 3 });
+  expect(await soundCount(page, "move")).toBeGreaterThanOrEqual(1);
+  // The 3-star bishop on d2 isn't held to a bishop's moves: every empty square of your half lights (32 less the king and the four pieces' squares: 27).
+  await tapSquare(page, "d2");
+  const dots = await dotSquares(page);
+  expect(dots).toHaveLength(27);
+  for (const sqr of ["h4", "h1", "g3", "a4", "f1"]) expect(dots).toContain(sqr);
+  for (const sqr of ["b1", "a1", "c2", "d2", "e2"]) expect(dots).not.toContain(sqr);
+  await tapSquare(page, "d5");
+  await expect(say(page)).toHaveText("Your half only");
+  // To h4, by a drag (not a bishop's line from d2 either way).
+  await dragMouse(page, await center(page, "d2"), await center(page, "h4"));
+  await expect(piece(page, "white", "bishop", "h4")).toBeVisible();
+  await expect(page.locator('.ac-moved[data-square="h4"]')).toBeVisible();
+  expect(await marks(page)).toEqual({ e2: 2, h4: 3 });
+  await expect(page.locator(".ac-pick")).toHaveCount(0);
+  // Both have moved: no second move for either (a tap on a moved piece takes it back, and says nothing is used up).
+  await tapSquare(page, "e2");
+  await expect(piece(page, "white", "knight", "g3")).toBeVisible();
+  await expect(page.locator(".ac-moved")).toHaveCount(1);
+  expect(await glowSquares(page)).toEqual(["g3"]);
+  expect(await marks(page)).toEqual({ g3: 2, h4: 3 });
+  // The knight goes elsewhere this time: f1.
+  await dragMouse(page, await center(page, "g3"), await center(page, "f1"));
+  await expect(piece(page, "white", "knight", "f1")).toBeVisible();
+  await expect(page.locator(".ac-moved")).toHaveCount(2);
+  // The step is 11 seconds, then the fight: the pieces start where they were left, their stars on them.
+  await expect(root(page)).toHaveAttribute("data-phase", /^(fight|result|over)$/, { timeout: 15_000 });
+  expect(await stepSeconds(page)).toBeGreaterThan(10.8);
+  expect(await stepSeconds(page)).toBeLessThan(11.8);
+  expect(await marks(page)).toEqual({ f1: 2, h4: 3 });
+  await expect(piece(page, "white", "knight", "f1")).toBeVisible();
+  await expect(piece(page, "white", "bishop", "h4")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("the move step with nobody starred (v8): a flat 5 seconds to look at the board, nothing glows, any piece of yours says 'Not starred', then the fight", async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  await page.goto(MOVE);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  // The knight for e2 and the pawns for a3 and h3 (plain pieces).
+  await tap(page, card(page, 0));
+  await tap(page, card(page, 1));
+  await tap(page, card(page, 2));
+  await expect(piece(page, "white", "knight", "e2")).toBeVisible();
+  await watchPhases(page);
+  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
+  await expect(clockOf(page)).toHaveText(/^0:0[45]$/);
+  await expect(stepLabel(page)).toHaveText("Move");
+  await expect(page.locator(".ac-pick")).toHaveCount(0);
+  await expect(page.locator(".ac-dot")).toHaveCount(0);
+  await expect(page.locator(".ac-starmark")).toHaveCount(0);
+  await tapSquare(page, "e2");
+  await expect(say(page)).toHaveText("Not starred");
+  await tapSquare(page, "a3");
+  await expect(say(page)).toHaveText("Not starred");
+  await tapSquare(page, "d1");
+  await expect(say(page)).toHaveText("King stays put");
+  await expect(page.locator(".ac-dot")).toHaveCount(0);
+  await expect(page.locator(".ac-moved")).toHaveCount(0);
+  await expect(root(page)).toHaveAttribute("data-phase", /^(fight|result|over)$/, { timeout: 12_000 });
+  expect(await stepSeconds(page)).toBeGreaterThan(4.8);
+  expect(await stepSeconds(page)).toBeLessThan(5.7);
+  // The step runs even with nothing to move (no skip), also when neither side has a piece that can: here with only a king, as in v7's "no piece can move" case.
+  expect(errors).toEqual([]);
+});
+
+test("the bot's stars (v8): a starred piece of theirs shows its stars once it is revealed (a circle shows none), all of them show in the move step, and the step runs 5 s plus 3 s for each", async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  await page.goto(BOTSTARS);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  await watchPhases(page);
+  // The 2-star knight on c7 is the first revealed (1.5 s); the 3-star bishop on f8 stays a plain circle until its reveal (4.5 s).
+  await expect.poll(() => marks(page), { timeout: 4000 }).toEqual({ c7: 2 });
+  await expect(page.locator('.ac-circle[data-square="f8"]')).toHaveCount(1);
+  await expect.poll(() => marks(page), { timeout: 5000 }).toEqual({ c7: 2, f8: 3 });
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  // The move step: all of their stars show, none of yours; 5 s + 3 s x 2 = 11 s even though you have no star.
+  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 10_000 });
+  await expect(clockOf(page)).toHaveText(/^0:1[01]$/);
+  expect(await marks(page)).toEqual({ c7: 2, f8: 3 });
+  await expect(page.locator('.ac-starmark[data-square="c7"] .ac-stars svg')).toHaveCount(2);
+  await expect(page.locator('.ac-starmark[data-square="f8"] .ac-stars svg')).toHaveCount(3);
+  await expect(page.locator(".ac-pick")).toHaveCount(0);
+  // Their stars are theirs: nothing of theirs can be moved or lit by you.
+  await tapSquare(page, "c7");
+  await expect(page.locator(".ac-dot")).toHaveCount(0);
+  await expect(root(page)).toHaveAttribute("data-phase", /^(fight|result|over)$/, { timeout: 15_000 });
+  expect(await stepSeconds(page)).toBeGreaterThan(10.8);
+  expect(await stepSeconds(page)).toBeLessThan(11.8);
+  // At the fight's start the bot has moved its two starred pieces (a 2-star one legal move, a 3-star anywhere on its half): their stars are still two and three, on pieces.
+  expect(Object.values(await marks(page)).sort()).toEqual([2, 3]);
+  for (const sqr of Object.keys(await marks(page))) await expect(page.locator(`${BOARD_SEL.piece}.black[data-square="${sqr}"]`)).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
+test("stars follow their pieces through the fight, and the survivors' refund counts what was paid for them (the price and 5 for each star above the first)", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors = watchErrors(page);
+  // (The move step off: the fight starts from the board as bought.)
+  await page.goto(`${STARMOVE}&adjust=0`);
+  await expect(root(page)).toHaveAttribute("data-phase", "fight", { timeout: 20_000 });
+  expect(await marks(page)).toEqual({ g3: 2, d2: 3 });
+  // A star is always on a piece (read in one go: the fight moves every 60 ms here): sampled through the fight, and once it is over.
+  const consistent = () =>
+    page.evaluate((sel) => [...document.querySelectorAll<HTMLElement>(".ac-starmark")].every((m) => !!document.querySelector(`${sel}[data-square="${m.dataset.square}"]`)), BOARD_SEL.piece);
+  for (let i = 0; i < 6; i++) {
+    await page.waitForTimeout(700);
+    if ((await root(page).getAttribute("data-phase")) !== "fight") break;
+    await expect.poll(consistent, { timeout: 3000 }).toBe(true);
+  }
+  await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 200_000 });
+  expect(await consistent()).toBe(true);
+  // The refund in the result's gold line: 25% of what was paid for the pieces of yours still standing: their prices and 5 for each star above the first.
+  const left = await page.locator(`${BOARD_SEL.piece}.white:not(.king)`).evaluateAll((els) => els.map((e) => ({ square: (e as HTMLElement).dataset.square!, kind: ["knight", "bishop", "rook", "queen", "pawn"].find((k) => e.classList.contains(k))! })));
+  const m = await marks(page);
+  const kindPrice: Record<string, number> = { knight: 30, bishop: 32, rook: 50, queen: 90, pawn: 10 };
+  const paid = left.reduce((sum, p) => sum + kindPrice[p.kind]! + 5 * ((m[p.square] ?? 1) - 1), 0);
+  const gold = (await page.locator(".ac-card-gold").innerText()).match(/(\d+) survivors/);
+  if (left.length) expect(Number(gold![1])).toBe(Math.floor(paid * 0.25));
+  else expect(gold).toBeNull();
+  expect(errors).toEqual([]);
+});
+
+test("layouts (v8): the stars sit inside their square, their bench tile and their card's tile, big enough to read and clear of the square's name, and nothing scrolls, at every phone size and on a computer", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  const sizes: [number, number][] = phone() ? [[320, 568], [360, 640], [393, 730], [428, 777]] : [[1280, 800], [1280, 600]];
+  const inside = (inner: { x: number; y: number; width: number; height: number }, outer: { x: number; y: number; width: number; height: number }, what: string) => {
+    expect(inner.x, `${what}: left`).toBeGreaterThanOrEqual(outer.x - 1.5);
+    expect(inner.x + inner.width, `${what}: right`).toBeLessThanOrEqual(outer.x + outer.width + 1.5);
+    expect(inner.y + inner.height, `${what}: bottom`).toBeLessThanOrEqual(outer.y + outer.height + 3);
+  };
+  for (const [w, h] of sizes) {
+    await page.setViewportSize({ width: w, height: h });
+    // The board: starred pieces (g3, d2), and after the two merges (c2 and d2 again); the cards: a gold and a rainbow one.
+    await page.goto(STARS);
+    await expect(root(page)).toHaveAttribute("data-phase", "buy");
+    await tap(page, card(page, 1));
+    await expect(page.locator(".ac-starmark")).toHaveCount(3);
+    for (const mark of await page.locator(".ac-starmark").all()) {
+      const cell = (await mark.boundingBox())!;
+      const stars = (await mark.locator(".ac-stars").boundingBox())!;
+      const star = (await mark.locator(".ac-stars svg").first().boundingBox())!;
+      inside(stars, cell, `${w}: board stars`);
+      expect(stars.y + stars.height / 2, `${w}: over the piece's lower part`).toBeGreaterThan(cell.y + cell.height * 0.7);
+      expect(star.width, `${w}: a star is big enough to read`).toBeGreaterThanOrEqual(w <= 320 ? 8 : 9);
+    }
+    for (const c of await page.locator(".ac-buy[data-up]").all()) {
+      const tile = (await c.locator(".ac-tile").boundingBox())!;
+      const stars = (await c.locator(".ac-stars").boundingBox())!;
+      inside(stars, tile, `${w}: card stars`);
+      expect((await c.boundingBox())!.width, `${w}: a card keeps its width`).toBeGreaterThan(50);
+    }
+    // The bench: a held 2-star and 3-star; their stars inside the tile and above the square's name.
+    await page.goto("/autochess?quick=1&seed=16&benchstars=q@h3:3,b@f3:2");
+    await expect(root(page)).toHaveAttribute("data-phase", "buy");
+    await expect(held(page)).toHaveCount(2);
+    for (const t of await held(page).all()) {
+      const tileBox = (await t.boundingBox())!;
+      const stars = (await t.locator(".ac-stars").boundingBox())!;
+      const name = (await t.locator("em").boundingBox())!;
+      inside(stars, tileBox, `${w}: bench stars`);
+      expect(stars.y + stars.height, `${w}: the stars are clear of the square's name`).toBeLessThanOrEqual(name.y + 1);
+      expect((await t.locator(".ac-stars svg").first().boundingBox())!.width).toBeGreaterThanOrEqual(6);
+    }
+    // Nothing scrolls.
+    expect(await page.evaluate(() => document.scrollingElement!.scrollHeight <= document.scrollingElement!.clientHeight + 1)).toBe(true);
+  }
+  expect(errors).toEqual([]);
+});
+
+test("reduced motion (v8): a star-up card keeps its border and glow but nothing moves, and a merge pops nothing (the star simply is there)", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(STARS);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const gold = await card(page, 1).evaluate((el) => ({ ring: getComputedStyle(el).boxShadow, glow: getComputedStyle(el, "::after").boxShadow, anim: getComputedStyle(el, "::after").animationName }));
+  expect(gold.ring).toContain(GOLD);
+  expect(gold.glow).not.toBe("none");
+  expect(gold.anim).toBe("none");
+  const rainbow = await card(page, 3).evaluate((el) => ({ bg: getComputedStyle(el, "::before").backgroundImage, anim: getComputedStyle(el, "::before").animationName, glowAnim: getComputedStyle(el, "::after").animationName }));
+  expect(rainbow.bg).toContain("linear-gradient");
+  expect(rainbow.anim).toBe("none");
+  expect(rainbow.glowAnim).toBe("none");
+  expect(await page.locator(".ac-uptarget").first().evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+  await tap(page, card(page, 1));
+  await expect.poll(() => marks(page)).toMatchObject({ c2: 2 });
+  // (The copy of the piece that pops is not shown, and the new star has no pop.)
+  expect(await page.locator(".ac-merge").evaluateAll((els) => els.every((e) => getComputedStyle(e).display === "none"))).toBe(true);
+  expect(await page.locator('.ac-starmark[data-square="c2"] .ac-stars svg').last().evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+  expect(errors).toEqual([]);
+});
+
+test("a star-up's sound is asked for muted when sound is off, and unmuted when it is on", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.addInitScript(() => localStorage.setItem("brc.muted", "1"));
+  await page.goto(STARS);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  await tap(page, card(page, 1));
+  await tap(page, card(page, 3));
+  const log = await page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => /^acStar/.test(l)));
+  expect(log.some((l) => l.startsWith("acStar2:"))).toBe(true);
+  expect(log.some((l) => l.startsWith("acStar3:"))).toBe(true);
+  expect(log.every((l) => l.endsWith(":muted"))).toBe(true);
   expect(errors).toEqual([]);
 });
