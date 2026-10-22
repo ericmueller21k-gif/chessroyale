@@ -519,7 +519,8 @@ export type SoundName =
   | "pop"
   | "popSoft"
   // Auto chess (the demo), synthesized: see autochess/sounds.ts. A piece sold (a coin cascade), a reroll, a piece placed, one held
-  // on the bench, XP bought, a level up, a lock in, one of their pieces revealed and a pawn cashing in during the fight.
+  // on the bench, XP bought, a level up, a lock in, one of their pieces revealed, a pawn cashing in during the fight, and a piece gaining
+  // its second star (acStar2) or its third (acStar3).
   | "sell"
   | "acReroll"
   | "acPlace"
@@ -529,6 +530,8 @@ export type SoundName =
   | "acLock"
   | "acReveal"
   | "acCash"
+  | "acStar2"
+  | "acStar3"
   | "chat"
   // Boingo the Clown (a raid boss): synthesised, see characters/clown-sounds.ts.
   | "clownBoing"
@@ -734,6 +737,8 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   acLock: autochess("lock"),
   acReveal: autochess("reveal"),
   acCash: autochess("cash"),
+  acStar2: autochess("star2"),
+  acStar3: autochess("star3"),
   // Quick chat: a team message arrives. A soft, short tick, well under a move's knock.
   chat: (t) => {
     clockTick(t, 0.5 * QUICK_CHAT.tickLevel);
@@ -891,6 +896,8 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   acLock: [["autochess", "lock"]],
   acReveal: [["autochess", "reveal"]],
   acCash: [["autochess", "cash"]],
+  acStar2: [["autochess", "star2"]],
+  acStar3: [["autochess", "star3"]],
   clownBoing: [["clown", "boing"]],
   clownHonk: [["clown", "honk"]],
   clownSqueak: [["clown", "squeak"]],

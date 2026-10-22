@@ -4,11 +4,11 @@ import { makeBossSound } from "../src/characters/boss-sounds.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 
 // Auto chess's sounds (v6, Eric Oct 20: "sounds that feel good"): reroll, place, hold, sell, XP, level up, lock in, a reveal and a
-// pawn's cash-in in the fight (the HunChess engine, Oct 21),
+// pawn's cash-in in the fight (the HunChess engine, Oct 21), and a star-up (v8, Eric Oct 22: "a cool level up sound", a bigger one for the third star),
 // synthesized, each under a piece's move in peak and loudness (as every synthesized sound here is) and each clearly its own.
 
 const RATE = 44100;
-const NAMES: AutochessSound[] = ["reroll", "place", "hold", "sell", "xp", "level", "lock", "reveal", "cash"];
+const NAMES: AutochessSound[] = ["reroll", "place", "hold", "sell", "xp", "level", "lock", "reveal", "cash", "star2", "star3"];
 
 /** What a sound measures: its peak, its loudness (mean level over the whole sample, dBFS), how long it sounds (s) and how bright (zero crossings a second). */
 function measure(s: Float32Array) {
@@ -28,7 +28,7 @@ function measure(s: Float32Array) {
 }
 
 describe("auto chess: the sounds (v6)", () => {
-  it("there is one for each thing: reroll, place, hold, sell, XP, level up, lock in, a reveal, a cash-in", () => {
+  it("there is one for each thing: reroll, place, hold, sell, XP, level up, lock in, a reveal, a cash-in, a second star, a third star", () => {
     expect([...AUTOCHESS_SOUNDS].sort()).toEqual([...NAMES].sort());
   });
 
@@ -77,5 +77,20 @@ describe("auto chess: the sounds (v6)", () => {
       autochessSound(name, 48000);
       expect(performance.now() - t0, name).toBeLessThan(120);
     }
+  });
+
+  it("the star-up sounds (v8): the second star's is about 0.6 s, the third's is bigger and about a second, and both are brighter and longer than a level-up's chime is quick", () => {
+    const two = measure(autochessSound("star2", RATE));
+    const three = measure(autochessSound("star3", RATE));
+    expect(two.length).toBeGreaterThan(0.5);
+    expect(two.length).toBeLessThan(0.75);
+    expect(three.length).toBeGreaterThan(0.9);
+    expect(three.length).toBeLessThan(1.2);
+    // Bigger: longer, and more of it (louder on average) than the second star's.
+    expect(three.sounds).toBeGreaterThan(two.sounds * 1.4);
+    expect(three.db).toBeGreaterThan(two.db);
+    // Both ring in the highs (a bell tail, sparkle), well above a thump.
+    expect(two.zcr).toBeGreaterThan(2000);
+    expect(three.zcr).toBeGreaterThan(two.zcr);
   });
 });
