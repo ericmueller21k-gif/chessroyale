@@ -93,8 +93,11 @@ export function beginRound(match: MatchState, cfg: AutoChessSettings = AUTOCHESS
   return { match: { ...match, round, you: paid(match.you, gold.you), bot: paid(match.bot, gold.bot) }, gold };
 }
 
-/** What a lost round costs: 2 plus 1 for every enemy piece (not the king) left. */
-export const damageFor = (enemyPiecesLeft: number, cfg: AutoChessSettings = AUTOCHESS) => cfg.damageBase + cfg.damagePerPiece * enemyPiecesLeft;
+/**
+ * What a lost round costs (v7.1, Eric Oct 22: "like TFT where each round is like say dmg+1"): the round's number, plus 1 for every 3
+ * enemy pieces (not the king) left, rounded down. Round 1 costs 1 to 3; round 5, 5 to 7.
+ */
+export const damageFor = (round: number, enemyPiecesLeft: number, cfg: AutoChessSettings = AUTOCHESS) => cfg.damagePerRound * round + Math.floor(Math.max(0, enemyPiecesLeft) / cfg.piecesPerDamage);
 
 /** The summed price of some pieces. */
 export const worth = (kinds: readonly Kind[], cfg: AutoChessSettings = AUTOCHESS) => kinds.reduce((sum, k) => sum + cfg.prices[k], 0);
@@ -109,7 +112,7 @@ export type RoundOutcome = "you" | "bot" | "draw";
 /** The round, settled: what each side lost and got. */
 export interface RoundResult {
   outcome: RoundOutcome;
-  /** HP the loser loses (0 for a draw). */
+  /** HP the loser loses (0 for a draw): the round's number plus 1 for every 3 enemy pieces left. */
   damage: number;
   /** The enemy pieces (not the king) the damage counted. */
   piecesLeft: number;
@@ -129,7 +132,7 @@ export function settleRound(
   cashIns: { you: number; bot: number } = { you: 0, bot: 0 },
 ): { match: MatchState; result: RoundResult } {
   const piecesLeft = outcome === "you" ? left.you.length : outcome === "bot" ? left.bot.length : 0;
-  const damage = outcome === "draw" ? 0 : damageFor(piecesLeft, cfg);
+  const damage = outcome === "draw" ? 0 : damageFor(match.round, piecesLeft, cfg);
   const withCash = (r: Refund, n: number): Refund => (n ? { ...r, cashIns: n * cfg.cashInGold } : r);
   const refund = { you: withCash(refundFor(left.you, cfg), cashIns.you), bot: withCash(refundFor(left.bot, cfg), cashIns.bot) };
   const next = (s: SideState, won: boolean, lost: boolean, r: Refund): SideState => ({

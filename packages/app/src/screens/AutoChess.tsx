@@ -48,7 +48,7 @@ import { botEvaluator, enginePick, newFight, stallEngine, warmEngine } from "../
 import { addXp, buyXp, xpBlock, xpToNext, xpWords } from "../autochess/level.ts";
 import { bonusFor, botLocked, bothLocked, buyFreeze, freezeWords, noLocks, tickLocks, youLock, type Locks } from "../autochess/lockin.ts";
 import { botSeen } from "../autochess/reveal.ts";
-import { buyFromSlot, holdFromSlot, newShop, oddsFor, replaceTaken, rerollFor, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
+import { buyFromSlot, holdFromSlot, newShop, oddsFor, replaceTaken, rerollFor, rerollPrice, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
 import { playFight, thinFight, withPiece } from "../autochess/fight.ts";
 import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn } from "../autochess/position.ts";
 import { KIND_NAME, KINDS, other, type Army, type Color, type Kind, type Offer } from "../autochess/types.ts";
@@ -599,7 +599,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if (!buying()) return;
     const cur = gref.current;
     const next = rerollFor({ gold: cur.match.you.gold, shop: cur.round.shop, army: cur.round.you, level: boardRoom() }, shopSeed(roundSeed(cur.match)), cfg);
-    if ("block" in next) return say(rerollWords(cur.match.you.gold, cfg));
+    if ("block" in next) return say(rerollWords(cur.match.you.gold, cur.round.shop.rerolls, cfg));
     commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: next.gold } }, round: { ...cur.round, shop: next.shop } });
     setMsg("");
     play("acReroll");
@@ -941,6 +941,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const oddsWordsLine = KINDS.map((k) => `${KIND_NAME[k]} ${odds[k]}%`).join(", ");
   const shopShut = g.phase !== "buy" || locked;
   const wins = g.match.you.wins;
+  // The next reroll's price (v7.1: 5, then 1 more each time, up to 10; back to 5 each round).
+  const rerollNow = rerollPrice(g.round.shop.rerolls, cfg);
 
   return (
     <div
@@ -1183,15 +1185,15 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 </button>
                 <button
                   type="button"
-                  class={`ac-btn ac-reroll${shopShut || goldNow < cfg.shop.rerollCost ? " off" : ""}`}
-                  aria-disabled={shopShut || goldNow < cfg.shop.rerollCost}
-                  aria-label={`Reroll the shop, ${cfg.shop.rerollCost} gold`}
+                  class={`ac-btn ac-reroll${shopShut || goldNow < rerollNow ? " off" : ""}`}
+                  aria-disabled={shopShut || goldNow < rerollNow}
+                  aria-label={`Reroll the shop, ${rerollNow} gold`}
                   onClick={reroll}
                 >
                   <span>Reroll</span>
                   <span class="ac-cost">
                     <i class="ac-coin" />
-                    <b>{cfg.shop.rerollCost}</b>
+                    <b>{rerollNow}</b>
                   </span>
                 </button>
               </div>

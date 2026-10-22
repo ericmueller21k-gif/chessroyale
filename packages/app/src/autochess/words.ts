@@ -84,6 +84,9 @@ export const fightRulesWords = (cfg: AutoChessSettings = AUTOCHESS) =>
 export const moveWords = (plies: number, cfg: AutoChessSettings = AUTOCHESS, thin = false) =>
   `Move ${Math.max(1, Math.ceil((plies + 1) / 2))} of ${cfg.moveCap}${thin || plies >= 2 * cfg.fightFastAfter ? " · twice as fast" : ""}`;
 
+/** The same counter, short, for the clock in the gold row: "12/60". */
+export const moveCount = (plies: number, cfg: AutoChessSettings = AUTOCHESS) => `${Math.max(1, Math.ceil((plies + 1) / 2))}/${cfg.moveCap}`;
+
 /** The headline of a round. */
 export const headline = (r: RoundResult) => (r.outcome === "you" ? "You win the round." : r.outcome === "bot" ? "You lose the round." : "The round is a draw.");
 

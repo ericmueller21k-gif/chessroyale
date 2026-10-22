@@ -8,8 +8,8 @@ import { KINDS, type Army, type Kind, type Offer } from "./types.ts";
  * your king's (a pawn on your 2nd to 4th rank, never past three in a file). **One offer to a square** (Eric, Oct 21): a roll
  * draws its square from the squares no piece of yours, your king or another current offer is on, so no two offers ever share
  * one (in the first roll, a reroll, a refill after a buy and `replaceTaken` alike). Buying an offer rolls a new one into its slot; so
- * does an offer's square being taken by another purchase. A reroll rolls all the offers again for gold; a round starts with a
- * fresh shop, free. Pure data, and every roll is seeded by the round, how many rerolls so far and how many refills since, so a
+ * does an offer's square being taken by another purchase. A reroll rolls all the offers again for gold (a price that climbs with each one in a round); a round starts with a
+ * fresh shop, free, and the first reroll's price again. Pure data, and every roll is seeded by the round, how many rerolls so far and how many refills since, so a
  * round played the same way shows the same offers (tests rely on that).
  */
 
@@ -115,11 +115,18 @@ export function replaceTaken(shop: Shop, seed: number, army: Army, cfg: AutoChes
 
 export type RerollBlock = "gold";
 
+/**
+ * What the next reroll costs (v7.1, Eric Oct 22: "5+1 per roll up to 10 max per round"): `shop.reroll.first` for the first of a round, `step`
+ * more for each one after it, up to `max` (5, 6, 7, 8, 9, 10, 10, ...). `done`: how many rerolls this round's shop has had (`shop.rerolls`);
+ * the next round's shop starts at 0 again.
+ */
+export const rerollPrice = (done: number, cfg: AutoChessSettings = AUTOCHESS) => Math.min(cfg.shop.reroll.max, cfg.shop.reroll.first + cfg.shop.reroll.step * Math.max(0, done));
+
 /** Why the shop can't be rerolled now, or null. */
-export const rerollBlock = (gold: number, cfg: AutoChessSettings = AUTOCHESS): RerollBlock | null => (gold < cfg.shop.rerollCost ? "gold" : null);
+export const rerollBlock = (gold: number, done: number, cfg: AutoChessSettings = AUTOCHESS): RerollBlock | null => (gold < rerollPrice(done, cfg) ? "gold" : null);
 
 /** (Short, as the other words under the board.) */
-export const rerollWords = (gold: number, cfg: AutoChessSettings = AUTOCHESS) => `Need ${cfg.shop.rerollCost - gold} more`;
+export const rerollWords = (gold: number, done: number, cfg: AutoChessSettings = AUTOCHESS) => `Need ${rerollPrice(done, cfg) - gold} more`;
 
 /**
  * What a buy from a slot gives: the army with the piece on its square, the gold left and the shop with the slot rolled again
@@ -162,9 +169,9 @@ export function holdFromSlot(
   return { army, gold: side.gold - priceOf(offer.kind, cfg), shop: refillSlot(side.shop, slot, seed, army, cfg, side.level) };
 }
 
-/** A reroll: the gold left and the new shop, or why not. */
+/** A reroll: the gold left (the climbing price, `rerollPrice`) and the new shop, or why not. */
 export function rerollFor(side: { gold: number; shop: Shop; army: Army; level?: number }, seed: number, cfg: AutoChessSettings = AUTOCHESS): { gold: number; shop: Shop } | { block: RerollBlock } {
-  const block = rerollBlock(side.gold, cfg);
+  const block = rerollBlock(side.gold, side.shop.rerolls, cfg);
   if (block) return { block };
-  return { gold: side.gold - cfg.shop.rerollCost, shop: rerollShop(side.shop, seed, side.army, cfg, side.level) };
+  return { gold: side.gold - rerollPrice(side.shop.rerolls, cfg), shop: rerollShop(side.shop, seed, side.army, cfg, side.level) };
 }
