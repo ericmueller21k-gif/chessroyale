@@ -17571,10 +17571,11 @@ button.sq-tiny {
 
 /* -- Auto chess, the demo (screens/AutoChess.tsx; docs/areas/autochess.md; ac- for auto chess) -- */
 /*
- * v7's screen (docs/decisions/2026-10-21-autochess-v7.md), built from Eric's approved round-4 mock. Kitty-corner: at the top their bench
- * (left) and their custom pawn (right), under the board your pawn (left), the clock's small numbers in the gap and your bench (right).
- * The move clock is the app's own bar (components/Countdown.tsx TimerBar, .timer-bar) along the board's top and bottom edges. Under the
- * board, the dock: gold with the shop's odds in a small pill, Buy XP and Reroll beside the four square cards.
+ * v7's screen (docs/decisions/2026-10-21-autochess-v7.md), built from Eric's approved round-4 mock, as v7.1 changed it (docs/decisions/2026-10-22-autochess-v7-1.md).
+ * Kitty-corner: at the top their bench (left) and their custom pawn (right), under the board your pawn (left) and your bench (right), each bench on the
+ * board frame's edge; the Sell button in the gap beside your bench and a message under the bench's row. The move clock is the app's own bar (components/Countdown.tsx
+ * TimerBar, .timer-bar) along the board's top and bottom edges. Under the board, the dock: gold, income and the clock's small numbers, the shop's odds in a small pill,
+ * then Buy XP and Reroll beside the four square cards.
  */
 .ac-root {
   --ac-card: var(--fd-panel-2);
@@ -17582,10 +17583,44 @@ button.sq-tiny {
   --ac-lip: rgba(0, 0, 0, 0.4);
   --ac-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
   --ac-xp: #5b7be8;
+  /*
+   * The screen's sizes (v7.1). Every row has a set height but the board and the shop, so the board takes exactly what is left: `--chrome` adds
+   * up every row, gap and padding (the safe areas too), and the frame is `--fw` wide, as wide as the column or as tall as the room left.
+   * The page keeps `--free` free at the bottom (Eric: every phone gets some free space there): room the board leaves, not padding, so a result
+   * a few lines long may use it without the page scrolling. The benches sit on the frame's edges
+   * (`--gut` is the room between the column's edge and the frame's), so they follow the board as it grows and shrinks.
+   */
+  --hop: 10px;
+  --tw: 40px;
+  --tile: 44px;
+  --sidew: 88px;
+  --fm: 4px;
+  --gap: 5px;
+  --dock-gap: 6px;
+  --pad-t: 6px;
+  --free: 12px;
+  --gold-h: 38px;
+  --lock-h: 0px;
+  /* The column's width, and the shop's height from it (the cards' tiles are square: a card's tile is its width less 6 px). */
+  --colw: min(calc(100vw - 24px), 560px);
+  --shop-h: max(94px, calc((var(--colw) - 102px) / 4 + 39px));
+  /*
+   * A pawn's column: the hop's room, the pawn, and its two thin bars. The top row is as tall as that or the title and bench (44 + 4 + 44). The pawn is 72 px, or up
+   * to 82 (the approved mock's) when the board is as wide as the column anyway and the room is there for it (`--pawn-fit`: what the two rows can have and still leave the board the column's width).
+   */
+  --k: calc(var(--pad-t) + var(--free) + env(safe-area-inset-top) + env(safe-area-inset-bottom) + 3 * var(--gap) + 2 * var(--fm) + var(--gold-h) + var(--dock-gap) + var(--shop-h) + var(--lock-h));
+  --pawn-fit: calc((var(--app-h) - var(--colw) - var(--k)) / 2 - var(--hop) - 28px);
+  --pawn: clamp(72px, var(--pawn-fit), 82px);
+  --rowh: calc(var(--hop) + var(--pawn) + 28px);
+  --top-h: max(var(--rowh), 92px);
+  --bot-h: var(--rowh);
+  --chrome: calc(var(--k) + var(--top-h) + var(--bot-h));
+  --fw: min(var(--colw), calc(var(--app-h) - var(--chrome)));
+  --gut: calc((var(--colw) - var(--fw)) / 2);
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: calc(env(safe-area-inset-top) + 6px) calc(12px + env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 8px) calc(12px + env(safe-area-inset-left));
+  padding: calc(env(safe-area-inset-top) + var(--pad-t)) calc(12px + env(safe-area-inset-right)) env(safe-area-inset-bottom) calc(12px + env(safe-area-inset-left));
 }
 :root[data-theme="light"] .ac-root {
   --ac-card: #ffffff;
@@ -17593,29 +17628,15 @@ button.sq-tiny {
   --ac-lip: rgba(0, 0, 0, 0.16);
   --ac-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
 }
-/*
- * One column. Every row has a fixed height but the board (as wide as the column, or as tall as the room left) and the dock under it.
- * The board's frame to its benches is the move clock's bar (6 px) and 4 px of air, the same above and below (`--fm`).
- */
+/* One column: the top row, the board's frame, the bottom row and the dock, each with its set height but the dock's. */
 .ac-col {
   position: relative;
   width: 100%;
   max-width: 560px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--gap);
   min-width: 0;
-  --pawn: 82px;
-  --hop: 12px;
-  --tw: 40px;
-  --tile: 44px;
-  --sidew: 92px;
-  --fm: 4px;
-  /* The column's width, and the shop's height from it (the cards' tiles are square: a card's tile is its width less 6 px). */
-  --colw: min(calc(100vw - 24px), 560px);
-  --shop-h: max(94px, calc((var(--colw) - 102px) / 4 + 39px));
-  /* Everything but the board and the shop that sets the board's size: the top and bottom rows (122 each), the gold row and its gap, the gaps and the padding. */
-  --chrome: calc(362px + var(--shop-h));
 }
 /* ---- The top: the title row over their bench (left), their name and pawn (right) ---- */
 .ac-top {
@@ -17625,6 +17646,7 @@ button.sq-tiny {
   column-gap: 8px;
   row-gap: 4px;
   align-items: end;
+  height: var(--top-h);
 }
 .ac-titlebar {
   grid-area: 1 / 1 / 2 / 4;
@@ -17654,8 +17676,10 @@ button.sq-tiny {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Their bench's left edge is the board frame's left edge, at any size of the board (the pawn stays by the column's edge). */
 .ac-top > .ac-bench {
   grid-area: 2 / 1;
+  margin-left: var(--gut);
 }
 .ac-top > .ac-opp {
   grid-area: 1 / 3 / 3 / 4;
@@ -17720,7 +17744,6 @@ button.sq-tiny {
   position: absolute;
   inset: 0;
   transform-origin: 50% 92%;
-  animation: ac-hop var(--dur, 1.8s) linear var(--delay, 0s) infinite;
 }
 .ac-shadow {
   position: absolute;
@@ -17732,9 +17755,19 @@ button.sq-tiny {
   border-radius: 50%;
   background: #000;
   opacity: 0.22;
-  animation: ac-shade var(--dur, 1.8s) linear var(--delay, 0s) infinite;
 }
-/* A small hop: a crouch, up (slowing), down (speeding up), a squash on landing and a settle, then a rest. */
+/* One hop each time the screen puts `hopping` on the pawn (AutoChess.tsx, HopPawn: every 7 to 10 s, `AUTOCHESS.hopEvery`; nothing in between). */
+.ac-pawn.hopping .ac-hop {
+  animation: ac-hop var(--dur, 1.8s) linear 1;
+}
+.ac-pawn.hopping .ac-shadow {
+  animation: ac-shade var(--dur, 1.8s) linear 1;
+}
+/* The dressed pawn's own ground shadow (three skins draw one in their art) is hidden here: `.ac-shadow` is the one shadow, and it shrinks and fades as the pawn rises. */
+.ac-pawn .skin-shadow {
+  display: none;
+}
+/* A small hop: a crouch, up (slowing), down (speeding up), a squash on landing and a settle. */
 @keyframes ac-hop {
   0%,
   8% {
@@ -17797,8 +17830,8 @@ button.sq-tiny {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ac-hop,
-  .ac-shadow {
+  .ac-pawn.hopping .ac-hop,
+  .ac-pawn.hopping .ac-shadow {
     animation: none;
   }
 }
@@ -17996,7 +18029,7 @@ button.sq-tiny {
 .ac-frame {
   position: relative;
   align-self: center;
-  width: min(100%, calc(var(--app-h) - var(--chrome)));
+  width: var(--fw);
   margin: var(--fm) 0;
   padding: 3px;
   border-radius: 13px;
@@ -18235,55 +18268,79 @@ button.sq-tiny {
   position: relative;
   display: grid;
   grid-template-columns: var(--sidew) minmax(0, 1fr) auto;
+  grid-template-rows: var(--tile) minmax(0, 1fr);
   column-gap: 8px;
   align-items: start;
+  height: var(--bot-h);
 }
+.ac-bottom > .ac-me {
+  grid-area: 1 / 1 / 3 / 2;
+}
+/* Your bench's right edge is the board frame's right edge, at any size of the board (your pawn stays by the column's edge). */
 .ac-bottom > .ac-bench {
+  grid-area: 1 / 3;
   align-self: start;
+  margin-right: var(--gut);
 }
-/* The numbers: small, straight on the page, no box: the time, and the step's name under it (a message takes the name's place for a moment). */
-.ac-timer {
-  position: relative;
-  align-self: stretch;
+/* The Sell button sits in the gap between your pawn and your bench, level with the bench (the clock is in the gold row now). */
+.ac-spot {
+  grid-area: 1 / 2;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+}
+/* A short message, for a moment: under the bench's row, beside your pawn, as wide as the room there (one or two short lines), centered under the gap and the bench. */
+.ac-bottom > .say {
+  grid-area: 2 / 2 / 3 / 4;
+  margin-right: var(--gut);
+  padding-top: 4px;
   min-width: 0;
   text-align: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--fd-text);
+}
+/* The clock, in the gold row between the income and the odds pill: small, straight on the page, no box. The time, and the step's name on the row's baseline
+   (it is a block of one inline-block, so its baseline is its last line, like the pill's). */
+.ac-clock {
+  margin-left: auto;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 0;
   line-height: 1.15;
 }
-.ac-timer b {
+.ac-clock-in {
+  display: inline-block;
+  vertical-align: baseline;
+}
+.ac-clock b {
   display: block;
   font: 400 17px/1.15 "Archivo Black", Archivo, sans-serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
-.ac-timer span {
+.ac-clock .ac-step {
   display: block;
   margin-top: 1px;
   font-size: 11.5px;
   font-weight: 700;
+  line-height: 1.15;
   color: var(--fd-sub);
 }
-.ac-timer.low b,
-.ac-timer.low span {
+.ac-clock.low b,
+.ac-clock.low .ac-step {
   color: #c0372f;
 }
-.ac-timer.quiet b {
+.ac-clock.quiet b {
   color: var(--fd-dim);
 }
-.ac-timer span.say {
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--fd-text);
-}
-/* Sell (a piece of yours is selected on the board): a gold button low in the gap, over the free room beside the pawn (it never moves a row). */
+/* Sell (a piece of yours is selected on the board): a gold button in the gap, as tall as the bench's row (it never grows a row). */
 .ac-sell {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-  min-width: 84px;
-  max-width: 100%;
+  width: 100%;
+  max-width: 84px;
   height: 44px;
-  padding: 0 14px;
+  padding: 0 6px;
   border: 0;
   border-radius: 12px;
   background: var(--fd-gold);
@@ -18298,14 +18355,14 @@ button.sq-tiny {
 .ac-dock {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--dock-gap);
 }
 /* The gold row: gold, income, then (at the right) the odds pill and the win streak, all on one text baseline: the % under each icon and the gold number sit on the same line. */
 .ac-goldrow {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  min-height: 30px;
+  height: var(--gold-h);
 }
 .ac-purse {
   display: block;
@@ -18338,7 +18395,7 @@ button.sq-tiny {
 .ac-odds {
   display: block;
   margin-left: auto;
-  padding: 3px 7px 2px;
+  padding: 3px 6px 2px;
   border-radius: 999px;
   background: var(--fd-panel-2);
   text-align: center;
@@ -18348,8 +18405,8 @@ button.sq-tiny {
 .ac-od {
   display: inline-block;
   vertical-align: baseline;
-  min-width: 26px;
-  margin: 0 2px;
+  min-width: 24px;
+  margin: 0 1px;
 }
 .ac-od .ac-pc {
   width: 20px;
@@ -18547,7 +18604,7 @@ button.sq-tiny {
 }
 .ac-card-result,
 .ac-card-over {
-  min-height: calc(var(--shop-h) + 40px);
+  min-height: calc(var(--shop-h) + var(--gold-h) + var(--dock-gap));
 }
 .ac-card-body {
   display: flex;
@@ -18675,7 +18732,7 @@ button.sq-tiny {
   filter: brightness(0.92);
 }
 .ac-root .ac-sell:active {
-  transform: translateX(-50%) translateY(3px);
+  transform: translateY(3px);
   box-shadow: 0 0 0 transparent;
 }
 .ac-root .ac-reroll:active {
@@ -18705,35 +18762,29 @@ button.sq-tiny {
 }
 
 /* With lock-in on (off by default) its bar is one more row under the shop: the board gives the room, so nothing scrolls. */
-.ac-root[data-lockin] .ac-col {
-  --chrome: calc(392px + var(--shop-h));
+.ac-root[data-lockin] {
+  --lock-h: calc(44px + var(--gap));
 }
-/* ---- A short phone (320 x 568, 360 x 640, 375 x 667): smaller pawns, tighter rows ---- */
+/* ---- A short phone (320 x 568, 360 x 640, 375 x 667, 393 x 730): smaller pawns, tighter rows ---- */
 @media (max-height: 760px) {
   .ac-root {
-    padding-top: 4px;
-    padding-bottom: calc(env(safe-area-inset-bottom) + 6px);
-  }
-  .ac-col {
-    gap: 4px;
     --pawn: 46px;
     --hop: 8px;
     --sidew: 80px;
-    --fm: 5px;
+    --pad-t: 4px;
+    --gold-h: 36px;
+    --dock-gap: 4px;
     --shop-h: max(92px, calc((var(--colw) - 94px) / 4 + 39px));
-    --chrome: calc(262px + var(--shop-h));
+    --top-h: 90px;
   }
-  .ac-root[data-lockin] .ac-col {
-    --chrome: calc(298px + var(--shop-h));
+  .ac-col {
+    gap: 5px;
   }
   .ac-top {
     row-gap: 2px;
   }
   .ac-who {
     transform: translateY(-24px);
-  }
-  .ac-dock {
-    gap: 4px;
   }
   .ac-goldrow {
     min-height: 24px;
@@ -18756,11 +18807,40 @@ button.sq-tiny {
     right: -5px;
     bottom: 0;
   }
-  .ac-timer b {
+  .ac-clock b {
     font-size: 16px;
   }
-  .ac-timer span {
+  .ac-clock .ac-step,
+  .ac-bottom > .say {
     font-size: 11px;
+  }
+}
+
+/* ---- A phone under 415 wide (360, 375, 390, 393, 414): the gold row holds gold, income, the clock, the odds pill and the win streak, so "Income" is dropped (the "+140" stays) and the pill is a little tighter ---- */
+@media (max-width: 414px) {
+  .ac-root {
+    --tw: 36px;
+  }
+  .ac-sell {
+    font-size: 13px;
+  }
+  .ac-goldrow {
+    gap: 6px;
+  }
+  .ac-income-word {
+    display: none;
+  }
+  .ac-income {
+    margin-left: 8px;
+  }
+  .ac-od {
+    min-width: 22px;
+  }
+  .ac-od .ac-pc {
+    width: 19px;
+  }
+  .ac-streak {
+    padding: 3px 7px;
   }
 }
 
@@ -18769,9 +18849,7 @@ button.sq-tiny {
   .ac-root {
     padding-left: 8px;
     padding-right: 8px;
-  }
-  .ac-col {
-    --sidew: 84px;
+    --sidew: 60px;
     --tw: 34px;
     --colw: calc(100vw - 16px);
     --shop-h: 92px;
@@ -18796,45 +18874,57 @@ button.sq-tiny {
     grid-template-columns: 13px minmax(0, 1fr) auto;
     gap: 3px;
   }
-  .ac-bottom,
+  .ac-bottom {
+    column-gap: 4px;
+  }
   .ac-top {
     column-gap: 6px;
   }
-  .ac-timer b {
+  .ac-clock b {
     font-size: 15px;
   }
-  .ac-timer span {
+  .ac-clock .ac-step,
+  .ac-bottom > .say {
     font-size: 10.5px;
   }
   .ac-sell {
-    min-width: 56px;
-    padding: 0 6px;
-    font-size: 13px;
+    padding: 0 3px;
+    font-size: 12px;
   }
   .ac-bench {
     gap: 2px;
   }
+  /* The gold row at 320: gold, income, the clock, the odds pill and the streak in 304 px: a smaller coin and numbers, smaller icons in a tighter pill. */
   .ac-goldrow {
-    gap: 6px;
+    gap: 4px;
   }
-  .ac-income-word {
-    display: none;
+  .ac-gold-you .ac-coin {
+    width: 13px;
+    height: 13px;
+    margin-right: 4px;
+  }
+  .ac-gold-you b {
+    font-size: 17px;
   }
   .ac-income {
-    margin-left: 8px;
+    margin-left: 6px;
   }
   .ac-odds {
     padding: 3px 4px 2px;
   }
   .ac-od {
-    min-width: 24px;
+    min-width: 21px;
     margin: 0 1px;
   }
   .ac-od .ac-pc {
-    width: 19px;
+    width: 17px;
   }
   .ac-od b {
     font-size: 10px;
+  }
+  .ac-streak {
+    padding: 3px 6px;
+    font-size: 11.5px;
   }
   .ac-shop {
     grid-template-columns: 62px minmax(0, 1fr);
@@ -18877,6 +18967,14 @@ button.sq-tiny {
   .ac-card-gold {
     font-size: 12px;
   }
+  /* The fight's rules are the longest words the box holds: a little smaller and tighter so they fit what the shop's height reserves (the page must not scroll). */
+  .ac-card-fight {
+    padding: 6px 8px;
+  }
+  .ac-card-fight .ac-card-text {
+    font-size: 11px;
+    line-height: 1.25;
+  }
 }
 
 /* ---- A computer (1280 x 800): the board with the rows around it at the left, the dock at the right ---- */
@@ -18884,16 +18982,19 @@ button.sq-tiny {
   .ac-root {
     justify-content: center;
     padding: 14px 24px;
-  }
-  .ac-col {
-    --zone: 126px;
-    --pawn: 80px;
-    --hop: 13px;
+    --pawn: 72px;
+    --hop: 12px;
     --tw: 54px;
     --tile: 52px;
     --sidew: 116px;
     --fm: 4px;
-    --bw: min(560px, calc(var(--app-h) - 28px - 2 * var(--zone) - 20px - 2 * var(--fm)));
+    --gold-h: 40px;
+    --top-h: max(var(--rowh), 100px);
+    /* The board's column: the rows above and below it, the gaps (10) and the page's padding (28) come off the height. The benches are on the frame's edges already: nothing to add. */
+    --bw: min(560px, calc(var(--app-h) - 28px - var(--top-h) - var(--bot-h) - 20px - 2 * var(--fm)));
+    --gut: 0px;
+  }
+  .ac-col {
     width: calc(var(--bw) + 32px + 440px);
     max-width: 100%;
     display: grid;
@@ -18948,17 +19049,15 @@ button.sq-tiny {
   .ac-bar b {
     font-size: 12px;
   }
-  .ac-timer b {
+  .ac-clock b {
     font-size: 22px;
   }
-  .ac-timer span {
+  .ac-clock .ac-step,
+  .ac-bottom > .say {
     font-size: 13px;
   }
   .ac-slot em {
     font-size: 10px;
-  }
-  .ac-goldrow {
-    min-height: 36px;
   }
   .ac-gold-you b {
     font-size: 24px;
@@ -19029,8 +19128,7 @@ button.sq-tiny {
 
 /* A laptop's short window (1280 x 600): the rows around the board are tighter (a smaller pawn, narrower bench tiles), so the board keeps room and their bench, name and pawn still fit its width. */
 @media (min-width: 900px) and (min-height: 540px) and (max-height: 700px) {
-  .ac-col {
-    --zone: 100px;
+  .ac-root {
     --pawn: 60px;
     --hop: 9px;
     --tw: 38px;

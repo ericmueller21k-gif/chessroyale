@@ -25,7 +25,7 @@ test.use({ actionTimeout: 15_000 });
 // 6298: bishop f3, pawn f2, pawn h2, pawn h4; king b1. Holding the bishop rolls a pawn onto f3 (the held piece's square); holding the pawn for h4 rolls a pawn
 //       onto h4 too: the two ways an offer can meet a held piece's square.
 // 24 (quick): knight e2, pawn a3, pawn h3, bishop a1; king d1. Buying the first three, the move step lights the knight on e2 (c1, c3, d4, f4, g1, g3).
-// 25 (quick, gold=600): pawn b3, pawn f4, pawn d3, pawn g4; king f1. The bot buys XP and holds a rook for h6 and a bishop for e7 by 3 s.
+// 316 (quick, gold=600): the bot (king g8, yours g1) holds a rook for e7 and a bishop for c8 by 3 s, and nothing more (v7.1: the bot's reroll habits moved seed 25's holds).
 const PLAIN = "/autochess?quick=1&seed=9";
 const NEVER = PLAIN;
 const LATE = "/autochess?quick=1&seed=5";
@@ -33,7 +33,7 @@ const EARLY = "/autochess?quick=1&seed=11";
 const FIGHT = "/autochess?quick=1&seed=3";
 const TWOQ = "/autochess?quick=1&seed=60&level=10";
 const MOVE = "/autochess?quick=1&seed=24";
-const HELD = "/autochess?quick=1&seed=25&gold=600";
+const HELD = "/autochess?quick=1&seed=316&gold=600";
 /** Every way a fight's result line can begin (the reason it ended), then the HP line. */
 const RESULT_WHY =
   /^(Checkmate\.|Stalemate\.|(You|Your opponent) gained 3\+ pawns and held it for 6 moves\.|Fight stalled \((moves repeated|10 moves each, no capture|60 moves each)\): ((you|your opponent) gained (\d+ pawns?|the edge|a winning edge)|neither side gained the edge, a draw)\.|Draw by the fifty-move rule\.|Draw: not enough pieces left to mate\.|A side left with only its king loses at once\.|Both sides are down to a king: a draw\.) /;
@@ -54,10 +54,10 @@ const root = (p: Page) => p.locator(".ac-root");
 const goldOf = async (p: Page) => Number(await p.locator(".ac-gold-you b").innerText());
 const hp = async (p: Page, who: "you" | "bot") => Number(await p.locator(`.ac-hp-${who} b`).innerText());
 const soundCount = (p: Page, name: string) => p.evaluate((n) => (window as any).__soundLog.filter((l: string) => l.startsWith(`${n}:`)).length, name);
-/** The small spot under the board, in the gap beside your pawn: the clock's numbers, and under them the step's name, or a short message for a moment. */
-const clockOf = (p: Page) => p.locator(".ac-timer b");
-const stepLabel = (p: Page) => p.locator(".ac-timer span");
-const say = (p: Page) => p.locator(".ac-timer span.say");
+/** The clock, in the gold row between the income and the odds pill (v7.1): the time, and the step's name under it. A short message shows for a moment under your bench's row, beside your pawn. */
+const clockOf = (p: Page) => p.locator(".ac-clock b");
+const stepLabel = (p: Page) => p.locator(".ac-clock .ac-step");
+const say = (p: Page) => p.locator(".ac-bottom > .say");
 /** Your level (the badge on your pawn) and the XP toward the next (its bar), and theirs. */
 const youBadge = (p: Page) => p.locator(".ac-badge");
 const botLevel = (p: Page) => p.locator(".ac-who .ac-lv");
@@ -154,19 +154,20 @@ async function buyAll(p: Page, max: number) {
 async function watchFight(p: Page) {
   await p.evaluate(() => {
     const root = document.querySelector<HTMLElement>(".ac-root")!;
-    const seen = { fight: false, say: "", text: "", label: "", lastMove: false };
+    const seen = { fight: false, say: "", count: "", text: "", label: "", lastMove: false };
     (window as any).__fight = seen;
     new MutationObserver(() => {
       if (root.dataset.phase !== "fight") return;
       seen.fight = true;
-      seen.say ||= document.querySelector(".ac-timer span")?.textContent ?? "";
+      seen.say ||= document.querySelector(".ac-clock")?.getAttribute("aria-label") ?? "";
+      seen.count ||= document.querySelector(".ac-clock .ac-step")?.textContent ?? "";
       seen.text ||= document.querySelector(".ac-card-text")?.textContent ?? "";
-      seen.label ||= document.querySelector(".ac-timer b")?.textContent ?? "";
+      seen.label ||= document.querySelector(".ac-clock b")?.textContent ?? "";
       if (document.querySelector(".hb-board square.last-move")) seen.lastMove = true;
     }).observe(root, { attributes: true, subtree: true, childList: true, characterData: true });
   });
 }
-const fightSeen = (p: Page) => p.evaluate(() => (window as any).__fight as { fight: boolean; say: string; text: string; label: string; lastMove: boolean });
+const fightSeen = (p: Page) => p.evaluate(() => (window as any).__fight as { fight: boolean; say: string; count: string; text: string; label: string; lastMove: boolean });
 
 /** Every banner on the board from now on (the phase words and the 3-2-1), in the order they first showed, each with when. */
 async function watchBanners(p: Page) {
@@ -274,16 +275,16 @@ test("the shop: four offers, each a piece and a square of your own, on a square 
   expect(errors).toEqual([]);
 });
 
-test("the shop: a reroll costs 2 and rolls all four offers (the same for the same seed), and is refused without the gold", async ({ page }) => {
+test("the shop: a reroll costs 5 (1 more each time, up to 10) and rolls all four offers (the same for the same seed), and is refused without the gold", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const first = await offers(page);
   expect(await goldOf(page)).toBe(100);
   await expect(reroll(page)).toContainText("Reroll");
-  await expect(reroll(page)).toContainText("2");
+  await expect(reroll(page)).toContainText("5");
   await tap(page, reroll(page));
-  expect(await goldOf(page)).toBe(98);
+  expect(await goldOf(page)).toBe(95);
   // (A shuffle and a coin's clink.)
   expect(await soundCount(page, "acReroll")).toBe(1);
   const rolled = await offers(page);
@@ -297,23 +298,55 @@ test("the shop: a reroll costs 2 and rolls all four offers (the same for the sam
   expect(await offers(page)).toEqual(first);
   await tap(page, reroll(page));
   expect(await offers(page)).toEqual(rolled);
-  // Without the gold it is refused, with the reason (the other 49 rerolls in one go: the same button, the same code).
+  // Without the gold it is refused, with the reason (the other rerolls in one go: the same button, the same code). From 95 gold: 6, 7, 8, 9, then 10 each
+  // until 5 are left, which is under the next price (10).
   await page.evaluate(() => {
     const b = document.querySelector<HTMLButtonElement>(".ac-reroll")!;
     for (let i = 0; i < 49; i++) b.click();
   });
-  expect(await goldOf(page)).toBe(0);
+  expect(await goldOf(page)).toBe(5);
   await expect(reroll(page)).toHaveAttribute("aria-disabled", "true");
+  await expect(reroll(page)).toContainText("10");
   const before = await offers(page);
   await reroll(page).click({ force: true });
-  await expect(say(page)).toHaveText("Need 2 more");
-  expect(await goldOf(page)).toBe(0);
+  await expect(say(page)).toHaveText("Need 5 more");
+  expect(await goldOf(page)).toBe(5);
   expect(await offers(page)).toEqual(before);
   // Buy XP says so too (4 XP cost 20).
   await expect(xpButton(page)).toHaveAttribute("aria-disabled", "true");
   await xpButton(page).click({ force: true });
-  await expect(say(page)).toHaveText("Need 20 more");
-  expect(await goldOf(page)).toBe(0);
+  await expect(say(page)).toHaveText("Need 15 more");
+  expect(await goldOf(page)).toBe(5);
+  expect(errors).toEqual([]);
+});
+
+test("the reroll's price climbs 5, 6, 7 ... up to 10 as the Reroll button shows it, each one charged at that price, and is back to 5 in the next round", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors = watchErrors(page);
+  // (Gold enough for the whole climb: 5 + 6 + 7 + 8 + 9 + 10 + 10 = 55.)
+  await page.goto("/autochess?quick=1&seed=9&adjust=0&gold=100");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const price = async () => Number(await reroll(page).locator(".ac-cost b").innerText());
+  let gold = await goldOf(page);
+  // (The start gold of 100, its interest and the round's income: the whole climb, 55, is there.)
+  expect(gold).toBeGreaterThanOrEqual(200);
+  const climb = [5, 6, 7, 8, 9, 10, 10];
+  for (const [i, expected] of climb.entries()) {
+    expect(await price(), `the button shows the price of reroll ${i + 1}`).toBe(expected);
+    await expect(reroll(page)).toHaveAttribute("aria-label", `Reroll the shop, ${expected} gold`);
+    await tap(page, reroll(page));
+    gold -= expected;
+    expect(await goldOf(page), `reroll ${i + 1} cost ${expected}`).toBe(gold);
+  }
+  expect(await price(), "it stays at 10").toBe(10);
+  // The next round's shop starts at 5 again (play the round out; the fight has no move step here).
+  await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 200_000 });
+  await page.getByRole("button", { name: "Next round" }).click();
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  await expect(root(page)).toHaveAttribute("data-round", "2");
+  expect(await price(), "back to 5 at the next round's start").toBe(5);
+  await tap(page, reroll(page));
+  await expect(reroll(page).locator(".ac-cost b")).toHaveText("6");
   expect(errors).toEqual([]);
 });
 
@@ -360,8 +393,8 @@ test("buying: tap an offer's silhouette or its shop card, and it lands on its sq
   // Round 1: no start gold, an income of 100; the kings are placed by the game, mirrored; you are White, at the bottom.
   expect(await goldOf(page)).toBe(100);
   await expect(page.locator(".ac-income b")).toHaveText("+100");
-  expect(await hp(page, "you")).toBe(20);
-  expect(await hp(page, "bot")).toBe(20);
+  expect(await hp(page, "you")).toBe(24);
+  expect(await hp(page, "bot")).toBe(24);
   const botKing = (await root(page).getAttribute("data-bot-king"))!;
   expect(botKing).toBe("d7");
   await expect(piece(page, "white", "king", "d2")).toBeVisible();
@@ -436,17 +469,22 @@ test("buying: a greyed offer says why (gold, the one-queen limit), in a few word
   // The king is the game's: tapping it says so.
   await tapSquare(page, "h1");
   await expect(say(page)).toHaveText("King: set by game");
-  // Sell by tapping your queen: the Sell button (in the gap under the clock) says what it gives, "Sell 67" (75% of 90, rounded down), and the sell sound plays.
+  // Sell by tapping your queen: the Sell button (in the gap between your pawn and your bench, level with the bench) says what it gives, "Sell 67" (75% of 90, rounded down), and the sell sound plays.
   await tapSquare(page, "g3");
   const sellButton = page.getByRole("button", { name: "Sell 67", exact: true });
   await expect(sellButton).toBeVisible();
   const sb = (await sellButton.boundingBox())!;
-  const clock = (await page.locator(".ac-timer").boundingBox())!;
+  const gap = (await page.locator(".ac-spot").boundingBox())!;
+  const bench = (await youBench(page).boundingBox())!;
+  const mine = (await page.locator(".ac-me").boundingBox())!;
   const frame = (await page.locator(".ac-frame").boundingBox())!;
   expect(sb.height).toBeGreaterThanOrEqual(44);
   expect(sb.y, "under the board, in the gap").toBeGreaterThan(frame.y + frame.height);
-  expect(sb.x + sb.width / 2, "centered in the gap").toBeGreaterThan(clock.x + 4);
-  expect(sb.x + sb.width / 2).toBeLessThan(clock.x + clock.width - 4);
+  expect(Math.abs(sb.y - bench.y), "level with the bench").toBeLessThanOrEqual(2);
+  expect(sb.x, "right of your pawn").toBeGreaterThanOrEqual(mine.x + mine.width - 1);
+  expect(sb.x + sb.width, "left of your bench").toBeLessThanOrEqual(bench.x + 1);
+  expect(sb.x + sb.width / 2, "centered in the gap").toBeGreaterThan(gap.x + gap.width / 2 - 3);
+  expect(sb.x + sb.width / 2).toBeLessThan(gap.x + gap.width / 2 + 3);
   await tap(page, sellButton);
   await expect(piece(page, "white", "queen", "g3")).toHaveCount(0);
   expect(await goldOf(page)).toBe(77);
@@ -667,7 +705,7 @@ test("the odds pill in the gold row: each piece's icon with its percent under it
     { kind: "q", pct: "0%", faded: true },
   ]);
   await expect(pill).toHaveAttribute("aria-label", "Chance of each piece in the shop at level 4: pawn 74%, knight 14%, bishop 12%, rook 0%, queen 0%");
-  // The pill lives in the gold row (gold, income, the pill, the streak), with no word "Odds" and no row of its own above Buy XP.
+  // The pill lives in the gold row (gold, income, the clock, the pill, the streak), with no word "Odds" and no row of its own above Buy XP.
   expect(await pill.evaluate((el) => !!el.closest(".ac-goldrow"))).toBe(true);
   await expect(page.locator(".ac-dock")).not.toContainText(/odds/i);
   await expect(page.locator(".ac-dock .ac-pc")).toHaveCount(5 + 4);
@@ -719,7 +757,7 @@ test("the odds pill in the gold row: each piece's icon with its percent under it
   expect(errors).toEqual([]);
 });
 
-test("the screen's kitty-corner: their bench top left and their pawn top right above the board; your pawn bottom left and your bench bottom right under it, the same gap from the board; name and level, thin HP and XP bars", async ({ page }) => {
+test("the screen's kitty-corner: their bench top left and their pawn top right above the board; your pawn bottom left and your bench bottom right under it, the same gap from the board, the benches' outer edges on the board's; name and level, thin HP and XP bars", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -729,7 +767,6 @@ test("the screen's kitty-corner: their bench top left and their pawn top right a
   const yours = await box(".ac-bench.you");
   const opp = await box(".ac-opp");
   const me = await box(".ac-me");
-  const timer = await box(".ac-timer");
   // Their bench top left and their pawn top right, both above the board; yours bottom right and your pawn bottom left, both under it.
   expect(theirs.y + theirs.height).toBeLessThanOrEqual(frame.y + 0.5);
   expect(opp.y + opp.height).toBeLessThanOrEqual(frame.y + 12);
@@ -737,16 +774,13 @@ test("the screen's kitty-corner: their bench top left and their pawn top right a
   expect(yours.y).toBeGreaterThanOrEqual(frame.y + frame.height - 0.5);
   expect(me.y).toBeGreaterThanOrEqual(frame.y + frame.height - 0.5);
   expect(me.x + me.width, "your pawn is left of your bench").toBeLessThan(yours.x);
-  // The clock's numbers sit in the gap between your pawn and your bench.
-  expect(timer.x).toBeGreaterThanOrEqual(me.x + me.width - 12);
-  expect(timer.x + timer.width).toBeLessThanOrEqual(yours.x + 1);
-  // Kitty-corner: their bench at the top left of the column, their pawn at its top right; your pawn at the bottom left, your bench at the bottom right.
+  // Kitty-corner (v7.1): their bench's left edge is the board frame's left edge and your bench's right edge is its right edge (they follow the board's size); the pawns stay by the column's edges.
   const top = await box(".ac-top");
   const bottom = await box(".ac-bottom");
-  expect(Math.abs(theirs.x - top.x), "their bench starts at the column's left edge").toBeLessThanOrEqual(1);
-  expect(Math.abs(top.x + top.width - (opp.x + opp.width)), "their pawn ends at its right edge").toBeLessThanOrEqual(1);
-  expect(Math.abs(me.x - bottom.x), "your pawn starts at its left edge").toBeLessThanOrEqual(1);
-  expect(Math.abs(bottom.x + bottom.width - (yours.x + yours.width)), "your bench ends at its right edge").toBeLessThanOrEqual(1);
+  expect(Math.abs(theirs.x - frame.x), "their bench starts at the board's left edge").toBeLessThanOrEqual(1);
+  expect(Math.abs(yours.x + yours.width - (frame.x + frame.width)), "your bench ends at the board's right edge").toBeLessThanOrEqual(1);
+  expect(Math.abs(top.x + top.width - (opp.x + opp.width)), "their pawn ends at the column's right edge").toBeLessThanOrEqual(1);
+  expect(Math.abs(me.x - bottom.x), "your pawn starts at the column's left edge").toBeLessThanOrEqual(1);
   // The same gap from the board for both (the clock's bar and a little air), and identical tiles.
   const gapTop = frame.y - (theirs.y + theirs.height);
   const gapBottom = yours.y - (frame.y + frame.height);
@@ -758,8 +792,8 @@ test("the screen's kitty-corner: their bench top left and their pawn top right a
   // The name and the level beside their pawn; their and your numbers in thin bars under the pawns.
   await expect(page.locator(".ac-who .ac-name")).toHaveText("Bot");
   await expect(botLevel(page)).toHaveText("Lv 4");
-  await expect(page.locator(".ac-hp-you b")).toHaveText("20");
-  await expect(page.locator(".ac-hp-bot b")).toHaveText("20");
+  await expect(page.locator(".ac-hp-you b")).toHaveText("24");
+  await expect(page.locator(".ac-hp-bot b")).toHaveText("24");
   await expect(page.locator(".ac-xp-you b")).toHaveText("2/4");
   await expect(page.locator(".ac-xp-bot b")).toHaveText("2/4");
   await expectLevel(page, 4, "2/4");
@@ -786,64 +820,185 @@ test("the screen's kitty-corner: their bench top left and their pawn top right a
   expect(errors).toEqual([]);
 });
 
-test("both custom pawns hop, out of step (about 1.8 s and 2.1 s loops), crouch, rise, squash and settle with the shadow shrinking and fading as it rises; transforms and opacity only; off under reduced motion", async ({ page }) => {
+/** The hop animations on the page now (the pawn's and its shadow's), by the pawn they belong to. */
+const hopAnims = (p: Page) =>
+  p.evaluate(() =>
+    document.getAnimations().flatMap((a) => {
+      const el = (a.effect as KeyframeEffect | null)?.target as HTMLElement | null;
+      if (!el || !/^ac-(hop|shade)$/.test((a as CSSAnimation).animationName ?? "")) return [];
+      const keys = (a.effect as KeyframeEffect).getKeyframes();
+      const props = new Set<string>();
+      for (const k of keys) for (const q of Object.keys(k)) if (!["offset", "easing", "composite", "computedOffset"].includes(q)) props.add(q);
+      const timing = (a.effect as KeyframeEffect).getTiming();
+      return [{ name: (a as CSSAnimation).animationName, who: el.closest(".ac-me") ? "me" : "opp", duration: timing.duration, iterations: timing.iterations, props: [...props].sort() }];
+    }),
+  );
+
+/** Records when each pawn's `hopping` class goes on and off (the fake clock's performance.now), from before the screen exists. */
+const recordHops = (p: Page) =>
+  p.addInitScript(() => {
+    const hops: Record<string, { on: number[]; off: number[] }> = { me: { on: [], off: [] }, opp: { on: [], off: [] } };
+    (window as any).__hops = hops;
+    const was = new WeakMap<Element, boolean>();
+    new MutationObserver((records) => {
+      for (const r of records) {
+        const el = r.target as Element;
+        if (!el.classList?.contains("ac-pawn")) continue;
+        const who = el.closest(".ac-me") ? "me" : "opp";
+        const now = el.classList.contains("hopping");
+        if (now === (was.get(el) ?? false)) continue;
+        was.set(el, now);
+        (now ? hops[who]!.on : hops[who]!.off).push(performance.now());
+      }
+    }).observe(document, { attributes: true, attributeFilter: ["class"], subtree: true });
+  });
+const hopsSeen = (p: Page) => p.evaluate(() => (window as any).__hops as Record<"me" | "opp", { on: number[]; off: number[] }>);
+
+test("each custom pawn hops once, then waits a random 7 to 10 s (its own draws, so the two never fall into step) before its next single hop: a crouch, a rise, a squash and a settle, the shadow shrinking and fading as it rises; transforms and opacity only; nothing moves in between", async ({ page }) => {
+  test.setTimeout(120_000);
   const errors = watchErrors(page);
-  await page.goto(PLAIN);
+  // (A fake clock: seven to ten seconds take no time. The screen's own steps run on it too: the buy step is 30 s, so what follows stays inside it.)
+  await recordHops(page);
+  await page.clock.install();
+  await page.goto("/autochess?seed=9");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  const anims = () =>
-    page.evaluate(() =>
-      document.getAnimations().flatMap((a) => {
-        const el = (a.effect as KeyframeEffect | null)?.target as HTMLElement | null;
-        if (!el || !/^ac-(hop|shade)$/.test((a as CSSAnimation).animationName ?? "")) return [];
-        const keys = (a.effect as KeyframeEffect).getKeyframes();
-        const props = new Set<string>();
-        for (const k of keys) for (const p of Object.keys(k)) if (!["offset", "easing", "composite", "computedOffset"].includes(p)) props.add(p);
-        return [{ name: (a as CSSAnimation).animationName, who: el.closest(".ac-me") ? "me" : "opp", duration: (a.effect as KeyframeEffect).getTiming().duration, delay: (a.effect as KeyframeEffect).getTiming().delay, props: [...props].sort(), iterations: (a.effect as KeyframeEffect).getTiming().iterations }];
-      }),
-    );
-  const running = await anims();
-  // Two animations each (the pawn, and its shadow), looping for ever.
-  expect(running.filter((a) => a.who === "me")).toHaveLength(2);
-  expect(running.filter((a) => a.who === "opp")).toHaveLength(2);
-  for (const a of running) {
-    expect(a.iterations).toBe(Infinity);
-    // Transforms and opacity only (nothing that lays out or paints a lot): the pawn moves by transform, its shadow by transform and opacity.
-    expect(a.props.every((p) => p === "transform" || p === "opacity"), `${a.name}: ${a.props}`).toBe(true);
-  }
-  const mine = running.find((a) => a.who === "me" && a.name === "ac-hop")!;
-  const theirsHop = running.find((a) => a.who === "opp" && a.name === "ac-hop")!;
-  expect(mine.duration).toBe(1800);
-  expect(theirsHop.duration).toBe(2100);
-  // Out of step: theirs starts 0.8 s along.
-  expect(mine.delay).not.toBe(theirsHop.delay);
-  expect(running.find((a) => a.who === "me" && a.name === "ac-shade")!.props).toContain("opacity");
-  // The pawn rises (and the shadow shrinks and fades as it does): at the loop's top the pawn is higher than at rest and the shadow smaller and fainter.
+  const mountedAt = await page.evaluate(() => performance.now());
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
+  let posed = false;
+  let idle = 0;
   const pose = async (who: string, ms: number) =>
     page.evaluate(
       ([w, t]) => {
         const all = document.getAnimations() as CSSAnimation[];
-        const hop = all.find((a) => a.animationName === "ac-hop" && !!((a.effect as KeyframeEffect).target as HTMLElement).closest(w === "me" ? ".ac-me" : ".ac-opp"))!;
-        const shade = all.find((a) => a.animationName === "ac-shade" && !!((a.effect as KeyframeEffect).target as HTMLElement).closest(w === "me" ? ".ac-me" : ".ac-opp"))!;
-        for (const a of [hop, shade]) {
-          a.pause();
-          a.currentTime = Number(t) + Number((a.effect as KeyframeEffect).getTiming().delay);
-        }
+        const mineHop = (n: string) => all.find((a) => a.animationName === n && !!((a.effect as KeyframeEffect).target as HTMLElement).closest(w === "me" ? ".ac-me" : ".ac-opp"))!;
+        const hop = mineHop("ac-hop");
+        const shade = mineHop("ac-shade");
+        // (The animations are set to the time asked and read at once, never paused: a script-paused animation would outlive its class.)
+        for (const a of [hop, shade]) a.currentTime = Number(t);
         const h = new DOMMatrix(getComputedStyle((hop.effect as KeyframeEffect).target as HTMLElement).transform);
-        const s = getComputedStyle((shade.effect as KeyframeEffect).target as HTMLElement);
-        return { y: h.m42, shadowScale: new DOMMatrix(s.transform).a, shadowOpacity: Number(s.opacity) };
+        const sh = getComputedStyle((shade.effect as KeyframeEffect).target as HTMLElement);
+        return { y: h.m42, shadowScale: new DOMMatrix(sh.transform).a, shadowOpacity: Number(sh.opacity) };
       },
       [who, ms] as const,
     );
-  const rest = await pose("me", 0);
-  const top = await pose("me", 0.37 * 1800);
-  expect(top.y, "the pawn rises").toBeLessThan(rest.y - 5);
-  expect(top.shadowScale, "the shadow shrinks as it rises").toBeLessThan(rest.shadowScale - 0.2);
-  expect(top.shadowOpacity, "and fades").toBeLessThan(rest.shadowOpacity - 0.05);
-  // Off under reduced motion.
+  // 28 seconds of the buy step, in steps of a quarter second.
+  for (let t = 0; t < 28_000; t += 250) {
+    await page.clock.runFor(250);
+    const hopping = await page.evaluate(() => [...document.querySelectorAll(".ac-pawn.hopping")].map((e) => (e.closest(".ac-me") ? "me" : "opp")));
+    const anims = await hopAnims(page);
+    // While a pawn hops it has its two animations (the pawn and its shadow), once each, a hop long; when it doesn't, nothing of it moves.
+    for (const who of ["me", "opp"] as const) {
+      const mine = anims.filter((a) => a.who === who);
+      if (hopping.includes(who)) {
+        expect(mine, `${who} hopping`).toHaveLength(2);
+        for (const a of mine) {
+          expect(a.iterations, `${a.name}: one hop, not a loop`).toBe(1);
+          expect(a.duration, `${a.name}: a hop is 1.8 s`).toBe(1800);
+          // Transforms and opacity only (nothing that lays out or paints a lot): the pawn moves by transform, its shadow by transform and opacity.
+          expect(a.props.every((q) => q === "transform" || q === "opacity"), `${a.name}: ${a.props}`).toBe(true);
+        }
+        expect(mine.find((a) => a.name === "ac-shade")!.props).toContain("opacity");
+        if (!posed && who === "me") {
+          posed = true;
+          // The pawn rises (and the shadow shrinks and fades as it does): at the hop's top the pawn is higher than at rest and the shadow smaller and fainter.
+          const rest = await pose("me", 0);
+          const top = await pose("me", 0.37 * 1800);
+          expect(top.y, "the pawn rises").toBeLessThan(rest.y - 5);
+          expect(top.shadowScale, "the shadow shrinks as it rises").toBeLessThan(rest.shadowScale - 0.2);
+          expect(top.shadowOpacity, "and fades").toBeLessThan(rest.shadowOpacity - 0.05);
+        }
+      } else {
+        expect(mine, `${who} resting: nothing animates`).toHaveLength(0);
+        idle++;
+      }
+    }
+  }
+  expect(posed, "your pawn hopped").toBe(true);
+  expect(idle, "the pawns spend most of their time still").toBeGreaterThan(80);
+  const hops = await hopsSeen(page);
+  for (const who of ["me", "opp"] as const) {
+    const { on, off } = hops[who];
+    // In 28 s: a first hop within the first 7 s, then one every 7 to 10 s: three or four hops.
+    expect(on.length, `${who}'s hops`).toBeGreaterThanOrEqual(3);
+    expect(on.length).toBeLessThanOrEqual(5);
+    expect(on[0]! - mountedAt, `${who}: the first hop comes within the first 7 s`).toBeLessThanOrEqual(7000);
+    for (let i = 1; i < on.length; i++) {
+      const wait = on[i]! - on[i - 1]!;
+      expect(wait, `${who}: the wait before hop ${i + 1} is ${wait} ms`).toBeGreaterThanOrEqual(6990);
+      expect(wait, `${who}: the wait before hop ${i + 1} is ${wait} ms`).toBeLessThanOrEqual(10_010);
+    }
+    // Each hop's class stays on for one hop (1.8 s), then comes off.
+    for (let i = 0; i < off.length; i++) expect(Math.abs(off[i]! - on[i]! - 1800), `${who}: hop ${i + 1} lasts 1.8 s`).toBeLessThanOrEqual(10);
+  }
+  // Their own draws: the two pawns never hop at the same moment, and the gap between them changes from hop to hop.
+  const gaps = hops.me.on.slice(0, 3).map((t, i) => hops.opp.on[i]! - t);
+  expect(gaps.every((g) => g !== 0)).toBe(true);
+  expect(new Set(gaps).size, "the pawns drift apart").toBe(gaps.length);
+  expect(errors).toEqual([]);
+});
+
+test("the pawns stay still under reduced motion: no hop at all", async ({ page }) => {
+  const errors = watchErrors(page);
+  await recordHops(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.reload();
+  await page.clock.install();
+  await page.goto("/autochess?seed=9");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  expect(await anims()).toEqual([]);
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
+  for (let t = 0; t < 20_000; t += 1000) {
+    await page.clock.runFor(1000);
+    expect(await hopAnims(page)).toEqual([]);
+  }
+  const hops = await hopsSeen(page);
+  expect(hops.me.on).toEqual([]);
+  expect(hops.opp.on).toEqual([]);
+  await expect(page.locator(".ac-pawn.hopping")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("each pawn has one shadow: the hopping pawn's own, that shrinks and fades as it rises; the dressed pawn's own ground shadow is hidden here and still shown elsewhere", async ({ page }) => {
+  const errors = watchErrors(page);
+  // Dress your pawn as a snowman (its art draws its own ground shadow, which stayed under the pawn as it hopped): the profile's look comes from the server.
+  await page.route(/\/api\/me(\?.*)?$/, async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    body.locker = { ...(body.locker ?? {}), look: { skin: { def: "snowman", color: "#f8fafc", blemish: 0, seed: 1 } } };
+    await route.fulfill({ response: res, json: body });
+  });
+  await page.goto(PLAIN);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  // The snowman is drawn (with its own ground shadow in its art), and that shadow is not shown.
+  const own = page.locator(".ac-me .avatar-skin .skin-shadow");
+  await expect(own).toHaveCount(1);
+  expect(await own.evaluate((el) => getComputedStyle(el).display)).toBe("none");
+  // Exactly one shadow under each pawn: `.ac-shadow`, a flat dark ellipse on the ground; no other shadow box, ::after or filter on the pawn.
+  for (const who of ["me", "opp"]) {
+    await expect(page.locator(`.ac-${who} .ac-shadow`)).toHaveCount(1);
+    const shadows = await page.locator(`.ac-${who} .ac-pawn`).evaluate((pawn) => {
+      const visible = (el: Element) => getComputedStyle(el).display !== "none";
+      return {
+        ellipses: [...pawn.querySelectorAll("ellipse")].filter(visible).length,
+        afters: [pawn, ...pawn.querySelectorAll("*")].filter((el) => getComputedStyle(el, "::after").content !== "none" && getComputedStyle(el, "::after").content !== "normal").length,
+        filters: [pawn, ...pawn.querySelectorAll(":scope > *, .fd-pawn-box, .avatar")].filter((el) => /drop-shadow/.test(getComputedStyle(el).filter)).length,
+        // (The level badge's ring is a box-shadow of 0 blur, not a shadow under the pawn.)
+        boxShadows: [pawn, ...pawn.querySelectorAll(":scope > *, .fd-pawn-box, .avatar")].filter((el) => !el.classList.contains("ac-badge") && getComputedStyle(el).boxShadow !== "none").length,
+        own: pawn.classList.contains("shadow"),
+      };
+    });
+    expect(shadows, `${who}'s pawn`).toEqual({ ellipses: 0, afters: 0, filters: 0, boxShadows: 0, own: false });
+  }
+  // Only here: the same art on any other screen keeps its shadow (the rule is scoped to the pawn on this screen).
+  const elsewhere = await page.evaluate(() => {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const e = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+    e.setAttribute("class", "skin-shadow");
+    svg.appendChild(e);
+    document.body.appendChild(svg);
+    const d = getComputedStyle(e).display;
+    svg.remove();
+    return d;
+  });
+  expect(elsewhere).not.toBe("none");
   expect(errors).toEqual([]);
 });
 
@@ -1118,16 +1273,16 @@ test("tap one of their bench pieces: a red ring on it and its landing square lig
   const errors = watchErrors(page);
   await page.goto(HELD);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  // Their bench shows real pieces (a rook for h6 and a bishop for e7 here), each with its square, on the color of that square, and the pieces are drawn black.
+  // Their bench shows real pieces (a rook for e7 and a bishop for c8 here), each with its square, on the color of that square, and the pieces are drawn black.
   const tiles = theirBench(page).locator(".ac-slot.has");
   await expect(tiles).toHaveCount(2, { timeout: 8000 });
   await expect(tiles.nth(0)).toHaveAttribute("data-kind", "r");
-  await expect(tiles.nth(0)).toHaveAttribute("data-square", "h6");
-  await expect(tiles.nth(0).locator("em")).toHaveText("h6");
-  await expect(tiles.nth(0)).toHaveClass(isDark("h6") ? /\bd\b/ : /\bl\b/);
+  await expect(tiles.nth(0)).toHaveAttribute("data-square", "e7");
+  await expect(tiles.nth(0).locator("em")).toHaveText("e7");
+  await expect(tiles.nth(0)).toHaveClass(isDark("e7") ? /\bd\b/ : /\bl\b/);
   await expect(tiles.nth(0).locator("piece")).toHaveClass(/black/);
   await expect(tiles.nth(1)).toHaveAttribute("data-kind", "b");
-  await expect(tiles.nth(1)).toHaveAttribute("data-square", "e7");
+  await expect(tiles.nth(1)).toHaveAttribute("data-square", "c8");
   // A tile is a real target: 44 px tall.
   expect((await tiles.nth(0).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await expect(page.locator(".ac-red")).toHaveCount(0);
@@ -1136,11 +1291,11 @@ test("tap one of their bench pieces: a red ring on it and its landing square lig
   await tap(page, tiles.nth(0));
   await expect(tiles.nth(0)).toHaveClass(/tapped/);
   await expect(page.locator(".ac-red")).toHaveCount(1);
-  await expect(page.locator(".ac-red")).toHaveAttribute("data-square", "h6");
+  await expect(page.locator(".ac-red")).toHaveAttribute("data-square", "e7");
   const red = (await page.locator(".ac-red").boundingBox())!;
-  const h6 = await center(page, "h6");
-  expect(Math.abs(red.x + red.width / 2 - h6.x)).toBeLessThan(1.5);
-  expect(Math.abs(red.y + red.height / 2 - h6.y)).toBeLessThan(1.5);
+  const rookSq = await center(page, "e7");
+  expect(Math.abs(red.x + red.width / 2 - rookSq.x)).toBeLessThan(1.5);
+  expect(Math.abs(red.y + red.height / 2 - rookSq.y)).toBeLessThan(1.5);
   expect(await page.locator(".ac-red").evaluate((el) => getComputedStyle(el).backgroundColor)).toMatch(/^rgba\(220, 38, 38/);
   expect(await tiles.nth(0).evaluate((el) => getComputedStyle(el).boxShadow)).toMatch(/220, 38, 38/);
   // It is on their half (the top, as White is at the bottom), and over the whole square.
@@ -1152,7 +1307,7 @@ test("tap one of their bench pieces: a red ring on it and its landing square lig
   await expect(tiles.nth(0)).not.toHaveClass(/tapped/);
   await expect(tiles.nth(1)).toHaveClass(/tapped/);
   await expect(page.locator(".ac-red")).toHaveCount(1);
-  await expect(page.locator(".ac-red")).toHaveAttribute("data-square", "e7");
+  await expect(page.locator(".ac-red")).toHaveAttribute("data-square", "c8");
   // A second tap on the same one clears it.
   await tap(page, tiles.nth(1));
   await expect(page.locator(".ac-red")).toHaveCount(0);
@@ -1221,7 +1376,7 @@ test("the phase banners on the board: ACTION PHASE as buying begins, the big 3-2
   expect(style.blur).toContain("blur");
   expect(style.radius).toBeGreaterThan(8);
   expect(style.bg).toMatch(/^rgba\(/);
-  // No hint text under the board any more: nothing but the clock's numbers, its name and the benches.
+  // No hint text under the board any more: nothing but a short message for a moment, and the benches.
   await expect(page.locator(".ac-msg, .ac-card-say, .ac-hint")).toHaveCount(0);
   // The move clock: the app's own bars along the board's top and bottom (6 px, green at the start), shrinking toward the middle as the step runs.
   await expect(page.locator(".ac-frame > .timer-bar")).toHaveCount(2);
@@ -1240,10 +1395,10 @@ test("the phase banners on the board: ACTION PHASE as buying begins, the big 3-2
   const f1 = await fill();
   expect(f1.w, "the bar shrinks as the time runs").toBeLessThan(f0.w - 10);
   expect(f1.bg).not.toBe("rgba(0, 0, 0, 0)");
-  // The clock's numbers and the step's name under the board, small, with no box.
+  // The clock's numbers and the step's name in the gold row (v7.1), small, with no box.
   await expect(clockOf(page)).toHaveText(/^0:0[4-7]$/);
   await expect(stepLabel(page)).toHaveText("Buy");
-  expect(await page.locator(".ac-timer").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+  expect(await page.locator(".ac-clock").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
   // The 3-2-1 for the last seconds, the app's own big numbers, and the shop shut with them.
   const count = page.locator(".ac-banner[data-banner=count] .cc-num");
   await expect(count).toHaveText(/^[321]$/, { timeout: 8000 });
@@ -1462,10 +1617,11 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   await watchFight(page);
   // To a result (through the move step and the fight).
   await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 150_000 });
-  // The fight: "Move N of 60" under "Fight" by the board, with its rules in the box, the moves highlighted on the board.
+  // The fight: "Fight" and the move count ("12/60") in the gold row's clock (its spoken label "Move 12 of 60"), with its rules in the box, the moves highlighted on the board.
   const fight = await fightSeen(page);
   expect(fight.fight).toBe(true);
   expect(fight.say).toMatch(/^Move \d+ of 60/);
+  expect(fight.count).toMatch(/^\d+\/60$/);
   expect(fight.label).toBe("Fight");
   expect(fight.text).toContain("A side left with only its king loses. Gains count, not army size: 3 pawns gained for 6 moves wins,");
   expect(fight.text).toContain("and a stall (repeats, 10 moves each with no capture, or 60) goes to the side that gained more.");
@@ -1485,22 +1641,25 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   expect(gold).toMatch(new RegExp(`^Next round: ${left} saved \\+ 120 income`));
   const [youHp, botHp] = [await hp(page, "you"), await hp(page, "bot")];
   if (head.startsWith("You win")) {
-    expect(youHp).toBe(20);
-    expect(botHp).toBe(20 - Number(lost![1]));
-    expect(botHp).toBeLessThan(20);
+    expect(youHp).toBe(24);
+    expect(botHp).toBe(24 - Number(lost![1]));
+    expect(botHp).toBeLessThan(24);
   } else if (head.startsWith("You lose")) {
-    expect(botHp).toBe(20);
-    expect(youHp).toBe(20 - Number(lost![1]));
-    expect(youHp).toBeLessThan(20);
+    expect(botHp).toBe(24);
+    expect(youHp).toBe(24 - Number(lost![1]));
+    expect(youHp).toBeLessThan(24);
   } else {
-    expect([youHp, botHp]).toEqual([20, 20]);
+    expect([youHp, botHp]).toEqual([24, 24]);
     expect(words).toContain("Nobody loses HP.");
   }
-  // The loss is 2 plus 1 for every enemy piece (not the king) left: never under 2 for a lost round.
-  if (lost) expect(Number(lost[1])).toBeGreaterThanOrEqual(2);
+  // The loss is the round's number (1) plus 1 for every 3 enemy pieces (not the king) left: round 1 costs 1 to 3, never under 1 for a lost round.
+  if (lost) {
+    expect(Number(lost[1])).toBeGreaterThanOrEqual(1);
+    expect(Number(lost[1])).toBeLessThanOrEqual(3);
+  }
   // The final position stays on the board for a look; the result is in the box under it.
   expect(await page.locator(BOARD_SEL.piece).count()).toBeGreaterThanOrEqual(2);
-  // (A match can't end in one round: the most a lost round costs is 2 + 14.)
+  // (A match can't end in one round: a lost round 1 costs 3 at most, of 24.)
   await expect(root(page)).toHaveAttribute("data-phase", "result");
   // Both benches are still there for the result: yours holds the bishop.
   await expect(held(page)).toHaveCount(1);
@@ -1642,13 +1801,17 @@ test("a side that starts the fight with only its king loses at once: the round i
   const words = (await page.locator(".ac-card .ac-card-text").innerText()).trim();
   expect(words).toMatch(/^A side left with only its king loses at once\. You lose (\d+) HP\.$/);
   const lost = Number(words.match(/You lose (\d+) HP/)![1]);
-  // 2 for the loss and 1 for each of their pieces left (all of them: nothing was played).
-  expect(lost).toBeGreaterThanOrEqual(3);
-  expect(await hp(page, "you")).toBe(20 - lost);
-  expect(await hp(page, "bot")).toBe(20);
   // No move was played: the board is the position the fight started from (every piece of theirs still there).
   await expect(page.locator(`${BOARD_SEL.square}.last-move`)).toHaveCount(0);
-  expect(await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count()).toBe(lost - 2);
+  const theirs = await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count();
+  expect(theirs, "they bought something").toBeGreaterThanOrEqual(1);
+  // A lost round 1 (v7.1, Eric Oct 22): 1 (the round's number) plus 1 for every 3 of their pieces left (all of them: nothing was played), rounded down: 1 to 3 in all, of 24 HP.
+  expect(lost).toBe(1 + Math.floor(theirs / 3));
+  expect(lost).toBeGreaterThanOrEqual(1);
+  expect(lost).toBeLessThanOrEqual(3);
+  expect(await hp(page, "you")).toBe(24 - lost);
+  expect(await hp(page, "bot")).toBe(24);
+  await expect(root(page)).toHaveAttribute("data-round", "1");
   // Nothing spent, nothing lost: the gold is saved, with the interest and the income.
   await expect(page.locator(".ac-card-gold")).toHaveText("Next round: 100 saved + 120 income + 10 interest = 230 gold");
   const box = await page.locator(".ac-card").evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight, buttons: (el.querySelector(".ac-go") as HTMLElement).getBoundingClientRect().bottom - el.getBoundingClientRect().bottom }));
@@ -1684,10 +1847,15 @@ const measure = (p: Page) =>
       board: { w: board.width, h: board.height, left: board.left, right: board.right, top: board.top },
       dockBottom: dock.bottom,
       gaps: { top: frame.top - them.bottom, bottom: you.top - frame.bottom },
+      // (v7.1: the benches' outer edges are the board frame's.)
+      frameEdges: { left: frame.left, right: frame.right, w: frame.width },
+      boardEdges: { left: board.left, right: board.right },
       benchRight: you.right,
-      bottomRight: bottomRow.right,
       benchLeft: them.left,
-      topLeft: topRow.left,
+      col: rect(".ac-col").width,
+      free: innerHeight - dock.bottom,
+      bottomRow: { left: bottomRow.left, right: bottomRow.right },
+      topRow: { left: topRow.left, right: topRow.right },
       targets: {
         buttons: all(".ac-btn").map((b) => ({ w: b.width, h: b.height })),
         cards: all(".ac-buy").map((b) => ({ w: b.width, h: b.height, l: b.left, r: b.right })),
@@ -1706,11 +1874,33 @@ const measure = (p: Page) =>
         const row = rect(".ac-goldrow");
         const pill = rect(".ac-odds");
         const gold = document.querySelector(".ac-gold-you b")!;
-        return { left: row.left, right: row.right, pillLeft: pill.left, pillRight: pill.right, pillH: pill.height, baselineGold: base(gold), baselines: [...document.querySelectorAll(".ac-od b")].map(base), incomeWord: incomeWord ? getComputedStyle(incomeWord).display : "none", income: (document.querySelector(".ac-income b") as HTMLElement).getBoundingClientRect().right };
+        const clock = rect(".ac-clock");
+        const streak = document.querySelector(".ac-streak")?.getBoundingClientRect();
+        return {
+          left: row.left,
+          right: row.right,
+          pillLeft: pill.left,
+          pillRight: pill.right,
+          pillH: pill.height,
+          baselineGold: base(gold),
+          baselines: [...document.querySelectorAll(".ac-od b")].map(base),
+          incomeWord: incomeWord ? getComputedStyle(incomeWord).display : "none",
+          income: (document.querySelector(".ac-income b") as HTMLElement).getBoundingClientRect().right,
+          clockLeft: clock.left,
+          clockRight: clock.right,
+          clockBase: base(document.querySelector(".ac-clock .ac-step")!),
+          streakRight: streak?.right ?? null,
+          streakLeft: streak?.left ?? null,
+          over: (document.querySelector(".ac-goldrow") as HTMLElement).scrollWidth - (document.querySelector(".ac-goldrow") as HTMLElement).clientWidth,
+          clockBox: getComputedStyle(document.querySelector(".ac-clock")!).backgroundColor,
+        };
       })(),
-      timer: (() => {
-        const t = rect(".ac-timer");
-        return { l: t.left, r: t.right, bench: you.left, pawnR: rect(".ac-me").right };
+      // The Sell button's gap (between your pawn and your bench), and the message under the bench's row (when one shows).
+      spot: (() => {
+        const gap = rect(".ac-spot");
+        const say = document.querySelector(".ac-bottom > .say")?.getBoundingClientRect();
+        const sayEl = document.querySelector(".ac-bottom > .say") as HTMLElement | null;
+        return { l: gap.left, r: gap.right, bench: you.left, benchBottom: you.bottom, pawnR: rect(".ac-me").right, say: say ? { l: say.left, r: say.right, t: say.top, b: say.bottom, over: sayEl!.scrollWidth - sayEl!.clientWidth } : null };
       })(),
       who: (() => {
         const w = rect(".ac-who");
@@ -1719,7 +1909,7 @@ const measure = (p: Page) =>
     };
   });
 
-test("layouts: nothing scrolls, every target is at least 44 px (a tile 34 or more wide), the benches' gaps from the board are equal, and the odds pill fits the gold row, at every phone size and on a computer", async ({ page }) => {
+test("layouts: nothing scrolls, every target is at least 44 px (a tile 34 or more wide), the benches sit on the board's edges with equal gaps from it, the gold row holds gold, income, the clock, the odds pill and the streak, and the board is as big as fits, at every phone size and on a computer", async ({ page }) => {
   const errors = watchErrors(page);
   const sizes = phone()
     ? ([[320, 568], [360, 640], [375, 667], [390, 664], [390, 844], [414, 896], [430, 932]] as const)
@@ -1729,9 +1919,18 @@ test("layouts: nothing scrolls, every target is at least 44 px (a tile 34 or mor
     await page.goto(TWOQ);
     await expect(root(page)).toHaveAttribute("data-phase", "buy");
     await tap(page, card(page, 0));
-    // Your gold at its widest, a real one: a message in the small spot too ("Need 22 more").
+    // Your gold at its widest, a real one: a message under the bench's row too ("Need 22 more").
     await card(page, 3).click({ force: true });
     await expect(say(page)).toHaveText("Need 22 more");
+    // The gold row at its widest, as a long match makes it (Eric: check at the widest realistic value): 3 digits of gold, an income of +200, a W10 streak.
+    await page.evaluate(() => {
+      document.querySelector(".ac-gold-you b")!.textContent = "999";
+      document.querySelector(".ac-income b")!.textContent = "+200";
+      const streak = document.createElement("span");
+      streak.className = "ac-streak";
+      streak.textContent = "W10";
+      document.querySelector(".ac-goldrow")!.appendChild(streak);
+    });
     const m = await measure(page);
     const where = `${w}×${h}`;
     expect(m.down, `${where}: scrolling down`).toBeLessThanOrEqual(0);
@@ -1763,33 +1962,48 @@ test("layouts: nothing scrolls, every target is at least 44 px (a tile 34 or mor
     expect(m.who.r, `${where}: and left of their pawn`).toBeLessThanOrEqual(m.who.pawn + 2);
     // The benches are the same distance from the board (the clock's bar and a little air), theirs top left and yours bottom right.
     expect(Math.abs(m.gaps.top - m.gaps.bottom), `${where}: the benches' gaps ${m.gaps.top} and ${m.gaps.bottom}`).toBeLessThanOrEqual(1.5);
-    expect(Math.abs(m.benchRight - m.bottomRight), `${where}: your bench ends at the column's right edge`).toBeLessThanOrEqual(1);
-    expect(Math.abs(m.benchLeft - m.topLeft), `${where}: their bench starts at its left edge`).toBeLessThanOrEqual(1);
-    // The clock's numbers and the message sit in the gap, clear of the pawn and the bench.
-    expect(m.timer.l, `${where}: the gap`).toBeGreaterThanOrEqual(m.timer.pawnR - 14);
-    expect(m.timer.r, `${where}: the gap`).toBeLessThanOrEqual(m.timer.bench + 1);
-    // The gold row: gold, income, and the odds pill, inside the screen, on one baseline; "Income" is dropped at 320 (the "+140" stays).
-    expect(m.goldRow.pillRight, `${where}: the pill inside the row`).toBeLessThanOrEqual(m.goldRow.right + 0.5);
-    expect(m.goldRow.pillLeft, `${where}: the pill clear of the income`).toBeGreaterThan(m.goldRow.income + 4);
+    // The benches' outer edges are the board's (v7.1): theirs on its left edge, yours on its right, at any size of the board.
+    expect(Math.abs(m.benchLeft - m.frameEdges.left), `${where}: their bench starts on the board's left edge`).toBeLessThanOrEqual(1);
+    expect(Math.abs(m.benchRight - m.frameEdges.right), `${where}: your bench ends on the board's right edge`).toBeLessThanOrEqual(1);
+    // The Sell button's gap is between your pawn and your bench; a message is under the bench's row, clear of the pawn, inside the board's right edge, on one or two lines.
+    expect(m.spot.l, `${where}: the gap`).toBeGreaterThanOrEqual(m.spot.pawnR - 1);
+    expect(m.spot.r, `${where}: the gap`).toBeLessThanOrEqual(m.spot.bench + 1);
+    expect(m.spot.say, `${where}: the message shows`).not.toBeNull();
+    expect(m.spot.say!.t, `${where}: the message is under the bench's row`).toBeGreaterThanOrEqual(m.spot.benchBottom - 1);
+    expect(m.spot.say!.l, `${where}: the message is clear of the pawn`).toBeGreaterThanOrEqual(m.spot.pawnR - 1);
+    expect(m.spot.say!.r, `${where}: the message ends by the board's right edge`).toBeLessThanOrEqual(m.frameEdges.right + 1);
+    expect(m.spot.say!.over, `${where}: the message fits`).toBeLessThanOrEqual(0);
+    // The gold row: gold, income, the clock (the time, and the step's name under it), the odds pill and the streak, inside the screen, in that order and clear of each other,
+    // the pill's percents, the clock's step name and the gold number on one baseline; "Income" is dropped under 415 wide (the "+200" stays); nothing overflows the row.
+    expect(m.goldRow.over, `${where}: nothing overflows the gold row`).toBeLessThanOrEqual(0);
+    expect(m.goldRow.clockLeft, `${where}: the clock is right of the income`).toBeGreaterThan(m.goldRow.income + 2);
+    expect(m.goldRow.pillLeft, `${where}: the pill is right of the clock`).toBeGreaterThan(m.goldRow.clockRight + 2);
+    expect(m.goldRow.streakLeft!, `${where}: the streak is right of the pill`).toBeGreaterThan(m.goldRow.pillRight + 2);
+    expect(m.goldRow.streakRight!, `${where}: the streak is inside the row`).toBeLessThanOrEqual(m.goldRow.right + 0.5);
+    expect(m.goldRow.clockBox, `${where}: the clock has no box`).toBe("rgba(0, 0, 0, 0)");
     expect(m.goldRow.pillH, `${where}: a small pill`).toBeLessThan(44);
     for (const y of m.goldRow.baselines) expect(Math.abs(y - m.goldRow.baselineGold), `${where}: baselines`).toBeLessThanOrEqual(1);
-    expect(m.goldRow.incomeWord, `${where}: "Income"`).toBe(w <= 350 ? "none" : "inline");
-    await expect(page.locator(".ac-income b")).toHaveText("+100");
-    // Every phone gets some free room at the bottom (the odds strip's room: the shop moved up). On a computer the dock isn't at the bottom.
-    if (phone()) expect(h - m.dockBottom, `${where}: free room at the bottom`).toBeGreaterThanOrEqual(8);
-    // A phone's board is as wide as the room allows; the others' room is the height.
-    if (w <= 430) expect(m.board.w, `${where}`).toBeGreaterThan(Math.min(w - 40, h - 420) - 6);
+    expect(Math.abs(m.goldRow.clockBase - m.goldRow.baselineGold), `${where}: the step's name is on the gold number's baseline`).toBeLessThanOrEqual(1.5);
+    expect(m.goldRow.incomeWord, `${where}: "Income"`).toBe(w <= 414 ? "none" : "inline");
+    await expect(page.locator(".ac-income b")).toHaveText("+200");
+    // Every phone gets some free room at the bottom (Eric: some free space; about 12 px is kept, and the page doesn't scroll if a result runs a few lines longer). On a computer the dock isn't at the bottom.
+    if (phone()) expect(h - m.dockBottom, `${where}: free room at the bottom`).toBeGreaterThanOrEqual(11.5);
+    // The board is as big as fits: as wide as the column, or as tall as the room leaves with the free room kept (about 12 px).
+    if (phone()) expect(m.frameEdges.w >= m.col - 1 || Math.abs(m.free - 12) <= 1.5, `${where}: the board is as big as fits (frame ${m.frameEdges.w} of ${m.col}, ${m.free} free)`).toBe(true);
   }
   expect(errors).toEqual([]);
 });
 
-test("layouts: the short words of every message fit the small spot at 320 px (at most 3 lines, clear of the pawn and the bench), and the 'Sell' button sits in the gap without moving a row", async ({ page }) => {
+test("layouts: the short words of every message fit under the bench's row at 320 px (at most 2 lines, clear of the pawn, inside the board's edge), and the 'Sell' button sits in the gap beside the bench without moving a row", async ({ page }) => {
   test.skip(!phone(), "320 px");
   const errors = watchErrors(page);
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto(TWOQ);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await tap(page, card(page, 0));
+  // (A real message first, so its box is there to lay the others into.)
+  await card(page, 3).click({ force: true });
+  await expect(say(page)).toBeVisible();
   // Every message the screen can say (the longest first), laid into the spot.
   const words = [
     "Board full. Drag to bench",
@@ -1814,19 +2028,18 @@ test("layouts: the short words of every message fit the small spot at 320 px (at
   const before = await page.evaluate(() => ({ bottom: document.querySelector(".ac-bottom")!.getBoundingClientRect().height, dock: document.querySelector(".ac-dock")!.getBoundingClientRect().top }));
   for (const text of words) {
     const r = await page.evaluate((t) => {
-      const spans = document.querySelector(".ac-timer")!;
-      const sp = spans.querySelector("span")!;
-      sp.className = "say";
+      const sp = document.querySelector(".ac-bottom > .say")!;
       sp.textContent = t;
       const b = sp.getBoundingClientRect();
       const lineH = parseFloat(getComputedStyle(sp).lineHeight);
       const me = document.querySelector(".ac-me")!.getBoundingClientRect();
       const bench = document.querySelector(".ac-bench.you")!.getBoundingClientRect();
-      return { lines: Math.round(b.height / lineH), l: b.left, r: b.right, me: me.right, bench: bench.left, bottom: document.querySelector(".ac-bottom")!.getBoundingClientRect().height, dock: document.querySelector(".ac-dock")!.getBoundingClientRect().top, over: sp.scrollWidth - sp.clientWidth };
+      return { lines: Math.round((b.height - 4) / lineH), l: b.left, r: b.right, t: b.top, me: me.right, bench: bench.right, benchBottom: bench.bottom, bottom: document.querySelector(".ac-bottom")!.getBoundingClientRect().height, dock: document.querySelector(".ac-dock")!.getBoundingClientRect().top, over: sp.scrollWidth - sp.clientWidth };
     }, text);
-    expect(r.lines, `"${text}": lines`).toBeLessThanOrEqual(3);
-    expect(r.l, `"${text}": clear of the pawn`).toBeGreaterThanOrEqual(r.me - 8);
-    expect(r.r, `"${text}": clear of the bench`).toBeLessThanOrEqual(r.bench + 1);
+    expect(r.lines, `"${text}": lines`).toBeLessThanOrEqual(2);
+    expect(r.l, `"${text}": clear of the pawn`).toBeGreaterThanOrEqual(r.me - 1);
+    expect(r.r, `"${text}": inside the board's right edge`).toBeLessThanOrEqual(r.bench + 1);
+    expect(r.t, `"${text}": under the bench's row`).toBeGreaterThanOrEqual(r.benchBottom - 1);
     expect(r.over, `"${text}": no overflow`).toBeLessThanOrEqual(0);
     expect(r.bottom, `"${text}": the row doesn't grow`).toBeLessThanOrEqual(before.bottom + 0.5);
     expect(r.dock, `"${text}": the dock doesn't move`).toBeLessThanOrEqual(before.dock + 0.5);
@@ -1838,10 +2051,11 @@ test("layouts: the short words of every message fit the small spot at 320 px (at
   const sb = (await sell.boundingBox())!;
   expect(sb.height).toBeGreaterThanOrEqual(44);
   expect(sb.width).toBeGreaterThanOrEqual(44);
-  const timer = (await page.locator(".ac-timer").boundingBox())!;
+  const gap = (await page.locator(".ac-spot").boundingBox())!;
   const bench = (await youBench(page).boundingBox())!;
-  expect(sb.x).toBeGreaterThanOrEqual(timer.x - 1);
+  expect(sb.x).toBeGreaterThanOrEqual(gap.x - 1);
   expect(sb.x + sb.width).toBeLessThanOrEqual(bench.x + 1);
+  expect(Math.abs(sb.y - bench.y), "level with the bench").toBeLessThanOrEqual(2);
   const after = await page.evaluate(() => ({ bottom: document.querySelector(".ac-bottom")!.getBoundingClientRect().height, dock: document.querySelector(".ac-dock")!.getBoundingClientRect().top }));
   expect(after.bottom).toBeLessThanOrEqual(before.bottom + 0.5);
   expect(after.dock).toBeLessThanOrEqual(before.dock + 0.5);
@@ -1887,6 +2101,75 @@ test("layouts: the board never moves from step to step (buy, move, fight, result
       expect(Math.abs(step.dockTop - buy.dockTop), `${where}, ${name}: the dock's top`).toBeLessThan(1);
       expect(step.dockBottom, `${where}, ${name}: the box on screen`).toBeLessThanOrEqual(h);
     }
+  }
+  expect(errors).toEqual([]);
+});
+
+test("the benches sit flush with the board (v7.1, Eric Oct 22): their bench's left edge on the board's left edge and yours' right edge on its right edge, at 393 x 730, 428 x 777 (Eric's iPhone), 320 x 568 and the sizes between, and the board is bigger than v7's", async ({ page }) => {
+  const errors = watchErrors(page);
+  // (The board's squares in v7, measured on main before this change: the room it left at the bottom is now the board's.)
+  // (A phone whose width is the limit, 390 x 844 and up, already had the column's width: its board stays as it was, never smaller.)
+  const sizes = phone()
+    ? ([[393, 730, 352, 3], [428, 777, 292, 3], [320, 568, 208, 3], [375, 667, 292, 3], [360, 640, 273, 3], [390, 844, 360, -0.5], [430, 932, 400, -0.5]] as const)
+    : ([[1280, 800, 484, 3], [1280, 600, 336, 3]] as const);
+  for (const [w, h, before, grow] of sizes) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto(PLAIN);
+    await expect(root(page)).toHaveAttribute("data-phase", "buy");
+    const where = `${w}×${h}`;
+    const m = await page.evaluate(() => {
+      const r = (sel: string) => document.querySelector(sel)!.getBoundingClientRect();
+      const frame = r(".ac-frame");
+      const board = r(".hb-board");
+      const them = r(".ac-bench.them");
+      const you = r(".ac-bench.you");
+      return { frame: { l: frame.left, r: frame.right, w: frame.width }, board: { l: board.left, r: board.right, w: board.width }, them: { l: them.left, r: them.right }, you: { l: you.left, r: you.right }, col: r(".ac-col").width };
+    });
+    // The benches' outer edges are the frame's (the white edge of the board), to the pixel.
+    expect(Math.abs(m.them.l - m.frame.l), `${where}: their bench's left edge on the board's left edge`).toBeLessThanOrEqual(1);
+    expect(Math.abs(m.you.r - m.frame.r), `${where}: your bench's right edge on the board's right edge`).toBeLessThanOrEqual(1);
+    // And the squares' own edges are within the frame's 3 px and the squares' rounding (up to 8 device pixels).
+    expect(Math.abs(m.them.l - m.board.l), `${where}: ... and the squares' left edge`).toBeLessThanOrEqual(4);
+    expect(Math.abs(m.you.r - m.board.r), `${where}: ... and the squares' right edge`).toBeLessThanOrEqual(8);
+    // They follow the board: its size has grown since v7, and the benches stay on its edges whatever the size (never past them).
+    expect(m.board.w, `${where}: the board is bigger than v7's ${before}`).toBeGreaterThan(before + grow);
+    expect(m.them.l, `${where}: not left of the board`).toBeGreaterThanOrEqual(m.frame.l - 1);
+    expect(m.you.r, `${where}: not right of the board`).toBeLessThanOrEqual(m.frame.r + 1);
+  }
+  expect(errors).toEqual([]);
+});
+
+test("the clock is in the gold row (v7.1, Eric Oct 22): the small time with the step's name under it, between 'Income' and the odds pill, no box, and none under the board; it counts down and goes red as the step locks", async ({ page }) => {
+  const errors = watchErrors(page);
+  for (const [w, h] of phone() ? ([[320, 568], [393, 730], [428, 777]] as const) : ([[1280, 800]] as const)) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto(PLAIN);
+    await expect(root(page)).toHaveAttribute("data-phase", "buy");
+    const where = `${w}×${h}`;
+    // Where it is: a child of the gold row, after the gold and the income and before the odds pill; the old spot under the board has no clock.
+    const order = await page.locator(".ac-goldrow > *").evaluateAll((els) => els.map((e) => (e as HTMLElement).className.split(" ")[0]));
+    expect(order.slice(0, 3), `${where}: gold and income, the clock, the pill`).toEqual(["ac-purse", "ac-clock", "ac-odds"]);
+    await expect(page.locator(".ac-bottom .ac-clock, .ac-bottom .ac-timer, .ac-timer")).toHaveCount(0);
+    await expect(page.locator(".ac-purse .ac-income")).toBeVisible();
+    // Small, no box: the time in the same size as the gold number or under it, the name under the time, in small letters.
+    const look = await page.evaluate(() => {
+      const t = document.querySelector(".ac-clock b")!.getBoundingClientRect();
+      const n = document.querySelector(".ac-clock .ac-step")!.getBoundingClientRect();
+      const css = (sel: string) => getComputedStyle(document.querySelector(sel)!);
+      return { timeBottom: t.bottom, nameTop: n.top, nameLeft: n.left, nameRight: n.right, timeLeft: t.left, timeRight: t.right, timeFont: parseFloat(css(".ac-clock b").fontSize), goldFont: parseFloat(css(".ac-gold-you b").fontSize), nameFont: parseFloat(css(".ac-clock .ac-step").fontSize), bg: css(".ac-clock").backgroundColor, border: css(".ac-clock").borderTopWidth, shadow: css(".ac-clock").boxShadow };
+    });
+    expect(look.nameTop, `${where}: the name is under the time`).toBeGreaterThanOrEqual(look.timeBottom - 3);
+    expect(look.timeFont, `${where}: the time is no bigger than the gold`).toBeLessThanOrEqual(look.goldFont);
+    expect(look.nameFont, `${where}: the name is small`).toBeLessThanOrEqual(12);
+    expect([look.bg, look.border, look.shadow], `${where}: no box`).toEqual(["rgba(0, 0, 0, 0)", "0px", "none"]);
+    // It counts down (quick: a buy step of 7 s) and the step's last seconds are red ("Locked").
+    await expect(clockOf(page)).toHaveText(/^0:0[4-7]$/);
+    await expect(stepLabel(page)).toHaveText("Buy");
+    const first = Number((await clockOf(page).innerText()).slice(2));
+    await expect.poll(async () => Number((await clockOf(page).innerText()).slice(2))).toBeLessThan(first);
+    await expect(stepLabel(page)).toHaveText("Locked", { timeout: 8000 });
+    expect(await page.locator(".ac-clock").evaluate((el) => el.classList.contains("low"))).toBe(true);
+    expect(await clockOf(page).evaluate((el) => getComputedStyle(el).color), `${where}: red`).toBe("rgb(192, 55, 47)");
   }
   expect(errors).toEqual([]);
 });

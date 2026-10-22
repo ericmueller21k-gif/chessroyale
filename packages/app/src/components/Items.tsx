@@ -308,7 +308,7 @@ function Snowman({ p, side }: { p: Paint; side: "w" | "b" }) {
     <g>
       {/* Stick arms, behind the body. */}
       <path d="M38 45 L22 34 M27 37 L24 30 M62 45 L78 34 M73 37 L76 30" fill="none" stroke="#6b4423" {...lw(2.6)} stroke-linecap="round" />
-      <ellipse cx="50" cy="88" rx="26" ry="3.5" fill="#000" opacity="0.12" />
+      <ellipse class="skin-shadow" cx="50" cy="88" rx="26" ry="3.5" fill="#000" opacity="0.12" />
       <circle cx="50" cy="69" r="20" fill={snow} {...LINE} />
       <circle cx="50" cy="44" r="14" fill={snow} {...LINE} />
       <circle cx="50" cy="20" r="10.5" fill={snow} {...LINE} />
@@ -450,7 +450,7 @@ function Gingerbread({ p, side }: { p: Paint; side: "w" | "b" }) {
   };
   return (
     <g>
-      <ellipse cx="50" cy="92" rx="26" ry="3" fill="#000" opacity="0.12" />
+      <ellipse class="skin-shadow" cx="50" cy="92" rx="26" ry="3" fill="#000" opacity="0.12" />
       <Region p={p} name="cookie" d={[GINGER]} />
       <g fill="none" stroke={icing} stroke-linecap="round" stroke-linejoin="round" {...lw(1.8)}>
         <path d="M22.5 42 Q25 46.5 22.5 51" />
@@ -494,7 +494,7 @@ function Chimney({ p, side }: { p: Paint; side: "w" | "b" }) {
       <g transform="scale(2.2222)">
         <path d={PAWN_PATH} fill={side === "w" ? "#fff" : "#000"} stroke="#000" stroke-width="1.5" stroke-linecap="round" />
       </g>
-      <ellipse cx="50" cy="95" rx="30" ry="3" fill="#000" opacity="0.12" />
+      <ellipse class="skin-shadow" cx="50" cy="95" rx="30" ry="3" fill="#000" opacity="0.12" />
       <Region
         p={p}
         name="bricks"
