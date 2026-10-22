@@ -18844,6 +18844,13 @@ button.sq-tiny {
   }
 }
 
+/* A phone 381 to 414 wide has room to spare in the gold row once "Income" is gone: the pill's numbers get a little air. */
+@media (min-width: 381px) and (max-width: 414px) {
+  .ac-od {
+    min-width: 26px;
+  }
+}
+
 /* ---- A narrow phone (320) ---- */
 @media (max-width: 350px) {
   .ac-root {
