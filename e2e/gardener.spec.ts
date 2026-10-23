@@ -12,7 +12,7 @@ import { test, bossAloneFromHome, createLobbyFromHome, submitMove } from "./help
  * - Rules: the opening five seeds, the meter's two numbers in the view, a watering of ten seeds (`&power=water&seeds=10`) within the band, its
  *   outcomes where their rules allow, the plain plants blocking for 3 turns.
  * - The opening toss: his plant animation, five seeds arcing from his hand into the board's middle, each plopping, nothing left.
- * - A seed landing on the page's own clock (`&seedspeed=15`, a test switch: no 30 s wait) and the meter rising; a hidden page counts no seeds
+ * - A seed landing on the page's own clock (`&seedspeed=4`, a test switch: no 30 s wait; the second landing is the one it checks) and the meter rising; a hidden page counts no seeds
  *   and tosses no burst when it comes back.
  * - The watering on the board: the sweep, a sprout on every outcome's square as the front reaches it, then each outcome at its cue (a piece
  *   off at `snap`, a piece on at `pop`), the plain plants through green, fall and drop, gone; a move onto a plant refused with

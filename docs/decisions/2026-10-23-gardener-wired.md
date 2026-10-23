@@ -164,7 +164,7 @@ with `green` there every sprout grew into a tree (seen in the frames, not by a t
 
 Unit: `packages/app/test/gardener-wired.test.ts` (listed in the area page), the art's `gardener.test.ts` and `gardener-art.test.ts`, the roster, kit, king-attack
 (the face direction and the 64 squares), the effects' and FAQ tests with him added, and the lists that count the bosses (the roster, the lobby's pick, Big
-Boy's). E2E: `e2e/gardener.spec.ts` (nine: the rules' watering; the opening toss; a seed landing on `?seedspeed` and a hidden page; the watering on the board
+Boy's). E2E: `e2e/gardener.spec.ts` (eight: the rules' watering; the opening toss; a seed landing on `?seedspeed` and a hidden page; the watering on the board
 frame by frame; online with a reload; the bar at 320, 360, 390 and 1280; his king attack; his long lines), `king-attack.spec.ts`, `boss-select.spec.ts`
 (his tile and stage, fourteen tiles, the layout), `boss-smoke.spec.ts` (his passive and his ultimate fire within its time: the opening toss at the start, the
 admins' trigger for the watering), `formats.spec.ts`, `home-ranked.spec.ts`. Frame by frame: `node scripts/frames-gardener.mjs <dir> [stage] [phone|desktop]`.
