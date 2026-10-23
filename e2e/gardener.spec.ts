@@ -69,6 +69,7 @@ type Rec = {
   t: number;
   phase: string;
   anim: string | null;
+  caster: string | null;
   seeds: { sq: string; x: number; y: number }[];
   plops: string[];
   plants: string[];
@@ -126,6 +127,7 @@ async function record(page: Page, watch: string[] = []) {
         t: Date.now(),
         phase: w.match?.phase?.kind ?? "none",
         anim: char?.getAttribute("data-anim") ?? null,
+        caster: document.querySelector(".pm-caster canvas")?.getAttribute("data-frame") ?? null,
         seeds: [...document.querySelectorAll<HTMLElement>(".gd-seed")].map((e) => {
           const r = e.getBoundingClientRect();
           return { sq: e.dataset.square!, x: r.left + r.width / 2, y: r.top + r.height / 2 };
@@ -268,30 +270,43 @@ test("the opening's five seeds: his plant animation, five seeds arcing from his 
   expect(errors).toEqual([]);
 });
 
-test("a seed lands on the page's own clock (?seedspeed=15): the meter rises, his plant animation tosses one seed; a hidden page counts no seeds and tosses no burst", async ({ page }) => {
+test("a seed lands on the page's own clock (?seedspeed=4): the meter rises, his plant animation tosses one seed; a hidden page counts no seeds and tosses no burst", async ({ page }) => {
   test.skip(desktop(), "one run is enough: a phone");
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto(`${BASE}&seedspeed=15`);
+  // (A seed every 7.5 s of real time: the page's garden clock runs four times faster than the clock.)
+  await page.goto(`${BASE}&seedspeed=4`);
   await bossAloneFromHome(page);
+  await soundsFromPlay(page);
   await yourMove(page);
-  await page.waitForTimeout(3600);
-  await page.evaluate(() => ((window as any).__soundLog = []));
   await record(page);
   const meter = () => page.locator(".seed-meter");
-  // Five at the start; a seed every 2 s of real time now: the count rises one at a time, the bar fills between, and each lands a toss.
-  await expect.poll(async () => Number(await meter().getAttribute("data-seeds")), { timeout: 20_000 }).toBeGreaterThanOrEqual(6);
-  await expect(meter()).toContainText(/^Seeds [6-9]$/);
+  const start = Number(await meter().getAttribute("data-seeds"));
+  expect(start).toBeGreaterThanOrEqual(BOSS_POWERS.seedsAtStart);
+  // The count rises one at a time, the bar fills between, and the landing tosses a seed with his plant animation: the board's own
+  // drawing (its squares and pieces) is not redrawn for the timer, the toss or the meter.
+  const draws = () => page.evaluate(() => (document.querySelector(".hb-board") as (HTMLElement & { hbDraws?: number }) | null)?.hbDraws ?? -1);
+  const draws0 = await draws();
+  // (The first landing may come while the opening's own toss is still on: then only its seed flies, since his body never cuts another animation
+  // off. So the checks below are about the second landing, which comes with him at rest.)
+  await expect.poll(async () => Number(await meter().getAttribute("data-seeds")), { timeout: 20_000 }).toBeGreaterThan(start);
+  const mid = Number(await meter().getAttribute("data-seeds"));
+  await expect.poll(async () => Number(await meter().getAttribute("data-seeds")), { timeout: 20_000 }).toBeGreaterThan(mid);
   await page.waitForTimeout(2500);
+  expect(await draws(), "the board is not drawn again for a seed: its timer waits for the seed's time").toBe(draws0);
   const rec = await recorded(page);
   const counts = rec.filter((r) => r.meter).map((r) => r.meter!.seeds);
   for (let i = 1; i < counts.length; i++) expect(counts[i]! - counts[i - 1]!, "the count rises one seed at a time").toBeLessThanOrEqual(1);
-  const fills = rec.filter((r) => r.meter && r.meter.seeds === counts[0]).map((r) => r.meter!.fill);
-  expect(Math.max(...fills), "the bar fills toward the next seed").toBeGreaterThan(Math.min(...fills) + 20);
+  const label = rec.filter((r) => r.meter).map((r) => r.meter!.text);
+  expect(label.every((t) => /^Seeds \d+$/.test(t))).toBe(true);
+  // The seed has landed: the bar starts again from the bottom and fills toward the next one.
+  const fills = rec.filter((r) => r.meter && r.meter.seeds === mid + 1).map((r) => r.meter!.fill);
+  expect(Math.min(...fills), "the bar starts again from the bottom").toBeLessThan(15);
+  expect(Math.max(...fills), "the bar fills toward the next seed").toBeGreaterThan(Math.min(...fills) + 15);
   expect(rec.filter((r) => r.anim === "plant").length, "his plant animation").toBeGreaterThan(5);
-  const tossed = new Set(rec.flatMap((r) => r.seeds.map((s) => s.sq)));
-  expect(tossed.size, "a seed to a square of the middle").toBeGreaterThanOrEqual(1);
+  const tossed = new Set(rec.slice(rec.findIndex((r) => r.anim === "plant")).flatMap((r) => r.seeds.map((s) => s.sq)));
+  expect(tossed.size, "one seed to a square of the middle").toBeGreaterThanOrEqual(1);
   for (const sq of tossed) expect(sq).toMatch(/^[a-h][3-6]$/);
   const log = (await page.evaluate(() => (window as any).__soundLog as string[])).map((x) => x.split(":")[0]);
   expect(log, "a soft toss, never a grunt").not.toContain("gardenerGrunt");
@@ -304,14 +319,14 @@ test("a seed lands on the page's own clock (?seedspeed=15): the meter rises, his
   const at = Number(await meter().getAttribute("data-seeds"));
   await hide(true);
   await page.evaluate(() => ((window as any).__rec.length = 0));
-  await page.waitForTimeout(4500);
-  expect(Number(await meter().getAttribute("data-seeds")), "no seed counted while hidden").toBe(at);
+  await page.waitForTimeout(9000);
+  expect(Number(await meter().getAttribute("data-seeds")), "no seed counted while hidden (a seed is 7.5 s)").toBe(at);
   expect((await recorded(page)).every((r) => r.seeds.length === 0 && r.anim !== "plant"), "no toss while hidden").toBe(true);
   await hide(false);
-  await page.waitForTimeout(2600);
+  await page.waitForTimeout(3000);
   const after = await recorded(page);
   expect(Math.max(0, ...after.map((r) => r.seeds.length)), "a seed at a time, no burst for the time it didn't count").toBeLessThanOrEqual(1);
-  expect(Number(await meter().getAttribute("data-seeds")) - at).toBeLessThanOrEqual(2);
+  expect(Number(await meter().getAttribute("data-seeds")) - at).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });
 
@@ -382,7 +397,7 @@ test("his watering on the board: the sweep, a sprout per seed, each outcome at i
     }
   });
   // His cast and reaction.
-  expect(rec.some((r) => r.anim === "water"), "his cast").toBe(true);
+  expect(rec.some((r) => r.caster?.startsWith("water:")), "his cast at the board's corner").toBe(true);
   // The plain plants stay: drawn green on their squares, in the view, on the crowd's turn after the watering.
   expect(plants.length).toBeGreaterThan(0);
   await expect.poll(async () => (await recorded(page)).at(-1)!.plants.length, { timeout: 5_000 }).toBe(plants.length);
