@@ -367,9 +367,32 @@ build): online, phase 1 won is the crowd's victory):
   A move that brings a power's moment says nothing of its own (the moment's line is the boss's word that turn). Lights
   out's round prompt keeps its own box above the board for the whole round (and the dock). Each speaker's box keeps
   itself current (`VoiceBubble`: it listens to its voice and draws every frame while a line types and fades), so
-  nothing around it has to be drawn again for it. On a phone the boss's box is in the boss bar's name column (BossBar,
-  `.bc-bar-bubble`), from just above the bar's bottom edge upwards, never over the bar's status at its right or the line
-  and board under the bar.
+  nothing around it has to be drawn again for it. On a phone the boss's box is over the boss bar's bottom (BossBar,
+  `.bc-bar-bubble`), as small as its line (one or two lines, the font as ever, a thin frame; Eric, Oct 23: "his text box very
+  big"), in the grid area of the bar's first two columns, the room left of the status, so never over the status however
+  many lines it takes; it grows upward as the line needs (over the bars, then his name, then the title line above the bar for
+  a long line at 320 px) and never over the line and board under the bar.
+- **The boss bar and the level in it** (Eric, Oct 23; docs/decisions/2026-10-23-boss-bar.md): `BossBar` (`screens/Boss.tsx`) is a
+  figure (a phone) and a grid. **No skulls** in the battle bar (the select screen and the menus keep theirs; the threat is in the
+  bar's `aria-label`, "Puddles, threat 3 of 5"). At the left one column under the name, every row left aligned with it: **LVL**
+  (`BossLevel`), the ultimate's rage meter (`.boss-ult`: `RageMeter`, and Moo's moon beside it: `BossUi.ultBar`), then the
+  passive's bar when the boss has one (`.boss-passive`: `BossUi.bar`: Hollow's bulbs, Puddles' Seeds); a row with nothing in it
+  takes no room, and the Hidden Boss's phase 2 has none of the meters. **The status** ("Strikes in 3 moves", "58 moves left", the
+  results, "N of 4 won") at the top right. **Free room** under it (`.boss-prop`, the grid's two right columns in the second
+  row; a boss draws into it with `BossUi.barProp`, positioned inside it, nothing clipped; none does yet; the circus tiger's pump
+  will); `?barslot=1` outlines it with a dashed line. **The level** is the rating over `BOSS_LEVEL.divisor` (28) plus a random
+  offset of up to `spread` (10) either way drawn once from the battle's seed, from 1 to `max` (99): `bossLevelBase` (core
+  `boss.ts`), computed in the runner's `bossView` (`level`, `levelBase`; the same on every screen and after a reload), "LVL ???"
+  for the Hidden Boss (`BossDef.levelUnknown`, in both phases). Its rating is Boss alone's Maia rating (what the Boss raid
+  stage shows as "Rating 1400": `bossRatingShown`), else his strength in the battle. **It follows his strength**
+  (`runner.bossStrengthNow`): up to the engine's top (`ENGINE_MAX_ELO`) for the Full Moon's whole stretch (`BossRules.fullStretch`,
+  the crowd's turns between his moves too) and for a power's engine-best reply when he's to move (`bestReply`: Wrangler's reply
+  to the showdown), `weakDrop` (700 Elo, 25 levels) lower for the move the King's strike weakens (`staggerNext`); gold with a small
+  arrow while up, red with a quick slash while down (color only under reduced motion); heard as "Level 99" (a screen reader's
+  live region) or "Level unknown". A slip (`bossStumbles`), the bridge's Stockfish share and every scripted move leave it alone
+  (the decision file lists each place his strength changes and what it does for each). Tests: `packages/core/test/boss.test.ts`,
+  `packages/chess/test/moo.test.ts`, `pig.test.ts`, `recluse.test.ts`, `e2e/boss-bar.spec.ts` (every boss's bar and bubble at
+  320, 390, 428 and 1280; the Full Moon's lift and the strike's slash).
 - **Nothing said twice during a power** (Oct 15; DECISIONS.md, "Nothing said twice"): **the banner names the power**
   (with its line saying what it does to you, as before); **the dock says what it means for you, or just your clock**:
   through a moment it keeps the turn's own line ("Boss plays Nf6"), unless the moment has words of its own where no
@@ -561,7 +584,7 @@ A boss's rules are a `BossRules` object; every hook sees only its own boss's bat
 | `opening` | `fromStart`, `crowdWhite`, `setUp` before move 1 | Hollow, Big Boy (the snack), Sawyer (his cuts from turn 3) |
 | `view(p)` | Its fields for the screens (`NetBossPowers`) | Hollow, Big Boy, Sawyer, Wrangler (his meter `ready`, the `scout` cue), Moo & Moon (`stunned`, `fullMoon`), the hippo gardener (`garden`: the meter's `since` and `base`, `fixed`, the plants with `left`, his last watering, how many) |
 
-A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` words where no banner says what it means, `appearAt`, `own` screen, `line`, `lineAt`, `priority`, `view`), its ultimate's name for the warning, an optional `bar` piece by the rage meter and its `board` layer. A moment's line is said for it (its kit's line for the moment, as the moment begins, an ultimate's critical): a view never draws a boss's words itself. While a moment plays the boss's figure leaves its spot (it steps up to cast), unless the view's root has `pm-stay` (a moment it doesn't cast in: Ginger's thaw).
+A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` words where no banner says what it means, `appearAt`, `own` screen, `line`, `lineAt`, `priority`, `view`), its ultimate's name for the warning, an optional `bar` piece (its passive's bar, the row under the rage meter: Hollow's bulbs, Puddles' Seeds), `ultBar` (beside the rage meter: Moo's moon), `barProp` (its prop in the boss bar's free room at the right, under the status: none yet) and its `board` layer. A moment's line is said for it (its kit's line for the moment, as the moment begins, an ultimate's critical): a view never draws a boss's words itself. While a moment plays the boss's figure leaves its spot (it steps up to cast), unless the view's root has `pm-stay` (a moment it doesn't cast in: Ginger's thaw).
 
 ### Adding a boss
 

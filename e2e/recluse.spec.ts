@@ -132,6 +132,11 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes,
   expect(await intro.seen()).toEqual({ stare: true });
   let b = await bossNow(page);
   expect(b).toMatchObject({ id: "recluse", name: "Hidden Boss" });
+  // His level in the bar: "LVL ???" (Eric, Oct 23: Fischer's is not 100), heard as "Level unknown"; no number in the view.
+  expect(b.level).toBeNull();
+  await expect(page.locator(".boss-level .lv-text")).toHaveText("LVL ???");
+  await expect(page.locator(".boss-level .lv-sr")).toHaveText("Level unknown");
+  await expect(page.locator(".boss-level.lv-up, .boss-level.lv-down")).toHaveCount(0);
   // His brain: Maia at its top rating (2500 here), no guard, whatever your rating.
   await expect.poll(() => page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/^Maia 2500 · no guard/);
 
@@ -561,6 +566,10 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   expect(await words.seen()).toEqual({ dockRepeat: false, barPhase: false, beaten: false, clockLine: true });
   // Phase 2's bar: how many are won, nothing the title says; its subtitle: the variant alone.
   await expect(page.locator(".boss-next")).toHaveText(/^\d of 4 won$/);
+  // His level is unknown in phase 2 too ("LVL ???", Eric, Oct 23: Fischer's is not 100), his bar's meters gone as before.
+  await expect(page.locator(".boss-level .lv-text")).toHaveText("LVL ???");
+  await expect(page.locator(".boss-level .lv-sr")).toHaveText("Level unknown");
+  await expect(page.locator(".boss-bar .rage-meter")).toHaveCount(0);
   await expect(page.locator(".opening-name")).toHaveText(/· Chess960$/);
   // Phase 2: the God King gone (nothing to tap), the boss's look on where he stands.
   await expect(page.locator(".gk-unit.gone")).toHaveCount(1);
