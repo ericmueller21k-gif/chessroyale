@@ -48,7 +48,7 @@ Oct 23: "do the edge to edge on the bosses. And I may even say you could probabl
    phone and 6, 5, 5 wide. A new boss never leaves one tile alone on a row, and nobody has to edit CSS per boss (the old layout's
    "two rows of six and the last two on a third" was rewritten with every new boss).
 4. **Seven from 480 px.** A 560 px column (the Boss raid screen's most) with five to a row would make tiles 100 px wide and the
-   block 300 px tall. 480 is where the two layouts' tile sizes are closest (about 105 at five, 76 at seven). The breakpoint is the
+   block 300 px tall. Switching at 480 keeps the largest five-to-a-row tile at about 105 px (it would be 114 at 520) and the smallest seven-to-a-row one at 76 px, both in the range of the phone's tiles. The breakpoint is the
    window's width, which is the column's up to 560 px; on a computer the column is 560 px and the block 540 (the same 10 px).
 5. **The picked tile's frame is 3 px of gold** (a ring inside its own shape, as before), over the neighbors' 1 px lines. A press
    (`scale(0.95)`) shows the frame's color around the shrunk tile instead of a gap of the page's color.
