@@ -260,7 +260,7 @@ test("their tile and stage, their figure by the board and the dock's count: whol
   // (Their wider box in a phone's bar: below.)
   await page.goto("/?debug&mode=raid");
   const tile = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", { name: "Chub & Chirp", exact: true });
-  await expect(tile.locator("canvas.boss-portrait")).toBeVisible();
+  await expect(tile.locator("canvas.bs-art")).toBeVisible();
   expect((await tile.boundingBox())!.width).toBeGreaterThanOrEqual(44);
   await tile.click();
   await expect(page.locator(".bs-stage .bs-sprite")).toHaveAttribute("data-fx", "hopper");

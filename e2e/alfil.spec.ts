@@ -251,7 +251,7 @@ test("Alfil's tile and stage, and his figure by the board: whole on a phone (320
   if (phone) await page.setViewportSize({ width: 320, height: 640 });
   await page.goto("/?debug&mode=raid");
   const tile = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", { name: "Alfil", exact: true });
-  await expect(tile.locator("canvas.boss-portrait")).toBeVisible();
+  await expect(tile.locator("canvas.bs-art")).toBeVisible();
   await tile.click();
   await expect(page.locator(".bs-stage .bs-sprite")).toHaveAttribute("data-fx", "alfil");
   await expect(page.locator(".bs-name")).toHaveText("Alfil");
