@@ -4362,16 +4362,16 @@ button.history-label {
 .boss-level.lv-down .lv-mark::before {
   content: "\2193";
 }
-/* The slash: a diagonal stroke across the number, quick, gone as the flash ends. */
+/* The slash: a diagonal stroke from the number's foot to its top, quick, gone as the flash ends. */
 .boss-level.lv-down .lv-text::after {
   content: "";
   position: absolute;
   left: -2px;
   right: -2px;
-  top: 50%;
+  top: calc(100% - 1px);
   height: 2px;
   background: #fff;
-  transform: rotate(-24deg);
+  transform: rotate(-11deg);
   transform-origin: 0 50%;
   opacity: 0;
   animation: lv-slash 420ms ease-out;
