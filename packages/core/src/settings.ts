@@ -609,7 +609,7 @@ export const BOSS_POWERS = {
    * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
    * fire most of the game.
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.2 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.4 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1069,9 +1069,11 @@ export const BOSS_POWERS = {
    * real time (the battle's clock: the server's online, the page's visible time solo), then waits, ready. At the end of
    * his turn a ready balloon lands as his piece or pops. Its shape (percent; the fake queen looks like a queen) and
    * whether it pops (percent of that shape's) are rolled as it goes on, from the battle's seed: about a quarter pop.
+   * balloonStageSec is the raid sim's (Eric's 15 s left the crowd 0.00 in 29 battles: about four balloons landing a
+   * battle; 30 s, two minutes a balloon, puts him in the pack: reports/tiger-sim.md).
    */
   balloonStages: 4,
-  balloonStageSec: 15,
+  balloonStageSec: 30,
   balloonOdds: { pawn: 55, knight: 13, bishop: 13, rook: 6, fakeQueen: 10, queen: 3 } as Readonly<Record<"pawn" | "knight" | "bishop" | "rook" | "fakeQueen" | "queen", number>>,
   balloonPops: { pawn: 12, knight: 25, bishop: 25, rook: 35, fakeQueen: 100, queen: 0 } as Readonly<Record<"pawn" | "knight" | "bishop" | "rook" | "fakeQueen" | "queen", number>>,
   /** How many colors a balloon can be (seeded, not tied to its shape: the art's six). */

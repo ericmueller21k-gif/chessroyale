@@ -43,6 +43,7 @@
 import { BOSS_POWERS, type Balloon, type BalloonResult, type BalloonShape, type BalloonState, type BossPowerSettings, type BossPowerState, type HoopsState, type PowerEvent, type Settings } from "@chessroyale/core";
 import { applyMove, kingAttacked, kingAttackers, legalMoves, matingMoves, pieceAt, sideToMove, withPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
+import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { stockfishRefuses } from "../uci.ts";
 import { PASS_WAIT, eachOn, from, logit, meterFull, moveSquares, other, passLoses, powerRoll, testSwitch, to, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 import { passTurn } from "./hollow.ts";
@@ -565,8 +566,17 @@ export const hoopBlocks = (p: Pick<BossPowerState, "hoops"> | null | undefined):
 export const balloonReaction = (r: Pick<BalloonResult, "outcome" | "shape">): "balloonBigCheer" | "balloonCheer" | "wince" => (r.outcome === "pop" ? "wince" : r.shape === "q" ? "balloonBigCheer" : "balloonCheer");
 
 /**
+ * The test switch ?balloon=<shape> (bossBalloonTest) starts his battle from 1.e4 d5 2.exd5 Qxd5, a pawn gone from each side,
+ * so a balloon can land from his first turn: every raid starts from the starting position, and with all eight of his
+ * pawns and his full set, every balloon pops (`nine`: a ninth pawn, or more pieces than promotions could make, is a
+ * position the engine refuses). The crowd White moves next; the crowd Black (?side=b) has him move first.
+ */
+export const BALLOON_TEST_MOVES: readonly string[] = ["e2e4", "d7d5", "e4d5", "d8d5"];
+
+/**
  * The test switches: ?power=hoops warns as the second turn begins, the cast at the start of his turn after it, its pass
- * guard off; ?balloon=<shape> and ?stage=N (Settings' bossBalloonTest, bossStageTest) force his balloons.
+ * guard off; ?balloon=<shape> and ?stage=N (Settings' bossBalloonTest, bossStageTest) force his balloons (the former from
+ * BALLOON_TEST_MOVES).
  */
 export const TIGER: BossRules = {
   id: "tiger",
@@ -612,6 +622,12 @@ export const TIGER: BossRules = {
     const p = boss.powers;
     const last = p?.balloon?.last;
     return !!p?.hoops || (!!last && last.outcome === "land" && last.at === boss.crowdMoves);
+  },
+  opening: {
+    setUp(b, at) {
+      if (b.settings.bossBalloonTest) b.boards.set(at.boardId, newBoard(at.boardId, { ...BOSS_OPENING, moves: [...BALLOON_TEST_MOVES] }, BALLOON_TEST_MOVES.length, at.generation));
+      return {};
+    },
   },
   afterCrowdMove(b) {
     tigerBattle.afterCrowdMove(b);

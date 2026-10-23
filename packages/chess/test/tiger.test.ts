@@ -46,7 +46,7 @@ import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.
 
 /**
  * The circus tiger (docs/decisions/2026-10-23-tiger-rules.md): Balloons (a real-time pump: a balloon on the nozzle at the
- * start of his turn, four stages of 15 s, at the end of a turn it lands as his piece in the shape's band or pops) and
+ * start of his turn, four stages of 30 s, at the end of a turn it lands as his piece in the shape's band or pops) and
  * Hoops (his whole turn: three 2x2 blocks walled for the crowd's next 2 moves, placed by the engine in a band).
  */
 
@@ -154,8 +154,8 @@ describe("the circus tiger: his sheet", () => {
     expect(S.rageSpeed.tiger).toBeGreaterThan(0);
   });
 
-  it("his numbers: 4 stages of 15 s; the shapes' odds add to 100, about a quarter pop, a fake queen always, a queen never; six colors; the bands", () => {
-    expect([S.balloonStages, S.balloonStageSec, S.balloonColors]).toEqual([4, 15, 6]);
+  it("his numbers: 4 stages of 30 s (the sim's; Eric's 15 s made him far too strong); the shapes' odds add to 100, about a quarter pop, a fake queen always, a queen never; six colors; the bands", () => {
+    expect([S.balloonStages, S.balloonStageSec, S.balloonColors]).toEqual([4, 30, 6]);
     const o = S.balloonOdds;
     expect(o).toEqual({ pawn: 55, knight: 13, bishop: 13, rook: 6, fakeQueen: 10, queen: 3 });
     expect(Object.values(o).reduce((a, b) => a + b, 0)).toBe(100);
@@ -210,7 +210,7 @@ describe("Balloons: the rolls", () => {
 });
 
 describe("Balloons: the stages over time", () => {
-  it("four stages of 15 s, then ready (and drawn at stage 4)", () => {
+  it("four stages of balloonStageSec, then ready (and drawn at stage 4)", () => {
     const b = { at: 1000, readyAt: 1000 + BLOWN };
     expect(balloonStage(b, 1000)).toEqual({ stage: 1, ready: false });
     expect(balloonStage(b, 1000 + STAGE - 1)).toEqual({ stage: 1, ready: false });
@@ -222,7 +222,7 @@ describe("Balloons: the stages over time", () => {
     expect(balloonStage(b, 1000 + 10 * BLOWN)).toEqual({ stage: 4, ready: true });
   });
 
-  it("on the runner's clock (online the server's, solo the page's): placed as his turn begins, at that time; ready a minute later", async () => {
+  it("on the runner's clock (online the server's, solo the page's): placed as his turn begins, at that time; ready after its four stages", async () => {
     const b = battle(3);
     expect(powersOf(b.r).balloon ?? null).toBeNull();
     await crowdMove(b.r);
@@ -232,10 +232,10 @@ describe("Balloons: the stages over time", () => {
     expect(p.events.filter((e) => e.kind === "place")).toEqual([{ kind: "place", turn: p.turn, shape: p.balloon!.nozzle!.shape, color: p.balloon!.nozzle!.color }]);
     const view = b.r.bossView()!.powers!;
     expect(view.balloon).toEqual({ shape: p.balloon!.nozzle!.shape, color: p.balloon!.nozzle!.color, at: b.now(), readyAt: b.now() + BLOWN, ready: false });
-    expect(balloonStage(view.balloon!, b.now() + 20_000).stage).toBe(2);
+    expect(balloonStage(view.balloon!, b.now() + STAGE + 5_000).stage).toBe(2);
   });
 
-  it("without a clock (tests, the sims), each crowd move counts as seedEverySec (30 s): a balloon is ready two crowd moves on", async () => {
+  it("without a clock (tests, the sims), each crowd move counts as seedEverySec (30 s): a balloon is ready four crowd moves on", async () => {
     const b = battle(5, { clock: false });
     await crowdMove(b.r);
     const at = powersOf(b.r).balloon!.nozzle!.at;
@@ -333,9 +333,9 @@ describe("Balloons: placed at his turn's start, landing or popping only at his t
     const fake = battle(15, { balloon: "fakequeen", stage: 3 });
     await onQuiet(real);
     await onQuiet(fake);
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 12; i++) {
       for (const b of [real, fake]) {
-        b.tick(4_000);
+        b.tick(10_000);
         if (b.r.bossToMove()) {
           const ask = b.r.balloonAsk();
           expect(JSON.stringify(ask ?? {})).not.toMatch(/dud|fake/i);
@@ -447,6 +447,31 @@ describe("Balloons: where they land (the bands and the guards)", () => {
       // (Not on a square the crowd can take it on at once for free.)
       expect(legalMoves(after).some((m) => m.slice(2, 4) === pick.square && pieceAt(after, m.slice(0, 2))?.type !== "k"), shape).toBe(false);
     }
+  });
+
+  it("from the starting position (every raid's), with all eight of his pawns and his full set, a balloon pops (`nine`)", async () => {
+    let nine = 0;
+    for (let seed = 17; seed < 23; seed++) {
+      const b = battle(seed, { stage: 4 });
+      expect(fenOf(b.r).split(" ")[0]).toBe("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
+      await crowdMove(b.r);
+      const dud = powersOf(b.r).balloon!.nozzle!.dud;
+      await b.r.playBoss(fakeEngine());
+      const last = powersOf(b.r).balloon!.last!;
+      expect(last).toMatchObject({ outcome: "pop", square: null });
+      expect(!!last.nine).toBe(!dud);
+      if (last.nine) nine++;
+      expect(tigerEvents(powersOf(b.r).events).map((e) => e.kind)).toEqual(["pop", "wince"]);
+    }
+    expect(nine).toBeGreaterThan(0);
+  });
+
+  it("the test switch ?balloon= starts his battle a pawn down each side (1.e4 d5 2.exd5 Qxd5), so its balloon can land", async () => {
+    const b = battle(18, { balloon: "rook", stage: 4 });
+    expect(fenOf(b.r)).toBe(applyMove(applyMove(applyMove(applyMove("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "e2e4"), "d7d5"), "e4d5"), "d8d5"));
+    await crowdMove(b.r);
+    await b.r.playBoss(fakeEngine());
+    expect(powersOf(b.r).balloon!.last).toMatchObject({ outcome: "land", shape: "r" });
   });
 
   it("weighs at most balloonLooks squares, the same pick everywhere for the same ask", async () => {
