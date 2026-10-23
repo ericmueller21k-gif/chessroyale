@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ROSTER, hiddenBosses, menuBosses } from "@chessroyale/core";
-import { SELECT_LINES, SELECT_SOUND, selectLine } from "../src/characters/boss-select.ts";
+import { rowSizes, SELECT_LINES, SELECT_SOUND, selectLine, TILES_PER_ROW } from "../src/characters/boss-select.ts";
 import { bossKit } from "../src/characters/kits.ts";
 
 /** The Boss raid screen's character select: each boss's sound and lines (docs/decisions/2026-10-16-boss-character-select.md). */
@@ -49,5 +49,29 @@ describe("the boss select", () => {
 
   it("never names the Hidden Boss in his lines", () => {
     for (const l of SELECT_LINES.recluse!) expect(l).not.toMatch(/Fischer|Soviet|Russian/i);
+  });
+
+  it("shares the tiles out over as few rows as it takes, evenly, the longer rows first (docs/decisions/2026-10-23-boss-select-grid.md)", () => {
+    const { phone, wide } = TILES_PER_ROW;
+    // Today's fourteen tiles (twelve bosses, the Hidden Boss's and "?"): 5, 5, 4 on a phone, 7, 7 on a wide column.
+    expect(all.length + 1).toBe(14);
+    expect(rowSizes(all.length + 1, phone)).toEqual([5, 5, 4]);
+    expect(rowSizes(all.length + 1, wide)).toEqual([7, 7]);
+    // The next bosses: never a tile alone on a row.
+    expect(rowSizes(15, phone)).toEqual([5, 5, 5]);
+    expect(rowSizes(15, wide)).toEqual([5, 5, 5]);
+    expect(rowSizes(16, phone)).toEqual([4, 4, 4, 4]);
+    expect(rowSizes(16, wide)).toEqual([6, 5, 5]);
+    expect(rowSizes(0, phone)).toEqual([]);
+    for (const per of [phone, wide]) {
+      for (let n = 1; n <= 60; n++) {
+        const rows = rowSizes(n, per);
+        expect(rows.reduce((a, b) => a + b, 0), `${n} in ${per}s`).toBe(n);
+        expect(Math.max(...rows), `${n} in ${per}s`).toBeLessThanOrEqual(per);
+        expect(Math.max(...rows) - Math.min(...rows), `${n} in ${per}s`).toBeLessThanOrEqual(1);
+        expect(rows, `${n} in ${per}s: the longer rows first`).toEqual([...rows].sort((a, b) => b - a));
+        if (n > 1) expect(Math.min(...rows), `${n} in ${per}s: no tile alone`).toBeGreaterThan(1);
+      }
+    }
   });
 });

@@ -74,3 +74,21 @@ export function selectLine(id: string, last: string | null, rand: number = Math.
   const pool = lines.length > 1 ? lines.filter((l) => l !== last) : lines;
   return pool[Math.min(pool.length - 1, Math.floor(rand * pool.length))]!;
 }
+
+/** Tiles to a row: a phone's five, and seven from 480 px (the Boss raid column is 560 px at most: three rows of five would
+ *  make each tile 100 px wide there). The CSS reads it as `--bs-per`. */
+export const TILES_PER_ROW = { phone: 5, wide: 7 } as const;
+export const WIDE_QUERY = "(min-width: 480px)";
+
+/**
+ * How many tiles go in each row for `n` tiles with at most `per` to a row: as few rows as that takes, then the tiles shared
+ * out evenly, the longer rows first (fourteen on a phone: 5, 5, 4; on a computer 7, 7; fifteen: 5, 5, 5). So a new boss
+ * never leaves one tile alone on a row, and no row is more than one tile shorter than another.
+ */
+export function rowSizes(n: number, per: number): number[] {
+  if (n <= 0) return [];
+  const rows = Math.ceil(n / per);
+  const base = Math.floor(n / rows);
+  const extra = n % rows;
+  return Array.from({ length: rows }, (_, i) => base + (i < extra ? 1 : 0));
+}

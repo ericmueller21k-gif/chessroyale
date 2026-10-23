@@ -17,8 +17,14 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   from the `/bosses` picker (his tile on the Boss raid screen is dark and locked for everyone).
 - **The Boss raid screen's character select** (Eric, Oct 16; docs/decisions/2026-10-16-boss-character-select.md;
   `components/BossSelect.tsx`, `characters/boss-select.ts`): a tile per boss you can meet, the picked one on a stage in
-  its idle (one sprite animating, on the shared loop; reduced motion: a still, no drop). Fourteen tiles since Puddles (Oct 23):
-  two rows of six and the last two (the Hidden Boss's and "?") on a third, on a phone and a computer (twelve in one row were under 44 px in a computer's column). A tap drops it on (the 1 v 1
+  its idle (one sprite animating, on the shared loop; reduced motion: a still, no drop). **The grid** (Eric, Oct 21 and 23: "like
+  a real fighting game"; docs/decisions/2026-10-23-boss-select-grid.md): fourteen tiles since Puddles, in rows that touch,
+  edge to edge (a 10 px buffer at the top and both sides), slanted tiles sharing their edge with one thin frame line
+  between neighbors, the rows' outer ends cut straight so the block's edges are even. Five to a row on a phone (5, 5, 4: the
+  short row's tiles wider, so every row ends flush) and seven from 480 px (7, 7); `rowSizes` in `characters/boss-select.ts`
+  shares any number of tiles out as few rows as it takes, evenly, so a new boss never leaves one alone. A tile at 390 px is 84 x 76
+  px (70 at mid-height), at 1280 px 89 x 80. A screen 700 px tall or less has its stage 220 px wide, not 280, so the ways to
+  play stay on screen. A tap drops it on (the 1 v 1
   stage's drop), plays its sound once (`SELECT_SOUND`: Ginger `gingerCrackle`, her freeze; Boingo `clownSplat`, his
   pie; Jefferson `grexFizz`, his sparkler; Hollow `hollowCast`, his darkness; Big Boy `bigboyClack`, a toy block
   landing; Sawyer `sawyerRev`, his saw; Wrangler `pigWhirl`, his lasso; Alfil `alfilTrumpet`, his trumpet; Chub & Chirp
@@ -708,7 +714,10 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   body clear, frame edges and palette, hit effects, the hits' sounds together; every attacker's face toward the king;
   its place at all 64 squares both ways up: `kingAttackPlace`).
 - e2e, the Boss raid screen's select: `e2e/boss-select.spec.ts`; unit `packages/app/test/boss-select.test.ts` (every
-  boss's sound from its own pack, its own lines, none twice running, the Hidden Boss's in turn).
+  boss's sound from its own pack, its own lines, none twice running, the Hidden Boss's in turn; how the tiles are shared out
+  over rows). The grid's e2e, at 320, 360, 390, 428, 430 and 1280 px in light and dark: five or seven to a row, neighbors
+  sharing their edge, rows meeting, the ends in line, the buffer, no bare point in the block, bigger than before, 44 px
+  targets, every tile tapped, either side of each shared edge, the press, the gold, the dark tile, the "?".
 - e2e: `e2e/pig.spec.ts` (Wrangler: the long pull, a drag, his meter's line and ready loop, a showdown with no warning,
   its forced duel and his reply (the engine's best), phone and computer, solo and online; the admins' trigger),
   `e2e/sawyer.spec.ts` "Sawyer's board saw on Maia" (his five replies under the saw never across it, a move of yours

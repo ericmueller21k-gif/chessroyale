@@ -5,7 +5,8 @@ import { named, openBossRaid, test } from "./helpers.ts";
  * The Boss raid screen as an old-school character select (Eric, Oct 16; docs/decisions/2026-10-16-boss-character-select.md):
  * the slanted tiles, the stage (the picked boss's idle, its name and strength), a tap's drop, sound and line, the "?"
  * tile, the Hidden Boss dark and locked (never named), the pick reaching Boss alone, a Solo raid and a raid you make
- * (the public queues always random), resting bosses left out, the layout at every width, and home's card turning.
+ * (the public queues always random), resting bosses left out, the grid (touching, edge to edge, bigger, 44 px targets) and
+ * the layout at every width, and home's card turning. The grid: docs/decisions/2026-10-23-boss-select-grid.md.
  */
 
 const desktop = () => test.info().project.name === "desktop";
@@ -193,26 +194,187 @@ test("a resting boss has no tile, and a pick of it reads as a random boss", asyn
   await expect(page.locator(".bs-name")).toHaveText("Random boss");
 });
 
-test("the layout: the tiles in rows, the stage under them, the ways to play under the stage; no sideways scroll at 320, 360, 390 and 1280 px", async ({ page }) => {
-  const widths = desktop() ? [[1280, 800]] : [[320, 640], [360, 740], [390, 844]];
-  for (const [w, h] of widths) {
+/** The windows the select is checked at (Eric's iPhone in Safari is 428 x 777), and the tiles' size in each before the full-width grid (Oct 23: width, height). */
+const SIZES = () => (desktop() ? [[1280, 800]] : [[320, 568], [360, 740], [390, 844], [428, 777], [430, 932]]);
+const TILE_BEFORE: Record<number, [number, number]> = { 320: [44, 39.6], 360: [50.7, 45.6], 390: [55.7, 50.1], 428: [62, 55.8], 430: [62.3, 56.1], 1280: [76, 68.4] };
+
+/** The grid's boxes (rows, tiles, the block, the column and the header over it) and the points of it that nothing tile-shaped covers. */
+function measureGrid() {
+  const R = (e: Element) => {
+    const b = e.getBoundingClientRect();
+    return { x: b.x, y: b.y, r: b.right, b: b.bottom, w: b.width, h: b.height };
+  };
+  const rows = [...document.querySelectorAll(".bs-row")].map((row) => ({
+    ...R(row),
+    tiles: [...row.querySelectorAll(".bs-tile")].map((t) => ({ ...R(t), name: t.getAttribute("aria-label")!, clip: getComputedStyle(t).clipPath })),
+  }));
+  // (A point is bare when no tile is within half a pixel of it either way: two shapes meeting at a fractional position can leave a
+  // hairline a hundredth of a pixel wide between them, which nothing can tap; a hole in the block would be many pixels wide.)
+  const at1 = (x: number, y: number) => !!document.elementFromPoint(x, y)?.closest(".bs-tile");
+  const onTile = (x: number, y: number) => at1(x, y) || at1(x - 0.5, y) || at1(x + 0.5, y);
+  let samples = 0;
+  let holes = 0;
+  let corners = 0;
+  for (const row of rows) {
+    for (let y = row.y + 2.0377; y < row.b - 2; y += 3.1071) for (let x = row.x + 2.0731; x < row.r - 2; x += 4.3137) {
+      samples++;
+      if (!onTile(x, y)) holes++;
+    }
+    // (The block's own corners: where a row nested by its slant would have a bite.)
+    for (const [x, y] of [[row.x + 2, row.y + 2], [row.r - 2, row.y + 2], [row.x + 2, row.b - 2], [row.r - 2, row.b - 2]]) if (!onTile(x!, y!)) corners++;
+  }
+  return { rows, block: R(document.querySelector(".bs-tiles")!), column: R(document.querySelector(".rd-page")!), head: R(document.querySelector(".rd-page .fd-page-head")!), samples, holes, corners };
+}
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`the grid, ${scheme}: tiles and rows touching, edge to edge within a 10 px buffer, bigger than before, 44 px targets, nothing sideways; five to a row on a phone, seven on a computer`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    for (const [w, h] of SIZES()) {
+      const at = `${scheme} ${w}x${h}`;
+      await page.setViewportSize({ width: w!, height: h! });
+      await page.goto("/?mode=raid");
+      await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+      await expect(page.locator(".bs-tile")).toHaveCount(14);
+      await page.evaluate(() => document.fonts.ready);
+      const g = await page.evaluate(measureGrid);
+
+      // Five to a row on a phone (5, 5, 4: the short row's tiles wider), seven on a computer (7, 7).
+      expect(g.rows.map((r) => r.tiles.length), at).toEqual(desktop() ? [7, 7] : [5, 5, 4]);
+      const tiles = g.rows.flatMap((r) => r.tiles);
+      const full = g.rows[0]!.tiles[0]!;
+
+      // Full width, a small even buffer at the top, left and right.
+      const left = g.block.x - g.column.x;
+      const right = g.column.r - g.block.r;
+      expect(left, `${at}: left buffer`).toBeGreaterThanOrEqual(8);
+      expect(left, `${at}: left buffer`).toBeLessThanOrEqual(12);
+      expect(right, `${at}: right buffer`).toBeGreaterThanOrEqual(8);
+      expect(right, `${at}: right buffer`).toBeLessThanOrEqual(12);
+      expect(Math.abs(left - right), `${at}: even`).toBeLessThanOrEqual(1);
+      const top = g.block.y - g.head.b;
+      expect(top, `${at}: top buffer`).toBeGreaterThanOrEqual(8);
+      expect(top, `${at}: top buffer`).toBeLessThanOrEqual(12);
+      if (!desktop()) {
+        expect(g.block.x, `${at}: a phone's block is the window's width less the buffer`).toBeLessThanOrEqual(12);
+        expect(w! - g.block.r, at).toBeLessThanOrEqual(12);
+      }
+      for (const t of tiles) {
+        expect(t.x, `${at} ${t.name}`).toBeGreaterThanOrEqual(g.block.x);
+        expect(t.r, `${at} ${t.name}`).toBeLessThanOrEqual(g.block.r + 0.01);
+      }
+
+      // Touching: a row's tiles share their slanted edge (each starts one slant back under the last, the slant the same in
+      // every row and a sixth of a tile), the rows meet, and the outer ends are straight and in line (the block's edges even).
+      const slant = full.r - g.rows[0]!.tiles[1]!.x;
+      expect(slant, `${at}: the frame stays slanted`).toBeGreaterThan(8);
+      expect(Math.abs(slant - 0.16 * full.w), `${at}: slant`).toBeLessThan(0.7);
+      for (const row of g.rows) {
+        expect(Math.abs(row.h - g.rows[0]!.h), `${at}: row height`).toBeLessThan(0.6);
+        for (let i = 1; i < row.tiles.length; i++) expect(Math.abs(row.tiles[i - 1]!.r - row.tiles[i]!.x - slant), `${at}: ${row.tiles[i]!.name} meets ${row.tiles[i - 1]!.name}`).toBeLessThan(0.6);
+        expect(Math.abs(row.tiles[0]!.x - g.rows[0]!.tiles[0]!.x), `${at}: left ends in line`).toBeLessThan(0.6);
+        expect(Math.abs(row.tiles.at(-1)!.r - g.rows[0]!.tiles.at(-1)!.r), `${at}: right ends in line`).toBeLessThan(0.6);
+        for (const t of row.tiles) {
+          expect(Math.abs(t.y - row.y) + Math.abs(t.b - row.b), `${at} ${t.name}: as tall as its row`).toBeLessThan(0.6);
+          expect(t.clip, `${at} ${t.name}: still a parallelogram's frame`).toMatch(/^polygon\(/);
+        }
+      }
+      for (let i = 1; i < g.rows.length; i++) expect(Math.abs(g.rows[i]!.y - g.rows[i - 1]!.b), `${at}: rows ${i} and ${i + 1} meet`).toBeLessThan(0.6);
+      // The short row's tiles are wider (so it ends flush with the rest), never narrower.
+      for (const row of g.rows) expect(row.tiles[0]!.w, at).toBeGreaterThanOrEqual(full.w - 0.6);
+      // Nothing between them: no point of the block is bare, its four corners (where a row nested by its slant would have a bite) are tiles.
+      expect(g.samples, at).toBeGreaterThan(500);
+      expect(g.holes, `${at}: bare points in the block`).toBe(0);
+      expect(g.corners, `${at}: bare corners`).toBe(0);
+
+      // Bigger than before, every tile a 44 px target (its width at mid-height: a slant narrower than its box).
+      const [bw, bh] = TILE_BEFORE[w!]!;
+      for (const t of tiles) {
+        expect(t.w, `${at} ${t.name}: wider than before (${bw})`).toBeGreaterThanOrEqual(bw * 1.15);
+        expect(t.h, `${at} ${t.name}: taller than before (${bh})`).toBeGreaterThanOrEqual(bh * 1.15);
+        expect(t.h, `${at} ${t.name}: 44 px high`).toBeGreaterThanOrEqual(44);
+        expect(t.w - slant, `${at} ${t.name}: 44 px wide at mid-height`).toBeGreaterThanOrEqual(44);
+      }
+      expect(await sideways(page), at).toBe(0);
+    }
+  });
+}
+
+test("every tile can be tapped, in its middle and either side of a slanted edge it shares; a press shrinks it; the picked one is gold, the Hidden Boss's dark, and '?' stays in its tile", async ({ page }) => {
+  await named(page, "Tapper");
+  for (const [w, h] of desktop() ? [[1280, 800]] : [[320, 568], [428, 777]]) {
+    const at = `${w}x${h}`;
+    await page.setViewportSize({ width: w!, height: h! });
+    await page.goto("/?mode=raid");
+    await expect(page.locator(".bs-tile")).toHaveCount(14);
+    const g = await page.evaluate(measureGrid);
+    const slant = g.rows[0]!.tiles[0]!.r - g.rows[0]!.tiles[1]!.x;
+    const names = g.rows.flatMap((r) => r.tiles.map((t) => t.name));
+
+    // Each tile in turn, by its middle: it's the one picked, and only it.
+    for (const name of names) {
+      await tile(page, name).click();
+      await expect(tile(page, name), `${at} ${name}`).toHaveAttribute("aria-checked", "true");
+      await expect(page.locator('.bs-tile[aria-checked="true"]'), `${at} ${name}`).toHaveCount(1);
+    }
+
+    // Either side of each shared edge, at its top, middle and foot: the tile that side (the boxes overlap, the shapes don't).
+    const probes: { x: number; y: number; want: string }[] = [];
+    for (const row of g.rows) {
+      for (let i = 1; i < row.tiles.length; i++) {
+        const a = row.tiles[i - 1]!;
+        for (const f of [0.1, 0.5, 0.9]) {
+          const edge = a.r - slant * f;
+          const y = a.y + a.h * f;
+          probes.push({ x: edge - 5, y, want: a.name }, { x: edge + 5, y, want: row.tiles[i]!.name });
+        }
+      }
+    }
+    const got = await page.evaluate((ps) => ps.map((p) => document.elementFromPoint(p.x, p.y)?.closest(".bs-tile")?.getAttribute("aria-label") ?? null), probes);
+    expect(got, at).toEqual(probes.map((p) => p.want));
+
+    // A press: the tile under the finger shrinks (and springs back).
+    const ginger = (await tile(page, "Ginger").boundingBox())!;
+    await page.mouse.move(ginger.x + ginger.width / 2, ginger.y + ginger.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(250);
+    expect(await tile(page, "Ginger").evaluate((e) => getComputedStyle(e).transform), at).toMatch(/^matrix\(0\.95, 0, 0, 0\.95/);
+    await page.mouse.up();
+    await page.waitForTimeout(250);
+    expect(await tile(page, "Ginger").evaluate((e) => getComputedStyle(e).transform), at).toBe("none");
+
+    // The picked tile's frame is gold (the others' is not); the Hidden Boss's tile is dark; "?" is whole inside its tile, as big as its tile.
+    const gold = (rgb: string) => {
+      const [r, gr, b] = rgb.match(/\d+/g)!.map(Number) as [number, number, number];
+      return r > 200 && gr > 150 && b < 130;
+    };
+    await tile(page, "Hollow").click();
+    expect(gold(await tile(page, "Hollow").evaluate((e) => getComputedStyle(e).backgroundColor)), `${at}: the picked tile's frame`).toBe(true);
+    expect(gold(await tile(page, "Ginger").evaluate((e) => getComputedStyle(e).backgroundColor)), `${at}: another tile's`).toBe(false);
+    expect(await tile(page, "Locked boss").locator(".bs-tile-in").evaluate((e) => getComputedStyle(e).backgroundColor), at).toBe("rgb(11, 10, 16)");
+    const q = (await tile(page, "Random boss").locator(".bs-q").boundingBox())!;
+    const rb = (await tile(page, "Random boss").boundingBox())!;
+    expect(q.x, at).toBeGreaterThanOrEqual(rb.x);
+    expect(q.x + q.width, at).toBeLessThanOrEqual(rb.x + rb.width);
+    expect(q.y, at).toBeGreaterThanOrEqual(rb.y);
+    expect(q.y + q.height, at).toBeLessThanOrEqual(rb.y + rb.height);
+    expect(q.height, `${at}: a "?" that fills its tile`).toBeGreaterThanOrEqual(rb.height * 0.4);
+  }
+});
+
+test("the layout: the stage under the tiles, the ways to play under the stage and still on screen, every boss whole on the stage; no sideways scroll at 320, 360, 390, 428, 430 and 1280 px", async ({ page }) => {
+  for (const [w, h] of SIZES()) {
     await page.setViewportSize({ width: w!, height: h! });
     await page.goto("/?mode=raid");
     await tile(page, "Hollow").click();
-    const boxes = await page.locator(".bs-tile").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON() as DOMRect));
-    for (const b of boxes) {
-      expect(b.left, `${w}`).toBeGreaterThanOrEqual(0);
-      expect(b.right, `${w}`).toBeLessThanOrEqual(w!);
-      expect(b.width, `${w}: a tile big enough to tap`).toBeGreaterThanOrEqual(44);
-    }
-    // Two rows of six and the last two (the Hidden Boss's and "?") on a third (fourteen tiles since Puddles), a phone and a computer.
-    const rows = new Set(boxes.map((b) => Math.round(b.top)));
-    expect(rows.size, `${w}`).toBe(3);
-    const tilesBottom = Math.max(...boxes.map((b) => b.bottom));
+    const tilesBottom = (await page.locator(".bs-tiles").boundingBox())!;
     const stage = (await page.locator(".bs-spot").boundingBox())!;
     const first = (await page.locator(".rd-option").first().boundingBox())!;
-    expect(stage.y, `${w}`).toBeGreaterThan(tilesBottom);
+    expect(stage.y, `${w}`).toBeGreaterThan(tilesBottom.y + tilesBottom.height);
     expect(first.y, `${w}`).toBeGreaterThan(stage.y + stage.height);
+    // The first way to play stays on the screen as the tiles grew: all of it where the window is 740 px tall or more, and at 568 px
+    // (the smallest phone, the stage a fifth smaller there) as much as it showed before (its top 19 px).
+    if (h! >= 740) expect(first.y + first.height, `${w}x${h}: the first way to play whole in the window`).toBeLessThanOrEqual(h!);
+    else expect(first.y, `${w}x${h}: the first way to play starts in the window`).toBeLessThanOrEqual(h! - 18);
     // Every boss whole inside the stage's width (Wrangler's lasso out to one side, the tallest the Hidden Boss).
     for (const name of ["Ginger", "Boingo the Clown", "Jefferson", "Hollow", "Big Boy", "Sawyer", "Wrangler", "Alfil", "Chub & Chirp", "Smudgy", "Moo & Moon", "Puddles", "Locked boss"]) {
       await tile(page, name).click();

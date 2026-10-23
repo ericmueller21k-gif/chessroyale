@@ -8502,9 +8502,12 @@ button.fd-logo {
 
 /*
  * -- The Boss raid screen's character select (Eric, Oct 16: SF2 / PlayStation era; bs- for boss select) --
- * Slanted tiles (parallelograms: clip-path, so nothing sticks out sideways), six to a row (eleven tiles since Chub &
- * Chirp, Oct 18: a row of six and one of five; eleven in one row were under 44 px in a computer's column). The picked
- * one gold.
+ * A fighting game's grid (Eric, Oct 21 and 23): slanted tiles that touch, rows that touch, the block nearly the screen's
+ * full width (a 10 px buffer at the top and both sides; the rest of the page's padding is taken back by a negative margin),
+ * five to a row on a phone and seven from 520 px (BossSelect's `--bs-per`). Each tile is a parallelogram (clip-path, so
+ * neighbors share their slanted edge and nothing sticks out sideways); a row's outer tiles are cut straight, so the block's
+ * edges are even; the short row's tiles are wider, so every row ends flush. One thin frame line between neighbors (each
+ * tile's 1 px ring and its neighbor's), the picked one's ring gold and 3 px. docs/decisions/2026-10-23-boss-select-grid.md.
  */
 .bs-select {
   display: flex;
@@ -8512,25 +8515,31 @@ button.fd-logo {
   gap: 10px;
 }
 .bs-tiles {
-  --bs-gap: 4px;
-  --bs-per: 6;
+  /* (A row of n touching tiles is n wide minus (n - 1) slants; the slant is 16% of a tile's width and a tile is 0.9 as
+     tall as wide, whichever row it's in: --bs-w is the width of a tile in a full row. cqi: the block's own width.) */
+  --bs-per: 5;
+  --bs-w: calc(100cqi / (var(--bs-per) - 0.16 * (var(--bs-per) - 1)));
+  --bs-slant: calc(var(--bs-w) * 0.16);
+  --bs-h: calc(var(--bs-w) * 0.9);
+  container-type: inline-size;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px var(--bs-gap);
+  flex-direction: column;
+  /* (The page pads 18 px: 8 px back leaves 10 px; 6 px back from the header above leaves 10 px too.) */
+  margin: -6px -8px 0;
+  /* The frame's outer line (the tiles' rings are inside it), and the color the frame shows when a tile is pressed in. */
+  padding: 1px;
+  background: var(--bs-edge);
 }
-@media (min-width: 600px) {
-  .bs-tiles {
-    --bs-gap: 6px;
-  }
+.bs-row {
+  display: flex;
+  height: var(--bs-h);
 }
 .bs-tile {
-  --bs-slant: 16%;
   --bs-shape: polygon(var(--bs-slant) 0, 100% 0, calc(100% - var(--bs-slant)) 100%, 0 100%);
+  --bs-line: 1px;
   position: relative;
-  flex: 0 0 calc((100% - (var(--bs-per) - 1) * var(--bs-gap)) / var(--bs-per));
-  max-width: 76px;
-  aspect-ratio: 1 / 0.9;
+  flex: 1 1 0;
+  min-width: 0;
   padding: 0;
   border: 0;
   background: var(--bs-edge);
@@ -8538,19 +8547,35 @@ button.fd-logo {
   cursor: pointer;
   transition: transform 80ms;
 }
+/* Neighbors share a slanted edge: each tile starts one slant back under the last. */
+.bs-tile + .bs-tile {
+  margin-left: calc(var(--bs-slant) * -1);
+}
+/* A row's outer ends are straight, so the block has even edges. */
+.bs-tile:first-child {
+  --bs-shape: polygon(0 0, 100% 0, calc(100% - var(--bs-slant)) 100%, 0 100%);
+}
+.bs-tile:last-child {
+  --bs-shape: polygon(var(--bs-slant) 0, 100% 0, 100% 100%, 0 100%);
+}
+.bs-tile:only-child {
+  --bs-shape: none;
+}
 .bs-tile-in {
   position: absolute;
-  inset: 3px;
+  inset: var(--bs-line);
   display: grid;
   place-items: center;
   overflow: hidden;
   clip-path: var(--bs-shape);
   background: linear-gradient(160deg, var(--bs-fill-hi), var(--bs-fill));
 }
+/* (As wide as in a full row, whichever row the tile is in.) */
 .bs-tile .boss-portrait {
-  width: 66%;
+  width: calc(var(--bs-w) * 0.62);
 }
 .bs-tile.on {
+  --bs-line: 3px;
   background: var(--fd-gold);
 }
 .bs-tile.on .bs-tile-in {
@@ -8571,6 +8596,9 @@ button.fd-logo {
   font-size: 28px;
   line-height: 1;
   color: var(--fd-gold-text);
+}
+.bs-tile .bs-q {
+  font-size: calc(var(--bs-w) * 0.5);
 }
 :root {
   --bs-edge: #3d4453;
@@ -8594,6 +8622,13 @@ button.fd-logo {
   width: min(100%, 280px);
   aspect-ratio: 124 / 96;
   container-type: inline-size;
+}
+/* A short screen (a small phone's 568 to 667 px): the stage a fifth smaller (220 px wide, not 280), so the ways to play under it
+   stay on screen as they were before the tiles grew (the page scrolls from there). */
+@media (max-height: 700px) {
+  .bs-spot {
+    width: min(100%, 220px);
+  }
 }
 .bs-spot::before {
   content: "";
@@ -10031,6 +10066,10 @@ button.fd-seat {
   /* Pages (profile, settings) and the private lobby: a readable column in the center. */
   .fd-root.framed .fd-page {
     padding: 28px 32px 40px;
+  }
+  /* (The select's block takes back all but 10 px of that padding.) */
+  .fd-root.framed .bs-tiles {
+    margin-inline: -22px;
   }
 }
 @media (min-width: 1440px) {
