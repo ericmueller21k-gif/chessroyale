@@ -1,7 +1,20 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { PIECES, TIGER, TIGER_PORTRAIT, balloon, tigerLayers, type TigerPose } from "../src/characters/tiger.ts";
-import { frameKeys, renderFrame } from "../src/characters/sprite.ts";
+import { KING_ATTACK, kingAttackHits } from "@chessroyale/chess";
+import { PIECES, TIGER, TIGER_ANIMS, TIGER_ATTACK, TIGER_HOP_AIR, TIGER_PORTRAIT, TIGER_STILL_BOX, balloon, tigerLayers, type TigerPose } from "../src/characters/tiger.ts";
+import { SMUDGY } from "../src/characters/smudgy.ts";
+import { frameKeys, renderFrame, type Anim } from "../src/characters/sprite.ts";
+
+const length = (a: Anim) => a.frames.reduce((t, f) => t + f.ms, 0);
+function cues(anim: Anim): [number, string][] {
+  const out: [number, string][] = [];
+  let t = 0;
+  for (const f of anim.frames) {
+    if (f.cue) out.push([t, f.cue]);
+    t += f.ms;
+  }
+  return out;
+}
 
 /** The select stage draws every boss at one pixel size, up to this many sprite px from the top of its drawing to its feet (BossSelect's TALLEST / PX). */
 const STAGE_TALLEST = 70;
@@ -12,8 +25,8 @@ describe("the circus tiger's still", () => {
   const still = TIGER.anims.idle!.frames[0]!;
   const keys = frameKeys(TIGER, still);
 
-  it("starts its idle on one still, in a palette that holds every color it uses", () => {
-    expect(Object.keys(TIGER.anims)).toEqual(["idle"]);
+  it("starts its idle on the still, in a palette that holds every color it uses", () => {
+    expect(Object.keys(TIGER.anims)).toEqual([...TIGER_ANIMS]);
     expect(TIGER.anims.idle!.loop).toBe(true);
     for (const [name, part] of Object.entries(TIGER.parts))
       for (const row of part.grid) for (const k of row) if (k !== "." && k !== " ") expect(TIGER.palette, `${name}: "${k}"`).toHaveProperty(k);
@@ -67,9 +80,22 @@ describe("the circus tiger's still", () => {
   });
 
   it("keeps his approved figure: everything but the balloons and their strings is the pixels Eric approved (d570e8f)", () => {
+    // (His frame has headroom above the still's now: the still's 76 x 78 is `TIGER_STILL_BOX` in it, and nothing is drawn outside it.)
     const layers = tigerLayers().filter((l) => !l.part.startsWith("balloon:") && !l.part.startsWith("strings:"));
     const img = renderFrame(TIGER, { layers, ms: 1 });
-    expect(createHash("sha256").update(img.data).digest("hex")).toBe("6cf6e3fe0c31c7f7eca6f9e0d7e5754e56814591748c1b4d753acae59c3648ce");
+    const b = TIGER_STILL_BOX;
+    const h = createHash("sha256");
+    let outside = 0;
+    for (let y = 0; y < TIGER.h; y++)
+      for (let x = 0; x < TIGER.w; x++) {
+        const px = img.data.subarray((y * TIGER.w + x) * 4, (y * TIGER.w + x) * 4 + 4);
+        if (x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h) h.update(px);
+        else outside += px[3]! ? 1 : 0;
+      }
+    expect(outside).toBe(0);
+    expect(h.digest("hex")).toBe("6cf6e3fe0c31c7f7eca6f9e0d7e5754e56814591748c1b4d753acae59c3648ce");
+    // And his idle starts on that still, the balloons where the bunch hangs.
+    expect(TIGER.anims.idle!.frames[0]!.layers).toEqual(tigerLayers());
   });
 
   it("holds four balloons, no king, with a clear gap between them (no two outlines touch)", () => {
@@ -87,5 +113,52 @@ describe("the circus tiger's still", () => {
           const [x, y] = c.split(",").map(Number) as [number, number];
           for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) expect(cells[j]!.has(`${x + dx},${y + dy}`), `${bunch[i]!.part} / ${bunch[j]!.part}`).toBe(false);
         }
+  });
+});
+
+describe("the circus tiger's animations", () => {
+  it("has every animation the other bosses have, with their frame counts and lengths, looping where theirs do", () => {
+    for (const name of ["idle", "entrance", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory"]) {
+      const mine = TIGER.anims[name]!;
+      const theirs = SMUDGY.anims[name]!;
+      expect([mine.frames.length, length(mine), mine.loop], name).toEqual([theirs.frames.length, length(theirs), theirs.loop]);
+    }
+  });
+
+  it("has his own moments, one-shots, the hoops about as long as Alfil's Slam, with the cues the wiring starts from", () => {
+    const a = TIGER.anims;
+    for (const name of ["hop", "place", "cheer", "bigCheer", "wince", "hoops"]) expect(a[name]!.loop, name).toBe(false);
+    expect(Math.abs(length(a.hoops!) - 1360)).toBeLessThanOrEqual(60);
+    expect(cues(a.hoops!).filter(([, c]) => c.startsWith("throw")).map(([, c]) => c)).toEqual(["throw1", "throw2", "throw3"]);
+    expect(cues(a.place!).map(([, c]) => c)).toContain("touch");
+    expect(cues(a.hop!).map(([, c]) => c)).toEqual(["spring", "thump"]);
+    // The hop's airborne frame: off the ground, so it can be held while he is moved.
+    const air = frameKeys(TIGER, a.hop!.frames[TIGER_HOP_AIR]!);
+    expect(air[TIGER.foot[1] - 1]!.slice(TIGER.foot[0] - 12, TIGER.foot[0] + 12).some((c) => c && c !== "z" && c !== "@")).toBe(false);
+    // A hoop is in his paw before each throw and gone on the throw's frame.
+    const hoopIn = (i: number) => a.hoops!.frames[i]!.layers.some((l) => l.part.startsWith("hoop:"));
+    a.hoops!.frames.forEach((f, i) => {
+      if (f.cue?.startsWith("throw")) expect([hoopIn(i - 1), hoopIn(i)], f.cue).toEqual([true, false]);
+    });
+  });
+
+  it("draws every frame of every animation inside its frame, in its palette's colors", () => {
+    for (const ch of [TIGER, TIGER_ATTACK])
+      for (const [name, a] of Object.entries(ch.anims))
+        a.frames.forEach((f, i) => {
+          const k = frameKeys(ch, f);
+          const edge = [...k[0]!, ...k[ch.h - 1]!, ...k.map((r) => r[0]), ...k.map((r) => r[ch.w - 1])];
+          expect(edge.filter(Boolean), `${ch.id} ${name} ${i + 1}`).toEqual([]);
+          for (const c of new Set(k.flat())) if (c) expect(ch.palette[c] ?? (c === "@" ? "halo" : undefined), `${ch.id} ${name}: "${c}"`).toBeDefined();
+        });
+  });
+
+  it("attacks a king on the shared beats: ten balloons bonk on the hits' own times and pop, the last frame empty", () => {
+    const attack = TIGER_ATTACK.anims.kingAttack!;
+    expect(length(attack)).toBe(KING_ATTACK.ms);
+    expect(cues(attack).filter(([, c]) => c === "bonk").map(([t]) => t)).toEqual(kingAttackHits());
+    expect(cues(attack).filter(([, c]) => c === "pop").length).toBe(KING_ATTACK.lashes);
+    expect(attack.frames[attack.frames.length - 1]!.layers).toEqual([]);
+    expect(cues(attack).find(([, c]) => c === "land")![0]).toBe(KING_ATTACK.landAt - 110);
   });
 });

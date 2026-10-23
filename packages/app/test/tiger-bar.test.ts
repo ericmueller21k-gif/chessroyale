@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { frameKeys, renderFrame, type Character } from "../src/characters/sprite.ts";
 import { BALLOON_COLOR_NAMES, BALLOON_PIECES, BALLOON_SHAPES, PUMP_H, PUMP_REST_H, TIGER_PUMP, pumpAnim } from "../src/characters/tiger-bar.ts";
-import { BALLOON_FLY, BALLOON_LAND } from "../src/characters/effects/tiger.ts";
+import { BALLOON_FLY, BALLOON_HIT, BALLOON_LAND, HOOP_FLY, HOOP_RING } from "../src/characters/effects/tiger.ts";
 
 /** The rows (from the top) a frame draws in. */
 const rows = (ch: Character, anim: string, i = 0) => {
@@ -14,12 +14,12 @@ const edge = (ch: Character, k: (string | null)[][], ground = false) => [...k[0]
 
 describe("the circus tiger's pump and balloons", () => {
   it("draws every frame in every color, from palette keys only, with nothing cut off at the frame's edge (the pump stands on its bottom)", () => {
-    for (const ch of [TIGER_PUMP, BALLOON_FLY, BALLOON_LAND]) {
+    for (const ch of [TIGER_PUMP, BALLOON_FLY, BALLOON_LAND, HOOP_RING, HOOP_FLY, BALLOON_HIT]) {
       for (const [name, part] of Object.entries(ch.parts))
         for (const row of part.grid) for (const k of row) if (k !== ".") expect(ch.palette, `${ch.id} ${name}: "${k}"`).toHaveProperty(k);
       for (const [name, a] of Object.entries(ch.anims))
         a.frames.forEach((f, i) => expect(edge(ch, frameKeys(ch, f), ch === TIGER_PUMP), `${ch.id} ${name} ${i}`).toEqual([]));
-      for (const look of BALLOON_COLOR_NAMES) expect(renderFrame(ch, Object.values(ch.anims)[0]!.frames[0]!, { look }).data.length).toBe(ch.w * ch.h * 4);
+      for (const look of ch.looks ? BALLOON_COLOR_NAMES : []) expect(renderFrame(ch, Object.values(ch.anims)[0]!.frames[0]!, { look }).data.length).toBe(ch.w * ch.h * 4);
     }
   });
 
@@ -66,5 +66,19 @@ describe("the circus tiger's pump and balloons", () => {
       expect(Math.abs(land!.y - fly!.y)).toBeLessThanOrEqual(1);
       expect(land!.x).toBe(fly!.x);
     }
+  });
+
+  it("burns a hoop round a 2 x 2 block: lands, burns, dies down, goes out in smoke; nothing drawn on the four squares but the ring's edge", () => {
+    const a = HOOP_RING.anims;
+    expect(a.land!.frames.map((f) => f.cue).filter(Boolean)).toEqual(["whoosh", "thump", "flame"]);
+    expect(a.burn!.loop && a.dying!.loop).toBe(true);
+    expect(a.out!.frames[a.out!.frames.length - 1]!.layers).toEqual([]);
+    // Inside the block (the four squares less the ring's 2 px at their outer edges), every frame of burn and dying is clear.
+    const m = (HOOP_RING.w - 64) / 2;
+    for (const name of ["burn", "dying"])
+      for (const f of a[name]!.frames) {
+        const k = frameKeys(HOOP_RING, f);
+        for (let y = m + 3; y < m + 61; y++) for (let x = m + 3; x < m + 61; x++) if (Math.abs(x - m - 32) + Math.abs(y - m - 32) < 50) expect(k[y]![x], `${name} ${x},${y}`).toBeNull();
+      }
   });
 });

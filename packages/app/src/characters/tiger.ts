@@ -8,10 +8,11 @@
  * highlight, drawn as the pump's balloons are, tiger-bar.ts; Eric's picture has six); his long striped tail curling up behind. Facing our left (as Alfil, Sawyer, Chub & Chirp, Smudgy, Moo and
  * Puddles), so his balloons are toward the board; light from the top left.
  *
- * This is his look only: ONE still, the first frame of `idle` (docs/decisions/2026-10-23-tiger-still.md). His powers (the balloons
- * he blows up on a pump nozzle in the boss bar, and his burning hoops) and his animations come later. He isn't in `CHARACTERS`,
- * `BOSS_KITS` or the roster, and nothing in the game draws him; the preview draws him with its `extra=` option
- * (`npm run preview:characters -- <dir> extra=packages/app/src/characters/tiger.ts only=tiger`).
+ * His still (docs/decisions/2026-10-23-tiger-still.md) is the first frame of `idle`; his animation pack, his own moments (hop, place,
+ * cheer, bigCheer, wince, hoops) and his attack on a king (`TIGER_ATTACK`) are docs/decisions/2026-10-23-tiger-animations.md. Look
+ * only: his powers' rules come later. He isn't in `CHARACTERS`, `BOSS_KITS` or the roster, and nothing in the game draws him; the
+ * preview draws him with its `extra=` option (`npm run preview:characters -- <dir> extra=packages/app/src/characters/tiger.ts
+ * only=tiger,tiger-attack`).
  *
  * Rigging, so the poses that follow are numbers (`TigerPose`), as the other bosses':
  * - the raised paw (`paw`: the fist; the elbow bends by itself) and the strings, a part of their own, redrawn from each balloon's knot
@@ -25,8 +26,11 @@
  *   numbers (hips under the shoulders, forelegs hanging, head up), not a redraw of the art.
  */
 import { canvas, inEllipse, inPoly, toGrid, type Canvas } from "./paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part } from "./sprite.ts";
-import { BALLOON_PIECES, BALLOON_SHAPES, balloonPartOf, knotX, type BalloonPiece, type Stage } from "./tiger-bar.ts";
+import { KING_ATTACK } from "@chessroyale/chess";
+import { groundShadow, moved } from "./attack-frame.ts";
+import { sparkle } from "./effects/common.ts";
+import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { BALLOON_COLORS, BALLOON_COLOR_NAMES, BALLOON_PIECES, BALLOON_SHAPES, balloonPartOf, knotX, type BalloonColor, type BalloonPiece, type Stage } from "./tiger-bar.ts";
 
 export const TIGER_PALETTE: Record<string, string> = {
   k: "#1f1210", // outline
@@ -83,6 +87,19 @@ export const TIGER_PALETTE: Record<string, string> = {
   Z: "#9150d6",
   "0": "#c79bf5",
   z: "#0d0e12", // ground shadow
+  j: "#b02a6e", // a balloon he holds out (the limp one for the pump, one he bats): pink by default, its color a look
+  l: "#ec5fa5",
+  m: "#ffaed6",
+  p: "#7a1a0a", // fire: the burning hoop's flames, dark red to white-hot
+  u: "#e8461c",
+  v: "#ff9b22",
+  Q: "#ffd84a",
+  R: "#fff3b0",
+  "%": "#4a4756", // the hoop's steel: dark, mid, light
+  "&": "#8d8a9c",
+  "=": "#cfccd9",
+  "~": "#7d6c5a", // dust: dark, light
+  "^": "#b9a88f",
 };
 
 type Pt = readonly [number, number];
@@ -182,9 +199,9 @@ const taper = (pts: readonly Pt[], r: readonly number[]): Inside => (x, y) => {
 
 const GROUND = 70;
 const OX = 6;
-const OY = 4;
+const OY = 30;
 const W = OX + 64 + 6;
-const H = OY + GROUND + 4;
+const H = OY + GROUND + 6;
 /** The ground point he is placed by (x): between his feet, shifted so the balloons and the tail reach as far one side as the other. */
 const FOOT_X = 30;
 
@@ -395,7 +412,7 @@ function ear(cx: number, cy: number, tilt: number, far = false): { part: Part; a
   });
 }
 
-export type Eyes = "open" | "half" | "shut" | "wide";
+export type Eyes = "open" | "half" | "shut" | "wide" | "joy";
 /** An eye (`x0`, `y0` its top left): amber in a dark rim, with a pupil; `w` its width (the far eye, seen at an angle, is narrower). */
 function eye(x0: number, y0: number, w: number, lid: Eyes): { part: Part; at: Pt } {
   const rows: Record<Eyes, string[]> = {
@@ -403,6 +420,7 @@ function eye(x0: number, y0: number, w: number, lid: Eyes): { part: Part; at: Pt
     half: w >= 6 ? ["ssssss", "ssxyss", ".ssss."] : ["sssss", "ssxss", ".sss."],
     shut: w >= 6 ? ["ssssss", ".ssss."] : ["sssss", ".sss."],
     wide: w >= 6 ? ["ssssss", "sYYYYs", "syxyYs", ".ssss."] : ["sssss", "sYYYs", "syxys", ".sss."],
+    joy: w >= 6 ? ["......", ".ssss.", "s....s"] : [".....", ".sss.", "s...s"],
   };
   return painted(x0, y0, 6, 5, (_F, S) => S(rows[lid], x0, y0), false);
 }
@@ -479,9 +497,11 @@ export function balloon(piece: Piece, at: Pt, stage: Stage = 4): { part: Part; a
 const GATHER: Pt = [6, 46.5];
 /** Where his raised paw is (its middle), holding the strings. */
 const FIST: Pt = [8, 52];
-function strings(knots: readonly Pt[], fist: Pt): { part: Part; at: Pt } {
-  const cv = canvas(46, 56);
-  const [x0, y0] = [0, 14];
+function strings(knots: readonly Pt[], fist: Pt, gather: Pt = GATHER, loose = false): { part: Part; at: Pt } {
+  const all = [...knots, fist, gather];
+  const x0 = Math.floor(Math.min(...all.map((p) => p[0]))) - 4;
+  const y0 = Math.floor(Math.min(...all.map((p) => p[1]))) - 2;
+  const cv = canvas(Math.ceil(Math.max(...all.map((p) => p[0]))) + 6 - x0, Math.ceil(Math.max(...all.map((p) => p[1]))) + 10 - y0);
   const draw = (a: Pt, b: Pt, k: string) => {
     const n = Math.ceil(Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])) * 2);
     for (let i = 0; i <= n; i++) {
@@ -490,18 +510,26 @@ function strings(knots: readonly Pt[], fist: Pt): { part: Part; at: Pt } {
       if (cv[y]?.[x] !== undefined) cv[y]![x] = k;
     }
   };
+  if (loose) {
+    // Let go: each string trails a few pixels under its balloon.
+    knots.forEach((k, i) => {
+      draw(k, [k[0] + (i % 2 ? 1 : -1), k[1] + 3], "8");
+      draw([k[0] + (i % 2 ? 1 : -1), k[1] + 3], [k[0], k[1] + 6], "8");
+    });
+    return { part: { grid: toGrid(cv), outline: false }, at: [x0, y0] };
+  }
   const top: Pt = [fist[0] - 0.5, fist[1] - 3];
   // Each string hangs in a curve: down and out toward his front first, then down to the gathering point.
   for (const k of knots) {
-    const c: Pt = [(GATHER[0] + k[0]) / 2 - 1, (GATHER[1] + k[1]) / 2];
+    const c: Pt = [(gather[0] + k[0]) / 2 - 1, (gather[1] + k[1]) / 2];
     let prev = k;
     for (let i = 1; i <= 14; i++) {
-      const q = bez(k, c, GATHER, i / 14);
+      const q = bez(k, c, gather, i / 14);
       draw(prev, q, "8");
       prev = q;
     }
   }
-  draw(GATHER, top, "9");
+  draw(gather, top, "9");
   // A loose end under his fist.
   draw([fist[0] - 1, fist[1] + 3], [fist[0] - 2, fist[1] + 6], "8");
   return { part: { grid: toGrid(cv), outline: false }, at: [x0, y0] };
@@ -517,10 +545,86 @@ function shadow(w: number): Part {
   return { grid: toGrid(cv), outline: false };
 }
 
+/** Inside his mouth as the jaw opens `open` degrees: dark, a pink tongue low in it (drawn under the jaw and the head, which frame it). */
+function mouth(open: number): { part: Part; at: Pt } {
+  const turn = (deg: number) => {
+    const th = rad(deg);
+    const [c, s] = [Math.cos(th), Math.sin(th)];
+    return JAW_POLY.map(([x, y]): Pt => [HINGE[0] + (x - HINGE[0]) * c + (y - HINGE[1]) * s, HINGE[1] - (x - HINGE[0]) * s + (y - HINGE[1]) * c]);
+  };
+  const shapes = [0, 0.25, 0.5, 0.75, 1].map((f) => inPoly(turn(open * f)));
+  const tongue = inPoly(turn(open * 0.8));
+  return painted(HEAD_AT[0], HEAD_AT[1] + 9, 16, 14, (F) => F(union(...shapes), (x, y) => (tongue(x, y) ? "r" : "q")));
+}
+
+/**
+ * A part turned `deg` degrees (positive: clockwise on the screen) about `pivot` (scene pixels): his body rearing up onto his hind legs
+ * (Eric's second picture). The part's pixels are read back nearest-neighbor, so it stays pixel art (no smoothing).
+ */
+function turned(src: { part: Part; at: Pt }, deg: number, pivot: Pt): { part: Part; at: Pt } {
+  if (!deg) return src;
+  const th = rad(deg);
+  const [c, s] = [Math.cos(th), Math.sin(th)];
+  const g = src.part.grid;
+  const [w, h] = [g[0]!.length, g.length];
+  const fwd = ([x, y]: Pt): Pt => [pivot[0] + c * (x - pivot[0]) - s * (y - pivot[1]), pivot[1] + s * (x - pivot[0]) + c * (y - pivot[1])];
+  const corners = ([[0, 0], [w, 0], [0, h], [w, h]] as Pt[]).map(([x, y]) => fwd([src.at[0] + x, src.at[1] + y]));
+  const x0 = Math.floor(Math.min(...corners.map((p) => p[0]))) - 1;
+  const y0 = Math.floor(Math.min(...corners.map((p) => p[1]))) - 1;
+  const cv = canvas(Math.ceil(Math.max(...corners.map((p) => p[0]))) + 2 - x0, Math.ceil(Math.max(...corners.map((p) => p[1]))) + 2 - y0);
+  for (let y = 0; y < cv.length; y++)
+    for (let x = 0; x < cv[0]!.length; x++) {
+      const [px, py] = [x0 + x + 0.5 - pivot[0], y0 + y + 0.5 - pivot[1]];
+      const gx = Math.floor(pivot[0] + c * px + s * py - src.at[0]);
+      const gy = Math.floor(pivot[1] - s * px + c * py - src.at[1]);
+      const k = g[gy]?.[gx];
+      if (k && k !== ".") cv[y]![x] = k;
+    }
+  return { part: { grid: toGrid(cv), outline: src.part.outline }, at: [x0, y0] };
+}
+
+/** A burning hoop held up (his old act), its middle at (`cx`, `cy`), seen edge-on: a ring of steel with flames licking off it; `seed` flickers them. */
+function hoopPart(seed: number): Part {
+  const [w, h] = [13, 17];
+  const cv = canvas(w, h);
+  const [cx, cy, rx, ry] = [6, 8.5, 3.6, 6.2];
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const d = ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2;
+      if (d >= 0.55 && d <= 1.05) cv[y]![x] = x < cx ? "=" : x > cx + 1 ? "%" : "&";
+    }
+  // Flames up off the ring and out at its sides, a little different each frame.
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2 + seed * 0.7;
+    const ox = cx + Math.cos(a) * (rx + 1);
+    const oy = cy + Math.sin(a) * (ry + 1);
+    const len = 1 + ((i * 7 + seed * 3) % 3);
+    for (let j = 0; j < len; j++) {
+      const X = Math.round(ox + Math.cos(a) * j * 0.6);
+      const Y = Math.round(oy + Math.sin(a) * j * 0.6 - j);
+      if (cv[Y]?.[X] === ".") cv[Y]![X] = j === 0 ? "v" : j === 1 ? "u" : "p";
+    }
+    const X = Math.round(ox);
+    const Y = Math.round(oy);
+    if (cv[Y]?.[X] !== undefined && cv[Y]![X] !== "=" && cv[Y]![X] !== "&" && cv[Y]![X] !== "%") cv[Y]![X] = "Q";
+  }
+  return { grid: toGrid(cv) };
+}
+
+/** A small round balloon (his limp one for the pump, or one to bat at a king), in one color's keys. */
+const smallBalloon = (piece: Piece, stage: Stage, keys: string): Part => {
+  const shape = BALLOON_SHAPES[piece][stage - 1]!;
+  return balloonPartOf(shape.sil, shape.marks, { d: keys[0]!, b: keys[1]!, l: keys[2]!, w: "w", n: keys[0]! });
+};
+
 // ---- Parts and the pose.
 
 const { parts: PARTS, add } = lazyParts();
 add("shadow", () => shadow(46));
+for (let i = 0; i < 4; i++) add(`hoop:${i}`, () => hoopPart(i));
+add("limp", () => smallBalloon("pawn", 1, "jlm"));
+const BAT_KEYS = ["EFG", "HIN", "OPS", "TUV", "XZ0", "jlm"] as const;
+BAT_KEYS.forEach((k, i) => add(`bat:${i}`, () => smallBalloon("pawn", 2, k)));
 
 type Placed = { name: string; at: Pt };
 const placedAt = new Map<string, Pt>();
@@ -539,11 +643,16 @@ function placed(name: string, make: () => { part: Part; at: Pt }): Placed {
 export interface TigerPose {
   /** He sinks this many pixels (a breath, a crouch): his body, head and raised arm go down; his feet stay on the ground. */
   bob?: number;
+  /** All of him off the ground this many pixels (a hop, a drop in; his shadow stays), and moved across (negative: to our left). */
+  air?: number;
+  dx?: number;
+  /** Reared up onto his hind legs, degrees (0 on all fours, about 65 standing): his body turns about his hips, his head and arms go with it. */
+  rear?: number;
   /** His head (skull, jaw, ears, eyes, whiskers and the hat on it) moved from where it stands: a nod, a lean (negative x: to our left). */
   head?: Pt;
-  /** The jaw: degrees open (0 closed, about 30 a great yawn or a roar). */
+  /** The jaw: degrees open (0 closed, about 30 a great yawn). */
   jaw?: number;
-  /** The ears' lean, in pixels at the tips (negative: toward his front), and the eyes. */
+  /** The ears' lean, in pixels at the tips (negative: toward his front; positive: laid back flat), and the eyes. */
   earN?: number;
   earF?: number;
   eyes?: Eyes;
@@ -554,9 +663,18 @@ export interface TigerPose {
   tail?: number;
   /** The raised paw (its middle); the strings go into it and the elbow bends by itself. */
   paw?: Pt;
-  /** Each balloon of the bunch moved from where it hangs (a bob, or handed over: out of the bunch with `gone`). */
+  /** The far forepaw lifted off the ground (its middle), as an arm: standing, or holding the strings (`holdF`). */
+  pawF?: Pt;
+  holdF?: boolean;
+  /** Each balloon of the bunch moved from where it hangs (a bob, or handed over: out of the bunch with `gone`), the whole bunch moved (`bunch`), or let go (`loose`: the strings trail under the balloons). */
   balloons?: Partial<Record<Piece, Pt>>;
+  bunch?: Pt;
   gone?: readonly Piece[];
+  loose?: boolean;
+  /** In his raised paw: a burning hoop (its flicker, 0 to 3), a limp balloon (for the pump), or a balloon to bat (its color, 0 to 5). */
+  hoop?: number;
+  limp?: boolean;
+  bat?: number;
   /** The feet's lift (a step): near hind, far hind, far front. */
   stepHN?: number;
   stepHF?: number;
@@ -565,6 +683,9 @@ export interface TigerPose {
 
 const REST = {
   bob: 0,
+  air: 0,
+  dx: 0,
+  rear: 0,
   head: [0, 0] as Pt,
   jaw: 0,
   earN: 0,
@@ -574,8 +695,15 @@ const REST = {
   hatTilt: 12,
   tail: 0,
   paw: FIST,
+  pawF: undefined as Pt | undefined,
+  holdF: false,
   balloons: {} as Partial<Record<Piece, Pt>>,
+  bunch: [0, 0] as Pt,
   gone: [] as readonly Piece[],
+  loose: false,
+  hoop: undefined as number | undefined,
+  limp: false,
+  bat: undefined as number | undefined,
   stepHN: 0,
   stepHF: 0,
   stepFF: 0,
@@ -585,6 +713,10 @@ const REST = {
 const SHOULDER: Pt = [27, 49.8];
 const BONES: Pt = [10.6, 8.2];
 const WRIST_FROM_PAW: Pt = [2.4, 2.6];
+/** What he rears up about (his hips), and the base of his neck (his head rides on it) and of his tail. */
+const PIVOT: Pt = [42, 54];
+const NECK: Pt = [26, 46];
+const TAIL_BASE: Pt = [50, 50];
 
 /** An elbow for an arm of two bones `l1` and `l2` from `s` to `t`, bent down (or as far out as it reaches). */
 function elbowOf(s: Pt, t: Pt, [l1, l2]: Pt): Pt {
@@ -607,46 +739,363 @@ const up = (p: Pt, dy: number): Pt => [p[0], p[1] + dy];
 export function tigerLayers(pose: TigerPose = {}): Layer[] {
   const p = { ...REST, ...pose };
   const b = p.bob;
+  const th = rad(p.rear);
+  /** A point of his body as he rears (it turns about his hips). */
+  const rr = ([x, y]: Pt): Pt => (p.rear ? [PIVOT[0] + Math.cos(th) * (x - PIVOT[0]) - Math.sin(th) * (y - PIVOT[1]), PIVOT[1] + Math.sin(th) * (x - PIVOT[0]) + Math.cos(th) * (y - PIVOT[1])] : [x, y]);
+  const neck = rr(NECK);
+  const hd: Pt = [p.head[0] + neck[0] - NECK[0], p.head[1] + neck[1] - NECK[1]];
+  const tb = rr(TAIL_BASE);
   const at = (pl: Placed, dx = 0, dy = 0): Layer => ({ part: pl.name, x: OX + pl.at[0] + dx, y: OY + pl.at[1] + dy });
   /** A part of his head: it moves with it. */
-  const H = (pl: Placed) => at(pl, Math.round(p.head[0]), b + Math.round(p.head[1]));
+  const H = (pl: Placed) => at(pl, Math.round(hd[0]), b + Math.round(hd[1]));
   const paw: Pt = up(p.paw, b);
   const wrist: Pt = [paw[0] + WRIST_FROM_PAW[0], paw[1] + WRIST_FROM_PAW[1]];
-  const shoulder = up(SHOULDER, b);
+  const shoulder = up(rr(SHOULDER), b);
   const elbow = elbowOf(shoulder, wrist, BONES);
   const bunch = BALLOON_ORDER.filter((n) => !p.gone.includes(n));
-  const offset = (n: Piece): Pt => [Math.round(p.balloons[n]?.[0] ?? 0), b + Math.round(p.balloons[n]?.[1] ?? 0)];
+  const offset = (n: Piece): Pt => [Math.round(p.bunch[0] + (p.balloons[n]?.[0] ?? 0)), b + Math.round(p.bunch[1] + (p.balloons[n]?.[1] ?? 0))];
+  const knots = bunch.map((n) => [knotOf(n)[0] + offset(n)[0], knotOf(n)[1] + offset(n)[1]] as Pt);
+  const gather: Pt = [GATHER[0] + p.bunch[0], GATHER[1] + p.bunch[1] + b];
+  // The far forepaw: on the ground (a leg), or lifted as an arm.
+  const shoulderF = up(rr([27, 50.2]), b);
+  const pawF = p.pawF ? up(p.pawF, b) : p.rear ? up([shoulderF[0] - 4, shoulderF[1] + 10], 0) : undefined;
+  const fist = p.holdF && pawF ? pawF : paw;
   // (A leg's top joints sink with the body; its foot and the lower joints lift with the step.)
-  const hindFar = (): Pt[] => [[39.4, 52.6 + b], [36.2, 59 + b / 2 - p.stepHF / 2], [39.4, 64 - p.stepHF], [38, 67.2 - p.stepHF]];
-  const hindNear = (): Pt[] => [[44.6, 51.8 + b], [41.2, 59 + b / 2 - p.stepHN / 2], [45.6, 64 - p.stepHN], [44.2, 67.2 - p.stepHN]];
-  const frontFar = (): Pt[] => [[27, 50.2 + b], [26.4, 58 + b / 2 - p.stepFF / 2], [25.4, 64.2 - p.stepFF]];
-  return [
+  const hipF = up(rr([39.4, 52.6]), b);
+  const hipN = up(rr([44.6, 51.8]), b);
+  const hindFar = (): Pt[] => [hipF, [36.2, 59 + b / 2 - p.stepHF / 2], [39.4, 64 - p.stepHF], [38, 67.2 - p.stepHF]];
+  const hindNear = (): Pt[] => [hipN, [41.2, 59 + b / 2 - p.stepHN / 2], [45.6, 64 - p.stepHN], [44.2, 67.2 - p.stepHN]];
+  const frontFar = (): Pt[] => [shoulderF, [26.4, 58 + b / 2 - p.stepFF / 2], [25.4, 64.2 - p.stepFF]];
+  const R = (name: string, make: () => { part: Part; at: Pt }) => placed(p.rear ? `${name}@${p.rear}` : name, () => turned(make(), p.rear, PIVOT));
+  const STRIPES_N: readonly (readonly Pt[])[] = [[[46.6, 46], [44.4, 50], [43.2, 54]], [[49.2, 48.2], [46.8, 52], [45.4, 56]], [[42.4, 47], [40.4, 50.6], [39.6, 54]]];
+  const stripesN = STRIPES_N.map((s) => s.map((q) => up(rr(q), b)));
+  const farArm = (): { part: Part; at: Pt } => {
+    const wristF: Pt = [pawF![0] + WRIST_FROM_PAW[0], pawF![1] + WRIST_FROM_PAW[1]];
+    return leg([shoulderF, elbowOf(shoulderF, wristF, BONES), wristF], [4.4, 3.3, 3], [pawF![0], pawF![1], 3.4, 3.1, true], [6, 10.5], 0.2);
+  };
+  const inPaw: Layer[] = [];
+  if (p.hoop !== undefined) inPaw.push({ part: `hoop:${p.hoop % 4}`, x: OX + Math.round(paw[0]) - 10, y: OY + Math.round(paw[1]) - 14 });
+  if (p.limp) inPaw.push({ part: "limp", x: OX + Math.round(paw[0]) - 4, y: OY + Math.round(paw[1]) - 9 });
+  if (p.bat !== undefined) inPaw.push({ part: `bat:${p.bat % BAT_KEYS.length}`, x: OX + Math.round(paw[0]) - 5, y: OY + Math.round(paw[1]) - 11 });
+  const layers: Layer[] = [
     { part: "shadow", x: OX + 12, y: OY + GROUND - 3 },
-    at(placed(`tail:${r2(p.tail)}:${b}`, () => tail(p.tail, b))),
+    at(placed(`tail:${r2(p.tail)}:${b}`, () => tail(p.tail, b)), Math.round(tb[0] - TAIL_BASE[0]), Math.round(tb[1] - TAIL_BASE[1])),
     at(placed(`legHF:${key(hindFar())}`, () => leg(hindFar(), [4.4, 3.4, 2.3, 2.7], [38, 67.2 - p.stepHF, 5, 2.6], [6, 10], 0.2))),
-    at(placed(`legFF:${key(frontFar())}`, () => leg(frontFar(), [4.4, 3.3, 3], [24.6, 67.2 - p.stepFF, 5.4, 2.7], [6, 10.5], 0.2))),
-    at(placed("torso", torso), 0, b),
-    at(placed("vest", vest), 0, b),
-    at(
-      placed(`legHN:${key(hindNear())}`, () =>
-        leg(hindNear(), [5.4, 3.9, 2.6, 3], [44.2, 67.2 - p.stepHN, 5.4, 2.7], [9.4, 13], 0, [[[46.6, 46 + b], [44.4, 50 + b], [43.2, 54 + b]], [[49.2, 48.2 + b], [46.8, 52 + b], [45.4, 56 + b]], [[42.4, 47 + b], [40.4, 50.6 + b], [39.6, 54 + b]]]),
-      ),
-    ),
+    at(pawF ? placed(`armFF:${key([shoulderF, pawF])}`, farArm) : placed(`legFF:${key(frontFar())}`, () => leg(frontFar(), [4.4, 3.3, 3], [24.6, 67.2 - p.stepFF, 5.4, 2.7], [6, 10.5], 0.2))),
+    at(R("torso", torso), 0, b),
+    at(R("vest", vest), 0, b),
+    at(placed(`legHN:${key(hindNear())}`, () => leg(hindNear(), [5.4, 3.9, 2.6, 3], [44.2, 67.2 - p.stepHN, 5.4, 2.7], [9.4, 13], 0, stripesN))),
     at(placed(`legFN:${key([shoulder, elbow, wrist, paw])}`, () => leg([shoulder, elbow, wrist], [5, 3.8, 3], [paw[0], paw[1], 3.7, 3.4, true], [4.5, 8.5, 12.5]))),
-    at(placed(`strings:${bunch.join()}:${key([paw, ...bunch.map(offset)])}`, () => strings(bunch.map((n) => [knotOf(n)[0] + offset(n)[0], knotOf(n)[1] + offset(n)[1]] as Pt), paw))),
+    at(placed(`strings:${bunch.join()}:${p.loose ? "loose" : key([fist, gather])}:${key(knots)}`, () => strings(knots, fist, gather, p.loose))),
     H(placed(`earF:${p.earF}`, () => ear(EAR_F[0], EAR_F[1], p.earF, true))),
     H(placed(`earN:${p.earN}`, () => ear(EAR_N[0], EAR_N[1], p.earN))),
+    ...(p.jaw > 0 ? [H(placed(`mouth:${p.jaw}`, () => mouth(p.jaw)))] : []),
     H(placed(`jaw:${p.jaw}`, () => jaw(p.jaw))),
     H(placed("head", head)),
     H(placed(`eyeF:${p.eyes}`, () => eye(EYE_F[0], EYE_F[1], 5, p.eyes))),
     H(placed(`eyeN:${p.eyes}`, () => eye(EYE_N[0], EYE_N[1], 6, p.eyes))),
     H(placed("whiskers", whiskers)),
-    at(placed(`hat:${p.hatTilt}`, () => hat(p.hatTilt)), Math.round(p.head[0] + p.hat[0]), b + Math.round(p.head[1] + p.hat[1])),
+    at(placed(`hat:${p.hatTilt}`, () => hat(p.hatTilt)), Math.round(hd[0] + p.hat[0]), b + Math.round(hd[1] + p.hat[1])),
     ...bunch.map((n) => at(placed(`balloon:${n}`, () => balloon(n, BUNCH[n]!.at, BUNCH[n]!.stage)), offset(n)[0], offset(n)[1])),
+    ...inPaw,
   ];
+  if (!p.air && !p.dx) return layers;
+  return layers.map((l) => ({ ...l, x: l.x + Math.round(p.dx), y: l.part === "shadow" ? l.y : l.y - Math.round(p.air) }));
 }
 
-const idle: Anim = { loop: true, frames: [{ ms: 1000, layers: tigerLayers() } as Frame] };
+/** The balloon he holds out (the limp one, one he bats) in each of the pump's colors: a look over its keys. */
+const tigerLooks = (): Record<BalloonColor, Record<string, string>> =>
+  Object.fromEntries(BALLOON_COLOR_NAMES.map((c): [string, Record<string, string>] => [c, { j: BALLOON_COLORS[c][0], l: BALLOON_COLORS[c][1], m: BALLOON_COLORS[c][2] }])) as Record<BalloonColor, Record<string, string>>;
+
+// ---- His animations (docs/decisions/2026-10-23-tiger-animations.md). Frame counts and times are the other bosses' (Smudgy's,
+// Puddles'); every frame is a pose. His attitude: a bored, grumpy circus cat who hated the roaring and the hoops: he yawns where
+// another boss would roar, watches through half-shut eyes, and only his balloons make him smile.
+
+const sp = (x: number, y: number, k: string): Speck => [OX + Math.round(x), OY + Math.round(y), k];
+const F = (ms: number, pose: TigerPose = {}, extra: Partial<Frame> = {}): Frame => ({ ms, layers: tigerLayers(pose), ...extra });
+const ALL_GONE: readonly Piece[] = ["queen", "knight", "rook", "pawn"];
+/** His shadow on the ground alone (before he drops in, after he's gone). */
+const shadowOnly = (r: number): Speck[] => groundShadow(OX + 35, OY + GROUND - 1, r);
+/** Dust kicked up at his feet, `t` a frame number (it spreads and settles). */
+const dust = (t: number, n = 3): Speck[] =>
+  Array.from({ length: n * 2 }, (_, i): Speck => {
+    const side = i % 2 ? 1 : -1;
+    return sp(35 + side * (12 + t * 3 + (i >> 1) * 4), GROUND - 1 - ((i + t) % 3) - (t === 1 ? 1 : 0), (i + t) % 2 ? "^" : "~");
+  });
+/** Each balloon of the bunch bobbing a pixel, out of step with the others (`i` a frame number of 16). */
+const bobbing = (i: number): Partial<Record<Piece, Pt>> => ({
+  queen: [0, i >= 2 && i <= 7 ? -1 : 0],
+  knight: [0, i >= 6 && i <= 11 ? -1 : 0],
+  rook: [0, i >= 10 && i <= 15 ? -1 : 0],
+  pawn: [i >= 4 && i <= 9 ? 1 : 0, 0],
+});
+/** A hit: every color goes pale. */
+const FLASH: Record<string, string> = Object.fromEntries(
+  Object.entries(TIGER_PALETTE)
+    .filter(([k]) => !["k", "z", "x", "s", "w"].includes(k))
+    .map(([k, c]) => {
+      const n = parseInt(c.slice(1), 16);
+      const mix = (v: number) => Math.round(v + (255 - v) * 0.55).toString(16).padStart(2, "0");
+      return [k, `#${mix((n >> 16) & 255)}${mix((n >> 8) & 255)}${mix(n & 255)}`];
+    }),
+);
+const twinkle = (x: number, y: number): Speck[] => sparkle(OX + x, OY + y, "w", "Y");
+
+/** On his hind legs (Eric's second picture), the bunch held up in his raised paw. */
+const STAND: TigerPose = { rear: 65, paw: [24, 30], bunch: [16, -18] };
+/** Standing with a hoop: the strings in his far paw up behind his head, the near paw free for the hoop. */
+const HOOP_STAND: TigerPose = { rear: 65, pawF: [33, 30], holdF: true, bunch: [18, -17], eyes: "half", hatTilt: 6 };
+
+/** Idle: frame 1 is the still. He breathes slowly, his balloons bob out of step, his tail swishes, an ear flicks, he blinks. */
+const idle: Anim = {
+  loop: true,
+  frames: Array.from({ length: 16 }, (_, i) =>
+    F(125, {
+      bob: i >= 5 && i <= 12 ? 1 : 0,
+      balloons: bobbing(i),
+      earN: i === 3 ? -2 : i === 4 ? -1 : 0,
+      earF: i === 3 ? -1 : 0,
+      tail: i >= 8 && i <= 11 ? [2, 3, 3, 1][i - 8]! : 0,
+      eyes: i === 11 ? "shut" : i === 12 ? "half" : "open",
+      head: [0, i >= 6 && i <= 9 ? 1 : 0],
+    }),
+  ),
+};
+
+/** Entrance: his shadow spreads, he drops in, lands in a crouch with dust, straightens, and gives the crowd a big bored yawn. */
+const entrance: Anim = {
+  loop: false,
+  frames: [
+    { ms: 100, layers: [], specks: shadowOnly(8), cue: "drop" },
+    { ms: 100, layers: [], specks: shadowOnly(16) },
+    F(70, { air: 22, eyes: "wide", earN: -2, earF: -2, tail: 4, stepHN: 3, stepHF: 3, stepFF: 3, hat: [0, -3], balloons: { queen: [0, 2], knight: [0, 2], rook: [0, 2] } }),
+    F(70, { air: 7, eyes: "wide", earN: -2, earF: -2, tail: 3, stepHN: 1, stepHF: 1, stepFF: 1, hat: [0, -1] }),
+    F(130, { bob: 3, eyes: "shut", earN: 3, earF: 3, hat: [0, 1], balloons: { queen: [0, 2], knight: [0, 1], rook: [0, 2], pawn: [0, 1] } }, { cue: "thump", shake: [0, 2], specks: dust(0) }),
+    F(110, { bob: 1, earN: 1, earF: 1 }, { specks: dust(1) }),
+    F(110, { eyes: "half" }, { specks: dust(2) }),
+    F(160, { head: [1, -1], jaw: 22, eyes: "shut", earN: 2, earF: 2, tail: 2 }, { cue: "yawn" }),
+    F(160, { head: [1, -1], jaw: 30, eyes: "shut", earN: 3, earF: 3, tail: 3 }),
+    F(300, { eyes: "half" }),
+  ],
+};
+
+/** Thinking: bored, eyes half shut on the board, his tail tip tapping, an ear turning; a slow yawn in the third round. */
+const THINK_JAW = [0, 0, 0, 0, 0, 0, 0, 0, 8, 18, 24, 10, 0, 0, 0, 0] as const;
+const thinking: Anim = {
+  loop: true,
+  frames: Array.from({ length: 16 }, (_, i) =>
+    F(130, {
+      head: [-1, 1],
+      eyes: THINK_JAW[i] ? "shut" : i % 4 === 3 ? "shut" : "half",
+      jaw: THINK_JAW[i]!,
+      earN: [0, 1, 0, -1][i % 4]!,
+      earF: i >= 12 ? 1 : 0,
+      tail: [0, 2, 0, -1][i % 4]!,
+      balloons: bobbing(i),
+      bob: i >= 8 && i <= 11 ? 1 : 0,
+    }),
+  ),
+};
+
+/** His move: a crouch, a step with the front foot and one with the hind, each with a thump of dust, and a settle. */
+const move: Anim = {
+  loop: false,
+  frames: [
+    F(100, { bob: 2, earN: 1, earF: 1, eyes: "half" }),
+    F(90, { stepFF: 3, bob: 1, head: [-1, 0], eyes: "half", balloons: { queen: [0, 1], knight: [0, 1] } }),
+    F(110, { bob: 2, eyes: "half" }, { cue: "thump", shake: [0, 1], specks: dust(0, 2) }),
+    F(130, { stepHN: 3, stepHF: 1, bob: 1, head: [-1, 0], tail: 2, eyes: "half", balloons: { rook: [0, 1], pawn: [0, 1] } }),
+    F(120, { bob: 2, eyes: "half" }, { cue: "thump", shake: [0, 1], specks: dust(1, 2) }),
+    F(160, { eyes: "half" }),
+  ],
+};
+
+/** A capture: a lazy swat at the board with his raised paw (the balloons jerk on their strings), then a pleased little grin. */
+const capture: Anim = {
+  loop: false,
+  frames: [
+    F(90, { bob: 2, earN: 2, earF: 2, eyes: "half" }),
+    F(85, { bob: 1, paw: [13, 44], head: [1, 0], eyes: "half", balloons: { queen: [1, -1], knight: [1, -1], rook: [1, 0], pawn: [1, 0] } }),
+    F(85, { bob: 2, paw: [8, 57], head: [-2, 1], eyes: "wide", earN: -2, earF: -2, balloons: { queen: [-1, 1], knight: [-1, 1], rook: [-1, 1], pawn: [-2, 1] } }, { cue: "swat", shake: [-1, 0] }),
+    F(85, { bob: 2, paw: [9, 56], head: [-2, 1], eyes: "open", balloons: { queen: [-1, 0], knight: [-1, 0], rook: [0, 1], pawn: [-1, 1] } }),
+    F(85, { bob: 1, paw: [7, 53], head: [-1, 0], eyes: "half" }),
+    ...Array.from({ length: 6 }, (_, i) => F(85, { eyes: i < 4 ? "joy" : "half", jaw: i < 4 ? 6 : 0, tail: [2, 4, 2, 4, 2, 0][i]!, earN: -1, earF: -1, head: [0, -1], balloons: bobbing(i * 2) })),
+    F(160, { eyes: "half" }),
+  ],
+};
+
+/** Hurt: every color pale, knocked back with his eyes shut and ears flat, the hat jolted up, the balloons yanked; a glare. */
+const hurt: Anim = {
+  loop: false,
+  frames: [
+    F(70, { dx: 2, head: [2, -1], eyes: "shut", earN: 3, earF: 3, hat: [1, -3], hatTilt: 20, tail: 4, balloons: { queen: [2, -2], knight: [2, -1], rook: [1, -2], pawn: [2, -1] } }, { cue: "oof", pal: FLASH, shake: [2, 0] }),
+    F(80, { dx: 2, bob: 1, head: [2, 0], eyes: "shut", earN: 3, earF: 3, hat: [1, -2], hatTilt: 18, tail: 3, balloons: { queen: [1, -1], knight: [1, 0], rook: [1, -1], pawn: [1, 0] } }),
+    F(90, { dx: 1, bob: 2, head: [1, 1], eyes: "shut", earN: 2, earF: 2, hat: [0, -1], hatTilt: 14 }),
+    F(90, { dx: 1, bob: 1, head: [0, 1], eyes: "half", earN: 2, earF: 2 }),
+    F(110, { bob: 1, head: [-1, 1], eyes: "half", earN: 3, earF: 3, tail: -2 }),
+    F(120, { head: [-1, 0], eyes: "half", earN: 2, earF: 2, tail: -1 }),
+    F(160, { eyes: "half" }),
+  ],
+};
+
+/** Check: a growl he can't be bothered to make a roar (a crouch, the jaw open, ears back), then he shakes his bunch at the board. */
+const check: Anim = {
+  loop: false,
+  frames: [
+    F(100, { bob: 2, head: [-1, 1], earN: 2, earF: 2, eyes: "half" }),
+    F(120, { bob: 2, head: [-2, 1], jaw: 18, earN: 3, earF: 3, eyes: "half", tail: 3 }, { cue: "growl" }),
+    F(100, { bob: 2, head: [-2, 1], jaw: 14, earN: 3, earF: 3, eyes: "half", tail: 4 }),
+    F(100, { bob: 1, head: [-1, 0], earN: 1, earF: 1, eyes: "half" }),
+    F(120, { bob: 1, paw: [6, 48], earN: -1, eyes: "half", balloons: { queen: [-1, -1], knight: [-1, -1], rook: [-2, -1], pawn: [-2, 0] } }, { cue: "squeak" }),
+    F(100, { bob: 1, paw: [9, 51], eyes: "half", balloons: { queen: [1, 0], knight: [1, 0], rook: [0, 1], pawn: [1, 0] } }),
+    F(150, { paw: [7, 50], eyes: "half", balloons: { queen: [-1, 0], rook: [-1, 0] } }),
+    F(160, { eyes: "half" }),
+  ],
+};
+
+/** Smug: head back, eyes half shut, a thin grin, the hat tipped further, his tail swishing slowly, the balloons bobbing. */
+const smug: Anim = {
+  loop: true,
+  frames: Array.from({ length: 8 }, (_, i) =>
+    F(150, { head: [1, -1], eyes: i === 5 ? "shut" : "half", jaw: i % 4 === 1 ? 4 : 0, hatTilt: 16, tail: [0, 2, 3, 2, 0, -1, -2, -1][i]!, earN: i === 2 ? -1 : 0, balloons: bobbing(i * 2) }),
+  ),
+};
+
+/** Rattled: shaking a pixel either way, eyes wide, ears back, tail up and bristling, the balloons jittering on their strings. */
+const rattled: Anim = {
+  loop: true,
+  frames: Array.from({ length: 8 }, (_, i) =>
+    F(80, { dx: i % 2 ? 1 : -1, bob: i % 4 === 0 ? 1 : 0, eyes: "wide", earN: 3, earF: 3, tail: 5, hat: [0, i % 2 ? -1 : 0], balloons: { queen: [i % 2 ? 1 : 0, 0], knight: [0, i % 2 ? 0 : -1], rook: [i % 2 ? 0 : -1, 0], pawn: [0, i % 2 ? 1 : 0] } }),
+  ),
+};
+
+/** Defeat: a flash and a reel; he lets go of his balloons (they float up and away) and slumps down, ears limp, the hat tipped over his eyes. */
+const defeat: Anim = {
+  loop: false,
+  frames: [
+    F(80, { dx: 2, head: [2, -1], eyes: "shut", earN: 3, earF: 3, hat: [1, -2], tail: 3 }, { cue: "oof", pal: FLASH, shake: [2, 0] }),
+    F(100, { dx: 1, bob: 1, head: [1, 0], eyes: "wide", earN: 2, earF: 2, paw: [10, 54], loose: true, bunch: [0, -5] }),
+    F(110, { bob: 3, head: [0, 2], eyes: "half", earN: 3, earF: 3, paw: [12, 58], loose: true, bunch: [1, -12], hat: [-1, 1], hatTilt: 0 }, { cue: "flop", specks: dust(0, 2) }),
+    F(120, { bob: 4, head: [0, 3], eyes: "shut", earN: 3, earF: 3, paw: [12, 60], loose: true, bunch: [2, -20], hat: [-2, 2], hatTilt: -8, tail: -2 }, { specks: dust(1, 2) }),
+    F(140, { bob: 4, head: [0, 3], eyes: "shut", earN: 3, earF: 3, paw: [12, 60], loose: true, bunch: [3, -27], hat: [-2, 2], hatTilt: -10, tail: -3 }),
+    F(1000, { bob: 4, head: [0, 3], eyes: "shut", earN: 3, earF: 3, paw: [12, 60], gone: ALL_GONE, hat: [-2, 2], hatTilt: -10, tail: -3 }),
+  ],
+};
+
+/** Victory: up on his hind legs (the old act's bow, without the enthusiasm), the bunch held high, a smug look, a foot tap. */
+const victory: Anim = {
+  loop: true,
+  frames: Array.from({ length: 12 }, (_, i) =>
+    F(110, {
+      ...STAND,
+      bob: i % 6 === 2 || i % 6 === 3 ? 1 : 0,
+      eyes: i === 9 ? "shut" : i < 6 ? "half" : "joy",
+      jaw: i >= 6 && i <= 8 ? 6 : 0,
+      paw: [24, 30 - (i % 6 === 2 || i % 6 === 3 ? 0 : 1)],
+      tail: [0, 2, 4, 2, 0, -2][i % 6]!,
+      hatTilt: i >= 6 ? 20 : 12,
+      balloons: bobbing(i),
+      stepHN: i === 8 ? 2 : 0,
+    }, i === 2 ? { cue: "huff" } : i === 8 ? { cue: "thump" } : {}),
+  ),
+};
+
+// ---- His own moments.
+
+/** The hop to the pump and back (one animation; mirror it for the way back): a crouch, a spring, in the air (`air`: hold it while the hop moves him), down, a landing with dust, a settle. */
+const hop: Anim = {
+  loop: false,
+  frames: [
+    F(110, { bob: 3, earN: 2, earF: 2, eyes: "half", tail: -2 }),
+    F(70, { air: 4, bob: -1, stepHF: 2, stepHN: 2, tail: 3, eyes: "open", balloons: { queen: [0, 2], knight: [0, 2], rook: [0, 2], pawn: [0, 1] } }, { cue: "spring" }),
+    F(120, { air: 10, bob: -1, stepHF: 4, stepHN: 4, stepFF: 4, tail: 4, earN: -1, earF: -1, eyes: "half", hat: [0, -1], balloons: { queen: [0, 3], knight: [0, 3], rook: [0, 3], pawn: [0, 2] } }),
+    F(70, { air: 4, stepHF: 1, stepHN: 1, stepFF: 2, tail: 2, eyes: "half", balloons: { queen: [0, 1], knight: [0, 1], rook: [0, 1] } }),
+    F(100, { bob: 3, earN: 2, earF: 2, eyes: "shut", balloons: { queen: [0, -1], knight: [0, -1], rook: [0, -1] } }, { cue: "thump", specks: dust(0, 2) }),
+    F(150, { bob: 1, eyes: "half" }, { specks: dust(1, 2) }),
+  ],
+};
+/** The frame of `hop` that holds while he is moved through the air. */
+export const TIGER_HOP_AIR = 2;
+
+/** Place: he pulls a limp balloon from his vest pocket and sets it on the nozzle in front of him (`touch`: it is on the nozzle). */
+const place: Anim = {
+  loop: false,
+  frames: [
+    F(110, { paw: [30, 48], head: [1, 1], eyes: "half" }),
+    F(100, { paw: [31, 47], head: [1, 1], eyes: "half", limp: true }, { cue: "rustle" }),
+    F(110, { paw: [18, 50], head: [0, 1], eyes: "half", limp: true }),
+    F(120, { bob: 2, paw: [9, 58], head: [-2, 2], eyes: "half", limp: true }),
+    F(120, { bob: 2, paw: [9, 59], head: [-2, 2], eyes: "half" }, { cue: "touch" }),
+    F(120, { bob: 1, paw: [7, 55], head: [-1, 1], eyes: "half" }),
+    F(140, { eyes: "half" }),
+  ],
+};
+
+/** Cheer (a balloon landed on the board): a small pleased grin, the tail up, the balloons bobbing. */
+const cheer: Anim = {
+  loop: false,
+  frames: [
+    F(90, { eyes: "open", earN: -1, earF: -1 }, { cue: "cheer" }),
+    ...Array.from({ length: 6 }, (_, i) => F(90, { eyes: "joy", jaw: i % 2 ? 4 : 7, tail: [3, 5, 4, 5, 3, 2][i]!, head: [0, -1], earN: -2, earF: -2, bob: i % 2, balloons: bobbing(i * 2 + 1) })),
+    F(90, { eyes: "half", jaw: 0 }),
+  ],
+};
+
+/** Big cheer (a real queen landed): he half rears up, a wide grin, the balloons swinging, sparkles; then down again, still pleased. */
+const bigCheer: Anim = {
+  loop: false,
+  frames: [
+    F(90, { bob: 2, eyes: "wide", earN: -2, earF: -2 }, { cue: "cheer" }),
+    F(90, { rear: 20, paw: [12, 44], bunch: [2, -4], eyes: "joy", jaw: 10, tail: 4 }),
+    ...Array.from({ length: 7 }, (_, i) =>
+      F(110, { rear: 32, paw: [16, 38], bunch: [6, -8], eyes: "joy", jaw: i % 2 ? 10 : 14, tail: [4, 6, 4, 6, 4, 6, 4][i]!, earN: -2, earF: -2, hatTilt: 18, balloons: bobbing(i * 2) }, {
+        ...(i === 2 ? { cue: "whoop" } : {}),
+        specks: i % 2 ? [...twinkle(2, 14), ...twinkle(40, 8)] : [...twinkle(8, 6), ...twinkle(34, 18)],
+      }),
+    ),
+    F(110, { rear: 16, paw: [11, 46], bunch: [2, -3], eyes: "joy", jaw: 6 }),
+    F(100, { bob: 1, eyes: "joy", jaw: 4 }),
+  ],
+};
+
+/** Wince (a balloon popped): ears flat, eyes shut, a flinch, then an annoyed look and a lash of his tail. */
+const wince: Anim = {
+  loop: false,
+  frames: [
+    F(80, { dx: 1, bob: 1, head: [1, 0], eyes: "shut", earN: 3, earF: 3, tail: 3, hat: [0, -1] }, { cue: "wince", shake: [1, 0] }),
+    F(100, { dx: 1, bob: 2, head: [2, 1], eyes: "shut", earN: 3, earF: 3, tail: 2 }),
+    F(110, { bob: 1, head: [1, 1], eyes: "shut", earN: 3, earF: 2 }),
+    F(130, { head: [0, 1], eyes: "half", earN: 2, earF: 2, tail: -2 }),
+    F(130, { head: [-1, 1], eyes: "half", earN: 2, earF: 2, tail: 4 }, { cue: "huff" }),
+    F(120, { head: [-1, 0], eyes: "half", earN: 1, earF: 1, tail: -1 }),
+    F(110, { eyes: "half" }),
+  ],
+};
+
+/** The hoops (his ultimate's cast, Alfil's Slam's length): up on his hind legs with a burning hoop, the old act and a sour look; three throws. */
+const HOOP_HOLD: Pt = [25, 34];
+const HOOP_BACK: Pt = [37, 24];
+const HOOP_THROW: Pt = [22, 42];
+const hoops: Anim = {
+  loop: false,
+  frames: [
+    F(90, { rear: 30, paw: [14, 46], eyes: "half", bunch: [6, -6] }),
+    F(110, { ...HOOP_STAND, paw: HOOP_HOLD, hoop: 0 }, { cue: "flame" }),
+    F(100, { ...HOOP_STAND, paw: HOOP_BACK, hoop: 1, head: [1, 0] }),
+    F(90, { ...HOOP_STAND, paw: HOOP_THROW, head: [-1, 1] }, { cue: "throw1" }),
+    F(100, { ...HOOP_STAND, paw: HOOP_HOLD, hoop: 2 }),
+    F(90, { ...HOOP_STAND, paw: HOOP_BACK, hoop: 3, head: [1, 0] }),
+    F(90, { ...HOOP_STAND, paw: HOOP_THROW, head: [-1, 1] }, { cue: "throw2" }),
+    F(100, { ...HOOP_STAND, paw: HOOP_HOLD, hoop: 0 }),
+    F(90, { ...HOOP_STAND, paw: HOOP_BACK, hoop: 1, head: [1, 0] }),
+    F(90, { ...HOOP_STAND, paw: HOOP_THROW, head: [-1, 1] }, { cue: "throw3" }),
+    F(150, { ...HOOP_STAND, paw: [26, 38], eyes: "shut", jaw: 0 }, { cue: "huff" }),
+    F(90, { rear: 30, paw: [14, 46], eyes: "half", bunch: [6, -6] }),
+    F(170, { bob: 2, eyes: "half" }, { cue: "thump", specks: dust(0, 2) }),
+  ],
+};
+
+export const TIGER_ANIMS = ["idle", "entrance", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "hop", "place", "cheer", "bigCheer", "wince", "hoops"] as const;
 
 export const TIGER: Character = {
   id: "tiger",
@@ -656,9 +1105,100 @@ export const TIGER: Character = {
   foot: [OX + FOOT_X, OY + GROUND],
   palette: TIGER_PALETTE,
   halo: "#3a2a22",
+  looks: tigerLooks(),
   parts: PARTS,
-  anims: { idle },
+  anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory, hop, place, cheer, bigCheer, wince, hoops },
 };
 
 /** The part of him a portrait shows (his head, ears and hat, a bit of his shoulders and vest collar), in frame pixels. */
 export const TIGER_PORTRAIT = { x: OX + 10, y: OY + 24, w: 27, h: 27 } as const;
+/** Where the approved still's 76 x 78 frame is in his frame (the headroom above it is new): a test keeps those pixels. */
+export const TIGER_STILL_BOX = { x: OX - 6, y: OY - 4, w: 76, h: 78 } as const;
+
+// ---- His attack on a king (the ten shared beats): he drops in beside the king and bats a balloon at him each beat; it bonks on the
+// king and pops (the board's `balloonHit` on the king's square at each `bonk`).
+
+/** The king, to our left: as far as Puddles' (1.8 squares of 36 px), so the frame is this much wider on the left. */
+const ATTACK_REACH = 44;
+const AW = W + ATTACK_REACH;
+const STAND_OFF = 1.8 * 36;
+/** Where each balloon meets the king (scene pixels): at his head, or a little lower, in turn. */
+const KING_AT = (i: number): Pt => [FOOT_X - STAND_OFF - 4, GROUND - 1 - (i % 2 ? 21 : 27)];
+const fa = (fr: Frame): Frame => moved(fr, ATTACK_REACH, 0, AW, H);
+const landShadow = (r: number): Speck[] => shadowOnly(r).map(([x, y, k]): Speck => [x + ATTACK_REACH, y, k]);
+/** A balloon's colors in turn (his palette's: red, yellow, blue, green, purple, pink). */
+const BAT_COLORS = ["EFG", "HIN", "OPS", "TUV", "XZ0", "jlm"] as const;
+/** The balloon at the king (scene pixels): squashed against him (`bonk`), or burst (a flash, scraps). */
+function atKing(i: number, burst: boolean): Speck[] {
+  const [kx, ky] = KING_AT(i);
+  const [d, b, l] = [...BAT_COLORS[i % BAT_COLORS.length]!];
+  if (!burst) {
+    const out: Speck[] = [];
+    // A squashed round balloon, 7 wide and 5 high, flat on the king's side (its right), outlined.
+    for (let y = -3; y <= 3; y++)
+      for (let x = -1; x <= 7; x++) {
+        const e = ((x - 3) / 4.2) ** 2 + (y / 3.2) ** 2;
+        if (e <= 1) out.push(sp(kx + x, ky + y, e > 0.62 ? "k" : x < 3 && y < 0 ? l! : x > 4 || y > 1 ? d! : b!));
+      }
+    out.push(sp(kx + 2, ky - 1, "w"), sp(kx + 7, ky + 3, d!), sp(kx + 8, ky + 4, "8"), sp(kx + 9, ky + 5, "8"));
+    return out;
+  }
+  return [
+    ...sparkle(OX + Math.round(kx + 2), OY + Math.round(ky), "w", "Y", true),
+    sp(kx - 3, ky - 4, b!), sp(kx - 2, ky - 4, d!), sp(kx + 6, ky - 3, b!), sp(kx + 6, ky - 2, d!),
+    sp(kx - 2, ky + 4, b!), sp(kx + 5, ky + 4, b!), sp(kx + 5, ky + 5, d!), sp(kx + 2, ky - 6, l!),
+  ];
+}
+/** A beat: the swat lands and the balloon bonks on the king (the cue frame is where the board marks the king's square). */
+const batBeat = (i: number): Frame => {
+  const fr = fa(F(90, { bob: 2, paw: [8, 56], head: [-2, 1], eyes: "half", earN: 1, earF: 1, tail: i % 2 ? 3 : -1, balloons: { queen: [-1, 1], knight: [-1, 1], rook: [-1, 0], pawn: [-1, 1] } }, { cue: "bonk", shake: [i % 2 ? -1 : 1, 0] }));
+  return { ...fr, specks: [...(fr.specks ?? []), ...atKing(i, false).map(([x, y, k]): Speck => [x + ATTACK_REACH, y, k])] };
+};
+/** Between beats: it pops on the king; his paw is back with the next balloon. */
+const popBeat = (i: number): Frame => {
+  const fr = fa(F(80, { bob: 1, paw: [14, 46], bat: i + 1, head: [-1, 0], eyes: "half", tail: i % 2 ? -1 : 2, balloons: bobbing(i) }, { cue: "pop" }));
+  return { ...fr, specks: [...(fr.specks ?? []), ...atKing(i, true).map(([x, y, k]): Speck => [x + ATTACK_REACH, y, k])] };
+};
+
+/**
+ * His attack on a king, the king to our left (the board mirrors him when it's to his right), on the shared beats (KING_ATTACK,
+ * boss-timing.ts): his shadow spreads, he drops in (`drop`), lands (`land`), takes a balloon in his paw, then bats it at the king,
+ * ten times: each lands on a hit's own time (`bonk`: the cue frame is where the board marks the king's square) and pops there (`pop`)
+ * as the next one comes up in his paw; a bored huff (`huff`), and he hops out of the frame. The last frame is empty.
+ */
+const kingAttack: Anim = (() => {
+  const A = KING_ATTACK;
+  const frames: Frame[] = [
+    { ms: 100, layers: [], specks: landShadow(8) },
+    { ms: 100, layers: [], specks: landShadow(16) },
+    fa(F(80, { air: 22, eyes: "wide", earN: -2, earF: -2, tail: 4, stepHN: 3, stepHF: 3, stepFF: 3, hat: [0, -3] }, { cue: "drop" })),
+    fa(F(80, { air: 7, eyes: "wide", earN: -2, earF: -2, stepHN: 1, stepHF: 1, stepFF: 1 })),
+    fa(F(A.landAt - 360, { bob: 3, eyes: "shut", earN: 3, earF: 3 }, { cue: "land", shake: [0, 2], specks: dust(0) })),
+    fa(F(A.lashAt - A.landAt, { bob: 1, paw: [14, 46], bat: 0, eyes: "half" }, { specks: dust(1) })),
+  ];
+  for (let i = 0; i < A.lashes; i++) frames.push(batBeat(i), popBeat(i));
+  const done = A.leaveAt - (A.lashAt + A.lashes * A.lashEveryMs);
+  frames.push(fa(F(done, { head: [1, -1], eyes: "shut", jaw: 4, earN: 1, earF: 1, tail: 3 }, { cue: "huff" })));
+  const leave = A.ms - A.leaveAt;
+  frames.push(
+    fa(F(leave - 300, { bob: 3, eyes: "half", earN: 2, earF: 2 })),
+    fa(F(80, { air: 8, eyes: "half", stepHN: 2, stepHF: 2, stepFF: 2 }, { cue: "drop" })),
+    fa(F(80, { air: 24, eyes: "half", stepHN: 4, stepHF: 4, stepFF: 4, tail: 4 })),
+    { ms: 80, layers: [], specks: landShadow(10) },
+    { ms: 60, layers: [] },
+  );
+  return { loop: false, frames };
+})();
+
+/**
+ * The tiger for his attack on a king: the same drawing, parts and palette, facing our left as always, in a frame `ATTACK_REACH`
+ * wider on the left (the balloon's reach to the king). Its `idle`, one still, is for the preview, which starts every reel from one.
+ */
+export const TIGER_ATTACK: Character = {
+  ...TIGER,
+  id: "tiger-attack",
+  name: "Tiger (his attack)",
+  w: AW,
+  foot: [TIGER.foot[0] + ATTACK_REACH, TIGER.foot[1]],
+  anims: { idle: { loop: true, frames: [fa(F(1000))] }, kingAttack },
+};
