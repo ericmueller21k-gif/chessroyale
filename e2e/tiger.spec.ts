@@ -10,8 +10,8 @@ import { test, bossAloneFromHome, submitMove } from "./helpers.ts";
  * show (the pump, the balloons' flight and landing, the burning hoops) and its own visual e2e.
  * - Hoops (`&power=hoops`): at the start of his turn after the warning, his whole turn: blocks within ranks 2 to 7, apart,
  *   your allowed moves never crossing their walls, for exactly your next 2 moves, then gone (`hoopsOut`).
- * - Balloons (`&balloon=knight&stage=4`: every balloon a knight, ready as it goes on, from 1.e4 d5 2.exd5 Qxd5): at the
- *   end of his first turn it lands as his knight, its gain by this device's engines in the knight's band.
+ * - Balloons (`&balloon=pawn&stage=4`: every balloon a pawn, ready as it goes on, from 1.e4 d5 2.exd5 Qxd5): at the end
+ *   of his first turn it lands as his pawn, its gain by this device's engines in the pawn's band.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const state = (p: Page) =>
@@ -100,27 +100,27 @@ test("the circus tiger: a hoops cast walls off its blocks for exactly two of you
   expect(errors).toEqual([]);
 });
 
-test("the circus tiger: a forced balloon lands at the end of his turn as his knight, within the knight's band", async ({ page }) => {
+test("the circus tiger: a forced balloon lands at the end of his turn as his pawn, within the pawn's band", async ({ page }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&wip=1&balloon=knight&stage=4");
+  await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&wip=1&balloon=pawn&stage=4");
   await bossAloneFromHome(page);
   await yourMove(page);
   await watchKinds(page);
   const first = await state(page);
   expect(first.boss.id).toBe("tiger");
-  // (From 1.e4 d5 2.exd5 Qxd5: a pawn gone from each side, so a knight of his can land.)
+  // (From 1.e4 d5 2.exd5 Qxd5: a pawn gone from each side, so a pawn of his can land.)
   expect(first.history).toEqual(["e2e4", "d7d5", "e4d5", "d8d5"]);
   expect(first.boss.powers.balloon ?? null).toBeNull();
   await submitMove(page, quiet(first.fen, first.allowed), first.fen);
   await yourMove(page);
   const s = await state(page);
   const last = s.boss.powers.balloonLast;
-  expect(last).toMatchObject({ outcome: "land", shape: "n" });
+  expect(last).toMatchObject({ outcome: "land", shape: "p" });
   const his = s.boss.crowdSide === "w" ? "b" : "w";
-  expect(new Chess(s.fen).get(last.square)).toMatchObject({ type: "n", color: his });
-  const [lo, hi] = BOSS_POWERS.balloonBands.n;
+  expect(new Chess(s.fen).get(last.square)).toMatchObject({ type: "p", color: his });
+  const [lo, hi] = BOSS_POWERS.balloonBands.p;
   expect(last.gain).toBeGreaterThanOrEqual(lo);
   expect(last.gain).toBeLessThanOrEqual(hi);
   expect(new Chess(s.fen).inCheck()).toBe(false);

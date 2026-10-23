@@ -41,7 +41,7 @@
  *   answer: no cast this turn (the meter stays full) and he plays his move.
  */
 import { BOSS_POWERS, type Balloon, type BalloonResult, type BalloonShape, type BalloonState, type BossPowerSettings, type BossPowerState, type HoopsState, type PowerEvent, type Settings } from "@chessroyale/core";
-import { applyMove, kingAttacked, kingAttackers, legalMoves, matingMoves, pieceAt, sideToMove, withPiece } from "../rules.ts";
+import { applyMove, attackedSquares, kingAttacked, kingAttackers, legalMoves, matingMoves, pieceAt, sideToMove, withPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { stockfishRefuses } from "../uci.ts";
@@ -414,7 +414,7 @@ export async function landFrom(engines: readonly EngineLike[], fen: string, ask:
   const crowd = sideToMove(fen);
   const his = other(crowd);
   if (landRefused(fen, ask.shape, his)) return null;
-  const attacked = new Set(legalMoves(fen).map(to));
+  const attacked = attackedSquares(fen, crowd);
   const ranked = SQUARES.filter((sq) => !pieceAt(fen, sq))
     .map((sq) => ({ sq, k: (attacked.has(sq) ? 1 : 0) + powerRoll(ask.order, "land", sq) }))
     .sort((a, b) => a.k - b.k);

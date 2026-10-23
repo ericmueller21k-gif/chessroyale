@@ -491,6 +491,18 @@ export function mateInOne(fen: string): string | null {
   }
 }
 
+/** The squares `by` attacks in this position (whoever is to move), as chess.js counts attacks: a pawn's diagonals, not its push. */
+export function attackedSquares(fen: string, by: "w" | "b"): Set<string> {
+  try {
+    const chess = new Chess(plainFen(fen), { skipValidation: true });
+    const out = new Set<string>();
+    for (const f of "abcdefgh") for (let r = 1; r <= 8; r++) if (chess.isAttacked(`${f}${r}` as Square, by)) out.add(`${f}${r}`);
+    return out;
+  } catch {
+    return new Set();
+  }
+}
+
 /** Every legal move that checkmates here (chess.js marks a mating move's SAN with "#"); [] for a Chess960 position or none. */
 export function matingMoves(fen: string): string[] {
   try {
