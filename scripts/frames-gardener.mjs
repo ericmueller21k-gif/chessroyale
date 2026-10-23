@@ -118,10 +118,20 @@ async function run(stage) {
   const has = (s, kind) => (s.boss?.powers?.events ?? []).some((e) => e.kind === kind);
   /** Starts every battle with his army short (the GIF's position): the board's record, before the first move. */
   const shorten = async () => {
-    await p.evaluate((fen) => {
-      const b = window.match.runner.boards.get(0);
-      window.match.runner.boards.set(0, { ...b, fen, history: [], bases: [{ ply: 0, fen }] });
-    }, SHORT_FEN);
+    // (And the battle's seed one whose first watering rolls a killer plant, three plain plants and a grown piece, so one GIF shows them all.)
+    const { rollSeed } = await server.ssrLoadModule("/@fs" + resolve("packages/chess/src/bosses/gardener.ts"));
+    let seed = 1;
+    for (; seed < 100_000; seed++) {
+      const kinds = Array.from({ length: 10 }, (_, i) => rollSeed(seed, 0, i));
+      const n = (f) => kinds.filter(f).length;
+      if (n((k) => k === "killer") >= 1 && n((k) => k === "plant") >= 3 && n((k) => ["p", "n", "b", "r"].includes(k)) >= 1) break;
+    }
+    await p.evaluate(([fen, seed]) => {
+      const r = window.match.runner;
+      r.boards.set(0, { ...r.boards.get(0), fen, history: [], bases: [{ ply: 0, fen }] });
+      r.state.boss.powers.seed = seed;
+    }, [SHORT_FEN, seed]);
+    log(`battle seed ${seed}`);
     await p.waitForTimeout(300);
   };
 
