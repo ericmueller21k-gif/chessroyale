@@ -8623,11 +8623,11 @@ button.fd-logo {
   aspect-ratio: 124 / 96;
   container-type: inline-size;
 }
-/* A short screen (a small phone's 568 to 667 px): the stage a fifth smaller, so the ways to play under it stay on screen as they
-   were before the tiles grew (the page scrolls from there). */
+/* A short screen (a small phone's 568 to 667 px): the stage a fifth smaller (220 px wide, not 280), so the ways to play under it
+   stay on screen as they were before the tiles grew (the page scrolls from there). */
 @media (max-height: 700px) {
   .bs-spot {
-    width: min(100%, 224px);
+    width: min(100%, 220px);
   }
 }
 .bs-spot::before {

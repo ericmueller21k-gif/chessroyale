@@ -3,7 +3,7 @@ import { bossThreat, hiddenBosses, menuBosses, type BossDef, type BossDifficulty
 import { bossAloneElo, difficultyLabel } from "../boss-difficulty.ts";
 import { bossKit } from "../characters/kits.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
-import { SELECT_SOUND, selectLine } from "../characters/boss-select.ts";
+import { rowSizes, SELECT_SOUND, selectLine, TILES_PER_ROW, WIDE_QUERY } from "../characters/boss-select.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { playOnTap, warmSounds } from "../sound.ts";
 import { NORMAL, Voice, VoiceBubble } from "../speech.tsx";
@@ -66,24 +66,6 @@ function placeOnStage(ch: Character, idle: string): { left: number; width: numbe
 
 /** The "?" tile's value, and the stage's when a random boss is picked. */
 export const RANDOM = "";
-
-/** Tiles to a row: a phone's five, and seven from 480 px (the Boss raid column is 560 px at most: three rows of five would
- *  make each tile 100 px wide there). The CSS reads it as `--bs-per`. */
-export const TILES_PER_ROW = { phone: 5, wide: 7 } as const;
-export const WIDE_QUERY = "(min-width: 480px)";
-
-/**
- * How many tiles go in each row for `n` tiles with at most `per` to a row: as few rows as that takes, then the tiles shared
- * out evenly, the longer rows first (fourteen on a phone: 5, 5, 4; on a computer 7, 7; fifteen: 5, 5, 5). So a new boss
- * never leaves one tile alone on a row, and no row is more than one tile shorter than another.
- */
-export function rowSizes(n: number, per: number): number[] {
-  if (n <= 0) return [];
-  const rows = Math.ceil(n / per);
-  const base = Math.floor(n / rows);
-  const extra = n % rows;
-  return Array.from({ length: rows }, (_, i) => base + (i < extra ? 1 : 0));
-}
 
 export function BossSelect({ value, rating, difficulty, onPick }: { value: string; rating: number | null; difficulty: BossDifficultyId; onPick: (id: string) => void }) {
   useServerStatus();
