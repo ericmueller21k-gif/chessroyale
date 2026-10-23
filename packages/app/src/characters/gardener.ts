@@ -1081,7 +1081,7 @@ const shrug: Anim = {
 
 export const GARDENER: Character = {
   id: "gardener",
-  name: "The Hippo",
+  name: "Gardener",
   w: W,
   h: H,
   foot: [OX + FOOT_X, OY + GROUND],
@@ -1194,7 +1194,7 @@ const kingAttack: Anim = (() => {
 export const GARDENER_ATTACK: Character = {
   ...GARDENER,
   id: "gardener-attack",
-  name: "The Hippo (his attack)",
+  name: "Gardener (his attack)",
   w: AW,
   foot: [GARDENER.foot[0] + ATTACK_REACH, GARDENER.foot[1]],
   anims: { idle: { loop: true, frames: [fa(F(1000))] }, kingAttack },

@@ -569,9 +569,9 @@ export const EFFECTS: Record<EffectName, Effect> = {
   seedPlop: { ch: EFFECT_SPRITES.seedPlop, covers: "square", start: "plop", sounds: { plop: "gardenerPlip" } },
   // The watering's sweep: its `spray` cue is the same instant as his own (`spray`, in the cast), so it is quiet here.
   waterSweep: { ch: EFFECT_SPRITES.waterSweep, covers: "board", start: "sweep", end: "sheen", sounds: {} },
-  // A sprout and what it turns into. Only the killer plant's snap and gulp and a bud's pop have sounds (the queen's pop is a chime of
+  // A sprout and what it turns into (no `loop`: a sprout holds its last look until its outcome's turn; the board names each animation and its `then`). Only the killer plant's snap and gulp and a bud's pop have sounds (the queen's pop is a chime of
   // its own, played by the moment: the same cue name), the wilt a sigh; the sprouts and the plain plants are quiet.
-  gardenPlant: { ch: EFFECT_SPRITES.gardenPlant, covers: "square", start: "sprout", loop: "green", end: "gone", sounds: { snap: "gardenerSnap", gulp: "gardenerGulp", pop: "gardenerPop", wilt: "gardenerWilt" } },
+  gardenPlant: { ch: EFFECT_SPRITES.gardenPlant, covers: "square", start: "sprout", end: "gone", sounds: { snap: "gardenerSnap", gulp: "gardenerGulp", pop: "gardenerPop", wilt: "gardenerWilt" } },
   waterHit: { ch: EFFECT_SPRITES.waterHit, covers: "square", start: "hitHL", sounds: {} },
 };
 

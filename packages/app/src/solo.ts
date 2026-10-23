@@ -21,7 +21,7 @@ import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain } from "./boss-brain
 import { prefetchMaia, startMaia } from "./maia.ts";
 import { MaiaGate, type GateEnd } from "./maia-gate.ts";
 import { testParams } from "./test-switches.ts";
-import { gardenClock } from "./garden-clock.ts";
+import { gardenClock, setGardenSource } from "./garden-clock.ts";
 
 export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
@@ -85,7 +85,10 @@ export class SoloMatch implements GameView {
     readonly practice = false,
     /** A boss raid with bots in the crowd (Solo); without, it's you against the boss (Boss alone). Other modes always have bots. */
     private readonly raidBots = false,
-  ) {}
+  ) {
+    // (The hippo gardener's seeds count by this page's visible time, not an earlier online match's server.)
+    setGardenSource(null);
+  }
 
   /** The match's settings (the move clock can change with Crowd augment votes). */
   get settings(): Settings {
