@@ -216,8 +216,8 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // keeps his gain in the piece's band, or pops: about a quarter pop, a fake queen always), and Hoops, his whole turn:
   // three burning 2x2 hoops whose walls nothing crosses, moves, captures or checks, for the crowd's next 2 moves, placed by
   // the host's engines in a fair band (bosses/tiger.ts; docs/decisions/2026-10-23-tiger-rules.md). Not playable until his art is wired in
-  // (`kit: null`; the test links `?boss=tiger&wip=1`, `&power=hoops`, `&balloon=<shape>`, `&stage=4`). His offset from
-  // the raid sim (reports/tiger-sim.md).
+  // (`kit: null`; the test links `?boss=tiger&wip=1`, `&power=hoops`, `&balloon=<shape>`, `&stage=4`). The raid sim: at the
+  // usual −250, with 30 s stages and rageSpeed 1.4, the crowd scores 0.14 in 38 moves (reports/tiger-sim.md).
   { id: "tiger", name: TIGER_NAME, icon: "🐯", kit: null, offset: -250, powers: { passive: "balloons", ultimate: "hoops" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
