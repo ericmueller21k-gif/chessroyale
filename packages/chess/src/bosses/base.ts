@@ -350,6 +350,11 @@ export interface BossRules {
    */
   specialMove?(boss: BossState, fen: string, move: string): { play: string; san: string } | null;
   /**
+   * The boss plays at full strength for a stretch of his moves, the crowd's turns between them too (Moo's Full Moon): the bar's level
+   * lifts for all of it, not only while he's to move (`bestReply` is for his move now). Left out: none.
+   */
+  fullStretch?(boss: BossState): boolean;
+  /**
    * The boss's move now (`board`: him to move) is the follow-up its power's engine search scored (Wrangler's reply to
    * the showdown's duel): it must be the engine's best move at full strength (BossMoveKind "best": never the brain's, a
    * slip or a stumble), or the power plays out other than it was scored. The server decides it, so the host and solo

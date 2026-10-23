@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_DIFFICULTY, ENGINE_MAX_ELO, BOSS_ROSTER, bossDef, bossIdFromLink, bossInText, bossStrength, bossThreat, chooseBoss, crowdFinalBoss, isPlayable, playableBosses, type BossDef } from "../src/index.ts";
+import { BOSS_DIFFICULTY, BOSS_LEVEL, ENGINE_MAX_ELO, BOSS_ROSTER, bossLevelBase, bossLevelNow, bossRatingShown, bossDef, bossIdFromLink, bossInText, bossStrength, bossThreat, chooseBoss, crowdFinalBoss, isPlayable, playableBosses, type BossDef } from "../src/index.ts";
 
 describe("the boss template: who can be met", () => {
   it("only a boss with a complete character and its powers is playable", () => {
@@ -97,5 +97,54 @@ describe("a boss's name in a sentence", () => {
     expect(bossInText("Boingo the Clown", true)).toBe("Boingo the Clown");
     // Renamed without the flag: no article.
     expect(bossInText("Hidden Boss", false, BOSS_ROSTER.map(({ the: _, ...b }) => b))).toBe("Hidden Boss");
+  });
+});
+
+describe("the level in a boss's bar (LVL 50)", () => {
+  it("is the rating over 28 with a random offset of up to 10 either way: Normal's 1400 lands between 40 and 60, every number of the band comes up", () => {
+    expect(BOSS_LEVEL).toMatchObject({ divisor: 28, spread: 10, max: 99 });
+    const seen = new Set<number>();
+    for (let seed = 1; seed <= 2000; seed++) seen.add(bossLevelBase(1400, seed * 7919));
+    expect(Math.min(...seen)).toBe(40);
+    expect(Math.max(...seen)).toBe(60);
+    expect(seen.size).toBe(21);
+    // (2000, Hard's neighbor, is 71 over 28: 61 to 81.)
+    const high = new Set<number>();
+    for (let seed = 1; seed <= 2000; seed++) high.add(bossLevelBase(2000, seed * 7919));
+    expect([Math.min(...high), Math.max(...high)]).toEqual([61, 81]);
+  });
+
+  it("is the same for the same battle, wherever and whenever it's asked, and rolls again for another battle", () => {
+    for (const seed of [0, 1, 12345, 2 ** 32 - 1]) expect(bossLevelBase(1400, seed)).toBe(bossLevelBase(1400, seed));
+    const levels = new Set(Array.from({ length: 40 }, (_, i) => bossLevelBase(1400, 1000 + i)));
+    expect(levels.size).toBeGreaterThan(8);
+  });
+
+  it("never goes under 1 or over 99 (100 is Fischer's)", () => {
+    for (let seed = 1; seed <= 500; seed++) {
+      expect(bossLevelBase(100, seed)).toBeGreaterThanOrEqual(1);
+      expect(bossLevelBase(0, seed)).toBeGreaterThanOrEqual(1);
+      expect(bossLevelBase(ENGINE_MAX_ELO, seed)).toBeLessThanOrEqual(99);
+      expect(bossLevelBase(9999, seed)).toBe(99);
+    }
+    expect(bossLevelNow(95, 1400, ENGINE_MAX_ELO)).toBe(99);
+    expect(bossLevelNow(3, 1400, 700)).toBe(1);
+  });
+
+  it("follows the strength he plays at now by the same divisor: the engine's top lifts it, a weakened move slashes it, equal ratings change nothing", () => {
+    expect(bossLevelNow(50, 1400, 1400)).toBe(50);
+    expect(bossLevelNow(50, 1400, ENGINE_MAX_ELO)).toBe(99);
+    expect(bossLevelNow(40, 1400, 1400 + 280)).toBe(50);
+    expect(bossLevelNow(50, 1400, 1400 - BOSS_LEVEL.weakDrop)).toBe(50 - BOSS_LEVEL.weakDrop / BOSS_LEVEL.divisor);
+    expect(bossLevelNow(50, 1400, 1400 - BOSS_LEVEL.weakDrop)).toBeLessThan(50);
+  });
+
+  it("is made from Boss alone's Maia rating when there is one (the stage's 'Rating 1400'), else from his strength in the battle", () => {
+    expect(bossRatingShown(2300, { bossAloneMaia: 1400 })).toBe(1400);
+    expect(bossRatingShown(2300, { bossAloneMaia: 0 })).toBe(2300);
+  });
+
+  it("is unknown ('LVL ???') for the Hidden Boss, and for him alone", () => {
+    expect(BOSS_ROSTER.filter((b) => b.levelUnknown).map((b) => b.id)).toEqual(["recluse"]);
   });
 });

@@ -18,7 +18,8 @@ import { test, bossAloneFromHome, createLobbyFromHome, submitMove } from "./help
  *   off at `snap`, a piece on at `pop`), the plain plants through green, fall and drop, gone; a move onto a plant refused with
  *   "A plant is in the way." and another move working.
  * - Online: the meter by the server's clock, and a reload mid-battle showing the plants as they are without the watering again.
- * - The seed meter in the phone's bar at 320, 360, 390 and 1280: nothing pushed, nothing sideways.
+ * - The seed meter in the bar at 320, 360, 390 and 1280: in the column under his name and the rage meter, inside the bar, nothing
+ *   sideways (a phone's bar, tall for his figure, and the board stay put with or without it).
  * - His king attack in the Last Stand; his long lines whole in view; no page errors. (His tile and stage: boss-select.spec.ts; every
  *   boss's king attack: king-attack.spec.ts; his passive and ultimate in the smoke time: boss-smoke.spec.ts.)
  */
@@ -471,7 +472,7 @@ test("online: the meter counts by the server's clock, and a reload mid-battle ke
   expect(errors).toEqual([]);
 });
 
-test("the seed meter in the phone's bar at 320, 360, 390 and 1280: beside the skulls and the rage meter or under them, nothing pushed, nothing sideways", async ({ page }) => {
+test("the seed meter in the bar at 320, 360, 390 and 1280: under the rage meter, left aligned with his name, inside the bar, nothing sideways", async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -492,7 +493,13 @@ test("the seed meter in the phone's bar at 320, 360, 390 and 1280: beside the sk
     expect(m.y + m.height, `${w}: inside the bar`).toBeLessThanOrEqual(bar.y + bar.height);
     await expect(page.locator(".seed-meter")).toHaveText("Seeds 10");
     expect(await page.locator(".boss-name strong").evaluate((e) => e.scrollWidth <= e.clientWidth), `${w}: "Puddles" whole`).toBe(true);
-    // Nothing pushed: the bar and the board under it are where they are without the meter.
+    // Under the rage meter, left aligned with his name (no skulls in the bar: docs/decisions/2026-10-23-boss-bar.md).
+    const rage = (await page.locator(".rage-meter").boundingBox())!;
+    expect(m.y, `${w}: the seed meter under the rage meter`).toBeGreaterThanOrEqual(rage.y + rage.height - 1);
+    expect(Math.abs(m.x - name.x), `${w}: left aligned with his name`).toBeLessThanOrEqual(1);
+    await expect(page.locator(".boss-threat")).toHaveCount(0);
+    // A phone's bar is as tall as his figure: it and the board under it are where they are without the meter. (A computer's bar
+    // holds the column: the meter's row is part of it.)
     const withMeter = await page.evaluate(() => [document.querySelector(".boss-bar")!.getBoundingClientRect().height, document.querySelector(".hb-board")!.getBoundingClientRect().top]);
     const without = await page.evaluate(() => {
       const st = document.createElement("style");
@@ -502,7 +509,8 @@ test("the seed meter in the phone's bar at 320, 360, 390 and 1280: beside the sk
       st.remove();
       return r;
     });
-    expect(withMeter, `${w}: the bar and the board stay put`).toEqual(without);
+    if (!desktop()) expect(withMeter, `${w}: the bar and the board stay put`).toEqual(without);
+    else expect(withMeter[0]!, `${w}: the bar holds the meter's row`).toBeGreaterThan(without[0]!);
     // The meter's own parts, whole: icon, label and bar in one row.
     const parts = await page.locator(".seed-meter").evaluate((e) => [...e.children].map((c) => c.getBoundingClientRect().top + c.getBoundingClientRect().height / 2));
     expect(Math.max(...parts) - Math.min(...parts), `${w}: one row`).toBeLessThanOrEqual(3);

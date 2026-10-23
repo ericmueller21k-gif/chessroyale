@@ -118,7 +118,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     `window`), `nolanding`, `boss=<id>` (skips the boss menu), `win`, `mate`, `phase`, `laststand`, `side`, `wip` and
     `kit`, a crate page's `fischer` and `shiny` and its "Testing:" boxes, and 1 v 1's `fewAfter=SECONDS` (the "Few players
     online" choice sooner) and `clock` (the bot game's clock too), and `cardMs=MS` (home's Boss raid card turns to the
-  next boss this often instead of every 30 s).
+  next boss this often instead of every 30 s), and `barslot=1` (the boss bar's free room for a boss's own prop drawn with a
+  dashed outline, so a screenshot shows it; nothing else changes).
   - **Kept for everyone** (the home screen's own choices): `mode` and a raid's boss picked from the menu; preferences
     and pages (`anim`, `trail`, `crates`). Gone on Oct 15: `turns` (Crowd is always team turns), `moves` (Classic plays
     its default opening moves) and `soundlab` (its choice is Settings' Reveal sound).

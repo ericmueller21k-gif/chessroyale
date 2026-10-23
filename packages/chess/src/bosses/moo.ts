@@ -213,6 +213,8 @@ export const MOO: BossRules = {
   powerTurn: (boss) => !!stunOn(mooOf(boss.powers), turnOf(boss)),
   // The Full Moon: his moves are the engine's at full strength (the runner's "best").
   bestReply: (boss) => (boss.powers?.moo?.full?.left ?? 0) > 0,
+  // (The bar's level is up for the whole Full Moon, the crowd's turns between his moves too.)
+  fullStretch: (boss) => (boss.powers?.moo?.full?.left ?? 0) > 0,
   afterCrowdMove(b) {
     mooBattle.afterCrowdMove(b);
   },

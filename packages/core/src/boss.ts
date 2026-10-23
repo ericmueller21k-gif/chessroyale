@@ -1,5 +1,6 @@
 import { PRIOR_RATING } from "./rating.ts";
-import { BOSS_BRAIN, type BossBrain, type BossBrainSettings, type Settings } from "./settings.ts";
+import { mulberry32, randomInt } from "./rng.ts";
+import { BOSS_BRAIN, BOSS_LEVEL, type BossBrain, type BossBrainSettings, type Settings } from "./settings.ts";
 
 /**
  * Boss battle: the Crowd's finalists team up against a boss. Its strength comes
@@ -121,6 +122,8 @@ export interface BossDef {
    * his bar): a name that's a title. `bossInText` adds it.
    */
   the?: true;
+  /** Its bar says "LVL ???" (Eric, Oct 23: Fischer's level is not 100, it's unknown): the Hidden Boss. */
+  levelUnknown?: true;
 }
 
 /**
@@ -201,7 +204,7 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // from the raid sim: the usual −250, with rageSpeed 1.2 the crowd scores 0.17 in 46 moves with 3.0 waterings a battle,
   // inside the pack (reports/gardener-sim.md).
   { id: "gardener", name: GARDENER_NAME, icon: "🦛", kit: "Gardener", offset: -250, powers: { passive: "seeds", ultimate: "water" } },
-  { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true },
+  { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
   { id: "knight", name: "The Black Knight", icon: "🐴", kit: null, offset: 0, powers: null },
@@ -289,6 +292,30 @@ export const ENGINE_MIN_ELO = 1320;
 export function bossStrength(base: number, def: (Pick<BossDef, "offset"> & { id?: string }) | null, extra = 0, s: Pick<BossBrainSettings, "fixed" | "maiaRating"> = BOSS_BRAIN): number {
   if (def?.id && s.fixed[def.id]) return fixedLevel(s);
   return Math.max(800, Math.min(ENGINE_MAX_ELO, Math.round(base + (def?.offset ?? 0) + extra)));
+}
+
+/**
+ * The level a battle's boss starts with: its rating over BOSS_LEVEL.divisor, plus a random offset of up to `spread` either
+ * way from the battle's `seed` (the same seed, the same level, wherever it's asked), from 1 to `max`. The seed is salted,
+ * so the offset gives nothing of the seed's other uses away.
+ */
+export function bossLevelBase(rating: number, seed: number, s: Pick<typeof BOSS_LEVEL, "divisor" | "spread" | "max"> = BOSS_LEVEL): number {
+  const offset = randomInt(mulberry32((seed ^ 0x4c564c) >>> 0), -s.spread, s.spread);
+  return Math.max(1, Math.min(s.max, Math.round(rating / s.divisor) + offset));
+}
+
+/**
+ * The rating the bar's level is made from: Boss alone's (`bossAloneMaia`, the difficulty's Maia rating: the number the Boss raid
+ * screen's stage shows as "Rating 1400"), else the boss's strength in the battle (`elo`).
+ */
+export const bossRatingShown = (elo: number, s: Pick<Settings, "bossAloneMaia">): number => (s.bossAloneMaia > 0 ? s.bossAloneMaia : elo);
+
+/**
+ * The level now: the battle's `base` level moved by how far the strength he plays a move at now (`nowRating`) is from his
+ * rating (`rating`), by the same divisor, from 1 to `max`. Equal ratings: the base itself.
+ */
+export function bossLevelNow(base: number, rating: number, nowRating: number, s: Pick<typeof BOSS_LEVEL, "divisor" | "max"> = BOSS_LEVEL): number {
+  return Math.max(1, Math.min(s.max, base + Math.round((nowRating - rating) / s.divisor)));
 }
 
 /** Maia's top rating in our setup (BOSS_BRAIN.maiaRating's last point: 2500), and the level it's reached at (2650). */

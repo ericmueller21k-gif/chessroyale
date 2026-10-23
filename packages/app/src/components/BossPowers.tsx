@@ -159,14 +159,16 @@ export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), 
 }
 
 /**
- * The boss's own piece by the boss bar's rage meter (Hollow's bulbs), from the boss screen's moments ending at `until`.
- * Through the boss's turn on its screen it draws itself every frame (the strip relights as his darkness lands): the
- * header around it draws only now and then (useStillKey).
+ * The boss's own piece in the boss bar, from the boss screen's moments ending at `until`: its passive's bar under the rage
+ * meter (`bar`: Hollow's bulbs, Puddles' Seeds), its ultimate's piece beside the rage meter (`ult`: Moo's moon) or its prop
+ * in the free room at the right (`prop`; none yet). Through the boss's turn on its screen it draws itself every frame (the
+ * strip relights as his darkness lands): the header around it draws only now and then (useStillKey).
  */
-export function BossBarExtra({ boss, until = 0 }: { boss: BossView; until?: number }) {
-  const bar = bossUi(boss)?.bar;
-  useFrameNow(!!bar && !!until);
-  return bar?.({ boss, moments: () => momentsOf(boss, until) }) ?? null;
+export function BossBarExtra({ boss, until = 0, part = "bar" }: { boss: BossView; until?: number; part?: "bar" | "ult" | "prop" }) {
+  const ui = bossUi(boss);
+  const draw = part === "ult" ? ui?.ultBar : part === "prop" ? ui?.barProp : ui?.bar;
+  useFrameNow(!!draw && !!until);
+  return draw?.({ boss, moments: () => momentsOf(boss, until) }) ?? null;
 }
 
 // ---------------- The moments ----------------

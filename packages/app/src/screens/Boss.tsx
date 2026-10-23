@@ -35,6 +35,7 @@ import { CRITICAL, VoiceBubble, bossVoice } from "../speech.tsx";
 import { kingBlocked } from "../components/Recluse.tsx";
 import { BrainLoading } from "../components/BrainLoading.tsx";
 import { BOSS_BANNER, bossInText, crowdFinalists } from "@chessroyale/core";
+import { testParams } from "../test-switches.ts";
 
 /** The Crowd's boss final as it starts: how many face the boss (crowdFinalists: the top 4), as a word. */
 const NUMBER_WORDS = ["None", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
@@ -81,51 +82,89 @@ function burnStart(key: string): number {
   return t;
 }
 
-/** The boss at a glance: who it is, how scary, when it strikes next. Shown above the board all through the battle. */
+/**
+ * The boss at a glance: who it is, its level, its bars, when it strikes next. Shown above the board all through the battle.
+ * Its name, then its level ("LVL 50"), then its ultimate's rage meter, then its passive's bar when it has one, in a column
+ * at the left, left aligned with the name; the status ("Strikes in 3 moves", "58 moves left", the result) at the top right;
+ * under it free room, a slot for the boss's own prop (BossUi.barProp). The boss's threat (1 to 5) is in the bar's label, no
+ * longer drawn (Eric, Oct 23: "remove the skull shit"; the select screen and the menus keep their skulls).
+ */
 export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
   // A boss with a character stands at the bar's left on a phone (on a computer, by the board: see BossSide), with
   // its portrait in the bar instead.
   const char = !!match && hasCharacter(match);
+  // (The Hidden Boss's phase 2 has no meters: his bullet clock is phase 1's.)
+  const meters = match?.bossNote == null;
+  const until = match?.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0;
+  // (Test link ?barslot=1: the prop's room outlined, so a screenshot shows it.)
+  const slot = testParams().get("barslot") === "1";
   return (
-    <div class={`boss-bar${char ? " has-char" : ""}`} role="status">
+    <div class={`boss-bar${char ? " has-char" : ""}${slot ? " barslot" : ""}`} role="status" aria-label={`${boss.name}, threat ${boss.threat} of 5`}>
       {char && <BossCharacter match={match!} place="bar" />}
       <span class={`boss-icon${char ? " boss-icon-face" : ""}`} aria-hidden="true">
         <BossFace boss={boss} />
       </span>
-      <span class="boss-name">
-        <strong>{boss.name}</strong>
-        <span class="boss-threat" aria-label={`Threat ${boss.threat} of 5`}>
-          {Array.from({ length: 5 }, (_, i) => (
-            <i key={i} class={i < boss.threat ? "on" : ""}>
-              💀
-            </i>
-          ))}
-          {/* (The Hidden Boss's phase 2 has no meter: his bullet clock is phase 1's.) */}
-          {match?.bossNote == null && <RageMeter boss={boss} />}
-          {match?.bossNote == null && <BossBarExtra boss={boss} until={match?.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0} />}
+      <span class="boss-main">
+        <span class="boss-name">
+          <strong>{boss.name}</strong>
+          <BossLevel boss={boss} />
+          {meters && (
+            <>
+              <span class="boss-ult">
+                <RageMeter boss={boss} />
+                <BossBarExtra boss={boss} until={until} part="ult" />
+              </span>
+              <span class="boss-passive">
+                <BossBarExtra boss={boss} until={until} />
+              </span>
+            </>
+          )}
         </span>
-        {/* (His words, a phone's: in his name's room, from the bar's bottom up over the title line, never over the
-            status at the right ("58 moves left", "2 of 4 won") or the line and the board under the bar. A computer's
-            are by his figure beside the board.) */}
+        <span class="boss-next">
+          {match?.bossNote != null
+            ? match.bossNote
+            : boss.result
+            ? boss.result === "crowd"
+              ? "Defeated!"
+              : boss.result === "boss"
+                ? "The boss won"
+                : "A draw"
+            : boss.strikeIn !== null
+              ? boss.strikeIn <= 1
+                ? "Strikes after this move"
+                : `Strikes in ${boss.strikeIn} moves`
+              : // (A boss that never strikes, the Hidden Boss: the moves left, since the title says which move it is.)
+                movesLeft(boss)}
+        </span>
+        <span class="boss-prop">{meters && <BossBarExtra boss={boss} until={until} part="prop" />}</span>
+        {/* (His words, a phone's: over the bar's bottom, as small as the line, in the room left of the status, so never over it.
+            A computer's are by his figure beside the board.) */}
         {char && <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble" />}
       </span>
-      <span class="boss-next">
-        {match?.bossNote != null
-          ? match.bossNote
-          : boss.result
-          ? boss.result === "crowd"
-            ? "Defeated!"
-            : boss.result === "boss"
-              ? "The boss won"
-              : "A draw"
-          : boss.strikeIn !== null
-            ? boss.strikeIn <= 1
-              ? "Strikes after this move"
-              : `Strikes in ${boss.strikeIn} moves`
-            : // (A boss that never strikes, the Hidden Boss: the moves left, since the title says which move it is.)
-              movesLeft(boss)}
-      </span>
     </div>
+  );
+}
+
+/**
+ * His level under his name: "LVL 50", Eric's RPG number (the battle's own, from his rating: NetBoss.level). It follows the
+ * strength he plays his next move at: up (the Full Moon, the showdown's reply) it's gold with a small arrow, down (the King's
+ * strike) it's red with a quick slash, for as long as that lasts; screen readers hear "Level 99". "LVL ???" (Level unknown)
+ * for the Hidden Boss; nothing from a server that sends none.
+ */
+export function BossLevel({ boss }: { boss: BossView }) {
+  const lv = boss.level;
+  if (lv === undefined) return null;
+  const base = boss.levelBase ?? lv;
+  const dir = lv === null || base === null || lv === base ? "" : lv > base ? "up" : "down";
+  return (
+    // (Its own element for each direction: a lift or a slash plays as it begins, then stays as a color.)
+    <span key={dir} class={`boss-level${dir ? ` lv-${dir}` : ""}`} data-level={lv ?? "unknown"}>
+      <span class="lv-text" aria-hidden="true">
+        LVL {lv ?? "???"}
+      </span>
+      {dir && <i class="lv-mark" aria-hidden="true" />}
+      <span class="lv-sr">{lv === null ? "Level unknown" : `Level ${lv}`}</span>
+    </span>
   );
 }
 

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BOSS_POWERS, BOSS_ROSTER, isPlayable, mulberry32, type BossPowerState, type BossState, type PowerEvent } from "@chessroyale/core";
+import { BOSS_LEVEL, BOSS_POWERS, BOSS_ROSTER, ENGINE_MAX_ELO, bossLevelNow, bossRatingShown, isPlayable, mulberry32, type BossPowerState, type BossState, type PowerEvent } from "@chessroyale/core";
 import {
   BOSS_OPENING,
   MOO_BEATS,
@@ -597,4 +597,76 @@ describe("Moo & Moon: a small fuzz of whole battles", () => {
     expect(flurries).toBeGreaterThan(2);
     expect(moons).toBeGreaterThan(2);
   }, 60_000);
+});
+
+describe("his bar's level (LVL)", () => {
+  /** The level a bar shows when he plays at `nowRating`, from the view's own base. */
+  const levelAt = (r: MatchRunner, nowRating: number) => {
+    const rating = bossRatingShown(r.boss!.elo, r.settings);
+    return bossLevelNow(r.bossView()!.levelBase!, rating, nowRating);
+  };
+
+  it("is the battle's own: near his rating over 28, the same on every view and for the same battle, a new battle rolls again", () => {
+    const r = battle(3, "w");
+    const v = r.bossView()!;
+    const middle = Math.round(r.boss!.elo / BOSS_LEVEL.divisor);
+    expect(v.levelBase!).toBeGreaterThanOrEqual(Math.max(1, middle - BOSS_LEVEL.spread));
+    expect(v.levelBase!).toBeLessThanOrEqual(middle + BOSS_LEVEL.spread);
+    expect(v.level).toBe(v.levelBase);
+    expect(r.bossView()!.level).toBe(v.level);
+    expect(battle(3, "w").bossView()!.levelBase).toBe(v.levelBase);
+    expect(new Set(Array.from({ length: 12 }, (_, i) => battle(100 + i, "w").bossView()!.levelBase)).size).toBeGreaterThan(3);
+  });
+
+  it("is up for the whole Full Moon, his own turn and the crowd's between his moves, and back with his last move at full strength", async () => {
+    const r = battle(3, "w", "fullmoon");
+    await crowdMove(r);
+    await r.playBoss();
+    expect(r.bossView()!.level).toBe(r.bossView()!.levelBase);
+    await crowdMove(r);
+    // The transformation: his turn, five moves at full strength to come.
+    expect(r.bossView()!.powers!.fullMoon).toEqual({ left: BOSS_POWERS.fullMoonMoves });
+    const lifted = levelAt(r, ENGINE_MAX_ELO);
+    expect(lifted).toBeGreaterThan(r.bossView()!.levelBase!);
+    expect(r.bossView()!.level).toBe(lifted);
+    for (let k = 0; k < BOSS_POWERS.fullMoonMoves; k++) {
+      if (!r.bossToMove()) await crowdMove(r);
+      expect(r.bossView()!.level, `his move ${k + 1} to come`).toBe(lifted);
+      await r.playBoss();
+      // (After a move: the crowd's turn, still in the Full Moon until the fifth has been played.)
+      if (k < BOSS_POWERS.fullMoonMoves - 1) expect(r.bossView()!.level, `the crowd's turn after his move ${k + 1}`).toBe(lifted);
+    }
+    expect(r.bossView()!.powers!.fullMoon?.left ?? 0).toBe(0);
+    expect(r.bossView()!.level).toBe(r.bossView()!.levelBase);
+  });
+
+  it("is slashed for the move the King's strike weakens, and back when that move lands", async () => {
+    const r = battle(3, "w");
+    await crowdMove(r);
+    await r.playBoss();
+    r.state = { ...r.state, boss: { ...r.state.boss!, kingCharges: 1 } };
+    r.deal();
+    expect(r.callStrike("h0").struck).toBe(true);
+    await r.score(new Map([["h0", { move: [...(r.crowdAllowed() ?? legalMoves(fenOf(r)))].sort()[0]!, thinkMs: 1000 }]]));
+    expect(r.boss!.staggerNext).toBe(true);
+    const rating = bossRatingShown(r.boss!.elo, r.settings);
+    const slashed = levelAt(r, rating - BOSS_LEVEL.weakDrop);
+    expect(slashed).toBeLessThan(r.bossView()!.levelBase!);
+    expect(r.bossView()!.level).toBe(slashed);
+    await r.playBoss();
+    expect(r.boss!.staggerNext).toBe(false);
+    expect(r.bossView()!.level).toBe(r.bossView()!.levelBase);
+  });
+
+  it("a strike in the Full Moon slashes that one move, then the Full Moon's lift is back for the rest", async () => {
+    const r = battle(3, "w", "fullmoon");
+    await crowdMove(r);
+    await r.playBoss();
+    await crowdMove(r);
+    const lifted = r.bossView()!.level!;
+    r.state = { ...r.state, boss: { ...r.state.boss!, staggerNext: true } };
+    expect(r.bossView()!.level!).toBeLessThan(r.bossView()!.levelBase!);
+    r.state = { ...r.state, boss: { ...r.state.boss!, staggerNext: false } };
+    expect(r.bossView()!.level).toBe(lifted);
+  });
 });

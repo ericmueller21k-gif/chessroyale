@@ -4238,7 +4238,7 @@ button.history-label {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 5px 10px 6px;
   border-radius: 12px;
   background: linear-gradient(90deg, #3a0d12, #1b0d22);
   color: #fff;
@@ -4253,32 +4253,174 @@ button.history-label {
     transform: scale(1.12);
   }
 }
-.boss-name {
-  display: grid;
-  line-height: 1.15;
+/* The bar right of the figure, a grid of three columns (his name and bars, free room, the status) and two rows (the status's, the
+   rest): his name and bars in a column at the left, the status at the top right, the boss's own room under it and left of it
+   (the prop's). His words are laid over the first two columns (the bubble's grid area), so they never reach the status. */
+.boss-main {
+  position: relative;
   flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
+  column-gap: 8px;
+  row-gap: 2px;
+}
+/* His name, his level, his ultimate's bar, his passive's bar: left aligned in one column, only as wide as the widest. */
+.boss-name {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1.15;
   min-width: 0;
 }
 .boss-name strong {
+  max-width: 100%;
   font-size: 15px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* (The skulls only: the rage meter's bar, inside the same box, is an <i> too, and was drawn at the dim skulls' 22%.) */
-.boss-threat > i {
-  font-style: normal;
-  font-size: 11px;
-  opacity: 0.22;
+/* (A row with nothing in it, a boss with no passive bar or no meters, takes no room.) */
+.boss-ult,
+.boss-passive {
+  display: flex;
+  align-items: center;
+  min-height: 0;
 }
-.boss-threat > i.on {
-  opacity: 1;
+.boss-ult:empty,
+.boss-passive:empty {
+  display: none;
 }
+/* The status at the top right ("Strikes in 3 moves", "58 moves left", the result). */
 .boss-next {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: start;
   font-size: 12px;
+  line-height: 1.15;
   font-weight: 700;
   color: #ffb4b4;
   text-align: right;
+}
+/* The free room: the bar's right part under the status, right of his bars. A boss draws into it (BossUi.barProp), positioned
+   inside it, nothing clipped. ?barslot=1 outlines it. */
+.boss-prop {
+  grid-column: 2 / 4;
+  grid-row: 2;
+  position: relative;
+  min-height: 0;
+}
+.boss-bar.barslot .boss-prop {
+  outline: 1px dashed rgba(255, 255, 255, 0.7);
+  outline-offset: -1px;
+}
+/* His level under his name (BossLevel): an RPG number. Lifted gold with a small arrow, slashed red, for as long as it lasts. */
+.boss-level {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.72);
+  transform-origin: 0 50%;
+}
+.boss-level .lv-text {
+  position: relative;
+}
+.boss-level .lv-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.boss-level.lv-up {
+  color: #ffd466;
+  animation: lv-pop 560ms ease-out;
+}
+.boss-level.lv-down {
+  color: #ff6b6b;
+  animation: lv-flash 480ms steps(1, end);
+}
+.boss-level .lv-mark {
+  font-style: normal;
+}
+.boss-level.lv-up .lv-mark::before {
+  content: "\2191";
+}
+.boss-level.lv-down .lv-mark::before {
+  content: "\2193";
+}
+/* The slash: a diagonal stroke from the number's foot to its top, quick, gone as the flash ends. */
+.boss-level.lv-down .lv-text::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: calc(100% - 1px);
+  height: 2px;
+  background: #fff;
+  transform: rotate(-11deg);
+  transform-origin: 0 50%;
+  opacity: 0;
+  animation: lv-slash 420ms ease-out;
+}
+@keyframes lv-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.4);
+    text-shadow: 0 0 6px rgba(255, 212, 102, 0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes lv-flash {
+  0%,
+  50% {
+    color: #fff;
+  }
+  25%,
+  75%,
+  100% {
+    color: #ff6b6b;
+  }
+}
+@keyframes lv-slash {
+  0% {
+    opacity: 1;
+    clip-path: inset(0 100% 0 0);
+  }
+  45% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(0 0 0 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boss-level.lv-up,
+  .boss-level.lv-down {
+    animation: none;
+  }
+  .boss-level.lv-down .lv-text::after {
+    display: none;
+  }
 }
 .final-out-name {
   font-size: 13px;
@@ -11876,21 +12018,19 @@ img.qicon {
 .bc-bubble.leaving {
   opacity: 0;
 }
-/* A phone's boss bar: his words in his name's room, from just above the bar's bottom edge upwards (over his name and the
-   title line above the bar), never over the status at its right or the line and the board under it. (A box laid out at
-   its full size from its first letter would otherwise cover them for the whole line.) */
-.boss-bar.has-char .boss-name {
-  position: relative;
-  align-self: stretch;
-  align-content: center;
-}
-/* (At least his name's room high, so a short line covers the name and skulls whole, never half of them; nothing under it
-   is hidden, it's only covered while he speaks, as before.) */
+/* A phone's boss bar: his words as small as the line, over the bar's bottom from his name's left, in the room left of the status
+   (the grid area of the first two columns), so never over the status, however many lines it takes: one line over the bars, the
+   next over his name too, growing up as the line needs. Never taller than that (a box as high as the bar's name room was the
+   whole bar). A smaller box: the line's font as ever, a thinner frame. */
 .bc-bar-bubble {
+  grid-column: 1 / 3;
+  grid-row: 1 / 3;
   left: 0;
-  bottom: -2px;
-  min-height: calc(100% + 4px);
+  bottom: -4px;
   max-width: 100%;
+  padding: 4px 7px 3px;
+  border-width: 2px;
+  box-shadow: 2px 2px 0 rgba(43, 13, 19, 0.85);
 }
 .place-side .bc-bubble {
   right: 0;
@@ -12216,8 +12356,6 @@ img.qicon {
   position: relative;
   width: 44px;
   height: 6px;
-  margin-left: 6px;
-  vertical-align: 1px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.45);
@@ -12867,13 +13005,11 @@ img.qicon {
 .refused-note {
   color: var(--bad);
 }
-/* His bulbs (the strip): one lit for each of his moves until he covers another square. Beside the rage meter. */
+/* His bulbs (the strip): one lit for each of his moves until he covers another square. In the boss bar's row under the rage meter. */
 .bulb-strip {
-  display: inline-block;
+  display: block;
   width: 33px;
   aspect-ratio: 44 / 15;
-  margin-left: 6px;
-  vertical-align: -2px;
 }
 /* The darkness's banner: a violet-black band. */
 .fight-banner.power-cut.dark .fb-band {
@@ -19397,14 +19533,6 @@ button.sq-tiny {
 .mo-moon svg {
   display: block;
 }
-/* (With the moon beside it his meter is a little shorter: at 320 px the skulls, the meter and the moon would not fit his name's column in one row,
-   and the bar would grow a line.) */
-.boss-threat:has(> .mo-moon) .rage-meter {
-  width: 32px;
-}
-.boss-threat > .mo-moon {
-  margin-left: 4px;
-}
 .mo-moon .dark {
   fill: #4b5588;
 }
@@ -19431,15 +19559,11 @@ button.sq-tiny {
   left: -3.5%;
   top: -12%;
 }
-/* His seed meter, by the rage meter in the boss bar: a seed, "Seeds 7" and a bar filling toward the next one. It is one unit that wraps whole
-   onto the line below the skulls where the name's column is too narrow for both (a phone's bar is tall for him, so the line costs
-   nothing; a computer's has the room). */
+/* His seed meter, in the boss bar's row under the rage meter: a seed, "Seeds 7" and a bar filling toward the next one, one unit. */
 .seed-meter {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  margin-left: 6px;
-  vertical-align: -3px;
   white-space: nowrap;
   font-size: 10px;
   line-height: 1;

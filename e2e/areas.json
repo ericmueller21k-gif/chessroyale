@@ -186,6 +186,7 @@
         "packages/app/src/boss-history.ts"
       ],
       "specs": [
+        "e2e/boss-bar.spec.ts",
         "e2e/boss-character.spec.ts",
         "e2e/boss-dock.spec.ts",
         "e2e/boss-powers.spec.ts",
@@ -422,6 +423,7 @@
     "the stylesheet (one file for every screen: the specs that measure layouts)": {
       "paths": ["packages/app/src/styles.css"],
       "specs": [
+        "e2e/boss-bar.spec.ts",
         "e2e/boss-dock.spec.ts",
         "e2e/boss-select.spec.ts",
         "e2e/eval-bar.spec.ts",

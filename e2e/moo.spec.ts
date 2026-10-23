@@ -430,12 +430,17 @@ test("Moo & Moon at 320, 360, 390 and 1280 px: his figure whole, his name and th
     expect(fig.top, `${w}`).toBeGreaterThanOrEqual(0);
     expect(fig.bottom, `${w}`).toBeLessThanOrEqual(h!);
     if (!desktop()) {
-      // A phone's bar: his figure clear of his name, the name whole, and the skulls, the rage meter and the moon in one row under it, inside the bar.
+      // A phone's bar: his figure clear of his name, the name whole, and under it his level, then the rage meter and the moon in one row, inside the bar (no skulls: docs/decisions/2026-10-23-boss-bar.md).
       const name = (await page.locator(".boss-name strong").boundingBox())!;
       expect(fig.right, `${w}: his figure clear of his name`).toBeLessThanOrEqual(name.x + 1);
       const bar = (await page.locator(".boss-bar").boundingBox())!;
-      const meter = (await page.locator(".boss-threat .rage-meter").boundingBox())!;
-      const moon = (await page.locator(".boss-threat .mo-moon").boundingBox())!;
+      const meter = (await page.locator(".boss-ult .rage-meter").boundingBox())!;
+      const moon = (await page.locator(".boss-ult .mo-moon").boundingBox())!;
+      const level = (await page.locator(".boss-level").boundingBox())!;
+      await expect(page.locator(".boss-threat")).toHaveCount(0);
+      expect(meter.y, `${w}: the rage meter under his level`).toBeGreaterThanOrEqual(level.y + level.height - 1);
+      expect(Math.abs(meter.x - name.x), `${w}: the rage meter left aligned with his name`).toBeLessThanOrEqual(1);
+      expect(meter.width, `${w}: the rage meter at its usual width, the moon doesn't shorten it`).toBe(44);
       expect(await page.locator(".boss-name strong").evaluate((e) => e.scrollWidth <= e.clientWidth), `${w}: "Moo & Moon" whole`).toBe(true);
       expect(moon.x, `${w}: the moon after the meter`).toBeGreaterThanOrEqual(meter.x + meter.width - 1);
       expect(moon.x + moon.width, `${w}: the moon inside the bar`).toBeLessThanOrEqual(bar.x + bar.width);

@@ -276,7 +276,7 @@ export const MOO_UI = {
   ultimate: { name: "Full Moon", when: "After your move" },
   moments: MOMENTS,
   // His meter's moon, beside it in the boss bar.
-  bar: ({ boss }) => <MoonPhase boss={boss} />,
+  ultBar: ({ boss }) => <MoonPhase boss={boss} />,
   // The stunned mark: the burned-in crescent under the piece, and the beam's glow over it, for as long as the piece is held.
   board: ({ boss, p, moments, now, orientation }) => {
     const marks = heldMarks(boss, p.stunned ?? [], now);

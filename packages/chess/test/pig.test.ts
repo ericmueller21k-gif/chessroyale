@@ -946,8 +946,12 @@ describe("Wrangler's showdown in the match", () => {
     const draws = vi.spyOn(r, "bossStumbles");
     expect(r.bossMoveKind()).toBe("best");
     expect(draws).toHaveBeenCalledTimes(1);
+    // His bar's level is up for the engine's reply to the duel (his move to come), and the King's strike takes it under his own.
+    const v = r.bossView()!;
+    expect(v.level!, "lifted for the engine's reply").toBeGreaterThan(v.levelBase!);
     r.state = { ...r.state, boss: { ...r.boss!, staggerNext: true } };
     expect(r.bossMoveKind()).toBe("stagger");
+    expect(r.bossView()!.level!, "slashed for the strike").toBeLessThan(v.levelBase!);
   }, 60_000);
 
   it("the host's path: the server's request (best, no brain) played as net.ts plays it is the reply solo plays", async () => {
