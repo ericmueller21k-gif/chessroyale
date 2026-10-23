@@ -21,6 +21,7 @@ import { alfilSound, type AlfilSound } from "./characters/alfil-sounds.ts";
 import { hopperSound, type HopperSound } from "./characters/hopper-sounds.ts";
 import { smudgySound, type SmudgySound } from "./characters/smudgy-sounds.ts";
 import { mooSound, type MooSound } from "./characters/moo-sounds.ts";
+import { gardenerSound, type GardenerSound } from "./characters/gardener-sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
 import { captureWorkerError } from "./problems.ts";
 import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
@@ -246,6 +247,7 @@ const alfil = (name: AlfilSound) => (t: number) => buffer(alfilSound(name, ctx!.
 const hopper = (name: HopperSound) => (t: number) => buffer(hopperSound(name, ctx!.sampleRate), t);
 const smudgy = (name: SmudgySound) => (t: number) => buffer(smudgySound(name, ctx!.sampleRate), t);
 const mooBoss = (name: MooSound) => (t: number) => buffer(mooSound(name, ctx!.sampleRate), t);
+const gardenerBoss = (name: GardenerSound) => (t: number) => buffer(gardenerSound(name, ctx!.sampleRate), t);
 /** The God King tapped with no charges left: his soft "can't" (god-king-sounds.ts). */
 const kingCant = (t: number) => buffer(godKingSound("cant", ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
@@ -673,6 +675,29 @@ export type SoundName =
   | "mooZap"
   | "mooShimmer"
   | "mooFizz"
+  // Puddles, the hippo gardener (a raid boss): synthesized, see characters/gardener-sounds.ts.
+  | "gardenerGrunt"
+  | "gardenerBellow"
+  | "gardenerCheer"
+  | "gardenerHello"
+  | "gardenerThump"
+  | "gardenerOof"
+  | "gardenerFlop"
+  | "gardenerWhoosh"
+  | "gardenerToss"
+  | "gardenerPlip"
+  | "gardenerTug"
+  | "gardenerSpray"
+  | "gardenerSwell"
+  | "gardenerDrips"
+  | "gardenerSnap"
+  | "gardenerGulp"
+  | "gardenerPop"
+  | "gardenerChime"
+  | "gardenerWilt"
+  | "gardenerSigh"
+  | "gardenerJet"
+  | "gardenerSpurt"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -872,6 +897,28 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   mooZap: mooBoss("zap"),
   mooShimmer: mooBoss("shimmer"),
   mooFizz: mooBoss("fizz"),
+  gardenerGrunt: gardenerBoss("grunt"),
+  gardenerBellow: gardenerBoss("bellow"),
+  gardenerCheer: gardenerBoss("cheer"),
+  gardenerHello: gardenerBoss("hello"),
+  gardenerThump: gardenerBoss("thump"),
+  gardenerOof: gardenerBoss("oof"),
+  gardenerFlop: gardenerBoss("flop"),
+  gardenerWhoosh: gardenerBoss("whoosh"),
+  gardenerToss: gardenerBoss("toss"),
+  gardenerPlip: gardenerBoss("plip"),
+  gardenerTug: gardenerBoss("tug"),
+  gardenerSpray: gardenerBoss("spray"),
+  gardenerSwell: gardenerBoss("swell"),
+  gardenerDrips: gardenerBoss("drips"),
+  gardenerSnap: gardenerBoss("snap"),
+  gardenerGulp: gardenerBoss("gulp"),
+  gardenerPop: gardenerBoss("pop"),
+  gardenerChime: gardenerBoss("chime"),
+  gardenerWilt: gardenerBoss("wilt"),
+  gardenerSigh: gardenerBoss("sigh"),
+  gardenerJet: gardenerBoss("jet"),
+  gardenerSpurt: gardenerBoss("spurt"),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -1026,6 +1073,28 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   mooZap: [["moo", "zap"]],
   mooShimmer: [["moo", "shimmer"]],
   mooFizz: [["moo", "fizz"]],
+  gardenerGrunt: [["gardener", "grunt"]],
+  gardenerBellow: [["gardener", "bellow"]],
+  gardenerCheer: [["gardener", "cheer"]],
+  gardenerHello: [["gardener", "hello"]],
+  gardenerThump: [["gardener", "thump"]],
+  gardenerOof: [["gardener", "oof"]],
+  gardenerFlop: [["gardener", "flop"]],
+  gardenerWhoosh: [["gardener", "whoosh"]],
+  gardenerToss: [["gardener", "toss"]],
+  gardenerPlip: [["gardener", "plip"]],
+  gardenerTug: [["gardener", "tug"]],
+  gardenerSpray: [["gardener", "spray"]],
+  gardenerSwell: [["gardener", "swell"]],
+  gardenerDrips: [["gardener", "drips"]],
+  gardenerSnap: [["gardener", "snap"]],
+  gardenerGulp: [["gardener", "gulp"]],
+  gardenerPop: [["gardener", "pop"]],
+  gardenerChime: [["gardener", "chime"]],
+  gardenerWilt: [["gardener", "wilt"]],
+  gardenerSigh: [["gardener", "sigh"]],
+  gardenerJet: [["gardener", "jet"]],
+  gardenerSpurt: [["gardener", "spurt"]],
   kingCant: [["godKing", "cant"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */

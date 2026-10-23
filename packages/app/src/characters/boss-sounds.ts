@@ -3,6 +3,7 @@ import { alfilSound } from "./alfil-sounds.ts";
 import { bigBoySound } from "./bigboy-sounds.ts";
 import { clownSound } from "./clown-sounds.ts";
 import { gingerSound } from "./gingerbread-sounds.ts";
+import { gardenerSound } from "./gardener-sounds.ts";
 import { godKingSound } from "./god-king-sounds.ts";
 import { grexSound } from "./grex-sounds.ts";
 import { hollowSound } from "./hollow-sounds.ts";
@@ -24,6 +25,7 @@ const MAKERS = {
   alfil: alfilSound,
   bigBoy: bigBoySound,
   clown: clownSound,
+  gardener: gardenerSound,
   ginger: gingerSound,
   godKing: godKingSound,
   grex: grexSound,

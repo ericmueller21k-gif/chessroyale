@@ -18,6 +18,7 @@ import { ANKUS_HIT } from "./effects/alfil.ts";
 import { CARROT_FLY, CARROT_HIT, CARROT_ICON, CARROT_PATCH } from "./effects/hopper.ts";
 import { BRUSH_STROKE, PAINT_DRIP, PAINT_FLY, PAINT_HIT, PAINT_SPLASH } from "./effects/smudgy.ts";
 import { MOONBEAM, MOON_HIT, MOON_SCORCH } from "./effects/moo.ts";
+import { GARDEN_PLANT, SEED_FLY, SEED_PLOP, WATER_HIT, WATER_SWEEP } from "./effects/gardener.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
 export { BOARD_CELL, SQUARE } from "./effects/common.ts";
@@ -73,4 +74,9 @@ export const EFFECT_SPRITES = {
   moonbeam: MOONBEAM,
   moonScorch: MOON_SCORCH,
   moonHit: MOON_HIT,
+  seedFly: SEED_FLY,
+  seedPlop: SEED_PLOP,
+  waterSweep: WATER_SWEEP,
+  gardenPlant: GARDEN_PLANT,
+  waterHit: WATER_HIT,
 } as const satisfies Record<string, Character>;

@@ -196,10 +196,11 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // battle begins, one every 30 s, up to 10), and Watering, his whole turn: every seed rolls nothing, a plain plant that
   // blocks a square for 3 crowd turns, a killer plant that eats a piece of either side, a piece grown for him, or the queen
   // jackpot, placed by the host's engines so his gain stays in a fair band (bosses/gardener.ts;
-  // docs/decisions/2026-10-21-gardener-rules.md). Not playable until his art is wired in (`kit: null`; the test links
-  // `?boss=gardener&wip=1`, `&power=water`, `&seeds=10`). His offset from the raid sim: the usual −250, with
-  // rageSpeed 1.2 the crowd scores 0.17 in 46 moves with 3.0 waterings a battle, inside the pack (reports/gardener-sim.md).
-  { id: "gardener", name: GARDENER_NAME, icon: "🦛", kit: null, offset: -250, powers: { passive: "seeds", ultimate: "water" } },
+  // docs/decisions/2026-10-21-gardener-rules.md). Live with his art (Eric, Oct 21: "hippo is good to go";
+  // docs/decisions/2026-10-23-gardener-wired.md; the test links `?boss=gardener`, `&power=water`, `&seeds=10`). His offset
+  // from the raid sim: the usual −250, with rageSpeed 1.2 the crowd scores 0.17 in 46 moves with 3.0 waterings a battle,
+  // inside the pack (reports/gardener-sim.md).
+  { id: "gardener", name: GARDENER_NAME, icon: "🦛", kit: "Gardener", offset: -250, powers: { passive: "seeds", ultimate: "water" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
