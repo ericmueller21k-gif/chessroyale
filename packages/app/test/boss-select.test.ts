@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ROSTER, hiddenBosses, menuBosses } from "@chessroyale/core";
-import { rowSizes, SELECT_LINES, SELECT_SOUND, selectLine, TILES_PER_ROW } from "../src/characters/boss-select.ts";
+import { readFileSync } from "node:fs";
+import { rowSizes, SELECT_FRAMING, SELECT_LINES, SELECT_SOUND, SELECT_TINT, selectLine, TILE_RATIO, TILES_PER_ROW } from "../src/characters/boss-select.ts";
+import { renderFrame } from "../src/characters/sprite.ts";
 import { bossKit } from "../src/characters/kits.ts";
 
 /** The Boss raid screen's character select: each boss's sound and lines (docs/decisions/2026-10-16-boss-character-select.md). */
@@ -51,26 +53,102 @@ describe("the boss select", () => {
     for (const l of SELECT_LINES.recluse!) expect(l).not.toMatch(/Fischer|Soviet|Russian/i);
   });
 
-  it("shares the tiles out over as few rows as it takes, evenly, the longer rows first (docs/decisions/2026-10-23-boss-select-grid.md)", () => {
-    const { phone, wide } = TILES_PER_ROW;
-    // Today's fourteen tiles (twelve bosses, the Hidden Boss's and "?"): 5, 5, 4 on a phone, 7, 7 on a wide column.
+  it("shares the tiles out over as few rows as it takes, evenly, the longer rows first (docs/decisions/2026-10-23-boss-select-sf.md)", () => {
+    const per = TILES_PER_ROW;
+    expect(per).toBe(5);
+    // Today's fourteen tiles (twelve bosses, the Hidden Boss's and "?"): 5, 5, 4, the short row centered by the stylesheet.
     expect(all.length + 1).toBe(14);
-    expect(rowSizes(all.length + 1, phone)).toEqual([5, 5, 4]);
-    expect(rowSizes(all.length + 1, wide)).toEqual([7, 7]);
+    expect(rowSizes(all.length + 1, per)).toEqual([5, 5, 4]);
     // The next bosses: never a tile alone on a row.
-    expect(rowSizes(15, phone)).toEqual([5, 5, 5]);
-    expect(rowSizes(15, wide)).toEqual([5, 5, 5]);
-    expect(rowSizes(16, phone)).toEqual([4, 4, 4, 4]);
-    expect(rowSizes(16, wide)).toEqual([6, 5, 5]);
-    expect(rowSizes(0, phone)).toEqual([]);
-    for (const per of [phone, wide]) {
-      for (let n = 1; n <= 60; n++) {
-        const rows = rowSizes(n, per);
-        expect(rows.reduce((a, b) => a + b, 0), `${n} in ${per}s`).toBe(n);
-        expect(Math.max(...rows), `${n} in ${per}s`).toBeLessThanOrEqual(per);
-        expect(Math.max(...rows) - Math.min(...rows), `${n} in ${per}s`).toBeLessThanOrEqual(1);
-        expect(rows, `${n} in ${per}s: the longer rows first`).toEqual([...rows].sort((a, b) => b - a));
-        if (n > 1) expect(Math.min(...rows), `${n} in ${per}s: no tile alone`).toBeGreaterThan(1);
+    expect(rowSizes(15, per)).toEqual([5, 5, 5]);
+    expect(rowSizes(16, per)).toEqual([4, 4, 4, 4]);
+    expect(rowSizes(17, per)).toEqual([5, 4, 4, 4]);
+    expect(rowSizes(0, per)).toEqual([]);
+    for (let n = 1; n <= 60; n++) {
+      const rows = rowSizes(n, per);
+      expect(rows.reduce((a, b) => a + b, 0), `${n}`).toBe(n);
+      expect(Math.max(...rows), `${n}`).toBeLessThanOrEqual(per);
+      expect(Math.max(...rows) - Math.min(...rows), `${n}`).toBeLessThanOrEqual(1);
+      expect(rows, `${n}: the longer rows first`).toEqual([...rows].sort((a, b) => b - a));
+      if (n > 1) expect(Math.min(...rows), `${n}: no tile alone`).toBeGreaterThan(1);
+    }
+  });
+
+  /** A boss's figure as its tile frames it: the frame, the tile's box in the frame's pixels, and where the figure's ink is. */
+  const framed = (b: { id: string; name: string }) => {
+    const kit = bossKit(b.name)!;
+    const p = kit.portrait;
+    const img = renderFrame(kit.ch, kit.ch.anims[p.anim]!.frames[p.frame]!);
+    let x0 = img.w, y0 = img.h, x1 = -1, y1 = -1;
+    for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) if (img.data[(y * img.w + x) * 4 + 3]! > 0) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const fit = SELECT_FRAMING[b.id]!;
+    const [nx, ny] = fit.neck;
+    const tile = { left: nx - fit.span / 2, right: nx + fit.span / 2, top: ny - fit.at * TILE_RATIO * fit.span, bottom: ny + (1 - fit.at) * TILE_RATIO * fit.span };
+    return { kit, img, ink: { x0, y0, x1, y1 }, tile, fit };
+  };
+
+  it("frames every boss's whole figure: it covers the tile's width, the head is inside the tile, and the body runs on past its foot", () => {
+    for (const b of all) {
+      const { img, ink, tile, fit } = framed(b);
+      expect(fit, b.id).toBeDefined();
+      expect(fit.at, b.id).toBeGreaterThan(0.3);
+      expect(fit.at, b.id).toBeLessThan(0.7);
+      // (The tile is TILE_RATIO tall at most: a short screen has it shorter, never taller.) No bare strip down either side.
+      expect(tile.left, `${b.id}: the left edge of its frame`).toBeGreaterThanOrEqual(0);
+      expect(tile.right, `${b.id}: the right edge of its frame`).toBeLessThanOrEqual(img.w);
+      // The head, hat, ears and all, inside the tile's top, and the figure still going at its foot.
+      expect(ink.y0, `${b.id}: the top of its head`).toBeGreaterThanOrEqual(tile.top - 0.5);
+      expect(ink.y1, `${b.id}: its body to the tile's foot`).toBeGreaterThanOrEqual(tile.bottom - 0.5);
+      // Neither the tile nor its neck outside the frame.
+      expect(fit.neck[0], b.id).toBeGreaterThan(0);
+      expect(fit.neck[0], b.id).toBeLessThan(img.w);
+      expect(fit.neck[1], b.id).toBeGreaterThan(ink.y0);
+      expect(fit.neck[1], b.id).toBeLessThan(ink.y1);
+    }
+    // Nothing for a boss that isn't in the roster.
+    for (const id of Object.keys(SELECT_FRAMING)) expect(BOSS_ROSTER.some((r) => r.id === id), id).toBe(true);
+  });
+
+  it("gives every boss with a character a color of its own palette behind it (the Hidden Boss's tile is dark and '?' is plain), one that doesn't blend into the figure, in either theme", () => {
+    const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+    const get = (name: string, from: number) => css.slice(from).match(new RegExp(`--${name}: ([^;]+);`))![1]!;
+    const dark = css.indexOf(":root {\n  --bs-edge");
+    const light = css.indexOf(':root[data-theme="light"] {\n  --bs-edge');
+    expect(dark).toBeGreaterThan(0);
+    expect(light).toBeGreaterThan(dark);
+    const hex = (c: string) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)) as [number, number, number];
+    const mix = (tint: string, pct: string, base: string) => {
+      const a = parseInt(pct) / 100;
+      const [t, b] = [hex(tint), hex(base)];
+      return [0, 1, 2].map((i) => t[i]! * a + b[i]! * (1 - a)) as [number, number, number];
+    };
+    // The gradient's two ends in each theme, worked out as the stylesheet's color-mix does.
+    const themes = { dark, light };
+    const ends = (tint: string, at: number) => ({ hi: mix(tint, get("bs-mix-hi", at), get("bs-base-hi", at)), lo: mix(tint, get("bs-mix-lo", at), get("bs-base-lo", at)) });
+    for (const b of all) {
+      if (b.id === "recluse") {
+        expect(SELECT_TINT[b.id], "the Hidden Boss's tile is always dark").toBeUndefined();
+        continue;
+      }
+      const tint = SELECT_TINT[b.id];
+      expect(tint, b.id).toMatch(/^#[0-9a-f]{6}$/);
+      // (A color of the boss's own palette.)
+      const palette = Object.values(bossKit(b.name)!.ch.palette).map((c) => c.slice(0, 7).toLowerCase());
+      expect(palette, `${b.id}: ${tint} is one of its colors`).toContain(tint);
+      // The figure's pixels (not its dark outline: a ring of every shape) against the background's two ends: how many are close to it.
+      const { img } = framed(b);
+      for (const [theme, at] of Object.entries(themes)) {
+        const { hi, lo } = ends(tint!, at);
+        let own = 0, near = 0;
+        for (let i = 0; i < img.data.length; i += 4) {
+          if (img.data[i + 3]! < 255) continue;
+          const px = [img.data[i]!, img.data[i + 1]!, img.data[i + 2]!];
+          if (px[0]! + px[1]! + px[2]! < 120) continue;
+          own++;
+          const far = (bg: number[]) => Math.hypot(px[0]! - bg[0]!, px[1]! - bg[1]!, px[2]! - bg[2]!);
+          if (Math.min(far(hi), far(lo)) < 50) near++;
+        }
+        expect(near / own, `${b.id} in the ${theme} theme: the share of its figure close to its background`).toBeLessThan(0.2);
       }
     }
   });

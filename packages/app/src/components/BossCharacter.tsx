@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
 import { bossKit, poweredKit, type BossKit } from "../characters/kits.ts";
+import { SELECT_FRAMING } from "../characters/boss-select.ts";
 import { stanceAt } from "../characters/stance.ts";
 import { resetMoo } from "../characters/moo-state.ts";
 import { renderFrame, type Anim, type Character, type Frame } from "../characters/sprite.ts";
@@ -391,6 +392,25 @@ export function BossFace({ boss, class: cls = "", label }: { boss: Pick<BossView
   }, [kit]);
   if (!kit) return <>{boss.icon}</>;
   return <canvas ref={cv} class={`boss-portrait ${cls}`} width={kit.portrait.w} height={kit.portrait.h} {...(label === "" ? { "aria-hidden": "true" } : { role: "img", "aria-label": label ?? boss.name })} />;
+}
+
+/**
+ * A boss's whole figure for a select tile (docs/decisions/2026-10-23-boss-select-sf.md): its portrait's frame, full size, on a
+ * canvas of its own. The stylesheet (`.bs-art`) scales it and puts its neck where `SELECT_FRAMING` says; the tile's slanted
+ * shape cuts off what doesn't fit. A boss without a character keeps its emoji.
+ */
+export function BossArt({ boss, class: cls = "" }: { boss: { id: string; name: string; icon: string }; class?: string }) {
+  const kit = bossKit(boss.name);
+  const fit = SELECT_FRAMING[boss.id];
+  const cv = useRef<HTMLCanvasElement>(null);
+  useLayoutEffect(() => {
+    if (!kit || !cv.current) return;
+    const p = kit.portrait;
+    cv.current.getContext("2d")?.putImageData(frameImage(kit.ch, kit.ch.anims[p.anim]!.frames[p.frame]!), 0, 0);
+  }, [kit]);
+  if (!kit || !fit) return <>{boss.icon}</>;
+  const style = { "--ax": fit.neck[0], "--ay": fit.neck[1], "--aw": kit.ch.w, "--ah": kit.ch.h, "--span": fit.span, "--at": fit.at };
+  return <canvas ref={cv} class={`bs-art ${cls}`} width={kit.ch.w} height={kit.ch.h} aria-hidden="true" style={style} />;
 }
 
 /**
