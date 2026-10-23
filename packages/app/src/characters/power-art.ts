@@ -270,7 +270,7 @@
  *                          from the left or right edge: a flash, a ring of sparkles (Moo's attack on a king).
  *   seedFly        square  fly (loop, 220 ms): a seed tumbling; the board moves it on an arc from his hand to a square (a CSS animation).
  *   seedPlop       square  plop (ends empty, 425 ms, `plop`): the seed lands in a puff of dirt, dips into the soil and is gone; nothing stays.
- *   waterSweep     board   sweep (420 ms, `spray`), sheen (760 ms, ends empty): a pass of spray from the board's left edge to its right, the
+ *   waterSweep     board   sweep (420 ms, `spray`; ends on the sheen's first look), sheen (760 ms, ends empty): a pass of spray from the board's left edge to its right, the
  *                          lower rows leading, and a wet shine that thins away. See-through. Drawn coming from the left.
  *   gardenPlant    square  sprout (300 ms), then an outcome from it: grow, green (loop), toFall, fall (loop), toDrop, drop (loop), gone
  *                          (a plain plant, a state a turn); kill (870 ms, `snap` at 350: the piece off), bud / budQueen (550 / 630 ms,
@@ -567,11 +567,11 @@ export const EFFECTS: Record<EffectName, Effect> = {
   // A seed in flight (moved from his hand to a square), and landing: its plop is the one sound.
   seedFly: { ch: EFFECT_SPRITES.seedFly, covers: "square", loop: "fly", sounds: {} },
   seedPlop: { ch: EFFECT_SPRITES.seedPlop, covers: "square", start: "plop", sounds: { plop: "gardenerPlip" } },
-  // The watering's sweep: its `spray` cue is the same instant as his own (`spray`, in the cast), so it is quiet here.
-  waterSweep: { ch: EFFECT_SPRITES.waterSweep, covers: "board", start: "sweep", end: "sheen", sounds: {} },
-  // A sprout and what it turns into (no `loop`: a sprout holds its last look until its outcome's turn; the board names each animation and its `then`). Only the killer plant's snap and gulp and a bud's pop have sounds (the queen's pop is a chime of
+  // The watering's sweep, then its sheen (the board names each: the sweep ends on the sheen's first look); its `spray` cue is the same instant as his own (`spray`, in the cast), so the board plays it `quiet` (BossEffect).
+  waterSweep: { ch: EFFECT_SPRITES.waterSweep, covers: "board", end: "sheen", sounds: { spray: "gardenerSpray" } },
+  // A sprout and what it turns into (no `start` or `loop`: a sprout holds its last look until its outcome's turn, and the board names each animation and its `then`). Only the killer plant's snap and gulp and a bud's pop have sounds (the queen's pop is a chime of
   // its own, played by the moment: the same cue name), the wilt a sigh; the sprouts and the plain plants are quiet.
-  gardenPlant: { ch: EFFECT_SPRITES.gardenPlant, covers: "square", start: "sprout", end: "gone", sounds: { snap: "gardenerSnap", gulp: "gardenerGulp", pop: "gardenerPop", wilt: "gardenerWilt" } },
+  gardenPlant: { ch: EFFECT_SPRITES.gardenPlant, covers: "square", end: "gone", sounds: { sprout: "gardenerRustle", grow: "gardenerRustle", rise: "gardenerRustle", open: "gardenerRustle", swell: "gardenerRustle", snap: "gardenerSnap", gulp: "gardenerGulp", pop: "gardenerPop", wilt: "gardenerWilt" } },
   waterHit: { ch: EFFECT_SPRITES.waterHit, covers: "square", start: "hitHL", sounds: {} },
 };
 

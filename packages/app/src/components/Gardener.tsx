@@ -164,7 +164,7 @@ function waterItems(m: Moment, now: number, orientation: Orientation): BoardItem
       // (The queen's pop has a chime of its own: SoundAt below. A plain plant ends on its green and stays so.)
       const how = g.kind === "killer" ? { anim: "kill" } : g.kind === "q" ? { anim: "budQueen", quiet: true } : g.kind === "plant" ? { anim: "grow", then: "green" } : g.kind === "nothing" ? { anim: "wilt" } : { anim: "bud" };
       out.push({ square: g.square, name: "gardenPlant", since: at, ...how });
-    } else if (now >= sproutAt) out.push({ square: g.square, name: "gardenPlant", anim: "sprout", since: sproutAt });
+    } else if (now >= sproutAt) out.push({ square: g.square, name: "gardenPlant", anim: "sprout", since: sproutAt, quiet: true });
   });
   return out;
 }
@@ -178,7 +178,7 @@ function Sweep({ m, now }: { m: Moment; now: number }) {
   const sheen = now >= sheenAt;
   return (
     <div class="gd-sweep" data-phase={sheen ? "sheen" : "sweep"} aria-hidden="true">
-      <BossEffect name="waterSweep" anim={sheen ? "sheen" : "sweep"} since={sheen ? sheenAt : at} id={`${m.key}:${sheen ? "sheen" : "sweep"}`} />
+      <BossEffect name="waterSweep" anim={sheen ? "sheen" : "sweep"} since={sheen ? sheenAt : at} id={`${m.key}:${sheen ? "sheen" : "sweep"}`} quiet />
     </div>
   );
 }

@@ -13,7 +13,7 @@
  */
 import { bandpass, lowpass, noise, osc, render, rng, saw, sine, soft, soundCache, type Voice } from "./synth.ts";
 
-export type GardenerSound = "grunt" | "bellow" | "cheer" | "hello" | "thump" | "oof" | "flop" | "whoosh" | "toss" | "plip" | "tug" | "spray" | "swell" | "drips" | "snap" | "gulp" | "pop" | "chime" | "wilt" | "sigh" | "jet" | "spurt";
+export type GardenerSound = "grunt" | "bellow" | "cheer" | "hello" | "thump" | "oof" | "flop" | "whoosh" | "toss" | "plip" | "tug" | "spray" | "swell" | "drips" | "snap" | "gulp" | "pop" | "chime" | "wilt" | "sigh" | "jet" | "spurt" | "rustle";
 
 /** A voice read once a sample however many filters share it (a source feeding two formants). */
 const shared = (v: Voice): Voice => {
@@ -220,6 +220,11 @@ const SOUNDS: Record<GardenerSound, (rate: number) => Float32Array> = {
   },
   // A shrug: "hm", a breathy hum falling off.
   sigh: (rate) => grunt(rate, { dur: 0.55, pitch: [112, 104, 84], f1: [300, 400], f2: [640, 800], vibrato: [3.6, 0.03], rough: 0.1, breath: 0.55, open: 0.25, attack: 0.1, release: 0.3, seed: 2045 }),
+  // A plant coming up, leaves unfurling or a snapping plant's jaws opening: a very soft rustle of leaves.
+  rustle: (rate) => {
+    const leaves = bandpass(rate, (t) => 2600 - 900 * Math.min(1, t / 0.12), 1.0, murk(rate, 6500, 2051));
+    return render(rate, 0.13, (t) => Math.sin(Math.PI * Math.min(1, t / 0.13)) * (0.7 + 0.3 * Math.sin(2 * Math.PI * 38 * t)) * 2.2 * leaves(t));
+  },
   // One jet of his hose at the king: a short squirt of water, a hiss with a splash on its end.
   jet: (rate) => splash(rate, 0.14, 4200, 2600, 2047, (t) => Math.min(1, t / 0.008) * Math.exp(-t / 0.07), 0.7),
   // A sputter between jets: shorter and softer.
@@ -250,6 +255,7 @@ const LEVEL: Record<GardenerSound, number> = {
   sigh: 0.05,
   jet: 0.14,
   spurt: 0.12,
+  rustle: 0.1,
 };
 
 const cache = soundCache("gardener");

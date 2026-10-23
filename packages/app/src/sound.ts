@@ -698,6 +698,7 @@ export type SoundName =
   | "gardenerSigh"
   | "gardenerJet"
   | "gardenerSpurt"
+  | "gardenerRustle"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -919,6 +920,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   gardenerSigh: gardenerBoss("sigh"),
   gardenerJet: gardenerBoss("jet"),
   gardenerSpurt: gardenerBoss("spurt"),
+  gardenerRustle: gardenerBoss("rustle"),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -1095,6 +1097,7 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   gardenerSigh: [["gardener", "sigh"]],
   gardenerJet: [["gardener", "jet"]],
   gardenerSpurt: [["gardener", "spurt"]],
+  gardenerRustle: [["gardener", "rustle"]],
   kingCant: [["godKing", "cant"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */
