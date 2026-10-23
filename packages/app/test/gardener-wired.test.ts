@@ -208,7 +208,7 @@ describe("his sounds", () => {
     expect(mean("grunt")).toBeGreaterThan(mean("toss") + 5);
   });
 
-  it("grunts deep and bellows bigger: the bellow longer and lower than the grunt, the cheer two short grunts", () => {
+  it("talks in quick made-up syllables: the queen's whoop a long excited run, a cheer longer than his usual word", () => {
     const len = (n: Parameters<typeof gardenerSound>[0]) => gardenerSound(n, 44100).length / 44100;
     expect(len("bellow")).toBeGreaterThan(len("grunt") * 2);
     expect(len("cheer")).toBeGreaterThan(len("grunt"));

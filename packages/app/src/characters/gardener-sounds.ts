@@ -1,11 +1,12 @@
 /**
  * Puddles', the hippo gardener's, sounds, synthesized (no files, no licenses), as the other bosses' are. He is a big, patient,
- * friendly hippo: a deep warm grunt and a bigger bellow (each a pulse train, low, through two formants that open from "mm" to
- * "uh", a little rough and breathy; warm and never scary), heavy footstep thumps, an oof, a flop. His garden has a soft "plip"
+ * friendly hippo who talks in quick, high, made-up syllables (Eric, Oct 23: "like in Pikmin"; his first deep grunt sounded like
+ * Moo's moo): a few for most things, a happy run for a cheer, a long excited one for a queen, an "uh-oh" when hurt and a slow
+ * falling "oh well" for a shrug. Heavy footstep thumps and a flop are his body's. His garden has a soft "plip"
  * for each seed landing, a quiet whiff for the toss (the 30 s seed must never wear on you: no grunt, nothing but a whiff), and the
  * hose: a rubbery creak as he hauls it, a hiss that starts, swells for the sweep and dies away to drips. The plants have a killer
  * plant's snap and gulp, a bud's bright little pop, a sparkly chime for the queen's, and the wilt, a soft deflating sigh. His
- * attack on a king is ten short squirts. His select sound is a happy grunt and a splash.
+ * attack on a king is ten short squirts. His select sound is a hello in his talk and a splash.
  * Each is a pure function of the sample rate (its noise is seeded), so a test can measure it: every one stays quieter than a piece's
  * move (peak and loudness), and the ten squirts of his attack on a king together too.
  *
@@ -31,42 +32,68 @@ const lerp = (a: number, b: number, u: number) => a + (b - a) * Math.max(0, Math
 /** Noise with its highs rolled off twice: a soft puff or breath, never a hiss. */
 const murk = (rate: number, cut: number, seed: number): Voice => lowpass(rate, cut, lowpass(rate, cut, noise(seed)));
 
-/** A grunt's shape: how long, the pitch (Hz) at its start, peak and end, its two formants (Hz) closed and open, and how rough and breathy. */
-interface Grunt {
-  dur: number;
-  pitch: [number, number, number];
-  f1: [number, number];
-  f2: [number, number];
-  vibrato: [number, number];
-  rough: number;
-  breath: number;
-  open: number;
-  attack: number;
-  release: number;
+/** A vowel: its first two formants (Hz), a small speaker's (an adult's times 1.22, so the voice reads small and bright). */
+type Vowel = "ee" | "ih" | "eh" | "ah" | "uh" | "oh" | "oo";
+const VOWEL: Record<Vowel, readonly [number, number]> = { ee: [366, 2806], ih: [512, 2379], eh: [683, 2196], ah: [927, 1586], uh: [683, 1403], oh: [586, 1098], oo: [415, 1000] };
+const CHATTY: readonly Vowel[] = ["ee", "ih", "eh", "ah", "oo", "ee", "ah"];
+/** His speaking pitch (Hz): the first sample Eric picked was 430, "just slightly too high pitched" (Oct 23). */
+const VOICE = 370;
+
+/**
+ * What he says: `syllables` of made-up talk at `pitch` times his voice, on a sing-song line that rises by `lift` in the middle
+ * and drops by `fall` on the last (shares of the pitch), from `vowels`, at `pace` (1 his usual quick chatter; more is slower).
+ */
+interface Talk {
+  syllables: number;
+  pitch: number;
+  lift: number;
+  fall: number;
+  vowels: readonly Vowel[];
+  pace: number;
   seed: number;
 }
 
-function grunt(rate: number, m: Grunt): Float32Array {
-  const source = shared(
-    osc(
-      rate,
-      (t) => {
-        const u = t / m.dur;
-        const f = u < 0.35 ? lerp(m.pitch[0], m.pitch[1], u / 0.35) : lerp(m.pitch[1], m.pitch[2], (u - 0.35) / 0.65);
-        return f * (1 + m.vibrato[1] * Math.sin(2 * Math.PI * m.vibrato[0] * t));
-      },
-      saw,
-    ),
-  );
-  const rolled = lowpass(rate, 2200, source);
-  const a = bandpass(rate, (t) => lerp(m.f1[0], m.f1[1], t / m.open), 6, rolled);
-  const b = bandpass(rate, (t) => lerp(m.f2[0], m.f2[1], t / m.open), 7, rolled);
-  const air = bandpass(rate, () => 900, 1.2, murk(rate, 2400, m.seed));
-  return render(rate, m.dur, (t) => {
-    const env = Math.min(1, t / m.attack) * Math.min(1, (m.dur - t) / m.release);
-    const grr = 1 - m.rough * (0.5 + 0.5 * Math.sin(2 * Math.PI * 26 * t));
-    return env * (grr * (2.2 * a(t) + 1.2 * b(t) + 0.2 * rolled(t)) + m.breath * air(t));
+/**
+ * His voice (Eric, Oct 23: the deep grunt "sounds like the same as the cow"; "like in Pikmin... not real words, and they say it
+ * kind of fast, like in higher pitch"): quick made-up syllables, each a bright pulse through the two formants of its vowel, most
+ * with a little "p/t" click at the start, each bending its pitch a little. Made at a loudness of 1 (its RMS), so `LEVEL` sets it.
+ */
+function talk(rate: number, m: Talk): Float32Array {
+  const r = rng(m.seed);
+  const between = (lo: number, hi: number) => lo + (hi - lo) * r();
+  const plan: { at: number; d: number; p0: number; p1: number; v: readonly [number, number]; click: boolean }[] = [];
+  let at = 0.01;
+  for (let i = 0; i < m.syllables; i++) {
+    const d = between(0.055, 0.085) * m.pace;
+    const line = Math.sin((Math.PI * (i + 0.5)) / m.syllables) * m.lift - (i === m.syllables - 1 ? m.fall : 0);
+    const centre = VOICE * m.pitch * (1 + line + (r() - 0.5) * 0.32);
+    const bend = (r() - 0.4) * 0.19;
+    const v = VOWEL[m.vowels[Math.floor(r() * m.vowels.length)]!];
+    plan.push({ at, d, p0: centre * (1 - bend / 2), p1: centre * (1 + bend / 2), v, click: r() < 0.55 });
+    at += d + between(0.012, 0.03) * m.pace;
+  }
+  const out = new Float32Array(Math.ceil((at + 0.04) * rate));
+  plan.forEach((s, k) => {
+    // (The syllable's source made first, then read by both formants and the onset, each in time order.)
+    const len = Math.ceil((s.d + 0.03) * rate);
+    const pulse = lowpass(rate, 5000, osc(rate, (t) => lerp(s.p0, s.p1, t / s.d), saw));
+    const source = new Float32Array(len);
+    for (let i = 0; i < len; i++) source[i] = pulse(i / rate);
+    const read: Voice = (t) => source[Math.min(len - 1, Math.round(t * rate))]!;
+    const f1 = bandpass(rate, () => s.v[0], 5, read);
+    const f2 = bandpass(rate, () => s.v[1], 7, read);
+    const air = bandpass(rate, () => 3500, 1.4, noise(m.seed * 31 + k));
+    const tick = bandpass(rate, () => 4200, 2, noise(m.seed * 17 + k));
+    const start = Math.round(s.at * rate);
+    for (let i = 0; i < len && start + i < out.length; i++) {
+      const t = i / rate;
+      const env = Math.min(1, t / 0.007) * Math.max(0, Math.min(1, (s.d + 0.012 - t) / 0.03));
+      const click = s.click && t < 0.012 ? 1.6 * tick(t) * (1 - t / 0.012) : 0;
+      out[start + i]! += env * (2.0 * f1(t) + 1.3 * f2(t) + 0.15 * read(t) + 0.08 * air(t)) + click;
+    }
   });
+  const loud = Math.sqrt(out.reduce((a, v) => a + v * v, 0) / out.length);
+  return out.map((v) => v / loud);
 }
 
 /** Sums sounds, each starting at its own time (seconds), into one of `dur` seconds. */
@@ -87,21 +114,17 @@ function splash(rate: number, dur: number, from: number, to: number, seed: numbe
 }
 
 const SOUNDS: Record<GardenerSound, (rate: number) => Float32Array> = {
-  // A deep, friendly grunt: low, two syllables of one breath, the mouth opening a little.
-  grunt: (rate) => grunt(rate, { dur: 0.38, pitch: [104, 120, 90], f1: [300, 520], f2: [640, 980], vibrato: [5, 0.02], rough: 0.2, breath: 0.25, open: 0.14, attack: 0.05, release: 0.16, seed: 2001 }),
-  // A bigger bellow: lower, longer, the mouth wide, a growl in it and a fall at the end (warm: no snarl).
-  bellow: (rate) => grunt(rate, { dur: 0.85, pitch: [76, 112, 64], f1: [380, 650], f2: [780, 1060], vibrato: [4.2, 0.022], rough: 0.28, breath: 0.2, open: 0.22, attack: 0.05, release: 0.3, seed: 2003 }),
-  // A happy cheer: two short rising grunts, "hoo-hoo".
-  cheer: (rate) =>
-    mix(rate, 0.55, [
-      [0, grunt(rate, { dur: 0.22, pitch: [112, 150, 138], f1: [330, 560], f2: [700, 1080], vibrato: [6, 0.02], rough: 0.1, breath: 0.2, open: 0.08, attack: 0.03, release: 0.09, seed: 2005 })],
-      [0.2, grunt(rate, { dur: 0.3, pitch: [120, 168, 124], f1: [340, 590], f2: [720, 1120], vibrato: [6, 0.025], rough: 0.12, breath: 0.2, open: 0.1, attack: 0.03, release: 0.14, seed: 2007 })],
-    ]),
-  // His select sound: a happy grunt, and a splash after it.
+  // His word for most things (his entrance, a capture, a check, a win): four quick syllables, up a little and down at the end.
+  grunt: (rate) => talk(rate, { syllables: 4, pitch: 1, lift: 0.18, fall: 0.12, vowels: CHATTY, pace: 1, seed: 2001 }),
+  // A queen grew: a long, excited run, higher and climbing.
+  bellow: (rate) => talk(rate, { syllables: 10, pitch: 1.12, lift: 0.32, fall: 0, vowels: CHATTY, pace: 0.95, seed: 2003 }),
+  // A piece grew: a happy run, a little higher, ending up.
+  cheer: (rate) => talk(rate, { syllables: 6, pitch: 1.08, lift: 0.28, fall: -0.06, vowels: CHATTY, pace: 1, seed: 2005 }),
+  // His select sound: a friendly hello in his talk, and a splash after it.
   hello: (rate) =>
-    mix(rate, 0.8, [
-      [0, grunt(rate, { dur: 0.34, pitch: [110, 148, 118], f1: [330, 560], f2: [700, 1080], vibrato: [6, 0.02], rough: 0.1, breath: 0.2, open: 0.12, attack: 0.04, release: 0.14, seed: 2009 })],
-      [0.3, splash(rate, 0.46, 3800, 1800, 2011, (t) => Math.min(1, t / 0.02) * Math.exp(-t / 0.13), 0.7)],
+    mix(rate, 0.85, [
+      [0, talk(rate, { syllables: 4, pitch: 1.04, lift: 0.22, fall: 0.06, vowels: CHATTY, pace: 1, seed: 2009 })],
+      [0.36, splash(rate, 0.46, 3800, 1800, 2011, (t) => Math.min(1, t / 0.02) * Math.exp(-t / 0.13), 0.7)],
     ]),
   // A heavy footstep: a low sine dropping in pitch under a puff of dust.
   thump: (rate) => {
@@ -109,12 +132,8 @@ const SOUNDS: Record<GardenerSound, (rate: number) => Float32Array> = {
     const dust = murk(rate, 520, 2013);
     return render(rate, 0.3, (t) => Math.exp(-t / 0.08) * (1.2 * body(t) + 0.9 * dust(t)));
   },
-  // An oof: a short grunt knocked out of him, breathy, falling.
-  oof: (rate) => {
-    const v = lowpass(rate, 900, osc(rate, (t) => 150 - 60 * Math.min(1, t / 0.2), saw));
-    const breath = murk(rate, 1400, 2015);
-    return render(rate, 0.24, (t) => Math.sin(Math.PI * Math.min(1, t / 0.24)) ** 0.7 * (1.5 * v(t) + 0.5 * breath(t)));
-  },
+  // Hurt: a quick "uh-oh" in his talk, falling.
+  oof: (rate) => talk(rate, { syllables: 2, pitch: 1.06, lift: 0, fall: 0.3, vowels: ["uh", "oh"], pace: 0.9, seed: 2015 }),
   // A flop: him sinking onto his haunches, a big soft thud with a slow settle under it.
   flop: (rate) => {
     const body = osc(rate, (t) => 54 + 52 * Math.exp(-t / 0.04), sine);
@@ -218,8 +237,8 @@ const SOUNDS: Record<GardenerSound, (rate: number) => Float32Array> = {
     const tone = osc(rate, (t) => 330 - 190 * Math.min(1, t / 0.4), sine);
     return render(rate, 0.5, (t) => Math.sin(Math.PI * Math.min(1, t / 0.5)) ** 0.8 * (1.8 * air(t) + 0.3 * tone(t)));
   },
-  // A shrug: "hm", a breathy hum falling off.
-  sigh: (rate) => grunt(rate, { dur: 0.55, pitch: [112, 104, 84], f1: [300, 400], f2: [640, 800], vibrato: [3.6, 0.03], rough: 0.1, breath: 0.55, open: 0.25, attack: 0.1, release: 0.3, seed: 2045 }),
+  // A shrug (nothing came up): three slower syllables in his talk, lower and falling, "oh well".
+  sigh: (rate) => talk(rate, { syllables: 3, pitch: 0.88, lift: 0, fall: 0.25, vowels: ["oh", "uh", "oo"], pace: 1.35, seed: 2045 }),
   // A plant coming up, leaves unfurling or a snapping plant's jaws opening: a very soft rustle of leaves.
   rustle: (rate) => {
     const leaves = bandpass(rate, (t) => 2600 - 900 * Math.min(1, t / 0.12), 1.0, murk(rate, 6500, 2051));
@@ -238,7 +257,7 @@ const LEVEL: Record<GardenerSound, number> = {
   cheer: 0.05,
   hello: 0.05,
   thump: 0.2,
-  oof: 0.1,
+  oof: 0.05,
   flop: 0.2,
   whoosh: 0.18,
   toss: 0.07,

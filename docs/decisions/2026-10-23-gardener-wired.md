@@ -121,7 +121,7 @@ with `green` there every sprout grew into a tree (seen in the frames, not by a t
     turn 3, so the board test sets his army short (a position set from the page, as the paint test does) and sets the battle's seed to one whose first watering
     rolls a killer plant, plain plants and a grown piece (`rollSeed` in the test, the same function the rules use). The page's own code is untouched by either.
 13. **`net.ts` and `solo.ts` are touched** (the garden's source), which the CI plan counts as shared foundations: the whole e2e suite runs on this PR, not only his area's.
-14. **Sounds** (`gardener-sounds.ts`, synthesized; the others' style): a deep friendly grunt and a bigger bellow (a pulse train through two formants, low, warm,
+14. **Sounds** (`gardener-sounds.ts`, synthesized; the others' style; his voice was replaced the same day by quick made-up talk: [2026-10-23-puddles-voice.md](2026-10-23-puddles-voice.md)): a deep friendly grunt and a bigger bellow (a pulse train through two formants, low, warm,
     a little rough: not a snarl), a cheer (two short rising grunts), heavy footstep thumps, an oof and a flop, the toss's quiet whiff, a soft plip for each seed landing,
     the hose's rubbery creak, the spray's hiss starting (`spray` cue), swelling for the sweep (`sweep`) and dying to drips (`stop`), the killer plant's snap and gulp,
     a bud's bright pop, the queen's sparkly chime, the wilt's deflating sigh, his shrug's breath, ten squirts for his attack (a jet and a shorter sputter in turn) and
