@@ -59,7 +59,9 @@ pack did: `OX`, `OY` are numbers, the parts are painted in scene pixels).
 
 - **Facing:** the reference flipped, side on with the head turned to us, facing our left like the others, so the balloons are toward
   the board.
-- **Four balloons, not six** (Eric allowed 4 or 5): a red king, a blue knight, a yellow bishop and a purple pawn. The pawn is the
+- **Four balloons, not six** (Eric allowed 4 or 5): a red king, a blue knight, a yellow bishop and a purple pawn. (Later the same
+  day the bunch was redrawn sharper, with the pump's balloon drawings: a red queen, a blue knight, a green rook and a purple pawn, no
+  king: [2026-10-23-tiger-animations.md](2026-10-23-tiger-animations.md).) The pawn is the
   piece the pump will make most, so it is in the bunch, small, at its lower left. A green rook was drawn and tried as a fifth, but at this size
   it hid behind the others and read as a green bone, and the pink pawn is a second pawn. Each balloon is drawn as a silhouette and
   shaded by one rule (a light rim at its left, a dark one at its right and under it, a shine), so they all look inflated alike.

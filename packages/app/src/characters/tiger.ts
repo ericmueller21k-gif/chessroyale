@@ -4,8 +4,8 @@
  * "where the balloons look like balloons"), redrawn: a realistic big cat on all fours, a long body and heavy paws, orange with
  * black stripes, a cream chest, muzzle and belly, amber eyes and whiskers; a small black top hat with a red band, tipped on his
  * head; a red and gold ringmaster's vest (gold edging, buttons, an embroidered panel); one front paw raised, holding the strings of
- * a bunch of four chess-piece balloons (a red king, a blue knight, a yellow bishop and a purple pawn: shiny, round, each with a
- * highlight; Eric's picture has six, and a green rook is drawn too, for the pump's pieces to come); his long striped tail curling up behind. Facing our left (as Alfil, Sawyer, Chub & Chirp, Smudgy, Moo and
+ * a bunch of four chess-piece balloons (a red queen, a blue knight, a green rook and a purple pawn: shiny, round, each with a
+ * highlight, drawn as the pump's balloons are, tiger-bar.ts; Eric's picture has six); his long striped tail curling up behind. Facing our left (as Alfil, Sawyer, Chub & Chirp, Smudgy, Moo and
  * Puddles), so his balloons are toward the board; light from the top left.
  *
  * This is his look only: ONE still, the first frame of `idle` (docs/decisions/2026-10-23-tiger-still.md). His powers (the balloons
@@ -26,6 +26,7 @@
  */
 import { canvas, inEllipse, inPoly, toGrid, type Canvas } from "./paint.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part } from "./sprite.ts";
+import { BALLOON_PIECES, BALLOON_SHAPES, balloonPartOf, knotX, type BalloonPiece, type Stage } from "./tiger-bar.ts";
 
 export const TIGER_PALETTE: Record<string, string> = {
   k: "#1f1210", // outline
@@ -66,7 +67,7 @@ export const TIGER_PALETTE: Record<string, string> = {
   M: "#ffe58a",
   "8": "#6b4a30", // the strings
   "9": "#9a7a56",
-  E: "#8f0f22", // a balloon's colors, three each: dark, round, light (the king's red)
+  E: "#8f0f22", // a balloon's colors, three each: dark, round, light (the queen's red)
   F: "#dc2433",
   G: "#ff6a5e",
   H: "#b88a0a", // the bishop's yellow
@@ -442,162 +443,36 @@ function hat(tilt: number): { part: Part; at: Pt } {
   );
 }
 
-// ---- The balloons: chess pieces, four in his bunch and a rook for later, shiny and round, each a part of its own. Each is drawn as a silhouette (`#` filled, `n` its knot) and
-// shaded by rule, as an inflated balloon is lit from the top left: a light rim on its left, a dark one at its right and under it, a round
-// light band inside the rim, and `marks` over it (the shine, the king's cross lines, the knight's eye, the bishop's slit).
+// ---- The balloons: chess pieces, four in his bunch, shiny and round, each a part of its own. They are the pump's drawings (tiger-bar.ts:
+// a silhouette per piece and stage, shaded by one rule, with the 1 px outline every part gets), in the colors of his palette, and
+// they hang with a clear gap between them so their shapes never merge (Eric, Oct 23: "if they could be slightly sharper"). His bunch:
+// a red queen, a blue knight, a green rook and a purple pawn (no king: he never makes one); the bishop is drawn too, in yellow.
 
-type Mark = readonly [x: number, y: number, key: "w" | "d" | "l"];
-const BALLOONS = {
-  king: {
-    sil: [
-      "....###....",
-      "....###....",
-      "..#######..",
-      "..#######..",
-      "....###....",
-      "....###....",
-      "...#####...",
-      "..#######..",
-      ".#########.",
-      ".#########.",
-      "..#######..",
-      "...#####...",
-      "....###....",
-      "....###....",
-      "...#####...",
-      "..#######..",
-      ".#########.",
-      "###########",
-      "###########",
-      ".#########.",
-      ".....n.....",
-    ],
-    marks: [[3, 2, "w"], [3, 3, "w"], [4, 7, "w"], [2, 9, "w"], [3, 16, "w"], [1, 17, "w"]] as Mark[],
-  },
-  bishop: {
-    sil: [
-      "...###...",
-      "...###...",
-      "..#####..",
-      "..#####..",
-      ".#######.",
-      ".#######.",
-      ".#######.",
-      "..#####..",
-      "...###...",
-      "..#####..",
-      "...###...",
-      "...###...",
-      "...###...",
-      "..#####..",
-      ".#######.",
-      "#########",
-      ".#######.",
-      "....n....",
-    ],
-    marks: [[3, 0, "w"], [3, 4, "w"], [5, 3, "d"], [4, 4, "d"], [3, 5, "d"], [2, 14, "w"], [2, 15, "w"]] as Mark[],
-  },
-  knight: {
-    sil: [
-      "......#.#....",
-      ".....##.##...",
-      "....########.",
-      "...##########",
-      "...##########",
-      "..###########",
-      "..###########",
-      ".############",
-      "#############",
-      "#########....",
-      ".#########...",
-      "...######....",
-      "...#######...",
-      "..#########..",
-      ".###########.",
-      "#############",
-      ".###########.",
-      "......n......",
-    ],
-    marks: [[6, 2, "w"], [4, 5, "w"], [5, 5, "d"], [5, 6, "d"], [1, 8, "d"], [3, 9, "d"], [4, 9, "d"], [10, 3, "d"], [11, 4, "d"], [10, 5, "d"], [11, 6, "d"], [10, 7, "d"], [11, 8, "d"], [3, 14, "w"], [2, 15, "w"]] as Mark[],
-  },
-  rook: {
-    sil: [
-      "###.###.###",
-      "###.###.###",
-      "###########",
-      ".#########.",
-      "..#######..",
-      "...#####...",
-      "...#####...",
-      "...#####...",
-      "..#######..",
-      ".#########.",
-      "###########",
-      "###########",
-      ".#########.",
-      ".....n.....",
-    ],
-    marks: [[1, 0, "w"], [1, 1, "w"], [4, 0, "w"], [4, 1, "w"], [8, 0, "l"], [8, 1, "l"], [4, 5, "w"], [4, 6, "w"], [2, 10, "w"]] as Mark[],
-  },
-  pawn: {
-    sil: [
-      "..###..",
-      ".#####.",
-      ".#####.",
-      "..###..",
-      ".#####.",
-      "..###..",
-      "..###..",
-      ".#####.",
-      "#######",
-      ".#####.",
-      "...n...",
-    ],
-    marks: [[2, 1, "w"], [2, 2, "w"], [2, 4, "w"], [1, 8, "w"]] as Mark[],
-  },
-};
-
-/** A silhouette shaded: `d` shade, `b` the balloon, `l` light, `w` shine, `n` knot. */
-function shaded(sil: readonly string[], marks: readonly Mark[]): string[] {
-  const at = (x: number, y: number) => sil[y]?.[x] ?? ".";
-  const solid = (x: number, y: number) => at(x, y) !== ".";
-  const grid = sil.map((row, y) =>
-    [...row]
-      .map((c, x) => {
-        if (c === "." || c === "n") return c;
-        const [L, R, U, D] = [!solid(x - 1, y), !solid(x + 1, y), !solid(x, y - 1), !solid(x, y + 1)];
-        if (D || (R && !solid(x, y + 1))) return "d";
-        if (R || (!solid(x + 1, y + 1) && !L)) return "d";
-        if (L || (U && !R)) return "l";
-        if (!solid(x - 2, y) || (!solid(x - 1, y - 1) && !solid(x - 2, y))) return "l";
-        return "b";
-      })
-      .join(""),
-  );
-  for (const [x, y, k] of marks) if (grid[y]?.[x] && grid[y]![x] !== ".") grid[y] = grid[y]!.slice(0, x) + k + grid[y]!.slice(x + 1);
-  return grid;
-}
-
-export type Piece = keyof typeof BALLOONS;
-/** Every balloon drawn: the bunch's four and the rook, which isn't in it (it is for the pieces the pump makes). */
-export const PIECES = Object.keys(BALLOONS) as readonly Piece[];
+export type Piece = BalloonPiece;
+/** Every balloon he can hold: the bunch's four and the bishop. */
+export const PIECES: readonly Piece[] = BALLOON_PIECES;
 /** Each balloon's three keys (dark, round, light) in the palette. */
-const BALLOON_KEYS: Record<Piece, string> = { king: "EFG", bishop: "HIN", knight: "OPS", rook: "TUV", pawn: "XZ0" };
-/** Where each balloon of his bunch hangs: its top left, and the knot its string is tied at (scene pixels). The rook (drawn for the pump's pieces to come) isn't in the bunch. */
-const BALLOON_AT: Partial<Record<Piece, { at: Pt; knot: Pt }>> = {
-  king: { at: [12, 2], knot: [17, 22] },
-  bishop: { at: [19, 6], knot: [23, 23] },
-  knight: { at: [3, 6], knot: [9, 23] },
-  pawn: { at: [3, 20], knot: [6, 30] },
+const BALLOON_KEYS: Record<Piece, string> = { queen: "EFG", bishop: "HIN", knight: "OPS", rook: "TUV", pawn: "XZ0" };
+/** The bunch: each balloon's stage (the pawn a small one, by his brow) and its top left (scene pixels); its knot follows from its drawing. */
+const BUNCH: Partial<Record<Piece, { stage: Stage; at: Pt }>> = {
+  rook: { stage: 4, at: [3, 2] },
+  pawn: { stage: 3, at: [3, 20] },
+  queen: { stage: 4, at: [16, 2] },
+  knight: { stage: 4, at: [30, 2] },
+};
+const knotOf = (n: Piece): Pt => {
+  const { stage, at } = BUNCH[n]!;
+  const sil = BALLOON_SHAPES[n][stage - 1]!.sil;
+  return [at[0] + knotX(sil), at[1] + sil.length - 1];
 };
 /** The bunch, back to front. */
-const BALLOON_ORDER = ["bishop", "knight", "king", "pawn"] as const satisfies readonly Piece[];
+const BALLOON_ORDER = ["knight", "queen", "rook", "pawn"] as const satisfies readonly Piece[];
 
-/** One balloon, as a part at `at`. */
-export function balloon(piece: Piece, at: Pt): { part: Part; at: Pt } {
+/** One balloon, as a part at `at` (a finished one unless `stage` says). */
+export function balloon(piece: Piece, at: Pt, stage: Stage = 4): { part: Part; at: Pt } {
   const k = BALLOON_KEYS[piece];
-  const keys: Record<string, string> = { d: k[0]!, b: k[1]!, l: k[2]!, w: "w", n: k[0]! };
-  return { part: { grid: shaded(BALLOONS[piece].sil, BALLOONS[piece].marks).map((row) => [...row].map((c) => (c === "." ? "." : keys[c]!)).join("")) }, at };
+  const shape = BALLOON_SHAPES[piece][stage - 1]!;
+  return { part: balloonPartOf(shape.sil, shape.marks, { d: k[0]!, b: k[1]!, l: k[2]!, w: "w", n: k[0]! }), at };
 }
 
 /** The strings: from each balloon's knot, swinging out ahead of his muzzle, to one gathering point, and from there down into his fist; the ends hang below it. */
@@ -605,8 +480,8 @@ const GATHER: Pt = [6, 46.5];
 /** Where his raised paw is (its middle), holding the strings. */
 const FIST: Pt = [8, 52];
 function strings(knots: readonly Pt[], fist: Pt): { part: Part; at: Pt } {
-  const cv = canvas(34, 50);
-  const [x0, y0] = [0, 20];
+  const cv = canvas(46, 56);
+  const [x0, y0] = [0, 14];
   const draw = (a: Pt, b: Pt, k: string) => {
     const n = Math.ceil(Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])) * 2);
     for (let i = 0; i <= n; i++) {
@@ -758,7 +633,7 @@ export function tigerLayers(pose: TigerPose = {}): Layer[] {
       ),
     ),
     at(placed(`legFN:${key([shoulder, elbow, wrist, paw])}`, () => leg([shoulder, elbow, wrist], [5, 3.8, 3], [paw[0], paw[1], 3.7, 3.4, true], [4.5, 8.5, 12.5]))),
-    at(placed(`strings:${bunch.join()}:${key([paw, ...bunch.map(offset)])}`, () => strings(bunch.map((n) => [BALLOON_AT[n]!.knot[0] + offset(n)[0], BALLOON_AT[n]!.knot[1] + offset(n)[1]] as Pt), paw))),
+    at(placed(`strings:${bunch.join()}:${key([paw, ...bunch.map(offset)])}`, () => strings(bunch.map((n) => [knotOf(n)[0] + offset(n)[0], knotOf(n)[1] + offset(n)[1]] as Pt), paw))),
     H(placed(`earF:${p.earF}`, () => ear(EAR_F[0], EAR_F[1], p.earF, true))),
     H(placed(`earN:${p.earN}`, () => ear(EAR_N[0], EAR_N[1], p.earN))),
     H(placed(`jaw:${p.jaw}`, () => jaw(p.jaw))),
@@ -767,7 +642,7 @@ export function tigerLayers(pose: TigerPose = {}): Layer[] {
     H(placed(`eyeN:${p.eyes}`, () => eye(EYE_N[0], EYE_N[1], 6, p.eyes))),
     H(placed("whiskers", whiskers)),
     at(placed(`hat:${p.hatTilt}`, () => hat(p.hatTilt)), Math.round(p.head[0] + p.hat[0]), b + Math.round(p.head[1] + p.hat[1])),
-    ...bunch.map((n) => at(placed(`balloon:${n}`, () => balloon(n, BALLOON_AT[n]!.at)), offset(n)[0], offset(n)[1])),
+    ...bunch.map((n) => at(placed(`balloon:${n}`, () => balloon(n, BUNCH[n]!.at, BUNCH[n]!.stage)), offset(n)[0], offset(n)[1])),
   ];
 }
 

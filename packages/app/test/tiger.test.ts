@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { PIECES, TIGER, TIGER_PORTRAIT, balloon, tigerLayers, type TigerPose } from "../src/characters/tiger.ts";
 import { frameKeys, renderFrame } from "../src/characters/sprite.ts";
@@ -46,7 +47,7 @@ describe("the circus tiger's still", () => {
     const poses: TigerPose[] = [
       { jaw: 28, eyes: "wide", head: [-1, 1], earN: -1, earF: 1 },
       { bob: 1, hat: [1, -3], hatTilt: 10, tail: 3, stepHN: 2, stepHF: 2, stepFF: 1 },
-      { paw: [14, 46], balloons: { king: [0, -1], pawn: [0, 1] }, gone: ["bishop"], eyes: "half" },
+      { paw: [14, 46], balloons: { queen: [0, -1], pawn: [0, 1] }, gone: ["rook"], eyes: "half" },
     ];
     for (const pose of poses) {
       const k = frameKeys(TIGER, { layers: tigerLayers(pose), ms: 100 });
@@ -62,6 +63,29 @@ describe("the circus tiger's still", () => {
       for (const row of grid) for (const k of row) if (k !== ".") expect(TIGER.palette, `${piece}: "${k}"`).toHaveProperty(k);
     }
     expect(tigerLayers().filter((l) => l.part.startsWith("balloon:")).length).toBe(4);
-    expect(tigerLayers({ gone: ["king"] }).some((l) => l.part === "balloon:king")).toBe(false);
+    expect(tigerLayers({ gone: ["queen"] }).some((l) => l.part === "balloon:queen")).toBe(false);
+  });
+
+  it("keeps his approved figure: everything but the balloons and their strings is the pixels Eric approved (d570e8f)", () => {
+    const layers = tigerLayers().filter((l) => !l.part.startsWith("balloon:") && !l.part.startsWith("strings:"));
+    const img = renderFrame(TIGER, { layers, ms: 1 });
+    expect(createHash("sha256").update(img.data).digest("hex")).toBe("6cf6e3fe0c31c7f7eca6f9e0d7e5754e56814591748c1b4d753acae59c3648ce");
+  });
+
+  it("holds four balloons, no king, with a clear gap between them (no two outlines touch)", () => {
+    const bunch = tigerLayers().filter((l) => l.part.startsWith("balloon:"));
+    expect(bunch.map((l) => l.part.slice(8)).sort()).toEqual(["knight", "pawn", "queen", "rook"]);
+    // Each balloon's pixels with their outline, as a set of frame cells: no cell is shared, and none is next to another balloon's.
+    const cells = bunch.map((l) => {
+      const set = new Set<string>();
+      for (const [y, row] of frameKeys(TIGER, { layers: [l], ms: 1 }).entries()) row.forEach((c, x) => c && c !== "@" && set.add(`${x},${y}`));
+      return set;
+    });
+    for (let i = 0; i < cells.length; i++)
+      for (let j = i + 1; j < cells.length; j++)
+        for (const c of cells[i]!) {
+          const [x, y] = c.split(",").map(Number) as [number, number];
+          for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) expect(cells[j]!.has(`${x + dx},${y + dy}`), `${bunch[i]!.part} / ${bunch[j]!.part}`).toBe(false);
+        }
   });
 });
