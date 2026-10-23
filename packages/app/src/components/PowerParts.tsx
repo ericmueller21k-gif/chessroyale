@@ -114,8 +114,19 @@ export interface BossUi {
   moments: Partial<Record<PowerEventKind, MomentUi>>;
   /** Its ultimate, as the rage warning names it, and when the warning says it comes ("Next turn" unless given). */
   ultimate: { name: string; when?: string };
-  /** Its own piece by the boss bar's rage meter (Hollow's bulbs); `moments`: the boss screen's moments now. */
+  /**
+   * Its passive's own bar, in the boss bar's row under the rage meter (Hollow's bulbs, Puddles' Seeds); `moments`: the boss
+   * screen's moments now. Nothing: no such row. (The rows sit under the name and its level, left aligned with them.)
+   */
   bar?: (p: { boss: BossView; moments: () => Moment[] }) => ComponentChildren;
+  /** Its ultimate's own piece beside the rage meter, in the same row (Moo's moon). Nothing: the rage meter alone. */
+  ultBar?: (p: { boss: BossView; moments: () => Moment[] }) => ComponentChildren;
+  /**
+   * Its prop in the boss bar's free room at the right, under the status ("Strikes in 3 moves", "58 moves left"): a slot
+   * of the bar's own size, positioned (`.boss-prop` is its containing block, nothing in it clips), nothing by default. A
+   * test link's `?barslot=1` outlines it with a dashed line, so a screenshot shows the room.
+   */
+  barProp?: (p: { boss: BossView; moments: () => Moment[] }) => ComponentChildren;
   /**
    * The dock's line for its turn when that turn brought no move to show (Alfil's fusion was his move: "Alfil spent his
    * move on the fusion."); null or left out: none.

@@ -110,6 +110,21 @@ describe("the FAQ's contents", () => {
     expect(words).not.toMatch(/undefined|NaN|\$\{/);
   });
 
+  it("the level in a boss's bar: its divisor, spread, top and drop come from the settings, and what lifts it and slashes it is told", () => {
+    const words = section("boss-powers");
+    expect(words).toContain("The level in a boss's bar");
+    expect(words).toContain("a number from 1 to 99");
+    expect(words).toContain("its rating over 28");
+    expect(words).toContain("up or down by up to 10");
+    expect(words).toContain("falls 25 levels");
+    expect(words).toContain("LVL ???");
+    const moved = section("boss-powers", { ...FAQ_DEFAULTS, level: { divisor: 30, spread: 5, max: 90, weakDrop: 600 } });
+    expect(moved).toContain("a number from 1 to 90");
+    expect(moved).toContain("its rating over 30");
+    expect(moved).toContain("up or down by up to 5");
+    expect(moved).toContain("falls 20 levels");
+  });
+
   it("leaves no markup in the words", () => {
     const t = text();
     expect(t).not.toMatch(/\*\*|\]\(#|\{#|\$\{|undefined|NaN|null/);

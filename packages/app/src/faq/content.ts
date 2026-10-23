@@ -15,6 +15,7 @@
 import {
   BOSS_BRAIN,
   BOSS_DIFFICULTY,
+  BOSS_LEVEL,
   BOSS_POWERS,
   BOSS_ROSTER,
   BOSS_TIERS,
@@ -83,6 +84,8 @@ export interface FaqSources {
   powers: BossPowerSettings;
   brain: BossBrainSettings;
   difficulty: readonly { id: string; label: string; elo: number; maia: number }[];
+  /** The level in a boss's bar: its rating's divisor, how far a battle's draw moves it, its top, how far a weakened move drops it. */
+  level: { divisor: number; spread: number; max: number; weakDrop: number };
   tiers: readonly number[];
   roster: readonly BossDef[];
   engineMinElo: number;
@@ -119,6 +122,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   powers: BOSS_POWERS,
   brain: BOSS_BRAIN,
   difficulty: BOSS_DIFFICULTY,
+  level: BOSS_LEVEL,
   tiers: BOSS_TIERS,
   roster: BOSS_ROSTER,
   engineMinElo: ENGINE_MIN_ELO,
@@ -791,6 +795,10 @@ In a level game (at ×1) it's full after about ${n(level, "crowd move")}; with t
 When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Hollow's, Big Boy's, Alfil's and Chub & Chirp's ultimates come at the start of their own turn instead (Lights Out's only warning is the full meter), Sawyer's needs more than a full meter, and Wrangler has a meter of his own with no warning (below).
 
 Then the meter empties and fills again for the next one. While an ultimate is still under way (the Blizzard's ${n(Math.max(2, Math.round(p.blizzardTurns)), "turn")}, the Roman Candle's fireballs still falling or burning, the board flipped or sawn in two, Lights Out and the extra move after it, Alfil's Slam while your pieces are up) the meter stays empty, dimmed, and nothing adds to it, so two ultimates never overlap. Chub & Chirp's Carrot Patch comes once a battle: after it, their meter is gone.
+
+### The level in a boss's bar {#boss-level}
+
+Under each boss's name the bar shows a level, like "LVL 54": a number from 1 to ${src.level.max} for how strong the boss plays. It starts from the boss's strength (its rating over ${src.level.divisor}) and moves up or down by up to ${src.level.spread} for each battle, so the same boss can show a different level next time; it's the same for everyone in a battle. It follows his strength as it changes: while the boss plays at full strength (Moo & Moon's Full Moon, Wrangler's reply to his showdown) the level rises, gold with a small arrow, and for the one move the God King's strike weakens it falls ${src.level.weakDrop / src.level.divisor} levels, red with a slash, then it's back. The Crowd's final boss shows "LVL ???".
 
 ${blocks}
 ${later.length ? `\n### Still to come {#bosses-later}\n\n${n(later.length, "more boss", "more bosses")} are waiting for their art and powers: ${later.join(", ")}.` : ""}
