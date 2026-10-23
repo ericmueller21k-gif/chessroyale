@@ -180,6 +180,18 @@
  *     ultimate     "fullMoon"   The transformation, while he thinks: the moon swells, at `swap` his colors go gold and the aura flares on.
  *     ultimateHit  "flurry"     The five beams: at `beam1` to `beam5` (120 ms apart) one falls on each square, all hold together. Lines: `flurry`.
  *
+ *   "Gardener" (Puddles, the hippo gardener)
+ *     power        "plant"      One seed tossed (every 30 s of real time), where he stands, never a power moment of its own: at `toss`
+ *                               the seed leaves his hand (`seedFly` to a square, then `seedPlop`). `plantMany`, the same for the opening's
+ *                               five. Lines: `plant` (now and then), `plantMany`.
+ *     ultimateWarn "check"      His hose at the board, for the warning.
+ *     ultimate     "water"      The watering: he hauls the hose out (`tug`), at `spray` the water starts and the `waterSweep` crosses the
+ *                               board (`sweep`), each seed's square sprouting (`gardenPlant` sprout) as the front reaches it; then each
+ *                               outcome plays from its sprout in turn: a killer plant `kill` (the piece off at `snap`), a grown piece
+ *                               `bud` / `budQueen` (the piece on at `pop`), a plain plant `grow` then `green`, nothing `wilt`.
+ *     ultimateHit  "cheer"      His reaction: `cheer` (a piece grew), `bigCheer` (a queen), `shrug` (nothing came up). Lines: `cheer`,
+ *                               `bigCheer`, `shrug`; a killer plant that ate his own piece: `ownEaten`.
+ *
  *   Each moment's animation is in the kit (`BOSS_KITS[name].anims[power | ultimateWarn | ultimate]`), its lines
  *   are `kit.lines.power / ultimateWarn / ultimate` (pick with `pickLine(kit, "power", key)` from boss-beats.ts,
  *   keyed by the moment so every player gets the same line), and its sounds fire from its frames' cues.
@@ -256,6 +268,15 @@
  *   moonScorch     square  burn (220 ms), hold (loop), fade (ends empty): a crescent moon burned into the square, under the piece.
  *   moonHit        square  hit<H|L><L|R> (ends empty, about 200 ms): a small moonbeam landing on a king's head or a little lower,
  *                          from the left or right edge: a flash, a ring of sparkles (Moo's attack on a king).
+ *   seedFly        square  fly (loop, 220 ms): a seed tumbling; the board moves it on an arc from his hand to a square (a CSS animation).
+ *   seedPlop       square  plop (ends empty, 425 ms, `plop`): the seed lands in a puff of dirt, dips into the soil and is gone; nothing stays.
+ *   waterSweep     board   sweep (420 ms, `spray`; ends on the sheen's first look), sheen (760 ms, ends empty): a pass of spray from the board's left edge to its right, the
+ *                          lower rows leading, and a wet shine that thins away. See-through. Drawn coming from the left.
+ *   gardenPlant    square  sprout (300 ms), then an outcome from it: grow, green (loop), toFall, fall (loop), toDrop, drop (loop), gone
+ *                          (a plain plant, a state a turn); kill (870 ms, `snap` at 350: the piece off), bud / budQueen (550 / 630 ms,
+ *                          `pop` at 270: the piece on), wilt (490 ms). Drawn over the piece on the square.
+ *   waterHit       square  hit<H|L><L|R> (ends empty, about 200 ms): his jet landing on a king's head or a little lower, from the left or
+ *                          right edge: a burst of water, drops, a splash (Puddles' attack on a king).
  *
  * Play them with <BossEffect> (components/BossEffect.tsx), which plays their sounds from the frames' cues, once,
  * through the mute switch; or render frames yourself with `renderFrame`. For many square effects at once (G-REX's
@@ -313,6 +334,12 @@ export const POWER_ANIMS = [
   "fullMoon",
   "flurry",
   "dazed",
+  "plant",
+  "plantMany",
+  "water",
+  "cheer",
+  "bigCheer",
+  "shrug",
 ] as const;
 export type PowerAnim = (typeof POWER_ANIMS)[number];
 
@@ -431,6 +458,17 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
     // The flurry: at `beam1` to `beam5` a beam falls on each of five squares.
     ultimateHit: { anim: "flurry", hit: "beam1", effects: ["moonbeam", "moonScorch"] },
   },
+  "Gardener": {
+    // One seed (`plant`) or the opening's five (`plantMany`) tossed where he stands: at `toss` the seed leaves his hand and flies to a
+    // square (`seedFly`), then plops into it (`seedPlop`).
+    power: { anim: "plant", hit: "toss", effects: ["seedFly", "seedPlop"] },
+    ultimateWarn: { anim: "check" },
+    // The watering: at `spray` the water starts and the sweep crosses the board; each outcome grows from its sprout.
+    ultimate: { anim: "water", hit: "spray", effects: ["waterSweep", "gardenPlant"] },
+    // What came up: a cheer (a piece), a big cheer (a queen), a shrug (nothing).
+    ultimateHit: { anim: "cheer" },
+    more: { bigCheer: { anim: "bigCheer" }, shrug: { anim: "shrug" } },
+  },
   "Alfil": {
     power: { anim: "tusksCast", hit: "cast" },
     powerHit: { anim: "tusksFuse", hit: "flash" },
@@ -526,6 +564,15 @@ export const EFFECTS: Record<EffectName, Effect> = {
   // is its sound).
   moonScorch: { ch: EFFECT_SPRITES.moonScorch, covers: "square", start: "burn", loop: "hold", end: "fade", sounds: { burn: "mooShimmer" } },
   moonHit: { ch: EFFECT_SPRITES.moonHit, covers: "square", start: "hitHL", sounds: {} },
+  // A seed in flight (moved from his hand to a square), and landing: its plop is the one sound.
+  seedFly: { ch: EFFECT_SPRITES.seedFly, covers: "square", loop: "fly", sounds: {} },
+  seedPlop: { ch: EFFECT_SPRITES.seedPlop, covers: "square", start: "plop", sounds: { plop: "gardenerPlip" } },
+  // The watering's sweep, then its sheen (the board names each: the sweep ends on the sheen's first look); its `spray` cue is the same instant as his own (`spray`, in the cast), so the board plays it `quiet` (BossEffect).
+  waterSweep: { ch: EFFECT_SPRITES.waterSweep, covers: "board", end: "sheen", sounds: { spray: "gardenerSpray" } },
+  // A sprout and what it turns into (no `start` or `loop`: a sprout holds its last look until its outcome's turn, and the board names each animation and its `then`). Only the killer plant's snap and gulp and a bud's pop have sounds (the queen's pop is a chime of
+  // its own, played by the moment: the same cue name), the wilt a sigh; the sprouts and the plain plants are quiet.
+  gardenPlant: { ch: EFFECT_SPRITES.gardenPlant, covers: "square", end: "gone", sounds: { sprout: "gardenerRustle", grow: "gardenerRustle", rise: "gardenerRustle", open: "gardenerRustle", swell: "gardenerRustle", snap: "gardenerSnap", gulp: "gardenerGulp", pop: "gardenerPop", wilt: "gardenerWilt" } },
+  waterHit: { ch: EFFECT_SPRITES.waterHit, covers: "square", start: "hitHL", sounds: {} },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------
@@ -721,6 +768,11 @@ export function carrotItem(square: string, i: number, from: "L" | "R", since: nu
 /** Moo's i-th little moonbeam landing on the king's square (on its head, then a little lower, in turn), from his side. */
 export function moonItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   return { square, name: "moonHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
+}
+
+/** Puddles' i-th jet of water landing on the king's square (on its head, then a little lower, in turn), from his side. */
+export function waterItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "waterHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }
 
 /** Smudgy's i-th blob of paint splatting on the king's square (on its head, then a little lower, in turn), from his side. */

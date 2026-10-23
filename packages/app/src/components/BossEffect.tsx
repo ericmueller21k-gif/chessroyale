@@ -216,10 +216,10 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
 }
 
 /** An effect sprite (power-art.ts EFFECTS) playing `anim` (default: its start, else its loop), then `then`. */
-export function BossEffect({ name, anim, since, then, id, class: cls, style }: { name: EffectName; anim?: string; since: number; then?: string; id?: string; class?: string; style?: Record<string, string | number> }) {
+export function BossEffect({ name, anim, since, then, id, class: cls, style, quiet = false }: { name: EffectName; anim?: string; since: number; then?: string; id?: string; class?: string; style?: Record<string, string | number>; /** Plays none of its cues' sounds (the boss's own cue at the same instant is the sound). */ quiet?: boolean }) {
   const fx = EFFECTS[name];
   const a = anim ?? fx.start ?? fx.loop!;
-  return <SpriteAnim ch={fx.ch} anim={a} since={since} then={then ?? (a === fx.start ? fx.loop : undefined)} sounds={fx.sounds} id={id} class={cls} style={style} />;
+  return <SpriteAnim ch={fx.ch} anim={a} since={since} then={then ?? (a === fx.start ? fx.loop : undefined)} sounds={quiet ? {} : fx.sounds} id={id} class={cls} style={style} />;
 }
 
 /** A boss's own animation (a power moment) somewhere other than his usual spot: Boingo's funhouse on the board. */

@@ -9,6 +9,7 @@ import { alfilFen, alfilJolt, earlyLanding } from "../components/Alfil.tsx";
 import { hopperFen, yourPulls } from "../components/Hopper.tsx";
 import { rookTakenMoment, smudgyFen } from "../components/Smudgy.tsx";
 import { fullMoonMoment, noteMooMoments } from "../components/Moo.tsx";
+import { gardenerFen } from "../components/Gardener.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
 import { rememberBoss } from "../boss-history.ts";
 import { bossKit } from "../characters/kits.ts";
@@ -330,7 +331,10 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // off it, a Repaint's pieces in their old colors until each stroke (his hidden rook itself is drawn as a pawn by the board:
   // camo.ts); the board doesn't animate what his moment changes under the paint.
   const smudgy = bounceShown || splitShown || pig || alfil || hopper ? null : smudgyFen(boss, moments, now, fenShown);
-  const boardFen = bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? fenShown;
+  // Puddles': the position before his watering until each outcome's cue (a piece a killer plant eats, until its snap; a grown piece, until
+  // its pop, which pops in); the board shows the rest as it fades and appears.
+  const gardener = bounceShown || splitShown || pig || alfil || hopper || smudgy ? null : gardenerFen(boss, moments, now, fenShown);
+  const boardFen = bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? fenShown;
   const evalFen = bounceShown && bounceShown !== boss.board.fen ? (boss.powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? fenShown);
   const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now) ?? alfilJolt(moment, now);
   // (One or two pieces by name; more, how many: the dock's line stays one line.)
@@ -455,7 +459,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           {bossSide}
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? lastShown} animate={!bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : boss.powers?.elephants}>
+          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? lastShown} animate={!bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : boss.powers?.elephants} decor={gardener?.decor}>
             {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={boardFen} />}
             {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}
             {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}

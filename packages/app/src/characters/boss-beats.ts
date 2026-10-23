@@ -67,6 +67,14 @@ export type Beat =
   | "wax"
   | "flurry"
   | "dazed"
+  // Puddles', the hippo gardener's: the opening five seeds tossed, one seed (every 30 s), the watering's reactions (a piece grew,
+  // a queen grew, nothing came up) and a killer plant that ate one of his own pieces.
+  | "plantMany"
+  | "plant"
+  | "cheer"
+  | "bigCheer"
+  | "shrug"
+  | "ownEaten"
   // A boss's attack on a king (its kit's `kingAttack`): the God King in his Last Stand, the crowd's king at its mate.
   | "kingAttack";
 /** The loops it rests in between moments (`ready`: Wrangler's, his meter full). */

@@ -1,7 +1,7 @@
 import { useContext, useLayoutEffect } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import type { ComponentChildren, JSX } from "preact";
-import type { PowerEventKind } from "@chessroyale/core";
+import type { PowerEventKind, WaterGrowth } from "@chessroyale/core";
 import type { BossKit } from "../characters/kits.ts";
 import type { BossView } from "../game.ts";
 import { BossFace } from "./BossCharacter.tsx";
@@ -37,10 +37,12 @@ export interface Moment {
   by?: "crowd" | "boss";
   tier?: number;
   prize?: string[];
+  /** The hippo gardener's watering: what came up where, in the order it plays. */
+  growth?: WaterGrowth[];
 }
 
 /** Which of a boss kit's moments a power's moment is (its animation and lines: characters/power-art.ts). */
-export type KitMoment = "power" | "powerHit" | "ultimateWarn" | "ultimate" | "ultimateHit";
+export type KitMoment = "power" | "powerHit" | "ultimateWarn" | "ultimate" | "ultimateHit" | "plantMany" | "plant" | "cheer" | "bigCheer" | "shrug";
 
 /** What a moment's view gets: the moment, the clock, and the helpers every moment uses. */
 export interface MomentProps {

@@ -77,6 +77,7 @@ import { isAdmin, maiaAllowed } from "./boss-brain.ts";
 import { resetKingSpeech } from "./godKing.ts";
 import { bossVoice } from "./speech.tsx";
 import { prefetchMaia, startMaia } from "./maia.ts";
+import { setGardenSource } from "./garden-clock.ts";
 
 /** Your result in a lobby's match (once it's over), from the server: for "See your result". */
 export interface LobbyResult {
@@ -241,7 +242,10 @@ export class NetMatch implements GameView {
     readonly playerName: string,
     private readonly engines: () => Promise<UciEngine[]>,
     readonly practice = false,
-  ) {}
+  ) {
+    // (The hippo gardener's seeds count by the server's clock: his meter and tosses read it through the garden's source.)
+    setGardenSource(() => Date.now() + this.offset);
+  }
 
   get totalPlayers() {
     return this.leftPlayers ?? (this.players.length || this.settings.lobbySize);
@@ -469,6 +473,7 @@ export class NetMatch implements GameView {
 
   dispose() {
     this.closed = true;
+    setGardenSource(null);
     if (this.resignTimer) clearTimeout(this.resignTimer);
     this.freeBrain();
     if (this.retryTimer) clearTimeout(this.retryTimer);

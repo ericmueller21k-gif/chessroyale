@@ -131,15 +131,15 @@ function onPosition(r: MatchRunner, fen: string, kinds: WaterKind[], plants: str
 }
 
 describe("the hippo gardener: his sheet", () => {
-  it("is on the roster as Puddles, a hippo, not playable until wired, with Seeds and Watering", () => {
+  it("is on the roster as Puddles, a hippo, playable (his art is wired in), with Seeds and Watering", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "gardener")!;
-    expect(def).toMatchObject({ name: GARDENER_NAME, icon: "🦛", kit: null, powers: { passive: "seeds", ultimate: "water" } });
+    expect(def).toMatchObject({ name: GARDENER_NAME, icon: "🦛", kit: "Gardener", powers: { passive: "seeds", ultimate: "water" } });
     expect(GARDENER_NAME).toBe("Puddles");
     // (A plain name: no "the", at a sentence's start or in its middle.)
     expect(def.the).toBeUndefined();
     expect(bossInText(def.name, true)).toBe("Puddles");
     expect(bossInText(def.name)).toBe("Puddles");
-    expect(isPlayable(def)).toBe(false);
+    expect(isPlayable(def)).toBe(true);
     expect(bossRules({ id: "gardener" })?.id).toBe("gardener");
   });
 

@@ -16,6 +16,7 @@ import { prewarmAlfil } from "./Alfil.tsx";
 import { prewarmHopper } from "./Hopper.tsx";
 import { prewarmSmudgy } from "./Smudgy.tsx";
 import { prewarmMoo } from "./Moo.tsx";
+import { prewarmGardener, resetGarden } from "./Gardener.tsx";
 import { EngineOverlay, placeEngine, prewarmRecluse } from "./Recluse.tsx";
 import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
@@ -58,6 +59,7 @@ export function resetBeats() {
   figure.run = null;
   engine.at = null;
   resetMoo();
+  resetGarden();
 }
 
 /**
@@ -139,6 +141,19 @@ function inPlaceShowing(ch: Character, now: number): { anim: string; frame: numb
     t -= length(a);
   }
   return null;
+}
+
+/** When the beat the figure is in ends, if it is a one-shot animation still to play (0: it rests in a loop). Both placements note the same. */
+const beatEnds = { at: 0 };
+
+/**
+ * Whether the figure is in the middle of something now: a one-shot animation of its beat still playing, a run in place, or a power
+ * moment (which hides it while the boss casts at the board's corner). The hippo's 30 s toss (components/Gardener.tsx) plays only when
+ * it isn't: it never cuts another animation off.
+ */
+export function figureBusy(ch: Character, now = Date.now()): boolean {
+  if (now < beatEnds.at || inPlaceShowing(ch, now) || figure.run) return true;
+  return typeof document !== "undefined" && !!document.querySelector(".power-moment:not(.pm-stay)");
 }
 
 /**
@@ -231,6 +246,9 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     [kit, stage, boss.board.fen, boss.board.history.length, boss.result, boss.justKilled, boss.powers?.ready],
   );
   const since = beat ? startOf(beat.key) : 0;
+  // (When this beat's one-shot ends, for figureBusy.)
+  const shot = kit && beat ? kit.ch.anims[kit.anims[beat.anim] ?? beat.anim] : undefined;
+  beatEnds.at = shot && !shot.loop ? since + length(shot) : 0;
   // His sounds and his powers' made ahead, in idle moments, so a first play never stalls a slow phone.
   useEffect(() => {
     if (!kit) return;
@@ -255,6 +273,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     if (kit.ch.id === "smudgy") prewarmSmudgy(kit.ch.name);
     // (Moo's moonbeam, flurry and daze, his powered-up twins, his sit, and the beams on the board.)
     if (kit.ch.id === "moo") prewarmMoo(kit.ch.name);
+    // (Puddles' tosses, watering and reactions, and the seeds, sweep and plants on the board.)
+    if (kit.ch.id === "gardener") prewarmGardener(kit.ch.name);
     // (The Hidden Boss's phase change: his rage, his leap onto the board, the book thrown down, the chant.)
     if (kit.ch.id === "recluse") prewarmRecluse(boss.crowdSide);
     // (Its attack on a king too: the God King's Last Stand, or its mate.)

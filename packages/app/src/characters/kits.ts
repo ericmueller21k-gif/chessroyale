@@ -20,12 +20,15 @@ import { ALFIL, ALFIL_ATTACK, ALFIL_CHANCE, ALFIL_LINES, ALFIL_PORTRAIT } from "
 import { HOPPER, HOPPER_ATTACK, HOPPER_CHANCE, HOPPER_LINES, HOPPER_PORTRAIT } from "./hopper.ts";
 import { SMUDGY, SMUDGY_ATTACK, SMUDGY_CHANCE, SMUDGY_LINES, SMUDGY_PORTRAIT } from "./smudgy.ts";
 import { MOO, MOO_ATTACK, MOO_CHANCE, MOO_LINES, MOO_PORTRAIT } from "./moo.ts";
+import { GARDENER, GARDENER_ATTACK, GARDENER_PORTRAIT } from "./gardener.ts";
+import { GARDENER_BAR } from "./gardener-bar.ts";
+import { GARDENER_CHANCE, GARDENER_LINES } from "./gardener-lines.ts";
 import type { Stance } from "./stance.ts";
 import { mooPowered } from "./moo-state.ts";
 import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
-import { ankusItem, bonkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, type SquareItem } from "./power-art.ts";
+import { ankusItem, bonkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
@@ -522,6 +525,63 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // as Sawyer; 36 frame pixels a square, 1.8 off, as Smudgy's.
     kingAttack: { ch: MOO_ATTACK, anim: "kingAttack", poweredAnim: "p_kingAttack", perSquare: 36, stand: 1.8, facesLeft: true, hit: moonItem },
   },
+  // Puddles, the hippo gardener (Eric, Oct 20-21): docs/decisions/2026-10-23-gardener-wired.md.
+  "Gardener": {
+    ch: GARDENER,
+    // (A phone's bar: the same drawing with the water off, which would run past his box into his name.)
+    bar: GARDENER_BAR,
+    anims: {
+      // The periodic strike on a piece is his capture cheer.
+      strike: "capture",
+      // Seeds: the opening five (`plantMany`) and one every 30 s (`plant`) are tossed where he stands (components/Gardener.tsx); the
+      // `toss` cue is where the seeds leave his hand.
+      power: "plant",
+      plantMany: "plantMany",
+      plant: "plant",
+      ultimateWarn: "check",
+      // Watering: he hauls the hose out and sprays across the board from the `spray` cue.
+      ultimate: "water",
+      // What came up: a piece (`cheer`), a queen (`bigCheer`), nothing (`shrug`).
+      ultimateHit: "cheer",
+      cheer: "cheer",
+      bigCheer: "bigCheer",
+      shrug: "shrug",
+    },
+    sounds: {
+      // (His entrance's drop and the attack's: a soft whoosh down; his landing and steps: a heavy thump.)
+      drop: "gardenerWhoosh",
+      thump: "gardenerThump",
+      land: "gardenerThump",
+      // A friendly grunt (his entrance, a capture, a check, a win, the attack's last), a hurt oof, the flop of his defeat.
+      grunt: "gardenerGrunt",
+      oof: "gardenerOof",
+      flop: "gardenerFlop",
+      // The 30 s seed's toss must stay quiet (a soft whiff, no grunt): only this one cue is in `plant` and `plantMany`.
+      toss: "gardenerToss",
+      // The watering: the hose tugged (a rubbery creak), the spray hissing on, swelling for the sweep and dying to drips.
+      tug: "gardenerTug",
+      spray: "gardenerSpray",
+      sweep: "gardenerSwell",
+      stop: "gardenerDrips",
+      // His reactions: a happy cheer, the queen's whoop, a shrug (a soft sigh).
+      cheer: "gardenerCheer",
+      whoop: "gardenerBellow",
+      shrug: "gardenerSigh",
+      // (His attack on a king: a short squirt a jet, a shorter one a sputter.)
+      jet: "gardenerJet",
+      spurt: "gardenerSpurt",
+    },
+    lines: GARDENER_LINES,
+    chance: GARDENER_CHANCE,
+    portrait: { ...GARDENER_PORTRAIT, anim: "idle", frame: 0 },
+    // His frame is 90 x 102 with 28 rows of headroom over his idle for the entrance's drop and the cheers' hops: the bar's tall
+    // box; he reaches 28 px left and 25 right of his feet, past the usual box's 24: the wide one (docs/decisions/2026-10-20-gardener-still.md).
+    tall: true,
+    wide: true,
+    // He drops in and sprays the king with his hose, ten jets (gardener.ts: GARDENER_ATTACK), a splash on its square each hit. Facing
+    // our left, as Sawyer; 36 frame pixels a square, 1.8 off (the animation decision's suggested values).
+    kingAttack: { ch: GARDENER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, facesLeft: true, hit: waterItem },
+  },
   "Hidden Boss": {
     ch: RECLUSE,
     // (A phone's boss bar: his bust, head and shoulders, the same animations.)
@@ -587,7 +647,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
 };
 
 /** Every moment a kit may name an animation for (and so every `anims` key a powered twin may replace). */
-const BEAT_NAMES = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit", "wax", "flurry", "dazed", "kingAttack"] as const satisfies readonly Beat[];
+const BEAT_NAMES = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit", "wax", "flurry", "dazed", "plantMany", "plant", "cheer", "bigCheer", "shrug", "kingAttack"] as const satisfies readonly Beat[];
 const LOOP_NAMES = ["idle", "thinking", "smug", "rattled", "defeat", "victory"] as const satisfies readonly Loop[];
 const poweredKits = new WeakMap<BossKit, BossKit>();
 /**

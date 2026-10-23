@@ -105,7 +105,8 @@ describe("the effect sprites", () => {
   it("cover one square, or the whole board (or a strip of their own size), and draw every frame", () => {
     for (const name of EFFECT_NAMES) {
       const fx = EFFECTS[name];
-      const size = fx.covers === "board" ? 8 * BOARD_CELL : SQUARE;
+      // (A board effect is eight cells across: the first bosses' at BOARD_CELL, the hippo's sweep at a square's own 32 px.)
+      const size = fx.covers === "board" ? (fx.ch.w === 8 * SQUARE ? 8 * SQUARE : 8 * BOARD_CELL) : SQUARE;
       if (fx.covers !== "strip") expect([fx.ch.w, fx.ch.h], name).toEqual([size, size]);
       keysOk(fx.ch);
       for (const a of Object.values(fx.ch.anims)) for (const f of a.frames) expect(renderFrame(fx.ch, f).data.length).toBe(fx.ch.w * fx.ch.h * 4);

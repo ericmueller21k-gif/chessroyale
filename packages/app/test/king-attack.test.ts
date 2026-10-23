@@ -5,7 +5,7 @@ import { BOSS_KITS, bossKit } from "../src/characters/kits.ts";
 import { HOLLOW, HOLLOW_ATTACK, HOLLOW_LINES } from "../src/characters/hollow.ts";
 import { ALFIL_LINES } from "../src/characters/alfil.ts";
 import { GOD_KING } from "../src/characters/god-king.ts";
-import { EFFECTS, animLength, bonkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem } from "../src/characters/power-art.ts";
+import { EFFECTS, animLength, bonkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem } from "../src/characters/power-art.ts";
 import { CLOWN_LINES } from "../src/characters/clown.ts";
 import { SAWYER_LINES } from "../src/characters/sawyer.ts";
 import { PIG_LINES } from "../src/characters/pig.ts";
@@ -22,6 +22,8 @@ import { HOPPER_LINES } from "../src/characters/hopper.ts";
 import { hopperSound, type HopperSound } from "../src/characters/hopper-sounds.ts";
 import { SMUDGY_LINES } from "../src/characters/smudgy.ts";
 import { MOO_LINES } from "../src/characters/moo.ts";
+import { GARDENER_LINES } from "../src/characters/gardener-lines.ts";
+import { gardenerSound, type GardenerSound } from "../src/characters/gardener-sounds.ts";
 import { mooSound, type MooSound } from "../src/characters/moo-sounds.ts";
 import { smudgySound, type SmudgySound } from "../src/characters/smudgy-sounds.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
@@ -49,7 +51,7 @@ describe("the kit's kingAttack", () => {
       .filter(([, k]) => k.kingAttack)
       .map(([name]) => BOSS_ROSTER.find((b) => b.kit === name)!.id);
     expect(withAttack).toEqual([...KING_ATTACKERS]);
-    expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo"]);
+    expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener"]);
   });
 
   it("Alfil's: a `jab` cue on each of the shared hits, lasting the attack exactly, his ankus's tip in the king's square, a gold jab on it each hit", () => {
@@ -148,7 +150,7 @@ describe("the kit's kingAttack", () => {
 const ASSAULTS: {
   kit: string;
   item: KingAttackKit["hit"];
-  effect: "sawHit" | "lassoHit" | "pieHit" | "bonkHit" | "frostHit" | "popHit" | "carrotHit" | "paintHit" | "moonHit";
+  effect: "sawHit" | "lassoHit" | "pieHit" | "bonkHit" | "frostHit" | "popHit" | "carrotHit" | "paintHit" | "moonHit" | "waterHit";
   anims: [string, string];
   /** The cues on its hits, in turn, and their sounds. */
   cues: [string, string];
@@ -166,6 +168,7 @@ const ASSAULTS: {
   { kit: "Chub & Chirp", item: carrotItem, effect: "carrotHit", anims: ["hitH", "hitL"], cues: ["toss", "bonk"], sounds: ["hopperToss", "hopperBonk"], prop: "RKJPwbcd" /* (the carrot, its leaves in the grasshopper's greens, its speed lines) */, lines: HOPPER_LINES.kingAttack, wave: (n) => hopperSound(n.replace(/^hopper/, "").replace(/^./, (c) => c.toLowerCase()) as HopperSound, 44100) },
   { kit: "Smudgy", item: paintItem, effect: "paintHit", anims: ["hitH", "hitL"], cues: ["flick", "splat"], sounds: ["smudgySwish", "smudgySplash"], prop: "LMNQfgijUVWPRK12345678" /* (the brush: its handle, ferrule and bristles, the yellow paint on it and the flecks flying off) */, lines: SMUDGY_LINES.kingAttack, wave: (n) => smudgySound(n.replace(/^smudgy/, "").replace(/^./, (c) => c.toLowerCase()) as SmudgySound, 44100) },
   { kit: "Moo", item: moonItem, effect: "moonHit", anims: ["hitH", "hitL"], cues: ["beam", "shine"], sounds: ["mooBeam", "mooZap"], prop: "wKL" /* (the moon's small beam: its white core, pale shaft and rim) */, lines: MOO_LINES.kingAttack, wave: (n) => mooSound({ mooBeam: "beam", mooZap: "zap" }[n] as MooSound, 44100) },
+  { kit: "Gardener", item: waterItem, effect: "waterHit", anims: ["hitH", "hitL"], cues: ["jet", "spurt"], sounds: ["gardenerJet", "gardenerSpurt"], prop: "JKLMk1234" /* (the brass nozzle, the water and the drops thrown off it) */, lines: GARDENER_LINES.kingAttack, wave: (n) => gardenerSound(n.replace(/^gardener/, "").replace(/^./, (c) => c.toLowerCase()) as GardenerSound, 44100) },
   { kit: "Boingo the Clown", item: pieItem, effect: "pieHit", anims: ["hitH", "hitL"], cues: ["splat", "squeak"], sounds: ["clownSplat", "clownSqueak"], prop: "wWXoOrSsE", lines: CLOWN_LINES.kingAttack, wave: (n) => clownSound(n.replace(/^clown/, "").replace(/^./, (c) => c.toLowerCase()) as ClownSound, 44100) },
 ];
 
@@ -301,6 +304,8 @@ const FACES: Record<string, { keys: string; front?: boolean; head?: string; gaze
   Smudgy: { keys: "", gaze: true },
   // (Moo's eyes are layers of their own too, each posed by where its pupil looks: toward the king, level.)
   Moo: { keys: "", gaze: true },
+  // (Puddles' eyes are layers of their own, but his face is turned in three quarters: his nostrils, in his muzzle's end, are toward the king.)
+  Gardener: { keys: "y" },
 };
 /** Where his eyes look in a frame (the mean of his two pupils' x, in eye pixels; - toward our left), from the eye layers' own poses. */
 function gazeTurn(f: Anim["frames"][number]): number {

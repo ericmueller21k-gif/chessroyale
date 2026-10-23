@@ -138,7 +138,7 @@ test("boss raid (solo): you against a boss from the starting position (Eric, Oct
   // First, the Boss raid screen's tiles: every boss you can meet (a complete character and powers), the Hidden Boss's
   // locked tile and a random one. Boss alone's menu then has that boss, at your strength plus its own offset.
   await bossAloneFromHome(page, "Boingo the Clown");
-  await expect(page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio")).toHaveCount(13);
+  await expect(page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio")).toHaveCount(14);
   const menu = page.getByRole("dialog", { name: "Boss alone" });
   await expect(menu).toBeVisible();
   await expect(menu.locator(".boss-row")).toHaveCount(1);
