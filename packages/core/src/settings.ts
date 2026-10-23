@@ -1487,6 +1487,10 @@ export const FRONT_DOOR = {
    */
   bossCardMs: 30_000,
   bossCardFadeMs: 600,
+  /** Home's hero pawn hops on a phone (Eric: "add the bounce effect every 30 seconds like we have in autochess"): the first hop this many seconds after home shows… */
+  heroHopFirstSec: 4,
+  /** …then one every this many seconds (never under reduced motion). */
+  heroHopEverySec: 30,
 } as const;
 
 /**
