@@ -8118,6 +8118,102 @@ button.fd-logo {
   background: #000;
   opacity: var(--fd-shadow, 0.35);
 }
+/* Phones: home's hero pawn has one shadow (the ::after above); a skin's own ground shadow (its SVG's) is hidden there. */
+@media (max-width: 899px) {
+  .fd-hero .fd-pawn .skin-shadow {
+    display: none;
+  }
+}
+/*
+ * Home's hero pawn hops on a phone (DressedPawn: the `hop` class for 1.8 s; FRONT_DOOR.heroHopEverySec): auto chess's hop,
+ * the same steps (its ac-hop and ac-shade), with the shadow (the ::after) shrinking and fading as the pawn rises. The
+ * wrapper .fd-hop is pawn-sized, so the hop moves the pawn and nothing in the layout; its z-index keeps the shadow under it.
+ */
+@media (max-width: 899px) {
+  .fd-hop {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    transform-origin: 50% 92%;
+  }
+  .fd-hero .fd-pawn.hop .fd-hop {
+    animation: fd-hop 1.8s linear 1;
+  }
+  .fd-hero .fd-pawn.hop.shadow::after {
+    animation: fd-shade 1.8s linear 1;
+  }
+}
+@media (max-width: 899px) and (prefers-reduced-motion: reduce) {
+  .fd-hero .fd-pawn.hop .fd-hop,
+  .fd-hero .fd-pawn.hop.shadow::after {
+    animation: none;
+  }
+}
+/* A small hop: a crouch, up (slowing), down (speeding up), a squash on landing and a settle (ac-hop; 10 px up, auto chess's --hop). */
+@keyframes fd-hop {
+  0%,
+  8% {
+    transform: translateY(0) scale(1, 1);
+    animation-timing-function: ease-out;
+  }
+  17% {
+    transform: translateY(0) scale(1.07, 0.91);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  37% {
+    transform: translateY(-10px) scale(0.95, 1.07);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.5);
+  }
+  55% {
+    transform: translateY(0) scale(1.13, 0.85);
+    animation-timing-function: ease-out;
+  }
+  67% {
+    transform: translateY(0) scale(0.97, 1.04);
+    animation-timing-function: ease-in-out;
+  }
+  78%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+/*
+ * Its shadow (ac-shade): shrinks and fades as the pawn rises, grows back as it lands. Opacity is a share of the theme's
+ * shadow opacity (--fd-shadow), and translateX(-50%) keeps the ::after centred.
+ */
+@keyframes fd-shade {
+  0%,
+  8% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: var(--fd-shadow, 0.35);
+    animation-timing-function: ease-out;
+  }
+  17% {
+    transform: translateX(-50%) scale(1.06, 1);
+    opacity: calc(var(--fd-shadow, 0.35) * 1.09);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  37% {
+    transform: translateX(-50%) scale(0.55, 0.7);
+    opacity: calc(var(--fd-shadow, 0.35) * 0.36);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.5);
+  }
+  55% {
+    transform: translateX(-50%) scale(1.14, 1.05);
+    opacity: calc(var(--fd-shadow, 0.35) * 1.23);
+    animation-timing-function: ease-out;
+  }
+  67% {
+    transform: translateX(-50%) scale(0.98, 1);
+    opacity: calc(var(--fd-shadow, 0.35) * 1.05);
+    animation-timing-function: ease-in-out;
+  }
+  78%,
+  100% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: var(--fd-shadow, 0.35);
+  }
+}
 .fd-pawn-hero {
   width: 170px;
   height: 154px;
@@ -8471,6 +8567,22 @@ button.fd-logo {
 @media (min-width: 1024px) {
   .fd-root.framed .fd-hint {
     height: 1.3em;
+  }
+}
+/*
+ * Phones: the Boss raid card comes up under the one-line hint (Eric: "slide boss button up a bit so it's closer to the
+ * text bar above it"). A plain hint is one line (each fits a 320 px column), so its box is one line; a paused line may wrap,
+ * so it keeps the two-line box and a longer line never moves what's under it. The 2.1 px puts the card 14 px under the
+ * line's text. The card's bottom margin takes back the room the box gave up, in the same states only, so the column, the
+ * hero and PLAY keep their size and place, and nothing moves on a click (home keeps still).
+ */
+@media (max-width: 899px) {
+  .fd-hint.fd-hint-line {
+    height: 1.3em;
+    margin-bottom: 2.1px;
+  }
+  .fd-play-col:has(> .fd-go > .fd-hint-line) > .rd-card {
+    margin-bottom: 14.8px;
   }
 }
 /*

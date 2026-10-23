@@ -920,7 +920,8 @@ export function HomeScreen({
       <button type="button" class="fd-play" disabled={!mode || loading || !!resting || (mode === "classic" && type !== "solo")} onClick={play}>
         PLAY
       </button>
-      <div class="fd-hint" aria-live="polite">
+      {/* (A plain line is one line on a phone, so the Boss raid card comes up under it: styles.css, `fd-hint-line`. A paused line may wrap.) */}
+      <div class={typeof hint === "string" && !resting ? "fd-hint fd-hint-line" : "fd-hint"} aria-live="polite">
         {loading ? "Loading the engine…" : hint}
       </div>
       {error && <p class="fd-error">{error}</p>}

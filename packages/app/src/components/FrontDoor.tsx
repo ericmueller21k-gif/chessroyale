@@ -1,5 +1,6 @@
 import type { ComponentChildren } from "preact";
-import { itemDef, ratingTier, type ItemLook, type ItemSlot, type RankEffect } from "@chessroyale/core";
+import { useEffect, useRef } from "preact/hooks";
+import { FRONT_DOOR, itemDef, ratingTier, type ItemLook, type ItemSlot, type RankEffect } from "@chessroyale/core";
 import { Avatar } from "./Items.tsx";
 import { account } from "../account.ts";
 import type { LiveCounts } from "../live.ts";
@@ -30,6 +31,9 @@ export function Logo({ onClick }: { onClick?: () => void }) {
  * A dressed pawn (the item-builder's Avatar) in a box with room for what sticks out (a weapon, a crown), and an
  * optional shadow under it. `size` picks the box from the stylesheet.
  */
+/** One hop of the hero pawn (styles.css, `fd-hop`: 1.8 s). */
+const HOP_MS = 1800;
+
 export function DressedPawn({
   look,
   size,
@@ -41,11 +45,38 @@ export function DressedPawn({
   shadow?: boolean;
   side?: "w" | "b";
 }) {
+  const pawn = useRef<HTMLSpanElement>(null);
+  // Home's hero pawn hops on a phone, not under reduced motion (Eric: "add the bounce effect every 30 seconds like we have
+  // in autochess"): the first hop FRONT_DOOR.heroHopFirstSec after it shows, then one every FRONT_DOOR.heroHopEverySec. The
+  // timers stop when the pawn goes (home closes).
+  useEffect(() => {
+    if (size !== "hero") return;
+    const canHop = () =>
+      !!window.matchMedia?.("(max-width: 899px)").matches && !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    let next: ReturnType<typeof setTimeout>;
+    let land: ReturnType<typeof setTimeout>;
+    const hop = () => {
+      if (canHop()) {
+        pawn.current?.classList.add("hop");
+        land = setTimeout(() => pawn.current?.classList.remove("hop"), HOP_MS);
+      }
+      next = setTimeout(hop, FRONT_DOOR.heroHopEverySec * 1000);
+    };
+    next = setTimeout(hop, FRONT_DOOR.heroHopFirstSec * 1000);
+    return () => {
+      clearTimeout(next);
+      clearTimeout(land);
+    };
+  }, [size]);
+  const box = (
+    <span class="fd-pawn-box">
+      <Avatar look={look} side={side} />
+    </span>
+  );
   return (
-    <span class={`fd-pawn fd-pawn-${size}${shadow ? " shadow" : ""}`} aria-hidden="true">
-      <span class="fd-pawn-box">
-        <Avatar look={look} side={side} />
-      </span>
+    <span ref={pawn} class={`fd-pawn fd-pawn-${size}${shadow ? " shadow" : ""}`} aria-hidden="true">
+      {/* (Home's hero: the box sits in a pawn-sized wrapper that hops, so the hop moves the pawn and nothing in the layout.) */}
+      {size === "hero" ? <span class="fd-hop">{box}</span> : box}
     </span>
   );
 }
