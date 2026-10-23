@@ -37,9 +37,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     `?cardMs=`). The animated card with lines is shelved (a later idea).
   - **The Boss raid screen: a character select** (Eric, Oct 16;
     [docs/decisions/2026-10-16-boss-character-select.md](../decisions/2026-10-16-boss-character-select.md);
-    `BossSelect`): slanted tiles at the top, one per boss you can meet, touching and edge to edge like a fighting game's
-    select grid (five to a row on a phone, seven from 480 px;
-    [docs/decisions/2026-10-23-boss-select-grid.md](../decisions/2026-10-23-boss-select-grid.md)), the Hidden Boss's dark
+    `BossSelect`): tall slanted tiles at the top like a fighting game's select grid, one per boss you can meet, each its
+    boss's figure on a color of its own, all the same size with a small gap, five to a row on a phone and a computer alike
+    ([docs/decisions/2026-10-23-boss-select-sf.md](../decisions/2026-10-23-boss-select-sf.md)), the Hidden Boss's dark
     and locked, and "?" for a random boss; under them a stage (the 1 v 1 stage's
     platform) with the picked boss in its idle, its name and its strength against you: skulls and Boss alone's level at
     your difficulty ("💀 Rating 1800 · Hard": the Maia rating it plays at, Oct 18; the difficulty named unless it's Normal), the same number Boss alone's menu

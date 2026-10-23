@@ -1,5 +1,9 @@
 # The boss select as a fighting game's grid: touching tiles, edge to edge, bigger (Oct 23, 2026)
 
+> Superseded the same day by [2026-10-23-boss-select-sf.md](2026-10-23-boss-select-sf.md): Eric asked for the Street Fighter 6 look
+> (gaps, one size, a figure per tile, always five to a row). Still true here: the 10 px buffer, `rowSizes`, the stage's trim on short
+> screens (made larger there) and the tests' method (sampling the block, probing either side of an edge).
+
 Lane: `characters`. Area pages: [bosses.md](../areas/bosses.md), [hub.md](../areas/hub.md). Builds on
 [2026-10-16-boss-character-select.md](2026-10-16-boss-character-select.md), which still says why the screen looks as it does.
 

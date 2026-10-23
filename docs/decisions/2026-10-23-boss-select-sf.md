@@ -33,20 +33,20 @@ to see", and "just 5 per row, and it doesn't matter if you're on a desktop... we
   (52% of it over the dark fill at the top, 34% at the foot), lighter in the light theme (34% over the light fill, 52% at the foot). The
   Hidden Boss's tile stays dark and "?" keeps the neutral fill.
 
-| Boss | Color | Why |
+| Boss | Color | Why it stands out |
 | --- | --- | --- |
-| Ginger | `#3fae4f` (her bow's green) | her browns stand out from it |
-| Boingo | `#4aa3ff` (his sky blue) | white face, red hair |
-| Jefferson | `#e5566a` (his pink-red) | orange and yellow on a dark rose |
-| Hollow | `#ffcf3a` (his eyes') | black and violet on gold; any dark tint made him vanish |
-| Big Boy | `#a24cf5` (his lollipop's purple) | skin and teal shirt |
-| Sawyer | `#e1262c` (his saw's red) | gray raccoon, yellow hat; the weakest (his grays are near any dark tint, 19% of the figure) |
-| Wrangler | `#fff3b0` (his star's cream) | pink pig, brown hat |
-| Alfil | `#1d3d8c` (his blanket's navy) | browns and tusks |
-| Chub & Chirp | `#9fd8ff` (their sky) | brown rabbit, green grasshopper |
-| Smudgy | `#0e5c60` (his teal) | bright green frog |
-| Moo & Moon | `#5d7ad8` (the Moon's blue) | cow's white and browns |
-| Puddles | `#7fe0ae` (his garden's green) | pinks |
+| Ginger | `#3fae4f` | her browns and white icing |
+| Boingo | `#4aa3ff` | white face, red hair |
+| Jefferson | `#e5566a` | orange and yellow on a dark rose |
+| Hollow | `#ffcf3a` (his eyes' yellow) | black and violet on gold; any dark tint made him vanish |
+| Big Boy | `#a24cf5` | skin and teal shirt |
+| Sawyer | `#e1262c` | gray raccoon, yellow hat; the weakest (his grays are near any dark tint: 19% of the figure) |
+| Wrangler | `#fff3b0` | pink pig, brown hat |
+| Alfil | `#1d3d8c` | browns and tusks |
+| Chub & Chirp | `#9fd8ff` | brown rabbit, green grasshopper |
+| Smudgy | `#0e5c60` | bright green frog |
+| Moo & Moon | `#5d7ad8` | the cow's whites and browns, the yellow Moon |
+| Puddles | `#7fe0ae` | pinks |
 
 ## The calls I made
 
@@ -57,8 +57,7 @@ to see", and "just 5 per row, and it doesn't matter if you're on a desktop... we
    is wide and short (his whole figure fits, so his neck is low in the tile), Jefferson tall with a long neck, the Hidden Boss a
    whole standing man. Tuned by eye in the 4x sheet of all fourteen tiles, both themes, then solved so a test can hold them: the
    head, hat and ears inside the tile (down to its tallest, 1.24), the body running on to the foot, no bare strip at either side.
-3. **A boss's frame is the portrait's frame** (not the idle's first, which is the same for twelve of the thirteen; Boingo's portrait is
-   a later frame of his idle, with his mouth open).
+3. **A boss's frame is the one its portrait is cut from** (`kit.portrait`): for most bosses the first frame of the idle, for Boingo a later one.
 4. **The two-character bosses show both:** Chub & Chirp's frame is the rabbit riding the grasshopper, Moo & Moon's the cow holding
    the Moon; both fit the tile.
 5. **Colors from the palette, and measured.** For each boss I scored every color of its palette by the share of its figure's pixels
