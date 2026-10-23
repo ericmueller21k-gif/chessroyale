@@ -187,6 +187,15 @@ export interface NetBoss {
   icon: string;
   /** 1 to 5: how scary the boss is (its Elo stays secret). */
   threat: number;
+  /**
+   * The level its bar shows now, "LVL 50" (core's bossLevelBase: its rating over 28 plus a random offset drawn once from the
+   * battle's seed, so every screen and a reload show the same number; Eric, Oct 23). It follows the strength it plays its next
+   * move at: the Full Moon's moves and the showdown's follow-up lift it, the King's strike slashes it (the runner's
+   * bossStrengthNow), then it's back. `null`: unknown, "LVL ???" (the Hidden Boss). Missing from older servers: no level line.
+   */
+  level?: number | null;
+  /** The level at its usual strength: the bar shows a lift or a slash as `level` against it (missing with `level`; none for "???"). */
+  levelBase?: number;
   /** The side the crowd plays. */
   crowdSide: "w" | "b";
   crowdMoves: number;

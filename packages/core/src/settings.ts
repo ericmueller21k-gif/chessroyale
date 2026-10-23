@@ -1280,6 +1280,17 @@ export const BOSS_DIFFICULTY = [
 export type BossDifficultyId = (typeof BOSS_DIFFICULTY)[number]["id"];
 
 /**
+ * The level a boss's bar shows, "LVL 50" (Eric, Oct 23: "really just the Maia or Stockfish level converted to a range up to
+ * level 100"; "randomly pick between say 40 and 60 even if it really means 1400 Elo... this way it feels unique";
+ * docs/decisions/2026-10-23-boss-bar.md): its rating (bossRatingShown) divided by `divisor`, plus a random offset of up to
+ * `spread` either way drawn once from the battle's seed (the same on every screen and after a reload), from 1 to `max` (100 is
+ * Fischer's: the Hidden Boss's bar says "LVL ???"). The level follows the boss's strength while it changes for a time, by
+ * the same divisor: `weakDrop` Elo less for a move the King's strike weakens, the engine's top (ENGINE_MAX_ELO) for the
+ * Full Moon's moves and the showdown's follow-up (bossLevelNow).
+ */
+export const BOSS_LEVEL = { divisor: 28, spread: 10, max: 99, weakDrop: 700 } as const;
+
+/**
  * How a boss picks its moves (DECISIONS.md: "A human-like boss: Maia-3 for Ginger", Oct 11; "Every boss on Maia",
  * Oct 12):
  * - `stockfish`: Stockfish at the boss's UCI_Elo with the blunder guard (bossMaxLoss, bossMaxLogitLoss), as always.

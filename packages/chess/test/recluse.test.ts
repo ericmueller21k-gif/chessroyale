@@ -112,6 +112,16 @@ describe("who meets him: hidden from players, an admin's Boss alone, and the Cro
     for (const [admin, raid] of [[false, false], [false, true], [true, true]] as const) expect(ids(admin, raid)).toEqual(playableBosses().map((b) => b.id));
   });
 
+  it("his bar's level is unknown, \"LVL ???\": null, with no base, from the first view and through the battle", async () => {
+    const r = alone();
+    expect(r.bossView()!.level).toBeNull();
+    expect(r.bossView()!.levelBase).toBeUndefined();
+    await untilTurn(r, 3);
+    expect(r.bossView()!.level).toBeNull();
+    // (Every other boss has a number.)
+    expect(typeof alone({ bossId: "clown", bossHidden: false }).bossView()!.level).toBe("number");
+  });
+
   it("starts from the starting position, never a book opening (he has no memorized lines); as White he moves first", async () => {
     const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     const r = alone();

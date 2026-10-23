@@ -67,7 +67,7 @@ import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves
 import { pickOpenings, type Opening } from "./openings.ts";
 import { applyMove, gameEnd, legalMoves, materialSlips, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
-import { BOSS_BRAIN, bossBrainFor, type BossBrain, type BossBrainPlan } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, type BossBrain, type BossBrainPlan } from "@chessroyale/core";
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
 import {
   allowedSearch,
@@ -1218,6 +1218,20 @@ export class MatchRunner {
     return stumbles ? "stumble" : "elo";
   }
 
+  /**
+   * How strong the boss plays his next move, for his bar's level: "weak" after the King's strike (until his move lands),
+   * "full" for the Full Moon's whole stretch (BossRules.fullStretch) and for a power's engine-best follow-up when he's to
+   * move (bestReply: Wrangler's reply to the showdown), else "usual". A slip (bossStumbles) isn't here: it's drawn as his
+   * move begins, so it can't be shown before (docs/decisions/2026-10-23-boss-bar.md).
+   */
+  bossStrengthNow(b: BossState | null | undefined = this.state.boss): "usual" | "weak" | "full" {
+    if (!b) return "usual";
+    if (b.staggerNext) return "weak";
+    const rules = bossRules(b);
+    if (rules?.fullStretch?.(b)) return "full";
+    return rules?.bestReply && this.bossToMove() && rules.bestReply(b, this.boards.get(this.state.boards[0]!)!) ? "full" : "usual";
+  }
+
   /** The boss's move now is a power's follow-up its engine search scored (BossRules.bestReply): the engine's best. */
   bossBestReply(): boolean {
     const b = this.state.boss;
@@ -1718,6 +1732,11 @@ export class MatchRunner {
   private buildBossView(b: BossState, justKilled: string | null): NetBoss {
     const def = chooseBoss(0, b.id, null, undefined, true, true);
     const info = { name: def.name, icon: def.icon, threat: bossThreat(b.elo) };
+    // (His bar's level: the battle's own, and what his strength now makes of it; "???" for the Hidden Boss.)
+    const rating = bossRatingShown(b.elo, this.settings);
+    const levelBase = def.levelUnknown ? null : bossLevelBase(rating, b.powers?.seed ?? 0);
+    const strength = this.bossStrengthNow(b);
+    const levelNow = levelBase === null ? null : bossLevelNow(levelBase, rating, strength === "full" ? ENGINE_MAX_ELO : strength === "weak" ? rating - BOSS_LEVEL.weakDrop : rating);
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     const powers = bossPowers(b);
     const p = b.powers;
@@ -1727,6 +1746,8 @@ export class MatchRunner {
       name: info.name,
       icon: info.icon,
       threat: info.threat,
+      level: levelNow,
+      ...(levelBase !== null ? { levelBase } : {}),
       crowdSide: b.crowdSide,
       crowdMoves: b.crowdMoves,
       maxMoves: this.settings.bossMaxMoves,
