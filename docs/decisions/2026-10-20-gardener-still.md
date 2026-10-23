@@ -1,0 +1,75 @@
+# The hippo gardener: one still for Eric's review (Oct 20, 2026)
+
+**Eric:** a hippo who waters plants and plants seeds (no name yet; his code id is `gardener`, no clash in the roster or the
+code). His reference picture (ChatGPT's): an upright hippo with intentionally realistic proportions, a green apron with a
+daisy pocket, a brass-and-green spray nozzle with water coming out of it, a hose reel on the ground. This step is his look
+only: one still. His powers (hidden seeds on a timer, watering the board for his ultimate) and his animations come later.
+
+## Second pass (Oct 21, Eric: three changes)
+
+- **The apron is gone** (Eric: "the apron is no good either"), with its straps, pocket, daisies and the seed bag. He is just a
+  hippo: grey-mauve back and sides, a pink belly with a navel, a pink throat. The seeds will come from his hand in the planting
+  animation. The belly is bigger and pinker for it.
+- **The hose is held in both hands.** The near hand is on the nozzle (spraying toward the board, as before); the other hand
+  holds the hose too. **No coil on his shoulder** ("it looks like a shield"). (This pass put the other hand near the middle of
+  his chest, and the end of the hose in a small coil on the ground; the third pass changed both.)
+- **A friendlier face:** a bigger, round eye (4 x 4, a glint inside) and a smaller one for the far eye, and a soft smile line from
+  the corner of his mouth up into his cheek. The head, muzzle and proportions are as they were.
+
+## Third pass (Oct 21, Eric: two fixes)
+
+- **No coil on the ground** (Eric: it "reads badly, like a mess on the floor"). The spare hose is looped behind his back,
+  hidden by his body and his back leg but for one short curve that shows past his hip (`BACK_LOOP`, `hoseBack`), so it reads as
+  hose that will feed out from behind him when he pulls on it.
+- **His other arm is back where it was in the first pass** (out at his right side: shoulder (51.5, 28.5), elbow (55.5, 40), hand
+  (47.5, 48.5), the same thickness and color), and the hose moves to fit it, not the arm: from the nozzle it sags across his belly
+  through that hand (the hand is on the hose) and on to his hip, where it goes behind him. His tail moved a little up, under the
+  elbow, to leave the hip's curve of hose clear; his legs are back at their first-pass places (no coil to leave room for).
+  The near arm, the face, the colors and the size are the second pass's. The idle is as wide as before (28 left, 25 right).
+
+## What was built
+
+`packages/app/src/characters/gardener.ts`: `GARDENER` (`GARDENER_PALETTE`, one `idle` animation of one frame),
+`GARDENER_PORTRAIT`, `gardenerLayers(pose)`. He isn't in `CHARACTERS`, `BOSS_KITS` or the roster: nothing in the game draws
+him. The preview draws him with its `extra=` option
+(`npm run preview:characters -- <dir> extra=packages/app/src/characters/gardener.ts only=gardener`).
+`packages/app/test/gardener.test.ts` checks the still (palette, the stage's 70 px, nothing cut off, the feet, the portrait)
+and that a few poses redraw.
+
+Parts are painted once and poses are numbers (`GardenerPose`), as the other bosses':
+
+- **the nozzle hand** (`fist`, `elbowN`, `nozzle`: it aims; the elbow bends by itself) and **the water spray as a part of its
+  own** (`spray` its length, 0 off; `droop`; `seed` picks the streaks and drops, so a flicker is a new seed each frame);
+- **the other arm** (`hand`, `elbowF`) and **the hose**: the front of it is one part redrawn from the nozzle's fitting through
+  that hand to his hip (`sag` is how far it hangs across his belly), so it stays in one piece wherever either hand goes. The
+  spare hose behind him (`BACK_LOOP`) is a part of its own, drawn behind his body and leg;
+- **the head** moves as one (`head`), with **the jaw a part of its own** (`jaw`, degrees open: hinged under the cheek, the dark
+  mouth and a tusk appear as it opens), **the ears** (`earN`, `earF`: lean at the tip), **the eyes** (`eyes`: open, half,
+  shut, wide) and the nostrils in the muzzle;
+- the tail (`tail`), the feet (`stepN`, `stepF`), his breath (`bob`).
+
+The jaw hangs over his chest when it opens: a yawn needs the head raised or the nozzle hand lowered (`fist`), or the arm hides it.
+
+## Calls made
+
+- **Facing:** the reference flipped, three-quarters on, facing our left like the others, the nozzle toward the board.
+- **Colors:** pinkish-grey skin in five tones, a salmon pink in four for his belly, throat, cheek and ears, a greyer lilac for
+  the muzzle; a teal hose, brass (the game's gold at its top) for the nozzle, water in four blues. Outline `#1d1019`, halo
+  `#2c2430`, light from the top left, so he reads on light and dark grounds.
+- **Size:** a 84 x 88 frame, foot at (49, 82) (the animation pack's frame is 90 x 102, foot at (55, 96), the same pixels moved: `2026-10-21-gardener-animations.md`); 69 px from the halo over his ears to his feet, inside the select stage's 70
+  (`TALLEST / PX` in `BossSelect.tsx`), so he is drawn at the usual 0.8. The frame has room to the left for the spray only as it
+  is in the still; a longer spray (his ultimate) wants a wider copy of him, as Smudgy's and Moo's attack frames.
+- **The phone's boss bar: he needs the `wide` box.** From his feet (outline, halo one more): 28 left (the muzzle's tip and the
+  nozzle's cap) and 25 right (his back, the loop of hose and the tail); the usual box holds 24 each side, `wide` 29.
+  The spray reaches 16 farther left (44), past `wide`: on the bar draw it short or off (`spray: 4`, `spray: 0`).
+
+## Simplified for the pixel size
+
+- **The hose:** a smooth tube, no ribs; the spare hose behind him is one loop, most of it hidden.
+- **The spray:** streaks and drops in four blues, no mist; it has no outline (it is water), so on a light ground its palest
+  pixels are lost and the middle tones carry it.
+- **His skin:** no wrinkles, no pores; the muzzle has a few stubble dots and two nostrils, the ears a pink inside; no teeth or
+  tusks while the mouth is shut.
+- **His hands and feet:** fists with no fingers drawn, three nails on each foot, no toes.
+- **The ground:** no grass or puddle, and no reel: the shadow only.
+- **Head size:** a little bigger than in Eric's picture (about 40% of his height against 35%), kept for the big square muzzle.
