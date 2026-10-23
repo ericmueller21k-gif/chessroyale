@@ -22,7 +22,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   stage's drop), plays its sound once (`SELECT_SOUND`: Ginger `gingerCrackle`, her freeze; Boingo `clownSplat`, his
   pie; Jefferson `grexFizz`, his sparkler; Hollow `hollowCast`, his darkness; Big Boy `bigboyClack`, a toy block
   landing; Sawyer `sawyerRev`, his saw; Wrangler `pigWhirl`, his lasso; Alfil `alfilTrumpet`, his trumpet; Chub & Chirp
-  `hopperChirp`, Chirp's chirp; Smudgy `smudgySplash`, paint landing; Moo & Moon `mooHappy`, a happy moo; Puddles `gardenerHello`, a happy grunt and a splash; the Hidden Boss `recluseHum`, his stare) and
+  `hopperChirp`, Chirp's chirp; Smudgy `smudgySplash`, paint landing; Moo & Moon `mooHappy`, a happy moo; Puddles `gardenerHello`, a hello in his quick made-up talk and a splash; the Hidden Boss `recluseHum`, his stare) and
   says a line in its bubble (`SELECT_LINES`: its existing lines that read right outside a match, none twice running;
   new ones from each boss's lore wait for Eric). The Hidden Boss: a silhouette (his sprite drawn black, edged in
   violet), "???", never named, his ominous hum and Eric's two lines in turn ("Team up on me. It wouldn't be the first
