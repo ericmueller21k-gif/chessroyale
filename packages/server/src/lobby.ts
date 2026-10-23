@@ -25,6 +25,7 @@ import {
   toSan,
   type BoardRound,
   type WaterAsk,
+  type HoopsAsk,
   type BoardScore,
   type ClientMessage,
   type NetFinal,
@@ -298,14 +299,15 @@ export interface LobbyRecord {
    * "slam": it picks Alfil's cast (the pair), his fusion's square and his Slam's lift; "hop": which pawn of Chub & Chirp's hops.
    * "carrots": Chub & Chirp's Carrot Patch cast (his whole turn; no host asked: the placement is the server's).
    * "repaint": it picks Smudgy's Repaint pair (his whole turn). "water": it places the hippo gardener's watering (his whole turn).
+   * "hoops": it places the circus tiger's hoops (his whole turn).
    */
-  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop" | "carrots" | "repaint" | "water";
+  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop" | "carrots" | "repaint" | "water" | "hoops";
   /** Big Boy's Big Bounce, Alfil's fusion and Slam, the hopper's hop: the candidates the host was sent (the answer must be one of them). */
   bounceCandidates?: string[];
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
   bossPending?: string;
   /** What came with that move (Wrangler's drag or showdown line-up), held with it. */
-  bossPendingExtras?: { drag?: string; showdown?: string; outside?: boolean; beam?: string[] };
+  bossPendingExtras?: { drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string };
   bossMinAt?: number;
   bossIntroDone?: boolean;
   /**
@@ -459,6 +461,12 @@ const bossTimeoutMs = (asks: { showdown?: string; drag?: true } | null): number 
 const waterAsk = (runner: MatchRunner): { water?: WaterAsk; waterAny?: true } => {
   const water = runner.waterAsk();
   return water ? { water, ...(runner.waterAny() ? { waterAny: true as const } : {}) } : {};
+};
+
+/** The circus tiger's cast for the host to place (the boss request's `hoops`), or nothing. */
+const hoopsAsk = (runner: MatchRunner): { hoops?: HoopsAsk; hoopsAny?: true } => {
+  const hoops = runner.hoopsAsk();
+  return hoops ? { hoops, ...(runner.hoopsAny() ? { hoopsAny: true as const } : {}) } : {};
 };
 
 export class LobbyCore {
@@ -1118,7 +1126,7 @@ export class LobbyCore {
       }
       case "bossMove":
         if (playerId === this.r.hostId && this.r.phase === "boss" && this.r.bossKey === msg.key)
-          this.playBoss(msg.move, { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}), ...(msg.outside === true ? { outside: true } : {}), ...(Array.isArray(msg.beam) ? { beam: msg.beam.filter((x): x is string => typeof x === "string").slice(0, 32) } : {}) });
+          this.playBoss(msg.move, { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}), ...(msg.outside === true ? { outside: true } : {}), ...(Array.isArray(msg.beam) ? { beam: msg.beam.filter((x): x is string => typeof x === "string").slice(0, 32) } : {}), ...(typeof msg.balloon === "string" ? { balloon: msg.balloon.slice(0, 2) } : {}) });
         return;
       case "leave":
         // (Cancel on the queue screen once its seats have filled is leaving the match: before move 1, a bot sits in.)
@@ -1408,7 +1416,7 @@ export class LobbyCore {
     // (A pick among candidate positions, not a move: Big Boy's bounce, Alfil's cast, fusion and Slam, the hopper's hop;
     // and the Carrot Patch's cast, which only asks the pass guard.)
     const kind = this.r.bossKind;
-    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam" || kind === "hop" || kind === "carrots" || kind === "repaint" || kind === "water";
+    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam" || kind === "hop" || kind === "carrots" || kind === "repaint" || kind === "water" || kind === "hoops";
     // A power limits the moves: the boss's (a pie), or the crowd's for the move Boingo plays for it.
     const allowed = funhouse ? runner.crowdAllowed() : runner.bossAllowed();
     // (Wrangler's turn: his long pulls, a drag or the showdown to work out too, ordered by a seed of the turn's own.)
@@ -1420,6 +1428,9 @@ export class LobbyCore {
     const race = kind === "elo" ? (runner.bossRace("elo")?.race ?? null) : null;
     // (Moo's Moonbeam lands after this move: the host lists the crowd's top moves after it.)
     const beam = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best" ? runner.bossBeam() : null;
+    // (The circus tiger's balloon, due at the end of this turn (his move or his cast): the host lands it after. Decided once
+    // a turn, the same for a balloon that will pop.)
+    const balloon = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best" || kind === "hoops" ? runner.balloonAsk() : null;
     this.io.send(host, {
       t: "bossRequest",
       key: this.r.bossKey!,
@@ -1436,6 +1447,7 @@ export class LobbyCore {
       ...(kind === "hop" ? { hop: this.r.bounceCandidates ?? [] } : {}),
       ...(kind === "repaint" ? { repaint: this.r.bounceCandidates ?? [], ...(runner.repaintAny() ? { repaintAny: true as const } : {}) } : {}),
       ...(kind === "water" ? waterAsk(runner) : {}),
+      ...(kind === "hoops" ? hoopsAsk(runner) : {}),
       // (A step that spends his whole turn: the pass guard, on the host's engine. The server never searches.)
       ...(kind === "fuse" || kind === "carrots" ? { pass: true as const } : {}),
       ...(allowed && !pick ? { allowed } : {}),
@@ -1446,6 +1458,7 @@ export class LobbyCore {
       ...(land ? { land: land.map((x) => ({ ...x })) } : {}),
       ...(race ? { race } : {}),
       ...(beam ? { beam } : {}),
+      ...(balloon ? { balloon } : {}),
     });
   }
 
@@ -1587,6 +1600,26 @@ export class LobbyCore {
   }
 
   /**
+   * The circus tiger's hoops (at the start of his turn after their warning, or the admins' trigger: the runner's hoopsDue):
+   * everyone sees him get ready (thinking; your queen banner first, if it's up) while the host's engines place the blocks
+   * (hoopsFrom) and land a due balloon after them; then the cast, his whole turn, checked against the rules (hoopsCheck,
+   * landCheck), and the crowd's turn, its moments (the cast's first) before the crowd's clock starts. The host's
+   * PASS_WAIT (the pass guard), "", anything else, or no host engine anywhere: no cast this turn (it waits for his next),
+   * and his move is asked for.
+   */
+  private requestHoops() {
+    this.r.phase = "boss";
+    this.r.bossKey = `r-${++this.r.counter}`;
+    this.r.bossKind = "hoops";
+    this.r.bossMinAt = this.thinkMinAt();
+    this.broadcast(this.bossMessage(0, { thinking: true }));
+    const host = this.hostNow();
+    this.r.hostId = host;
+    if (host) this.sendBossRequest(host);
+    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
+  }
+
+  /**
    * Hollow's extra move (the crowd failed Lights out): after his own move, he thinks again while the host's engine
    * picks a quiet move that gains him only a little (extraMoveFrom); everyone sees it land with its banner, then the
    * crowd's turn. No such move (or no engine anywhere): he skips it.
@@ -1619,7 +1652,7 @@ export class LobbyCore {
     this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
   }
 
-  private playBoss(move: string, extras: { drag?: string; showdown?: string; outside?: boolean; beam?: string[] } = {}) {
+  private playBoss(move: string, extras: { drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string } = {}) {
     this.r.bossKey = undefined;
     // Too soon (your queen banner is still up): hold the move (or Big Boy's bounce) until then.
     if (this.r.bossMinAt && this.io.now() < this.r.bossMinAt - 50) {
@@ -1688,6 +1721,16 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
+    if (this.r.bossKind === "hoops") {
+      // The circus tiger's hoops (the host's cast, checked, with a due balloon's landing after it): his whole turn (the
+      // crowd's turn begins as after his move: its moments, the cast's first). Anything else (PASS_WAIT, "", not a cast,
+      // none due any more): no cast now, and straight on to his move.
+      this.r.bossKind = undefined;
+      this.runner!.applyHoops(move);
+      const until = this.io.now() + (!this.runner!.bossToMove() ? bossTurnShowMs(this.runner!.bossView()) : 0);
+      this.broadcast(this.bossMessage(until));
+      return this.setTimer("nextRound", until);
+    }
     if (this.r.bossKind === "hop") {
       // Chub & Chirp's hop (the host's pick, one of the candidates; else the first): it plays out, then his move. None
       // due any more (nothing came of it): straight on to his move.
@@ -1716,7 +1759,7 @@ export class LobbyCore {
       return this.setTimer("nextRound", until);
     }
     // (Wrangler's drag or showdown line-up, Moo's lines for his Moonbeam: the runner checks each against his rules before it's used.)
-    this.runner!.applyBossMove(move, undefined, { drag: extras.drag ?? null, showdown: extras.showdown ?? null, outside: extras.outside ?? null, beam: extras.beam ?? null });
+    this.runner!.applyBossMove(move, undefined, { drag: extras.drag ?? null, showdown: extras.showdown ?? null, outside: extras.outside ?? null, beam: extras.beam ?? null, balloon: extras.balloon ?? null });
     // As the turn passes to the crowd, any power that comes with it (a freeze, a pie, the warning, the blizzard)
     // plays out before the crowd's clock starts.
     // (At a mate, the boss's attack on the crowd's king, if it has one: the result waits for it.)
@@ -1738,7 +1781,7 @@ export class LobbyCore {
     // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in his funhouse, the
     // crowd's: a random allowed one too). His extra move needs the engine to stay small: without one, he skips it.
     const runner = this.runner!;
-    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop" || this.r.bossKind === "carrots" || this.r.bossKind === "repaint" || this.r.bossKind === "water") return this.playBoss("");
+    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop" || this.r.bossKind === "carrots" || this.r.bossKind === "repaint" || this.r.bossKind === "water" || this.r.bossKind === "hoops") return this.playBoss("");
     const legal = (this.r.bossKind === "funhouse" ? runner.crowdAllowed() : runner.bossAllowed()) ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
     this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
   }
@@ -1781,9 +1824,9 @@ export class LobbyCore {
         return this.finishMatch();
       }
       // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps, Chub & Chirp's Carrot Patch cast (his whole turn) and
-      // hop, Smudgy's Repaint and the hippo gardener's watering (each his whole turn) come at the start of his turn, before
+      // hop, Smudgy's Repaint, the hippo gardener's watering and the circus tiger's hoops (each his whole turn) come at the start of his turn, before
       // his move.)
-      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.carrotDue() ? this.requestCarrots() : runner.repaintDue() ? this.requestRepaint() : runner.waterDue() ? this.requestWater() : runner.hopDue() ? this.requestHop() : this.requestBoss();
+      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.carrotDue() ? this.requestCarrots() : runner.repaintDue() ? this.requestRepaint() : runner.waterDue() ? this.requestWater() : runner.hoopsDue() ? this.requestHoops() : runner.hopDue() ? this.requestHop() : this.requestBoss();
       // (A failed Lights out: his extra move, after his own and before the crowd's turn.)
       if (runner.extraMoveDue()) return this.requestExtra();
       // (Boingo's funhouse: his move for the crowd, as its turn begins.)

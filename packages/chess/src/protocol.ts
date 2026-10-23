@@ -8,6 +8,7 @@ import type { CarrotRace } from "./bosses/carrots.ts";
 import type { CarrotView } from "./bosses/hopper.ts";
 import type { CamoView } from "./bosses/smudgy.ts";
 import type { GardenView, WaterAsk } from "./bosses/gardener.ts";
+import type { BalloonAsk, HoopsAsk, TigerView } from "./bosses/tiger.ts";
 import type { MoveScore } from "./uci.ts";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
@@ -410,6 +411,18 @@ export interface NetBossPowers {
    * plays) and how many he's made.
    */
   garden?: GardenView | null;
+  /**
+   * The circus tiger (missing for other bosses and from older servers; an older app ignores them): the balloon on his
+   * nozzle (`balloon`: its shape as everyone sees it, a fake queen's "q"; its color; when it went on and when it's fully
+   * blown, on the battle's clock: the server's online, the page's visible time solo, so every device draws the same stage;
+   * `ready`, found ready at his turn's check), his last balloon's end (`balloonLast`: landed where, or popped), his counts,
+   * and the hoops standing (`hoops`: each block by its corner, in throw order; the crowd moves they still stand for).
+   * Nothing here says whether a balloon will pop.
+   */
+  balloon?: TigerView["balloon"];
+  balloonLast?: TigerView["balloonLast"];
+  balloons?: TigerView["balloons"];
+  hoops?: TigerView["hoops"];
 }
 
 /**
@@ -511,9 +524,10 @@ export type ClientMessage =
    * Boss battle, host only: the boss's move (Wrangler's long pull written as its three squares), and what its turn was
    * asked to work out besides (Wrangler's): the lasso drag after it ("c3c4", "" none) and the showdown's line-up after it
    * (checkLineup's spec, "" none). The server checks each against the rules. `beam` (Moo's Moonbeam, asked with
-   * `beam`): the crowd's top moves after his move, best first (beamLines); the server checks each.
+   * `beam`): the crowd's top moves after his move, best first (beamLines); the server checks each. `balloon` (the circus
+   * tiger's, asked with `balloon`): the square his balloon lands on after his move (landFrom); the server checks it.
    */
-  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[] }
+  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string }
   /** Leaving before the match starts (Cancel in the queue): the seat is freed. */
   | { t: "leave" }
   /**
@@ -836,6 +850,21 @@ export type ServerMessage = { now: number } & (
        */
       water?: WaterAsk;
       waterAny?: true;
+      /**
+       * The circus tiger's hoops (his whole turn): the order the blocks are tried in. Answer the cast as `move`
+       * (hoopsAnswer: hoopsFrom's blocks by their corners in throw order, then "@" and the square a ready balloon lands on
+       * after it, if `balloon` is asked: "c3 f5 b6 @e4"; PASS_WAIT when passing would lose real material, unless
+       * `hoopsAny`: the test switch or the admins' trigger; "" with no engine or no block that fits). The server checks it
+       * (hoopsCheck, landCheck). An older app ignores it and plays a move, which isn't a cast: the hoops wait for his next turn.
+       */
+      hoops?: HoopsAsk;
+      hoopsAny?: true;
+      /**
+       * The circus tiger's balloon is due at the end of this turn: where it lands (landFrom, on the position after his move,
+       * or after the cast with its hoops), answered as the move's `balloon` (or in the cast's answer). Asked the same for a
+       * balloon that will pop: nothing here says which. An older app ignores it: the balloon waits ready for his next turn.
+       */
+      balloon?: BalloonAsk;
       /**
        * Moo & Moon's Moonbeam (or his Full Moon's flurry) lands after this move: list the crowd's top this-many moves in
        * the position after it (beamLines, at BOSS_POWERS.moonbeamNodes) as the answer's `beam`. An older app ignores it:

@@ -13,6 +13,7 @@ import { HOPPER_FX } from "./bosses/hopper.ts";
 import { SMUDGY_FX } from "./bosses/smudgy.ts";
 import { MOO_FX } from "./bosses/moo.ts";
 import { GARDENER_FX, waterMs } from "./bosses/gardener.ts";
+import { TIGER_FX } from "./bosses/tiger.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -55,7 +56,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * step, `spin`: its banner, then the board turns again); the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX } as const;
+export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX, ...TIGER_FX } as const;
 
 /** What a moment's length reads of its event: its kind, Hollow's first cover, the hippo gardener's watering's outcomes. */
 type FxEvent = { kind: keyof typeof POWER_FX; first?: boolean; growth?: readonly { kind: string }[] };
