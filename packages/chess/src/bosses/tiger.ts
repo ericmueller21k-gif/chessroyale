@@ -448,11 +448,21 @@ export interface HoopsAsk {
   order: number;
 }
 
-/** The corners in the order a step tries them: the inner ranks' (blocks within ranks 3 to 6) first, each set seeded. */
-export function hoopOrder(order: number, step: number): string[] {
-  const inner = (c: string) => Number(c[1]) >= 3 && Number(c[1]) <= 5;
-  return HOOP_CORNERS.map((c) => ({ c, k: (inner(c) ? 0 : 1) + powerRoll(order, "hoop", step, c) }))
-    .sort((a, b) => a.k - b.k)
+/** A block within ranks 3 to 6 (the inner ranks the brief prefers): its corner on rank 3, 4 or 5. */
+const innerHoop = (c: string) => Number(c[1]) >= 3 && Number(c[1]) <= 5;
+
+/**
+ * The corners in the order a step tries them (`fen`: the crowd to move after the pass; `chosen`: the blocks already
+ * thrown): the ones whose walls, with those already chosen, stop the most of the crowd's legal moves first (a block
+ * nothing would cross changes nothing), an inner block counting HOOP_INNER moves more (the inner ranks preferred); ties
+ * seeded. Cheap: no engine, only which moves cross a wall.
+ */
+export const HOOP_INNER = 3;
+export function hoopOrder(fen: string, chosen: readonly string[], order: number, step: number): string[] {
+  const moves = legalMoves(fen);
+  const bite = (c: string) => moves.filter((m) => crossesHoop(m, fen, [...chosen, c])).length;
+  return HOOP_CORNERS.map((c) => ({ c, k: bite(c) + (innerHoop(c) ? HOOP_INNER : 0), r: powerRoll(order, "hoop", step, c) }))
+    .sort((a, b) => b.k - a.k || a.r - b.r)
     .map((x) => x.c);
 }
 
@@ -468,7 +478,7 @@ export interface HoopsPick {
 
 /**
  * Where the engines throw his hoops (`fen`: him to move, before the cast), on this device's engines: block by block, up to
- * hoopsCount, each step weighing up to hoopsLooks blocks (hoopOrder, apart from those already chosen, the whole set
+ * hoopsCount, each step weighing up to hoopsLooks blocks (hoopOrder: the ones that stop the most crowd moves first, apart from those already chosen, the whole set
  * passing hoopsGuard) and keeping the one whose total gain (his evaluation with the walls in force, the crowd to move,
  * against his before, him to move, in pawns of log-odds) is in hoopsBand nearest hoopsTarget, else nearest the band. At
  * most hoopsLooks x hoopsCount positions searched besides the one before, within hoopsTimeMs (its own clock, `now`; past
@@ -486,7 +496,7 @@ export async function hoopsFrom(engines: readonly EngineLike[], fen: string, ask
   let looks = 0;
   for (let step = 0; step < s.hoopsCount && !p.over(); step++) {
     const options: string[][] = [];
-    for (const c of hoopOrder(ask.order, step)) {
+    for (const c of hoopOrder(passed, chosen, ask.order, step)) {
       if (options.length >= s.hoopsLooks || p.over()) break;
       if (chosen.some((x) => hoopsTouch(x, c))) continue;
       await p.breathe();

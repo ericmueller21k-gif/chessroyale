@@ -606,14 +606,20 @@ describe("Hoops: the cast", () => {
     expect(hoopsGuard(check, ["d2"])).toBe(false);
   });
 
-  it("the order: the inner ranks' blocks (within ranks 3 to 6) first, each set seeded", () => {
-    const o = hoopOrder(42, 0);
+  it("the order: the blocks that stop the most of the crowd's moves first, an inner one (within ranks 3 to 6) counting more, ties seeded", () => {
+    // (A queen in the middle: a block around her stops the most.)
+    const fen = "6k1/8/8/8/3Q4/8/8/6K1 w - - 0 1";
+    const o = hoopOrder(fen, [], 42, 0);
     expect(o).toHaveLength(35);
-    const inner = o.findIndex((c) => Number(c[1]) === 2 || Number(c[1]) === 6);
-    expect(inner).toBe(21);
-    expect(o.slice(0, 21).every((c) => Number(c[1]) >= 3 && Number(c[1]) <= 5)).toBe(true);
-    expect(hoopOrder(42, 0)).toEqual(o);
-    expect(hoopOrder(43, 0)).not.toEqual(o);
+    const bite = (c: string) => legalMoves(fen).filter((m) => crossesHoop(m, fen, [c])).length + (Number(c[1]) >= 3 && Number(c[1]) <= 5 ? 3 : 0);
+    for (let i = 1; i < o.length; i++) expect(bite(o[i - 1]!)).toBeGreaterThanOrEqual(bite(o[i]!));
+    expect(["c3", "d3", "c4", "d4"]).toContain(o[0]);
+    expect(hoopOrder(fen, [], 42, 0)).toEqual(o);
+    // (With nothing to bite on, the inner ranks first, in a seeded order.)
+    const empty = "k7/8/8/8/8/8/8/7K w - - 0 1";
+    const e = hoopOrder(empty, [], 42, 0);
+    expect(e.slice(0, 21).every((c) => Number(c[1]) >= 3 && Number(c[1]) <= 5)).toBe(true);
+    expect(hoopOrder(empty, [], 43, 0)).not.toEqual(e);
   });
 
   const START = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 5 4";
