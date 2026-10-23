@@ -296,9 +296,9 @@
         "packages/app/src/characters/gardener*.ts",
         "packages/app/src/characters/effects/gardener.ts",
         "packages/app/src/components/Gardener.tsx",
-        "packages/app/src/garden-clock.ts"
+        "packages/app/src/garden-*.ts"
       ],
-      "specs": ["e2e/gardener.spec.ts"]
+      "specs": ["e2e/gardener.spec.ts", "e2e/king-attack.spec.ts"]
     },
     "Smudgy (smudgy)": {
       "paths": [

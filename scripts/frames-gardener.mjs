@@ -4,7 +4,7 @@
 // outcome); the plain plants through their turns and a move refused for one ("A plant is in the way."); his attack on a king in the God
 // King's Last Stand (?laststand=1); and his select tile. Records every painted frame (Chrome's screencast), saves a GIF of each moment and
 // stills through them.
-//   npm run frames:gardener -- <out-dir> [tile|opening|seeds|water|plants|attack|bar|all] [phone|desktop] [light|dark] [width] [fen]
+//   node scripts/frames-gardener.mjs <out-dir> [tile|opening|seeds|water|plants|attack|bar|all] [phone|desktop] [light|dark] [width] [fen]
 // `fen` (water, plants): his army short a pawn, a bishop, a knight and the queen when the battle starts (set from the page, for the GIF
 // only: a position where a grown piece can come up at the first watering), so the outcomes can include pieces.
 // The page draws what a player sees; the script reads the game (window.match) only to pick moves and to say, in the log, what the rules

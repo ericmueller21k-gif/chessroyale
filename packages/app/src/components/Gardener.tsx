@@ -8,6 +8,7 @@ import { EFFECTS, animLength, cueAt } from "../characters/power-art.ts";
 import type { PieceDecor } from "../board/types.ts";
 import type { BossView } from "../game.ts";
 import { gardenNow, realMs } from "../garden-clock.ts";
+import { frontMs } from "../garden-sweep.ts";
 import { addToss, currentTosses, freshLanding, hasTossed, onTosses, resetTosses, seedReading, tossSquares, type Toss } from "../garden-seeds.ts";
 import { NORMAL, Say, bossVoice } from "../speech.tsx";
 import { BoardEffects, BossEffect, prewarm, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
@@ -43,22 +44,6 @@ const cellOf = (square: string, o: Orientation) => {
   const r = Number(square[1]) - 1;
   return { col: o === "white" ? f : 7 - f, row: o === "white" ? 7 - r : r };
 };
-
-// ---------------- Where the sweep is, and when ----------------
-
-/**
- * The spray's front across the board in the art (effects/gardener.ts, `WATER_SWEEP`): the front is at x `front0 + step * i` (of the
- * board's 256 px) in frame i (`frameMs` each), and the lower rows lead by `lean` px a row. A test measures the sprite against these.
- * He casts at the board's left (its top-left corner), the sweep as drawn comes in from the left edge: it needs no flip for his side.
- */
-export const SWEEP = { frameMs: 60, front0: -24, step: 50, lean: 0.35, board: 256 } as const;
-
-/** When the spray's front reaches a square's middle, ms after the sweep starts (0 to SWEEP_MS): where it sprouts. */
-export function frontMs(square: string, orientation: Orientation): number {
-  const { col, row } = cellOf(square, orientation);
-  const front = (col + 0.5) * 32 - SWEEP.lean * ((row + 0.5) * 32 - SWEEP.board / 2);
-  return Math.max(0, Math.min(SWEEP_MS, Math.round(((front - SWEEP.front0) / SWEEP.step) * SWEEP.frameMs)));
-}
 
 // ---------------- The board under the watering ----------------
 
