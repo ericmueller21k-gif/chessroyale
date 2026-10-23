@@ -11,6 +11,25 @@ the one where the balloons look like balloons": a realistic tiger on all fours i
 gold ringmaster's vest, one paw raised holding the strings of chess-piece balloons. The second picture (him standing on his hind
 legs) is only "how we may alternate between standing and being on all 4".
 
+## Second pass (Oct 23, Eric on the first: "you can't even tell he's a tiger in his face... I think it's fine that he's a little chunkier... we just need to make sure his face is clearly that of a tiger")
+
+The build, the size (70 px, the `wide` box: 29 either side) and the colors of his body are the first pass's. Changed:
+
+- **Nothing covers the face.** The pawn balloon, which hung beside his muzzle, is smaller and up with the others (the bunch now
+  ends above his forehead and ahead of his brow, 8 px clear of his nose); the strings are shorter and straighter, run behind his head
+  and into the fist at his front; the paw is lower and farther forward, under and ahead of his chin; the raised arm is drawn behind
+  his head, so his cheek ruff flares over his shoulder instead of the arm cutting into it. The hat is smaller and tipped back
+  (`hatTilt` 12, its front up) at the top of his skull, so his whole brow shows under it.
+- **A face that reads "tiger" first**, in the order the picture reads it: *contrast* (an orange face, a bright white muzzle and cheek
+  ruffs, black bars: the cream ramp is lighter now, `#fff8e8` at the top), *bold brow bars* (five black bars across the forehead, the
+  middle ones longest, stopping above the eyes so the orange shows between them and the eyes), *white cheek ruffs flaring out at his
+  sides* in points, with two black stripes into the near one, a black line from the outer corner of his eye; *a white muzzle* with a pink nose
+  under a dark line, a dark line down to his lip and four whisker dots; *amber eyes in dark rims* (6 x 3 and 5 x 3 px, up from 4 x 3
+  and 3 x 2); *round dark ears with a white spot* and an orange rim, one each side of the hat; the whiskers a tan so they show on both
+  grounds. The head is 25 px across with the ruff (it was 21), same body.
+- **The portrait is the face and the hat** (`TIGER_PORTRAIT`, 27 x 27 from the ears and hat's top to under his chin; the pawn's
+  new size keeps the bunch out of it), checked at 1x, 2x and 3x (`tiger-face-1x-3x.png` in the review pictures).
+
 ## What was built
 
 `packages/app/src/characters/tiger.ts`: `TIGER` (`TIGER_PALETTE`, one `idle` animation of one frame, the still),
@@ -41,7 +60,7 @@ pack did: `OX`, `OY` are numbers, the parts are painted in scene pixels).
 - **Facing:** the reference flipped, side on with the head turned to us, facing our left like the others, so the balloons are toward
   the board.
 - **Four balloons, not six** (Eric allowed 4 or 5): a red king, a blue knight, a yellow bishop and a purple pawn. The pawn is the
-  piece the pump will make most, so it hangs low in front of his muzzle. A green rook was drawn and tried as a fifth, but at this size
+  piece the pump will make most, so it is in the bunch, small, at its lower left. A green rook was drawn and tried as a fifth, but at this size
   it hid behind the others and read as a green bone, and the pink pawn is a second pawn. Each balloon is drawn as a silhouette and
   shaded by one rule (a light rim at its left, a dark one at its right and under it, a shine), so they all look inflated alike.
 - **Size:** a 76 x 78 frame, foot at (36, 74): 70 px from the halo over the king's top to his feet, exactly the select stage's 70
@@ -53,7 +72,7 @@ pack did: `OX`, `OY` are numbers, the parts are painted in scene pixels).
 - **Colors:** orange in five tones, cream in four (chest, belly, muzzle, ruff, paws), black-brown stripes, an amber eye, a red vest
   in four tones with the game's gold at its edge, a black hat in four with a red band, each balloon three tones and a white shine.
   Outline `#1f1210`, halo `#3a2a22`, light from the top left, so he reads on light and dark grounds.
-- **Head size:** about 21 px across with the cheek ruff (Eric's picture has about 16 px at this scale): kept bigger so the face reads
+- **Head size:** about 25 px across with the cheek ruff (Eric's picture has about 16 px at this scale): kept bigger so the face reads
   at 0.8, a big head being the house style.
 
 ## Simplified for the pixel size
@@ -62,8 +81,8 @@ pack did: `OX`, `OY` are numbers, the parts are painted in scene pixels).
   cream belly; one pattern for
   the flank, three arcs on the thigh, a few bars on each leg and the arm, rings on the tail. The picture's double and forked stripes
   and the fine fur are gone.
-- **The face:** orange crown, brow and bridge, a cream muzzle and ruff, a pink nose, two amber eyes under a dark lid, bars on the brow,
-  lines by the eye and two stripes in the cheek ruff; no fur tufts, no teeth or tongue while the mouth is shut (the jaw opens as a part), the whiskers three strands.
+- **The face:** orange crown, brow and bridge, a cream muzzle and ruff, a pink nose, two amber eyes in dark rims, five bars on the brow,
+  a line from each eye and two stripes in the cheek ruff; no fur tufts, no teeth or tongue while the mouth is shut (the jaw opens as a part), the whiskers three strands.
 - **The vest:** red with a gold edge, two gold diamonds and three buttons; the collar stands up behind his neck. The picture's
   embroidery and lapels are not drawn; the raised arm hides most of the front.
 - **The paws:** cream with two toe lines each, no claws; the raised paw is a fist with the strings going in at its top and two

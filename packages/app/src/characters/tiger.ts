@@ -34,10 +34,10 @@ export const TIGER_PALETTE: Record<string, string> = {
   c: "#d06a18",
   d: "#e8892a",
   e: "#f5ad55",
-  f: "#a98d6e", // the cream of his chest, belly, muzzle and cheeks: shadow to highlight
-  g: "#d3b996",
-  h: "#ecd9b6",
-  i: "#fbf1da",
+  f: "#b79c78", // the cream of his chest, belly, muzzle and cheeks: shadow to highlight
+  g: "#dcc7a3",
+  h: "#f3e6c8",
+  i: "#fff8e8",
   s: "#2a160f", // stripes: black-brown, and a softer brown for the tips and the far side
   t: "#4d2813",
   n: "#e0837e", // his nose, and the dark of it and of his mouth line
@@ -305,57 +305,60 @@ function vest(): { part: Part; at: Pt } {
   });
 }
 
-// ---- His head: the skull and muzzle (one part), the jaw, the ears, the eyes, the whiskers; the hat on top.
+// ---- His head: the skull and muzzle (one part), the jaw, the ears, the eyes, the whiskers; the hat on top. A tiger's face at a glance: an
+// orange face with bold black bars across its brow, a white muzzle and white cheek ruffs flaring out at its sides, a pink nose, a dark
+// mouth, amber eyes in dark rims, round dark ears with a white spot.
 
-/** The head's outline in scene pixels, clockwise from the nose's tip: the muzzle at our left, the cheek ruff at the back, the jaw's line under. */
-const HEAD_AT: Pt = [11, 32];
+/** The head's outline in scene pixels, clockwise from the muzzle's tip: the muzzle at our left, the ruff's points at the back and under. */
+const HEAD_AT: Pt = [10, 31];
 const local = (pts: readonly Pt[]): Pt[] => pts.map(([x, y]) => [x + HEAD_AT[0], y + HEAD_AT[1]]);
-const HEAD_POLY = local([[1.2, 9.6], [0.6, 8], [1.4, 6.6], [3.8, 5.8], [6, 4.6], [8.2, 3], [10.8, 1.4], [14.2, 0.6], [17.6, 1], [20.2, 3], [21.4, 6], [21.6, 9.4], [20.6, 12], [21.6, 14.8], [18.6, 14], [18.2, 16.6], [15.2, 15.2], [13.8, 17], [11.6, 14.6], [9.4, 12.8], [5.6, 11.8], [2.8, 11.2]]);
+const HEAD_POLY = local([[0.8, 12.2], [0.2, 10.4], [0.8, 8.8], [2.6, 7.6], [4.2, 5.6], [5.4, 3.6], [7.4, 1.8], [10.4, 0.6], [14, 0.2], [17.6, 0.8], [20.6, 2.6], [22.4, 5.4], [23.2, 8.2], [24.8, 10.2], [23.4, 12], [25, 14.2], [22.6, 14.4], [23.2, 17.2], [20, 15.6], [19, 18.4], [16.2, 16], [14.4, 18], [12.4, 15], [9.6, 13.8], [5, 13], [2.4, 12.6]]);
 const HEAD_INSIDE = inPoly(HEAD_POLY);
 /** Where the jaw hinges (under his cheek), and the closed jaw's outline. */
-const HINGE: Pt = [HEAD_AT[0] + 11, HEAD_AT[1] + 13.2];
-const JAW_POLY = local([[2, 10.6], [5.6, 11.6], [9.4, 12.6], [11.8, 13.4], [10.8, 15.4], [7, 15.8], [3.4, 14.2], [1.6, 12.4]]);
+const HINGE: Pt = [HEAD_AT[0] + 10.6, HEAD_AT[1] + 14.8];
+const JAW_POLY = local([[1.6, 12], [5, 12.6], [9, 13.6], [11.4, 14.4], [10.4, 16.6], [6.4, 17], [3, 15.4], [1.2, 13.6]]);
 /** Where the eyes go (their top left in scene pixels) and the ears (their middles). */
-const EYE_N: Pt = [HEAD_AT[0] + 13, HEAD_AT[1] + 6];
-const EYE_F: Pt = [HEAD_AT[0] + 6, HEAD_AT[1] + 5];
-const EAR_N: Pt = [HEAD_AT[0] + 19.4, HEAD_AT[1] + 2.4];
-const EAR_F: Pt = [HEAD_AT[0] + 4.4, HEAD_AT[1] + 3];
+const EYE_N: Pt = [HEAD_AT[0] + 12, HEAD_AT[1] + 6];
+const EYE_F: Pt = [HEAD_AT[0] + 5, HEAD_AT[1] + 5];
+const EAR_N: Pt = [HEAD_AT[0] + 20.4, HEAD_AT[1] + 2.4];
+const EAR_F: Pt = [HEAD_AT[0] + 5.4, HEAD_AT[1] + 3.4];
 
-/** The skull and the muzzle: orange crown and brow, a cream muzzle and a cream cheek ruff with dark stripes, the nose, the cheek's bars. */
+/** The skull and the muzzle. */
 function head(): { part: Part; at: Pt } {
   const [hx, hy] = HEAD_AT;
-  const light = (x: number, y: number) => 0.62 - 0.36 * ((x - (hx + 10)) / 11) - 0.5 * ((y - (hy + 7)) / 9);
-  const bar = (pts: readonly Pt[], r: readonly number[] = [0.75, 0.65, 0.35]) => taper(pts.map(([x, y]): Pt => [hx + x, hy + y]), r);
+  const light = (x: number, y: number) => 0.64 - 0.34 * ((x - (hx + 11)) / 12) - 0.5 * ((y - (hy + 7)) / 10);
+  const bar = (pts: readonly Pt[], r: readonly number[] = [1, 0.85, 0.4]) => taper(pts.map(([x, y]): Pt => [hx + x, hy + y]), r);
   const marks = union(
-    // The brow's bars, running down from under his hat.
-    bar([[7.4, 3.4], [7.8, 4.4], [8, 5.2]], [0.6, 0.55, 0.3]),
-    bar([[10.2, 1.6], [10.6, 3], [10.6, 4]], [0.6, 0.55, 0.3]),
-    bar([[17.8, 1.6], [17.4, 3], [17, 4.2]], [0.6, 0.55, 0.3]),
-    // Out from his eye, across his cheek.
-    bar([[17.6, 6.8], [19.4, 7.2], [21.8, 7.4]], [0.6, 0.6, 0.35]),
-    // Under the eye: a line down his cheek.
-    bar([[14.8, 9.4], [14.8, 11], [14.2, 12.4]], [0.6, 0.6, 0.35]),
+    // The brow: bold bars running down from the crown, the middle ones longest, the outer ones short and leaning out; they stop above his eyes.
+    bar([[10.4, 1.4], [10.8, 3.2], [10.4, 4.8]], [0.85, 0.75, 0.4]),
+    bar([[13.4, 1], [13.8, 3.2], [13.4, 5]], [0.85, 0.75, 0.4]),
+    bar([[16.4, 1.6], [16.4, 3.4], [15.8, 4.8]], [0.85, 0.75, 0.4]),
+    bar([[7.8, 3.2], [8.2, 4.2], [8, 5]], [0.7, 0.6, 0.3]),
+    bar([[19.4, 2.6], [18.8, 4], [18.2, 5]], [0.75, 0.65, 0.35]),
+    // From the outer corner of his eye back across his cheek.
+    bar([[18.6, 7.8], [20.8, 8.2], [23, 9.2]], [0.65, 0.65, 0.35]),
     // The ruff's stripes, pointing in from the back of his cheek.
-    bar([[21.8, 9.6], [19.2, 10.2], [16.8, 11.4]], [0.8, 0.7, 0.35]),
-    bar([[21.6, 12.8], [19.2, 12.8], [17, 13.4]], [0.7, 0.6, 0.3]),
+    bar([[25.2, 10.8], [22, 11.2], [18.4, 12.2]], [0.95, 0.85, 0.4]),
+    bar([[25, 13.8], [22, 14], [19.2, 14.8]], [0.9, 0.8, 0.4]),
   );
-  return painted(hx - 1, hy - 1, 24, 20, (F, S) => {
+  return painted(hx - 1, hy - 1, 28, 21, (F, S) => {
     F(HEAD_INSIDE, (x, y) => {
       const lx = x + 0.5 - hx;
       const ly = y + 0.5 - hy;
       const l = light(x, y);
       if (marks(x, y)) return "s";
-      // Cream: the muzzle, the cheeks under his eyes and the whole ruff. Orange: the crown, the brow and the bridge between his eyes.
-      const cream = ly > 8.6 + 0.4 * Math.sin(lx * 0.9) || (lx > 10.4 && ly > 8) || lx > 19.2;
-      return cream ? ramp(CREAM, l + 0.2) : ramp(ORANGE, l + 0.14);
+      // White: the muzzle, the cheek under each eye and the whole ruff. Orange: the crown, the brow and the bridge between his eyes.
+      const white = (lx < 11.6 && ly > 8.6 + 0.4 * Math.sin(lx * 1.1)) || (lx < 14.8 && ly > 9.6) || (lx >= 14.8 && ly > 8.4);
+      return white ? ramp(CREAM, l + 0.34) : ramp(ORANGE, l + 0.2);
     });
-    // His nose: pink at the muzzle's tip with a dark line under it; and the spots on his muzzle where the whiskers grow.
-    S([".nn.", "nnnn", ".oo."], hx + 0.8, hy + 6.8);
-    for (const [x, y] of [[4, 9], [6, 9], [5, 10.4]] as Pt[]) S(["s"], hx + x, hy + y);
+    // The nose: dark above, pink below, a line down to his lip; and the dots his whiskers grow from.
+    S(["oooo", "nnnn", ".nn."], hx + 0.8, hy + 8.6);
+    S(["s", "s"], hx + 2, hy + 11.2);
+    for (const [x, y] of [[4.4, 9.8], [6.6, 10.2], [5.2, 11.6], [7.6, 11.8]] as Pt[]) S(["s"], hx + x, hy + y);
   });
 }
 
-/** His lower jaw, hinged at `HINGE`, `open` degrees down: cream. */
+/** His lower jaw, hinged at `HINGE`, `open` degrees down: white, and a dark mouth showing as it opens. */
 function jaw(open: number): { part: Part; at: Pt } {
   const th = rad(open);
   const [c, s] = [Math.cos(th), Math.sin(th)];
@@ -369,65 +372,72 @@ function jaw(open: number): { part: Part; at: Pt } {
   return painted(x0, y0, x1 - x0 + 1, y1 - y0 + 1, (F) =>
     F(inside, (x, y) => {
       const ly = y + 0.5 - HEAD_AT[1];
-      return ramp(CREAM, 0.72 - 0.25 * ((ly - 11) / 4) - 0.15 * ((x - HEAD_AT[0]) / 11));
+      return ramp(CREAM, 0.86 - 0.26 * ((ly - 12) / 5) - 0.1 * ((x - HEAD_AT[0]) / 11));
     }),
   );
 }
 
-/** An ear (`cx`, `cy` its middle), `tilt` pixels leaning: orange outside, a cream inner ear. */
+/** An ear (`cx`, `cy` its middle), `tilt` pixels leaning: round, dark at the back with a white spot, an orange rim along its top and front. */
 function ear(cx: number, cy: number, tilt: number, far = false): { part: Part; at: Pt } {
-  return painted(Math.floor(cx) - 4, Math.floor(cy) - 4, 9, 9, (F) => {
+  const [rx, ry] = [3.4, 3.5];
+  return painted(Math.floor(cx) - 5, Math.floor(cy) - 5, 11, 11, (F) => {
     const lean = (y: number) => (tilt * (cy + 2 - y)) / 4;
-    const shape: Inside = (x, y) => ((x + 0.5 - cx - lean(y)) / 3.1) ** 2 + ((y + 0.5 - cy) / 3.2) ** 2 <= 1;
-    const inner: Inside = (x, y) => ((x + 0.5 - cx - lean(y) + 0.2) / 1.6) ** 2 + ((y + 0.5 - cy - 0.4) / 2) ** 2 <= 1;
-    F(shape, (x, y) => (inner(x, y) ? ramp(CREAM, 0.5 + 0.2 * ((cy - y) / 2)) : ramp(ORANGE, (far ? 0.4 : 0.55) - 0.12 * ((x - cx) / 3) - 0.1 * ((y - cy) / 3))));
+    const shape: Inside = (x, y) => ((x + 0.5 - cx - lean(y)) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1;
+    const spot: Inside = (x, y) => ((x + 0.5 - cx - lean(y) + 0.3) / 1.3) ** 2 + ((y + 0.5 - cy + 0.2) / 1.4) ** 2 <= 1;
+    F(shape, (x, y) => {
+      const nx = (x + 0.5 - cx - lean(y)) / rx;
+      const ny = (y + 0.5 - cy) / ry;
+      if (spot(x, y)) return far ? "h" : "i";
+      if (nx + ny < -0.45 || ny < -0.5) return far ? "b" : "d";
+      return nx + ny > 0.5 ? "s" : "t";
+    });
   });
 }
 
 export type Eyes = "open" | "half" | "shut" | "wide";
-/** An eye (`x0`, `y0` its top left): amber under a dark lid, with a pupil and a glint; `w` its width (the far eye, seen at an angle, is narrower). */
+/** An eye (`x0`, `y0` its top left): amber in a dark rim, with a pupil; `w` its width (the far eye, seen at an angle, is narrower). */
 function eye(x0: number, y0: number, w: number, lid: Eyes): { part: Part; at: Pt } {
   const rows: Record<Eyes, string[]> = {
-    open: w >= 4 ? ["ssss", "yxYy", ".yy."] : ["sss", "xYy"],
-    half: w >= 4 ? ["ssss", "yxss"] : ["sss", "sxs"],
-    shut: w >= 4 ? ["ssss"] : ["sss"],
-    wide: w >= 4 ? ["ssss", "yYxy", "yYYy"] : ["sss", "YxY", "yYy"],
+    open: w >= 6 ? ["ssssss", "sYxyYs", ".ssss."] : ["sssss", "sYxYs", ".sss."],
+    half: w >= 6 ? ["ssssss", "ssxyss", ".ssss."] : ["sssss", "ssxss", ".sss."],
+    shut: w >= 6 ? ["ssssss", ".ssss."] : ["sssss", ".sss."],
+    wide: w >= 6 ? ["ssssss", "sYYYYs", "syxyYs", ".ssss."] : ["sssss", "sYYYs", "syxys", ".sss."],
   };
-  return painted(x0, y0, 5, 5, (_F, S) => S(rows[lid], x0, y0), false);
+  return painted(x0, y0, 6, 5, (_F, S) => S(rows[lid], x0, y0), false);
 }
 
 /** His whiskers: a few fine strands out from his muzzle toward his front. */
 function whiskers(): { part: Part; at: Pt } {
-  return painted(2, 38, 16, 14, (_F, S) => {
+  return painted(3, 38, 12, 12, (_F, S) => {
     const strand = (pts: readonly Pt[]) => pts.forEach(([x, y]) => S(["W"], x, y));
-    strand([[14, 42], [13, 42], [12, 41], [11, 41], [10, 40]]);
-    strand([[14, 43], [13, 43], [12, 43], [11, 43], [10, 44]]);
-    strand([[14, 44], [13, 44], [12, 45], [11, 45], [10, 46]]);
+    strand([[11, 42], [10, 42], [9, 41], [8, 41], [7, 40]]);
+    strand([[11, 43], [10, 43], [9, 43], [8, 43], [7, 43]]);
+    strand([[11, 44], [10, 44], [9, 45], [8, 45], [7, 46]]);
   }, false);
 }
 
-/** His top hat: a black crown with a shine down one side, a red band and a brim, tipped `tilt` degrees (positive: clockwise, its front up). */
+/** His top hat, a small one tipped back on the top of his head, so his brow shows under it: a black crown with a shine down one side, a red band and a brim, tipped `tilt` degrees (positive: clockwise, its front up). */
 function hat(tilt: number): { part: Part; at: Pt } {
-  const [cx, cy] = [24.4, 34];
+  const [cx, cy] = [23.6, 31.8];
   const th = rad(tilt);
   const [cs, sn] = [Math.cos(th), Math.sin(th)];
   /** A pixel in the hat's own frame: u across it (negative toward his front), v along it (negative up). */
   const lc = (x: number, y: number): Pt => [(x + 0.5 - cx) * cs + (y + 0.5 - cy) * sn, -(x + 0.5 - cx) * sn + (y + 0.5 - cy) * cs];
   const crown: Inside = (x, y) => {
     const [u, v] = lc(x, y);
-    return Math.abs(u) <= 3.6 && v >= -6.8 && v <= 0.6;
+    return Math.abs(u) <= 3.4 && v >= -6.4 && v <= 0.6;
   };
   const brim: Inside = (x, y) => {
     const [u, v] = lc(x, y);
-    return (u / 6) ** 2 + ((v - 0.4) / 1.5) ** 2 <= 1;
+    return (u / 5.6) ** 2 + ((v - 0.4) / 1.4) ** 2 <= 1;
   };
-  return painted(15, 24, 20, 14, (F) =>
+  return painted(14, 23, 20, 13, (F) =>
     F(union(crown, brim), (x, y) => {
       const [u, v] = lc(x, y);
-      if (!crown(x, y) || v > 0.1) return u < -2.5 ? "3" : u > 3 ? "1" : "2";
-      if (v < -6.1) return "3";
-      if (v > -3.3 && v < -1.5) return u < -2.4 ? "7" : u > 2.1 ? "5" : "6";
-      return u < -2.7 ? "4" : u < -1.1 ? "3" : u > 2.2 ? "1" : "2";
+      if (!crown(x, y) || v > 0.1) return u < -2 ? "3" : u > 2.6 ? "1" : "2";
+      if (v < -5.8) return "3";
+      if (v > -3.2 && v < -1.4) return u < -2 ? "7" : u > 1.8 ? "5" : "6";
+      return u < -2.2 ? "4" : u < -0.8 ? "3" : u > 1.8 ? "1" : "2";
     }),
   );
 }
@@ -531,21 +541,19 @@ const BALLOONS = {
   },
   pawn: {
     sil: [
-      "...###...",
-      "..#####..",
-      "..#####..",
-      "..#####..",
-      "...###...",
-      "..#####..",
-      "...###...",
-      "...###...",
-      "..#####..",
-      ".#######.",
-      "#########",
-      ".#######.",
-      "....n....",
+      "..###..",
+      ".#####.",
+      ".#####.",
+      "..###..",
+      ".#####.",
+      "..###..",
+      "..###..",
+      ".#####.",
+      "#######",
+      ".#####.",
+      "...n...",
     ],
-    marks: [[3, 1, "w"], [3, 2, "w"], [3, 5, "w"], [2, 9, "w"], [1, 10, "w"]] as Mark[],
+    marks: [[2, 1, "w"], [2, 2, "w"], [2, 4, "w"], [1, 8, "w"]] as Mark[],
   },
 };
 
@@ -579,8 +587,8 @@ const BALLOON_KEYS: Record<Piece, string> = { king: "EFG", bishop: "HIN", knight
 const BALLOON_AT: Partial<Record<Piece, { at: Pt; knot: Pt }>> = {
   king: { at: [12, 2], knot: [17, 22] },
   bishop: { at: [19, 6], knot: [23, 23] },
-  knight: { at: [3, 9], knot: [9, 26] },
-  pawn: { at: [3, 31], knot: [7, 43] },
+  knight: { at: [3, 6], knot: [9, 23] },
+  pawn: { at: [3, 20], knot: [6, 30] },
 };
 /** The bunch, back to front. */
 const BALLOON_ORDER = ["bishop", "knight", "king", "pawn"] as const satisfies readonly Piece[];
@@ -593,9 +601,9 @@ export function balloon(piece: Piece, at: Pt): { part: Part; at: Pt } {
 }
 
 /** The strings: from each balloon's knot, swinging out ahead of his muzzle, to one gathering point, and from there down into his fist; the ends hang below it. */
-const GATHER: Pt = [8, 45.5];
+const GATHER: Pt = [6, 46.5];
 /** Where his raised paw is (its middle), holding the strings. */
-const FIST: Pt = [11, 51];
+const FIST: Pt = [8, 52];
 function strings(knots: readonly Pt[], fist: Pt): { part: Part; at: Pt } {
   const cv = canvas(34, 50);
   const [x0, y0] = [0, 20];
@@ -610,7 +618,7 @@ function strings(knots: readonly Pt[], fist: Pt): { part: Part; at: Pt } {
   const top: Pt = [fist[0] - 0.5, fist[1] - 3];
   // Each string hangs in a curve: down and out toward his front first, then down to the gathering point.
   for (const k of knots) {
-    const c: Pt = [GATHER[0] + 3, k[1] + 5];
+    const c: Pt = [(GATHER[0] + k[0]) / 2 - 1, (GATHER[1] + k[1]) / 2];
     let prev = k;
     for (let i = 1; i <= 14; i++) {
       const q = bez(k, c, GATHER, i / 14);
@@ -619,10 +627,8 @@ function strings(knots: readonly Pt[], fist: Pt): { part: Part; at: Pt } {
     }
   }
   draw(GATHER, top, "9");
-  draw(GATHER, [top[0] + 1, top[1]], "8");
-  // The loose ends under his fist.
-  draw([fist[0] - 1, fist[1] + 3], [fist[0] - 2, fist[1] + 7], "8");
-  draw([fist[0] + 1, fist[1] + 3], [fist[0] + 2, fist[1] + 8], "9");
+  // A loose end under his fist.
+  draw([fist[0] - 1, fist[1] + 3], [fist[0] - 2, fist[1] + 6], "8");
   return { part: { grid: toGrid(cv), outline: false }, at: [x0, y0] };
 }
 
@@ -690,7 +696,7 @@ const REST = {
   earF: 0,
   eyes: "open" as Eyes,
   hat: [0, 0] as Pt,
-  hatTilt: -7,
+  hatTilt: 12,
   tail: 0,
   paw: FIST,
   balloons: {} as Partial<Record<Piece, Pt>>,
@@ -751,17 +757,17 @@ export function tigerLayers(pose: TigerPose = {}): Layer[] {
         leg(hindNear(), [5.4, 3.9, 2.6, 3], [44.2, 67.2 - p.stepHN, 5.4, 2.7], [9.4, 13], 0, [[[46.6, 46 + b], [44.4, 50 + b], [43.2, 54 + b]], [[49.2, 48.2 + b], [46.8, 52 + b], [45.4, 56 + b]], [[42.4, 47 + b], [40.4, 50.6 + b], [39.6, 54 + b]]]),
       ),
     ),
+    at(placed(`legFN:${key([shoulder, elbow, wrist, paw])}`, () => leg([shoulder, elbow, wrist], [5, 3.8, 3], [paw[0], paw[1], 3.7, 3.4, true], [4.5, 8.5, 12.5]))),
     at(placed(`strings:${bunch.join()}:${key([paw, ...bunch.map(offset)])}`, () => strings(bunch.map((n) => [BALLOON_AT[n]!.knot[0] + offset(n)[0], BALLOON_AT[n]!.knot[1] + offset(n)[1]] as Pt), paw))),
     H(placed(`earF:${p.earF}`, () => ear(EAR_F[0], EAR_F[1], p.earF, true))),
     H(placed(`earN:${p.earN}`, () => ear(EAR_N[0], EAR_N[1], p.earN))),
     H(placed(`jaw:${p.jaw}`, () => jaw(p.jaw))),
     H(placed("head", head)),
-    H(placed(`eyeF:${p.eyes}`, () => eye(EYE_F[0], EYE_F[1], 3, p.eyes))),
-    H(placed(`eyeN:${p.eyes}`, () => eye(EYE_N[0], EYE_N[1], 4, p.eyes))),
+    H(placed(`eyeF:${p.eyes}`, () => eye(EYE_F[0], EYE_F[1], 5, p.eyes))),
+    H(placed(`eyeN:${p.eyes}`, () => eye(EYE_N[0], EYE_N[1], 6, p.eyes))),
     H(placed("whiskers", whiskers)),
     at(placed(`hat:${p.hatTilt}`, () => hat(p.hatTilt)), Math.round(p.head[0] + p.hat[0]), b + Math.round(p.head[1] + p.hat[1])),
     ...bunch.map((n) => at(placed(`balloon:${n}`, () => balloon(n, BALLOON_AT[n]!.at)), offset(n)[0], offset(n)[1])),
-    at(placed(`legFN:${key([shoulder, elbow, wrist, paw])}`, () => leg([shoulder, elbow, wrist], [5, 3.8, 3], [paw[0], paw[1], 3.7, 3.4, true], [4.5, 8.5, 12.5]))),
   ];
 }
 
@@ -780,4 +786,4 @@ export const TIGER: Character = {
 };
 
 /** The part of him a portrait shows (his head, ears and hat, a bit of his shoulders and vest collar), in frame pixels. */
-export const TIGER_PORTRAIT = { x: OX + 12, y: OY + 26, w: 29, h: 25 } as const;
+export const TIGER_PORTRAIT = { x: OX + 10, y: OY + 24, w: 27, h: 27 } as const;
