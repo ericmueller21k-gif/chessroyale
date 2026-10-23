@@ -217,7 +217,8 @@ only his balloons make him smile.
 - **Wince (780):** a flinch, eyes shut, ears flat, the hat jumping (0, `wince`), hunched (80, 180), eyes open half (290), an annoyed lash of
   his tail (420, `huff`), settles (550, 670).
 - **Hoops (1360, Alfil's Slam's length):** he rears up (0); standing, the strings moved to his far paw up behind his head, a burning hoop
-  in his near paw and a sour look (90, `flame`); winds it back over his head (200); throws (300, `throw1`: **the hoop leaves his paw**; the
+  in his near paw and a sour look (90, `flame`: the hoop burns as the board's does, tongues of fire licking up and out all round its
+  steel ring in the same colors, flickering each frame, held out toward the board clear of his muzzle); winds it back over his head (200); throws (300, `throw1`: **the hoop leaves his paw**; the
   board's `hoopFly` takes it from his paw to its block); the next hoop in his paw (390), back (490), `throw2` (580), the third (670), back
   (770), `throw3` (860); a weary huff with his eyes shut (950); down onto all fours (1100, 1190 `thump`).
 - **His attack on a king (2780, the shared beats):** shadow on the ground (0, 100), drops in (200, `drop`), lands with dust (360, `land`),

@@ -583,30 +583,42 @@ function turned(src: { part: Part; at: Pt }, deg: number, pivot: Pt): { part: Pa
   return { part: { grid: toGrid(cv), outline: src.part.outline }, at: [x0, y0] };
 }
 
-/** A burning hoop held up (his old act), its middle at (`cx`, `cy`), seen edge-on: a ring of steel with flames licking off it; `seed` flickers them. */
+/**
+ * A burning hoop held up (his old act), seen edge-on: a ring of steel with tongues of fire licking up and outward all round it, in the
+ * board ring's colors (white-hot at the ring to red at the tips); `seed` flickers them frame to frame.
+ */
+const HOOP_W = 21;
+const HOOP_H = 27;
 function hoopPart(seed: number): Part {
-  const [w, h] = [13, 17];
-  const cv = canvas(w, h);
-  const [cx, cy, rx, ry] = [6, 8.5, 3.6, 6.2];
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
+  const cv = canvas(HOOP_W, HOOP_H);
+  const [cx, cy, rx, ry] = [10.5, 16, 3.8, 6.6];
+  for (let y = 0; y < HOOP_H; y++)
+    for (let x = 0; x < HOOP_W; x++) {
       const d = ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2;
-      if (d >= 0.55 && d <= 1.05) cv[y]![x] = x < cx ? "=" : x > cx + 1 ? "%" : "&";
+      if (d >= 0.5 && d <= 1.05) cv[y]![x] = x < cx - 1 ? "=" : x > cx + 1 ? "%" : "&";
     }
-  // Flames up off the ring and out at its sides, a little different each frame.
-  for (let i = 0; i < 9; i++) {
-    const a = (i / 9) * Math.PI * 2 + seed * 0.7;
-    const ox = cx + Math.cos(a) * (rx + 1);
-    const oy = cy + Math.sin(a) * (ry + 1);
-    const len = 1 + ((i * 7 + seed * 3) % 3);
-    for (let j = 0; j < len; j++) {
-      const X = Math.round(ox + Math.cos(a) * j * 0.6);
-      const Y = Math.round(oy + Math.sin(a) * j * 0.6 - j);
-      if (cv[Y]?.[X] === ".") cv[Y]![X] = j === 0 ? "v" : j === 1 ? "u" : "p";
-    }
-    const X = Math.round(ox);
-    const Y = Math.round(oy);
-    if (cv[Y]?.[X] !== undefined && cv[Y]![X] !== "=" && cv[Y]![X] !== "&" && cv[Y]![X] !== "%") cv[Y]![X] = "Q";
+  const hash = (n: number) => ((Math.sin(n * 12.9898 + seed * 78.233) * 43758.5453) % 1 + 1) % 1;
+  const n = 14;
+  for (let i = 0; i < n; i++) {
+    const a = ((i + hash(i + 20) * 0.5) / n) * Math.PI * 2;
+    const [ox, oy] = [Math.cos(a), Math.sin(a)];
+    const [bx, by] = [cx + ox * (rx + 0.3), cy + oy * (ry + 0.3)];
+    let [dx, dy] = [ox, oy * 0.6 - 0.9];
+    const dl = Math.hypot(dx, dy) || 1;
+    [dx, dy] = [dx / dl, dy / dl];
+    const len = 3.2 + 3.2 * hash(i) - (oy > 0.6 ? 1.6 : 0);
+    const width = 1.5;
+    for (let y = 0; y < HOOP_H; y++)
+      for (let x = 0; x < HOOP_W; x++) {
+        if (cv[y]![x] !== "." && !"pu".includes(cv[y]![x]!)) continue;
+        const [px, py] = [x + 0.5 - bx, y + 0.5 - by];
+        const along = px * dx + py * dy;
+        const across = Math.abs(-px * dy + py * dx + Math.sin(along + i + seed) * 0.4);
+        if (along < -0.6 || along > len) continue;
+        const f = Math.max(0, along) / len;
+        if (across > width * (1 - f * 0.8)) continue;
+        cv[y]![x] = f < 0.2 && across < 0.8 ? "R" : f < 0.45 ? "Q" : f < 0.72 ? "v" : f < 0.9 ? "u" : "p";
+      }
   }
   return { grid: toGrid(cv) };
 }
@@ -774,7 +786,8 @@ export function tigerLayers(pose: TigerPose = {}): Layer[] {
     return leg([shoulderF, elbowOf(shoulderF, wristF, BONES), wristF], [4.4, 3.3, 3], [pawF![0], pawF![1], 3.4, 3.1, true], [6, 10.5], 0.2);
   };
   const inPaw: Layer[] = [];
-  if (p.hoop !== undefined) inPaw.push({ part: `hoop:${p.hoop % 4}`, x: OX + Math.round(paw[0]) - 10, y: OY + Math.round(paw[1]) - 14 });
+  // (A hoop is held out ahead of him, toward the board, its foot in his fist: clear of his muzzle.)
+  if (p.hoop !== undefined) inPaw.push({ part: `hoop:${p.hoop % 4}`, x: OX + Math.round(paw[0]) - HOOP_W + 1, y: OY + Math.round(paw[1]) - HOOP_H + 6 });
   if (p.limp) inPaw.push({ part: "limp", x: OX + Math.round(paw[0]) - 4, y: OY + Math.round(paw[1]) - 9 });
   if (p.bat !== undefined) inPaw.push({ part: `bat:${p.bat % BAT_KEYS.length}`, x: OX + Math.round(paw[0]) - 5, y: OY + Math.round(paw[1]) - 11 });
   const layers: Layer[] = [
@@ -1074,7 +1087,7 @@ const wince: Anim = {
 
 /** The hoops (his ultimate's cast, Alfil's Slam's length): up on his hind legs with a burning hoop, the old act and a sour look; three throws. */
 const HOOP_HOLD: Pt = [25, 34];
-const HOOP_BACK: Pt = [37, 24];
+const HOOP_BACK: Pt = [38, 18];
 const HOOP_THROW: Pt = [22, 42];
 const hoops: Anim = {
   loop: false,
