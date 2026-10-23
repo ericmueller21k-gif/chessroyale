@@ -8502,12 +8502,13 @@ button.fd-logo {
 
 /*
  * -- The Boss raid screen's character select (Eric, Oct 16: SF2 / PlayStation era; bs- for boss select) --
- * A fighting game's grid (Eric, Oct 21 and 23): slanted tiles that touch, rows that touch, the block nearly the screen's
- * full width (a 10 px buffer at the top and both sides; the rest of the page's padding is taken back by a negative margin),
- * five to a row on a phone and seven from 520 px (BossSelect's `--bs-per`). Each tile is a parallelogram (clip-path, so
- * neighbors share their slanted edge and nothing sticks out sideways); a row's outer tiles are cut straight, so the block's
- * edges are even; the short row's tiles are wider, so every row ends flush. One thin frame line between neighbors (each
- * tile's 1 px ring and its neighbor's), the picked one's ring gold and 3 px. docs/decisions/2026-10-23-boss-select-grid.md.
+ * A fighting game's grid (Eric, Oct 21 to 23; the last look from Street Fighter 6's select): tall slanted tiles, all the same
+ * size, a small gap between them, five to a row on a phone and a computer alike (BossSelect's `--bs-per`), a short row
+ * centered. The block takes back all but 10 px of the page's padding at the top and both sides, so on a phone it's nearly the
+ * screen's width; on a computer the tiles stop growing at 96 px and the block stays in the middle of the column. Each tile is
+ * a parallelogram (clip-path: nothing sticks out sideways, and a tap lands on the right tile where boxes overlap) holding the
+ * boss's whole figure, which its slanted corners cut off, on a color from its palette. The picked one's frame is gold.
+ * docs/decisions/2026-10-23-boss-select-sf.md.
  */
 .bs-select {
   display: flex;
@@ -8515,31 +8516,31 @@ button.fd-logo {
   gap: 10px;
 }
 .bs-tiles {
-  /* (A row of n touching tiles is n wide minus (n - 1) slants; the slant is 16% of a tile's width and a tile is 0.9 as
-     tall as wide, whichever row it's in: --bs-w is the width of a tile in a full row. cqi: the block's own width.) */
+  /* (A row of n tiles with a gap between them is n wide, less n - 1 slants, plus n - 1 gaps; the slant is a fifth of a tile's
+     width and a tile is 1.24 as tall as wide, which makes its visible width 1 to 1.55 of its height. --bs-w: a tile's width in a
+     full row, at most 96 px. cqi: the block's own width.) */
   --bs-per: 5;
-  --bs-w: calc(100cqi / (var(--bs-per) - 0.16 * (var(--bs-per) - 1)));
-  --bs-slant: calc(var(--bs-w) * 0.16);
-  --bs-h: calc(var(--bs-w) * 0.9);
+  --bs-gap: 5px;
+  --bs-w: min(calc((100cqi - (var(--bs-per) - 1) * var(--bs-gap)) / (var(--bs-per) - 0.2 * (var(--bs-per) - 1))), 96px);
+  --bs-slant: calc(var(--bs-w) * 0.2);
+  --bs-h: calc(var(--bs-w) * 1.24);
   container-type: inline-size;
   display: flex;
   flex-direction: column;
+  gap: var(--bs-gap);
   /* (The page pads 18 px: 8 px back leaves 10 px; 6 px back from the header above leaves 10 px too.) */
   margin: -6px -8px 0;
-  /* The frame's outer line (the tiles' rings are inside it), and the color the frame shows when a tile is pressed in. */
-  padding: 1px;
-  background: var(--bs-edge);
 }
 .bs-row {
   display: flex;
+  justify-content: center;
   height: var(--bs-h);
 }
 .bs-tile {
   --bs-shape: polygon(var(--bs-slant) 0, 100% 0, calc(100% - var(--bs-slant)) 100%, 0 100%);
-  --bs-line: 1px;
+  --bs-line: 2px;
   position: relative;
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 0 0 var(--bs-w);
   padding: 0;
   border: 0;
   background: var(--bs-edge);
@@ -8547,19 +8548,9 @@ button.fd-logo {
   cursor: pointer;
   transition: transform 80ms;
 }
-/* Neighbors share a slanted edge: each tile starts one slant back under the last. */
+/* Neighbors keep the gap along their slanted edge: each starts one slant back, less the gap, from the last. */
 .bs-tile + .bs-tile {
-  margin-left: calc(var(--bs-slant) * -1);
-}
-/* A row's outer ends are straight, so the block has even edges. */
-.bs-tile:first-child {
-  --bs-shape: polygon(0 0, 100% 0, calc(100% - var(--bs-slant)) 100%, 0 100%);
-}
-.bs-tile:last-child {
-  --bs-shape: polygon(var(--bs-slant) 0, 100% 0, 100% 100%, 0 100%);
-}
-.bs-tile:only-child {
-  --bs-shape: none;
+  margin-left: calc(var(--bs-gap) - var(--bs-slant));
 }
 .bs-tile-in {
   position: absolute;
@@ -8570,21 +8561,31 @@ button.fd-logo {
   clip-path: var(--bs-shape);
   background: linear-gradient(160deg, var(--bs-fill-hi), var(--bs-fill));
 }
-/* (As wide as in a full row, whichever row the tile is in.) */
-.bs-tile .boss-portrait {
-  width: calc(var(--bs-w) * 0.62);
+/* A boss's color: its tint softened into a gradient, so its figure stands out from it. */
+.bs-tile-in.bs-tinted {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--bs-tint) var(--bs-mix-hi), var(--bs-base-hi)), color-mix(in srgb, var(--bs-tint) var(--bs-mix-lo), var(--bs-base-lo)));
+}
+/* The boss's whole figure (BossArt): scaled by its framing so `--span` of its frame's pixels fit across the tile, its neck
+   (--ax, --ay) in the tile's middle, `--at` of the way down; the tile's shape cuts off the rest. */
+.bs-art {
+  --u: calc(var(--bs-w) / var(--span));
+  position: absolute;
+  left: calc(50% - var(--ax) * var(--u));
+  top: calc(var(--at) * 100% - var(--ay) * var(--u));
+  width: calc(var(--aw) * var(--u));
+  height: calc(var(--ah) * var(--u));
+  max-width: none;
+  image-rendering: pixelated;
+  pointer-events: none;
 }
 .bs-tile.on {
   --bs-line: 3px;
   background: var(--fd-gold);
 }
-.bs-tile.on .bs-tile-in {
-  background: linear-gradient(160deg, var(--fd-gold-soft), var(--bs-fill));
-}
 .bs-tile:active {
   transform: scale(0.95);
 }
-/* The Hidden Boss's tile: dark, his portrait a silhouette edged in violet. */
+/* The Hidden Boss's tile: dark, his figure a silhouette edged in violet. */
 .bs-tile.bs-locked .bs-tile-in {
   background: #0b0a10;
 }
@@ -8604,11 +8605,20 @@ button.fd-logo {
   --bs-edge: #3d4453;
   --bs-fill: #1b1e25;
   --bs-fill-hi: #2a2f3a;
+  /* (A boss's tint over these: a good part of it in the dark theme, so its figure's lights stand out.) */
+  --bs-base-hi: #20242d;
+  --bs-base-lo: #101217;
+  --bs-mix-hi: 52%;
+  --bs-mix-lo: 34%;
 }
 :root[data-theme="light"] {
   --bs-edge: #c9c3b7;
   --bs-fill: #e3dfd6;
   --bs-fill-hi: #f6f3ee;
+  --bs-base-hi: #fbf8f2;
+  --bs-base-lo: #e9e3d8;
+  --bs-mix-hi: 34%;
+  --bs-mix-lo: 52%;
 }
 /* The stage: the picked boss on the 1 v 1 stage's platform (dv-st-plat), in his idle; his name and strength under it. */
 .bs-stage {
@@ -8623,11 +8633,16 @@ button.fd-logo {
   aspect-ratio: 124 / 96;
   container-type: inline-size;
 }
-/* A short screen (a small phone's 568 to 667 px): the stage a fifth smaller (220 px wide, not 280), so the ways to play under it
-   stay on screen as they were before the tiles grew (the page scrolls from there). */
+/* A short screen: the stage smaller, so the tall tiles above it leave the ways to play under it on the screen where they can (the page
+   scrolls from there): 210 px wide, not 280, up to 800 px tall (Eric's iPhone is 777), 170 px up to 700 (the small phones). */
+@media (max-height: 800px) {
+  .bs-spot {
+    width: min(100%, 210px);
+  }
+}
 @media (max-height: 700px) {
   .bs-spot {
-    width: min(100%, 220px);
+    width: min(100%, 170px);
   }
 }
 .bs-spot::before {

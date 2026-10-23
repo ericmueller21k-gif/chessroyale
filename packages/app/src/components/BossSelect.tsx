@@ -3,11 +3,11 @@ import { bossThreat, hiddenBosses, menuBosses, type BossDef, type BossDifficulty
 import { bossAloneElo, difficultyLabel } from "../boss-difficulty.ts";
 import { bossKit } from "../characters/kits.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
-import { rowSizes, SELECT_SOUND, selectLine, TILES_PER_ROW, WIDE_QUERY } from "../characters/boss-select.ts";
+import { rowSizes, SELECT_SOUND, SELECT_TINT, selectLine, TILES_PER_ROW } from "../characters/boss-select.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { playOnTap, warmSounds } from "../sound.ts";
 import { NORMAL, Voice, VoiceBubble } from "../speech.tsx";
-import { BossFace } from "./BossCharacter.tsx";
+import { BossArt, BossFace } from "./BossCharacter.tsx";
 import { SpriteAnim } from "./BossEffect.tsx";
 import { useMedia } from "./QuickChat.tsx";
 
@@ -19,10 +19,10 @@ import { useMedia } from "./QuickChat.tsx";
  * its idle animation, its name and its strength against you: Boss alone's at your difficulty (the number its menu shows
  * for it, so a boss never has two numbers on screen), the difficulty named after it unless it's Normal.
  *
- * The tiles are a fighting game's select grid (Eric, Oct 21 and 23: "basically the full width of the screen with a little bit
- * of a buffer… touching borders… like a Tekken or Street Fighter", "a little bit bigger too"): rows that touch, five to a
- * row on a phone and seven where the column is wide, the outer ends cut straight, the short row's tiles wider so every
- * row ends flush (`rowSizes`). docs/decisions/2026-10-23-boss-select-grid.md.
+ * The tiles are a fighting game's select grid (Eric, Oct 21 to 23; the last look from Street Fighter 6's): tall slanted tiles,
+ * all the same size, a small gap between them, five to a row on a phone and a computer alike (a short row centered), each
+ * with the boss's whole figure framed from the neck up and cut off by the tile's corners, on a color from its own palette.
+ * No names on the tiles. docs/decisions/2026-10-23-boss-select-sf.md.
  *
  * A tap drops the boss onto the stage (the 1 v 1 opponent's drop, `dv-st-drop`), plays its sound once (SELECT_SOUND,
  * through the mute switch) and says one of its lines in its speech bubble (SELECT_LINES, its own voice here). The Hidden
@@ -71,7 +71,6 @@ export function BossSelect({ value, rating, difficulty, onPick }: { value: strin
   useServerStatus();
   const { bosses, hidden } = selectBosses();
   const still = useMedia("(prefers-reduced-motion: reduce)");
-  const per = useMedia(WIDE_QUERY) ? TILES_PER_ROW.wide : TILES_PER_ROW.phone;
   // Each tap (re)starts the drop and the idle under it.
   const [drop, setDrop] = useState({ n: 0, at: Date.now() });
   const hiddenIds = new Set(hidden.map((b) => b.id));
@@ -100,21 +99,23 @@ export function BossSelect({ value, rating, difficulty, onPick }: { value: strin
   const elo = def && !dark ? bossAloneElo(rating, def, difficulty) : null;
   const kit = def ? bossKit(def.name) : null;
   const idle = kit ? (kit.anims.idle ?? "idle") : null;
-  const tile = (id: string, label: string, body: preact.ComponentChildren, cls = "") => (
+  const tile = (id: string, label: string, body: preact.ComponentChildren, cls = "", tint?: string) => (
     <button type="button" role="radio" key={id || "random"} aria-checked={value === id} aria-label={label} class={`bs-tile${cls}${value === id ? " on" : ""}`} data-boss={hiddenIds.has(id) ? "hidden" : id || "random"} onClick={() => tap(id)}>
-      <span class="bs-tile-in">{body}</span>
+      <span class={`bs-tile-in${tint ? " bs-tinted" : ""}`} style={tint ? { "--bs-tint": tint } : undefined}>
+        {body}
+      </span>
     </button>
   );
   const tiles = [
-    ...bosses.map((b) => tile(b.id, b.name, <BossFace boss={b} label="" />)),
-    ...hidden.map((b) => tile(b.id, "Locked boss", <BossFace boss={b} label="" class="bs-shadow" />, " bs-locked")),
+    ...bosses.map((b) => tile(b.id, b.name, <BossArt boss={b} />, "", SELECT_TINT[b.id])),
+    ...hidden.map((b) => tile(b.id, "Locked boss", <BossArt boss={b} class="bs-shadow" />, " bs-locked")),
     tile(RANDOM, "Random boss", <span class="bs-q" aria-hidden="true">?</span>, " bs-random"),
   ];
-  const rows = rowSizes(tiles.length, per).map((n) => tiles.splice(0, n));
+  const rows = rowSizes(tiles.length, TILES_PER_ROW).map((n) => tiles.splice(0, n));
   return (
     <div class="bs-select">
       {/* (Rows are layout only: the radios stay one group, in order.) */}
-      <div class="bs-tiles" role="radiogroup" aria-label="Bosses" style={{ "--bs-per": per }}>
+      <div class="bs-tiles" role="radiogroup" aria-label="Bosses" style={{ "--bs-per": TILES_PER_ROW }}>
         {rows.map((row, i) => (
           <div class="bs-row" role="presentation" key={i}>
             {row}

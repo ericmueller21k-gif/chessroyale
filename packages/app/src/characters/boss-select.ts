@@ -75,15 +75,20 @@ export function selectLine(id: string, last: string | null, rand: number = Math.
   return pool[Math.min(pool.length - 1, Math.floor(rand * pool.length))]!;
 }
 
-/** Tiles to a row: a phone's five, and seven from 480 px (the Boss raid column is 560 px at most: three rows of five would
- *  make each tile 100 px wide there). The CSS reads it as `--bs-per`. */
-export const TILES_PER_ROW = { phone: 5, wide: 7 } as const;
-export const WIDE_QUERY = "(min-width: 480px)";
+/**
+ * Tiles to a row, on a phone and a computer alike (Eric, Oct 23: "just 5 per row, and it doesn't matter if you're on a
+ * desktop"). The CSS reads it as `--bs-per`.
+ */
+export const TILES_PER_ROW = 5;
+
+/** A tile's height as a multiple of its width (styles.css, `--bs-h`): its visible width is 0.8 of its width (the slant is 0.2), so
+ *  it is 1.55 times as tall as that. */
+export const TILE_RATIO = 1.24;
 
 /**
  * How many tiles go in each row for `n` tiles with at most `per` to a row: as few rows as that takes, then the tiles shared
- * out evenly, the longer rows first (fourteen on a phone: 5, 5, 4; on a computer 7, 7; fifteen: 5, 5, 5). So a new boss
- * never leaves one tile alone on a row, and no row is more than one tile shorter than another.
+ * out evenly, the longer rows first (fourteen: 5, 5, 4; fifteen: 5, 5, 5; sixteen: 4, 4, 4, 4). So a new boss never leaves
+ * one tile alone on a row, and no row is more than one tile shorter than another. A short row is centered.
  */
 export function rowSizes(n: number, per: number): number[] {
   if (n <= 0) return [];
@@ -92,3 +97,55 @@ export function rowSizes(n: number, per: number): number[] {
   const extra = n % rows;
   return Array.from({ length: rows }, (_, i) => base + (i < extra ? 1 : 0));
 }
+
+/**
+ * How a boss's whole figure sits in its tile (Eric, Oct 23, from a Street Fighter 6 select: "the full character sprite, but
+ * it simply gets cut off on the corners of the boxes… use their neck area as the starting point"). The figure is the
+ * portrait's frame at full size; the tile's slanted shape cuts off what doesn't fit.
+ *  - `neck`: the figure's neck, in its frame's pixels (x across, y down): pinned to the tile's middle, `at` of the way down.
+ *  - `span`: how many of the frame's pixels fit across the tile (a smaller number is a closer shot).
+ *  - `at`: how far down the tile the neck sits (0 to 1): the head is above it, the body below, running on past the edge.
+ * Tuned by eye in the 4x sheet of every tile (docs/decisions/2026-10-23-boss-select-sf.md). A test checks that the figure
+ * covers the whole tile and that its head is inside it.
+ */
+export interface Framing {
+  neck: readonly [x: number, y: number];
+  span: number;
+  at: number;
+}
+export const SELECT_FRAMING: Readonly<Record<string, Framing>> = {
+  gingerbread: { neck: [44, 49], span: 44, at: 0.42 },
+  clown: { neck: [37, 49], span: 55, at: 0.52 },
+  grex: { neck: [38, 55], span: 62, at: 0.4 },
+  hollow: { neck: [51, 50], span: 64, at: 0.4 },
+  bigboy: { neck: [49, 50], span: 57, at: 0.52 },
+  sawyer: { neck: [45, 40], span: 56, at: 0.57 },
+  pig: { neck: [43, 50], span: 55, at: 0.66 },
+  alfil: { neck: [35, 52], span: 59, at: 0.55 },
+  hopper: { neck: [38, 42], span: 57, at: 0.47 },
+  smudgy: { neck: [41, 46], span: 55.5, at: 0.51 },
+  moo: { neck: [36, 58], span: 56, at: 0.39 },
+  gardener: { neck: [48, 56], span: 57, at: 0.42 },
+  recluse: { neck: [33, 47], span: 61, at: 0.5 },
+};
+
+/**
+ * The color behind each boss's figure (Eric, Oct 23: "make the background kind of appropriate based on their colors, but…
+ * it can't be something that makes it so they're difficult to see"): a color from the boss's own palette, chosen to stand
+ * apart from the figure's, which the stylesheet softens into a gradient (darker in the dark theme, lighter in the light
+ * one). The Hidden Boss's tile is always dark and "?" has a neutral fill: neither is here.
+ */
+export const SELECT_TINT: Readonly<Record<string, string>> = {
+  gingerbread: "#3fae4f",
+  clown: "#4aa3ff",
+  grex: "#e5566a",
+  hollow: "#ffcf3a",
+  bigboy: "#a24cf5",
+  sawyer: "#e1262c",
+  pig: "#fff3b0",
+  alfil: "#1d3d8c",
+  hopper: "#9fd8ff",
+  smudgy: "#0e5c60",
+  moo: "#5d7ad8",
+  gardener: "#7fe0ae",
+};

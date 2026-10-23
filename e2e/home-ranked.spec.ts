@@ -124,7 +124,7 @@ test("the Boss raid card opens its screen; each choice reaches its flow (a raid'
     "Play with friendsMake a raid and share its code, or join one",
   ]);
   await expect(main.locator(".rd-about")).toHaveText("Up to 50 of you pick the crowd's moves together against a boss. The most popular pick is played.");
-  await expect(main.locator(".bs-tile canvas.boss-portrait").first()).toBeVisible();
+  await expect(main.locator(".bs-tile canvas.bs-art").first()).toBeVisible();
   for (const b of await main.locator(".rd-option").all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await sideways(page)).toBe(0);
 
