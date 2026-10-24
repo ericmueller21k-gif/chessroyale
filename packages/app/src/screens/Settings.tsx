@@ -36,40 +36,48 @@ interface SoundOption {
 const REVEAL_SOUNDS: readonly SoundOption[] = (Object.keys(REEL_VOICES) as ReelVoice[]).map((id) => ({ id, label: REEL_VOICES[id].label, note: REEL_VOICES[id].blurb }));
 
 /**
- * A sound picker (Move, Capture and Reveal sound): each option is a radio (picking it plays it) with its own ▶ to hear
- * it without picking. Kept on the device; the first option is the default.
+ * A sound picker (Move, Capture and Reveal sound; Eric, Oct 24: "make these lists collapsed by default ... do this for all
+ * sound fx and future sound fx options"). Collapsed, it shows the title, the current pick's name and a chevron; a tap on
+ * the title row opens the list: each option is a radio (picking it plays it and keeps the list open) with its own ▶ to
+ * hear it without picking. Each picker opens on its own. The open state isn't stored, so Settings opens collapsed.
+ * Kept on the device; the first option is the default.
  */
 function SoundPicker(props: { title: string; options: readonly SoundOption[]; chosen: string; pick: (id: string) => string; hear: (id: string) => void; children: ComponentChildren }) {
   const { title, options, pick, hear, children } = props;
   const [chosen, setChosen] = useState(props.chosen);
+  const [open, setOpen] = useState(false);
   return (
     <div class="ps-picker">
-      <span class="fd-toggle-text">
+      <button type="button" class="ps-head" aria-expanded={open} onClick={() => setOpen(!open)}>
         <strong>{title}</strong>
-        <span>{children}</span>
-      </span>
-      <div class="ps-list" role="radiogroup" aria-label={title}>
-        {options.map((o) => (
-          <div key={o.id} class={`ps-row${chosen === o.id ? " on" : ""}`}>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={chosen === o.id}
-              class="ps-choice"
-              onClick={() => {
-                setChosen(pick(o.id));
-                hear(o.id);
-              }}
-            >
-              <strong>{o.label}</strong>
-              <span>{o.note}</span>
-            </button>
-            <button type="button" class="ps-play" aria-label={`Play ${o.label}`} onClick={() => hear(o.id)}>
-              {"\u25B6\uFE0E"}
-            </button>
-          </div>
-        ))}
-      </div>
+        <span class="ps-now">{options.find((o) => o.id === chosen)?.label}</span>
+        <span class="ps-chev" aria-hidden="true">{"▾"}</span>
+      </button>
+      <div class="ps-note">{children}</div>
+      {open && (
+        <div class="ps-list" role="radiogroup" aria-label={title}>
+          {options.map((o) => (
+            <div key={o.id} class={`ps-row${chosen === o.id ? " on" : ""}`}>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={chosen === o.id}
+                class="ps-choice"
+                onClick={() => {
+                  setChosen(pick(o.id));
+                  hear(o.id);
+                }}
+              >
+                <strong>{o.label}</strong>
+                <span>{o.note}</span>
+              </button>
+              <button type="button" class="ps-play" aria-label={`Play ${o.label}`} onClick={() => hear(o.id)}>
+                {"\u25B6\uFE0E"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

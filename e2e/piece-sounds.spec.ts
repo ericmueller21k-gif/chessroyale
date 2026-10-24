@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { test } from "./helpers.ts";
 import { CAPTURE_SOUNDS, CASTLE_SOUND, MOVE_SOUNDS } from "../packages/app/src/piece-sounds.ts";
 
@@ -7,26 +7,36 @@ import { CAPTURE_SOUNDS, CASTLE_SOUND, MOVE_SOUNDS } from "../packages/app/src/p
  * beside them (Oct 15). The classic knocks (PyChess's) by default, then their variations and the other wood; ▶ plays
  * one without picking it (loading only that file); a pick is kept on the device; the first tap (as a game starts)
  * loads only the picked sounds; every option's file decodes in the browser, starts on its hit and is as loud as the
- * classic; and the classics are credited.
+ * classic; and the classics are credited. Each list is collapsed until a tap on its title row (Oct 24).
  */
 test.use({ serviceWorkers: "block" }); // (the service worker would precache every file, hiding what the app loads)
 
 /** The piece sounds requested: the classics (sounds/*.mp3) and the rest (sounds/pieces/). */
 const pieceFiles = (urls: string[]) => [...new Set(urls.filter((u) => /\/sounds\/(pieces\/)?[^/]+\.mp3$/.test(new URL(u).pathname)).map((u) => new URL(u).pathname))].sort();
 
+/** Opens one sound block by its title row (a tap only if it's still collapsed, so a repeat call doesn't close it). */
+async function openSound(page: Page, title: string) {
+  const head = page.getByRole("button", { name: title });
+  if ((await head.getAttribute("aria-expanded")) !== "true") await head.click();
+  await expect(head).toHaveAttribute("aria-expanded", "true");
+}
+
 test("piece sounds: pick a move and a capture sound, hear one, and they're kept after a reload", async ({ page }) => {
   await page.addInitScript(() => ((window as any).__soundLog = []));
   const requested: string[] = [];
   page.on("request", (r) => requested.push(r.url()));
   await page.goto("/settings?debug");
+  // Nothing loaded before a tap (the first tap of a visit loads the picked sounds and the classics: see below).
+  expect(pieceFiles(requested)).toEqual([]);
+  await openSound(page, "Move sound");
+  await openSound(page, "Capture sound");
   const move = page.getByRole("radiogroup", { name: "Move sound" });
   const capture = page.getByRole("radiogroup", { name: "Capture sound" });
   await expect(move.getByRole("radio")).toHaveCount(9);
   await expect(capture.getByRole("radio")).toHaveCount(9);
-  // The classics until you pick, and nothing loaded before a tap.
+  // The classics until you pick.
   await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Classic knock/);
   await expect(capture.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Classic double knock/);
-  expect(pieceFiles(requested)).toEqual([]);
   // The classic first, its three variations next, then the other wood (Eric, Oct 12).
   const names = (g: typeof move) => g.getByRole("radio").locator("strong").allTextContents();
   expect(await names(move)).toEqual(MOVE_SOUNDS.map((o) => o.label));
@@ -48,14 +58,17 @@ test("piece sounds: pick a move and a capture sound, hear one, and they're kept 
   expect(await page.evaluate(() => (window as any).__soundLog)).toEqual(["preview:move:ringing-wood", "preview:move:wood-tap", "preview:capture:double-knock"]);
 
   // Kept on the device: the same after a reload.
+  requested.length = 0;
   await page.reload();
+  // (Opening the lists is the first tap of this visit: it loads the picked sounds, the classics and castling's classic knock.)
+  await openSound(page, "Move sound");
+  await openSound(page, "Capture sound");
   await expect(page.getByRole("radiogroup", { name: "Move sound" }).getByRole("radio", { checked: true })).toHaveAccessibleName(/^Wooden tap/);
   await expect(page.getByRole("radiogroup", { name: "Capture sound" }).getByRole("radio", { checked: true })).toHaveAccessibleName(/^Double knock/);
   expect(await page.evaluate(() => [localStorage.getItem("brc.moveSound"), localStorage.getItem("brc.captureSound")])).toEqual(["wood-tap", "double-knock"]);
 
   // The first tap loads the picked sounds, the classics (the defaults: the judge's gavel is built from them) and
-  // castling's classic knock, not the other options.
-  requested.length = 0;
+  // castling's classic knock, not the other options; ▶ then loads the one it plays.
   await page.getByRole("button", { name: "Play Big wood" }).click();
   await expect
     .poll(() => pieceFiles(requested), { timeout: 10_000 })
@@ -85,6 +98,56 @@ test("piece sounds: pick a move and a capture sound, hear one, and they're kept 
   // A variation of the classic plays as picked, too.
   await moves.getByRole("radio", { name: /^Classic deep/ }).click();
   await expect.poll(async () => Math.abs((await level("move")).peak - tap.peak), { timeout: 10_000 }).toBeGreaterThan(0.01);
+});
+
+test("piece sounds: each Sound list is collapsed when Settings opens, a tap opens it with every ▶, and it's collapsed again after a reload or a visit elsewhere", async ({ page }) => {
+  await page.goto("/settings");
+  const lists = [
+    { title: "Move sound", pick: "Classic knock", count: 9 },
+    { title: "Capture sound", pick: "Classic double knock", count: 9 },
+    { title: "Reveal sound", pick: "Steel pan", count: 6 },
+  ];
+  const head = (title: string) => page.getByRole("button", { name: title });
+  // Collapsed when Settings opens: the title row shows the current pick's name, and no option is in the page.
+  for (const { title, pick } of lists) {
+    await expect(head(title)).toHaveAttribute("aria-expanded", "false");
+    await expect(head(title)).toContainText(pick);
+    await expect(page.getByRole("radiogroup", { name: title })).toHaveCount(0);
+  }
+  // A tap on the title row opens its list: every option, each with its ▶. The blocks open on their own.
+  for (const { title, count } of lists) {
+    await head(title).click();
+    await expect(head(title)).toHaveAttribute("aria-expanded", "true");
+    const group = page.getByRole("radiogroup", { name: title });
+    await expect(group.getByRole("radio")).toHaveCount(count);
+    await expect(group.getByRole("button", { name: /^Play / })).toHaveCount(count);
+  }
+  // A tap on an open title row closes it; the others stay open.
+  const move = page.getByRole("radiogroup", { name: "Move sound" });
+  await head("Move sound").click();
+  await expect(head("Move sound")).toHaveAttribute("aria-expanded", "false");
+  await expect(move).toHaveCount(0);
+  await expect(head("Capture sound")).toHaveAttribute("aria-expanded", "true");
+  await head("Move sound").click();
+  // A pick keeps its list open, shows its name on the title row, and is kept after a reload (collapsed again then).
+  await move.getByRole("radio", { name: /^Wooden tap/ }).click();
+  await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Wooden tap/);
+  await expect(head("Move sound")).toHaveAttribute("aria-expanded", "true");
+  await expect(head("Move sound")).toContainText("Wooden tap");
+  await page.reload();
+  await expect(head("Move sound")).toHaveAttribute("aria-expanded", "false");
+  await expect(head("Move sound")).toContainText("Wooden tap");
+  await expect(move).toHaveCount(0);
+  await head("Move sound").click();
+  await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Wooden tap/);
+  // Leaving Settings and coming back: all collapsed again, the pick kept.
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Settings" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Settings", exact: true }).first().click();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  for (const { title } of lists) await expect(head(title)).toHaveAttribute("aria-expanded", "false");
+  await expect(head("Move sound")).toContainText("Wooden tap");
+  await expect(move).toHaveCount(0);
 });
 
 test("piece sounds: the classics and their variations are credited to PyChess (GPL-3.0), with the license served", async ({ page }) => {
@@ -171,6 +234,7 @@ test("the reveal sound (Settings → Sound, beside the piece sounds): the steel 
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.addInitScript(() => ((window as any).__soundLog = []));
   await page.goto("/settings");
+  await openSound(page, "Reveal sound");
   const reveal = page.getByRole("radiogroup", { name: "Reveal sound" });
   expect(await reveal.getByRole("radio").locator("strong").allTextContents()).toEqual(["Steel pan", "Kalimba", "Marimba", "Glockenspiel", "Music box", "8-bit blip"]);
   await expect(reveal.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Steel pan/);
@@ -183,6 +247,7 @@ test("the reveal sound (Settings → Sound, beside the piece sounds): the steel 
   // A pick (it plays too), kept on the device.
   await reveal.getByRole("radio", { name: /^Marimba/ }).click();
   await page.reload();
+  await openSound(page, "Reveal sound");
   await expect(page.getByRole("radiogroup", { name: "Reveal sound" }).getByRole("radio", { checked: true })).toHaveAccessibleName(/^Marimba/);
   expect(await page.evaluate(() => localStorage.getItem("brc.reelVoice"))).toBe("marimba");
 });

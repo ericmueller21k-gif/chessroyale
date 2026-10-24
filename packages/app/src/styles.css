@@ -9520,6 +9520,44 @@ a.fd-row-link {
   border-radius: 14px;
   padding: 12px;
 }
+/* The title row (one button, collapsed by default: the title, the current pick's name, a chevron that turns when open). */
+.ps-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fd-text);
+  font: 600 14px Archivo, system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.ps-head strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+.ps-now {
+  min-width: 0;
+  color: var(--fd-sub);
+  overflow-wrap: anywhere;
+}
+.ps-chev {
+  margin-left: auto;
+  flex: none;
+  color: var(--fd-sub);
+  font-size: 14px;
+}
+.ps-head[aria-expanded="true"] .ps-chev {
+  transform: rotate(180deg);
+}
+.ps-note {
+  font-size: 13px;
+  color: var(--fd-sub);
+}
 .ps-list {
   display: flex;
   flex-direction: column;

@@ -72,6 +72,8 @@ test("settings: the sections in order, the board's choices stick, and Testing (p
   // switches, the sound lab (its choice is the Reveal sound picker).
   await expect(page.getByRole("switch", { name: /Practice mode|Eval bar|Pre-game votes/ })).toHaveCount(0);
   await expect(page.getByText(/Opening moves|Sound lab/)).toHaveCount(0);
+  // (The Reveal sound list is collapsed until its title is tapped, Oct 24.)
+  await page.getByRole("button", { name: "Reveal sound" }).click();
   await expect(page.getByRole("radiogroup", { name: "Reveal sound" })).toBeVisible();
   // Board: animations off takes the motion trail with it; both stick.
   const anim = page.getByRole("switch", { name: /Animations/ });
