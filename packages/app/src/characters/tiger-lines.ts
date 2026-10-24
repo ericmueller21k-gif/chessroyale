@@ -18,7 +18,7 @@ export const TIGER_LINES: Partial<Record<Beat, readonly string[]>> = {
   capture: ["Pop goes your piece.", "That one didn't make the show.", "Swat."],
   hurt: ["Hey! Watch the whiskers.", "Rude. I was concentrating.", "That's coming out of your ticket."],
   strike: ["Swat!", "Claws out. Just this once."],
-  thinking: ["Hmm… a giraffe? No. A knight.", "Don't rush the artist."],
+  thinking: ["Thinking. Please hold your applause.", "Don't rush the artist."],
   check: ["Check. Ta-da.", "Check. The crowd goes mild."],
   smug: ["Now that's showmanship.", "Balloon artist. Chess genius. Same paws."],
   rattled: ["This was not in the act!", "Somebody get the ringmaster!"],

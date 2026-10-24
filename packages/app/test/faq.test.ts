@@ -85,7 +85,7 @@ describe("the FAQ's contents", () => {
     expect(p.balloonPops.bishop).toBe(p.balloonPops.knight);
     expect(p.balloonPops.rook).toBe(p.balloonPops.knight);
     expect(words).toContain(`duds that always pop (${o.fakeQueen} in every ${o.queen + o.fakeQueen}), and you can't tell which`);
-    expect(words).toContain("about 50% of his balloons pop");
+    expect(words).toContain("about 58% of his balloons pop");
     expect(words).toContain("never a square you attack (you can't take it at once)");
     expect(words).toContain("beyond what his missing pawns could have promoted into");
     expect(words).toContain(`throws ${p.hoopsCount} burning hoops`);

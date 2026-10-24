@@ -8,7 +8,7 @@ import { test, bossAloneFromHome, createLobbyFromHome, submitMove } from "./help
  * Babur, the circus tiger (id tiger; docs/decisions/2026-10-23-tiger-rules.md and 2026-10-24-tiger-wired.md), played alone, the state
  * read from the game and what the page draws watched every frame:
  * - Balloons: a balloon put on the pump at the start of his turn (on a phone his hop along the bar to it and back, on a computer a limp
- *   balloon tossed from his paw), its stages on the page's clock (`?seedspeed=30`: a stage a second, never a real wait), a landing
+ *   balloon tossed from his paw), its stages on the page's clock (`?seedspeed=12`: a stage a second, never a real wait), a landing
  *   (`?balloon=pawn&stage=4`: every balloon a ready pawn, from 1.e4 d5 2.exd5 Qxd5) with its flight and his piece appearing at the
  *   landing's puff, a pop (`?balloon=fakequeen&stage=4`) and his wince.
  * - Hoops (`&power=hoops`): blocks within ranks 2 to 7, your allowed moves never crossing their walls, for exactly your next 2 moves;
@@ -272,8 +272,8 @@ test("Babur: a balloon put on the pump at the start of his turn (a phone: his ho
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  // (The page's clock 30 times faster: a stage a second.)
-  await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&seedspeed=30");
+  // (The page's clock 12 times faster, as the stage is 12 s: a stage a second.)
+  await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&seedspeed=12");
   await bossAloneFromHome(page);
   await yourMove(page);
   await record(page);
@@ -323,9 +323,9 @@ test("Babur's pump in the bar at 320 and 1280: inside the bar's free room, clear
   page.on("pageerror", (e) => errors.push(e.message));
   const [w, h] = desktop() ? [1280, 800] : [320, 640];
   await page.setViewportSize({ width: w, height: h });
-  // (A queen put on at stage 3, the page's clock 30 times faster: not due as his turn's work is asked for, so it stays, and is ready
+  // (A queen put on at stage 3, the page's clock 12 times faster: not due as his turn's work is asked for, so it stays, and is ready
   // a couple of seconds into your turn: the tallest balloon.)
-  await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&balloon=queen&stage=3&seedspeed=30");
+  await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&balloon=queen&stage=3&seedspeed=12");
   await bossAloneFromHome(page);
   await yourMove(page);
   const first = await state(page);
@@ -389,7 +389,7 @@ test("Babur's pump on a phone is twice its size: 68 × 72 in the bar, its balloo
     [428, 777],
   ] as const) {
     await page.setViewportSize({ width: w, height: h });
-    await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&balloon=queen&stage=3&seedspeed=30");
+    await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&balloon=queen&stage=3&seedspeed=12");
     await bossAloneFromHome(page);
     await yourMove(page);
     const first = await state(page);
