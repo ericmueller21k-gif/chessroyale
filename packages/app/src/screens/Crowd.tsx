@@ -16,7 +16,6 @@ import { LastStand, clearSquare, lastStandBoard } from "../components/LastStand.
 import { KING_COMMAND, KING_SUMMON, LAST_STAND, LAST_STAND_MS } from "@chessroyale/chess";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
-import { BossHeading } from "./Play.tsx";
 import { allowanceNote, bossAlone, elimination, finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { GavelPiece } from "../components/Gavel.tsx";
 import { Avatar } from "../components/Items.tsx";
@@ -350,6 +349,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                   ) : (
                     <>
                       <Dots /> <strong>Counting the votes…</strong>
+                      {!bossAlone(match) && <span class="muted"> · {voters} {voters === 1 ? "vote" : "votes"}</span>}
                     </>
                   )
                 ) : mine.king ? (
@@ -469,19 +469,12 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
     <div class="screen game crowd" onClick={() => played && !stand && match.skipReveal()}>
       {hud}
       <div class={`board-area${stand && ts >= LAST_STAND.crashAt && ts < LAST_STAND.crashAt + 450 ? " ls-shake" : ""}`}>
-        <div class="opening-name">
-          {match.boss ? (
-            <BossHeading
-              side={sideToMove(fen)}
-              final={!match.settings.raid}
-              note={mine.king ? "the God King's move" : stand && played ? (ts < LAST_STAND.freezeAt ? "a blunder" : "the God King's Last Stand") : bossAlone(match) ? undefined : `${voters} ${voters === 1 ? "vote" : "votes"}`}
-            />
-          ) : (
-            <>
-              <strong>{sideName(sideToMove(fen))}</strong> · {voters} {voters === 1 ? "vote" : "votes"}
-            </>
-          )}
-        </div>
+        {/* (A boss battle has no line above its board: the dock says what's happening, and "N votes" is in it, Eric, Oct 24.) */}
+        {!match.boss && (
+          <div class="opening-name">
+            <strong>{sideName(sideToMove(fen))}</strong> · {voters} {voters === 1 ? "vote" : "votes"}
+          </div>
+        )}
         {/* Same row as the play screen (eval bar + board), so the board never moves or resizes between phases. */}
         <div class="board-row">
         {bossSide}

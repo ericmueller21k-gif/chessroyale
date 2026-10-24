@@ -66,7 +66,8 @@ async function openConfirm(page: Page, title: RegExp, note: RegExp) {
     return confirm;
   }
   const box = (await confirm.boundingBox())!;
-  for (const sel of [`.board-area ${BOARD_SEL.wrap}`, ".board-area .opening-name", ".timer-bar", ".board-clock", ".sq-clockline"]) {
+  // (A boss battle's line above the board is gone (Eric, Oct 24): its dock's status box stands in for it.)
+  for (const sel of [`.board-area ${BOARD_SEL.wrap}`, ".board-area .opening-name", ".boss-dock-status", ".timer-bar", ".board-clock", ".sq-clockline"]) {
     for (const el of await page.locator(sel).all()) {
       const b = await el.boundingBox();
       if (b && b.height > 0) expect(apart(box, b), `the confirm covers ${sel}`).toBe(true);

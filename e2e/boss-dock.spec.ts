@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, engineTop, submitMove, test, bossAloneFromHome, openBossRaid } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, engineTop, submitMove, test, bossAloneFromHome, openBossRaid } from "./helpers.ts";
 
 /**
  * The boss battle's dock under the board, on every screen (Eric, Oct 15, after his Hidden Boss playtest):
@@ -303,4 +303,69 @@ test("the dock's line under the reveal: the verdict first and whole at 320, 360 
       expect(m.scroll, where).toBeLessThanOrEqual(0);
     }
   }
+});
+
+/**
+ * The admins' testing tools in Boss alone (Eric, Oct 24: "tiny icons next to the king's head, a fish for engine move and a
+ * lightning bolt for ult"): on a phone, a ⚡ and a 🐟 beside the God King's head, inside the viewport and below the status
+ * box, each working, the brain's line hidden (its words are the 🐟's title); on a computer, the title line's tools as before.
+ */
+test("the admins' ⚡ and 🐟: on a phone, tiny icons beside the God King's head, inside the viewport, each working; the brain's line hidden. On a computer, the title line's tools", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const phone = test.info().project.name === "phone";
+  await asAdmin(page);
+  await page.goto("/?debug&laststand=0&boss=gingerbread&clock=60");
+  await bossAloneFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 120_000 }).toBe("play");
+  const ult = page.getByRole("button", { name: "Trigger ultimate (testing)", exact: true });
+  const fish = page.getByRole("button", { name: "Engine move", exact: true });
+  await expect(ult).toBeVisible();
+  await expect(fish).toBeVisible();
+  if (!phone) {
+    // A computer: both in the title line, with their words, and the brain's pill there too.
+    await expect(page.locator(".match-tools .ult-test")).toHaveText("Trigger ultimate (testing)");
+    await expect(page.locator(".match-tools .engine-move")).toHaveText("Engine move");
+    await expect(page.locator(".match-tools .brain-debug")).toBeVisible();
+    await expect(page.locator(".boss-dock .gk-tool")).toHaveCount(0);
+    return;
+  }
+  const box = () =>
+    page.evaluate(() => {
+      const r = (s: string) => {
+        const b = document.querySelector(s)?.getBoundingClientRect();
+        return b ? { l: b.left, r: b.right, t: b.top, b: b.bottom } : null;
+      };
+      return {
+        ult: r(".boss-dock > .ult-test.gk-tool"),
+        fish: r(".boss-dock > .engine-move.gk-tool"),
+        king: r(".boss-dock .gk-unit-btn"),
+        status: r(".boss-dock-status"),
+        view: { w: innerWidth, h: innerHeight },
+        opacity: getComputedStyle(document.querySelector(".boss-dock > .ult-test.gk-tool")!).opacity,
+      };
+    });
+  const g = await box();
+  expect(g.ult && g.fish && g.king && g.status, "the icons and the God King are on the screen").toBeTruthy();
+  const { ult: u, fish: f, king: k, status: s } = { ult: g.ult!, fish: g.fish!, king: g.king!, status: g.status! };
+  for (const [name, t] of [["⚡", u], ["🐟", f]] as const) {
+    expect(t.r - t.l, `${name} tap target`).toBeGreaterThanOrEqual(28);
+    expect(t.b - t.t, `${name} tap target`).toBeGreaterThanOrEqual(28);
+    expect(t.l, `${name} inside the viewport`).toBeGreaterThanOrEqual(0);
+    expect(t.r, `${name} inside the viewport`).toBeLessThanOrEqual(g.view.w);
+    expect(t.t, `${name} below the status box, never over the board`).toBeGreaterThanOrEqual(s.b - 1);
+    expect(t.r, `${name} beside his head, on his left`).toBeLessThanOrEqual(k.l + 1);
+    expect((t.t + t.b) / 2, `${name} level with his head`).toBeLessThanOrEqual(k.t + (k.b - k.t) / 2);
+  }
+  expect(f.r, "the 🐟 beside the ⚡, not over it").toBeLessThanOrEqual(u.l + 1);
+  expect(Number(g.opacity), "muted at rest").toBeCloseTo(0.6, 1);
+  // The brain's line: hidden on a phone, its words in the 🐟's title.
+  await expect(page.locator(".brain-debug")).toBeHidden();
+  await expect(fish).toHaveAttribute("title", /^Engine move · Maia \d+ · no guard/, { timeout: 30_000 });
+  // ⚡ triggers the ultimate (its name says so); 🐟 plays the engine's move as yours.
+  await ult.click();
+  await expect(page.getByRole("button", { name: "Ultimate next turn (testing)", exact: true })).toBeVisible();
+  await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
+  const before = await page.evaluate(() => (window as any).match.moves.length as number);
+  await fish.click();
+  await expect.poll(() => page.evaluate(() => (window as any).match.moves.length as number), { timeout: 60_000 }).toBe(before + 1);
 });

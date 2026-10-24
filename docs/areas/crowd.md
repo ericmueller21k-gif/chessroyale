@@ -135,7 +135,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   computer's sound button, then the flag. On a
   computer the title line spans the board's column only (the boss bar's width), so these sit at its right end above
   the board's right edge, after an admin's testing items in boss battles (the brain's pill, which ellipsizes first,
-  and "Trigger ultimate (testing)": `Hud.tsx`, `.match-tools`; Eric, Oct 13); a phone keeps those under the boss dock. A
+  and "Trigger ultimate (testing)": `Hud.tsx`, `.match-tools`; Eric, Oct 13); a phone keeps those as tiny icons beside the God King (Oct 24). A
   second step (on a computer beside the flag, out into the column next to the board) says what happens (Cancel focused). Before move 1 it's **Leave**; once out, **Leave the match** (also a
   plain button on the cut screen, Classic's watching and stage break, and solo's play-out: "Skip to your result").
   - **Solo:** the match stops at once (`SoloMatch.resign`: every timer, every step after an engine search, Maia and the

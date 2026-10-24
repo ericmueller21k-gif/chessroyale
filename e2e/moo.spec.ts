@@ -349,7 +349,7 @@ test("Moo & Moon's icons in a line: pixel images in the bubble, the plain words 
     // The long lines in a copy of the real box, each with an image where it has an icon: whole, in view, over neither the board nor the bar's status.
     const fits = await bubble.evaluate(
       (el, lines) => {
-        const keepOff = [".board-row .hb-container", ".boss-next", ".board-area > .opening-name"];
+        const keepOff = [".board-row .hb-container", ".boss-next", ".boss-dock-status"];
         const pic = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
         return lines.map((line) => {
           const c = el.cloneNode(true) as HTMLElement;

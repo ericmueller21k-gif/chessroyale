@@ -5206,6 +5206,53 @@ button.history-label {
     right: 20px;
   }
 }
+/* The admins' testing buttons on a phone (Eric, Oct 24: "tiny icons next to the king's head, a fish for engine move and a
+   lightning bolt for ult"): a ⚡ and a 🐟 beside his head, out of the way of the board, the row and his words (his bubble
+   is on his right). He stands on his line under the row (top: the row's 62 px and its 6 px gap, then his head); beside
+   the row, they stack on his right. Their names are their aria-labels and titles (BossDock.tsx, TestButton). */
+@media (max-width: 899px), (max-height: 599px) {
+  .boss-dock > .gk-tool {
+    position: absolute;
+    top: 72px;
+    display: block;
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 14px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 16px;
+    line-height: 28px;
+    text-align: center;
+    opacity: 0.6;
+    cursor: pointer;
+  }
+  .boss-dock > .gk-tool:active {
+    opacity: 1;
+  }
+  .boss-dock > .gk-tool:disabled {
+    opacity: 0.25;
+    cursor: default;
+  }
+  .boss-dock > .ult-test.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) / 2 - 61px);
+  }
+  .boss-dock > .engine-move.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) / 2 - 91px);
+  }
+  .boss-dock.dk-beside > .gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) + 72px);
+  }
+  .boss-dock.dk-beside > .ult-test.gk-tool {
+    top: 2px;
+  }
+  .boss-dock.dk-beside > .engine-move.gk-tool {
+    top: 34px;
+  }
+}
 .dock-line {
   display: block;
   white-space: nowrap;
@@ -5237,7 +5284,8 @@ button.history-label {
    bottom-right corner instead, mirroring the boss by its bottom-left (Eric, Oct 11: they face each other across the
    board): his feet on the board's bottom edge like the boss's, his middle as far from the board as the boss's (see
    .boss-side: `--gk-off`, his box 26 px from the board's edge with the eval bar, 2 px without), his crowns under his
-   feet. The board keeps the room it had (310 px of the height for the rest). The column beside the board (chat, or from
+   feet. The board keeps the room it had (288 px of the height for the rest; the boss line that took 22 px above it is gone,
+   Eric, Oct 24). The column beside the board (chat, or from
    900 to 1099 px the scoreboard) keeps clear of him: `--gk-clear`, how far he reaches past the board's column, worked
    out from the same sums as the board's size (the screen's width less its gutters, the 28 px gap and the 340 px
    column; the board's width in what's left).
@@ -5251,13 +5299,13 @@ button.history-label {
     --gk-screen: var(--col);
     --gk-column: calc(var(--gk-screen) - 2 * var(--gutter) - 368px);
     --bs-need: calc(var(--bs-reach, 0px) - (100vw - var(--col)) / 2 - var(--gutter));
-    --gk-board: min(var(--gk-column) - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
+    --gk-board: min(var(--gk-column) - 2 * max(0px, var(--bs-need)), var(--app-h) - 288px);
     /* (His box is 120 px; his cape reaches a few pixels past it.) */
     --gk-clear: max(0px, var(--gk-off) + 128px - (var(--gk-column) - var(--gk-board)) / 2 - 28px);
   }
   .screen.game:has(> .boss-dock):has(.board-row > .eval-bar) {
     --gk-off: 26px;
-    --gk-board: min(var(--gk-column) - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
+    --gk-board: min(var(--gk-column) - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 288px);
   }
   .screen.game:has(> .boss-dock) > .board-area {
     grid-row: 3;
@@ -5267,17 +5315,17 @@ button.history-label {
     grid-row: 4;
     align-self: start;
     width: 100%;
-    max-width: min(100% - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
+    max-width: min(100% - 2 * max(0px, var(--bs-need)), var(--app-h) - 288px);
     justify-self: center;
   }
   .screen.game:has(.board-row > .eval-bar) > .boss-dock {
-    max-width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
+    max-width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 288px);
   }
   .screen.game:has(> .boss-dock) .board-area .board-wrap {
-    width: min(100% - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
+    width: min(100% - 2 * max(0px, var(--bs-need)), var(--app-h) - 288px);
   }
   .screen.game:has(> .boss-dock) .board-row .eval-bar ~ .board-wrap {
-    width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 310px);
+    width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 288px);
   }
   .screen.game:has(> .boss-dock) > .under-board,
   .screen.game:has(> .boss-dock) > .mini-tower {
@@ -12843,7 +12891,7 @@ img.qicon {
   cursor: default;
 }
 /* Testing, admins: the boss's brain at work (Boss alone, BrainDebug in BossDock.tsx). One short line. */
-/* (A phone's wraps rather than cut: a failure's reason is read whole, Oct 14. A computer's pill: see .match-tools.) */
+/* (A phone hides it, `hidden` in BossDock.tsx: its words are the 🐟 icon's title. A computer's pill: see .match-tools.) */
 .brain-debug {
   margin: 4px auto 0;
   max-width: 100%;
