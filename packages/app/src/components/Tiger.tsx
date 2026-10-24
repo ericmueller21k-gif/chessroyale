@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { BOSS_POWERS } from "@chessroyale/core";
 import { HOOPS_BEATS, TIGER_ANIM } from "@chessroyale/chess";
 import { pickLine } from "../characters/boss-beats.ts";
 import { bossKit, type BossKit } from "../characters/kits.ts";
@@ -29,8 +30,9 @@ import type { BoardLayerProps, BossUi, Moment, MomentProps, MomentUi } from "./P
  * - **balloonLand** (as your turn begins): the pump's `release`, the balloon flying to its square, `land<Piece>` there, his piece on
  *   at its `poof` (the board leaves it off until then: tiger-show.ts `balloonFen`); then his cheer (a big one for a queen). **pop**:
  *   the pump's `pop`, then his wince. None of these holds a move.
- * - **hoops** (his whole turn, as your turn after it begins): his `hoops` at the board's corner; at each `throwN` a burning hoop flies
- *   from his paw to its block and its ring lands there. The rings burn from the view's `hoops` (`left` 2: `burn`, 1: `dying`) and go
+ * - **hoops** (after his move, as your turn after it begins, once his move has shown): the HOOPS! banner, a boss banner's whole
+ *   length with nothing under it; then his `hoops` at the board's corner, and at each `throwN` a burning hoop flies from his paw to
+ *   its block and its ring lands there. A balloon landing (or popping) the same turn plays after the cast, never under it. The rings burn from the view's `hoops` (`left` 2: `burn`, 1: `dying`) and go
  *   `out` as `hoopsOut` comes (as your second move lands). A reload draws them as they are, never the cast again.
  */
 
@@ -325,11 +327,15 @@ const nothing = () => null;
 /** Where a hoop leaves his paw (board units), as he casts at the board's top-left corner (.pm-caster.pm-by-tiger): measured on his frame. */
 export const HOOP_PAW = { x: 0.03, y: 0.0 } as const;
 
-/** The hoops: his cast at the board's corner, and each hoop flying from his paw to its block at its throw (its ring is the board's). */
-function hoopsMoment({ boss, moment, t, orientation, cast }: MomentProps) {
+/**
+ * The hoops: the HOOPS! banner (off the board before the first throw), his cast at the board's corner, and each hoop flying from his
+ * paw to its block at its throw (its ring is the board's).
+ */
+function hoopsMoment({ boss, moment, t, orientation, banner, cast }: MomentProps) {
   const blocks = boss.powers?.hoops?.blocks ?? [];
   return (
     <div class="power-moment pm-hoops">
+      {banner("HOOPS!", `No crossing the rings for ${BOSS_POWERS.hoopsCrowdMoves} moves`, "fire", HOOPS_BEATS.throwsAt[0])}
       {cast("throw1", HOOPS_BEATS.throwsAt[0])}
       <div class="tg-hoops" aria-hidden="true">
         {blocks.map((corner, i) => {
@@ -365,9 +371,6 @@ const MOMENTS: Record<"place" | "balloonLand" | "pop" | "balloonCheer" | "balloo
   hoopsOut: { order: 0, kit: "ultimateHit", line: () => null, view: nothing },
 };
 
-/** The dock's line on the turn he spent throwing his hoops (his whole turn: no move to show). */
-export const hoopsLine = (boss: Pick<BossView, "name">): string => `${boss.name} spent his turn on the hoops.`;
-
 let warmed = false;
 /** His trip, place, reactions and hoops drawn ahead as his battle starts, and the rings' and hoops' sprites. */
 export function prewarmTiger(name: string): void {
@@ -381,11 +384,9 @@ export function prewarmTiger(name: string): void {
 
 export const TIGER_UI = {
   id: "tiger",
-  // (His hoops come at the start of his turn, after your move, as Puddles' watering.)
+  // (His hoops come after your move and his: as your next turn begins, after his move shows.)
   ultimate: { name: "Hoops", when: "After your move" },
   moments: MOMENTS,
   barProp: ({ boss, moments }) => <TigerPump boss={boss} moments={moments} />,
-  // His hoops were his whole turn: no move to show.
-  noMove: (boss) => (boss.powers?.hoops && boss.powers.hoops.left >= 2 && !boss.lastMove ? hoopsLine(boss) : null),
   board: (p) => ({ over: <TigerLayer {...p} /> }),
 } satisfies BossUi;

@@ -422,6 +422,12 @@ export interface BossMoveExtras {
    */
   balloon?: string | null;
   balloonGain?: number | null;
+  /**
+   * The circus tiger's hoops, due at the end of this turn (asked with his move): the cast after it, by its blocks' corners
+   * (hoopsCode; the host's answer online), checked as they're thrown (hoopsCheck), and what they gain him (null: not known).
+   */
+  hoops?: string | null;
+  hoopsGain?: number | null;
 }
 
 /** A board's evaluation as the judge works it out: its best move, that move's expected score, and every move's. */

@@ -943,24 +943,6 @@ export class SoloMatch implements GameView {
   }
 
   /**
-   * The circus tiger's hoops (at the start of his turn after their warning, or the admins' trigger): he gets ready
-   * (thinking; your queen banner first, if your move took his queen) while this device's engines place the blocks
-   * (hoopsFrom) and land a due balloon after them, then the cast, his whole turn; then your turn, its moments (the cast's
-   * first) before your clock starts, as after his move. No block fits, the pass guard, or no engine answer: no cast this
-   * turn (it waits for his next), and he plays his move.
-   */
-  private async hoopsTurn() {
-    const snap = this.bossSnapshot();
-    this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
-    const cast = this.runner.playHoops(this.engines).catch(() => this.runner.applyHoops(null));
-    await Promise.all([cast, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
-    if (this.stopped) return;
-    const showMs = !this.runner.bossToMove() ? bossTurnShowMs(this.runner.bossView(), this.alone) : 0;
-    this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
-    this.timer = setTimeout(() => this.nextRound(), showMs);
-  }
-
-  /**
    * As your turn begins: if Wrangler's showdown may follow before long (the rules' `scout`: from his move showdownFrom
    * while he has one left; or the test trigger), his scout searches line-ups of three pairs and two on this position (an
    * engine of its own) until his turn; else it stops.
@@ -1221,7 +1203,7 @@ export class SoloMatch implements GameView {
       }
       // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps, Chub & Chirp's Carrot Patch cast (his whole turn) and
       // hop come at the start of his turn, before his move.)
-      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.carrotDue() ? this.carrotTurn() : this.runner.repaintDue() ? this.repaintTurn() : this.runner.waterDue() ? this.waterTurn() : this.runner.hoopsDue() ? this.hoopsTurn() : this.runner.hopDue() ? this.hopTurn() : this.bossTurn());
+      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.carrotDue() ? this.carrotTurn() : this.runner.repaintDue() ? this.repaintTurn() : this.runner.waterDue() ? this.waterTurn() : this.runner.hopDue() ? this.hopTurn() : this.bossTurn());
       // (A failed Lights out: his extra move, after his own and before your turn.)
       if (this.runner.extraMoveDue()) return void this.extraTurn();
       // (Boingo's funhouse: his move for you, as your turn begins.)
@@ -1467,8 +1449,6 @@ export class SoloMatch implements GameView {
           if (this.runner.repaintDue()) await this.runner.playRepaint(this.engines).catch(() => this.runner.applyRepaint(null));
           // (The hippo gardener's watering: his whole turn; the pass guard, or no engine answer: he moves.)
           if (this.runner.waterDue()) await this.runner.playWater(this.engines).catch(() => this.runner.applyWater(null));
-          // (The circus tiger's hoops: his whole turn; no block fits, the pass guard, or no engine answer: he moves.)
-          if (this.runner.hoopsDue()) await this.runner.playHoops(this.engines).catch(() => this.runner.applyHoops(null));
           if (this.runner.hopDue()) await this.runner.playHop(this.engines).catch(() => this.runner.applyHop(null));
           if (this.runner.bossToMove()) await this.runner.playBoss(this.engines[0]);
           continue;

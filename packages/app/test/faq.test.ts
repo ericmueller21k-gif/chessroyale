@@ -88,7 +88,8 @@ describe("the FAQ's contents", () => {
     expect(words).toContain("about 58% of his balloons pop");
     expect(words).toContain("never a square you attack (you can't take it at once)");
     expect(words).toContain("beyond what his missing pawns could have promoted into");
-    expect(words).toContain(`throws ${p.hoopsCount} burning hoops`);
+    expect(words).toContain(`he plays his move as usual, then throws ${p.hoopsCount} burning hoops onto the board before your turn`);
+    expect(words).not.toMatch(/whole turn|real material/);
     expect(words).toContain(`For your next ${p.hoopsCrowdMoves} moves`);
     expect(words).toContain("Attacks across a hoop still count for the kings");
     expect(words).not.toMatch(/fake|about 1\.5/i);

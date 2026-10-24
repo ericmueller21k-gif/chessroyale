@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
-import { PASS_WAIT, applyMove, hoopStops, hoopsAnswer, hoopsCheck, landFrom, legalMoves, pieceAt, sanLineToUci, sideToMove, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { applyMove, hoopStops, hoopsAnswer, hoopsCheck, inHoop, landFrom, legalMoves, pieceAt, sanLineToUci, sideToMove, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { fakeEngine } from "../../chess/test/boss-kit-lib.ts";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 /**
  * The circus tiger online (docs/decisions/2026-10-23-tiger-rules.md): his balloon on the server's clock, its landing asked of
- * the host with his move (the same ask for a balloon that will pop) and checked; his hoops asked of the host as his whole
- * turn, checked, the walls in every allowed move; anything else (junk, PASS_WAIT) leaving him his move. And fair play: no
+ * the host with his move (the same ask for a balloon that will pop) and checked; his hoops asked of the host with his move
+ * (after it: he keeps his turn), checked, the walls in every allowed move; anything else (junk, "") leaving his move alone. And fair play: no
  * message to any device says a balloon will pop before it does.
  */
 
@@ -64,10 +64,10 @@ function tiger(patch: Partial<Settings> = {}, players = ["P1", "P2"]) {
     expect(hostScores()).toBe(true);
     inbox.set("p1", (inbox.get("p1") ?? []).filter((x) => x.t !== "bossRequest"));
   };
-  const answer = (move: string, balloon?: string) => {
+  const answer = (move: string, balloon?: string, hoops?: string) => {
     const req = last("p1", "bossRequest")!;
     inbox.set("p1", (inbox.get("p1") ?? []).filter((x) => x.t !== "bossRequest"));
-    core.message("p1", { t: "bossMove", key: req.key, move, ...(balloon ? { balloon } : {}) });
+    core.message("p1", { t: "bossMove", key: req.key, move, ...(balloon ? { balloon } : {}), ...(hoops !== undefined ? { hoops } : {}) });
   };
   advance(1000);
   advance(60_000);
@@ -122,38 +122,50 @@ describe("the circus tiger online", () => {
     expect(round.boss!.powers!.balloon).toMatchObject({ shape: "b", ready: true });
   });
 
-  it("his hoops: the request asks for the cast (and a due balloon's landing); the host's answer, checked, is his whole turn, the walls in every allowed move", async () => {
-    const L = tiger({ bossPowerTest: "hoops" });
+  it("his hoops after his move: the request for his move asks for the cast too (and a due balloon's landing); his move AND the host's cast, checked, the same turn; the walls for the crowd's next 2 moves", async () => {
+    const L = tiger({ bossPowerTest: "hoops", bossBalloonTest: "pawn", bossStageTest: 4 });
     const req = until(L, (r) => !!r.hoops);
-    expect(req.hoopsAny).toBe(true);
-    expect(req.allowed ?? req.brain).toBeUndefined();
-    const { answer, pick } = await hoopsAnswer([fakeEngine()], req.fen, req.hoops!, req.balloon ?? null, true);
-    const checked = hoopsCheck(req.fen, answer)!;
-    expect(checked).not.toBeNull();
-    L.answer(answer);
+    // (Asked with his move, as any move of his is: no separate cast to pick.)
+    expect(req.fen && sideToMove(req.fen)).not.toBe(L.runner().boss!.crowdSide);
+    const move = (req.allowed ?? legalMoves(req.fen))[0]!;
+    const after = applyMove(req.fen, move);
+    const { answer, pick, land } = await hoopsAnswer([fakeEngine()], after, req.hoops!, req.balloon ?? null);
+    // (The blocks are chosen on the position after his move, the crowd to move.)
+    expect(hoopsCheck(after, answer)).toEqual(pick!.blocks);
+    const ply = L.runner().boards.get(L.runner().state.boards[0]!)!.history.length;
+    L.answer(move, land?.square, answer);
     const round = L.toRound();
     expect(sideToMove(round.board!.fen)).toBe(L.runner().boss!.crowdSide);
+    const board = L.runner().boards.get(L.runner().state.boards[0]!)!;
+    expect(board.history).toHaveLength(ply + 1);
+    expect(board.history.at(-1)).toBe(move);
     const p = round.boss!.powers!;
     expect(p.hoops).toEqual({ blocks: pick!.blocks, left: 2 });
+    const kinds = p.events.filter((e) => e.kind === "hoops" || e.kind === "balloonLand" || e.kind === "pop").map((e) => e.kind);
+    expect(kinds[0]).toBe("hoops");
     expect(p.events.find((e) => e.kind === "hoops")).toMatchObject({ blocks: pick!.blocks });
+    // (A ready balloon the same turn: after the cast, outside the hoops.)
+    if (req.balloon && land && p.balloonLast?.outcome === "land") for (const c of pick!.blocks) expect(inHoop(c, p.balloonLast.square!)).toBe(false);
     const allowed = p.allowed ?? legalMoves(round.board!.fen);
     for (const m of allowed) expect(hoopStops(m, round.board!.fen, pick!.blocks)).toBe(false);
     expect(L.last("p2", "round")!.boss!.powers!.hoops).toEqual(p.hoops);
-    // (His move between the crowd's two: asked with the walls' allowed moves.)
+    // (His move between the crowd's two: asked with the walls' allowed moves, and no cast.)
     L.crowdPlays();
     const next = L.asked()!;
+    expect(next.hoops).toBeUndefined();
     for (const m of next.allowed ?? legalMoves(next.fen)) expect(hoopStops(m, next.fen, pick!.blocks)).toBe(false);
   });
 
-  it("junk, \"\" or PASS_WAIT from the host: no cast now, and his move is asked for at once; next turn it's asked again", () => {
-    for (const junk of ["e2e4", "", PASS_WAIT, "a1 h8"]) {
+  it("junk, \"\" or no cast from the host: his move alone stands; with his next move it's asked again", () => {
+    for (const junk of ["e2e4", "", "a1 h8", undefined]) {
       const L = tiger({ bossPowerTest: "hoops" });
-      until(L, (r) => !!r.hoops);
-      L.answer(junk);
-      const move = L.asked()!;
-      expect(move.hoops).toBeUndefined();
-      expect(L.runner().boss!.powers!.hoopsWait).toBe(L.runner().boss!.crowdMoves);
-      L.answer((move.allowed ?? legalMoves(move.fen))[0]!);
+      const req = until(L, (r) => !!r.hoops);
+      const move = (req.allowed ?? legalMoves(req.fen))[0]!;
+      const ply = L.runner().boards.get(L.runner().state.boards[0]!)!.history.length;
+      L.answer(move, undefined, junk);
+      expect(L.runner().boards.get(L.runner().state.boards[0]!)!.history).toHaveLength(ply + 1);
+      expect(L.runner().boss!.powers!.hoops ?? null).toBeNull();
+      expect(L.runner().boss!.powers!.ultAt).toBeUndefined();
       L.crowdPlays();
       expect(L.asked()!.hoops).toBeDefined();
     }

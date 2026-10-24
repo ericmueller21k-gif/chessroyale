@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import { BOSS_BANNER, BANNER_PLUS_MS, DEFAULT_SETTINGS, SQUADS, bannerPlusMs, bossBannerMs, setBannerPlusSource, voteResultMs, type PowerEventKind } from "@chessroyale/core";
-import { ALFIL_BEATS, BLOCK, BOARD_SAW, BOSS_INTRO, BOUNCE, HOPPER_BEATS, KING_COMMAND, KING_SUMMON, LAST_STAND, LIGHTS_OUT, POWER_BANNERS, POWER_FX, PULL, RECLUSE_FX, SAW_CUT, SHOWDOWN, SPLIT, START_FEN, bannerLeadMs, bannerWaitMs, bossIntroTimeline, bossShowMs, bossThinkMs, kingStrikeMs, lastStandMs, lightsOutTimeline, powerFxMs, powerMomentMs } from "@chessroyale/chess";
+import { ALFIL_BEATS, BLOCK, BOARD_SAW, BOSS_INTRO, BOUNCE, HOOPS_BEATS, HOPPER_BEATS, KING_COMMAND, KING_SUMMON, LAST_STAND, LIGHTS_OUT, POWER_BANNERS, POWER_FX, PULL, RECLUSE_FX, SAW_CUT, SHOWDOWN, SPLIT, START_FEN, bannerLeadMs, bannerWaitMs, bossIntroTimeline, bossShowMs, bossThinkMs, kingStrikeMs, lastStandMs, lightsOutTimeline, powerFxMs, powerMomentMs } from "@chessroyale/chess";
 import { WARN, PowerBanner, PowerMoment, momentAt, momentsOf } from "../src/components/BossPowers.tsx";
 import { HOPPER_UI } from "../src/components/Hopper.tsx";
 import { SMUDGY_UI } from "../src/components/Smudgy.tsx";
@@ -85,6 +85,7 @@ const POWER_AT: Partial<Record<PowerEventKind, number>> = {
   showdown: SHOWDOWN.throwAt,
   tusks: ALFIL_BEATS.tusks.castAt,
   slam: ALFIL_BEATS.slam.leapAt,
+  hoops: HOOPS_BEATS.throwsAt[0],
 };
 
 /** Each power's banner on screen on Oct 15, ms (its window, at most the 2.5 s it slid off by then). */
