@@ -26,7 +26,10 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   his figure animates on its own canvas loop, his words in their own box (`VoiceBubble` on `kingVoice`), so a screen
   drawn every frame doesn't draw him with it.
 - **The clock stands still** while he acts, for everyone, solo and online: a move lengthens the reveal by
-  `KING_COMMAND.moveMs`, a strike stops every deadline for `kingStrikeMs`. Nothing he does costs anyone time.
+  `KING_COMMAND.moveMs`, a strike stops every deadline for `kingStrikeMs`. Nothing he does costs anyone time. His
+  cut-in (2.5 s) and the Last Stand's (3.1 s) carry the banners' extra since Oct 24 (`BANNER_PLUS_MS`, 0.75 s), and
+  everything after each comes that much later (his bolt and slashes, the slide and the blows; `moveMs`, `kingStrikeMs`
+  and `lastStandMs()` with them): docs/decisions/2026-10-24-banner-and-speech-time.md.
 - **His Last Stand.** Always armed, once per game. If the crowd's played move gives away at least the bar (in points
   of expected score against the best move, by the judge's own numbers), he dives onto the board, takes the blow and
   falls; the move is undone and the crowd picks again with a fresh clock, the move he took back barred. The bar starts

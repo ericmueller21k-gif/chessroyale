@@ -2,6 +2,7 @@ import { useContext, useEffect, useMemo, useState } from "preact/hooks";
 import { BoardTurn } from "../board-view.ts";
 import { LAST_STAND, lastStandAttackHits, lastStandHits, pieceAt, toSan, type NetBoss } from "@chessroyale/chess";
 import { useFrameNow } from "./Countdown.tsx";
+import { bannerLength } from "./FightBanner.tsx";
 import { GodKingFallen, GodKingPortrait, GodKingSprite, squareXY } from "./GodKing.tsx";
 import { play, type SoundName } from "../sound.ts";
 import { KING_LINES, blunderLabel, blunderWords, chancesWords, kingSay, lastStandLine, replyWords } from "../godKing.ts";
@@ -215,7 +216,7 @@ export function LastStand({ side, orientation, fen, move, startAt, boss }: { sid
         return <span key={i} class="ls-drop" style={{ left: pct(to.x + dir * (14 + 70 * p)), top: pct(to.y - 10 - 90 * p + 190 * p * p), opacity: 1 - p * p, rotate: `${dir * (30 + 90 * p)}deg` }} />;
       })}
       {/* 3. His cut-in: LAST STAND, his battle-worn portrait and his line. */}
-      {t >= L.bannerAt && t < L.bannerAt + L.bannerMs && <LastStandCutIn side={side} line={line} />}
+      {t >= L.bannerAt && t < L.bannerAt + L.bannerMs && <LastStandCutIn side={side} line={line} ms={L.bannerMs} />}
     </div>
   );
 }
@@ -225,9 +226,9 @@ export function LastStand({ side, orientation, fen, move, startAt, boss }: { sid
  * portrait, "LAST STAND" and his line in his own pixel type. A little longer than his usual cut-in, so the line
  * can be read.
  */
-export function LastStandCutIn({ side, line }: { side: "w" | "b"; line: string }) {
+export function LastStandCutIn({ side, line, ms }: { side: "w" | "b"; line: string; /** Its length (LAST_STAND.bannerMs); none, the stylesheet's 3.1 s. */ ms?: number }) {
   return (
-    <div class="fight-banner king-cut last-stand-cut" role="alert" aria-label={`Last stand: ${line}`}>
+    <div class="fight-banner king-cut last-stand-cut" style={bannerLength(ms)} role="alert" aria-label={`Last stand: ${line}`}>
       <div class="fb-flash" />
       <div class="fb-band">
         <div class="fb-lines" />

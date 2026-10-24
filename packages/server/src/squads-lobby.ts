@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, FRONT_DOOR, LEAVING, LOBBY_LIFE, SQUADS, SQUADS_LOBBY, botVotes, castPregameVote, cleanLook, closePregameVote, shuffle, type ItemLook, type MercItem, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, FRONT_DOOR, LEAVING, LOBBY_LIFE, SQUADS, SQUADS_LOBBY, botVotes, castPregameVote, cleanLook, closePregameVote, shuffle, voteResultMs, type ItemLook, type MercItem, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
 import { botRoster, type LobbyCloseReason, type MoveScore, type Opening } from "@chessroyale/chess";
 import { Chess } from "chess.js";
 import {
@@ -987,7 +987,7 @@ export class SquadsCore {
     v.result = result;
     for (const id of joined) v.votes[id] = { option: result, at: now, joined: true };
     this.r.voteResults[def.id] = result;
-    v.nextAt = now + this.s.voteResultSeconds * 1000;
+    v.nextAt = now + voteResultMs(this.s);
     this.r.timer = { kind: "voteNext", at: v.nextAt };
     this.sendAll({ t: "vote", vote: this.voteView() });
   }

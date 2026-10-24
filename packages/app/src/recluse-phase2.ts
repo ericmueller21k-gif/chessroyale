@@ -1,8 +1,8 @@
-import { BOSS_BANNER, RECLUSE_PHASE2 } from "@chessroyale/core";
+import { BOSS_BANNER, RECLUSE_PHASE2, bannerPlusMs, bossBannerMs } from "@chessroyale/core";
 import { RECLUSE, RECLUSE_JUMP } from "./characters/recluse.ts";
 import { animLength, cueAt } from "./characters/power-art.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
-import { holdMs } from "./speech.tsx";
+import { holdMs, typeMs } from "./speech.tsx";
 import {
   LAST_STAND,
   legalMoves,
@@ -62,7 +62,9 @@ export const PHASE_CHANGE = (() => {
   // his collapse), then his new line about taking that power (`seizeTalk`), said as the mumbling ends; then he seizes it.
   const mumbleEnd = -fallMs + len("collapse") + holdMs(RECLUSE_LINES.fall[0]);
   const talkAt = Math.max(kingAt, mumbleEnd + 150);
-  const seizeAt = 1700 + pace.talkMs;
+  // (And never before that line has typed out: the mumbling before it is as long as the speech rule makes it, 1.5 s
+  // longer since Oct 24.)
+  const seizeAt = Math.max(1700 + pace.talkMs, talkAt + Math.max(...RECLUSE_LINES.seizeTalk.map(typeMs)) + 100);
   const drainAt = seizeAt + (cueAt(a.seize!, "reach") ?? 0);
   const drainMs = LAST_STAND.staggerAt - LAST_STAND.slashAt;
   const igniteAt = drainAt + drainMs;
@@ -98,7 +100,8 @@ export const PHASE_CHANGE = (() => {
   const backAt = pickupAt + len("pickup");
   const homeAt = backAt + len("leap2");
   const bannerAt = Math.max(homeAt, shuffleAt + shuffleMs) + 100;
-  // ("PHASE 2": a boss's banner, 1.4 s; Eric, Oct 16, a second shorter again. The clocks start after it.)
+  // ("PHASE 2": a boss's banner, 1.4 s; Eric, Oct 16, a second shorter again; Oct 24, the banners' extra on top
+  // (bannerPlusMs). The clocks start after it.)
   const bannerMs = BOSS_BANNER.phase2Ms;
   // (Then phase 2's boards, still: a big 5, 4, 3, 2, 1 on every one before the clocks run. SimulScreen draws it.)
   const countdownMs = pace.countdownSeconds * 1000;
@@ -137,8 +140,12 @@ export const PHASE_CHANGE = (() => {
     backAt,
     homeAt,
     bannerAt,
-    bannerMs,
-    total: bannerAt + bannerMs,
+    get bannerMs(): number {
+      return bannerMs + bannerPlusMs();
+    },
+    get total(): number {
+      return bannerAt + bannerMs + bannerPlusMs();
+    },
     countdownMs,
   };
 })();
@@ -246,10 +253,11 @@ export function smoothPath(pts: readonly Pt[]): string {
 /** His ultimate where he stands (playInPlace): the spellbook opened, held, slammed shut. */
 export const PHASE2_ULT_ANIMS = ["spellbook2", "spellLoop2", "spellClose2"] as const;
 /**
- * "5 SECONDS!" shows this long as his ultimate comes (ms): a boss's banner (BOSS_BANNER.ms, 1.5 s; Eric, Oct 16, a
- * second shorter again: it showed 2.5 s, the extra second it had first, Oct 14, and every banner had since Oct 15).
+ * "5 SECONDS!" shows this long as his ultimate comes (ms): a boss's banner (bossBannerMs: BOSS_BANNER.ms, 1.5 s since
+ * Eric's Oct 16 "a second shorter again", and since Oct 24 the banners' extra). Everyone's few seconds start as it goes
+ * (phase2Ult), so it never eats into them.
  */
-export const PHASE2_ULT_BANNER_MS = BOSS_BANNER.ms;
+export const phase2UltBannerMs = (): number => bossBannerMs();
 
 /**
  * Whether his phase 2 follows phase 1 won, on this device (solo): alone (Boss alone), or in a solo Crowd's boss final

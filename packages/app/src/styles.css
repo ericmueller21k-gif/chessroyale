@@ -18791,7 +18791,7 @@ button.sq-tiny {
   line-height: 1;
   letter-spacing: 0.02em;
   -webkit-text-stroke-width: 0.5cqw;
-  animation-duration: 1.6s;
+  animation-duration: var(--ac-banner-ms, 1.6s);
   padding: 3.2cqw 6.4cqw 3.4cqw;
   border-radius: 7cqw;
   -webkit-backdrop-filter: blur(10px) grayscale(0.4);

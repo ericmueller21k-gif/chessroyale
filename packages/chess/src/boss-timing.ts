@@ -1,4 +1,4 @@
-import { BOSS_BANNER } from "@chessroyale/core";
+import { bannerPlusMs, bossBannerMs } from "@chessroyale/core";
 import { fenAtPly, gameEnd, pieceAt, sideToMove, type Base } from "./rules.ts";
 import { GINGER_FX } from "./bosses/ginger.ts";
 import { BOINGO_FX } from "./bosses/boingo.ts";
@@ -21,9 +21,18 @@ import { TIGER_FX } from "./bosses/tiger.ts";
  *
  * The intro: the boss's card (with the opening roulette in a raid) over the
  * starting position, then the game so far replayed quickly from the start, one
- * move at a time, then a fighting-game "START!" banner.
+ * move at a time, then a fighting-game "START!" banner (a boss's banner's length: bossBannerMs, the extra included).
  */
-export const BOSS_INTRO = { cardMs: 2600, replayMs: 2400, minStepMs: 110, maxStepMs: 260, bannerGapMs: 250, bannerMs: BOSS_BANNER.ms } as const;
+export const BOSS_INTRO = {
+  cardMs: 2600,
+  replayMs: 2400,
+  minStepMs: 110,
+  maxStepMs: 260,
+  bannerGapMs: 250,
+  get bannerMs(): number {
+    return bossBannerMs();
+  },
+} as const;
 
 /**
  * When each part of the intro happens (ms after it starts), for a game `plies` half-moves in. `claimed`: Hollow claims
@@ -38,12 +47,15 @@ export function bossIntroTimeline(plies: number, claimed = false, snack = false)
   return { step, replayAt, claimAt, bannerAt, total: bannerAt + BOSS_INTRO.bannerMs };
 }
 
-/** How long the boss's move stays on screen: longer when it takes your queen (its banner and roar). */
+/**
+ * How long the boss's move stays on screen: longer when it takes your queen (QUEEN DOWN! and his roar; the banner's
+ * extra, BANNER_PLUS_MS, on top, so your turn comes that much later and never under it).
+ */
 export function bossShowMs(lastMove: { captured?: string } | null | undefined, alone = false): number {
   // Alone (a solo boss raid), the game flows like any chess site: the boss's move animates and it's your turn,
   // unless it took your queen (its banner plays first).
   if (alone && lastMove?.captured !== "q") return BOSS_MOVE_ALONE_MS;
-  return 1800 + (lastMove?.captured === "q" ? 1300 : 0);
+  return 1800 + (lastMove?.captured === "q" ? 1300 + bannerPlusMs() : 0);
 }
 
 /**
@@ -61,8 +73,66 @@ export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ..
 /** What a moment's length reads of its event: its kind, Hollow's first cover, the hippo gardener's watering's outcomes. */
 type FxEvent = { kind: keyof typeof POWER_FX; first?: boolean; growth?: readonly { kind: string }[] };
 
-/** How long one power's moment holds the screen (ms). */
-export const powerFxMs = (e: FxEvent): number => (POWER_FX[e.kind] ?? 0) + (POWER_FX_EXTRA[e.kind]?.(e) ?? 0);
+/** How long one power's moment holds the screen (ms): its own beats, and the time its banner's extra adds (bannerWait). */
+export const powerFxMs = (e: FxEvent): number => (POWER_FX[e.kind] ?? 0) + (POWER_FX_EXTRA[e.kind]?.(e) ?? 0) + bannerWaitMs(e.kind);
+
+/**
+ * Each power moment's banners, as its view on screen draws them (the app's PowerMoment `banner` calls; a unit test there
+ * keeps the two the same): `[from, window]`, from `from` ms into the moment for `window` ms, the time its beats give it
+ * (BOSS_BANNER.ms, or less where the power starts sooner). A moment left out has no banner.
+ *
+ * Every banner now shows a boss banner's whole length (bossBannerMs, the extra included; Eric, Oct 24), and nothing of
+ * its power plays under it: a banner from the moment's start holds the moment's own clock at its start for the time it
+ * gains (`lead`), so everything the moment does comes that much later; one later in it (BULLET!, DRAW!) grows in place,
+ * the moment longer by whatever of it passes the moment's end (`tail`).
+ */
+export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (readonly [from: number, window: number])[]>> = {
+  warn: [[0, 1500]],
+  freeze: [[0, 1500]],
+  blizzard: [[0, 1300]],
+  thaw: [[0, 1300]],
+  pie: [[0, 1450]],
+  funhouse: [[0, 1500]],
+  spin: [[0, 1300]],
+  spark: [[0, 1450]],
+  candle: [[0, 1500]],
+  dark: [[0, 1250]],
+  extra: [[0, 1500]],
+  block: [[0, 1450]],
+  bounce: [[0, 1300]],
+  split: [[0, 1300]],
+  cut: [[0, 1500]],
+  boardsaw: [[0, 1500]],
+  pull: [[0, 1300]],
+  drag: [[0, 1300]],
+  showdown: [
+    [0, 1300],
+    [4600, 1400],
+  ],
+  bullet: [[1850, 1500]],
+  tusks: [[0, 1500]],
+  slam: [[0, 1500]],
+  hop: [[0, 720]],
+  carrots: [[0, 1100]],
+  carrotWin: [[0, 1500]],
+  camouflage: [[0, 1500]],
+  repaint: [[0, 1500]],
+};
+
+/** How long a moment's own clock holds at its start while its banner shows longer (ms; 0 without one from its start). */
+export function bannerLeadMs(kind: string): number {
+  const b = POWER_BANNERS[kind as keyof typeof POWER_FX]?.find(([from]) => from === 0);
+  return b ? Math.max(0, bossBannerMs() - b[1]) : 0;
+}
+
+/** How much a moment's banners add to it in all (ms): the hold at its start (bannerLeadMs) and any later banner's end past it. */
+export function bannerWaitMs(kind: string): number {
+  const all = POWER_BANNERS[kind as keyof typeof POWER_FX];
+  if (!all) return 0;
+  const base = POWER_FX[kind as keyof typeof POWER_FX] ?? 0;
+  const tail = Math.max(0, ...all.filter(([from]) => from > 0).map(([from]) => from + bossBannerMs() - base));
+  return bannerLeadMs(kind) + tail;
+}
 
 /**
  * A moment that can hold longer, the extra ms by its kind: Hollow's first cover of the dark; the hippo gardener's
@@ -89,20 +159,36 @@ export function powerMomentMs(events: readonly FxEvent[] | null | undefined): nu
 export const KING_COMMAND = {
   raiseAt: 0,
   cutAt: 300,
-  cutMs: 2500,
-  boltAt: 3000,
-  moveAt: 3350,
-  lowerAt: 3900,
-  slashAt: [3050, 3500, 3950] as readonly number[],
-  strikeLowerAt: 4400,
-  moveMs: 2700,
+  // (Oct 24: the cut-in BANNER_PLUS_MS longer, and everything after it that much later.)
+  get cutMs(): number {
+    return 2500 + bannerPlusMs();
+  },
+  get boltAt(): number {
+    return 3000 + bannerPlusMs();
+  },
+  get moveAt(): number {
+    return 3350 + bannerPlusMs();
+  },
+  get lowerAt(): number {
+    return 3900 + bannerPlusMs();
+  },
+  get slashAt(): readonly number[] {
+    return [3050, 3500, 3950].map((t) => t + bannerPlusMs());
+  },
+  get strikeLowerAt(): number {
+    return 4400 + bannerPlusMs();
+  },
+  get moveMs(): number {
+    return 2700 + bannerPlusMs();
+  },
 } as const;
 
 /**
  * The old way, kept for later behind settings.kingOnBoard: summoned onto your king's square. Bolts converge, a beam,
  * he appears (`appearAt`), raises his sword with his cut-in (`raiseAt`), bolts the piece (`boltAt`; it moves at
  * `moveAt`, walking with a king move) or slashes the boss's king (`slashAt`), and holy light takes him off at the
- * end. The reveal lasts `moveMs` longer; a strike stops the clock for `strikeMs`.
+ * end. The reveal lasts `moveMs` longer; a strike stops the clock for `strikeMs`. (Off, so not given Oct 24's extra:
+ * whoever turns it on again adds it, as KING_COMMAND has.)
  */
 export const KING_SUMMON = {
   appearAt: 1300,
@@ -118,8 +204,8 @@ export const KING_SUMMON = {
 
 /** How much longer the reveal lasts when the God King plays the move. */
 export const kingMoveMs = (s: { kingOnBoard?: boolean }): number => (s.kingOnBoard ? KING_SUMMON.moveMs : KING_COMMAND.moveMs);
-/** How long the clock stands still while the God King strikes the boss. */
-export const kingStrikeMs = (s: { kingOnBoard?: boolean; kingStrikeMs: number }): number => (s.kingOnBoard ? KING_SUMMON.strikeMs : s.kingStrikeMs);
+/** How long the clock stands still while the God King strikes the boss (his cut-in's extra, BANNER_PLUS_MS, included). */
+export const kingStrikeMs = (s: { kingOnBoard?: boolean; kingStrikeMs: number }): number => (s.kingOnBoard ? KING_SUMMON.strikeMs : s.kingStrikeMs + bannerPlusMs());
 
 /** Alone: how long the boss's move shows before your turn (the piece's slide, and a beat). */
 export const BOSS_MOVE_ALONE_MS = 450;
@@ -163,7 +249,7 @@ export function queenSlain(boss: QueenSlainView): boolean {
  * the boss's own played after the crowd's move (`afterMs`: Alfil's pieces coming down early, landedEarly).
  */
 export function bossThinkMs(boss: QueenSlainView, burnt = false, afterMs = 0): number {
-  return Math.max(queenSlain(boss) ? BOSS_BANNER.ms + 500 : 1200, burnt ? FIRE_BURN_MS : 0, afterMs);
+  return Math.max(queenSlain(boss) ? bossBannerMs() + 500 : 1200, burnt ? FIRE_BURN_MS : 0, afterMs);
 }
 
 /**
@@ -183,7 +269,7 @@ export const landedEarlyMs = (boss: { crowdMoves: number; powers?: { landed?: { 
 
 /**
  * The God King's Last Stand, beat by beat (ms after the crowd's disastrous move lands on the board). The reveal
- * where it happens lasts LAST_STAND_MS longer, solo and online; the next move's clock only starts after it, so
+ * where it happens lasts lastStandMs() longer, solo and online; the next move's clock only starts after it, so
  * nobody loses any time.
  *
  * 0. The warning (`warnMs` long): a red "??" badge pops on the piece's square (`badgeAt`), the square pulses red,
@@ -203,9 +289,11 @@ export const landedEarlyMs = (boss: { crowdMoves: number; powers?: { landed?: { 
  *
  * Beats 1 to 7 are as they were before the warning, all `warnMs` later. Since Oct 15 (Eric: every banner a second
  * longer) the cut-in holds 3.1 s, not 2.1, and beats 4 to 7 come a second later, so it still ends before the slide.
+ * Since Oct 24 the cut-in holds BANNER_PLUS_MS longer again, and beats 4 to 7 come that much later (`later`).
  */
 const LS_WARN_MS = 1300;
 const after = (ms: number) => LS_WARN_MS + ms;
+const later = (ms: number) => after(ms) + bannerPlusMs();
 /**
  * With a boss whose character has a `kingAttack` (KING_ATTACKERS; Hollow, Eric, Oct 10), beat 5 is the boss's attack:
  * from `attackAt` (just as the piece starts sliding back) he drops in beside the God King and lashes him
@@ -220,22 +308,40 @@ export const LAST_STAND = {
   fallAt: after(1150),
   crashAt: after(1400),
   bannerAt: after(1950),
-  bannerMs: 3100,
-  slideAt: after(5150),
-  slashAt: after(5650),
+  get bannerMs(): number {
+    return 3100 + bannerPlusMs();
+  },
+  get slideAt(): number {
+    return later(5150);
+  },
+  get slashAt(): number {
+    return later(5650);
+  },
   slashes: 25,
   slashEveryMs: 80,
-  attackAt: after(5250),
-  crackAt: [after(6050), after(6650), after(7250)] as readonly number[],
-  staggerAt: after(7800),
-  collapseAt: after(8250),
-  fadeAt: after(8800),
+  get attackAt(): number {
+    return later(5250);
+  },
+  get crackAt(): readonly number[] {
+    return [later(6050), later(6650), later(7250)];
+  },
+  get staggerAt(): number {
+    return later(7800);
+  },
+  get collapseAt(): number {
+    return later(8250);
+  },
+  get fadeAt(): number {
+    return later(8800);
+  },
   fadeMs: 500,
-  endMs: after(9600),
+  get endMs(): number {
+    return later(9600);
+  },
 } as const;
 
-/** How much longer the reveal lasts when the God King makes his Last Stand. */
-export const LAST_STAND_MS: number = LAST_STAND.endMs;
+/** How much longer the reveal lasts when the God King makes his Last Stand (ms). */
+export const lastStandMs = (): number => LAST_STAND.endMs;
 
 /**
  * The damage numbers on his Last Stand's slashes: `count` of them, 6 to 14 each, the same on every screen for

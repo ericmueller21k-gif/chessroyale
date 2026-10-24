@@ -3,6 +3,7 @@
   "e2e/account.spec.ts": 104,
   "e2e/age-gate.spec.ts": 16,
   "e2e/alfil.spec.ts": 147,
+  "e2e/banner-time.spec.ts": 360,
   "e2e/bigboy.spec.ts": 115,
   "e2e/boss-bar.spec.ts": 320,
   "e2e/boss-character.spec.ts": 43,

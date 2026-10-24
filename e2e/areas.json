@@ -130,6 +130,7 @@
       ],
       "specs": [
         "e2e/alfil.spec.ts",
+        "e2e/banner-time.spec.ts",
         "e2e/bigboy.spec.ts",
         "e2e/boss-character.spec.ts",
         "e2e/boss-dock.spec.ts",
@@ -187,6 +188,7 @@
         "packages/app/src/boss-history.ts"
       ],
       "specs": [
+        "e2e/banner-time.spec.ts",
         "e2e/boss-bar.spec.ts",
         "e2e/boss-character.spec.ts",
         "e2e/boss-dock.spec.ts",

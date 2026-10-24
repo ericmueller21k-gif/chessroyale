@@ -2,7 +2,7 @@ import { hollowLobby } from "./bosses/hollow.ts";
 import type { BossLobby } from "./bosses/base.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
-import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   BOT_NAMES,
@@ -16,7 +16,7 @@ import {
   landsAfterHisMove,
   PASS_WAIT,
   powerMomentMs,
-  LAST_STAND_MS,
+  lastStandMs,
   queenSlain,
   legalMoves,
   START_FEN,
@@ -1372,7 +1372,7 @@ export class LobbyCore {
     this.r.overrides = { ...(this.r.overrides ?? {}), ...patch } as LobbyRecord["overrides"];
     this.settings = { ...this.settings, ...patch };
     this.runner!.patchSettings(patch);
-    v.nextAt = this.io.now() + this.settings.voteResultSeconds * 1000;
+    v.nextAt = this.io.now() + voteResultMs(this.settings);
     this.broadcast({ t: "vote", vote: this.voteView(), standings: this.standings() });
     this.setTimer("voteNext", v.nextAt);
   }
@@ -2169,7 +2169,7 @@ export class LobbyCore {
     const kingActs = report.boards.some((b) => b.king);
     // The God King's Last Stand plays out in the reveal (the next move's clock starts after it: nobody loses time).
     const stand = report.boards.some((b) => b.lastStand);
-    const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (kingActs ? kingMoveMs(this.settings) : 0) + (stand ? LAST_STAND_MS : 0);
+    const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (kingActs ? kingMoveMs(this.settings) : 0) + (stand ? lastStandMs() : 0);
     const bossNow = runner.boss ? runner.bossView()! : undefined;
     const st = this.standings();
     const cutoff = this.cutoff();

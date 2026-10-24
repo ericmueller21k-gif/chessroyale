@@ -1352,31 +1352,67 @@ export type BossPowerSettings = {
  * SLAIN! and QUEEN DOWN!, "START!", and the Hidden Boss's "PHASE 2" and "5 SECONDS!". Each slides in, holds and slides
  * off by its end (styles.css times the band's exit from it). Eric, Oct 15: every banner a second longer (2.5 s); Oct 16,
  * a boss's a second shorter again: "when the bosses ult they are ulting while the banner is still up, same thing for
- * Toy Blocks... Do 1 second less" (docs/decisions/2026-10-16-banner-timing.md). A power's banner ends sooner where the
- * power itself starts sooner (the beat it gives way to, in its boss's file), so nothing it does plays under it. The
- * God King's cut-ins and FISCHER RANDOM! keep 2.5 s.
+ * Toy Blocks... Do 1 second less" (docs/decisions/2026-10-16-banner-timing.md). Oct 24: BANNER_PLUS_MS on top of
+ * every one (below), each a boss's banner's whole length (bossBannerMs), and what comes after it that much later.
  */
 export const BOSS_BANNER = {
-  /** How long one shows (ms). */
+  /** How long one showed before Oct 24's extra (ms): what the beats inside a power's moment are counted from. */
   ms: 1500,
-  /** "PHASE 2", as the Hidden Boss's phase change ends (its clocks start after it). */
+  /** "PHASE 2", as the Hidden Boss's phase change ends (its clocks start after it; the extra on top). */
   phase2Ms: 1400,
 } as const;
 
 /**
+ * The extra time on every full-width banner over the board, in every mode (ms). Eric, Oct 24, on his phone: "we need
+ * the banners to appear… at least… 3/4 of a second longer, or 1/2 a second even, just to start… across the entire
+ * board… the large banners… when the boss ults, when your queen is down, for any mode, those things should be more
+ * consistent, because it's just so fast." Every beat that comes after a banner comes this much later too, so nothing
+ * plays under a longer banner (the Oct 15 trap: docs/decisions/2026-10-24-banner-and-speech-time.md). A tester's
+ * `?bannerplus=` (seconds) sets it for a page's games on the device (the app's test-switches.ts); online the server
+ * and every screen use this default.
+ */
+export const BANNER_PLUS_MS = 750;
+let bannerPlusFrom: () => number | null = () => null;
+/** The extra time on every banner now (ms): BANNER_PLUS_MS, or a tester's `?bannerplus=` for a game on the device. */
+export const bannerPlusMs = (): number => bannerPlusFrom() ?? BANNER_PLUS_MS;
+/** Where a page's own extra comes from (the app's `?bannerplus=`; null: the default). The server never sets one. */
+export function setBannerPlusSource(from: () => number | null): void {
+  bannerPlusFrom = from;
+}
+/**
+ * How long every boss's banner shows (ms), each power's and QUEEN SLAIN!, QUEEN DOWN!, "START!", BULLET!, "5 SECONDS!":
+ * the same length for all (Eric, Oct 24: "more consistent"), BOSS_BANNER.ms and the extra. One that ended sooner for its
+ * power (Leapfrog's, 0.72 s) is brought up to it, and its power waits for it.
+ */
+export const bossBannerMs = (): number => BOSS_BANNER.ms + bannerPlusMs();
+/**
+ * How long a pre-game vote's result shows before the next vote or the match (ms): `voteResultSeconds` (the walk to the
+ * winner, then its banner) and the banners' extra (Oct 24), Crowd and Squads, solo and online.
+ */
+export const voteResultMs = (s: { voteResultSeconds: number }): number => s.voteResultSeconds * 1000 + bannerPlusMs();
+
+/**
  * How long every speech line stays up, and how lines take turns (Eric, Oct 10: Ginger's line came and went at once).
  * The rule for every boss's lines and the God King's, in one place (packages/app/src/speech.tsx): a line types out
- * (`typeMs` a character), then stays fully readable for `readMs` plus `perCharMs` a character, at most `maxReadMs`,
- * then fades (`fadeMs`). Eric, later on Oct 10: "a few seconds… two, three, four, not that long": a short line
- * ("Freeze!") rests about 2.5 s once typed, a long one (50 characters) about 4 s, none over 4.5 s. Only a critical
- * line cuts in on one still inside that time; any other waits its turn, highest priority first, and is dropped if it
- * can't start within `waitMs` of being said (it would be stale by then).
+ * (`typeMs` a character), then stays fully readable for `readMs` plus `perCharMs` a character, and `longExtraMs` more
+ * for a line longer than `longChars` (about one row of the bar's bubble on a 390 px phone), at most `maxReadMs`, then
+ * fades (`fadeMs`). Once a line has started, nothing takes it off before it has typed out and been fully readable for
+ * `minReadMs`: a critical line that comes sooner waits for that, then cuts in; any other waits its turn, highest
+ * priority first, and is dropped if it can't start within `waitMs` of being said (it would be stale by then).
+ * Eric, Oct 10: "a few seconds… two, three, four, not that long". Oct 24 (Babur's thinking line, cut off by his hoops'
+ * line a quarter of a second in): "same with the text bubbles when the boss talks… I couldn't even see what the heck he
+ * was saying… because it was so fast. And it shouldn't linger forever… they need to be like a second longer if they're
+ * like two rows or more than a certain number of words, and then even… sit out a little bit longer." A short line now
+ * rests about 3 s once typed, a two-row one (50 characters) about 5.5 s, none over 6.5 s.
  */
 export const SPEECH = {
   typeMs: 28,
-  readMs: 2200,
+  readMs: 2700,
   perCharMs: 35,
-  maxReadMs: 4500,
+  longChars: 30,
+  longExtraMs: 1000,
+  maxReadMs: 6500,
+  minReadMs: 1500,
   fadeMs: 260,
   waitMs: 5000,
 } as const;

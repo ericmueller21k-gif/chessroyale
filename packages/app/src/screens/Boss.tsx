@@ -33,7 +33,7 @@ import { ordinal } from "./StageBreak.tsx";
 import { CRITICAL, VoiceBubble, bossVoice } from "../speech.tsx";
 import { kingBlocked } from "../components/Recluse.tsx";
 import { BrainLoading } from "../components/BrainLoading.tsx";
-import { BOSS_BANNER, bossInText, crowdFinalists } from "@chessroyale/core";
+import { bossBannerMs, bossInText, crowdFinalists } from "@chessroyale/core";
 import { testParams } from "../test-switches.ts";
 
 /** The Crowd's boss final as it starts: how many face the boss (crowdFinalists: the top 4), as a word. */
@@ -351,7 +351,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const lastShown = funMove?.move ? (funPlayed ? funMove.move : null) : introLast;
   // The Big Bounce: the board before it, less the pieces up in the air, then the new position as they come down; the
   // eval bar keeps the position before it until they've all settled. The board jolts as he lands and at the crash.
-  const bounceShown = bounceFen(boss.powers?.bounce, bounce && now >= bounce.at ? bounce : null, now, boss.board.fen);
+  const bounceShown = bounceFen(boss.powers?.bounce, bounce && now >= bounce.at - (bounce.lead ?? 0) ? bounce : null, now, boss.board.fen);
   // Sawyer's split after his first move: the new half isn't on the board until the pawn cracks, and both are in the air
   // (the moment draws them) until they've landed; the board doesn't animate those changes.
   const split = moments.find((m) => m.kind === "split") ?? null;
@@ -506,11 +506,11 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             <FireBurn burnt={burnt} since={burnAt} now={now} orientation={orientation} />
             {claimed && t >= tl.claimAt && t < tl.bannerAt && <ClaimDark boss={boss} since={mountedAt + tl.claimAt} now={now} />}
             {snack && t >= tl.claimAt && t < tl.bannerAt && <SnackTime boss={boss} since={snackAt} now={now} orientation={orientation} />}
-            {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" ms={BOSS_BANNER.ms} />}
+            {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" ms={tl.total - tl.bannerAt} />}
             {/* (The queen banners are silent for now: Eric, Oct 11, the gasp sounded wrong. Its file is kept, unused:
                 queenGasp in sound.ts, public/sounds/banner/queen-gasp.mp3.) */}
-            {slewQueen && <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${bossInText(boss.name)}'s queen`} ms={BOSS_BANNER.ms} />}
-            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${bossInText(boss.name, true)} takes your queen`} ms={BOSS_BANNER.ms} />}
+            {slewQueen && <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${bossInText(boss.name)}'s queen`} ms={bossBannerMs()} />}
+            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${bossInText(boss.name, true)} takes your queen`} ms={bossBannerMs()} />}
             {loading && <BrainLoading match={match} boss={boss} />}
             {showCard && (
               // (After the loading step, whose card it takes over from: no entrance, so the board doesn't blink between.)

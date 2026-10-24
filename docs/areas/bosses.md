@@ -167,7 +167,7 @@ solo Crowd's boss final you reached, where the other three finalists take the ot
 `phase2Mates`). **Not online yet** (four boards online, his server-side Stockfish and its fair-play hooks are a separate
 build): online, phase 1 won is the crowd's victory):
 - **The phase change** (Eric, Oct 14, reworked, then opened with the God King's absorption; `PHASE_CHANGE` in
-  `packages/app/src/recluse-phase2.ts`, about 24.8 s after a 1.8 s fall (its "PHASE 2" banner 1.4 s, `BOSS_BANNER.phase2Ms`, Oct 16), one timeline, not skippable like a boss's
+  `packages/app/src/recluse-phase2.ts`, about 24.8 s after a 1.8 s fall (its "PHASE 2" banner 1.4 s, `BOSS_BANNER.phase2Ms`, Oct 16, and the banners' extra since Oct 24), one timeline, not skippable like a boss's
   intro; drawn by `screens/Recluse2.tsx`, `PhaseChangeScreen`). **Its pace** (Eric, Oct 17, after playing it: "everything's
   perfect, but it happens way too fast"; docs/decisions/2026-10-17-phase-change-pace.md): about 10 s more from the mate
   to the split, the animations unchanged, every added time a setting (`RECLUSE_PHASE2.change`): his words before the
@@ -252,8 +252,8 @@ build): online, phase 1 won is the crowd's victory):
   `recluseSlow`; the marks flash and that board gets a "slow move" note); each shows as a red pixel X beside your board
   only (`SlowMarks`: ten slots in a column by its right edge, as Jefferson's candle shots; on a phone, by the big board;
   once, since the count is the team's: Eric, Oct 14). The team's `slowMovesForUlt`-th (10; Eric, Oct 14) brings it (`phase2Ult`): his line (`ult2`), the
-  spellbook where he stands, "5 SECONDS!" over every board (`PHASE2_ULT_BANNER_MS`: a boss's banner, 1.5 s, Oct 16); everyone
-  whose move it is gets a fresh 5 s from then; from then on every move has `ultMoveSeconds` (5 s), no bank, and out of
+  spellbook where he stands, "5 SECONDS!" over every board (`phase2UltBannerMs()`: a boss's banner, 2.25 s since Oct 24); everyone
+  whose move it is gets a fresh 5 s from when it goes (Oct 24: the longer banner never eats into them); from then on every move has `ultMoveSeconds` (5 s), no bank, and out of
   time a random legal move is played for that player (`phase2Timeouts`, as Squads plays a missed move; never a loss on
   time). The dock's clock counts it down ("5 s a move, or a random one" beside it). Bots think past 5 s now and then before it (`botSlowChance`, `botSlowMs`). The
   admins' trigger brings it at once.
@@ -350,6 +350,32 @@ build): online, phase 1 won is the crowd's victory):
   (the crowd's clock starts after the moments; a strike stops it for `kingStrikeMs`, 4.7 s). Tests:
   `packages/app/test/banners.test.ts` (each power's banner read from its view's own code), `e2e/bigboy.spec.ts` (the
   toy block's and the Big Bounce's banners off the board before the throw and the leap, frame by frame: `watchSpans`).
+- **Every banner longer, the same length, nothing under it** (Eric, Oct 24: "at least… 3/4 of a second longer, or 1/2
+  a second even… across the entire board… for any mode, those things should be more consistent";
+  docs/decisions/2026-10-24-banner-and-speech-time.md): `BANNER_PLUS_MS` (0.75 s, settings.ts; `bannerPlusMs()`) is
+  added to every full-width banner in every mode, and **everything after a banner comes that much later**, so nothing
+  plays under it (the Oct 15 trap). A boss's banners are all one length, `bossBannerMs()` (1.5 s and the extra, 2.25 s):
+  each power's, QUEEN SLAIN!, QUEEN DOWN!, "START!", BULLET!, "5 SECONDS!", LIGHTS OUT!; one that ended sooner for its
+  power (Leapfrog's 0.72 s, the Carrot Patch's 1.1 s, the 1.25 to 1.45 s ones) is brought up to it. How: the views keep
+  their windows (Oct 16's beats); `POWER_BANNERS` in `boss-timing.ts` lists them (`[from, window]` per moment kind; a
+  unit test keeps it equal to what each view draws), and **one place adds the time**: a banner from a moment's start
+  holds the moment's own clock at its start (`bannerLeadMs`: `momentsOf` gives the moment a `lead`, its `at` that much
+  later, and `PowerMoment` draws the banner from the lead's start), so its power, its cast, its line, its board layer and
+  its sounds all come later by it; a banner later in its moment (BULLET!, DRAW!) grows in place, the moment longer by
+  whatever passes its end. `powerFxMs` adds it all (`bannerWaitMs`), so the solo runner's and the lobby's holds
+  (`powerMomentMs`, `bossTurnShowMs`) wait for it; no boss's timeline changed. The others: "START!" (`BOSS_INTRO.bannerMs`:
+  the intro's end), QUEEN SLAIN! (`bossThinkMs`: 2.25 s and a beat), QUEEN DOWN! (`bossShowMs`: the move shows 3.85 s),
+  LIGHTS OUT! (`LIGHTS_OUT.dropAt`: his drop and every round after), "PHASE 2" (2.15 s; the countdown after it), "5
+  SECONDS!" (everyone's few seconds start as it goes: `phase2Ult`), the God King's cut-in (`KING_COMMAND`: 3.25 s, his
+  bolt, slashes and lowering after it, `moveMs` and `kingStrikeMs` with it; `KING_SUMMON`, off, unchanged), the Last
+  Stand's (3.85 s; the slide, the blows, the stagger, the fall and `lastStandMs()` after it; his figure's frames made for
+  the extra in use), FISCHER RANDOM! (3.25 s), Squads' block banner (4.35 s, drawn only), auto chess's phase words (2.35 s,
+  drawn only: the step's clock runs under them as before) and the votes' result (`voteResultMs`: 4.95 s). **Trying the
+  lengths:** `?bannerplus=0`, `0.5`, `0.75` or `1` (seconds; a test switch, `test-switches.ts`) sets the extra for the
+  page's games on the device; online the server's default rules and the screens keep it. Tests: `banners.test.ts`
+  (POWER_BANNERS against the views, each banner's length and its power after it at 0, 0.5, 0.75 and 1 s, the moments'
+  holds, the starts moving by exactly the extra), `test-switches.test.ts`, `e2e/banner-time.spec.ts` (frame by frame on a
+  phone: the toy block, the Big Bounce, Lights out, Leapfrog, Babur's warning, QUEEN DOWN!; `BANNERPLUS=0` to compare).
 - **QUEEN SLAIN! once, and only for your capture** (Eric, Oct 16: "he used his ult and idk what happened but the queen
   slayed banner appeared for like 1 second very fast"): it plays while the boss thinks after your move took his queen
   (`queenSlain` in `boss-timing.ts`, the screen's banner and `bossThinkMs`'s wait alike, solo and the lobby's
@@ -362,10 +388,14 @@ build): online, phase 1 won is the crowd's victory):
   at once): every line (its powers' moments, its ultimate, its warning, its reactions, Hollow's claim and Lights out
   words, Big Boy's snack) goes into the boss's voice and shows in its text box beside it (in the boss bar on a phone,
   by the board on a computer), on every screen of the battle, also while it stands at the board's corner for a
-  moment. Each line types out, then stays fully readable for 2.2 s plus 35 ms a character (at most 4.5 s: a short
-  line about 2.5 s, a long one about 4 s; Eric, later on Oct 10: "a few seconds… not that long"), whatever the screen
-  does next. One line at a time: only a critical line (an ultimate's, Hollow's first cover of the dark, his
-  claim, the battle's end) cuts in on another; the rest wait their turn, highest first, and lapse after 5 s of waiting.
+  moment. Each line types out, then stays fully readable for 2.7 s plus 35 ms a character, a second more past 30
+  characters (about one row of the bar's bubble at 390 px), at most 6.5 s (a short line about 3 s, a two-row one about
+  5.5 s; Eric, later on Oct 10: "a few seconds… not that long"; Oct 24: "a second longer if they're like two rows… and
+  then even… sit out a little bit longer"; a tester's `?talkplus=` adds seconds), whatever the screen does next. One
+  line at a time: only a critical line (an ultimate's, Hollow's first cover of the dark, his claim, the battle's end)
+  cuts in on another, and **never before the one up has typed out and been readable for 1.5 s** (`SPEECH.minReadMs`,
+  Oct 24: Babur's thinking line, which had waited behind his balloon's cheer, was up a quarter of a second when his
+  hoops' line cut in); the rest wait their turn, highest first, and lapse after 5 s of waiting.
   A move that brings a power's moment says nothing of its own (the moment's line is the boss's word that turn). Lights
   out's round prompt keeps its own box above the board for the whole round (and the dock). Each speaker's box keeps
   itself current (`VoiceBubble`: it listens to its voice and draws every frame while a line types and fades), so

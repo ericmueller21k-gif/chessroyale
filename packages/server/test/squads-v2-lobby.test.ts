@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { FRONT_DOOR, SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
+import { FRONT_DOOR, SQUADS, SQUADS_LOBBY, voteResultMs } from "@chessroyale/core";
 import { START_FEN } from "@chessroyale/chess";
 import { halfDuties, squadsLegalMoves, type SquadsEvent } from "@chessroyale/chess/squads";
 import { clearTopCache, parseTestFen, testLobbyOptions, type LiveMatch } from "../src/squads-lobby.ts";
@@ -12,7 +12,7 @@ import { squadsLobby } from "./squads-fixture.ts";
  */
 
 /** The votes before the bracket: a test lobby whose mode is set holds Start and Clock only (no Mode vote). */
-const VOTES_MS = FRONT_DOOR.fillShowMs + 2 * (SQUADS.voteSeconds + SQUADS.voteResultSeconds) * 1000;
+const VOTES_MS = FRONT_DOOR.fillShowMs + 2 * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
 /** The bracket's intro: a Mercenary test lobby that skips rounds has a longer one, to shop in. */
 const introMs = (start: number, mode: "classic" | "mercenary") => (start > 0 && mode === "mercenary" ? Math.max(SQUADS_LOBBY.bracketIntroSeconds, SQUADS_LOBBY.testShopSeconds) : SQUADS_LOBBY.bracketIntroSeconds) * 1000;
 const mineIn = (lm: LiveMatch, id: string) => lm.m.sides.some((x) => x.seats.includes(id));
@@ -258,7 +258,7 @@ describe("squads v2 server: test lobbies and views", () => {
       const L = squadsLobby({ seed, test: o.test, fillInMs: 5_000 });
       const tess = L.join("Tess");
       // (No mode set: the Mode vote too.)
-      L.advance(5_000 + VOTES_MS + (SQUADS.voteSeconds + SQUADS.voteResultSeconds) * 1000);
+      L.advance(5_000 + VOTES_MS + (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS)));
       expect(L.core.record.bots.every((b) => b.skill === Math.min(...L.core.record.bots.map((x) => x.skill!)))).toBe(true);
       const pairs = L.core.allMatches().filter((m) => m.round === 1);
       expect(pairs.every((m) => m.m.boards.every((b) => b.fen === fen))).toBe(true);

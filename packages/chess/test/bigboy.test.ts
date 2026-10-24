@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
-import { BOSS_BANNER, BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type BossState, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, bossBannerMs, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type BossState, type Settings } from "@chessroyale/core";
 import {
   BOUNCE,
   MatchRunner,
@@ -27,6 +27,7 @@ import {
   pickBounce,
   pieceAt,
   powerMomentMs,
+  bannerWaitMs,
   powerTurn,
   prepareTurn,
   queenSlain,
@@ -503,7 +504,8 @@ describe("Big Boy's Big Bounce in a battle", () => {
     expect(rageOf(r.boss)).toBe(0);
     expect(r.bossView()!.powers!.paused).toBe(true);
     expect(r.boss!.powers!.ults).toBe(1);
-    expect(powerMomentMs([{ kind: "bounce" }])).toBe(BOUNCE.total);
+    // (Its beats, and its banner's hold before them: Oct 24.)
+    expect(powerMomentMs([{ kind: "bounce" }])).toBe(BOUNCE.total + bannerWaitMs("bounce"));
     // He plays his move from the new position; the game replays through it.
     await r.playBoss();
     const board = r.boards.get(0)!;
@@ -530,7 +532,7 @@ describe("Big Boy's Big Bounce in a battle", () => {
     expect(r.bounceDue()).toBe(true);
     // The bounce's thinking: your banner, and he waits for it.
     expect(queenSlain(r.bossView()!)).toBe(true);
-    expect(bossThinkMs(r.bossView()!)).toBe(BOSS_BANNER.ms + 500);
+    expect(bossThinkMs(r.bossView()!)).toBe(bossBannerMs() + 500);
     await r.playBounce();
     // His move's thinking, the same last move: no banner, no wait for one.
     expect(r.boards.get(0)!.history.at(-1)).toBe(take);

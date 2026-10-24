@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { FRONT_DOOR, LOBBY_LIFE, SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
+import { FRONT_DOOR, LOBBY_LIFE, SQUADS, SQUADS_LOBBY, voteResultMs } from "@chessroyale/core";
 import { SQUADS_PROTOCOL, dutyOf, halfDuties, squadsLegalMoves, squadsVotes, type NetSquadsMatch } from "@chessroyale/chess/squads";
 import { clearTopCache, parseTestClock, partiesFit, squadsClosing, squadsTestAllowed, testLobbyOptions, type LiveMatch } from "../src/squads-lobby.ts";
 import { fallbackTop } from "../src/squads-bots.ts";
@@ -11,7 +11,7 @@ import { squadsLobby } from "./squads-fixture.ts";
  */
 
 /** The votes before the bracket: Mode, Start and Clock. */
-const VOTES_MS = FRONT_DOOR.fillShowMs + squadsVotes().length * (SQUADS.voteSeconds + SQUADS.voteResultSeconds) * 1000;
+const VOTES_MS = FRONT_DOOR.fillShowMs + squadsVotes().length * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
 const mineIn = (lm: LiveMatch, id: string) => lm.m.sides.some((x) => x.seats.includes(id));
 
 beforeEach(() => clearTopCache());
@@ -97,7 +97,7 @@ describe("squads lobby: votes and the bracket", () => {
     expect(L.last(a, "voteCast")).toBeUndefined();
     L.core.message(a, { t: "vote", key: mode.key, option: 1 });
     expect(L.last(a, "voteCast")).toMatchObject({ playerId: a, option: 1 });
-    L.advance((SQUADS.voteSeconds + SQUADS.voteResultSeconds) * 1000);
+    L.advance((SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS)));
     const modeResult = L.all(a, "vote").map((x) => x.vote).filter((x) => x.id === "mode").at(-1)!.result!;
     expect([0, 1]).toContain(modeResult);
     const vote = L.last(a, "vote")!.vote;
@@ -109,9 +109,9 @@ describe("squads lobby: votes and the bracket", () => {
     expect(counted.result).not.toBeNull();
     // Everyone who didn't vote joins the winner: all 32 are counted.
     expect(counted.votes).toHaveLength(32);
-    L.advance(SQUADS.voteResultSeconds * 1000);
+    L.advance(voteResultMs(SQUADS));
     expect(L.last(a, "vote")!.vote.id).toBe("clock");
-    L.advance((SQUADS.voteSeconds + SQUADS.voteResultSeconds) * 1000);
+    L.advance((SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS)));
     const lobby = L.last(a, "lobby")!.lobby;
     expect(lobby.phase).toBe("bracket");
     expect(lobby.rules).not.toBeNull();

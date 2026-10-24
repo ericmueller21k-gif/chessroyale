@@ -32,6 +32,7 @@ import {
   pieceAt,
   pigTurn,
   powerMomentMs,
+  bannerWaitMs,
   powerTurn,
   prepareTurn,
   pullFrom,
@@ -968,8 +969,9 @@ describe("Wrangler's showdown in the match", () => {
 
 describe("Wrangler's moments", () => {
   it("each holds the screen for its beats", () => {
-    expect(powerMomentMs([{ kind: "pull" }])).toBe(PULL.total);
-    expect(powerMomentMs([{ kind: "showdown" }])).toBe(SHOWDOWN.total);
+    // (Its beats, and its banners' extra: Oct 24.)
+    expect(powerMomentMs([{ kind: "pull" }])).toBe(PULL.total + bannerWaitMs("pull"));
+    expect(powerMomentMs([{ kind: "showdown" }])).toBe(SHOWDOWN.total + bannerWaitMs("showdown"));
     expect(SHOWDOWN.pairs.every((t) => t >= SHOWDOWN.cornerAt && t + SHOWDOWN.yankMs <= SHOWDOWN.drawAt)).toBe(true);
     expect(SHOWDOWN.drawAt).toBeLessThan(SHOWDOWN.total);
   });

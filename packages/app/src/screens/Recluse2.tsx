@@ -20,7 +20,7 @@ import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import type { GameView, SimulBoardView, SimulView } from "../game.ts";
 import type { ComponentChildren } from "preact";
-import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE2_ULT_BANNER_MS, PHASE_CHANGE, absorbKing, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
+import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, phase2UltBannerMs, absorbKing, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
 import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
 import { useStillKey } from "../hooks.ts";
@@ -528,9 +528,9 @@ export function SimulScreen({ match }: { match: GameView }) {
   const yourTurn = v.playing && mine.toMove === "crowd";
   // His ultimate as it comes: "5 SECONDS!" over the boards.
   // (On every board at once; nobody waits for it: the 5 s start now.)
-  const ultOn = v.ultAt !== null && now - v.ultAt < PHASE2_ULT_BANNER_MS;
+  const ultOn = v.ultAt !== null && now - v.ultAt < phase2UltBannerMs();
   // (Its name alone: what it means, "5 s a move, or a random one", is the dock's.)
-  const ultBanner = ultOn && <FightBanner text={`${RECLUSE_PHASE2.ultMoveSeconds} SECONDS!`} tone="boss" sound="bannerStart" ms={PHASE2_ULT_BANNER_MS} />;
+  const ultBanner = ultOn && <FightBanner text={`${RECLUSE_PHASE2.ultMoveSeconds} SECONDS!`} tone="boss" sound="bannerStart" ms={phase2UltBannerMs()} />;
 
   // Your board's clock in the dock (DockClock): running on your move, holding (undefined) while he answers, none (null)
   // once your board is decided or before the clocks start.

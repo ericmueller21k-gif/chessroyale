@@ -5,9 +5,9 @@ import { engineTop, test, bossAloneFromHome } from "./helpers.ts";
 /**
  * Speech stays up long enough to read (Eric, Oct 10: Ginger froze his queen, and her text box came and went at once).
  * For one power moment of every boss, alone (solo) on a phone and a computer: the boss's line for it shows in its text
- * box beside it as the moment plays, and stays there, whole and in view, for its full time by the shared rule (2.2 s
- * plus 35 ms a character once typed, at most 4.5 s: SPEECH in settings.ts, read here, so the numbers can change
- * without this test), through the end of the boss's turn and into yours.
+ * box beside it as the moment plays, and stays there, whole and in view, for its full time by the shared rule (2.7 s
+ * plus 35 ms a character once typed, a second more past 30 characters, at most 6.5 s: SPEECH in settings.ts, read here,
+ * so the numbers can change without this test), through the end of the boss's turn and into yours.
  * The God King's opening line is held to the same rule. Every frame is watched, from before the page loads.
  * Neither box is ever over the board's squares, and the boss's never over the boss bar's status or the line under the
  * bar, nor the God King's over the dock's box (Oct 15: his had covered ranks 1 and 2 while you chose a move): a frame
@@ -15,7 +15,7 @@ import { engineTop, test, bossAloneFromHome } from "./helpers.ts";
  */
 
 /** How long a line must stay fully on screen: typed, then readable (its fade after that isn't counted). */
-const minOnScreen = (text: string) => text.length * SPEECH.typeMs + Math.min(SPEECH.maxReadMs, SPEECH.readMs + SPEECH.perCharMs * text.length);
+const minOnScreen = (text: string) => text.length * SPEECH.typeMs + Math.min(SPEECH.maxReadMs, SPEECH.readMs + SPEECH.perCharMs * text.length + (text.length > SPEECH.longChars ? SPEECH.longExtraMs : 0));
 
 const BOSSES = [
   { id: "gingerbread", name: "Ginger", banner: "FREEZE!" },

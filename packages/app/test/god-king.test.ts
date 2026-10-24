@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { KING_SPEECH } from "@chessroyale/core";
-import { holdMs } from "../src/speech.tsx";
+import { KING_SPEECH, SPEECH } from "@chessroyale/core";
+import { holdMs, typeMs } from "../src/speech.tsx";
 import { GOD_KING_SOUNDS, godKingSound } from "../src/characters/god-king-sounds.ts";
 import { makeBossSound } from "../src/characters/boss-sounds.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
@@ -26,8 +26,9 @@ describe("the God King's lines", () => {
     expect(kingSay("intro", "intro", t + 10, always)).toBeNull();
     // Small talk waits a while after the last line…
     expect(kingSay("idle", "idle-1", t + 1000, always)).toBeNull();
-    // …but danger doesn't: it's said, and (both critical) it waits until his opening line has had its time.
-    const danger = kingSay("queenDanger", "q-1", t + 1500, always)!;
+    // …but danger doesn't: it's said, and (both critical) it waits until his opening line has had its time (said within
+    // SPEECH.waitMs of the opening line's end, so it hasn't lapsed by then).
+    const danger = kingSay("queenDanger", "q-1", t + Math.max(1500, holdMs(intro) - SPEECH.waitMs + 500), always)!;
     expect(KING_LINES.queenDanger).toContain(danger);
     expect(kingLine(t + holdMs(intro) - 1)?.text).toBe(intro);
     expect(kingLine(t + holdMs(intro))).toMatchObject({ text: danger, at: t + holdMs(intro) });
@@ -68,11 +69,14 @@ describe("the God King's lines", () => {
       expect(kingSay("badMove", `b${m}`, t, always)).toBeNull();
     }
     kingTurn("r-last");
-    expect(kingSay("goodMove", "g-last", (t += 60_000), always)).not.toBeNull();
-    // A critical moment speaks at once, whatever was just said: it cuts in on the remark.
+    const remark = kingSay("goodMove", "g-last", (t += 60_000), always)!;
+    expect(remark).not.toBeNull();
+    // A critical moment speaks whatever was just said: it cuts in on the remark, once the remark has typed out and been
+    // readable for SPEECH.minReadMs (Oct 24).
     const lost = kingSay("queenLost", "ql", t + 100, () => 0.99);
     expect(lost).not.toBeNull();
-    expect(kingLine(t + 200)?.text).toBe(lost);
+    expect(kingLine(t + 200)?.text).toBe(remark);
+    expect(kingLine(t + typeMs(remark) + SPEECH.minReadMs)?.text).toBe(lost);
     // And the dice: a brilliant move is remarked on about a third of the time.
     expect(KING_SPEECH.chance.greatMove).toBeLessThanOrEqual(0.35);
   });

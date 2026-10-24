@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import { AUTOCHESS, botLook, mulberry32, type AutoChessSettings } from "@chessroyale/core";
+import { AUTOCHESS, bannerPlusMs, botLook, mulberry32, type AutoChessSettings } from "@chessroyale/core";
 import { account } from "../account.ts";
 import { useAccount } from "./Profile.tsx";
 import { Board } from "../components/Board.tsx";
@@ -112,8 +112,11 @@ const BOT_WAIT_MS = 2500;
 const CASH_LEAVE_MS = 220;
 /** A press on a silhouette on the board is a tap while the pointer stays this close to where it went down (a finger always wobbles); farther, it is neither a tap nor a drag, and does nothing. */
 const TAP_SLOP_PX = 10;
-/** A phase banner ("ACTION PHASE", "MOVE PHASE", "BATTLE PHASE") stays this long: its pop's length (styles.css, `.ac-phase`). */
-const BANNER_MS = 1600;
+/**
+ * A phase banner ("ACTION PHASE", "MOVE PHASE", "BATTLE PHASE") stays this long: its pop's length (styles.css, `.ac-phase`, its
+ * `--ac-banner-ms`), 1.6 s and the banners' extra since Oct 24 (bannerPlusMs). The step's clock runs under it, as before.
+ */
+const bannerMs = () => 1600 + bannerPlusMs();
 /** A merge (a star-up) pops and flashes its piece this long, and its new star pops in (styles.css, `.ac-merge`). */
 const MERGE_MS = 700;
 
@@ -1063,9 +1066,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   let banner: { words: string } | { n: number } | null = null;
   if (g.phase === "buy") {
     if (remaining > 0 && remaining <= COUNT_FROM_SECONDS * 1000) banner = { n: Math.ceil(remaining / 1000) };
-    else if (elapsed < BANNER_MS) banner = { words: "ACTION PHASE" };
-  } else if (g.phase === "adjust" && elapsed < BANNER_MS) banner = { words: "MOVE PHASE" };
-  else if (g.phase === "fight" && elapsed < BANNER_MS) banner = { words: "BATTLE PHASE" };
+    else if (elapsed < bannerMs()) banner = { words: "ACTION PHASE" };
+  } else if (g.phase === "adjust" && elapsed < bannerMs()) banner = { words: "MOVE PHASE" };
+  else if (g.phase === "fight" && elapsed < bannerMs()) banner = { words: "BATTLE PHASE" };
 
   const held = sel ?? null;
   // What is being dragged while buying: an offer (to the bench) or a piece of yours (to the shop, to sell it).
@@ -1240,7 +1243,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               {banner && (
                 <div class="center-count ac-banner" role="status" aria-live="polite" data-banner={"words" in banner ? "words" : "count"}>
                   {"words" in banner ? (
-                    <div class="cc-num ac-phase" key={banner.words}>
+                    <div class="cc-num ac-phase" key={banner.words} style={{ "--ac-banner-ms": `${bannerMs()}ms` }}>
                       {banner.words}
                     </div>
                   ) : (

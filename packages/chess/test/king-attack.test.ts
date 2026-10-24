@@ -4,7 +4,7 @@ import {
   KING_ATTACK,
   KING_ATTACKERS,
   LAST_STAND,
-  LAST_STAND_MS,
+  lastStandMs,
   MATE_TEST_MOVES,
   MatchRunner,
   bossShowMs,
@@ -41,7 +41,7 @@ describe("the attack's beats (KING_ATTACK)", () => {
   });
 
   it("fits the Last Stand without making it longer: from the slide back to the stagger", () => {
-    expect(LAST_STAND_MS).toBe(LAST_STAND.endMs);
+    expect(lastStandMs()).toBe(LAST_STAND.endMs);
     expect(LAST_STAND.attackAt).toBeGreaterThanOrEqual(LAST_STAND.slideAt);
     expect(LAST_STAND.attackAt).toBeGreaterThan(LAST_STAND.bannerAt + LAST_STAND.bannerMs);
     const hits = lastStandAttackHits();

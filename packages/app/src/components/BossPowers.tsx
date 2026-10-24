@@ -1,8 +1,8 @@
 import type { ComponentChildren } from "preact";
 import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
-import { BOSS_BANNER, BOSS_POWERS, type PowerEventKind } from "@chessroyale/core";
-import { KING_ATTACK, mateMoments, powerFxMs, powerMomentMs } from "@chessroyale/chess";
+import { BOSS_BANNER, BOSS_POWERS, bossBannerMs, type PowerEventKind } from "@chessroyale/core";
+import { KING_ATTACK, bannerLeadMs, mateMoments, powerFxMs, powerMomentMs } from "@chessroyale/chess";
 import { bossKit, poweredKit, type BossKit } from "../characters/kits.ts";
 import { cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
@@ -92,7 +92,9 @@ const OWN = (Object.keys(MOMENT_UI) as PowerEventKind[]).filter((k) => MOMENT_UI
 /**
  * The moments a boss screen plays, ending at `until` (the screen's end: the crowd's clock starts then), one after
  * another. The funhouse has a screen of its own (after the move he plays for the crowd); so do Hollow's extra move and
- * Big Boy's Big Bounce; the rest come after the boss's move, as the turn passes to the crowd.
+ * Big Boy's Big Bounce; the rest come after the boss's move, as the turn passes to the crowd. A moment whose banner
+ * shows longer than its beats give it (Oct 24: every banner a boss banner's whole length) starts its own clock (`at`)
+ * that much later (`lead`, bannerLeadMs), its banner up meanwhile: everything it does comes after.
  */
 export function momentsOf(boss: BossView, until: number): Moment[] {
   const p = boss.powers;
@@ -103,8 +105,9 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   let t = until - powerMomentMs(list);
   return list.map((e) => {
     // (Chub & Chirp's carrots: one pulled by each side in one turn, two moments.)
-    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}${e.by ? `:${e.by}` : ""}`, at: t, ms: powerFxMs(e), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}) };
-    t += m.ms;
+    const lead = bannerLeadMs(e.kind);
+    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}${e.by ? `:${e.by}` : ""}`, at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}) };
+    t += lead + m.ms;
     return m;
   });
 }
@@ -119,8 +122,8 @@ export const mateMomentsOf = (boss: BossView, until: number): Moment[] => (mateM
 /** The dock's line for the boss's turn when it brought no move to show (BossUi.noMove: Alfil's fusion); null otherwise. */
 export const noMoveLine = (boss: BossView): string | null => bossUi(boss)?.noMove?.(boss) ?? null;
 
-/** The moment playing at `now`, if any. */
-export const momentAt = (moments: readonly Moment[], now: number) => moments.find((m) => now >= m.at && now < m.at + m.ms) ?? null;
+/** The moment playing at `now`, if any (its banner's hold before its own clock, `lead`, included). */
+export const momentAt = (moments: readonly Moment[], now: number) => moments.find((m) => now >= m.at - (m.lead ?? 0) && now < m.at + m.ms) ?? null;
 
 /**
  * The board as the crowd sees it: from its own side, or (in Boingo's funhouse) turned: upside down (the other side's
@@ -225,15 +228,22 @@ const kitAnim = (kit: BossKit | null, kind: PowerEventKind) => {
  * view, from its boss's file). The ice and the pie themselves are the board layer's (PowerBoard), timed to land with
  * the effect.
  */
-export function PowerMoment({ boss, moment, now, orientation, side }: { boss: BossView; moment: Moment | null; now: number; orientation: "white" | "black"; side: "w" | "b" }) {
+export function PowerMoment({ boss, moment, now: wall, orientation, side }: { boss: BossView; moment: Moment | null; now: number; orientation: "white" | "black"; side: "w" | "b" }) {
   if (!moment) return null;
+  // (Its banner's hold, `lead`, before its own clock: the moment drawn as at its start, its banner up.)
+  const now = Math.max(wall, moment.at);
   const t = now - moment.at;
+  const shown = bossBannerMs();
   // (Moo's Full Moon: his moments' animations are powered while it lasts.)
   const plain = bossKit(boss.name);
   const kit = plain?.powered?.on(boss, now, "bossMove") ? poweredKit(plain) : plain;
+  // Every banner a boss banner's whole length (Oct 24): one from the moment's start from its hold (`lead`) to the end of
+  // its window in the moment's beats (POWER_BANNERS in boss-timing.ts: bannerLeadMs makes up the rest); one later in it
+  // (BULLET!, DRAW!) in place, the moment longer by whatever passes its end (bannerWaitMs).
   const banner = (text: string, sub?: string, tone = "", until = Infinity, from = 0) => {
     const ms = Math.min(BOSS_BANNER.ms, until - from);
-    return t >= from && t < from + ms ? <PowerBanner key={moment.key} boss={boss} side={side} text={text} sub={sub} tone={tone} ms={ms} /> : null;
+    const on = from === 0 ? wall >= moment.at - (moment.lead ?? 0) && t < ms : t >= from && t < from + shown;
+    return on ? <PowerBanner key={moment.key} boss={boss} side={side} text={text} sub={sub} tone={tone} ms={shown} /> : null;
   };
   /** The boss casting by the board's top-left corner, its animation's `hit` cue landing at `hitAt` (ms into the moment). */
   const cast = (hit: string, hitAt: number) => {
