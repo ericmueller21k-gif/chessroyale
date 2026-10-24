@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { createPortal } from "preact/compat";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { HOOPS_BEATS, TIGER_ANIM } from "@chessroyale/chess";
 import { pickLine } from "../characters/boss-beats.ts";
 import { bossKit, type BossKit } from "../characters/kits.ts";
 import { EFFECTS } from "../characters/power-art.ts";
 import { HOP_AIR_AT, HOP_AIR_MS } from "../characters/tiger-figure.ts";
-import { BALLOON_SHAPES, PUMP_FOOT, PUMP_PALETTE, PUMP_W, RELEASE_KNOT, TIGER_PUMP, balloonDrawing, balloonLooks, balloonPartOf } from "../characters/tiger-bar.ts";
+import { BALLOON_SHAPES, PUMP_FOOT, PUMP_H, PUMP_PALETTE, PUMP_W, RELEASE_KNOT, TIGER_PUMP, balloonDrawing, balloonLooks, balloonPartOf } from "../characters/tiger-bar.ts";
 import { LAND_Y } from "../characters/effects/tiger.ts";
 import type { Character } from "../characters/sprite.ts";
 import type { SoundName } from "../sound.ts";
@@ -20,7 +21,8 @@ import type { BoardLayerProps, BossUi, Moment, MomentProps, MomentUi } from "./P
 /**
  * Babur's, the circus tiger's, powers on screen (his rules: packages/chess/src/bosses/tiger.ts; docs/decisions/2026-10-23-tiger-rules.md
  * and 2026-10-24-tiger-wired.md), all from the shared state and the battle's clock (tiger-show.ts), so everyone online sees the same:
- * - **The pump** (BossUi.barProp, in the boss bar's free room: a phone's at its right end, a computer's at its left): the nozzle bare
+ * - **The pump** (BossUi.barProp: a phone's at the right end of the boss bar's free room, 2x; a computer's as big as the board's
+ *   balloons, beside his figure by the board, or in a taller bar where there's no room there: `pumpPlace`): the nozzle bare
  *   when none; else the balloon at the stage the battle's clock gives, the pump's `grow` (a plunger stroke and the balloon's puff) as
  *   each stage comes, a gentle bob once ready. It waits for the next stage's time: no timer redraws it every frame. Hidden, nothing
  *   plays; back, it shows the stage it's at.
@@ -99,7 +101,7 @@ const barFigure = (): HTMLElement | null => {
   const el = document.querySelector<HTMLElement>(".boss-bar .boss-char.place-bar");
   return el && el.getBoundingClientRect().width > 0 ? el : null;
 };
-const pumpEl = (): HTMLElement | null => document.querySelector<HTMLElement>(".boss-bar .tg-pump");
+const pumpEl = (): HTMLElement | null => document.querySelector<HTMLElement>(".tg-pump");
 /** A point of the pump's frame on screen (px), from its drawn size: the nozzle's knot by default. */
 function onPump(pump: HTMLElement, at: readonly [number, number] = [RELEASE_KNOT[0], RELEASE_KNOT[1] + 5]) {
   const r = pump.getBoundingClientRect();
@@ -108,7 +110,7 @@ function onPump(pump: HTMLElement, at: readonly [number, number] = [RELEASE_KNOT
 }
 
 /** The limp balloons in the air on a computer (Date.now() times; screen px). */
-const limps = new Map<string, { from: { x: number; y: number }; to: { x: number; y: number }; at: number; look: string }>();
+const limps = new Map<string, { from: { x: number; y: number }; to: { x: number; y: number }; at: number; look: string; scale: number }>();
 
 /** Each of his moments plays once on this device, from when it first saw it: his trip or place, his reactions, their lines. */
 const acted = new Set<string>();
@@ -147,7 +149,8 @@ function actPlace(kit: BossKit, rec: TigerShow, now: number): void {
     const side = document.querySelector<HTMLElement>(".boss-char.place-side .boss-char-sprite");
     const sr = side?.getBoundingClientRect();
     if (sr && sr.width > 0 && pump) {
-      limps.set(id, { from: { x: sr.left + (PAW_LIMP.x / kit.ch.w) * sr.width, y: sr.top + (PAW_LIMP.y / kit.ch.h) * sr.height }, to: onPump(pump), at: now + TOUCH_AT, look: colorLook(pl.color) });
+      // (The limp balloon at the pump's own scale: it lands on the nozzle as the balloon it becomes.)
+      limps.set(id, { from: { x: sr.left + (PAW_LIMP.x / kit.ch.w) * sr.width, y: sr.top + (PAW_LIMP.y / kit.ch.h) * sr.height }, to: onPump(pump), at: now + TOUCH_AT, look: colorLook(pl.color), scale: pump.getBoundingClientRect().width / PUMP_W });
       if (limps.size > 4) limps.delete(limps.keys().next().value!);
       pl.putAt = now + TOUCH_AT + LIMP_FLY_MS;
     } else pl.putAt = now + TOUCH_AT;
@@ -166,6 +169,100 @@ function actEnd(kit: BossKit, rec: TigerShow, end: EndShow): void {
   playInPlace(`tiger:${id}:${end.at}`, [beat], at);
   later(`say:${id}`, at, () => bossVoice.say(pickLine(kit, beat, id), id, NORMAL));
 }
+
+/**
+ * A balloon on the board is as tall as a queen piece on its square (Eric, Oct 24: "a full balloon the size of a piece"). The cburnett
+ * queen's art fills QUEEN_ART of its square's height (measured on the board; e2e/tiger.spec.ts checks it), and the stage-4 balloon is
+ * BALLOON_ROWS art px tall: one art px is PX board units (the board as 1, a square as 1/8). The sprite's frame is 32 art px: FRAME.
+ */
+const QUEEN_ART = 0.772;
+const BALLOON_ROWS = BALLOON_SHAPES.queen[3].sil.length;
+const PX = QUEEN_ART / 8 / BALLOON_ROWS;
+const FRAME = 32 * PX;
+
+// ---------------- The pump's place and size on a computer ----------------
+
+/**
+ * A computer's pump is as big as the board's balloons (Eric, Oct 24, on a computer: "the piece needs to be blown up the same size as it
+ * is on the board"; docs/decisions/2026-10-24-babur-desktop-pump.md): a stage-4 queen on it as tall as her piece. Its scale is a whole
+ * number where that is within PUMP_FIT of the board balloon's (PX times the board's size, in screen px per art px), otherwise the
+ * nearest scale within it (pixelated). PUMP_FIT is 8%, under the 10% asked, for the pixels' rounding.
+ */
+export const PUMP_FIT = 0.08;
+export function pumpScale(board: number): number {
+  const ideal = PX * board;
+  return Math.min(ideal * (1 + PUMP_FIT), Math.max(ideal * (1 - PUMP_FIT), Math.max(1, Math.round(ideal))));
+}
+/**
+ * The most of the board's size the pump is ever tall (its 36 rows at the largest scale): the room styles.css keeps for a taller bar
+ * (`--bd-h`, its 1.1876).
+ */
+export const PUMP_BAR_SHARE = PUMP_H * PX * (1 + PUMP_FIT);
+
+export type Box = { left: number; top: number; right: number; bottom: number };
+/** His drawn left edge in his frame, every pose (his capture's reach; his frame is 76 wide). */
+const FIG_LEFT = 4;
+/** The pump's drawn right edge in its frame (its barrel's base: columns 1 to 32 of 34 are ever drawn, the pop's swell at 1). */
+const PUMP_RIGHT = 33;
+/** Between the pump and him, and the least room from the window's edge (px). */
+const PUMP_GAP = 6;
+const PUMP_EDGE = 4;
+const overlaps = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+
+/**
+ * The pump's frame beside his figure by the board's bottom left (a computer): standing on his baseline, its drawn right edge PUMP_GAP
+ * px left of his drawn left edge, at scale `s` (screen px). `fig` is his sprite's box at `figScale` screen px per art px. Null where
+ * it would leave the window or overlap any of `keepClear` (the leaderboard, the eval bar, the board, the status): the pump then goes
+ * in a taller bar.
+ */
+export function sidePump(fig: Box, figScale: number, baseline: number, s: number, win: { w: number; h: number }, keepClear: readonly Box[]): Box | null {
+  const left = fig.left + FIG_LEFT * figScale - PUMP_GAP - PUMP_RIGHT * s;
+  const box = { left, top: baseline - PUMP_H * s, right: left + PUMP_W * s, bottom: baseline };
+  if (box.left < PUMP_EDGE || box.top < PUMP_EDGE || box.right > win.w - PUMP_EDGE || box.bottom > win.h) return null;
+  return keepClear.some((k) => k.right > k.left && k.bottom > k.top && overlaps(k, box)) ? null : box;
+}
+
+/**
+ * Where the pump is drawn: `phone`, at the bar's right end, 2x (styles.css); `side`, beside his figure by the board (in `.boss-side`,
+ * `x` px from its left), at `scale`; `tall`, at the left of a taller bar, at `scale`; `bar`, at the bar's left at 1x (a screen without
+ * the boss dock, whose board doesn't leave room for a taller bar).
+ */
+type PumpPlace = { at: "phone" | "side" | "tall" | "bar"; scale: number; x: number; side: HTMLElement | null };
+const PHONE: PumpPlace = { at: "phone", scale: 2, x: 0, side: null };
+/** styles.css' computer. */
+const COMPUTER = "(min-width: 900px) and (min-height: 600px)";
+/** What the pump keeps clear of beside his figure. */
+const KEEP_CLEAR = ".tower-side, .eval-bar, .board-wrap, .boss-dock, .boss-bar, .under-board, .mini-tower";
+/** The place last worked out, so a screen that hands the bar on starts with the same layout (no jump before it measures). */
+let lastPlace: PumpPlace = PHONE;
+
+/**
+ * Works out the pump's place on this screen, beside him if there's room with the bar at its usual size, else in the taller bar (whose
+ * class it leaves on `slot`). Synchronous: the class comes off and on again in the same task, never painted in between.
+ */
+function pumpPlace(slot: HTMLElement, figW: number): PumpPlace {
+  if (!matchMedia(COMPUTER).matches) return PHONE;
+  const screen = slot.closest<HTMLElement>(".screen") ?? document.body;
+  const board = screen.querySelector<HTMLElement>(".hb-board");
+  slot.classList.remove("tg-tall");
+  if (!board || !screen.querySelector(":scope > .boss-dock")) return { at: "bar", scale: 1, x: 0, side: null };
+  const side = screen.querySelector<HTMLElement>(".boss-side");
+  const sprite = side?.querySelector<HTMLElement>(".boss-char-sprite");
+  const b = board.getBoundingClientRect();
+  // (Boxes in screen px, the scale and the place in layout px: they differ only while a transform is on the screen.)
+  const zoom = b.width / (board.offsetWidth || 1) || 1;
+  const fig = sprite?.getBoundingClientRect();
+  if (side && fig && fig.width > 0) {
+    const s = pumpScale(board.offsetWidth);
+    const at = side.getBoundingClientRect();
+    const keep = [...document.querySelectorAll(KEEP_CLEAR)].map((e) => e.getBoundingClientRect());
+    const box = sidePump(fig, fig.width / figW, at.bottom, s * zoom, { w: document.documentElement.clientWidth, h: innerHeight }, keep);
+    if (box) return { at: "side", scale: s, x: (box.left - at.left) / zoom, side };
+  }
+  slot.classList.add("tg-tall");
+  return { at: "tall", scale: pumpScale(board.offsetWidth), x: 0, side: null };
+}
+const samePlace = (a: PumpPlace, b: PumpPlace) => a.at === b.at && Math.abs(a.scale - b.scale) < 1e-3 && Math.abs(a.x - b.x) < 0.5 && a.side === b.side;
 
 // ---------------- The pump ----------------
 
@@ -195,23 +292,63 @@ export function TigerPump({ boss, moments }: { boss: BossView; moments: () => Mo
   const rec = noteTiger(boss, now, moments());
   const kit = bossKit(boss.name);
   const [, bump] = useState(0);
+  // Its place (a computer's beside him or in a taller bar), worked out before the first paint and again as the window, the board or the
+  // leaderboard changes size. (The observer's run waits a frame: changing the board's size inside it would be a resize loop.)
+  const slot = useRef<HTMLSpanElement>(null);
+  const [place, setPlace] = useState(lastPlace);
+  // (A screen that has just come draws the pump beside him only once its place is measured: his moments wait for it, as they measure it.)
+  const drawn = place.at !== "side" || !!place.side?.isConnected;
   useLayoutEffect(() => {
-    if (!rec || !kit || boss.result) return;
+    if (!rec || !kit || boss.result || !drawn) return;
     if (rec.place && rec.place.putAt === undefined) {
       actPlace(kit, rec, Date.now());
       bump((n) => n + 1);
     }
     if (rec.end) actEnd(kit, rec, rec.end);
-  }, [rec?.place?.key, rec?.end?.key, rec?.end?.at]);
+  }, [rec?.place?.key, rec?.end?.key, rec?.end?.at, drawn]);
   const b = boss.powers?.balloon ?? null;
   const show = pumpShows(rec, b, gardenNow(), now, document.visibilityState !== "hidden", realMs);
   const limp = rec?.place ? limps.get(`${rec.key}:${rec.place.key}`) : undefined;
   useWake([show.wake, rec?.place?.putAt ?? null, limp ? limp.at : null, limp ? limp.at + LIMP_FLY_MS : null]);
+  const figW = kit?.ch.w ?? 76;
+  useLayoutEffect(() => {
+    const el = slot.current;
+    if (!el) return;
+    const run = () => {
+      if (!el.isConnected) return;
+      const p = pumpPlace(el, figW);
+      lastPlace = p;
+      setPlace((old) => (samePlace(old, p) ? old : p));
+    };
+    run();
+    let frame = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(run);
+    });
+    for (const t of [el.closest(".screen")?.querySelector(".board-wrap"), document.querySelector(".tower-side")]) if (t) ro.observe(t);
+    addEventListener("resize", run);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(frame);
+      removeEventListener("resize", run);
+    };
+  }, []);
+  const sized = place.at === "side" || place.at === "tall" ? { "--tg-s": place.scale.toFixed(4) } : undefined;
+  const sprite = <SpriteAnim ch={TIGER_PUMP} anim={show.anim} since={show.since} then={show.then} look={show.look} sounds={show.quiet ? {} : PUMP_SOUNDS} id={`pump:${rec?.key ?? ""}`} class="tg-pump" />;
+  const side = place.at === "side" && drawn ? place.side : null;
   return (
-    <span class="tg-pump-slot" data-anim={show.anim} data-balloon={b ? `${b.shape}${b.color}` : ""}>
-      <SpriteAnim ch={TIGER_PUMP} anim={show.anim} since={show.since} then={show.then} look={show.look} sounds={show.quiet ? {} : PUMP_SOUNDS} id={`pump:${rec?.key ?? ""}`} class="tg-pump" />
+    <span ref={slot} class={`tg-pump-slot${place.at === "side" ? " tg-side" : place.at === "tall" ? " tg-tall" : ""}`} style={place.at === "tall" ? sized : undefined} data-anim={show.anim} data-balloon={b ? `${b.shape}${b.color}` : ""} data-place={place.at}>
+      {place.at !== "side" && sprite}
+      {side &&
+        createPortal(
+          <span class="tg-side-pump" style={{ ...sized, left: `${place.x.toFixed(1)}px` }}>
+            {sprite}
+          </span>,
+          side,
+        )}
       {limp && now >= limp.at && now < limp.at + LIMP_FLY_MS && (
-        <span class="tg-limp" style={{ "--x0": `${limp.from.x}px`, "--y0": `${limp.from.y}px`, "--x1": `${limp.to.x}px`, "--y1": `${limp.to.y}px`, "--lw": `${LIMP.w * 2}px`, "--lh": `${LIMP.h * 2}px`, animationDuration: `${LIMP_FLY_MS}ms`, animationDelay: `${limp.at - now}ms` }}>
+        <span class="tg-limp" style={{ "--x0": `${limp.from.x}px`, "--y0": `${limp.from.y}px`, "--x1": `${limp.to.x}px`, "--y1": `${limp.to.y}px`, "--lw": `${LIMP.w * limp.scale}px`, "--lh": `${LIMP.h * limp.scale}px`, animationDuration: `${LIMP_FLY_MS}ms`, animationDelay: `${limp.at - now}ms` }}>
           <SpriteAnim ch={LIMP} anim="fly" since={limp.at} look={limp.look} />
         </span>
       )}
@@ -225,15 +362,6 @@ export function TigerPump({ boss, moments }: { boss: BossView; moments: () => Mo
 const FLY_KNOT = { x: 16, y: 22 } as const;
 /** Where the flight starts without a pump on screen (board units: above the board's top right). */
 const FLY_FALLBACK = { x: 0.9, y: -0.35 } as const;
-/**
- * A balloon on the board is as tall as a queen piece on its square (Eric, Oct 24: "a full balloon the size of a piece"). The cburnett
- * queen's art fills QUEEN_ART of its square's height (measured on the board; e2e/tiger.spec.ts checks it), and the stage-4 balloon is
- * BALLOON_ROWS art px tall: one art px is PX board units (the board as 1, a square as 1/8). The sprite's frame is 32 art px: FRAME.
- */
-const QUEEN_ART = 0.772;
-const BALLOON_ROWS = BALLOON_SHAPES.queen[3].sil.length;
-const PX = QUEEN_ART / 8 / BALLOON_ROWS;
-const FRAME = 32 * PX;
 /**
  * A balloon's frame on a square (board units, its top left): its knot's bottom center on the square's bottom edge, where the landing
  * brings it to rest (its knot on row LAND_Y, the bottom edge at LAND_Y + 1), so a landed balloon stands where his piece stands.
@@ -265,13 +393,20 @@ function TigerLayer({ boss, p, orientation, moments, now }: BoardLayerProps) {
   const [, bump] = useState(0);
   const end = rec?.end?.kind === "land" && rec.end.square ? rec.end : null;
   const beats = end ? landBeats(end.at) : null;
-  // (The flight starts at the pump's knot, measured once.)
+  // (The flight starts at the pump's knot, measured once it's drawn: a screen that has just come draws a computer's pump a moment later,
+  // so it looks again each frame until then, and takes the fallback only if the flight starts without one.)
+  const [tries, tryAgain] = useState(0);
   useLayoutEffect(() => {
-    if (end && !end.from) {
-      end.from = pumpOnBoard(root.current) ?? FLY_FALLBACK;
+    if (!end || end.from) return;
+    const at = pumpOnBoard(root.current);
+    if (at || Date.now() >= landBeats(end.at).flyAt) {
+      end.from = at ?? FLY_FALLBACK;
       bump((n) => n + 1);
+      return;
     }
-  }, [end?.key, end?.at]);
+    const id = requestAnimationFrame(() => tryAgain((n) => n + 1));
+    return () => cancelAnimationFrame(id);
+  }, [end?.key, end?.at, tries]);
   const cast = moments.find((m) => m.kind === "hoops") ?? null;
   const rings = ringShows(p.hoops, rec, now, cast?.at ?? null);
   const wake: (number | null)[] = [];

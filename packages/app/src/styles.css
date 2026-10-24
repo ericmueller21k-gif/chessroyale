@@ -5422,13 +5422,15 @@ button.history-label {
     --gk-screen: var(--col);
     --gk-column: calc(var(--gk-screen) - 2 * var(--gutter) - 368px);
     --bs-need: calc(var(--bs-reach, 0px) - (100vw - var(--col)) / 2 - var(--gutter));
-    --gk-board: min(var(--gk-column) - 2 * max(0px, var(--bs-need)), var(--app-h) - 288px);
+    /* (The board's most by the window's height: all but 288 px, less where Babur's pump makes the bar taller, below.) */
+    --bd-h: calc(var(--app-h) - 288px);
+    --gk-board: min(var(--gk-column) - 2 * max(0px, var(--bs-need)), var(--bd-h));
     /* (His box is 120 px; his cape reaches a few pixels past it.) */
     --gk-clear: max(0px, var(--gk-off) + 128px - (var(--gk-column) - var(--gk-board)) / 2 - 28px);
   }
   .screen.game:has(> .boss-dock):has(.board-row > .eval-bar) {
     --gk-off: 26px;
-    --gk-board: min(var(--gk-column) - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 288px);
+    --gk-board: min(var(--gk-column) - 48px - 2 * max(0px, var(--bs-need)), var(--bd-h));
   }
   .screen.game:has(> .boss-dock) > .board-area {
     grid-row: 3;
@@ -5438,17 +5440,17 @@ button.history-label {
     grid-row: 4;
     align-self: start;
     width: 100%;
-    max-width: min(100% - 2 * max(0px, var(--bs-need)), var(--app-h) - 288px);
+    max-width: min(100% - 2 * max(0px, var(--bs-need)), var(--bd-h));
     justify-self: center;
   }
   .screen.game:has(.board-row > .eval-bar) > .boss-dock {
-    max-width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 288px);
+    max-width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--bd-h));
   }
   .screen.game:has(> .boss-dock) .board-area .board-wrap {
-    width: min(100% - 2 * max(0px, var(--bs-need)), var(--app-h) - 288px);
+    width: min(100% - 2 * max(0px, var(--bs-need)), var(--bd-h));
   }
   .screen.game:has(> .boss-dock) .board-row .eval-bar ~ .board-wrap {
-    width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--app-h) - 288px);
+    width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--bd-h));
   }
   .screen.game:has(> .boss-dock) > .under-board,
   .screen.game:has(> .boss-dock) > .mini-tower {
@@ -20138,7 +20140,10 @@ button.sq-tiny {
   width: 68px;
   height: 72px;
 }
-/* A computer's, at its left and at 1 to 1 (the right runs into the status, and the bar holds no more: docs/decisions/2026-10-24-babur-bigger.md). */
+/* A computer's (Tiger.tsx `pumpPlace`; docs/decisions/2026-10-24-babur-desktop-pump.md): as big as the board's balloons (`--tg-s`
+   screen px an art px: a stage-4 queen as tall as her piece), beside his figure by the board's bottom left where there's room
+   (`.tg-side-pump`, in `.boss-side`; the bar's slot is left empty), else at the left of a taller bar (`.tg-tall`). A screen without the
+   boss dock (its board leaves no room for a taller bar) keeps it 1 to 1 at the bar's left. */
 @media (min-width: 900px) and (min-height: 600px) {
   .tg-pump-slot {
     right: auto;
@@ -20150,6 +20155,40 @@ button.sq-tiny {
   .tg-pump-slot > .tg-pump {
     width: 34px;
     height: 36px;
+  }
+  .tg-pump-slot.tg-side {
+    width: 0;
+    height: 0;
+  }
+  .tg-side-pump {
+    position: absolute;
+    bottom: 0;
+    width: calc(34px * var(--tg-s));
+    height: calc(36px * var(--tg-s));
+    pointer-events: none;
+  }
+  /* The taller bar: the free room takes both of the bar's rows (the status keeps its place over it, at the right) and the pump stands
+     at its bottom left, in the flow, so the bar is as tall as the pump. The board leaves it that room (--bd-h): the bar is 49 px, of
+     which 38 inside its padding; the pump at most PUMP_BAR_SHARE (0.1876) of the board: B + 288 + 0.1876 B - 38 fits the window. */
+  .boss-bar .boss-prop:has(> .tg-pump-slot.tg-tall) {
+    grid-row: 1 / 3;
+    display: flex;
+    align-items: flex-end;
+  }
+  .tg-pump-slot.tg-tall {
+    position: relative;
+    inset: auto;
+    flex: none;
+    width: calc(34px * var(--tg-s));
+    height: calc(36px * var(--tg-s));
+  }
+  .tg-pump-slot.tg-tall > .tg-pump,
+  .tg-side-pump > .tg-pump {
+    width: 100%;
+    height: 100%;
+  }
+  .screen.game:has(> .boss-dock):has(.tg-pump-slot.tg-tall) {
+    --bd-h: calc((var(--app-h) - 250px) / 1.1876);
   }
 }
 /* A computer's limp balloon, tossed from his paw by the board to the pump in the bar: across, and up and over, down onto the nozzle
