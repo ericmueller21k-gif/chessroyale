@@ -508,7 +508,9 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   expect((await simulNow(page)).playing).toBe(false);
   // (Reduced motion: the same countdown, its numbers still.)
   await page.emulateMedia({ reducedMotion: "reduce" });
-  expect(await page.locator(".rc-simul .cc-num").first().evaluate((e) => getComputedStyle(e).animationName)).toBe("none");
+  // (Read through a retrying locator: each second's number is a new element (`key={n}` in Countdown.tsx), so a one-shot read
+  // could land on the one just removed and get "" (once in CI, Oct 24).)
+  await expect(page.locator(".rc-simul .cc-num").first()).toHaveCSS("animation-name", "none");
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 }).toBe(true);
   // (The phase change was about 15 s before Oct 17, under 20 s here.)
