@@ -50,7 +50,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   out, ties go through"), "Why was I cut?" (the elimination breakdown: "level with the last player through" only at the
   last cut, with why). `stageBreakSeconds` 10.
 - **Pre-game votes (50 v 50, `augments`).** Before move 1 everyone votes by dragging their pawn into one of three zones
-  on an empty board (or tapping a card): how it ends (**team final**, **the Hidden Boss** (the boss final), **duel**), then "How fast?", a
+  on an empty board (or tapping a card): how it ends (**team final**, **the Hidden Boss** (the boss final), **duel**), then
+  "How does it start?" (**Normal**, **Random opening**, **Freestyle**; Normal when nobody votes; below), then "How fast?", a
   chess time control (**Bullet 3+2**, **Blitz 5+3**, **Rapid 10+5**, left to right; Blitz when nobody votes). The options and what
   they change are plain data in `packages/core/src/votes.ts` (a time control is one `timeControl(...)` entry: its bank,
   increment and cap; the card's label and blurb are made from them). **Every vote's options keep one order** on every
@@ -61,6 +62,21 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   the winner, then the winner's banner; each result shows `voteResultSeconds` (4.2 s since Eric's Oct 15 "every banner a
   second longer"; was 3.2). `?speed=bullet|blitz|rapid` skips the vote for tests (old ids map over: normal → rapid, variable →
   blitz; an unknown id gets Blitz).
+- **How it starts** (Eric, Oct 24; docs/decisions/2026-10-24-opening-vote.md): the second vote. Each option's patch sets
+  `crowdStart` and `openingMoves`; `MatchRunner.patchSettings` then sets the board up before move 1 (`setUpStart`), one
+  start for the one board everyone shares. **Normal**: the starting position (nothing drawn: the board as made).
+  **Random opening**: a balanced named line from the library, `CROWD_START.randomOpeningMoves` (4) moves a side in, drawn as
+  Classic's boards are (`pickOpenings`, inside `openingBalance`); the board's history holds the opening's moves, so the
+  game's move number (and the opening allowance) starts at 5, and a phone new to the board replays them from the start.
+  **Freestyle** (FIDE's name for Chess960; the only name players see): a Chess960 start drawn from the match's own random
+  source, never the usual one (`freestyleStart`), in a base at ply 0 (`freestyleBoard`, opening `FREESTYLE_OPENING`), so
+  every replay, the history and a restored lobby start there; the rules, the judge (Stockfish's `UCI_Chess960`, from the
+  position's castling field), the bots and the board's castling (the king onto its rook, or onto its g/c square) are
+  Chess960's (`chess960.ts`). A game that ends before the final restarts from another start of the same kind
+  (`replaceBoard`). The team final and the duel play on the same board; **the boss final is always from the usual
+  starting position** (the Hidden Boss starts there anyway; any boss after a Freestyle game does too). The vote message
+  carries `start` (Freestyle's position) so the pieces that drop in after the last vote are the game's. `?start=normal|random|freestyle`
+  sets it for tests (with `?format=`, like `?speed=`; an unknown id is Normal).
 - **The first-time hint** (Oct 16): the first pawn vote a player meets on a device (any mode: this one, Squads' or
   1 v 1's) shows "Drag your pawn into a zone to vote" over the board just above the zones until they vote; never again
   on that device (`VoteHint`, `brc.voteHintSeen`; `FirstVoteHint` in `screens/Vote.tsx`, one per vote). e2e
@@ -138,6 +154,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 | Scoring, the opening allowance, brilliant moves | `packages/core/src/scoring.ts`; the exchange check `packages/chess/src/rules.ts` (`exchangeNet`, `materialSlips`) |
 | The cut: ties, what's owed, the last cut's tie-break | `packages/core/src/match.ts` (`cutPlan`, `standings`, `endStage`) |
 | Pre-game votes | `packages/core/src/votes.ts`; screen `packages/app/src/screens/Vote.tsx` |
+| The start vote's boards (Normal, Random opening, Freestyle) | `MatchRunner.setUpStart` / `freshStart` (`runner.ts`), `freestyleBoard` (`boards.ts`), `freestyleStart` (`chess960.ts`) |
 | The match runner (rounds, judging, the boss battle) | `packages/chess/src/runner.ts` |
 | Boards and their positions (bases, replays) | `packages/chess/src/boards.ts`, `rules.ts` (`fenAtPly`) |
 | The lobby protocol | `packages/chess/src/protocol.ts` |
@@ -149,7 +166,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 
 ## Settings
 
-`OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
+`OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `CROWD_START` (the start vote's random opening length), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
 (the `?pace=quick` test switch, per mode; players always play the mode's own pace), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
 `moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
 time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
@@ -163,6 +180,11 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   agree), `runner.test.ts` (Classic's boards with ties kept in), `packages/app/test/faq.test.ts`. Sims:
   `packages/sim/scripts/opening-allowance.ts` (the calibration, `reports/opening-allowance.md`) and
   `allowance-sim.ts` (before/after Crowd matches, `reports/allowance-sim.md`).
+- The start vote: unit `packages/core/test/votes.test.ts` (its cards, default, patches, `?start=`), `packages/chess/test/opening-vote.test.ts`
+  (each start's board, seeded, the balance window, a Freestyle game through the runner, castling both ways, the snapshot),
+  `packages/server/test/lobby.test.ts` ("the start vote online": Freestyle and Random opening, castling, a lobby that
+  sleeps), `packages/app/test/board-logic.test.ts`, `faq.test.ts`; e2e `e2e/opening-vote.spec.ts`; the sim
+  `crowd-sim.ts [matches] [start]`.
 - Unit: `packages/core/test/match.test.ts`, `scoring.test.ts`, `votes.test.ts`, `brilliance.test.ts`,
   `packages/chess/test/crowd.test.ts`, `runner.test.ts`, `replay-cache.test.ts`, `long-match.test.ts`. The clock vote:
   `votes.test.ts` (each time control, the bank math, the calibration), `crowd.test.ts` (the runner) and

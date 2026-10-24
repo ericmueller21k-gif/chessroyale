@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, LEAVING, RANKED_1V1, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVING, RANKED_1V1, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
 import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
@@ -375,6 +375,24 @@ describe("the FAQ's numbers come from the settings", () => {
   });
 });
 
+describe("the FAQ on the start vote (Eric, Oct 24: Normal | Random opening | Freestyle)", () => {
+  it("the three starts in the vote's words, the random opening's moves and the default from the data; never Chess960 or Fischer Random", () => {
+    const t = section("modes");
+    expect(t).toContain("Then on how it starts, then on the clock.");
+    expect(t).toContain(`Normal, the usual starting position; Random opening, a real, balanced opening already ${CROWD_START.randomOpeningMoves} moves in for each side, so the game picks up at move ${CROWD_START.randomOpeningMoves + 1}; or Freestyle: the pieces on the back row start shuffled`);
+    expect(t).toContain("To castle in Freestyle, move your king onto its rook");
+    expect(t).toContain("Nobody voting means Normal.");
+    expect(t).toContain("a boss final is played from the usual starting position");
+    expect(t).not.toMatch(/960|Fischer/);
+    // Other numbers and labels change the words.
+    const V = FAQ_DEFAULTS.startVote;
+    const options = V.options.map((o) => (o.id === "random" ? { ...o, label: "Book opening", patch: { ...o.patch, openingMoves: 6 } } : o));
+    const moved = section("modes", { ...FAQ_DEFAULTS, startVote: { options, defaultOption: options.findIndex((o) => o.id === "freestyle") } });
+    expect(moved).toContain("Book opening, a real, balanced opening already 6 moves in for each side, so the game picks up at move 7");
+    expect(moved).toContain("Nobody voting means Freestyle.");
+  });
+});
+
 describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Boss, the top 4)", () => {
   const him = crowdFinalBoss()!;
   it("names him (the roster's name) and the number who face him (the knockouts), never typed", () => {
@@ -397,7 +415,7 @@ describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Bos
     expect(t).toContain(`Met only in the Crowd's boss final, where it's always him, against the top ${crowdFinalists("boss")}.`);
     expect(t).toContain(`full as turn ${BOSS_POWERS.bulletTurn} begins`);
     expect(t).toContain(`every bank is ${BOSS_POWERS.bulletBankSeconds / 60} minute`);
-    expect(t).toContain(`${RECLUSE_PHASE2.boards} boards of Chess960 at once`);
+    expect(t).toContain(`${RECLUSE_PHASE2.boards} boards of Freestyle chess at once`);
     expect(t).toContain(`against Stockfish at ${RECLUSE_PHASE2.elo}`);
     expect(t).toContain(`A ${RECLUSE_PHASE2.change.countdownSeconds}-second countdown on every board, then`);
     expect(t).toContain("online, that's the crowd's victory");

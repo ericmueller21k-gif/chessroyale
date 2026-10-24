@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CROWD_KNOCKOUTS,
   CROWD_SETTINGS,
+  CROWD_START,
   DEFAULT_SETTINGS,
   crowdFinalBoss,
   crowdFinalists,
@@ -20,6 +21,7 @@ import {
   mulberry32,
   speedOption,
   startBanks,
+  startOption,
   tallyVotes,
   voteHomeSpots,
   voteZoneAt,
@@ -43,6 +45,7 @@ describe("every vote's options keep one fixed order (Eric, Oct 13: \"should neve
   it("each vote's options, left to right, and its default by id", () => {
     expect(PREGAME_VOTES.map((v) => [v.id, v.options.map((o) => o.id), v.options[v.defaultOption]!.id])).toEqual([
       ["format", ["team", "boss", "duel"], "team"],
+      ["start", ["normal", "random", "freestyle"], "normal"],
       ["speed", ["bullet", "blitz", "rapid"], "blitz"],
     ]);
   });
@@ -85,6 +88,44 @@ describe("how it ends: the boss final is the Hidden Boss's (Eric, Oct 14)", () =
     for (const k of CROWD_KNOCKOUTS.boss) expect(k % 2).toBe(0);
     // A count from other knockouts, or another lobby.
     expect(crowdFinalists("boss", { ...CROWD_KNOCKOUTS, boss: [90] }, 100)).toBe(10);
+  });
+});
+
+describe("how it starts (Eric, Oct 24): Normal | Random opening | Freestyle, the second vote", () => {
+  const start = PREGAME_VOTES.find((v) => v.id === "start")!;
+
+  it("held second, between how it ends and the clock; its cards left to right, in a player's words", () => {
+    expect(PREGAME_VOTES.map((v) => v.title)).toEqual(["How does it end?", "How does it start?", "How fast?"]);
+    expect(start.options.map((o) => [o.id, o.icon, o.label, o.blurb])).toEqual([
+      ["normal", "♟️", "Normal", "The usual starting position"],
+      ["random", "🎲", "Random opening", `A real opening, ${CROWD_START.randomOpeningMoves} moves in`],
+      ["freestyle", "🔀", "Freestyle", "The back-row pieces start shuffled"],
+    ]);
+    // Eric's word for the variant is Freestyle: a player never reads Chess960 or Fischer Random in the vote.
+    for (const v of PREGAME_VOTES) expect(JSON.stringify(v)).not.toMatch(/960|fischer/i);
+  });
+
+  it("nobody votes: Normal, by its id", () => {
+    expect(start.options[start.defaultOption]!.id).toBe("normal");
+  });
+
+  it("each patch sets the start and its opening moves: only Random opening has any (CROWD_START), as 50 v 50 had none before", () => {
+    expect(Object.fromEntries(start.options.map((o) => [o.id, o.patch]))).toEqual({
+      normal: { crowdStart: "normal", openingMoves: 0 },
+      random: { crowdStart: "random", openingMoves: CROWD_START.randomOpeningMoves },
+      freestyle: { crowdStart: "freestyle", openingMoves: 0 },
+    });
+    // Normal is the 50 v 50 as it was: the same opening moves as Crowd's own settings.
+    expect(start.options[0]!.patch.openingMoves).toBe(CROWD_SETTINGS.openingMoves);
+    expect(CROWD_START.randomOpeningMoves).toBeGreaterThan(0);
+  });
+
+  it("?start= ids: each option by its id; an unknown id gets the default (Normal); no id is nothing", () => {
+    for (const o of start.options) expect(startOption(o.id)).toBe(o);
+    expect(startOption("FREESTYLE")!.id).toBe("freestyle");
+    expect(startOption("chess960")!.id).toBe("normal");
+    expect(startOption(null)).toBeNull();
+    expect(startOption("")).toBeNull();
   });
 });
 
@@ -286,7 +327,7 @@ describe("time's up: everyone who didn't vote joins the winner", () => {
     expect(votes.filter((v) => v.option === 1)).toHaveLength(99);
   });
 
-  it("nobody votes: the option's default wins (Team final, Blitz) and everyone goes there", () => {
+  it("nobody votes: the option's default wins (Team final, Normal, Blitz) and everyone goes there", () => {
     const labels = PREGAME_VOTES.map((vote) => {
       const { result, votes, joined } = closePregameVote([], everyone, vote, mulberry32(3), join);
       expect(result).toBe(vote.defaultOption);
@@ -294,7 +335,7 @@ describe("time's up: everyone who didn't vote joins the winner", () => {
       expect(votes.map((v) => v.option)).toEqual(everyone.map(() => vote.defaultOption));
       return vote.options[result]!.label;
     });
-    expect(labels).toEqual(["Team final", "Blitz 5+3"]);
+    expect(labels).toEqual(["Team final", "Normal", "Blitz 5+3"]);
   });
 
   it("everyone voted: nobody joins", () => {

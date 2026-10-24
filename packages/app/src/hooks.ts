@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
-import { START_FEN, applyMove, baseAt } from "@chessroyale/chess";
+import { applyMove, baseAt } from "@chessroyale/chess";
 import type { BoardView, GameView } from "./game.ts";
 import { crowdAnimations, crowdTrail, onPrefsChange } from "./prefs.ts";
 
@@ -44,9 +44,9 @@ export function useReplay(
     const last = match.seen.get(key);
     match.seen.set(key, board.ply);
     if (last === undefined && board.history.length) {
-      // First time on this board: the whole game from the starting position.
-      const out = [{ fen: START_FEN, lastMove: null as string | null }];
-      let fen = START_FEN;
+      // First time on this board: the whole game from its start (the starting position, or Freestyle's in a base at ply 0).
+      let fen = baseAt(0, board.bases).fen;
+      const out = [{ fen, lastMove: null as string | null }];
       board.history.forEach((m, i) => {
         fen = applyMove(fen, m);
         // (A piece G-REX's fire destroyed after this move: gone from here on.)
@@ -78,7 +78,7 @@ export function useReplay(
     return () => clearTimeout(t);
   }, [step, frames.length]);
   // A replay from move 0 starts at the initial position.
-  const fromStart = frames[0]?.fen === START_FEN && frames.length > 1;
+  const fromStart = frames[0]?.fen === baseAt(0, board.bases).fen && frames.length > 1;
   if (!frames.length || step >= frames.length - 1) return { fen: board.fen, lastMove: board.lastMove, replaying: false, fromStart };
   return { ...frames[step]!, replaying: true, fromStart };
 }

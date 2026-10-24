@@ -1,6 +1,6 @@
 import type { Rng } from "./rng.ts";
 import { BOSS_ROSTER, crowdFinalBoss, type BossDef } from "./boss.ts";
-import { CROWD_KNOCKOUTS, crowdFinalists, type Settings } from "./settings.ts";
+import { CROWD_KNOCKOUTS, CROWD_START, crowdFinalists, type Settings } from "./settings.ts";
 
 /**
  * Crowd 50 v 50's pre-game votes. Before the first move, everyone (both teams) votes by dragging their own pawn into
@@ -125,8 +125,34 @@ function formatVote(): PregameVote {
   return { id: "format", title: "How does it end?", defaultOption: optionIndex(options, "team"), options };
 }
 
-/** The 50 v 50's votes, in the order they're held. */
-export const PREGAME_VOTES: readonly PregameVote[] = [formatVote(), speedVote()];
+/**
+ * "How does it start?" (Eric, Oct 24): the usual starting position on the left, a random real opening in the middle,
+ * Freestyle on the right (FIDE's name for Chess960, the name players see: never "Chess960" or "Fischer Random"). Nobody
+ * votes: Normal, by its id. Each patch sets the start (`crowdStart`) and the opening moves played before move 1 (only
+ * Random opening has any: CROWD_START). docs/decisions/2026-10-24-opening-vote.md.
+ */
+function openingVote(): PregameVote {
+  const n: number = CROWD_START.randomOpeningMoves;
+  const options: VoteOption[] = [
+    { id: "normal", icon: "♟️", label: "Normal", blurb: "The usual starting position", patch: { crowdStart: "normal", openingMoves: 0 } },
+    { id: "random", icon: "🎲", label: "Random opening", blurb: `A real opening, ${n} ${n === 1 ? "move" : "moves"} in`, patch: { crowdStart: "random", openingMoves: n } },
+    { id: "freestyle", icon: "🔀", label: "Freestyle", blurb: "The back-row pieces start shuffled", patch: { crowdStart: "freestyle", openingMoves: 0 } },
+  ];
+  return { id: "start", title: "How does it start?", defaultOption: optionIndex(options, "normal"), options };
+}
+
+/** The 50 v 50's votes, in the order they're held: how it ends, how it starts, then the clock (Eric, Oct 24). */
+export const PREGAME_VOTES: readonly PregameVote[] = [formatVote(), openingVote(), speedVote()];
+
+/**
+ * A start by its id (a test URL's ?start=normal|random|freestyle), as the vote's option sets it; an id we don't know
+ * gets the default (Normal). No id: null (the vote decides).
+ */
+export function startOption(id: string | null | undefined): VoteOption | null {
+  if (!id) return null;
+  const vote = PREGAME_VOTES.find((v) => v.id === "start")!;
+  return vote.options.find((o) => o.id === id.toLowerCase()) ?? vote.options[vote.defaultOption]!;
+}
 
 /** Speeds that are gone, by their old ?speed= ids: Normal (and before it Slow and Standard) is Rapid, Variable Blitz. */
 const OLD_SPEEDS: ReadonlyMap<string, string> = new Map([

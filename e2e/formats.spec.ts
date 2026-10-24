@@ -65,8 +65,9 @@ test("pre-game votes: the cards vote too; the winners set the ending and the clo
   await expect(page.locator(".vote-banner")).toBeVisible({ timeout: 15_000 });
   const format = await page.evaluate(() => (window as any).match.settings.finalFormat);
   expect(["team", "boss", "duel"]).toContain(format);
-  // Vote 2: tap the Bullet card.
-  await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 10_000 });
+  // Vote 2, how it starts (e2e/opening-vote.spec.ts); then vote 3: tap the Bullet card.
+  await expect(page.getByRole("heading", { name: "How does it start?" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 20_000 });
   await page.getByRole("radio", { name: /Bullet/ }).click();
   // (Bullet is the left-hand card: Bullet on the left, the longest on the right; Eric, Oct 16.)
   await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(0);

@@ -166,6 +166,8 @@ export function VoteScreen({
   const resetting = !counting && !last && now >= nextAt - RESET_MS;
   const leaving = !counting && last && now >= nextAt - LEAVE_MS;
   const dropping = !counting && last && now >= nextAt - DROP_MS;
+  // (The pieces that drop in: the game's own start, Freestyle's shuffled back rows when the start vote chose it.)
+  const start = vote.start ?? START_FEN;
   // (After the last vote they fade where they stand.)
   const home = resetting;
   // The game's screen makes its board bigger when the space under it is folded (that space's own setting): so does this.
@@ -325,8 +327,8 @@ export function VoteScreen({
           {hint}
         </div>
         <div class={`board-row vote-board-row${dropping ? " dropping" : ""}`}>
-          {evalBar && <EvalBar fen={START_FEN} orientation={side} evaluate={match.evaluate ? (f) => match.evaluate!(f) : undefined} />}
-          <Board fen={dropping ? START_FEN : EMPTY_FEN} orientation={orientation} animate={false}>
+          {evalBar && <EvalBar fen={start} orientation={side} evaluate={match.evaluate ? (f) => match.evaluate!(f) : undefined} />}
+          <Board fen={dropping ? start : EMPTY_FEN} orientation={orientation} animate={false}>
             {counting && <TimerBar startsAt={vote.startsAt} deadline={vote.until} total={Math.max(1, vote.until - vote.startsAt)} quiet={!chime} />}
             <div
               ref={layer}

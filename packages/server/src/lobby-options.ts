@@ -1,4 +1,4 @@
-import { BOSS_TIERS, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, QUICK_PACE, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { BOSS_TIERS, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, QUICK_PACE, definedOnly, modeSettings, speedOption, startOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { LobbyRecord } from "./lobby.ts";
 
 /**
@@ -10,7 +10,7 @@ import type { LobbyRecord } from "./lobby.ts";
  *     admin, or TEST_SWITCHES on: testSwitchesOn in admin.ts); for anyone else they're dropped, silently, so the lobby
  *     is exactly the one made without them.
  */
-export const LOBBY_TEST_SWITCHES = ["rounds", "clock", "finalTurns", "bossMoves", "draw", "power", "format", "speed", "weakbots", "keep", "pace", "augments"] as const;
+export const LOBBY_TEST_SWITCHES = ["rounds", "clock", "finalTurns", "bossMoves", "draw", "power", "format", "speed", "weakbots", "keep", "pace", "augments", "start"] as const;
 
 /** `?boss=` is the creator's pick only in a raid, as a boss's id: a fixed strength (a tier), or a boss in another mode, is a test's. */
 const testBoss = (q: URLSearchParams) => q.has("boss") && (q.get("mode") !== "raid" || BOSS_TIERS.includes(Number(q.get("boss"))));
@@ -69,6 +69,8 @@ export function lobbyOptions(query: URLSearchParams, test: boolean): { overrides
     })(),
     // ?speed=bullet|blitz|rapid: that time control (for testing, with ?format=; old ids map over, unknown ones are Blitz).
     ...(mode === "crowd" ? (speedOption(q.get("speed"))?.patch ?? {}) : {}),
+    // ?start=normal|random|freestyle: that start (for testing, with ?format=, like ?speed=; an unknown id is Normal).
+    ...(mode === "crowd" && !raid ? (startOption(q.get("start"))?.patch ?? {}) : {}),
     // ?weakbots=1: every bot plays loosely and people rank above bots (for testing: a person surely survives the cuts).
     ...(q.get("weakbots") === "1" ? WEAK_BOTS : {}),
   };

@@ -25,6 +25,20 @@ export interface BoardState {
 /** The boss battle's board: a fresh game from the starting position. */
 export const BOSS_OPENING: Opening = { id: "boss", eco: "", name: "Boss battle", family: "Boss battle", unusual: false, moves: [], namedPlies: 0, expected: { 0: 0.5 } };
 
+/**
+ * A Freestyle board's "opening" (the 50 v 50's start vote; FIDE's name for Chess960): no moves, its start in a base at
+ * ply 0. Its id names it in a snapshot (MatchRunner.restore), its name is what a player may see.
+ */
+export const FREESTYLE_OPENING: Opening = { ...BOSS_OPENING, id: "freestyle", name: "Freestyle", family: "Freestyle" };
+
+/**
+ * A board from a Freestyle (Chess960) start: a base at ply 0 holds its FEN, so everything that replays it (fenAtPly,
+ * boardEnd, recentMoves, the app's history) starts there, as for the Hidden Boss's phase 2 boards.
+ */
+export function freestyleBoard(id: number, fen: string, generation = 0): BoardState {
+  return { id, opening: FREESTYLE_OPENING, openingPlies: 0, history: [], fen, expected: 0.5, lastMove: null, generation, evals: [0.5], bases: [{ ply: 0, fen }] };
+}
+
 export function newBoard(id: number, opening: Opening, plies: number, generation = 0): BoardState {
   const history = opening.moves.slice(0, plies);
   return {

@@ -467,6 +467,11 @@ export interface NetVote {
   nextAt?: number;
   /** A player may move their pawn to another zone after voting (voteChangeAllowed; off: one vote each). */
   changeAllowed?: boolean;
+  /**
+   * The position the game starts from, once the start vote has made it anything but the usual one (Freestyle's
+   * shuffled back rows): the pieces that drop in after the last vote. Unset: the usual starting position.
+   */
+  start?: string;
 }
 
 /**

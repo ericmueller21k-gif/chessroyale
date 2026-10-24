@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type MatchmakingType, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type MatchmakingType, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, raidInUrl } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -80,6 +80,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
   const forced = crowd && format && format in CROWD_KNOCKOUTS ? { finalFormat: format, knockoutsPerStage: CROWD_KNOCKOUTS[format], augments: false } : {};
   // ?speed=bullet|blitz|rapid: that time control (for testing, with ?format=; old ids map over, unknown ones are Blitz).
   const speed = crowd ? (speedOption(q.get("speed"))?.patch ?? {}) : {};
+  // ?start=normal|random|freestyle: that start (for testing, with ?format=, like ?speed=; an unknown id is Normal).
+  const start = crowd && !raid ? (startOption(q.get("start"))?.patch ?? {}) : {};
   return {
     // The mode's own rules and pace first, then playtest overrides on top (only the ones that are set).
     // The boss raid: its own settings, and (solo) a boss a step above your rating.
@@ -112,6 +114,7 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     ...(n("clock") ? { bossAloneUntimed: false } : {}),
     ...forced,
     ...speed,
+    ...start,
     // Any boss battle: not the boss you met last (when it's random); ?power= brings a boss power at once (tests).
     bossAvoid: lastBoss() ?? "",
     // Never a boss that's resting (a kill switch, status.ts): a solo game skips them as the server's lobbies do.

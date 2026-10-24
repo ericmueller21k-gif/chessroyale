@@ -243,6 +243,19 @@ describe("Chess960 castling on the board", () => {
     expect(gestureMoves(step, undefined, "f1", "h1")).toEqual(["f1h1"]);
   });
 
+  it("a 50 v 50 Freestyle game (the start vote): both castles from the king between its rooks, onto the rook or its square", () => {
+    // King e1, rooks b1 and g1 (and Black's the same), the squares between them cleared.
+    const free = "1r2k1r1/pppppppp/8/8/8/8/PPPPPPPP/1R2K1R1 w GBgb - 0 1";
+    expect(destsFor(free).get("e1")!.sort()).toEqual(["b1", "c1", "d1", "f1", "g1"]);
+    // The king's side: onto the rook (g1), which is also where the king lands.
+    expect(gestureMoves(free, undefined, "e1", "g1")).toEqual(["e1g1"]);
+    // The queen's side: onto the rook (b1), or onto c1, where the king lands.
+    expect(gestureMoves(free, undefined, "e1", "b1")).toEqual(["e1b1"]);
+    expect(gestureMoves(free, undefined, "e1", "c1")).toEqual(["e1b1"]);
+    expect(applyMove(free, "e1b1").split(" ")[0]).toBe("1r2k1r1/pppppppp/8/8/8/8/PPPPPPPP/2KR2R1");
+    expect(applyMove(free, "e1g1").split(" ")[0]).toBe("1r2k1r1/pppppppp/8/8/8/8/PPPPPPPP/1R3RK1");
+  });
+
   it("only from the moves allowed: no castling dot when a screen leaves castling out", () => {
     expect(destsFor(open, ["b1c1", "a2a3"]).get("b1")).toEqual(["c1"]);
     expect(gestureMoves(open, ["b1c1", "a2a3"], "b1", "g1")).toEqual([]);

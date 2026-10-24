@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { Chess } from "chess.js";
+import { legalMoves, pieceAt } from "@chessroyale/chess";
 import { BOARD_SEL, named, test, pickMode } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
@@ -19,11 +19,12 @@ async function untilMyTurn(p: Page, other: Page) {
   while (Date.now() < stopAt) {
     if ((await phase(other)) === "play") {
       const fen: string = await other.evaluate(() => (window as any).match.phase.board.fen);
-      const mv = new Chess(fen).moves({ verbose: true })[0]!;
+      // (The game's own rules: a 50 v 50 may start from Freestyle's Chess960 position, which chess.js can't read.)
+      const mv = legalMoves(fen)[0]!;
       await other.evaluate((m) => {
         const x = (window as any).match;
         if (x.phase.kind === "play" && Date.now() > x.phase.startsAt) x.submit(m);
-      }, mv.from + mv.to + (mv.promotion ?? ""));
+      }, mv);
     }
     const ready = await p.evaluate(() => {
       const m = (window as any).match;
@@ -50,8 +51,10 @@ async function tapMove(p: Page): Promise<string> {
   });
   const fen: string = await p.evaluate(() => (window as any).match.phase.board.fen);
   const side = fen.split(" ")[1];
-  const moves = new Chess(fen).moves({ verbose: true }).filter((m) => !m.promotion);
-  const mv = moves.find((m) => m.piece === "n") ?? moves[0]!;
+  const moves = legalMoves(fen)
+    .filter((m) => m.length === 4)
+    .map((m) => ({ from: m.slice(0, 2), to: m.slice(2, 4) }));
+  const mv = moves.find((m) => pieceAt(fen, m.from)?.type === "n") ?? moves[0]!;
   const box = (await rect(p, `.board-area ${BOARD_SEL.squares}`))!;
   const at = (sq: string) => {
     const f = sq.charCodeAt(0) - 97;

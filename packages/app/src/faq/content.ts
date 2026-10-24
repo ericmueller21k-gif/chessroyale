@@ -102,6 +102,8 @@ export interface FaqSources {
   squads: SquadsSettings;
   /** Crowd 50 v 50's clock vote: its time controls (each option's patch has the bank, increment and cap) and default. */
   clockVote: Pick<PregameVote, "options" | "defaultOption">;
+  /** Crowd 50 v 50's start vote ("How does it start?"): its options (each patch has the start and its opening moves) and default. */
+  startVote: Pick<PregameVote, "options" | "defaultOption">;
   /** Resigning and leaving: how long someone may be gone from a match and still have their seat. */
   leaving: { awayMs: number };
   /** Squads' "Jump to my next board" (Relay): on for a device that hasn't set it. */
@@ -138,6 +140,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   shopFree: SHOP_FREE,
   squads: SQUADS,
   clockVote: PREGAME_VOTES.find((v) => v.id === "speed")!,
+  startVote: PREGAME_VOTES.find((v) => v.id === "start")!,
   leaving: LEAVING,
   squadsWatching: SQUADS_LOBBY.watching,
   phase2: RECLUSE_PHASE2,
@@ -199,6 +202,11 @@ function modes(src: FaqSources): FaqSection {
     return o ? `**${o.label}**` : timeControl(p);
   };
   const teamSizes = S.teamFinalSizes.map((x) => `${x}v${x}`);
+  // The start vote's options by their id (their labels and opening moves from the vote's data).
+  const SV = src.startVote;
+  const startBy = (id: string) => SV.options.find((o) => o.patch.crowdStart === id);
+  const startLabel = (id: string) => `**${startBy(id)?.label ?? id}**`;
+  const randomMoves = Number(startBy("random")?.patch.openingMoves ?? 0);
   const clocks = squadsClocks(Q);
   // The boss final's boss (Eric, Oct 14: always the Hidden Boss), by his roster name, linked to his block.
   const finalBoss = crowdFinalBoss(src.roster);
@@ -213,7 +221,8 @@ function modes(src: FaqSources): FaqSection {
 - Each turn, everyone on the side to move picks a move before the clock runs out, and the **most popular pick is played** (a tie is settled at random).
 - Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(C.firstStageRounds / 2, "move")}; after that, the lowest scorers are cut after every move, the same number from each team. Scores carry over all game.
 - **A tie at the cut line goes through:** everyone tied exactly with the last player through stays in, and the cuts still to come take the extra, a little at each. Only the last cut before the ending breaks a tie, so the ending has its size: fewer points given away before the [opening allowance](#opening-allowance) go through, then less thinking time.
-- **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss final (the top ${left(src.crowdKnockouts.boss)} team up against ${finalFoe}) or a duel (the best of each side, 1v1). Then on the clock.
+- **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss final (the top ${left(src.crowdKnockouts.boss)} team up against ${finalFoe}) or a duel (the best of each side, 1v1). Then on how it starts, then on the clock.
+- **How it starts**, voted on before move 1: ${startLabel("normal")}, the usual starting position; ${startLabel("random")}, a real, balanced opening already ${n(randomMoves, "move")} in for each side, so the game picks up at move ${randomMoves + 1}; or ${startLabel("freestyle")}: the pieces on the back row start shuffled, the same for both sides and different every game. To castle in Freestyle, move your king onto its rook: the king lands on the g- or c-file with the rook beside it, as usual. Nobody voting means ${SV.options[SV.defaultOption]?.label}. Both teams play from that start; a boss final is played from the usual starting position.
 - **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. A boss raid is ${namedClock(R)}.
 - **${n(C.powerUpsAtStart, "power-up")}** each: a power-up shows the engine's top 3 moves for that turn.
 - Matchmaking: **Default** fills empty seats with bots after a short wait, **Bots off** waits for real players, and **Solo** is you and bots, at once.
@@ -752,7 +761,7 @@ Met only in the Crowd's boss final, where it's always him, against the top ${n2}
 
 - **No Help** (passive): the God King's help doesn't work against him: his move, his strike and his Last Stand never come. Calling him spends a charge all the same, and ${bossInText(b.name, false, src.roster)} mocks it. He never strikes anyone down either: all ${n2} of you play to the end.
 - **Bullet** (ultimate): a meter of his own, full as turn ${p.bulletTurn} begins, when it comes with no warning. From then on every bank is ${clock(p.bulletBankSeconds)}, with no cap on a move${increment}. If everyone still in runs out of time, he wins on time.
-- **Beaten:** online, that's the crowd's victory. In a Solo game, if you reached him, his second phase follows: he absorbs the God King (gone for the rest of the fight), then ${n(P.boards, "board")} of Chess960 at once, each from its own start, you on one and the bots who reached him with you on the rest, against Stockfish at ${num(P.elo)}. A ${num(P.change.countdownSeconds)}-second countdown on every board, then ${clock(P.bankSeconds)} a board with no added time, and a board whose clock runs out is lost; all ${num(P.boards)} must be won. A move slower than ${num(P.slowMoveSeconds)} s counts against the team, and the team's ${ordinal(P.slowMovesForUlt)} brings his last power: from then on ${num(P.ultMoveSeconds)} s a move on every board, and a move out of time is played at random for you.`;
+- **Beaten:** online, that's the crowd's victory. In a Solo game, if you reached him, his second phase follows: he absorbs the God King (gone for the rest of the fight), then ${n(P.boards, "board")} of Freestyle chess at once (the back-row pieces shuffled), each from its own start, you on one and the bots who reached him with you on the rest, against Stockfish at ${num(P.elo)}. A ${num(P.change.countdownSeconds)}-second countdown on every board, then ${clock(P.bankSeconds)} a board with no added time, and a board whose clock runs out is lost; all ${num(P.boards)} must be won. A move slower than ${num(P.slowMoveSeconds)} s counts against the team, and the team's ${ordinal(P.slowMovesForUlt)} brings his last power: from then on ${num(P.ultMoveSeconds)} s a move on every board, and a move out of time is played at random for you.`;
 }
 
 function bossPowers(src: FaqSources): FaqSection {
