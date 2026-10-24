@@ -207,7 +207,7 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
   note, sent with the same diagnostics and the page's last 3 errors; the answer is "Report AB12CD — share this id": 6
   characters, no look-alikes), 💬 Feedback and 💡 Suggest an idea (a note, required, sent alone: no diagnostics, no
   account; the answer is a thank-you). One sheet over any screen (rendered beside the ban notice, so a match redrawing
-  never takes the form away). Opened on Report a bug from the match menu (a phone's "⋯" sheet; a computer's 🐞 button
+  never takes the form away). Opened on Report a bug from the match menu (a phone's gear, its list and a confirm first; a computer's 🐞 button
   beside the sound button, except where an admin's testing items fill that line), and on Feedback from Settings
   (HELP).
 - **Under the age gate** (Oct 16; [docs/decisions/2026-10-16-age-gate-and-real-money.md](../decisions/2026-10-16-age-gate-and-real-money.md)):

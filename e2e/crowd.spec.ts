@@ -37,7 +37,7 @@ test("narrow phones: the top bar's numbers stay clear of the options button, and
     const bar = await page.evaluate(() => {
       const hud = document.querySelector(".hud-row .hud")!;
       const cut = document.querySelector(".hud-row .hud-cut")!.getBoundingClientRect();
-      // (On a phone the top line ends in "⋯", the match's options: Sound and Resign.)
+      // (On a phone the top line ends in the gear, the match's options: Sound, Resign and more.)
       const mute = document.querySelector(".hud-row .mm-more")!.getBoundingClientRect();
       const label = [...document.querySelectorAll(".hud-row .hud-stage-text > span")];
       return {

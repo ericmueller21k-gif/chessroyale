@@ -72,8 +72,8 @@ export async function named(page: Page, name: string) {
 }
 
 /**
- * Sound off in a match: the sound button in the top line on a computer; on a phone, the "⋯" sheet's Sound switch
- * (MatchMenu.tsx: the phone's top line has "⋯" where the sound button was).
+ * Sound off in a match: the sound button in the top line on a computer; on a phone, the gear's list and its Sound switch
+ * (MatchMenu.tsx: the phone's top line has the gear where the sound button was).
  */
 export async function soundOff(page: Page) {
   const btn = page.getByRole("button", { name: "Turn sound off" }).first();
@@ -81,7 +81,7 @@ export async function soundOff(page: Page) {
   await page.getByRole("button", { name: "Match options" }).click();
   const sheet = page.getByRole("dialog", { name: "Match options" });
   await sheet.getByRole("switch", { name: /Sound/ }).click();
-  // (A tap anywhere else, or Escape, closes the sheet.)
+  // (A tap anywhere else, the X, or Escape, closes the list.)
   await page.keyboard.press("Escape");
   await sheet.waitFor({ state: "detached" });
 }

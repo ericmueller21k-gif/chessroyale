@@ -2,9 +2,10 @@ import { devices, expect, type Browser, type Page } from "@playwright/test";
 import { BOARD_SEL, named, test, bossAloneFromHome, openBossRaid, pickMode } from "./helpers.ts";
 
 /**
- * Resign in every mode (Eric, Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): a phone's "⋯" in the top
- * line opens a sheet (Sound, Resign), a computer's flag sits beside the sound button; either way a second step says
- * what happens, and nothing covers the board meanwhile. Solo stops at once; online, a bot takes your seat and the
+ * Resign in every mode (Eric, Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): a phone's gear in the top
+ * line opens a list (Sound, Resign; Eric, Oct 24), a computer's flag sits beside the sound button; either way a second
+ * step says what happens. On a computer nothing covers the board meanwhile; on a phone the confirm sits in the middle,
+ * over the match, which is faded and blurred (docs/decisions/2026-10-24-match-menu.md). Solo stops at once; online, a bot takes your seat and the
  * others play on; Squads' squad plays on with a bot in your seat.
  */
 
@@ -19,8 +20,9 @@ const apart = (a: { x: number; y: number; width: number; height: number }, b: { 
   a.x + a.width <= b.x + 1 || b.x + b.width <= a.x + 1 || a.y + a.height <= b.y + 1 || b.y + b.height <= a.y + 1;
 
 /**
- * Opens the match's control the way this device has it (a phone: "⋯", then Resign or Leave in its sheet; a computer:
- * the flag) and checks the confirm says `title` and `note`, leaving the board, its moves and the clock clear.
+ * Opens the match's control the way this device has it (a phone: the gear, then Resign or Leave in its list; a computer:
+ * the flag) and checks the confirm says `title` and `note`. A computer's confirm leaves the board, its moves and the
+ * clock clear; a phone's sits in the middle over the blurred match.
  */
 async function openConfirm(page: Page, title: RegExp, note: RegExp) {
   const resign = title.source.replace(/^\^/, "").startsWith("Resign");
@@ -54,6 +56,15 @@ async function openConfirm(page: Page, title: RegExp, note: RegExp) {
   await expect(confirm.getByRole("button", { name: "Cancel" })).toBeFocused();
   // Nothing over the board (its moves), the line above it (the move's count, a clock), the move's timer bars, the
   // board's clock (Crowd) or the squads' clocks under the board (Squads).
+  if (phone()) {
+    // Eric, Oct 24: on a phone the confirm is centered, over the match, which is faded and blurred behind it.
+    const c = (await confirm.boundingBox())!;
+    const view = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
+    expect(Math.abs(c.x + c.width / 2 - view.w / 2), "centered across").toBeLessThanOrEqual(8);
+    expect(Math.abs(c.y + c.height / 2 - view.h / 2), "centered down").toBeLessThanOrEqual(8);
+    expect(await page.locator(".mm-scrim.mm-full").evaluate((el) => getComputedStyle(el).backdropFilter), "blurred behind").toContain("blur");
+    return confirm;
+  }
   const box = (await confirm.boundingBox())!;
   for (const sel of [`.board-area ${BOARD_SEL.wrap}`, ".board-area .opening-name", ".timer-bar", ".board-clock", ".sq-clockline"]) {
     for (const el of await page.locator(sel).all()) {
