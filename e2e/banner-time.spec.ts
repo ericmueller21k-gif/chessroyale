@@ -97,8 +97,9 @@ async function check(page: Page, what: string) {
   const after = Math.round(s.motion! - s.banner!.last);
   console.log(`banner-time: ${what} bannerplus=${plusMs} up=${up}ms next=${after}ms after its last frame (frames over 50 ms: ${s.gaps})`);
   test.info().annotations.push({ type: "banner-time", description: `${what}: up ${up} ms, next ${after} ms after it` });
-  // (Its band slides in from off the board and off it again by its length: a frame or so of each is off the board.)
-  expect(up, `${what}: over the board`).toBeGreaterThanOrEqual(shownMs - 150);
+  // (Its band slides off over its last 240 ms (styles.css: --fb-out) and has left the board part-way through: measured
+  // 190 to 210 ms before its length at 0 and at 0.75 s alike.)
+  expect(up, `${what}: over the board`).toBeGreaterThanOrEqual(shownMs - 260);
   expect(up, `${what}: over the board`).toBeLessThanOrEqual(shownMs + 70);
   expect(s.motion!, `${what}: nothing after it while it's up`).toBeGreaterThan(s.banner!.last);
 }
