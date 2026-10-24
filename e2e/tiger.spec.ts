@@ -57,6 +57,8 @@ type Rec = {
   side: string | null;
   fly: string | null;
   land: string | null;
+  /** The landing sprite's frame, as "landPawn:3" (its data-frame), while it's on screen. */
+  frame: string | null;
   /** Whether a piece is drawn on the square being watched (window.__tgSquare). */
   piece: boolean | null;
   rings: string[];
@@ -84,6 +86,7 @@ async function record(page: Page) {
         side: side && side.getBoundingClientRect().width ? side.dataset.anim : null,
         fly: document.querySelector(".tg-fly")?.getAttribute("data-square") ?? null,
         land: document.querySelector(".tg-land")?.getAttribute("data-square") ?? null,
+        frame: document.querySelector(".tg-land canvas")?.getAttribute("data-frame") ?? null,
         piece: sq ? !!document.querySelector(`.hb-board piece[data-square="${sq}"]:not(.fading)`) : null,
         rings: [...document.querySelectorAll(".tg-ring")].map((r) => `${r.getAttribute("data-corner")}:${r.getAttribute("data-state")}`).sort(),
         hoops: document.querySelectorAll(".tg-hoop").length,
@@ -226,7 +229,12 @@ test("Babur: a forced balloon lands at the end of his turn as his pawn: released
   expect(land.length, "the landing").toBeGreaterThan(3);
   expect(fly.every((r) => r.piece === false), "no piece on the square while the balloon flies").toBe(true);
   const landAt = land[0]!.now;
-  expect(rec.filter((r) => r.land && r.now < landAt + 400).every((r) => r.piece === false), "none as it drifts down").toBe(true);
+  // (Its frames, not the clock: the first look at a landing can trail it, and the puff starts 470 ms in, frame 6. Frames 0 to 5 are the
+  // drift and the touch-down: no piece then.)
+  expect(
+    land.filter((r) => r.frame !== null && Number(r.frame.split(":")[1]) <= 5).every((r) => r.piece === false),
+    `none as it drifts down (first seen at ${land[0]!.frame})`,
+  ).toBe(true);
   expect(land.some((r) => r.piece), "his piece under the puff").toBe(true);
   expect(rec.at(-1)!.piece, "his piece there").toBe(true);
   // (Before his move shows, nothing of it: the square stays empty from the moment the end is in the view.)
@@ -332,8 +340,12 @@ test("Babur's pump in the bar at 320 and 1280: inside the bar's free room, clear
   expect(pump.x + pump.width).toBeLessThanOrEqual(room.x + room.width + 1);
   expect(pump.y + pump.height).toBeLessThanOrEqual(bar.y + bar.height + 1);
   expect(pump.y, "inside the bar").toBeGreaterThanOrEqual(bar.y);
-  // Clear of the status: under it on a phone, left of it on a computer.
-  expect(pump.y >= status.y + status.height || pump.x + pump.width <= status.x).toBe(true);
+  // Clear of the status: its balloon's top under it on a phone, left of it on a computer. (The pump's box may reach up beside the status:
+  // its frame has empty rows above the balloon, and the phone's pump is 2x: docs/decisions/2026-10-24-babur-bigger.md.)
+  expect(
+    (await pumpBalloonTop(page)) >= status.y + status.height || pump.x + pump.width <= status.x,
+    "the balloon's top clears the status",
+  ).toBe(true);
   if (desktop()) expect(pump.x - room.x, "a computer's at the room's left end").toBeLessThan(6);
   else expect(room.x + room.width - (pump.x + pump.width), "a phone's at the room's right end").toBeLessThan(6);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
@@ -367,3 +379,86 @@ test("Babur online: a reload mid-hoops draws the rings as they are, without the 
   expect(rec.at(-1)!.rings).toEqual(hoops.blocks.map((b: string) => `${b}:burn`).sort());
   expect(errors).toEqual([]);
 });
+
+test("Babur's pump on a phone is twice its size: 68 × 72 in the bar, its balloon's top under the status at 390 × 844 and 428 × 777", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  for (const [w, h] of [
+    [390, 844],
+    [428, 777],
+  ] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&balloon=queen&stage=3&seedspeed=30");
+    await bossAloneFromHome(page);
+    await yourMove(page);
+    const first = await state(page);
+    await submitMove(page, quiet(first.fen, first.allowed), first.fen);
+    await yourMove(page);
+    await expect(page.locator(".tg-pump-slot")).toHaveAttribute("data-anim", "readyQueen", { timeout: 10_000 });
+    const pump = (await page.locator(".tg-pump").boundingBox())!;
+    const bar = (await page.locator(".boss-bar").boundingBox())!;
+    const room = (await page.locator(".boss-prop").boundingBox())!;
+    const status = (await page.locator(".boss-next").boundingBox())!;
+    expect(pump.width, `${w} wide: the pump's width`).toBe(68);
+    expect(pump.height, `${w} wide: the pump's height`).toBe(72);
+    expect(pump.y + pump.height, `${w} wide: inside the bar`).toBeLessThanOrEqual(bar.y + bar.height + 1);
+    expect(room.x + room.width - (pump.x + pump.width), `${w} wide: at the room's right end`).toBeLessThan(6);
+    expect(await pumpBalloonTop(page), `${w} wide: the balloon's top under the status`).toBeGreaterThanOrEqual(status.y + status.height);
+  }
+  expect(errors).toEqual([]);
+});
+
+test("Babur's balloon on the board is as tall as a queen piece on its square: its flight drawn within 10% of the piece's height", async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&balloon=queen&stage=4");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  // A queen piece on the board, drawn: its art's own height (the cburnett queen's silhouette, by its alpha) on its square.
+  const queenH = await page.evaluate(async () => {
+    const piece = document.querySelector<HTMLElement>(".hb-board piece.queen.white");
+    const url = piece && getComputedStyle(piece).backgroundImage.match(/url\("?(.*?)"?\)/)?.[1];
+    if (!piece || !url) return 0;
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const cv = document.createElement("canvas");
+    cv.width = img.naturalWidth;
+    cv.height = img.naturalHeight;
+    const g = cv.getContext("2d")!;
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, cv.width, cv.height).data;
+    let top = -1;
+    let bottom = -1;
+    for (let y = 0; y < cv.height; y++)
+      for (let x = 0; x < cv.width; x++)
+        if (d[(y * cv.width + x) * 4 + 3]! > 8) {
+          if (top < 0) top = y;
+          bottom = y;
+        }
+    return ((bottom - top + 1) / cv.height) * piece.getBoundingClientRect().height;
+  });
+  expect(queenH, "a queen piece on the board").toBeGreaterThan(0);
+  const first = await state(page);
+  await submitMove(page, quiet(first.fen, first.allowed), first.fen);
+  // (The flight is about half a second: watched for from the moment it can appear.)
+  await page.waitForFunction(() => !!document.querySelector(".tg-fly canvas"), null, { timeout: 60_000, polling: 10 });
+  const cv = (await page.locator(".tg-fly canvas").first().boundingBox())!;
+  // The balloon's art is 20 rows tall (the stage-4 queen, tiger-bar.ts BALLOON_SHAPES) in its 32-row frame, drawn at the frame's scale.
+  const balloonH = (cv.height / 32) * 20;
+  expect(Math.abs(balloonH - queenH) / queenH, `a balloon ${balloonH.toFixed(1)} px, a queen ${queenH.toFixed(1)} px`).toBeLessThan(0.1);
+  expect(errors).toEqual([]);
+});
+
+/** The screen y (CSS px) of the top of the pump's balloon: its first drawn row, from the pump's own pixels. */
+async function pumpBalloonTop(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const cv = document.querySelector<HTMLCanvasElement>(".tg-pump")!;
+    const r = cv.getBoundingClientRect();
+    const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+    for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) if (d[(y * cv.width + x) * 4 + 3]! > 0) return r.top + (y * r.height) / cv.height;
+    return r.bottom;
+  });
+}
