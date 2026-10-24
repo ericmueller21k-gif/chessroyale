@@ -209,13 +209,13 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // inside the pack (reports/gardener-sim.md).
   { id: "gardener", name: GARDENER_NAME, icon: "🦛", kit: "Gardener", offset: -250, powers: { passive: "seeds", ultimate: "water" } },
   // Babur, the circus tiger (TIGER_NAME; Eric, Oct 23, named Oct 24): Balloons, on a real-time pump (a balloon on the nozzle at
-  // the start of his turn, four stages of 30 s (Eric said 15; the sim's 30), then at the end of a turn it lands as one of his pieces where the engine
-  // takes the least valuable safe square, or pops: about half pop, a fake queen always), and Hoops, his whole turn:
+  // the start of his turn, four stages of 12 s (Oct 24, Eric's pace: 30 s left him too slow), then at the end of a turn it lands as one of his pieces where the engine
+  // takes the least valuable safe square, or pops: about 58% pop, a fake queen always), and Hoops, his whole turn:
   // three burning 2x2 hoops whose walls nothing crosses, moves, captures or checks, for the crowd's next 2 moves, placed by
   // the host's engines in a fair band (bosses/tiger.ts; docs/decisions/2026-10-23-tiger-rules.md). Live with his art
   // (docs/decisions/2026-10-24-tiger-wired.md; the test links `?boss=tiger`, `&power=hoops`, `&balloon=<shape>`, `&stage=4`). The raid sim: at the
-  // usual −250, with 30 s stages, half the balloons popping and rageSpeed 1.6, the crowd scores 0.40 in 49 moves (0.05 with a
-  // slow crowd; reports/tiger-sim.md).
+  // usual −250, with 12 s stages, about 58% of the balloons popping and rageSpeed 1.6, the crowd scores 0.35 in 47 moves at a
+  // 10 s pick (Oct 24; 0.05 with a slow crowd at 30 s, before; reports/tiger-sim.md).
   { id: "tiger", name: TIGER_NAME, icon: "🐯", kit: "Tiger", offset: -250, powers: { passive: "balloons", ultimate: "hoops" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },

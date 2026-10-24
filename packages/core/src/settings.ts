@@ -1086,14 +1086,18 @@ export const BOSS_POWERS = {
    * real time (the battle's clock: the server's online, the page's visible time solo), then waits, ready. At the end of
    * his turn a ready balloon lands as his piece or pops. Its shape (percent; the fake queen looks like a queen) and
    * whether it pops (percent of that shape's) are rolled as it goes on: the shape from the battle's seed, a queen's being a
-   * fake one and every pop from the battle's own secret (BalloonState.secret). About half pop (the review's numbers, Oct 24,
-   * after Eric: "most don't even make it and most are pawns or maybe a bishop knight"; his two queen numbers kept).
-   * balloonStageSec is the raid sim's (Eric's 15 s left the crowd 0.00 in 29 battles): reports/tiger-sim.md.
+   * fake one and every pop from the battle's own secret (BalloonState.secret). About 58% pop (Oct 24: pops 50 for a pawn,
+   * 65 for a knight, bishop or rook; the fake queen always, the real one never). Eric, Oct 24: "the balloons… they're not
+   * landing… for a full game… he's way too easy otherwise"; "about a bishop's worth… on average of pieces a game, like a
+   * bishop and a pawn… it's still just a little too slow." Target: landed material a battle, at Eric's pace (a 5 s pick), of
+   * 4 or more, a bishop and a pawn as the floor.
+   * balloonStageSec is the raid sim's, at that pace (20 battles each): 30 s gave 2.15 landed material a battle; 12 s gave
+   * 6.35 at the old pops (40 / 55) and 5.50 at these (reports/tiger-sim.md, Oct 24).
    */
   balloonStages: 4,
-  balloonStageSec: 30,
+  balloonStageSec: 12,
   balloonOdds: { pawn: 55, knight: 13, bishop: 13, rook: 6, fakeQueen: 10, queen: 3 } as Readonly<Record<"pawn" | "knight" | "bishop" | "rook" | "fakeQueen" | "queen", number>>,
-  balloonPops: { pawn: 40, knight: 55, bishop: 55, rook: 55, fakeQueen: 100, queen: 0 } as Readonly<Record<"pawn" | "knight" | "bishop" | "rook" | "fakeQueen" | "queen", number>>,
+  balloonPops: { pawn: 50, knight: 65, bishop: 65, rook: 65, fakeQueen: 100, queen: 0 } as Readonly<Record<"pawn" | "knight" | "bishop" | "rook" | "fakeQueen" | "queen", number>>,
   /** How many colors a balloon can be (seeded, not tied to its shape: the art's six). */
   balloonColors: 6,
   /**

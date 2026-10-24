@@ -1,5 +1,44 @@
 # Babur, the circus tiger: calibrating Balloons and Hoops (Oct 23-24, 2026)
 
+## Oct 24: the balloons blow up faster (Eric's pace)
+
+Eric, Oct 24, after a ~60-move Boss-alone game against him: the balloons weren't landing, "he's way too easy otherwise", and
+he expects "about a bishop's worth or whatever on average of pieces a game, like a bishop and a pawn… it's still just a
+little too slow." The floor the director set (Oct 24): landed material of **4 or more a battle at Eric's pace**, a bishop and
+a pawn; a rook's worth is fine at times; more balloons popping is fine if that's what it takes.
+
+**Shipped: `balloonStageSec` 12 (was 30), pops 50 / 65 / 65 / 65 (was 40 / 55 / 55 / 55; about 58% pop, was about half).**
+The sweep, in the order the director set: 30 s (2.15), 20 s (3.60) and 15 s (3.80) stayed under 4.0; 12 s gave 6.35, over
+6.0, so the stage stayed at 12 s and the pops were raised 10 points each (pawn 40 → 50, knight, bishop and rook 55 → 65; fake
+queen 100, queen 0), once more (5.50, in 4.0 to 6.0: shipped). 10 s was not needed. Each mean is over 20 battles, so each
+has a standard error of about ±0.6 to ±0.9. The two 12 s runs differ only in the pops (6.35 at the old odds, 5.50 at the new),
+and their errors overlap.
+
+**The raid check:** at the shipped values, the 10 s crowd scores **0.35** (± 0.10, 20 battles; 5 won, 4 drawn, 11 lost): the
+report's 0.40 at 30 s and the same 10 s crowd re-run today at 30 s, 0.42 (± 0.10). Inside the director's 0.25 to 0.40 target,
+and well above the 0.15 flag line. The slow crowd (20 s a pick, the 0.05 below) was not run again at 12 s.
+
+**How it was run:** the sim has no Boss-alone mode (checked: `packages/sim/scripts/boss-sim.ts` has only the raid), so Eric's
+pace is the raid with `"pickSec":5`: a crowd of 50 bots, each crowd turn picked in 5 s. That's a fast crowd, not one player
+alone, so the pace is an approximation. Seed 41, games 0 to 19 (20 battles a run), the shipped offset −250 and `rageSpeed`
+1.6, as the report's runs. Landed material: pawn 1, knight 3, bishop 3, rook 5, queen 9; a popped balloon 0. The battle's real
+time is estimated from its moves (each crowd turn is the pick, the 2 s reveal and his 3 s turn: the sim doesn't log its clock).
+Rows: `reports/boss-sim/raid-<tag>.jsonl`.
+
+| Run | Crowd's pick | Stage | Pops p / n / b / r / fake q / q | Battles | W / D / L | Crowd score (± 1 s.e.) | Crowd moves: mean (range) | At the cap | Casts a battle | Balloons placed / landed / popped a battle | Landed material a battle (± 1 s.e.) | Est. real time a battle |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| babur30E | 5 s | 30 s | 40 / 55 / 55 / 55 / 100 / 0 | 20 | 8 / 3 / 9 | 0.47 (± 0.11) | 53 (29-60) | 12 | 4.10 | 4.50 / 1.45 / 2.05 | **2.15** (± 0.29) | 8.8 min |
+| babur20E | 5 s | 20 s | 40 / 55 / 55 / 55 / 100 / 0 | 20 | 4 / 2 / 14 | 0.25 (± 0.09) | 48 (18-60) | 8 | 3.30 | 5.55 / 1.80 / 2.75 | **3.60** (± 0.82) | 7.9 min |
+| babur15E | 5 s | 15 s | 40 / 55 / 55 / 55 / 100 / 0 | 20 | 7 / 3 / 10 | 0.42 (± 0.10) | 49 (22-60) | 10 | 3.60 | 7.25 / 2.40 / 3.85 | **3.80** (± 0.62) | 8.1 min |
+| babur12E | 5 s | 12 s | 40 / 55 / 55 / 55 / 100 / 0 | 20 | 4 / 1 / 15 | 0.23 (± 0.09) | 47 (17-60) | 9 | 3.45 | 7.85 / 2.85 / 4.05 | **6.35** (± 0.93) | 7.9 min |
+| babur12P | 5 s | 12 s | 50 / 65 / 65 / 65 / 100 / 0 | 20 | 6 / 2 / 12 | 0.35 (± 0.10) | 52 (24-60) | 10 | 4.05 | 8.85 / 2.60 / 5.25 | **5.50** (± 0.83): shipped | 8.7 min |
+| babur30R10 | 10 s | 30 s | 40 / 55 / 55 / 55 / 100 / 0 | 20 | 7 / 3 / 10 | 0.42 (± 0.10) | 47 (21-60) | 9 | 3.50 | 5.35 / 1.90 / 2.50 | 3.00 (± 0.48) | 11.7 min |
+| babur12R10 | 10 s | 12 s | 50 / 65 / 65 / 65 / 100 / 0 | 20 | 5 / 4 / 11 | **0.35** (± 0.10) | 47 (15-60) | 7 | 3.45 | 9.70 / 2.75 / 5.95 | 6.25 (± 0.98) | 11.7 min |
+
+babur30R10 and babur12R10 are the 10 s raid check: today's numbers and the shipped ones. The 5 s runs are Eric's pace.
+
+## Oct 23-24: the review's calibration
+
 Babur, the circus tiger (id `tiger`; docs/decisions/2026-10-23-tiger-rules.md). From the starting position, as every raid.
 **Balloons:** a balloon on his nozzle at the start of his turn, 4 stages on the battle's clock, then at the end of a turn it
 lands as his piece (never on a square the crowd attacks; the least valuable safe square, by the engine) or pops. **Hoops**
@@ -8,8 +47,9 @@ lands as his piece (never on a square the crowd attacks; the least valuable safe
 The rule for the choice: place him in the pack (a crowd score of about 0.08 to 0.55, 33 to 57 crowd moves, about 3 casts),
 and after the review (Oct 24) the director's target, a crowd score of 0.25 to 0.40.
 
-**Shipped (after the review): offset −250, `balloonStageSec` 30, `rageSpeed` 1.6, pops 40 / 55 / 55 / 55 (fake queen always,
-real queen never: about half), the landing on the least valuable safe square.** With a crowd that takes 10 s to pick
+**Shipped (Oct 24, the section above): offset −250, `balloonStageSec` 12, `rageSpeed` 1.6, pops 50 / 65 / 65 / 65 (fake queen
+always, real queen never: about 58%), the landing on the least valuable safe square. The review's values (below, Oct 23-24) were
+`balloonStageSec` 30 and pops 40 / 55 / 55 / 55 (about half).** With a crowd that takes 10 s to pick
 (tigerR10) the crowd scores **0.40** (± 0.11, 20 battles) in **49** crowd moves with **3.5 casts** a battle: at the top of the
 target. A slow crowd (20 s a pick, the raid's whole clock every turn; tigerR20) scores **0.05** (± 0.05, 20): the slower the
 crowd, the more balloons (5.8 against 7.6 a battle) and the more land (1.9 against 2.9). Within the review's rule (try 45 s

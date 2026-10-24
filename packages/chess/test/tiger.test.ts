@@ -47,7 +47,7 @@ import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.
 
 /**
  * The circus tiger (docs/decisions/2026-10-23-tiger-rules.md): Balloons (a real-time pump: a balloon on the nozzle at the
- * start of his turn, four stages of 30 s, at the end of a turn it lands as his piece in the shape's band or pops) and
+ * start of his turn, four stages of 12 s, at the end of a turn it lands as his piece in the shape's band or pops) and
  * Hoops (his whole turn: three 2x2 blocks walled for the crowd's next 2 moves, placed by the engine in a band).
  */
 
@@ -155,14 +155,14 @@ describe("the circus tiger: his sheet", () => {
     expect(S.rageSpeed.tiger).toBeGreaterThan(0);
   });
 
-  it("his numbers: 4 stages of 30 s (the sim's; Eric's 15 s made him far too strong); the shapes' odds add to 100, about half pop, a fake queen always, a queen never; six colors; the bands (in the engine's units)", () => {
-    expect([S.balloonStages, S.balloonStageSec, S.balloonColors]).toEqual([4, 30, 6]);
+  it("his numbers: 4 stages of 12 s (the sim's, at Eric's pace: 30 s left him too slow to land a bishop and a pawn a battle); the shapes' odds add to 100, about 58% pop, a fake queen always, a queen never; six colors; the bands (in the engine's units)", () => {
+    expect([S.balloonStages, S.balloonStageSec, S.balloonColors]).toEqual([4, 12, 6]);
     const o = S.balloonOdds;
     expect(o).toEqual({ pawn: 55, knight: 13, bishop: 13, rook: 6, fakeQueen: 10, queen: 3 });
     expect(Object.values(o).reduce((a, b) => a + b, 0)).toBe(100);
-    expect(S.balloonPops).toEqual({ pawn: 40, knight: 55, bishop: 55, rook: 55, fakeQueen: 100, queen: 0 });
+    expect(S.balloonPops).toEqual({ pawn: 50, knight: 65, bishop: 65, rook: 65, fakeQueen: 100, queen: 0 });
     const popPct = (Object.keys(o) as (keyof typeof o)[]).reduce((t, k) => t + (o[k] * S.balloonPops[k]) / 100, 0);
-    expect(popPct).toBeCloseTo(49.6, 1);
+    expect(popPct).toBeCloseTo(58.3, 1);
     expect(S.balloonBands).toEqual({ p: [0.3, 1.5], n: [7, 8.5], b: [7, 8.5], r: [7, 8.5], q: [7, 8.5] });
     expect([S.hoopsCount, S.hoopsCrowdMoves, S.hoopsTarget]).toEqual([3, 2, 1.5]);
     expect(S.hoopsBand).toEqual([0.5, 2.5]);
@@ -197,8 +197,8 @@ describe("Balloons: the rolls", () => {
     }
     for (const [k, pct] of Object.entries(S.balloonOdds)) expect(Math.abs((100 * (kinds[k] ?? 0)) / n - pct), k).toBeLessThan(1);
     for (const [k, pct] of Object.entries(S.balloonPops)) expect(Math.abs((100 * (pops[k] ?? 0)) / Math.max(1, kinds[k] ?? 0) - pct), k).toBeLessThan(pct === 0 || pct === 100 ? 0.001 : 4);
-    expect((100 * popped) / n).toBeGreaterThan(47);
-    expect((100 * popped) / n).toBeLessThan(52.5);
+    expect((100 * popped) / n).toBeGreaterThan(55.5);
+    expect((100 * popped) / n).toBeLessThan(61);
     for (const c of colors) expect(c / n).toBeGreaterThan(0.15);
   });
 
