@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { Chess } from "chess.js";
+import { legalMoves } from "@chessroyale/chess";
 import { BOARD_SEL, soloFromHome, submitMove, test, pickMode } from "./helpers.ts";
 
 /**
@@ -118,8 +118,8 @@ test("on a computer, chat under the vote results stays put from your move to the
   const during = await chatTop();
   // Your move (any legal one: the layout is what's tested).
   const fen: string = await page.evaluate(() => (window as any).match.phase.board.fen);
-  const m = new Chess(fen).moves({ verbose: true })[0]!;
-  await page.evaluate((uci) => (window as any).match.submit(uci), m.from + m.to + (m.promotion ?? ""));
+  // (The game's own rules: a 50 v 50 may start from Freestyle's Chess960 position, which chess.js can't read.)
+  await page.evaluate((uci) => (window as any).match.submit(uci), legalMoves(fen)[0]!);
   await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("reveal");
   await expect(page.locator(".poll-result")).toBeVisible();
   const poll = await page.locator(".poll").boundingBox();

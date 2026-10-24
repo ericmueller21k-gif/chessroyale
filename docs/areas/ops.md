@@ -107,7 +107,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   variable `TEST_SWITCHES` is "1" (local `wrangler dev --var TEST_SWITCHES:1`, the e2e server, staging; never
   production), and in the app on Vite's dev server. For everyone else they're ignored, silently: the lobby, the queue,
   the crate and the solo game are exactly the ones made without them.
-  - **The server's:** a new lobby's `rounds`, `clock`, `finalTurns`, `bossMoves`, `draw`, `power`, `format`, `speed`,
+  - **The server's:** a new lobby's `rounds`, `clock`, `finalTurns`, `bossMoves`, `draw`, `power`, `format`, `speed`, `start`,
     `weakbots`, `keep`, `pace=quick` (a test switch since Oct 15: players always play the mode's own pace), `augments=0`
     (no pre-game votes; a test switch since Oct 15: players always vote), a boss's fixed strength (`boss=1600`) and a boss outside a raid (`lobby-options.ts`); a queue's
     own `pool` (`/api/play`, `/api/squads/play`, `/api/squads/party`, `/api/1v1/play`: `testPool` in `index.ts`); a 1 v 1

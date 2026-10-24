@@ -51,7 +51,7 @@ async function drag(page: Page, from: { x: number; y: number }, to: { x: number;
   await cdp.detach();
 }
 
-test("the vote board: your pawn is solid, drag it into a zone, the count goes up; the second vote starts from home; the game begins with the pieces", async ({ page }) => {
+test("the vote board: your pawn is solid, drag it into a zone, the count goes up; the next vote starts from home; the game begins with the pieces", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   const touch = test.info().project.name === "phone";
   await page.goto("/?debug&mode=crowd&augments=1");
@@ -124,8 +124,10 @@ test("the vote board: your pawn is solid, drag it into a zone, the count goes up
   await expect(page.getByRole("radio", { name: /Duel/ })).toBeDisabled();
   await expect(page.locator(".vote-banner")).toBeVisible({ timeout: 15_000 });
 
-  // The second vote: everyone back on their spot (yours too), and the time controls left to right.
-  await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 10_000 });
+  // The clock, the third vote (Eric, Oct 24: how it starts comes second; e2e/opening-vote.spec.ts): everyone back on
+  // their spot (yours too), and the time controls left to right.
+  await expect(page.getByRole("heading", { name: "How does it start?" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 20_000 });
   // Bullet on the left, the longest on the right (Eric, Oct 16), from either side (Eric, Oct 13: never change position).
   await expect(page.locator(".vote-card strong")).toHaveText(["Bullet 3+2", "Blitz 5+3", "Rapid 10+5"]);
   await expect(page.locator(".vote-card-blurb")).toHaveText(["3 min + 2 s a move · max 10 s", "5 min + 3 s a move · max 15 s", "10 min + 5 s a move · max 20 s"]);
@@ -224,7 +226,7 @@ test("time's up: whoever didn't vote (you, and a few bots) walks to the winner, 
     .toBe(100);
   // Then the banner, and the line goes back to what's next.
   await expect(page.locator(".vote-banner")).toBeVisible();
-  await expect(page.locator(".vote-hint")).toHaveText(/How fast\? in \d…|How fast\?…/, { timeout: 5_000 });
+  await expect(page.locator(".vote-hint")).toHaveText(/How does it start\? in \d…|How does it start\?…/, { timeout: 5_000 });
   expect(await page.evaluate(() => (window as any).match.myVote)).toBe(atEnd.result);
 });
 

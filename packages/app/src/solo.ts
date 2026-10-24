@@ -1,5 +1,5 @@
 import { RECLUSE_PHASE2, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
-import { GUARD_WORDS, MatchRunner, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
+import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, SimulView, Standing, VoteView } from "./game.ts";
@@ -395,9 +395,17 @@ export class SoloMatch implements GameView {
       votes: botVotes(this.rng, bots.map((b) => b.id), votes[index]!.options.length, ms, this.settings.voteBotSkip).map((v) => ({ playerId: v.id, option: v.option, at: now + v.atMs, side: side.get(v.id)! })),
       result: null,
       ...(this.settings.voteChangeAllowed ? { changeAllowed: true } : {}),
+      ...this.voteStart(),
     };
     this.set({ kind: "vote", vote: this.voteState });
     this.timer = setTimeout(() => this.endVote(), ms);
+  }
+
+  /** The position the game starts from once the start vote made it another (Freestyle's), for the pieces that drop in. */
+  private voteStart(): { start?: string } {
+    const board = this.runner.boards.get(this.runner.state.boards[0] ?? 0);
+    const start = board ? baseAt(0, board.bases).fen : START_FEN;
+    return start !== START_FEN ? { start } : {};
   }
 
   castVote(option: number) {
@@ -422,7 +430,7 @@ export class SoloMatch implements GameView {
     // (The crowd voted for a boss battle at the end: Maia's files ahead, if it may play.)
     if (def.options[result]!.patch.finalFormat === "boss" && maiaAllowed()) prefetchMaia();
     const nextAt = at + this.settings.voteResultSeconds * 1000;
-    this.voteState = { ...v, votes, result, nextAt };
+    this.voteState = { ...v, votes, result, nextAt, ...this.voteStart() };
     this.set({ kind: "vote", vote: this.voteState });
     this.timer = setTimeout(() => (v.index + 1 < v.count ? this.startVote(v.index + 1) : this.nextRound()), nextAt - Date.now());
   }

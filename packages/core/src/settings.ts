@@ -28,6 +28,18 @@ export type ModeChoiceId = GameMode | "raid";
  */
 export type FinalFormat = "team" | "boss" | "duel";
 
+/**
+ * How a Crowd 50 v 50's game starts (the pre-game vote "How does it start?", Eric, Oct 24): the usual starting position,
+ * a balanced named opening `CROWD_START.randomOpeningMoves` moves in, or Freestyle (FIDE's name for Chess960: the back-row
+ * pieces shuffled, a seeded start, never the usual one).
+ */
+export type CrowdStart = "normal" | "random" | "freestyle";
+
+/** The start vote's numbers: how many moves per side a random opening is played in before move 1 of the vote's game. */
+export const CROWD_START = {
+  randomOpeningMoves: 4,
+} as const;
+
 export interface Settings {
   mode: GameMode;
   /**
@@ -282,6 +294,11 @@ export interface Settings {
    * a boss whose gimmick is openings may later). Off: every raid starts from the starting position (Eric, Oct 21).
    */
   raidOpening?: boolean;
+  /**
+   * Crowd 50 v 50: how the game starts (the pre-game vote, CrowdStart). Unset is "normal". The runner sets the board up
+   * from it before move 1 (MatchRunner.patchSettings); Random opening also sets `openingMoves`.
+   */
+  crowdStart?: CrowdStart;
   /** A line qualifies if the side to move's expected score at its end is inside this window. */
   openingBalance: readonly [number, number];
   engineNodes: number;

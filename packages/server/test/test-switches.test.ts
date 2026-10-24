@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_ROSTER, BOSS_TIERS, CRATES_FREE, CROWD_SETTINGS, QUICK_PACE, WEAK_BOT_SKILL, isPlayable } from "@chessroyale/core";
+import { BOSS_ROSTER, BOSS_TIERS, CRATES_FREE, CROWD_SETTINGS, CROWD_START, QUICK_PACE, WEAK_BOT_SKILL, isPlayable } from "@chessroyale/core";
 import { createGuest, createSession, ensureSchema, signInWithIdentity } from "../src/accounts.ts";
 import { testSwitchesOn } from "../src/admin.ts";
 import { handleAccountApi } from "../src/api.ts";
@@ -27,7 +27,7 @@ describe("who may use them", () => {
 });
 
 describe("a new lobby's options", () => {
-  const all = `rounds=1&clock=5&finalTurns=2&bossMoves=3&draw=weighted&power=candle&format=boss&speed=bullet&weakbots=1&keep=5&pace=quick&augments=0`;
+  const all = `rounds=1&clock=5&finalTurns=2&bossMoves=3&draw=weighted&power=candle&format=boss&speed=bullet&weakbots=1&keep=5&pace=quick&augments=0&start=freestyle`;
 
   it("for a player, every test switch is dropped: the lobby is exactly the one made without them", () => {
     for (const base of ["mode=crowd", "mode=classic", `mode=raid&boss=${playable}`]) {
@@ -69,13 +69,17 @@ describe("a new lobby's options", () => {
 
   it("for those allowed, the switches work", () => {
     const o = lobbyOptions(q(`mode=crowd&${all}`), true);
-    expect(o.overrides).toMatchObject({ roundsPerStage: 1, firstStageRounds: 1, finalMaxTurns: 2, bossMaxMoves: 3, drawRuleByStage: ["weighted"], bossPowerTest: "candle", finalFormat: "boss", botSkillRange: WEAK_BOT_SKILL, peopleFirst: true });
+    expect(o.overrides).toMatchObject({ roundsPerStage: 1, firstStageRounds: 1, finalMaxTurns: 2, bossMaxMoves: 3, drawRuleByStage: ["weighted"], bossPowerTest: "candle", finalFormat: "boss", botSkillRange: WEAK_BOT_SKILL, peopleFirst: true, crowdStart: "freestyle", openingMoves: 0 });
     expect(o.keepMs).toBe(5000);
     expect(lobbyOptions(q(`mode=raid&boss=${BOSS_TIERS[0]}`), true).overrides).toMatchObject({ bossFixedElo: BOSS_TIERS[0], bossFixed: BOSS_TIERS[0] });
     expect(lobbyOptions(q(`mode=crowd&boss=${playable}`), true).overrides.bossId).toBe(playable);
     expect(lobbyOptions(q("mode=crowd&pace=quick"), true).overrides).toMatchObject(QUICK_PACE.crowd);
     expect(lobbyOptions(q("mode=classic&pace=quick"), true).overrides).toMatchObject(QUICK_PACE.classic);
     expect(lobbyOptions(q("mode=crowd&augments=0"), true).overrides.augments).toBe(false);
+    // ?start= (Eric, Oct 24's start vote): Random opening plays its opening moves; an unknown id is Normal; never a raid's.
+    expect(lobbyOptions(q("mode=crowd&format=team&start=random"), true).overrides).toMatchObject({ crowdStart: "random", openingMoves: CROWD_START.randomOpeningMoves });
+    expect(lobbyOptions(q("mode=crowd&start=nope"), true).overrides).toMatchObject({ crowdStart: "normal", openingMoves: 0 });
+    expect(lobbyOptions(q(`mode=raid&boss=${playable}&start=freestyle`), true).overrides.crowdStart).toBeUndefined();
   });
 
   it("asks who's asking only when a query has a test switch", () => {

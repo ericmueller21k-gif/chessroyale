@@ -329,8 +329,9 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
       {hud}
       <div class={`board-area${jolt ? " pw-crash" : ""}`}>
         <div class="opening-name">
-          {/* (The title says "phase 2" already, and "the boss is beaten" read wrong as he rises: Chess960 once it splits.) */}
-          <BossHeading side="w" final={!match.settings.raid} note={split ? "Chess960" : undefined} />
+          {/* (The title says "phase 2" already, and "the boss is beaten" read wrong as he rises: Freestyle once it splits.
+              Freestyle is FIDE's name for Chess960, the one players see: Eric, Oct 24.) */}
+          <BossHeading side="w" final={!match.settings.raid} note={split ? "Freestyle" : undefined} />
         </div>
         <div class="board-row">
           {bossSide}
@@ -568,7 +569,7 @@ export function SimulScreen({ match }: { match: GameView }) {
       <div class="board-area">
         <div class="opening-name">
           {/* (How many are won: the boss bar's right side.) */}
-          <BossHeading side="w" final={!match.settings.raid} note="Chess960" />
+          <BossHeading side="w" final={!match.settings.raid} note="Freestyle" />
         </div>
         <div class="board-row">
           {bossSide}

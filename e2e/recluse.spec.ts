@@ -570,7 +570,7 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   await expect(page.locator(".boss-level .lv-text")).toHaveText("LVL ???");
   await expect(page.locator(".boss-level .lv-sr")).toHaveText("Level unknown");
   await expect(page.locator(".boss-bar .rage-meter")).toHaveCount(0);
-  await expect(page.locator(".opening-name")).toHaveText(/· Chess960$/);
+  await expect(page.locator(".opening-name")).toHaveText(/· Freestyle$/);
   // Phase 2: the God King gone (nothing to tap), the boss's look on where he stands.
   await expect(page.locator(".gk-unit.gone")).toHaveCount(1);
   await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(0);

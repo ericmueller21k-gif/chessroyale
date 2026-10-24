@@ -33,7 +33,7 @@ test("Crowd: the first vote on this device shows the hint until you vote; the se
   await page.getByRole("radio", { name: /Duel/ }).click();
   await expect(hint(page)).toHaveCount(0);
   // The second vote: no hint.
-  await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "How does it start?" })).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(1000);
   await expect(hint(page)).toHaveCount(0);
   // The next match on this device: none either.

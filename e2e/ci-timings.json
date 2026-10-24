@@ -45,6 +45,7 @@
   "e2e/match-screen.spec.ts": 69,
   "e2e/matchmaking.spec.ts": 105,
   "e2e/multiplayer.spec.ts": 348,
+  "e2e/opening-vote.spec.ts": 240,
   "e2e/panel.spec.ts": 113,
   "e2e/piece-sounds.spec.ts": 14,
   "e2e/pig.spec.ts": 176,

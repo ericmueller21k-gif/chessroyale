@@ -115,6 +115,16 @@ export function randomChess960(rng: () => number): { index: number; fen: string 
 }
 
 /**
+ * A Freestyle start (the 50 v 50's vote: FIDE's name for Chess960) drawn from a random source: any of the 959 that
+ * aren't the usual setup (number 518), each as likely; the same source, the same start.
+ */
+export function freestyleStart(rng: () => number): { index: number; fen: string } {
+  const k = Math.min(958, Math.floor(rng() * 959));
+  const index = k >= CHESS960_STANDARD_INDEX ? k + 1 : k;
+  return { index, fen: chess960Fen(index) };
+}
+
+/**
  * Whether a FEN is a Chess960 position for these rules: its castling rights name rooks by file (Shredder-FEN). A normal
  * FEN (KQkq or "-") never does, so normal games never come here. (A Chess960 game whose rights are all gone plays the
  * same under either rules.)

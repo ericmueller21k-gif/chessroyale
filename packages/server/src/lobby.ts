@@ -19,6 +19,8 @@ import {
   LAST_STAND_MS,
   queenSlain,
   legalMoves,
+  START_FEN,
+  baseAt,
   netBoard,
   boardSlots,
   maskedFen,
@@ -1310,6 +1312,12 @@ export class LobbyCore {
       result: v.result,
       ...(v.nextAt ? { nextAt: v.nextAt } : {}),
       ...(this.settings.voteChangeAllowed ? { changeAllowed: true } : {}),
+      ...(() => {
+        // (The start vote's Freestyle: the pieces that drop in after the last vote are its own.)
+        const board = this.runner?.boards.get(this.runner.state.boards[0] ?? 0);
+        const start = board ? baseAt(0, board.bases).fen : START_FEN;
+        return start !== START_FEN ? { start } : {};
+      })(),
     };
   }
 

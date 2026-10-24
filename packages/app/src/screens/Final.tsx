@@ -34,7 +34,8 @@ const avgText = (avg: number | null) => (avg === null ? "—" : avg.toFixed(1));
  */
 export function FinalScreen({ match, final }: { match: GameView; final: FinalView }) {
   const sides = teamSides(final);
-  const history = useHistoryView(final.board.history);
+  // (With its bases: a Freestyle game steps back to its own start.)
+  const history = useHistoryView(final.board.history, final.board.bases);
   const orientation = (() => {
     const mine = final.teams.findIndex((t) => t.some((id) => match.isYou(id)));
     return (mine >= 0 ? sides[mine] : "w") === "w" ? "white" : "black";

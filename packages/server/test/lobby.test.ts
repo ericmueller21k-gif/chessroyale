@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, FRONT_DOOR, OPENING_ALLOWANCE, crowdFinalists, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
-import { LAST_STAND_MS, applyMove, bossIntroTimeline, legalMoves, sanLineToUci, toSan, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, FRONT_DOOR, OPENING_ALLOWANCE, crowdFinalists, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
+import { LAST_STAND_MS, START_FEN, applyMove, bossIntroTimeline, freestyleBoard, isChess960Fen, legalMoves, pieceAt, sanLineToUci, toSan, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 const hash = (s: string) => {
@@ -378,7 +378,7 @@ describe("lobby: Crowd mode", () => {
     throw new Error("the humans were always on the same team");
   });
 
-  it("pre-game votes: everyone votes on the ending and the speed; the winners set the match's settings", () => {
+  it("pre-game votes: everyone votes on the ending, the start and the speed; the winners set the match's settings", () => {
     const L = setup({ ...modeSettings("crowd", { augments: true }), boardIntroSeconds: 0 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
@@ -414,10 +414,16 @@ describe("lobby: Crowd mode", () => {
     const format = PREGAME_VOTES[0]!.options[done.result!]!;
     expect(L.core.record.overrides?.finalFormat).toBe(format.patch.finalFormat);
     L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
-    const speedVote = L.last("p1", "vote")!.vote;
-    expect(speedVote.index).toBe(1);
+    // How it starts (Eric, Oct 24: the second vote now), then the speed.
+    expect(L.last("p1", "vote")!.vote.index).toBe(1);
     L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
-    const speed = PREGAME_VOTES[1]!.options[L.last("p1", "vote")!.vote.result!]!;
+    const start = PREGAME_VOTES[1]!.options[L.last("p1", "vote")!.vote.result!]!;
+    expect(L.core.record.overrides).toMatchObject(start.patch);
+    L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    const speedVote = L.last("p1", "vote")!.vote;
+    expect(speedVote.index).toBe(2);
+    L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+    const speed = PREGAME_VOTES[2]!.options[L.last("p1", "vote")!.vote.result!]!;
     L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
     // The game starts with the voted time control: its cap and increment on the round, its bank for everyone.
     const round = L.last("p1", "round")!;
@@ -427,12 +433,12 @@ describe("lobby: Crowd mode", () => {
     expect(L.core.record.overrides).toMatchObject(speed.patch);
   });
 
-  it("pre-game votes: nobody votes, so the default wins (Team final, then Blitz 5+3) and everyone joins it", () => {
+  it("pre-game votes: nobody votes, so the default wins (Team final, Normal, then Blitz 5+3) and everyone joins it", () => {
     const L = setup({ ...modeSettings("crowd", { augments: true }), boardIntroSeconds: 0, voteBotSkip: 1 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
-    for (const [index, want] of [[0, "team"], [1, "blitz"]] as const) {
+    for (const [index, want] of [[0, "team"], [1, "normal"], [2, "blitz"]] as const) {
       const v = L.last("p1", "vote")!.vote;
       expect(v.index).toBe(index);
       expect(v.votes).toEqual([]);
@@ -443,7 +449,7 @@ describe("lobby: Crowd mode", () => {
       expect(done.votes.every((x) => x.joined && x.option === done.result)).toBe(true);
       L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
     }
-    expect(L.core.record.overrides).toMatchObject({ finalFormat: "team", timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15 });
+    expect(L.core.record.overrides).toMatchObject({ finalFormat: "team", crowdStart: "normal", openingMoves: 0, timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15 });
     const round = L.last("p1", "round")!;
     expect([round.moveClock, round.increment, round.deadline - round.startsAt!]).toEqual([15, 3, 15_000]);
   });
@@ -453,16 +459,18 @@ describe("lobby: Crowd mode", () => {
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
-    // The ending (nobody votes: Team final), then the clock: both people vote Bullet; the bots don't vote.
-    L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
-    L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    // The ending and the start (nobody votes: Team final, Normal), then the clock: both people vote Bullet; the bots don't vote.
+    for (let i = 0; i < 2; i++) {
+      L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+      L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    }
     const v = L.last("p1", "vote")!.vote;
-    expect(v.index).toBe(1);
-    const bullet = PREGAME_VOTES[1]!.options.findIndex((o) => o.id === "bullet");
+    expect(v.index).toBe(2);
+    const bullet = PREGAME_VOTES[2]!.options.findIndex((o) => o.id === "bullet");
     for (const id of ["p1", "p2"]) L.core.message(id, { t: "vote", key: v.key, option: bullet });
     L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
     const result = L.last("p1", "vote")!;
-    expect(PREGAME_VOTES[1]!.options[result.vote.result!]!.id).toBe("bullet");
+    expect(PREGAME_VOTES[2]!.options[result.vote.result!]!.id).toBe("bullet");
     // Everyone's bank is now Bullet's 3:00 (people and bots; the match was made with the default 10:00).
     expect(new Set(result.standings.map((x) => x.bankMs))).toEqual(new Set([180_000]));
     expect(L.core.record.overrides).toMatchObject({ timeBankSeconds: 180, timeIncrementSeconds: 2, moveClockSeconds: 10, moveClockSteps: [] });
@@ -498,6 +506,123 @@ describe("lobby: Crowd mode", () => {
     const bank = (id: string) => L.last("p1", "reveal")!.standings.find((x) => x.id === id)!.bankMs;
     for (const id of movers) expect(bank(id)).toBe(181_000);
     for (const id of ["p1", "p2"].filter((x) => !movers.includes(x))) expect(bank(id)).toBe(180_000);
+  });
+
+  /** A Crowd lobby through its votes to move 1: nobody votes but the two people, who vote `start` in the start vote. */
+  const toStart = (start: string) => {
+    const L = setup({ ...modeSettings("crowd", { augments: true }), firstStageRounds: 20, roundsPerStage: 2, boardIntroSeconds: 0, voteBotSkip: 1 });
+    L.core.connect(undefined, "Ann", "computer");
+    L.core.connect(undefined, "Bo", "phone");
+    L.core.message("p1", { t: "start" });
+    L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+    L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    const v = L.last("p1", "vote")!.vote;
+    expect(PREGAME_VOTES[v.index]!.title).toBe("How does it start?");
+    const option = PREGAME_VOTES[v.index]!.options.findIndex((o) => o.id === start);
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "vote", key: v.key, option });
+    L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+    const won = L.last("p2", "vote")!.vote;
+    expect(PREGAME_VOTES[won.index]!.options[won.result!]!.id).toBe(start);
+    expect(L.core.record.overrides).toMatchObject(PREGAME_VOTES[won.index]!.options[won.result!]!.patch);
+    return { L, won };
+  };
+  const runnerOf = (core: LobbyCore) => (core as unknown as { runner: MatchRunner }).runner;
+  /** Every person to move picks `pick` (else the first legal move); the host scores, its bots picking `botPick` when it's legal. */
+  const playRound = (L: ReturnType<typeof setup>, pick?: string, botPick?: string) => {
+    for (const id of ["p1", "p2"]) {
+      const r = L.last(id, "round")!;
+      if (!r.watching) L.core.message(id, { t: "pick", key: r.key, move: pick && legalMoves(r.board!.fen).includes(pick) ? pick : legalMoves(r.board!.fen)[0]! });
+    }
+    if (["p1", "p2"].every((id) => L.last(id, "round")!.watching)) L.advance(DEFAULT_SETTINGS.moveClockSeconds * 1000);
+    expect(scoreWith(L, botPick)).toBe(true);
+    const rev = L.last("p1", "reveal")!;
+    L.advance(10_000);
+    return rev;
+  };
+  /** The host's answer (as hostScores), its bots picking `botPick` wherever it's legal. */
+  const scoreWith = (L: ReturnType<typeof setup>, botPick?: string) => {
+    for (const host of ["p1", "p2"]) {
+      const req = L.last(host, "scoreRequest");
+      if (!req) continue;
+      const boards: BoardScore[] = req.jobs.map((j) => {
+        const legal = legalMoves(j.fen);
+        const best = botPick && legal.includes(botPick) ? botPick : legal[0]!;
+        const exp = Object.fromEntries(legal.map((m) => [m, m === best ? 0.6 : 0.4]));
+        return { boardId: j.boardId, bestMove: best, bestExpected: 0.6, expectedAfter: exp, botPicks: Object.fromEntries(j.bots.map((b) => [b.id, best])), botThinkMs: Object.fromEntries(j.bots.map((b) => [b.id, 4000])) };
+      });
+      L.core.message(host, { t: "scores", key: req.key, boards });
+      L.inbox.set(host, (L.inbox.get(host) ?? []).filter((m) => m.t !== "scoreRequest"));
+      return true;
+    }
+    return false;
+  };
+
+  it("the start vote online, Freestyle: a Chess960 start for everyone (the vote says it for the pieces that drop in), bots move, the judge scores, castling both ways, and a lobby that sleeps wakes with it", () => {
+    const { L, won } = toStart("freestyle");
+    // The pieces that drop in after the last vote are the game's own, from now on in every vote message.
+    expect(won.start && isChess960Fen(won.start)).toBe(true);
+    L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    expect(L.last("p1", "vote")!.vote.start).toBe(won.start);
+    L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+    L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    // Move 1: both people see the same start, in a base at ply 0.
+    for (const id of ["p1", "p2"]) {
+      const b = L.last(id, "round")!.board!;
+      expect([b.fen, b.ply, b.bases]).toEqual([won.start, 0, [{ ply: 0, fen: won.start }]]);
+      expect(b.openingName).toBe("Freestyle");
+    }
+    // A few moves: the crowd's pick played from the Chess960 position, every pick judged.
+    for (let i = 0; i < 4; i++) {
+      const rev = playRound(L);
+      expect(legalMoves(rev.fenBefore!)).toContain(rev.playedMove);
+      expect(rev.picks.filter((p) => p.move).every((p) => p.loss !== null)).toBe(true);
+    }
+    const board = L.last("p1", "round")!.board!;
+    expect(board.history).toHaveLength(4);
+    expect(board.bases).toEqual([{ ply: 0, fen: won.start }]);
+
+    // The lobby sleeps here and wakes from its record: the same game, from the same start.
+    const sent = new Map<string, Msg[]>();
+    let wokenNow = L.now;
+    const io = { now: () => wokenNow, send: (id: string, msg: Msg) => sent.set(id, [...(sent.get(id) ?? []), msg]) };
+    const woken = new LobbyCore(JSON.parse(JSON.stringify(L.core.save())), io, library, mulberry32(7), { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0 });
+    expect(runnerOf(woken).settings.crowdStart).toBe("freestyle");
+    const wokenBoard = runnerOf(woken).boards.get(0)!;
+    expect([wokenBoard.fen, wokenBoard.bases, wokenBoard.opening.name]).toEqual([board.fen, board.bases, "Freestyle"]);
+
+    // Castling, both ways, on a Freestyle board (king e1, rooks b1 and g1): the king onto its own rook is a pick like any
+    // other, judged and played.
+    for (const [move, king, rook] of [["e1g1", "g1", "f1"], ["e1b1", "c1", "d1"]] as const) {
+      const { L: C } = toStart("freestyle");
+      runnerOf(C.core).boards.set(0, freestyleBoard(0, "1r2k1r1/pppppppp/8/8/8/8/PPPPPPPP/1R2K1R1 w GBgb - 0 1"));
+      C.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+      C.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+      C.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+      const rev = playRound(C, move, move);
+      expect(rev.playedMove).toBe(move);
+      expect(rev.picks.filter((p) => p.move === move).every((p) => p.loss === 0)).toBe(true);
+      const after = runnerOf(C.core).boards.get(0)!.fen;
+      expect([pieceAt(after, king), pieceAt(after, rook)]).toEqual([{ color: "w", type: "k" }, { color: "w", type: "r" }]);
+    }
+  });
+
+  it("the start vote online, Random opening: a named line from the library, CROWD_START moves a side in; Normal: the starting position", () => {
+    const { L, won } = toStart("random");
+    expect(won.start).toBeUndefined();
+    L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+    L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    const b = L.last("p1", "round")!.board!;
+    const plies = 2 * CROWD_START.randomOpeningMoves;
+    expect([b.ply, b.history, b.fen.split(" ")[5]]).toEqual([plies, line.slice(0, plies), String(CROWD_START.randomOpeningMoves + 1)]);
+    const rev = playRound(L);
+    expect(legalMoves(rev.fenBefore!)).toContain(rev.playedMove);
+
+    const { L: N } = toStart("normal");
+    N.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    N.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+    N.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    expect(N.last("p1", "round")!.board!.fen).toBe(START_FEN);
   });
 
   it("pre-game votes: one vote each (a second is ignored); with voteChangeAllowed it replaces the first", () => {

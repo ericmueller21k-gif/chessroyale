@@ -63,9 +63,10 @@ import {
   moveClockAt,
 } from "@chessroyale/core";
 import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./protocol.ts";
-import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
+import { BOSS_OPENING, FREESTYLE_OPENING, boardEnd, boardStatus, freestyleBoard, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
+import { freestyleStart } from "./chess960.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
-import { applyMove, gameEnd, legalMoves, materialSlips, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
+import { START_FEN, applyMove, baseAt, gameEnd, legalMoves, materialSlips, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, type BossBrain, type BossBrainPlan } from "@chessroyale/core";
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
@@ -412,6 +413,41 @@ export class MatchRunner {
     // Crowd 50 v 50: a random half play White all match, the rest Black.
     this.state = assignColours(this.state, opts.rng, isTeamMatch(this.settings) ? Math.floor(this.alive().length / 2) : this.whiteSeats());
     if (this.settings.raid) this.startRaid();
+    // (A start set before the match, the ?start= test switch: Random opening is the openings above; Freestyle here.)
+    else this.setUpStart();
+  }
+
+  /**
+   * Crowd 50 v 50's start (the pre-game vote "How does it start?"; docs/decisions/2026-10-24-opening-vote.md), set up
+   * before move 1 on every board still at its start (the 50 v 50 has one, so everyone shares it). Normal: the starting
+   * position; Random opening: a balanced named line from the library, `openingMoves` moves a side in, as Classic's boards
+   * are drawn; Freestyle: a Chess960 start drawn from the match's own random source (never the usual one), in a base at
+   * ply 0. A board already as asked is left alone (so Normal draws nothing), and once a move is played nothing changes.
+   */
+  private setUpStart() {
+    if (!isTeamMatch(this.settings) || this.settings.raid || this.state.round > 0) return;
+    const want = this.settings.crowdStart ?? "normal";
+    const plies = openingPlies(this.settings);
+    for (const id of this.state.boards) {
+      const b = this.boards.get(id)!;
+      if (b.history.length !== b.openingPlies) continue;
+      const now = b.opening.id === FREESTYLE_OPENING.id ? "freestyle" : b.openingPlies > 0 ? "random" : "normal";
+      if (now === want && (want === "freestyle" || b.openingPlies === plies)) continue;
+      this.freshStart(id, b.generation);
+    }
+  }
+
+  /** A board slot's fresh game from this match's start: Freestyle's own Chess960 start, else an opening from the library. */
+  private freshStart(id: number, generation: number) {
+    if (this.settings.crowdStart === "freestyle") {
+      this.boards.set(id, freestyleBoard(id, freestyleStart(this.opts.rng).fen, generation));
+      return;
+    }
+    const plies = openingPlies(this.settings);
+    const [opening] = pickOpenings(this.opts.rng, this.opts.library, { classic: 1, unusual: 0 }, plies, this.settings.openingBalance, this.usedFamilies);
+    const chosen = opening ?? this.opts.library.find((o) => o.expected[plies] !== undefined) ?? this.opts.library[0]!;
+    this.usedFamilies.add(chosen.family);
+    this.boards.set(id, newBoard(id, chosen, plies, generation));
   }
 
   /** Boss raid: the boss is there from the start, from the starting position; strikes stop at half the group; the King has every charge. */
@@ -594,10 +630,14 @@ export class MatchRunner {
   patchSettings(patch: Partial<Settings>): void {
     this.opts.settings = { ...this.opts.settings, ...patch };
     if (patch.timeBankSeconds !== undefined) this.state = startBanks(this.state, this.settings);
+    // (The start vote: the board set up afresh from the start that won, before move 1.)
+    if (patch.crowdStart !== undefined) this.setUpStart();
   }
 
   private replaceBoard(id: number): void {
     const old = this.boards.get(id)!;
+    // (Freestyle: a new game from another Chess960 start.)
+    if (this.settings.crowdStart === "freestyle" && isTeamMatch(this.settings)) return this.freshStart(id, old.generation + 1);
     const side = sideToMove(old.fen);
     const plies = side === "w" ? openingPlies(this.settings) : openingPlies(this.settings) + 1;
     const [opening] = pickOpenings(
@@ -1150,7 +1190,8 @@ export class MatchRunner {
     snapshot: RunnerSnapshot,
     opts: { settings: Settings; rng: Rng; engines: readonly EngineLike[]; library: readonly Opening[]; clock?: () => number },
   ): MatchRunner {
-    const byId = new Map(opts.library.map((o) => [o.id, o]));
+    // (A Freestyle board's opening isn't in the library either.)
+    const byId = new Map([...opts.library, FREESTYLE_OPENING].map((o) => [o.id, o]));
     const runner = Object.create(MatchRunner.prototype) as MatchRunner;
     Object.assign(runner, {
       opts: { ...opts, entrants: [] },
@@ -1876,7 +1917,9 @@ export class MatchRunner {
     const def = crowdFinalBoss(roster) ?? chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, roster, this.settings.bossUnfinished);
     // (A boss who plays from the starting position: Hollow, the Hidden Boss; Big Boy too, less the pawn he eats.)
     const start = bossRules(def)?.opening;
-    if (start?.fromStart) startPly = 0;
+    // (After a Freestyle game, from the usual starting position too: his powers and Maia, his phase 1's brain, know only
+    // normal chess; docs/decisions/2026-10-24-opening-vote.md.)
+    if (start?.fromStart || baseAt(0, old.bases).fen !== START_FEN) startPly = 0;
     const opening = { ...BOSS_OPENING, moves: old.history.slice(0, startPly), expected: { [startPly]: old.evals?.[startPly] ?? 0.5 } };
     this.boards.set(id, { ...newBoard(id, opening, startPly, old.generation + 1), opening: BOSS_OPENING });
     let setUp = start?.setUp?.(this.battle, { boardId: id, seed, crowdSide: "w", generation: old.generation + 1 }) ?? null;
