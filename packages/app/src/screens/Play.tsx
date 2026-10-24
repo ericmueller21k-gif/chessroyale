@@ -212,11 +212,11 @@ export function PlayScreen({
     <div class="screen game">
       <Hud match={match} />
       <div class="board-area">
+        {/* (A boss battle has no line above its board: its dock says what's happening, and "N/M picked" is in it, Eric, Oct 24.) */}
+        {(!match.boss || match.final) && (
         <div class="opening-name">
           {match.final ? (
             <FinalTurnLabel match={match} side={side} />
-          ) : match.boss ? (
-            <BossHeading side={side} final={!match.settings.raid} note={alone ? (waiting ? "the boss is thinking" : undefined) : `${doneCount}/${alive.length} picked`} />
           ) : match.settings.mode === "crowd" ? (
             <>
               {/* (On a phone, dropped while the lit "▲" note is in the line, to leave room for the clock at the board's
@@ -237,6 +237,7 @@ export function PlayScreen({
             <span class="opening-title" title={board.openingName}>{board.openingName}</span>
           )}
         </div>
+        )}
         <div class="board-row">
           {match.boss && <BossSide match={match} />}
           <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
@@ -294,9 +295,10 @@ export function PlayScreen({
               </span>
             ) : waiting ? (
               <span>
-                {/* (How many have picked: the line above the board says it.) */}
+                {/* (How many have picked: a raid's crowd, "16/50 picked", as the line above the board said.) */}
                 <Dots /> <strong>{picked ? "Move in." : note?.out ? "Out of tries." : "Time's up."}</strong>{" "}
-                {alive.length > 1 && <span class="muted">Waiting for the others</span>}
+                {!alone && <span class="muted">{doneCount}/{alive.length} picked</span>}
+                {alive.length > 1 && <span class="muted"> · Waiting for the others</span>}
               </span>
             ) : intro ? (
               <span class="muted">Get ready…</span>
@@ -325,6 +327,7 @@ export function PlayScreen({
             ) : (
               <span>
                 <strong>Your move.</strong>{" "}
+                {!alone && <span class="muted">{doneCount}/{alive.length} picked </span>}
                 {note && !note.pending ? (
                   // Your own attempt into the dark wasn't legal: what it cost, and the tries you have left.
                   <span class="dark-note" role="status">
@@ -385,15 +388,3 @@ export function PlayScreen({
   );
 }
 
-/**
- * Boss battle: the line above the board, the same on every screen of it. `final`: the Crowd's boss final (a raid or
- * Boss alone is a boss battle).
- */
-export function BossHeading({ side, note, final = false }: { side: "w" | "b"; note?: string; final?: boolean }) {
-  return (
-    <>
-      <strong>{final ? "BOSS FINAL" : "BOSS BATTLE"}</strong> · you play {side === "w" ? "White" : "Black"}
-      {note ? <> · {note}</> : null}
-    </>
-  );
-}

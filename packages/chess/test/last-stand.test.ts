@@ -216,6 +216,10 @@ describe("the God King's Last Stand: the rule", () => {
     expect(k.boards[0]!.king).toBe(true);
     expect(k.boards[0]!.lastStand).toBeUndefined();
     await runner.playBoss();
+    // (On a plain board: G-REX's first fire tile, lit as crowd move 2 begins, is put out. The Last Stand sits out on a
+    // board a boss has changed: king-save-altered.test.ts.)
+    expect(runner.boss!.powers!.fire?.length).toBe(1);
+    runner.state = { ...runner.state, boss: { ...runner.boss!, powers: { ...runner.boss!.powers!, fire: [] } } };
     // Now the disaster: he takes it.
     runner.deal();
     expect((await runner.score(pick(BLUNDER))).boards[0]!.lastStand).toBeDefined();

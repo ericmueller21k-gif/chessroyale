@@ -29,7 +29,6 @@ import { Hud } from "./Hud.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossCharacter, BossFace, BossSide, hasCharacter, resetBeats } from "../components/BossCharacter.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
-import { BossHeading } from "./Play.tsx";
 import { ordinal } from "./StageBreak.tsx";
 import { CRITICAL, VoiceBubble, bossVoice } from "../speech.tsx";
 import { kingBlocked } from "../components/Recluse.tsx";
@@ -494,10 +493,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   return (
     <div class={`screen game boss-screen${victim ? " striking" : ""}`}>
       {hud}
+      {/* (No line above the board: the dock says what's happening, and "You beat him!", "The boss is thinking…", "Struck down"
+          and "Boss plays" say what the old line did, Eric, Oct 24.) */}
       <div class={`board-area${slam ? " pw-slam" : ""}${jolt === "crash" ? " pw-crash" : jolt === "bump" ? " pw-bump" : ""}`}>
-        <div class="opening-name">
-          <BossHeading side={boss.crowdSide} final={!boss.raid} note={fall ? "the boss is beaten" : lights ? "Lights Out" : thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
-        </div>
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           {bossSide}
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />

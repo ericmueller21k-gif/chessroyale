@@ -380,9 +380,9 @@ test("Wrangler's showdown on demand (the admins' trigger): his meter full at onc
   // His meter: one move of his in, nowhere near full.
   expect((await powers(page)).rage).toBeLessThan(1);
   const btn = page.locator(".ult-test");
-  await expect(btn).toHaveText("Trigger ultimate (testing)");
+  await expect(btn).toHaveAccessibleName("Trigger ultimate (testing)");
   await btn.click();
-  await expect(btn).toHaveText("Ultimate next turn (testing)");
+  await expect(btn).toHaveAccessibleName("Ultimate next turn (testing)");
   await expect.poll(async () => (await powers(page)).rage).toBe(1);
   const seen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /SHOWDOWN!/ }, draw: { selector: ".fight-banner.power-cut", text: /DRAW!/ } });
   await play(page, await goodMove(page));

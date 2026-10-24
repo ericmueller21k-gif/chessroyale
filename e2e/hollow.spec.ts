@@ -215,9 +215,9 @@ test("Hollow's Lights out (the admins' trigger): the night over every square, a 
   await yourMove(page);
   // Pressed during your turn: it comes at the start of his turn, after your move.
   const btn = page.locator(".ult-test");
-  await expect(btn).toHaveText("Trigger ultimate (testing)");
+  await expect(btn).toHaveAccessibleName("Trigger ultimate (testing)");
   await btn.click();
-  await expect(btn).toHaveText("Ultimate next turn (testing)");
+  await expect(btn).toHaveAccessibleName("Ultimate next turn (testing)");
   const banner = await watchFor(page, { lights: { selector: ".fight-banner.power-cut", text: /LIGHTS OUT!/ } });
   await play(page, "e2e4");
   await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.lights), { timeout: 20_000 }).toBe(true);
@@ -295,7 +295,7 @@ test("Hollow's Lights out (the admins' trigger): the night over every square, a 
   expect(p.rage).toBe(0);
   expect(p.paused).toBe(true);
   await expect(page.locator(".rage-meter.paused")).toBeVisible();
-  await expect(btn).toHaveText("Ultimate under way (testing)");
+  await expect(btn).toHaveAccessibleName("Ultimate under way (testing)");
   expect(errors).toEqual([]);
 });
 

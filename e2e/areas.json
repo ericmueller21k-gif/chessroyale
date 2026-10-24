@@ -142,6 +142,7 @@
         "e2e/hollow.spec.ts",
         "e2e/hopper.spec.ts",
         "e2e/king-attack.spec.ts",
+        "e2e/king-save-altered.spec.ts",
         "e2e/maia.spec.ts",
         "e2e/pig.spec.ts",
         "e2e/recluse.spec.ts",
@@ -221,6 +222,7 @@
         "e2e/crowd-hidden.spec.ts",
         "e2e/formats.spec.ts",
         "e2e/king-attack.spec.ts",
+        "e2e/king-save-altered.spec.ts",
         "e2e/recluse.spec.ts"
       ]
     },
@@ -312,7 +314,7 @@
         "packages/app/src/tiger-show.ts",
         "scripts/frames-tiger.mjs"
       ],
-      "specs": ["e2e/tiger.spec.ts", "e2e/king-attack.spec.ts"]
+      "specs": ["e2e/tiger.spec.ts", "e2e/king-attack.spec.ts", "e2e/king-save-altered.spec.ts"]
     },
     "Smudgy (smudgy)": {
       "paths": [

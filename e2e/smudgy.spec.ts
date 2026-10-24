@@ -479,7 +479,7 @@ test("Smudgy at 320, 360, 390 and 1280 px: his figure whole in the bar, his long
     await bossAloneFromHome(page);
     // His entrance line is up for a few seconds: copies of its box with each long line in it, placed as it is.
     const fits = await page.locator(".bc-bubble:visible").first().evaluate((el, lines) => {
-      const keepOff = [".board-row .hb-container", ".boss-next", ".board-area > .opening-name"];
+      const keepOff = [".board-row .hb-container", ".boss-next", ".boss-dock-status"];
       return lines.map((line) => {
         const c = el.cloneNode(true) as HTMLElement;
         c.textContent = line;

@@ -78,8 +78,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   Oct 14 (`BOSS_BRAIN.forPlayers`). A solo battle on Maia begins with a short loading step before its intro ("Loading
   the boss…": Maia loads alone, this device's Stockfish paused, 20 s at most; Oct 14). The Brain picker in Boss alone's
   menu and a debug line are admins' test tools. Details in [engine.md](engine.md), "The boss's brain".
-- **Engine move** (admins only, Boss alone, Oct 14; `BOSS_POWERS.engineMoveButton`): a small "Engine move" button
-  beside the ultimate's test trigger (a phone: under the dock; a computer: the title line) plays Stockfish's best move
+- **Engine move** (admins only, Boss alone, Oct 14; `BOSS_POWERS.engineMoveButton`): a 🐟 icon beside the God King's head
+  next to the ultimate's ⚡ (a phone, Oct 24; its title is the brain's line, which a phone doesn't show; a computer: the
+  title line's "Engine move" button) plays Stockfish's best move
   as yours (`SoloMatch.engineMove`: the power-up hints' search, `topMovesFor`, so only the moves the turn allows), through
   the normal move path. Gated by `engineMoveAllowed` in `boss-brain.ts`; online matches (`NetMatch`) have none. Tests:
   `packages/app/test/engine-move.test.ts`, `e2e/recluse.spec.ts`.
@@ -320,7 +321,7 @@ build): online, phase 1 won is the crowd's victory):
   are moves the board you see offers and the real board refuses); admins
   see "Trigger ultimate (testing)" in any boss battle (`ultimateTestButton`, `triggerUltimate`: the ultimate as the next
   crowd turn begins, no warning; on a computer in the title line with the brain's pill, before sound and the flag; on a
-  phone under the dock). A boss's attack on a king: `?boss=hollow&laststand=1` (Boss alone: your first move
+  phone a tiny ⚡ beside the God King's head, Oct 24). A boss's attack on a king: `?boss=hollow&laststand=1` (Boss alone: your first move
   calls the God King's Last Stand, and Hollow lashes him) and `?boss=hollow&mate=1` (Boss alone from 1.f3 e5 2.g4, the
   boss to move: he mates at once, lashes your king, then the result; `settings.bossMateTest`, solo only).
 - **Resigning never waits for a moment** (Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): the top
@@ -431,6 +432,8 @@ build): online, phase 1 won is the crowd's victory):
 - **The dock under the board, every boss battle** (Eric, Oct 15; DECISIONS.md, "The boss dock after Eric's Hidden Boss
   playtest"): the row (« status ») exactly the board's width, under its left and right edges, on every screen (BossDock
   measures the board as drawn, before the first paint and on every resize: `lineUpWithBoard`, `--dk-left`, `--dk-w`).
+  **No line above the board** on a boss screen (Eric, Oct 24: "the BOSS BATTLE line has no purpose"; the board starts
+  under the boss bar): what it said is in the dock's line, or gone, decided in `docs/decisions/2026-10-24-boss-screens.md`.
   In the box, the words centered and, at its right, **your clock** (`DockClock`): bold, m:ss rounded up as the big 3-2-1
   counts; running on your move, red in its last 10 s; once your move is in, it holds where it stopped, dimmed, through
   the boss's turn, the reveal and the moments, whichever screen shows it; under the bullet clock's increment a "+2"
@@ -440,7 +443,8 @@ build): online, phase 1 won is the crowd's victory):
   (the box holds two and the muted line under them). The muted line under a reveal leads with the verdict, in the
   reveal's words ("Best move · You: e4 (+2.1)", "Best was Qxe7+ · You: e4 (+0.0)"), so a cut on a narrow phone falls
   on your move and score, never on it. The words never carry the time, nor how many have
-  picked (the line above the board says it). On a phone the God King stands on a line of his own under the row, in its
+  picked (on your move, the dock's line says "Your move. 16/50 picked"; Eric, Oct 24: the boss screens have no line
+  above the board). On a phone the God King stands on a line of his own under the row, in its
   middle, his menu opening above the row and his words beside him to his right, on his line (a long line runs down past
   it), never over the board or the box; beside the row only where the screen's column has 66 px right of the board
   (`KING_BESIDE_PX`: a phone on its side, his words above him as before). Tests: `e2e/boss-dock.spec.ts` (the edges
@@ -577,6 +581,7 @@ A boss's rules are a `BossRules` object; every hook sees only its own boss's bat
 | `passive(next, t)` | The passive's step (it waits a turn if the ultimate came now) | all |
 | `crowdFilter`, `bossStops` | Its limits on the crowd's and the boss's moves (the dispatcher lifts them if none are left) | Ginger, Boingo, Big Boy, Sawyer (his first move a pawn's; the cuts), Smudgy (his forced moves; the hidden rook's pawn moves; the crowd's moves legal on the board it sees too), Moo & Moon (stunned pieces), the hippo gardener (plain plants, either side), the circus tiger (his hoops' walls, either side: `hoopStops`) |
 | `powerTurn` | A turn its powers touch doesn't count for fair play (nor, from the runner, one where its judge changed the engine's best move's score) | all but Hollow (Sawyer: a cut or the board saw on); Moo & Moon: a turn with a stunned piece; the circus tiger: a turn with hoops standing, and the turn a balloon landed |
+| `altersBoard` | Something of its powers is on the board that `powerTurn`, `bossStops` and `crowdFilter` don't show: the God King's Last Stand sits out (`boardAltered`, with those three; docs/decisions/2026-10-24-king-save-off-on-altered-boards.md) | Hollow (the dark), Jefferson (the Roman candle's shadows), Chub & Chirp (the carrots, the race on) |
 | `iced` | The squares that show ice | Ginger |
 | `judge` | What the judge must score too, how it ranks and reads moves; `offer`: the moves the bots may pick besides the top moves | Jefferson (fire), Chub & Chirp (the Carrot Patch's race: the pulls offered too) |
 | `afterCrowdMove(b, move)` | After any crowd move, in the match | Jefferson (the burn), Sawyer (the halves follow), Moo & Moon (the stun over; the Full Moon comes), the circus tiger (a new balloon on the nozzle, `place`; the hoops' count down, `hoopsOut`) |

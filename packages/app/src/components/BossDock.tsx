@@ -201,10 +201,12 @@ export function BossDock({
         }
         onTap={onTap}
       />
+      {/* (Admins' testing: tiny icons beside the God King's head, styles.css .gk-tool; a computer has them in its title line.) */}
+      {!computer && <UltimateTest match={match} icon />}
+      {!computer && <EngineMove match={match} icon />}
     </div>
-    {!computer && <UltimateTest match={match} />}
-    {!computer && <EngineMove match={match} />}
-    {!computer && <BrainDebug match={match} />}
+    {/* (A phone keeps the brain's line in the page, hidden: its words are the 🐟 icon's title, and the tests read them.) */}
+    {!computer && <BrainDebug match={match} hidden />}
     </>
   );
 }
@@ -310,9 +312,9 @@ export function DockClock({ match, boss, run }: { match: GameView; boss: GameVie
  * way or under way (its effect still running); ready again once it's over, as the meter fills again. Gone once a
  * once-a-battle ultimate has come (`ultimateOnce`: Chub & Chirp's Carrot Patch), or the last of a boss's few
  * (`ultimateMax`: Smudgy's second Repaint), whose trigger then refuses: a press would wait for nothing.
- * BOSS_POWERS.ultimateTestButton false removes it. A phone: under the dock; a computer: in the title line (Hud.tsx).
+ * BOSS_POWERS.ultimateTestButton false removes it. A phone: a tiny ⚡ beside the God King; a computer: in the title line (Hud.tsx).
  */
-export function UltimateTest({ match }: { match: GameView }) {
+export function UltimateTest({ match, icon = false }: { match: GameView; icon?: boolean }) {
   const boss = match.boss;
   const p = boss?.powers;
   // (A press is for the next ultimate only: once it has come, the button is ready again.)
@@ -323,9 +325,14 @@ export function UltimateTest({ match }: { match: GameView }) {
   if (BOSS_POWERS.ultimateTestButton && account().profile?.admin && simul) {
     if (!simul.playing || simul.decided) return null;
     return (
-      <button type="button" class="ult-test" disabled={simul.ultAt !== null} onClick={() => match.triggerUltimate()}>
-        {simul.ultAt !== null ? "Ultimate under way (testing)" : "Trigger ultimate (testing)"}
-      </button>
+      <TestButton
+        cls="ult-test"
+        icon={icon}
+        glyph="⚡"
+        label={simul.ultAt !== null ? "Ultimate under way (testing)" : "Trigger ultimate (testing)"}
+        disabled={simul.ultAt !== null}
+        onClick={() => match.triggerUltimate()}
+      />
     );
   }
   if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result || match.bossNote != null || (bossRules(boss)?.ultimateOnce && p.ults) || (p.ults ?? 0) >= (bossRules(boss)?.ultimateMax ?? Infinity)) return null;
@@ -334,50 +341,79 @@ export function UltimateTest({ match }: { match: GameView }) {
   const underWay = p.ultAt !== null && (!lights || (p.lightsAt != null && p.lightsAt >= p.ultAt));
   const coming = !underWay && (!!p.ultNext || p.warned || (lights && p.ultAt !== null) || pressed === key);
   return (
-    <button
-      type="button"
-      class="ult-test"
+    <TestButton
+      cls="ult-test"
+      icon={icon}
+      glyph="⚡"
+      label={underWay ? "Ultimate under way (testing)" : coming ? "Ultimate next turn (testing)" : "Trigger ultimate (testing)"}
       disabled={underWay || coming}
       onClick={() => {
         setPressed(key);
         match.triggerUltimate();
       }}
-    >
-      {underWay ? "Ultimate under way (testing)" : coming ? "Ultimate next turn (testing)" : "Trigger ultimate (testing)"}
-    </button>
+    />
   );
 }
 
 /**
- * Testing, admins only, Boss alone (Eric, Oct 14): "Engine move" plays Stockfish's best move for you (SoloMatch.engineMove).
- * Waits while it searches and when it isn't your move. A phone: under the dock; a computer: in the title line (Hud.tsx).
+ * One of the admins' testing buttons: its words (a computer's title line), or on a phone a tiny icon beside the God King
+ * (styles.css, .gk-tool), named by the same words: its accessible name and its title.
  */
-export function EngineMove({ match }: { match: GameView }) {
+function TestButton({ cls, icon, glyph, label, title, disabled, onClick }: { cls: string; icon: boolean; glyph: string; label: string; title?: string; disabled: boolean; onClick: () => void }) {
+  return icon ? (
+    <button type="button" class={`${cls} gk-tool`} aria-label={label} title={title ?? label} disabled={disabled} onClick={onClick}>
+      {glyph}
+    </button>
+  ) : (
+    <button type="button" class={cls} disabled={disabled} onClick={onClick}>
+      {label}
+    </button>
+  );
+}
+
+/** The boss brain's line, as the admins' testing shows it (BrainDebug; the 🐟 icon's title): the brain, and Wrangler's showdown note. */
+function brainLine(match: GameView): string {
+  const p = match.boss?.powers;
+  const outside = p?.showdown?.outside && p.showdown.turn === p.turn ? "Showdown (test: outside the band)" : null;
+  return [match.brainLine, outside].filter(Boolean).join(" · ");
+}
+
+/**
+ * Testing, admins only, Boss alone (Eric, Oct 14): "Engine move" plays Stockfish's best move for you (SoloMatch.engineMove).
+ * Waits while it searches and when it isn't your move. A phone: a tiny 🐟 beside the God King, whose title is the brain's line;
+ * a computer: in the title line (Hud.tsx).
+ */
+export function EngineMove({ match, icon = false }: { match: GameView; icon?: boolean }) {
   // (The Hidden Boss's phase 2 too: on your board, while it's your move there.)
   const simul = match.simul;
   if (!match.engineMoveShown || !match.engineMove || (match.boss?.result && !simul)) return null;
   if (simul && (simul.decided || !simul.playing)) return null;
   const ready = simul ? simul.playing && simul.boards[0]?.toMove === "crowd" : match.phase.kind === "play";
+  const line = brainLine(match);
   return (
-    <button type="button" class="engine-move" disabled={!ready || !!match.engineThinking} onClick={() => match.engineMove?.()}>
-      Engine move
-    </button>
+    <TestButton
+      cls="engine-move"
+      icon={icon}
+      glyph="🐟"
+      label="Engine move"
+      title={line ? `Engine move · ${line}` : "Engine move"}
+      disabled={!ready || !!match.engineThinking}
+      onClick={() => match.engineMove?.()}
+    />
   );
 }
 
 /**
  * Testing, admins (Boss alone): the boss's brain at work, e.g. "Maia 1450 · no guard · Maia's #1 · 120 ms"; and
  * Wrangler's showdown when the test trigger fired it outside the band (none inside it found), so it isn't taken for one
- * a player would get. A phone: a line under the dock; a computer: a small pill in the title line (Hud.tsx), the first
- * thing to shrink there.
+ * a player would get. A phone: hidden (`hidden`; its words are the 🐟 icon's title); a computer: a small pill in the title line
+ * (Hud.tsx), the first thing to shrink there.
  */
-export function BrainDebug({ match }: { match: GameView }) {
-  const p = match.boss?.powers;
-  const outside = p?.showdown?.outside && p.showdown.turn === p.turn ? "Showdown (test: outside the band)" : null;
-  const line = [match.brainLine, outside].filter(Boolean).join(" · ");
+export function BrainDebug({ match, hidden = false }: { match: GameView; hidden?: boolean }) {
+  const line = brainLine(match);
   if (!line || !account().profile?.admin) return null;
   return (
-    <div class="brain-debug" aria-label="Boss brain (testing)" title={line}>
+    <div class="brain-debug" hidden={hidden} aria-label="Boss brain (testing)" title={line}>
       🧠 {line}
     </div>
   );

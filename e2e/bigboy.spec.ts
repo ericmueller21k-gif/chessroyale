@@ -148,9 +148,9 @@ test("Big Boy's Big Bounce (the admins' trigger): pieces knocked up, the crash, 
   await bossAloneFromHome(page);
   await yourMove(page);
   const btn = page.locator(".ult-test");
-  await expect(btn).toHaveText("Trigger ultimate (testing)");
+  await expect(btn).toHaveAccessibleName("Trigger ultimate (testing)");
   await btn.click();
-  await expect(btn).toHaveText("Ultimate next turn (testing)");
+  await expect(btn).toHaveAccessibleName("Ultimate next turn (testing)");
   const seen = await watchFor(page, {
     banner: { selector: ".fight-banner.power-cut", text: /BIG BOUNCE!/ },
     boy: { selector: ".bb-layer .bb-boy" },
@@ -192,7 +192,7 @@ test("Big Boy's Big Bounce (the admins' trigger): pieces knocked up, the crash, 
   // The meter spent: empty, filling again for the next; the trigger ready again for it.
   expect((await powers(page)).rage).toBe(0);
   expect((await powers(page)).ults).toBe(1);
-  await expect(btn).toHaveText("Trigger ultimate (testing)");
+  await expect(btn).toHaveAccessibleName("Trigger ultimate (testing)");
   // His sounds came (the boing, the crash), and through the mute switch, silent.
   const log = await soundsHeard(page);
   const his = log.filter((x) => x.startsWith("bigboy"));

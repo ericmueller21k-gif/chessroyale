@@ -75,7 +75,7 @@ async function watchSpeech(page: Page) {
     const frame = () => {
       const now = Date.now();
       if (prev && now - prev > 150) out.gaps.push([prev, now - prev]);
-      track(out.boss, look(".bc-bubble", [".board-row .hb-container", ".boss-next", ".board-area > .opening-name"]), now);
+      track(out.boss, look(".bc-bubble", [".board-row .hb-container", ".boss-next", ".boss-dock-status"]), now);
       track(out.king, look(".gk-bubble", [".board-row .hb-container", ".boss-dock-status"]), now);
       for (const b of document.querySelectorAll(".fight-banner.power-cut .kc-text")) out.banners[b.textContent ?? ""] ??= now;
       prev = now;

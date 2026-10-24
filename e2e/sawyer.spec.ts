@@ -481,7 +481,7 @@ test("Sawyer: the board saw from the admins' trigger, a cut taped over and heali
   await yourMove(page);
   const btn = page.locator(".ult-test");
   await btn.click();
-  await expect(btn).toHaveText("Ultimate next turn (testing)");
+  await expect(btn).toHaveAccessibleName("Ultimate next turn (testing)");
   const both = await watchFor(page, { split: { selector: ".fight-banner.power-cut", text: /SPLIT PAWN!/ }, saw: { selector: ".fight-banner.power-cut", text: /BOARD SAW!/ } });
   await play(page, await allowedMove(page, ["g1f3", "b1c3"]));
   await yourMove(page);
@@ -489,7 +489,7 @@ test("Sawyer: the board saw from the admins' trigger, a cut taped over and heali
   expect(await both.seen()).toEqual({ split: !!(await powers(page)).split?.square, saw: true });
   expect((await powers(page)).boardSaw).toEqual({ at: 2, until: 6 });
   // Under way while the halves are apart (no other can come meanwhile); the meter empty and held.
-  await expect(btn).toHaveText("Ultimate under way (testing)");
+  await expect(btn).toHaveAccessibleName("Ultimate under way (testing)");
   await expect(btn).toBeDisabled();
   expect((await powers(page)).rage).toBe(1);
 

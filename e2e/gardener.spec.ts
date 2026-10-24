@@ -571,7 +571,7 @@ test("his long lines whole and in view at 320, 360, 390 and 1280: the entrance, 
     expect([...GARDENER_LINES.entrance!, ...GARDENER_LINES.plantMany!], `${w}`).toContain(label);
     const fits = await bubble.evaluate(
       (el, lines) => {
-        const keepOff = [".board-row .hb-container", ".boss-next", ".board-area > .opening-name"];
+        const keepOff = [".board-row .hb-container", ".boss-next", ".boss-dock-status"];
         return lines.map((line) => {
           const c = el.cloneNode(true) as HTMLElement;
           c.classList.remove("leaving");

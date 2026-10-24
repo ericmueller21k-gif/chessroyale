@@ -292,6 +292,8 @@ export const HOLLOW: BossRules = {
   },
   // Always Black, from the starting position (no opening moves).
   opening: { fromStart: true, crowdWhite: true },
+  // Squares in the dark, their pieces hidden (the God King's Last Stand sits out).
+  altersBoard: (boss) => darkSquares(boss).length > 0,
   // Each wrong attempt into the dark costs darkTryCost; a turn never costs more than missing it.
   scoreRound(b, players) {
     const tries = hollowBattle.darkTries(b);

@@ -177,9 +177,9 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes,
 
   // His ultimate on the admins' trigger: as the next turn begins, no warning.
   const btn = page.locator(".ult-test");
-  await expect(btn).toHaveText("Trigger ultimate (testing)");
+  await expect(btn).toHaveAccessibleName("Trigger ultimate (testing)");
   await btn.click();
-  await expect(btn).toHaveText("Ultimate next turn (testing)");
+  await expect(btn).toHaveAccessibleName("Ultimate next turn (testing)");
   const ult = await watchFor(page, {
     consult: { selector: `${figure()}[data-anim="consult"]` },
     spell: { selector: `${figure()}[data-anim="spellLoop"]` },
@@ -194,7 +194,7 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes,
   expect(await ult.seen()).toEqual({ consult: true, spell: true, close: true, banner: true, sub: true, line: true, warn: false });
   b = await bossNow(page);
   expect(b.powers.events.map((e: { kind: string }) => e.kind)).toEqual(["bullet"]);
-  await expect(btn).toHaveText("Ultimate under way (testing)");
+  await expect(btn).toHaveAccessibleName("Ultimate under way (testing)");
   // The bullet clock: this move may take the whole bullet bank (no 20 s cap), the dock says what's left.
   const BANK = BOSS_POWERS.bulletBankSeconds * 1000;
   const allowed = await page.evaluate(() => (window as any).match.phase.allowedMs as number);
@@ -492,12 +492,12 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   // (No clock runs from here until the countdown is over: neither the dock's nor any board's.)
   const clocks = await watchSpans(page, { running: { selector: ".dk-clock.running, .rc-tag.running" } });
   // Nothing said twice at once in the phase change (Eric, Oct 15): the dock never repeats his line or the banner, the
-  // boss bar never repeats the title's "phase 2", and the subtitle never says he's beaten as he rises (it did during
-  // his fall, on the boss screen, where it's true).
+  // boss bar never repeats the title's "phase 2", and the dock never says he's beaten as he rises (it did during his
+  // fall, on the boss screen, where it's true; there's no line above the board now, Eric, Oct 24).
   const words = await watchFor(page, {
     dockRepeat: { selector: ".boss-dock-status", text: /Mind and engine|Phase 2!|Every board must be won/ },
     barPhase: { selector: ".boss-next", text: /Phase 2/ },
-    beaten: { selector: ".rc-change .opening-name", text: /the boss is beaten|phase 2:/ },
+    beaten: { selector: ".rc-change .boss-dock-status", text: /the boss is beaten|phase 2:/ },
     clockLine: { selector: ".boss-dock-status .dk-text", text: /^2:00 on your clockNo added time\.$/ },
   });
   expect(await fall.seen()).toMatchObject({ collapse: true, dock: true });
@@ -572,7 +572,8 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   await expect(page.locator(".boss-level .lv-text")).toHaveText("LVL ???");
   await expect(page.locator(".boss-level .lv-sr")).toHaveText("Level unknown");
   await expect(page.locator(".boss-bar .rage-meter")).toHaveCount(0);
-  await expect(page.locator(".opening-name")).toHaveText(/· Freestyle$/);
+  // (Freestyle is in the dock's line, where the line above the board said it: Eric, Oct 24.)
+  await expect(page.locator(".boss-dock-status .dock-line").first()).toHaveText(/· Freestyle$/);
   // Phase 2: the God King gone (nothing to tap), the boss's look on where he stands.
   await expect(page.locator(".gk-unit.gone")).toHaveCount(1);
   await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(0);
@@ -602,7 +603,16 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
   page.on("pageerror", (e) => errors.push(e.message));
   await meetHim(page, "phase=2");
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("phaseChange");
-  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 + ADDED_MS }).toBe(true);
+  // (Sampled every 50 ms, and the boards read at once: the bots on White's boards move 0.9 s after play begins, so a read
+  // made later (on a computer, after its tag checks) could see their first move. Eric, Oct 24, "never loosen": same checks.)
+  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 + ADDED_MS, intervals: [50] }).toBe(true);
+  const v = await simulNow(page);
+  expect(new Set(v.boards.map((b: { number: number }) => b.number)).size).toBe(4);
+  expect(new Set(v.boards.map((b: { fen: string }) => b.fen)).size).toBe(4);
+  for (const b of v.boards) {
+    expect(b.fen).toMatch(/ w [A-H]{2}[a-h]{2} - 0 1$/);
+    expect(b.bases).toEqual([{ ply: 0, fen: b.fen }]);
+  }
   // The God King is gone (the boss absorbed him in the phase change): his place in the dock empty, nothing to tap, and
   // not a word from him all through phase 2.
   const king = await watchFor(page, { bubble: { selector: ".gk-bubble" }, figure: { selector: ".boss-dock .god-king" } });
@@ -637,13 +647,6 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
     }
     await expect(page.locator(".tower-side .tower-head span:nth-child(6)")).toBeHidden();
     await expect(page.locator(".tower-side .t-bank").first()).toBeHidden();
-  }
-  const v = await simulNow(page);
-  expect(new Set(v.boards.map((b: { number: number }) => b.number)).size).toBe(4);
-  expect(new Set(v.boards.map((b: { fen: string }) => b.fen)).size).toBe(4);
-  for (const b of v.boards) {
-    expect(b.fen).toMatch(/ w [A-H]{2}[a-h]{2} - 0 1$/);
-    expect(b.bases).toEqual([{ ply: 0, fen: b.fen }]);
   }
   await expect.poll(() => page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/^Stockfish 2750/);
   // A pawn move of yours, with real taps; he answers on your board.
