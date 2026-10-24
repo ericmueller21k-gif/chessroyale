@@ -215,6 +215,17 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
     const e = el.current;
     if (!balanced || !e) return;
     setWidth(balancedWidth(e));
+    // (The pixel font may still be loading (font-display: swap): measure again once it's in, so the box fits the font it's drawn in.)
+    let live = true;
+    void document.fonts?.load(`${getComputedStyle(e).fontSize} "Press Start 2P"`).then(
+      () => {
+        if (live && el.current) setWidth(balancedWidth(el.current));
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
   }, [text, balanced]);
   useLayoutEffect(() => {
     const e = el.current;

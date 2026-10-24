@@ -117,13 +117,17 @@ const sayLine = (page: Page, text: string): Promise<LineRes> =>
     async ({ text, plain }) => {
       const say = (globalThis as { sayBoss?: (t: string) => boolean }).sayBoss;
       if (!say) return { text, missing: true as const, seen: "no hook" };
-      const taken = say(text);
-      const deadline = performance.now() + 3000;
+      // (A boss's own entrance line can take the box in the battle's first seconds, after the line is said: say it again then.)
       let el: HTMLElement | null = null;
-      while (performance.now() < deadline) {
-        el = document.querySelector<HTMLElement>(".bc-bar-bubble");
-        if (el && el.getAttribute("aria-label") === plain) break;
-        await new Promise((r) => requestAnimationFrame(() => r(null)));
+      let taken = false;
+      for (let attempt = 0; attempt < 2 && !(el && el.getAttribute("aria-label") === plain); attempt++) {
+        taken = say(text);
+        const deadline = performance.now() + 2500;
+        while (performance.now() < deadline) {
+          el = document.querySelector<HTMLElement>(".bc-bar-bubble");
+          if (el && el.getAttribute("aria-label") === plain) break;
+          await new Promise((r) => requestAnimationFrame(() => r(null)));
+        }
       }
       if (!el || el.getAttribute("aria-label") !== plain) return { text, missing: true as const, seen: `taken ${taken}, bubbles ${document.querySelectorAll(".bc-bar-bubble").length}, shown ${el?.getAttribute("aria-label") ?? "none"}` };
       for (const a of el.getAnimations({ subtree: true })) {
