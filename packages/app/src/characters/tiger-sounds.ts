@@ -3,7 +3,7 @@
  * roaring: his voice is a low, slow, purring grumble of made-up syllables (`grumble`: clearly not Puddles' quick high chatter or Moo's
  * moo), a "heh" for a cheer, a longer pleased run for a queen, an "ugh" for a wince or a knock. Where another boss roars he yawns (a big,
  * bored, breathy yawn), and his growl is a half-hearted one. Heavy paws thump, his hop springs, his vest pocket rustles, and he huffs.
- * His balloons: the pump's soft rubbery plunger stroke (one every 30 s, so it stays very quiet), the rubber's squeak, a sharp pop
+ * His balloons: the pump's soft rubbery plunger stroke (one a stage, so it stays very quiet), the rubber's squeak, a sharp pop
  * (never louder than a capture), the whoosh of the release and the flight, the soft poof of a landing. His hoops: a fire whoosh and
  * crackle for each. His attack on a king: a rubbery bonk and a pop for each of ten balloons. His select sound: a bored yawn, then a
  * balloon squeak.
@@ -124,7 +124,7 @@ function yawn(rate: number): Float32Array {
 }
 
 const SOUNDS: Record<TigerSound, (rate: number) => Float32Array> = {
-  // The pump's plunger: a soft rubbery "fwump" (one every 30 s: it stays very quiet), a little low thud of the plunger at its foot.
+  // The pump's plunger: a soft rubbery "fwump" (one a stage: it stays very quiet), a little low thud of the plunger at its foot.
   pump: (rate) => {
     const puff = bandpass(rate, (t) => lerp(320, 700, t / 0.12), 1.4, murk(rate, 2400, 3001));
     const thud = osc(rate, (t) => 110 + 60 * Math.exp(-t / 0.02), sine);

@@ -13,7 +13,7 @@ import { HOPPER_FX } from "./bosses/hopper.ts";
 import { SMUDGY_FX } from "./bosses/smudgy.ts";
 import { MOO_FX } from "./bosses/moo.ts";
 import { GARDENER_FX, waterMs } from "./bosses/gardener.ts";
-import { TIGER_FX } from "./bosses/tiger.ts";
+import { HOOPS_BEATS, TIGER_FX } from "./bosses/tiger.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -117,6 +117,8 @@ export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (read
   carrotWin: [[0, 1500]],
   camouflage: [[0, 1500]],
   repaint: [[0, 1500]],
+  // (Babur's HOOPS!, Oct 24: after his move, off the board as his first hoop leaves his paw.)
+  hoops: [[0, HOOPS_BEATS.throwsAt[0]]],
 };
 
 /** How long a moment's own clock holds at its start while its banner shows longer (ms; 0 without one from its start). */

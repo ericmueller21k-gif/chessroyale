@@ -33,8 +33,9 @@ export const TIGER_LINES: Partial<Record<Beat, readonly string[]>> = {
 };
 
 /**
- * How often each moment speaks: Puddles', plus a new balloon on the pump rarely (one comes about every two minutes), a landing and a
- * pop often, a real queen and the hoops always. (Puddles' seeds and watering have no counterpart here.)
+ * How often each moment speaks: Puddles', plus a new balloon on the pump rarely (one comes about every 50 s: balloonStages
+ * stages of balloonStageSec, then the end of his turn), a landing and a pop often, a real queen and the hoops always. (Puddles'
+ * seeds and watering have no counterpart here.)
  */
 export const TIGER_CHANCE: Partial<Record<Beat, number>> = {
   entrance: 1,

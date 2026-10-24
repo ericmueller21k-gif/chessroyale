@@ -37,7 +37,7 @@ import {
   repaintFrom,
   waterAnswer,
   hoopsAnswer,
-  landFrom,
+  type HoopsAsk,
   applyMove,
   type BalloonAsk,
   allowedSearch,
@@ -744,12 +744,9 @@ export class NetMatch implements GameView {
         // (The hippo gardener's watering: what the seeds rolled, placed by this device's engines within the band; the pass
         // guard's PASS_WAIT unless it's the test switch's or the trigger's; "" with no answer: it waits, and he moves.)
         if (m.water) return void this.hostPick(m.key, async (engines) => (await waterAnswer(engines, m.fen, m.water!, !!m.waterAny)).answer);
-        // (The circus tiger's hoops: the blocks by this device's engines within the band, then a due balloon's landing after
-        // them; the pass guard's PASS_WAIT unless it's the test switch's or the trigger's; "" with no answer: he moves.)
-        if (m.hoops) return void this.hostPick(m.key, async (engines) => (await hoopsAnswer(engines, m.fen, m.hoops!, m.balloon ?? null, !!m.hoopsAny)).answer);
         // (Chub & Chirp's Carrot Patch cast spends his whole turn: only the pass guard to ask.)
         if (m.pass) return void this.hostPick(m.key, (engines) => castAnswer(engines, m.fen));
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null);
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
         return void this.useBrain(m.brain);
@@ -839,10 +836,12 @@ export class NetMatch implements GameView {
    * "best" (Wrangler's reply to the showdown's duel): the engine's best at full strength, sent without a brain.
    * `land`: Alfil's Slam's pieces land as the crowd's turn after this move begins, so it's judged with them down too
    * (the landing guard; the move still comes from `fen`). `beam` (Moo's Moonbeam lands after this move): the crowd's top
-   * that-many moves after it go with the move (beamLines). `balloon` (the circus tiger's balloon is due at the end of
-   * this turn): where it lands after the move goes with it (landFrom), the same whether it will pop or not.
+   * that-many moves after it go with the move (beamLines). `hoops` (the circus tiger's hoops are due after this move): his
+   * move, then the cast on the position after it (hoopsAnswer: its blocks go with the move as `hoops`). `balloon` (his
+   * balloon is due at the end of this turn): where it lands after the move and the cast goes with it (landFrom, outside
+   * the hoops), the same whether it will pop or not.
    */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null, beam: number | null = null, balloon: BalloonAsk | null = null) {
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null, beam: number | null = null, balloon: BalloonAsk | null = null, hoops: HoopsAsk | null = null) {
     try {
       const engines = await this.engines();
       const [engine] = engines;
@@ -865,8 +864,8 @@ export class NetMatch implements GameView {
       // stops it too). The server sends the one move to everyone.
       const move = funhouse ? await funhouseMoveFrom(engine!, fen, allowed) : await ordinary();
       const lines = beam && !funhouse ? await beamLines(engine!, fen, move, beam) : null;
-      const landing = balloon && !funhouse ? await (async () => landFrom(engines, applyMove(fen, move), balloon))().catch(() => null) : null;
-      this.send({ t: "bossMove", key, move, ...(lines ? { beam: lines } : {}), ...(landing ? { balloon: landing.square } : {}) });
+      const end = (balloon || hoops) && !funhouse ? await (async () => hoopsAnswer(engines, applyMove(fen, move), hoops, balloon))().catch(() => null) : null;
+      this.send({ t: "bossMove", key, move, ...(lines ? { beam: lines } : {}), ...(end?.land ? { balloon: end.land.square } : {}), ...(end?.answer ? { hoops: end.answer } : {}) });
       this.emit();
     } catch {
       // No engine here: the server asks someone else, or plays a random move.

@@ -537,9 +537,11 @@ export type ClientMessage =
    * asked to work out besides (Wrangler's): the lasso drag after it ("c3c4", "" none) and the showdown's line-up after it
    * (checkLineup's spec, "" none). The server checks each against the rules. `beam` (Moo's Moonbeam, asked with
    * `beam`): the crowd's top moves after his move, best first (beamLines); the server checks each. `balloon` (the circus
-   * tiger's, asked with `balloon`): the square his balloon lands on after his move (landFrom); the server checks it.
+   * tiger's, asked with `balloon`): the square his balloon lands on after his move (landFrom); the server checks it. `hoops`
+   * (the circus tiger's, asked with `hoops`): the cast after his move, its blocks by their corners in throw order
+   * (hoopsAnswer's, "c3 f5 b6"; "" none); the server checks it (hoopsCheck).
    */
-  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string }
+  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string }
   /** Leaving before the match starts (Cancel in the queue): the seat is freed. */
   | { t: "leave" }
   /**
@@ -865,17 +867,15 @@ export type ServerMessage = { now: number } & (
       water?: WaterAsk;
       waterAny?: true;
       /**
-       * The circus tiger's hoops (his whole turn): the order the blocks are tried in. Answer the cast as `move`
-       * (hoopsAnswer: hoopsFrom's blocks by their corners in throw order, then "@" and the square a ready balloon lands on
-       * after it, if `balloon` is asked: "c3 f5 b6 @e4"; PASS_WAIT when passing would lose real material, unless
-       * `hoopsAny`: the test switch or the admins' trigger; "" with no engine or no block that fits). The server checks it
-       * (hoopsCheck, landCheck). An older app ignores it and plays a move, which isn't a cast: the hoops wait for his next turn.
+       * The circus tiger's hoops are due after this move (he keeps his turn): the order the blocks are tried in. Play his
+       * move as ever, then answer the cast as the move's `hoops` (hoopsAnswer, on the position after his move: hoopsFrom's
+       * blocks by their corners in throw order, "c3 f5 b6"; "" with no engine or no block that fits). The server checks it
+       * (hoopsCheck). An older app ignores it and sends his move alone: the hoops wait for his next move.
        */
       hoops?: HoopsAsk;
-      hoopsAny?: true;
       /**
        * The circus tiger's balloon is due at the end of this turn: where it lands (landFrom, on the position after his move,
-       * or after the cast with its hoops), answered as the move's `balloon` (or in the cast's answer). Asked the same for a
+       * with the cast's hoops when `hoops` is asked too: hoopsAnswer), answered as the move's `balloon`. Asked the same for a
        * balloon that will pop: nothing here says which. An older app ignores it: the balloon waits ready for his next turn.
        */
       balloon?: BalloonAsk;

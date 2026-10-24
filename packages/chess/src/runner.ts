@@ -118,7 +118,7 @@ import {
   gardenerBattle,
   type WaterAsk,
   tigerBattle,
-  landFrom,
+  hoopsAnswer,
   type BalloonAsk,
   type HoopsAsk,
   beamLines,
@@ -139,7 +139,7 @@ import {
   type ShowdownScout,
   type CarrotRace,
 } from "./boss-powers.ts";
-import type { BossPowerSettings, BounceResult, CarrotPatch, HoopsState, LeapfrogHop, LightsOutTest, RepaintResult, WaterResult } from "@chessroyale/core";
+import type { BossPowerSettings, BounceResult, CarrotPatch, LeapfrogHop, LightsOutTest, RepaintResult, WaterResult } from "@chessroyale/core";
 
 /**
  * Runs a match round by round: deal, collect picks, score with the engine, draw,
@@ -1365,11 +1365,13 @@ export class MatchRunner {
     }
     // (Moo's Moonbeam lands after this move: the crowd's top moves after it, on this device's engine, as the host does online.)
     const beam = this.bossBeam();
-    // (The circus tiger's balloon, if it's due at the end of this turn: decided as his turn's work begins, as online.)
+    // (The circus tiger's balloon, if it's due at the end of this turn: decided as his turn's work begins, as online; and his
+    // hoops, if they're due after this move.)
     const balloon = this.balloonAsk();
+    const hoops = this.hoopsAsk();
     const move = await ordinary();
-    const land = balloon ? await this.balloonLanding(fen, move, balloon, engine) : null;
-    this.applyBossMove(move, kind === "stagger", { ...(beam ? { beam: await beamLines(engine, fen, move, beam) } : {}), ...(land ? { balloon: land.square, balloonGain: land.gain } : {}) });
+    const end = balloon || hoops ? await this.tigerTurnEnd(fen, move, hoops, balloon, engine) : {};
+    this.applyBossMove(move, kind === "stagger", { ...(beam ? { beam: await beamLines(engine, fen, move, beam) } : {}), ...end });
     return move;
   }
 
@@ -1728,32 +1730,12 @@ export class MatchRunner {
   }
 
   /**
-   * The circus tiger's hoops are due: the start of his turn after their warning (or the admins' trigger), none standing,
-   * not waiting after this crowd move (tigerBattle.hoopsDue). It's his whole turn: no move of his follows it. Not when it
-   * waits (no block fits, the pass guard, no answer): then he moves.
+   * What the circus tiger's hoops need placed after his move now (the boss request's `hoops`: the order their blocks are
+   * tried in), or null when none is due: from the turn after their warning (or the admins' trigger), none standing.
+   * Thrown at the end of his turn, after his move (tigerBattle.cast, from afterBossMove): he keeps his turn.
    */
-  hoopsDue(): boolean {
-    return tigerBattle.hoopsDue(this.battle);
-  }
-
-  /** What the cast needs placed (the boss request's `hoops`): the order its blocks are tried in; null when none is due. */
   hoopsAsk(): HoopsAsk | null {
     return tigerBattle.hoopsAsk(this.battle);
-  }
-
-  /** The cast comes even when it would lose him real material (the test switch's first, or the admins' trigger). */
-  hoopsAny(): boolean {
-    return tigerBattle.hoopsAny(this.battle);
-  }
-
-  /** The cast from this device's engines (hoopsFrom, a due balloon's landing after it); null: none was due, or it waits (he moves). */
-  async playHoops(engines: readonly EngineLike[] = this.opts.engines): Promise<HoopsState | null> {
-    return tigerBattle.play(this.battle, engines);
-  }
-
-  /** The cast (online the host's answer, checked: hoopsCheck, landCheck); anything else, none now, and he moves. */
-  applyHoops(answer: string | null, gain: number | null = null, landGain: number | null = null): HoopsState | null {
-    return tigerBattle.apply(this.battle, answer, gain, landGain);
   }
 
   /**
@@ -1765,15 +1747,21 @@ export class MatchRunner {
     return tigerBattle.balloonAsk(this.battle);
   }
 
-  /** Where a due balloon lands after the boss's `move` from `fen`, on this device's engines (landFrom); null: nowhere, or no answer. */
-  async balloonLanding(fen: string, move: string, ask: BalloonAsk, engine?: EngineLike): Promise<{ square: string; gain: number } | null> {
+  /**
+   * The end of the circus tiger's turn after his `move` from `fen`, on this device's engines (hoopsAnswer, as the host's
+   * online): the hoops when they're due (`hoops`), then a due balloon's landing outside them (`balloon`), as his move's
+   * extras. Nothing: none fits, no square, or no answer.
+   */
+  async tigerTurnEnd(fen: string, move: string, hoops: HoopsAsk | null, balloon: BalloonAsk | null, engine?: EngineLike): Promise<Pick<BossMoveExtras, "hoops" | "hoopsGain" | "balloon" | "balloonGain">> {
     let after: string;
     try {
       after = applyMove(fen, move);
     } catch {
-      return null;
+      return {};
     }
-    return landFrom(this.opts.engines.length ? this.opts.engines : engine ? [engine] : [], after, ask).catch(() => null);
+    const engines = this.opts.engines.length ? this.opts.engines : engine ? [engine] : [];
+    const { answer, pick, land } = await hoopsAnswer(engines, after, hoops, balloon).catch(() => ({ answer: "", pick: null, land: null }));
+    return { ...(answer ? { hoops: answer, hoopsGain: pick?.gain ?? null } : {}), ...(land ? { balloon: land.square, balloonGain: land.gain } : {}) };
   }
 
   /** The boss's last move, and the piece it took (if any). */
