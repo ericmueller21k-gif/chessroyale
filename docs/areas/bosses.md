@@ -368,13 +368,17 @@ build): online, phase 1 won is the crowd's victory):
   A move that brings a power's moment says nothing of its own (the moment's line is the boss's word that turn). Lights
   out's round prompt keeps its own box above the board for the whole round (and the dock). Each speaker's box keeps
   itself current (`VoiceBubble`: it listens to its voice and draws every frame while a line types and fades), so
-  nothing around it has to be drawn again for it. On a phone the boss's box is over the boss bar's bottom (BossBar,
-  `.bc-bar-bubble`), as small as its line (one or two lines, the font as ever, a thin frame; Eric, Oct 23: "his text box very
-  big"), in the grid area of the bar's first two columns, the room left of the status, so never over the status however
-  many lines it takes; it grows upward as the line needs (over the bars, then his name, then the title line above the bar for
-  a long line at 320 px) and never over the line and board under the bar.
+  nothing around it has to be drawn again for it. On a phone the boss's box is inside the boss bar (BossBar,
+  `.bc-bar-bubble`; Oct 24, docs/decisions/2026-10-24-boss-bar-same.md): from the name column's left edge to the bar's right
+  padding, under the status (its grid row 2, so never over the status), one row when short, else two balanced rows, never
+  more than three (`SpeechBox`'s `balanced`); its speech font, 9 px (8 px at 320). It may cover the name's lower bars and his
+  prop for its moment. Never over the line and board under the bar.
 - **The boss bar and the level in it** (Eric, Oct 23; docs/decisions/2026-10-23-boss-bar.md): `BossBar` (`screens/Boss.tsx`) is a
-  figure (a phone) and a grid. **No skulls** in the battle bar (the select screen and the menus keep theirs; the threat is in the
+  figure (a phone) and a grid. **On a phone, every boss has the same bar and the same figure box** (Oct 24;
+  docs/decisions/2026-10-24-boss-bar-same.md): the compact bar (64 px, the default, `?bar=out`) where a taller figure rises
+  above the bar (never over the "BOSS · move N" line), or the taller bar (99 px, `?bar=fit`) where each idle figure is
+  inside it; each boss's size per layout is its kit's `barScale`, the name column is 130 px, and the rules are checked on
+  every frame by `packages/app/test/boss-bar-same.test.ts` and on the page by `e2e/boss-bar-same.spec.ts`. **No skulls** in the battle bar (the select screen and the menus keep theirs; the threat is in the
   bar's `aria-label`, "Puddles, threat 3 of 5"). At the left one column under the name, every row left aligned with it: **LVL**
   (`BossLevel`), the ultimate's rage meter (`.boss-ult`: `RageMeter`, and Moo's moon beside it: `BossUi.ultBar`), then the
   passive's bar when the boss has one (`.boss-passive`: `BossUi.bar`: Hollow's bulbs, Puddles' Seeds); a row with nothing in it

@@ -18,12 +18,13 @@
  * from its BossUi, the boss character for its reactions); its words show in its text box beside it, on every screen.
  */
 import type { ComponentChildren, JSX } from "preact";
-import { useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { SPEECH } from "@chessroyale/core";
 import { useFrameNow } from "./components/Countdown.tsx";
 import { lineLength, plainLine, sliceLine, type LineSeg } from "./speech-icons.ts";
 import { mooIconSprite, type MooIconId } from "./characters/moo.ts";
 import { renderFrame } from "./characters/sprite.ts";
+import { testSwitchesAllowed } from "./test-switches.ts";
 
 /** How much a line matters: only a critical line cuts in on another (and any line on chatter); the rest wait their turn. */
 export const CHATTER = -1;
@@ -83,6 +84,16 @@ export class Voice {
     }
     for (const f of this.listeners) f();
     return true;
+  }
+
+  /**
+   * A test's line (the boss-bar check's `sayBoss` hook, test switches only): it replaces the line up now and the queue, whatever
+   * their priority, so each line of a boss is drawn in its own box in turn (e2e/boss-bar-same.spec.ts).
+   */
+  replace(text: string, key: string, priority: Priority = CRITICAL, at = Date.now()): boolean {
+    this.now = null;
+    this.queue = [];
+    return this.say(text, key, priority, at);
   }
 
   /** The line up at `now`, if any (the next one in line starts as the last ends). */
@@ -150,9 +161,33 @@ export function useVoice(voice: Voice): { line: Spoken | null; now: number } {
  * A voice's line in its box (SpeechBox), keeping itself current (useVoice): the figure it stands by isn't drawn again
  * for it. `hidden`: not shown just now (it's still looked at, so its lines keep their time and their turns).
  */
-export function VoiceBubble({ voice, class: cls, hidden = false }: { voice: Voice; class: string; hidden?: boolean }) {
+export function VoiceBubble({ voice, class: cls, hidden = false, balanced = false }: { voice: Voice; class: string; hidden?: boolean; balanced?: boolean }) {
   const { line, now } = useVoice(voice);
-  return line && !hidden ? <SpeechBox key={line.key} class={cls} text={line.text} at={line.at} until={line.until} now={now} fits={1} /> : null;
+  // A test hook (test switches only): `sayBoss(text)` says any line in the boss's voice at once, so the boss-bar check
+  // (e2e/boss-bar-same.spec.ts) can put every line of every boss into its bubble and measure it.
+  useEffect(() => {
+    if (voice === bossVoice && testSwitchesAllowed()) (globalThis as { sayBoss?: (text: string) => void }).sayBoss = (text) => void voice.replace(text, `test:${Date.now()}:${text}`);
+  }, [voice]);
+  return line && !hidden ? <SpeechBox key={line.key} class={cls} text={line.text} at={line.at} until={line.until} now={now} fits={1} balanced={balanced} /> : null;
+}
+
+/**
+ * The width of a balanced box (SpeechBox's `balanced`, a boss's bar; Eric, Oct 24: "two rows is better than one row, but 1.5
+ * rows is better than 4 small rows"): null (the box's own width, one row) when the line's one row is at most half the room
+ * its box's parent offers; else half the line plus the box's frame (two rows of similar length, `text-wrap: balance`), never
+ * wider than that room. The room is the parent's width (the bar's grid, from the name column's left edge to its right padding).
+ */
+let measureCanvas: CanvasRenderingContext2D | null | undefined;
+function balancedWidth(e: HTMLElement, text: string): number | null {
+  const room = e.parentElement?.clientWidth ?? 0;
+  measureCanvas ??= document.createElement("canvas").getContext("2d");
+  if (!room || !measureCanvas) return null;
+  const cs = getComputedStyle(e);
+  const frame = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+  measureCanvas.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  const one = measureCanvas.measureText(plainLine(text)).width;
+  if (one + frame <= room / 2) return null;
+  return Math.min(room, Math.ceil(one / 2 + frame + measureCanvas.measureText("M").width));
 }
 
 /** Says a line into a voice once, as it's first drawn (a moment's line from inside its screen); draws nothing. */
@@ -167,9 +202,15 @@ export function Say({ voice, text, sayKey, priority = NORMAL }: { voice: Voice; 
  * would run off the screen takes a smaller size (`fits` steps: its CSS's `.fit1`…), and past the last step is moved
  * back into view. It's never hidden.
  */
-export function SpeechBox({ class: cls, text, at, until, now, fits = 0, children, ...props }: { class: string; text: string; at: number; until: number; now: number; fits?: number; children?: ComponentChildren } & Omit<JSX.HTMLAttributes<HTMLDivElement>, "class">) {
+export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced = false, children, ...props }: { class: string; text: string; at: number; until: number; now: number; fits?: number; /** Two balanced rows at most a line's half (balancedWidth): a boss's bar. */ balanced?: boolean; children?: ComponentChildren } & Omit<JSX.HTMLAttributes<HTMLDivElement>, "class">) {
   const el = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState<{ step: number; dx: number; dy: number }>({ step: 0, dx: 0, dy: 0 });
+  const [width, setWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const e = el.current;
+    if (!balanced || !e) return;
+    setWidth(balancedWidth(e, text));
+  }, [text, balanced]);
   useLayoutEffect(() => {
     const e = el.current;
     if (!e || fit.dx || fit.dy) return;
@@ -181,7 +222,8 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, children
   }, [fit]);
   const { shown, rest } = sliceLine(text, typedCount(text, at, now));
   const leaving = until - now < SPEECH.fadeMs;
-  const style = fit.dx || fit.dy ? { transform: `translate(${Math.round(fit.dx)}px, ${Math.round(fit.dy)}px)` } : undefined;
+  const move = fit.dx || fit.dy ? `translate(${Math.round(fit.dx)}px, ${Math.round(fit.dy)}px)` : null;
+  const style = width || move ? { ...(width ? { width: `${width}px` } : {}), ...(move ? { transform: move } : {}) } : undefined;
   return (
     <div ref={el} class={`${cls}${now - at < 200 ? " fresh" : ""}${leaving ? " leaving" : ""}${fit.step ? ` fit${fit.step}` : ""}`} style={style} role="status" aria-label={plainLine(text)} data-fit={fit.step} {...props}>
       <span aria-hidden="true">

@@ -98,8 +98,11 @@ export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
   const until = match?.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0;
   // (Test link ?barslot=1: the prop's room outlined, so a screenshot shows it.)
   const slot = testParams().get("barslot") === "1";
+  // (Test switch ?bar=fit: the taller bar that holds every figure whole, against the compact bar that's the default (?bar=out):
+  // the phone's layouts, styles.css, docs/decisions/2026-10-24-boss-bar-same.md.)
+  const fit = testParams().get("bar") === "fit";
   return (
-    <div class={`boss-bar${char ? " has-char" : ""}${slot ? " barslot" : ""}`} role="status" aria-label={`${boss.name}, threat ${boss.threat} of 5`}>
+    <div class={`boss-bar${char ? " has-char" : ""}${fit ? " bar-fit" : ""}${slot ? " barslot" : ""}`} role="status" aria-label={`${boss.name}, threat ${boss.threat} of 5`}>
       {char && <BossCharacter match={match!} place="bar" />}
       <span class={`boss-icon${char ? " boss-icon-face" : ""}`} aria-hidden="true">
         <BossFace boss={boss} />
@@ -137,9 +140,9 @@ export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
                 movesLeft(boss)}
         </span>
         <span class="boss-prop">{meters && <BossBarExtra boss={boss} until={until} part="prop" />}</span>
-        {/* (His words, a phone's: over the bar's bottom, as small as the line, in the room left of the status, so never over it.
-            A computer's are by his figure beside the board.) */}
-        {char && <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble" />}
+        {/* (His words, a phone's: inside the bar, from the name column's left edge to its right padding, under the status, so never
+            over it: one row when short, else two balanced rows. A computer's are by his figure beside the board.) */}
+        {char && <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble" balanced />}
       </span>
     </div>
   );
