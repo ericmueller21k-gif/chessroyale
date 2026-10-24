@@ -35,6 +35,14 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   `lastStandShare` (half) of the chances left, when that's lower. Never when the best move is worth under
   `lastStandFrom` (20%: a lost position). Charges he falls with go to the crowd as power-ups. The round's scores
   stand.
+- **Never on a board a boss has changed** (Eric, Oct 24: inside Babur's hoop it took back his queen's capture, fearing
+  a recapture the hoop's walls forbid; docs/decisions/2026-10-24-king-save-off-on-altered-boards.md). The judge's numbers
+  are plain chess's, so while a boss's power has changed the board the Last Stand sits out: the move stands, nothing is
+  spent, no word; once the board is plain again he saves as before. One rule for every boss (`boardAltered` in
+  `boss-powers.ts`, from the runner's `lastStandFor`): a power touches the turn (`powerTurn`, fair play's own test),
+  something stops his moves (`bossStops`), something stops any of the crowd's (`crowdFilter`), or something else of his
+  is on the board (`altersBoard`: Hollow's dark, the Roman candle's shadows, the carrots). The test switch
+  `?laststand=1` still calls him on any board.
 - **The Last Stand on screen** (`LAST_STAND` in `boss-timing.ts`, `LastStand.tsx`): the warning, the freeze, his dive
   onto the piece's square, his cut-in, the piece sliding back, the blow meant for it, his stagger, collapse and fade.
   The blow is 25 red slashes with red numbers; against a boss whose kit has a `kingAttack` (Hollow, Eric, Oct 10;
@@ -124,6 +132,8 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   never a turn or a strike, and spends a charge); e2e `e2e/recluse.spec.ts` (the dock's count drops in phase 1; the
   absorption's beats; no button, no figure and no word from him in phase 2), `e2e/crowd-hidden.spec.ts` (the Crowd's
   final, solo and online).
+- On a board a boss has changed: unit `packages/chess/test/king-save-altered.test.ts` (Eric's hoop; every boss's states,
+  audited from the roster; a stub boss's new filter); e2e `e2e/king-save-altered.spec.ts` (Babur's hoops).
 - Unit: `packages/chess/test/last-stand.test.ts`, `packages/app/test/god-king.test.ts`,
   `packages/app/test/god-king-sprite.test.ts`, `packages/server/test/lobby.test.ts`.
 - e2e: `e2e/formats.spec.ts` (the boss final), `e2e/boss-powers.spec.ts`.

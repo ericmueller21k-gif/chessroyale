@@ -335,6 +335,8 @@ export const HOPPER: BossRules = {
     const p = boss.powers!;
     return (!!p.hop && p.hop.at === boss.crowdMoves) || p.carrots?.spin?.at === boss.crowdMoves;
   },
+  // The carrots on the board while the race is on (the God King's Last Stand sits out).
+  altersBoard: (boss) => raceOn(boss.powers!.carrots),
   // The judge weighs the race (as G-REX's fire): every move's score with what it does to his chances of each carrot,
   // and the moves that pull one always scored (carrots.ts). The bots pick by it too, the pulls among their choices (as
   // his brain weighs his).

@@ -4,7 +4,8 @@ import { pickLine } from "../characters/boss-beats.ts";
 import { bossKit, type BossKit } from "../characters/kits.ts";
 import { EFFECTS } from "../characters/power-art.ts";
 import { HOP_AIR_AT, HOP_AIR_MS } from "../characters/tiger-figure.ts";
-import { PUMP_FOOT, PUMP_PALETTE, PUMP_W, RELEASE_KNOT, TIGER_PUMP, balloonDrawing, balloonLooks, balloonPartOf } from "../characters/tiger-bar.ts";
+import { BALLOON_SHAPES, PUMP_FOOT, PUMP_PALETTE, PUMP_W, RELEASE_KNOT, TIGER_PUMP, balloonDrawing, balloonLooks, balloonPartOf } from "../characters/tiger-bar.ts";
+import { LAND_Y } from "../characters/effects/tiger.ts";
 import type { Character } from "../characters/sprite.ts";
 import type { SoundName } from "../sound.ts";
 import type { BossView } from "../game.ts";
@@ -218,10 +219,24 @@ export function TigerPump({ boss, moments }: { boss: BossView; moments: () => Mo
 
 // ---------------- The board: a balloon's flight and landing, the rings ----------------
 
-/** Where a fly sprite's knot is in its square (frame pixels of 32): the bar's balloon knot lines up with it. */
-const FLY_KNOT = { x: 16, y: 22.5 } as const;
+/** Where a fly sprite's knot is in its frame (its top left, of 32 px; effects/tiger.ts draws it there). */
+const FLY_KNOT = { x: 16, y: 22 } as const;
 /** Where the flight starts without a pump on screen (board units: above the board's top right). */
 const FLY_FALLBACK = { x: 0.9, y: -0.35 } as const;
+/**
+ * A balloon on the board is as tall as a queen piece on its square (Eric, Oct 24: "a full balloon the size of a piece"). The cburnett
+ * queen's art fills QUEEN_ART of its square's height (measured on the board; e2e/tiger.spec.ts checks it), and the stage-4 balloon is
+ * BALLOON_ROWS art px tall: one art px is PX board units (the board as 1, a square as 1/8). The sprite's frame is 32 art px: FRAME.
+ */
+const QUEEN_ART = 0.772;
+const BALLOON_ROWS = BALLOON_SHAPES.queen[3].sil.length;
+const PX = QUEEN_ART / 8 / BALLOON_ROWS;
+const FRAME = 32 * PX;
+/**
+ * A balloon's frame on a square (board units, its top left): its knot's bottom center on the square's bottom edge, where the landing
+ * brings it to rest (its knot on row LAND_Y, the bottom edge at LAND_Y + 1), so a landed balloon stands where his piece stands.
+ */
+const balloonBox = (col: number, row: number) => ({ x: (col + 0.5) / 8 - 16 * PX, y: (row + 1) / 8 - (LAND_Y + 1) * PX });
 
 /** The pump's knot in board units (the board's size as 1, its top left 0,0), or null. */
 function pumpOnBoard(root: HTMLElement | null): { x: number; y: number } | null {
@@ -230,7 +245,8 @@ function pumpOnBoard(root: HTMLElement | null): { x: number; y: number } | null 
   if (!board || !pump) return null;
   const b = board.getBoundingClientRect();
   if (!b.width || !pump.getBoundingClientRect().width) return null;
-  const k = onPump(pump);
+  // (The flight starts where the release's last lifted look ends: its knot at RELEASE_KNOT, not the nozzle's rest.)
+  const k = onPump(pump, RELEASE_KNOT);
   return { x: (k.x - b.left) / b.width, y: (k.y - b.top) / b.width };
 }
 
@@ -262,14 +278,15 @@ function TigerLayer({ boss, p, orientation, moments, now }: BoardLayerProps) {
     wake.push(beats.flyAt, beats.landAt, beats.landAt + LAND_MS);
     const look = colorLook(end.color);
     const { col, row } = cellOf(end.square!, orientation);
+    const box = balloonBox(col, row);
     if (now >= beats.flyAt && now < beats.landAt) {
       const from = end.from ?? FLY_FALLBACK;
-      // (In squares, from the square: the fly sprite's knot at the pump's.)
-      const dx = (from.x - (col + FLY_KNOT.x / 32) / 8) * 8;
-      const dy = (from.y - (row + FLY_KNOT.y / 32) / 8) * 8;
+      // (Board units from the balloon's rest: the fly sprite's knot starts at the pump's; the offsets are in its own frame, FRAME.)
+      const dx = from.x - (box.x + FLY_KNOT.x * PX);
+      const dy = from.y - (box.y + FLY_KNOT.y * PX);
       const timing = { animationDuration: `${FLY_MS}ms`, animationDelay: `${beats.flyAt - now}ms` };
       out.push(
-        <span key={`fly-${end.key}`} class="tg-fly" data-square={end.square} style={{ "--x1": r4(col / 8), "--y1": r4(row / 8), "--dx": r4(dx), "--dy": r4(dy), "--dyp": r4(Math.min(dy, 0) - 0.6), ...timing }}>
+        <span key={`fly-${end.key}`} class="tg-fly" data-square={end.square} style={{ "--x1": r4(box.x), "--y1": r4(box.y), "--bs": r4(FRAME), "--dx": r4(dx / FRAME), "--dy": r4(dy / FRAME), "--dyp": r4((Math.min(dy, 0) - 0.6 / 8) / FRAME), ...timing }}>
           <span class="tg-fly-in" style={timing}>
             <SpriteAnim ch={EFFECTS.balloonFly.ch} anim={flyAnim(end.shape)} since={beats.flyAt} look={look} id={`fly:${end.key}`} />
           </span>
@@ -277,7 +294,7 @@ function TigerLayer({ boss, p, orientation, moments, now }: BoardLayerProps) {
       );
     } else if (now >= beats.landAt && now < beats.landAt + LAND_MS)
       out.push(
-        <span key={`land-${end.key}`} class="tg-land" data-square={end.square} style={{ "--x1": r4(col / 8), "--y1": r4(row / 8) }}>
+        <span key={`land-${end.key}`} class="tg-land" data-square={end.square} style={{ "--x1": r4(box.x), "--y1": r4(box.y), "--bs": r4(FRAME) }}>
           <SpriteAnim ch={EFFECTS.balloonLand.ch} anim={landAnim(end.shape)} since={beats.landAt} look={look} sounds={EFFECTS.balloonLand.sounds} id={`land:${rec!.key}:${end.key}`} />
         </span>,
       );

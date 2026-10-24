@@ -65,10 +65,9 @@ test("an admin's Brain picker: Ginger on Maia with the full guard, on a phone; M
   expect(await page.evaluate(() => (window as any).match.boss.id)).toBe("gingerbread");
   const debug = page.locator(".brain-debug");
   await expect(debug).toContainText(/Maia \d+ · full guard/, { timeout: 30_000 });
-  // The line fits the phone's width.
-  const box = await debug.boundingBox();
-  expect(box!.x).toBeGreaterThanOrEqual(0);
-  expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  // A phone hides the line (Eric, Oct 24): its words are the 🐟 icon's title, the same line.
+  await expect(debug).toBeHidden();
+  await expect(page.locator(".engine-move")).toHaveAttribute("title", /Maia \d+ · full guard/);
   // (The model loads during the intro; it's ready before long.)
   await expect.poll(() => page.evaluate(() => (window as any).match.brainLine as string), { timeout: 60_000 }).toMatch(/· ready$|Maia's/);
   const lines: string[] = [];
@@ -272,8 +271,9 @@ test("the loading step gives up when Maia can't load (its model missing): the ba
   await expect(page.locator(".boss-loading")).toHaveCount(0);
   const debug = page.locator(".brain-debug");
   await expect(debug).toContainText(/failed: Stockfish \(load failed: model: HTTP 404\)/, { timeout: 10_000 });
-  // The whole reason shows: the line wraps, nothing cut.
-  expect(await debug.evaluate((el) => getComputedStyle(el).textOverflow)).not.toBe("ellipsis");
+  // A phone hides the line (Eric, Oct 24): the whole reason is the 🐟 icon's title, nothing cut.
+  await expect(debug).toBeHidden();
+  await expect(page.locator(".engine-move")).toHaveAttribute("title", /failed: Stockfish \(load failed: model: HTTP 404\)/);
   await play(page);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/^(play|results)$/);
   // The boss played Stockfish's move: the battle went on.

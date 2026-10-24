@@ -318,6 +318,11 @@ export interface BossRules {
   stopReason?(boss: { powers?: StopFields | null }, fen: string, move: string): StopReason | null;
   /** A power touches this crowd turn: its picks don't count as fair-play signals. */
   powerTurn?(boss: BossState): boolean;
+  /**
+   * Something of its powers is on the board now that powerTurn, bossStops and crowdFilter don't show (Hollow's dark, the
+   * Roman candle's shadows, the carrots): the God King's Last Stand sits out (boardAltered in boss-powers.ts).
+   */
+  altersBoard?(boss: BossState): boolean;
   /** The squares that show ice (`crowdAllowed`: the dispatcher's). */
   iced?(boss: BossState, fen: string, crowdAllowed: (boss: BossState, fen: string) => string[] | null): string[];
   /**

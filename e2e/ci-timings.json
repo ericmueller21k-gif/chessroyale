@@ -36,6 +36,7 @@
   "e2e/judges.spec.ts": 18,
   "e2e/kill-switches.spec.ts": 17,
   "e2e/king-attack.spec.ts": 449,
+  "e2e/king-save-altered.spec.ts": 120,
   "e2e/landing.spec.ts": 5,
   "e2e/legal.spec.ts": 7,
   "e2e/live-window.spec.ts": 80,
