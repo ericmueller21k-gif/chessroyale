@@ -1827,9 +1827,10 @@ p {
   white-space: nowrap;
 }
 
-/* ---- Resign and leave (components/MatchMenu.tsx; Eric, Oct 13) ----
-   At the right end of a match's top line: a phone's "⋯" (its sheet at the foot of the screen: Sound, Resign), a
-   computer's flag beside the sound button (its confirm under the flag). Nothing dims or covers the board. */
+/* ---- Resign and leave (components/MatchMenu.tsx; Eric, Oct 13; the match's options, Eric, Oct 24) ----
+   At the right end of a match's top line: a phone's gear (its list in the middle of the screen, over the blurred match:
+   Sound, Animations and Motion trail in a crowd match, Resign, Report a bug), a computer's flag beside the sound button
+   (its confirm under the flag). On a computer nothing dims or covers the board. */
 .mm {
   position: relative;
   flex: none;
@@ -1853,10 +1854,8 @@ p {
   cursor: pointer;
 }
 .mm-more > span {
-  font-size: 24px;
-  font-weight: 900;
-  line-height: 1;
-  transform: translateY(-2px);
+  display: grid;
+  place-items: center;
 }
 .mm-flag {
   color: var(--muted);
@@ -1869,10 +1868,11 @@ p {
 .mm-flag.on {
   background: var(--surface-2);
 }
-.mm-flag-icon {
+.mm-flag-icon,
+.mm-gear-icon {
   display: block;
 }
-/* An invisible layer over the page while the sheet or the confirm is open: a tap outside closes it, nothing dims. */
+/* An invisible layer over the page while the confirm is open on a computer: a tap outside closes it, nothing dims. */
 .mm-scrim {
   position: fixed;
   inset: 0;
@@ -1881,44 +1881,78 @@ p {
   align-items: flex-end;
   justify-content: center;
 }
-.mm-sheet,
-.mm-confirm.mm-sheet {
-  width: min(100vw, 480px);
-  display: grid;
-  gap: 8px;
-  padding: 8px 10px calc(env(safe-area-inset-bottom) + 8px);
-  border: 1px solid var(--line);
-  border-bottom: none;
-  border-radius: 14px 14px 0 0;
-  background: var(--surface);
-  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.35);
-  animation: mm-up 160ms ease-out;
+/* A phone's layer: the match behind it is faded and blurred, and the list or the confirm sits in the middle. */
+.mm-scrim.mm-full {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: mm-fade 150ms ease-out;
 }
-/* The phone's options: Sound and Resign side by side, one row. */
-.mm-sheet {
-  grid-template-columns: 1fr 1fr;
-}
-.mm-sheet.one {
-  grid-template-columns: 1fr;
-}
-@keyframes mm-up {
+@keyframes mm-fade {
   from {
-    transform: translateY(24px);
-  }
-  to {
-    transform: none;
+    opacity: 0;
   }
 }
-.mm-row {
+/* The list (a card in the middle; 320 px, or the screen less 16 px a side). */
+.mm-panel,
+.mm-confirm.mm-center {
+  width: min(320px, calc(100vw - 32px));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow), 0 8px 28px rgba(0, 0, 0, 0.3);
+  animation: mm-fade 150ms ease-out;
+}
+.mm-panel {
+  display: grid;
+  padding-bottom: 4px;
+  overflow: hidden;
+}
+.mm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 4px 0 16px;
+}
+.mm-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+}
+.mm-x {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.mm-list {
+  display: grid;
+}
+/* One row: 48 px, a thin divider above it, the label on the left, its control on the right. */
+.mm-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 0;
+  width: 100%;
   min-height: 48px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface-2);
+  padding: 0 16px;
+  border: none;
+  border-top: 1px solid var(--line);
+  background: transparent;
   color: var(--text);
   font: inherit;
   font-size: 16px;
@@ -1926,7 +1960,11 @@ p {
   text-align: left;
   cursor: pointer;
 }
-.mm-row-icon {
+.mm-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.mm-item-icon {
   flex: none;
   width: 20px;
   display: grid;
@@ -1934,7 +1972,7 @@ p {
   font-size: 17px;
   line-height: 1;
 }
-.mm-row-label {
+.mm-item-label {
   flex: 1;
   min-width: 0;
   white-space: nowrap;
@@ -1956,7 +1994,8 @@ p {
   background: var(--good);
   color: #fff;
 }
-/* The confirm: what happens, Cancel and Resign. On a phone, the sheet's place; on a computer, under the flag. */
+/* The confirm: what happens, Cancel and the go button. On a phone, centered over the blurred match; on a computer,
+   under the flag. */
 .mm-confirm {
   color: var(--text);
 }
@@ -2003,6 +2042,21 @@ p {
   background: var(--danger);
   color: #fff;
 }
+.mm-confirm.mm-center {
+  display: grid;
+  gap: 14px;
+  padding: 18px 16px 16px;
+  text-align: left;
+  white-space: normal;
+}
+.mm-center .mm-confirm-title {
+  display: flex;
+  margin-bottom: 4px;
+  font-size: 18px;
+}
+.mm-center .mm-confirm-text {
+  font-size: 15px;
+}
 /* (A computer's: beside the flag, out into the column next to the board, its top level with the title line. The flag
    sits over the board's right edge, so a confirm dropping under it would cover the board; Eric, Oct 13.) */
 .mm-confirm.mm-pop {
@@ -2031,12 +2085,15 @@ p {
   min-height: 40px;
   font-size: 15px;
 }
-/* The phone's sheet: Report a bug on a row of its own, under Sound and Resign. */
-.mm-wide {
-  grid-column: 1 / -1;
+@media (prefers-reduced-motion: reduce) {
+  .mm-scrim.mm-full,
+  .mm-panel,
+  .mm-confirm.mm-center {
+    animation: none;
+  }
 }
 /* A computer's title line with an admin's testing items has no room for one more button (they'd run over the title):
-   the report button gives way there; Settings and the phone's sheet still have it. */
+   the report button gives way there; Settings and the phone's list still have it. */
 .match-tools:not(:empty) ~ .mm .mm-report {
   display: none;
 }
@@ -2752,7 +2809,7 @@ button.history-label {
   }
 }
 
-/* The strip above the boards: one clean line, no box (sound toggle, "⋯" and the flag too). */
+/* The strip above the boards: one clean line, no box (sound toggle, the gear and the flag too). */
 .screen.game .hud,
 .screen.game .mute-btn,
 .screen.game .mm-more,

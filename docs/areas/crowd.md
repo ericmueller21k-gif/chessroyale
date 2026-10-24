@@ -113,8 +113,10 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   clock-read values they show (the move landed and played, the vote bars' count, the Last Stand's steps). A new word
   read from the clock there goes in its list; otherwise it waits up to 200 ms for the next `useStillKey` tick.
 - **Resigning and leaving** (Eric, Oct 13; `LEAVING`; DECISIONS.md, "Resign: leaving a match in every mode"). The
-  top line of every match screen ends in the match's control (`components/MatchMenu.tsx`): a phone's "⋯" (a sheet at
-  the foot of the screen: Sound, Resign) where the sound button was; a computer's sound button, then the flag. On a
+  top line of every match screen ends in the match's control (`components/MatchMenu.tsx`): a phone's gear (Eric, Oct 24:
+  a list in the middle of the screen over the blurred match: Sound, Animations and Motion trail in a crowd match only,
+  Resign or Leave, Report a bug, which asks first; docs/decisions/2026-10-24-match-menu.md) where the sound button was; a
+  computer's sound button, then the flag. On a
   computer the title line spans the board's column only (the boss bar's width), so these sit at its right end above
   the board's right edge, after an admin's testing items in boss battles (the brain's pill, which ellipsizes first,
   and "Trigger ultimate (testing)": `Hud.tsx`, `.match-tools`; Eric, Oct 13); a phone keeps those under the boss dock. A
@@ -145,7 +147,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 | Screens | `packages/app/src/screens/` (`Play`, `Crowd`, `Reveal`, `StageBreak`, `Final`, `Results`, `Hud`, `Spectate`) |
 | The board and its overlays | `components/Board.tsx` (the board itself: [board.md](board.md)), `CrowdGhosts.tsx`, `EvalBar.tsx`, `Breakdown.tsx`, `Gavel.tsx`, `ShadeMoves.tsx` |
 | Online lobby flow | `packages/server/src/lobby.ts` (pure), `lobby-do.ts` (the Durable Object) |
-| Resigning and leaving | `components/MatchMenu.tsx` (the "⋯", the flag, the confirm), `match-exit.ts` (what it offers, its words), `SoloMatch.resign`, `NetMatch.resign`, `LobbyCore.resign` (`lobby.ts`), `runner.handOver` / `retire` / `withdraw` |
+| Resigning and leaving | `components/MatchMenu.tsx` (the gear and its list, the flag, the confirms), `match-exit.ts` (what it offers, its words), `SoloMatch.resign`, `NetMatch.resign`, `LobbyCore.resign` (`lobby.ts`), `runner.handOver` / `retire` / `withdraw` |
 
 ## Settings
 

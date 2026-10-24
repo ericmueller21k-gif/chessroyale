@@ -441,7 +441,7 @@ door's look; every class is `sq-`.
   computer: a side panel (from 1100 px). A phone: a strip of eight chips (name and clock), tapped for the whole table
   and the bracket. The standings' foot has "Leave the lobby" (it asks again while your squad still plays: "Resign: a
   loss, and a bot takes your seat"). The match's top line ends in the match's control as in every mode
-  (`MatchMenu`: a phone's "⋯" with Sound and Resign, a computer's flag; `squadsExit` says what it offers), and the
+  (`MatchMenu`: a phone's gear with Sound and Resign, a computer's flag; `squadsExit` says what it offers), and the
   votes' top line too; resigning shows "You resigned" (your record, the bot in your seat), then Queue again or Home.
 - **A match** (`screens/SquadsMatch.tsx`): the score and round on top, the strip, every board in the lobby as tiny
   boards (`TinyBoard`, match by match, your squad's ringed, YOU on your board and NEXT on next turn's; tappable only once

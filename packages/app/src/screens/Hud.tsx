@@ -140,8 +140,8 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
             <EngineMove match={match} />
           </span>
         )}
-        {/* Sound, and Resign (a phone: "⋯" and its sheet; a computer: the sound button, then the flag). */}
-        <MatchMenu exit={exitFor(match)} />
+        {/* Sound, and Resign (a phone: the gear and its list; a computer: the sound button, then the flag). A crowd match (Crowd, a raid) adds the motion rows. */}
+        <MatchMenu exit={exitFor(match)} crowd={crowd} />
       </div>
       {boss ? <BossBar boss={boss} match={match} /> : <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />}
       {open && <LeaderboardSheet match={match} onClose={() => setOpen(false)} />}

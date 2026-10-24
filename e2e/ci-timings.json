@@ -41,6 +41,7 @@
   "e2e/lobby-chat.spec.ts": 85,
   "e2e/lobby-close.spec.ts": 132,
   "e2e/maia.spec.ts": 288,
+  "e2e/match-menu.spec.ts": 50,
   "e2e/match-screen.spec.ts": 69,
   "e2e/matchmaking.spec.ts": 105,
   "e2e/multiplayer.spec.ts": 348,
