@@ -11,6 +11,8 @@ import { watchErrors } from "./problems.ts";
 import { audioUnlocked, prepareAudio, unlockAudio } from "./sound.ts";
 import { watchTheme } from "./theme.ts";
 import { applyBoardColors } from "./prefs.ts";
+import { setBannerPlusSource } from "@chessroyale/core";
+import { bannerPlusAsked } from "./test-switches.ts";
 import "./styles.css";
 
 // Errors on this device are reported (problems.ts), from the start.
@@ -21,6 +23,8 @@ setUpInstall();
 watchTheme();
 // The board colors picked on this device (Settings → Board): on the page before any board is drawn.
 applyBoardColors();
+// A tester's ?bannerplus= (test-switches.ts): the banners' extra for the games on this device.
+setBannerPlusSource(bannerPlusAsked);
 // Browsers allow sound only after a tap. iPhones don't count every event as one (a pointerdown alone isn't
 // enough), so every tap tries until sound is on (cheap once it is). The audio graph is made beforehand, while the page
 // is idle, so the first tap (often a game's first move) only switches it on and starts the samples loading after its

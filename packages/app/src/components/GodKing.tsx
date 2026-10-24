@@ -6,6 +6,7 @@ import { createPortal } from "preact/compat";
 import { GOD_KING, GOD_KING_BOX, GOD_KING_PORTRAIT, KING_TIP, commandMoment, kingFrameAt, summonMoment, type GodKingAnim } from "../characters/god-king.ts";
 import { renderFrame, type Frame } from "../characters/sprite.ts";
 import { useFrameNow } from "./Countdown.tsx";
+import { bannerLength } from "./FightBanner.tsx";
 import { KING_COMMAND, KING_SUMMON, pieceAt } from "@chessroyale/chess";
 import { play, type SoundName } from "../sound.ts";
 import { equippedLook } from "@chessroyale/core";
@@ -444,7 +445,7 @@ export function KingCommand({
   ) : null;
   return (
     <div ref={ref} class={`king-command ${mode}`} aria-label={mode === "move" ? "The God King plays the move" : "The God King strikes the boss"}>
-      {t >= C.cutAt && t < C.cutAt + C.cutMs && <KingCutIn mode={mode} side={side} san={san} piece={piece} bossIcon={bossIcon} />}
+      {t >= C.cutAt && t < C.cutAt + C.cutMs && <KingCutIn mode={mode} side={side} san={san} piece={piece} bossIcon={bossIcon} ms={C.cutMs} />}
       {fx && createPortal(fx, document.body)}
     </div>
   );
@@ -489,15 +490,18 @@ export function KingCutIn({
   san,
   piece,
   bossIcon,
+  ms,
 }: {
   mode: "move" | "strike";
   side: "w" | "b";
   san?: string;
   piece?: keyof typeof PIECE_NAMES;
   bossIcon?: ComponentChildren;
+  /** How long it shows (ms; KING_COMMAND.cutMs: 2.5 s and the banners' extra since Oct 24); none, the stylesheet's 2.5 s. */
+  ms?: number;
 }) {
   return (
-    <div class="fight-banner king-cut" role="alert" aria-label={mode === "move" ? `The God King plays ${san}` : "The God King strikes"}>
+    <div class="fight-banner king-cut" style={bannerLength(ms)} role="alert" aria-label={mode === "move" ? `The God King plays ${san}` : "The God King strikes"}>
       <div class="fb-flash" />
       <div class="fb-band">
         <div class="fb-lines" />

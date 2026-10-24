@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { FRONT_DOOR, SQUADS, SQUADS_LOBBY, type MercItem } from "@chessroyale/core";
+import { FRONT_DOOR, SQUADS, SQUADS_LOBBY, type MercItem, voteResultMs } from "@chessroyale/core";
 import { MERC_ITEMS, NO_ITEMS, blockTargets, catchUpCoins, checkBlock, dutyDeadline, halfDuties, itemPrice, piecesOf, squadsLegalMoves, squadsVotes, type BrilliantCandidate, type NetWallet, type SquadsEvent } from "@chessroyale/chess/squads";
 import { SquadsCore, clearTopCache, testLobbyOptions, type LiveMatch } from "../src/squads-lobby.ts";
 import { library } from "./squads-fixture.ts";
@@ -13,7 +13,7 @@ import { squadsLobby } from "./squads-fixture.ts";
  */
 
 const M = SQUADS.mercenary;
-const VOTE_MS = (SQUADS.voteSeconds + SQUADS.voteResultSeconds) * 1000;
+const VOTE_MS = (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
 const mineIn = (lm: LiveMatch, id: string) => lm.m.sides.some((x) => x.seats.includes(id));
 const ofKind = <K extends SquadsEvent["kind"]>(events: readonly SquadsEvent[], kind: K) => events.filter((e): e is Extract<SquadsEvent, { kind: K }> => e.kind === kind);
 /** What a squad has spent: every item it has bought this tournament at the price it was then. */

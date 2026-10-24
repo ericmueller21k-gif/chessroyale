@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BOSS_BRAIN, RECLUSE_PHASE2 } from "@chessroyale/core";
+import { BOSS_BRAIN, RECLUSE_PHASE2, bossBannerMs } from "@chessroyale/core";
 import {
   PHASE2_WIN_FEN,
   UciEngine,
@@ -216,31 +216,37 @@ describe("his phase 2 ultimate: slow moves, then a few seconds a move, a random 
     expect(st.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt);
     expect(st.ultAt).not.toBeNull();
     const ultAt = st.ultAt!;
-    // Every player whose move it is starts their few seconds as it comes (all but board 1's, whose move it was).
-    for (const b of st.boards.filter((x) => x.id !== 1)) expect(b.turnAt).toBe(ultAt);
+    // Every player whose move it is starts their few seconds as it comes, from when its banner goes (Oct 24; all but
+    // board 1's, whose move it was).
+    for (const b of st.boards.filter((x) => x.id !== 1)) expect(b.turnAt).toBe(ultAt + bossBannerMs());
     ({ st } = round(st, 0, SLOW + 100, at));
     expect(st.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt);
     expect(phase2Flags(st, ultAt + 10 * 60_000)).toBe(st);
   });
 
-  it("gives anyone mid-move a fresh, full ultMoveSeconds from the moment it comes, however long they'd thought (nobody paused)", () => {
+  it("gives anyone mid-move a fresh, full ultMoveSeconds as its banner goes, however long they'd thought (nobody paused)", () => {
     const st0 = start([518, 1, 2, 3]);
     // (Board 1's player has thought for 4.9 s, board 2's for a minute: both get the whole 5 s from the ultimate.)
     const st = { ...st0, boards: st0.boards.map((b) => (b.id === 1 ? { ...b, turnAt: T0 - 4900 } : b.id === 2 ? { ...b, turnAt: T0 - 60_000 } : b)) };
     const ult = phase2Ult(st, T0);
+    // ("5 SECONDS!" over the boards first, a boss banner's length: the few seconds start as it goes, Oct 24.)
+    const from = T0 + bossBannerMs();
     for (const b of ult.boards) expect(moveLeft(ult, b, T0)).toBe(RECLUSE_PHASE2.ultMoveSeconds * 1000);
-    expect(moveLeft(ult, ult.boards[1]!, T0 + 4000)).toBe(RECLUSE_PHASE2.ultMoveSeconds * 1000 - 4000);
-    // (Their clocks run on: nothing waits for the banner.)
-    expect(phase2Timeouts(ult, T0 + RECLUSE_PHASE2.ultMoveSeconds * 1000, () => 0).boards.every((b) => b.board.history.length === 1)).toBe(true);
+    for (const b of ult.boards) expect(moveLeft(ult, b, from)).toBe(RECLUSE_PHASE2.ultMoveSeconds * 1000);
+    expect(moveLeft(ult, ult.boards[1]!, from + 4000)).toBe(RECLUSE_PHASE2.ultMoveSeconds * 1000 - 4000);
+    expect(phase2Timeouts(ult, from + RECLUSE_PHASE2.ultMoveSeconds * 1000 - 1, () => 0)).toBe(ult);
+    expect(phase2Timeouts(ult, from + RECLUSE_PHASE2.ultMoveSeconds * 1000, () => 0).boards.every((b) => b.board.history.length === 1)).toBe(true);
   });
 
   it("then each move has ultMoveSeconds, no bank; out of them, a random legal move is played for that player (never a loss)", () => {
     const st = phase2Ult(start([518, 1, 2, 3]), T0 + 1000);
     expect(phase2Ult(st, T0 + 2000)).toBe(st);
     const b = st.boards[0]!;
-    expect(moveLeft(st, b, T0 + 3000)).toBe(RECLUSE_PHASE2.ultMoveSeconds * 1000 - 2000);
-    expect(phase2Timeouts(st, T0 + 1000 + RECLUSE_PHASE2.ultMoveSeconds * 1000 - 1, () => 0)).toBe(st);
-    const out = phase2Timeouts(st, T0 + 1000 + RECLUSE_PHASE2.ultMoveSeconds * 1000, () => 0.5);
+    // (From as its banner goes.)
+    const from = T0 + 1000 + bossBannerMs();
+    expect(moveLeft(st, b, from + 2000)).toBe(RECLUSE_PHASE2.ultMoveSeconds * 1000 - 2000);
+    expect(phase2Timeouts(st, from + RECLUSE_PHASE2.ultMoveSeconds * 1000 - 1, () => 0)).toBe(st);
+    const out = phase2Timeouts(st, from + RECLUSE_PHASE2.ultMoveSeconds * 1000, () => 0.5);
     for (const x of out.boards) {
       expect(x.result).toBeNull();
       expect(x.board.history).toHaveLength(1);

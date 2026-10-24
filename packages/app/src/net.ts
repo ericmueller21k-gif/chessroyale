@@ -82,6 +82,7 @@ import { resetKingSpeech } from "./godKing.ts";
 import { bossVoice } from "./speech.tsx";
 import { prefetchMaia, startMaia } from "./maia.ts";
 import { setGardenSource } from "./garden-clock.ts";
+import { timingOnDevice } from "./test-switches.ts";
 
 /** Your result in a lobby's match (once it's over), from the server: for "See your result". */
 export interface LobbyResult {
@@ -249,6 +250,8 @@ export class NetMatch implements GameView {
   ) {
     // (The hippo gardener's seeds count by the server's clock: his meter and tosses read it through the garden's source.)
     setGardenSource(() => Date.now() + this.offset);
+    // (Online the server's times rule: the banners' default extra, whatever a tester's ?bannerplus= says.)
+    timingOnDevice(false);
   }
 
   get totalPlayers() {

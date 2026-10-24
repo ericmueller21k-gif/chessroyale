@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2, SPEECH } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2, SPEECH, bossBannerMs } from "@chessroyale/core";
 import { LAST_STAND, legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
 import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, absorbKing, arcPoints, phase2Follows, phase2Mates, phaseChangeRun, smoothPath } from "../src/recluse-phase2.ts";
 import { ON_BOARD_ANIMS, RECLUSE, RECLUSE_BUST } from "../src/characters/recluse.ts";
@@ -55,8 +55,11 @@ describe("the phase change", () => {
     expect(RECLUSE.anims.seize!.frames[3]!.cue).toBe("reach");
     expect(C.goneAt).toBeGreaterThan(C.igniteAt);
     expect(C.goneAt).toBeLessThanOrEqual(C.riseAt + C.rageMs);
-    expect(C.riseAt).toBeGreaterThanOrEqual(10_000);
-    expect(C.riseAt).toBeLessThanOrEqual(12_000);
+    // (From his line about the power on, as on Oct 17 (10 to 12 s to the rise with the line at 4.65 s); the mumbling
+    // before it as long as the speech rule makes it, 1.5 s longer since Oct 24.)
+    expect(C.riseAt - C.talkAt).toBeGreaterThanOrEqual(10_000 - 4652);
+    expect(C.riseAt - C.talkAt).toBeLessThanOrEqual(12_000 - 4652);
+    expect(C.talkAt).toBe(-C.fallMs + animLength(RECLUSE.anims.collapse!) + holdMs(RECLUSE_LINES.fall[0]) + 150);
     // He gets up where he stands, then the board takes him over; the light is up through the cracks and the split.
     expect(C.leapAt).toBe(C.riseAt + animLength(RECLUSE.anims.rage!));
     expect(C.chantAt + C.lightMs).toBeLessThanOrEqual(C.crackAt);
@@ -82,7 +85,8 @@ describe("the phase change", () => {
     expect(P.castHoldMs).toBeLessThanOrEqual(5_000);
     expect(P.countdownSeconds).toBe(5);
     // Where each lands: the seize after the talk, the rise after the hold, the crack after the cast.
-    expect(C.seizeAt).toBe(1700 + P.talkMs);
+    // (Or once his line about the power has typed out, after his mumbling: Oct 24, the speech rule's longer lines.)
+    expect(C.seizeAt).toBe(Math.max(1700 + P.talkMs, C.talkAt + Math.max(...RECLUSE_LINES.seizeTalk.map(typeMs)) + 100));
     expect(C.riseAt).toBe(C.igniteAt + animLength(RECLUSE.anims.seized!) + P.absorbHoldMs);
     expect(C.crackAt - C.chantAt).toBe(1700 + P.castHoldMs);
     // (The beats themselves keep their lengths: the drain, the rage, the split, the shuffle, the leap back.)
@@ -195,7 +199,7 @@ describe("his phase 2 lines", () => {
     expect(RECLUSE_LINES.engine).toEqual(expect.arrayContaining(["Fun, isn't it?", "Look how much fun we're having.", "Not so nice when the engine's on my side, is it?"]));
   });
 
-  it("the boss's word as the power lands comes as it lands (cutting in on his word before the seize), whole until his chant, whose line waits a second at most", () => {
+  it("the boss's word as the power lands comes as it lands (cutting in on his word before the seize), whole until his chant, whose line follows it before the board cracks", () => {
     const C = PHASE_CHANGE;
     expect(C.absorbLineAt).toBeGreaterThanOrEqual(C.igniteAt);
     for (const line of RECLUSE_LINES.absorb) {
@@ -206,8 +210,11 @@ describe("his phase 2 lines", () => {
       // (Its whole time, up to the chant at most.)
       expect(v.line(Math.min(C.chantAt, C.absorbLineAt + holdMs(line)) - 1)?.text).toBe(line);
       v.say(RECLUSE_LINES.chant[0], "chant", CRITICAL, C.chantAt);
-      // (The chant's line as soon as it's over: within about a second of the chant.)
-      expect(v.line(C.chantAt + 1200)?.text, line).toBe(RECLUSE_LINES.chant[0]);
+      // (The chant's line as soon as it's over, while he chants: before the board cracks. Within about a second of the
+      // chant until Oct 24; up to about 2.6 s since, the speech rule's longer lines.)
+      const chantShows = Math.max(C.chantAt, C.absorbLineAt + holdMs(line));
+      expect(v.line(chantShows)?.text, line).toBe(RECLUSE_LINES.chant[0]);
+      expect(chantShows + typeMs(RECLUSE_LINES.chant[0]), line).toBeLessThan(C.crackAt);
       // (Typed out, and on screen whole for at least two seconds and a half.)
       expect(C.absorbLineAt + holdMs(line) - SPEECH.fadeMs - (C.absorbLineAt + typeMs(line)), line).toBeGreaterThanOrEqual(2500);
     }
@@ -334,7 +341,8 @@ describe("phase 2's four boards on this device", () => {
     g.ult();
     expect(ult).toHaveBeenCalledTimes(1);
     expect(g.state.ultAt).not.toBeNull();
-    await vi.advanceTimersByTimeAsync(RECLUSE_PHASE2.ultMoveSeconds * 1000 + 300);
+    // (Its banner first: the few seconds start as it goes, Oct 24.)
+    await vi.advanceTimersByTimeAsync(bossBannerMs() + RECLUSE_PHASE2.ultMoveSeconds * 1000 + 300);
     expect(g.board(0)!.result).toBeNull();
     expect(g.board(0)!.board.history.length).toBeGreaterThanOrEqual(1);
     g.ult();

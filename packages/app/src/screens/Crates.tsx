@@ -17,6 +17,7 @@ import {
   presentChance,
   presentItems,
   itemColor,
+  bannerPlusMs,
   itemDef,
   purity,
   rollBlemish,
@@ -42,6 +43,8 @@ import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 
 const tierIndex = (def: string) => TIERS.findIndex((t) => t.id === itemDef(def)?.tier);
 const colorIndex = (c: string) => ITEM_COLORS.findIndex((x) => x.id === c);
+/** FISCHER RANDOM!'s banner (ms): 2.5 s since Oct 15, and the banners' extra since Oct 24 (bannerPlusMs). */
+const fischerBannerMs = () => 2500 + bannerPlusMs();
 const pct = (x: number) => (x >= 0.01 ? `${(x * 100).toFixed(x >= 0.1 ? 0 : 1)}%` : `${(x * 100).toFixed(2)}%`);
 
 /** An item's one-line finish: "Emerald · Purity 91.5%". */
@@ -441,9 +444,9 @@ function CrateOpening({
   const afterFirst = () => {
     if (!strips) return;
     if (result?.roll.fischer) {
-      // (Its banner's 2.5 s and a beat: every banner a second longer, Eric, Oct 15.)
+      // (Its banner's 2.5 s and a beat: every banner a second longer, Eric, Oct 15; and the banners' extra, Oct 24.)
       setStage("fischer");
-      setTimeout(() => setStage("spin2"), 2700);
+      setTimeout(() => setStage("spin2"), fischerBannerMs() + 200);
     } else {
       setStage("unwrap");
       setTimeout(() => setStage("reveal"), 1150);
@@ -459,7 +462,7 @@ function CrateOpening({
       {strips && stage === "spin" && <Spin key={`a${round}`} tiles={strips.one} land={38} ms={6200} look={crate.look} onDone={afterFirst} />}
       {strips && stage === "fischer" && (
         <div class="fischer-stage">
-          <FightBanner tone="hero" face={<FischerArt />} text="FISCHER RANDOM!" sub="Legendary or Mythic" sound="bannerStart" />
+          <FightBanner tone="hero" face={<FischerArt />} text="FISCHER RANDOM!" sub="Legendary or Mythic" sound="bannerStart" ms={fischerBannerMs()} />
         </div>
       )}
       {strips && stage === "unwrap" && <Unwrap tier={strips.tier} look={crate.look} />}

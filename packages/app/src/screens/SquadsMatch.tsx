@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
+import { SQUADS, SQUADS_LOBBY, bannerPlusMs } from "@chessroyale/core";
 import { applyMove, inCheck, legalMoves, toSan, type MoveScore } from "@chessroyale/chess";
 import { matchClockLine, minutesName, tokenLines, type Colour, type Side, type SquadsEvent } from "@chessroyale/chess/squads";
 import { Board, type Arrow } from "../components/Board.tsx";
@@ -520,11 +520,11 @@ function MatchView({
   // Every blocked move on this board, for everyone, from when it's placed until the other squad has moved.
   const shownBlocks = history.browsing ? [] : blocksShown(m, boardId);
   const onBoard = client.bannerOn(m.key, boardId);
-  const banner = onBoard && now - onBoard.at < BANNER_MS ? onBoard : null;
+  const banner = onBoard && now - onBoard.at < bannerMs() ? onBoard : null;
   // (The banner goes when its time is up, whatever else is drawn meanwhile.)
   useEffect(() => {
     if (!banner) return;
-    const t = setTimeout(() => redraw((n) => n + 1), Math.max(0, banner.at + BANNER_MS - Date.now()) + 20);
+    const t = setTimeout(() => redraw((n) => n + 1), Math.max(0, banner.at + bannerMs() - Date.now()) + 20);
     return () => clearTimeout(t);
   }, [banner?.at]);
   const sideTag = (s: Side) => <SquadTag id={m.sides[s].squadId} you={s === mySide} />;
@@ -1058,8 +1058,11 @@ function DutyPanel({
   );
 }
 
-/** A block banner shows this long over the board (ms; 3.6 s: every banner a second longer, Eric, Oct 15). */
-const BANNER_MS = 3600;
+/**
+ * A block banner shows this long over the board (ms; 3.6 s: every banner a second longer, Eric, Oct 15; and the
+ * banners' extra, bannerPlusMs, Oct 24). Only what's drawn: the game never waits for it.
+ */
+const bannerMs = () => 3600 + bannerPlusMs();
 /** How long "+30 s" shows on a squad's clock after a Time chip (both squads). */
 const CHIP_FLASH_MS = 1800;
 

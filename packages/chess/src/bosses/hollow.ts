@@ -7,7 +7,7 @@
  * points, and a crowd that finds too few lets him move twice. Numbers: BOSS_POWERS.dark*, lightsOut*. His art and
  * moments are the app's (characters/hollow.ts, components/LightsOut.tsx, the dark in characters/effects/).
  */
-import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type DarkSquare, type LightsOutRound, type LightsOutTarget, type LightsOutTest } from "@chessroyale/core";
+import { BOSS_POWERS, bossBannerMs, type BossPowerSettings, type BossPowerState, type BossState, type DarkSquare, type LightsOutRound, type LightsOutTarget, type LightsOutTest } from "@chessroyale/core";
 import { playOnBoard, type BoardState } from "../boards.ts";
 import { applyMove, inCheck, legalMoves, pieceAt, toSan } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
@@ -363,7 +363,7 @@ export function pickExtraMove(scored: readonly MoveScore[], before: number, cand
 
 /**
  * Hollow's Lights out, beat by beat (ms from its start), the same for the server and every screen. Nobody's clock runs.
- *   0          "LIGHTS OUT!" (his banner) and his line, "It's time."
+ *   0          "LIGHTS OUT!" (his banner: a boss banner's length, bossBannerMs) and his line, "It's time."
  *   dropAt     he drops onto the board's top edge (his `lightsOut`) and smashes his strand in three strikes: the board
  *              dims a step at each, night at the last.
  *   rounds     each round: his prompt ("Find my queen."), its seconds to tap (BOSS_POWERS.lightsOutRounds) and the
@@ -371,7 +371,17 @@ export function pickExtraMove(scored: readonly MoveScore[], before: number, cand
  *   backAt     the lights come back (his `lightsBack`: a fresh strand from the void, the dawn spreading from his spot),
  *              he returns to his corner (`backMs`), and his turn goes on: he plays his move.
  */
-export const LIGHTS_OUT = { dropAt: 1300, dropMs: 2900, gapMs: 300, answerMs: 1800, backMs: 2300 } as const;
+export const LIGHTS_OUT = {
+  // (Its banner showed until he dropped, 1.3 s; since Oct 24 it shows a boss banner's whole length, the extra included,
+  // and he drops, and everything after, as it goes: bossBannerMs.)
+  get dropAt(): number {
+    return Math.max(1300, bossBannerMs());
+  },
+  dropMs: 2900,
+  gapMs: 300,
+  answerMs: 1800,
+  backMs: 2300,
+} as const;
 
 /**
  * Lights out's beats for its rounds' seconds (`ms` each) and the late grace on each round. A round is over when every

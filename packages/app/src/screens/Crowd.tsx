@@ -13,7 +13,7 @@ import { SquareRing } from "../components/ShadeMoves.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LastStand, clearSquare, lastStandBoard } from "../components/LastStand.tsx";
-import { KING_COMMAND, KING_SUMMON, LAST_STAND, LAST_STAND_MS } from "@chessroyale/chess";
+import { KING_COMMAND, KING_SUMMON, LAST_STAND, lastStandMs } from "@chessroyale/chess";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
 import { allowanceNote, bossAlone, elimination, finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
@@ -137,7 +137,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const trail = useMotionTrail();
   // Boss battle: the God King's Last Stand on this move (it plays out after the move lands, in its own extra time).
   const stand = match.boss && mine.lastStand ? mine.lastStand : null;
-  const total = Math.max(2500, until - start - (stand ? LAST_STAND_MS : 0));
+  const total = Math.max(2500, until - start - (stand ? lastStandMs() : 0));
   const picks = mine.result.players;
   // Every pick, in a mixed order (not grouped by move), for the rapid succession of ghosts.
   const ghosts = useMemo(() => {

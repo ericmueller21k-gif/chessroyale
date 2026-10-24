@@ -18,3 +18,38 @@ export function testParams(): URLSearchParams {
   if (typeof location === "undefined" || !testSwitchesAllowed()) return new URLSearchParams();
   return new URLSearchParams(location.search);
 }
+
+/**
+ * Two switches for trying lengths on a phone (Eric, Oct 24: "have a URL where I can change the URL and make it say 1/2 a
+ * second longer or 1 second longer or 3/4 of a second longer, and then I can go test all three of them"), in seconds:
+ * - `?bannerplus=0`, `0.5`, `0.75`, `1`: the extra time on every banner over the board (BANNER_PLUS_MS, 0.75 s, unless
+ *   set), and everything after a banner that much later, for the games played on this device (Boss alone, a solo Crowd,
+ *   any mode the device plays). Online the server's times rule, so an online game's screens keep the default.
+ * - `?talkplus=0`, `0.5`, `1`: added to every speech line's read time (speech.tsx), everywhere.
+ * Read from the address once, as the page opens (a link that drops the query later keeps them for the page); whether
+ * they count, each time (testSwitchesAllowed). From 0 to 3 s; anything else is ignored.
+ */
+export function timingSeconds(value: string | null): number | null {
+  if (value === null || value.trim() === "") return null;
+  const s = Number(value);
+  return Number.isFinite(s) && s >= 0 && s <= 3 ? Math.round(s * 1000) : null;
+}
+const TIMING_ASKED = (() => {
+  try {
+    const q = new URLSearchParams(globalThis.location?.search ?? "");
+    return { banner: timingSeconds(q.get("bannerplus")), talk: timingSeconds(q.get("talkplus")) };
+  } catch {
+    return { banner: null, talk: null };
+  }
+})();
+let gameOnDevice = true;
+/** The game now is played on this device (a solo game), or online (false: the server's times, the default extra). */
+export function timingOnDevice(on: boolean): void {
+  gameOnDevice = on;
+}
+/** A page's banner extra from its `?bannerplus=` (ms), if it counts now: allowed, and the game is on this device; else null. */
+export const bannerPlusFor = (asked: number | null, allowed: () => boolean, onDevice: boolean): number | null => (asked !== null && onDevice && allowed() ? asked : null);
+/** This page's banner extra (core's setBannerPlusSource takes it; null: BANNER_PLUS_MS). */
+export const bannerPlusAsked = (): number | null => bannerPlusFor(TIMING_ASKED.banner, testSwitchesAllowed, gameOnDevice);
+/** What `?talkplus=` adds to every speech line's read time now (ms; 0 without it, or where the switches don't count). */
+export const talkPlusMs = (): number => (TIMING_ASKED.talk !== null && testSwitchesAllowed() ? TIMING_ASKED.talk : 0);

@@ -12,6 +12,7 @@
  * ripple; the helmet's wings flap; his eyes glow, flare or go dark. (No back wings: Eric, Oct 9, 2026.)
  */
 import { LAST_STAND, lastStandAttackHits } from "@chessroyale/chess";
+import { bannerPlusMs } from "@chessroyale/core";
 import { canvas, edge, ellipse, inEllipse, line, poly, roundLight, shade, tint, toGrid } from "./paint.ts";
 import { lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
@@ -760,19 +761,29 @@ function lastStandAnim(blows: readonly number[], cracks: readonly number[]): Ani
   frames.push(fallenFrame(Math.max(100, L.fadeAt + L.fadeMs - t - 280), 0), fallenFrame(1000, 1));
   return { loop: false, frames };
 }
-/** The 25 blows, one every LAST_STAND.slashEveryMs from slashAt; his armor cracks at crackAt. */
-const lastStand = lastStandAnim(
-  Array.from({ length: LAST_STAND.slashes }, (_, b) => LAST_STAND.slashAt + b * LAST_STAND.slashEveryMs),
-  LAST_STAND.crackAt,
-);
 /**
- * Against a boss that attacks him itself (its kit's `kingAttack`: Hollow lashing him with his strand), the blows are its
- * lashes (lastStandAttackHits), and his armor cracks at the 2nd, 6th and 9th.
+ * His Last Stand's two figures for the banners' extra now (bannerPlusMs: his cut-in holds that much longer, and his
+ * guard with it), made once for each: the 25 blows, one every LAST_STAND.slashEveryMs from slashAt, his armor cracking
+ * at crackAt; and against a boss that attacks him itself (its kit's `kingAttack`: Hollow lashing him with his strand),
+ * its lashes (lastStandAttackHits), his armor cracking at the 2nd, 6th and 9th.
  */
-const lastStandAttacked = (() => {
-  const hits = lastStandAttackHits();
-  return lastStandAnim(hits, [hits[1]!, hits[5]!, hits[8]!]);
-})();
+const lastStands = new Map<number, { lastStand: Anim; lastStandAttacked: Anim }>();
+function lastStandsNow(): { lastStand: Anim; lastStandAttacked: Anim } {
+  const plus = bannerPlusMs();
+  let both = lastStands.get(plus);
+  if (!both) {
+    const hits = lastStandAttackHits();
+    both = {
+      lastStand: lastStandAnim(
+        Array.from({ length: LAST_STAND.slashes }, (_, b) => LAST_STAND.slashAt + b * LAST_STAND.slashEveryMs),
+        LAST_STAND.crackAt,
+      ),
+      lastStandAttacked: lastStandAnim(hits, [hits[1]!, hits[5]!, hits[8]!]),
+    };
+    lastStands.set(plus, both);
+  }
+  return both;
+}
 
 /** His portraits for the banners: sword raised, eyes blazing; and battle-worn (cracked, eyes dim, a few red drops). */
 const portrait: Anim = { loop: true, frames: [f(1000, { ...RAISED, flick: 1, wave: 0 }, { specks: eyeFlare(RAISED) })] };
@@ -785,7 +796,26 @@ const portraitHurt: Anim = {
   ],
 };
 
-const ANIMS = { idle, appear, raise, raised, point, slash, lower, leap, lastStand, lastStandAttacked, fallen, rise, portrait, portraitHurt };
+const ANIMS = {
+  idle,
+  appear,
+  raise,
+  raised,
+  point,
+  slash,
+  lower,
+  leap,
+  get lastStand(): Anim {
+    return lastStandsNow().lastStand;
+  },
+  get lastStandAttacked(): Anim {
+    return lastStandsNow().lastStandAttacked;
+  },
+  fallen,
+  rise,
+  portrait,
+  portraitHurt,
+};
 export type GodKingAnim = keyof typeof ANIMS;
 
 export const GOD_KING: Character = {
