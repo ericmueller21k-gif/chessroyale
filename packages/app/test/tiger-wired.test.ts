@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BOSS_POWERS, BOSS_ROSTER, TIGER_NAME, isPlayable, playableBosses } from "@chessroyale/core";
 import { HOOPS_BEATS, KING_ATTACK, KING_ATTACKERS, POWER_FX, TIGER_ANIM, kingAttackHits } from "@chessroyale/chess";
@@ -10,7 +11,7 @@ import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { SELECT_LINES, SELECT_SOUND } from "../src/characters/boss-select.ts";
 import { bossKit } from "../src/characters/kits.ts";
 import { EFFECTS, animLength, cueAt } from "../src/characters/power-art.ts";
-import { HOP_TRIP_MS, TIGER_UI, blockCell, tripMove } from "../src/components/Tiger.tsx";
+import { HOP_TRIP_MS, PUMP_BAR_SHARE, PUMP_FIT, TIGER_UI, blockCell, pumpScale, sidePump, tripMove } from "../src/components/Tiger.tsx";
 import { POOF_AT, balloonFen, landBeats, noteTiger, pumpShows, resetTiger, ringShows, ringState, type TigerShow } from "../src/tiger-show.ts";
 import { REFUSED } from "../src/refused.ts";
 
@@ -259,5 +260,53 @@ describe("his trip along a phone's bar", () => {
     const home = m(2 * HOP_TRIP_MS + TIGER_ANIM.place + 10);
     expect(home).toMatchObject({ x: 0, flip: false });
     expect(tripMove(-50)(HOP_TRIP_MS + 100).flip).toBe(false);
+  });
+});
+
+// The pump on a computer (docs/decisions/2026-10-24-babur-desktop-pump.md): as big as the board's balloons, beside him or in a taller bar.
+describe("the pump's size and place on a computer", () => {
+  // (The board balloon's art px in screen px, for a board `b` px wide: a stage-4 queen, 20 rows, as tall as her piece.)
+  const ideal = (b: number) => (0.772 / 8 / 20) * b;
+  it("is a whole number where that is within PUMP_FIT of the board balloon's, otherwise the nearest scale within it", () => {
+    expect(PUMP_FIT).toBeLessThan(0.1);
+    for (let b = 240; b <= 1000; b += 1) {
+      const s = pumpScale(b);
+      const i = ideal(b);
+      expect(Math.abs(s - i) / i, `${b} px`).toBeLessThanOrEqual(PUMP_FIT + 1e-9);
+      const n = Math.round(i);
+      if (Math.abs(n - i) / i <= PUMP_FIT) expect(s, `${b} px: whole`).toBe(n);
+      else expect(s, `${b} px: the nearest within`).toBeCloseTo(i * (n > i ? 1 + PUMP_FIT : 1 - PUMP_FIT), 9);
+    }
+    // The computer's sizes measured (the board at 1280 x 800, 1024 x 768 in the taller bar, 1440 x 900 and 1920 x 1080).
+    expect(pumpScale(456)).toBeCloseTo(2.024, 3);
+    expect(pumpScale(432)).toBe(2);
+    expect(pumpScale(552)).toBeCloseTo(2.876, 3);
+    // A stage-4 queen on the pump, 20 rows, against her piece (0.772 of a square): within 10% at every size.
+    for (let b = 240; b <= 1000; b += 7) expect(Math.abs(20 * pumpScale(b) - (0.772 * b) / 8) / ((0.772 * b) / 8)).toBeLessThan(0.1);
+  });
+  it("never needs more of the board's size than the taller bar keeps for it (styles.css' --bd-h)", () => {
+    for (let b = 200; b <= 1000; b += 1) expect(36 * pumpScale(b)).toBeLessThanOrEqual(PUMP_BAR_SHARE * b + 1e-9);
+    const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+    expect(css).toContain(`--bd-h: calc((var(--app-h) - 250px) / ${(1 + PUMP_BAR_SHARE).toFixed(4)});`);
+  });
+  it("stands left of his figure on his baseline, clear of everything, or nowhere (then the taller bar)", () => {
+    // At 1280 x 800 (Boss alone: the leaderboard one row): his 2x sprite from x 250, his feet on the board's bottom at 577.
+    const fig = { left: 250, top: 377, right: 402, bottom: 589 };
+    const tower = { left: 10, top: 0, right: 370, bottom: 110 };
+    const evalBar = { left: 384, top: 121, right: 402, bottom: 577 };
+    const s = pumpScale(456);
+    const box = sidePump(fig, 2, 577, s, { w: 1280, h: 800 }, [tower, evalBar])!;
+    expect(box).not.toBeNull();
+    expect(box.bottom).toBe(577);
+    expect(box.bottom - box.top).toBeCloseTo(36 * s, 6);
+    expect(box.right - box.left).toBeCloseTo(34 * s, 6);
+    // (Its drawn right edge, column 33 of 34, 6 px left of his drawn left edge, column 4 of his.)
+    expect(box.left + 33 * s).toBeCloseTo(250 + 4 * 2 - 6, 6);
+    // A raid's leaderboard down the whole column: no room.
+    expect(sidePump(fig, 2, 577, s, { w: 1280, h: 800 }, [{ ...tower, bottom: 800 }, evalBar])).toBeNull();
+    // From 900 to 1099 px he's drawn at 1x by the window's edge: no room.
+    expect(sidePump({ left: 10, top: 485, right: 86, bottom: 591 }, 1, 585, pumpScale(464), { w: 1024, h: 768 }, [])).toBeNull();
+    // A box of no size (a hidden element) is never in the way.
+    expect(sidePump(fig, 2, 577, s, { w: 1280, h: 800 }, [{ left: 0, top: 0, right: 0, bottom: 0 }])).not.toBeNull();
   });
 });

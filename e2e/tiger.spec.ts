@@ -14,7 +14,9 @@ import { test, bossAloneFromHome, createLobbyFromHome, submitMove } from "./help
  * - Hoops (`&power=hoops`): after his move (Oct 24: he keeps his turn): his move on the board, then the HOOPS! banner with nothing
  *   under it, then the cast with a hoop flying to each, then your turn; blocks within ranks 2 to 7, your allowed moves never crossing
  *   their walls, for exactly your next 2 moves; three rings burning, a move through one refused with its words, dying, then out.
- * - Online: a reload mid-hoops draws the rings as they are, without the cast again. The pump's place in the bar at 320 and 1280.
+ * - Online: a reload mid-hoops draws the rings as they are, without the cast again. The pump's place in the bar at 320; on a computer
+ *   (docs/decisions/2026-10-24-babur-desktop-pump.md) as big as the board's balloons, beside him by the board or in a taller bar, at
+ *   1280 × 800, 1440 × 900, 1920 × 1080 and 1024 × 768.
  */
 const desktop = () => test.info().project.name === "desktop";
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
@@ -348,7 +350,7 @@ test("Babur: a balloon put on the pump at the start of his turn (a phone: his ho
   expect(errors).toEqual([]);
 });
 
-test("Babur's pump in the bar at 320 and 1280: inside the bar's free room, clear of the status (a phone's at its right end, a computer's at its left), nothing sideways", async ({ page }) => {
+test("Babur's pump at 320 in the bar's free room, at its right end, clear of the status; at 1280 beside him by the board, the bar's room left empty; nothing sideways", async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -367,6 +369,18 @@ test("Babur's pump in the bar at 320 and 1280: inside the bar's free room, clear
   const bar = (await page.locator(".boss-bar").boundingBox())!;
   const room = (await page.locator(".boss-prop").boundingBox())!;
   const status = (await page.locator(".boss-next").boundingBox())!;
+  if (desktop()) {
+    // A computer's (docs/decisions/2026-10-24-babur-desktop-pump.md): beside his figure, on the board's bottom, left of him; none in the bar.
+    await expect(page.locator(".tg-pump-slot")).toHaveAttribute("data-place", "side");
+    await expect(page.locator(".boss-bar .tg-pump")).toHaveCount(0);
+    const fig = (await page.locator(".boss-char.place-side .boss-char-sprite").boundingBox())!;
+    const feet = (await page.locator(".boss-char.place-side").boundingBox())!;
+    expect(pump.x + pump.width, "left of him").toBeLessThanOrEqual(fig.x + 12);
+    expect(Math.abs(pump.y + pump.height - (feet.y + feet.height)), "on his baseline, by the board's bottom").toBeLessThan(1.5);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+    expect(errors).toEqual([]);
+    return;
+  }
   expect(pump.x).toBeGreaterThanOrEqual(room.x - 1);
   expect(pump.x + pump.width).toBeLessThanOrEqual(room.x + room.width + 1);
   expect(pump.y + pump.height).toBeLessThanOrEqual(bar.y + bar.height + 1);
@@ -377,8 +391,7 @@ test("Babur's pump in the bar at 320 and 1280: inside the bar's free room, clear
     (await pumpBalloonTop(page)) >= status.y + status.height || pump.x + pump.width <= status.x,
     "the balloon's top clears the status",
   ).toBe(true);
-  if (desktop()) expect(pump.x - room.x, "a computer's at the room's left end").toBeLessThan(6);
-  else expect(room.x + room.width - (pump.x + pump.width), "a phone's at the room's right end").toBeLessThan(6);
+  expect(room.x + room.width - (pump.x + pump.width), "a phone's at the room's right end").toBeLessThan(6);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
   expect(errors).toEqual([]);
 });
@@ -486,6 +499,125 @@ test("Babur's balloon on the board is as tall as a queen piece on its square: it
   expect(errors).toEqual([]);
 });
 
+// The pump on a computer (Eric, Oct 24: "the piece needs to be blown up the same size as it is on the board"; docs/decisions/
+// 2026-10-24-babur-desktop-pump.md): a stage-4 queen on it as tall as the board's queen piece, beside his figure by the board where
+// there's room (1100 px and up, the leaderboard short as in Boss alone), else in a taller bar (from 900 to 1099 px he's drawn at 1x by
+// the window's edge); clear of the board, the eval bar, the leaderboard and the status, inside the window; a landing flies from it.
+test("Babur's pump on a computer at 1280 × 800, 1440 × 900, 1920 × 1080 and 1024 × 768: a stage-4 queen as tall as the board's queen, beside him or in a taller bar, clear of everything, and a landing flies from it", async ({ page }) => {
+  test.skip(!desktop(), "a computer's layout");
+  test.setTimeout(420_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  for (const [w, h, place] of [
+    [1280, 800, "side"],
+    [1440, 900, "side"],
+    [1920, 1080, "side"],
+    [1024, 768, "tall"],
+  ] as const) {
+    const at = `${w} × ${h}`;
+    await page.setViewportSize({ width: w, height: h });
+    // (A queen put on at stage 3, the page's clock 12 times faster: ready a couple of seconds into your turn; it lands as his next turn ends.)
+    await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&balloon=queen&stage=3&seedspeed=12");
+    await bossAloneFromHome(page);
+    await yourMove(page);
+    const queenH = await queenPieceHeight(page);
+    expect(queenH, `${at}: a queen piece on the board`).toBeGreaterThan(0);
+    const first = await state(page);
+    await submitMove(page, quiet(first.fen, first.allowed), first.fen);
+    await yourMove(page);
+    await expect(page.locator(".tg-pump-slot")).toHaveAttribute("data-anim", "readyQueen", { timeout: 10_000 });
+    await expect(page.locator(".tg-pump-slot"), `${at}: its place`).toHaveAttribute("data-place", place);
+    // The size: the stage-4 queen's 20 rows of the pump's 36, drawn at the pump's scale, within 10% of the queen piece.
+    const pump = (await page.locator(".tg-pump").boundingBox())!;
+    const balloonH = (pump.height / 36) * 20;
+    expect(Math.abs(balloonH - queenH) / queenH, `${at}: a balloon ${balloonH.toFixed(1)} px, a queen ${queenH.toFixed(1)} px`).toBeLessThan(0.1);
+    expect(pump.width / 34, `${at}: pixels square`).toBeCloseTo(pump.height / 36, 2);
+    // The place: inside the window, over none of the board, the eval bar, the leaderboard or the status.
+    expect(pump.x, `${at}: inside the window`).toBeGreaterThanOrEqual(0);
+    expect(pump.y).toBeGreaterThanOrEqual(0);
+    expect(pump.x + pump.width).toBeLessThanOrEqual(w);
+    expect(pump.y + pump.height).toBeLessThanOrEqual(h);
+    const clear = await page.evaluate((p) => {
+      const hit: string[] = [];
+      for (const sel of [".hb-board", ".board-wrap", ".eval-bar", ".tower-side", ".mini-tower", ".under-board", ".boss-dock-status", ".boss-next"])
+        for (const e of document.querySelectorAll(sel)) {
+          const r = e.getBoundingClientRect();
+          if (r.width && r.height && r.left < p.x + p.width && p.x < r.right && r.top < p.y + p.height && p.y < r.bottom) hit.push(sel);
+        }
+      return hit;
+    }, pump);
+    expect(clear, `${at}: over nothing`).toEqual([]);
+    if (place === "side") {
+      // (His baseline: his box's bottom, where his feet are, by the board's bottom; the board's row can be a few px taller than the board.)
+      const fig = (await page.locator(".boss-char.place-side .boss-char-sprite").boundingBox())!;
+      const feet = (await page.locator(".boss-char.place-side").boundingBox())!;
+      const board = (await page.locator(".hb-board").boundingBox())!;
+      expect(pump.x + pump.width, `${at}: left of him`).toBeLessThanOrEqual(fig.x + 12);
+      expect(Math.abs(pump.y + pump.height - (feet.y + feet.height)), `${at}: on his baseline`).toBeLessThan(1.5);
+      expect(Math.abs(pump.y + pump.height - (board.y + board.height)), `${at}: by the board's bottom`).toBeLessThan(6);
+      await expect(page.locator(".boss-bar .tg-pump")).toHaveCount(0);
+    } else {
+      const bar = (await page.locator(".boss-bar").boundingBox())!;
+      expect(pump.y, `${at}: inside the bar`).toBeGreaterThanOrEqual(bar.y);
+      expect(pump.y + pump.height).toBeLessThanOrEqual(bar.y + bar.height + 1);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight), `${at}: no scrolling`).toBeLessThanOrEqual(0);
+    // A landing (at the end of a turn of his, as your next begins: his next, or a later one if no square passed): the flight starts at
+    // the pump's knot, where the release leaves it, and comes down on its square. (Watched every frame from before it can start.)
+    await page.evaluate(() => {
+      const wd = window as any;
+      wd.__fly = [] as unknown[];
+      wd.__landed = null;
+      wd.__flyFrom = null;
+      const look = () => {
+        // (The flight's start as it declares it: its frame's rest box, in layout px, moved by --dx and --dy of its own size.)
+        const el = document.querySelector<HTMLElement>(".tg-fly");
+        if (el && !wd.__flyFrom) {
+          const parent = (el.offsetParent as HTMLElement).getBoundingClientRect();
+          const cs = getComputedStyle(el);
+          const w = el.offsetWidth;
+          const h = el.offsetHeight;
+          wd.__flyFrom = { x: parent.left + el.offsetLeft + (16 / 32) * w + Number(cs.getPropertyValue("--dx")) * w, y: parent.top + el.offsetTop + (22 / 32) * h + Number(cs.getPropertyValue("--dy")) * h };
+        }
+        const fly = document.querySelector(".tg-fly canvas")?.getBoundingClientRect();
+        const pump = document.querySelector(".tg-pump")?.getBoundingClientRect();
+        if (fly && fly.width) wd.__fly.push({ fly: { x: fly.x, y: fly.y, w: fly.width, h: fly.height }, pump: pump && pump.width ? { x: pump.x, y: pump.y, w: pump.width } : null, square: document.querySelector(".tg-fly")?.getAttribute("data-square") });
+        wd.__landed = document.querySelector(".tg-land")?.getAttribute("data-square") ?? null;
+        if (!wd.__landed) requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    });
+    for (let i = 0; i < 3; i++) {
+      const st = await state(page);
+      await submitMove(page, quiet(st.fen, st.allowed), st.fen);
+      await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
+      await yourMove(page);
+      const landed = await page.waitForFunction(() => !!(window as any).__landed, null, { timeout: 4000, polling: 20 }).then(
+        () => true,
+        () => false,
+      );
+      if (landed) break;
+    }
+    const fly = (await page.evaluate(() => (window as any).__fly)) as { fly: { x: number; y: number; w: number; h: number }; pump: { x: number; y: number; w: number } | null; square: string }[];
+    expect(fly.length, `${at}: the flight`).toBeGreaterThan(3);
+    // (The fly sprite's knot is at 16, 22 of its 32; the pump's release knot at 11, 21 of its 34 wide frame.)
+    const knot = (f: (typeof fly)[number]) => ({ x: f.fly.x + (16 / 32) * f.fly.w, y: f.fly.y + (22 / 32) * f.fly.h });
+    const from = fly[0]!.pump ?? pump;
+    const s = from.w / 34;
+    const release = { x: from.x + 11 * s, y: from.y + 21 * s };
+    const end = knot(fly.at(-1)!);
+    const dist = Math.hypot(end.x - release.x, end.y - release.y);
+    const declared = (await page.evaluate(() => (window as any).__flyFrom)) as { x: number; y: number };
+    expect(Math.hypot(declared.x - release.x, declared.y - release.y), `${at}: it starts at the pump's release knot`).toBeLessThan(4);
+    // (And the first frame drawn is on its way from there: the fallback start, above the board's far corner, is hundreds of px off.)
+    const k0 = knot(fly[0]!);
+    expect(Math.hypot(k0.x - release.x, k0.y - release.y), `${at}: first seen near the pump (${dist.toFixed(0)} px of flight)`).toBeLessThan(10 + 0.3 * dist);
+    const square = await page.evaluate(() => (window as any).__landed as string);
+    expect(fly.at(-1)!.square, `${at}: to its square`).toBe(square);
+  }
+  expect(errors).toEqual([]);
+});
+
 /** The screen y (CSS px) of the top of the pump's balloon: its first drawn row, from the pump's own pixels. */
 async function pumpBalloonTop(page: Page): Promise<number> {
   return page.evaluate(() => {
@@ -494,5 +626,33 @@ async function pumpBalloonTop(page: Page): Promise<number> {
     const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
     for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) if (d[(y * cv.width + x) * 4 + 3]! > 0) return r.top + (y * r.height) / cv.height;
     return r.bottom;
+  });
+}
+
+/** The board's queen piece's drawn height (CSS px): the cburnett queen's art by its alpha, drawn 400 px tall for a fine measure. */
+async function queenPieceHeight(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const piece = document.querySelector<HTMLElement>(".hb-board piece.queen.white");
+    const url = piece && getComputedStyle(piece).backgroundImage.match(/url\("?(.*?)"?\)/)?.[1];
+    if (!piece || !url) return 0;
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const n = 400;
+    const cv = document.createElement("canvas");
+    cv.width = n;
+    cv.height = n;
+    const g = cv.getContext("2d")!;
+    g.drawImage(img, 0, 0, n, n);
+    const d = g.getImageData(0, 0, n, n).data;
+    let top = -1;
+    let bottom = -1;
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++)
+        if (d[(y * n + x) * 4 + 3]! > 8) {
+          if (top < 0) top = y;
+          bottom = y;
+        }
+    return ((bottom - top + 1) / n) * piece.getBoundingClientRect().height;
   });
 }
