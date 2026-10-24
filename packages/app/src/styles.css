@@ -19887,20 +19887,33 @@ button.sq-tiny {
   transform: scaleX(-1);
   transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
 }
-/* The pump in the bar's free room, at 2 screen px to a sprite pixel (a whole scale, crisp: pixelated), at its right end (the room is tall
-   there). Its foot sits 3 px below the room's bottom, inside the bar's padding: so a stage-4 balloon's top, a pop's over-swell too (4 art
-   px above it), clears the status above at any width and any status text (docs/decisions/2026-10-24-babur-bigger.md). */
+/* The pump in the bar's free room, at its right end, standing on the room's bottom. On a phone's compact bar (the default) the room is
+   37 px tall under the status, so the pump is 1 to 1 (34 x 36, its top 1 px into the room): a 2x pump's balloon would reach under the
+   status (docs/decisions/2026-10-24-boss-bar-same.md, "The pump"). A phone's taller bar (?bar=fit) holds it at 2x, 68 x 72, its foot
+   3 px below the room's bottom, inside the bar's padding, so a stage-4 balloon's top and a pop's over-swell clear the status at any
+   width (docs/decisions/2026-10-24-babur-bigger.md). */
 .tg-pump-slot {
   position: absolute;
   right: 2px;
-  bottom: -3px;
-  width: 68px;
-  height: 72px;
+  bottom: 0;
+  width: 34px;
+  height: 36px;
   pointer-events: none;
 }
 .tg-pump-slot > .tg-pump {
-  width: 68px;
-  height: 72px;
+  width: 34px;
+  height: 36px;
+}
+@media (max-width: 899px), (max-height: 599px) {
+  .boss-bar.bar-fit .tg-pump-slot {
+    bottom: -3px;
+    width: 68px;
+    height: 72px;
+  }
+  .boss-bar.bar-fit .tg-pump-slot > .tg-pump {
+    width: 68px;
+    height: 72px;
+  }
 }
 /* A computer's, at its left and at 1 to 1 (the right runs into the status, and the bar holds no more: docs/decisions/2026-10-24-babur-bigger.md). */
 @media (min-width: 900px) and (min-height: 600px) {

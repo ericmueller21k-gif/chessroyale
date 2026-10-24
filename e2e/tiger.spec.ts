@@ -380,31 +380,40 @@ test("Babur online: a reload mid-hoops draws the rings as they are, without the 
   expect(errors).toEqual([]);
 });
 
-test("Babur's pump on a phone is twice its size: 68 × 72 in the bar, its balloon's top under the status at 390 × 844 and 428 × 777", async ({ page }) => {
-  test.setTimeout(240_000);
+// The pump's size per phone layout (docs/decisions/2026-10-24-boss-bar-same.md, "The pump"): 2x (68 × 72) in the taller bar (?bar=fit),
+// 1 to 1 (34 × 36) in the compact bar (the default, ?bar=out), where the room is 37 px tall under the status. Either way it sits
+// at the room's right end, inside the bar, and its balloon's top is under the status.
+test("Babur's pump on a phone at 390 × 844 and 428 × 777: 68 × 72 in the taller bar, 34 × 36 in the compact one; at the room's right end, inside the bar, its balloon's top under the status", async ({ page }) => {
+  test.setTimeout(300_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   for (const [w, h] of [
     [390, 844],
     [428, 777],
   ] as const) {
-    await page.setViewportSize({ width: w, height: h });
-    await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&balloon=queen&stage=3&seedspeed=30");
-    await bossAloneFromHome(page);
-    await yourMove(page);
-    const first = await state(page);
-    await submitMove(page, quiet(first.fen, first.allowed), first.fen);
-    await yourMove(page);
-    await expect(page.locator(".tg-pump-slot")).toHaveAttribute("data-anim", "readyQueen", { timeout: 10_000 });
-    const pump = (await page.locator(".tg-pump").boundingBox())!;
-    const bar = (await page.locator(".boss-bar").boundingBox())!;
-    const room = (await page.locator(".boss-prop").boundingBox())!;
-    const status = (await page.locator(".boss-next").boundingBox())!;
-    expect(pump.width, `${w} wide: the pump's width`).toBe(68);
-    expect(pump.height, `${w} wide: the pump's height`).toBe(72);
-    expect(pump.y + pump.height, `${w} wide: inside the bar`).toBeLessThanOrEqual(bar.y + bar.height + 1);
-    expect(room.x + room.width - (pump.x + pump.width), `${w} wide: at the room's right end`).toBeLessThan(6);
-    expect(await pumpBalloonTop(page), `${w} wide: the balloon's top under the status`).toBeGreaterThanOrEqual(status.y + status.height);
+    for (const [mode, size] of [
+      ["out", 34],
+      ["fit", 68],
+    ] as const) {
+      await page.setViewportSize({ width: w, height: h });
+      await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&balloon=queen&stage=3&seedspeed=30&bar=${mode}`);
+      await bossAloneFromHome(page);
+      await yourMove(page);
+      const first = await state(page);
+      await submitMove(page, quiet(first.fen, first.allowed), first.fen);
+      await yourMove(page);
+      await expect(page.locator(".tg-pump-slot")).toHaveAttribute("data-anim", "readyQueen", { timeout: 10_000 });
+      const pump = (await page.locator(".tg-pump").boundingBox())!;
+      const bar = (await page.locator(".boss-bar").boundingBox())!;
+      const room = (await page.locator(".boss-prop").boundingBox())!;
+      const status = (await page.locator(".boss-next").boundingBox())!;
+      expect(pump.width, `${w} wide, ${mode}: the pump's width`).toBe(size);
+      expect(pump.height, `${w} wide, ${mode}: the pump's height`).toBe(size === 68 ? 72 : 36);
+      expect(pump.y + pump.height, `${w} wide, ${mode}: inside the bar`).toBeLessThanOrEqual(bar.y + bar.height + 1);
+      expect(pump.y, `${w} wide, ${mode}: inside the bar, top`).toBeGreaterThanOrEqual(bar.y);
+      expect(room.x + room.width - (pump.x + pump.width), `${w} wide, ${mode}: at the room's right end`).toBeLessThan(6);
+      expect(await pumpBalloonTop(page), `${w} wide, ${mode}: the balloon's top under the status`).toBeGreaterThanOrEqual(status.y + status.height);
+    }
   }
   expect(errors).toEqual([]);
 });
