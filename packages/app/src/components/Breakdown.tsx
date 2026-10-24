@@ -4,7 +4,7 @@ import { Board } from "./Board.tsx";
 import type { MoveRecord } from "../game.ts";
 import { ordinal } from "../screens/StageBreak.tsx";
 
-const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
+const fmt = (x: number, dp = 1) => (x >= 0 ? "+" : "") + x.toFixed(dp);
 const moveNo = (fen: string) => Number(fen.split(" ")[5] ?? 1);
 
 /**
@@ -19,6 +19,7 @@ export function Breakdown({
   placement,
   lastCut,
   onClose,
+  dp = 1,
 }: {
   moves: readonly MoveRecord[];
   you?: number;
@@ -27,6 +28,8 @@ export function Breakdown({
   /** You went out at the last cut before the ending, where a tie is broken (not kept in). */
   lastCut?: boolean;
   onClose: () => void;
+  /** Decimals on the scores (scoreDp: 2 in 50 v 50). */
+  dp?: number;
 }) {
   const played = moves.filter((m) => m.bestMove);
   const costly = [...played].filter((m) => m.roundScore < 0).sort((a, b) => a.roundScore - b.roundScore).slice(0, 3);
@@ -47,7 +50,7 @@ export function Breakdown({
             {placement ? `${placement}${ordinal(placement)} place. ` : ""}
             {short >= 0.05 ? (
               <>
-                You finished <strong>{short.toFixed(1)} points</strong> below the last player through.
+                You finished <strong>{short.toFixed(dp)} points</strong> below the last player through.
               </>
             ) : lastCut ? (
               // (A tie at any other cut goes through: only the last cut before the ending breaks one.)
@@ -57,8 +60,8 @@ export function Breakdown({
             )}
           </p>
           <div class="line-scores">
-            <span class="line-score you">You {fmt(you!)}</span>
-            <span class="line-score line">Last through {fmt(line!)}</span>
+            <span class="line-score you">You {fmt(you!, dp)}</span>
+            <span class="line-score line">Last through {fmt(line!, dp)}</span>
           </div>
         </div>
       )}
@@ -71,14 +74,14 @@ export function Breakdown({
       {costly.length > 0 && <h3>What cost you the most</h3>}
       <ol class="breakdown-list">
         {costly.map((m) => (
-          <MoveRow key={`c${m.fen}`} m={m} open={open === m} onOpen={() => setOpen(open === m ? null : m)} />
+          <MoveRow key={`c${m.fen}`} m={m} dp={dp} open={open === m} onOpen={() => setOpen(open === m ? null : m)} />
         ))}
       </ol>
       <details class="breakdown-all">
         <summary>Every move ({played.length})</summary>
         <ol class="breakdown-list">
           {played.map((m) => (
-            <MoveRow key={`a${m.fen}`} m={m} open={open === m} onOpen={() => setOpen(open === m ? null : m)} />
+            <MoveRow key={`a${m.fen}`} m={m} dp={dp} open={open === m} onOpen={() => setOpen(open === m ? null : m)} />
           ))}
         </ol>
       </details>
@@ -94,7 +97,7 @@ function allowanceWords(m: MoveRecord): string {
   return m.counted < 0.05 ? "; none of it counted: the opening allowance" : `; ${m.counted.toFixed(1)} counted after the opening allowance`;
 }
 
-function MoveRow({ m, open, onOpen }: { m: MoveRecord; open: boolean; onOpen: () => void }) {
+function MoveRow({ m, open, onOpen, dp }: { m: MoveRecord; open: boolean; onOpen: () => void; dp: number }) {
   const best = m.bestMove ? toSan(m.fen, m.bestMove) : "?";
   const same = m.move === m.bestMove;
   const side = m.fen.split(" ")[1] === "w" ? "white" : "black";
@@ -111,7 +114,7 @@ function MoveRow({ m, open, onOpen }: { m: MoveRecord; open: boolean; onOpen: ()
         <span class="bm-found">
           {m.found ?? 0}/{m.pickers ?? 0} found
         </span>
-        <span class={`bm-score ${m.roundScore >= 0 ? "good" : "bad"}`}>{fmt(m.roundScore)}</span>
+        <span class={`bm-score ${m.roundScore >= 0 ? "good" : "bad"}`}>{fmt(m.roundScore, dp)}</span>
       </button>
       {open && (
         <div class="bm-board">

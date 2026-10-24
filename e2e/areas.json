@@ -391,11 +391,13 @@
         "packages/app/src/components/Breakdown.tsx",
         "packages/app/src/components/VoteHint.tsx",
         "packages/app/src/pick-rows.ts",
-        "packages/app/src/looks.ts"
+        "packages/app/src/looks.ts",
+        "packages/app/src/components/StreakFire.tsx"
       ],
       "specs": [
         "e2e/crowd.spec.ts",
         "e2e/crowd-hidden.spec.ts",
+        "e2e/crowd-scoring.spec.ts",
         "e2e/match-screen.spec.ts",
         "e2e/opening-vote.spec.ts",
         "e2e/panel.spec.ts",

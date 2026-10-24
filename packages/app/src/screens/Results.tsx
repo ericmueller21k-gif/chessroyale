@@ -1,6 +1,6 @@
 import { applyMove } from "@chessroyale/chess";
 import { MiniBoard } from "../components/MiniBoard.tsx";
-import { elimination, lossRows, myTeam, type GameView } from "../game.ts";
+import { elimination, lossRows, myTeam, scoreDp, type GameView } from "../game.ts";
 import { useState } from "preact/hooks";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { ordinal } from "./StageBreak.tsx";
@@ -206,7 +206,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
           {elim ? "Why you went out" : "Your game, move by move"}
         </button>
       )}
-      {review && <Breakdown moves={match.moves} you={elim?.you} line={elim?.line} placement={elim ? placement : null} lastCut={elim?.lastCut} onClose={() => setReview(false)} />}
+      {review && <Breakdown moves={match.moves} you={elim?.you} line={elim?.line} placement={elim ? placement : null} lastCut={elim?.lastCut} onClose={() => setReview(false)} dp={scoreDp(match.settings)} />}
       {avgMs > 0 && <p class="muted small">Scoring took {Math.round(avgMs)} ms per round on this device.</p>}
       <div class="actions">
         <button type="button" class="btn btn-secondary" onClick={onHome}>

@@ -1,5 +1,5 @@
 import type { Rng } from "./rng.ts";
-import { DEFAULT_SETTINGS, OPENING_ALLOWANCE, type DrawRule, type Settings } from "./settings.ts";
+import { DEFAULT_SETTINGS, OPENING_ALLOWANCE, type CrowdScoring, type CrowdStart, type DrawRule, type Settings } from "./settings.ts";
 
 /**
  * Scoring from buildspec.md. Expected scores are from the mover's side, 0 to 1
@@ -14,6 +14,11 @@ export type MaterialSlip = "missed" | "gave";
 export interface Allowance {
   points: number;
   material?: MaterialSlip;
+  /**
+   * Crowd 50 v 50 (CrowdScoring): the pick gave up a piece's worth of material by the exchange check
+   * (`uncapPawns` or more), so its minus score isn't capped. Any move, with or without an allowance on it.
+   */
+  uncap?: MaterialSlip;
 }
 
 /** One player's pick in a group: a move (UCI) or null for a miss. */
@@ -50,6 +55,26 @@ export interface PlayerRoundResult {
   abstained?: boolean;
   /** Used a power-up (saw the engine's top moves) this round: the pick can't count as brilliant. */
   usedPowerUp?: boolean;
+  /** Crowd 50 v 50 (CrowdScoring): the loss after the shared-blunder relief, when it took something off. */
+  shared?: number;
+  /** Crowd 50 v 50: the pick gave up material, so its minus score wasn't capped. */
+  uncapped?: MaterialSlip;
+  /** Crowd 50 v 50: strong moves in a row after this one (set whenever the crowd's scoring is on). */
+  streak?: number;
+  /** Crowd 50 v 50: the streak's bonus in roundScore. */
+  streakBonus?: number;
+  /** Crowd 50 v 50: a rare brilliant find's bonus in roundScore (crowdBrilliant). */
+  brilliantBonus?: number;
+}
+
+/** What scoreGroup needs to know about the move for Crowd 50 v 50's scoring (settings.crowdScoring). */
+export interface ScoreContext {
+  /** The match's stage (0 before the first cut): which cap applies. */
+  stage: number;
+  /** Streaks count on this move (streakCounts). */
+  streaks: boolean;
+  /** Each player's streak before this move (none: 0). */
+  streakOf?: (playerId: string) => number;
 }
 
 export interface GroupResult {
@@ -62,6 +87,8 @@ export interface GroupResult {
   drawRule: DrawRule;
   /** Chance each distinct move had of being drawn. */
   drawOdds: Record<string, number>;
+  /** Crowd 50 v 50: a rare brilliant find (crowdBrilliant): its moves and who found it, for the shoutout. */
+  brilliant?: { moves: string[]; players: string[] };
 }
 
 /**
@@ -149,10 +176,53 @@ export function openingAllowance(move: number, a: { points: number; flatThrough:
 /** The loss a result counts for points: `counted` when the opening allowance took something off, else the raw loss. */
 export const countedOf = (p: { loss: number | null; counted?: number }) => p.counted ?? p.loss;
 
+/** Kept to 2 decimals (Crowd 50 v 50's round scores). */
+export const round2 = (x: number) => Math.round(x * 100) / 100;
+
+/**
+ * The soft cap (CrowdScoring.capCurve): inside +-cap, rising all the way, about the score itself while it's small. "tanh":
+ * cap x tanh(x / cap); "ratio": x / (1 + |x| / cap). Null: no cap.
+ */
+export const softCap = (x: number, cap: number | null, curve: CrowdScoring["capCurve"] = "tanh") =>
+  cap === null ? x : curve === "ratio" ? x / (1 + Math.abs(x) / cap) : cap * Math.tanh(x / cap);
+
+/** The cap on a stage (CrowdScoring.cap, from capFrom). */
+export function capFor(cs: CrowdScoring, stage: number): number | null {
+  let cap: number | null = cs.cap[0] ?? null;
+  cs.capFrom.forEach((from: number, i: number) => {
+    if (stage >= from && i < cs.cap.length) cap = cs.cap[i]!;
+  });
+  return cap;
+}
+
+/** The bonus a strong move earns at `streak` in a row (0 below streakFrom; the ramp's last entry from then on). */
+export function streakBonusAt(cs: CrowdScoring, streak: number): number {
+  if (streak < cs.streakFrom || !cs.streakBonus.length) return 0;
+  return cs.streakBonus[Math.min(streak - cs.streakFrom, cs.streakBonus.length - 1)]!;
+}
+
+/**
+ * Whether streaks count on a move: from the player's `streakFromMove`th picked move on the usual start, from the first in
+ * Random opening and Freestyle (`pickedMove` counts from the first picked move, 1 up, never the game's move number).
+ */
+export function streakCounts(cs: CrowdScoring, start: CrowdStart | undefined, pickedMove: number, stage: number): boolean {
+  if (cs.streakFromCut && stage < 1) return false;
+  return (start ?? "normal") !== "normal" || pickedMove >= cs.streakFromMove;
+}
+
+/** The share of a losing pick's loss that counts when many made it (CrowdScoring's shared-blunder relief). */
+export function sharedFactor(cs: CrowdScoring, loss: number, count: number, pickers: number): number {
+  if (loss < cs.sharedFrom || pickers <= 0) return 1;
+  const share = count / pickers;
+  if (count < cs.sharedMin && share < cs.sharedShare) return 1;
+  return Math.max(cs.sharedFloor, 1 - cs.sharedK * share);
+}
+
 /**
  * Scores a group's picks. `allowance` gives the opening allowance for each picked move: points taken off its loss before
  * it counts for points, or none because it gave up material (the runner's: OPENING_ALLOWANCE on the game's move number,
- * and the exchange check). Left out: none. The board's draw, and every raw `loss`, are before it.
+ * and the exchange check). Left out: none. The board's draw, and every raw `loss`, are before it. With
+ * `settings.crowdScoring` and a `context`, Crowd 50 v 50's scoring (CrowdScoring) shapes each round score.
  */
 export function scoreGroup(
   picks: readonly Pick[],
@@ -161,6 +231,7 @@ export function scoreGroup(
   settings: Settings = DEFAULT_SETTINGS,
   rule: DrawRule = "random",
   allowance?: (move: string) => Allowance,
+  context?: ScoreContext,
 ): GroupResult {
   const picked = picks.filter((p) => p.move !== null);
   const losses = moveLosses(
@@ -169,13 +240,46 @@ export function scoreGroup(
   );
   const off = new Map(picked.map((p) => [p.move!, allowance?.(p.move!) ?? { points: 0 }]));
   const counted = (m: string) => Math.max(0, losses[m]! - off.get(m)!.points);
-  const averageLoss = picked.length ? picked.reduce((s, p) => s + counted(p.move!), 0) / picked.length : null;
+  const cs = context ? settings.crowdScoring : undefined;
+  // (Crowd 50 v 50: a losing pick many made counts less: the shared-blunder relief.)
+  const count = new Map<string, number>();
+  for (const p of picked) count.set(p.move!, (count.get(p.move!) ?? 0) + 1);
+  const scored = (m: string) => (cs ? counted(m) * sharedFactor(cs, counted(m), count.get(m)!, picked.length) : counted(m));
+  const averageLoss = picked.length ? picked.reduce((s, p) => s + scored(p.move!), 0) / picked.length : null;
+  const cap = cs ? capFor(cs, context!.stage) : null;
   const players = picks.map((p): PlayerRoundResult => {
-    if (p.move === null) return { playerId: p.playerId, move: null, loss: null, roundScore: settings.missedMoveScore };
+    if (!cs) {
+      if (p.move === null) return { playerId: p.playerId, move: null, loss: null, roundScore: settings.missedMoveScore };
+      const loss = losses[p.move]!;
+      const c = counted(p.move);
+      const material = off.get(p.move)!.material;
+      return { playerId: p.playerId, move: p.move, loss, ...(c !== loss ? { counted: c } : {}), ...(material ? { material } : {}), roundScore: averageLoss! - c };
+    }
+    const before = context!.streakOf?.(p.playerId) ?? 0;
+    if (p.move === null) return { playerId: p.playerId, move: null, loss: null, roundScore: cap === null ? settings.missedMoveScore : round2(-cs.missCaps * cap), streak: 0 };
     const loss = losses[p.move]!;
     const c = counted(p.move);
-    const material = off.get(p.move)!.material;
-    return { playerId: p.playerId, move: p.move, loss, ...(c !== loss ? { counted: c } : {}), ...(material ? { material } : {}), roundScore: averageLoss! - c };
+    const a = off.get(p.move)!;
+    const slip = a.uncap;
+    const relieved = scored(p.move);
+    const x = averageLoss! - relieved;
+    const uncapped = !!slip && x < 0;
+    // A strong move: within streakStrong of the engine's best, by its raw loss (the allowance forgives most opening moves).
+    const strong = loss <= cs.streakStrong + 1e-9;
+    const streak = context!.streaks ? (strong ? before + 1 : 0) : before;
+    const bonus = context!.streaks && strong ? streakBonusAt(cs, streak) : 0;
+    return {
+      playerId: p.playerId,
+      move: p.move,
+      loss,
+      ...(c !== loss ? { counted: c } : {}),
+      ...(a.material ? { material: a.material } : {}),
+      ...(relieved !== c ? { shared: relieved } : {}),
+      ...(uncapped ? { uncapped: slip } : {}),
+      roundScore: round2((uncapped ? x : softCap(x, cap, cs.capCurve)) + bonus),
+      streak,
+      ...(bonus ? { streakBonus: bonus } : {}),
+    };
   });
   const playedMove = picked.length
     ? drawMove(
@@ -187,6 +291,29 @@ export function scoreGroup(
       )
     : evaluation.bestMove;
   return { players, averageLoss, playedMove, drawRule: rule, drawOdds: drawOdds(picks) };
+}
+
+/**
+ * Crowd 50 v 50: a brilliant find (`brilliance`, on the round's players once power-ups are marked, the rest giving
+ * away `brilliantMinGap` points or more) earns
+ * `brilliantBonus` and a shoutout, only when it's rare: `brilliantMaxFound` or fewer found it, or exactly one when
+ * `brilliantFewLeft` or fewer picked. Adds the bonus to the finders' round scores and sets `result.brilliant`. It never
+ * changes the move played. `force` (a test switch) names the given players whatever the field did.
+ */
+export function crowdBrilliant(result: GroupResult, settings: Settings = DEFAULT_SETTINGS, force?: readonly string[]): GroupResult {
+  const cs = settings.crowdScoring;
+  if (!cs || result.brilliant) return result;
+  const b = brilliance(result.players, { minGap: cs.brilliantMinGap });
+  const rare = !!b && b.players.length > 0 && (b.total <= cs.brilliantFewLeft ? b.found === 1 : b.found <= cs.brilliantMaxFound);
+  const found = rare ? { moves: b!.moves, players: b!.players } : force?.length ? { moves: [...new Set(result.players.filter((p) => force.includes(p.playerId) && p.move).map((p) => p.move!))], players: [...force] } : null;
+  if (!found || !found.players.length) return result;
+  for (const p of result.players) {
+    if (!found.players.includes(p.playerId)) continue;
+    p.roundScore = round2(p.roundScore + cs.brilliantBonus);
+    p.brilliantBonus = cs.brilliantBonus;
+  }
+  result.brilliant = found;
+  return result;
 }
 
 /** A round is dead when every pick in the group is within `margin` points of the others. */

@@ -17,7 +17,8 @@ import { KING_COMMAND, KING_SUMMON, LAST_STAND, LAST_STAND_MS } from "@chessroya
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
 import { BossHeading } from "./Play.tsx";
-import { allowanceNote, bossAlone, elimination, finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
+import { allowanceNote, bossAlone, elimination, finalName, myTeam, scoreDp, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
+import { StreakFire } from "../components/StreakFire.tsx";
 import { GavelPiece } from "../components/Gavel.tsx";
 import { Avatar } from "../components/Items.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
@@ -61,7 +62,13 @@ export function LiveGhosts({ match, fen, orientation }: { match: GameView; fen: 
   for (const p of visible) seenLive.ids.add(p.playerId);
   return <CrowdGhosts fen={fen} picks={ghostPicks(match, visible)} orientation={orientation} animate={animate} trail={trail} faint />;
 }
-const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
+const fmt = (x: number, dp = 1) => (x >= 0 ? "+" : "") + x.toFixed(dp);
+
+/** Names in a line ("You", "Ana and Ben", "You, Ana and Ben"): you first. */
+export function namesLine(ids: readonly string[], match: Pick<GameView, "isYou" | "nameOf">): string {
+  const names = [...ids].sort((a, b) => Number(match.isYou(b)) - Number(match.isYou(a))).map((id) => (match.isYou(id) ? "You" : match.nameOf(id)));
+  return names.length < 2 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
 
 /** Crowd 50 v 50: the other team is choosing (or their votes are being counted). You watch. */
 export function WatchScreen({
@@ -269,8 +276,12 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const me = picks.find((p) => match.isYou(p.playerId));
   // Your row (your bank, for the board's clock), once per reveal.
   const you = useMemo(() => match.standings().find((s) => s.isYou), [mine]);
-  // A move that separated the field (never one found with a power-up, which shows the engine's moves).
-  const bril = useMemo(() => brilliance(picks), [mine]);
+  // A move that separated the field (never one found with a power-up, which shows the engine's moves). In 50 v 50
+  // (CrowdScoring) only a rare find gets a line: the shoutout, naming who found it, with its bonus.
+  const dp = scoreDp(match.settings);
+  const shout = match.settings.crowdScoring ? (mine.result.brilliant ?? null) : undefined;
+  const bril = useMemo(() => (shout === undefined ? brilliance(picks) : null), [mine]);
+  const shoutBonus = match.settings.crowdScoring?.brilliantBonus ?? 0;
   const youBrilliant = !!me && !!bril?.players.includes(me.playerId);
   const youHelped = !!me && !!bril && !youBrilliant && bril.moves.includes(me.move ?? "");
   const yours = me?.move ?? null;
@@ -388,7 +399,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                       // docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md.)
                       <>
                         <span class="dk-verdict">{me.move === mine.bestMove ? "Best move" : `Best was ${seenSan(fen, mine.bestMove)}`}</span>
-                        {` · You: ${seenSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore)})`}
+                        {` · You: ${seenSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore, dp)})`}
                       </>
                     )}
               </span>
@@ -436,6 +447,16 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
               <span class="poll-votes">{Math.round((mine.kingCalls ?? 0) * grow)}</span>
             </div>
           )}
+          {landed && shout && (
+            <div class={`brilliant-line shoutout${shout.players.some((id) => match.isYou(id)) ? " you" : ""}`} role="status">
+              <span class="brilliant-mark" aria-hidden="true">‼</span>
+              <span>
+                <strong>Brilliant find! </strong>
+                {namesLine(shout.players, match)} found {shout.moves.map((m) => seenSan(fen, m)).join(" / ")} · +{shoutBonus}
+                {shout.players.length > 1 ? " each" : ""}
+              </span>
+            </div>
+          )}
           {landed && bril && (
             <div class={`brilliant-line${youBrilliant ? " you" : ""}`} role="status">
               <span class="brilliant-mark" aria-hidden="true">‼</span>
@@ -449,12 +470,18 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           <div class="poll-result">
             {me ? (
               <>
-                <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore)}</span>
+                <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore, dp)}</span>
                 <span class="muted small">
                   {me.move && me.move === mine.bestMove ? `you found the best move, ${seenSan(fen, me.move)}` : `${me.move ? `you picked ${seenSan(fen, me.move)}` : "no move from you"} · best was ${seenSan(fen, mine.bestMove)}`}
                 </span>
                 {/* The opening allowance on your pick: what it took off, or why it didn't (one line). */}
                 {allowanceNote(me) && <span class="allowance-line">{allowanceNote(me)}</span>}
+                {/* 50 v 50: the streak's bonus in that score (CrowdScoring). */}
+                {!!me.streakBonus && (
+                  <span class="streak-note">
+                    <StreakFire count={me.streak ?? 0} /> +{me.streakBonus.toFixed(2)} streak bonus
+                  </span>
+                )}
               </>
             ) : (
               <span class="muted small">Your team watched this one · best was {seenSan(fen, mine.bestMove)}</span>
@@ -698,7 +725,7 @@ export function CrowdCut({
       )}
       {why && (
         <div onClick={(e) => e.stopPropagation()}>
-          <Breakdown moves={match.moves} you={me?.points} line={line} placement={match.placement} lastCut={final} onClose={() => setWhy(false)} />
+          <Breakdown moves={match.moves} you={me?.points} line={line} placement={match.placement} lastCut={final} onClose={() => setWhy(false)} dp={scoreDp(match.settings)} />
         </div>
       )}
       {augments && !youOut && !outBefore && (

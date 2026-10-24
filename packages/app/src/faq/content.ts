@@ -29,6 +29,8 @@ import {
   ITEM_COLORS,
   LEAVING,
   OPENING_ALLOWANCE,
+  CROWD_SCORING,
+  type CrowdScoring,
   PREGAME_VOTES,
   PRIOR_RATING,
   PURITY_BANDS,
@@ -114,6 +116,8 @@ export interface FaqSources {
   allowance: { points: number; flatThrough: number; goneBy: number; materialPawns: number };
   /** Ranked 1 v 1: the time controls and their vote, the game's timings, the ladder, rank points, placements, coins. */
   ranked: typeof RANKED_1V1;
+  /** Crowd 50 v 50's scoring: the soft limit by stage, pieces hung, shared blunders, streaks, rare finds, the bubble. */
+  crowdScoring: CrowdScoring;
 }
 
 export const FAQ_DEFAULTS: FaqSources = {
@@ -146,6 +150,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   phase2: RECLUSE_PHASE2,
   allowance: OPENING_ALLOWANCE,
   ranked: RANKED_1V1,
+  crowdScoring: CROWD_SCORING,
 };
 
 // ---------------- Numbers as words ----------------
@@ -220,7 +225,7 @@ function modes(src: FaqSources): FaqSection {
 - **${C.lobbySize} players, one game of chess**, from the first move. Two teams of ${team}: your team plays White or Black all game.
 - Each turn, everyone on the side to move picks a move before the clock runs out, and the **most popular pick is played** (a tie is settled at random).
 - Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(C.firstStageRounds / 2, "move")}; after that, the lowest scorers are cut after every move, the same number from each team. Scores carry over all game.
-- **A tie at the cut line goes through:** everyone tied exactly with the last player through stays in, and the cuts still to come take the extra, a little at each. Only the last cut before the ending breaks a tie, so the ending has its size: fewer points given away before the [opening allowance](#opening-allowance) go through, then less thinking time.
+- **A tie at the cut line goes through:** everyone tied exactly with the last player through stays in, and the cuts still to come take the extra, a little at each. So does anyone within ${n(src.crowdScoring.cutGrace, "point")} of that player ([the bubble](#crowd-scoring)). Only the last cut before the ending breaks a tie, so the ending has its size: fewer points given away before the [opening allowance](#opening-allowance) go through, then less thinking time.
 - **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss final (the top ${left(src.crowdKnockouts.boss)} team up against ${finalFoe}) or a duel (the best of each side, 1v1). Then on how it starts, then on the clock.
 - **How it starts**, voted on before move 1: ${startLabel("normal")}, the usual starting position; ${startLabel("random")}, a real, balanced opening already ${n(randomMoves, "move")} in for each side, so the game picks up at move ${randomMoves + 1}; or ${startLabel("freestyle")}: the pieces on the back row start shuffled, the same for both sides and different every game. To castle in Freestyle, move your king onto its rook: the king lands on the g- or c-file with the rook beside it, as usual. Nobody voting means ${SV.options[SV.defaultOption]?.label}. Both teams play from that start; a boss final is played from the usual starting position.
 - **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. A boss raid is ${namedClock(R)}.
@@ -352,6 +357,28 @@ ${item("Shield", "shield", "cancels the next block against your squad that would
  * The opening allowance in two sentences (Eric, Oct 15: cut players should think "yeah, I messed up"): what it forgives
  * and what it never does, with the reveal's own words. Every number from OPENING_ALLOWANCE.
  */
+/**
+ * Crowd 50 v 50's scoring in a player's words (docs/decisions/2026-10-24-crowd-scoring.md): the soft limit by stage,
+ * pieces hung, shared blunders, streaks, rare brilliant finds, a miss and the bubble. Every number from CrowdScoring.
+ */
+export function crowdScoringWords(cs: CrowdScoring): string {
+  const limit = (cap: number | null) => (cap === null ? "no limit" : `about ±${num(cap)}`);
+  const when = (from: number) => (from === 0 ? "before the first cut" : from === 1 ? "from the first cut" : `from the ${ordinal(from)} cut`);
+  const caps = cs.cap.map((c, i) => `${limit(c)} ${when(cs.capFrom[i] ?? 0)}`);
+  const ramp = cs.streakBonus.map((b, i) => `+${num(b)} at ${cs.streakFrom + i}`);
+  const last = cs.streakBonus.at(-1) ?? 0;
+  const firstCap = cs.cap[0] ?? null;
+  return `In 50 v 50 each move's round score is eased into a range, so no single move makes or breaks you early, and the range widens as the game goes on:
+
+- **A soft limit on every move:** ${caps.slice(0, -1).join(", ")} and ${caps.at(-1)}. It's a smooth curve, not a wall: a small score is barely changed, and a bigger mistake still scores a little worse than a smaller one. Scores show to 2 decimals.
+- **Hanging a piece isn't softened:** a move that gives up ${n(cs.uncapPawns, "pawn")}' worth of material or more against the best move, by the same exchange check as the opening allowance, takes its whole minus score.
+- **When everyone fell for it:** when ${cs.sharedMin} or more of your team (or ${pct(cs.sharedShare, 0)} of it) pick the same move and it gives away ${n(cs.sharedFrom, "point")} or more, it counts less for each of them: the bigger their share, the less it costs, down to ${pct(cs.sharedFloor, 0)} of it.
+- **Streaks:** a move within ${n(cs.streakStrong, "point")} of the engine's best is a strong move. ${cs.streakFrom} strong moves in a row put you on a streak, shown by the fire and its count beside your name on the scoreboard (orange, then red from ${cs.streakFrom + 2}, then white-blue from ${cs.streakFrom + 4}). Each strong move on it adds a bonus on top of its score: ${ramp.join(", ")} in a row${cs.streakBonus.length > 1 ? `, and +${num(last)} from then on` : " and after"}. Any other move, or a missed one, ends it. From the usual start, streaks count from your ${ordinal(cs.streakFromMove)} move; in a Random opening or Freestyle, from your first.
+- **Rare brilliant finds:** a [brilliant move](#brilliant) that ${cs.brilliantMaxFound} or fewer of your team found (just one, when ${cs.brilliantFewLeft} or fewer are picking), while the rest gave away ${n(cs.brilliantMinGap, "point")} or more on average, earns +${num(cs.brilliantBonus)} and a shoutout naming who found it. It doesn't change the move played.
+- **A missed move** scores ${cs.missCaps} times the limit below zero${firstCap === null ? "" : ` (${num(-cs.missCaps * firstCap)} before the first cut)`}.
+- **The bubble:** at a cut, anyone within ${n(cs.cutGrace, "point")} of the last player through goes through too, like a tie (except at the last cut before the ending).`;
+}
+
 export function openingAllowanceWords(A: FaqSources["allowance"]): string {
   return `Through move ${A.flatThrough}, the first ${n(A.points, "point")} a move gives away don't count (less each move after that, and none from move ${A.goneBy}), so a sound move off the engine's line costs nothing early on: the reveal shows it as "1.2 forgiven · opening". A move that gives up ${A.materialPawns === 1 ? "a pawn" : n(A.materialPawns, "pawn")} or more by a simple exchange check, by leaving something to be taken or by missing a capture, gets no allowance, so all of it counts ("no allowance · gave up material", "no allowance · missed a capture").`;
 }
@@ -399,11 +426,15 @@ A loss is never below zero: if picks score above the engine's own choice, the hi
 
 $ round score = the group's average loss − your loss
 
-Positive means you beat your group (early in a game, every loss here is after the [opening allowance](#opening-allowance)). A missed move scores ${num(S.missedMoveScore)} and is left out of the average. In Crowd your round scores add up all game, and every cut goes by the total.
+Positive means you beat your group (early in a game, every loss here is after the [opening allowance](#opening-allowance)). A missed move scores ${num(S.missedMoveScore)} (in 50 v 50, [less](#crowd-scoring)) and is left out of the average. In Crowd your round scores add up all game, and every cut goes by the total.
 
 ### The opening allowance {#opening-allowance}
 
 ${openingAllowanceWords(src.allowance)}
+
+### Scoring in 50 v 50 {#crowd-scoring}
+
+${crowdScoringWords(src.crowdScoring)}
 
 ### A worked example {#worked-example}
 

@@ -1218,7 +1218,7 @@ p {
 .tower-head,
 .tower-row {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 46px 40px 46px 38px 20px;
+  grid-template-columns: 30px minmax(0, 1fr) 52px 44px 46px 38px 20px;
   align-items: center;
   column-gap: 4px;
   padding: 0 8px 0 0;
@@ -1311,6 +1311,92 @@ p {
 }
 .t-practice {
   margin-left: 4px;
+}
+/* A streak's fire beside the name (StreakFire, Crowd 50 v 50): our own flame and its count, small and steady in size
+   (it never changes the row's height), a gentle flicker on the flame only, still under reduced motion. The tower is
+   dark in both themes; the reveal's note sits on the page's own background (light mode below). */
+.streak-fire {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: 4px;
+  line-height: 1;
+  font-size: 10px;
+  font-weight: 900;
+  vertical-align: -1px;
+  --sf-outer: #ff8a1f;
+  --sf-core: #ffd34d;
+  --sf-text: #ff9d3d;
+}
+.streak-fire svg {
+  display: block;
+  flex: none;
+  transform-origin: 50% 100%;
+  animation: sf-flicker 1.8s ease-in-out infinite;
+}
+.streak-fire .sf-outer {
+  fill: var(--sf-outer);
+}
+.streak-fire .sf-core {
+  fill: var(--sf-core);
+}
+.streak-fire .sf-count {
+  color: var(--sf-text);
+}
+.streak-fire.t2 {
+  --sf-outer: #ff3b2a;
+  --sf-core: #ffb14a;
+  --sf-text: #ff6a55;
+}
+.streak-fire.t3 {
+  --sf-outer: #ff4d3a;
+  --sf-core: #dff1ff;
+  --sf-text: #9fd3ff;
+}
+.streak-fire.t3 svg {
+  filter: drop-shadow(0 0 2px rgba(120, 190, 255, 0.7));
+}
+@keyframes sf-flicker {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  30% {
+    transform: scale(0.96, 1.07);
+  }
+  55% {
+    transform: scale(1.03, 0.97);
+  }
+  80% {
+    transform: scale(0.98, 1.04);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .streak-fire svg {
+    animation: none;
+  }
+}
+/* The reveal's streak note ("+0.50 streak bonus"): its own line under your score, like the allowance's. */
+.streak-note {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.streak-note .streak-fire {
+  margin-left: 0;
+}
+/* (Light mode: the count a shade deeper on the light page. The tower stays dark in both.) */
+:root[data-theme="light"] .streak-note .streak-fire {
+  --sf-text: #c85a0c;
+}
+:root[data-theme="light"] .streak-note .streak-fire.t3 {
+  --sf-text: #2f6fb8;
 }
 .t-pts {
   text-align: right;
@@ -2677,7 +2763,7 @@ button.history-label {
 }
 .tower-mini .tower-head,
 .tower-mini .tower-row {
-  grid-template-columns: 26px minmax(0, 1fr) 46px 40px 42px 18px;
+  grid-template-columns: 26px minmax(0, 1fr) 50px 42px 42px 18px;
 }
 .tower-mini .tower-head span:nth-child(6),
 .tower-mini .t-bank {
@@ -2686,7 +2772,7 @@ button.history-label {
 /* No bank column (RaceTower's `bank`: the Hidden Boss's phase 2, where each clock is its board's). */
 .tower-nobank:not(.tower-mini) .tower-head,
 .tower-nobank:not(.tower-mini) .tower-row {
-  grid-template-columns: 30px minmax(0, 1fr) 46px 40px 46px 20px;
+  grid-template-columns: 30px minmax(0, 1fr) 52px 44px 46px 20px;
 }
 .tower-nobank .tower-head span:nth-child(6),
 .tower-nobank .t-bank {
@@ -11364,7 +11450,7 @@ img.qicon {
 /* The scoreboard's narrow form beside chat: place, name and points. */
 .mini-tower.narrow .tower-mini .tower-head,
 .mini-tower.narrow .tower-mini .tower-row {
-  grid-template-columns: 24px minmax(0, 1fr) 44px;
+  grid-template-columns: 24px minmax(0, 1fr) 50px;
 }
 .mini-tower.narrow .tower-mini .tower-head span:nth-child(n + 4),
 .mini-tower.narrow .tower-mini .t-avg,

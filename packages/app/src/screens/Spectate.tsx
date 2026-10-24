@@ -1,4 +1,4 @@
-import { cutLabel, type BoardView, type GameView } from "../game.ts";
+import { cutLabel, scoreDp, type BoardView, type GameView } from "../game.ts";
 import { MiniBoard } from "../components/MiniBoard.tsx";
 import { RaceTower } from "../components/RaceTower.tsx";
 import { ChatSection } from "../components/QuickChat.tsx";
@@ -25,7 +25,7 @@ export function SpectateScreen({ match, boards, note }: { match: GameView; board
           Leave the match
         </button>
       )}
-      <RaceTower standings={st} cutoff={match.cutoff} cutLabel={cutLabel(match)} floats={match.chat?.floats()} />
+      <RaceTower standings={st} cutoff={match.cutoff} cutLabel={cutLabel(match)} floats={match.chat?.floats()} dp={scoreDp(match.settings)} />
     </div>
   );
 }

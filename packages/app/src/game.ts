@@ -66,12 +66,16 @@ export interface MoveRecord {
 /**
  * The opening allowance on a pick, in a few plain words for the reveal (one line, even at 320 px), one number at most:
  * what it forgave ("1.2 forgiven · opening", "8 of 9.6 forgiven · opening"), or why it didn't cover the pick
- * ("no allowance · gave up material", "no allowance · missed a capture"). `short`: the boss dock on the narrowest
- * phones ("8 of 9.6 forgiven", "no allowance"). Null when it made no difference (no loss, or no allowance on this move).
+ * ("no allowance · gave up material", "no allowance · missed a capture"); in 50 v 50 after the allowance, a piece given
+ * up that the soft limit didn't cover ("not capped · gave up a piece", "not capped · missed a piece"). `short`: the boss
+ * dock on the narrowest phones ("8 of 9.6 forgiven", "no allowance"). Null when it made no difference (no loss, or no
+ * allowance on this move).
  */
-export function allowanceNote(p: { loss: number | null; counted?: number; material?: MaterialSlip }, short = false): string | null {
+export function allowanceNote(p: { loss: number | null; counted?: number; material?: MaterialSlip; uncapped?: MaterialSlip }, short = false): string | null {
   if (p.loss === null || p.loss < 0.05) return null;
   if (p.material) return short ? "no allowance" : `no allowance · ${p.material === "missed" ? "missed a capture" : "gave up material"}`;
+  // (Crowd 50 v 50 after the allowance: a piece given up isn't capped. CrowdScoring.)
+  if (p.uncapped) return short ? "not capped" : `not capped · ${p.uncapped === "missed" ? "missed a piece" : "gave up a piece"}`;
   if (p.counted === undefined) return null;
   const pts = (x: number) => x.toFixed(1).replace(/\.0$/, "");
   const forgiven = p.counted < 0.05 ? `${pts(p.loss)} forgiven` : `${pts(p.loss - p.counted)} of ${pts(p.loss)} forgiven`;
@@ -100,7 +104,7 @@ export function moveRecordFrom(stage: number, round: number, mine: GroupReveal, 
     pickers: picked.length,
     avgLoss: picked.length ? picked.reduce((s, p) => s + (p.counted ?? p.loss!), 0) / picked.length : null,
     ...(picked.some((p) => p.counted !== undefined) ? { avgRaw: picked.reduce((s, p) => s + p.loss!, 0) / picked.length } : {}),
-    brilliant: !!bril?.players.includes(me.playerId),
+    brilliant: !!(mine.result.brilliant ?? bril)?.players.includes(me.playerId),
     usedPowerUp: !!me.usedPowerUp,
   };
 }
@@ -137,7 +141,7 @@ export type LightsView = NetLightsOut;
 
 /** The reveal: your group's picks and scores (same shape the server sends). */
 export type GroupReveal = Pick<BoardRound, "fenBefore" | "bestMove" | "playerIds" | "king" | "kingCalls" | "lastStand"> & {
-  result: Pick<BoardRound["result"], "players" | "playedMove" | "drawRule">;
+  result: Pick<BoardRound["result"], "players" | "playedMove" | "drawRule" | "brilliant">;
 };
 
 /**
@@ -391,6 +395,9 @@ export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" 
 }
 
 export const isCrowd = (m: Pick<GameView, "settings">) => m.settings.mode === "crowd";
+
+/** Decimals a score shows to: 2 where the crowd's scoring keeps them (CrowdScoring), else 1. */
+export const scoreDp = (s: Pick<Settings, "crowdScoring">) => (s.crowdScoring ? 2 : 1);
 
 /** What a Crowd match's last cut leads to, by name: the team final, the boss final or the duel. */
 export function finalName(s: Pick<Settings, "finalFormat">): string {

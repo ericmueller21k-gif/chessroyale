@@ -78,6 +78,8 @@ export interface NetStanding {
   out: boolean;
   /** Still in, but the stage's cut would take them if it came now (ties at the line go through). */
   cut?: boolean;
+  /** Crowd 50 v 50: strong moves in a row, from CrowdScoring.streakFrom (the scoreboard's fire). */
+  streak?: number;
   placement: number | null;
   /** Crowd 50 v 50: the player's team (the side they play all match). */
   team?: "w" | "b" | null;
@@ -99,6 +101,11 @@ export interface NetPick {
   roundScore: number;
   /** Used a power-up this round (so the pick can't count as brilliant). */
   usedPowerUp?: boolean;
+  /** Crowd 50 v 50 (PlayerRoundResult): gave up material so the minus score wasn't capped; the streak's and a find's bonus. */
+  uncapped?: MaterialSlip;
+  streak?: number;
+  streakBonus?: number;
+  brilliantBonus?: number;
 }
 
 /** What the host's browser computes for one board after picks lock. */
@@ -702,6 +709,8 @@ export type ServerMessage = { now: number } & (
       picks: NetPick[];
       /** How the played move was chosen from the group's picks. */
       drawRule: DrawRule;
+      /** Crowd 50 v 50: a rare brilliant find, for the shoutout (GroupResult.brilliant). */
+      brilliant?: { moves: string[]; players: string[] };
       /** Boss battle: the King played the move, and how many called him; or he struck the boss. */
       king?: boolean;
       kingCalls?: number;

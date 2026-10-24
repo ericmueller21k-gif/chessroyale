@@ -321,7 +321,85 @@ export interface Settings {
    * first. Never for players.
    */
   peopleFirst?: boolean;
+  /**
+   * Crowd 50 v 50's scoring (CROWD_SCORING: the soft cap by stage, shared-blunder relief, streaks, rare brilliant
+   * finds, the bubble grace). Unset: every other mode scores as before.
+   */
+  crowdScoring?: CrowdScoring;
 }
+
+/**
+ * Crowd 50 v 50's scoring (Eric, Oct 23; docs/decisions/2026-10-24-crowd-scoring.md, measured in reports/crowd-scoring.md).
+ * A pick's round score starts as today's (the group's average loss less its own, the opening allowance taken off), then:
+ * - **shared-blunder relief**: a losing pick (`sharedFrom` points or more) made by at least `sharedMin` players, or by
+ *   `sharedShare` of the group, counts its loss times (1 - `sharedK` x its share), never less than `sharedFloor` of it;
+ * - **the soft cap**: a smooth curve (`capCurve`) that keeps a score inside +-cap, a bigger miss still scoring worse than a
+ *   smaller one. The cap widens by stage: `cap[i]` from the match's stage `capFrom[i]` (stage 0 is before the first cut),
+ *   null for none. A pick that gives up a piece (`uncapPawns` of material) by the exchange check takes a minus score
+ *   uncapped;
+ * - **streaks**: a strong move is one within `streakStrong` points of the engine's best (its raw loss); strong moves in a
+ *   row make a streak, which any other pick or a miss ends. From `streakFrom` in a row a strong move earns
+ *   `streakBonus[n - streakFrom]` (the last entry from then on), added after the cap. Streaks count from the player's
+ *   `streakFromMove`th picked move on the usual start, from the first in Random opening and Freestyle;
+ * - **brilliant finds** (`brilliance`, the rest giving away `brilliantMinGap` points or more): `brilliantBonus` and a
+ *   shoutout, only when rare: `brilliantMaxFound` or fewer found it, or exactly one when `brilliantFewLeft` or fewer picked;
+ * - a miss scores `missCaps` times the stage's cap below zero (missedMoveScore when there's no cap);
+ * - every round score is kept to 2 decimals, and at a cut (not the last) anyone within `cutGrace` points of the last
+ *   player through goes through like an exact tie (what that leaves over carries, as cutCarry).
+ * The FAQ and the screens read these numbers from here.
+ */
+export interface CrowdScoring {
+  cap: readonly (number | null)[];
+  /**
+   * The soft cap's curve: "tanh" (cap x tanh(x / cap): close to the score while small, then flat near the cap, so big
+   * misses all read about -cap) or "ratio" (x / (1 + |x| / cap): eases in sooner and never quite flattens, so a bigger
+   * miss always shows a little worse, even to 2 decimals).
+   */
+  capCurve: "tanh" | "ratio";
+  capFrom: readonly number[];
+  /** A pick that gives up this many pawns of material or more by the exchange check (a piece) isn't capped. */
+  uncapPawns: number;
+  sharedFrom: number;
+  sharedMin: number;
+  sharedShare: number;
+  sharedK: number;
+  sharedFloor: number;
+  streakStrong: number;
+  streakFrom: number;
+  streakFromMove: number;
+  /** Testing in the sim only: streaks count from the first cut. */
+  streakFromCut?: boolean;
+  streakBonus: readonly number[];
+  brilliantBonus: number;
+  /** A find is a shoutout only when the rest gave away this many points on average or more (`brilliance`'s minGap). */
+  brilliantMinGap: number;
+  brilliantMaxFound: number;
+  brilliantFewLeft: number;
+  missCaps: number;
+  cutGrace: number;
+}
+
+export const CROWD_SCORING: CrowdScoring = {
+  cap: [2, 3.5, 5, 8],
+  capCurve: "ratio",
+  capFrom: [0, 1, 5, 9],
+  uncapPawns: 3,
+  sharedFrom: 5,
+  sharedMin: 3,
+  sharedShare: 0.25,
+  sharedK: 1,
+  sharedFloor: 0.4,
+  streakStrong: 2,
+  streakFrom: 3,
+  streakFromMove: 6,
+  streakBonus: [0.25, 0.5, 0.75, 1],
+  brilliantBonus: 1,
+  brilliantMinGap: 15,
+  brilliantMaxFound: 3,
+  brilliantFewLeft: 10,
+  missCaps: 2,
+  cutGrace: 0.1,
+};
 
 /**
  * One step of a move clock that rises as the game goes on: from this move on, this many seconds a move. "Move" is the
@@ -522,6 +600,7 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   firstStageRounds: 20,
   roundsPerStage: 2,
   scoresBetweenStages: "carry",
+  crowdScoring: CROWD_SCORING,
   colourPerStage: false,
   drawRuleByStage: ["popular"],
   powerUpsAtStart: 3,
@@ -558,6 +637,8 @@ export const RAID_SETTINGS: Partial<Settings> = {
   ...CROWD_SETTINGS,
   raid: true,
   crowdTeams: false,
+  // (A raid scores as before: the crowd's scoring is 50 v 50's.)
+  crowdScoring: undefined,
   augments: false,
   lobbySize: 50,
   groupSize: 50,

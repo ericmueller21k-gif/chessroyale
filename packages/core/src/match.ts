@@ -70,6 +70,9 @@ export interface PlayerState {
   placement: number | null;
   /** Moves missed over the match (each counts as finalMissLoss in matchLoss). */
   misses?: number;
+  /** Crowd 50 v 50 (CrowdScoring): strong moves in a row now, and the streak bonus earned over the match. */
+  streak?: number;
+  streakPoints?: number;
 }
 
 export type Side = "w" | "b";
@@ -332,6 +335,9 @@ export interface RoundPlayerOutcome {
   /** Called the King instead of picking: counts as the round's average loss for the boss's strikes, and isn't a miss. */
   abstained?: boolean;
   neutralLoss?: number;
+  /** Crowd 50 v 50: the player's streak after this move, and its bonus (already in roundScore). */
+  streak?: number;
+  streakBonus?: number;
 }
 
 /**
@@ -388,6 +394,8 @@ export function applyRound(
       thinkMsTotal: p.thinkMsTotal + think,
       movesTimed: p.movesTimed + 1,
       misses: (p.misses ?? 0) + (o.loss === null && !o.abstained ? 1 : 0),
+      ...(o.streak !== undefined ? { streak: o.streak } : {}),
+      ...(o.streakBonus ? { streakPoints: (p.streakPoints ?? 0) + o.streakBonus } : {}),
       lossesByStage,
       countedLossSum: countedSum(p) + (counted ?? 0),
       rawLossSum: rawSum(p) + (o.loss ?? 0),
@@ -443,6 +451,8 @@ export function outcomesFromGroup(
     thinkMs: thinkMs[p.playerId] ?? 0,
     usedPowerUp: usedPowerUp.has(p.playerId),
     ...(p.abstained ? { abstained: true, neutralLoss: result.averageLoss ?? 0 } : {}),
+    ...(p.streak !== undefined ? { streak: p.streak } : {}),
+    ...(p.streakBonus ? { streakBonus: p.streakBonus } : {}),
   }));
 }
 
@@ -483,7 +493,8 @@ export const isLastCut = (state: Pick<MatchState, "stage">, settings: Pick<Setti
  *   left over (`cutCarry`), spread evenly over the cuts still to come (rounded up), so no one cut takes them all at once
  *   (Eric's bar: a player who goes out should think "yeah, I messed up", not lose to a pile-up of owed places).
  * - It takes the bottom of the pool, except that everyone tied exactly with the last player through goes through too:
- *   nobody goes out on thinking time or a coin flip. What that leaves over is owed by the cuts after it.
+ *   nobody goes out on thinking time or a coin flip. In Crowd 50 v 50 so does anyone within the bubble grace of that
+ *   player (CrowdScoring.cutGrace). What that leaves over is owed by the cuts after it.
  * - The last cut before a fixed-size ending takes exactly what's owed, so the ending has its size: an exact tie at
  *   its line goes to less raw loss over the match, then less thinking time (the order of `ranked`).
  * Returns the ids going out (in ranked order) and what each pool still owes the cuts to come.
@@ -505,7 +516,8 @@ export function cutPlan(state: MatchState, ranked: readonly PlayerState[], setti
     const n = Math.max(0, Math.min(owed, members.length - 1));
     const bottom = members.slice(members.length - n);
     const line = members[members.length - n - 1];
-    const going = exact || !line ? bottom : bottom.filter((p) => !sameScore(standingPoints(p, settings), standingPoints(line, settings)));
+    const grace = settings.crowdScoring?.cutGrace ?? 0;
+    const going = exact || !line ? bottom : bottom.filter((p) => !sameScore(standingPoints(p, settings), standingPoints(line, settings)) && standingPoints(line, settings) - standingPoints(p, settings) > grace + 1e-9);
     for (const p of going) out.add(p.id);
     const left = carried - dueNow + (owed - going.length);
     if (left > 0) carry[pool] = left;
