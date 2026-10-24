@@ -705,9 +705,11 @@ export const BOSS_POWERS = {
    * little faster (Eric, Oct 11: her ultimate's weak; about twice a game), and 1.2 since her blizzard lasts three turns
    * (Oct 12, by estimate: the second still comes about turn 30). Jefferson's candle burns for about a third of a
    * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
-   * fire most of the game.
+   * fire most of the game. Babur (tiger) 1.3 (Oct 24, was 1.6: Eric, "he's ulting so much… 2 to 4 times per game"; his
+   * hoops now come after his move): the raid sim's 10 s crowd, 2.55 casts a battle of 44 moves, 3.45 per 60 moves (1.1 gave
+   * 1.80 a battle, under 2: his battles are shorter now he keeps his turn; reports/tiger-sim.md).
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.6 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1196,12 +1198,14 @@ export const BOSS_POWERS = {
   /** A landing's search time on the host (ms; past it, the squares searched so far), its own share after a cast's. */
   balloonTimeMs: 3_000,
   /**
-   * His Hoops (his ultimate, his whole turn; Eric, Oct 23: "3 staggered burning hoops on the board each covering 2x2 areas.
-   * No pieces can leave that area for 2 turns, nothing can get in or out"): hoopsCount 2x2 blocks within ranks 2 to 7 (the
-   * inner ranks 3 to 6 first), apart from each other, walled for the crowd's next hoopsCrowdMoves moves (his move between
-   * them too). Where (hoopsFrom, on the host's engines, block by block): his gain with the walls in force (the crowd to
-   * move) against before it (him to move) in hoopsBand, nearest hoopsTarget; up to hoopsLooks blocks weighed a step, each
-   * at hoopsNodes, within hoopsTimeMs (past it, the blocks placed so far).
+   * His Hoops (his ultimate; Eric, Oct 23: "3 staggered burning hoops on the board each covering 2x2 areas. No pieces can
+   * leave that area for 2 turns, nothing can get in or out"). **After his move** (Eric, Oct 24: "he plays his move, then
+   * before your turn, he throws the rings"; until then they were his whole turn): hoopsCount 2x2 blocks within ranks 2 to 7
+   * (the inner ranks 3 to 6 first), apart from each other, walled for the crowd's next hoopsCrowdMoves moves (his move
+   * between them too). Where (hoopsFrom, on the host's engines, block by block, on the position after his move): his gain
+   * with the walls in force against the same position without them (the crowd to move both) in hoopsBand, nearest
+   * hoopsTarget; up to hoopsLooks blocks weighed a step, each at hoopsNodes, within hoopsTimeMs (past it, the blocks placed
+   * so far; the server gives the host that much longer for his move's request). How often: rageSpeed.tiger.
    */
   hoopsCount: 3,
   hoopsCrowdMoves: 2,

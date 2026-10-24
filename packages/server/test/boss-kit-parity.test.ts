@@ -21,7 +21,6 @@ import {
   slamAhead,
   waterAnswer,
   hoopsAnswer,
-  landFrom,
   applyMove,
   slamFrom,
   type BoardScore,
@@ -87,7 +86,6 @@ async function hostBoss(engine: EngineLike, s: Settings, m: Extract<Msg, { t: "b
   if (m.hop) return reply((await hopFrom(engines, m.fen, m.hop))?.fen ?? "");
   if (m.repaint) return reply((await repaintFrom(engines, m.fen, m.repaint, !!m.repaintAny))?.fen ?? "");
   if (m.water) return reply((await waterAnswer(engines, m.fen, m.water, !!m.waterAny)).answer);
-  if (m.hoops) return reply((await hoopsAnswer(engines, m.fen, m.hoops, m.balloon ?? null, !!m.hoopsAny)).answer);
   const kind = m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo";
   const ahead = m.land?.length && !m.funhouse ? slamAhead(m.land) : null;
   const look = m.race && !m.funhouse ? { race: m.race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;
@@ -99,9 +97,9 @@ async function hostBoss(engine: EngineLike, s: Settings, m: Extract<Msg, { t: "b
   const move = m.funhouse ? await funhouseMoveFrom(engine, m.fen, m.allowed ?? null) : await ordinary();
   // (Moo's Moonbeam after his move: the crowd's top moves after it go with the move.)
   const beam = m.beam && !m.funhouse ? await beamLines(engine, m.fen, move, m.beam) : null;
-  // (The circus tiger's balloon due after his move: where it lands goes with the move.)
-  const land = m.balloon && !m.funhouse ? await landFrom(engines, applyMove(m.fen, move), m.balloon) : null;
-  return { ...reply(move), ...(beam ? { beam } : {}), ...(land ? { balloon: land.square } : {}) };
+  // (The circus tiger's hoops and balloon due after his move: the cast's blocks and where it lands go with the move.)
+  const end = (m.balloon || m.hoops) && !m.funhouse ? await hoopsAnswer(engines, applyMove(m.fen, move), m.hoops ?? null, m.balloon ?? null) : null;
+  return { ...reply(move), ...(beam ? { beam } : {}), ...(end?.land ? { balloon: end.land.square } : {}), ...(end?.answer ? { hoops: end.answer } : {}) };
 }
 
 /** What a battle showed: each crowd turn's position and allowed moves, every power event, the result. */
@@ -194,8 +192,6 @@ async function solo(start: MatchRunner): Promise<Trace> {
       if (r.bossToMove() && r.repaintDue()) await r.playRepaint(engines).catch(() => r.applyRepaint(null));
       seen();
       if (r.bossToMove() && r.waterDue()) await r.playWater(engines).catch(() => r.applyWater(null));
-      seen();
-      if (r.bossToMove() && r.hoopsDue()) await r.playHoops(engines).catch(() => r.applyHoops(null));
       seen();
       if (r.bossToMove() && r.hopDue()) await r.playHop(engines).catch(() => r.applyHop(null));
       seen();

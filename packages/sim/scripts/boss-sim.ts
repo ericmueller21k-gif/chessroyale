@@ -45,15 +45,16 @@
  *
  * The circus tiger (id tiger): his balloons blow up on the sim's clock (as the hippo gardener's seeds: `pickSec`). Each
  * row logs every balloon's end (after which crowd move, its shape as shown, landed or popped, why a pop: a dud or `nine`,
- * his gain by the engine, in the shape's band or not), how many went on, every cast of his hoops (after which crowd move,
- * the blocks, his gain, the blocks weighed, the ms) and every one that waited, and each crowd turn with hoops standing:
+ * his gain by the engine, in the shape's band or not), how many went on, every cast of his hoops after his move (after
+ * which crowd move, the blocks, his gain, the ms of his whole turn) and every one that waited (his move gave check, or none
+ * fitted), and each crowd turn with hoops standing:
  * whether the walls took away the engine's best move.
  *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, PASS_WAIT, powerMomentMs, waterAnswer, hoopsAnswer, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, PASS_WAIT, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -350,8 +351,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         pickSec,
         balloons: [] as { at: number; shape: string; outcome: string; nine: boolean; gain: number | null; inBand: boolean | null }[],
         placed: 0,
-        casts: [] as { at: number; blocks: string[]; gain: number; looks: number; ms: number; late: boolean }[],
-        waits: [] as { at: number; answer: string; gain: number | null }[],
+        casts: [] as { at: number; blocks: string[]; gain: number | null; ms: number }[],
+        waits: [] as { at: number; check: boolean }[],
         walled: { turns: 0, changed: 0 },
       };
       const tigerBalloon = () => {
@@ -478,25 +479,6 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             }
             garden.waits.push({ at, seeds: ask.kinds.length, gain: pick?.gain ?? null, answer: answer === PASS_WAIT ? "wait" : answer || "none" });
           }
-          if (bossId === "tiger" && runner.hoopsDue()) {
-            // (His hoops: his whole turn, unless none fits, the pass guard has them wait, or no answer: then his move.)
-            const at = runner.boss!.crowdMoves;
-            const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
-            const ask = runner.hoopsAsk()!;
-            const balloon = runner.balloonAsk();
-            const tw = Date.now();
-            const { answer, pick, land } = await hoopsAnswer(engines, fen, ask, balloon, runner.hoopsAny());
-            const ms = Date.now() - tw;
-            const done = runner.applyHoops(answer, pick?.gain ?? null, land?.gain ?? null);
-            tigerBalloon();
-            if (done) {
-              tiger.casts.push({ at, blocks: done.blocks, gain: pick!.gain, looks: pick!.looks, ms, late: !!pick!.late });
-              ults.push({ kind: "hoops", turn: at });
-              look();
-              continue;
-            }
-            tiger.waits.push({ at, answer: answer === PASS_WAIT ? "wait" : answer || "none", gain: pick?.gain ?? null });
-          }
           if (bossId === "hopper") {
             const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
             const his = runner.boss!.crowdSide === "w" ? "b" : "w";
@@ -522,8 +504,19 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
               ults.push({ kind: "fullMoon", turn: at });
             }
             if (bossId === "moo" && runner.bossBestReply() && !runner.boss!.staggerNext) moo.best++;
+            // (The circus tiger's hoops come after his move, with it: asked with it, cast at its end.)
+            const hoopsAsked = bossId === "tiger" && !!runner.hoopsAsk();
+            const ultsBefore = runner.boss!.powers?.ults ?? 0;
+            const tw = Date.now();
             await runner.playBoss(engines[0]);
-            if (bossId === "tiger") tigerBalloon();
+            if (bossId === "tiger") {
+              tigerBalloon();
+              const h = runner.boss!.powers?.hoops;
+              if ((runner.boss!.powers?.ults ?? 0) > ultsBefore && h) {
+                tiger.casts.push({ at, blocks: h.blocks, gain: h.gain, ms: Date.now() - tw });
+                ults.push({ kind: "hoops", turn: at });
+              } else if (hoopsAsked) tiger.waits.push({ at, check: inCheck(runner.boards.get(runner.state.boards[0]!)!.fen) });
+            }
             if (bossId === "moo") {
               const m = runner.boss!.powers?.moo;
               if (m?.stun?.flurry) moo.flurries.push(m.stun.squares.length);

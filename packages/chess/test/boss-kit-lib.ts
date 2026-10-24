@@ -56,7 +56,7 @@ export const PROMOTION_OPT_OUT: Readonly<Record<string, string>> = {};
  * The runner's steps the driver plays, by name. A runner method that names a step (`…Due`, `…Step`) and isn't listed
  * here fails the kit (`unknownSteps`): a new kind of step must be played by the driver, never skipped silently.
  */
-export const KNOWN_STEPS = ["lightsOutDue", "bounceDue", "alfilStep", "carrotDue", "repaintDue", "waterDue", "hoopsDue", "hopDue", "extraMoveDue", "funhouseDue", "bossKillDue"] as const;
+export const KNOWN_STEPS = ["lightsOutDue", "bounceDue", "alfilStep", "carrotDue", "repaintDue", "waterDue", "hopDue", "extraMoveDue", "funhouseDue", "bossKillDue"] as const;
 
 /** Runner methods that look like steps but aren't in KNOWN_STEPS. */
 export function unknownSteps(): string[] {
@@ -548,12 +548,6 @@ export async function runBattle(k: KitBattle, sf: StockfishMoves | null): Promis
         note("water");
         await c.position(r, "the watering");
         c.promotion(r, crowdLeft, "the watering");
-      }
-      if (r.bossToMove() && r.hoopsDue()) {
-        await r.playHoops(engines).catch(() => r.applyHoops(null));
-        note("hoops");
-        await c.position(r, "the hoops");
-        c.promotion(r, crowdLeft, "the hoops");
       }
       if (r.bossToMove() && r.hopDue()) {
         await r.playHop(engines).catch(() => r.applyHop(null));

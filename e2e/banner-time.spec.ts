@@ -151,7 +151,7 @@ test("Leapfrog: LEAPFROG! up its length (was 0.72 s), the hop after it", async (
   await check(page, "LEAPFROG! (Chub & Chirp) → the hop");
 });
 
-test("Babur's hoops: his warning, RAGE!, up its length, your turn after it (the hoops' cast has no banner of its own)", async ({ page }) => {
+test("Babur's hoops: his warning, RAGE!, up its length, your turn after it (the cast's own HOOPS! after his move: tiger.spec.ts)", async ({ page }) => {
   test.setTimeout(4 * 60_000);
   await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&power=hoops${plusParam}`);
   await bossAloneFromHome(page);

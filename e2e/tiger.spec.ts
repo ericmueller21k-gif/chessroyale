@@ -11,8 +11,9 @@ import { test, bossAloneFromHome, createLobbyFromHome, submitMove } from "./help
  *   balloon tossed from his paw), its stages on the page's clock (`?seedspeed=12`: a stage a second, never a real wait), a landing
  *   (`?balloon=pawn&stage=4`: every balloon a ready pawn, from 1.e4 d5 2.exd5 Qxd5) with its flight and his piece appearing at the
  *   landing's puff, a pop (`?balloon=fakequeen&stage=4`) and his wince.
- * - Hoops (`&power=hoops`): blocks within ranks 2 to 7, your allowed moves never crossing their walls, for exactly your next 2 moves;
- *   the cast with a hoop flying to each, three rings burning, a move through one refused with its words, dying, then out.
+ * - Hoops (`&power=hoops`): after his move (Oct 24: he keeps his turn): his move on the board, then the HOOPS! banner with nothing
+ *   under it, then the cast with a hoop flying to each, then your turn; blocks within ranks 2 to 7, your allowed moves never crossing
+ *   their walls, for exactly your next 2 moves; three rings burning, a move through one refused with its words, dying, then out.
  * - Online: a reload mid-hoops draws the rings as they are, without the cast again. The pump's place in the bar at 320 and 1280.
  */
 const desktop = () => test.info().project.name === "desktop";
@@ -65,6 +66,11 @@ type Rec = {
   hoops: number;
   cast: boolean;
   limp: boolean;
+  /** The HOOPS! banner's band over the board. */
+  banner: boolean;
+  /** The match's phase, and the squares the board draws a piece on. */
+  phase: string;
+  pieces: string;
 };
 /** What the page draws of him, every frame: the pump, his figure, a flight and landing, the rings, the cast. */
 async function record(page: Page) {
@@ -92,6 +98,15 @@ async function record(page: Page) {
         hoops: document.querySelectorAll(".tg-hoop").length,
         cast: !!document.querySelector(".pm-hoops"),
         limp: !!document.querySelector(".tg-limp"),
+        banner: (() => {
+          const el = [...document.querySelectorAll(".fight-banner")].find((e) => /HOOPS!/.test(e.textContent ?? ""));
+          const box = el?.getBoundingClientRect();
+          const band = el?.querySelector(".fb-band")?.getBoundingClientRect();
+          return !!box && !!band && Math.min(box.right, band.right) - Math.max(box.left, band.left) > 1;
+        })(),
+        phase: w.match?.phase?.kind ?? "none",
+        // (Only while he has the turn: the one moment it's read, so the other frames stay as light as before.)
+        pieces: w.match?.phase?.kind === "boss" ? [...document.querySelectorAll(".hb-board piece[data-square]:not(.fading)")].map((e) => e.getAttribute("data-square")).sort().join(" ") : "",
       });
       if (w.__tg.length > 6000) w.__tg.splice(0, 1000);
       requestAnimationFrame(look);
@@ -102,7 +117,7 @@ async function record(page: Page) {
 }
 const recorded = (page: Page) => page.evaluate(() => (window as any).__tg as Rec[]);
 
-test("Babur: a hoops cast walls off its blocks for exactly two of your moves: the hoops thrown, three rings burning, a move through one refused, dying, then out", async ({ page }) => {
+test("Babur: his move, then the hoops (HOOPS! with nothing under it, the throw), then your turn; the walls for exactly two of your moves: three rings burning, a move through one refused, dying, then out", async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -113,7 +128,7 @@ test("Babur: a hoops cast walls off its blocks for exactly two of your moves: th
   await record(page);
   const first = await state(page);
   expect(first.boss.id).toBe("tiger");
-  // Your moves until he has cast (the warning as the second turn begins, the cast at the start of his turn after it).
+  // Your moves until he has cast (the warning as the second turn begins, the cast after his move on his turn after it).
   let before = first;
   for (let i = 0; i < 6; i++) {
     await yourMove(page);
@@ -128,12 +143,28 @@ test("Babur: a hoops cast walls off its blocks for exactly two of your moves: th
   const hoops = cast.boss.powers.hoops;
   expect(hoops).toMatchObject({ left: BOSS_POWERS.hoopsCrowdMoves });
   expect(hoopsValid(hoops.blocks)).toBe(true);
-  // His whole turn: no move of his after your last.
-  expect(cast.history.length).toBe(before.history.length + 1);
+  // He kept his turn: your move, then his, then the hoops.
+  expect(cast.history.length).toBe(before.history.length + 2);
+  const his0 = cast.history.at(-1)!;
   await expect.poll(() => kinds(page), { timeout: 10_000 }).toContain("hoops");
-  // On screen: his cast at the board's corner, a hoop flying to each block, the rings landing one by one, then all three burning.
+  // On screen: his move first (his piece on its square before the banner), then HOOPS! up its length with nothing under it, then
+  // his cast at the board's corner, a hoop flying to each block, the rings landing one by one, then your turn with all three burning.
   await page.waitForTimeout(400);
   let rec = await recorded(page);
+  const fb = rec.findIndex((r) => r.banner);
+  expect(fb, "the HOOPS! banner").toBeGreaterThan(-1);
+  const lb = rec.length - 1 - [...rec].reverse().findIndex((r) => r.banner);
+  const onTo = (r: Rec) => r.pieces.split(" ").includes(his0.slice(2, 4));
+  const offFrom = (r: Rec) => !r.pieces.split(" ").includes(his0.slice(0, 2));
+  expect(onTo(rec[fb]!) && offFrom(rec[fb]!), `his move ${his0} drawn before the banner`).toBe(true);
+  const under = rec.slice(fb, lb + 1).filter((r) => r.hoops > 0 || r.rings.length > 0);
+  expect(under, "nothing under the banner").toEqual([]);
+  expect(rec[lb]!.now - rec[fb]!.now, "the banner up a boss banner's length").toBeGreaterThan(1500);
+  const firstHoop = rec.findIndex((r, i) => i > fb && r.hoops > 0);
+  expect(firstHoop, "a hoop thrown after the banner").toBeGreaterThan(lb);
+  const play = rec.findIndex((r, i) => i > fb && r.phase === "play");
+  expect(play, "then your turn").toBeGreaterThan(firstHoop);
+  expect(rec.slice(play).some((r) => r.hoops > 0), "no hoop in flight on your turn").toBe(false);
   expect(rec.some((r) => r.cast), "his cast").toBe(true);
   expect(Math.max(...rec.map((r) => r.hoops)), "a hoop in flight").toBeGreaterThanOrEqual(1);
   expect(rec.find((r) => r.rings.length)!.rings, "the first ring lands alone").toHaveLength(1);

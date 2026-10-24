@@ -1,5 +1,38 @@
 # Babur, the circus tiger: calibrating Balloons and Hoops (Oct 23-24, 2026)
 
+## Oct 24 (later): the hoops after his move, 2 to 4 a battle
+
+Eric, Oct 24: "he cannot lose five turns a game because of his ults… he plays his move, then before your turn, he throws the
+rings… It should be… 2 to 4 times per game." The hoops now come **after his move** (he keeps his turn; the blocks chosen on
+the position after it: docs/decisions/2026-10-24-babur-hoops-after-his-move.md), and `rageSpeed.tiger` comes down from 1.6.
+The aim: about 3 casts at the 60-move cap, at least 2 in a typical battle.
+
+**Shipped: `rageSpeed.tiger` 1.3.** The first run, at 1.1 (an estimate from babur12R10's 4.4 casts per 60 moves), gave 1.80
+casts a battle, under 2: he keeps his turn now, so his battles are shorter (39 moves, against 47). By the brief's rule (sweep
+only outside 2 to 4) one more run, at 1.3: **2.55 casts a battle**, 3.45 per 60 moves, in the range; the sweep stopped there.
+The four battles that reached the cap had 4.5 each (4, 5, 5 and 4 at 1.3; 3 and 4 at 1.1): too few to read alone.
+
+The same 10 s crowd as babur12R10 (`"pickSec":10`), seed 41, games 0 to 19, the shipped balloons (12 s stages, pops 50 / 65 /
+65 / 65). Landed material: pawn 1, knight 3, bishop 3, rook 5, queen 9. Rows: `reports/boss-sim/raid-<tag>.jsonl`.
+
+| Run | Hoops | rageSpeed | Battles | W / D / L | Crowd score (± 1 s.e.) | Crowd moves: mean (range) | At the cap | Casts a battle (0 / 1 / 2 / 3 / 4+) | Casts per 60 moves | Waited (his move gave check) | Balloons placed / landed / popped | Landed material a battle (± 1 s.e.) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| babur12R10 (#333) | his whole turn | 1.6 | 20 | 5 / 4 / 11 | 0.35 (± 0.10) | 47 (15-60) | 7 | 3.45 | 4.41 | 0 (29 waits: the pass guard and none fitting) | 9.70 / 2.75 / 5.95 | 6.25 (± 0.98) |
+| baburAfterR10 | after his move | 1.1 | 20 | 1 / 2 / 17 | 0.10 (± 0.06) | 39 (16-60) | 2 | 1.80 (2 / 7 / 5 / 5 / 1) | 2.76 | 9 (9) | 8.15 / 2.30 / 4.85 | 4.90 (± 0.86) |
+| baburAfter13R10 | after his move | 1.3 | 20 | 2 / 1 / 17 | **0.12** (± 0.07) | 44 (19-60) | 4 | **2.55** (0 / 6 / 3 / 7 / 4) | 3.45 | 13 (11) | 9.20 / 3.00 / 5.30 | 5.90 (± 0.71) |
+
+**Strength (reported, not tuned; the director takes it to Eric):** keeping his turn makes him much stronger. The 10 s crowd
+scores **0.12** (± 0.07) at the shipped values, against **0.35** for the same crowd after the faster balloons (#333,
+babur12R10), 0.40 in the review's run (tigerR10, 30 s stages) and the director's 0.25 to 0.40 target. Eric's pace (a 5 s
+pick: 0.35 with 5.5 landed in #333, babur12P) was not re-run. Landed material per battle is about the same as before (5.9
+against 6.25): the loss is the turns he no longer gives away (3.45 a battle at 1.6) while his walls still bite (they took
+the crowd's engine-best move on 66% of the walled turns, 67 of 102).
+
+**Notes.** His move gave check on 11 of the 64 turns the hoops were due at 1.3 (9 of 45 at 1.1; 2 more at 1.3 found no block that fit): no cast then, again after his
+next move (the guard's "no king in check"). The cast's gain is now measured against the same position without walls, so it's
+never the lost tempo's negative any more: median 0.06, mean 0.43, 13 of 51 casts in [0.5, 2.5] (the walls the engine sees only
+at the root). His whole turn on a computer (his move, the cast, a landing): median 2.6 s.
+
 ## Oct 24: the balloons blow up faster (Eric's pace)
 
 Eric, Oct 24, after a ~60-move Boss-alone game against him: the balloons weren't landing, "he's way too easy otherwise", and

@@ -4,13 +4,14 @@ import {
   HOOPS_BEATS,
   HOOP_CORNERS,
   MatchRunner,
-  PASS_WAIT,
+  POWER_BANNERS,
   POWER_FX,
   TIGER_ANIM,
   TIGER_FX,
   applyMove,
   attackAcross,
   balloonStage,
+  bannerLeadMs,
   bossAllowed,
   crossesHoop,
   crowdAllowed,
@@ -21,6 +22,7 @@ import {
   hoopStops,
   hoopsAnswer,
   hoopsCheck,
+  hoopsCode,
   hoopsFrom,
   hoopsGuard,
   hoopsTouch,
@@ -48,7 +50,7 @@ import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.
 /**
  * The circus tiger (docs/decisions/2026-10-23-tiger-rules.md): Balloons (a real-time pump: a balloon on the nozzle at the
  * start of his turn, four stages of 12 s, at the end of a turn it lands as his piece in the shape's band or pops) and
- * Hoops (his whole turn: three 2x2 blocks walled for the crowd's next 2 moves, placed by the engine in a band).
+ * Hoops (after his move, Oct 24: three 2x2 blocks walled for the crowd's next 2 moves, placed by the engine in a band).
  */
 
 const S = BOSS_POWERS;
@@ -77,9 +79,8 @@ async function crowdMove(r: MatchRunner, pick?: (fen: string, allowed: string[])
   return move;
 }
 
-/** His turn: the hoops when due (and he moves if they wait), else his move. */
+/** His turn: his move, and the hoops after it when they're due. */
 async function histurn(r: MatchRunner, engines: EngineLike[] = [fakeEngine()]) {
-  if (r.hoopsDue()) await r.playHoops(engines);
   if (r.bossToMove()) await r.playBoss(engines[0]!);
 }
 
@@ -173,7 +174,9 @@ describe("the circus tiger: his sheet", () => {
     expect(HOOPS_BEATS.total).toBe(Math.max(1360, 860 + HOOPS_BEATS.flyMs + 330));
     expect(TIGER_FX).toEqual({ place: 0, balloonLand: 0, pop: 0, balloonCheer: 0, balloonBigCheer: 0, wince: 0, hoops: HOOPS_BEATS.total, hoopsOut: 0 });
     for (const [k, v] of Object.entries(TIGER_FX)) expect(POWER_FX[k as keyof typeof POWER_FX]).toBe(v);
-    expect(powerMomentMs([{ kind: "hoops" }, { kind: "balloonLand" }, { kind: "balloonCheer" }])).toBe(HOOPS_BEATS.total);
+    // (The cast's HOOPS! banner, Oct 24: its hold before the first throw, a boss banner's whole length; the landing after it.)
+    expect(POWER_BANNERS.hoops).toEqual([[0, HOOPS_BEATS.throwsAt[0]]]);
+    expect(powerMomentMs([{ kind: "hoops" }, { kind: "balloonLand" }, { kind: "balloonCheer" }])).toBe(HOOPS_BEATS.total + bannerLeadMs("hoops"));
   });
 });
 
@@ -705,84 +708,124 @@ describe("Hoops: the cast", () => {
     expect(hoopOrder(empty, [], 43, 0)).not.toEqual(e);
   });
 
-  const START = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 5 4";
+  /** The position after his move (Black's), the crowd (White) to move: where his hoops are chosen. */
+  const AFTER = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 5";
 
-  it("hoopsFrom: three blocks apart in the inner ranks, block by block, his gain in the band nearest its target", async () => {
-    const pick = (await hoopsFrom([mobilityEngine()], START, { order: 9 }))!;
+  it("hoopsFrom, on the position after his move (the crowd to move): three blocks apart in the inner ranks, block by block, his gain against the same position without walls, in the band nearest its target", async () => {
+    const pick = (await hoopsFrom([mobilityEngine()], AFTER, { order: 9 }))!;
     expect(pick).not.toBeNull();
     expect(pick.blocks).toHaveLength(3);
     expect(hoopsValid(pick.blocks)).toBe(true);
     for (const c of pick.blocks) expect(Number(c[1])).toBeGreaterThanOrEqual(3);
-    expect(hoopsGuard(pick.fen, pick.blocks)).toBe(true);
+    expect(hoopsGuard(AFTER, pick.blocks)).toBe(true);
     expect(pick.looks).toBeLessThanOrEqual(S.hoopsLooks * S.hoopsCount);
-    expect(sideToMove(pick.fen)).toBe("w");
+    // (The walls only take the crowd's moves away: against the same position without them, never a loss for him.)
+    expect(pick.gain).toBeGreaterThan(0);
     // (The same answer everywhere for the same ask; the server's check accepts it.)
-    expect(await hoopsFrom([mobilityEngine()], START, { order: 9 })).toEqual(pick);
-    expect(hoopsCheck(START, pick.blocks.join(" "))).toMatchObject({ blocks: pick.blocks, land: null });
+    expect(await hoopsFrom([mobilityEngine()], AFTER, { order: 9 })).toEqual(pick);
+    expect(hoopsCheck(AFTER, hoopsCode(pick.blocks))).toEqual(pick.blocks);
   });
 
   it("past hoopsTimeMs it answers in time with the blocks placed so far (at least one)", async () => {
     let t = 0;
     const slow: EngineLike = { ...mobilityEngine(), topMovesAt: async (f, n, nodes, only) => ((t += 3_000), mobilityEngine().topMovesAt!(f, n, nodes, only)) };
-    const pick = (await hoopsFrom([slow], START, { order: 9 }, BOSS_POWERS, () => t))!;
+    const pick = (await hoopsFrom([slow], AFTER, { order: 9 }, BOSS_POWERS, () => t))!;
     expect(pick.late).toBe(true);
     expect(pick.blocks.length).toBeGreaterThanOrEqual(1);
     expect(pick.blocks.length).toBeLessThan(3);
-    expect(hoopsCheck(START, pick.blocks.join(" "))).not.toBeNull();
+    expect(hoopsCheck(AFTER, pick.blocks.join(" "))).not.toBeNull();
   });
 
-  it("hoopsCheck refuses what isn't a cast: junk, a block on rank 1 or 8, touching blocks, more than three, a position the guards refuse", () => {
-    for (const bad of ["", "junk", "a1", "h3", "c3 d4", "a2 d2 g2 a5", "c3 c3"]) expect(hoopsCheck(START, bad), bad).toBeNull();
-    expect(hoopsCheck(START, "c3 f5 @e4")).toMatchObject({ blocks: ["c3", "f5"], land: "e4" });
-    expect(hoopsCheck(START, "c3 @e4 @e5")).toBeNull();
-    expect(hoopsCheck("6k1/8/8/8/7b/8/8/r3K3 b - - 0 1", "a3")).toBeNull();
+  it("hoopsCheck refuses what isn't a cast: junk, a block on rank 1 or 8, touching blocks, more than three, a position the guards refuse (his move gave check)", () => {
+    for (const bad of ["", "junk", "a1", "h3", "c3 d4", "a2 d2 g2 a5", "c3 c3", "c3 f5 @e4"]) expect(hoopsCheck(AFTER, bad), bad).toBeNull();
+    expect(hoopsCheck(AFTER, "c3 f5")).toEqual(["c3", "f5"]);
+    // (The crowd's king in check after his move: no cast that turn.)
+    expect(hoopsCheck("6k1/8/8/8/7b/8/8/r3K3 w - - 0 1", "a3")).toBeNull();
   });
 
-  it("the pass guard: a cast that loses him real material waits (PASS_WAIT), unless it's the test switch's or the trigger's", async () => {
-    const lose: EngineLike = { ...mobilityEngine(), topMovesAt: async (f, n, _nodes, only) => (only ?? legalMoves(f)).slice(0, n).map((move) => ({ move, expected: sideToMove(f) === "b" ? 0.5 : 0.99 })) };
-    expect((await hoopsAnswer([lose], START, { order: 1 })).answer).toBe(PASS_WAIT);
-    const any = await hoopsAnswer([lose], START, { order: 1 }, null, true);
-    expect(any.answer).not.toBe(PASS_WAIT);
-    expect(hoopsCheck(START, any.answer)).not.toBeNull();
+  it("hoopsAnswer: the cast's blocks, then a due balloon's landing on the same position, outside them; without a cast asked, the landing alone; no block fits, \"\"", async () => {
+    const quiet = "1nb3k1/pp3pp1/2p1p3/3p4/3P4/2P1P3/PP3PPP/1NB3K1 w - - 0 13";
+    const ask = { shape: "n" as const, order: 5, blocks: [] };
+    const both = await hoopsAnswer([materialEngine()], quiet, { order: 3 }, ask);
+    expect(both.answer).toBe(hoopsCode(both.pick!.blocks));
+    expect(both.land).not.toBeNull();
+    for (const c of both.pick!.blocks) expect(inHoop(c, both.land!.square)).toBe(false);
+    expect(landCheck(quiet, "n", both.land!.square, both.pick!.blocks)).not.toBeNull();
+    const alone = await hoopsAnswer([materialEngine()], quiet, null, ask);
+    expect(alone).toMatchObject({ answer: "", pick: null });
+    expect(alone.land).toEqual(await landFrom([materialEngine()], quiet, ask));
+    const none: EngineLike = { topMoves: async () => [], scoreMoves: async () => [], topMovesAt: async () => [] };
+    expect((await hoopsAnswer([none], quiet, { order: 3 })).answer).toBe("");
   });
 });
 
 describe("Hoops in a battle", () => {
+  /** On to his turn with the hoops due after his move (asked for with it). */
   async function toCast(b: Battle) {
-    for (let i = 0; i < 20 && !b.r.hoopsDue(); i++) await step(b);
-    expect(b.r.hoopsDue()).toBe(true);
+    for (let i = 0; i < 20 && !b.r.hoopsAsk(); i++) await step(b);
+    expect(b.r.hoopsAsk()).not.toBeNull();
   }
 
-  it("his whole turn at the start of his turn after the warning: the turn passes (a base at its ply), the cast's moment first, then a due balloon's", async () => {
+  it("after his move: a full meter, and he plays his move AND throws the hoops in the same turn, chosen on the position after his move; the cast's moment as the crowd's turn begins", async () => {
+    const b = battle(31, { test: "hoops" });
+    await toCast(b);
+    const id = b.r.state.boards[0]!;
+    const before = b.r.boards.get(id)!;
+    const ask = b.r.hoopsAsk()!;
+    const move = await b.r.playBoss(fakeEngine());
+    const board = b.r.boards.get(id)!;
+    // His move: played, on the board, the last move shown.
+    expect(board.history).toHaveLength(before.history.length + 1);
+    expect(board.history.at(-1)).toBe(move);
+    const after = applyMove(before.fen, move);
+    expect(board.lastMove).toBe(move);
+    expect(b.r.bossView()!.lastMove?.move).toBe(move);
+    // Then the hoops: the blocks the engines pick on the position after his move, the crowd to move.
+    const p = powersOf(b.r);
+    expect(p.hoops).toMatchObject({ at: b.r.boss!.crowdMoves, left: 2 });
+    const h = p.hoops!;
+    expect(hoopsValid(h.blocks)).toBe(true);
+    expect(h.blocks).toEqual((await hoopsFrom([fakeEngine()], after, ask))!.blocks);
+    expect(hoopsCheck(after, h.blocks.join(" "))).toEqual(h.blocks);
+    expect(sideToMove(board.fen)).toBe(b.r.boss!.crowdSide);
+    expect(p.ults).toBe(1);
+    expect(p.ultAt).toBe(b.r.boss!.crowdMoves);
+    expect(tigerEvents(p.events).map((e) => e.kind)[0]).toBe("hoops");
+    expect(p.events.find((e) => e.kind === "hoops")).toMatchObject({ blocks: h.blocks });
+    expect(powerTurn(b.r.state.boss!)).toBe(true);
+    expect(b.r.bossView()!.powers!.hoops).toEqual({ blocks: h.blocks, left: 2 });
+    // (Nothing more asked of him this turn: the crowd moves next.)
+    expect(b.r.bossToMove()).toBe(false);
+    expect(b.r.hoopsAsk()).toBeNull();
+  });
+
+  it("a ready balloon and the hoops in the same turn: his move, the cast, then the balloon's end, landing outside the hoops (checked with the walls standing); on screen the cast first", async () => {
     const b = battle(31, { test: "hoops", balloon: "pawn", stage: 4 });
     await toCast(b);
     const ply = b.r.boards.get(b.r.state.boards[0]!)!.history.length;
-    const h = (await b.r.playHoops([fakeEngine()]))!;
-    expect(h).not.toBeNull();
-    expect(hoopsValid(h.blocks)).toBe(true);
+    expect(b.r.balloonAsk()).not.toBeNull();
+    await b.r.playBoss(fakeEngine());
     const board = b.r.boards.get(b.r.state.boards[0]!)!;
-    expect(sideToMove(board.fen)).toBe(b.r.boss!.crowdSide);
-    expect(board.history).toHaveLength(ply);
-    expect(fenAtPly(board.history, ply, board.bases)).toBe(board.fen);
+    expect(board.history).toHaveLength(ply + 1);
     const p = powersOf(b.r);
-    expect(p.hoops).toMatchObject({ blocks: h.blocks, at: b.r.boss!.crowdMoves, left: 2 });
-    expect(p.ults).toBe(1);
-    const kinds = tigerEvents(p.events).map((e) => e.kind);
-    expect(kinds[0]).toBe("hoops");
-    expect(p.events.find((e) => e.kind === "hoops")).toMatchObject({ blocks: h.blocks });
-    // (A due pawn balloon landed after the cast, outside the hoops.)
+    const h = p.hoops!;
+    expect(h).toMatchObject({ left: 2 });
     const last = p.balloon!.last!;
-    expect(kinds.slice(1)).toEqual(last.outcome === "land" ? ["balloonLand", "balloonCheer"] : ["pop", "wince"]);
-    if (last.outcome === "land") for (const c of h.blocks) expect(inHoop(c, last.square!)).toBe(false);
-    expect(powerTurn(b.r.state.boss!)).toBe(true);
-    expect(b.r.bossView()!.powers!.hoops).toEqual({ blocks: h.blocks, left: 2 });
+    expect(last.at).toBe(b.r.boss!.crowdMoves);
+    const kinds = tigerEvents(p.events).map((e) => e.kind);
+    expect(kinds).toEqual(last.outcome === "land" ? ["hoops", "balloonLand", "balloonCheer"] : ["hoops", "pop", "wince"]);
+    if (last.outcome === "land") {
+      for (const c of h.blocks) expect(inHoop(c, last.square!)).toBe(false);
+      expect(pieceAt(board.fen, last.square!)?.type).toBe("p");
+      expect(fenAtPly(board.history, board.history.length, board.bases)).toBe(board.fen);
+    }
   });
 
   it("the walls stand for exactly the crowd's next 2 moves (his move between them too), then go out (`hoopsOut`) as the second lands", async () => {
     const b = battle(32, { test: "hoops" });
     await toCast(b);
-    const h = (await b.r.playHoops([fakeEngine()]))!;
-    const blocks = h.blocks;
+    await b.r.playBoss(fakeEngine());
+    const blocks = powersOf(b.r).hoops!.blocks;
     // Crowd move 1: only moves the walls leave.
     let fen = fenOf(b.r);
     b.r.deal();
@@ -790,7 +833,8 @@ describe("Hoops in a battle", () => {
     for (const m of allowed1) expect(hoopStops(m, fen, blocks)).toBe(false);
     await crowdMove(b.r);
     expect(powersOf(b.r).hoops).toMatchObject({ left: 1 });
-    // His move: the walls too.
+    // His move: the walls too, and no second cast.
+    expect(b.r.hoopsAsk()).toBeNull();
     fen = fenOf(b.r);
     const his = b.r.bossAllowed() ?? legalMoves(fen);
     for (const m of his) expect(hoopStops(m, fen, blocks)).toBe(false);
@@ -810,41 +854,47 @@ describe("Hoops in a battle", () => {
     expect(powersOf(b.r).ultAt).toBeUndefined();
   });
 
-  it("the host's answer is checked: junk, \"\" or PASS_WAIT and the cast waits for his next turn, and he moves (a due balloon still ends his turn)", async () => {
-    for (const junk of ["", "zz", PASS_WAIT, "a1 b1", null]) {
-      const b = battle(33, { test: "hoops", balloon: "knight", stage: 4 });
+  it("the host's answer is checked: junk, \"\" (none fits) or none at all and no cast, his move stands, the warning stays, and it's asked again with his next move", async () => {
+    const none: EngineLike = { topMoves: async () => [], scoreMoves: async () => [], topMovesAt: async () => [] };
+    for (const junk of ["", "zz", "a1 b1", "c3 c3", "c3 @e4", null]) {
+      const b = battle(33, { test: "hoops" });
       await toCast(b);
-      onPosition(b.r, QUIET_B, "w", { ...(powersOf(b.r).balloon?.nozzle ? {} : {}) });
-      b.r.balloonAsk();
-      expect(b.r.applyHoops(junk)).toBeNull();
-      expect(b.r.hoopsDue()).toBe(false);
-      expect(b.r.bossToMove()).toBe(true);
-      expect(powersOf(b.r).hoopsWait).toBe(b.r.boss!.crowdMoves);
-      await b.r.playBoss(fakeEngine());
-      expect(powersOf(b.r).balloon!.last).toMatchObject({ outcome: "land", shape: "n" });
-      // (Again at the start of his next turn, the warning staying.)
+      const fen = fenOf(b.r);
+      const move = (b.r.bossAllowed() ?? legalMoves(fen))[0]!;
+      if (junk === "") expect((await hoopsAnswer([none], applyMove(fen, move), b.r.hoopsAsk()!)).answer).toBe("");
+      b.r.applyBossMove(move, undefined, { hoops: junk });
+      expect(b.r.boards.get(b.r.state.boards[0]!)!.history.at(-1)).toBe(move);
+      expect(powersOf(b.r).hoops ?? null).toBeNull();
+      expect(powersOf(b.r).ultAt).toBeUndefined();
+      expect(powersOf(b.r).warnAt).toBeDefined();
       await crowdMove(b.r);
-      expect(b.r.hoopsDue()).toBe(true);
+      expect(b.r.hoopsAsk()).not.toBeNull();
     }
   });
 
-  it("no block fits: no cast (the meter stays full) and he moves", async () => {
-    const b = battle(34, { test: "hoops" });
-    await toCast(b);
-    const none: EngineLike = { topMoves: async () => [], scoreMoves: async () => [], topMovesAt: async () => [] };
-    expect(await b.r.playHoops([none])).toBeNull();
-    expect(powersOf(b.r).ultAt).toBeUndefined();
-    expect(powersOf(b.r).warnAt).toBeDefined();
-    expect(b.r.bossToMove()).toBe(true);
+  it("a cast when none is due (before the warning) is refused: his move alone", async () => {
+    const b = battle(36);
+    for (let i = 0; i < 4 && !b.r.bossToMove(); i++) await step(b);
+    expect(b.r.hoopsAsk()).toBeNull();
+    const fen = fenOf(b.r);
+    const move = (b.r.bossAllowed() ?? legalMoves(fen))[0]!;
+    const blocks = (await hoopsFrom([mobilityEngine()], applyMove(fen, move), { order: 1 }))!.blocks;
+    b.r.applyBossMove(move, undefined, { hoops: hoopsCode(blocks) });
+    expect(powersOf(b.r).hoops ?? null).toBeNull();
+    expect(powersOf(b.r).ults ?? 0).toBe(0);
   });
 
-  it("the admins' trigger brings it at the start of his next turn, without the warning", async () => {
+  it("the admins' trigger brings it after his next move, without the warning", async () => {
     const b = battle(35);
     for (let i = 0; i < 4; i++) await step(b);
     expect(b.r.triggerUltimate()).toBe(true);
-    for (let i = 0; i < 4 && !b.r.hoopsDue(); i++) await step(b);
-    expect(b.r.hoopsDue()).toBe(true);
-    expect(b.r.hoopsAny()).toBe(true);
+    for (let i = 0; i < 4 && !b.r.hoopsAsk(); i++) await step(b);
+    expect(b.r.hoopsAsk()).not.toBeNull();
+    const ply = b.r.boards.get(b.r.state.boards[0]!)!.history.length;
+    await b.r.playBoss(fakeEngine());
+    expect(b.r.boards.get(b.r.state.boards[0]!)!.history).toHaveLength(ply + 1);
+    expect(powersOf(b.r).hoops).toMatchObject({ left: 2 });
+    expect(powersOf(b.r).ultNext).toBeFalsy();
     expect(powersOf(b.r).events.some((e) => e.kind === "warn")).toBe(false);
   });
 });

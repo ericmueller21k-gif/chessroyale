@@ -10,10 +10,9 @@ import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { SELECT_LINES, SELECT_SOUND } from "../src/characters/boss-select.ts";
 import { bossKit } from "../src/characters/kits.ts";
 import { EFFECTS, animLength, cueAt } from "../src/characters/power-art.ts";
-import { HOP_TRIP_MS, TIGER_UI, blockCell, hoopsLine, tripMove } from "../src/components/Tiger.tsx";
+import { HOP_TRIP_MS, TIGER_UI, blockCell, tripMove } from "../src/components/Tiger.tsx";
 import { POOF_AT, balloonFen, landBeats, noteTiger, pumpShows, resetTiger, ringShows, ringState, type TigerShow } from "../src/tiger-show.ts";
 import { REFUSED } from "../src/refused.ts";
-import type { BossView } from "../src/game.ts";
 
 /**
  * Babur, the circus tiger, in the game (Oct 24: live, his art wired in): his kit, lines and sounds, the art's timing against the rules',
@@ -52,13 +51,10 @@ describe("Babur: playable", () => {
     expect(SELECT_SOUND.tiger).toBe("tigerHello");
   });
 
-  it("goes with the warning's words, the dock's on his cast, and the rules' refusal", () => {
+  it("goes with the warning's words, his move in the dock on his cast's turn (he keeps his turn: Oct 24), and the rules' refusal", () => {
     expect(TIGER_UI.ultimate).toEqual({ name: "Hoops", when: "After your move" });
-    expect(hoopsLine({ name: TIGER_NAME })).toBe("Babur spent his turn on the hoops.");
-    const v = (hoops: { blocks: string[]; left: number } | null, lastMove: unknown) => ({ name: TIGER_NAME, powers: { hoops }, lastMove }) as unknown as BossView;
-    expect(TIGER_UI.noMove(v({ blocks: ["c3"], left: 2 }, null))).toBe("Babur spent his turn on the hoops.");
-    expect(TIGER_UI.noMove(v({ blocks: ["c3"], left: 1 }, null))).toBeNull();
-    expect(TIGER_UI.noMove(v({ blocks: ["c3"], left: 2 }, { move: "e7e5" }))).toBeNull();
+    // (No "spent his turn" line: the dock shows his move, as any turn of his.)
+    expect("noMove" in TIGER_UI).toBe(false);
     expect(REFUSED.hoop).toBe("A burning hoop is in the way.");
   });
 });

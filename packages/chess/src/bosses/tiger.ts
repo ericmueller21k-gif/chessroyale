@@ -8,9 +8,9 @@
  *   balloonStageSec seconds on the battle's clock (the match runner's `clock`, as Puddles' seeds: online the server's, solo
  *   and Boss alone the page's time while it's in view; without one, a crowd move counts as seedEverySec), then waits,
  *   ready. Stage changes are drawn from the clock (the view's `at` and `ready`): no moment.
- * - **At the end of his turn** (after his move, or after his hoops cast) a balloon that was ready as his turn's work was
- *   asked for (the request for his move or his hoops: `asked`/`due`, so the host, the server and solo decide on the same
- *   balloon) lands as one of his pieces, or pops. Then the nozzle is empty until his next turn begins. One not ready then
+ * - **At the end of his turn** (after his move, and after his hoops when they come with it) a balloon that was ready as
+ *   his turn's work was asked for (the request for his move: `asked`/`due`, so the host, the server and solo decide on the
+ *   same balloon) lands as one of his pieces, or pops. Then the nozzle is empty until his next turn begins. One not ready then
  *   keeps blowing up and is looked at again at the end of his next turn.
  * - **What it is**, rolled as it goes on (balloonOdds): a pawn, knight, bishop, rook, a fake queen or a queen; and whether
  *   it pops (balloonPops of that shape's: a fake queen always, a queen never: about half). The shape and color come from
@@ -27,9 +27,11 @@
  *   the nozzle until the end of his next turn; then a dud pops and a real one lands.
  *
  * His ultimate, Hoops (the rage meter, `rageSpeed.tiger`):
- * - The usual warning as a crowd turn begins; at the start of his turn after it, his whole turn (passTurn, a base at its
- *   ply): hoopsCount burning hoops, each a 2x2 block (named by its corner, its lowest file and rank) within ranks 2 to 7,
- *   apart from each other (never touching, sides or corners). Ready balloons land (or pop) at the end of it, outside them.
+ * - The usual warning as a crowd turn begins; on his turn after it, **after his move** (Eric, Oct 24: "he plays his move,
+ *   then before your turn, he throws the rings"; he keeps his turn): hoopsCount burning hoops, each a 2x2 block (named by
+ *   its corner, its lowest file and rank) within ranks 2 to 7, apart from each other (never touching, sides or corners).
+ *   Asked for with his move (the request's `hoops`) and thrown at its end (afterBossMove, `cast`), before a ready balloon
+ *   lands (or pops), outside them: on screen the cast plays first, then the landing.
  * - **The walls** (hoopStops), for both sides, for the crowd's next hoopsCrowdMoves moves and his move between them: no
  *   move crosses a hoop's wall, into a block or out of it, sliding or jumping (a slider can't pass through a block; a
  *   capture en passant across a wall neither); pieces inside move within their block. No capture and no attack across a
@@ -37,18 +39,19 @@
  *   take moves away, so every check is one the board and the engine agree on). They go in the move lists the way Big
  *   Boy's toy blocks do (crowdFilter, bossStops: the crowd's allowed moves, the judge's and the bots', his own search's
  *   searchmoves), and lift for a turn that would have none, as every power's limit does.
- * - **Where, by the engine** (hoopsFrom, the host's engines; the server checks the answer with hoopsCheck): block by
- *   block, each the one (of up to hoopsLooks a step, seeded, the inner ranks first) that keeps his gain with the walls in
- *   force in hoopsBand, nearest hoopsTarget. Hard guards (hoopsGuard): the crowd always has a move, no mate in one for
- *   either side, no king in check. Fewer blocks fit: what fits (at least one); none, the pass guard (passLoses), or no
- *   answer: no cast this turn (the meter stays full) and he plays his move.
+ * - **Where, by the engine** (hoopsFrom, the host's engines; the server checks the answer with hoopsCheck), on the position
+ *   after his move, the crowd to move: block by block, each the one (of up to hoopsLooks a step, seeded, the inner ranks
+ *   first) that keeps his gain (the crowd's best with the walls in force against the same position without them) in
+ *   hoopsBand, nearest hoopsTarget. Hard guards (hoopsGuard): the crowd always has a move, no mate in one for either side,
+ *   no king in check (so a move of his that gives check leaves no cast that turn). Fewer blocks fit: what fits (at least
+ *   one); none, or no answer: no cast this turn (the meter stays full), again after his next move.
  */
 import { BOSS_POWERS, type Balloon, type BalloonResult, type BalloonShape, type BalloonState, type BossPowerSettings, type BossPowerState, type HoopsState, type PowerEvent, type Settings } from "@chessroyale/core";
 import { applyMove, attackedSquares, kingAttacked, kingAttackers, legalMoves, matingMoves, pieceAt, sideToMove, withPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { stockfishRefuses } from "../uci.ts";
-import { PASS_WAIT, eachOn, from, logit, meterFull, moveSquares, other, passLoses, powerRoll, testSwitch, to, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { eachOn, from, logit, meterFull, moveSquares, other, powerRoll, testSwitch, to, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 import { passTurn } from "./hollow.ts";
 
 // ---------------- His moments ----------------
@@ -97,7 +100,7 @@ export const TIGER_FX = { place: 0, balloonLand: 0, pop: 0, balloonCheer: 0, bal
 
 type BalloonSettings = Pick<BossPowerSettings, "balloonStages" | "balloonStageSec" | "balloonOdds" | "balloonPops" | "balloonColors">;
 type LandSettings = Pick<BossPowerSettings, "balloonBands" | "balloonLooks" | "balloonNodes" | "balloonTimeMs" | "bouncePawnLogit">;
-type HoopsSettings = Pick<BossPowerSettings, "hoopsCount" | "hoopsBand" | "hoopsTarget" | "hoopsLooks" | "hoopsNodes" | "hoopsTimeMs" | "bouncePawnLogit" | "passGuardPawns">;
+type HoopsSettings = Pick<BossPowerSettings, "hoopsCount" | "hoopsBand" | "hoopsTarget" | "hoopsLooks" | "hoopsNodes" | "hoopsTimeMs" | "bouncePawnLogit">;
 
 const SQUARES: readonly string[] = [..."abcdefgh"].flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`));
 const isSquare = (sq: string) => SQUARES.includes(sq);
@@ -416,7 +419,7 @@ export interface LandPick {
 }
 
 /**
- * Where his balloon lands (`fen`: the crowd to move, before it lands, after his move or his cast), on this device's engines
+ * Where his balloon lands (`fen`: the crowd to move, before it lands, after his move and any cast), on this device's engines
  * (the host's online, solo's, the sims'): up to balloonLooks squares in a seeded order, each passing every guard (landCheck:
  * never one the crowd attacks), each searched at balloonNodes (the crowd's best over the moves the walls leave), breathing
  * per square, within `limitMs` (balloonTimeMs; past it, what's searched so far). The least valuable: the one whose gain
@@ -488,10 +491,9 @@ export function hoopOrder(fen: string, chosen: readonly string[], order: number,
     .map((x) => x.c);
 }
 
-/** The engines' cast (hoopsFrom): the blocks in throw order, the position after (the crowd to move), his gain, the blocks weighed. */
+/** The engines' cast (hoopsFrom): the blocks in throw order, his gain, the blocks weighed. */
 export interface HoopsPick {
   blocks: string[];
-  fen: string;
   gain: number;
   looks: number;
   /** It reached hoopsTimeMs: the blocks placed so far. */
@@ -499,35 +501,35 @@ export interface HoopsPick {
 }
 
 /**
- * Where the engines throw his hoops (`fen`: him to move, before the cast), on this device's engines: block by block, up to
- * hoopsCount, each step weighing up to hoopsLooks blocks (hoopOrder: the ones that stop the most crowd moves first, apart from those already chosen, the whole set
- * passing hoopsGuard) and keeping the one whose total gain (his evaluation with the walls in force, the crowd to move,
- * against his before, him to move, in pawns of log-odds) is in hoopsBand nearest hoopsTarget, else nearest the band. At
- * most hoopsLooks x hoopsCount positions searched besides the one before, within hoopsTimeMs (its own clock, `now`; past
- * it, the blocks so far), breathing between steps. Null: no engine, no answer, he can't pass, or no block fits at all.
+ * Where the engines throw his hoops (`fen`: the position after his move, the crowd to move), on this device's engines:
+ * block by block, up to hoopsCount, each step weighing up to hoopsLooks blocks (hoopOrder: the ones that stop the most
+ * crowd moves first, apart from those already chosen, the whole set passing hoopsGuard) and keeping the one whose total
+ * gain (the crowd's best with the walls in force against its best in the same position without them, in pawns of
+ * log-odds, his way up) is in hoopsBand nearest hoopsTarget, else nearest the band. At most hoopsLooks x hoopsCount
+ * positions searched besides the one without walls, within hoopsTimeMs (its own clock, `now`; past it, the blocks so
+ * far), breathing between steps. Null: no engine, no answer, or no block fits at all.
  */
 export async function hoopsFrom(engines: readonly EngineLike[], fen: string, ask: HoopsAsk, s: HoopsSettings = BOSS_POWERS, now: () => number = () => performance.now()): Promise<HoopsPick | null> {
-  const passed = passTurn(fen);
-  if (!passed || !engines.length) return null;
+  if (!engines.length) return null;
   const p = pace(now, s.hoopsTimeMs);
   const before = await sideBest(engines[0]!, fen, [], s.hoopsNodes);
   if (before === null) return null;
-  const gainOf = (crowd: number) => (logit(1 - crowd) - logit(before)) / s.bouncePawnLogit;
+  const gainOf = (crowd: number) => (logit(1 - crowd) - logit(1 - before)) / s.bouncePawnLogit;
   const chosen: string[] = [];
   let gain: number | null = null;
   let looks = 0;
   for (let step = 0; step < s.hoopsCount && !p.over(); step++) {
     const options: string[][] = [];
-    for (const c of hoopOrder(passed, chosen, ask.order, step)) {
+    for (const c of hoopOrder(fen, chosen, ask.order, step)) {
       if (options.length >= s.hoopsLooks || p.over()) break;
       if (chosen.some((x) => hoopsTouch(x, c))) continue;
       await p.breathe();
       const blocks = [...chosen, c];
-      if (hoopsGuard(passed, blocks)) options.push(blocks);
+      if (hoopsGuard(fen, blocks)) options.push(blocks);
     }
     if (!options.length) break;
     looks += options.length;
-    const scores = await eachOn(engines, options, async (e, blocks) => (await p.breathe(), sideBest(e, passed, blocks, s.hoopsNodes)));
+    const scores = await eachOn(engines, options, async (e, blocks) => (await p.breathe(), sideBest(e, fen, blocks, s.hoopsNodes)));
     let best: { blocks: string[]; gain: number } | null = null;
     options.forEach((blocks, i) => {
       const c = scores[i];
@@ -541,53 +543,44 @@ export async function hoopsFrom(engines: readonly EngineLike[], fen: string, ask
     gain = b.gain;
   }
   if (!chosen.length || gain === null) return null;
-  return { blocks: chosen, fen: passed, gain: Math.round(gain * 100) / 100, looks, ...(p.over() ? { late: true as const } : {}) };
+  return { blocks: chosen, gain: Math.round(gain * 100) / 100, looks, ...(p.over() ? { late: true as const } : {}) };
 }
 
-/** The host's answer for a cast: its blocks in throw order, and "@" and the square a ready balloon lands on after it ("c3 f5 b6 @e4"). */
-export const hoopsCode = (blocks: readonly string[], land?: string | null): string => [...blocks, ...(land ? [`@${land}`] : [])].join(" ");
+/** The host's answer for a cast: its blocks by their corners, in throw order ("c3 f5 b6"). */
+export const hoopsCode = (blocks: readonly string[]): string => blocks.join(" ");
 
 /**
- * The host's answer (and solo's) for a cast: hoopsFrom's blocks (hoopsCode), with a ready balloon's landing after it
- * (landFrom, on the position after the cast, its walls standing: `balloon`, the server's ask), PASS_WAIT when it would
- * lose him real material and it isn't the test switch's or the admins' trigger's (`any`: the pass guard), or "" with no
- * engine, no answer or no block that fits (no cast: he moves).
+ * The end of his turn on this device's engines (the host's online, solo's, the sims'), on the position after his move
+ * (`fen`: the crowd to move): the hoops when they're asked (hoopsFrom: `answer`, their hoopsCode, "" when none fits or no
+ * answer), then a due balloon's landing (`balloon`, the server's ask; landFrom with the cast's walls standing, outside
+ * them). The landing gets its own share of time, never past hoopsTimeMs + balloonTimeMs in all.
  */
 export async function hoopsAnswer(
   engines: readonly EngineLike[],
   fen: string,
-  ask: HoopsAsk,
+  ask: HoopsAsk | null,
   balloon: BalloonAsk | null = null,
-  any = false,
   s: HoopsSettings & LandSettings = BOSS_POWERS,
   now?: () => number,
 ): Promise<{ answer: string; pick: HoopsPick | null; land: LandPick | null }> {
   const clock = now ?? (() => performance.now());
   const start = clock();
-  const pick = await hoopsFrom(engines, fen, ask, s, clock).catch(() => null);
-  if (!pick) return { answer: "", pick: null, land: null };
-  if (!any && passLoses(pick.gain, s)) return { answer: PASS_WAIT, pick, land: null };
-  // (The landing after it gets its own share, never past hoopsTimeMs + balloonTimeMs in all: well inside the request's timeout.)
+  const pick = ask ? await hoopsFrom(engines, fen, ask, s, clock).catch(() => null) : null;
   const left = Math.max(0, s.hoopsTimeMs + s.balloonTimeMs - (clock() - start));
-  const land = balloon ? await landFrom(engines, pick.fen, { ...balloon, blocks: pick.blocks }, s, clock, Math.min(s.balloonTimeMs, left)).catch(() => null) : null;
-  return { answer: hoopsCode(pick.blocks, land?.square), pick, land };
+  const blocks = pick?.blocks ?? balloon?.blocks ?? [];
+  const land = balloon ? await landFrom(engines, fen, { ...balloon, blocks }, s, clock, Math.min(s.balloonTimeMs, left)).catch(() => null) : null;
+  return { answer: pick ? hoopsCode(pick.blocks) : "", pick, land };
 }
 
 /**
- * A cast's answer checked against the rules (the server's check of the host's, and solo's own): 1 to hoopsCount blocks,
- * each a corner there may be, none twice, no two touching, the position after the pass passing hoopsGuard with them all
- * standing. The blocks, the position after (the crowd to move) and the balloon's square named ("@e4"; null: none; it's
- * checked as it lands), or null: not a cast.
+ * A cast's answer checked against the rules (the server's check of the host's, and solo's own), on the position after his
+ * move (`fen`, the crowd to move): 1 to hoopsCount blocks, each a corner there may be, none twice, no two touching, the
+ * position passing hoopsGuard with them all standing. The blocks, or null: not a cast.
  */
-export function hoopsCheck(fen: string, answer: string, s: Pick<BossPowerSettings, "hoopsCount"> = BOSS_POWERS): { blocks: string[]; fen: string; land: string | null } | null {
-  const passed = passTurn(fen);
-  if (!passed) return null;
-  const tokens = answer.trim().split(/\s+/).filter(Boolean);
-  const blocks = tokens.filter((t) => !t.startsWith("@"));
-  const lands = tokens.filter((t) => t.startsWith("@"));
-  if (lands.length > 1 || !hoopsValid(blocks, s)) return null;
-  if (!hoopsGuard(passed, blocks)) return null;
-  return { blocks, fen: passed, land: lands[0]?.slice(1) ?? null };
+export function hoopsCheck(fen: string, answer: string, s: Pick<BossPowerSettings, "hoopsCount"> = BOSS_POWERS): string[] | null {
+  const blocks = answer.trim().split(/\s+/).filter(Boolean);
+  if (!hoopsValid(blocks, s) || !hoopsGuard(fen, blocks)) return null;
+  return blocks;
 }
 
 // ---------------- His rules ----------------
@@ -610,14 +603,14 @@ export const balloonReaction = (r: Pick<BalloonResult, "outcome" | "shape">): "b
 export const BALLOON_TEST_MOVES: readonly string[] = ["e2e4", "d7d5", "e4d5", "d8d5"];
 
 /**
- * The test switches: ?power=hoops warns as the second turn begins, the cast at the start of his turn after it, its pass
- * guard off; ?balloon=<shape> and ?stage=N (Settings' bossBalloonTest, bossStageTest) force his balloons (the former from
+ * The test switches: ?power=hoops warns as the second turn begins, the cast after his move on his turn after it;
+ * ?balloon=<shape> and ?stage=N (Settings' bossBalloonTest, bossStageTest) force his balloons (the former from
  * BALLOON_TEST_MOVES).
  */
 export const TIGER: BossRules = {
   id: "tiger",
-  // Hoops: the meter full as a turn begins, its warning that turn; at the start of his turn, after the crowd's move
-  // (tigerBattle.hoopsDue). The trigger (`ultNext`, kept): at the start of his next turn, without the warning.
+  // Hoops: the meter full as a turn begins, its warning that turn; on his turn after it, after his move (asked for with it:
+  // tigerBattle.hoopsAsk; thrown in afterBossMove). The trigger (`ultNext`, kept): after his next move, without the warning.
   ultimateOnHisTurn: true,
   ultimate(next, t) {
     if (next.warnAt !== undefined || t.ultNext) return false;
@@ -669,7 +662,9 @@ export const TIGER: BossRules = {
   afterCrowdMove(b) {
     tigerBattle.afterCrowdMove(b);
   },
+  // The end of his turn: the hoops first (when due and answered), then a due balloon's end, outside them.
   afterBossMove(b, _move, extras) {
+    tigerBattle.cast(b, extras?.hoops ?? null, extras?.hoopsGain ?? null);
     tigerBattle.endOfTurn(b, extras?.balloon ?? null, extras?.balloonGain ?? null);
   },
   view: (p) => tigerView(p),
@@ -767,7 +762,7 @@ export const tigerBattle = {
   },
 
   /**
-   * The end of his turn (after his move, or his cast): a balloon due now (balloonAsk; asked now if it wasn't) pops if he
+   * The end of his turn (after his move and any cast): a balloon due now (balloonAsk; asked now if it wasn't) pops if he
    * can't have its shape (`nine`, dud or not). Else `square` (the host's answer online, this device's in solo) must be one
    * the rules allow (landCheck), dud or not: none, or one refused, and it stays ready on the nozzle, looked at again at the
    * end of his next turn. Then a dud pops and a real one lands there (a base at its ply), the nozzle empty after either. The crowd's turn's moments
@@ -818,66 +813,42 @@ export const tigerBattle = {
   },
 
   /**
-   * His hoops are due: the start of his turn (the crowd has just moved) from the turn the meter warned, or after the
-   * admins' trigger; none standing; not already waiting after this crowd move; and he can pass (not in check).
+   * His hoops are due at the end of this turn of his: from the turn the meter warned (the crowd has moved since), or after
+   * the admins' trigger; none standing or under way; the battle on. Asked for as his move is (hoopsAsk) and thrown after
+   * it (cast): the same state then, as only his move lies between.
    */
-  hoopsDue(b: Battle): boolean {
+  castDue(b: Battle): boolean {
     const boss = b.state.boss;
     const p = boss?.powers;
-    if (!boss || !p || boss.id !== "tiger" || boss.result || !b.bossToMove() || b.finalGameOver()) return false;
+    if (!boss || !p || boss.id !== "tiger" || boss.result || b.finalGameOver()) return false;
     if (p.ultAt !== undefined || p.hoops) return false;
-    if (!p.ultNext && !(p.warnAt !== undefined && p.warnAt <= boss.crowdMoves)) return false;
-    if (p.hoopsWait === boss.crowdMoves) return false;
-    return passTurn(boardOf(b).fen) !== null;
+    return !!p.ultNext || (p.warnAt !== undefined && p.warnAt <= boss.crowdMoves);
   },
 
-  /** What the host's engines need to place the cast (the boss request's `hoops`), or null when none is due. */
+  /** What the host's engines need to place the cast after his move (the boss request's `hoops`), or null when none is due. */
   hoopsAsk(b: Battle): HoopsAsk | null {
-    if (!tigerBattle.hoopsDue(b)) return null;
+    if (!b.bossToMove() || !tigerBattle.castDue(b)) return null;
     const p = b.state.boss!.powers!;
     return { order: Math.floor(powerRoll(p.seed, "hoops-order", p.ults ?? 0, b.state.boss!.crowdMoves) * 2 ** 32) };
   },
 
-  /** It comes even when it would lose him real material: the test switch's first cast, or the admins' trigger. */
-  hoopsAny(b: Battle): boolean {
-    const p = b.state.boss?.powers;
-    return !!p && (!!p.ultNext || (b.settings.bossPowerTest === "hoops" && !p.ults));
-  },
-
-  /** The cast from this device's engines (solo, the sims): hoopsAnswer (with a due balloon's landing), then apply. */
-  async play(b: Battle, engines: readonly EngineLike[]): Promise<HoopsState | null> {
-    const ask = tigerBattle.hoopsAsk(b);
-    if (!ask) return null;
-    const balloon = tigerBattle.balloonAsk(b);
-    const { answer, pick, land } = await hoopsAnswer(engines, boardOf(b).fen, ask, balloon, tigerBattle.hoopsAny(b));
-    return tigerBattle.apply(b, answer, pick?.gain ?? null, land?.gain ?? null);
-  },
-
   /**
-   * The cast (online the host's answer): checked (hoopsCheck); PASS_WAIT, "", or anything that isn't a cast: none now (it
-   * waits for his next turn, the warning and the trigger staying), and he plays his move. Else his whole turn: the
-   * position (a base at its ply), the turn passed to the crowd, the hoops standing for hoopsCrowdMoves crowd moves, the
-   * rage meter spent; then a due balloon's end (landing outside the hoops), and the crowd's turn set up as after his move
-   * (its moments play as it begins). Returns the hoops; null when none was due, or it waits.
+   * The cast at the end of his turn, after his move (online the host's answer, the bossMove's `hoops`; solo and the sims
+   * this device's): checked on the position after his move (hoopsCheck); "", none, or anything that isn't a cast: none now
+   * (the warning and the trigger staying: asked again with his next move). Else the hoops stand for hoopsCrowdMoves crowd
+   * moves from now, the rage meter spent; the board is unchanged (walls only) and the crowd's turn begins with the cast's
+   * moment (everyTurn). Returns the hoops, or null.
    */
-  apply(b: Battle, answer: string | null, gain: number | null = null, landGain: number | null = null, s: Pick<BossPowerSettings, "hoopsCrowdMoves" | "hoopsCount"> = BOSS_POWERS): HoopsState | null {
-    if (!tigerBattle.hoopsDue(b)) return null;
+  cast(b: Battle, answer: string | null, gain: number | null = null, s: Pick<BossPowerSettings, "hoopsCrowdMoves" | "hoopsCount"> = BOSS_POWERS): HoopsState | null {
+    if (!answer || !tigerBattle.castDue(b)) return null;
     const boss = b.state.boss!;
-    const checked = answer && answer !== PASS_WAIT ? hoopsCheck(boardOf(b).fen, answer, s) : null;
-    if (!checked) {
-      setPowers(b, (p) => ({ ...p, hoopsWait: boss.crowdMoves }));
-      return null;
-    }
-    const board = boardOf(b);
-    const id = b.state.boards[0]!;
-    const ply = board.history.length;
-    b.boards.set(id, { ...board, fen: checked.fen, expected: 1 - board.expected, lastMove: null, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: checked.fen }] });
-    b.bossLast = null;
-    const hoops: HoopsState = { blocks: checked.blocks, at: boss.crowdMoves, left: Math.max(1, Math.round(s.hoopsCrowdMoves)), gain };
-    const { ultNext: _trigger, hoopsWait: _wait, ...p } = boss.powers!;
+    const fen = boardOf(b).fen;
+    if (sideToMove(fen) !== boss.crowdSide) return null;
+    const blocks = hoopsCheck(fen, answer, s);
+    if (!blocks) return null;
+    const hoops: HoopsState = { blocks, at: boss.crowdMoves, left: Math.max(1, Math.round(s.hoopsCrowdMoves)), gain };
+    const { ultNext: _trigger, ...p } = boss.powers!;
     b.state = { ...b.state, boss: { ...boss, powers: unleashed({ ...p, ultAt: boss.crowdMoves, hoops }) } };
-    tigerBattle.endOfTurn(b, checked.land, landGain);
-    b.bossPassed();
     return hoops;
   },
 };

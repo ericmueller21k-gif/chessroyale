@@ -87,7 +87,7 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * begins (the Full Moon at the start of his turn after it). The hippo gardener's Seeds count from the battle's start whatever
  * the switch says; ?power=water warns as the second turn begins (the watering at the start of his turn after it; ?seeds=N for
  * a set count). The circus tiger's Balloons come whatever the switch says (?balloon=<shape> and ?stage=N force his balloons);
- * ?power=hoops warns as the second turn begins (the cast at the start of his turn after it).
+ * ?power=hoops warns as the second turn begins (the cast after his move on his turn after it).
  */
 export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops"];
 
@@ -210,12 +210,13 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "gardener", name: GARDENER_NAME, icon: "🦛", kit: "Gardener", offset: -250, powers: { passive: "seeds", ultimate: "water" } },
   // Babur, the circus tiger (TIGER_NAME; Eric, Oct 23, named Oct 24): Balloons, on a real-time pump (a balloon on the nozzle at
   // the start of his turn, four stages of 12 s (Oct 24, Eric's pace: 30 s left him too slow), then at the end of a turn it lands as one of his pieces where the engine
-  // takes the least valuable safe square, or pops: about 58% pop, a fake queen always), and Hoops, his whole turn:
-  // three burning 2x2 hoops whose walls nothing crosses, moves, captures or checks, for the crowd's next 2 moves, placed by
+  // takes the least valuable safe square, or pops: about 58% pop, a fake queen always), and Hoops, after his move
+  // (Oct 24: he keeps his turn): three burning 2x2 hoops whose walls nothing crosses, moves, captures or checks, for the crowd's next 2 moves, placed by
   // the host's engines in a fair band (bosses/tiger.ts; docs/decisions/2026-10-23-tiger-rules.md). Live with his art
   // (docs/decisions/2026-10-24-tiger-wired.md; the test links `?boss=tiger`, `&power=hoops`, `&balloon=<shape>`, `&stage=4`). The raid sim: at the
-  // usual −250, with 12 s stages, about 58% of the balloons popping and rageSpeed 1.6, the crowd scores 0.35 in 47 moves at a
-  // 10 s pick (Oct 24; 0.05 with a slow crowd at 30 s, before; reports/tiger-sim.md).
+  // usual −250, with 12 s stages, about 58% of the balloons popping, the hoops after his move and rageSpeed 1.3, the crowd
+  // scores 0.12 in 44 moves at a 10 s pick with 2.55 casts a battle (Oct 24; 0.35 when the hoops were his whole turn, at
+  // rageSpeed 1.6; reports/tiger-sim.md).
   { id: "tiger", name: TIGER_NAME, icon: "🐯", kit: "Tiger", offset: -250, powers: { passive: "balloons", ultimate: "hoops" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
@@ -615,11 +616,6 @@ export interface BossPowerState {
    * crowd move after which they were thrown, the crowd moves they still stand for, and what the cast gained him.
    */
   hoops?: HoopsState | null;
-  /**
-   * His hoops were due after this crowd move and none came (no block fitted the guards, the pass guard, or no engine's
-   * answer): he plays his move, and they come again at the start of his next turn, the warning staying. Never sent to screens.
-   */
-  hoopsWait?: number;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -760,7 +756,7 @@ export interface BalloonState {
 
 /**
  * The circus tiger's hoops while they stand: each block by its corner (its lowest file and rank: "c3" is c3, d3, c4, d4),
- * in throw order; the crowd move after which he threw them (`at`, his whole turn); the crowd moves they still stand for
+ * in throw order; the crowd move after which he threw them (`at`: at the end of his turn, after his move); the crowd moves they still stand for
  * (`left`: hoopsCrowdMoves, then one less as each lands; gone after the last); what the cast gained him (null: not known).
  */
 export interface HoopsState {
@@ -1145,8 +1141,8 @@ export interface BurnEvent {
  * while he thinks; `shape` as everyone sees it, `color`); `balloonLand` (`square`, `shape`, `color`) or `pop` (`shape`,
  * `color`) as the crowd's turn after his turn's end begins, then his reaction: `balloonCheer` (a landing), `balloonBigCheer`
  * (a queen landed) or `wince` (a pop). (Their own names: Alfil's `land` and Puddles' `cheer` and `bigCheer` hold the turn
- * for their length, and a kind has one length and one view.) `hoops`, his cast (his whole turn: as the crowd's turn after
- * it begins; `blocks` in throw order), the one the server waits for; `hoopsOut`, the hoops gone, as the crowd's second
+ * for their length, and a kind has one length and one view.) `hoops`, his cast (after his move: as the crowd's turn after
+ * it begins, after his move shows; `blocks` in throw order), the one the server waits for; `hoopsOut`, the hoops gone, as the crowd's second
  * move after the cast lands (while he thinks; `blocks`).
  */
 export type PowerEventKind =
