@@ -54,7 +54,7 @@ type Snap = {
   main: Box;
 };
 type LineRes =
-  | { text: string; rows: number; pitch: number; bubble: Box; bar: Box; status: Box; name: Box; main: Box; fit: string | null }
+  | { text: string; rows: number; pitch: number; w1: number; frame: number; roomRows: number; bubble: Box; bar: Box; status: Box; name: Box; main: Box; fit: string | null }
   | { text: string; missing: true; seen: string };
 
 /** Every box the bar is made of, as the page draws it, and the figure's drawn pixels at rest (its idle frame). */
@@ -128,53 +128,97 @@ const sayLine = (page: Page, text: string): Promise<LineRes> =>
     async ({ text, plain }) => {
       const say = (globalThis as { sayBoss?: (t: string) => boolean }).sayBoss;
       if (!say) return { text, missing: true as const, seen: "no hook" };
-      // (A boss's own entrance line can take the box in the battle's first seconds, after the line is said: say it again then.)
-      let el: HTMLElement | null = null;
-      let taken = false;
-      for (let attempt = 0; attempt < 2 && !(el && el.getAttribute("aria-label") === plain); attempt++) {
-        taken = say(text);
-        const deadline = performance.now() + 2500;
-        while (performance.now() < deadline) {
-          el = document.querySelector<HTMLElement>(".bc-bar-bubble");
-          if (el && el.getAttribute("aria-label") === plain) break;
-          await new Promise((r) => requestAnimationFrame(() => r(null)));
-        }
-      }
-      if (!el || el.getAttribute("aria-label") !== plain) return { text, missing: true as const, seen: `taken ${taken}, bubbles ${document.querySelectorAll(".bc-bar-bubble").length}, shown ${el?.getAttribute("aria-label") ?? "none"}` };
-      // (The bubble fits its line in the pixel font: when the font is still loading, it fits again once it's in. Wait for that, then measure.)
-      await document.fonts.ready;
-      await new Promise((r) => setTimeout(r, 50));
-      for (let i = 0; i < 3; i++) await new Promise((r) => requestAnimationFrame(() => r(null)));
-      el = document.querySelector<HTMLElement>(".bc-bar-bubble") ?? el;
-      for (const a of el.getAnimations({ subtree: true })) {
-        try {
-          a.finish();
-        } catch {
-          // (A finished animation can't be finished again.)
-        }
-      }
+      const shown = () => document.querySelector<HTMLElement>(".bc-bar-bubble");
       const rect = (e: Element) => {
         const b = e.getBoundingClientRect();
         return { x: b.x, y: b.y, w: b.width, h: b.height, r: b.right, b: b.bottom };
       };
-      const rg = document.createRange();
-      rg.selectNodeContents(el);
-      // (A row: the text's boxes whose tops lie within 3 px of each other; the rows' pitch is the closest two rows.)
-      const tops = [...rg.getClientRects()].filter((q) => q.width > 0.5 && q.height > 0.5).map((q) => q.top).sort((a, b) => a - b);
-      const rowTops: number[] = [];
-      for (const t of tops) if (!rowTops.length || t - rowTops[rowTops.length - 1]! > 3) rowTops.push(t);
-      const pitch = rowTops.length > 1 ? Math.min(...rowTops.slice(1).map((t, i) => t - rowTops[i]!)) : 0;
-      return {
-        text,
-        rows: rowTops.length,
-        pitch,
-        bubble: rect(el),
-        bar: rect(document.querySelector(".boss-bar")!),
-        status: rect(document.querySelector(".boss-next")!),
-        name: rect(document.querySelector(".boss-name")!),
-        main: rect(document.querySelector(".boss-main")!),
-        fit: el.dataset.fit ?? null,
-      };
+      const frameNow = () => new Promise((r) => requestAnimationFrame(() => r(null)));
+      let last = "none";
+      // (A round: say the line, wait for it to type out, and measure it while it's the one up. A boss's own line can cut in while
+      // the line types out (a critical one, once it's firm): then the round starts again, up to three rounds.)
+      for (let round = 0; round < 3; round++) {
+        let el: HTMLElement | null = null;
+        let taken = false;
+        for (let attempt = 0; attempt < 2 && !(el && el.getAttribute("aria-label") === plain); attempt++) {
+          taken = say(text);
+          const deadline = performance.now() + 2500;
+          while (performance.now() < deadline) {
+            el = shown();
+            if (el && el.getAttribute("aria-label") === plain) break;
+            await frameNow();
+          }
+        }
+        if (!el || el.getAttribute("aria-label") !== plain) {
+          last = `taken ${taken}, bubbles ${document.querySelectorAll(".bc-bar-bubble").length}, shown ${el?.getAttribute("aria-label") ?? "none"}`;
+          continue;
+        }
+        // (The bubble fits its line in the pixel font: when the font is still loading, it fits again once it's in. Wait for that.)
+        await document.fonts.ready;
+        await new Promise((r) => setTimeout(r, 50));
+        for (let i = 0; i < 3; i++) await frameNow();
+        // (The words type out a letter at a time, the rest held hidden: measure and picture the line once its last letter is in.)
+        const typedBy = performance.now() + 8000;
+        const typed = () => {
+          const rest = shown()?.querySelector(".speech-rest");
+          return !rest || ((rest.textContent ?? "") === "" && !rest.querySelector(".line-icon"));
+        };
+        while (!typed() && performance.now() < typedBy) await frameNow();
+        el = shown();
+        if (!el || el.getAttribute("aria-label") !== plain) {
+          last = "replaced while it typed out";
+          continue;
+        }
+        for (const a of el.getAnimations({ subtree: true })) {
+          try {
+            a.finish();
+          } catch {
+            // (A finished animation can't be finished again.)
+          }
+        }
+        // (Measured now, with nothing awaited since the check that it's still the line up.)
+        const rg = document.createRange();
+        rg.selectNodeContents(el);
+        // (A row: the text's boxes whose tops lie within 3 px of each other; the rows' pitch is the closest two rows.)
+        const tops = [...rg.getClientRects()].filter((q) => q.width > 0.5 && q.height > 0.5).map((q) => q.top).sort((a, b) => a - b);
+        const rowTops: number[] = [];
+        for (const t of tops) if (!rowTops.length || t - rowTops[rowTops.length - 1]! > 3) rowTops.push(t);
+        const pitch = rowTops.length > 1 ? Math.min(...rowTops.slice(1).map((t, i) => t - rowTops[i]!)) : 0;
+        // (w1: the line's one-row width. A hidden copy of its text, nowrap, in the bubble's own font and styles, so it's measured as one row
+        // whatever the bubble's width is now; then taken out again, at once.)
+        const cs = getComputedStyle(el);
+        const frame = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+        const probe = document.createElement("span");
+        probe.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;left:0;top:0";
+        probe.append(...[...el.children].map((c) => c.cloneNode(true)));
+        el.appendChild(probe);
+        const w1 = probe.getBoundingClientRect().width;
+        probe.remove();
+        // (The rows the line takes at the room's width: a hidden copy of the bubble as wide as its room, counted by its height.)
+        const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+        const outer = el.parentElement!.getBoundingClientRect().width;
+        const copy = el.cloneNode(true) as HTMLElement;
+        // (bottom: auto: the bubble's own bottom would stretch the copy down to its grid area.)
+        copy.style.cssText = `position:absolute;visibility:hidden;left:0;top:0;bottom:auto;width:${outer}px;max-width:none;transform:none;animation:none`;
+        el.parentElement!.appendChild(copy);
+        const roomRows = Math.round((copy.offsetHeight - padY) / parseFloat(cs.lineHeight));
+        copy.remove();
+        return {
+          text,
+          rows: rowTops.length,
+          pitch,
+          w1,
+          frame,
+          roomRows,
+          bubble: rect(el),
+          bar: rect(document.querySelector(".boss-bar")!),
+          status: rect(document.querySelector(".boss-next")!),
+          name: rect(document.querySelector(".boss-name")!),
+          main: rect(document.querySelector(".boss-main")!),
+          fit: el.dataset.fit ?? null,
+        };
+      }
+      return { text, missing: true as const, seen: `lost in three rounds: ${last}` };
     },
     { text, plain: plainLine(text) },
   );
@@ -221,6 +265,8 @@ test("every playable boss's phone bar: one bar and one figure box for all, the f
   const lines: Record<string, Partial<Record<number, LineRes[]>>> = {};
   const pngs: Record<number, { name: string; png: Buffer }[]> = { 320: [], 390: [], 428: [] };
   const lineup: { name: string; png: Buffer; box: Box }[] = [];
+  /** Each boss's longest line, held up in its bubble (typed out): the bar as it reads with a line in it, for the sheets. */
+  const lined: Record<number, { name: string; png: Buffer }[]> = { 320: [], 390: [], 428: [] };
   const boards: Record<number, Record<string, Box | null>> = { 320: {}, 390: {}, 428: {} };
   for (const def of PLAYABLE) {
     await page.goto(`${BASE}&boss=${def.id}`);
@@ -250,12 +296,23 @@ test("every playable boss's phone bar: one bar and one figure box for all, the f
       // starts once the box has been empty for a moment.)
       await expect.poll(() => bubbleQuiet(page, 1500), { timeout: 60_000, message: `${def.id} at ${w}: the boss is quiet` }).toBe(true);
       const out: LineRes[] = [];
-      for (const text of linesOf(def.kit!)) out.push(await sayLine(page, text));
+      const all = linesOf(def.kit!);
+      const longest = all.reduce((a, b) => (plainLine(b).length > plainLine(a).length ? b : a), all[0] ?? "");
+      for (const text of all) {
+        const r = await sayLine(page, text);
+        out.push(r);
+        if (text === longest && !("missing" in r)) {
+          // (Its picture while it's up: a line holds for seconds after it has typed out, and this is taken at once.)
+          const bar = await page.locator(".boss-bar").boundingBox();
+          if (bar) lined[w]!.push({ name: def.name, png: await page.screenshot({ clip: bar }) });
+        }
+      }
       lines[def.id]![w] = out;
     }
   }
   expect(errors, "no page errors").toEqual([]);
 
+  const rowsWrong: string[] = [];
   for (const [w] of SIZES) {
     const at = (id: string) => snaps[id]![w]!;
     const all = PLAYABLE.map((d) => d.id);
@@ -304,8 +361,12 @@ test("every playable boss's phone bar: one bar and one figure box for all, the f
         const who = `${id} at ${w}: "${r.text}"`;
         expect.soft("missing" in r ? `missing (seen: ${r.seen})` : "ok", `${who}: said and drawn`).toBe("ok");
         if ("missing" in r) continue;
+        // The rows the line gets (Eric, Oct 24): one row when its one-row width is at most 60% of the room's text width; else two
+        // balanced rows when two rows hold the line at the room's width; else three, never four. Both widths are measured here.
+        const room = r.main.w - r.frame;
+        const want = r.w1 <= 0.6 * room ? 1 : r.roomRows <= 2 ? 2 : 3;
+        if (r.rows !== want) rowsWrong.push(`${who}: ${r.rows} rows, want ${want} (one row ${r.w1.toFixed(1)} px, room ${room.toFixed(1)} px, ${r.roomRows} rows at the room's width)`);
         expect.soft(r.rows, `${who}: rows`).toBeLessThanOrEqual(3);
-        expect.soft(r.rows, `${who}: at least one row`).toBeGreaterThanOrEqual(1);
         if (r.rows >= 2) expect.soft(r.pitch, `${who}: the rows' pitch`).toBeGreaterThanOrEqual(ROW_PITCH_MIN);
         expect.soft(r.bubble.x, `${who}: inside the bar, left`).toBeGreaterThanOrEqual(r.bar.x - TOL);
         expect.soft(r.bubble.r, `${who}: inside the bar, right`).toBeLessThanOrEqual(r.bar.r + TOL);
@@ -313,7 +374,6 @@ test("every playable boss's phone bar: one bar and one figure box for all, the f
         expect.soft(r.bubble.b, `${who}: inside the bar, bottom`).toBeLessThanOrEqual(r.bar.b + TOL);
         expect.soft(r.bubble.y, `${who}: under the status, never over it`).toBeGreaterThanOrEqual(r.status.b - TOL);
         expect.soft(r.bubble.x, `${who}: from the name column's left edge`).toBeGreaterThanOrEqual(r.name.x - TOL);
-        if (r.rows === 1) expect.soft(r.bubble.w, `${who}: a one-row line within 60% of its room`).toBeLessThanOrEqual(0.6 * r.main.w + TOL);
       }
     }
   }
@@ -322,6 +382,7 @@ test("every playable boss's phone bar: one bar and one figure box for all, the f
   testInfo.annotations.push({ type: "boards", description: JSON.stringify(boards) });
   // A stacked sheet of every boss's bar at each size, and the lineup of the figures at 390 (each at its own size, feet on one line).
   for (const [w] of SIZES) await sheet(page, `boss bar at ${w}`, pngs[w]!, testInfo);
+  for (const [w] of SIZES) await sheet(page, `boss bar at ${w}, with its longest line`, lined[w]!, testInfo);
   await testInfo.attach("lineup.json", { body: Buffer.from(JSON.stringify(lineup.map((l) => ({ name: l.name, box: l.box })))), contentType: "application/json" });
   for (const l of lineup) await testInfo.attach(`lineup-${l.name}.png`, { body: l.png, contentType: "image/png" });
   // (For a person to compare: the bars and the lineup as PNG files, when a directory is given: BAR_SHEET_DIR.)
@@ -330,6 +391,9 @@ test("every playable boss's phone bar: one bar and one figure box for all, the f
     mkdirSync(dir, { recursive: true });
     const safe = (n: string) => n.replace(/[^a-zA-Z0-9]+/g, "-");
     for (const [w] of SIZES) for (const b of pngs[w]!) writeFileSync(`${dir}/after-${w}-${safe(b.name)}.png`, b.png);
+    for (const [w] of SIZES) for (const b of lined[w]!) writeFileSync(`${dir}/lined-${w}-${safe(b.name)}.png`, b.png);
     for (const l of lineup) writeFileSync(`${dir}/lineup-${safe(l.name)}.png`, l.png);
   }
+  // The rows are a hard check: every line of every boss at every size has the rows its width asks for (see sayLine).
+  expect(rowsWrong, "every line's rows: one row, two balanced, or three").toEqual([]);
 });

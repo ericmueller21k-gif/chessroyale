@@ -195,32 +195,49 @@ export function VoiceBubble({ voice, class: cls, hidden = false, balanced = fals
 }
 
 /**
- * A boss's bar bubble, fitted to its line (SpeechBox's `balanced`; Eric, Oct 24: "two rows is better than one row, but 1.5 rows is
- * better than 4 small rows"; the box must use its own width): null when the line is one row (at most half the room its box's parent
- * offers: the box's own width); else two rows of about the same length when two fit the room (the box half the line plus its frame,
- * `text-wrap: balance`); else three rows, the box as wide as the room and the text wrapped to fill it (`wide3`). The line's width is
- * measured in the box itself, in the page's font.
+ * A boss's bar bubble, fitted to its line (SpeechBox's `balanced`). Eric, Oct 24: "two rows is better than one row, but 1.5 rows is
+ * better than 4 small rows"; the box uses its own width. `w1` is the line's one-row width in the page's font; `inner` the room's text
+ * width (the room, the parent's width, less the box's frame); `longest` the longest word, in the same font. One row when `w1` is at
+ * most 60% of `inner`: the box as wide as its line. Else two balanced rows when two rows hold the line at the room's width (measured:
+ * the box laid out at the room's width, counted by its height): the text `w1`/2 plus the longest word, so the words break without a
+ * third row, and never as wide as the line (so it breaks), at most the room. Else three rows: the box as wide as the room, the text
+ * wrapped to fill it (`wide3`).
  */
 function bubbleFit(e: HTMLElement): { width: number; three: boolean } | null {
   const room = e.parentElement?.clientWidth ?? 0;
   if (!room) return null;
   const cs = getComputedStyle(e);
-  const frame = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
-  // (The box's one row: set to its widest and measured, then its width put back.)
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+  const line = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
+  const inner = room - padX;
+  // (The box's width is set for each measure, then put back. offsetWidth and offsetHeight, not its box: the entrance scales it.)
   const was = e.style.width;
   const wasMax = e.style.maxWidth;
-  e.style.width = "max-content";
   e.style.maxWidth = "none";
-  // (offsetWidth, not its box: the box's entrance scales it for a moment, and a scaled box would read as a short line.)
+  e.style.width = "max-content";
   const one = e.offsetWidth;
+  // The longest word, in the same font: a hidden nowrap probe in the box, one word at a time, taken out again at once.
+  const probe = document.createElement("span");
+  probe.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;left:0;top:0";
+  e.appendChild(probe);
+  let longest = 0;
+  for (const word of (e.getAttribute("aria-label") ?? "").split(/\s+/)) {
+    if (!word) continue;
+    probe.textContent = word;
+    longest = Math.max(longest, probe.getBoundingClientRect().width);
+  }
+  probe.remove();
+  // The rows the line takes at the room's width.
+  e.style.width = `${room}px`;
+  const roomRows = Math.round((e.offsetHeight - padY) / line);
   e.style.width = was;
   e.style.maxWidth = wasMax;
-  if (one <= room / 2) return null;
-  const text = one - frame;
-  const char = parseFloat(cs.fontSize);
-  const two = Math.ceil(text / 2) + char + frame;
-  if (two <= room) return { width: Math.ceil(two), three: false };
-  return { width: room, three: true };
+  const w1 = one - padX;
+  if (w1 <= 0.6 * inner) return { width: Math.ceil(one), three: false };
+  if (roomRows > 2) return { width: room, three: true };
+  const text = Math.max(longest, Math.min(inner, w1 / 2 + longest, w1 - 1));
+  return { width: Math.min(room, Math.ceil(text + padX)), three: false };
 }
 
 /** Says a line into a voice once, as it's first drawn (a moment's line from inside its screen); draws nothing. */

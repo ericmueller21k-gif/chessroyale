@@ -6,7 +6,7 @@
   "e2e/banner-time.spec.ts": 360,
   "e2e/bigboy.spec.ts": 115,
   "e2e/boss-bar.spec.ts": 320,
-  "e2e/boss-bar-same.spec.ts": 600,
+  "e2e/boss-bar-same.spec.ts": 1400,
   "e2e/boss-character.spec.ts": 43,
   "e2e/boss-dock.spec.ts": 142,
   "e2e/boss-powers.spec.ts": 345,

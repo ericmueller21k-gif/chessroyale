@@ -20,6 +20,10 @@ to the far right… even if it's overlapping, say, the balloon pump for a second
   the bars came in two heights, the names sat at different heights (the name column was centred), and the free room beside the name
   was a different width for every boss.
 - The speech bubble sat over the name column and below the bar (`bottom: -4px`), in a box that changed with the line.
+- The bubble's width rule (`bubbleFit`) had two faults, found with the sheet ("Drip, drip… bah!", 16 characters, came out as three rows
+  of about five characters in an 85 px box, in a room of about 270 px): a line was one row only when it was at most half the room
+  (60% is the rule), and two rows were a box of half the line plus one character, too narrow for the words, so the text broke into
+  three rows. Two balanced rows need the half line plus the longest word.
 
 ## What changed (phone only; the computer's bar is unchanged)
 
@@ -43,10 +47,13 @@ to the far right… even if it's overlapping, say, the balloon pump for a second
   the "BOSS · move N" text, but never off the screen (L·s − shift ≤ 48, U·s ≤ 141, R·s + shift ≤ 272 at 320 px).
 - **The bubble** (Eric: "the text box contained"): inside the bar, from the name column's left edge to the bar's right padding, under the
   status (its grid row 2, so never over the status). It may cover the name's lower bars and the boss's prop for its moment. Its width is
-  fitted to its line in the page's font (`speech.tsx`, `bubbleFit`): one row when the line is at most half the room; else two rows of
-  about the same length when two fit the room (`text-wrap: balance`); else three rows, the box as wide as the room and the text wrapped
-  to fill it (`.wide3`, `text-wrap: wrap`); never four. The line's width is read from the box's layout width (`offsetWidth`), and again
-  once the pixel font has loaded. Font: 9 px at 390 and 428; 8 px at 320, with the same row pitch (10.8 px) as at 390 (`line-height: 1.35`).
+  fitted to its line in the page's font (`speech.tsx`, `bubbleFit`), from `w1`, the line's one-row width (the box laid out one row and
+  measured, `offsetWidth`, so it includes the line's icons), and `inner`, the room's text width (the bar's room less the box's frame).
+  One row when `w1` is at most 60% of `inner`: the box as wide as its line. Else two balanced rows when two rows hold the line at the
+  room's width (`roomRows`: the box laid out at the room's width and counted by its height, so a long word counts): the text `w1`/2
+  plus the longest word (measured in the same font), never as wide as the line, so it breaks, at most the room (`text-wrap: balance`).
+  Else three rows: the box as wide as the room and the text wrapped to fill it (`.wide3`, `text-wrap: wrap`); never four. Measured again once the pixel font has loaded (`document.fonts.load`). Font: 9 px at 390 and 428; 8 px at 320, with the same row
+  pitch (10.8 px) as at 390 (`line-height: 1.35`).
 - **The pump** (Babur's, `components/Tiger.tsx`): 2x (68 × 72) in the bar's room at its right end, its foot 3 px below the room's bottom
   (inside the bar's padding), so a stage-4 balloon's top and a pop's over-swell clear the status (docs/decisions/2026-10-24-babur-bigger.md).
   The room is 72 px tall under the status in this bar.
@@ -103,6 +110,10 @@ size (Chub's 71 px): Alfil 79 px, Moo & Moon 84 px, Puddles 88 px, Babur 97 px.
 - **The room rule covers idle frames at rest; a one-shot moment only has to stay on the screen.** A one-shot may rise over the text for
   its moment (Eric: "even over" the line, "never off the screen").
 - **The bubble can cover the prop and the lower bars** for its moment. The prop is drawn again afterwards.
+- **Two rows are measured, not taken from a ratio.** A first rule used `w1` at most 1.8 times the room for two rows. It was wrong both
+  ways: "Hold still, your majesty. You look thirsty." (344 px in a 197 px room at 320 px) needs three rows, since its longest word is
+  72 px and no break gives two rows of 197 px, and Moo's longer lines fit two rows above 1.8 times. So the bubble lays the line out
+  at the room's width and counts its rows, and the check measures the same.
 - **`sayBoss(text)`** (a test hook in `speech.tsx`, `VoiceBubble`, installed only where `testSwitchesAllowed()`) says any line through the
   boss's own voice, so each line is measured in its real bubble, not a copy. The line check waits for the boss's own lines to settle and
   for the pixel font before it measures.
@@ -114,7 +125,11 @@ size (Chub's 71 px): Alfil 79 px, Moo & Moon 84 px, Puddles 88 px, Babur 97 px.
 - `e2e/boss-bar-same.spec.ts` (phone; 320 × 568, 390 × 844, 428 × 777; every playable boss): the bar's height, the figure box and the name,
   level, bars, status and free room are the same for every boss (±1 px); the feet on the bar's baseline; at rest, the drawing 2 px inside the
   screen's left edge, 2 px clear of the name column, under the "BOSS · move N" text; every line the boss says: its bubble inside the bar,
-  under the status, from the name column's left edge, at most three rows at the same pitch as at 390, a one-row line at most 60% of its
-  room. A stacked sheet of every boss's bar per size, and a lineup of the figures at 390, are attached to the test.
+  under the status, from the name column's left edge, and the rows its width asks for (`w1` from a hidden nowrap copy of the line, and
+  `roomRows` from a hidden copy of the bubble at the room's width, both in the bubble's font, after it has typed out: one row when `w1`
+  is at most 60% of the room's text width, else two when two rows hold it, else three, never four; a hard check), at the same pitch as
+  at 390. Each line is measured once its last letter is in, and only while it's still the line up: a boss's own critical line can cut
+  in while a line types out, and then the line is said again (up to three rounds). A stacked sheet of every boss's bar per size, each
+  with its longest line typed out, and a lineup of the figures at 390, are attached to the test.
 - `e2e/boss-bar.spec.ts` and `e2e/boss-character.spec.ts`: the status, the column, the room, the bubble's rules, the figure's box.
 - `e2e/tiger.spec.ts`: Babur's pump, 68 × 72 at 390 and 428 px, inside the bar, at the room's right end, its balloon under the status.
