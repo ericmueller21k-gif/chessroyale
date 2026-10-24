@@ -23,7 +23,6 @@ import type { ComponentChildren } from "preact";
 import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE2_ULT_BANNER_MS, PHASE_CHANGE, absorbKing, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
 import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
-import { BossHeading } from "./Play.tsx";
 import { useStillKey } from "../hooks.ts";
 import { clockShown } from "../clock-text.ts";
 import { underBoardView } from "../prefs.ts";
@@ -327,12 +326,9 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   return (
     <div class={`screen game boss-screen rc-change${away ? " rc-away" : ""}${folded ? " rc-folded" : ""}`}>
       {hud}
+      {/* (No line above the board (Eric, Oct 24): the dock's second line says "Freestyle" once the boards split, the variant
+          players see: FIDE's name for Chess960.) */}
       <div class={`board-area${jolt ? " pw-crash" : ""}`}>
-        <div class="opening-name">
-          {/* (The title says "phase 2" already, and "the boss is beaten" read wrong as he rises: Freestyle once it splits.
-              Freestyle is FIDE's name for Chess960, the one players see: Eric, Oct 24.) */}
-          <BossHeading side="w" final={!match.settings.raid} note={split ? "Freestyle" : undefined} />
-        </div>
         <div class="board-row">
           {bossSide}
           <div class="eval-bar rc-evalgap" aria-hidden="true" />
@@ -409,7 +405,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
               </strong>
             </span>
             {/* (The second line kept, empty until then, so the box keeps its height.) */}
-            <span class="dock-line muted">{t >= C.bannerAt ? "No added time." : ""}</span>
+            <span class="dock-line muted">{t >= C.bannerAt ? "No added time." : split ? "Freestyle" : ""}</span>
           </>
         }
       />
@@ -567,10 +563,6 @@ export function SimulScreen({ match }: { match: GameView }) {
         </div>
       )}
       <div class="board-area">
-        <div class="opening-name">
-          {/* (How many are won: the boss bar's right side.) */}
-          <BossHeading side="w" final={!match.settings.raid} note="Freestyle" />
-        </div>
         <div class="board-row">
           {bossSide}
           <div class="eval-bar rc-evalgap" aria-hidden="true" />
@@ -642,6 +634,8 @@ const SimulDock = memo(function SimulDock({
         <>
           <span class="dock-line">
             <strong>{status}</strong>
+            {/* (Freestyle: FIDE's name for the Chess960 boards, the variant the players see; the line above the board said it.) */}
+            <span class="muted"> · Freestyle</span>
           </span>
           <span class="dock-line muted">
             {line === "back" ? (

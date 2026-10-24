@@ -234,11 +234,11 @@ test("an admin's test trigger against Ginger, pressed during your turn: the bliz
   await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   const btn = page.locator(".ult-test");
-  await expect(btn).toHaveText("Trigger ultimate (testing)");
+  await expect(btn).toHaveAccessibleName("Trigger ultimate (testing)");
   // (A computer: in the title line, before sound and the flag; a phone: under the dock. Eric, Oct 13.)
   await expect(page.locator(".hud-row .ult-test")).toHaveCount(test.info().project.name === "desktop" ? 1 : 0);
   await btn.click();
-  await expect(btn).toHaveText("Ultimate next turn (testing)");
+  await expect(btn).toHaveAccessibleName("Ultimate next turn (testing)");
   await expect(btn).toBeDisabled();
   // This turn goes on as it was.
   expect((await powers(page)).allowed).toBeNull();
@@ -248,27 +248,27 @@ test("an admin's test trigger against Ginger, pressed during your turn: the bliz
   await expect.poll(async () => (await blizzard.seen()).banner, { timeout: 30_000 }).toBe(true);
   await expect(banner(page, "RAGE!")).toHaveCount(0);
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
-  await expect(btn).toHaveText("Ultimate under way (testing)");
+  await expect(btn).toHaveAccessibleName("Ultimate under way (testing)");
   expect((await powers(page)).allowed.length).toBeGreaterThan(0);
   // Under way through its three turns (Oct 12): the thaw, then the ice gone.
   const thawing = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /THAWING!/ } });
   await play(page);
   await expect.poll(async () => (await thawing.seen()).banner, { timeout: 30_000 }).toBe(true);
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
-  await expect(btn).toHaveText("Ultimate under way (testing)");
+  await expect(btn).toHaveAccessibleName("Ultimate under way (testing)");
   const thawed = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /THAWED!/ } });
   await play(page);
   await expect.poll(async () => (await thawed.seen()).banner, { timeout: 30_000 }).toBe(true);
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
-  await expect(btn).toHaveText("Ultimate under way (testing)");
+  await expect(btn).toHaveAccessibleName("Ultimate under way (testing)");
   expect((await powers(page)).allowed).toBeNull();
   // Over as the next turn begins: the meter emptied (filling again), the trigger ready, and the blizzard comes again.
   await play(page);
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
-  await expect(btn).toHaveText("Trigger ultimate (testing)");
+  await expect(btn).toHaveAccessibleName("Trigger ultimate (testing)");
   expect((await powers(page)).rage).toBeLessThan(0.5);
   await btn.click();
-  await expect(btn).toHaveText("Ultimate next turn (testing)");
+  await expect(btn).toHaveAccessibleName("Ultimate next turn (testing)");
   const again = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /BLIZZARD!/ } });
   await play(page);
   await expect.poll(async () => (await again.seen()).banner, { timeout: 30_000 }).toBe(true);
