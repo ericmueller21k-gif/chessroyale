@@ -376,10 +376,12 @@ build): online, phase 1 won is the crowd's victory):
   prop for its moment. Never over the line and board under the bar.
 - **The boss bar and the level in it** (Eric, Oct 23; docs/decisions/2026-10-23-boss-bar.md): `BossBar` (`screens/Boss.tsx`) is a
   figure (a phone) and a grid. **On a phone, every boss has the same bar and the same figure box** (Oct 24;
-  docs/decisions/2026-10-24-boss-bar-same.md): the compact bar (64 px, the default, `?bar=out`) where a taller figure rises
-  above the bar (never over the "BOSS · move N" line), or the taller bar (99 px, `?bar=fit`) where each idle figure is
-  inside it; each boss's size per layout is its kit's `barScale`, the name column is 130 px, and the rules are checked on
-  every frame by `packages/app/test/boss-bar-same.test.ts` and on the page by `e2e/boss-bar-same.spec.ts`. **No skulls** in the battle bar (the select screen and the menus keep theirs; the threat is in the
+  docs/decisions/2026-10-24-boss-bar-same.md): one bar, 99 px tall, and one figure box (58 px wide, the bar's content tall) for
+  every boss, its feet on one baseline. Each boss is drawn at its own size, never below full size: the big animals (Alfil,
+  Puddles, Moo & Moon, Babur) at up to 4/3 (`barScale` in kits.ts), and a per-boss sideways shift (`barShift`) where a drawing is
+  wider on one side. At rest (every idle frame) the drawing stays 2 px inside the screen's left edge, 2 px clear of the name
+  column and under the "BOSS · move N" text; it may hang out of the bar's top and left edge. Checked every frame by
+  `packages/app/test/boss-bar-same.test.ts` and on the page by `e2e/boss-bar-same.spec.ts`. **No skulls** in the battle bar (the select screen and the menus keep theirs; the threat is in the
   bar's `aria-label`, "Puddles, threat 3 of 5"). At the left one column under the name, every row left aligned with it: **LVL**
   (`BossLevel`), the ultimate's rage meter (`.boss-ult`: `RageMeter`, and Moo's moon beside it: `BossUi.ultBar`), then the
   passive's bar when the boss has one (`.boss-passive`: `BossUi.bar`: Hollow's bulbs, Puddles' Seeds); a row with nothing in it

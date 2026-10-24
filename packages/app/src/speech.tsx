@@ -188,7 +188,8 @@ function bubbleFit(e: HTMLElement): { width: number; three: boolean } | null {
   const wasMax = e.style.maxWidth;
   e.style.width = "max-content";
   e.style.maxWidth = "none";
-  const one = e.getBoundingClientRect().width;
+  // (offsetWidth, not its box: the box's entrance scales it for a moment, and a scaled box would read as a short line.)
+  const one = e.offsetWidth;
   e.style.width = was;
   e.style.maxWidth = wasMax;
   if (one <= room / 2) return null;

@@ -119,9 +119,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     `kit`, a crate page's `fischer` and `shiny` and its "Testing:" boxes, and 1 v 1's `fewAfter=SECONDS` (the "Few players
     online" choice sooner) and `clock` (the bot game's clock too), and `cardMs=MS` (home's Boss raid card turns to the
   next boss this often instead of every 30 s), and `barslot=1` (the boss bar's free room for a boss's own prop drawn with a
-  dashed outline, so a screenshot shows it; nothing else changes), `bar=fit` (a phone's boss bar: the taller bar that holds every
-  figure whole, against the compact bar that's the default, `bar=out`; Oct 24, docs/decisions/2026-10-24-boss-bar-same.md),
-  and the `sayBoss(text)` hook (speech.tsx: a boss's voice says any line at once, for e2e/boss-bar-same.spec.ts).
+  dashed outline, so a screenshot shows it; nothing else changes), and the `sayBoss(text)` hook (speech.tsx: a boss's voice says
+  any line at once, for e2e/boss-bar-same.spec.ts).
   - **Kept for everyone** (the home screen's own choices): `mode` and a raid's boss picked from the menu; preferences
     and pages (`anim`, `trail`, `crates`). Gone on Oct 15: `turns` (Crowd is always team turns), `moves` (Classic plays
     its default opening moves) and `soundlab` (its choice is Settings' Reveal sound).
