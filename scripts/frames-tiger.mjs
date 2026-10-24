@@ -42,7 +42,7 @@ const QUERY = {
   pop: "&balloon=fakequeen&stage=4&laststand=0",
   hoops: "&power=hoops&laststand=0",
   attack: "&laststand=1",
-  bar: "&balloon=knight&stage=4&laststand=0",
+  bar: "&balloon=queen&stage=3&seedspeed=30&laststand=0",
 };
 
 async function run(stage) {
@@ -203,10 +203,12 @@ async function run(stage) {
     await waitUntil((x) => x.kind === "play", 60_000);
     clip("attack", attackAt - 600, attackAt + 3400);
   } else if (stage === "bar") {
-    // His bar with a ready balloon on the pump (from his first turn), after his first lines are gone.
+    // His bar with a ready queen on the pump (put on at stage 3 at his first turn, so it stays; the clock 30 times faster), after his
+    // first lines are gone.
     await play();
     await waitUntil((x) => !!x.boss?.powers?.balloon && x.kind === "play", 60_000);
-    await p.waitForTimeout(5000);
+    await p.locator('.tg-pump-slot[data-anim="readyQueen"]').waitFor({ timeout: 20_000 });
+    await p.waitForTimeout(4000);
     await p.locator(".boss-bar").screenshot({ path: join(outDir, `${name}-bar.png`) });
     await p.screenshot({ path: join(outDir, `${name}-screen.png`) });
   }
