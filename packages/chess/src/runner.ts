@@ -72,6 +72,7 @@ import { BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, bossBrainFor, bossLevelBase, bo
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
 import {
   allowedSearch,
+  boardAltered,
   bossAllowed,
   boardFlipped,
   crowdAllowed,
@@ -1013,7 +1014,8 @@ export class MatchRunner {
    * Boss battle: whether the God King makes his Last Stand on the crowd's played move. Once per game, whether or
    * not he has charges left: the move gave away at least the bar (lastStandBar: it falls the longer the battle
    * goes without one, and in a weak position it's a share of the chances left), and the crowd wasn't already lost
-   * (lastStandFrom). The judge's numbers decide, as given.
+   * (lastStandFrom). The judge's numbers decide, as given. Never while a boss's power has changed the board
+   * (boardAltered).
    */
   private lastStandFor(
     fen: string,
@@ -1031,6 +1033,10 @@ export class MatchRunner {
     const charges = b.kingCharges ?? 0;
     const bar = Math.round(lastStandBar(best, b.crowdMoves, charges, this.settings) * 10) / 10;
     if (!this.forceLastStand && !lastStandDue(loss, best, b.crowdMoves, charges, this.settings)) return undefined;
+    // (Never while a boss's power has changed the board: the judge's numbers are plain chess's, and the reply they fear
+    // may be one the board doesn't allow (Eric, Oct 24: Babur's hoop). The move stands and nothing is spent. The test
+    // switch, ?laststand=1, still calls him on any board.)
+    if (!this.forceLastStand && boardAltered(b, fen)) return undefined;
     // What it loses: the boss's best reply (only if it's a legal move there) and a mate it allows (the crowd mated).
     const reply = evaluation.replies?.[played];
     const mate = evaluation.mates?.[played];

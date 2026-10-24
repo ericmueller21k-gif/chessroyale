@@ -212,6 +212,22 @@ export function powerTurn(boss: BossState | null | undefined): boolean {
 }
 
 /**
+ * A boss's power has changed the board this crowd turn (`fen`: the crowd to move), so the God King's Last Stand sits out
+ * (Eric, Oct 24: Babur's hoop stopped the recapture the plain-chess judge feared;
+ * docs/decisions/2026-10-24-king-save-off-on-altered-boards.md). One rule for every boss, no list: a power touches the
+ * turn (`powerTurn`, fair play's own test), something stops his moves (`bossStops`), something stops any of the crowd's
+ * (`crowdFilter`), or something else of his is on the board (`altersBoard`: Hollow's dark, the Roman candle's shadows,
+ * the carrots). `rules`: the boss's (a test's stand-in).
+ */
+export function boardAltered(boss: BossState | null | undefined, fen: string, rules: BossRules | null = bossRules(boss)): boolean {
+  if (!boss?.powers || !rules) return false;
+  if (rules.powerTurn?.(boss) || rules.bossStops?.(boss) || rules.altersBoard?.(boss)) return true;
+  if (!rules.crowdFilter) return false;
+  const legal = legalMoves(fen);
+  return rules.crowdFilter(legal, boss, fen).length < legal.length;
+}
+
+/**
  * The squares that show ice: the frozen piece; in the blizzard the crowd's pieces its ice holds (every one but those
  * free), on the crowd's turn and through the boss's turn after it.
  */

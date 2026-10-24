@@ -298,6 +298,8 @@ export const GREX: BossRules = {
     }
   },
   powerTurn: (boss) => !!boss.powers!.fire?.length,
+  // The Roman candle's shadows on the board, where its fireballs are coming down (the God King's Last Stand sits out).
+  altersBoard: (boss) => fireShadows(boss.powers).length > 0,
   // The judge: a piece left on a tile ablaze counts as gone, and the moves that save it are always scored.
   judge: {
     mustScore: (boss, fen) => fireEscapes(fen, ablaze(boss)),
