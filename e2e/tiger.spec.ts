@@ -608,10 +608,9 @@ test("Babur's pump on a computer at 1280 × 800, 1440 × 900, 1920 × 1080 and 1
     const end = knot(fly.at(-1)!);
     const dist = Math.hypot(end.x - release.x, end.y - release.y);
     const declared = (await page.evaluate(() => (window as any).__flyFrom)) as { x: number; y: number };
-    expect(Math.hypot(declared.x - release.x, declared.y - release.y), `${at}: it starts at the pump's release knot`).toBeLessThan(4);
-    // (And the first frame drawn is on its way from there: the fallback start, above the board's far corner, is hundreds of px off.)
-    const k0 = knot(fly[0]!);
-    expect(Math.hypot(k0.x - release.x, k0.y - release.y), `${at}: first seen near the pump (${dist.toFixed(0)} px of flight)`).toBeLessThan(10 + 0.3 * dist);
+    // (The start as the flight declares it, not its first sampled frame: the flight mounts on a timer at its time, 20 to 35 ms late on a
+    // quiet machine, and a loaded runner's first sample can come most of the way along; the fallback start is hundreds of px off.)
+    expect(Math.hypot(declared.x - release.x, declared.y - release.y), `${at}: it starts at the pump's release knot (${dist.toFixed(0)} px of flight)`).toBeLessThan(4);
     const square = await page.evaluate(() => (window as any).__landed as string);
     expect(fly.at(-1)!.square, `${at}: to its square`).toBe(square);
   }

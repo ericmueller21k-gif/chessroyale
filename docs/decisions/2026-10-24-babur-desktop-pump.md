@@ -74,7 +74,8 @@ point 2): a stage-4 queen on it was 20 px tall, against a queen piece of 44 px a
   within 10% of the board's queen piece (measured at 400 px for precision), beside him (the first three) or in the taller bar
   (1024 x 768), inside the window, over none of the board, the eval bar, the leaderboard and the status, no scrolling; then a landing
   flies from the pump to its square: the flight's own start (its rest box moved by its `--dx`, `--dy`) within 4 px of the pump's
-  release knot, and the first frame drawn on its way from there. The 320/1280 test's computer half now checks the pump beside him at 1280 x 800
+  release knot. (Not its first sampled frame: the flight mounts on a timer at its time, 20 to 35 ms late on a quiet machine, and on a
+  loaded CI runner the first sample once came 92% along while the declared start was exact.) The 320/1280 test's computer half now checks the pump beside him at 1280 x 800
   and none in the bar. The phone's tests are unchanged.
 
 **Files.** `packages/app/src/components/Tiger.tsx`, `packages/app/src/styles.css`, `packages/app/test/tiger-wired.test.ts`,
