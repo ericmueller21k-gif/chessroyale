@@ -27,6 +27,7 @@
  *                          stage with a squash and a stretch (`squeak`), the plunger comes back up.
  *   pop<2-4><Piece>        (ends bare, 400) the balloon swells past its size (`squeak`), strains (the shine stretches, a
  *                          wobble), bursts (`pop`: a flash) and its scraps fall and are gone; the nozzle is left bare.
+ *   ready<Piece>           (loop) a finished balloon, ready, bobbing gently: a pixel's stretch and back (the wiring's).
  *   release<Piece>         (ends bare, 330) a finished balloon lifts off the nozzle on its string (`whoosh`); at its last lifted
  *                          look (`RELEASE_KNOT`, the knot's place in the frame) the flight takes over (effects/tiger.ts
  *                          `balloonFly`) and the prop shows `bare`.
@@ -667,8 +668,9 @@ const fr = (ms: number, layers: Layer[], extra: Partial<Frame> = {}): Frame => (
 
 const cap = (s: string) => s[0]!.toUpperCase() + s.slice(1);
 /** The name of an animation of the pump: `bare`, `put`, `stage` (with the stage), `grow` (into the stage), `pop` (from the stage), `release`. */
-export function pumpAnim(kind: "bare" | "put" | "stage" | "grow" | "pop" | "release", piece: BalloonPiece, stage: Stage = 4): string {
+export function pumpAnim(kind: "bare" | "put" | "stage" | "grow" | "pop" | "release" | "ready", piece: BalloonPiece, stage: Stage = 4): string {
   if (kind === "bare") return "bare";
+  if (kind === "ready") return `ready${cap(piece)}`;
   if (kind === "stage" && stage === 1) return "stage1";
   if (kind === "put") return `put${cap(piece)}`;
   if (kind === "release") return `release${cap(piece)}`;
@@ -731,6 +733,8 @@ function pieceAnims(piece: BalloonPiece): Record<string, Anim> {
       ],
     };
   }
+  // Ready (the wiring's, Oct 24): the finished balloon bobs gently on the nozzle, a pixel's stretch and back (the knot stays on).
+  out[pumpAnim("ready", piece)] = { loop: true, frames: [fr(650, pumpLayers(0, at(4))), fr(650, pumpLayers(0, at(4, { squash: 1 })))] };
   // The release: a finished balloon lifts off the nozzle on its string; then the flight takes over and the nozzle is bare.
   const lifted = (lift: number): Layer[] => {
     const s = stringPart(lift + 1, lift > 3 ? 1 : 0, lift);

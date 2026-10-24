@@ -306,9 +306,11 @@
         "packages/chess/src/bosses/tiger.ts",
         "packages/app/src/characters/tiger*.ts",
         "packages/app/src/characters/effects/tiger.ts",
-        "packages/app/src/components/Tiger.tsx"
+        "packages/app/src/components/Tiger.tsx",
+        "packages/app/src/tiger-show.ts",
+        "scripts/frames-tiger.mjs"
       ],
-      "specs": ["e2e/tiger.spec.ts"]
+      "specs": ["e2e/tiger.spec.ts", "e2e/king-attack.spec.ts"]
     },
     "Smudgy (smudgy)": {
       "paths": [

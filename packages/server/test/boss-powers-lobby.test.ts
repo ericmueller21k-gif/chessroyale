@@ -288,7 +288,7 @@ describe("boss powers online", () => {
       expect(L.core.save().runner!.state.boss!.id).not.toBe("clown");
     }
     const ids = new Set<string>();
-    // (Every playable boss turns up: twelve of them with Puddles, so more seeds than there were.)
+    // (Every playable boss turns up: thirteen of them with Babur, so more seeds than there were.)
     const playable = playableBosses().map((b) => b.id).sort();
     for (let seed = 1; seed <= 400 && ids.size < playable.length; seed++) {
       const L = setup({ ...RAID_SETTINGS, raidOpening: true }, {}, seed);
@@ -297,7 +297,7 @@ describe("boss powers online", () => {
       ids.add(L.core.save().runner!.state.boss!.id!);
     }
     expect([...ids].sort()).toEqual(playable);
-    expect(playable).toEqual(["alfil", "bigboy", "clown", "gardener", "gingerbread", "grex", "hollow", "hopper", "moo", "pig", "sawyer", "smudgy"]);
+    expect(playable).toEqual(["alfil", "bigboy", "clown", "gardener", "gingerbread", "grex", "hollow", "hopper", "moo", "pig", "sawyer", "smudgy", "tiger"]);
   });
 
   it("the test trigger: only an admin's is taken; it brings the ultimate as the next turn begins, once; switched off, nothing", () => {
