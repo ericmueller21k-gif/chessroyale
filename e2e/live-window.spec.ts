@@ -71,7 +71,8 @@ test("computer: a bot match plays in the live window above the buttons, labeled 
     expect(Math.abs(box.y - card.y)).toBeLessThan(2);
     const ranked = (await page.getByRole("radiogroup", { name: "RANKED" }).boundingBox())!;
     expect(box.y + box.height).toBeLessThanOrEqual(ranked.y);
-    const foot = (await page.locator(".rd-card").boundingBox())!;
+    // (The column's last card: Auto chess, under the Boss raid card, Oct 24.)
+    const foot = (await page.locator(".rd-card").last().boundingBox())!;
     expect(Math.abs(foot.y + foot.height - (card.y + card.height)), `${w}x${h}: the column's foot`).toBeLessThan(12);
     // Its words fit on their lines (cut short with "…" at worst, never spilling out).
     for (const sel of [".fd-livewin-head", ".fd-livewin-line"]) {

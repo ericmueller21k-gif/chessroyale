@@ -191,11 +191,8 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => ((window as any).__soundLog = []));
 });
 
-test("shelved (Eric, Oct 19): no button on home or in a player's Settings; an admin opens it from Settings' Testing; its back button goes home", async ({ page }) => {
+test("shelved (Eric, Oct 19; home's card came on Oct 24, home-ranked.spec.ts): no row in a player's Settings; an admin opens it from Settings' Testing; its back button goes home", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/");
-  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Auto chess/ })).toHaveCount(0);
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Auto chess/ })).toHaveCount(0);
