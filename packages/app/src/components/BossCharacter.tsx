@@ -18,6 +18,8 @@ import { prewarmHopper } from "./Hopper.tsx";
 import { prewarmSmudgy } from "./Smudgy.tsx";
 import { prewarmMoo } from "./Moo.tsx";
 import { prewarmGardener, resetGarden } from "./Gardener.tsx";
+import { prewarmTiger } from "./Tiger.tsx";
+import { resetTiger } from "../tiger-show.ts";
 import { EngineOverlay, placeEngine, prewarmRecluse } from "./Recluse.tsx";
 import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
@@ -61,6 +63,7 @@ export function resetBeats() {
   engine.at = null;
   resetMoo();
   resetGarden();
+  resetTiger();
 }
 
 /**
@@ -123,9 +126,14 @@ function figureShowing(ch: Character, now: number): { anim: string; frame: numbe
  * ultimate comes, the book slammed shut as he mocks the God King's help): from `since`, each in turn, then its beat
  * again. Set by what plays it (a moment's view, the dock); read by its figure every frame, both placements alike.
  */
-const inPlace: { run: { key: string; since: number; anims: readonly string[] } | null } = { run: null };
-export function playInPlace(key: string, anims: readonly string[], since = Date.now()) {
-  if (inPlace.run?.key !== key) inPlace.run = { key, since, anims };
+/**
+ * Where a run in place moves the figure in a phone's boss bar, `t` ms into it (Babur's hop along the bar to his pump and back): across
+ * by `x` and up by `y` px, and facing the other way (`flip`, mirrored about his feet). A computer's figure stays where it is.
+ */
+export type FigureMove = (t: number) => { x: number; y: number; flip: boolean };
+const inPlace: { run: { key: string; since: number; anims: readonly string[]; move?: FigureMove } | null } = { run: null };
+export function playInPlace(key: string, anims: readonly string[], since = Date.now(), move?: FigureMove) {
+  if (inPlace.run?.key !== key) inPlace.run = { key, since, anims, move };
 }
 /** What a run in place shows at `now`, or null once it's over (or before it starts). */
 function inPlaceShowing(ch: Character, now: number): { anim: string; frame: number; tag: string } | null {
@@ -276,6 +284,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     if (kit.ch.id === "moo") prewarmMoo(kit.ch.name);
     // (Puddles' tosses, watering and reactions, and the seeds, sweep and plants on the board.)
     if (kit.ch.id === "gardener") prewarmGardener(kit.ch.name);
+    // (Babur's trip to the pump, his place, reactions and hoops, and the balloons and rings on the board.)
+    if (kit.ch.id === "tiger") prewarmTiger(kit.ch.name);
     // (The Hidden Boss's phase change: his rage, his leap onto the board, the book thrown down, the chant.)
     if (kit.ch.id === "recluse") prewarmRecluse(boss.crowdSide);
     // (Its attack on a king too: the God King's Last Stand, or its mate.)
@@ -297,13 +307,23 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     const g = cv.current.getContext("2d");
     let raf = 0;
     let last = "";
+    let moved = "";
     let lit: boolean | null = null;
     const draw = () => {
       const now = Date.now();
       // (A run of its own animations in place, over its beat, while one lasts: the Hidden Boss's spellbook, his slam.)
       // (Moo's Full Moon: every animation of his is its powered-up twin while it lasts.)
       const live = kit.powered?.on(nowRef.current.boss, now, nowRef.current.stage) ? poweredKit(kit) : kit;
-      let s = inPlaceShowing(kit.ch, now) ?? figureShowing(kit.ch, now) ?? showing(live, beat, now, since);
+      const own = inPlaceShowing(kit.ch, now);
+      let s = own ?? figureShowing(kit.ch, now) ?? showing(live, beat, now, since);
+      // (A run that moves the figure along a phone's bar: Babur's hop to his pump.)
+      const mv = own && place === "bar" && inPlace.run?.move ? inPlace.run.move(now - inPlace.run.since) : null;
+      const moveId = mv ? `${Math.round(mv.x)},${Math.round(mv.y)},${mv.flip}` : "";
+      if (moveId !== moved && box.current) {
+        moved = moveId;
+        box.current.style.translate = mv && (mv.x || mv.y) ? `${Math.round(mv.x)}px ${Math.round(mv.y)}px` : "";
+        box.current.classList.toggle("bc-flip", !!mv?.flip);
+      }
       // (Moo at rest: his idle, then now and then the sit and back: stance.ts. Never over a moment, which has settled into its
       // idle first, and never powered up.)
       if (kit.rest && live === kit && !figure.run && s.anim === (kit.loops?.idle ?? "idle")) {

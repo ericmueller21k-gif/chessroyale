@@ -277,6 +277,16 @@
  *                          `pop` at 270: the piece on), wilt (490 ms). Drawn over the piece on the square.
  *   waterHit       square  hit<H|L><L|R> (ends empty, about 200 ms): his jet landing on a king's head or a little lower, from the left or
  *                          right edge: a burst of water, drops, a splash (Puddles' attack on a king).
+ *   balloonFly     square  fly<Piece> (loop, 480 ms): a finished balloon bobbing on its string; the board moves it on an arc from the pump in
+ *                          the boss bar to its square (a CSS transform). Its color is one of the sprite's looks (BALLOON_COLORS).
+ *   balloonLand    square  land<Piece> (ends empty, 790 ms; `thump` at 260, `poof` at 520: his real piece goes on under the puff): it drifts
+ *                          down onto the square, squashes, bounces, and a puff of smoke turns it into his piece. Drawn over the square.
+ *   hoopFly        square  fly (loop, 280 ms): a small burning hoop turning over; moved on an arc from his paw to its block.
+ *   hoopRing       strip   land (330 ms: `whoosh`, `thump`, `flame`; ends on burn's first look), burn (loop: the crowd's first move), dying
+ *                          (loop: its last), out (ends empty, 400 ms, `puff`): the ring of fire round a 2 x 2 block, HOOP_SIZE (96)
+ *                          square, the block's four squares and HOOP_MARGIN (16) round them; the four squares inside stay clear.
+ *   balloonHit     square  hit<H|L><L|R> (ends empty, about 200 ms): a balloon bonking on a king's head or a little lower, and popping
+ *                          (Babur's attack on a king).
  *
  * Play them with <BossEffect> (components/BossEffect.tsx), which plays their sounds from the frames' cues, once,
  * through the mute switch; or render frames yourself with `renderFrame`. For many square effects at once (G-REX's
@@ -340,6 +350,10 @@ export const POWER_ANIMS = [
   "cheer",
   "bigCheer",
   "shrug",
+  "place",
+  "hop",
+  "wince",
+  "hoops",
 ] as const;
 export type PowerAnim = (typeof POWER_ANIMS)[number];
 
@@ -469,6 +483,17 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
     ultimateHit: { anim: "cheer" },
     more: { bigCheer: { anim: "bigCheer" }, shrug: { anim: "shrug" } },
   },
+  "Tiger": {
+    // A new balloon on the pump, at the start of his turn (components/Tiger.tsx): on a phone he hops along the bar to it (`hop`, the
+    // airborne frame held) and back; `place` where he stands, at `touch` the limp balloon is on the nozzle (the pump's `put`).
+    power: { anim: "place", hit: "touch" },
+    ultimateWarn: { anim: "check" },
+    // The hoops: at `throw1` to `throw3` a burning hoop leaves his paw (`hoopFly`) for its block, where its ring lands (`hoopRing`).
+    ultimate: { anim: "hoops", hit: "throw1", effects: ["hoopFly", "hoopRing"] },
+    // A balloon landed (`balloonFly` from the pump to its square, `balloonLand` there): a cheer; a real queen: a big cheer; a pop: a wince.
+    ultimateHit: { anim: "cheer", effects: ["balloonFly", "balloonLand"] },
+    more: { bigCheer: { anim: "bigCheer" }, wince: { anim: "wince" }, hop: { anim: "hop" } },
+  },
   "Alfil": {
     power: { anim: "tusksCast", hit: "cast" },
     powerHit: { anim: "tusksFuse", hit: "flash" },
@@ -573,6 +598,14 @@ export const EFFECTS: Record<EffectName, Effect> = {
   // its own, played by the moment: the same cue name), the wilt a sigh; the sprouts and the plain plants are quiet.
   gardenPlant: { ch: EFFECT_SPRITES.gardenPlant, covers: "square", end: "gone", sounds: { sprout: "gardenerRustle", grow: "gardenerRustle", rise: "gardenerRustle", open: "gardenerRustle", swell: "gardenerRustle", snap: "gardenerSnap", gulp: "gardenerGulp", pop: "gardenerPop", wilt: "gardenerWilt" } },
   waterHit: { ch: EFFECT_SPRITES.waterHit, covers: "square", start: "hitHL", sounds: {} },
+  // Babur's balloon in flight (the board names its piece's animation and color), and landing: its thump and its puff of smoke.
+  balloonFly: { ch: EFFECT_SPRITES.balloonFly, covers: "square", loop: "flyPawn", sounds: {} },
+  balloonLand: { ch: EFFECT_SPRITES.balloonLand, covers: "square", start: "landPawn", sounds: { thump: "tigerThump", poof: "tigerPoof" } },
+  // A hoop in flight (his `throwN` cue is its whoosh), and its ring: the landing's whoosh and thump are quiet beside the flame's
+  // whoosh and crackle (one a hoop); the smoke as it goes out is a soft poof.
+  hoopFly: { ch: EFFECT_SPRITES.hoopFly, covers: "square", loop: "fly", sounds: {} },
+  hoopRing: { ch: EFFECT_SPRITES.hoopRing, covers: "strip", start: "land", loop: "burn", end: "out", sounds: { whoosh: "tigerWhoosh", thump: "tigerThump", flame: "tigerFlame", puff: "tigerPoof" } },
+  balloonHit: { ch: EFFECT_SPRITES.balloonHit, covers: "square", start: "hitHL", sounds: {} },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------
@@ -773,6 +806,11 @@ export function moonItem(square: string, i: number, from: "L" | "R", since: numb
 /** Puddles' i-th jet of water landing on the king's square (on its head, then a little lower, in turn), from his side. */
 export function waterItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   return { square, name: "waterHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
+}
+
+/** Babur's i-th balloon bonking on the king's square (on its head, then a little lower, in turn), from his side, and popping. */
+export function balloonItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "balloonHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }
 
 /** Smudgy's i-th blob of paint splatting on the king's square (on its head, then a little lower, in turn), from his side. */

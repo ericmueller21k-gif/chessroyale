@@ -75,6 +75,9 @@ export type Beat =
   | "bigCheer"
   | "shrug"
   | "ownEaten"
+  // Babur's, the circus tiger's: a new balloon on his pump, and a balloon popped (a landing's reactions are `cheer` and `bigCheer`).
+  | "place"
+  | "wince"
   // A boss's attack on a king (its kit's `kingAttack`): the God King in his Last Stand, the crowd's king at its mate.
   | "kingAttack";
 /** The loops it rests in between moments (`ready`: Wrangler's, his meter full). */

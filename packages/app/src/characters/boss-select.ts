@@ -35,6 +35,8 @@ export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
   moo: "mooHappy",
   // His happy grunt and a splash.
   gardener: "gardenerHello",
+  // A big, bored yawn, then a balloon squeak.
+  tiger: "tigerHello",
   // The Hidden Boss: his low, ominous hum (the stare).
   recluse: "recluseHum",
 };
@@ -56,6 +58,8 @@ export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
   moo: ["Hi! This is Moo. He's my best friend. (Moo! {heart})", "I watched your farm for ages. Let's play! (Moo? {question})", "Best friends make the best moves! (Moo! {heart})"],
   // The director's draft (Oct 21), as written: his entrance, a seed line and a smug one, which read right outside a match.
   gardener: ["Mind the flower beds.", "Good soil here. Very good soil.", "Everything's coming up roses."],
+  // The director's draft (Oct 24), as written: lines that read right outside a match.
+  tiger: ["No roaring tonight. Balloons only.", "Another masterpiece.", "Don't rush the artist."],
   // The Hidden Boss (Eric's own first line; never named on screen): the two in turn.
   recluse: ["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."],
 };
@@ -126,6 +130,8 @@ export const SELECT_FRAMING: Readonly<Record<string, Framing>> = {
   smudgy: { neck: [41, 46], span: 55.5, at: 0.51 },
   moo: { neck: [36, 58], span: 56, at: 0.39 },
   gardener: { neck: [48, 56], span: 57, at: 0.42 },
+  // (His bunch of balloons rides high over his head: the neck low in the tile, so the balloons are in it too.)
+  tiger: { neck: [31, 78], span: 56, at: 0.69 },
   recluse: { neck: [33, 47], span: 61, at: 0.5 },
 };
 
@@ -148,4 +154,6 @@ export const SELECT_TINT: Readonly<Record<string, string>> = {
   smudgy: "#0e5c60",
   moo: "#5d7ad8",
   gardener: "#7fe0ae",
+  // (His knight balloon's blue: across the wheel from his orange, so his stripes and his red vest stay clear on it.)
+  tiger: "#2f7fe0",
 };

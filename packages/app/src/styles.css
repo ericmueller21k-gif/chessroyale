@@ -19853,3 +19853,148 @@ button.sq-tiny {
     scale: 1;
   }
 }
+
+/* ---- Babur, the circus tiger (components/Tiger.tsx; tg- for tiger) ---- */
+/* He casts his hoops from the board's top-left corner, in his own frame's shape (76 x 106: room above him for his standing pose). */
+.pm-caster.pm-by-tiger {
+  aspect-ratio: 76 / 106;
+  width: 28%;
+  left: -5%;
+  top: -20%;
+}
+/* His hop along a phone's bar to the pump and back: facing the way he goes (his drawing faces our left), mirrored about his feet. */
+.boss-char.bc-flip .boss-char-sprite {
+  transform: scaleX(-1);
+  transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
+}
+/* The pump in the bar's free room, one sprite pixel to a screen pixel (as his figure there), standing on the room's bottom: a phone's
+   at its right end (the room is tall there), a computer's at its left (the right runs into the status: docs/decisions/2026-10-24-tiger-wired.md). */
+.tg-pump-slot {
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  width: 34px;
+  height: 36px;
+  pointer-events: none;
+}
+.tg-pump-slot > .tg-pump {
+  width: 34px;
+  height: 36px;
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .tg-pump-slot {
+    right: auto;
+    left: 2px;
+  }
+}
+/* A computer's limp balloon, tossed from his paw by the board to the pump in the bar: across, and up and over, down onto the nozzle
+   (screen px; anchored at its knot). */
+.tg-limp {
+  position: fixed;
+  z-index: 60;
+  width: var(--lw);
+  height: var(--lh);
+  margin: calc(var(--lh) * -1) 0 0 calc(var(--lw) / -2);
+  pointer-events: none;
+  animation-name: tg-limp-x, tg-limp-y;
+  animation-timing-function: linear, linear;
+  animation-fill-mode: both;
+}
+@keyframes tg-limp-x {
+  from {
+    left: var(--x0);
+  }
+  to {
+    left: var(--x1);
+  }
+}
+@keyframes tg-limp-y {
+  0% {
+    top: var(--y0);
+    animation-timing-function: cubic-bezier(0.25, 0.6, 0.45, 1);
+  }
+  45% {
+    top: calc(min(var(--y0), var(--y1)) - 40px);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.4);
+  }
+  100% {
+    top: var(--y1);
+  }
+}
+/* On the board's own squares (eighths of --board-size), over the pieces, never taking a tap. */
+.tg-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tg-fly,
+.tg-land,
+.tg-hoop {
+  position: absolute;
+  left: calc(var(--board-size, 100%) * var(--x1));
+  top: calc(var(--board-size, 100%) * var(--y1));
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
+  z-index: 9;
+  pointer-events: none;
+}
+/* A balloon from the pump to its square: across (a transform, in squares), and up a little and down onto it. */
+.tg-fly {
+  animation-name: tg-fly-x;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+.tg-fly-in {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation-name: tg-fly-y;
+  animation-fill-mode: both;
+}
+@keyframes tg-fly-x {
+  from {
+    translate: calc(var(--dx) * 100%) 0;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@keyframes tg-fly-y {
+  0% {
+    translate: 0 calc(var(--dy) * 100%);
+    animation-timing-function: cubic-bezier(0.3, 0.5, 0.5, 1);
+  }
+  40% {
+    translate: 0 calc(var(--dyp) * 100%);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.7, 0.5);
+  }
+  100% {
+    translate: 0 0;
+  }
+}
+/* A burning hoop's ring: its 2 x 2 block and half a square round it (HOOP_SIZE, 96 frame pixels), over the pieces; the four squares
+   inside stay clear in the art. */
+.tg-ring {
+  position: absolute;
+  left: calc(var(--board-size, 100%) * var(--x1));
+  top: calc(var(--board-size, 100%) * var(--y1));
+  width: calc(var(--board-size, 100%) * 3 / 8);
+  height: calc(var(--board-size, 100%) * 3 / 8);
+  z-index: 4;
+  pointer-events: none;
+}
+/* The hoops in flight from his paw (his cast at the corner): over everything on the board. */
+.tg-hoops {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 9;
+  pointer-events: none;
+}
+/* (His trip along a phone's bar passes under the status: it stays readable over his figure.) */
+.boss-bar .boss-next {
+  position: relative;
+  z-index: 4;
+}

@@ -147,11 +147,11 @@ function mobilityEngine(): EngineLike {
 // ---------------- His sheet ----------------
 
 describe("the circus tiger: his sheet", () => {
-  it("is on the roster as Babur, a tiger, not playable until his art is wired in, with Balloons and Hoops", () => {
+  it("is on the roster as Babur, a tiger, playable (his art is wired in), with Balloons and Hoops", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "tiger")!;
-    expect(def).toMatchObject({ name: TIGER_NAME, icon: "🐯", kit: null, powers: { passive: "balloons", ultimate: "hoops" } });
+    expect(def).toMatchObject({ name: TIGER_NAME, icon: "🐯", kit: "Tiger", powers: { passive: "balloons", ultimate: "hoops" } });
     expect(TIGER_NAME).toBe("Babur");
-    expect(isPlayable(def)).toBe(false);
+    expect(isPlayable(def)).toBe(true);
     expect(S.rageSpeed.tiger).toBeGreaterThan(0);
   });
 

@@ -51,7 +51,7 @@ describe("the kit's kingAttack", () => {
       .filter(([, k]) => k.kingAttack)
       .map(([name]) => BOSS_ROSTER.find((b) => b.kit === name)!.id);
     expect(withAttack).toEqual([...KING_ATTACKERS]);
-    expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener"]);
+    expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener", "tiger"]);
   });
 
   it("Alfil's: a `jab` cue on each of the shared hits, lasting the attack exactly, his ankus's tip in the king's square, a gold jab on it each hit", () => {
@@ -306,6 +306,8 @@ const FACES: Record<string, { keys: string; front?: boolean; head?: string; gaze
   Moo: { keys: "", gaze: true },
   // (Puddles' eyes are layers of their own, but his face is turned in three quarters: his nostrils, in his muzzle's end, are toward the king.)
   Gardener: { keys: "y" },
+  // (Babur's face is turned toward the king as he bats each balloon: his amber eyes and his nose.)
+  Tiger: { keys: "yYn" },
 };
 /** Where his eyes look in a frame (the mean of his two pupils' x, in eye pixels; - toward our left), from the eye layers' own poses. */
 function gazeTurn(f: Anim["frames"][number]): number {

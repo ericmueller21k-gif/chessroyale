@@ -56,9 +56,10 @@ describe("the boss select", () => {
   it("shares the tiles out over as few rows as it takes, evenly, the longer rows first (docs/decisions/2026-10-23-boss-select-sf.md)", () => {
     const per = TILES_PER_ROW;
     expect(per).toBe(5);
-    // Today's fourteen tiles (twelve bosses, the Hidden Boss's and "?"): 5, 5, 4, the short row centered by the stylesheet.
-    expect(all.length + 1).toBe(14);
-    expect(rowSizes(all.length + 1, per)).toEqual([5, 5, 4]);
+    // Today's fifteen tiles (thirteen bosses, the Hidden Boss's and "?"): three rows of five.
+    expect(all.length + 1).toBe(15);
+    expect(rowSizes(all.length + 1, per)).toEqual([5, 5, 5]);
+    expect(rowSizes(14, per)).toEqual([5, 5, 4]);
     // The next bosses: never a tile alone on a row.
     expect(rowSizes(15, per)).toEqual([5, 5, 5]);
     expect(rowSizes(16, per)).toEqual([4, 4, 4, 4]);

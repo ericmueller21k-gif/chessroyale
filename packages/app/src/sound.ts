@@ -22,6 +22,7 @@ import { hopperSound, type HopperSound } from "./characters/hopper-sounds.ts";
 import { smudgySound, type SmudgySound } from "./characters/smudgy-sounds.ts";
 import { mooSound, type MooSound } from "./characters/moo-sounds.ts";
 import { gardenerSound, type GardenerSound } from "./characters/gardener-sounds.ts";
+import { tigerSound, type TigerSound } from "./characters/tiger-sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
 import { captureWorkerError } from "./problems.ts";
 import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
@@ -248,6 +249,7 @@ const hopper = (name: HopperSound) => (t: number) => buffer(hopperSound(name, ct
 const smudgy = (name: SmudgySound) => (t: number) => buffer(smudgySound(name, ctx!.sampleRate), t);
 const mooBoss = (name: MooSound) => (t: number) => buffer(mooSound(name, ctx!.sampleRate), t);
 const gardenerBoss = (name: GardenerSound) => (t: number) => buffer(gardenerSound(name, ctx!.sampleRate), t);
+const tigerBoss = (name: TigerSound) => (t: number) => buffer(tigerSound(name, ctx!.sampleRate), t);
 /** The God King tapped with no charges left: his soft "can't" (god-king-sounds.ts). */
 const kingCant = (t: number) => buffer(godKingSound("cant", ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
@@ -699,6 +701,24 @@ export type SoundName =
   | "gardenerJet"
   | "gardenerSpurt"
   | "gardenerRustle"
+  // Babur, the circus tiger (a raid boss): synthesized, see characters/tiger-sounds.ts.
+  | "tigerPump"
+  | "tigerSqueak"
+  | "tigerPop"
+  | "tigerWhoosh"
+  | "tigerPoof"
+  | "tigerThump"
+  | "tigerSpring"
+  | "tigerRustle"
+  | "tigerYawn"
+  | "tigerGrowl"
+  | "tigerHuff"
+  | "tigerFlame"
+  | "tigerBonk"
+  | "tigerCheer"
+  | "tigerWhoop"
+  | "tigerWince"
+  | "tigerHello"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -921,6 +941,23 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   gardenerJet: gardenerBoss("jet"),
   gardenerSpurt: gardenerBoss("spurt"),
   gardenerRustle: gardenerBoss("rustle"),
+  tigerPump: tigerBoss("pump"),
+  tigerSqueak: tigerBoss("squeak"),
+  tigerPop: tigerBoss("pop"),
+  tigerWhoosh: tigerBoss("whoosh"),
+  tigerPoof: tigerBoss("poof"),
+  tigerThump: tigerBoss("thump"),
+  tigerSpring: tigerBoss("spring"),
+  tigerRustle: tigerBoss("rustle"),
+  tigerYawn: tigerBoss("yawn"),
+  tigerGrowl: tigerBoss("growl"),
+  tigerHuff: tigerBoss("huff"),
+  tigerFlame: tigerBoss("flame"),
+  tigerBonk: tigerBoss("bonk"),
+  tigerCheer: tigerBoss("cheer"),
+  tigerWhoop: tigerBoss("whoop"),
+  tigerWince: tigerBoss("wince"),
+  tigerHello: tigerBoss("hello"),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -1098,6 +1135,23 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   gardenerJet: [["gardener", "jet"]],
   gardenerSpurt: [["gardener", "spurt"]],
   gardenerRustle: [["gardener", "rustle"]],
+  tigerPump: [["tiger", "pump"]],
+  tigerSqueak: [["tiger", "squeak"]],
+  tigerPop: [["tiger", "pop"]],
+  tigerWhoosh: [["tiger", "whoosh"]],
+  tigerPoof: [["tiger", "poof"]],
+  tigerThump: [["tiger", "thump"]],
+  tigerSpring: [["tiger", "spring"]],
+  tigerRustle: [["tiger", "rustle"]],
+  tigerYawn: [["tiger", "yawn"]],
+  tigerGrowl: [["tiger", "growl"]],
+  tigerHuff: [["tiger", "huff"]],
+  tigerFlame: [["tiger", "flame"]],
+  tigerBonk: [["tiger", "bonk"]],
+  tigerCheer: [["tiger", "cheer"]],
+  tigerWhoop: [["tiger", "whoop"]],
+  tigerWince: [["tiger", "wince"]],
+  tigerHello: [["tiger", "hello"]],
   kingCant: [["godKing", "cant"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */

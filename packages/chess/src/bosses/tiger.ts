@@ -56,7 +56,7 @@ import { passTurn } from "./hollow.ts";
 /**
  * His animations' lengths (ms; the sprite's branch, docs/decisions/2026-10-23-tiger-animations.md), for the wiring and the
  * sims: his hop to the pump, `place` (its `touch` cue at 440: the balloon is on the nozzle), his reactions; the pump's
- * stage step, pop and release; the balloon's landing on its square (`poof` cue at 0.57 of it: his piece goes on); the
+ * stage step, pop and release; the balloon's landing on its square (`poof` cue at 520 of its 790 ms: his piece goes on); the
  * hoops' cast (`throw1` to `throw3`) and each ring's landing and going out.
  */
 export const TIGER_ANIM = {

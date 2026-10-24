@@ -23,12 +23,15 @@ import { MOO, MOO_ATTACK, MOO_CHANCE, MOO_LINES, MOO_PORTRAIT } from "./moo.ts";
 import { GARDENER, GARDENER_ATTACK, GARDENER_PORTRAIT } from "./gardener.ts";
 import { GARDENER_BAR } from "./gardener-bar.ts";
 import { GARDENER_CHANCE, GARDENER_LINES } from "./gardener-lines.ts";
+import { TIGER_ATTACK, TIGER_PORTRAIT } from "./tiger.ts";
+import { TIGER_FIGURE } from "./tiger-figure.ts";
+import { TIGER_CHANCE, TIGER_LINES } from "./tiger-lines.ts";
 import type { Stance } from "./stance.ts";
 import { mooPowered } from "./moo-state.ts";
 import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
-import { ankusItem, bonkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
+import { ankusItem, balloonItem, bonkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
@@ -582,6 +585,68 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // our left, as Sawyer; 36 frame pixels a square, 1.8 off (the animation decision's suggested values).
     kingAttack: { ch: GARDENER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, facesLeft: true, hit: waterItem },
   },
+  // Babur, the circus tiger (Eric, Oct 23-24): docs/decisions/2026-10-24-tiger-wired.md.
+  "Tiger": {
+    ch: TIGER_FIGURE,
+    anims: {
+      // The periodic strike on a piece is his lazy swat.
+      strike: "capture",
+      // A new balloon on the pump (components/Tiger.tsx: on a phone his hop along the bar to it and back, `hopTrip`): `place`, the
+      // limp balloon on the nozzle at its `touch` cue.
+      power: "place",
+      place: "place",
+      // The warning: a growl he can't be bothered to finish.
+      ultimateWarn: "check",
+      // Hoops: up on his hind legs, a burning hoop thrown at each `throwN` cue.
+      ultimate: "hoops",
+      // A balloon landed (`cheer`), a real queen (`bigCheer`), a pop (`wince`).
+      ultimateHit: "cheer",
+      cheer: "cheer",
+      bigCheer: "bigCheer",
+      wince: "wince",
+    },
+    sounds: {
+      // (His entrance's drop and the attack's: a whoosh down; his landing, steps and flop: a heavy thump.)
+      drop: "tigerWhoosh",
+      thump: "tigerThump",
+      land: "tigerThump",
+      flop: "tigerThump",
+      // Where another boss roars he yawns; his check's growl is a half-hearted one; a bored huff.
+      yawn: "tigerYawn",
+      growl: "tigerGrowl",
+      huff: "tigerHuff",
+      // A lazy swat of his paw (a capture), a hurt "ugh" (his grumble), his balloons squeaking on their strings.
+      swat: "tigerWhoosh",
+      oof: "tigerWince",
+      squeak: "tigerSqueak",
+      // The hop to the pump, the limp balloon out of his vest pocket, and on the nozzle (the pump's own `put` is quiet).
+      spring: "tigerSpring",
+      rustle: "tigerRustle",
+      touch: "tigerSqueak",
+      // His reactions, in his grumble: a "heh-heh", a pleased run for a queen, an "ugh" for a pop.
+      cheer: "tigerCheer",
+      whoop: "tigerWhoop",
+      wince: "tigerWince",
+      // The hoops: lit, then each thrown (the ring's own flame is its landing's sound).
+      flame: "tigerFlame",
+      throw1: "tigerWhoosh",
+      throw2: "tigerWhoosh",
+      throw3: "tigerWhoosh",
+      // His attack on a king: a bonk and a pop for each balloon.
+      bonk: "tigerBonk",
+      pop: "tigerPop",
+    },
+    lines: TIGER_LINES,
+    chance: TIGER_CHANCE,
+    portrait: { ...TIGER_PORTRAIT, anim: "idle", frame: 0 },
+    // His frame is 76 x 106: 26 rows over the still for the entrance's drop, the hop and his standing poses (victory, the hoops, the
+    // big cheer): the bar's tall box, as Puddles' cheers; and the wide box (docs/decisions/2026-10-23-tiger-animations.md).
+    tall: true,
+    wide: true,
+    // He drops in and bats ten balloons at the king (tiger.ts: TIGER_ATTACK), each bonking and popping on its square. Facing our left,
+    // as Sawyer; 36 frame pixels a square, 1.8 off (the animation decision's suggested values).
+    kingAttack: { ch: TIGER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, facesLeft: true, hit: balloonItem },
+  },
   "Hidden Boss": {
     ch: RECLUSE,
     // (A phone's boss bar: his bust, head and shoulders, the same animations.)
@@ -647,7 +712,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
 };
 
 /** Every moment a kit may name an animation for (and so every `anims` key a powered twin may replace). */
-const BEAT_NAMES = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit", "wax", "flurry", "dazed", "plantMany", "plant", "cheer", "bigCheer", "shrug", "kingAttack"] as const satisfies readonly Beat[];
+const BEAT_NAMES = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit", "wax", "flurry", "dazed", "plantMany", "plant", "cheer", "bigCheer", "shrug", "place", "wince", "kingAttack"] as const satisfies readonly Beat[];
 const LOOP_NAMES = ["idle", "thinking", "smug", "rattled", "defeat", "victory"] as const satisfies readonly Loop[];
 const poweredKits = new WeakMap<BossKit, BossKit>();
 /**

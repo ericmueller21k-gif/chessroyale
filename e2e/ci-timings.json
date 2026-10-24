@@ -34,7 +34,7 @@
   "e2e/install.spec.ts": 2,
   "e2e/judges.spec.ts": 18,
   "e2e/kill-switches.spec.ts": 17,
-  "e2e/king-attack.spec.ts": 396,
+  "e2e/king-attack.spec.ts": 449,
   "e2e/landing.spec.ts": 5,
   "e2e/legal.spec.ts": 7,
   "e2e/live-window.spec.ts": 80,
@@ -66,7 +66,7 @@
   "e2e/squads-watch.spec.ts": 114,
   "e2e/squads.spec.ts": 95,
   "e2e/test-switches.spec.ts": 3,
-  "e2e/tiger.spec.ts": 60,
+  "e2e/tiger.spec.ts": 262,
   "e2e/vote-hint.spec.ts": 82,
   "e2e/votes.spec.ts": 110
 }

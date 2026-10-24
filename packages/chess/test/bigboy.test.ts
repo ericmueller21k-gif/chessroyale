@@ -145,8 +145,8 @@ describe("Big Boy: who he is", () => {
     // (Sawyer has a pawn's head start too: his split pawn; Wrangler's drags and showdown cost the crowd about as much;
     // Alfil's elephants and Slam move material too, at the same offset: docs/decisions/2026-10-17-alfil-rules.md; Chub & Chirp's
     // hops and prize too: reports/hopper-sim.md; Puddles' watering grows pieces and plants for him, at the pack's -250 the raid sim
-    // tuned: reports/gardener-sim.md.)
-    const others = BOSS_ROSTER.filter((b) => isPlayable(b) && b.id !== "bigboy" && b.id !== "sawyer" && b.id !== "pig" && b.id !== "alfil" && b.id !== "hopper" && b.id !== "gardener");
+    // tuned: reports/gardener-sim.md; Babur's balloons land pieces for him, at the same -250: reports/tiger-sim.md.)
+    const others = BOSS_ROSTER.filter((b) => isPlayable(b) && b.id !== "bigboy" && b.id !== "sawyer" && b.id !== "pig" && b.id !== "alfil" && b.id !== "hopper" && b.id !== "gardener" && b.id !== "tiger");
     for (const o of others) expect(def.offset).toBeLessThan(o.offset);
   });
 });
