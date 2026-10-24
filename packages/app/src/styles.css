@@ -12269,6 +12269,11 @@ img.qicon {
 .bc-bar-bubble.wide3 {
   text-wrap: wrap;
 }
+/* A line's icon (Moo's heart, his milk…) is taller than the line: its margin box stays within the line, so the rows keep their pitch. */
+.bc-bar-bubble .line-icon {
+  vertical-align: top;
+  margin: -2px 1px;
+}
 /* On a 320 px screen the bar's room is narrower: the bubble's font 8 px and its rows at the font's own 8 px (three rows still fit
    under a status that wraps to two lines), and the bar's column gap and status font let "58 moves left" keep its one line beside
    the name column (the figure's box 58 px, the name column 130 px: docs/decisions/2026-10-24-boss-bar-same.md). */
@@ -12278,8 +12283,11 @@ img.qicon {
     line-height: 1.35;
     padding: 1px 5px;
   }
+  .boss-bar.has-char {
+    padding-right: 6px;
+  }
   .boss-bar.has-char .boss-main {
-    column-gap: 3px;
+    column-gap: 0;
   }
   .boss-bar.has-char .boss-next {
     font-size: 11px;

@@ -339,7 +339,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Alfil, the woolly mammoth (Eric, Oct 17): docs/decisions/2026-10-17-alfil-wired.md.
   "Alfil": {
     barScale: 13 / 12,
-    barShift: 2,
+    barShift: 3,
     ch: ALFIL,
     anims: {
       strike: "capture",
