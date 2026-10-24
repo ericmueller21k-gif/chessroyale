@@ -242,8 +242,8 @@ test("every playable boss's phone bar: one bar and one figure box for all, the f
       const at = (await page.locator(".boss-bar").boundingBox())!;
       pngs[w]!.push({ name: `${def.name}`, png: await page.screenshot({ clip: at }) });
       if (w === 390) {
-        // The lineup's figure: from the screen's top to the bar's bottom, the left of the bar (the HUD's text is cut off in the picture).
-        const fig = { x: at.x, y: 0, width: 96, height: at.y + at.height + 2 };
+        // The lineup's figure: from the screen's left edge to the name column, from the top to the bar's bottom (the HUD's text and the name are cut off).
+        const fig = { x: 0, y: 0, width: 88, height: at.y + at.height + 2 };
         lineup.push({ name: def.name, png: await page.screenshot({ clip: fig }), box: s.box });
       }
       // (The boss's own lines settle first: its entrance and its first idle moment take the box as the battle begins. The line check
