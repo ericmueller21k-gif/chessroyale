@@ -1,116 +1,118 @@
-# One boss bar on a phone: one box for every boss, the figure where its layout puts it, a check that catches it (Oct 24, 2026)
+# One boss bar on a phone: one box for every boss, every figure drawn in the room (Oct 24, 2026)
 
-Eric (Oct 24, two phone screenshots, Moo & Moon's bar and Babur's): "the boss boxes here are just way off in terms of how
-they look… there should be some continuity as far as the size and where their name sits… these box sizes should not change…
-I guess the boss can be a little smaller in the box sometimes, but… why the hell is the [figure] literally outside of the box…
-it just looks messy… these are the kind of checks that should be… built… to be looking at these inconsistencies." **ASAP.**
-Then, the same day: "I actually think it's kind of cute how they stick their head out of the [bar] sometimes… the only thing
-should ever be hanging out would be the boss… I could test both… one where they're all fitted, and then one where they're kind
-of hanging out"; "the text box contained… reconfiguring how the text works… to take up that space that's inside the
-container". And: "It's okay for us to use longer lines of text… two rows is better than one row, but 1.5 rows is better than 4
-small rows."
+Eric (Oct 24, two phone screenshots, Moo & Moon's bar and Babur's): "the boss boxes here are just way off in terms of how they look…
+there should be some continuity as far as the size and where their name sits… these box sizes should not change… I guess the boss
+can be a little smaller in the box sometimes, but… why the hell is the [figure] literally outside of the box… it just looks messy…
+these are the kind of checks that should be… built… to be looking at these inconsistencies." **ASAP.**
+
+Then, the same day, the choice between the two layouts we built: the taller bar, every figure inside it, is the phone's bar. Last word
+the same day: "bigger bosses, sized by what they are, and sticking out of the bar is fine. Today Alfil is drawn smaller than Ginger,
+which is wrong for an elephant. Babur is small because his balloons count toward his height." So: one bar, no switch, no boss drawn
+below its own size, the big animals bigger, and a figure may hang out of the bar's top and left edge.
+
+On the bubble: "the text box contained… reconfiguring how the text works… to take up that space that's inside the container"; "two rows
+is better than one row, but 1.5 rows is better than 4 small rows"; "It's okay for us to use longer lines of text… we can stretch it out
+to the far right… even if it's overlapping, say, the balloon pump for a second… we don't want it to be one long sentence."
 
 ## What was wrong
 
-- Each boss's figure box was a different size: 48 × 56 with a −6 px top margin, so the figure poked out of the top of the bar.
-  `.tall` (G-REX, Puddles, Babur) made the box 88 px tall and the whole bar 92 px; `.wide` (Sawyer and others) made it 58 px
-  wide. So the bars came in two heights, the names sat at different heights (the name column was centred in the bar), and
-  the free room beside the name was a different width for every boss.
+- Each boss's figure box was a different size (48 × 56 with a −6 px margin that let the figure poke out; 58 × 88 for the tall three), so
+  the bars came in two heights, the names sat at different heights (the name column was centred), and the free room beside the name
+  was a different width for every boss.
 - The speech bubble sat over the name column and below the bar (`bottom: -4px`), in a box that changed with the line.
 
 ## What changed (phone only; the computer's bar is unchanged)
 
-- **One bar height.** Two layouts behind the test switch `?bar=`:
-  - `out` (the default): a compact bar, **64 px** (the bar's content 53 px; 5 px top and 6 px bottom padding). Every boss's
-    figure is drawn at its own size and rises above the bar's top when it's taller than the bar. Nothing else hangs out.
-  - `fit` (`?bar=fit`): the taller bar, **99 px** (content 88 px, the box of the original brief). Every idle figure is wholly
-    inside the bar.
-- **One figure box.** 58 px wide and as tall as the bar's content (53 in `out`, 88 in `fit`), its feet on its bottom edge,
-  which is the bar's content bottom (6 px above the bar's bottom edge), so the feet are on the same baseline for every boss.
-  No negative margin. `tall` and `wide` no longer change the phone bar (`styles.css`, `BossCharacter.tsx`); `tall` still
-  makes the results screen's box taller (`.boss-char.place-results.tall`); `wide` now has no CSS at all (the kit flag is
-  still set in `kits.ts`, a follow-up to remove).
-- **One place for the column.** The name column is 130 px wide (the widest name, "Boingo the Clown", is 127.5 px at 15 px
-  bold) and starts 12 px past the figure's box (x = 88 px at 390). Its top aligns to the bar's content, not centred, so the
-  name, level, the ultimate's bar and the passive's bar sit at the same x and y for every boss. The status stays at the top right.
-  The free room (`.boss-prop`) has the same width and height for every boss, since the name column no longer changes width.
-- **Per-boss size.** Each boss's size is in its kit (`barScale: { out, fit }` in `characters/kits.ts`), applied as
-  `--bc-s-out` / `--bc-s-fit` on its bar figure. A figure is shrunk only as far as its layout needs, and the rule is the same
-  for every boss (measured on every frame of every animation, `packages/app/test/boss-bar-same.test.ts`):
-  - `out`: its top may rise to 1 px under the "BOSS · move N" line's text (16 px above the bar's top), so a figure's top
-    limit is 73 px above its feet (58 px from the bar's top plus 15). At 1× the one-shot moments of many bosses rise past it
-    (Jefferson's roman candles to 114 px, Moo's flurry to 98), so they shrink.
-  - `fit`: at rest the figure stays inside the bar: 33 px from its feet to the bar's left edge, 93 px up, and 41 px right to the
-    name column. Idle moments past the bar's left edge shrink (Alfil 44 px, Smudgy 42, Sawyer and Wrangler 39).
-  - Both: the figure never reaches the name column at rest (41 px right of its feet), and never drops more than 6 px below the feet.
-- **The bubble** (Eric: "the text box contained"): inside the bar, from the name column's left edge to the bar's right
-  padding, under the status (its grid row 2, so never over the status). It may cover the name's lower bars and the boss's prop
-  for its moment. One row when the line is short (at most half the room), otherwise two balanced rows: its width is half the
-  line plus its frame (`SpeechBox` `balanced`, `speech.tsx`, `text-wrap: balance`), up to the room; a line too long for two
-  rows at full width takes three; never four. Its text stays in the speech font, 9 px (8 px on a 320 px screen, where the
-  longest line, 64 characters, needs three rows).
-- **Moo's sprite clip** (`.boss-char.place-bar.ch-moo .boss-char-sprite`, which trimmed his glow to the old box's sides) is
-  removed: his glow reaches 34 px left and 32 right of his feet, within the name clearance and the screen, and it's a moment
-  (the one-shot rule above). Nothing else per boss is left on the phone bar.
+- **One bar, 99 px tall**, for every boss (its content 88 px; 5 px top and 6 px bottom padding). No switch and no second layout.
+- **One figure box**: 58 px wide, as tall as the bar's content (88 px), starting 5 px in from the bar's left edge, so its feet sit 48 px
+  from the screen's left edge (the bar's left edge is at 14 px) and 6 px above the bar's bottom edge. Its feet are on the same baseline
+  for every boss. No negative margin. `tall` and `wide` no longer change the phone bar (`tall` still makes the results screen's box
+  taller; the `wide` kit flag now has no CSS, a follow-up to remove it).
+- **One place for the column.** The name column is 130 px wide (the widest name, "Boingo the Clown", is 127.5 px at 15 px bold) and starts
+  12 px past the box, at 89 px from the screen's left edge. The name, level, the ultimate's bar and the passive's bar start at the same x
+  and y for every boss (the column's top, not centred). The status stays at the top right. The free room (`.boss-prop`) is the same
+  width and height for every boss, since the name column no longer changes width.
+- **Each boss's size** is one number in its kit, `barScale` (1 is full size; never less), and a sideways shift in whole px, `barShift`
+  (+ right), in the same kit. Both are applied to the bar's figure (`--bc-scale`, `--bc-shift`: `characters/kits.ts`,
+  `components/BossCharacter.tsx`, `styles.css`).
+- **The room at rest** (every idle frame; `packages/app/test/boss-bar-same.test.ts` and `e2e/boss-bar-same.spec.ts`): the drawing is
+  ≥ 2 px inside the screen's left edge (L·s − shift ≤ 46 from the feet), ≥ 2 px clear of the name column (R·s + shift ≤ 39), its top is
+  ≥ 1 px under the "BOSS · move N" text (U·s ≤ 108 from the feet at 141 px), and it drops no more than the bar's bottom padding (6 px)
+  below its feet. It may hang out of the bar's top and left edge.
+- **A one-shot moment** (every frame of every animation: an entrance, a hop, a power's moment) may rise anywhere above the bar, even over
+  the "BOSS · move N" text, but never off the screen (L·s − shift ≤ 48, U·s ≤ 141, R·s + shift ≤ 272 at 320 px).
+- **The bubble** (Eric: "the text box contained"): inside the bar, from the name column's left edge to the bar's right padding, under the
+  status (its grid row 2, so never over the status). It may cover the name's lower bars and the boss's prop for its moment. Its width is
+  fitted to its line in the page's font (`speech.tsx`, `bubbleFit`): one row when the line is at most half the room; else two rows of
+  about the same length when two fit the room (`text-wrap: balance`); else three rows, the box as wide as the room and the text wrapped
+  to fill it (`.wide3`, `text-wrap: wrap`); never four. The line's width is read from the box's layout width (`offsetWidth`), and again
+  once the pixel font has loaded. Font: 9 px at 390 and 428; 8 px at 320, with the same row pitch (10.8 px) as at 390 (`line-height: 1.35`).
+- **The pump** (Babur's, `components/Tiger.tsx`): 2x (68 × 72) in the bar's room at its right end, its foot 3 px below the room's bottom
+  (inside the bar's padding), so a stage-4 balloon's top and a pop's over-swell clear the status (docs/decisions/2026-10-24-babur-bigger.md).
+  The room is 72 px tall under the status in this bar.
+- **Status at 320 px**: 11 px, so "58 moves left" keeps its one line beside the 130 px name column (the status's column is 70 px there:
+  the figure box is 58 px, the name column 130 px and the two 3 px column gaps). The longer "Strikes in N moves" wraps to two lines at
+  320 px, as it did before.
+- **Moo's sprite clip** (`.boss-char.place-bar.ch-moo .boss-char-sprite`, trimming his glow to the old box's sides) is removed.
 
 ## The numbers
 
-Measured at 390 × 844 in the browser (`e2e/boss-bar-same.spec.ts`). The bar's top is 48 px, the "BOSS · move N" line's
-text ends at y = 32 (16 px above), the feet are at 106 (`out`) and 141 (`fit`).
+Measured at 390 × 844 in the browser (`e2e/boss-bar-same.spec.ts`): the bar's top at 48 px, its bottom at 147 px; the figure's feet at
+141 px (on every boss); the "BOSS · move N" text ends at 32 px; the name column at 89 px; the free room 72 px tall under the status.
 
-| Layout | Bar | Figure box | Free room (390 / 320 / 428) | Board top (390 / 320 / 428) |
-|---|---|---|---|---|
-| Before (normal boss) | 60 px (92 for the tall three) | 48 × 56 (58 × 88 for the tall three) | 157 / 87 / varies | 136 (168 for the tall three) |
-| `out` | 64 px | 58 × 53 | 140 / 70 / 178 | 140 |
-| `fit` | 99 px | 58 × 88 | 140 / 70 / 178 | 175 |
+| | Before (normal boss / tall three) | After |
+|---|---|---|
+| Bar | 60 px / 92 px | 99 px |
+| Figure box | 48 × 56 / 58 × 88 (a −6 px margin) | 58 × 88, on the baseline |
+| Board top (390 / 320 / 428) | 136 / 136 / not measured (168 for the tall three) | 175 / 175 / 175 |
+| Board size (390 / 320 / 428) | 314 / 238 / not measured | 314 / 238 / 352 |
 
-The board's size is the same before and after: 314 px at 390 × 844, 238 px at 320 × 568, 352 px at 428 × 777 (the
-board's top moves: +4 px in `out`, +39 px in `fit`, from the taller bar; a board's bottom is still well above the controls below it).
+The board's size is the same at 390 and 320; its top is 39 px lower, the taller bar's. At 428 px the board is 352 px (not measured before).
 
-Each boss's `barScale` (fraction of full size; the table lists what limits it):
+Each boss's size and shift (`barScale`, `barShift`); the table says what limits it:
 
-| Boss (kit) | `out` | `fit` | What limits it |
+| Boss (kit) | Scale | Shift | What limits it |
 |---|---|---|---|
-| Jefferson | 0.60 | 0.90 | roman candles rise to 114 px (`out` limit 73; `fit` 108) |
-| Moo & Moon | 0.70 | 0.95 | the flurry rises to 98 px; left of the feet 34 px (bar's left edge 33) |
-| Babur (Tiger) | 0.75 | 1.00 | `out`: defeat rises to 93 px |
-| Hollow | 0.75 | 1.00 | `out`: lights out rises to 92 px |
-| Puddles (Gardener) | 0.80 | 1.00 | `out`: entrance rises to 86 px |
-| Ginger | 0.80 | 0.95 | `out`: victory rises to 86 px; `fit`: 34 px left of the feet |
-| Boingo the Clown | 0.80 | 1.00 | `out`: entrance rises to 89 px |
-| Alfil | 0.85 | 0.75 | `fit`: 44 px left of the feet (victory 82 px rise in `out`) |
-| Chub & Chirp | 0.90 | 0.90 | `out`: entrance 79 px; `fit`: 36 px left of the feet |
-| Smudgy | 0.90 | 0.75 | `out`: entrance 79 px; `fit`: 42 px left of the feet |
-| Big Boy | 0.95 | 1.00 | `out`: big bounce 74 px |
-| Sawyer | 1.00 | 0.80 | `fit`: 39 px left of the feet |
-| Wrangler | 1.00 | 0.80 | `fit`: 39 px left of the feet |
+| Ginger | 1 | 0 | fits |
+| Boingo the Clown | 1 | 0 | fits |
+| Jefferson | 1 | −2 | idle right side 41 px against the room's 39 px |
+| Hollow | 1 | 0 | fits |
+| Big Boy | 1 | 0 | fits |
+| Sawyer | 1 | 0 | fits |
+| Wrangler | 1 | 0 | fits |
+| Alfil | 13/12 | +2 | 4/3 would be 100 px across; the room is 84 px (46 px left of the feet, 39 px right) |
+| Chub & Chirp | 1 | 0 | fits |
+| Smudgy | 1 | +3 | a move's left edge (51 px) needs a shift of at least 3 to stay on the screen; the idle right side (36 px) allows at most 3 |
+| Moo & Moon | 14/12 | −1 | 4/3 would be 91 px across, past the room's 84 px |
+| Puddles (Gardener) | 15/12 | +2 | 4/3 fails on a one-shot's left edge (40 px × 4/3 = 53 px; the screen allows 48 px from the feet) against his idle right side |
+| Babur (Tiger) | 4/3 | −1 | fits; his balloons hang above the bar, outside the room's top rule |
 
-Shrinking is by the nearest 0.05 below the limit, so the pixel art stays on whole steps.
+Order check: each big animal's idle figure is drawn at least as tall as the tallest of Ginger, Sawyer, Smudgy and Chub & Chirp at full
+size (Chub's 71 px): Alfil 79 px, Moo & Moon 84 px, Puddles 88 px, Babur 97 px.
 
 ## Judgment calls
 
-- **The compact bar is 64 px, not 60.** A line of three rows at 9 px needs the row under the status (37 px) plus the bar's
-  bottom padding; 60 px gave 33 px and did not hold three rows.
-- **The "BOSS · move N" line's gap is fixed.** Not moved: the figure is shrunk instead (Eric's rule: "if a figure would,
-  shrink that figure until it doesn't"). More room above the bar would let more bosses stay at full size: a decision for Eric
-  (for example 20 px more space above the bar would lift `out`'s limit to 93 px and leave Jefferson at 0.80).
-- **The rule covers every moment, not only the idle pose.** A one-shot moment's rise is shrunk too, so "never covers the line"
-  holds on every frame; the brief's "may rise for a moment" is applied only to the name column and the screen's edge.
-- **The name column is 130 px.** It's a fixed width so the free room is the same for every boss; a longer name would be cut
-  with an ellipsis (none is that long today).
-- **The bubble can cover the prop and the lower bars.** Eric allowed it for its moment; the prop is drawn again afterwards.
-- **`sayBoss(text)`** (a test hook in `speech.tsx`, `VoiceBubble`, installed only where `testSwitchesAllowed()`): the e2e says
-  every line of every boss through the boss's own voice, so each line is measured in its real bubble, not a copy.
+- **The bar's left padding is 5 px, not 4.** At 4 px no whole-px shift fits Smudgy (his move's left edge and his idle right side need a
+  shift of exactly 3 px together). The whole figure box moves 1 px for every boss; the name column and the room move with it.
+- **Name column 130 px, status 11 px at 320 px.** With the 58 px figure box and the 12 px gap, the 130 px name column and the status's
+  70 px leave no room at 320 px for a 12 px status. A 11 px status at 320 px is the smallest change that keeps "N moves left" on one line.
+- **4/3 is the cap, not the target.** Alfil, Moo & Moon and Puddles are below 4/3 because their drawings are wider than the room allows
+  at 4/3 (above). They get the largest step that holds.
+- **The room rule covers idle frames at rest; a one-shot moment only has to stay on the screen.** A one-shot may rise over the text for
+  its moment (Eric: "even over" the line, "never off the screen").
+- **The bubble can cover the prop and the lower bars** for its moment. The prop is drawn again afterwards.
+- **`sayBoss(text)`** (a test hook in `speech.tsx`, `VoiceBubble`, installed only where `testSwitchesAllowed()`) says any line through the
+  boss's own voice, so each line is measured in its real bubble, not a copy. The line check waits for the boss's own lines to settle and
+  for the pixel font before it measures.
 
 ## Checks
 
-- `e2e/boss-bar-same.spec.ts` (phone; 320 × 568, 390 × 844, 428 × 777; every playable boss; both layouts): the bar's height,
-  the figure box and the name, level, bars, status and free room are the same for every boss (±1 px); the feet are on the
-  bar's baseline; `out`: the figure's drawn pixels never cover the "BOSS · move N" line, reach the name column or drop below
-  the bar; `fit`: the idle figure is inside the bar; every line the boss says: its bubble inside the bar, under the status,
-  from the name column's left edge, at most three rows, and a one-row line at most 60% of the room. A stacked sheet of every
-  boss's bar per layout and size is attached to the test.
-- `packages/app/test/boss-bar-same.test.ts` (every playable boss, every frame of every animation, both layouts): the
-  figure's drawn pixels against the limits above, with the scales in the kits.
-- `e2e/boss-bar.spec.ts` and `e2e/boss-character.spec.ts` pass unchanged (the status, the column, the room and the bubble's
-  rules still hold). `e2e/tiger.spec.ts` (Babur's pump) is another helper's (claude/babur-bigger): not changed here.
+- `packages/app/test/boss-bar-same.test.ts` (every playable boss, every frame of every animation): scale ≥ 1; the big animals at 4/3 or the
+  largest fitting step; the room at rest on every idle frame with the shift; a moment on the screen; the order check.
+- `e2e/boss-bar-same.spec.ts` (phone; 320 × 568, 390 × 844, 428 × 777; every playable boss): the bar's height, the figure box and the name,
+  level, bars, status and free room are the same for every boss (±1 px); the feet on the bar's baseline; at rest, the drawing 2 px inside the
+  screen's left edge, 2 px clear of the name column, under the "BOSS · move N" text; every line the boss says: its bubble inside the bar,
+  under the status, from the name column's left edge, at most three rows at the same pitch as at 390, a one-row line at most 60% of its
+  room. A stacked sheet of every boss's bar per size, and a lineup of the figures at 390, are attached to the test.
+- `e2e/boss-bar.spec.ts` and `e2e/boss-character.spec.ts`: the status, the column, the room, the bubble's rules, the figure's box.
+- `e2e/tiger.spec.ts`: Babur's pump, 68 × 72 at 390 and 428 px, inside the bar, at the room's right end, its balloon under the status.

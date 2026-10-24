@@ -2,6 +2,7 @@ import { expect, type Page, type TestInfo } from "@playwright/test";
 import { BOSS_ROSTER, isPlayable } from "@chessroyale/core";
 import { BOSS_KITS } from "../packages/app/src/characters/kits.ts";
 import { plainLine } from "../packages/app/src/speech-icons.ts";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { bossAloneFromHome, test } from "./helpers.ts";
 
 /**
@@ -323,4 +324,12 @@ test("every playable boss's phone bar: one bar and one figure box for all, the f
   for (const [w] of SIZES) await sheet(page, `boss bar at ${w}`, pngs[w]!, testInfo);
   await testInfo.attach("lineup.json", { body: Buffer.from(JSON.stringify(lineup.map((l) => ({ name: l.name, box: l.box })))), contentType: "application/json" });
   for (const l of lineup) await testInfo.attach(`lineup-${l.name}.png`, { body: l.png, contentType: "image/png" });
+  // (For a person to compare: the bars and the lineup as PNG files, when a directory is given: BAR_SHEET_DIR.)
+  const dir = process.env.BAR_SHEET_DIR;
+  if (dir) {
+    mkdirSync(dir, { recursive: true });
+    const safe = (n: string) => n.replace(/[^a-zA-Z0-9]+/g, "-");
+    for (const [w] of SIZES) for (const b of pngs[w]!) writeFileSync(`${dir}/after-${w}-${safe(b.name)}.png`, b.png);
+    for (const l of lineup) writeFileSync(`${dir}/lineup-${safe(l.name)}.png`, l.png);
+  }
 });
