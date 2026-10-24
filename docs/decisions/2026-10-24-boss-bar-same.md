@@ -50,9 +50,10 @@ to the far right… even if it's overlapping, say, the balloon pump for a second
 - **The pump** (Babur's, `components/Tiger.tsx`): 2x (68 × 72) in the bar's room at its right end, its foot 3 px below the room's bottom
   (inside the bar's padding), so a stage-4 balloon's top and a pop's over-swell clear the status (docs/decisions/2026-10-24-babur-bigger.md).
   The room is 72 px tall under the status in this bar.
-- **Status at 320 px**: 11 px, so "58 moves left" keeps its one line beside the 130 px name column (the status's column is 70 px there:
-  the figure box is 58 px, the name column 130 px and the two 3 px column gaps). The longer "Strikes in N moves" wraps to two lines at
-  320 px, as it did before.
+- **Status and free room at 320 px**: the status is 11 px, so "58 moves left" keeps its one line beside the 130 px name column; the
+  bar's right padding is 6 px and the grid's column gap 0 there, so the status's column is 70 px and the free room 81 px (the old
+  boss-bar check's floor, 80 px; Babur's pump is 68 px). The longer "Strikes in N moves" wraps to two lines at 320 px, as it did before.
+- **Line icons** (Moo's heart and the like) sit with a negative vertical margin, so a line keeps its pitch with an icon in it.
 - **Moo's sprite clip** (`.boss-char.place-bar.ch-moo .boss-char-sprite`, trimming his glow to the old box's sides) is removed.
 
 ## The numbers
@@ -80,7 +81,7 @@ Each boss's size and shift (`barScale`, `barShift`); the table says what limits 
 | Big Boy | 1 | 0 | fits |
 | Sawyer | 1 | 0 | fits |
 | Wrangler | 1 | 0 | fits |
-| Alfil | 13/12 | +2 | 4/3 would be 100 px across; the room is 84 px (46 px left of the feet, 39 px right) |
+| Alfil | 13/12 | +3 | 4/3 would be 100 px across; the room is 84 px (46 px left of the feet, 39 px right). +3, not +2, keeps his canvas (its transparent edge) on the 320 px screen, as alfil.spec checks |
 | Chub & Chirp | 1 | 0 | fits |
 | Smudgy | 1 | +3 | a move's left edge (51 px) needs a shift of at least 3 to stay on the screen; the idle right side (36 px) allows at most 3 |
 | Moo & Moon | 14/12 | −1 | 4/3 would be 91 px across, past the room's 84 px |
@@ -94,8 +95,9 @@ size (Chub's 71 px): Alfil 79 px, Moo & Moon 84 px, Puddles 88 px, Babur 97 px.
 
 - **The bar's left padding is 5 px, not 4.** At 4 px no whole-px shift fits Smudgy (his move's left edge and his idle right side need a
   shift of exactly 3 px together). The whole figure box moves 1 px for every boss; the name column and the room move with it.
-- **Name column 130 px, status 11 px at 320 px.** With the 58 px figure box and the 12 px gap, the 130 px name column and the status's
-  70 px leave no room at 320 px for a 12 px status. A 11 px status at 320 px is the smallest change that keeps "N moves left" on one line.
+- **Name column 130 px, status 11 px and no gaps at 320 px.** With the 58 px figure box and the 12 px gap, the 130 px name column and a 12 px
+  status leave no room at 320 px for "N moves left" on one line; an 11 px status at 320 px, with the bar's right padding and the grid's
+  column gap closed up, is the smallest change that keeps it there and keeps the free room at the old check's floor.
 - **4/3 is the cap, not the target.** Alfil, Moo & Moon and Puddles are below 4/3 because their drawings are wider than the room allows
   at 4/3 (above). They get the largest step that holds.
 - **The room rule covers idle frames at rest; a one-shot moment only has to stay on the screen.** A one-shot may rise over the text for
