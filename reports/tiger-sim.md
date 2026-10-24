@@ -1,45 +1,63 @@
-# The circus tiger: calibrating Balloons and Hoops (Oct 23, 2026)
+# Babur, the circus tiger: calibrating Balloons and Hoops (Oct 23-24, 2026)
 
-The circus tiger (id `tiger`; docs/decisions/2026-10-23-tiger-rules.md). From the starting position, as every raid.
+Babur, the circus tiger (id `tiger`; docs/decisions/2026-10-23-tiger-rules.md). From the starting position, as every raid.
 **Balloons:** a balloon on his nozzle at the start of his turn, 4 stages on the battle's clock, then at the end of a turn it
-lands as his piece (the engine keeps his gain in the shape's band) or pops (pawn 55% / pops 12, knight 13 / 25, bishop 13 /
-25, rook 6 / 35, fake queen 10 / always, queen 3 / never). **Hoops** (the rage meter): his whole turn, three 2x2 blocks walled
-for the crowd's next 2 moves, the engine's pick nearest 1.5 pawns in [0.5, 2.5].
+lands as his piece (never on a square the crowd attacks; the least valuable safe square, by the engine) or pops. **Hoops**
+(the rage meter): his whole turn, three 2x2 blocks walled for the crowd's next 2 moves, the blocks that bite hardest.
 
-The rule for the choice (the brief): place him in the pack, a crowd score of about 0.08 to 0.55 and battles of about 33 to
-57 crowd moves, about 3 casts a battle; choose his offset and rage speed (and, Eric's accepted default, the stage time).
+The rule for the choice: place him in the pack (a crowd score of about 0.08 to 0.55, 33 to 57 crowd moves, about 3 casts),
+and after the review (Oct 24) the director's target, a crowd score of 0.25 to 0.40.
 
-**The result: shipped at offset −250, `balloonStageSec` 30 and `rageSpeed` 1.4.** With a crowd that takes 10 s to pick
-(tigerM), the crowd scores **0.14** (± 0.10, 14 battles) in **38** crowd moves, with **2.2 casts** a battle and **4.6
-balloons** placed a battle (2.6 landed, 0.9 popped, the rest still on the nozzle at the end): inside the pack (Alfil 0.15,
-Puddles 0.17, Moo 0.21). A fast crowd (5 s) scores 0.19 (± 0.13, 8), a slow one (20 s, the raid's whole clock every turn)
-0.00 (8): the slower the crowd, the more balloons (3.5 against 6.8 a battle).
+**Shipped (after the review): offset −250, `balloonStageSec` 30, `rageSpeed` 1.6, pops 40 / 55 / 55 / 55 (fake queen always,
+real queen never: about half), the landing on the least valuable safe square.** With a crowd that takes 10 s to pick
+(tigerR10) the crowd scores **0.40** (± 0.11, 20 battles) in **49** crowd moves with **3.5 casts** a battle: at the top of the
+target. A slow crowd (20 s a pick, the raid's whole clock every turn; tigerR20) scores **0.05** (± 0.05, 20): the slower the
+crowd, the more balloons (5.8 against 7.6 a battle) and the more land (1.9 against 2.9). Within the review's rule (try 45 s
+only if under 0.20), no further run: the 10 s crowd is in the target; the slow crowd's weakness is the pump's real-time
+nature (Eric: playing slowly feeds him), flagged.
 
-- **Eric's 15 s stages made him far too strong:** the crowd scored 0.00, 0.06 and 0.00 (29 battles over three crowd speeds),
-  about four balloons landing a battle. The offset can't weaken him further: at −250 against the 1600 tier he plays at
-  Stockfish's floor (1350) and slips at the cap already (`bossStumbleMax`). So the stage time is the knob: a sweep at
-  `rageSpeed` 2 (10 battles each) gave 0.40 at 30 s, 0.30 at 45 s and 0.50 at 60 s, the battles long (48 to 57 moves, many at
-  the 60-move cap) with 3.6 to 5.2 casts; 30 s keeps the most of Eric's pump (a balloon every two minutes) and with
-  `rageSpeed` 1.4 the battles shorten into the range.
-- **Casts: 2.2 a battle**, short of "about 3": the meter fills at 1.4 (2.0 gave 4.4 a battle in longer battles), and the pass
-  guard has a cast wait when passing would lose real material (13 waits in 14 battles), which holds the meter full.
-  `rageSpeed` 1.6 to 1.8 would likely give about 3 (not run: one setting, as the testing budget asks).
+Before the review, the same 30 s stages with the old pops (12 / 25 / 25 / 35), the old landing (the band's middle, the
+crowd's attacked squares only tried last) and `rageSpeed` 1.4 gave 0.14 (± 0.10, 14 battles; the reviewer's 54 battles of
+that code: 0.065 ± 0.03): his edge was landed material (5.5 to 8 pawns a battle, most of it pieces), not the hoops.
 
 ## How it was run
 
-The raid sim, as for Puddles: a Solo raid of 50 bots against him through the match runner, one battle per seed, no strikes,
-his meter on. `npx tsx packages/sim/scripts/boss-sim.ts raid tiger <games> <seed> 0 <tag> '{"pickSec":N}'` (the sweep:
-`"powers":{"balloonStageSec":S,"rageSpeed":{"tiger":R}}`); rows in `reports/boss-sim/raid-<tag>.jsonl`; the tables below
-from them. **His balloons need a clock:** the sim keeps one (the runner's `clock`): each crowd turn passes the crowd's pick
-(`pickSec`), the reveal (2.5 s), his thinking and his move's show (3 s) and the turn's moments. His landings (`landFrom`) and
-casts (`hoopsFrom`) are the host's code on native Stockfish. Score: a win 1, a draw ½ (at the 60-move cap the engine's
-verdict); ± one standard error. Not repeatable seed for seed (Stockfish's UCI_Elo), so runs compare by their totals; three
-ran side by side on a 4-core machine. **Runs:** tigerM/F/S are the shipped code. tiger30pre (before a landing's squares were
-ordered by the crowd's real attacks) and tiger30lo (before a cast's blocks were ordered by how many crowd moves they stop)
-are the same settings on earlier code, stopped part way when the code changed; tiger15 is Eric's 15 s; tiger30/45/60 the
-sweep at `rageSpeed` 2.
+The raid sim, as for Puddles: a Solo raid of 50 bots against him through the match runner, one battle per seed, no
+strikes, his meter on. `npx tsx packages/sim/scripts/boss-sim.ts raid tiger <games> <seed> 0 <tag> '{"pickSec":N}'` (the
+sweep: `"powers":{"balloonStageSec":S,"rageSpeed":{"tiger":R}}`); rows in `reports/boss-sim/raid-<tag>.jsonl`. His
+balloons need a clock: the sim keeps one (the runner's `clock`): each crowd turn passes the crowd's pick (`pickSec`), the
+reveal (2.5 s), his thinking and his move's show (3 s) and the turn's moments. His landings (`landFrom`) and casts
+(`hoopsFrom`) are the host's code on native Stockfish. Score: a win 1, a draw ½ (at the 60-move cap the engine's verdict); ±
+one standard error. Not repeatable seed for seed (Stockfish's UCI_Elo). The bands: `packages/sim/scripts/tiger-bands.ts`.
 
-## The tables
+## The review's runs (shipped code; bands [0.3, 1.5] for a pawn, [7, 8.5] for a piece)
+
+| Run | Crowd's pick | Stage | rageSpeed | Battles | W / D / L | Crowd score (± 1 s.e.) | Crowd moves: mean (range) | At the cap | Casts a battle | Balloons placed / landed / popped a battle |
+|---|---|---|---|---|---|---|---|---|---|---|
+| tigerR10 | 10 s | 30 s | 1.6 | 20 | 7 / 2 / 11 | **0.40** (± 0.11) | 49 (29-60) | 8 | 3.5 | 5.8 / 1.9 / 2.9 |
+| tigerR20 | 20 s | 30 s | 1.6 | 20 | 1 / 0 / 19 | **0.05** (± 0.05) | 45 (21-60) | 4 | 3.0 | 7.6 / 2.9 / 3.8 |
+
+| Run | Placed | Landed: p / n / b / r / q | Popped (duds): p / n / b / r / q | Popped (`nine`): p / n / b / r / q | Never ended (on the nozzle at the end) |
+|---|---|---|---|---|---|
+| tigerR10 | 115 | 27 / 3 / 4 / 1 / 2 | 23 / 5 / 6 / 4 / 12 | 7 / 0 / 0 / 1 / 0 | 20 |
+| tigerR20 | 152 | 36 / 5 / 6 / 5 / 5 | 22 / 11 / 9 / 6 / 12 | 10 / 0 / 1 / 1 / 3 | 20 |
+
+| Run | Landings with a gain | Saturated (0: battle decided) | In band | Under | Over | Mean gain (not 0) by shape: p / n / b / r / q |
+|---|---|---|---|---|---|---|
+| tigerR10 | 37 | 12 | 15 | 1 | 9 | 1.4 / 8.7 / 9.2 / - / - |
+| tigerR20 | 57 | 23 | 23 | 3 | 8 | 1.0 / 11.0 / 8.5 / 9.3 / 10.3 |
+
+| Run | Casts | Blocks a cast | Gain a cast: mean, median | In [0.5, 2.5] | Under 0.5 | Over 2.5 | Waits (pass guard / none) | Search ms: median, max | Crowd turns walled | Walls took the engine's best move |
+|---|---|---|---|---|---|---|---|---|---|---|
+| tigerR10 | 70 | 3.00 | -0.26, 0.00 | 1 | 69 | 0 | 27 / 0 | 1496, 2178 | 139 | 97 (70%) |
+| tigerR20 | 59 | 2.98 | -0.26, 0.00 | 2 | 57 | 0 | 31 / 1 | 1545, 2334 | 117 | 87 (74%) |
+
+## Before the review
+
+Runs: tiger15 (Eric's 15 s stages), tiger30/45/60 (a stage sweep at `rageSpeed` 2), tiger30pre and tiger30lo (30 s on
+earlier code, stopped part way when the code changed), tigerM/F/S (the first shipped setting: 30 s, `rageSpeed` 1.4). Old
+pops 12 / 25 / 25 / 35; old landing (the band's middle); old bands (pawn [0.3, 1.5], knight or bishop [2, 4], rook [3.5, 6],
+queen [7, 10.5]), which the "in band" columns below use.
 
 | Run | Crowd's pick | Stage | rageSpeed | Battles | W / D / L | Crowd score (± 1 s.e.) | Crowd moves: mean (range) | At the cap | Casts a battle | Balloons placed / landed / popped a battle |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -99,19 +117,15 @@ sweep at `rageSpeed` 2.
 
 ## What the numbers say
 
-- **Pops for the ninth-pawn rule (`nine`):** 5 of 64 balloons in tigerM (all pawns), 6 of 54 in the slow run: every raid
-  starts from the starting position, and while he has all eight pawns and his full set nothing can land, so early
-  balloons pop until he loses a pawn or a piece.
-- **His gain a landing:** a third to a half measure exactly 0 (the battle already decided by the engine's measure: its win
-  chances saturate). Of the rest, **pawns land in their band** (mean 0.9 in tigerM), but **pieces mostly land over theirs**
-  (knights 5.7, bishops 4.1, rooks 7.1): in the engine's log-odds a safe knight from an even position is already 4 to 6
-  pawns, a rook or queen saturates near 7, so the bands for the pieces (from the brief) are mostly out of reach below.
-  The pick is then the nearest above, never a piece left hanging to fit (the squares the crowd attacks come last). A
-  re-measured band per piece (in the engine's own scale) would be the fix if Eric wants them in band; flagged, not changed.
-- **His gain a cast:** never in [0.5, 2.5]: mean −0.30, median 0.00 (a decided battle measures 0). Passing costs him a move,
-  and the walls only restrict the crowd's root move in the engine's eyes (it can't be told about walls deeper), so the
-  measured gain is about the tempo less what the walls take. The pick is the one nearest 1.5, which is the one that bites
-  hardest. **The walls took the engine's best move from the crowd on 76% of the walled turns** (47 of 62): they bite in
-  play more than the one-ply measure shows.
-- **Search time:** a cast's search on native Stockfish, median 1.4 s, at most 2.1 s (under load, 3 runs on 4 cores); a slow
-  phone is several times slower, inside `hoopsTimeMs` (8 s, then the blocks so far) and the request's 15 s timeout.
+- **Pops for the ninth-pawn rule (`nine`, dud or not):** 8 of 115 balloons in tigerR10, 15 of 152 in tigerR20. Every raid
+  starts from the starting position: while he has all eight pawns and his full set nothing can land.
+- **His gain a landing**, in the engine's own units: a third measure exactly 0 (the battle already decided). Pawns land
+  in their band or near it (mean 1.0 to 1.4); a safe piece saturates the engine's win chances (the bands measured: a
+  safe knight, bishop, rook or queen from an even position gains 7.1 to 8.0, `tiger-bands.ts`), so a piece's band is
+  [7, 8.5] and the pick, the least valuable safe square, is the one nearest 7. Gains over 8.5 come from positions he was
+  behind in (the saturation's other end).
+- **His gain a cast:** still almost never in [0.5, 2.5] (mean −0.26, median 0.00): passing costs him a move and the engine
+  sees the walls only at the crowd's root move. The walls took the engine's best move from the crowd on 70 to 74% of the
+  walled turns. The FAQ no longer promises a gain for the hoops.
+- **Search time:** a cast's search, median 1.5 s, at most 2.3 s on native Stockfish under load; a slow phone is several
+  times slower, inside `hoopsTimeMs` (8 s) plus the landing's own `balloonTimeMs` (3 s), under the request's 15 s timeout.

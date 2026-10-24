@@ -1,8 +1,8 @@
 # The circus tiger in the rules: Balloons and Hoops (Oct 23, 2026)
 
-A new raid boss (Eric, Oct 23): **the circus tiger** (id `tiger`), a circus tiger who hated his act (the roaring, the
-jumping through hoops) and makes chess-piece balloons. No player-visible name yet: one placeholder constant,
-`TIGER_NAME = "The Tiger"` (core `boss.ts`), so the name is one edit later. This builds his rules, the server side, solo,
+A new raid boss (Eric, Oct 23): **Babur, the circus tiger** (id `tiger`), a circus tiger who hated his act (the roaring,
+the jumping through hoops) and makes chess-piece balloons. His name (Eric, Oct 24) is one constant, `TIGER_NAME = "Babur"`
+(core `boss.ts`), a plain name like Smudgy's. This builds his rules, the server side, solo,
 the raid sim, the tests and the FAQ block. His art and animations are on `claude/tiger-sprite`
 (docs/decisions/2026-10-23-tiger-animations.md there); the wiring (kit, sprite, the pump in the boss bar, the board art) is
 the next lane's. Until then he stays **not playable** (`kit: null`; the test links `?boss=tiger&wip=1`, `&power=hoops`,
@@ -32,9 +32,19 @@ the next lane's. Until then he stays **not playable** (`kit: null`; the test lin
    became ready during his think pop now (no square needed) but land only a turn later (no square asked): a sharp
    watcher could read which. One that becomes ready while he thinks is looked at at his next turn's end.
 2. **The host is asked to land every due balloon, dud or not** (the request's `balloon`: the shape as shown, "q" for a
-   fake queen, a seeded order, the hoops standing). The answer for a dud is thrown away. No request, view, moment or
-   saved field a device receives carries `dud`; the lobby test reads every message to three players until the pop.
-3. **A shape he can't have pops (`nine`)**: a ninth pawn (the brief), and, the same rule the engine applies
+   fake queen, a seeded order, the hoops standing), and **a dud goes through the same steps as a real balloon until the
+   last** (the review, Oct 24): a shape he can't have pops either way (`nine`); the square must pass `landCheck` either
+   way (none, or refused, and both wait ready); only then does a dud pop and a real one land. Before, a dud popped with
+   no square while a real one waited, so a "q" still on the nozzle after its due turn was known to be real (a host timeout,
+   an older app, or a deliberately refused square as a probe). Side-by-side tests (unit, and a lobby test comparing every
+   message to every device in a real queen's battle and a fake one's) hold it.
+2a. **Duds come from a secret of their own** (the review's blocker, Oct 24): the host's asks carry orders drawn from the
+   battle's seed, and a 32-bit seed can be brute-forced from one of them (the public shapes and colors pin it too). So
+   whether a balloon pops, and whether a queen is the fake one, come only from `BalloonState.secret`, a second draw from
+   the match's random source as his battle starts (`opening.setUp`, `Battle.random`), kept in the boss state and in no
+   view, moment or ask; the shapes, colors and orders still come from the seed. A test: the same seed with another secret
+   gives other duds and the same shapes; nothing a device gets carries the secret.
+3. **A shape he can't have pops (`nine`, dud or not, so a pop at full material says nothing of a "q")**: a ninth pawn (the brief), and, the same rule the engine applies
    (`stockfishRefuses`), more pieces than promotions could make. Since every raid starts from the starting position,
    **every balloon pops until he has lost a pawn or a piece** (with all eight pawns and his full set, a third knight is
    as impossible as a ninth pawn). Waiting on the nozzle instead would only block the pump for the same result.
@@ -73,9 +83,19 @@ the next lane's. Until then he stays **not playable** (`kit: null`; the test lin
    (8 s; past it, the blocks so far, at least one) and the request's 15 s timeout; the guards themselves cost about 10 ms a
    block on a computer (measured), so up to a second or two more on a slow phone, breathing between blocks. The pass guard
    applies as to every power that spends his whole turn (`passLoses`: unless the switch's or the trigger's).
-9. **The landing's search** (`landFrom`): up to `balloonLooks` (8) squares that pass `landCheck`, the squares the crowd
-   can't move to first (a cheap stand-in for "not simply taken"), each searched at `balloonNodes` (15,000), plus the
-   position before: about 135,000 nodes after his move on the host, under a second on a phone.
+9. **The landing** (the review, Oct 24): **never a square the crowd attacks** is now a hard guard in `landCheck` (the
+   server's check too; none left, and it waits, dud or not). `landFrom` weighs up to `balloonLooks` (8) seeded squares
+   that pass it, each at `balloonNodes` (15,000), breathing per square, within `balloonTimeMs` (3 s; inside a cast, its own
+   share of what's left of `hoopsTimeMs` + 3 s, so cast and landing stay well under the request's 15 s), and takes **the
+   least valuable**: his gain nearest the low end of the shape's band, in the band if any is. **The bands are measured in
+   the engine's own units** (`packages/sim/scripts/tiger-bands.ts`: 16 roughly even middlegames, up to 10 safe squares
+   a shape, 151 to 160 placements each): a safe pawn gains 0.06 / 0.31 / 0.68 / 1.57 / 4.91 (10th, 25th, 50th, 75th, 90th
+   percentiles), so its band stays [0.3, 1.5]; **any safe piece saturates the engine's win chances** (7.12 / 7.27 / 7.46 /
+   7.67 / 8.04 for a knight, bishop, rook or queen alike), so a piece's band is [7, 8.5] and "a piece's worth" is
+   whatever safe square helps him least. The brief's piece bands ([2, 4], [3.5, 6], [7, 10.5]) were out of reach below.
+9a. **The walls' rule stays** (the director's call on the review, Oct 24): attacks across a wall still count for king
+   safety; only moves and captures are removed. The FAQ says so plainly.
+9b. **`hoopMateInOne`**: when the walls leave a side no move they lift for that turn, so every legal mate counts.
 10. **The answers:** his move's landing is the bossMove message's `balloon` (a square); the cast's answer is one string,
     `hoopsCode`: the blocks by their corners in throw order and "@" and the landing square ("c3 f5 b6 @e4"). The server
     checks both (`hoopsCheck`, `landCheck`); junk, "" or PASS_WAIT: no cast (`hoopsWait`, he moves, again next turn); a
@@ -95,26 +115,27 @@ the next lane's. Until then he stays **not playable** (`kit: null`; the test lin
 - **Offset −250** (the usual for a boss with powers): it can't go lower usefully, since at −250 against the 1600 tier he
   plays at Stockfish's floor (1350) and slips at the cap already.
 - **`balloonStageSec` 30** (Eric's 15 s, the brief's default for the sim to tune): with 15 s the crowd scored 0.00, 0.06
-  and 0.00 over three crowd speeds (29 battles), about four balloons landing a battle; a sweep at `rageSpeed` 2 gave 0.40
-  (30 s), 0.30 (45 s) and 0.50 (60 s) in long battles. 30 s keeps the most of his pump (a balloon every two minutes).
-- **`rageSpeed` 1.4:** 2.2 casts a battle (2.0 gave 4.4 in longer battles; the pass guard's waits hold the meter full).
-  Short of "about 3": 1.6 to 1.8 would likely give it; not run (one setting, the testing budget).
-- **The bands** are the brief's; **`balloonLooks` 8, `balloonNodes` 15,000, `hoopsLooks` 8, `hoopsNodes` 20,000,
-  `hoopsTimeMs` 8 s**: Puddles' sizes, so a phone's search stays a few seconds.
+  and 0.00 over three crowd speeds (29 battles); a sweep at `rageSpeed` 2 gave 0.40 (30 s), 0.30 (45 s) and 0.50 (60 s).
+- **Pops 40 / 55 / 55 / 55, the fake queen always and the real one never (about half)**, and **the least valuable safe
+  square**: the review's (Oct 24), after Eric's "It's a lot of balloons but most don't even make it and most are pawns or
+  maybe a bishop knight". His edge had been landed material (the reviewer's 54 battles of the first shipped code, at 30 s
+  and `rageSpeed` 1.4: the crowd 0.065 ± 0.03).
+- **`rageSpeed` 1.6:** 3.5 casts a battle with a 10 s crowd, 3.0 with a slow one.
+- **The bands** measured in the engine's units (call 9); **`balloonLooks` 8, `balloonNodes` 15,000, `balloonTimeMs` 3 s,
+  `hoopsLooks` 8, `hoopsNodes` 20,000, `hoopsTimeMs` 8 s**: Puddles' sizes, so a phone's search stays a few seconds.
 
 | Run (shipped) | Crowd's pick | Battles | Crowd score | Crowd moves | Casts a battle | Balloons placed / landed / popped |
 | --- | --- | --- | --- | --- | --- | --- |
-| tigerM | 10 s | 14 | **0.14** (± 0.10) | 38 (25-60) | 2.2 | 4.6 / 2.6 / 0.9 |
-| tigerF | 5 s | 8 | 0.19 (± 0.13) | 41 | 2.0 | 3.5 / 1.6 / 0.9 |
-| tigerS | 20 s | 8 | 0.00 | 39 | 2.2 | 6.8 / 3.4 / 2.4 |
+| tigerR10 | 10 s | 20 | **0.40** (± 0.11) | 49 (29-60) | 3.5 | 5.8 / 1.9 / 2.9 |
+| tigerR20 | 20 s | 20 | 0.05 (± 0.05) | 45 (21-60) | 3.0 | 7.6 / 2.9 / 3.8 |
 
-In the pack (0.08 to 0.55, 33 to 57 moves). Pawns land in their band; **pieces mostly land over theirs** (a safe knight
-from an even position is already 4 to 6 pawns in the engine's log-odds; a rook or queen saturates near 7): the bands for
-the pieces would need re-measuring in the engine's scale to be reachable (flagged for the director, not changed). **A
-cast's gain is never in [0.5, 2.5]** (mean −0.30, median 0.00): passing costs him a move and the engine sees the walls only
-at the crowd's root move; yet **the walls took the engine's best move from the crowd on 76% of the walled turns**. The
-pick is the nearest 1.5, which is the one that bites hardest; the pass guard keeps a cast from costing him real material.
-Ninth-pawn pops: 5 of 64 balloons (tigerM). All of it: [reports/tiger-sim.md](../../reports/tiger-sim.md).
+The 10 s crowd is at the top of the director's target (0.25 to 0.40); by the review's rule (45 s stages only if under 0.20)
+no further run. **A slow crowd stays far weaker (0.05):** the pump is real time, so a crowd that uses its whole clock every
+turn feeds him a third more balloons (Eric: playing slowly feeds him); flagged. Ninth-pawn pops: 8 of 115 balloons
+(tigerR10). Landed pawns sit in or near their band; pieces at the saturated band's low end. A cast's gain is still almost
+never in [0.5, 2.5] (mean −0.26, median 0.00: the lost tempo, and walls the engine sees only at the root), yet the walls
+took the crowd's engine-best move on 70 to 74% of the walled turns; the FAQ no longer promises a gain for them. Before the
+review: 0.14 at 30 s and `rageSpeed` 1.4 (14 battles). All of it: [reports/tiger-sim.md](../../reports/tiger-sim.md).
 
 ## What the wiring lane needs
 

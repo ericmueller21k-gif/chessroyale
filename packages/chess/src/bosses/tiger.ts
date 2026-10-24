@@ -12,16 +12,19 @@
  *   asked for (the request for his move or his hoops: `asked`/`due`, so the host, the server and solo decide on the same
  *   balloon) lands as one of his pieces, or pops. Then the nozzle is empty until his next turn begins. One not ready then
  *   keeps blowing up and is looked at again at the end of his next turn.
- * - **What it is**, rolled as it goes on (seeded, balloonOdds): a pawn, knight, bishop, rook, a fake queen or a queen; and
- *   whether it pops (balloonPops of that shape's: a fake queen always, a queen never). The shape is public from the
- *   start (a fake queen is "q" everywhere); whether it pops (`dud`) is in no view, moment or request: it shows only as it
- *   pops at the end of his turn.
- * - **Where it lands, by the engine** (landFrom, the host's engines; the server checks the square with landCheck): his
- *   gain (his evaluation after it, the crowd to move, against before it) in the shape's band (balloonBands), nearest its
- *   middle; none in the band: the nearest. Hard guards (landGuard): an empty square, never inside a hoop, never a check
- *   either way, never a mate in one for either side, never the crowd without a move (the walls counted), never a
- *   position the engine refuses. A shape he can't have (a ninth pawn, more pieces than promotions could make) pops
- *   (`nine`). No square at all (or no answer): it stays ready on the nozzle until the end of his next turn.
+ * - **What it is**, rolled as it goes on (balloonOdds): a pawn, knight, bishop, rook, a fake queen or a queen; and whether
+ *   it pops (balloonPops of that shape's: a fake queen always, a queen never: about half). The shape and color come from
+ *   the battle's seed and are public from the start (a fake queen is "q" everywhere); a queen's being fake and every pop
+ *   (`dud`) come only from the battle's own secret (BalloonState.secret, a draw from the match's random source, never in a
+ *   view, moment or request): it shows only as it pops at the end of his turn.
+ * - **Where it lands, by the engine** (landFrom, the host's engines; the server checks the square with landCheck): the
+ *   least valuable safe square, his gain (his evaluation after it, the crowd to move, against before it) in the shape's
+ *   band (balloonBands, in the engine's units) nearest its low end; none in the band: the nearest. Hard guards
+ *   (landCheck): an empty square, never one the crowd attacks, never inside a hoop, never a check either way, never a mate
+ *   in one for either side, never the crowd without a move (the walls counted), never a position the engine refuses. A
+ *   dud goes through every step a real balloon does until the last: a shape he can't have (a ninth pawn, more pieces than
+ *   promotions could make) pops (`nine`) either way; no square the rules allow (or no answer) and either stays ready on
+ *   the nozzle until the end of his next turn; then a dud pops and a real one lands.
  *
  * His ultimate, Hoops (the rage meter, `rageSpeed.tiger`):
  * - The usual warning as a crowd turn begins; at the start of his turn after it, his whole turn (passTurn, a base at its
@@ -414,10 +417,11 @@ export interface LandPick {
 
 /**
  * Where his balloon lands (`fen`: the crowd to move, before it lands, after his move or his cast), on this device's engines
- * (the host's online, solo's, the sims'): up to balloonLooks squares, in a seeded order with the squares the crowd doesn't
- * attack first, each passing every guard (landCheck), each searched at balloonNodes (the crowd's best over the moves the
- * walls leave). The one whose gain (his evaluation after, against before, both the crowd to move) is in the shape's band
- * nearest its middle; none in the band: the nearest. Null: a shape he can't have, no square, no engine or no answer.
+ * (the host's online, solo's, the sims'): up to balloonLooks squares in a seeded order, each passing every guard (landCheck:
+ * never one the crowd attacks), each searched at balloonNodes (the crowd's best over the moves the walls leave), breathing
+ * per square, within `limitMs` (balloonTimeMs; past it, what's searched so far). The least valuable: the one whose gain
+ * (his evaluation after, against before, both the crowd to move) is in the shape's band nearest its low end; none in the
+ * band, the nearest. Null: a shape he can't have, no square, no engine or no answer.
  */
 export async function landFrom(
   engines: readonly EngineLike[],
