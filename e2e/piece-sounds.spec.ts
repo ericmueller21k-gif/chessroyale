@@ -64,6 +64,9 @@ test("piece sounds: pick a move and a capture sound, hear one, and they're kept 
   // A move in a game plays the pick: "move", rendered as the game plays it, is the classic with that picked, and the
   // Wooden tap once it's picked (and loaded: until then the default stands in).
   const level = (n: string) => page.evaluate((n) => (window as any).__measureSound(n), n) as Promise<{ peak: number; rms: number }>;
+  // (The hook is put on `window` once the app knows test switches are allowed, which it learns a moment after the reload:
+  // on a slow phone, after the taps above. Wait for it.)
+  await page.waitForFunction(() => typeof (window as any).__measureSound === "function", null, { timeout: 10_000 });
   const moves = page.getByRole("radiogroup", { name: "Move sound" });
   await moves.getByRole("radio", { name: /^Classic knock/ }).click();
   await expect.poll(async () => (await level("move")).peak, { timeout: 10_000 }).toBeGreaterThan(0.05);
