@@ -2803,7 +2803,10 @@ test("stars follow their pieces through the fight, and the survivors' refund cou
   await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 200_000 });
   expect(await consistent()).toBe(true);
   // The refund in the result's gold line: 25% of what was paid for the pieces of yours still standing: their prices and 5 for each star above the first.
-  const left = await page.locator(`${BOARD_SEL.piece}.white:not(.king)`).evaluateAll((els) => els.map((e) => ({ square: (e as HTMLElement).dataset.square!, kind: ["knight", "bishop", "rook", "queen", "pawn"].find((k) => e.classList.contains(k))! })));
+  // (Read once the last capture has faded off the board: a piece taken on the fight's last move is drawn for 220 ms more,
+  // `.fading`, and isn't a survivor. Counted, it read 28 against the game's right 20, once in CI, Oct 24.)
+  await expect(page.locator(`${BOARD_SEL.piece}.fading`)).toHaveCount(0);
+  const left = await page.locator(`${BOARD_SEL.piece}.white:not(.king):not(.fading)`).evaluateAll((els) => els.map((e) => ({ square: (e as HTMLElement).dataset.square!, kind: ["knight", "bishop", "rook", "queen", "pawn"].find((k) => e.classList.contains(k))! })));
   const m = await marks(page);
   const kindPrice: Record<string, number> = { knight: 30, bishop: 32, rook: 50, queen: 90, pawn: 10 };
   const paid = left.reduce((sum, p) => sum + kindPrice[p.kind]! + 5 * ((m[p.square] ?? 1) - 1), 0);

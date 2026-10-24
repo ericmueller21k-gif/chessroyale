@@ -228,7 +228,9 @@ export function MatchMenu({ exit, crowd = false }: { exit: MatchExit | null; cro
   useEffect(() => {
     if (!exit && open === "confirm") setOpen(null);
   }, [!exit]);
-  useEffect(() => {
+  // (A layout effect: the listener is there before the list can be seen, so an Escape pressed straight after the open
+  // closes it. A passive effect runs after the next paint, and a key in that gap was lost, once in CI, Oct 24.)
+  useLayoutEffect(() => {
     if (!open) return;
     const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(null);
     addEventListener("keydown", key);
