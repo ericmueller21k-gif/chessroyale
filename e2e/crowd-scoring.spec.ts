@@ -106,14 +106,31 @@ test("a rare brilliant find: the shoutout names you, its bonus is in your score,
     return { bonus: r.players.find((p: any) => m.isYou(p.playerId))?.brilliantBonus, named: r.brilliant?.players.some((id: string) => m.isYou(id)) };
   });
   expect(you).toEqual({ bonus: CROWD_SCORING.brilliantBonus, named: true });
-  // (The banner's whole line shows: the mark, the names, the bonus, inside the panel.)
+  // (The banner's whole line shows: the mark, the names, the bonus, inside the panel, all through its entrance.)
+  const entrance = await page.evaluate(
+    () =>
+      new Promise<number[]>((done) => {
+        const lefts: number[] = [];
+        const t0 = performance.now();
+        const look = () => {
+          const line = document.querySelector(".brilliant-line.shoutout");
+          if (line) lefts.push(line.getBoundingClientRect().left - line.closest(".poll")!.getBoundingClientRect().left);
+          if (performance.now() - t0 < 400 && line) requestAnimationFrame(look);
+          else done(lefts);
+        };
+        look();
+      }),
+  );
+  expect(Math.min(...entrance), entrance.join(" ")).toBeGreaterThanOrEqual(-0.5);
   const banner = await page.evaluate(() => {
     const line = document.querySelector(".brilliant-line.shoutout");
     if (!line) return null;
     const mark = line.querySelector(".brilliant-mark")!.getBoundingClientRect();
-    return { mark: Math.round(mark.width), spill: line.scrollWidth - line.clientWidth, right: line.getBoundingClientRect().right <= window.innerWidth + 0.5 };
+    const box = line.getBoundingClientRect();
+    const poll = line.closest(".poll")!.getBoundingClientRect();
+    return { mark: Math.round(mark.width), spill: line.scrollWidth - line.clientWidth, inside: box.left >= poll.left - 0.5 && box.right <= poll.right + 0.5 && mark.left >= box.left, onScreen: box.left >= 0 && box.right <= window.innerWidth + 0.5, box: [box.left, box.right, poll.left, poll.right, mark.left] };
   });
-  if (banner) expect(banner).toMatchObject({ spill: 0, right: true });
+  if (banner) expect(banner, JSON.stringify(banner?.box)).toMatchObject({ spill: 0, inside: true, onScreen: true });
   if (banner) expect(banner.mark).toBeGreaterThan(0);
   if (shots && (await page.locator(".brilliant-line.shoutout").isVisible())) await page.locator(".poll").first().screenshot({ path: `${shots}/shoutout-${test.info().project.name}.png` }).catch(() => undefined);
   const after = await boardBox(page);

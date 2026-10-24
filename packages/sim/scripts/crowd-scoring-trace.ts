@@ -8,7 +8,7 @@
  *       own probabilities (the human-like main test). `bots`: the game's own bots (botSkillSpread, botChoose). The judge
  *       scores every pick as the runner does (its top moves, then every other pick), the exchange check marks material
  *       slips, and the most popular pick of the side's 50 is played. A game that ends before PLIES starts again from the
- *       start, as the runner's replaceBoard does, and so does a decided one (DECIDED). Rows go to reports/crowd-scoring/<kind>-<seed>.jsonl.
+ *       start, as the runner's replaceBoard does, and so does a decided one (DECIDED). Rows go to reports/crowd-scoring/<kind>-<seed>.jsonl (gzip them to keep them: the sim reads both).
  *
  * One simplification, the same for every variant: every player keeps picking after a cut, and the move played is the
  * popular pick of all 50, so the games are the same under every scoring (common random numbers: the variants differ

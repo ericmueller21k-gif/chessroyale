@@ -394,7 +394,7 @@ export const CROWD_SCORING: CrowdScoring = {
   streakFromMove: 6,
   streakBonus: [0.25, 0.5, 0.75, 1],
   brilliantBonus: 1,
-  brilliantMinGap: 15,
+  brilliantMinGap: 35,
   brilliantMaxFound: 3,
   brilliantFewLeft: 10,
   missCaps: 2,

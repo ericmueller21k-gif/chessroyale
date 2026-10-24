@@ -215,9 +215,9 @@ describe("a miss", () => {
 });
 
 describe("brilliant finds", () => {
-  /** n pickers, `found` of them on the only good move, the rest giving away 20 points. */
-  const field = (n: number, found: number, usedPowerUp: readonly number[] = []) => {
-    const r = scoreGroup(picksOf(Array.from({ length: n }, (_, i) => (i < found ? "best" : "bad"))), evalOf({ bad: 20 }), rng, S, "popular", undefined, ctx(0));
+  /** n pickers, `found` of them on the only good move, the rest giving away `gap` points (brilliantMinGap's 5 more). */
+  const field = (n: number, found: number, usedPowerUp: readonly number[] = [], gap = CS.brilliantMinGap + 5) => {
+    const r = scoreGroup(picksOf(Array.from({ length: n }, (_, i) => (i < found ? "best" : "bad"))), evalOf({ bad: gap }), rng, S, "popular", undefined, ctx(0));
     for (const i of usedPowerUp) r.players[i]!.usedPowerUp = true;
     return r;
   };
@@ -234,6 +234,8 @@ describe("brilliant finds", () => {
       }
       expect(r.players[found]!.roundScore).toBe(before[found]);
     }
+    // The rest gave away less than brilliantMinGap: brilliant by brilliance's own bar, but no shoutout.
+    expect(crowdBrilliant(field(50, 1, [], CS.brilliantMinGap - 5), S).brilliant).toBeUndefined();
     // 4 found it among 50: brilliant, but not rare.
     const four = crowdBrilliant(field(50, 4), S);
     expect(four.brilliant).toBeUndefined();

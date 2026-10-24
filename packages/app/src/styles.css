@@ -6517,7 +6517,15 @@ button.history-label {
   background: color-mix(in srgb, #22d3ee 14%, var(--surface));
   border: 1px solid color-mix(in srgb, #22d3ee 55%, transparent);
   font-size: 13px;
-  animation: pop 260ms ease-out;
+  /* (Its own keyframes: the shared name "pop" is defined twice, and the later one, for a centered overlay, moves a box by
+     half its size, so the line flew in from the upper left.) */
+  animation: brilliant-pop 260ms ease-out;
+}
+@keyframes brilliant-pop {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
 }
 .brilliant-line.you {
   background: linear-gradient(90deg, color-mix(in srgb, #22d3ee 30%, var(--surface)), color-mix(in srgb, #a78bfa 30%, var(--surface)));
