@@ -115,9 +115,9 @@ const snap = (page: Page): Promise<Snap & { anim: string | null }> =>
 const sayLine = (page: Page, text: string): Promise<LineRes> =>
   page.evaluate(
     async ({ text, plain }) => {
-      const say = (globalThis as { sayBoss?: (t: string) => void }).sayBoss;
+      const say = (globalThis as { sayBoss?: (t: string) => boolean }).sayBoss;
       if (!say) return { text, missing: true as const, seen: "no hook" };
-      say(text);
+      const taken = say(text);
       const deadline = performance.now() + 3000;
       let el: HTMLElement | null = null;
       while (performance.now() < deadline) {
@@ -125,7 +125,7 @@ const sayLine = (page: Page, text: string): Promise<LineRes> =>
         if (el && el.getAttribute("aria-label") === plain) break;
         await new Promise((r) => requestAnimationFrame(() => r(null)));
       }
-      if (!el || el.getAttribute("aria-label") !== plain) return { text, missing: true as const, seen: el?.getAttribute("aria-label") ?? null };
+      if (!el || el.getAttribute("aria-label") !== plain) return { text, missing: true as const, seen: `taken ${taken}, bubbles ${document.querySelectorAll(".bc-bar-bubble").length}, shown ${el?.getAttribute("aria-label") ?? "none"}` };
       for (const a of el.getAnimations({ subtree: true })) {
         try {
           a.finish();

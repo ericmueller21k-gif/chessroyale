@@ -166,7 +166,7 @@ export function VoiceBubble({ voice, class: cls, hidden = false, balanced = fals
   // A test hook (test switches only): `sayBoss(text)` says any line in the boss's voice at once, so the boss-bar check
   // (e2e/boss-bar-same.spec.ts) can put every line of every boss into its bubble and measure it.
   useEffect(() => {
-    if (voice === bossVoice && testSwitchesAllowed()) (globalThis as { sayBoss?: (text: string) => void }).sayBoss = (text) => void voice.replace(text, `test:${Date.now()}:${text}`);
+    if (voice === bossVoice && testSwitchesAllowed()) (globalThis as { sayBoss?: (text: string) => boolean }).sayBoss = (text) => voice.replace(text, `test:${Date.now()}:${text}`);
   }, [voice]);
   return line && !hidden ? <SpeechBox key={line.key} class={cls} text={line.text} at={line.at} until={line.until} now={now} fits={1} balanced={balanced} /> : null;
 }
