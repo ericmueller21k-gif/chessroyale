@@ -64,6 +64,7 @@
   "e2e/squads-watch.spec.ts": 114,
   "e2e/squads.spec.ts": 95,
   "e2e/test-switches.spec.ts": 3,
+  "e2e/tiger.spec.ts": 60,
   "e2e/vote-hint.spec.ts": 82,
   "e2e/votes.spec.ts": 110
 }

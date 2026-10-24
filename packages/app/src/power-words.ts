@@ -33,6 +33,8 @@ export const POWER_WORDS: Record<PowerId, string> = {
   fullmoon: "Full Moon",
   seeds: "plants seeds as the clock runs",
   water: "Watering",
+  balloons: "blows up balloons that land as his pieces",
+  hoops: "Hoops",
 };
 
 /** A boss's card line for its powers: its passive, then its ultimate; empty for a boss without powers yet. */

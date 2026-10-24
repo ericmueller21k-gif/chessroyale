@@ -411,6 +411,12 @@ export interface BossMoveExtras {
   outside?: boolean | null;
   /** Moo's Moonbeam: the crowd's top moves after his move, best first (beamLines; the host's answer online), each checked before it's used. */
   beam?: readonly string[] | null;
+  /**
+   * The circus tiger's balloon, due at the end of this turn: the square it lands on (landFrom; the host's answer online),
+   * checked as it lands (landCheck), and what it gains him by that engine (null: not known here).
+   */
+  balloon?: string | null;
+  balloonGain?: number | null;
 }
 
 /** A board's evaluation as the judge works it out: its best move, that move's expected score, and every move's. */
@@ -473,7 +479,7 @@ export function warnThenUnleash(next: BossPowerState, t: TurnContext): boolean {
 export type BossLastMove = { move: string; san: string; staggered?: boolean; captured?: string; through?: StopReason };
 
 /** The power fields `BossRules.stopReason` reads: the same in the match's state and in the screens' view. */
-export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block">> & { camo?: { square: string | null } | null; garden?: { plants: readonly { square: string }[] } | null };
+export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block">> & { camo?: { square: string | null } | null; garden?: { plants: readonly { square: string }[] } | null; hoops?: { blocks: readonly string[] } | null };
 
 /**
  * What a boss's battle code (its moments in a match: the funhouse, Lights out, the bounce…) may use of the match
@@ -506,4 +512,9 @@ export interface Battle {
    * crowd move counts as BOSS_POWERS.seedEverySec.
    */
   now(): number;
+  /**
+   * A draw from the match's own random source (the server's online, this device's solo): for a secret a boss keeps from
+   * every device (the circus tiger's duds), never derived from the battle's seed, which the host's asks are built from.
+   */
+  random(): number;
 }

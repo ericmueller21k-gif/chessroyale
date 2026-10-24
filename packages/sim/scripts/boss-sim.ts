@@ -43,11 +43,17 @@
  * (after which crowd move, the seeds, what they rolled, what came up, what was dropped, his gain by the engine, the
  * positions searched and the ms, his own pieces eaten, the jackpot) and every one that waited (the pass guard).
  *
+ * The circus tiger (id tiger): his balloons blow up on the sim's clock (as the hippo gardener's seeds: `pickSec`). Each
+ * row logs every balloon's end (after which crowd move, its shape as shown, landed or popped, why a pop: a dud or `nine`,
+ * his gain by the engine, in the shape's band or not), how many went on, every cast of his hoops (after which crowd move,
+ * the blocks, his gain, the blocks weighed, the ms) and every one that waited, and each crowd turn with hoops standing:
+ * whether the walls took away the engine's best move.
+ *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, PASS_WAIT, powerMomentMs, waterAnswer, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, PASS_WAIT, powerMomentMs, waterAnswer, hoopsAnswer, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -339,6 +345,21 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         waits: [] as { at: number; seeds: number; gain: number | null; answer: string }[],
         plants: 0,
       };
+      // (The circus tiger: every balloon's end, every cast and the turns it waited, the walls against the crowd's best move.)
+      const tiger = {
+        pickSec,
+        balloons: [] as { at: number; shape: string; outcome: string; nine: boolean; gain: number | null; inBand: boolean | null }[],
+        placed: 0,
+        casts: [] as { at: number; blocks: string[]; gain: number; looks: number; ms: number; late: boolean }[],
+        waits: [] as { at: number; answer: string; gain: number | null }[],
+        walled: { turns: 0, changed: 0 },
+      };
+      const tigerBalloon = () => {
+        const last = runner.boss!.powers?.balloon?.last;
+        if (!last || tiger.balloons.some((x) => x.at === last.at)) return;
+        const band = BOSS_POWERS.balloonBands[last.shape];
+        tiger.balloons.push({ at: last.at, shape: last.shape, outcome: last.outcome, nine: !!last.nine, gain: last.gain, inBand: last.gain === null ? null : last.gain >= band[0] && last.gain <= band[1] });
+      };
       // (Moo & Moon: his beams, each flurry's size, each Full Moon with the crowd's material lead as it came and after it.)
       const moo = { beams: 0, flurries: [] as number[], moons: [] as { at: number; before: number; after: number | null }[], best: 0 };
       const lead = () => {
@@ -457,6 +478,25 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             }
             garden.waits.push({ at, seeds: ask.kinds.length, gain: pick?.gain ?? null, answer: answer === PASS_WAIT ? "wait" : answer || "none" });
           }
+          if (bossId === "tiger" && runner.hoopsDue()) {
+            // (His hoops: his whole turn, unless none fits, the pass guard has them wait, or no answer: then his move.)
+            const at = runner.boss!.crowdMoves;
+            const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+            const ask = runner.hoopsAsk()!;
+            const balloon = runner.balloonAsk();
+            const tw = Date.now();
+            const { answer, pick, land } = await hoopsAnswer(engines, fen, ask, balloon, runner.hoopsAny());
+            const ms = Date.now() - tw;
+            const done = runner.applyHoops(answer, pick?.gain ?? null, land?.gain ?? null);
+            tigerBalloon();
+            if (done) {
+              tiger.casts.push({ at, blocks: done.blocks, gain: pick!.gain, looks: pick!.looks, ms, late: !!pick!.late });
+              ults.push({ kind: "hoops", turn: at });
+              look();
+              continue;
+            }
+            tiger.waits.push({ at, answer: answer === PASS_WAIT ? "wait" : answer || "none", gain: pick?.gain ?? null });
+          }
           if (bossId === "hopper") {
             const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
             const his = runner.boss!.crowdSide === "w" ? "b" : "w";
@@ -483,6 +523,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             }
             if (bossId === "moo" && runner.bossBestReply() && !runner.boss!.staggerNext) moo.best++;
             await runner.playBoss(engines[0]);
+            if (bossId === "tiger") tigerBalloon();
             if (bossId === "moo") {
               const m = runner.boss!.powers?.moo;
               if (m?.stun?.flurry) moo.flurries.push(m.stun.squares.length);
@@ -531,6 +572,14 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             }
           }
         }
+        // (The circus tiger's walls: does the engine's best move for the crowd cross one?)
+        if (bossId === "tiger" && runner.boss!.powers?.hoops) {
+          const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+          const allowed = runner.crowdAllowed();
+          const [best] = await engines[0]!.topMoves(fen, 1);
+          tiger.walled.turns++;
+          if (best && allowed && !allowed.includes(best.move)) tiger.walled.changed++;
+        }
         const tusksBefore = runner.boss!.powers?.tusks;
         // (The sim's clock: this crowd turn's moments, the crowd's pick, the reveal, then his turn.)
         clockMs += powerMomentMs(runner.boss!.powers?.events) + (pickSec + (s.revealSeconds ?? 0) + GARDEN_TURN_SEC) * 1000;
@@ -544,7 +593,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       if (pc) Object.assign(carrots, { pulls: pc.pulls, over: pc.over ?? null, his: carrotsOf(pc, "boss"), crowd: carrotsOf(pc, "crowd"), spin: pc.spin ?? null });
       const camo = b.powers?.camo;
       const camoRow = camo ? { side: camo.side, missed: camo.missed, off: !!camo.off, swap: camo.swap ?? null, reveal: camo.reveal ?? null, hidden: camo.square, strikeAfter: camo.swap && camo.reveal ? camo.reveal.at - camo.swap.at : null } : null;
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }

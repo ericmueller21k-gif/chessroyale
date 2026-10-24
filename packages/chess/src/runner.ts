@@ -111,6 +111,10 @@ import {
   mooBattle,
   gardenerBattle,
   type WaterAsk,
+  tigerBattle,
+  landFrom,
+  type BalloonAsk,
+  type HoopsAsk,
   beamLines,
   bossRace,
   crowdRace,
@@ -129,7 +133,7 @@ import {
   type ShowdownScout,
   type CarrotRace,
 } from "./boss-powers.ts";
-import type { BossPowerSettings, BounceResult, CarrotPatch, LeapfrogHop, LightsOutTest, RepaintResult, WaterResult } from "@chessroyale/core";
+import type { BossPowerSettings, BounceResult, CarrotPatch, HoopsState, LeapfrogHop, LightsOutTest, RepaintResult, WaterResult } from "@chessroyale/core";
 
 /**
  * Runs a match round by round: deal, collect picks, score with the engine, draw,
@@ -1272,8 +1276,11 @@ export class MatchRunner {
     }
     // (Moo's Moonbeam lands after this move: the crowd's top moves after it, on this device's engine, as the host does online.)
     const beam = this.bossBeam();
+    // (The circus tiger's balloon, if it's due at the end of this turn: decided as his turn's work begins, as online.)
+    const balloon = this.balloonAsk();
     const move = await ordinary();
-    this.applyBossMove(move, kind === "stagger", beam ? { beam: await beamLines(engine, fen, move, beam) } : {});
+    const land = balloon ? await this.balloonLanding(fen, move, balloon, engine) : null;
+    this.applyBossMove(move, kind === "stagger", { ...(beam ? { beam: await beamLines(engine, fen, move, beam) } : {}), ...(land ? { balloon: land.square, balloonGain: land.gain } : {}) });
     return move;
   }
 
@@ -1631,6 +1638,55 @@ export class MatchRunner {
     return gardenerBattle.apply(this.battle, answer, gain);
   }
 
+  /**
+   * The circus tiger's hoops are due: the start of his turn after their warning (or the admins' trigger), none standing,
+   * not waiting after this crowd move (tigerBattle.hoopsDue). It's his whole turn: no move of his follows it. Not when it
+   * waits (no block fits, the pass guard, no answer): then he moves.
+   */
+  hoopsDue(): boolean {
+    return tigerBattle.hoopsDue(this.battle);
+  }
+
+  /** What the cast needs placed (the boss request's `hoops`): the order its blocks are tried in; null when none is due. */
+  hoopsAsk(): HoopsAsk | null {
+    return tigerBattle.hoopsAsk(this.battle);
+  }
+
+  /** The cast comes even when it would lose him real material (the test switch's first, or the admins' trigger). */
+  hoopsAny(): boolean {
+    return tigerBattle.hoopsAny(this.battle);
+  }
+
+  /** The cast from this device's engines (hoopsFrom, a due balloon's landing after it); null: none was due, or it waits (he moves). */
+  async playHoops(engines: readonly EngineLike[] = this.opts.engines): Promise<HoopsState | null> {
+    return tigerBattle.play(this.battle, engines);
+  }
+
+  /** The cast (online the host's answer, checked: hoopsCheck, landCheck); anything else, none now, and he moves. */
+  applyHoops(answer: string | null, gain: number | null = null, landGain: number | null = null): HoopsState | null {
+    return tigerBattle.apply(this.battle, answer, gain, landGain);
+  }
+
+  /**
+   * The circus tiger's balloon is due at the end of the boss's turn now (decided once a turn, as its work is asked for:
+   * the request for his move or his cast; tigerBattle.balloonAsk): what the engines need to land it (the boss request's
+   * `balloon`), or null: none due. Asked the same whether it will pop or not.
+   */
+  balloonAsk(): BalloonAsk | null {
+    return tigerBattle.balloonAsk(this.battle);
+  }
+
+  /** Where a due balloon lands after the boss's `move` from `fen`, on this device's engines (landFrom); null: nowhere, or no answer. */
+  async balloonLanding(fen: string, move: string, ask: BalloonAsk, engine?: EngineLike): Promise<{ square: string; gain: number } | null> {
+    let after: string;
+    try {
+      after = applyMove(fen, move);
+    } catch {
+      return null;
+    }
+    return landFrom(this.opts.engines.length ? this.opts.engines : engine ? [engine] : [], after, ask).catch(() => null);
+  }
+
   /** The boss's last move, and the piece it took (if any). */
   private bossLast: BossLastMove | null = null;
   /** The bosses' battle code's own store (Battle's memo). */
@@ -1667,6 +1723,7 @@ export class MatchRunner {
       bossPassed: () => runner.preparePowers(),
       memo: runner.bossMemo,
       now: () => runner.clockNow(),
+      random: () => runner.opts.rng(),
     };
   }
 

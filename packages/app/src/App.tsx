@@ -132,6 +132,11 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     // Testing, solo: ?seeds=N (0 to 10, with ?boss=gardener), N seeds at every watering of the hippo gardener's, whatever
     // the clock says (his meter shows N).
     ...(/^(?:[0-9]|10)$/.test(q.get("seeds") ?? "") ? { bossSeedTest: Number(q.get("seeds")) } : {}),
+    // Testing, solo (with ?boss=tiger): ?balloon=<pawn|knight|bishop|rook|queen|fakequeen>, every balloon of the circus
+    // tiger's that shape (never a dud but the fake queen, which always pops); ?stage=N (1 to 4), every balloon goes on N
+    // stages blown (4: ready at once, so it lands or pops at the end of that same turn).
+    ...(/^(?:pawn|knight|bishop|rook|queen|fakequeen)$/.test(q.get("balloon") ?? "") ? { bossBalloonTest: q.get("balloon") as NonNullable<Settings["bossBalloonTest"]> } : {}),
+    ...(/^[1-4]$/.test(q.get("stage") ?? "") ? { bossStageTest: Number(q.get("stage")) } : {}),
     // Testing: ?weakbots=1, every bot plays loosely and people rank above bots (WEAK_BOTS), so a test's player surely
     // survives the cuts.
     ...(q.get("weakbots") === "1" ? WEAK_BOTS : {}),

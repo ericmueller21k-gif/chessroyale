@@ -72,6 +72,31 @@ describe("the FAQ's contents", () => {
     expect(words).not.toMatch(/undefined|NaN|\$\{/);
   });
 
+  it("the circus tiger's block (Balloons and Hoops) is ready for when his art is wired, every number from the settings, never saying which queen is a dud", () => {
+    const def = BOSS_ROSTER.find((b) => b.id === "tiger")!;
+    const words = BOSS_BLOCKS.tiger!(BOSS_POWERS, def);
+    const p = BOSS_POWERS;
+    const o = p.balloonOdds;
+    expect(words).toContain("game so far");
+    expect(words).toContain(`It blows up in ${p.balloonStages} stages of ${p.balloonStageSec} seconds of real time`);
+    expect(words).toContain("counts only while the game is on your screen");
+    expect(words).toContain(`Most are pawns (${o.pawn}%), then knights and bishops (${o.knight}% and ${o.bishop}%), rooks (${o.rook}%) and queens (${o.queen + o.fakeQueen}%)`);
+    expect(words).toContain(`a pawn ${p.balloonPops.pawn}% of the time, a knight, bishop or rook ${p.balloonPops.knight}%`);
+    expect(p.balloonPops.bishop).toBe(p.balloonPops.knight);
+    expect(p.balloonPops.rook).toBe(p.balloonPops.knight);
+    expect(words).toContain(`duds that always pop (${o.fakeQueen} in every ${o.queen + o.fakeQueen}), and you can't tell which`);
+    expect(words).toContain("about 50% of his balloons pop");
+    expect(words).toContain("never a square you attack (you can't take it at once)");
+    expect(words).toContain("beyond what his missing pawns could have promoted into");
+    expect(words).toContain(`throws ${p.hoopsCount} burning hoops`);
+    expect(words).toContain(`For your next ${p.hoopsCrowdMoves} moves`);
+    expect(words).toContain("Attacks across a hoop still count for the kings");
+    expect(words).not.toMatch(/fake|about 1\.5/i);
+    expect(Object.values(o).reduce((a, b) => a + b, 0)).toBe(100);
+    expect(words).toContain(def.offset === 0 ? "at the usual strength" : `${Math.abs(def.offset)} ${def.offset < 0 ? "under" : "over"} the usual strength`);
+    expect(words).not.toMatch(/undefined|NaN|\$\{/);
+  });
+
   it("the hippo gardener's block (Seeds and Watering) is ready for when his art is wired, every number from the settings", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "gardener")!;
     const words = BOSS_BLOCKS.gardener!(BOSS_POWERS, def);

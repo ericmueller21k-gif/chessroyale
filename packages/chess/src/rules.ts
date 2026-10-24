@@ -461,6 +461,22 @@ export function kingAttacked(fen: string, color: "w" | "b"): boolean {
 }
 
 /**
+ * Every attack on `color`'s king (both kings' without one), whoever is to move, each as the attacker's square then the
+ * king's ("a4h4"); [] with no king.
+ */
+export function kingAttackers(fen: string, color?: "w" | "b"): string[] {
+  try {
+    const chess = new Chess(plainFen(fen), { skipValidation: true });
+    return (color ? [color] : (["w", "b"] as const)).flatMap((c) => {
+      const sq = chess.findPiece({ type: "k", color: c })[0];
+      return sq ? chess.attackers(sq, c === "w" ? "b" : "w").map((a) => a + sq) : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
  * The side to move has a mate in one here: a legal move that checkmates (the first found), or null (Alfil's Slam asks it
  * at the start of his turn while the crowd's pieces are in the air; his fusion, of each square it could take).
  */
@@ -472,6 +488,31 @@ export function mateInOne(fen: string): string | null {
     return m ? m.from + m.to + (m.promotion ?? "") : null;
   } catch {
     return null;
+  }
+}
+
+/** The squares `by` attacks in this position (whoever is to move), as chess.js counts attacks: a pawn's diagonals, not its push. */
+export function attackedSquares(fen: string, by: "w" | "b"): Set<string> {
+  try {
+    const chess = new Chess(plainFen(fen), { skipValidation: true });
+    const out = new Set<string>();
+    for (const f of "abcdefgh") for (let r = 1; r <= 8; r++) if (chess.isAttacked(`${f}${r}` as Square, by)) out.add(`${f}${r}`);
+    return out;
+  } catch {
+    return new Set();
+  }
+}
+
+/** Every legal move that checkmates here (chess.js marks a mating move's SAN with "#"); [] for a Chess960 position or none. */
+export function matingMoves(fen: string): string[] {
+  try {
+    if (isChess960Fen(fen)) return [];
+    return new Chess(fen)
+      .moves({ verbose: true })
+      .filter((x) => x.san.endsWith("#"))
+      .map((m) => m.from + m.to + (m.promotion ?? ""));
+  } catch {
+    return [];
   }
 }
 
