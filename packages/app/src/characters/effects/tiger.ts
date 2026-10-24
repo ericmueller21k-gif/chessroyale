@@ -1,10 +1,10 @@
 /**
  * The circus tiger's board art for his balloons (not wired in yet: drafts for Eric, Oct 23; docs/decisions/2026-10-23-tiger-animations.md).
  * A finished balloon leaves the pump in the boss bar (tiger-bar.ts `release<Piece>`), floats to its square on its string and lands
- * there as one of his pieces. Each sprite is a `Character` as the other bosses' board art: one frame exactly the square it covers
- * (`SQUARE` = 32 frame pixels), and the balloon is the bar's own stage-4 drawing at one frame pixel each (about 20 of the square's
- * 32, its string trailing under it), so the balloon that leaves the bar is the one that lands. Its color is a look of each sprite
- * (`BALLOON_COLORS`, the bar's), passed in.
+ * there as one of his pieces. Each sprite is a `Character` as the other bosses' board art: one 32-px frame (`SQUARE`), and the balloon
+ * is the bar's own stage-4 drawing at one frame pixel each (20 art px tall, its string trailing under it), so the balloon that leaves
+ * the bar is the one that lands. The board draws the frame bigger than its square, at the scale that makes a balloon as tall as a
+ * queen piece (Tiger.tsx, `balloonBox`). Its color is a look of each sprite (`BALLOON_COLORS`, the bar's), passed in.
  *
  *   balloonFly   square  fly<Piece> (loop, 4 frames, 480 ms): the balloon bobbing a pixel, its string swaying under it. Move it from
  *                the bar (the pump's `RELEASE_KNOT`) to the square (a CSS transform, as seedFly), then play balloonLand there: the
@@ -37,7 +37,7 @@ const { parts, add } = lazyParts();
 /** Where the balloon's knot is while it flies, and the landing's first look (frame pixels). */
 const FLY_KNOT: readonly [number, number] = [16, 22];
 /** Where its knot is once it stands on the square (its base two rows above, about where a piece's base is). */
-const LAND_Y = 29;
+export const LAND_Y = 29;
 
 function balloonAt(b: BalloonLook, kx: number, ky: number): Layer {
   const { sil, marks } = balloonDrawing(b);

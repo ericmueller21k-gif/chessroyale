@@ -19867,24 +19867,33 @@ button.sq-tiny {
   transform: scaleX(-1);
   transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
 }
-/* The pump in the bar's free room, one sprite pixel to a screen pixel (as his figure there), standing on the room's bottom: a phone's
-   at its right end (the room is tall there), a computer's at its left (the right runs into the status: docs/decisions/2026-10-24-tiger-wired.md). */
+/* The pump in the bar's free room, at 2 screen px to a sprite pixel (a whole scale, crisp: pixelated), at its right end (the room is tall
+   there). Its foot sits 3 px below the room's bottom, inside the bar's padding: so a stage-4 balloon's top, a pop's over-swell too (4 art
+   px above it), clears the status above at any width and any status text (docs/decisions/2026-10-24-babur-bigger.md). */
 .tg-pump-slot {
   position: absolute;
   right: 2px;
-  bottom: 0;
-  width: 34px;
-  height: 36px;
+  bottom: -3px;
+  width: 68px;
+  height: 72px;
   pointer-events: none;
 }
 .tg-pump-slot > .tg-pump {
-  width: 34px;
-  height: 36px;
+  width: 68px;
+  height: 72px;
 }
+/* A computer's, at its left and at 1 to 1 (the right runs into the status, and the bar holds no more: docs/decisions/2026-10-24-babur-bigger.md). */
 @media (min-width: 900px) and (min-height: 600px) {
   .tg-pump-slot {
     right: auto;
     left: 2px;
+    bottom: 0;
+    width: 34px;
+    height: 36px;
+  }
+  .tg-pump-slot > .tg-pump {
+    width: 34px;
+    height: 36px;
   }
 }
 /* A computer's limp balloon, tossed from his paw by the board to the pump in the bar: across, and up and over, down onto the nozzle
@@ -19938,7 +19947,13 @@ button.sq-tiny {
   z-index: 9;
   pointer-events: none;
 }
-/* A balloon from the pump to its square: across (a transform, in squares), and up a little and down onto it. */
+/* A balloon's frame on the board, at its scale (--bs, board units: a queen balloon as tall as her piece; Tiger.tsx `balloonBox`). */
+.tg-fly,
+.tg-land {
+  width: calc(var(--board-size, 100%) * var(--bs));
+  height: calc(var(--board-size, 100%) * var(--bs));
+}
+/* A balloon from the pump to its square: across (a transform, in the balloon's own frame), and up a little and down onto it. */
 .tg-fly {
   animation-name: tg-fly-x;
   animation-timing-function: linear;
