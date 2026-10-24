@@ -17,6 +17,7 @@
   "e2e/chat.spec.ts": 117,
   "e2e/crate-banner.spec.ts": 133,
   "e2e/crowd-hidden.spec.ts": 565,
+  "e2e/crowd-scoring.spec.ts": 90,
   "e2e/crowd.spec.ts": 558,
   "e2e/eval-bar.spec.ts": 53,
   "e2e/fairplay.spec.ts": 9,

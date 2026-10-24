@@ -937,11 +937,11 @@ describe("lobby: Crowd mode", () => {
 
 describe("lobby: quick chat", () => {
   /** A 50 v 50 with three people (two on one team, one on the other), the match begun. */
-  function chatLobby(icons: Record<string, string> = {}) {
+  function chatLobby(icons: Record<string, string> = {}, from = 7) {
     const ids = ["p1", "p2", "p3"];
     // Teams are drawn at random: the first seed (from 7) that puts two people on one side and one on the other.
     // (Not whatever seed 7 gives: anything else that draws from the match's random source moves the teams.)
-    for (let seed = 7; ; seed++) {
+    for (let seed = from; ; seed++) {
       const L = setup({ ...modeSettings("crowd"), augments: false, boardIntroSeconds: 0 }, icons, seed);
       for (const n of ["Ann", "Bo", "Cy"]) L.core.connect(undefined, n, "computer");
       // (Chat before the match, in the lobby: "lobby: quick chat before the match", below.)
@@ -1104,7 +1104,10 @@ describe("lobby: quick chat", () => {
   });
 
   it("bots chat a little: hello at the start and GG at the end, from bots, never more than a few a minute", () => {
-    const { L, a, team } = chatLobby();
+    // (The bots' GG at the end is a roll, QUICK_CHAT.botEndChance (90%), from their own seed, which moves with the
+    // match's message count: this needs a match whose roll says GG. The first seed that splits the teams (8) fell in the
+    // 10% once 50 v 50's scoring (Oct 24) changed how the cuts run; from 9 on the next seeds all roll GG.)
+    const { L, a, team } = chatLobby({}, 9);
     // The match is over: play it out with nobody picking.
     const st = L.core.record;
     for (let i = 0; i < 400 && st.phase !== "results"; i++) {

@@ -167,7 +167,10 @@ test("the vote board: your pawn is solid, drag it into a zone, the count goes up
 
   // The game begins: the pawns are gone, the real pieces are on their squares, and the board hasn't moved.
   await expect.poll(() => phase(page), { timeout: 20_000 }).toMatch(/play|watching/);
-  await expect(page.locator(BOARD_SEL.piece)).toHaveCount(32);
+  // (Every piece of the board's start: 32, fewer when the crowd voted a random opening whose moves took something.)
+  const startPieces = await page.evaluate(() => ((window as any).match.phase.board.fen as string).split(" ")[0]!.replace(/[^a-zA-Z]/g, "").length);
+  expect(startPieces).toBeGreaterThanOrEqual(24);
+  await expect(page.locator(BOARD_SEL.piece)).toHaveCount(startPieces);
   await expect(page.locator(".vote-pawn")).toHaveCount(0);
   expect(await boardBox(page)).toEqual(voteBoard);
   // The clock is the voted time control's cap: Bullet 10 s, Blitz 15 s, Rapid 20 s.

@@ -4,8 +4,10 @@ import type { ChatFloat } from "../chat.ts";
 import { PlayerName } from "./PlayerName.tsx";
 import { LiveNumber } from "./LiveNumber.tsx";
 import { clockShown } from "../clock-text.ts";
+import { StreakFire } from "./StreakFire.tsx";
 
-const pts = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
+/** Points with their sign, to `dp` decimals (Crowd 50 v 50's are kept to 2: scoreDp). */
+const signed = (x: number, dp: number) => (x >= 0 ? "+" : "") + x.toFixed(dp);
 /** A row moving more places than this fades in at its new place rather than sliding there. */
 const JUMP_ROWS = 4;
 
@@ -27,6 +29,7 @@ export function RaceTower({
   cutLabel = "Cut line",
   floats,
   bank = true,
+  dp = 1,
 }: {
   standings: readonly Standing[];
   cutoff: number;
@@ -50,7 +53,10 @@ export function RaceTower({
    * own clock then, on its tag, and the bank would show a clock nobody plays on).
    */
   bank?: boolean;
+  /** Decimals on the points (scoreDp: 2 in Crowd 50 v 50). */
+  dp?: number;
 }) {
+  const pts = (x: number) => signed(x, dp);
   const ROW = mini ? 22 : 30;
   const alive = standings.filter((s) => !s.out);
   const knockouts = cutoff < alive.length;
@@ -136,7 +142,11 @@ export function RaceTower({
               class={`tower-row${keys.get(r.id) !== r.id ? " jump" : ""}${r.isYou ? " you" : ""}${done?.has(r.id) ? " done" : ""}${done && !r.out && !done.has(r.id) ? " thinking" : ""}${zone ? " zone" : ""}${bubble ? " bubble" : ""}${r.out ? " out" : ""}${podium}`}
               style={{ transform: `translateY(${ys.get(r.id)}px)` }}
             >
-              <span class="t-pos">{r.out ? `${r.placement ?? "✕"}` : r.rank}</span>
+              <span class={`t-pos${!r.out && r.streak !== undefined ? " streak" : ""}`}>
+                <span class="t-rank">{r.out ? `${r.placement ?? "✕"}` : r.rank}</span>
+                {/* (A streak's fire: a badge on the rank square's corner, so the name keeps its room.) */}
+                {!r.out && r.streak !== undefined && <StreakFire count={r.streak} />}
+              </span>
               <span class="t-name">
                 {done?.has(r.id) && <span class="t-check">✓</span>}
                 {mini ? <span class="t-name-text">{r.name}</span> : <PlayerName class="t-name-text" name={r.name} uid={r.uid} you={r.isYou} bot={r.isBot} />}

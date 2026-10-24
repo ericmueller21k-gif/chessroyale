@@ -1235,6 +1235,20 @@ p {
 .tower-head span:first-child {
   text-align: center;
 }
+/* (The labels sit over what they label: the number columns' to the right, as their numbers are, so a narrow name column
+   never reads "PLAYERPTS"; a label too wide for its column is cut, never run into the next.) */
+.tower-head span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+.tower-head span:nth-child(n + 3) {
+  text-align: right;
+}
+.tower-head span:last-child {
+  text-align: center;
+}
 .tower-rows {
   position: relative;
   transition: height 0.5s ease;
@@ -1267,12 +1281,35 @@ p {
   }
 }
 .t-pos {
+  position: relative;
   height: 100%;
   display: grid;
   place-items: center;
   font-weight: 900;
   background: #23272f;
   color: #fff;
+}
+/* A streak's fire is a badge on the rank square's bottom-right corner (it reaches into the gap beside it, never into the
+   name's cell), and the rank moves left to make room: the name keeps all its width. */
+.t-pos.streak {
+  padding-right: 8px;
+}
+.t-pos .streak-fire {
+  position: absolute;
+  right: -4px;
+  bottom: 1px;
+  margin: 0;
+  padding: 0 2px 0 1px;
+  gap: 0;
+  height: 10px;
+  border-radius: 3px;
+  background: rgba(10, 12, 16, 0.82);
+  font-size: 8px;
+  vertical-align: 0;
+}
+.t-pos .streak-fire svg {
+  width: 6px;
+  height: 8px;
 }
 .tower-row.p1 .t-pos {
   background: #d4a531;
@@ -1311,6 +1348,92 @@ p {
 }
 .t-practice {
   margin-left: 4px;
+}
+/* A streak's fire beside the name (StreakFire, Crowd 50 v 50): our own flame and its count, small and steady in size
+   (it never changes the row's height), a gentle flicker on the flame only, still under reduced motion. The tower is
+   dark in both themes; the reveal's note sits on the page's own background (light mode below). */
+.streak-fire {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: 4px;
+  line-height: 1;
+  font-size: 10px;
+  font-weight: 900;
+  vertical-align: -1px;
+  --sf-outer: #ff8a1f;
+  --sf-core: #ffd34d;
+  --sf-text: #ff9d3d;
+}
+.streak-fire svg {
+  display: block;
+  flex: none;
+  transform-origin: 50% 100%;
+  animation: sf-flicker 1.8s ease-in-out infinite;
+}
+.streak-fire .sf-outer {
+  fill: var(--sf-outer);
+}
+.streak-fire .sf-core {
+  fill: var(--sf-core);
+}
+.streak-fire .sf-count {
+  color: var(--sf-text);
+}
+.streak-fire.t2 {
+  --sf-outer: #ff3b2a;
+  --sf-core: #ffb14a;
+  --sf-text: #ff6a55;
+}
+.streak-fire.t3 {
+  --sf-outer: #ff4d3a;
+  --sf-core: #dff1ff;
+  --sf-text: #9fd3ff;
+}
+.streak-fire.t3 svg {
+  filter: drop-shadow(0 0 2px rgba(120, 190, 255, 0.7));
+}
+@keyframes sf-flicker {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  30% {
+    transform: scale(0.96, 1.07);
+  }
+  55% {
+    transform: scale(1.03, 0.97);
+  }
+  80% {
+    transform: scale(0.98, 1.04);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .streak-fire svg {
+    animation: none;
+  }
+}
+/* The reveal's streak note ("+0.50 streak bonus"): its own line under your score, like the allowance's. */
+.streak-note {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.streak-note .streak-fire {
+  margin-left: 0;
+}
+/* (Light mode: the count a shade deeper on the light page. The tower stays dark in both.) */
+:root[data-theme="light"] .streak-note .streak-fire {
+  --sf-text: #c85a0c;
+}
+:root[data-theme="light"] .streak-note .streak-fire.t3 {
+  --sf-text: #2f6fb8;
 }
 .t-pts {
   text-align: right;
@@ -6479,7 +6602,15 @@ button.history-label {
   background: color-mix(in srgb, #22d3ee 14%, var(--surface));
   border: 1px solid color-mix(in srgb, #22d3ee 55%, transparent);
   font-size: 13px;
-  animation: pop 260ms ease-out;
+  /* (Its own keyframes: the shared name "pop" is defined twice, and the later one, for a centered overlay, moves a box by
+     half its size, so the line flew in from the upper left.) */
+  animation: brilliant-pop 260ms ease-out;
+}
+@keyframes brilliant-pop {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
 }
 .brilliant-line.you {
   background: linear-gradient(90deg, color-mix(in srgb, #22d3ee 30%, var(--surface)), color-mix(in srgb, #a78bfa 30%, var(--surface)));

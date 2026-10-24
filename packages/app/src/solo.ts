@@ -361,6 +361,10 @@ export class SoloMatch implements GameView {
       ],
     });
     this.runner.forceLastStand = this.forceLastStand;
+    // Test switches (50 v 50's scoring): ?streaks=1, everyone on a streak (every tier of the scoreboard's fire);
+    // ?shoutout=1, the first move you pick gets a brilliant find's shoutout.
+    if (this.settings.crowdScoring && testParams().get("streaks") === "1") this.runner.testStreaks();
+    if (this.settings.crowdScoring && testParams().get("shoutout") === "1") this.runner.forceShoutout = true;
   }
 
   /** The match begins: the pre-game votes, the boss's intro (a raid) or the opening. */

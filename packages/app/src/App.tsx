@@ -7,7 +7,7 @@ import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
 import { enginePool } from "./engine.ts";
-import { cutLabel, elimination, isCrowd, roundLive, towerView, type GameView } from "./game.ts";
+import { cutLabel, elimination, isCrowd, roundLive, scoreDp, towerView, type GameView } from "./game.ts";
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
 import { exitFor, exitMatch, onExitMatch } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
@@ -1457,7 +1457,7 @@ export function App() {
           return (
             <>
               {v.teamLabel && <div class="tower-team">{v.teamLabel}</div>}
-              <RaceTower standings={v.standings} cutoff={v.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={match.chat?.floats()} bank={!(match as GameView).simul} />
+              <RaceTower standings={v.standings} cutoff={v.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={match.chat?.floats()} bank={!(match as GameView).simul} dp={scoreDp(match.settings)} />
             </>
           );
         })()}
