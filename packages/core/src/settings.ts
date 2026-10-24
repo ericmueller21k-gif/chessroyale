@@ -609,7 +609,7 @@ export const BOSS_POWERS = {
    * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
    * fire most of the game.
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.4 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.6 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1068,25 +1068,31 @@ export const BOSS_POWERS = {
    * his nozzle at the start of his turn when it's empty, and blows up in balloonStages stages of balloonStageSec seconds of
    * real time (the battle's clock: the server's online, the page's visible time solo), then waits, ready. At the end of
    * his turn a ready balloon lands as his piece or pops. Its shape (percent; the fake queen looks like a queen) and
-   * whether it pops (percent of that shape's) are rolled as it goes on, from the battle's seed: about a quarter pop.
-   * balloonStageSec is the raid sim's (Eric's 15 s left the crowd 0.00 in 29 battles: about four balloons landing a
-   * battle; 30 s, two minutes a balloon, puts him in the pack: reports/tiger-sim.md).
+   * whether it pops (percent of that shape's) are rolled as it goes on: the shape from the battle's seed, a queen's being a
+   * fake one and every pop from the battle's own secret (BalloonState.secret). About half pop (the review's numbers, Oct 24,
+   * after Eric: "most don't even make it and most are pawns or maybe a bishop knight"; his two queen numbers kept).
+   * balloonStageSec is the raid sim's (Eric's 15 s left the crowd 0.00 in 29 battles): reports/tiger-sim.md.
    */
   balloonStages: 4,
   balloonStageSec: 30,
   balloonOdds: { pawn: 55, knight: 13, bishop: 13, rook: 6, fakeQueen: 10, queen: 3 } as Readonly<Record<"pawn" | "knight" | "bishop" | "rook" | "fakeQueen" | "queen", number>>,
-  balloonPops: { pawn: 12, knight: 25, bishop: 25, rook: 35, fakeQueen: 100, queen: 0 } as Readonly<Record<"pawn" | "knight" | "bishop" | "rook" | "fakeQueen" | "queen", number>>,
+  balloonPops: { pawn: 40, knight: 55, bishop: 55, rook: 55, fakeQueen: 100, queen: 0 } as Readonly<Record<"pawn" | "knight" | "bishop" | "rook" | "fakeQueen" | "queen", number>>,
   /** How many colors a balloon can be (seeded, not tied to its shape: the art's six). */
   balloonColors: 6,
   /**
-   * Where a landing balloon goes (landFrom, on the host's engines): his gain from it (his evaluation after it, the crowd
-   * to move, against before it, in pawns of log-odds: bouncePawnLogit) in its shape's band, nearest the band's middle;
-   * none in the band: the square nearest it. So it neither lands with a fork, a check or a won piece, nor where it's
-   * simply taken. Up to balloonLooks squares weighed (seeded, those the crowd doesn't attack first), each at balloonNodes.
+   * Where a landing balloon goes (landFrom, on the host's engines): only squares the crowd doesn't attack (landCheck), and of
+   * those the least valuable: his gain from it (his evaluation after it, the crowd to move, against before it, in pawns of
+   * log-odds: bouncePawnLogit) in its shape's band nearest the band's low end; none in the band, the nearest. The bands are
+   * measured in the engine's own units (packages/sim/scripts/tiger-bands.ts, Oct 24: 16 even middlegames, up to 10 safe
+   * squares a shape): a safe pawn gains 0.3 to 1.6 (the middle half), while any safe piece saturates the engine's win
+   * chances (7.1 to 8.0 for a knight, bishop, rook or queen alike), so a piece's band is that, and aiming at its low end
+   * takes the least useful safe square. Up to balloonLooks squares weighed (seeded), each at balloonNodes.
    */
-  balloonBands: { p: [0.3, 1.5], n: [2, 4], b: [2, 4], r: [3.5, 6], q: [7, 10.5] } as Readonly<Record<"p" | "n" | "b" | "r" | "q", readonly [number, number]>>,
+  balloonBands: { p: [0.3, 1.5], n: [7, 8.5], b: [7, 8.5], r: [7, 8.5], q: [7, 8.5] } as Readonly<Record<"p" | "n" | "b" | "r" | "q", readonly [number, number]>>,
   balloonLooks: 8,
   balloonNodes: 15_000,
+  /** A landing's search time on the host (ms; past it, the squares searched so far), its own share after a cast's. */
+  balloonTimeMs: 3_000,
   /**
    * His Hoops (his ultimate, his whole turn; Eric, Oct 23: "3 staggered burning hoops on the board each covering 2x2 areas.
    * No pieces can leave that area for 2 turns, nothing can get in or out"): hoopsCount 2x2 blocks within ranks 2 to 7 (the

@@ -97,6 +97,7 @@ function stub(fen: string, camo: Camouflage, crowdMoves: number, captured?: stri
     bossPassed: () => undefined,
     memo: new Map(),
     now: () => 0,
+    random: () => 0.5,
   };
   return b;
 }

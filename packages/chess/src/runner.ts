@@ -1723,6 +1723,7 @@ export class MatchRunner {
       bossPassed: () => runner.preparePowers(),
       memo: runner.bossMemo,
       now: () => runner.clockNow(),
+      random: () => runner.opts.rng(),
     };
   }
 

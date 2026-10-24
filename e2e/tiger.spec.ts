@@ -11,7 +11,7 @@ import { test, bossAloneFromHome, submitMove } from "./helpers.ts";
  * - Hoops (`&power=hoops`): at the start of his turn after the warning, his whole turn: blocks within ranks 2 to 7, apart,
  *   your allowed moves never crossing their walls, for exactly your next 2 moves, then gone (`hoopsOut`).
  * - Balloons (`&balloon=pawn&stage=4`: every balloon a pawn, ready as it goes on, from 1.e4 d5 2.exd5 Qxd5): at the end
- *   of his first turn it lands as his pawn, its gain by this device's engines in the pawn's band.
+ *   of his first turn it lands as his pawn, on a square you don't attack, with no check; its gain measured.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const state = (p: Page) =>
@@ -100,7 +100,7 @@ test("the circus tiger: a hoops cast walls off its blocks for exactly two of you
   expect(errors).toEqual([]);
 });
 
-test("the circus tiger: a forced balloon lands at the end of his turn as his pawn, within the pawn's band", async ({ page }) => {
+test("the circus tiger: a forced balloon lands at the end of his turn as his pawn, on a square the guards allow, its gain measured", async ({ page }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -120,9 +120,13 @@ test("the circus tiger: a forced balloon lands at the end of his turn as his paw
   expect(last).toMatchObject({ outcome: "land", shape: "p" });
   const his = s.boss.crowdSide === "w" ? "b" : "w";
   expect(new Chess(s.fen).get(last.square)).toMatchObject({ type: "p", color: his });
-  const [lo, hi] = BOSS_POWERS.balloonBands.p;
-  expect(last.gain).toBeGreaterThanOrEqual(lo);
-  expect(last.gain).toBeLessThanOrEqual(hi);
+  // (Its gain by this device's engines: in the band, or the nearest of the squares weighed, which the unit test checks
+  // square by square (tiger.test.ts, landFrom); here, that it was measured, and the guards on the board as it is.)
+  expect(typeof last.gain).toBe("number");
+  // Never a square you attack: with the pawn taken off, none of your pieces attacks its square.
+  const before = new Chess(s.fen);
+  before.remove(last.square);
+  expect(before.isAttacked(last.square, s.boss.crowdSide)).toBe(false);
   expect(new Chess(s.fen).inCheck()).toBe(false);
   expect(s.boss.powers.balloons).toMatchObject({ landed: 1, popped: 0 });
   await expect.poll(() => kinds(page), { timeout: 10_000 }).toContain("balloonLand");

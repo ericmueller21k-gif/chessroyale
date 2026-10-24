@@ -512,4 +512,9 @@ export interface Battle {
    * crowd move counts as BOSS_POWERS.seedEverySec.
    */
   now(): number;
+  /**
+   * A draw from the match's own random source (the server's online, this device's solo): for a secret a boss keeps from
+   * every device (the circus tiger's duds), never derived from the battle's seed, which the host's asks are built from.
+   */
+  random(): number;
 }

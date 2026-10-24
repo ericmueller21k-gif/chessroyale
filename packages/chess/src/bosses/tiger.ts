@@ -93,7 +93,7 @@ export const HOOPS_BEATS = {
 export const TIGER_FX = { place: 0, balloonLand: 0, pop: 0, balloonCheer: 0, balloonBigCheer: 0, wince: 0, hoops: HOOPS_BEATS.total, hoopsOut: 0 } as const;
 
 type BalloonSettings = Pick<BossPowerSettings, "balloonStages" | "balloonStageSec" | "balloonOdds" | "balloonPops" | "balloonColors">;
-type LandSettings = Pick<BossPowerSettings, "balloonBands" | "balloonLooks" | "balloonNodes" | "bouncePawnLogit">;
+type LandSettings = Pick<BossPowerSettings, "balloonBands" | "balloonLooks" | "balloonNodes" | "balloonTimeMs" | "bouncePawnLogit">;
 type HoopsSettings = Pick<BossPowerSettings, "hoopsCount" | "hoopsBand" | "hoopsTarget" | "hoopsLooks" | "hoopsNodes" | "hoopsTimeMs" | "bouncePawnLogit" | "passGuardPawns">;
 
 const SQUARES: readonly string[] = [..."abcdefgh"].flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`));
@@ -239,7 +239,8 @@ export function hoopMateInOne(fen: string, blocks: readonly string[]): boolean {
   const mates = matingMoves(fen);
   if (!mates.length || !blocks.length) return mates.length > 0;
   const open = hoopMoves(fen, blocks);
-  return mates.some((m) => open.includes(m));
+  // (The walls leaving no move lift for that turn: then every legal move counts.)
+  return !open.length || mates.some((m) => open.includes(m));
 }
 
 /**
@@ -315,18 +316,24 @@ const KINDS: readonly BalloonKind[] = ["pawn", "knight", "bishop", "rook", "fake
 const FORCED: Record<NonNullable<Settings["bossBalloonTest"]>, BalloonKind> = { pawn: "pawn", knight: "knight", bishop: "bishop", rook: "rook", queen: "queen", fakequeen: "fakeQueen" };
 
 /**
- * Balloon `n` of a battle (seeded): its shape as everyone sees it, whether it pops when ready (balloonPops of its kind's),
- * and its color. `forced` (the test switch ?balloon=): that kind, never a dud but the fake queen.
+ * Balloon `n` of a battle: its shape as everyone sees it and its color, from the battle's seed; whether it pops when ready
+ * (balloonPops of its kind's), from the battle's `secret` alone (BalloonState.secret: a fake queen's kind is the secret's,
+ * not the seed's, so its shape "q" says nothing of it). `forced` (the test switch ?balloon=): that kind, never a dud but
+ * the fake queen.
  */
-export function rollBalloon(seed: number, n: number, forced?: Settings["bossBalloonTest"], s: BalloonSettings = BOSS_POWERS): { kind: BalloonKind; shape: BalloonShape; dud: boolean; color: number } {
+export function rollBalloon(seed: number, secret: number, n: number, forced?: Settings["bossBalloonTest"], s: BalloonSettings = BOSS_POWERS): { kind: BalloonKind; shape: BalloonShape; dud: boolean; color: number } {
   let kind: BalloonKind;
   if (forced) kind = FORCED[forced];
   else {
+    // (The shape from the seed: pawn, knight, bishop, rook or queen; a queen's being a fake one, from the secret.)
     const r = powerRoll(seed, "balloon", n) * 100;
+    const o = s.balloonOdds;
+    const queens = o.fakeQueen + o.queen;
     let edge = 0;
-    kind = KINDS.find((k) => r < (edge += s.balloonOdds[k])) ?? "pawn";
+    const shown = (["pawn", "knight", "bishop", "rook"] as const).find((k) => r < (edge += o[k])) ?? "queen";
+    kind = shown !== "queen" ? shown : powerRoll(secret, "balloon-queen", n) * queens < o.fakeQueen ? "fakeQueen" : "queen";
   }
-  const dud = forced ? kind === "fakeQueen" : powerRoll(seed, "balloon-pop", n) * 100 < s.balloonPops[kind];
+  const dud = forced ? kind === "fakeQueen" : powerRoll(secret, "balloon-pop", n) * 100 < s.balloonPops[kind];
   const color = Math.floor(powerRoll(seed, "balloon-color", n) * s.balloonColors) % s.balloonColors;
   return { kind, shape: SHAPE_OF[kind], dud, color };
 }
@@ -374,8 +381,11 @@ export function landCheck(fen: string, shape: BalloonShape, square: string, bloc
     if (!isSquare(square) || pieceAt(fen, square) || fen.split(" ")[3] === square) return null;
     if (blocks.some((c) => inHoop(c, square))) return null;
     if (shape === "p" && (square[1] === "1" || square[1] === "8")) return null;
-    const his = other(sideToMove(fen));
+    const crowd = sideToMove(fen);
+    const his = other(crowd);
     if (landRefused(fen, shape, his)) return null;
+    // (Never where the crowd can take it at once: a square it attacks.)
+    if (attackedSquares(fen, crowd).has(square)) return null;
     const after = placed(fen, square, shape, his);
     return hoopsGuard(after, blocks) ? after : null;
   } catch {
@@ -409,18 +419,26 @@ export interface LandPick {
  * walls leave). The one whose gain (his evaluation after, against before, both the crowd to move) is in the shape's band
  * nearest its middle; none in the band: the nearest. Null: a shape he can't have, no square, no engine or no answer.
  */
-export async function landFrom(engines: readonly EngineLike[], fen: string, ask: BalloonAsk, s: LandSettings = BOSS_POWERS): Promise<LandPick | null> {
+export async function landFrom(
+  engines: readonly EngineLike[],
+  fen: string,
+  ask: BalloonAsk,
+  s: LandSettings = BOSS_POWERS,
+  now: () => number = () => performance.now(),
+  limitMs: number = s.balloonTimeMs,
+): Promise<LandPick | null> {
   if (!engines.length) return null;
   const crowd = sideToMove(fen);
   const his = other(crowd);
   if (landRefused(fen, ask.shape, his)) return null;
-  const attacked = attackedSquares(fen, crowd);
+  const p = pace(now, limitMs);
   const ranked = SQUARES.filter((sq) => !pieceAt(fen, sq))
-    .map((sq) => ({ sq, k: (attacked.has(sq) ? 1 : 0) + powerRoll(ask.order, "land", sq) }))
+    .map((sq) => ({ sq, k: powerRoll(ask.order, "land", sq) }))
     .sort((a, b) => a.k - b.k);
   const options: { square: string; fen: string }[] = [];
   for (const { sq } of ranked) {
-    if (options.length >= s.balloonLooks) break;
+    if (options.length >= s.balloonLooks || p.over()) break;
+    await p.breathe();
     const after = landCheck(fen, ask.shape, sq, ask.blocks);
     if (after) options.push({ square: sq, fen: after });
   }
@@ -428,17 +446,17 @@ export async function landFrom(engines: readonly EngineLike[], fen: string, ask:
   const before = await sideBest(engines[0]!, fen, ask.blocks, s.balloonNodes);
   if (before === null) return null;
   const band = s.balloonBands[ask.shape];
-  const mid = (band[0] + band[1]) / 2;
-  const scores = await eachOn(engines, options, (e, o) => sideBest(e, o.fen, ask.blocks, s.balloonNodes));
+  // (Past the time limit, the squares not yet searched are left out: what's searched so far is weighed.)
+  const scores = await eachOn(engines, options, async (e, o) => (p.over() ? null : (await p.breathe(), sideBest(e, o.fen, ask.blocks, s.balloonNodes))));
   let pick: LandPick | null = null;
   options.forEach((o, i) => {
     const c = scores[i];
     if (c === null || c === undefined) return;
     const gain = (logit(1 - c) - logit(1 - before)) / s.bouncePawnLogit;
-    if (!pick || bandDistance(gain, band, mid) < bandDistance(pick.gain, band, mid)) pick = { square: o.square, gain, looks: options.length, inBand: gain >= band[0] && gain <= band[1] };
+    if (!pick || bandDistance(gain, band, band[0]) < bandDistance(pick.gain, band, band[0])) pick = { square: o.square, gain, looks: options.length, inBand: gain >= band[0] && gain <= band[1] };
   });
-  const p = pick as LandPick | null;
-  return p ? { ...p, gain: Math.round(p.gain * 100) / 100 } : null;
+  const got = pick as LandPick | null;
+  return got ? { ...got, gain: Math.round(got.gain * 100) / 100 } : null;
 }
 
 // ---------------- Hoops: where ----------------
@@ -540,10 +558,14 @@ export async function hoopsAnswer(
   s: HoopsSettings & LandSettings = BOSS_POWERS,
   now?: () => number,
 ): Promise<{ answer: string; pick: HoopsPick | null; land: LandPick | null }> {
-  const pick = await hoopsFrom(engines, fen, ask, s, now).catch(() => null);
+  const clock = now ?? (() => performance.now());
+  const start = clock();
+  const pick = await hoopsFrom(engines, fen, ask, s, clock).catch(() => null);
   if (!pick) return { answer: "", pick: null, land: null };
   if (!any && passLoses(pick.gain, s)) return { answer: PASS_WAIT, pick, land: null };
-  const land = balloon ? await landFrom(engines, pick.fen, { ...balloon, blocks: pick.blocks }, s).catch(() => null) : null;
+  // (The landing after it gets its own share, never past hoopsTimeMs + balloonTimeMs in all: well inside the request's timeout.)
+  const left = Math.max(0, s.hoopsTimeMs + s.balloonTimeMs - (clock() - start));
+  const land = balloon ? await landFrom(engines, pick.fen, { ...balloon, blocks: pick.blocks }, s, clock, Math.min(s.balloonTimeMs, left)).catch(() => null) : null;
   return { answer: hoopsCode(pick.blocks, land?.square), pick, land };
 }
 
@@ -636,7 +658,8 @@ export const TIGER: BossRules = {
   opening: {
     setUp(b, at) {
       if (b.settings.bossBalloonTest) b.boards.set(at.boardId, newBoard(at.boardId, { ...BOSS_OPENING, moves: [...BALLOON_TEST_MOVES] }, BALLOON_TEST_MOVES.length, at.generation));
-      return {};
+      // (The duds' secret: a draw of its own from the match's random source, kept from every device.)
+      return { balloon: { ...FRESH, secret: Math.floor(b.random() * 2 ** 32) } };
     },
   },
   afterCrowdMove(b) {
@@ -707,7 +730,7 @@ export const tigerBattle = {
     }
     const st = balloonsOf(p);
     if (!st.nozzle && !boss.result && b.bossToMove() && boss.crowdMoves < b.settings.bossMaxMoves) {
-      const roll = rollBalloon(p.seed, st.placed, b.settings.bossBalloonTest, s);
+      const roll = rollBalloon(p.seed, st.secret ?? Math.imul(p.seed ^ 0x5bd1e995, 0x01000193) >>> 0, st.placed, b.settings.bossBalloonTest, s);
       const stageMs = s.balloonStageSec * 1000;
       const ahead = Math.max(0, Math.min(s.balloonStages, Math.round(b.settings.bossStageTest ?? 0)));
       const at = b.now() - ahead * stageMs;
@@ -740,10 +763,10 @@ export const tigerBattle = {
   },
 
   /**
-   * The end of his turn (after his move, or his cast): a balloon due now (balloonAsk; asked now if it wasn't) pops if it's
-   * a dud, or if he can't have its shape (`nine`); else it lands on `square` (the host's answer online, this device's in
-   * solo) if the rules allow it there (landCheck: a base at its ply), the nozzle empty after either. No square, or one the
-   * rules refuse: it stays ready on the nozzle, looked at again at the end of his next turn. The crowd's turn's moments
+   * The end of his turn (after his move, or his cast): a balloon due now (balloonAsk; asked now if it wasn't) pops if he
+   * can't have its shape (`nine`, dud or not). Else `square` (the host's answer online, this device's in solo) must be one
+   * the rules allow (landCheck), dud or not: none, or one refused, and it stays ready on the nozzle, looked at again at the
+   * end of his next turn. Then a dud pops and a real one lands there (a base at its ply), the nozzle empty after either. The crowd's turn's moments
    * (`balloonLand` or `pop`, then his reaction) play as it begins.
    */
   endOfTurn(b: Battle, square: string | null, gain: number | null): BalloonResult | null {
@@ -767,17 +790,21 @@ export const tigerBattle = {
     // (The battle is over on the board: nothing more happens.)
     if (sideToMove(fen) !== boss.crowdSide || !legalMoves(fen).length) return null;
     const blocks = hoopBlocks(p);
-    let result: BalloonResult;
     const base = { at: boss.crowdMoves, n: nz.n, shape: nz.shape, color: nz.color };
-    const refused = landRefused(fen, nz.shape, his);
-    if (nz.dud || refused) result = { ...base, outcome: "pop", square: null, gain: null, ...(refused && !nz.dud ? { nine: true as const } : {}) };
+    // (The same steps for a dud and a real balloon until the very last, so nothing before a pop tells them apart: a shape
+    // he can't have pops either way (`nine`); no square the rules allow, and either waits; then a dud pops, a real one lands.)
+    let result: BalloonResult;
+    if (landRefused(fen, nz.shape, his)) result = { ...base, outcome: "pop", square: null, gain: null, nine: true };
     else {
       const after = square ? landCheck(fen, nz.shape, square, blocks) : null;
       if (!after || !square) return null;
-      const id = b.state.boards[0]!;
-      const ply = board.history.length;
-      b.boards.set(id, { ...board, fen: after, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: after }] });
-      result = { ...base, outcome: "land", square, gain };
+      if (nz.dud) result = { ...base, outcome: "pop", square: null, gain: null };
+      else {
+        const id = b.state.boards[0]!;
+        const ply = board.history.length;
+        b.boards.set(id, { ...board, fen: after, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: after }] });
+        result = { ...base, outcome: "land", square, gain };
+      }
     }
     setPowers(b, (q) => {
       const s2 = balloonsOf(q);

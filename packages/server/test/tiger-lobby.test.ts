@@ -159,14 +159,57 @@ describe("the circus tiger online", () => {
     }
   });
 
-  it("fair play: until a dud pops, no message to any device says so; a fake queen is a queen everywhere, asked of the host as one", () => {
+  it("fair play, side by side: a real queen's battle and a fake one's send every device the very same messages until the turn one lands and the other pops (no square, or one refused: both wait)", async () => {
+    const real = tiger({ bossBalloonTest: "queen", bossStageTest: 4 });
+    const fake = tiger({ bossBalloonTest: "fakequeen", bossStageTest: 4 });
+    const same = () => {
+      for (const id of ["p1", "p2"]) expect(JSON.stringify(fake.inbox.get(id) ?? [])).toBe(JSON.stringify(real.inbox.get(id) ?? []));
+    };
+    let asked = 0;
+    for (let i = 0; i < 10; i++) {
+      if (real.runner().bossToMove()) {
+        const a = real.asked()!;
+        const b = fake.asked()!;
+        expect(JSON.stringify(b)).toBe(JSON.stringify(a));
+        if (a.balloon) asked++;
+        const move = (a.allowed ?? legalMoves(a.fen))[0]!;
+        // (A square the rules refuse, where his piece now stands, and no square at all, in turn.)
+        const square = i % 2 ? undefined : move.slice(2, 4);
+        real.answer(move, square);
+        fake.answer(move, square);
+      } else {
+        real.crowdPlays();
+        fake.crowdPlays();
+      }
+      same();
+    }
+    expect(asked).toBeGreaterThan(1);
+    expect(real.runner().boss!.powers!.balloon!.last ?? null).toBeNull();
+    // A square the rules allow: only now do they part.
+    for (let i = 0; i < 4 && !real.runner().bossToMove(); i++) {
+      real.crowdPlays();
+      fake.crowdPlays();
+    }
+    const a = real.asked()!;
+    fake.asked();
+    const move = (a.allowed ?? legalMoves(a.fen))[0]!;
+    const land = (await landFrom([fakeEngine()], applyMove(a.fen, move), a.balloon!))!;
+    real.answer(move, land.square);
+    fake.answer(move, land.square);
+    expect(real.runner().boss!.powers!.balloon!.last).toMatchObject({ outcome: "land", shape: "q" });
+    expect(fake.runner().boss!.powers!.balloon!.last).toMatchObject({ outcome: "pop", shape: "q" });
+  });
+
+  it("fair play: until a dud pops, no message to any device says so; a fake queen is a queen everywhere, asked of the host as one", async () => {
     const L = tiger({ bossBalloonTest: "fakequeen", bossStageTest: 3 }, ["P1", "P2", "P3"]);
     let popped = false;
     for (let i = 0; i < 16 && !popped; i++) {
       if (L.runner().bossToMove()) {
         const req = L.asked()!;
         if (req.balloon) expect(req.balloon.shape).toBe("q");
-        L.answer((req.allowed ?? legalMoves(req.fen))[0]!, "a6");
+        const move = (req.allowed ?? legalMoves(req.fen))[0]!;
+        const land = req.balloon ? await landFrom([fakeEngine()], applyMove(req.fen, move), req.balloon) : null;
+        L.answer(move, land?.square);
       } else L.crowdPlays();
       popped = !!L.runner().boss!.powers!.balloon?.last;
       // Everything every device has been sent so far, before the pop shows: nothing says it.

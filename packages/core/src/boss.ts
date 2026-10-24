@@ -142,11 +142,8 @@ export const HOPPER_NAME = "Chub & Chirp";
 /** The hippo gardener's name wherever it shows (Eric, Oct 21): a plain name, like Smudgy's. His id stays "gardener". */
 export const GARDENER_NAME = "Puddles";
 
-/**
- * The circus tiger's name wherever it shows: a placeholder until Eric names him (Oct 23), one string so the name is one edit
- * later. His id stays "tiger".
- */
-export const TIGER_NAME = "The Tiger";
+/** The circus tiger's name wherever it shows (Eric, Oct 24): a plain name, like Smudgy's. His id stays "tiger". */
+export const TIGER_NAME = "Babur";
 
 /**
  * Every boss, complete or not. Only a playable one (isPlayable: a complete character and powers) is ever chosen,
@@ -211,7 +208,7 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // from the raid sim: the usual −250, with rageSpeed 1.2 the crowd scores 0.17 in 46 moves with 3.0 waterings a battle,
   // inside the pack (reports/gardener-sim.md).
   { id: "gardener", name: GARDENER_NAME, icon: "🦛", kit: "Gardener", offset: -250, powers: { passive: "seeds", ultimate: "water" } },
-  // The circus tiger (TIGER_NAME, a placeholder; Eric, Oct 23): Balloons, on a real-time pump (a balloon on the nozzle at
+  // Babur, the circus tiger (TIGER_NAME; Eric, Oct 23, named Oct 24): Balloons, on a real-time pump (a balloon on the nozzle at
   // the start of his turn, four stages of 30 s (Eric said 15; the sim's 30), then at the end of a turn it lands as one of his pieces where the engine
   // keeps his gain in the piece's band, or pops: about a quarter pop, a fake queen always), and Hoops, his whole turn:
   // three burning 2x2 hoops whose walls nothing crosses, moves, captures or checks, for the crowd's next 2 moves, placed by
@@ -747,6 +744,12 @@ export interface BalloonResult {
 
 /** The circus tiger's Balloons in a battle: the nozzle (null: empty), his last balloon's end, and his counts. */
 export interface BalloonState {
+  /**
+   * The battle's second secret (drawn from the match's random source as it starts, never from its seed): the only thing a
+   * balloon's `dud` is rolled from. Never in a view, a moment or an ask (those carry only what the seed gives: the shapes,
+   * the colors, the orders squares and blocks are tried in), so no device can work a dud out.
+   */
+  secret?: number;
   nozzle: Balloon | null;
   last: BalloonResult | null;
   placed: number;

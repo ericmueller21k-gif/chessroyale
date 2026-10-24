@@ -34,6 +34,7 @@ import {
   materialOf,
   pieceAt,
   powerMomentMs,
+  powerRoll,
   powerTurn,
   rollBalloon,
   sideToMove,
@@ -146,23 +147,23 @@ function mobilityEngine(): EngineLike {
 // ---------------- His sheet ----------------
 
 describe("the circus tiger: his sheet", () => {
-  it("is on the roster as the placeholder name, a tiger, not playable until his art is wired in, with Balloons and Hoops", () => {
+  it("is on the roster as Babur, a tiger, not playable until his art is wired in, with Balloons and Hoops", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "tiger")!;
     expect(def).toMatchObject({ name: TIGER_NAME, icon: "🐯", kit: null, powers: { passive: "balloons", ultimate: "hoops" } });
-    expect(TIGER_NAME).toBe("The Tiger");
+    expect(TIGER_NAME).toBe("Babur");
     expect(isPlayable(def)).toBe(false);
     expect(S.rageSpeed.tiger).toBeGreaterThan(0);
   });
 
-  it("his numbers: 4 stages of 30 s (the sim's; Eric's 15 s made him far too strong); the shapes' odds add to 100, about a quarter pop, a fake queen always, a queen never; six colors; the bands", () => {
+  it("his numbers: 4 stages of 30 s (the sim's; Eric's 15 s made him far too strong); the shapes' odds add to 100, about half pop, a fake queen always, a queen never; six colors; the bands (in the engine's units)", () => {
     expect([S.balloonStages, S.balloonStageSec, S.balloonColors]).toEqual([4, 30, 6]);
     const o = S.balloonOdds;
     expect(o).toEqual({ pawn: 55, knight: 13, bishop: 13, rook: 6, fakeQueen: 10, queen: 3 });
     expect(Object.values(o).reduce((a, b) => a + b, 0)).toBe(100);
-    expect(S.balloonPops).toEqual({ pawn: 12, knight: 25, bishop: 25, rook: 35, fakeQueen: 100, queen: 0 });
+    expect(S.balloonPops).toEqual({ pawn: 40, knight: 55, bishop: 55, rook: 55, fakeQueen: 100, queen: 0 });
     const popPct = (Object.keys(o) as (keyof typeof o)[]).reduce((t, k) => t + (o[k] * S.balloonPops[k]) / 100, 0);
-    expect(popPct).toBeCloseTo(25.2, 1);
-    expect(S.balloonBands).toEqual({ p: [0.3, 1.5], n: [2, 4], b: [2, 4], r: [3.5, 6], q: [7, 10.5] });
+    expect(popPct).toBeCloseTo(49.6, 1);
+    expect(S.balloonBands).toEqual({ p: [0.3, 1.5], n: [7, 8.5], b: [7, 8.5], r: [7, 8.5], q: [7, 8.5] });
     expect([S.hoopsCount, S.hoopsCrowdMoves, S.hoopsTarget]).toEqual([3, 2, 1.5]);
     expect(S.hoopsBand).toEqual([0.5, 2.5]);
   });
@@ -180,14 +181,14 @@ describe("the circus tiger: his sheet", () => {
 
 describe("Balloons: the rolls", () => {
   it("each balloon's roll is seeded (the same everywhere) and over many keeps the sheet's odds, its pops and six colors", () => {
-    expect(rollBalloon(7, 3)).toEqual(rollBalloon(7, 3));
+    expect(rollBalloon(7, 99, 3)).toEqual(rollBalloon(7, 99, 3));
     const n = 40_000;
     const kinds: Record<string, number> = {};
     const pops: Record<string, number> = {};
     const colors = new Array(6).fill(0);
     let popped = 0;
     for (let i = 0; i < n; i++) {
-      const b = rollBalloon(1234 + (i % 7), i);
+      const b = rollBalloon(1234 + (i % 7), 777 + (i % 5), i);
       kinds[b.kind] = (kinds[b.kind] ?? 0) + 1;
       if (b.dud) pops[b.kind] = (pops[b.kind] ?? 0) + 1;
       if (b.dud) popped++;
@@ -196,16 +197,41 @@ describe("Balloons: the rolls", () => {
     }
     for (const [k, pct] of Object.entries(S.balloonOdds)) expect(Math.abs((100 * (kinds[k] ?? 0)) / n - pct), k).toBeLessThan(1);
     for (const [k, pct] of Object.entries(S.balloonPops)) expect(Math.abs((100 * (pops[k] ?? 0)) / Math.max(1, kinds[k] ?? 0) - pct), k).toBeLessThan(pct === 0 || pct === 100 ? 0.001 : 4);
-    expect((100 * popped) / n).toBeGreaterThan(23);
-    expect((100 * popped) / n).toBeLessThan(27.5);
+    expect((100 * popped) / n).toBeGreaterThan(47);
+    expect((100 * popped) / n).toBeLessThan(52.5);
     for (const c of colors) expect(c / n).toBeGreaterThan(0.15);
+  });
+
+  it("a dud comes from the battle's secret alone: the same seed with another secret, other duds; the shapes and colors the seed's", () => {
+    let differ = 0;
+    for (let i = 0; i < 200; i++) {
+      const a = rollBalloon(42, 1, i);
+      const b = rollBalloon(42, 2, i);
+      expect(b.shape).toBe(a.shape);
+      expect(b.color).toBe(a.color);
+      if (a.dud !== b.dud || a.kind !== b.kind) differ++;
+    }
+    expect(differ).toBeGreaterThan(40);
+  });
+
+  it("the secret is drawn from the match's random source as the battle starts, kept in the state and in nothing a device gets", async () => {
+    const one = battle(51);
+    const two = battle(52);
+    const s1 = powersOf(one.r).balloon!.secret!;
+    expect(typeof s1).toBe("number");
+    expect(s1).not.toBe(powersOf(two.r).balloon!.secret);
+    expect(s1).not.toBe(powersOf(one.r).seed);
+    for (let i = 0; i < 6; i++) await step(one, 20_000);
+    const seen = JSON.stringify([one.r.bossView(), one.r.bossToMove() ? one.r.balloonAsk() : null, one.r.hoopsAsk()]);
+    expect(seen).not.toContain(String(s1));
+    expect(seen).not.toMatch(/secret|dud/);
   });
 
   it("the test switch's shape: every balloon that shape, never a dud but the fake queen, which always pops", () => {
     for (const [forced, shape] of [["pawn", "p"], ["knight", "n"], ["bishop", "b"], ["rook", "r"], ["queen", "q"]] as const) {
-      for (let i = 0; i < 50; i++) expect(rollBalloon(9, i, forced)).toMatchObject({ shape, dud: false });
+      for (let i = 0; i < 50; i++) expect(rollBalloon(9, 5, i, forced)).toMatchObject({ shape, dud: false });
     }
-    for (let i = 0; i < 50; i++) expect(rollBalloon(9, i, "fakequeen")).toMatchObject({ shape: "q", dud: true });
+    for (let i = 0; i < 50; i++) expect(rollBalloon(9, 5, i, "fakequeen")).toMatchObject({ shape: "q", dud: true });
   });
 });
 
@@ -224,7 +250,7 @@ describe("Balloons: the stages over time", () => {
 
   it("on the runner's clock (online the server's, solo the page's): placed as his turn begins, at that time; ready after its four stages", async () => {
     const b = battle(3);
-    expect(powersOf(b.r).balloon ?? null).toBeNull();
+    expect(powersOf(b.r).balloon?.nozzle ?? null).toBeNull();
     await crowdMove(b.r);
     // (The crowd's move landed: his turn begins, and the nozzle being empty, a balloon goes on it now.)
     const p = powersOf(b.r);
@@ -362,6 +388,45 @@ describe("Balloons: placed at his turn's start, landing or popping only at his t
     expect(powersOf(real.r).balloon!.last).toMatchObject({ outcome: "land", shape: "q" });
   });
 
+  it("a fake and a real queen are treated alike until the last step: no square, or one the rules refuse, and both wait; a square they allow, and one pops while the other lands", async () => {
+    for (const answer of [null, "occupied", "attacked"] as const) {
+      const pair = [battle(19, { balloon: "queen", stage: 4 }), battle(19, { balloon: "fakequeen", stage: 4 })];
+      for (const b of pair) await onQuiet(b);
+      // (The host is asked the same for both.)
+      expect(pair[1]!.r.balloonAsk()).toEqual(pair[0]!.r.balloonAsk());
+      for (const b of pair) {
+        const move = "g8f8";
+        const after = applyMove(QUIET_B, move);
+        const square = answer === null ? null : answer === "occupied" ? "d5" : "e5";
+        if (square) expect(landCheck(after, "q", square, [])).toBeNull();
+        b.r.applyBossMove(move, false, { balloon: square });
+      }
+      const vr = pair[0]!.r.bossView()!.powers!;
+      const vf = pair[1]!.r.bossView()!.powers!;
+      expect(vf.balloon).toEqual(vr.balloon);
+      expect(vf.balloonLast ?? null).toBeNull();
+      expect(vr.balloonLast ?? null).toBeNull();
+      expect(tigerEvents(vf.events)).toEqual(tigerEvents(vr.events));
+      expect(fenOf(pair[1]!.r)).toBe(fenOf(pair[0]!.r));
+    }
+    // A square they allow: now (and only now) they part.
+    const pair = [battle(19, { balloon: "queen", stage: 4 }), battle(19, { balloon: "fakequeen", stage: 4 })];
+    for (const b of pair) {
+      await onQuiet(b);
+      b.r.balloonAsk();
+      b.r.applyBossMove("g8f8", false, { balloon: "a6" });
+    }
+    expect(powersOf(pair[0]!.r).balloon!.last).toMatchObject({ outcome: "land", square: "a6" });
+    expect(powersOf(pair[1]!.r).balloon!.last).toMatchObject({ outcome: "pop", square: null });
+    // (With his full set and eight pawns, either pops alike: `nine`, whatever it was.)
+    const full = [battle(20, { stage: 4 }), battle(21, { stage: 4 })];
+    for (const b of full) {
+      await crowdMove(b.r);
+      await b.r.playBoss(fakeEngine());
+      expect(powersOf(b.r).balloon!.last).toMatchObject({ outcome: "pop", nine: true });
+    }
+  });
+
   it("a ready balloon with no square (no answer, or one the rules refuse) stays ready on the nozzle until his next turn's end", async () => {
     const b = battle(16, { balloon: "pawn", stage: 4 });
     await onQuiet(b);
@@ -432,20 +497,37 @@ describe("Balloons: where they land (the bands and the guards)", () => {
     for (const sq of ["a6", "h5", "e5"]) expect(landCheck(eight.replace("8/8/8/8", "8/8/8/8"), "p", sq, [])).toBeNull();
   });
 
-  it("landFrom: the square in the shape's band nearest its middle (a pawn, a knight, a rook, a queen), never one the crowd simply takes", async () => {
+  it("landCheck: never a square the crowd attacks (it can't take the balloon's piece at once)", () => {
+    // (White's pawn on d4 attacks e5 and c5.)
+    expect(landCheck(QUIET, "n", "e5", [])).toBeNull();
+    expect(landCheck(QUIET, "n", "c5", [])).toBeNull();
+    expect(landCheck(QUIET, "n", "a6", [])).not.toBeNull();
+  });
+
+  it("landFrom: of the squares weighed (seeded, every guard passed), the least valuable in the shape's band (nearest its low end), else the nearest", async () => {
     for (const shape of ["p", "n", "r", "q"] as const) {
-      const pick = (await landFrom([materialEngine()], QUIET, { shape, order: 77, blocks: [] }))!;
+      const ask = { shape, order: 77, blocks: [] as string[] };
+      const pick = (await landFrom([materialEngine()], QUIET, ask))!;
       expect(pick, shape).not.toBeNull();
-      const after = landCheck(QUIET, shape, pick.square, [])!;
-      expect(after).not.toBeNull();
+      // (The same squares, in the same order, scored the same way here.)
+      const options = [..."abcdefgh"]
+        .flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`))
+        .filter((sq) => !pieceAt(QUIET, sq))
+        .sort((a, b) => powerRoll(77, "land", a) - powerRoll(77, "land", b))
+        .filter((sq) => landCheck(QUIET, shape, sq, []))
+        .slice(0, S.balloonLooks);
+      expect(options).toContain(pick.square);
+      const engine = materialEngine();
+      const crowdBest = async (f: string) => (await engine.topMovesAt!(f, 1, 1))[0]!.expected;
+      const logit = (x: number) => Math.log(Math.min(0.999, Math.max(0.001, x)) / (1 - Math.min(0.999, Math.max(0.001, x))));
+      const before = await crowdBest(QUIET);
+      const gains = await Promise.all(options.map(async (sq) => (logit(1 - (await crowdBest(landCheck(QUIET, shape, sq, [])!))) - logit(1 - before)) / S.bouncePawnLogit));
       const [lo, hi] = S.balloonBands[shape];
-      // (The material engine's gain is the material, saturated: a pawn ~1, a knight ~3, a rook ~5; a queen saturates.)
-      if (shape !== "q") {
-        expect(pick.gain, shape).toBeGreaterThanOrEqual(lo);
-        expect(pick.gain, shape).toBeLessThanOrEqual(hi);
-      }
-      // (Not on a square the crowd can take it on at once for free.)
-      expect(legalMoves(after).some((m) => m.slice(2, 4) === pick.square && pieceAt(after, m.slice(0, 2))?.type !== "k"), shape).toBe(false);
+      const dist = (g: number) => (g >= lo && g <= hi ? g - lo : 1000 + (g < lo ? lo - g : g - hi));
+      const bestDist = Math.min(...gains.map(dist));
+      expect(dist(gains[options.indexOf(pick.square)]!), shape).toBeCloseTo(bestDist, 6);
+      // (Never on a square the crowd attacks.)
+      expect(landCheck(QUIET, shape, pick.square, []), shape).not.toBeNull();
     }
   });
 
@@ -459,8 +541,9 @@ describe("Balloons: where they land (the bands and the guards)", () => {
       await b.r.playBoss(fakeEngine());
       const last = powersOf(b.r).balloon!.last!;
       expect(last).toMatchObject({ outcome: "pop", square: null });
-      expect(!!last.nine).toBe(!dud);
-      if (last.nine) nine++;
+      // (A dud too: nothing in a pop at full material tells a fake queen from a real one.)
+      expect(last.nine).toBe(true);
+      if (!dud) nine++;
       expect(tigerEvents(powersOf(b.r).events).map((e) => e.kind)).toEqual(["pop", "wince"]);
     }
     expect(nine).toBeGreaterThan(0);
