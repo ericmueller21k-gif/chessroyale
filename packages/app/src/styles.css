@@ -12084,6 +12084,10 @@ img.qicon {
   .boss-bar.has-char .boss-name {
     justify-content: flex-start;
   }
+  /* (The meter at the top of its row: a boss's own piece beside it, Moo's moon, may be taller, and must not move the meter.) */
+  .boss-bar.has-char .boss-ult {
+    align-items: flex-start;
+  }
 }
 .boss-bar.has-char .boss-icon-face {
   display: none;
@@ -12221,9 +12225,20 @@ img.qicon {
   text-wrap: balance;
   box-shadow: 2px 2px 0 rgba(43, 13, 19, 0.85);
 }
+/* On a 320 px screen the bar's room is narrower: the bubble's font 8 px and its rows at the font's own 8 px (three rows still fit
+   under a status that wraps to two lines), and the bar's column gap and status font let "58 moves left" keep its one line beside
+   the name column (the figure's box 58 px, the name column 130 px: docs/decisions/2026-10-24-boss-bar-same.md). */
 @media (max-width: 359px) {
   .bc-bar-bubble {
     font-size: 8px;
+    line-height: 1;
+    padding: 1px 5px;
+  }
+  .boss-bar.has-char .boss-main {
+    column-gap: 3px;
+  }
+  .boss-bar.has-char .boss-next {
+    font-size: 11px;
   }
 }
 .place-side .bc-bubble {

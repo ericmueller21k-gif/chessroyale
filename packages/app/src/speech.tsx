@@ -177,17 +177,22 @@ export function VoiceBubble({ voice, class: cls, hidden = false, balanced = fals
  * its box's parent offers; else half the line plus the box's frame (two rows of similar length, `text-wrap: balance`), never
  * wider than that room. The room is the parent's width (the bar's grid, from the name column's left edge to its right padding).
  */
-let measureCanvas: CanvasRenderingContext2D | null | undefined;
-function balancedWidth(e: HTMLElement, text: string): number | null {
+function balancedWidth(e: HTMLElement): number | null {
   const room = e.parentElement?.clientWidth ?? 0;
-  measureCanvas ??= document.createElement("canvas").getContext("2d");
-  if (!room || !measureCanvas) return null;
+  if (!room) return null;
   const cs = getComputedStyle(e);
   const frame = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
-  measureCanvas.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-  const one = measureCanvas.measureText(plainLine(text)).width;
-  if (one + frame <= room / 2) return null;
-  return Math.min(room, Math.ceil(one / 2 + frame + measureCanvas.measureText("M").width));
+  // (The box's own one row, in the page's font: the box set to its widest, measured, then its width put back.)
+  const was = e.style.width;
+  const wasMax = e.style.maxWidth;
+  e.style.width = "max-content";
+  e.style.maxWidth = "none";
+  const one = e.getBoundingClientRect().width;
+  e.style.width = was;
+  e.style.maxWidth = wasMax;
+  if (one <= room / 2) return null;
+  // Two rows of about the same length: half the text, and the frame.
+  return Math.min(room, Math.ceil((one - frame) / 2 + frame + 4));
 }
 
 /** Says a line into a voice once, as it's first drawn (a moment's line from inside its screen); draws nothing. */
@@ -209,7 +214,7 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
   useLayoutEffect(() => {
     const e = el.current;
     if (!balanced || !e) return;
-    setWidth(balancedWidth(e, text));
+    setWidth(balancedWidth(e));
   }, [text, balanced]);
   useLayoutEffect(() => {
     const e = el.current;

@@ -44,7 +44,7 @@ type Snap = {
   board: Box | null;
   main: Box;
 };
-type LineRes = { text: string; rows: number; bubble: Box; bar: Box; status: Box; name: Box; main: Box; fit: string | null } | { text: string; missing: true };
+type LineRes = { text: string; rows: number; bubble: Box; bar: Box; status: Box; name: Box; main: Box; fit: string | null } | { text: string; missing: true; seen: string | null };
 
 /** Every box the bar is made of, as the page draws it, and the figure's drawn pixels at rest (its idle frame). */
 const snap = (page: Page): Promise<Snap & { anim: string | null }> =>
@@ -116,7 +116,7 @@ const sayLine = (page: Page, text: string): Promise<LineRes> =>
   page.evaluate(
     async ({ text, plain }) => {
       const say = (globalThis as { sayBoss?: (t: string) => void }).sayBoss;
-      if (!say) return { text, missing: true as const };
+      if (!say) return { text, missing: true as const, seen: "no hook" };
       say(text);
       const deadline = performance.now() + 3000;
       let el: HTMLElement | null = null;
@@ -125,7 +125,7 @@ const sayLine = (page: Page, text: string): Promise<LineRes> =>
         if (el && el.getAttribute("aria-label") === plain) break;
         await new Promise((r) => requestAnimationFrame(() => r(null)));
       }
-      if (!el || el.getAttribute("aria-label") !== plain) return { text, missing: true as const };
+      if (!el || el.getAttribute("aria-label") !== plain) return { text, missing: true as const, seen: el?.getAttribute("aria-label") ?? null };
       for (const a of el.getAnimations({ subtree: true })) {
         try {
           a.finish();
@@ -214,63 +214,63 @@ for (const mode of MODES) {
       const at = (id: string) => snaps[id]![w]!;
       const all = PLAYABLE.map((d) => d.id);
       // One bar, one figure box, the same for every boss (±1 px).
-      expect(spread(all.map((id) => at(id).bar.h)), `${w}: the bar's height is the same for every boss`).toBeLessThanOrEqual(TOL);
-      expect(spread(all.map((id) => at(id).box.w)), `${w}: the figure box's width is the same`).toBeLessThanOrEqual(TOL);
-      expect(spread(all.map((id) => at(id).box.h)), `${w}: the figure box's height is the same`).toBeLessThanOrEqual(TOL);
+      expect.soft(spread(all.map((id) => at(id).bar.h)), `${w}: the bar's height is the same for every boss`).toBeLessThanOrEqual(TOL);
+      expect.soft(spread(all.map((id) => at(id).box.w)), `${w}: the figure box's width is the same`).toBeLessThanOrEqual(TOL);
+      expect.soft(spread(all.map((id) => at(id).box.h)), `${w}: the figure box's height is the same`).toBeLessThanOrEqual(TOL);
       const barH = mode === "out" ? 64 : 99;
-      expect(Math.abs(at(all[0]!).bar.h - barH), `${w}: ${mode} bar is ${barH} px`).toBeLessThanOrEqual(TOL);
+      expect.soft(Math.abs(at(all[0]!).bar.h - barH), `${w}: ${mode} bar is ${barH} px`).toBeLessThanOrEqual(TOL);
       // The same place for the name, level, bars, status and the free room, for every boss (±1 px).
       for (const key of ["name", "status", "prop"] as const) {
         const xs = all.map((id) => at(id)[key]!);
-        expect(spread(xs.map((b) => b.x)), `${w}: ${key}'s x is the same`).toBeLessThanOrEqual(TOL);
-        expect(spread(xs.map((b) => b.y)), `${w}: ${key}'s y is the same`).toBeLessThanOrEqual(TOL);
+        expect.soft(spread(xs.map((b) => b.x)), `${w}: ${key}'s x is the same`).toBeLessThanOrEqual(TOL);
+        expect.soft(spread(xs.map((b) => b.y)), `${w}: ${key}'s y is the same`).toBeLessThanOrEqual(TOL);
       }
-      expect(spread(all.map((id) => at(id).prop!.w)), `${w}: the free room is the same width`).toBeLessThanOrEqual(TOL);
-      expect(spread(all.map((id) => at(id).prop!.h)), `${w}: the free room is the same height`).toBeLessThanOrEqual(TOL);
+      expect.soft(spread(all.map((id) => at(id).prop!.w)), `${w}: the free room is the same width`).toBeLessThanOrEqual(TOL);
+      expect.soft(spread(all.map((id) => at(id).prop!.h)), `${w}: the free room is the same height`).toBeLessThanOrEqual(TOL);
       for (const key of ["level", "rage"] as const) {
         const xs = all.map((id) => at(id)[key]!);
-        expect(spread(xs.map((b) => b.x)), `${w}: ${key} x is the same`).toBeLessThanOrEqual(TOL);
-        expect(spread(xs.map((b) => b.y)), `${w}: ${key} y is the same`).toBeLessThanOrEqual(TOL);
+        expect.soft(spread(xs.map((b) => b.x)), `${w}: ${key} x is the same`).toBeLessThanOrEqual(TOL);
+        expect.soft(spread(xs.map((b) => b.y)), `${w}: ${key} y is the same`).toBeLessThanOrEqual(TOL);
       }
       const withPassive = all.filter((id) => at(id).passive);
-      expect(spread(withPassive.map((id) => at(id).passive!.y)), `${w}: the passive bar's y is the same for every boss that has one`).toBeLessThanOrEqual(TOL);
+      expect.soft(spread(withPassive.map((id) => at(id).passive!.y)), `${w}: the passive bar's y is the same for every boss that has one`).toBeLessThanOrEqual(TOL);
       for (const id of all) {
         const s = at(id);
         const who = `${id} at ${w} (${mode})`;
-        expect(s.nameWhole, `${who}: the name whole`).toBe(true);
-        expect(s.status.h, `${who}: the status on one line`).toBeLessThanOrEqual(STATUS_ONE_LINE);
+        expect.soft(s.nameWhole, `${who}: the name whole`).toBe(true);
+        expect.soft(s.status.h, `${who}: the status on one line`).toBeLessThanOrEqual(STATUS_ONE_LINE);
         // The figure: feet on the bar's baseline, the same box.
-        expect(Math.abs(s.box.b - (s.bar.b - FEET_PAD)), `${who}: feet on the baseline`).toBeLessThanOrEqual(TOL);
-        expect(s.pixels, `${who}: drawn`).not.toBeNull();
+        expect.soft(Math.abs(s.box.b - (s.bar.b - FEET_PAD)), `${who}: feet on the baseline`).toBeLessThanOrEqual(TOL);
+        expect.soft(s.pixels, `${who}: drawn`).not.toBeNull();
         const p = s.pixels!;
         // Nothing of the figure over the name column, nor below the bar.
-        expect(p.maxX, `${who}: the figure clears the name column`).toBeLessThanOrEqual(s.name.x + TOL);
-        expect(p.maxY, `${who}: nothing of the figure below the bar`).toBeLessThanOrEqual(s.bar.b + TOL);
+        expect.soft(p.maxX, `${who}: the figure clears the name column`).toBeLessThanOrEqual(s.name.x + TOL);
+        expect.soft(p.maxY, `${who}: nothing of the figure below the bar`).toBeLessThanOrEqual(s.bar.b + TOL);
         if (mode === "out") {
           // A taller figure rises above the bar, but never over the line above it.
-          expect(p.minY, `${who}: the figure never covers the "BOSS · move N" line`).toBeGreaterThanOrEqual(s.hudText!.b + 1);
+          expect.soft(p.minY, `${who}: the figure never covers the "BOSS · move N" line`).toBeGreaterThanOrEqual(s.hudText!.b + 1);
         } else {
           // Every idle figure wholly inside the taller bar.
-          expect(p.minX, `${who}: inside the bar, left`).toBeGreaterThanOrEqual(s.bar.x - TOL);
-          expect(p.maxX, `${who}: inside the bar, right`).toBeLessThanOrEqual(s.bar.r + TOL);
-          expect(p.minY, `${who}: inside the bar, top`).toBeGreaterThanOrEqual(s.bar.y - TOL);
+          expect.soft(p.minX, `${who}: inside the bar, left`).toBeGreaterThanOrEqual(s.bar.x - TOL);
+          expect.soft(p.maxX, `${who}: inside the bar, right`).toBeLessThanOrEqual(s.bar.r + TOL);
+          expect.soft(p.minY, `${who}: inside the bar, top`).toBeGreaterThanOrEqual(s.bar.y - TOL);
         }
       }
       // Every line, inside the bar and beside the status, in at most three rows; a one-row line never past 60% of its room.
       for (const id of all) {
         for (const r of lines[id]![w] ?? []) {
           const who = `${id} at ${w} (${mode}): "${r.text}"`;
-          expect("missing" in r ? "missing" : "ok", `${who}: said and drawn`).toBe("ok");
+          expect.soft("missing" in r ? `missing (seen: ${r.seen})` : "ok", `${who}: said and drawn`).toBe("ok");
           if ("missing" in r) continue;
-          expect(r.rows, `${who}: rows`).toBeLessThanOrEqual(3);
-          expect(r.rows, `${who}: at least one row`).toBeGreaterThanOrEqual(1);
-          expect(r.bubble.x, `${who}: inside the bar, left`).toBeGreaterThanOrEqual(r.bar.x - TOL);
-          expect(r.bubble.r, `${who}: inside the bar, right`).toBeLessThanOrEqual(r.bar.r + TOL);
-          expect(r.bubble.y, `${who}: inside the bar, top`).toBeGreaterThanOrEqual(r.bar.y - TOL);
-          expect(r.bubble.b, `${who}: inside the bar, bottom`).toBeLessThanOrEqual(r.bar.b + TOL);
-          expect(r.bubble.y, `${who}: under the status, never over it`).toBeGreaterThanOrEqual(r.status.b - TOL);
-          expect(r.bubble.x, `${who}: from the name column's left edge`).toBeGreaterThanOrEqual(r.name.x - TOL);
-          if (r.rows === 1) expect(r.bubble.w, `${who}: a one-row line within 60% of its room`).toBeLessThanOrEqual(0.6 * r.main.w + TOL);
+          expect.soft(r.rows, `${who}: rows`).toBeLessThanOrEqual(3);
+          expect.soft(r.rows, `${who}: at least one row`).toBeGreaterThanOrEqual(1);
+          expect.soft(r.bubble.x, `${who}: inside the bar, left`).toBeGreaterThanOrEqual(r.bar.x - TOL);
+          expect.soft(r.bubble.r, `${who}: inside the bar, right`).toBeLessThanOrEqual(r.bar.r + TOL);
+          expect.soft(r.bubble.y, `${who}: inside the bar, top`).toBeGreaterThanOrEqual(r.bar.y - TOL);
+          expect.soft(r.bubble.b, `${who}: inside the bar, bottom`).toBeLessThanOrEqual(r.bar.b + TOL);
+          expect.soft(r.bubble.y, `${who}: under the status, never over it`).toBeGreaterThanOrEqual(r.status.b - TOL);
+          expect.soft(r.bubble.x, `${who}: from the name column's left edge`).toBeGreaterThanOrEqual(r.name.x - TOL);
+          if (r.rows === 1) expect.soft(r.bubble.w, `${who}: a one-row line within 60% of its room`).toBeLessThanOrEqual(0.6 * r.main.w + TOL);
         }
       }
     }
