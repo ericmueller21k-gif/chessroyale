@@ -93,7 +93,8 @@ async function record(page: Page) {
       if (w.__tg.length > 6000) w.__tg.splice(0, 1000);
       requestAnimationFrame(look);
     };
-    requestAnimationFrame(look);
+    // (The first look now, not at the next frame: a reading straight after this has it.)
+    look();
   });
 }
 const recorded = (page: Page) => page.evaluate(() => (window as any).__tg as Rec[]);
