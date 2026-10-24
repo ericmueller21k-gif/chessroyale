@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { RECLUSE_TALK } from "@chessroyale/core";
+import { RECLUSE_TALK, SPEECH } from "@chessroyale/core";
 import { Chatter, TALK_TICK_MS, talkStage, talkWhen, type TalkPhase } from "../src/recluse-talk.ts";
 import { RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
-import { CHATTER, CRITICAL, LOW, NORMAL, Voice, holdMs } from "../src/speech.tsx";
+import { CHATTER, CRITICAL, LOW, NORMAL, Voice, holdMs, typeMs } from "../src/speech.tsx";
 import type { GameView } from "../src/game.ts";
 
 // The Hidden Boss's chatter (recluse-talk.ts): one line about every 15 s of play in both phases, by the clock, in three
@@ -36,8 +36,10 @@ function play(phase: TalkPhase, stretches: Stretch[], rng: () => number) {
     if (s.line) {
       const before = voice.line(t);
       voice.say(s.line.text, `m${k++}`, s.line.priority, t);
-      // (His chatter never holds another line back: over it, or with nothing up, the line starts at once.)
-      if (!before || before.priority === CHATTER) expect(voice.line(t)?.text).toBe(s.line.text);
+      // (His chatter never holds another line back for long: with nothing up the line starts at once; over his chatter,
+      // once the chatter has typed out and been readable for SPEECH.minReadMs, the rule for every line, Oct 24.)
+      if (!before) expect(voice.line(t)?.text).toBe(s.line.text);
+      else if (before.priority === CHATTER) expect(voice.line(t)?.text).toBe(t >= before.firm ? s.line.text : before.text);
     }
     const end = t + s.ms;
     // (The driver's looks run on the clock, across stretches.)
@@ -166,14 +168,28 @@ describe("his chatter", () => {
     expect(c.tick(due + RECLUSE_TALK.retryMs + due, false)).not.toBeNull();
   });
 
-  it("is the lowest priority in his voice: any other line cuts in on it, and it never cuts in", () => {
+  it("is the lowest priority in his voice: any other line cuts in on it (once it has been read: SPEECH.minReadMs), and it never cuts in", () => {
     const voice = new Voice();
-    voice.say("Who told you that move?", "talk", CHATTER, 1000);
+    const talk = "Who told you that move?";
+    const firm = 1000 + typeMs(talk) + SPEECH.minReadMs;
+    voice.say(talk, "talk", CHATTER, 1000);
     voice.say("Still thinking? Move!", "slow", LOW, 1500);
-    expect(voice.line(1500)?.text).toBe("Still thinking? Move!");
-    voice.say(RECLUSE_LINES.bullet[0], "bullet", CRITICAL, 2000);
-    expect(voice.line(2000)?.text).toBe(RECLUSE_LINES.bullet[0]);
-    expect(voice.line(2000 + holdMs(RECLUSE_LINES.bullet[0]) - 1)?.text).toBe(RECLUSE_LINES.bullet[0]);
+    expect(voice.line(1500)?.text).toBe(talk);
+    expect(voice.line(firm)?.text).toBe("Still thinking? Move!");
+    voice.say(RECLUSE_LINES.bullet[0], "bullet", CRITICAL, firm + 100);
+    expect(voice.line(firm + 100)?.text).toBe("Still thinking? Move!");
+    const cut = firm + typeMs("Still thinking? Move!") + SPEECH.minReadMs;
+    expect(voice.line(cut)?.text).toBe(RECLUSE_LINES.bullet[0]);
+    expect(voice.line(cut + holdMs(RECLUSE_LINES.bullet[0]) - 1)?.text).toBe(RECLUSE_LINES.bullet[0]);
+    // A critical line over his chatter: from when the chatter has been read.
+    const v = new Voice();
+    v.say(talk, "talk", CHATTER, 1000);
+    v.say(RECLUSE_LINES.bullet[0], "bullet", CRITICAL, 1200);
+    expect(v.line(firm - 1)?.text).toBe(talk);
+    expect(v.line(firm)?.text).toBe(RECLUSE_LINES.bullet[0]);
+    // His chatter never cuts in: said over a line, it waits.
+    v.say("Hm.", "talk2", CHATTER, firm + 10);
+    expect(v.line(firm + 20)?.text).toBe(RECLUSE_LINES.bullet[0]);
   });
 
   it("talks in phase 1 on your move once its clock runs or while he thinks, until he's beaten; in phase 2 while a board is in play; never to a player who's out, nor for another boss", () => {

@@ -19,10 +19,14 @@ import {
   keepBoards,
   outcomesFromGroup,
   scoreGroup,
+  crowdBrilliant,
+  streakCounts,
+  type ScoreContext,
   bestOf,
   openingAllowance,
   OPENING_ALLOWANCE,
   type Allowance,
+  type MaterialSlip,
   stageComplete,
   stagePlan,
   type GroupEvaluation,
@@ -925,6 +929,7 @@ export class MatchRunner {
       this.settings,
       drawRuleFor(this.state.stage, this.settings),
       this.allowanceFor(board.fen, evaluation.bestMove, pickList),
+      this.scoreContext(board),
     );
     // Every scored move, best first, with its loss in points from the highest of the best and the picks (as moveLosses).
     const scoredFrom = (e: BoardEvaluation) => {
@@ -973,17 +978,46 @@ export class MatchRunner {
   /**
    * The opening allowance on a board's position, for each picked move (OPENING_ALLOWANCE, on the game's own move number:
    * the position's fullmove number). A pick that gives up material against the best move by the exchange check gets
-   * none (`materialSlips`, run on the distinct picks only, and only while there's an allowance). Undefined once it's
-   * nothing.
+   * none (`materialSlips`, run on the distinct picks only, and only while there's an allowance). Crowd 50 v 50 also
+   * marks, all game, a pick that gives up a piece (`uncap`: CrowdScoring.uncapPawns), which the cap doesn't cover.
+   * Undefined once it's nothing.
    */
   private allowanceFor(fen: string, best: string, picks: readonly (string | null)[]): ((move: string) => Allowance) | undefined {
     const points = openingAllowance(moveNumber(fen));
-    if (points <= 0) return undefined;
-    const slips = materialSlips(fen, best, picks.flatMap((m) => (m ? [m] : [])), OPENING_ALLOWANCE.materialPawns);
+    // (Crowd 50 v 50's scoring needs the exchange check all game: a pick that gives up material isn't capped.)
+    if (points <= 0 && !this.settings.crowdScoring) return undefined;
+    const moves = picks.flatMap((m) => (m ? [m] : []));
+    const slips = points > 0 ? materialSlips(fen, best, moves, OPENING_ALLOWANCE.materialPawns) : new Map<string, MaterialSlip>();
+    const cs = this.settings.crowdScoring;
+    const pieces = cs ? materialSlips(fen, best, moves, cs.uncapPawns) : new Map<string, MaterialSlip>();
     return (m) => {
       const material = slips.get(m);
-      return material ? { points: 0, material } : { points };
+      const uncap = pieces.get(m);
+      return { points: material ? 0 : points, ...(material ? { material } : {}), ...(uncap ? { uncap } : {}) };
     };
+  }
+
+  /**
+   * Crowd 50 v 50's scoring on a board's move (settings.crowdScoring): the stage (its cap), whether streaks count (from
+   * the first picked move: the game's move number less the opening the board was dealt, so Random opening's move 5 is
+   * the first) and each player's streak so far. Undefined in every other mode.
+   */
+  private scoreContext(board: BoardState): ScoreContext | undefined {
+    const cs = this.settings.crowdScoring;
+    if (!cs) return undefined;
+    const picked = moveNumber(board.fen) - Math.floor(board.openingPlies / 2);
+    return { stage: this.state.stage, streaks: streakCounts(cs, this.settings.crowdStart, picked, this.state.stage), streakOf: (id) => this.player(id).streak ?? 0 };
+  }
+
+  /** Test switch (?shoutout=1 in solo): the next round's people who picked get a brilliant find's bonus and shoutout. */
+  forceShoutout = false;
+
+  /**
+   * Test switch (?streaks=1 in solo): every player starts on a streak, 3 to 9 in a row by seat (the first seat 3), so
+   * the scoreboard shows every tier of the fire. Streaks don't count until the streak rule's first move, so they hold.
+   */
+  testStreaks(): void {
+    this.state = { ...this.state, players: this.state.players.map((p, i) => ({ ...p, streak: 3 + (i % 7) })) };
   }
 
   /**
@@ -1119,6 +1153,14 @@ export class MatchRunner {
     this.botPowerUps = new Set();
     // Marked on the results (sent to every screen): a pick made with a power-up is never brilliant.
     for (const r of results) for (const p of r.result.players) if (used.has(p.playerId)) p.usedPowerUp = true;
+    // Crowd 50 v 50: a rare brilliant find's bonus and shoutout, once power-ups are known (a pick made with one never is).
+    if (this.settings.crowdScoring) {
+      for (const r of results) {
+        const force = this.forceShoutout ? r.result.players.filter((p) => p.move && !this.player(p.playerId).isBot && !p.usedPowerUp).map((p) => p.playerId) : undefined;
+        crowdBrilliant(r.result, this.settings, force);
+        if (r.result.brilliant) this.forceShoutout = false;
+      }
+    }
     const outcomes = results.flatMap((r) => outcomesFromGroup(r.result, think, used));
     const kingPlayed = results.some((r) => r.king);
     const stand = results.find((r) => r.lastStand)?.lastStand;
@@ -2077,12 +2119,15 @@ export class MatchRunner {
 
   /** The live leaderboard: alive players best first, then knocked-out players by placement. */
   leaderboard(): NetStanding[] {
+    const dp = this.settings.crowdScoring ? 100 : 10;
+    const streakFrom = this.settings.crowdScoring?.streakFrom;
     const row = (p: PlayerState): NetStanding => ({
       id: p.id,
       name: p.name,
-      points: Math.round(standingPoints(p, this.settings) * 10) / 10,
-      stageScore: Math.round(p.stageScore * 10) / 10,
-      avg: p.stageRounds ? Math.round((p.stageScore / p.stageRounds) * 10) / 10 : 0,
+      // (Crowd 50 v 50's scores are kept to 2 decimals: CrowdScoring.)
+      points: Math.round(standingPoints(p, this.settings) * dp) / dp,
+      stageScore: Math.round(p.stageScore * dp) / dp,
+      avg: p.stageRounds ? Math.round((p.stageScore / p.stageRounds) * dp) / dp : 0,
       bankMs: p.bankMs,
       avgThinkMs: p.movesTimed ? Math.round(p.thinkMsTotal / p.movesTimed) : 0,
       rating: estimateRating(p.lossesByStage.flat()),
@@ -2093,6 +2138,8 @@ export class MatchRunner {
       out: !p.alive,
       placement: p.placement,
       team: isTeamMatch(this.settings) ? p.colour : null,
+      // (The scoreboard's fire from streakFrom in a row: CrowdScoring.)
+      ...(streakFrom !== undefined && p.alive && (p.streak ?? 0) >= streakFrom ? { streak: p.streak } : {}),
     });
     const alive = standings(this.state, () => 0.5, this.settings);
     const out = this.state.players.filter((p) => !p.alive).sort((a, b) => (a.placement ?? 99) - (b.placement ?? 99));

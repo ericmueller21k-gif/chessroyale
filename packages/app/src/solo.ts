@@ -1,7 +1,7 @@
-import { RECLUSE_PHASE2, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
+import { RECLUSE_PHASE2, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
-import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
+import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -20,7 +20,7 @@ import { crumb } from "./problems.ts";
 import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
 import { prefetchMaia, startMaia } from "./maia.ts";
 import { MaiaGate, type GateEnd } from "./maia-gate.ts";
-import { testParams } from "./test-switches.ts";
+import { testParams, timingOnDevice } from "./test-switches.ts";
 import { gardenClock, setGardenSource } from "./garden-clock.ts";
 
 export const HUMAN = "you";
@@ -88,6 +88,8 @@ export class SoloMatch implements GameView {
   ) {
     // (The hippo gardener's seeds count by this page's visible time, not an earlier online match's server.)
     setGardenSource(null);
+    // (A game on this device: a tester's ?bannerplus= counts.)
+    timingOnDevice(true);
   }
 
   /** The match's settings (the move clock can change with Crowd augment votes). */
@@ -361,6 +363,10 @@ export class SoloMatch implements GameView {
       ],
     });
     this.runner.forceLastStand = this.forceLastStand;
+    // Test switches (50 v 50's scoring): ?streaks=1, everyone on a streak (every tier of the scoreboard's fire);
+    // ?shoutout=1, the first move you pick gets a brilliant find's shoutout.
+    if (this.settings.crowdScoring && testParams().get("streaks") === "1") this.runner.testStreaks();
+    if (this.settings.crowdScoring && testParams().get("shoutout") === "1") this.runner.forceShoutout = true;
   }
 
   /** The match begins: the pre-game votes, the boss's intro (a raid) or the opening. */
@@ -429,7 +435,7 @@ export class SoloMatch implements GameView {
     this.runner.patchSettings(def.options[result]!.patch);
     // (The crowd voted for a boss battle at the end: Maia's files ahead, if it may play.)
     if (def.options[result]!.patch.finalFormat === "boss" && maiaAllowed()) prefetchMaia();
-    const nextAt = at + this.settings.voteResultSeconds * 1000;
+    const nextAt = at + voteResultMs(this.settings);
     this.voteState = { ...v, votes, result, nextAt, ...this.voteStart() };
     this.set({ kind: "vote", vote: this.voteState });
     this.timer = setTimeout(() => (v.index + 1 < v.count ? this.startVote(v.index + 1) : this.nextRound()), nextAt - Date.now());
@@ -1297,13 +1303,13 @@ export class SoloMatch implements GameView {
         for (const c of crowdMoveCues(mine.fenBefore, played, mine.result.players.find((p) => p.move === played)?.loss ?? null)) if (kingSay(c.cue, c.key)) break;
         return this.afterReveal();
       }
-      const standMs = LAST_STAND_MS + 400;
+      const standMs = lastStandMs() + 400;
       this.set({ kind: "reveal", mine, board, until: Date.now() + standMs });
       this.timer = setTimeout(() => this.afterReveal(), standMs);
       return;
     }
     // The God King's Last Stand plays out in the reveal; the next move's clock starts after it (nobody loses time).
-    const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (mine.king ? kingMoveMs(this.settings) : 0) + (mine.lastStand ? LAST_STAND_MS : 0);
+    const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (mine.king ? kingMoveMs(this.settings) : 0) + (mine.lastStand ? lastStandMs() : 0);
     this.set({ kind: "reveal", mine, board, until: Date.now() + revealMs });
     this.timer = setTimeout(() => this.afterReveal(), revealMs);
   }

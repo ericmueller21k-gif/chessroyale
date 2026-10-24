@@ -12,7 +12,7 @@
  * Each board is a BoardState from a base at ply 0 holding its start FEN (`bases: [{ ply: 0, fen }]`), so fenAtPly,
  * boardEnd and replays work as for any board (DECISIONS.md, "Chess960's rules").
  */
-import { RECLUSE_PHASE2, mulberry32 } from "@chessroyale/core";
+import { RECLUSE_PHASE2, bossBannerMs, mulberry32 } from "@chessroyale/core";
 import { BOSS_OPENING, boardEnd, playOnBoard, type BoardState } from "../boards.ts";
 import { chess960Fen } from "../chess960.ts";
 import { legalMoves, sideToMove } from "../rules.ts";
@@ -137,12 +137,14 @@ export function moveLeft(st: Pick<Phase2State, "ultAt">, b: Pick<Phase2Board, "b
 
 /**
  * His ultimate comes at `now` (the team's slowMovesForUlt-th slow move, or the admins' trigger): every player whose
- * move it is starts their few seconds afresh now, however long they'd thought. Unchanged (the same object) once it has
- * come.
+ * move it is starts their few seconds afresh, however long they'd thought, as its banner ("5 SECONDS!", a boss banner's
+ * length: bossBannerMs) leaves the boards (Oct 24: a longer banner never eats into them). Unchanged (the same object)
+ * once it has come.
  */
 export function phase2Ult(st: Phase2State, now: number): Phase2State {
   if (st.ultAt !== null) return st;
-  return { ...st, ultAt: now, boards: st.boards.map((b) => (!b.result && b.turnAt !== null ? { ...b, turnAt: now } : b)) };
+  const from = now + bossBannerMs();
+  return { ...st, ultAt: now, boards: st.boards.map((b) => (!b.result && b.turnAt !== null ? { ...b, turnAt: from } : b)) };
 }
 
 /**

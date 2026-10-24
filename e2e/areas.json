@@ -130,6 +130,7 @@
       ],
       "specs": [
         "e2e/alfil.spec.ts",
+        "e2e/banner-time.spec.ts",
         "e2e/bigboy.spec.ts",
         "e2e/boss-character.spec.ts",
         "e2e/boss-dock.spec.ts",
@@ -188,6 +189,7 @@
         "packages/app/src/boss-history.ts"
       ],
       "specs": [
+        "e2e/banner-time.spec.ts",
         "e2e/boss-bar.spec.ts",
         "e2e/boss-bar-same.spec.ts",
         "e2e/boss-character.spec.ts",
@@ -395,11 +397,13 @@
         "packages/app/src/components/Breakdown.tsx",
         "packages/app/src/components/VoteHint.tsx",
         "packages/app/src/pick-rows.ts",
-        "packages/app/src/looks.ts"
+        "packages/app/src/looks.ts",
+        "packages/app/src/components/StreakFire.tsx"
       ],
       "specs": [
         "e2e/crowd.spec.ts",
         "e2e/crowd-hidden.spec.ts",
+        "e2e/crowd-scoring.spec.ts",
         "e2e/match-screen.spec.ts",
         "e2e/opening-vote.spec.ts",
         "e2e/panel.spec.ts",

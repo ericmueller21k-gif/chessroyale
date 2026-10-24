@@ -41,16 +41,19 @@ async function playKnockouts(settings: Settings, seed: number) {
     const side = runner.boards.get(boardId)!.fen.split(" ")[1];
     // Only the team whose side is to move picks.
     expect(ids.every((id) => runner.player(id).colour === side)).toBe(true);
-    expect(ids.length).toBe(runner.alive().length / 2);
+    expect(ids.length).toBe(runner.alive().filter((p) => p.colour === side).length);
     await runner.score(new Map());
     plies++;
     if (runner.stageComplete()) {
       runner.endStage();
       sizes.push(runner.alive().length);
       if (!runner.boss) {
-        // Teams stay even all the way down.
+        // Teams stay even all the way down, but for what one team still owes: the bubble grace (CROWD_SCORING.cutGrace,
+        // Oct 24) can keep a player in on one side, and the cuts to come take that place (cutCarry). Even at the end.
         const w = runner.alive().filter((p) => p.colour === "w").length;
-        expect(w * 2).toBe(runner.alive().length);
+        const carry = runner.state.cutCarry ?? {};
+        expect(w - (runner.alive().length - w)).toBe((carry.w ?? 0) - (carry.b ?? 0));
+        if (runner.isFinal()) expect(w * 2).toBe(runner.alive().length);
       }
     }
   }
@@ -63,7 +66,13 @@ describe("Crowd mode", () => {
   it("50 v 50 team final: down to 8, then 4v4 alternating, 3v3, 2v2 to the end", async () => {
     const settings: Settings = { ...base, finalMaxTurns: 70 };
     const { runner, sizes, plies } = await playKnockouts(settings, 1);
-    expect(sizes).toEqual([84, 70, 58, 48, 40, 32, 26, 20, 16, 12, 8]);
+    // The plan's sizes, but for the bubble grace (CROWD_SCORING.cutGrace, Oct 24): a cut can keep a player or two in
+    // within it, the cuts after take those places (cutCarry), and the ending has its size.
+    const plan = [84, 70, 58, 48, 40, 32, 26, 20, 16, 12, 8];
+    sizes.forEach((n, i) => expect(n - plan[i]!).toBeGreaterThanOrEqual(0));
+    sizes.forEach((n, i) => expect(n - plan[i]!).toBeLessThanOrEqual(2));
+    expect(sizes).toHaveLength(plan.length);
+    expect(sizes.at(-1)).toBe(8);
     expect(plies).toBe(20 + 2 * 10);
     // The final: each team's four, the side to move first, alternating teams.
     let f = runner.final!;

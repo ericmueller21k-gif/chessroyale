@@ -1,4 +1,4 @@
-import { cutLabel, roundLive, towerView, type GameView } from "../game.ts";
+import { cutLabel, roundLive, scoreDp, towerView, type GameView } from "../game.ts";
 import { RaceTower } from "./RaceTower.tsx";
 
 /** The full leaderboard as a sheet over the game. */
@@ -13,7 +13,7 @@ export function LeaderboardSheet({ match, onClose }: { match: GameView; onClose:
             ✕
           </button>
         </div>
-        <RaceTower standings={view.standings} cutoff={view.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} bank={!match.simul} />
+        <RaceTower standings={view.standings} cutoff={view.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} bank={!match.simul} dp={scoreDp(match.settings)} />
       </div>
     </div>
   );

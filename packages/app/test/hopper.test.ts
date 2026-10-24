@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, BOSS_ROSTER, HOPPER_NAME, isPlayable, playableBosses, type PowerEvent } from "@chessroyale/core";
-import { HOPPER_BEATS, HOPPER_FX, KING_ATTACK, KING_ATTACKERS, POWER_FX, START_FEN, bossShowMs, bossTurnShowMs, mateAttackDue, pieceAt, withPiece } from "@chessroyale/chess";
+import { BOSS_POWERS, BOSS_ROSTER, HOPPER_NAME, SPEECH, isPlayable, playableBosses, type PowerEvent } from "@chessroyale/core";
+import { HOPPER_BEATS, HOPPER_FX, KING_ATTACK, bannerLeadMs, KING_ATTACKERS, POWER_FX, START_FEN, bossShowMs, bossTurnShowMs, mateAttackDue, pieceAt, withPiece } from "@chessroyale/chess";
 import { mateMomentsOf, momentsOf, noMoveLine, powerLine, momentLineAt, momentPriority } from "../src/components/BossPowers.tsx";
-import { Voice, holdMs } from "../src/speech.tsx";
+import { Voice, holdMs, typeMs } from "../src/speech.tsx";
 import { CAST_LINE, HOPPER_UI, PRIZE_DROP, carrotItems, hopperFen, raceWon, yourPulls } from "../src/components/Hopper.tsx";
 import { HOPPER, HOPPER_LINES } from "../src/characters/hopper.ts";
 import { HOPPER_SOUNDS, hopperSound } from "../src/characters/hopper-sounds.ts";
@@ -187,7 +187,8 @@ describe("their moments on screen", () => {
     expect(HOPPER_LINES.carrotHis).toContain(powerLine(kit, list[0]!));
     expect(HOPPER_LINES.spinBig).toContain(powerLine(kit, list[1]!));
     expect(momentLineAt(list[1]!)).toBe(B.carrotSpin.reelAt);
-    // (As the reel starts, the spin's line is up, not the pull's said just before it, which it cuts short.)
+    // (As the reel starts, the spin's line is said, and cuts the pull's said just before it short, once the pull's has typed
+    // out and been readable for SPEECH.minReadMs: Oct 24.)
     const voice = new Voice();
     const sayAt = (m: Moment) => voice.say(powerLine(kit, m), m.key, momentPriority(m), m.at + momentLineAt(m));
     sayAt(list[0]!);
@@ -196,7 +197,9 @@ describe("their moments on screen", () => {
     expect(voice.line(reel - 1)?.text).toBe(powerLine(kit, list[0]!));
     expect(holdMs(powerLine(kit, list[0]!)!)).toBeGreaterThan(reel - list[0]!.at);
     sayAt(list[1]!);
-    expect(voice.line(reel)?.text).toBe(powerLine(kit, list[1]!));
+    const firm = list[0]!.at + typeMs(powerLine(kit, list[0]!)!) + SPEECH.minReadMs;
+    expect(voice.line(Math.max(reel, firm) - 1)?.text).toBe(powerLine(kit, list[0]!));
+    expect(voice.line(Math.max(reel, firm))?.text).toBe(powerLine(kit, list[1]!));
     expect(HOPPER_LINES.carrotsAll).toContain(powerLine(kit, list[2]!));
     expect(HOPPER_LINES.spinSmall).toContain(powerLine(kit, { ...list[1]!, tier: 2 }));
     expect(HOPPER_LINES.spinEmpty).toContain(powerLine(kit, { ...list[1]!, tier: 0 }));
@@ -221,7 +224,9 @@ describe("their moments on screen", () => {
     expect(list.map((m) => m.kind)).toEqual(["carrot", "carrotWin"]);
     // After his move has shown, one after another, ending as the attack's hold begins; the attack from mateAt into it.
     expect(list[0]!.at).toBe(shownAt + bossShowMs(v.lastMove, true));
-    expect(list[1]!.at).toBe(list[0]!.at + list[0]!.ms);
+    // (FIVE CARROTS!: its banner up for its moment's hold first, `lead`, Oct 24.)
+    expect(list[1]!.at - (list[1]!.lead ?? 0)).toBe(list[0]!.at + list[0]!.ms);
+    expect(list[1]!.lead).toBe(bannerLeadMs("carrotWin"));
     expect(list[1]!.at + list[1]!.ms).toBe(until - KING_ATTACK.mateHoldMs);
     expect(until - KING_ATTACK.mateHoldMs + KING_ATTACK.mateAt).toBeGreaterThan(list[1]!.at + list[1]!.ms);
     // (Any other mate: no moments, the attack alone.)

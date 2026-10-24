@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BOSS_BANNER, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, playableBosses, type Settings } from "@chessroyale/core";
-import { FIRE_BURN_MS, KING_ATTACK, POWER_FX, applyMove, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, powerMomentMs, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { BOSS_BRAIN, BOSS_POWERS, bossBannerMs, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, playableBosses, type Settings } from "@chessroyale/core";
+import { FIRE_BURN_MS, KING_ATTACK, applyMove, powerFxMs, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, powerMomentMs, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 afterEach(() => vi.restoreAllMocks());
@@ -122,7 +122,7 @@ describe("boss powers online", () => {
     expect(b1.boss.powers).toEqual(b2.boss.powers);
     const kinds = b1.boss.powers!.events.map((e) => e.kind).sort();
     expect(kinds).toEqual(["freeze", "warn"]);
-    expect(b1.until - b1.now).toBe(bossShowMs(b1.boss.lastMove) + POWER_FX.freeze + POWER_FX.warn);
+    expect(b1.until - b1.now).toBe(bossShowMs(b1.boss.lastMove) + powerFxMs({ kind: "freeze" }) + powerFxMs({ kind: "warn" }));
     L.advance(b1.until - L.now + 10);
     const r2 = L.last("p1", "round")!;
     const frozen = r2.boss!.powers!.frozen!.square;
@@ -162,7 +162,7 @@ describe("boss powers online", () => {
     const b4 = L.last("p1", "boss")!;
     expect(L.last("p2", "boss")!.boss.powers).toEqual(b4.boss.powers);
     expect(b4.boss.powers!.events.map((e) => e.kind)).toEqual(["thaw"]);
-    expect(b4.until - b4.now).toBe(bossShowMs(b4.boss.lastMove) + POWER_FX.thaw);
+    expect(b4.until - b4.now).toBe(bossShowMs(b4.boss.lastMove) + powerFxMs({ kind: "thaw" }));
     const thawed = b4.boss.powers!.events[0]!.squares!;
     for (const sq of due) if (pieceAt(b4.boss.board.fen, sq)?.color === "w") expect(thawed).toContain(sq);
     L.advance(b4.until - L.now + 10);
@@ -231,7 +231,7 @@ describe("boss powers online", () => {
     expect(played.san).toBeTruthy();
     expect(fun.boss.powers!.events.map((e) => e.kind)).toContain("funhouse");
     expect(fun.boss.powers!.angle).toBe(180);
-    expect(fun.until - fun.now).toBe(POWER_FX.funhouse);
+    expect(fun.until - fun.now).toBe(powerFxMs({ kind: "funhouse" }));
     // Everyone sees the same funhouse and the same move, on the board.
     expect(L.last("p1", "boss")!.boss.powers).toEqual(fun.boss.powers);
     expect(L.last("p1", "boss")!.boss.board.fen).toBe(fun.boss.board.fen);
@@ -390,7 +390,7 @@ describe("Hollow online", () => {
     const b1 = L.last("p1", "boss")!;
     expect(b1.boss.powers!.events).toEqual([{ kind: "dark", turn: 2, square: (req.allowed ?? legalMoves(req.fen))[0]!.slice(2, 4), first: true }]);
     expect(b1.boss.powers).toEqual(L.last("p2", "boss")!.boss.powers);
-    expect(b1.until - L.now).toBeGreaterThanOrEqual(POWER_FX.dark);
+    expect(b1.until - L.now).toBeGreaterThanOrEqual(powerFxMs({ kind: "dark" }));
     const r2 = toRound(L);
     const sq = r2.boss!.powers!.dark![0]!.square;
     L.take("p1");
@@ -518,7 +518,7 @@ describe("Hollow online", () => {
     expect(shown.boss.lastMove!.move).toBe(quiet[0]);
     expect(shown.boss.powers!.lightsExtra).toBe("played");
     expect(shown.boss.powers!.events.some((e) => e.kind === "extra")).toBe(true);
-    expect(shown.until - L.now).toBe(POWER_FX.extra);
+    expect(shown.until - L.now).toBe(powerFxMs({ kind: "extra" }));
     const h = shown.boss.board.history;
     expect(sideToMove(shown.boss.board.fen)).toBe("w");
     expect(h.length).toBe(5); // e2e4-ish, his reply, the crowd's 2nd, his move, his extra move
@@ -614,7 +614,7 @@ describe("Big Boy online", () => {
     expect(block).toMatchObject({ kind: "block", turn: 2 });
     expect(b.boss.powers).toEqual(L.last("p2", "boss")!.boss.powers);
     expect(b.boss.powers!.block).toEqual({ square: block.square, at: 2, until: 2 + BOSS_POWERS.blockTurns - 1 });
-    expect(b.until - L.now).toBeGreaterThanOrEqual(POWER_FX.block);
+    expect(b.until - L.now).toBeGreaterThanOrEqual(powerFxMs({ kind: "block" }));
     const r2 = toRound(L);
     const allowed = r2.boss!.powers!.allowed!;
     expect(allowed.length).toBeGreaterThan(0);
@@ -649,7 +649,7 @@ describe("Big Boy online", () => {
     expect(shown.boss.powers!.bounce!.spots).toHaveLength(3);
     expect(shown.boss.powers!.events.at(-1)).toEqual({ kind: "bounce", turn: 2 });
     expect(shown.boss.powers).toEqual(L.last("p1", "boss")!.boss.powers);
-    expect(shown.until - L.now).toBe(POWER_FX.bounce);
+    expect(shown.until - L.now).toBe(powerFxMs({ kind: "bounce" }));
     expect(shown.boss.board.bases).toContainEqual({ ply: shown.boss.board.history.length, fen: pick });
     // Then his own move, from the new position.
     L.advance(shown.until - L.now + 10);
@@ -691,7 +691,7 @@ describe("Big Boy online", () => {
     expect(thinking.thinking).toBe(true);
     expect(thinking.boss.board.history.at(-1)).toBe(take);
     expect(queenSlain(thinking.boss)).toBe(true);
-    expect(L.core.record.bossMinAt).toBe(thinking.now + BOSS_BANNER.ms + 500);
+    expect(L.core.record.bossMinAt).toBe(thinking.now + bossBannerMs() + 500);
     L.core.message("p1", { t: "bossMove", key: ask.key, move: ask.bounce![0]! });
     expect(L.last("p2", "boss")!.boss.powers!.bounce?.at).not.toBe(thinking.boss.crowdMoves);
     L.advance(L.core.record.bossMinAt! - L.now + 10);
@@ -781,7 +781,7 @@ describe("Sawyer online", () => {
     const b = L.last("p1", "boss")!;
     expect(b.boss.powers!.events.map((e) => e.kind)).toContain("boardsaw");
     expect(b.boss.powers!.boardSaw).toEqual({ at: 3, until: 3 + BOSS_POWERS.boardSawTurns - 1 });
-    expect(b.until - b.now).toBeGreaterThanOrEqual(POWER_FX.boardsaw);
+    expect(b.until - b.now).toBeGreaterThanOrEqual(powerFxMs({ kind: "boardsaw" }));
     const r3 = toRound(L);
     const allowed = r3.boss!.powers!.allowed!;
     expect(allowed.length).toBeGreaterThan(0);
@@ -883,7 +883,7 @@ describe("Alfil online", () => {
     expect(move.fuse ?? move.slam).toBeUndefined();
     const cast = shown(L, "p2", from).find((m) => !m.thinking && m.boss.powers!.events.at(-1)?.kind === "tusks")!;
     expect(cast).toBeTruthy();
-    expect(cast.until - (cast as unknown as { now: number }).now).toBe(POWER_FX.tusks);
+    expect(cast.until - (cast as unknown as { now: number }).now).toBe(powerFxMs({ kind: "tusks" }));
     const marked = cast.boss.powers!.tusks!.pawns;
     expect(marked).toHaveLength(2);
     for (const sq of marked) expect(pieceAt(cast.boss.board.fen, sq)).toMatchObject({ color: "b", type: "p" });
@@ -989,7 +989,7 @@ describe("Alfil online", () => {
     answer(L, ask.key, ask.slam![1]!);
     const slam = L.last("p2", "boss")!;
     expect(slam.boss.board.fen).toBe(ask.slam![1]);
-    expect(slam.until - L.now).toBe(POWER_FX.slam);
+    expect(slam.until - L.now).toBe(powerFxMs({ kind: "slam" }));
     const p = slam.boss.powers!;
     expect(p.events.at(-1)!.kind).toBe("slam");
     expect(p.slam!.pieces.length).toBeGreaterThan(0);
@@ -1179,7 +1179,7 @@ describe("Chub & Chirp online (Leapfrog)", () => {
     expect(sideToMove(req.fen)).toBe("b");
     const hop = shown(L, "p2", from).find((m) => !m.thinking && m.boss.powers!.events.at(-1)?.kind === "hop")!;
     expect(hop).toBeTruthy();
-    expect(hop.until - (hop as unknown as { now: number }).now).toBe(POWER_FX.hop);
+    expect(hop.until - (hop as unknown as { now: number }).now).toBe(powerFxMs({ kind: "hop" }));
     expect(hop.boss.powers!.hop).toEqual({ at: 1, from: "e5", over: "e4", to: "e3" });
     expect(hop.boss.powers!.events.at(-1)).toEqual({ kind: "hop", turn: hop.boss.powers!.turn, square: "e3", squares: ["e5", "e4", "e3"] });
     expect(hop.boss.board.fen).toBe(req.fen);
@@ -1205,7 +1205,7 @@ describe("Chub & Chirp online (Leapfrog)", () => {
     const hop = L.last("p2", "boss")!;
     expect(hop.boss.board.fen).toBe(req.hop![2]);
     expect(hop.boss.powers!.hop).toMatchObject({ from: "e5", over: "e4", to: "e3" });
-    expect(hop.until - L.now).toBe(POWER_FX.hop);
+    expect(hop.until - L.now).toBe(powerFxMs({ kind: "hop" }));
     const move = asked(L);
     expect(move.hop).toBeUndefined();
     expect(move.fen).toBe(req.hop![2]);
@@ -1651,7 +1651,7 @@ describe("Wrangler online", () => {
     expect(b.boss.powers!.pull).toMatchObject({ turn: 2, from: pull.slice(0, 2), to: pull.slice(2, 4) });
     expect(b.boss.powers!.events.map((e) => e.kind)).toContain("pull");
     expect(b.boss.powers).toEqual(L.last("p1", "boss")!.boss.powers);
-    expect(b.until - b.now).toBe(bossShowMs(b.boss.lastMove) + POWER_FX.pull);
+    expect(b.until - b.now).toBe(bossShowMs(b.boss.lastMove) + powerFxMs({ kind: "pull" }));
   });
 
   it("an ordinary first move when the host answers one; a later three-square move is never a pull", () => {
@@ -1682,7 +1682,7 @@ describe("Wrangler online", () => {
         expect(b.boss.powers!.drag).toEqual({ turn: 3, from: drag.from, to: drag.to, piece: drag.piece });
         expect(b.boss.board.fen).toBe(drag.fen);
         expect(b.boss.powers!.events).toContainEqual({ kind: "drag", turn: 3, square: drag.to, squares: [drag.from, drag.to] });
-        expect(b.until - b.now).toBe(bossShowMs(b.boss.lastMove) + POWER_FX.drag);
+        expect(b.until - b.now).toBe(bossShowMs(b.boss.lastMove) + powerFxMs({ kind: "drag" }));
       } else {
         expect(b.boss.powers!.drag ?? null).toBeNull();
         expect(b.boss.board.fen).toBe(after);
@@ -1714,7 +1714,7 @@ describe("Wrangler online", () => {
     expect(b.boss.board.fen).toBe(lineup.fen);
     expect(b.boss.powers!.events).toContainEqual({ kind: "showdown", turn: 3, squares: lineup.pairs.flatMap((p) => [p.crowd, p.boss]) });
     expect(b.boss.powers).toEqual(L.last("p1", "boss")!.boss.powers);
-    expect(b.until - b.now).toBe(bossShowMs(b.boss.lastMove) + POWER_FX.showdown);
+    expect(b.until - b.now).toBe(bossShowMs(b.boss.lastMove) + powerFxMs({ kind: "showdown" }));
     const r3 = toRound(L);
     expect([...r3.boss!.powers!.allowed!].sort()).toEqual([...lineup.duels].sort());
     // A pick that isn't a duel is refused; the job carries the duels.

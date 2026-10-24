@@ -85,7 +85,7 @@ describe("the FAQ's contents", () => {
     expect(p.balloonPops.bishop).toBe(p.balloonPops.knight);
     expect(p.balloonPops.rook).toBe(p.balloonPops.knight);
     expect(words).toContain(`duds that always pop (${o.fakeQueen} in every ${o.queen + o.fakeQueen}), and you can't tell which`);
-    expect(words).toContain("about 50% of his balloons pop");
+    expect(words).toContain("about 58% of his balloons pop");
     expect(words).toContain("never a square you attack (you can't take it at once)");
     expect(words).toContain("beyond what his missing pawns could have promoted into");
     expect(words).toContain(`throws ${p.hoopsCount} burning hoops`);
@@ -335,6 +335,27 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain("gives up 2 pawns or more");
     // Never "free moves" or a "full grace": an allowance off each loss.
     expect(text()).not.toMatch(/free moves?|full grace/i);
+  });
+
+  it("50 v 50's scoring: the soft limit by stage, pieces hung, shared blunders, streaks, rare finds, a miss, the bubble; every number from CROWD_SCORING", () => {
+    const cs = FAQ_DEFAULTS.crowdScoring;
+    const t = section("scoring");
+    expect(t).toContain(`about ±${cs.cap[0]} before the first cut`);
+    expect(t).toContain(`a move that gives up ${cs.uncapPawns} pawns' worth of material or more`);
+    expect(t).toContain(`when ${cs.sharedMin} or more of your team (or ${cs.sharedShare * 100}% of it) pick the same move and it gives away ${cs.sharedFrom} points or more`);
+    expect(t).toContain(`a move within ${cs.streakStrong} points of the engine's best is a strong move. ${cs.streakFrom} strong moves in a row put you on a streak`);
+    expect(t).toContain(`+${cs.streakBonus[0]} at ${cs.streakFrom}`);
+    expect(t).toContain(`a brilliant move that ${cs.brilliantMaxFound} or fewer of your team found (just one, when ${cs.brilliantFewLeft} or fewer are picking)`);
+    expect(t).toContain(`earns +${cs.brilliantBonus} and a shoutout naming who found it`);
+    expect(t).toContain(`anyone within ${cs.cutGrace} points of the last player through goes through too`);
+    expect(section("modes")).toContain(`So does anyone within ${cs.cutGrace} points of that player`);
+    const moved = section("scoring", { ...FAQ_DEFAULTS, crowdScoring: { ...cs, cap: [3, 5, 8, null], capFrom: [0, 1, 4, 8], streakStrong: 3, streakFromMove: 5, brilliantBonus: 2, cutGrace: 0.2, uncapPawns: 5 } });
+    expect(moved).toContain("about ±3 before the first cut, about ±5 from the first cut, about ±8 from the 4th cut and no limit from the 8th cut");
+    expect(moved).toContain("a move within 3 points of the engine's best");
+    expect(moved).toContain("streaks count from your 5th move");
+    expect(moved).toContain("earns +2 and a shoutout");
+    expect(moved).toContain("anyone within 0.2 points of the last player through");
+    expect(moved).toContain("gives up 5 pawns' worth");
   });
 
   it("ties at the cut line go through; the boss's tied strike waits", () => {

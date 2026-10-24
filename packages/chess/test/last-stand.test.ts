@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, countedOf, lastStandBar, lastStandDue, mulberry32, type Settings } from "@chessroyale/core";
-import { LAST_STAND, LAST_STAND_MS, MatchRunner, blunderCost, fenAfter, lastStandHits, legalMoves, sanLineToUci, toSan, type EngineLike, type Opening, type UciEngine } from "../src/index.ts";
+import { DEFAULT_SETTINGS, RAID_SETTINGS, bannerPlusMs, countedOf, lastStandBar, lastStandDue, mulberry32, type Settings } from "@chessroyale/core";
+import { LAST_STAND, lastStandMs, MatchRunner, blunderCost, fenAfter, lastStandHits, legalMoves, sanLineToUci, toSan, type EngineLike, type Opening, type UciEngine } from "../src/index.ts";
 import { createNodeEngine } from "../src/node.ts";
 
 /** A raid from the Ruy Lopez, 10 plies in, White (the crowd) to move. */
@@ -358,15 +358,15 @@ describe("the God King's Last Stand: the rule", () => {
   });
 
   it("its timeline: about 11 s, the warning first (1.2–1.5 s), every beat in order, 25 slashes with damage numbers the same on every screen", () => {
-    expect(LAST_STAND_MS).toBeGreaterThanOrEqual(9200);
-    // (A second longer since Oct 15: its cut-in, like every banner.)
-    expect(LAST_STAND_MS).toBeLessThanOrEqual(11500);
+    expect(lastStandMs()).toBeGreaterThanOrEqual(9200);
+    // (A second longer since Oct 15: its cut-in, like every banner; and since Oct 24 the banners' extra.)
+    expect(lastStandMs()).toBeLessThanOrEqual(11500 + bannerPlusMs());
     expect(LAST_STAND.warnMs).toBeGreaterThanOrEqual(1200);
     expect(LAST_STAND.warnMs).toBeLessThanOrEqual(1500);
     // The warning only adds to it: everything after starts warnMs later than it used to (the freeze at 250 ms, the end at
-    // 9.6 s: 8.6 s before the cut-in got its extra second, Oct 15).
+    // 9.6 s: 8.6 s before the cut-in got its extra second, Oct 15; and the banners' extra since Oct 24).
     expect(LAST_STAND.freezeAt - LAST_STAND.warnMs).toBe(250);
-    expect(LAST_STAND.endMs - LAST_STAND.warnMs).toBe(9600);
+    expect(LAST_STAND.endMs - LAST_STAND.warnMs).toBe(9600 + bannerPlusMs());
     const beats = [0, LAST_STAND.badgeAt, LAST_STAND.warnMs, LAST_STAND.freezeAt, LAST_STAND.leapAt, LAST_STAND.fallAt, LAST_STAND.crashAt, LAST_STAND.bannerAt, LAST_STAND.bannerAt + LAST_STAND.bannerMs, LAST_STAND.slideAt, LAST_STAND.slashAt, LAST_STAND.slashAt + LAST_STAND.slashes * LAST_STAND.slashEveryMs, LAST_STAND.staggerAt, LAST_STAND.collapseAt, LAST_STAND.fadeAt, LAST_STAND.fadeAt + LAST_STAND.fadeMs, LAST_STAND.endMs];
     expect([...beats].sort((a, b) => a - b)).toEqual(beats);
     const hits = lastStandHits("e2e4");

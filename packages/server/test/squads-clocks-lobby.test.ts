@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { FRONT_DOOR, SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
+import { FRONT_DOOR, SQUADS, SQUADS_LOBBY, voteResultMs } from "@chessroyale/core";
 import { halfDuties, squadsVotes, type SquadsMatch } from "@chessroyale/chess/squads";
 import { SquadsCore, clearTopCache, parseTestClock, testLobbyOptions, type LiveMatch, type SquadsRecord } from "../src/squads-lobby.ts";
 import { library, squadsLobby } from "./squads-fixture.ts";
@@ -11,7 +11,7 @@ import { library, squadsLobby } from "./squads-fixture.ts";
  * controls keeps playing on the clock it voted.
  */
 
-const VOTES_MS = FRONT_DOOR.fillShowMs + squadsVotes().length * (SQUADS.voteSeconds + SQUADS.voteResultSeconds) * 1000;
+const VOTES_MS = FRONT_DOOR.fillShowMs + squadsVotes().length * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
 
 beforeEach(() => clearTopCache());
 

@@ -35,9 +35,28 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   forgiven · opening", "no allowance · gave up material", "no allowance · missed a capture" (Crowd under the poll,
   Classic under the round score, a boss battle as the dock's second line, shortened under 380 px: "8 of 9.6
   forgiven", "no allowance"); the breakdown says what counted, and the group's average as it counted. Squads isn't scored per move: untouched.
+- **50 v 50's scoring** (Eric, Oct 23; docs/decisions/2026-10-24-crowd-scoring.md; `CROWD_SCORING` in settings.ts, as
+  `crowdScoring` in `CROWD_SETTINGS`, off in raids and Classic; measured with Maia players in `reports/crowd-scoring.md`).
+  `scoreGroup` shapes each round score when it gets a `ScoreContext` (the runner's `scoreContext`: the stage, whether
+  streaks count, each player's streak): a losing pick many made counts less (`sharedFactor`), then the round score goes
+  through a soft cap that widens by stage (`softCap`, `capFor`: `cap` from `capFrom`; `capCurve`), except that a pick
+  giving up a piece by the exchange check (`uncapPawns`: the runner's `allowanceFor` marks it all game, `uncap`) keeps a
+  minus score whole; a strong move (raw loss within `streakStrong`) adds to the player's streak, and from `streakFrom` in
+  a row earns `streakBonus` on top of the capped score (`streakCounts`: from the `streakFromMove`th picked move on the
+  usual start, the first in Random opening and Freestyle; picked moves count from the board's dealt opening, never the
+  game's move number); a miss scores `missCaps` times the cap below zero. Every round score is kept to 2 decimals
+  (`round2`); the screens show 2 (`scoreDp`). After power-ups are marked, `MatchRunner.finishRound` runs `crowdBrilliant`:
+  a rare find (`brilliance` with `brilliantMinGap`; `brilliantMaxFound` or fewer found it, exactly one when
+  `brilliantFewLeft` or fewer picked) adds `brilliantBonus` to the finders and sets `result.brilliant`, which the
+  reveal shows as the shoutout ("Brilliant find! You found Nf5 · +1"; online the reveal message's `brilliant`). The
+  standings carry `streak` from `streakFrom` (`NetStanding.streak`), and the scoreboard draws our own fire as a badge on the
+  rank square's corner, never in the name's cell, so a name keeps all its room (`components/StreakFire.tsx`, in `RaceTower`'s `.t-pos`: orange, red from 2 more, a white-blue core from 4 more; a flicker, still under reduced
+  motion). The reveal adds "+0.50 streak bonus" under your score, and "not capped · gave up a piece" after the allowance.
+  Test switches (solo): `?streaks=1` (every seat on a streak, 3 to 9), `?shoutout=1` (your first pick gets a shoutout).
 - **The cut.** After each stage (`firstStageRounds`, then `roundsPerStage`) the lowest scorers are knocked out
   (`knockoutsPerStage`; in 50 v 50 the same number from each team). **Ties at the line go through** (`cutPlan` in
-  `match.ts`): everyone tied exactly (`sameScore`) with the last player through stays in; nobody goes out on thinking
+  `match.ts`): everyone tied exactly (`sameScore`) with the last player through stays in (in 50 v 50 so does anyone within
+  `cutGrace` of them, the bubble grace, except at the last cut); nobody goes out on thinking
   time or a coin flip. What that leaves over is owed by the cuts still to come, spread evenly over them (`cutCarry`, per
   team in 50 v 50; each cut takes its share rounded up), so the endings keep their sizes and no one cut takes a
   pile-up of owed places. **The last cut before a fixed-size ending** (`isLastCut`) takes exactly what's owed: an exact tie
@@ -153,7 +172,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 | What | Where |
 | --- | --- |
 | Stages, grouping, the cut, retirement, bot picks (pure) | `packages/core/src/match.ts` |
-| Scoring, the opening allowance, brilliant moves | `packages/core/src/scoring.ts`; the exchange check `packages/chess/src/rules.ts` (`exchangeNet`, `materialSlips`) |
+| Scoring, the opening allowance, brilliant moves, 50 v 50's scoring (`scoreGroup`'s context, `crowdBrilliant`) | `packages/core/src/scoring.ts`; streaks in `applyRound` (`match.ts`); the fire `components/StreakFire.tsx`; the exchange check `packages/chess/src/rules.ts` (`exchangeNet`, `materialSlips`) |
 | The cut: ties, what's owed, the last cut's tie-break | `packages/core/src/match.ts` (`cutPlan`, `standings`, `endStage`) |
 | Pre-game votes | `packages/core/src/votes.ts`; screen `packages/app/src/screens/Vote.tsx` |
 | The start vote's boards (Normal, Random opening, Freestyle) | `MatchRunner.setUpStart` / `freshStart` (`runner.ts`), `freestyleBoard` (`boards.ts`), `freestyleStart` (`chess960.ts`) |
@@ -168,7 +187,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 
 ## Settings
 
-`OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `CROWD_START` (the start vote's random opening length), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
+`OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `CROWD_SCORING` (the cap and its stages and curve, the piece bar, the shared-blunder relief, streaks, rare finds, a miss, the bubble grace), `CROWD_START` (the start vote's random opening length), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
 (the `?pace=quick` test switch, per mode; players always play the mode's own pace), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
 `moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
 time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
@@ -182,6 +201,12 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   agree), `runner.test.ts` (Classic's boards with ties kept in), `packages/app/test/faq.test.ts`. Sims:
   `packages/sim/scripts/opening-allowance.ts` (the calibration, `reports/opening-allowance.md`) and
   `allowance-sim.ts` (before/after Crowd matches, `reports/allowance-sim.md`).
+- 50 v 50's scoring: unit `packages/core/test/crowd-scoring.test.ts` (the cap's shape and its stages, pieces uncapped,
+  the shared relief's thresholds, streaks and their start and ramp, a miss, rare finds and the switch, the bubble grace
+  and what carries, 2 decimals), `packages/app/test/faq.test.ts`; e2e `e2e/crowd-scoring.spec.ts` (the fire's tiers,
+  steady rows and no spill at 320 and 1280, reduced motion; the shoutout and its bonus, the board still); the sim
+  `packages/sim/scripts/crowd-scoring-trace.ts` (records Maia or bot matches) and `crowd-scoring-sim.ts` (re-scores them
+  under every variant: `reports/crowd-scoring.md`).
 - The start vote: unit `packages/core/test/votes.test.ts` (its cards, default, patches, `?start=`), `packages/chess/test/opening-vote.test.ts`
   (each start's board, seeded, the balance window, a Freestyle game through the runner, castling both ways, the snapshot),
   `packages/server/test/lobby.test.ts` ("the start vote online": Freestyle and Random opening, castling, a lobby that

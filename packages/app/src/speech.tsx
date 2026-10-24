@@ -3,14 +3,21 @@
  * once). The numbers are SPEECH in settings.ts.
  *
  * - **Its time.** A line types out, then stays fully readable for a time that grows with its length (`readMs` plus
- *   `perCharMs` a character, at most `maxReadMs`), then fades. Nothing a screen does cuts that short: the line lives
- *   in its speaker's Voice, not in a screen, so the boss's turn ending, the next screen or the next moment don't take
- *   it away (a new screen picks it up where it was).
+ *   `perCharMs` a character, and `longExtraMs` more past `longChars`, at most `maxReadMs`; a tester's `?talkplus=` adds
+ *   to it), then fades. Nothing a screen does cuts that short: the line lives in its speaker's Voice, not in a screen,
+ *   so the boss's turn ending, the next screen or the next moment don't take it away (a new screen picks it up where
+ *   it was). Eric, Oct 24: "I couldn't even see what the heck he was saying… because it was so fast. And it shouldn't
+ *   linger forever… they need to be like a second longer if they're like two rows or more than a certain number of
+ *   words, and then even… sit out a little bit longer."
  * - **Taking turns.** Each speaker (the boss, the God King) has one Voice, and says one line at a time. A line said
  *   while another is up waits its turn, highest priority first, unless it's critical and the one up isn't: then it
  *   cuts in. A line that can't start within `waitMs` of being said is dropped (it would be stale). Chatter (the
  *   lowest, the Hidden Boss's muttering in phase 2) is said only when nothing else is (its caller checks), and any
  *   other line cuts in on it.
+ * - **Never taken off unread.** Once a line has started, nothing takes it off before it has typed out and been fully
+ *   readable for `minReadMs`: a line that would cut in sooner waits for that, then cuts in (still dropped after
+ *   `waitMs`). (Oct 24: Babur's thinking line, which had waited its turn behind his balloon's cheer, was up for a
+ *   quarter of a second when his hoops' line, critical, cut in.)
  * - **Never hidden by a fit check.** A box that would run off the screen takes a smaller size, a step at a time, and
  *   past the last step is moved back into view (SpeechBox). Its size is settled once per line, before its first paint.
  *
@@ -20,11 +27,11 @@
 import type { ComponentChildren, JSX } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { SPEECH } from "@chessroyale/core";
+import { talkPlusMs, testSwitchesAllowed } from "./test-switches.ts";
 import { useFrameNow } from "./components/Countdown.tsx";
 import { lineLength, plainLine, sliceLine, type LineSeg } from "./speech-icons.ts";
 import { mooIconSprite, type MooIconId } from "./characters/moo.ts";
 import { renderFrame } from "./characters/sprite.ts";
-import { testSwitchesAllowed } from "./test-switches.ts";
 
 /** How much a line matters: only a critical line cuts in on another (and any line on chatter); the rest wait their turn. */
 export const CHATTER = -1;
@@ -33,19 +40,29 @@ export const NORMAL = 1;
 export const CRITICAL = 2;
 export type Priority = typeof CHATTER | typeof LOW | typeof NORMAL | typeof CRITICAL;
 
-/** A line on screen: its words, its moment (`key`), when it started and when it's gone (its fade included). */
+/**
+ * A line on screen: its words, its moment (`key`), when it started and when it's gone (its fade included), and the
+ * soonest another may cut in on it (`firm`: typed out and readable for SPEECH.minReadMs).
+ */
 export interface Spoken {
   text: string;
   key: string;
   priority: Priority;
   at: number;
   until: number;
+  firm: number;
 }
 
 /** How long a line takes to type out (ms; an icon in it, Moo's `{heart}`, counts as one character: speech-icons.ts). */
 export const typeMs = (text: string) => lineLength(text) * SPEECH.typeMs;
-/** How long a line stays fully readable once typed (ms): longer for a longer line, up to a cap. */
-export const readMs = (text: string) => Math.min(SPEECH.maxReadMs, SPEECH.readMs + SPEECH.perCharMs * lineLength(text));
+/**
+ * How long a line stays fully readable once typed (ms): longer for a longer line, a second more past one row of the
+ * bubble (`longChars`), up to a cap; and a tester's `?talkplus=`.
+ */
+export const readMs = (text: string) => {
+  const n = lineLength(text);
+  return Math.min(SPEECH.maxReadMs, SPEECH.readMs + SPEECH.perCharMs * n + (n > SPEECH.longChars ? SPEECH.longExtraMs : 0)) + talkPlusMs();
+};
 /** How long a line is up, from its first letter to the end of its fade (ms). */
 export const holdMs = (text: string) => typeMs(text) + readMs(text) + SPEECH.fadeMs;
 /** How many of a line's characters have typed out by `now`. */
@@ -76,7 +93,7 @@ export class Voice {
     if (this.said.size > 400) this.said.delete(this.said.values().next().value!);
     this.advance(at);
     const cur = this.now;
-    if (!cur || at >= cur.until || (priority === CRITICAL && cur.priority < CRITICAL) || (cur.priority === CHATTER && priority > CHATTER)) this.start({ text, key, priority, saidAt: at }, at);
+    if (!cur || at >= cur.until || (cutsIn(priority, cur) && at >= cur.firm)) this.start({ text, key, priority, saidAt: at }, at);
     else {
       this.queue.push({ text, key, priority, saidAt: at });
       // Highest priority first; in the order said within one.
@@ -88,7 +105,8 @@ export class Voice {
 
   /**
    * A test's line (the boss-bar check's `sayBoss` hook, test switches only): it replaces the line up now and the queue, whatever
-   * their priority, so each line of a boss is drawn in its own box in turn (e2e/boss-bar-same.spec.ts).
+   * their priority, so each line of a boss is drawn in its own box in turn (e2e/boss-bar-same.spec.ts). The one exception to
+   * "never taken off unread": a test hook, which the game never calls.
    */
   replace(text: string, key: string, priority: Priority = CRITICAL, at = Date.now()): boolean {
     this.now = null;
@@ -117,22 +135,27 @@ export class Voice {
   }
 
   private start(w: Waiting, at: number) {
-    this.now = { text: w.text, key: w.key, priority: w.priority, at, until: at + holdMs(w.text) };
+    this.now = { text: w.text, key: w.key, priority: w.priority, at, until: at + holdMs(w.text), firm: at + typeMs(w.text) + SPEECH.minReadMs };
   }
 
   /**
-   * The line up ends at its time; the next in line starts when it's next looked for (a box looks every frame while a
-   * line is up), so a busy frame at the handover never eats into it. The one up is never restarted.
+   * The line up ends at its time, or once it's firm when the first in line cuts in on it (cutsIn); the next in line
+   * starts when it's next looked for (a box looks every frame while a line is up), so a busy frame at the handover
+   * never eats into it. The one up is never restarted.
    */
   private advance(now: number) {
     if (this.now && now >= this.now.until) this.now = null;
-    if (this.now) return;
     // (Stale ones are dropped.)
-    this.queue = this.queue.filter((w) => now - w.saidAt <= SPEECH.waitMs);
-    const w = this.queue.shift();
-    if (w) this.start(w, Math.max(now, w.saidAt));
+    if (this.queue.length) this.queue = this.queue.filter((w) => now - w.saidAt <= SPEECH.waitMs);
+    const w = this.queue[0];
+    if (!w || (this.now && !(cutsIn(w.priority, this.now) && now >= this.now.firm))) return;
+    this.queue.shift();
+    this.start(w, Math.max(now, w.saidAt));
   }
 }
+
+/** Whether a line cuts in on the one up (once that one is firm): a critical one on any but a critical one, any on chatter. */
+const cutsIn = (priority: Priority, cur: Spoken) => (priority === CRITICAL && cur.priority < CRITICAL) || (cur.priority === CHATTER && priority > CHATTER);
 
 /** The boss's voice (one battle at a time on a device): its powers' lines, its reactions, its intro moments. */
 export const bossVoice = new Voice();

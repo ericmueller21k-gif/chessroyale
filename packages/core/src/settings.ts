@@ -321,7 +321,85 @@ export interface Settings {
    * first. Never for players.
    */
   peopleFirst?: boolean;
+  /**
+   * Crowd 50 v 50's scoring (CROWD_SCORING: the soft cap by stage, shared-blunder relief, streaks, rare brilliant
+   * finds, the bubble grace). Unset: every other mode scores as before.
+   */
+  crowdScoring?: CrowdScoring;
 }
+
+/**
+ * Crowd 50 v 50's scoring (Eric, Oct 23; docs/decisions/2026-10-24-crowd-scoring.md, measured in reports/crowd-scoring.md).
+ * A pick's round score starts as today's (the group's average loss less its own, the opening allowance taken off), then:
+ * - **shared-blunder relief**: a losing pick (`sharedFrom` points or more) made by at least `sharedMin` players, or by
+ *   `sharedShare` of the group, counts its loss times (1 - `sharedK` x its share), never less than `sharedFloor` of it;
+ * - **the soft cap**: a smooth curve (`capCurve`) that keeps a score inside +-cap, a bigger miss still scoring worse than a
+ *   smaller one. The cap widens by stage: `cap[i]` from the match's stage `capFrom[i]` (stage 0 is before the first cut),
+ *   null for none. A pick that gives up a piece (`uncapPawns` of material) by the exchange check takes a minus score
+ *   uncapped;
+ * - **streaks**: a strong move is one within `streakStrong` points of the engine's best (its raw loss); strong moves in a
+ *   row make a streak, which any other pick or a miss ends. From `streakFrom` in a row a strong move earns
+ *   `streakBonus[n - streakFrom]` (the last entry from then on), added after the cap. Streaks count from the player's
+ *   `streakFromMove`th picked move on the usual start, from the first in Random opening and Freestyle;
+ * - **brilliant finds** (`brilliance`, the rest giving away `brilliantMinGap` points or more): `brilliantBonus` and a
+ *   shoutout, only when rare: `brilliantMaxFound` or fewer found it, or exactly one when `brilliantFewLeft` or fewer picked;
+ * - a miss scores `missCaps` times the stage's cap below zero (missedMoveScore when there's no cap);
+ * - every round score is kept to 2 decimals, and at a cut (not the last) anyone within `cutGrace` points of the last
+ *   player through goes through like an exact tie (what that leaves over carries, as cutCarry).
+ * The FAQ and the screens read these numbers from here.
+ */
+export interface CrowdScoring {
+  cap: readonly (number | null)[];
+  /**
+   * The soft cap's curve: "tanh" (cap x tanh(x / cap): close to the score while small, then flat near the cap, so big
+   * misses all read about -cap) or "ratio" (x / (1 + |x| / cap): eases in sooner and never quite flattens, so a bigger
+   * miss always shows a little worse, even to 2 decimals).
+   */
+  capCurve: "tanh" | "ratio";
+  capFrom: readonly number[];
+  /** A pick that gives up this many pawns of material or more by the exchange check (a piece) isn't capped. */
+  uncapPawns: number;
+  sharedFrom: number;
+  sharedMin: number;
+  sharedShare: number;
+  sharedK: number;
+  sharedFloor: number;
+  streakStrong: number;
+  streakFrom: number;
+  streakFromMove: number;
+  /** Testing in the sim only: streaks count from the first cut. */
+  streakFromCut?: boolean;
+  streakBonus: readonly number[];
+  brilliantBonus: number;
+  /** A find is a shoutout only when the rest gave away this many points on average or more (`brilliance`'s minGap). */
+  brilliantMinGap: number;
+  brilliantMaxFound: number;
+  brilliantFewLeft: number;
+  missCaps: number;
+  cutGrace: number;
+}
+
+export const CROWD_SCORING: CrowdScoring = {
+  cap: [2, 3.5, 5, 8],
+  capCurve: "ratio",
+  capFrom: [0, 1, 5, 9],
+  uncapPawns: 3,
+  sharedFrom: 5,
+  sharedMin: 3,
+  sharedShare: 0.25,
+  sharedK: 1,
+  sharedFloor: 0.4,
+  streakStrong: 2,
+  streakFrom: 3,
+  streakFromMove: 6,
+  streakBonus: [0.25, 0.5, 0.75, 1],
+  brilliantBonus: 1,
+  brilliantMinGap: 35,
+  brilliantMaxFound: 3,
+  brilliantFewLeft: 10,
+  missCaps: 2,
+  cutGrace: 0.1,
+};
 
 /**
  * One step of a move clock that rises as the game goes on: from this move on, this many seconds a move. "Move" is the
@@ -522,6 +600,7 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   firstStageRounds: 20,
   roundsPerStage: 2,
   scoresBetweenStages: "carry",
+  crowdScoring: CROWD_SCORING,
   colourPerStage: false,
   drawRuleByStage: ["popular"],
   powerUpsAtStart: 3,
@@ -558,6 +637,8 @@ export const RAID_SETTINGS: Partial<Settings> = {
   ...CROWD_SETTINGS,
   raid: true,
   crowdTeams: false,
+  // (A raid scores as before: the crowd's scoring is 50 v 50's.)
+  crowdScoring: undefined,
   augments: false,
   lobbySize: 50,
   groupSize: 50,
@@ -1086,14 +1167,18 @@ export const BOSS_POWERS = {
    * real time (the battle's clock: the server's online, the page's visible time solo), then waits, ready. At the end of
    * his turn a ready balloon lands as his piece or pops. Its shape (percent; the fake queen looks like a queen) and
    * whether it pops (percent of that shape's) are rolled as it goes on: the shape from the battle's seed, a queen's being a
-   * fake one and every pop from the battle's own secret (BalloonState.secret). About half pop (the review's numbers, Oct 24,
-   * after Eric: "most don't even make it and most are pawns or maybe a bishop knight"; his two queen numbers kept).
-   * balloonStageSec is the raid sim's (Eric's 15 s left the crowd 0.00 in 29 battles): reports/tiger-sim.md.
+   * fake one and every pop from the battle's own secret (BalloonState.secret). About 58% pop (Oct 24: pops 50 for a pawn,
+   * 65 for a knight, bishop or rook; the fake queen always, the real one never). Eric, Oct 24: "the balloons… they're not
+   * landing… for a full game… he's way too easy otherwise"; "about a bishop's worth… on average of pieces a game, like a
+   * bishop and a pawn… it's still just a little too slow." Target: landed material a battle, at Eric's pace (a 5 s pick), of
+   * 4 or more, a bishop and a pawn as the floor.
+   * balloonStageSec is the raid sim's, at that pace (20 battles each): 30 s gave 2.15 landed material a battle; 12 s gave
+   * 6.35 at the old pops (40 / 55) and 5.50 at these (reports/tiger-sim.md, Oct 24).
    */
   balloonStages: 4,
-  balloonStageSec: 30,
+  balloonStageSec: 12,
   balloonOdds: { pawn: 55, knight: 13, bishop: 13, rook: 6, fakeQueen: 10, queen: 3 } as Readonly<Record<"pawn" | "knight" | "bishop" | "rook" | "fakeQueen" | "queen", number>>,
-  balloonPops: { pawn: 40, knight: 55, bishop: 55, rook: 55, fakeQueen: 100, queen: 0 } as Readonly<Record<"pawn" | "knight" | "bishop" | "rook" | "fakeQueen" | "queen", number>>,
+  balloonPops: { pawn: 50, knight: 65, bishop: 65, rook: 65, fakeQueen: 100, queen: 0 } as Readonly<Record<"pawn" | "knight" | "bishop" | "rook" | "fakeQueen" | "queen", number>>,
   /** How many colors a balloon can be (seeded, not tied to its shape: the art's six). */
   balloonColors: 6,
   /**
@@ -1271,31 +1356,67 @@ export type BossPowerSettings = {
  * SLAIN! and QUEEN DOWN!, "START!", and the Hidden Boss's "PHASE 2" and "5 SECONDS!". Each slides in, holds and slides
  * off by its end (styles.css times the band's exit from it). Eric, Oct 15: every banner a second longer (2.5 s); Oct 16,
  * a boss's a second shorter again: "when the bosses ult they are ulting while the banner is still up, same thing for
- * Toy Blocks... Do 1 second less" (docs/decisions/2026-10-16-banner-timing.md). A power's banner ends sooner where the
- * power itself starts sooner (the beat it gives way to, in its boss's file), so nothing it does plays under it. The
- * God King's cut-ins and FISCHER RANDOM! keep 2.5 s.
+ * Toy Blocks... Do 1 second less" (docs/decisions/2026-10-16-banner-timing.md). Oct 24: BANNER_PLUS_MS on top of
+ * every one (below), each a boss's banner's whole length (bossBannerMs), and what comes after it that much later.
  */
 export const BOSS_BANNER = {
-  /** How long one shows (ms). */
+  /** How long one showed before Oct 24's extra (ms): what the beats inside a power's moment are counted from. */
   ms: 1500,
-  /** "PHASE 2", as the Hidden Boss's phase change ends (its clocks start after it). */
+  /** "PHASE 2", as the Hidden Boss's phase change ends (its clocks start after it; the extra on top). */
   phase2Ms: 1400,
 } as const;
 
 /**
+ * The extra time on every full-width banner over the board, in every mode (ms). Eric, Oct 24, on his phone: "we need
+ * the banners to appear… at least… 3/4 of a second longer, or 1/2 a second even, just to start… across the entire
+ * board… the large banners… when the boss ults, when your queen is down, for any mode, those things should be more
+ * consistent, because it's just so fast." Every beat that comes after a banner comes this much later too, so nothing
+ * plays under a longer banner (the Oct 15 trap: docs/decisions/2026-10-24-banner-and-speech-time.md). A tester's
+ * `?bannerplus=` (seconds) sets it for a page's games on the device (the app's test-switches.ts); online the server
+ * and every screen use this default.
+ */
+export const BANNER_PLUS_MS = 750;
+let bannerPlusFrom: () => number | null = () => null;
+/** The extra time on every banner now (ms): BANNER_PLUS_MS, or a tester's `?bannerplus=` for a game on the device. */
+export const bannerPlusMs = (): number => bannerPlusFrom() ?? BANNER_PLUS_MS;
+/** Where a page's own extra comes from (the app's `?bannerplus=`; null: the default). The server never sets one. */
+export function setBannerPlusSource(from: () => number | null): void {
+  bannerPlusFrom = from;
+}
+/**
+ * How long every boss's banner shows (ms), each power's and QUEEN SLAIN!, QUEEN DOWN!, "START!", BULLET!, "5 SECONDS!":
+ * the same length for all (Eric, Oct 24: "more consistent"), BOSS_BANNER.ms and the extra. One that ended sooner for its
+ * power (Leapfrog's, 0.72 s) is brought up to it, and its power waits for it.
+ */
+export const bossBannerMs = (): number => BOSS_BANNER.ms + bannerPlusMs();
+/**
+ * How long a pre-game vote's result shows before the next vote or the match (ms): `voteResultSeconds` (the walk to the
+ * winner, then its banner) and the banners' extra (Oct 24), Crowd and Squads, solo and online.
+ */
+export const voteResultMs = (s: { voteResultSeconds: number }): number => s.voteResultSeconds * 1000 + bannerPlusMs();
+
+/**
  * How long every speech line stays up, and how lines take turns (Eric, Oct 10: Ginger's line came and went at once).
  * The rule for every boss's lines and the God King's, in one place (packages/app/src/speech.tsx): a line types out
- * (`typeMs` a character), then stays fully readable for `readMs` plus `perCharMs` a character, at most `maxReadMs`,
- * then fades (`fadeMs`). Eric, later on Oct 10: "a few seconds… two, three, four, not that long": a short line
- * ("Freeze!") rests about 2.5 s once typed, a long one (50 characters) about 4 s, none over 4.5 s. Only a critical
- * line cuts in on one still inside that time; any other waits its turn, highest priority first, and is dropped if it
- * can't start within `waitMs` of being said (it would be stale by then).
+ * (`typeMs` a character), then stays fully readable for `readMs` plus `perCharMs` a character, and `longExtraMs` more
+ * for a line longer than `longChars` (about one row of the bar's bubble on a 390 px phone), at most `maxReadMs`, then
+ * fades (`fadeMs`). Once a line has started, nothing takes it off before it has typed out and been fully readable for
+ * `minReadMs`: a critical line that comes sooner waits for that, then cuts in; any other waits its turn, highest
+ * priority first, and is dropped if it can't start within `waitMs` of being said (it would be stale by then).
+ * Eric, Oct 10: "a few seconds… two, three, four, not that long". Oct 24 (Babur's thinking line, cut off by his hoops'
+ * line a quarter of a second in): "same with the text bubbles when the boss talks… I couldn't even see what the heck he
+ * was saying… because it was so fast. And it shouldn't linger forever… they need to be like a second longer if they're
+ * like two rows or more than a certain number of words, and then even… sit out a little bit longer." A short line now
+ * rests about 3 s once typed, a two-row one (50 characters) about 5.5 s, none over 6.5 s.
  */
 export const SPEECH = {
   typeMs: 28,
-  readMs: 2200,
+  readMs: 2700,
   perCharMs: 35,
-  maxReadMs: 4500,
+  longChars: 30,
+  longExtraMs: 1000,
+  maxReadMs: 6500,
+  minReadMs: 1500,
   fadeMs: 260,
   waitMs: 5000,
 } as const;

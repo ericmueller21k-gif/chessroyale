@@ -23,6 +23,7 @@ import {
   moveEdges,
   pieceAt,
   powerMomentMs,
+  bannerWaitMs,
   powerTurn,
   prepareTurn,
   rageOf,
@@ -317,7 +318,7 @@ describe("Sawyer's split pawn", () => {
       expect(r.boss!.powers!.split).toEqual(expect.objectContaining({ turn: 2 }));
     }
     expect(splits).toBeGreaterThan(0);
-    expect(powerMomentMs([{ kind: "split" }])).toBe(SPLIT.total);
+    expect(powerMomentMs([{ kind: "split" }])).toBe(SPLIT.total + bannerWaitMs("split"));
   });
 
   it("the moves after it replay from the split, and the game goes on (a move only legal with the new pawn)", async () => {
@@ -514,7 +515,7 @@ describe("Sawyer's saw cuts", () => {
     expect(seen.find((s) => s.turn === 3)!.cut).toBe(seen.find((s) => s.turn === 5)!.cut);
     expect(seen.find((s) => s.turn === 6)!.cut).toBeNull();
     expect(judged).toBeGreaterThan(0);
-    expect(powerMomentMs([{ kind: "cut" }])).toBe(SAW_CUT.ms);
+    expect(powerMomentMs([{ kind: "cut" }])).toBe(SAW_CUT.ms + bannerWaitMs("cut"));
   });
 });
 
@@ -581,7 +582,7 @@ describe("Sawyer's board saw", () => {
       if (t <= 16) expect(rageOf(s)).toBe(0);
       else expect(rageOf(s)).toBeGreaterThan(0);
     }
-    expect(powerMomentMs([{ kind: "boardsaw" }])).toBe(BOARD_SAW.total);
+    expect(powerMomentMs([{ kind: "boardsaw" }])).toBe(BOARD_SAW.total + bannerWaitMs("boardsaw"));
   });
 
   it("the test switch: warned as turn 2 begins and sawn on turn 3, whatever the board; the trigger: as the next turn begins", async () => {

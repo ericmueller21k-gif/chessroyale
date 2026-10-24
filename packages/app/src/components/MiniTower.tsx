@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { cutLabel, roundLive, towerView, type GameView } from "../game.ts";
+import { cutLabel, roundLive, scoreDp, towerView, type GameView } from "../game.ts";
 import { LeaderboardSheet } from "./LeaderboardSheet.tsx";
 import { RaceTower } from "./RaceTower.tsx";
 import { pickRows } from "../pick-rows.ts";
@@ -92,7 +92,7 @@ export function MiniTower({
       </div>
       {open && (
         <div class="mini-tower-body" ref={body} onClick={() => setSheet(true)}>
-          <RaceTower standings={standings} cutoff={cutoff} mini keep={keep} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={floats} />
+          <RaceTower standings={standings} cutoff={cutoff} mini keep={keep} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={floats} dp={scoreDp(match.settings)} />
         </div>
       )}
       {sheet && <LeaderboardSheet match={match} onClose={() => setSheet(false)} />}

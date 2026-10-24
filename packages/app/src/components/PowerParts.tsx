@@ -17,12 +17,16 @@ import { play, type SoundName } from "../sound.ts";
  * (components/<Boss>.tsx) uses these; BossPowers.tsx puts them together (and is what the screens import).
  */
 
-/** One power's moment on screen: when it starts (ms, wall clock) and how long it takes. */
+/**
+ * One power's moment on screen: when its own clock starts (ms, wall clock) and how long it takes from then; `lead`, how
+ * long its banner is up before that (its banner shows a boss banner's whole length: bannerLeadMs in boss-timing.ts).
+ */
 export interface Moment {
   kind: PowerEventKind;
   key: string;
   at: number;
   ms: number;
+  lead?: number;
   square?: string;
   /** A wave of fireballs: their squares, in the order they land; those that fizzled (the crowd's king stood there). */
   squares?: string[];
@@ -55,9 +59,11 @@ export interface MomentProps {
   side: "w" | "b";
   kit: BossKit | null;
   /**
-   * The power's banner (the God King's cut-in style), from `from` ms into the moment (0: its start): on screen for
-   * BOSS_BANNER.ms, or until `until` ms into the moment where the power itself starts sooner (it's off the board by
-   * then, so nothing the power does plays under it). Null outside that time.
+   * The power's banner (the God King's cut-in style), from `from` ms into the moment (0: its start): its window in the
+   * moment's beats is BOSS_BANNER.ms, or until `until` ms into the moment where the power itself starts sooner (it's
+   * off the board by then, so nothing the power does plays under it). Since Oct 24 it shows a boss banner's whole
+   * length (bossBannerMs): one from the start is up through the moment's `lead` too, before its clock starts; one later
+   * in it grows in place. Every window is in POWER_BANNERS (boss-timing.ts; a test keeps them the same). Null outside.
    */
   banner: (text: string, sub?: string, tone?: string, until?: number, from?: number) => JSX.Element | null;
   /** The boss casting by the board's top-left corner, its animation's `hit` cue landing at `hitAt` (ms into the moment). */

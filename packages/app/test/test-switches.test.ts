@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AccountState, Profile } from "../src/account.ts";
-import { testParams, testSwitchesFor } from "../src/test-switches.ts";
+import { bannerPlusFor, testParams, testSwitchesFor, timingSeconds } from "../src/test-switches.ts";
 
 /**
  * The address's test switches (?debug, ?win=1, ?rounds=2, ?pool=, …; docs/areas/ops.md, "Test switches"): only for an
@@ -40,5 +40,46 @@ describe("reading them", () => {
   it("no address (Node): none", () => {
     vi.stubGlobal("location", undefined);
     expect([...testParams().keys()]).toEqual([]);
+  });
+});
+
+describe("?bannerplus= and ?talkplus= (Eric, Oct 24: a URL to try the lengths)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+  it("seconds, 0 to 3, as ms; anything else is ignored", () => {
+    expect(timingSeconds("0")).toBe(0);
+    expect(timingSeconds("0.5")).toBe(500);
+    expect(timingSeconds("0.75")).toBe(750);
+    expect(timingSeconds("1")).toBe(1000);
+    expect(timingSeconds("3")).toBe(3000);
+    for (const bad of [null, "", " ", "-1", "3.5", "abc", "1s", "Infinity", "NaN"]) expect(timingSeconds(bad), String(bad)).toBeNull();
+  });
+  it("counts only where the test switches do, and only for a game on this device (online: the server's default)", () => {
+    expect(bannerPlusFor(1000, () => true, true)).toBe(1000);
+    expect(bannerPlusFor(0, () => true, true)).toBe(0);
+    expect(bannerPlusFor(1000, () => false, true)).toBeNull();
+    expect(bannerPlusFor(1000, () => true, false)).toBeNull();
+    expect(bannerPlusFor(null, () => true, true)).toBeNull();
+  });
+  it("read from the address once, as the page opens; whether it counts, each time", async () => {
+    vi.stubGlobal("location", { search: "?bannerplus=1&talkplus=0.5" });
+    vi.resetModules();
+    const sw = await import("../src/test-switches.ts");
+    vi.stubEnv("DEV", true);
+    expect(sw.bannerPlusAsked()).toBe(1000);
+    expect(sw.talkPlusMs()).toBe(500);
+    // (A link that drops the query later keeps them for the page.)
+    vi.stubGlobal("location", { search: "" });
+    expect(sw.bannerPlusAsked()).toBe(1000);
+    sw.timingOnDevice(false);
+    expect(sw.bannerPlusAsked()).toBeNull();
+    expect(sw.talkPlusMs()).toBe(500);
+    sw.timingOnDevice(true);
+    vi.stubEnv("DEV", false);
+    expect(sw.bannerPlusAsked()).toBeNull();
+    expect(sw.talkPlusMs()).toBe(0);
   });
 });
