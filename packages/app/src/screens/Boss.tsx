@@ -136,9 +136,9 @@ export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
                 movesLeft(boss)}
         </span>
         <span class="boss-prop">{meters && <BossBarExtra boss={boss} until={until} part="prop" />}</span>
-        {/* (His words, a phone's: over the bar's bottom, as small as the line, in the room left of the status, so never over it.
-            A computer's are by his figure beside the board.) */}
-        {char && <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble" />}
+        {/* (His words, a phone's: inside the bar, from the name column's left edge to its right padding, under the status, so never
+            over it: one row when short, else two balanced rows. A computer's are by his figure beside the board.) */}
+        {char && <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble" balanced />}
       </span>
     </div>
   );

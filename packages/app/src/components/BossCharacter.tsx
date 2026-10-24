@@ -389,8 +389,10 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   }, [fallAt]);
   if (!kit || !beat) return null;
   const { ch } = kit;
+  // (A phone's bar: his size and his drawing's shift in the box (kits.ts barScale, barShift; styles.css). Full size and no shift otherwise.)
+  const barSize = place === "bar" ? { "--bc-scale": kit.barScale ?? 1, "--bc-shift": kit.barShift ?? 0 } : {};
   return (
-    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}`} data-anim={beat.anim} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1] }}>
+    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}`} data-anim={beat.anim} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
       {kit.engine && <EngineOverlay ch={ch} elRef={eng} />}
       {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). In the

@@ -173,6 +173,7 @@
         "packages/app/src/speech.tsx"
       ],
       "specs": [
+        "e2e/boss-bar-same.spec.ts",
         "e2e/boss-character.spec.ts",
         "e2e/boss-powers.spec.ts",
         "e2e/boss-select.spec.ts",
@@ -190,6 +191,7 @@
       "specs": [
         "e2e/banner-time.spec.ts",
         "e2e/boss-bar.spec.ts",
+        "e2e/boss-bar-same.spec.ts",
         "e2e/boss-character.spec.ts",
         "e2e/boss-dock.spec.ts",
         "e2e/boss-powers.spec.ts",
@@ -442,6 +444,7 @@
       "paths": ["packages/app/src/styles.css"],
       "specs": [
         "e2e/boss-bar.spec.ts",
+        "e2e/boss-bar-same.spec.ts",
         "e2e/boss-dock.spec.ts",
         "e2e/boss-select.spec.ts",
         "e2e/eval-bar.spec.ts",

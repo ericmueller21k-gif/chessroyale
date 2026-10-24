@@ -25,9 +25,9 @@
  * from its BossUi, the boss character for its reactions); its words show in its text box beside it, on every screen.
  */
 import type { ComponentChildren, JSX } from "preact";
-import { useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { SPEECH } from "@chessroyale/core";
-import { talkPlusMs } from "./test-switches.ts";
+import { talkPlusMs, testSwitchesAllowed } from "./test-switches.ts";
 import { useFrameNow } from "./components/Countdown.tsx";
 import { lineLength, plainLine, sliceLine, type LineSeg } from "./speech-icons.ts";
 import { mooIconSprite, type MooIconId } from "./characters/moo.ts";
@@ -103,6 +103,17 @@ export class Voice {
     return true;
   }
 
+  /**
+   * A test's line (the boss-bar check's `sayBoss` hook, test switches only): it replaces the line up now and the queue, whatever
+   * their priority, so each line of a boss is drawn in its own box in turn (e2e/boss-bar-same.spec.ts). The one exception to
+   * "never taken off unread": a test hook, which the game never calls.
+   */
+  replace(text: string, key: string, priority: Priority = CRITICAL, at = Date.now()): boolean {
+    this.now = null;
+    this.queue = [];
+    return this.say(text, key, priority, at);
+  }
+
   /** The line up at `now`, if any (the next one in line starts as the last ends). */
   line(now = Date.now()): Spoken | null {
     this.advance(now);
@@ -173,9 +184,60 @@ export function useVoice(voice: Voice): { line: Spoken | null; now: number } {
  * A voice's line in its box (SpeechBox), keeping itself current (useVoice): the figure it stands by isn't drawn again
  * for it. `hidden`: not shown just now (it's still looked at, so its lines keep their time and their turns).
  */
-export function VoiceBubble({ voice, class: cls, hidden = false }: { voice: Voice; class: string; hidden?: boolean }) {
+export function VoiceBubble({ voice, class: cls, hidden = false, balanced = false }: { voice: Voice; class: string; hidden?: boolean; balanced?: boolean }) {
   const { line, now } = useVoice(voice);
-  return line && !hidden ? <SpeechBox key={line.key} class={cls} text={line.text} at={line.at} until={line.until} now={now} fits={1} /> : null;
+  // A test hook (test switches only): `sayBoss(text)` says any line in the boss's voice at once, so the boss-bar check
+  // (e2e/boss-bar-same.spec.ts) can put every line of every boss into its bubble and measure it.
+  useEffect(() => {
+    if (voice === bossVoice && testSwitchesAllowed()) (globalThis as { sayBoss?: (text: string) => boolean }).sayBoss = (text) => voice.replace(text, `test:${Date.now()}:${text}`);
+  }, [voice]);
+  return line && !hidden ? <SpeechBox key={line.key} class={cls} text={line.text} at={line.at} until={line.until} now={now} fits={1} balanced={balanced} /> : null;
+}
+
+/**
+ * A boss's bar bubble, fitted to its line (SpeechBox's `balanced`). Eric, Oct 24: "two rows is better than one row, but 1.5 rows is
+ * better than 4 small rows"; the box uses its own width. `w1` is the line's one-row width in the page's font; `inner` the room's text
+ * width (the room, the parent's width, less the box's frame); `longest` the longest word, in the same font. One row when `w1` is at
+ * most 60% of `inner`: the box as wide as its line. Else two balanced rows when two rows hold the line at the room's width (measured:
+ * the box laid out at the room's width, counted by its height): the text `w1`/2 plus the longest word, so the words break without a
+ * third row, and never as wide as the line (so it breaks), at most the room. Else three rows: the box as wide as the room, the text
+ * wrapped to fill it (`wide3`).
+ */
+function bubbleFit(e: HTMLElement): { width: number; three: boolean } | null {
+  const room = e.parentElement?.clientWidth ?? 0;
+  if (!room) return null;
+  const cs = getComputedStyle(e);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+  const line = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
+  const inner = room - padX;
+  // (The box's width is set for each measure, then put back. offsetWidth and offsetHeight, not its box: the entrance scales it.)
+  const was = e.style.width;
+  const wasMax = e.style.maxWidth;
+  e.style.maxWidth = "none";
+  e.style.width = "max-content";
+  const one = e.offsetWidth;
+  // The longest word, in the same font: a hidden nowrap probe in the box, one word at a time, taken out again at once.
+  const probe = document.createElement("span");
+  probe.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;left:0;top:0";
+  e.appendChild(probe);
+  let longest = 0;
+  for (const word of (e.getAttribute("aria-label") ?? "").split(/\s+/)) {
+    if (!word) continue;
+    probe.textContent = word;
+    longest = Math.max(longest, probe.getBoundingClientRect().width);
+  }
+  probe.remove();
+  // The rows the line takes at the room's width.
+  e.style.width = `${room}px`;
+  const roomRows = Math.round((e.offsetHeight - padY) / line);
+  e.style.width = was;
+  e.style.maxWidth = wasMax;
+  const w1 = one - padX;
+  if (w1 <= 0.6 * inner) return { width: Math.ceil(one), three: false };
+  if (roomRows > 2) return { width: room, three: true };
+  const text = Math.max(longest, Math.min(inner, w1 / 2 + longest, w1 - 1));
+  return { width: Math.min(room, Math.ceil(text + padX)), three: false };
 }
 
 /** Says a line into a voice once, as it's first drawn (a moment's line from inside its screen); draws nothing. */
@@ -190,9 +252,26 @@ export function Say({ voice, text, sayKey, priority = NORMAL }: { voice: Voice; 
  * would run off the screen takes a smaller size (`fits` steps: its CSS's `.fit1`…), and past the last step is moved
  * back into view. It's never hidden.
  */
-export function SpeechBox({ class: cls, text, at, until, now, fits = 0, children, ...props }: { class: string; text: string; at: number; until: number; now: number; fits?: number; children?: ComponentChildren } & Omit<JSX.HTMLAttributes<HTMLDivElement>, "class">) {
+export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced = false, children, ...props }: { class: string; text: string; at: number; until: number; now: number; fits?: number; /** Fitted to its line, two balanced rows or three (bubbleFit): a boss's bar. */ balanced?: boolean; children?: ComponentChildren } & Omit<JSX.HTMLAttributes<HTMLDivElement>, "class">) {
   const el = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState<{ step: number; dx: number; dy: number }>({ step: 0, dx: 0, dy: 0 });
+  const [fitted, setFitted] = useState<{ width: number; three: boolean } | null>(null);
+  useLayoutEffect(() => {
+    const e = el.current;
+    if (!balanced || !e) return;
+    setFitted(bubbleFit(e));
+    // (The pixel font may still be loading (font-display: swap): measure again once it's in, so the box fits the font it's drawn in.)
+    let live = true;
+    void document.fonts?.load(`${getComputedStyle(e).fontSize} "Press Start 2P"`).then(
+      () => {
+        if (live && el.current) setFitted(bubbleFit(el.current));
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [text, balanced]);
   useLayoutEffect(() => {
     const e = el.current;
     if (!e || fit.dx || fit.dy) return;
@@ -204,9 +283,10 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, children
   }, [fit]);
   const { shown, rest } = sliceLine(text, typedCount(text, at, now));
   const leaving = until - now < SPEECH.fadeMs;
-  const style = fit.dx || fit.dy ? { transform: `translate(${Math.round(fit.dx)}px, ${Math.round(fit.dy)}px)` } : undefined;
+  const move = fit.dx || fit.dy ? `translate(${Math.round(fit.dx)}px, ${Math.round(fit.dy)}px)` : null;
+  const style = fitted || move ? { ...(fitted ? { width: `${fitted.width}px` } : {}), ...(move ? { transform: move } : {}) } : undefined;
   return (
-    <div ref={el} class={`${cls}${now - at < 200 ? " fresh" : ""}${leaving ? " leaving" : ""}${fit.step ? ` fit${fit.step}` : ""}`} style={style} role="status" aria-label={plainLine(text)} data-fit={fit.step} {...props}>
+    <div ref={el} class={`${cls}${now - at < 200 ? " fresh" : ""}${leaving ? " leaving" : ""}${fit.step ? ` fit${fit.step}` : ""}${fitted?.three ? " wide3" : ""}`} style={style} role="status" aria-label={plainLine(text)} data-fit={fit.step} {...props}>
       <span aria-hidden="true">
         <LineText segs={shown} />
       </span>

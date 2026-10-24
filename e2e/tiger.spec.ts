@@ -411,7 +411,9 @@ test("Babur online: a reload mid-hoops draws the rings as they are, without the 
   expect(errors).toEqual([]);
 });
 
-test("Babur's pump on a phone is twice its size: 68 × 72 in the bar, its balloon's top under the status at 390 × 844 and 428 × 777", async ({ page }) => {
+// The pump on a phone (docs/decisions/2026-10-24-babur-bigger.md): 2x (68 × 72) in the bar's room at its right end, inside the bar, its
+// balloon's top under the status (the phone's one bar, 99 px: the room is 72 px tall under the status).
+test("Babur's pump on a phone at 390 × 844 and 428 × 777: 68 × 72 at the room's right end, inside the bar, its balloon's top under the status", async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -434,6 +436,7 @@ test("Babur's pump on a phone is twice its size: 68 × 72 in the bar, its balloo
     expect(pump.width, `${w} wide: the pump's width`).toBe(68);
     expect(pump.height, `${w} wide: the pump's height`).toBe(72);
     expect(pump.y + pump.height, `${w} wide: inside the bar`).toBeLessThanOrEqual(bar.y + bar.height + 1);
+    expect(pump.y, `${w} wide: inside the bar, top`).toBeGreaterThanOrEqual(bar.y);
     expect(room.x + room.width - (pump.x + pump.width), `${w} wide: at the room's right end`).toBeLessThan(6);
     expect(await pumpBalloonTop(page), `${w} wide: the balloon's top under the status`).toBeGreaterThanOrEqual(status.y + status.height);
   }
