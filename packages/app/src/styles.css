@@ -1218,7 +1218,7 @@ p {
 .tower-head,
 .tower-row {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 52px 44px 46px 38px 20px;
+  grid-template-columns: 30px minmax(0, 1fr) 46px 40px 46px 38px 20px;
   align-items: center;
   column-gap: 4px;
   padding: 0 8px 0 0;
@@ -1233,6 +1233,20 @@ p {
   background: #181b21;
 }
 .tower-head span:first-child {
+  text-align: center;
+}
+/* (The labels sit over what they label: the number columns' to the right, as their numbers are, so a narrow name column
+   never reads "PLAYERPTS"; a label too wide for its column is cut, never run into the next.) */
+.tower-head span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+.tower-head span:nth-child(n + 3) {
+  text-align: right;
+}
+.tower-head span:last-child {
   text-align: center;
 }
 .tower-rows {
@@ -1267,12 +1281,35 @@ p {
   }
 }
 .t-pos {
+  position: relative;
   height: 100%;
   display: grid;
   place-items: center;
   font-weight: 900;
   background: #23272f;
   color: #fff;
+}
+/* A streak's fire is a badge on the rank square's bottom-right corner (it reaches into the gap beside it, never into the
+   name's cell), and the rank moves left to make room: the name keeps all its width. */
+.t-pos.streak {
+  padding-right: 8px;
+}
+.t-pos .streak-fire {
+  position: absolute;
+  right: -4px;
+  bottom: 1px;
+  margin: 0;
+  padding: 0 2px 0 1px;
+  gap: 0;
+  height: 10px;
+  border-radius: 3px;
+  background: rgba(10, 12, 16, 0.82);
+  font-size: 8px;
+  vertical-align: 0;
+}
+.t-pos .streak-fire svg {
+  width: 6px;
+  height: 8px;
 }
 .tower-row.p1 .t-pos {
   background: #d4a531;
@@ -2763,7 +2800,7 @@ button.history-label {
 }
 .tower-mini .tower-head,
 .tower-mini .tower-row {
-  grid-template-columns: 26px minmax(0, 1fr) 50px 42px 42px 18px;
+  grid-template-columns: 26px minmax(0, 1fr) 46px 40px 42px 18px;
 }
 .tower-mini .tower-head span:nth-child(6),
 .tower-mini .t-bank {
@@ -2772,7 +2809,7 @@ button.history-label {
 /* No bank column (RaceTower's `bank`: the Hidden Boss's phase 2, where each clock is its board's). */
 .tower-nobank:not(.tower-mini) .tower-head,
 .tower-nobank:not(.tower-mini) .tower-row {
-  grid-template-columns: 30px minmax(0, 1fr) 52px 44px 46px 20px;
+  grid-template-columns: 30px minmax(0, 1fr) 46px 40px 46px 20px;
 }
 .tower-nobank .tower-head span:nth-child(6),
 .tower-nobank .t-bank {
@@ -11458,7 +11495,7 @@ img.qicon {
 /* The scoreboard's narrow form beside chat: place, name and points. */
 .mini-tower.narrow .tower-mini .tower-head,
 .mini-tower.narrow .tower-mini .tower-row {
-  grid-template-columns: 24px minmax(0, 1fr) 50px;
+  grid-template-columns: 24px minmax(0, 1fr) 44px;
 }
 .mini-tower.narrow .tower-mini .tower-head span:nth-child(n + 4),
 .mini-tower.narrow .tower-mini .t-avg,

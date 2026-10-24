@@ -38,8 +38,13 @@ material fallback unchanged). Then, in this order:
 8. **The bubble grace.** At a cut (not the last before the ending) anyone within `cutGrace` 0.1 of the last player
    through goes through like an exact tie; what that leaves over is owed by the cuts to come (`cutCarry`), so the endings
    keep their sizes.
-9. **The scoreboard's fire** (`StreakFire`): our own inline flame and the count beside the name from 3 in a row; orange
-   3-4, a hotter red 5-6, a white-blue core 7+; a gentle flicker on the flame only, still under reduced motion.
+9. **The scoreboard's fire** (`StreakFire`): our own inline flame and the count, a badge on the rank square's corner from
+   3 in a row; orange 3-4, a hotter red 5-6, a white-blue core 7+; a gentle flicker on the flame only, still under reduced
+   motion. It was first drawn beside the name, which left one letter of each name in the full leaderboard at 320 px; on
+   the rank square (the rank moved left to make room, the badge reaching only into the gap beside it) every name keeps
+   the room it had before this change, measured at 320, 360, 390, 428 and 1280 px, and the points columns kept their
+   widths (2 decimals fit them). The header's number labels now sit right, over their numbers, so a narrow name column
+   no longer reads "PLAYERPTS".
 
 ## The sim (the deciding evidence)
 

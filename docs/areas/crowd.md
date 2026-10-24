@@ -49,8 +49,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   a rare find (`brilliance` with `brilliantMinGap`; `brilliantMaxFound` or fewer found it, exactly one when
   `brilliantFewLeft` or fewer picked) adds `brilliantBonus` to the finders and sets `result.brilliant`, which the
   reveal shows as the shoutout ("Brilliant find! You found Nf5 · +1"; online the reveal message's `brilliant`). The
-  standings carry `streak` from `streakFrom` (`NetStanding.streak`), and the scoreboard draws our own fire beside the name
-  (`components/StreakFire.tsx`: orange, red from 2 more, a white-blue core from 4 more; a flicker, still under reduced
+  standings carry `streak` from `streakFrom` (`NetStanding.streak`), and the scoreboard draws our own fire as a badge on the
+  rank square's corner, never in the name's cell, so a name keeps all its room (`components/StreakFire.tsx`, in `RaceTower`'s `.t-pos`: orange, red from 2 more, a white-blue core from 4 more; a flicker, still under reduced
   motion). The reveal adds "+0.50 streak bonus" under your score, and "not capped · gave up a piece" after the allowance.
   Test switches (solo): `?streaks=1` (every seat on a streak, 3 to 9), `?shoutout=1` (your first pick gets a shoutout).
 - **The cut.** After each stage (`firstStageRounds`, then `roundsPerStage`) the lowest scorers are knocked out

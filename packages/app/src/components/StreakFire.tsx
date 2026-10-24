@@ -2,7 +2,8 @@ import { CROWD_SCORING } from "@chessroyale/core";
 
 /**
  * A streak's fire (Crowd 50 v 50: CrowdScoring's strong moves in a row, from streakFrom): our own small flame, drawn
- * inline, with the count beside it. Its color by tier: orange, a hotter red from 2 more, a white-blue core from 4 more
+ * inline, with the count beside it. On the scoreboard it's a badge on the rank square's corner (RaceTower, `.t-pos`), so
+ * a name keeps its room. Its color by tier: orange, a hotter red from 2 more, a white-blue core from 4 more
  * (streakTier). A gentle flicker in CSS (`.streak-fire`), still under reduced motion. No emoji: the same on every phone.
  */
 export function StreakFire({ count, from = CROWD_SCORING.streakFrom }: { count: number; from?: number }) {

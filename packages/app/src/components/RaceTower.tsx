@@ -142,11 +142,14 @@ export function RaceTower({
               class={`tower-row${keys.get(r.id) !== r.id ? " jump" : ""}${r.isYou ? " you" : ""}${done?.has(r.id) ? " done" : ""}${done && !r.out && !done.has(r.id) ? " thinking" : ""}${zone ? " zone" : ""}${bubble ? " bubble" : ""}${r.out ? " out" : ""}${podium}`}
               style={{ transform: `translateY(${ys.get(r.id)}px)` }}
             >
-              <span class="t-pos">{r.out ? `${r.placement ?? "✕"}` : r.rank}</span>
+              <span class={`t-pos${!r.out && r.streak !== undefined ? " streak" : ""}`}>
+                <span class="t-rank">{r.out ? `${r.placement ?? "✕"}` : r.rank}</span>
+                {/* (A streak's fire: a badge on the rank square's corner, so the name keeps its room.) */}
+                {!r.out && r.streak !== undefined && <StreakFire count={r.streak} />}
+              </span>
               <span class="t-name">
                 {done?.has(r.id) && <span class="t-check">✓</span>}
                 {mini ? <span class="t-name-text">{r.name}</span> : <PlayerName class="t-name-text" name={r.name} uid={r.uid} you={r.isYou} bot={r.isBot} />}
-                {!r.out && r.streak !== undefined && <StreakFire count={r.streak} />}
                 {r.practice && (
                   <span class="t-practice" title="Practice mode (unlimited power-ups)">
                     💡
