@@ -156,6 +156,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - **The Reveal sound** (Settings → Sound, Oct 15; was the sound lab): the roulette's voice as the crowd's move is
   chosen (`REEL_VOICES` in `sound.ts`, `brc.reelVoice`): Steel pan (the default), Kalimba, Marimba, Glockenspiel, Music
   box, 8-bit blip. Picking plays a whole roulette (`previewReel`), as ▶ does without picking.
+- **Every sound list is collapsed by default** (Eric, Oct 24; [decision](../decisions/2026-10-24-sound-collapse.md)): the
+  title row ("Move sound", the pick's name, a chevron) is one button; a tap opens the list (each option with its ▶), a
+  tap on the row closes it. Each list opens on its own; the open state isn't stored, so Settings opens collapsed. All three
+  use `SoundPicker` in `Settings.tsx`: a future sound list gets the same by using it.
 - **Piece sounds** (Settings → Sound; Eric, Oct 11; all wood, Oct 12; the classics back as the defaults, Oct 12): a
   **Move sound** and a **Capture sound** picker, chosen separately, each option a radio (picking plays it) with its own
   ▶. Nine each, every one wood (Eric: "slightly different wooden sounds, not chips or clicks"). Moves: Classic knock
