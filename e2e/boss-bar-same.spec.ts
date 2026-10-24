@@ -140,6 +140,11 @@ const sayLine = (page: Page, text: string): Promise<LineRes> =>
         }
       }
       if (!el || el.getAttribute("aria-label") !== plain) return { text, missing: true as const, seen: `taken ${taken}, bubbles ${document.querySelectorAll(".bc-bar-bubble").length}, shown ${el?.getAttribute("aria-label") ?? "none"}` };
+      // (The bubble fits its line in the pixel font: when the font is still loading, it fits again once it's in. Wait for that, then measure.)
+      await document.fonts.ready;
+      await new Promise((r) => setTimeout(r, 50));
+      for (let i = 0; i < 3; i++) await new Promise((r) => requestAnimationFrame(() => r(null)));
+      el = document.querySelector<HTMLElement>(".bc-bar-bubble") ?? el;
       for (const a of el.getAnimations({ subtree: true })) {
         try {
           a.finish();
