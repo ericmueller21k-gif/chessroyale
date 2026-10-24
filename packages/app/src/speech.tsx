@@ -172,17 +172,18 @@ export function VoiceBubble({ voice, class: cls, hidden = false, balanced = fals
 }
 
 /**
- * The width of a balanced box (SpeechBox's `balanced`, a boss's bar; Eric, Oct 24: "two rows is better than one row, but 1.5
- * rows is better than 4 small rows"): null (the box's own width, one row) when the line's one row is at most half the room
- * its box's parent offers; else half the line plus the box's frame (two rows of similar length, `text-wrap: balance`), never
- * wider than that room. The room is the parent's width (the bar's grid, from the name column's left edge to its right padding).
+ * A boss's bar bubble, fitted to its line (SpeechBox's `balanced`; Eric, Oct 24: "two rows is better than one row, but 1.5 rows is
+ * better than 4 small rows"; the box must use its own width): null when the line is one row (at most half the room its box's parent
+ * offers: the box's own width); else two rows of about the same length when two fit the room (the box half the line plus its frame,
+ * `text-wrap: balance`); else three rows, the box as wide as the room and the text wrapped to fill it (`wide3`). The line's width is
+ * measured in the box itself, in the page's font.
  */
-function balancedWidth(e: HTMLElement): number | null {
+function bubbleFit(e: HTMLElement): { width: number; three: boolean } | null {
   const room = e.parentElement?.clientWidth ?? 0;
   if (!room) return null;
   const cs = getComputedStyle(e);
   const frame = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
-  // (The box's own one row, in the page's font: the box set to its widest, measured, then its width put back.)
+  // (The box's one row: set to its widest and measured, then its width put back.)
   const was = e.style.width;
   const wasMax = e.style.maxWidth;
   e.style.width = "max-content";
@@ -191,8 +192,11 @@ function balancedWidth(e: HTMLElement): number | null {
   e.style.width = was;
   e.style.maxWidth = wasMax;
   if (one <= room / 2) return null;
-  // Two rows of about the same length: half the text, and the frame.
-  return Math.min(room, Math.ceil((one - frame) / 2 + frame + 4));
+  const text = one - frame;
+  const char = parseFloat(cs.fontSize);
+  const two = Math.ceil(text / 2) + char + frame;
+  if (two <= room) return { width: Math.ceil(two), three: false };
+  return { width: room, three: true };
 }
 
 /** Says a line into a voice once, as it's first drawn (a moment's line from inside its screen); draws nothing. */
@@ -207,19 +211,19 @@ export function Say({ voice, text, sayKey, priority = NORMAL }: { voice: Voice; 
  * would run off the screen takes a smaller size (`fits` steps: its CSS's `.fit1`…), and past the last step is moved
  * back into view. It's never hidden.
  */
-export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced = false, children, ...props }: { class: string; text: string; at: number; until: number; now: number; fits?: number; /** Two balanced rows at most a line's half (balancedWidth): a boss's bar. */ balanced?: boolean; children?: ComponentChildren } & Omit<JSX.HTMLAttributes<HTMLDivElement>, "class">) {
+export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced = false, children, ...props }: { class: string; text: string; at: number; until: number; now: number; fits?: number; /** Fitted to its line, two balanced rows or three (bubbleFit): a boss's bar. */ balanced?: boolean; children?: ComponentChildren } & Omit<JSX.HTMLAttributes<HTMLDivElement>, "class">) {
   const el = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState<{ step: number; dx: number; dy: number }>({ step: 0, dx: 0, dy: 0 });
-  const [width, setWidth] = useState<number | null>(null);
+  const [fitted, setFitted] = useState<{ width: number; three: boolean } | null>(null);
   useLayoutEffect(() => {
     const e = el.current;
     if (!balanced || !e) return;
-    setWidth(balancedWidth(e));
+    setFitted(bubbleFit(e));
     // (The pixel font may still be loading (font-display: swap): measure again once it's in, so the box fits the font it's drawn in.)
     let live = true;
     void document.fonts?.load(`${getComputedStyle(e).fontSize} "Press Start 2P"`).then(
       () => {
-        if (live && el.current) setWidth(balancedWidth(el.current));
+        if (live && el.current) setFitted(bubbleFit(el.current));
       },
       () => undefined,
     );
@@ -239,9 +243,9 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
   const { shown, rest } = sliceLine(text, typedCount(text, at, now));
   const leaving = until - now < SPEECH.fadeMs;
   const move = fit.dx || fit.dy ? `translate(${Math.round(fit.dx)}px, ${Math.round(fit.dy)}px)` : null;
-  const style = width || move ? { ...(width ? { width: `${width}px` } : {}), ...(move ? { transform: move } : {}) } : undefined;
+  const style = fitted || move ? { ...(fitted ? { width: `${fitted.width}px` } : {}), ...(move ? { transform: move } : {}) } : undefined;
   return (
-    <div ref={el} class={`${cls}${now - at < 200 ? " fresh" : ""}${leaving ? " leaving" : ""}${fit.step ? ` fit${fit.step}` : ""}`} style={style} role="status" aria-label={plainLine(text)} data-fit={fit.step} {...props}>
+    <div ref={el} class={`${cls}${now - at < 200 ? " fresh" : ""}${leaving ? " leaving" : ""}${fit.step ? ` fit${fit.step}` : ""}${fitted?.three ? " wide3" : ""}`} style={style} role="status" aria-label={plainLine(text)} data-fit={fit.step} {...props}>
       <span aria-hidden="true">
         <LineText segs={shown} />
       </span>

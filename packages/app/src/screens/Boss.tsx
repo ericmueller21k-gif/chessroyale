@@ -97,11 +97,8 @@ export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
   const until = match?.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0;
   // (Test link ?barslot=1: the prop's room outlined, so a screenshot shows it.)
   const slot = testParams().get("barslot") === "1";
-  // (Test switch ?bar=fit: the taller bar that holds every figure whole, against the compact bar that's the default (?bar=out):
-  // the phone's layouts, styles.css, docs/decisions/2026-10-24-boss-bar-same.md.)
-  const fit = testParams().get("bar") === "fit";
   return (
-    <div class={`boss-bar${char ? " has-char" : ""}${fit ? " bar-fit" : ""}${slot ? " barslot" : ""}`} role="status" aria-label={`${boss.name}, threat ${boss.threat} of 5`}>
+    <div class={`boss-bar${char ? " has-char" : ""}${slot ? " barslot" : ""}`} role="status" aria-label={`${boss.name}, threat ${boss.threat} of 5`}>
       {char && <BossCharacter match={match!} place="bar" />}
       <span class={`boss-icon${char ? " boss-icon-face" : ""}`} aria-hidden="true">
         <BossFace boss={boss} />

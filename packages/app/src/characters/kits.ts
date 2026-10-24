@@ -89,12 +89,16 @@ export interface BossKit extends BeatLines {
    * edge nor the boss's name cuts into him. */
   wide?: boolean;
   /**
-   * The figure's size in a phone's boss bar, per layout, as a fraction of its drawing (Eric, Oct 24): `out` (the compact bar,
-   * the default) shrinks him only so his drawing never covers the line above the bar; `fit` (?bar=fit) only so he's wholly
-   * inside the taller bar. 1 is full size. Every phone bar's box is the same (BossCharacter, styles.css); see
-   * docs/decisions/2026-10-24-boss-bar-same.md for the numbers. Undefined: 1 in both.
+   * The figure's size in a phone's boss bar (Eric, Oct 24): 1 is full size, never less. The big animals (Alfil, Puddles, Moo & Moon,
+   * Babur) at 4/3, or the largest step of 1/12 that fits the bar's room at rest (docs/decisions/2026-10-24-boss-bar-same.md). Undefined: 1.
    */
-  barScale?: { out: number; fit: number };
+  barScale?: number;
+  /**
+   * The drawing's horizontal shift inside a phone's bar's figure box, px (+ right): for a boss wider on one side than the other, so
+   * its drawing fits the room beside the bar's left edge and the name column (the box, the name column and the baseline stay as they
+   * are for every boss). Undefined: 0.
+   */
+  barShift?: number;
   /** A recolor (one of the character's `looks`) from the battle's state: Big Boy's black pawn. */
   lookOf?: (boss: BossView) => string | undefined;
   /** Its attack on a king (the God King's Last Stand, its mate), if it has one: see KingAttackKit. */
@@ -116,7 +120,7 @@ export interface BossKit extends BeatLines {
 
 export const BOSS_KITS: Record<string, BossKit> = {
   "Boingo the Clown": {
-    barScale: { out: 0.80, fit: 1.00 },
+    barScale: 1,
     ch: CLOWN,
     anims: { strike: "capture", power: "pieThrow", ultimateWarn: "check", ultimate: "funhouse" },
     sounds: {
@@ -138,7 +142,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: CLOWN_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: pieItem },
   },
   "Ginger": {
-    barScale: { out: 0.80, fit: 0.95 },
+    barScale: 1,
     ch: GINGERBREAD,
     anims: { strike: "capture", power: "freezeCast", ultimateWarn: "check", ultimate: "blizzard" },
     sounds: { jingle: "gingerJingle", crunch: "gingerCrunch", crackle: "gingerCrackle", freeze: "gingerCrackle", blizzard: "gingerCrackle" },
@@ -150,7 +154,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: GINGER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1, hit: frostItem },
   },
   "Jefferson": {
-    barScale: { out: 0.60, fit: 0.90 },
+    barScale: 1,
+    barShift: -2,
     ch: GREX,
     anims: { strike: "capture", power: "ignite", powerHit: "capture", ultimateWarn: "candleWarn", ultimate: "romanCandle", ultimateHit: "capture" },
     sounds: {
@@ -176,7 +181,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: GREX_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: popItem },
   },
   "Hollow": {
-    barScale: { out: 0.75, fit: 1.00 },
+    barScale: 1,
     ch: HOLLOW,
     anims: { strike: "capture", power: "darkCast", darkFirst: "darkCast", ultimateWarn: "check", ultimate: "lightsOut", claim: "claimDark", found: "testFound", missed: "testMiss", lightsBack: "lightsBack" },
     sounds: {
@@ -202,7 +207,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: HOLLOW_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: lashItem },
   },
   "Big Boy": {
-    barScale: { out: 0.95, fit: 1.00 },
+    barScale: 1,
     ch: BIGBOY,
     anims: {
       entrance: "swing",
@@ -246,7 +251,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: BIGBOY_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1, facesLeft: true, hit: bonkItem },
   },
   "Sawyer": {
-    barScale: { out: 1.00, fit: 0.80 },
+    barScale: 1,
     ch: SAWYER,
     anims: {
       entrance: "rev",
@@ -282,7 +287,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: SAWYER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.45, facesLeft: true, hit: sawItem },
   },
   "Wrangler": {
-    barScale: { out: 1.00, fit: 0.80 },
+    barScale: 1,
     ch: PIG,
     anims: {
       entrance: "taunt",
@@ -333,7 +338,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Alfil, the woolly mammoth (Eric, Oct 17): docs/decisions/2026-10-17-alfil-wired.md.
   "Alfil": {
-    barScale: { out: 0.85, fit: 0.75 },
+    barScale: 13 / 12,
+    barShift: 2,
     ch: ALFIL,
     anims: {
       strike: "capture",
@@ -380,7 +386,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Eric's own, in one table (recluse-lines.ts).
   // Chub & Chirp, a rabbit riding a grasshopper (Eric, Oct 18): docs/decisions/2026-10-18-hopper-wired.md.
   "Chub & Chirp": {
-    barScale: { out: 0.90, fit: 0.90 },
+    barScale: 1,
     ch: HOPPER,
     anims: {
       strike: "capture",
@@ -431,7 +437,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Smudgy, the chameleon painter (Eric, Oct 19): docs/decisions/2026-10-19-smudgy-wired.md.
   "Smudgy": {
-    barScale: { out: 0.90, fit: 0.75 },
+    barScale: 1,
+    barShift: 3,
     ch: SMUDGY,
     anims: {
       // The boss's periodic strike on a piece is his capture cheer. (`strike` the beat is not `strike` the animation: his
@@ -477,7 +484,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Moo & Moon, a cow and his friend the Moon (Eric, Oct 20): docs/decisions/2026-10-20-moo-wired.md.
   "Moo": {
-    barScale: { out: 0.70, fit: 0.95 },
+    barScale: 14 / 12,
+    barShift: -1,
     ch: MOO,
     anims: {
       // The periodic strike on a piece is his capture cheer.
@@ -548,7 +556,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Puddles, the hippo gardener (Eric, Oct 20-21): docs/decisions/2026-10-23-gardener-wired.md.
   "Gardener": {
-    barScale: { out: 0.80, fit: 1.00 },
+    barScale: 15 / 12,
+    barShift: 2,
     ch: GARDENER,
     // (A phone's bar: the same drawing with the water off, which would run past his box into his name.)
     bar: GARDENER_BAR,
@@ -606,7 +615,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Babur, the circus tiger (Eric, Oct 23-24): docs/decisions/2026-10-24-tiger-wired.md.
   "Tiger": {
-    barScale: { out: 0.75, fit: 1.00 },
+    barScale: 16 / 12,
+    barShift: -1,
     ch: TIGER_FIGURE,
     anims: {
       // The periodic strike on a piece is his lazy swat.

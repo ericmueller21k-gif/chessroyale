@@ -5,25 +5,33 @@ import { plainLine } from "../packages/app/src/speech-icons.ts";
 import { bossAloneFromHome, test } from "./helpers.ts";
 
 /**
- * The boss bar is the same for every playable boss (docs/decisions/2026-10-24-boss-bar-same.md; Eric, Oct 24: "there should be
- * some continuity as far as the size and where their name sits… these box sizes should not change… these are the kind of
- * checks that should be… built"). Two phone layouts behind the test switch ?bar=: `out` (the compact bar, the default: a taller
- * figure rises above the bar, never over the line above it) and `fit` (the taller bar: every figure wholly inside it at rest).
- * In both: one bar, one figure box, the name, level, bars, status and free room in the same place for every boss, and every
- * line a boss says inside its bar: one row when short, else two balanced rows, never more than three. Every playable boss, at
- * 320x568, 390x844 and 428x777, on a phone (a computer's bar is unchanged, so one run is enough there).
+ * The phone boss bar is the same for every playable boss (docs/decisions/2026-10-24-boss-bar-same.md; Eric, Oct 24: "there should be
+ * some continuity as far as the size and where their name sits… these box sizes should not change… these are the kind of checks
+ * that should be… built"). One bar (99 px), one figure box (58 px wide, the bar's content tall), its feet on the same baseline for
+ * every boss; the name, level, bars, status and free room in the same place for every boss. A boss is drawn at its own size
+ * (4/3 or less for the big animals' steps, never below full size), and its drawing, at rest, stays 2 px inside the screen's left
+ * edge, 2 px clear of the name column, and under the "BOSS · move N" text; it may hang out of the bar's top and left edge. Every
+ * line a boss says sits inside its bar: one row when short, else two balanced rows, three only when two can't hold it, never four.
+ * Every playable boss, at 320x568, 390x844 and 428x777, on a phone (a computer's bar is unchanged, so one run is enough there).
  */
 const PLAYABLE = BOSS_ROSTER.filter(isPlayable);
 const SIZES: [number, number][] = [[320, 568], [390, 844], [428, 777]];
-const MODES = ["out", "fit"] as const;
-type Mode = (typeof MODES)[number];
 const BASE = "/?debug&pace=quick&clock=60&laststand=0&brain=stockfish";
 /** A pixel of slack for rounding (the box's edges are fractional at some widths). */
 const TOL = 1;
+/** The bar's height, the figure box's width and height (styles.css: the bar 99 px, the box 58 px wide, the bar's content tall). */
+const BAR_H = 99;
+const BOX_W = 58;
+const BOX_H = 88;
 /** The bar's bottom padding, under the feet: the figure's feet sit this far above the bar's bottom edge (styles.css). */
 const FEET_PAD = 6;
 /** The status's one line: taller than this, it has wrapped. */
 const STATUS_ONE_LINE = 16;
+/** The room at rest (px): the drawn left edge 2 px in from the screen, 2 px short of the name column, 1 px under the HUD's text. */
+const SCREEN_CLEAR = 2;
+const NAME_CLEAR = 2;
+/** Rows of a bubble's text: the pitch of a 320 px line matches a 390 px line's (10.8 px). */
+const ROW_PITCH_MIN = 10;
 
 type Box = { x: number; y: number; w: number; h: number; r: number; b: number };
 type Snap = {
@@ -44,7 +52,9 @@ type Snap = {
   board: Box | null;
   main: Box;
 };
-type LineRes = { text: string; rows: number; bubble: Box; bar: Box; status: Box; name: Box; main: Box; fit: string | null } | { text: string; missing: true; seen: string | null };
+type LineRes =
+  | { text: string; rows: number; pitch: number; bubble: Box; bar: Box; status: Box; name: Box; main: Box; fit: string | null }
+  | { text: string; missing: true; seen: string };
 
 /** Every box the bar is made of, as the page draws it, and the figure's drawn pixels at rest (its idle frame). */
 const snap = (page: Page): Promise<Snap & { anim: string | null }> =>
@@ -143,10 +153,15 @@ const sayLine = (page: Page, text: string): Promise<LineRes> =>
       };
       const rg = document.createRange();
       rg.selectNodeContents(el);
-      const tops = new Set([...rg.getClientRects()].filter((q) => q.width > 0.5 && q.height > 0.5).map((q) => Math.round(q.top / 4)));
+      // (A row: the text's boxes whose tops lie within 3 px of each other; the rows' pitch is the closest two rows.)
+      const tops = [...rg.getClientRects()].filter((q) => q.width > 0.5 && q.height > 0.5).map((q) => q.top).sort((a, b) => a - b);
+      const rowTops: number[] = [];
+      for (const t of tops) if (!rowTops.length || t - rowTops[rowTops.length - 1]! > 3) rowTops.push(t);
+      const pitch = rowTops.length > 1 ? Math.min(...rowTops.slice(1).map((t, i) => t - rowTops[i]!)) : 0;
       return {
         text,
-        rows: tops.size,
+        rows: rowTops.length,
+        pitch,
         bubble: rect(el),
         bar: rect(document.querySelector(".boss-bar")!),
         status: rect(document.querySelector(".boss-next")!),
@@ -157,6 +172,17 @@ const sayLine = (page: Page, text: string): Promise<LineRes> =>
     },
     { text, plain: plainLine(text) },
   );
+
+/** Whether the bar's bubble stays empty for `ms` (a boss's own line, its entrance or its idle moment, has taken the box before then). */
+const bubbleQuiet = (page: Page, ms: number): Promise<boolean> =>
+  page.evaluate(async (ms) => {
+    const start = performance.now();
+    while (performance.now() - start < ms) {
+      if (document.querySelector(".bc-bar-bubble")) return false;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return true;
+  }, ms);
 
 /** The bubble's line count, box and room, and its one-row width, for a boss's every line. */
 const linesOf = (kit: string): string[] => {
@@ -180,108 +206,116 @@ async function sheet(page: Page, title: string, bars: { name: string; png: Buffe
   await testInfo.attach(`${title}.png`, { body: png, contentType: "image/png" });
 }
 
-for (const mode of MODES) {
-  test(`${mode}: every playable boss's bar is the same box in the same place, its figure where ${mode} puts it, every line inside its bar`, async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "phone", "one run is enough: a computer's bar is unchanged");
-    test.setTimeout(1_800_000);
-    const errors: string[] = [];
-    page.on("pageerror", (e) => errors.push(e.message));
-    const snaps: Record<string, Partial<Record<number, Snap>>> = {};
-    const lines: Record<string, Partial<Record<number, LineRes[]>>> = {};
-    const pngs: Record<number, { name: string; png: Buffer }[]> = { 320: [], 390: [], 428: [] };
-    const boards: Record<number, Record<string, Box | null>> = { 320: {}, 390: {}, 428: {} };
-    for (const def of PLAYABLE) {
-      await page.goto(`${BASE}&boss=${def.id}&bar=${mode}`);
-      await bossAloneFromHome(page);
-      await expect(page.locator(".boss-bar")).toBeVisible({ timeout: 60_000 });
-      snaps[def.id] = {};
-      lines[def.id] = {};
-      for (const [w, h] of SIZES) {
-        await page.setViewportSize({ width: w, height: h });
-        // (The figure at rest: its idle frame drawn, nothing else of its moments.)
-        await expect.poll(async () => (await snap(page)).anim, { timeout: 20_000 }).toBe("idle");
-        await page.waitForTimeout(300);
-        const s = await snap(page);
-        snaps[def.id]![w] = s;
-        boards[w]![def.id] = s.board;
-        // (A clip of the page, not the element's own screenshot: the bar's live parts keep moving, so Playwright never finds it still.)
-        const at = (await page.locator(".boss-bar").boundingBox())!;
-        pngs[w]!.push({ name: `${def.name}`, png: await page.screenshot({ clip: at }) });
-        const out: LineRes[] = [];
-        for (const text of linesOf(def.kit!)) out.push(await sayLine(page, text));
-        lines[def.id]![w] = out;
+test("every playable boss's phone bar: one bar and one figure box for all, the figure at its size and in the room at rest, every line inside its bar", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "phone", "one run is enough: a computer's bar is unchanged");
+  test.setTimeout(3_000_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const snaps: Record<string, Partial<Record<number, Snap>>> = {};
+  const lines: Record<string, Partial<Record<number, LineRes[]>>> = {};
+  const pngs: Record<number, { name: string; png: Buffer }[]> = { 320: [], 390: [], 428: [] };
+  const lineup: { name: string; png: Buffer; box: Box }[] = [];
+  const boards: Record<number, Record<string, Box | null>> = { 320: {}, 390: {}, 428: {} };
+  for (const def of PLAYABLE) {
+    await page.goto(`${BASE}&boss=${def.id}`);
+    await bossAloneFromHome(page);
+    await expect(page.locator(".boss-bar")).toBeVisible({ timeout: 60_000 });
+    snaps[def.id] = {};
+    lines[def.id] = {};
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h });
+      // (The figure at rest: its idle frame drawn, nothing else of its moments.)
+      await expect.poll(async () => (await snap(page)).anim, { timeout: 20_000 }).toBe("idle");
+      await page.waitForTimeout(300);
+      const s = await snap(page);
+      snaps[def.id]![w] = s;
+      boards[w]![def.id] = s.board;
+      // (A clip of the page, not the element's own screenshot: the bar's live parts keep moving, so Playwright never finds it still.
+      // Its box is waited for first: the bar is redrawn when a boss's screen settles.)
+      await expect.poll(() => page.locator(".boss-bar").boundingBox(), { timeout: 20_000, message: `${def.id} at ${w}: the bar has a box` }).not.toBeNull();
+      const at = (await page.locator(".boss-bar").boundingBox())!;
+      pngs[w]!.push({ name: `${def.name}`, png: await page.screenshot({ clip: at }) });
+      if (w === 390) {
+        // The lineup's figure: from the screen's top to the bar's bottom, the left of the bar (the HUD's text is cut off in the picture).
+        const fig = { x: at.x, y: 0, width: 96, height: at.y + at.height + 2 };
+        lineup.push({ name: def.name, png: await page.screenshot({ clip: fig }), box: s.box });
+      }
+      // (The boss's own lines settle first: its entrance and its first idle moment take the box as the battle begins. The line check
+      // starts once the box has been empty for a moment.)
+      await expect.poll(() => bubbleQuiet(page, 1500), { timeout: 60_000, message: `${def.id} at ${w}: the boss is quiet` }).toBe(true);
+      const out: LineRes[] = [];
+      for (const text of linesOf(def.kit!)) out.push(await sayLine(page, text));
+      lines[def.id]![w] = out;
+    }
+  }
+  expect(errors, "no page errors").toEqual([]);
+
+  for (const [w] of SIZES) {
+    const at = (id: string) => snaps[id]![w]!;
+    const all = PLAYABLE.map((d) => d.id);
+    // One bar, one figure box, the same for every boss (±1 px).
+    expect.soft(spread(all.map((id) => at(id).bar.h)), `${w}: the bar's height is the same for every boss`).toBeLessThanOrEqual(TOL);
+    expect.soft(Math.abs(at(all[0]!).bar.h - BAR_H), `${w}: the bar is ${BAR_H} px`).toBeLessThanOrEqual(TOL);
+    expect.soft(spread(all.map((id) => at(id).box.w)), `${w}: the figure box's width is the same`).toBeLessThanOrEqual(TOL);
+    expect.soft(spread(all.map((id) => at(id).box.h)), `${w}: the figure box's height is the same`).toBeLessThanOrEqual(TOL);
+    expect.soft(Math.abs(at(all[0]!).box.w - BOX_W), `${w}: the box is ${BOX_W} px wide`).toBeLessThanOrEqual(TOL);
+    expect.soft(Math.abs(at(all[0]!).box.h - BOX_H), `${w}: the box is ${BOX_H} px tall`).toBeLessThanOrEqual(TOL);
+    // The same place for the name, level, bars, status and the free room, for every boss (±1 px).
+    for (const key of ["name", "status", "prop"] as const) {
+      const xs = all.map((id) => at(id)[key]!);
+      expect.soft(spread(xs.map((b) => b.x)), `${w}: ${key}'s x is the same`).toBeLessThanOrEqual(TOL);
+      expect.soft(spread(xs.map((b) => b.y)), `${w}: ${key}'s y is the same`).toBeLessThanOrEqual(TOL);
+    }
+    expect.soft(spread(all.map((id) => at(id).prop!.w)), `${w}: the free room is the same width`).toBeLessThanOrEqual(TOL);
+    expect.soft(spread(all.map((id) => at(id).prop!.h)), `${w}: the free room is the same height`).toBeLessThanOrEqual(TOL);
+    for (const key of ["level", "rage"] as const) {
+      const xs = all.map((id) => at(id)[key]!);
+      expect.soft(spread(xs.map((b) => b.x)), `${w}: ${key} x is the same`).toBeLessThanOrEqual(TOL);
+      expect.soft(spread(xs.map((b) => b.y)), `${w}: ${key} y is the same`).toBeLessThanOrEqual(TOL);
+    }
+    const withPassive = all.filter((id) => at(id).passive);
+    expect.soft(spread(withPassive.map((id) => at(id).passive!.y)), `${w}: the passive bar's y is the same for every boss that has one`).toBeLessThanOrEqual(TOL);
+    for (const id of all) {
+      const s = at(id);
+      const who = `${id} at ${w}`;
+      expect.soft(s.nameWhole, `${who}: the name whole`).toBe(true);
+      expect.soft(s.status.h, `${who}: the status on one line`).toBeLessThanOrEqual(STATUS_ONE_LINE);
+      // The figure: feet on the bar's baseline, the same box.
+      expect.soft(Math.abs(s.box.b - (s.bar.b - FEET_PAD)), `${who}: feet on the baseline`).toBeLessThanOrEqual(TOL);
+      expect(s.pixels, `${who}: drawn`).not.toBeNull();
+      const p = s.pixels!;
+      // At rest: the drawing 2 px inside the screen's left edge, 2 px clear of the name column, under the HUD's text, and no lower than the
+      // bar's bottom. It may hang out of the bar's top and left edge (Eric: "the only thing hanging out would be the boss").
+      expect.soft(p.minX, `${who}: 2 px inside the screen's left edge`).toBeGreaterThanOrEqual(SCREEN_CLEAR);
+      expect.soft(p.maxX, `${who}: 2 px clear of the name column`).toBeLessThanOrEqual(s.name.x - NAME_CLEAR);
+      expect.soft(p.minY, `${who}: never covers the "BOSS · move N" text`).toBeGreaterThanOrEqual(s.hudText!.b + 1);
+      expect.soft(p.maxY, `${who}: nothing of the figure below the bar`).toBeLessThanOrEqual(s.bar.b + TOL);
+    }
+    // Every line, inside the bar and beside the status, in at most three rows (two of them the same pitch as at 390); a one-row line
+    // never past 60% of its room.
+    for (const id of all) {
+      for (const r of lines[id]![w] ?? []) {
+        const who = `${id} at ${w}: "${r.text}"`;
+        expect.soft("missing" in r ? `missing (seen: ${r.seen})` : "ok", `${who}: said and drawn`).toBe("ok");
+        if ("missing" in r) continue;
+        expect.soft(r.rows, `${who}: rows`).toBeLessThanOrEqual(3);
+        expect.soft(r.rows, `${who}: at least one row`).toBeGreaterThanOrEqual(1);
+        if (r.rows >= 2) expect.soft(r.pitch, `${who}: the rows' pitch`).toBeGreaterThanOrEqual(ROW_PITCH_MIN);
+        expect.soft(r.bubble.x, `${who}: inside the bar, left`).toBeGreaterThanOrEqual(r.bar.x - TOL);
+        expect.soft(r.bubble.r, `${who}: inside the bar, right`).toBeLessThanOrEqual(r.bar.r + TOL);
+        expect.soft(r.bubble.y, `${who}: inside the bar, top`).toBeGreaterThanOrEqual(r.bar.y - TOL);
+        expect.soft(r.bubble.b, `${who}: inside the bar, bottom`).toBeLessThanOrEqual(r.bar.b + TOL);
+        expect.soft(r.bubble.y, `${who}: under the status, never over it`).toBeGreaterThanOrEqual(r.status.b - TOL);
+        expect.soft(r.bubble.x, `${who}: from the name column's left edge`).toBeGreaterThanOrEqual(r.name.x - TOL);
+        if (r.rows === 1) expect.soft(r.bubble.w, `${who}: a one-row line within 60% of its room`).toBeLessThanOrEqual(0.6 * r.main.w + TOL);
       }
     }
-    expect(errors, "no page errors").toEqual([]);
+  }
 
-    for (const [w] of SIZES) {
-      const at = (id: string) => snaps[id]![w]!;
-      const all = PLAYABLE.map((d) => d.id);
-      // One bar, one figure box, the same for every boss (±1 px).
-      expect.soft(spread(all.map((id) => at(id).bar.h)), `${w}: the bar's height is the same for every boss`).toBeLessThanOrEqual(TOL);
-      expect.soft(spread(all.map((id) => at(id).box.w)), `${w}: the figure box's width is the same`).toBeLessThanOrEqual(TOL);
-      expect.soft(spread(all.map((id) => at(id).box.h)), `${w}: the figure box's height is the same`).toBeLessThanOrEqual(TOL);
-      const barH = mode === "out" ? 64 : 99;
-      expect.soft(Math.abs(at(all[0]!).bar.h - barH), `${w}: ${mode} bar is ${barH} px`).toBeLessThanOrEqual(TOL);
-      // The same place for the name, level, bars, status and the free room, for every boss (±1 px).
-      for (const key of ["name", "status", "prop"] as const) {
-        const xs = all.map((id) => at(id)[key]!);
-        expect.soft(spread(xs.map((b) => b.x)), `${w}: ${key}'s x is the same`).toBeLessThanOrEqual(TOL);
-        expect.soft(spread(xs.map((b) => b.y)), `${w}: ${key}'s y is the same`).toBeLessThanOrEqual(TOL);
-      }
-      expect.soft(spread(all.map((id) => at(id).prop!.w)), `${w}: the free room is the same width`).toBeLessThanOrEqual(TOL);
-      expect.soft(spread(all.map((id) => at(id).prop!.h)), `${w}: the free room is the same height`).toBeLessThanOrEqual(TOL);
-      for (const key of ["level", "rage"] as const) {
-        const xs = all.map((id) => at(id)[key]!);
-        expect.soft(spread(xs.map((b) => b.x)), `${w}: ${key} x is the same`).toBeLessThanOrEqual(TOL);
-        expect.soft(spread(xs.map((b) => b.y)), `${w}: ${key} y is the same`).toBeLessThanOrEqual(TOL);
-      }
-      const withPassive = all.filter((id) => at(id).passive);
-      expect.soft(spread(withPassive.map((id) => at(id).passive!.y)), `${w}: the passive bar's y is the same for every boss that has one`).toBeLessThanOrEqual(TOL);
-      for (const id of all) {
-        const s = at(id);
-        const who = `${id} at ${w} (${mode})`;
-        expect.soft(s.nameWhole, `${who}: the name whole`).toBe(true);
-        expect.soft(s.status.h, `${who}: the status on one line`).toBeLessThanOrEqual(STATUS_ONE_LINE);
-        // The figure: feet on the bar's baseline, the same box.
-        expect.soft(Math.abs(s.box.b - (s.bar.b - FEET_PAD)), `${who}: feet on the baseline`).toBeLessThanOrEqual(TOL);
-        expect.soft(s.pixels, `${who}: drawn`).not.toBeNull();
-        const p = s.pixels!;
-        // Nothing of the figure over the name column, nor below the bar.
-        expect.soft(p.maxX, `${who}: the figure clears the name column`).toBeLessThanOrEqual(s.name.x + TOL);
-        expect.soft(p.maxY, `${who}: nothing of the figure below the bar`).toBeLessThanOrEqual(s.bar.b + TOL);
-        if (mode === "out") {
-          // A taller figure rises above the bar, but never over the line above it.
-          expect.soft(p.minY, `${who}: the figure never covers the "BOSS · move N" line`).toBeGreaterThanOrEqual(s.hudText!.b + 1);
-        } else {
-          // Every idle figure wholly inside the taller bar.
-          expect.soft(p.minX, `${who}: inside the bar, left`).toBeGreaterThanOrEqual(s.bar.x - TOL);
-          expect.soft(p.maxX, `${who}: inside the bar, right`).toBeLessThanOrEqual(s.bar.r + TOL);
-          expect.soft(p.minY, `${who}: inside the bar, top`).toBeGreaterThanOrEqual(s.bar.y - TOL);
-        }
-      }
-      // Every line, inside the bar and beside the status, in at most three rows; a one-row line never past 60% of its room.
-      for (const id of all) {
-        for (const r of lines[id]![w] ?? []) {
-          const who = `${id} at ${w} (${mode}): "${r.text}"`;
-          expect.soft("missing" in r ? `missing (seen: ${r.seen})` : "ok", `${who}: said and drawn`).toBe("ok");
-          if ("missing" in r) continue;
-          expect.soft(r.rows, `${who}: rows`).toBeLessThanOrEqual(3);
-          expect.soft(r.rows, `${who}: at least one row`).toBeGreaterThanOrEqual(1);
-          expect.soft(r.bubble.x, `${who}: inside the bar, left`).toBeGreaterThanOrEqual(r.bar.x - TOL);
-          expect.soft(r.bubble.r, `${who}: inside the bar, right`).toBeLessThanOrEqual(r.bar.r + TOL);
-          expect.soft(r.bubble.y, `${who}: inside the bar, top`).toBeGreaterThanOrEqual(r.bar.y - TOL);
-          expect.soft(r.bubble.b, `${who}: inside the bar, bottom`).toBeLessThanOrEqual(r.bar.b + TOL);
-          expect.soft(r.bubble.y, `${who}: under the status, never over it`).toBeGreaterThanOrEqual(r.status.b - TOL);
-          expect.soft(r.bubble.x, `${who}: from the name column's left edge`).toBeGreaterThanOrEqual(r.name.x - TOL);
-          if (r.rows === 1) expect.soft(r.bubble.w, `${who}: a one-row line within 60% of its room`).toBeLessThanOrEqual(0.6 * r.main.w + TOL);
-        }
-      }
-    }
-
-    // The board's size, before and after, for the PR: per size, the board's width and its top.
-    testInfo.annotations.push({ type: "boards", description: JSON.stringify(boards) });
-    // A stacked sheet of every boss's bar at each size.
-    for (const [w] of SIZES) await sheet(page, `${mode} layout at ${w}`, pngs[w]!, testInfo);
-  });
-}
+  // The board's size for the PR: per size, the board's box.
+  testInfo.annotations.push({ type: "boards", description: JSON.stringify(boards) });
+  // A stacked sheet of every boss's bar at each size, and the lineup of the figures at 390 (each at its own size, feet on one line).
+  for (const [w] of SIZES) await sheet(page, `boss bar at ${w}`, pngs[w]!, testInfo);
+  await testInfo.attach("lineup.json", { body: Buffer.from(JSON.stringify(lineup.map((l) => ({ name: l.name, box: l.box })))), contentType: "application/json" });
+  for (const l of lineup) await testInfo.attach(`lineup-${l.name}.png`, { body: l.png, contentType: "image/png" });
+});
