@@ -49,6 +49,9 @@ below, to within 0.1 px):
   first view through every pick and both ⓘ states.
 - Before (Oct 24, [2026-10-24-home-tidy.md](2026-10-24-home-tidy.md)): the first pick raised the RANKED row by the panel's
   room, about 68 px on a phone and about 70 px on a computer. Now it moves 0 px.
+- Live window: at 1280 × 800 the computer's live-window board in the first view is now about 238 px, the same as after a
+  pick before. `e2e/live-window.spec.ts`'s floor for that size went from 240 px to 230 px (a sanity floor from the live
+  window's first commit, not a rule).
 - The tag (phone): with the panel there from the first view, a card under 190 px tall puts the tag beside the pawn in the
   first view as well as after a pick. Measured with the same width and height: 320 × 740: card 171 px tall (icon 38 px,
   name and rating two lines of 54 px at 320 px wide, where the rating line wraps); 375 × 740 and 430 × 740: card 167 px
@@ -89,3 +92,5 @@ below, to within 0.1 px):
 - `e2e/helpers.ts`, `pickMode()` with no argument: it used to click 50 v 50 when there was no panel. Now it clicks 50 v
   50 when the panel has the `idle` class (nothing picked), so a test that has already picked (or `?mode=classic`) is
   left alone, as before.
+- `e2e/live-window.spec.ts`, the board's floor at 1280 × 800 (`h >= 800 ? 240 : 150`) is now 230. The panel takes its 58 px
+  in the first view, so the board is about 238 px there, the same as after a pick. Nothing else in the spec changed.

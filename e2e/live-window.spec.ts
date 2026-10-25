@@ -64,7 +64,8 @@ test("computer: a bot match plays in the live window above the buttons, labeled 
     const box = (await win.boundingBox())!;
     const board = (await win.locator(".board-wrap").boundingBox())!;
     expect(Math.abs(board.width - board.height), `${w}x${h}`).toBeLessThan(2);
-    expect(board.width, `${w}x${h}`).toBeGreaterThan(h >= 800 ? 240 : 150);
+    // (230 at 800 px tall: home's options panel is always there from the first view, Oct 25, so the board is about 238.)
+    expect(board.width, `${w}x${h}`).toBeGreaterThan(h >= 800 ? 230 : 150);
     expect(board.x).toBeGreaterThanOrEqual(box.x);
     expect(board.x + board.width).toBeLessThanOrEqual(box.x + box.width + 0.5);
     const card = (await page.locator(".fd-hero").boundingBox())!;
