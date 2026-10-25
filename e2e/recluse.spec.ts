@@ -351,12 +351,10 @@ async function simulPlay(page: Page, move: string) {
   }
   expect((await simulNow(page))?.boards[0].history.length ?? before + 1).toBeGreaterThan(before);
 }
-/** Resign from the match's control, the way this device has it (a phone's gear and its list; a computer's flag), and confirm. */
+/** Resign from the match's gear and its list (a phone or a computer), and confirm. */
 async function resignHere(page: Page, note: RegExp) {
-  if (test.info().project.name === "phone") {
-    await page.getByRole("button", { name: "Match options" }).click();
-    await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^Resign$/ }).click();
-  } else await page.getByRole("button", { name: "Resign", exact: true }).click();
+  await page.getByRole("button", { name: "Match options" }).click();
+  await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^Resign$/ }).click();
   const confirm = page.getByRole("alertdialog");
   await expect(confirm.locator(".mm-confirm-note")).toHaveText(note);
   await confirm.getByRole("button", { name: /Resign/ }).click();

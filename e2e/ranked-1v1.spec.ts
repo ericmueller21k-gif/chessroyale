@@ -69,13 +69,10 @@ async function waitForPlay(...pages: Page[]) {
   for (const p of pages) await expect(p.locator(".dv-status")).toContainText(/first move/, { timeout: 15_000 });
 }
 
-/** Resign (or Leave: an abort) from the match's control: the phone's gear and its list, or the computer's flag; then confirm. */
+/** Resign (or Leave: an abort) from the match's gear and its list, on a phone or a computer; then confirm. */
 async function resign(page: Page, word: "Resign" | "Leave" = "Resign") {
-  if (isComputer()) await page.getByRole("button", { name: word === "Resign" ? "Resign" : "Leave the match" }).click();
-  else {
-    await page.getByRole("button", { name: "Match options" }).click();
-    await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: new RegExp(word) }).click();
-  }
+  await page.getByRole("button", { name: "Match options" }).click();
+  await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: new RegExp(word) }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: word }).click();
 }
 

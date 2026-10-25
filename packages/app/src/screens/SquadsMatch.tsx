@@ -546,7 +546,7 @@ function MatchView({
             Next round
           </button>
         )}
-        {/* Sound, and Resign (a phone: the gear and its list; a computer: the sound button, then the flag). */}
+        {/* The gear: its list has Sound, Animations, Resign and Report a bug. */}
         <MatchMenu exit={exit} />
       </div>
       <StandingsStrip client={client} onLeave={onLeave} exit={exit} />

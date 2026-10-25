@@ -160,15 +160,17 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   clock-read values they show (the move landed and played, the vote bars' count, the Last Stand's steps). A new word
   read from the clock there goes in its list; otherwise it waits up to 200 ms for the next `useStillKey` tick.
 - **Resigning and leaving** (Eric, Oct 13; `LEAVING`; DECISIONS.md, "Resign: leaving a match in every mode"). The
-  top line of every match screen ends in the match's control (`components/MatchMenu.tsx`): a phone's gear (Eric, Oct 24:
-  a list in the middle of the screen over the blurred match: Sound, Animations and Motion trail in a crowd match only,
-  Resign or Leave, Report a bug, which asks first; docs/decisions/2026-10-24-match-menu.md) where the sound button was; a
-  computer's sound button, then the flag. On a
-  computer the title line spans the board's column only (the boss bar's width), so these sit at its right end above
-  the board's right edge, after an admin's testing items in boss battles (the brain's pill, which ellipsizes first,
-  and "Trigger ultimate (testing)": `Hud.tsx`, `.match-tools`; Eric, Oct 13); a phone keeps those as tiny icons beside the God King (Oct 24). A
-  second step (on a computer beside the flag, out into the column next to the board) says what happens (Cancel focused). Before move 1 it's **Leave**; once out, **Leave the match** (also a
-  plain button on the cut screen, Classic's watching and stage break, and solo's play-out: "Skip to your result").
+  top line of every screen with a chessboard ends in the match's control (`components/MatchMenu.tsx`): a gear (Eric, Oct 24
+  and 25: the same on a phone and a computer; docs/decisions/2026-10-24-match-menu.md and
+  2026-10-25-gear-everywhere.md) that opens a list in the middle of the screen over the blurred match: Sound, Animations
+  (every mode), Motion trail (a crowd match only), Resign or Leave, Report a bug, which asks first. On a computer the
+  gear sits at the right end of the title line over the board's column, after an admin's testing items in boss battles
+  (the brain's pill, which ellipsizes first, and "Trigger ultimate (testing)": `Hud.tsx`, `.match-tools`; Eric, Oct 13);
+  a phone keeps those as tiny icons beside the God King (Oct 24). The list's confirms are centered too (Cancel focused).
+  Before move 1 it's **Leave**; once out, **Leave the match** (also a plain button on the cut screen, Classic's watching
+  and stage break, and solo's play-out: "Skip to your result"). The screens with a chessboard and no top line of their
+  own (the openings, Classic's watching, a stage break, the results) carry the gear in their top right corner
+  (`.mm-corner`).
   - **Solo:** the match stops at once (`SoloMatch.resign`: every timer, every step after an engine search, Maia and the
     scout), out in the last place still open (`runner.retire`), "You resigned" on the results.
   - **Online** (`LobbyCore.resign`): out in the last place still open, a loss recorded at once (`takeLeftResults`), the
@@ -195,7 +197,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 | Screens | `packages/app/src/screens/` (`Play`, `Crowd`, `Reveal`, `StageBreak`, `Final`, `Results`, `Hud`, `Spectate`) |
 | The board and its overlays | `components/Board.tsx` (the board itself: [board.md](board.md)), `CrowdGhosts.tsx`, `EvalBar.tsx`, `Breakdown.tsx`, `Gavel.tsx`, `ShadeMoves.tsx` |
 | Online lobby flow | `packages/server/src/lobby.ts` (pure), `lobby-do.ts` (the Durable Object) |
-| Resigning and leaving | `components/MatchMenu.tsx` (the gear and its list, the flag, the confirms), `match-exit.ts` (what it offers, its words), `SoloMatch.resign`, `NetMatch.resign`, `LobbyCore.resign` (`lobby.ts`), `runner.handOver` / `retire` / `withdraw` |
+| Resigning and leaving | `components/MatchMenu.tsx` (the gear and its list, the confirms), `match-exit.ts` (what it offers, its words), `SoloMatch.resign`, `NetMatch.resign`, `LobbyCore.resign` (`lobby.ts`), `runner.handOver` / `retire` / `withdraw` |
 
 ## Settings
 

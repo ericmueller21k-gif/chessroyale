@@ -325,12 +325,12 @@ build): online, phase 1 won is the crowd's victory):
   would, then strikes on d2; 2, it steps to d6 and d5 and your rook takes it hidden (Ke2, Rd1, Rxd5); in both Kd1 and Kd2
   are moves the board you see offers and the real board refuses); admins
   see "Trigger ultimate (testing)" in any boss battle (`ultimateTestButton`, `triggerUltimate`: the ultimate as the next
-  crowd turn begins, no warning; on a computer in the title line with the brain's pill, before sound and the flag; on a
+  crowd turn begins, no warning; on a computer in the title line with the brain's pill, before the gear; on a
   phone a tiny ⚡ beside the God King's head, Oct 24). A boss's attack on a king: `?boss=hollow&laststand=1` (Boss alone: your first move
   calls the God King's Last Stand, and Hollow lashes him) and `?boss=hollow&mate=1` (Boss alone from 1.f3 e5 2.g4, the
   boss to move: he mates at once, lashes your king, then the result; `settings.bossMateTest`, solo only).
 - **Resigning never waits for a moment** (Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): the top
-  line's gear or flag works through every moment (the God King's Last Stand, Lights out, a power's banner, the boss's
+  line's gear works through every moment (the God King's Last Stand, Lights out, a power's banner, the boss's
   turn). Solo, the battle stops there (Boss alone: "You resigned", the boss won) and the moment's timers, its engine
   work, Maia and both voices are cleared. Online, the others' battle goes on: a host who resigns hands the boss's move
   to the next device at once, and someone resigning in Lights out leaves the test (a round no longer waits for them).

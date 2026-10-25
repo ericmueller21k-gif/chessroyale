@@ -1508,7 +1508,7 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
     case "lobby":
       return match instanceof NetMatch ? <LobbyScreen match={match} onLeave={actions.leave} /> : null;
     case "opening":
-      return <OpeningGrid boards={p.boards} title="Today's openings" />;
+      return <OpeningGrid boards={p.boards} title="Today's openings" menu={<MatchMenu exit={exitFor(match)} />} />;
     case "spectating":
       return (
         <SpectateScreen

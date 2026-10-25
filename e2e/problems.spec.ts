@@ -98,13 +98,10 @@ test("the feedback sheet: Report a bug from the match menu gives a short id that
   test.setTimeout(3 * 60_000);
   const tag = `${run}-${project()}`;
   await bossAlone(page);
-  // A phone: the gear, then Report a bug in its list, then Report in the confirm (Eric, Oct 24); a computer: the bug
-  // button beside the sound button, at once.
-  if (project() === "phone") {
-    await page.getByRole("button", { name: "Match options" }).click();
-    await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: "Report a bug" }).click();
-    await page.getByRole("alertdialog").getByRole("button", { name: "Report", exact: true }).click();
-  } else await page.getByRole("button", { name: "Report a bug" }).click();
+  // The gear, then Report a bug in its list, then Report in the confirm (Eric, Oct 24; the same on a computer, Oct 25).
+  await page.getByRole("button", { name: "Match options" }).click();
+  await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: "Report a bug" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Report", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "We'd love your feedback" });
   await expect(sheet).toBeVisible();
   await expect(sheet.getByRole("radio", { name: "Report a bug" })).toHaveAttribute("aria-checked", "true");

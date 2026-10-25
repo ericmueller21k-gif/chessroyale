@@ -72,12 +72,9 @@ export async function named(page: Page, name: string) {
 }
 
 /**
- * Sound off in a match: the sound button in the top line on a computer; on a phone, the gear's list and its Sound switch
- * (MatchMenu.tsx: the phone's top line has the gear where the sound button was).
+ * Sound off in a match: the gear's list and its Sound switch (MatchMenu.tsx; the same on a phone and a computer).
  */
 export async function soundOff(page: Page) {
-  const btn = page.getByRole("button", { name: "Turn sound off" }).first();
-  if (await btn.isVisible().catch(() => false)) return btn.click();
   await page.getByRole("button", { name: "Match options" }).click();
   const sheet = page.getByRole("dialog", { name: "Match options" });
   await sheet.getByRole("switch", { name: /Sound/ }).click();
