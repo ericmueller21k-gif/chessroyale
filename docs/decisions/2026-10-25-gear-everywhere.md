@@ -78,3 +78,32 @@ Auto chess, and the four above.
   platforms. `e2e/problems.spec.ts`, `e2e/recluse.spec.ts` and `e2e/ranked-1v1.spec.ts` open the report and resign through the
   gear on both platforms. `e2e/helpers.ts` `soundOff` uses the gear.
 - `packages/app/test/faq.test.ts`: the FAQ's resign line.
+
+## Auto chess's gear, placed (the director's rules, Oct 25)
+
+- **Plain icon:** the match screens' gear (`.mm-more`): no border, no fill, no shadow; the 36 px box. Open, it fills as on the
+  match screens.
+- **The opponent's block and the board don't move.** The name, pawn and bars keep their positions, so every autochess.spec
+  layout invariant (the kitty corners, the benches' edges, the pawn at the column's edge) holds as it was.
+- **Phone, the title row:** the gear sits in the gap after the title and before the opponent's name, 10 px after the title
+  (the row's gap), centered on the title's first line (the gear's centre is the first line's centre: within 1 px at every
+  phone size; the row centres the title, so the gear is centred on the row and lifted 7.2 px).
+- **Short phones (340 to 899 px wide, under 760 px high):** the name sits level with the gear's box, so the gear needs
+  horizontal room: the title's second line is cut with an ellipsis (`max-width: 100vw - 244px`; 360 × 640 shows "Round 1 · you
+  play…"). At 390 × 844 (tall) nothing is cut.
+- **Computer:** over the shop panel's right edge (the visible panel is the dock; its right edge is the column's). The block
+  stays where it is.
+- **Measured** (`getBoundingClientRect`; the board before and after, and the main stylesheet's board for comparison):
+
+  | Size | Board (before → after) | Gear box | Clearance: title / name / pawn / bars |
+  | --- | --- | --- | --- |
+  | 390 × 844 | 360 × 360 → 360 × 360 | 215–251 × 2.8–38.8 | 10 / 26.9 / 39.0 / 74.3 px |
+  | 360 × 640 | 287 × 287 → 287 × 287 | 192–228 × −1.2–34.8 | 10 / 8.3 / 40.0 / 52.0 px |
+  | 320 × 568 | 219 × 219 → 219 × 219 | 181–217 × −1.2–34.8 | 6 / 9.8 / 35.0 / 48.2 px |
+  | 1280 × 800 | 514 × 514 → 514 × 514 | 1100–1136 × 18–54 | over the shop: right edge 0 px from the panel's |
+  | 1440 × 900 | 554 × 554 → 554 × 554 | 1200–1236 × 18–54 | over the shop: right edge 0 px from the panel's |
+
+  At 320 × 568 the gear's box reaches 1.2 px above the screen's top edge (its 20 px glyph is inside).
+- **Tests:** `e2e/match-menu.spec.ts`, "Auto chess's gear": the plain look, the board's size at each size, the centring on
+  the first line and the clearances (8 px at 390 and 360, 4 px at 320), and on a computer the right edge within 2 px of the
+  shop panel's and the clearances.

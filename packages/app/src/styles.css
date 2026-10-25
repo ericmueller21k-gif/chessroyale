@@ -18320,13 +18320,27 @@ button.sq-tiny {
   align-items: center;
   gap: 10px;
 }
-/* The gear here is the match top line's size (36 px), so it clears the opponent's name beside it at a phone's width. */
+/* The gear (Eric, Oct 25; the director's review): the match screens' plain gear, no box, 36 px. On a phone it sits in the
+   title row, 8 px after the title, centered on the title's first line (the line box is 20.7 px: 36 px less that, halved, up).
+   On a computer it's over the column's right edge, the shop panel's (below, in the computer's layout). */
+/* (The title row centres the title, so the gear is centred on the row and lifted 7.2 px: its centre then sits on the title's
+   first line, whatever the row's height, the back button's included.) */
+.ac-titlebar .mm {
+  align-self: center;
+  margin-top: -14.4px;
+}
 .ac-titlebar .mm-more {
   width: 36px;
   min-height: 36px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+.ac-titlebar .mm-more.on {
+  background: var(--surface-2);
 }
 .ac-title {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -19794,6 +19808,14 @@ button.sq-tiny {
   --lock-h: calc(44px + var(--gap));
 }
 /* ---- A short phone (320 x 568, 360 x 640, 375 x 667, 393 x 730): smaller pawns, tighter rows ---- */
+/* A phone's short screen (340 to 899 px wide, under 760 px high): the title's text ends 8 px short of the gear, which sits
+   10 px after the title (the title row's gap) and 8 px before the opponent's name, the name being level with the gear's
+   box at this height. So the title's second line is cut with an ellipsis where it must (at 360 × 640, to about 116 px). */
+@media (min-width: 340px) and (max-width: 899px) and (max-height: 760px) {
+  .ac-title {
+    max-width: calc(100vw - 244px);
+  }
+}
 @media (max-height: 760px) {
   .ac-root {
     --pawn: 46px;
@@ -20097,6 +20119,16 @@ button.sq-tiny {
   }
   .ac-who {
     transform: translateY(-34px);
+  }
+  .ac-titlebar .mm {
+    position: absolute;
+    top: 4px;
+    right: 0;
+    align-self: auto;
+    margin: 0;
+  }
+  .ac-title {
+    flex: 1 1 auto;
   }
   .ac-who strong {
     font-size: 15px;
