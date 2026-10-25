@@ -25,7 +25,7 @@ import { RaceBadge } from "./Hopper.tsx";
  *
  * - one row, the board's width and lined up with its edges: the arrows for
  *   stepping through the game either side of a status box. In the box, centered,
- *   what's happening right now (two lines at most), or which move you're looking
+ *   what's happening right now (one line: Eric, Oct 25), or which move you're looking
  *   at while you step back; at its right, your clock, always there (DockClock); during Chub & Chirp's carrot race,
  *   the race's count (RaceBadge): at the box's left where it has the room, else at the left of the God King's line;
  * - the God King himself, standing by and breathing, with his charges at his
@@ -58,6 +58,7 @@ export function BossDock({
   powerUp,
   king,
   clock,
+  panel,
 }: {
   match: GameView;
   /** Your move: step back through the game (the arrows are grayed out elsewhere). */
@@ -97,6 +98,13 @@ export function BossDock({
    * stopped it (the boss's turn, the reveal, the waiting); null: none on this screen.
    */
   clock?: DockClockRun | null;
+  /**
+   * A phone: the panel under the row, left of the God King (MovePanel.tsx, BossPanel: the scoreboard and the moves), he at
+   * the strip's far right (Eric, Oct 25). Left out (the Hidden Boss's phase change and phase 2), he stands under the row in
+   * its middle as before. Screens pass it only in a phone's locked layout (MovePanel.tsx, STRIP_LAYOUT): a computer has its
+   * moves and scoreboard beside the board, and a phone on its side keeps its old dock.
+   */
+  panel?: ComponentChildren;
 }) {
   const boss = match.boss;
   const fallen = fallenNow ?? !!boss?.lastStand;
@@ -123,7 +131,8 @@ export function BossDock({
   const [beside, setBeside] = useState(false);
   // Chub & Chirp's carrot race count: in the status box where it has the room (a computer, or the God King beside the
   // row), else at the left of the God King's line under the row (a phone: the box keeps the room for its words).
-  const raceInBox = computer || beside;
+  const strip = !!panel;
+  const raceInBox = computer || (beside && !strip);
   const view = nav?.view;
   const moveNo = (p: number) => `${Math.ceil(p / 2)}${p % 2 === 1 ? "" : "…"}`;
   const ready = canCall && charges > 0 && !match.kingCalled && !fallen && !king;
@@ -138,12 +147,12 @@ export function BossDock({
     if (!ready) setMenu(false);
   }, [ready]);
   const dockRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => lineUpWithBoard(dockRef.current!, setBeside), []);
+  useLayoutEffect(() => lineUpWithBoard(dockRef.current!, strip ? undefined : setBeside), [strip]);
   // (His "can't" made ahead in the sound worker, so its first tap never stalls a slow phone.)
   useEffect(() => warmSounds(["kingCant"]), []);
   return (
     <>
-    <div class="boss-dock" ref={dockRef}>
+    <div class={`boss-dock${strip ? " dk-strip" : ""}`} ref={dockRef}>
       <div class={`history-nav boss-dock-main${view?.browsing ? " browsing" : ""}${wide ? " wide" : ""}`}>
         {!wide && (
           <button type="button" class="nav-btn" aria-label="Previous move" disabled={!view || view.ply === 0} onClick={() => view?.go(view.ply - 1)}>
@@ -172,6 +181,7 @@ export function BossDock({
         )}
       </div>
       {!wide && !raceInBox && <RaceBadge boss={boss} below />}
+      {strip && <div class="dk-panel">{panel}</div>}
       <GodKingUnit
         show={king}
         side={side}
@@ -231,6 +241,7 @@ function pageLeft(el: HTMLElement): number {
  * Oct 15: decided by the room there is, not the device).
  */
 function lineUpWithBoard(dock: HTMLElement, onBeside?: (beside: boolean) => void): (() => void) | void {
+  // (With the panel's strip under the row (`onBeside` left out), he's always in the strip: never beside.)
   const wrap = dock.parentElement?.querySelector<HTMLElement>(".board-area .board-row > .board-wrap");
   if (!wrap) return;
   const board = wrap.querySelector<HTMLElement>(":scope > .hb > .hb-container") ?? wrap;
@@ -239,8 +250,10 @@ function lineUpWithBoard(dock: HTMLElement, onBeside?: (beside: boolean) => void
     const width = board.offsetWidth;
     dock.style.setProperty("--dk-left", `${left}px`);
     dock.style.setProperty("--dk-w", `${width}px`);
+    // (The board's size for what's beside it on a computer: the move list stops above the God King, styles.css .mv-side.)
+    dock.parentElement?.style.setProperty("--board-px", `${width}px`);
     // (Room in the screen's column right of the board for the God King: he stands beside the row, not under it.)
-    const beside = dock.clientWidth - left - width >= KING_BESIDE_PX;
+    const beside = !!onBeside && dock.clientWidth - left - width >= KING_BESIDE_PX;
     dock.classList.toggle("dk-beside", beside);
     onBeside?.(beside);
   };

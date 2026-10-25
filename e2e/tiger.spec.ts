@@ -539,7 +539,7 @@ test("Babur's pump on a computer at 1280 × 800, 1440 × 900, 1920 × 1080 and 1
     expect(pump.y + pump.height).toBeLessThanOrEqual(h);
     const clear = await page.evaluate((p) => {
       const hit: string[] = [];
-      for (const sel of [".hb-board", ".board-wrap", ".eval-bar", ".tower-side", ".mini-tower", ".under-board", ".boss-dock-status", ".boss-next"])
+      for (const sel of [".hb-board", ".board-wrap", ".eval-bar", ".tower-side", ".mini-tower", ".under-board", ".mv-side", ".boss-dock-status", ".boss-next"])
         for (const e of document.querySelectorAll(sel)) {
           const r = e.getBoundingClientRect();
           if (r.width && r.height && r.left < p.x + p.width && p.x < r.right && r.top < p.y + p.height && p.y < r.bottom) hit.push(sel);

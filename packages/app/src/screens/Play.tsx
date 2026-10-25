@@ -10,6 +10,7 @@ import { kingTurn, turnCues } from "../godKing.ts";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import type { BoardView, GameView, StrikeState } from "../game.ts";
 import { UnderBoard } from "../components/QuickChat.tsx";
+import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossFace, BossSide } from "../components/BossCharacter.tsx";
@@ -94,6 +95,7 @@ export function PlayScreen({
   const side = sideToMove(board.fen);
   const waiting = picked !== undefined;
   const now = useNow();
+  const layout = useBossLayout();
   const [mountedAt] = useState(Date.now());
   // A new board: a short countdown while the last few moves replay, then the clock starts.
   const intro = !waiting && now < startsAt;
@@ -277,6 +279,7 @@ export function PlayScreen({
           away={striking && onBoardKing}
           command={command ? { mode: "strike", startAt: command.startAt } : undefined}
           nav={{ view: history, total: board.history.length }}
+          panel={layout.strip ? <BossPanel match={match} /> : undefined}
           canCall={!waiting && !intro && !shown.replaying && !striking}
           strike={strike}
           // After his Last Stand: the power-ups he left you (the engine's top 3 moves, as in Crowd).
@@ -383,7 +386,7 @@ export function PlayScreen({
         )}
       </div>
       )}
-      <UnderBoard match={match} />
+      {match.boss ? besideBoard(match, layout, <UnderBoard match={match} />) : <UnderBoard match={match} />}
     </div>
   );
 }

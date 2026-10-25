@@ -670,14 +670,13 @@ test("the board keeps its size from the mate until the split (Eric, Oct 18: it s
   // (A window short enough that a phone's board is sized by its height, where the minimized scoreboard's room counts;
   // a laptop's maximized window on a computer.)
   await page.setViewportSize(phone ? { width: 390, height: 600 } : { width: 1280, height: 600 });
+  // A phone: the scoreboard minimized, as a player may keep it. Since Oct 25 a boss screen on a phone upright has no
+  // scoreboard to minimize (its panel beside the God King keeps one size: docs/decisions/2026-10-25-board-layout.md), so
+  // the fold is one remembered from another match, which must change neither screen's board. (A computer's is beside the
+  // board, its size the board's own.)
+  if (phone) await page.addInitScript(() => localStorage.setItem("brc.underBoardView", JSON.stringify({ layout: "split", open: false })));
   await meetHim(page, "win=1");
   await yourMove(page);
-  // A phone: the scoreboard minimized, as a player may keep it (the board takes its room). (A computer's is beside the
-  // board, its size the board's own.)
-  if (phone) {
-    await page.getByRole("button", { name: "Minimize the leaderboard" }).click();
-    await expect(page.locator(".mini-tower.closed")).toHaveCount(1);
-  }
   // (The board resized for the minimized scoreboard before the watch starts: its squares are drawn by a ResizeObserver,
   // which runs after an animation frame's callbacks, so a frame read just after the fold sees the wrap's new size and
   // the squares' old one. Drawn: the squares fill the wrap, less up to 8 device pixels.)

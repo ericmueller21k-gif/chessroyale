@@ -416,6 +416,28 @@ export function BossFace({ boss, class: cls = "", label }: { boss: Pick<BossView
   return <canvas ref={cv} class={`boss-portrait ${cls}`} width={kit.portrait.w} height={kit.portrait.h} {...(label === "" ? { "aria-hidden": "true" } : { role: "img", "aria-label": label ?? boss.name })} />;
 }
 
+/** A boss's portrait as an image address, made once per boss (the move list's rows: one small image each, not a canvas each). */
+const portraitUrls = new Map<string, string | null>();
+export function bossPortraitUrl(name: string): string | null {
+  let url = portraitUrls.get(name);
+  if (url !== undefined) return url;
+  url = null;
+  const kit = bossKit(name);
+  if (kit && typeof document !== "undefined") {
+    const p = kit.portrait;
+    const cv = document.createElement("canvas");
+    cv.width = p.w;
+    cv.height = p.h;
+    const g = cv.getContext("2d");
+    if (g) {
+      g.putImageData(frameImage(kit.ch, kit.ch.anims[p.anim]!.frames[p.frame]!), -p.x, -p.y, p.x, p.y, p.w, p.h);
+      url = cv.toDataURL();
+    }
+  }
+  portraitUrls.set(name, url);
+  return url;
+}
+
 /**
  * A boss's whole figure for a select tile (docs/decisions/2026-10-23-boss-select-sf.md): its portrait's frame, full size, on a
  * canvas of its own. The stylesheet (`.bs-art`) scales it and puts its neck where `SELECT_FRAMING` says; the tile's slanted

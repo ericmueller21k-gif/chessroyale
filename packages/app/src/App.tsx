@@ -7,7 +7,7 @@ import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
 import { enginePool } from "./engine.ts";
-import { cutLabel, elimination, isCrowd, roundLive, scoreDp, towerView, type GameView } from "./game.ts";
+import { bossAlone, cutLabel, elimination, isCrowd, roundLive, scoreDp, towerView, type GameView } from "./game.ts";
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
 import { exitFor, exitMatch, onExitMatch } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
@@ -1444,6 +1444,9 @@ export function App() {
   // Computers get the leaderboard as a permanent sidebar during the knockout stages (and the pre-game votes, so the
   // board is in the same place when the game begins).
   const tower = ["vote", "play", "scoring", "reveal", "spectating", "final", "watching", "boss", "phaseChange", "simul"].includes(match.phase.kind) && match.standings().length > 0;
+  // (Boss alone has no scoreboard at all, Eric, Oct 25: alone, there's nobody to rank; its moves are beside the board. Its
+  // column stays, empty, so the board and the boss keep their places, and Babur's pump its room left of him.)
+  const noTower = !!match.boss && bossAlone(match);
   if (!tower)
     return (
       <>
@@ -1455,6 +1458,9 @@ export function App() {
   return (
     <div class="arena">
       {overlay}
+      {noTower ? (
+        <div class="tower-space" aria-hidden="true" />
+      ) : (
       <aside class="tower-side">
         {(() => {
           const v = towerView(match);
@@ -1466,6 +1472,7 @@ export function App() {
           );
         })()}
       </aside>
+      )}
       {screen}
       {bubble}
     </div>

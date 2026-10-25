@@ -112,7 +112,8 @@ test("home → queue → match, then tap a name for that player's profile (phone
   await expect(sheet).toHaveCount(0);
   // Phone: open the leaderboard, tap the other player's name.
   await expect.poll(() => phase(phone), { timeout: 30_000 }).toBe("play");
-  await phone.locator(".mini-tower-title").click();
+  // (A boss screen's scoreboard on a phone: the panel beside the God King, opened full size by a tap, since Oct 25.)
+  await phone.locator(".dk-panel .bp-tower").click();
   await phone.getByRole("dialog", { name: "Leaderboard" }).getByRole("button", { name: "Desky's profile" }).click();
   await expect(phone.locator(".fd-overlay").getByRole("heading", { name: "Desky" })).toBeVisible();
   await expect(phone.locator(".fd-overlay")).toContainText("Online now");

@@ -476,6 +476,25 @@ export function GodKingPortrait({ side, hurt = false }: { side: "w" | "b"; hurt?
   return <canvas ref={cv} class="gk-portrait" width={p.w} height={p.h} aria-hidden="true" />;
 }
 
+/** His portrait as an image address, made once per armor color (the move list's rows). */
+const portraitUrls: Partial<Record<"w" | "b", string | null>> = {};
+export function godKingPortraitUrl(side: "w" | "b"): string | null {
+  if (portraitUrls[side] !== undefined) return portraitUrls[side]!;
+  let url: string | null = null;
+  if (typeof document !== "undefined") {
+    const p = GOD_KING_PORTRAIT;
+    const cv = document.createElement("canvas");
+    cv.width = p.w;
+    cv.height = p.h;
+    const g = cv.getContext("2d");
+    if (g) {
+      g.putImageData(frameImage(side, GOD_KING.anims.portrait!.frames[0]!), -p.x, -p.y, p.x, p.y, p.w, p.h);
+      url = cv.toDataURL();
+    }
+  }
+  return (portraitUrls[side] = url);
+}
+
 const PIECE_NAMES = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" } as const;
 
 /**
