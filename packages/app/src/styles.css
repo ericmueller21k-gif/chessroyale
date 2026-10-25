@@ -8732,6 +8732,18 @@ button.fd-logo {
   opacity: 0.4;
   cursor: default;
 }
+/*
+ * No mode picked (Eric, Oct 25): the options show, none selected, a little greyer than the mode row, and not tappable
+ * (aria-disabled; no press effect either). The first pick wakes them with their usual default selected.
+ */
+.fd-mode-panel.idle .fd-modes.fd-types button,
+.fd-mode-panel.idle .fd-info-btn {
+  opacity: 0.6;
+  cursor: default;
+}
+.fd-mode-panel.idle button:active {
+  transform: none;
+}
 .fd-info-btn {
   flex: none;
   width: 44px;

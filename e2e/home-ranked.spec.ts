@@ -216,7 +216,7 @@ test("Other modes under PLAY: the label, then the Boss raid card, then Auto ches
   expect(new URL(page.url()).pathname).toBe("/");
 });
 
-test("home keeps still: after the first pick (the panel comes in), no click on a mode, an option or the ⓘ moves or resizes the board preview, PLAY or the Boss raid card (phone and computer)", async ({ page }) => {
+test("home keeps still: no click on a mode, an option or the ⓘ moves or resizes the board preview, PLAY, the panel or the Boss raid card (phone and computer)", async ({ page }) => {
   // (Eric, Oct 18: "nothing should actually be forced moving around the size of the board or where the play button
   // is"; docs/decisions/2026-10-18-home-steady-layout.md.)
   await named(page, "Still");
@@ -258,17 +258,13 @@ test("home keeps still: after the first pick (the panel comes in), no click on a
       await expect(page.locator(".fd-livewin-sq").first()).toBeVisible();
       expect((await box(page, ".fd-livewin-sq")).width, `${w}`).toBeGreaterThan(150);
     }
-    // Nothing picked: no panel (Oct 24). The first pick brings the panel in above PLAY: the RANKED row rises by its room,
-    // and PLAY, the cards and the line stay where they were. (The board above may take the room the panel needs.)
+    // The panel is there from the first view, greyed (Eric, Oct 25). The first pick wakes it and moves nothing: the RANKED
+    // row, PLAY, the cards, the panel and the board stay where they were.
     const before = await measure();
-    expect(before.panel, `${w}: no panel until a mode is picked`).toBeUndefined();
+    expect(before.panel, `${w}: the panel is there before a pick`).toBeDefined();
     await radio(/^50 v 50/).click();
     const first = await measure();
-    expect(first.panel, `${w}: the panel once a mode is picked`).toBeDefined();
-    for (const k of ["play", "boss"] as const) for (const d of ["x", "y", "width", "height"] as const) expect(Math.abs(first[k]![d] - before[k]![d]), `${w}×${h}, the first pick: ${k}'s ${d}`).toBeLessThanOrEqual(1);
-    const rise = before.ranked!.y - first.ranked!.y;
-    expect(rise, `${w}×${h}: the RANKED row rises by the panel's room`).toBeGreaterThanOrEqual(first.panel!.height);
-    expect(rise, `${w}×${h}: the RANKED row rises by the panel's room`).toBeLessThanOrEqual(first.panel!.height + 20);
+    for (const k of Object.keys(before)) for (const d of ["x", "y", "width", "height"] as const) expect(Math.abs(first[k]![d] - before[k]![d]), `${w}×${h}, the first pick: ${k}'s ${d}`).toBeLessThanOrEqual(1);
     for (const [step, act] of steps) {
       await act();
       const now: Awaited<ReturnType<typeof measure>> = {};
@@ -293,5 +289,81 @@ test("home keeps still: after the first pick (the panel comes in), no click on a
     // (The panel: there all along.)
     expect(Object.keys(first), `${w}`).toContain("panel");
     expect(await sideways(page), `${w}`).toBe(0);
+  }
+});
+
+// Changing this test needs Eric's OK (docs/rules/eric.md).
+test("Eric's rule (Oct 18, Oct 25): home's options panel is always there, greyed until a mode is picked, and home never moves", async ({ page }) => {
+  // (Oct 25, Eric: "the menu buttons should never be like invisible… they're just not selectable until you select the
+  // mode"; Oct 18: "nothing should… move around… where the play button is." docs/decisions/2026-10-25-home-panel-back.md.)
+  await named(page, "Rule");
+  const sizes: [number, number][] = [
+    [1280, 800],
+    [1440, 900],
+    [390, 844],
+    [360, 640],
+    [320, 568],
+  ];
+  const ranked = page.getByRole("radiogroup", { name: "RANKED" });
+  const matchmaking = page.getByRole("radiogroup", { name: "Matchmaking" });
+  const info = page.getByRole("button", { name: "About matchmaking" });
+  const play = page.getByRole("button", { name: "PLAY", exact: true });
+  const options = [/^Default/, /^Bots off/, /^Solo you/];
+  const parts: Record<string, string> = { board: ".fd-livewin", play: ".fd-play", label: ".fd-other-label", boss: ".rd-card", auto: ".fd-auto-card", panel: ".fd-mode-panel" };
+  const measure = async () => {
+    const out: Record<string, { x: number; y: number; width: number; height: number }> = {};
+    for (const [k, s] of Object.entries(parts)) if (await page.locator(s).count()) out[k] = await box(page, s);
+    return out;
+  };
+  const same = (a: Awaited<ReturnType<typeof measure>>, b: Awaited<ReturnType<typeof measure>>, where: string) => {
+    expect(Object.keys(b).sort(), `${where}: the same boxes are there`).toEqual(Object.keys(a).sort());
+    for (const k of Object.keys(a)) for (const d of ["x", "y", "width", "height"] as const) expect(Math.abs(b[k]![d] - a[k]![d]), `${where}: ${k}'s ${d}`).toBeLessThanOrEqual(1);
+  };
+  for (const [w, h] of sizes) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/");
+    await expect(play).toBeVisible();
+    // (The computer's live window: on screen at these sizes, waited for as in the keeps-still test.)
+    if (desktop() && w >= 1280) await expect(page.locator(".fd-livewin-sq").first()).toBeVisible();
+    // First view: the panel is there, greyed, its options shown, none selected and none tappable.
+    await expect(page.locator(".fd-mode-panel.idle"), `${w}×${h}: the panel in the first view`).toBeVisible();
+    for (const name of options) {
+      const option = matchmaking.getByRole("radio", { name });
+      await expect(option, `${w}×${h}: ${name} shown`).toBeVisible();
+      await expect(option, `${w}×${h}: ${name} not tappable`).toBeDisabled();
+      await expect(option, `${w}×${h}: ${name} not selected`).toHaveAttribute("aria-checked", "false");
+    }
+    await expect(info, `${w}×${h}: the ⓘ shown and not tappable`).toBeDisabled();
+    await expect(matchmaking.getByRole("radio", { checked: true }), `${w}×${h}: nothing in the options row selected`).toHaveCount(0);
+    await expect(page.locator(".fd-mode-panel .on"), `${w}×${h}: no selected look in the panel`).toHaveCount(0);
+    const before = await measure();
+    expect(before.panel, `${w}×${h}: the panel has its box`).toBeDefined();
+    // Tapping one does nothing: a forced tap reaches the handler, which ignores it.
+    for (const name of options) await matchmaking.getByRole("radio", { name }).click({ force: true });
+    await info.click({ force: true });
+    await expect(page.locator(".fd-types-info"), `${w}×${h}: the ⓘ's words stay shut`).toHaveCount(0);
+    await expect(matchmaking.getByRole("radio", { checked: true }), `${w}×${h}: still nothing selected`).toHaveCount(0);
+    await expect(page.locator(".fd-mode-panel.idle")).toBeVisible();
+    await expect(play).toBeDisabled();
+    same(before, await measure(), `${w}×${h}, after the taps on the greyed options`);
+    // The first pick wakes the options with their usual default selected, and moves nothing: PLAY, the label, both cards,
+    // the panel and (computer) the board stay put after each mode and after the ⓘ opens.
+    const steps: [string, () => Promise<unknown>][] = [
+      ["50 v 50", () => ranked.getByRole("radio", { name: /^50 v 50/ }).click()],
+      ["ⓘ open", () => info.click()],
+      ["ⓘ closed", () => info.click()],
+      ["1 v 1", () => ranked.getByRole("radio", { name: /^1 v 1/ }).click()],
+      ["Squads", () => ranked.getByRole("radio", { name: /^Squads/ }).click()],
+    ];
+    for (const [step, act] of steps) {
+      await act();
+      if (step === "50 v 50") {
+        await expect(matchmaking.getByRole("radio", { name: /^Default/ }), `${w}×${h}: Default selected once a mode is picked`).toHaveAttribute("aria-checked", "true");
+        await expect(matchmaking.getByRole("radio", { name: /^Default/ })).toBeEnabled();
+        await expect(page.locator(".fd-mode-panel.idle")).toHaveCount(0);
+      }
+      same(before, await measure(), `${w}×${h}, after ${step}`);
+    }
+    expect(await sideways(page), `${w}×${h}`).toBe(0);
   }
 });
