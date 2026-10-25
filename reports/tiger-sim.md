@@ -1,4 +1,24 @@
-# Babur, the circus tiger: calibrating Balloons and Hoops (Oct 23-24, 2026)
+# Babur, the circus tiger: calibrating Balloons and Hoops (Oct 23-25, 2026)
+
+## Oct 25: Boss alone at Eric's pace, the pops, and no long runs of landings
+
+Eric, Oct 25: "none of his pieces are popping… they're not popping as much as I think we had planned" (Boss alone, as fast
+as the Engine move allows). A new sim, `packages/sim/scripts/tiger-pops.ts`: Boss alone, every move the Engine move's,
+the page's clock passing your pick (1.5 s "fast", or 5 s) and his turn. Seed 25. Rows: `reports/boss-sim/alone-<tag>.jsonl`.
+No bug: the pops follow the odds, no dud landed, every pop had its moment
+(docs/decisions/2026-10-25-tiger-pops.md). **Shipped: `balloonLandsInRow` 2** (after two landings in a row the next
+balloon pops unless it's a real queen); `balloonPops` unchanged.
+
+| Run | Battles | Battle clock (s) | Placed / ready / popped (`nine`) / landed a battle | Pop rate | Longest landing streak (mean / max) | 3+ in a row (battles) | Landed material a battle (± 1 s.e.) |
+|---|---|---|---|---|---|---|---|
+| beforeF (fast) | 40 | 205 | 4.35 / 3.42 / 2.23 (0.07) / 1.18 | 65% of 136 | 1.00 / 3 | 2 | 2.42 (± 0.52) |
+| beforeF, games 0-19 | 20 | 196 | 4.10 / 3.25 / 1.95 (0) / 1.25 | 61% of 64 | 1.10 / 3 | 2 | 2.65 (± 0.80) |
+| afterF (fast), games 0-19 | 20 | 201 | 4.15 / 3.25 / 2.10 (0.15) / 1.10 | 66% of 64 | 0.95 / 2 | 0 | 2.90 (± 0.85) |
+| before5 (5 s), games 0-19 | 20 | 388 | 6.80 / 6.00 / 3.55 (0.50) / 2.40 | 60% of 119 | 1.85 / 4 | 5 | 6.80 (± 1.30) |
+| after5 (5 s), games 0-19 | 20 | 392 | 6.75 / 6.15 / 3.95 (0.35) / 1.95 | 67% of 118 | 1.45 / 2 | 0 | **5.55** (± 1.19) |
+
+At the floor's pace (5 s) he keeps 5.55, above 4. At Eric's own fast pace the battle's clock is short (about 205 s for 55
+moves), so only about 3.4 balloons are ready and 1.2 land a battle (2.4 to 2.9 material), before and after alike.
 
 ## Oct 24 (later): the hoops after his move, 2 to 4 a battle
 

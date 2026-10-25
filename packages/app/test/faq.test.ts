@@ -86,6 +86,7 @@ describe("the FAQ's contents", () => {
     expect(p.balloonPops.rook).toBe(p.balloonPops.knight);
     expect(words).toContain(`duds that always pop (${o.fakeQueen} in every ${o.queen + o.fakeQueen}), and you can't tell which`);
     expect(words).toContain("about 58% of his balloons pop");
+    expect(words).toContain(`he never lands more than ${p.balloonLandsInRow} in a row: after ${p.balloonLandsInRow} landings, the next one pops, unless it's a real queen`);
     expect(words).toContain("never a square you attack (you can't take it at once)");
     expect(words).toContain("beyond what his missing pawns could have promoted into");
     expect(words).toContain(`he plays his move as usual, then throws ${p.hoopsCount} burning hoops onto the board before your turn`);

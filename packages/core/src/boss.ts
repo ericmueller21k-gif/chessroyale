@@ -752,6 +752,8 @@ export interface BalloonState {
   placed: number;
   landed: number;
   popped: number;
+  /** His balloons landed in a row since his last pop (none yet: 0); balloonLandsInRow of them, and the next one pops. */
+  inRow?: number;
 }
 
 /**
