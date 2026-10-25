@@ -431,3 +431,18 @@ the building art and the names, which are wrong) and `chatgpt-town-square-overvi
   twice (the tiger still, Oct 23; Babur's circus tent, Oct 25) and can't do it. A building took Opus about 6 minutes; the
   circus tent test is the first. The reference pictures give the ideas; our style wins, and the names are written by the game
   on each building's sign, never drawn into the art.
+
+## Auto chess: a TFT-style economy (Eric, Oct 25, 2026; for another day, needs testing)
+
+Eric: rework Auto chess's gold so it plays like Teamfight Tactics, with buying, rolling and leveling in small whole numbers.
+"Will need to test it a bit so it feels like TFT… not sure yet but this is for another day." His numbers, with today's in
+brackets (`AUTOCHESS` in `packages/core/src/settings.ts`; today's are on a ×10 scale):
+
+- **Piece prices:** pawn 1, bishop 3, knight 3, rook 5, queen 7, "unless 8 or 9 is more true to chess value" [today 10, 32,
+  30, 50, 90]. The usual chess values are pawn 1, knight 3, bishop 3, rook 5, queen 9 (today's prices are already those,
+  ×10); 7 would make the queen cheaper than her worth. Settle by testing.
+- **Leveling:** 4 gold buys 4 XP; level 10 is the top [today 20 gold for 4 XP, top 10].
+- **Income:** squeezed to TFT's size per round [today 100 the first round, +20 a round, up to 200].
+- **Interest:** +1 gold per 10 held, up to +5 at 50 gold [today 10 per 100, up to 30].
+- **Rolling:** maybe starts at 2 and rises 2, 3, 4, 5 within a round, capped at 5; not decided [today 5, +1 a roll, up to 10].
+- The win-streak gold, selling back, star-ups and every other gold number scale down with it.
