@@ -1,4 +1,4 @@
-import { RECLUSE_PHASE2, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
+import { RECLUSE_PHASE2, BOSS_ALONE_SCORING, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs } from "@chessroyale/chess";
@@ -86,6 +86,8 @@ export class SoloMatch implements GameView {
     /** A boss raid with bots in the crowd (Solo); without, it's you against the boss (Boss alone). Other modes always have bots. */
     private readonly raidBots = false,
   ) {
+    // Boss alone (a raid without bots) keeps the old scoring; a Solo raid scores as every raid (RAID_SCORING).
+    if (baseSettings.raid && !raidBots) this.baseSettings = { ...baseSettings, ...BOSS_ALONE_SCORING };
     // (The hippo gardener's seeds count by this page's visible time, not an earlier online match's server.)
     setGardenSource(null);
     // (A game on this device: a tester's ?bannerplus= counts.)

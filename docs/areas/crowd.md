@@ -36,7 +36,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   Classic under the round score, a boss battle as the dock's second line, shortened under 380 px: "8 of 9.6
   forgiven", "no allowance"); the breakdown says what counted, and the group's average as it counted. Squads isn't scored per move: untouched.
 - **50 v 50's scoring** (Eric, Oct 23; docs/decisions/2026-10-24-crowd-scoring.md; `CROWD_SCORING` in settings.ts, as
-  `crowdScoring` in `CROWD_SETTINGS`, off in raids and Classic; measured with Maia players in `reports/crowd-scoring.md`).
+  `crowdScoring` in `CROWD_SETTINGS`, off in Classic; raids have their own, below; measured with Maia players in
+  `reports/crowd-scoring.md`).
   `scoreGroup` shapes each round score when it gets a `ScoreContext` (the runner's `scoreContext`: the stage, whether
   streaks count, each player's streak): a losing pick many made counts less (`sharedFactor`), then the round score goes
   through a soft cap that widens by stage (`softCap`, `capFor`: `cap` from `capFrom`; `capCurve`), except that a pick
@@ -53,6 +54,17 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   rank square's corner, never in the name's cell, so a name keeps all its room (`components/StreakFire.tsx`, in `RaceTower`'s `.t-pos`: orange, red from 2 more, a white-blue core from 4 more; a flicker, still under reduced
   motion). The reveal adds "+0.50 streak bonus" under your score, and "not capped · gave up a piece" after the allowance.
   Test switches (solo): `?streaks=1` (every seat on a streak, 3 to 9), `?shoutout=1` (your first pick gets a shoutout).
+- **A raid's scoring** (Eric, Oct 25: "Raids should use the 50 v 50 math"; docs/decisions/2026-10-25-raid-scoring.md;
+  `RAID_SCORING` in settings.ts, `RAID_SETTINGS.crowdScoring`; measured with Maia raids in `reports/raid-scoring.md`):
+  50 v 50's math (the shared relief, the soft cap, pieces uncapped, streaks and the fire, rare finds, a miss at 2 caps, 2
+  decimals), the whole crowd as one team. A raid has no cuts, so its cap widens by the crowd's move instead of the stage
+  (`capFromMove`: the runner's `scoreContext` passes the boss battle's crowd move, 1 up, and `capFor` reads it when the
+  scoring has `capFromMove`). A raid plays on in decided games, where every move is "strong", so a move counts for
+  streaks only when the crowd gave away `streakMinAverage` or more on average by raw loss; otherwise a streak neither
+  grows nor ends (unset in 50 v 50). No bubble (`cutGrace` 0: nothing is cut). The boss's strike goes by the points given
+  away, not by these ([bosses.md](bosses.md), "The strike"). Online raids and a Solo raid (Raid with bots) score this
+  way; **Boss alone** keeps the old scoring (`BOSS_ALONE_SCORING`, put over the settings by `SoloMatch` when a raid has
+  no bots).
 - **The cut.** After each stage (`firstStageRounds`, then `roundsPerStage`) the lowest scorers are knocked out
   (`knockoutsPerStage`; in 50 v 50 the same number from each team). **Ties at the line go through** (`cutPlan` in
   `match.ts`): everyone tied exactly (`sameScore`) with the last player through stays in (in 50 v 50 so does anyone within
@@ -187,7 +199,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 
 ## Settings
 
-`OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `CROWD_SCORING` (the cap and its stages and curve, the piece bar, the shared-blunder relief, streaks, rare finds, a miss, the bubble grace), `CROWD_START` (the start vote's random opening length), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
+`OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `CROWD_SCORING` (the cap and its stages and curve, the piece bar, the shared-blunder relief, streaks, rare finds, a miss, the bubble grace), `RAID_SCORING` (50 v 50's, the cap by crowd move, streaks on live moves only, no bubble), `BOSS_ALONE_SCORING`, `CROWD_START` (the start vote's random opening length), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
 (the `?pace=quick` test switch, per mode; players always play the mode's own pace), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
 `moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
 time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
@@ -207,6 +219,10 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   steady rows and no spill at 320 and 1280, reduced motion; the shoutout and its bonus, the board still); the sim
   `packages/sim/scripts/crowd-scoring-trace.ts` (records Maia or bot matches) and `crowd-scoring-sim.ts` (re-scores them
   under every variant: `reports/crowd-scoring.md`).
+- A raid's scoring: unit `packages/core/test/raid-scoring.test.ts` (raids on and Boss alone off, the cap by crowd move,
+  streaks on live moves only, the strike by points given away and its tie-break); e2e `e2e/boss-dock.spec.ts` (the dock's
+  line to 2 decimals in a Solo raid); the sim `packages/sim/scripts/raid-scoring-trace.ts` (records Maia raids through
+  the runner) and `raid-scoring-sim.ts` (re-scores and re-strikes them under each variant: `reports/raid-scoring.md`).
 - The start vote: unit `packages/core/test/votes.test.ts` (its cards, default, patches, `?start=`), `packages/chess/test/opening-vote.test.ts`
   (each start's board, seeded, the balance window, a Freestyle game through the runner, castling both ways, the snapshot),
   `packages/server/test/lobby.test.ts` ("the start vote online": Freestyle and Random opening, castling, a lobby that

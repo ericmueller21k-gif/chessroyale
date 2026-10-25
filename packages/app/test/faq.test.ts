@@ -359,6 +359,20 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain("gives up 5 pawns' worth");
   });
 
+  it("a raid's scoring: 50 v 50's, the limit by crowd move, the strike by points given away; Boss alone as before; every number from RAID_SCORING", () => {
+    const rs = FAQ_DEFAULTS.raid.crowdScoring!;
+    const t = section("scoring");
+    expect(t).toContain(`about ±${rs.cap[0]} from the 1st crowd move, about ±${rs.cap[1]} from the ${rs.capFromMove![1]}th crowd move`);
+    expect(t).toContain(`(${-rs.missCaps * rs.cap[0]!} at first)`.replace("-", "−"));
+    expect(t).toContain(`less than ${rs.streakMinAverage} point on average`);
+    expect(t).toContain("still goes by the points you gave away since its last strike, before the limit and the streaks");
+    expect(t).toContain("Boss alone scores as before");
+    expect(section("modes")).toContain("Scoring: the 50 v 50 way, its limit widening with the crowd's moves");
+    const moved = section("scoring", { ...FAQ_DEFAULTS, raid: { ...FAQ_DEFAULTS.raid, crowdScoring: { ...rs, capFromMove: [1, 6, 12, 20], streakMinAverage: 3 } } });
+    expect(moved).toContain("about ±3.5 from the 6th crowd move, about ±5 from the 12th crowd move and about ±8 from the 20th crowd move");
+    expect(moved).toContain("less than 3 points on average");
+  });
+
   it("ties at the cut line go through; the boss's tied strike waits", () => {
     const modes = section("modes");
     expect(modes).toContain("everyone tied exactly with the last player through stays in, and the cuts still to come take the extra, a little at each");

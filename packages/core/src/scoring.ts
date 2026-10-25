@@ -71,6 +71,8 @@ export interface PlayerRoundResult {
 export interface ScoreContext {
   /** The match's stage (0 before the first cut): which cap applies. */
   stage: number;
+  /** A boss battle: the crowd's move (1 up), which sets the cap when it widens by move (CrowdScoring.capFromMove: a raid). */
+  move?: number;
   /** Streaks count on this move (streakCounts). */
   streaks: boolean;
   /** Each player's streak before this move (none: 0). */
@@ -186,11 +188,16 @@ export const round2 = (x: number) => Math.round(x * 100) / 100;
 export const softCap = (x: number, cap: number | null, curve: CrowdScoring["capCurve"] = "tanh") =>
   cap === null ? x : curve === "ratio" ? x / (1 + Math.abs(x) / cap) : cap * Math.tanh(x / cap);
 
-/** The cap on a stage (CrowdScoring.cap, from capFrom). */
-export function capFor(cs: CrowdScoring, stage: number): number | null {
+/**
+ * The cap on a stage (CrowdScoring.cap, from capFrom), or in a raid on the crowd's move `move` (1 up), when the scoring
+ * widens by move (capFromMove).
+ */
+export function capFor(cs: CrowdScoring, stage: number, move?: number): number | null {
+  const byMove = cs.capFromMove && move !== undefined;
+  const at = byMove ? move : stage;
   let cap: number | null = cs.cap[0] ?? null;
-  cs.capFrom.forEach((from: number, i: number) => {
-    if (stage >= from && i < cs.cap.length) cap = cs.cap[i]!;
+  (byMove ? cs.capFromMove! : cs.capFrom).forEach((from: number, i: number) => {
+    if (at >= from && i < cs.cap.length) cap = cs.cap[i]!;
   });
   return cap;
 }
@@ -246,7 +253,11 @@ export function scoreGroup(
   for (const p of picked) count.set(p.move!, (count.get(p.move!) ?? 0) + 1);
   const scored = (m: string) => (cs ? counted(m) * sharedFactor(cs, counted(m), count.get(m)!, picked.length) : counted(m));
   const averageLoss = picked.length ? picked.reduce((s, p) => s + scored(p.move!), 0) / picked.length : null;
-  const cap = cs ? capFor(cs, context!.stage) : null;
+  const cap = cs ? capFor(cs, context!.stage, context!.move) : null;
+  // (A move that plays itself, the group giving away less than streakMinAverage on average by raw loss (a decided game,
+  // where every move scores about the same), neither adds to a streak nor ends it: CrowdScoring.streakMinAverage.)
+  const rawAverage = picked.length ? picked.reduce((sum, p) => sum + losses[p.move!]!, 0) / picked.length : 0;
+  const streakLive = !!context?.streaks && (cs?.streakMinAverage === undefined || rawAverage >= cs.streakMinAverage - 1e-9);
   const players = picks.map((p): PlayerRoundResult => {
     if (!cs) {
       if (p.move === null) return { playerId: p.playerId, move: null, loss: null, roundScore: settings.missedMoveScore };
@@ -266,8 +277,8 @@ export function scoreGroup(
     const uncapped = !!slip && x < 0;
     // A strong move: within streakStrong of the engine's best, by its raw loss (the allowance forgives most opening moves).
     const strong = loss <= cs.streakStrong + 1e-9;
-    const streak = context!.streaks ? (strong ? before + 1 : 0) : before;
-    const bonus = context!.streaks && strong ? streakBonusAt(cs, streak) : 0;
+    const streak = streakLive ? (strong ? before + 1 : 0) : before;
+    const bonus = streakLive && strong ? streakBonusAt(cs, streak) : 0;
     return {
       playerId: p.playerId,
       move: p.move,
