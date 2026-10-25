@@ -117,7 +117,7 @@ function versus(elo: number, you: number): { text: string; tone: "easy" | "even"
 
 /**
  * Boss alone's menu: your difficulty and the boss to fight, each at your strength
- * plus its own offset and your difficulty (`bossAloneElo`, as the Boss raid screen's stage shows it), with its threat
+ * plus its own offset and your difficulty (`bossAloneElo`, the number the menu shows), with its threat
  * and its strength against yours. A tap on a boss starts. The difficulty is the screen's (`difficulty`,
  * `onDifficulty`), so the stage follows it as it changes.
  * - From the Boss raid screen (`only`: the boss picked there, or "" for a random one): that boss alone, under the title
@@ -777,7 +777,7 @@ export function HomeScreen({
         {/* (Why you're here: a match that closed while this screen was where you'd come back to, as on home.) */}
         {notice && <Notice notice={notice} />}
         {/* The character select (Eric, Oct 16): the tiles, the stage; the ways to play under it. */}
-        <BossSelect value={pick} rating={profile?.rating ?? null} difficulty={difficulty} onPick={pickTile} />
+        <BossSelect value={pick} difficulty={difficulty} onPick={pickTile} />
         <div class="rd-options">
           {/* (The public queues share their lobby: always a random boss.) */}
           <RaidOption

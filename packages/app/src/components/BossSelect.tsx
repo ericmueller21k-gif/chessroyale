@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { bossThreat, hiddenBosses, menuBosses, type BossDef, type BossDifficultyId } from "@chessroyale/core";
-import { bossAloneElo, difficultyLabel } from "../boss-difficulty.ts";
+import { hiddenBosses, menuBosses, type BossDef, type BossDifficultyId } from "@chessroyale/core";
+import { difficultyLabel } from "../boss-difficulty.ts";
 import { bossKit } from "../characters/kits.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
 import { rowSizes, SELECT_SOUND, SELECT_TINT, selectLine, TILES_PER_ROW } from "../characters/boss-select.ts";
@@ -16,8 +16,8 @@ import { useMedia } from "./QuickChat.tsx";
  * boss that's selected… shows their full sprite… standing there doing its idle animation"): a grid of slanted tiles, one
  * per boss you can meet (a resting one is left out, as the boss menu leaves it out), the Hidden Boss's dark and locked,
  * and "?" for a random boss; under them a stage, the 1 v 1 versus stage's platform (`dv-st-`), the picked boss on it in
- * its idle animation, its name and its strength against you: Boss alone's at your difficulty (the number its menu shows
- * for it, so a boss never has two numbers on screen), the difficulty named after it unless it's Normal.
+ * its idle animation, and its name, with its difficulty named under it unless it's Normal. No number or skulls on the
+ * stage (Eric, Oct 25; Boss alone's menu keeps its number).
  *
  * The tiles are a fighting game's select grid (Eric, Oct 21 to 23; the last look from Street Fighter 6's): tall slanted tiles,
  * all the same size, a small gap between them, five to a row on a phone and a computer alike (a short row centered), each
@@ -67,7 +67,7 @@ function placeOnStage(ch: Character, idle: string): { left: number; width: numbe
 /** The "?" tile's value, and the stage's when a random boss is picked. */
 export const RANDOM = "";
 
-export function BossSelect({ value, rating, difficulty, onPick }: { value: string; rating: number | null; difficulty: BossDifficultyId; onPick: (id: string) => void }) {
+export function BossSelect({ value, difficulty, onPick }: { value: string; difficulty: BossDifficultyId; onPick: (id: string) => void }) {
   useServerStatus();
   const { bosses, hidden } = selectBosses();
   const still = useMedia("(prefers-reduced-motion: reduce)");
@@ -94,9 +94,6 @@ export function BossSelect({ value, rating, difficulty, onPick }: { value: strin
       selectVoice.say(line, `select:${id}:${Date.now()}`, NORMAL);
     }
   };
-  // Its strength against you: Boss alone's at your difficulty, the number Boss alone's menu shows for it (a Solo raid's
-  // is the same at Normal: no difficulty on top).
-  const elo = def && !dark ? bossAloneElo(rating, def, difficulty) : null;
   const kit = def ? bossKit(def.name) : null;
   const idle = kit ? (kit.anims.idle ?? "idle") : null;
   const tile = (id: string, label: string, body: preact.ComponentChildren, cls = "", tint?: string) => (
@@ -143,19 +140,8 @@ export function BossSelect({ value, rating, difficulty, onPick }: { value: strin
         <div class="bs-id" aria-live="polite">
           <strong class="bs-name">{dark ? "???" : (def?.name ?? "Random boss")}</strong>
           <span class="bs-rating">
-            {dark ? (
-              "Locked"
-            ) : elo !== null ? (
-              <>
-                <span class="br-skulls" aria-hidden="true">
-                  {"💀".repeat(bossThreat(elo))}
-                </span>{" "}
-                Rating {elo}
-                {difficulty !== "normal" && ` · ${difficultyLabel(difficulty)}`}
-              </>
-            ) : (
-              "A different boss from last time"
-            )}
+            {/* (Eric, Oct 25: no skulls, no rating, no number under the boss for now; only the difficulty's name when it isn't Normal.) */}
+            {dark ? "Locked" : def ? (difficulty === "normal" ? "" : difficultyLabel(difficulty)) : "A different boss from last time"}
           </span>
         </div>
       </section>
