@@ -20787,7 +20787,10 @@ button.sq-tiny {
 .bp-tab {
   flex: 0 1 auto;
   min-width: 0;
-  padding: 0 10px;
+  padding: 0 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   border: 0;
   border-radius: 7px;
   background: none;
@@ -20945,6 +20948,10 @@ button.sq-tiny {
     max-width: calc(var(--dk-w, 100vw) - 58px - 30px);
     padding: 8px 9px 7px;
     font-size: 8px;
+  }
+  /* (With the panel's switch, his words open under it: the switch always shows and takes its taps.) */
+  .boss-dock.dk-strip:has(.bp-tabs) > .gk-unit > .gk-bubble {
+    top: 34px;
   }
   .boss-dock.dk-strip > .gk-unit > .gk-bubble::after {
     top: 13px;

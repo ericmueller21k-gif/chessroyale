@@ -100,20 +100,26 @@ export function MiniTower({
   );
 }
 
+/** The panel scoreboard's last height (TowerFit). */
+let lastFit = 0;
+
 /**
  * The scoreboard's rows that fit their box, as the phone's scoreboard shows them (you, the leaders, your neighbors and the
  * cut line first), never scrolling: the boss battle's panel under the board (MovePanel.tsx, "Players"). A tap calls `onOpen`.
  */
 export function TowerFit({ match, floats, onOpen }: { match: GameView; floats?: ReadonlyMap<string, ChatFloat>; onOpen?: () => void }) {
-  const [space, setSpace] = useState(0);
+  // (Starting from the last box it had: a switch back to "Players" mounts it anew, and its first frame shows the rows that
+  // fit, not a few until it has measured.)
+  const [space, setSpace] = useState(lastFit);
   const body = useRef<HTMLDivElement>(null);
   // (Measured before the first paint: a switch back to "Players" shows the rows that fit at once.)
   useLayoutEffect(() => {
     const el = body.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setSpace(el.clientHeight));
+    const fit = () => setSpace((lastFit = el.clientHeight));
+    const ro = new ResizeObserver(fit);
     ro.observe(el);
-    setSpace(el.clientHeight);
+    fit();
     return () => ro.disconnect();
   }, []);
   const view = towerView(match);

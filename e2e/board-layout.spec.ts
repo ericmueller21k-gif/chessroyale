@@ -86,6 +86,42 @@ const boxes = (page: Page) =>
 
 const overlap = (a: Box, b: Box) => a.x < b.r - 0.5 && b.x < a.r - 0.5 && a.y < b.b - 0.5 && b.y < a.b - 0.5;
 
+/**
+ * The God King's words never cover the panel's switch (the director's review of #347: "he talks a lot, including right at
+ * the start"): while his words are up, each tab's center is the tab for a tap, and the words' box is clear of the switch's
+ * row; each tab still switches. (He speaks as your first move begins: watched for, then measured while it's up.)
+ */
+async function switchUnderHisWords(page: Page, at: string, shot: string) {
+  const words = page.locator(".dk-strip .gk-bubble:not(.leaving)");
+  await expect(words, `${at}: his words`).toBeVisible({ timeout: 30_000 });
+  const look = () =>
+    page.evaluate(() => {
+      const row = document.querySelector(".dk-panel .bp-tabs")!.getBoundingClientRect();
+      const w = document.querySelector(".dk-strip .gk-bubble")?.getBoundingClientRect() ?? null;
+      const tabs = [...document.querySelectorAll<HTMLElement>(".dk-panel .bp-tab")].map((t) => {
+        const r = t.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return { name: t.textContent, hit: !!hit && (hit === t || t.contains(hit)) };
+      });
+      const clear = !w || w.bottom <= row.top + 0.5 || w.top >= row.bottom - 0.5 || w.right <= row.left + 0.5 || w.left >= row.right - 0.5;
+      return { up: !!w, tabs, clear, row: [row.top, row.bottom], words: w && [w.top, w.bottom, w.left, w.right] };
+    });
+  const seen = await look();
+  expect(seen.up, `${at}: his words still up`).toBe(true);
+  expect(seen.tabs.length, at).toBeGreaterThanOrEqual(2);
+  for (const t of seen.tabs) expect(t.hit, `${at}: the ${t.name} tab takes a tap under his words: ${JSON.stringify(seen)}`).toBe(true);
+  expect(seen.clear, `${at}: his words clear of the switch: ${JSON.stringify(seen)}`).toBe(true);
+  // Each tab switches while he speaks.
+  const tabs = page.locator(".dk-panel").getByRole("tab");
+  await tabs.filter({ hasText: "Moves" }).click();
+  await expect(page.locator(".dk-panel .mv-box")).toBeVisible();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/${shot}-moves.png` });
+  await tabs.filter({ hasText: "Players" }).click();
+  await expect(page.locator(".dk-panel .bp-tower")).toBeVisible();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/${shot}-players.png` });
+  expect((await look()).clear, `${at}: still clear`).toBe(true);
+}
+
 test("a phone: the God King at the strip's right edge, the panel to his left, the board as big as before, no scrolling; Players / Moves in a raid, the moves alone in Boss alone; a tap opens it over the board, ✕ and Escape close it", async ({ browser }) => {
   test.skip(test.info().project.name !== "phone", "it opens its own phones");
   test.setTimeout(12 * 60_000);
@@ -95,6 +131,7 @@ test("a phone: the God King at the strip's right edge, the panel to his left, th
       const at = `${raid ? "raid" : "alone"} ${size}`;
       const { ctx, page } = await open(browser, w, h);
       await into(page, raid);
+      if (raid && size !== "360x640") await switchUnderHisWords(page, at, size === "390x844" ? "phone-raid-bubble" : "phone-raid-bubble-320");
       const b = await boxes(page);
       expect(b.board && b.row && b.king && b.panel, at).toBeTruthy();
       const { board, row, king, panel } = { board: b.board!, row: b.row!, king: b.king!, panel: b.panel! };

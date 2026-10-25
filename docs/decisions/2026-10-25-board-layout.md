@@ -49,7 +49,9 @@ rework. Every boss battle screen: Boss alone, a Solo raid, an online raid; phone
 - **Online chat on a phone**: the strip has no room for the old split (scoreboard beside chat), so chat is the panel's
   third tab when it's on; a tab other than Chat shows the unread count on it, and new messages still bubble up while chat
   isn't shown, as before. A tap on chat doesn't open the sheet (its lines are buttons).
-- **The God King's words on a phone** open to his left, over the panel (never over the board or the row), and his
+- **The God King's words on a phone** open to his left, over the panel, starting under the panel's switch when it has one
+  (the director's review: he talks a lot, from the first move, and the switch must always show and take its taps; Boss
+  alone's panel has no header, so his words start level with him there). Never over the board or the row; his
   menu above the row at his right, as it opened above the row before. His ⚡ and 🐟 stay beside his head on his left (Eric,
   Oct 24), over the panel's top right where the switch leaves room; Chub & Chirp's carrot count sits just left of him (or of
   the admins' icons).
@@ -79,7 +81,8 @@ rework. Every boss battle screen: Boss alone, a Solo raid, an online raid; phone
   crowd, the God King, the boss; the times and a raid's picks as a device watches the phases).
 - e2e: `e2e/board-layout.spec.ts` (a phone at 390 × 844, 360 × 640 and 320 × 568, Boss alone and a Solo raid: the God
   King at the strip's right edge, the panel to his left with no overlap, the board no smaller than main's, no scrolling,
-  the switch in a raid and none alone, the sheet over the board and its ✕ and Escape; a computer at 1280 × 800,
+  the switch in a raid and none alone, the sheet over the board and its ✕ and Escape; at 390 × 844 and 320 × 568 in a raid,
+  while his words are up, each tab's center takes a tap and his words stay clear of the switch's row; a computer at 1280 × 800,
   1440 × 900 and 1920 × 1080: Boss alone with no scoreboard, a raid's where it was within 1 px, the moves right of the
   board and over neither the board nor the God King; both: one row per move with the right piece, square and capture,
   and the "Your move" row at most 60% of main's height, its text one line).
