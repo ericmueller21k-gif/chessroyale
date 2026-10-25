@@ -271,7 +271,8 @@ export function BossPanel({ match, hushLast = false }: { match: GameView; hushLa
 function PanelSheet({ match, tab, tabs, hushLast }: { match: GameView; tab: PanelTab; tabs: PanelTab[]; hushLast: boolean }) {
   const close = () => panelSet({ sheet: null });
   const sheet = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  // (Listening from the frame it shows: a passive effect waits for the paint, and a key pressed as it appears was lost.)
+  useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && close();
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
