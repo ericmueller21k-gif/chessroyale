@@ -227,6 +227,14 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - Before blaming the game for a test that fails now and then, log every frame of the moment in the page and the
     test's own times next to it: where the two don't overlap is the answer.
 
+## Eric's rules hold
+
+- **An options panel that disappeared** (Oct 25, [story](../docs/history/lessons.md#an-options-panel-that-disappeared-oct-25-2026)):
+  - Eric's standing rules are in [`docs/rules/eric.md`](../docs/rules/eric.md). A change that breaks one, or edits a test that
+    guards one, needs his OK first. Above all: nothing hidden behind another tap (greyed instead), nothing shifts.
+  - A brief lists the rules of the area it touches; a PR lists every test check it changed or removed and whether one guards
+    a rule. A clash between Eric's new words and a standing rule is a question for him, not a call to make.
+
 ## Explaining the game
 
 - **A countdown that seemed to fire early** (Oct 15, [story](../docs/history/lessons.md#a-countdown-that-seemed-to-fire-early-oct-15-2026)):

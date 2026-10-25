@@ -872,3 +872,25 @@ says; silhouettes on the board are tap only. Tests hold a drag through each mome
 - An action on a "hold" re-checks what it points at now (the piece is there, of that kind) before it pays or changes anything.
 - A drag test holds the drag through every moment that can cut it off, and checks the ghost is gone within a moment of each, with
   nothing bought, held or sold; and a gesture tested with a mouse is tested with a finger too (`touch-action`).
+
+## An options panel that disappeared (Oct 25, 2026)
+
+**What Eric saw:** home on a computer and on a phone showed the RANKED row and PLAY with nothing between them; the Default /
+Bots off / Solo row only appeared after he tapped a mode, and the page moved when it did. "I feel like I've said this 100
+times, the menu buttons should never be like invisible… we had it working before… something should have caught this."
+
+**The cause:** on Oct 24 Eric asked to drop the "Tap a mode above to play" message and its white space. The director's brief
+for that tidy-up went further than he asked: "when no mode is picked, the panel isn't there at all… it may move." That
+reversed his Oct 18 rule (home keeps still; one panel, one height, options greyed or explained). The same brief told the
+helper to update the home specs to "no panel when no mode is picked", so the tests that guarded the Oct 18 rule were rewritten
+to guard the opposite, and the director merged it (#339) without checking the brief against the earlier decision.
+
+**The fix:** the panel is back in its place with nothing selected and its options greyed until a mode is picked; picking a
+mode moves nothing (docs/decisions/2026-10-25-home-panel-back.md). Eric's standing rules now live in `docs/rules/eric.md`,
+each with the test that guards it.
+
+**The rule:**
+- A brief lists the standing rules of the area it touches (`docs/rules/eric.md`, the area's decisions) and keeps them. When
+  Eric's new words seem to clash with one, ask him; never read a clash into them.
+- A test that guards one of Eric's rules changes only with his OK. A brief never says "update the specs to the new
+  behavior" for one, and every PR lists the test checks it changed or removed.
