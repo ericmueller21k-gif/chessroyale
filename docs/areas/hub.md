@@ -16,8 +16,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   - **The RANKED row:** a small "RANKED" label over three buttons, a radio group: **50 v 50** ("Crowd chess"), **1 v 1**
     ("Classic chess") and **Squads** ("8 squads of 4"). Home opens with **none picked** and PLAY dimmed: you tap the mode
     you want, then PLAY (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)). The pick holds until the app is opened again
-    (a reload), and `?mode=` picks one from a link. Classic still plays with `?mode=classic`. With none picked the panel
-    says "Tap a mode above to play". Under the row, **the panel**: one box of one fixed size for every mode (Eric, Oct 18:
+    (a reload), and `?mode=` picks one from a link. Classic still plays with `?mode=classic`. With none picked there is no
+    panel (Oct 24: no "Tap a mode above to play"). Under the row, **the panel**, once a mode is picked: one box of one fixed size for every mode (Eric, Oct 18:
     "it should never change size";
     [docs/decisions/2026-10-18-home-steady-layout.md](../decisions/2026-10-18-home-steady-layout.md)), holding the
     pick's options or words: 50 v 50's Matchmaking (Default, Bots off, Solo) with its ⓘ (its words float over the RANKED
@@ -25,16 +25,23 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     once, and PLAY opens it again while Party is picked); for 1 v 1 (always people) your rank in it, "Your rank: Gold 2 ·
     45 RP" or "Your rank: Placement 2/5" (`ranked1v1Label`, from your profile; whole on one line at 320 px at its
     widest), over "Ranked chess vs one player near your level". Then PLAY and its line, a fixed height whatever it says
-    (two lines' room on a phone, one line on a computer). No click on home moves or resizes anything (a mode, an option,
-    the ⓘ). 1 v 1's PLAY is
+    (two lines' room on a phone, one line on a computer). After the first pick no click on home moves or resizes anything
+    (a mode, an option, the ⓘ). The first pick brings the panel in above PLAY (Oct 24): the RANKED row rises by the
+    panel's room (58 px and its 10 px gap on a phone; the board above a computer's gives up its room), and PLAY, the
+    cards and the line stay put. 1 v 1's PLAY is
     `startRanked1v1()`: its queue at once, at `/1v1` ([ranked.md](ranked.md)); resting (`PAUSE_RANKED1V1`), PLAY is
     off with its line, as the other modes.
+  - **Other modes** (Oct 24, Eric: "a tiny text that says other modes, right below play"): an 11 px muted label under
+    PLAY, then the **Boss raid card** and the **Auto chess** card (the same look and size: "Auto chess", "Build an army,
+    watch it fight", a white knight from the board's own piece art; it opens `/autochess`, as Settings' Testing row
+    does, with its back button home). PLAY is a third shorter (43 px on a phone, 59 px on a computer).
   - **The Boss raid card** (full width, "Boss raid", "Team up vs a boss · up to 50") opens the **Boss raid screen**
     (`?mode=raid` opens it too; the computer's side menu has "Boss raid" in Boss alone's old place). Its portrait is a
     still of one boss you can meet, turning to the next every 30 s (`FRONT_DOOR.bossCardMs`) with a 0.6 s fade
     (`bossCardFadeMs`), never the Hidden Boss or a resting boss, the card's size fixed; it waits while the app is
     hidden, and under reduced motion there's no fade (`BossCardFace` in `components/BossSelect.tsx`; test switch
-    `?cardMs=`). The animated card with lines is shelved (a later idea).
+    `?cardMs=`). The animated card with lines is shelved (a later idea). The title is Archivo, not Archivo Black: that
+    file's lowercase i has no dot, so "raid" read as "raId" (Oct 24).
   - **The Boss raid screen: a character select** (Eric, Oct 16;
     [docs/decisions/2026-10-16-boss-character-select.md](../decisions/2026-10-16-boss-character-select.md);
     `BossSelect`): tall slanted tiles at the top like a fighting game's select grid, one per boss you can meet, each its
@@ -69,15 +76,17 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   - **Phone:** a top bar (the logo, your pawn (your profile), the shop, **Friends** (with a count
     of requests and invites), then a gear that opens Settings in one tap; a computer's are its side menu's, so none is
     there; [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md),
-    [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the Boss raid card, the RANKED row, its panel, then PLAY
-    and its line at the bottom. It fits the screen with no
-    scrolling from 360×640 up: your pawn's card takes the room left and its pawn is sized to it (beside your name
-    when the room is short); below that the card stops shrinking and the page scrolls
+    [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the RANKED row, its panel, PLAY
+    and its line, then Other modes with the Boss raid card and Auto chess at the bottom. Your pawn's card takes the room
+    left: your tag (icon, name, "Weighty · 1580") centered above your pawn's head, the pawn 75% bigger than before
+    (170 × 154 → up to 298 × 270) and sized to the room the tag leaves (Oct 24). On a short card (under 190 px tall: a
+    640 px phone with a mode picked) the tag stands beside the pawn instead, as it did when the room was short (Oct 18), so
+    home fits with no scrolling from 360×640 up in every mode. At 320×568 home fits too, with a small pawn (about 51 px).
     ([docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)). Big tap targets, no
     sideways scroll at 320–430 px; a long name on your home card ellipsizes.
-  - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the Boss
-    raid card (full width, a little shorter), the RANKED row, its panel, then PLAY and its line at the bottom; a side
-    panel (playing now, global chat).
+  - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the RANKED
+    row, its panel, PLAY and its line, then Other modes with the Boss raid card and Auto chess (a little shorter) at the
+    bottom; a side panel (playing now, global chat). The pawn hops on a computer too (Oct 24: the hop was phone-only).
     From 1280 px the play column starts with the **live window**: the featured real match (a matchmade one, most
     people, then newest) or, when none runs, bot-match replays played on a shared clock cycle so everyone sees the same
     moment (`LIVE_WINDOW`; replays in `packages/app/public/replays/crowd-bots.json`, never fetched on phones).

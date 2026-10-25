@@ -8,7 +8,7 @@ import { BossBrainPicker } from "../components/BossBrain.tsx";
 import { isAdmin, maiaAllowed, maiaLikely, pickedBrain, rememberBrain } from "../boss-brain.ts";
 import { prefetchMaia } from "../maia.ts";
 import type { ComponentChildren } from "preact";
-import { AccountBar, BackButton, DressedPawn, FdButton, FriendsIcon, GearIcon, LiveLine, Logo, RankLine, ShopIcon, wearingNames } from "../components/FrontDoor.tsx";
+import { AccountBar, BackButton, DressedPawn, FdButton, FriendsIcon, GearIcon, LiveLine, Logo, RankLine, ShopIcon } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
 import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/BossSelect.tsx";
 import { BossFace } from "../components/BossCharacter.tsx";
@@ -23,6 +23,7 @@ import { testParams } from "../test-switches.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
 import { ranked1v1Label } from "../ranked.ts";
+import { PIECE_SHAPES, type PieceShape } from "../autochess/pieceShapes.ts";
 
 const MODE_KEY = "brc.mode";
 
@@ -508,6 +509,7 @@ export function HomeScreen({
   onSquads,
   onParty,
   onRaid,
+  onAutoChess,
   onProfile,
   onSettings,
   onShop,
@@ -548,6 +550,8 @@ export function HomeScreen({
   onParty: () => void;
   /** Open (true) or close the Boss raid screen. */
   onRaid: (open: boolean) => void;
+  /** Auto chess's card under the Boss raid card: the screen, as /autochess opens it. */
+  onAutoChess: () => void;
   onProfile: () => void;
   /** The phone's gear in the top bar: Settings, as Profile → Settings opens it. */
   onSettings: () => void;
@@ -688,7 +692,6 @@ export function HomeScreen({
   );
   const look = profile?.locker?.look;
   const name = profile?.user.name ?? "Player";
-  const wearing = wearingNames(look);
   const queueing = queue !== undefined && queue !== null;
   // A screen that replaces home (a phone's queue, the Boss raid screen, and home again) starts at its top, wherever home
   // was scrolled to (its card and PLAY sit low on a small phone). Before its first paint.
@@ -700,10 +703,11 @@ export function HomeScreen({
   }, [view]);
   const hero = (
     <section class="fd-hero" aria-label="You">
-      {/* (A phone sizes your pawn to the room the card has, and sets it beside your name when that room is short.) */}
+      {/* (A phone sizes your pawn to the room the card has. Home shows your tag above the pawn's head, centered (styles.css, `order`); the
+          pawn comes first here, as the queue's small card has it beside the pawn.) */}
       <div class="fd-hero-in">
       <DressedPawn look={look} size="hero" shadow />
-      {/* (Your icon to the left of your name and rating, as beside your name in chat.) */}
+      {/* (Your icon to the left of your name and rating, as beside your name in chat; its height is the two lines'.) */}
       <div class="fd-hero-id">
         <span class="fd-hero-icon">
           <UserIcon icon={profile?.user.icon ?? "♟"} />
@@ -712,7 +716,6 @@ export function HomeScreen({
           <div class="fd-hero-name">{name}</div>
           <div class="fd-hero-sub">
             <RankLine rating={profile?.rating ?? null} />
-            {wearing && ` · ${wearing}`}
           </div>
         </div>
       </div>
@@ -836,15 +839,11 @@ export function HomeScreen({
   // need there to explain what that is, or if there needs to be options for it"): one box, the same size for every
   // mode, holding the pick's options or words. 50 v 50: Matchmaking (Default, Bots off, Solo) and its ⓘ. 1 v 1 (always
   // people, one tap to queue): your rank in it and what it is. Squads: Solo queue or Party. Nothing in it changes the
-  // page's layout: the ⓘ's words float over it.
+  // page's layout: the ⓘ's words float over it. (Oct 24: no panel until a mode is picked, so nothing says "tap a mode".)
   const rank1v1 = mode === "1v1" ? ranked1v1Label() : null;
-  const panel = (
+  const panel = !mode ? null : (
     <div class="fd-mode-panel">
-      {!mode ? (
-        <div class="fd-panel-words">
-          <span>Tap a mode above to play</span>
-        </div>
-      ) : mode === "squads" ? (
+      {mode === "squads" ? (
         <div class="fd-modes fd-types fd-squad-pick" role="radiogroup" aria-label="Squads">
           {(
             [
@@ -942,6 +941,22 @@ export function HomeScreen({
       </span>
     </button>
   );
+  // Auto chess's card (Eric, Oct 24: "build an army, watch it fight"): the Boss raid card's look and size, its picture the
+  // board's own white knight (KnightArt), its tap the screen /autochess opens.
+  const autoCard = (
+    <button type="button" class="rd-card fd-auto-card" onClick={onAutoChess}>
+      <span class="rd-face" aria-hidden="true">
+        <KnightArt />
+      </span>
+      <span class="rd-card-text">
+        <strong>Auto chess</strong>
+        <span>Build an army, watch it fight</span>
+      </span>
+      <span class="rd-card-go" aria-hidden="true">
+        ›
+      </span>
+    </button>
+  );
   return (
     <div class="fd-home">
       {/*
@@ -990,10 +1005,31 @@ export function HomeScreen({
           {ranked}
           {panel}
           {go}
+          <h2 class="fd-label fd-other-label">Other modes</h2>
           {bossCard}
+          {autoCard}
         </div>
       </div>
       {overlays}
     </div>
+  );
+}
+
+/**
+ * A white knight, drawn from the board's own piece art (the cburnett set's shapes, autochess/pieceShapes.ts): Auto chess's
+ * card picture. Nothing new is drawn.
+ */
+function KnightArt() {
+  const shapes: PieceShape[] = PIECE_SHAPES.nw ?? [];
+  return (
+    <svg class="fd-knight" viewBox="0 0 45 45" width="56" height="56" aria-hidden="true" focusable="false">
+      {shapes.map((s, i) =>
+        s.d ? (
+          <path key={i} d={s.d} transform={s.tf} fill={s.fill} stroke={s.stroke} stroke-width={s.sw} stroke-linecap={s.cap as "butt" | "round" | "square"} stroke-linejoin={s.join as "miter" | "round" | "bevel"} fill-rule={s.eo ? "evenodd" : undefined} />
+        ) : (
+          <circle key={i} cx={s.cx} cy={s.cy} r={s.r} transform={s.tf} fill={s.fill} stroke={s.stroke} stroke-width={s.sw} />
+        ),
+      )}
+    </svg>
   );
 }

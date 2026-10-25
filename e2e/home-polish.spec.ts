@@ -2,15 +2,15 @@ import { expect, type Page } from "@playwright/test";
 import { named, pickMode, test } from "./helpers.ts";
 
 /**
- * Home on a phone (Eric's screenshot): one shadow under your pawn (the snowman's own ground shadow is hidden there), your
- * pawn hops every 30 s (its first hop 4 s after home shows; FRONT_DOOR.heroHopFirstSec and heroHopEverySec; never under
- * reduced motion), and the Boss raid card sits 14 px under the one-line default hint ("Starts within", or "Usually about").
+ * Home (Eric's screenshots): one shadow under your pawn on a phone (the snowman's own ground shadow is hidden there), the
+ * "Other modes" label 14 px under the one-line default hint ("Starts within", or "Usually about"), and your pawn hops on
+ * a phone and a computer alike every 30 s (its first hop 4 s after home shows; FRONT_DOOR.heroHopFirstSec and
+ * heroHopEverySec; never under reduced motion). Oct 24: the hop was phone-only, so a computer never hopped.
  */
 const desktop = () => test.info().project.name === "desktop";
 
-test("phone home: one shadow under your pawn; a hop 4 s after home shows and then every 30 s, never under reduced motion; the Boss raid card 14 px under the Starts-within line", async ({ page }) => {
+test("phone home: one shadow under your pawn; the Other modes label 14 px under the Starts-within line", async ({ page }) => {
   test.skip(desktop(), "a phone's home");
-  test.setTimeout(180_000);
   await named(page, "Test2");
   // Dress your pawn as a snowman (its art draws its own ground shadow).
   await page.route(/\/api\/me(\?.*)?$/, async (route) => {
@@ -36,15 +36,21 @@ test("phone home: one shadow under your pawn; a hop 4 s after home shows and the
     expect(await pawn.locator(".skin-shadow").evaluate((el) => getComputedStyle(el).display), `${w}×${h}`).toBe("none");
     expect(await pawn.evaluate((el) => getComputedStyle(el, "::after").content), `${w}×${h}`).not.toBe("none");
     expect(Number(await pawn.evaluate((el) => getComputedStyle(el, "::after").opacity)), `${w}×${h}`).toBeGreaterThan(0);
-    // (The gap: from the hint's line of text to the card's top.)
+    // (The gap: from the hint's line of text to the "Other modes" label's top, then the Boss raid card under the label.)
     const gap = await page.evaluate(() => {
       const r = document.createRange();
       r.selectNodeContents(document.querySelector(".fd-hint")!);
-      return document.querySelector(".rd-card")!.getBoundingClientRect().top - r.getBoundingClientRect().bottom;
+      return document.querySelector(".fd-other-label")!.getBoundingClientRect().top - r.getBoundingClientRect().bottom;
     });
-    expect(Math.abs(gap - 14), `${w}×${h}: the card ${gap} px under the line`).toBeLessThanOrEqual(1);
+    expect(Math.abs(gap - 14), `${w}×${h}: the label ${gap} px under the line`).toBeLessThanOrEqual(1);
+    const under = await page.evaluate(() => document.querySelector(".rd-card")!.getBoundingClientRect().top - document.querySelector(".fd-other-label")!.getBoundingClientRect().bottom);
+    expect(under, `${w}×${h}: the Boss raid card under the label`).toBeGreaterThanOrEqual(0);
   }
+});
 
+test("home: your pawn hops on a phone and a computer alike, 4 s after home shows and then every 30 s, never under reduced motion; the hop's animation runs", async ({ page }) => {
+  test.setTimeout(180_000);
+  await named(page, "Test2");
   // (The hop, on a fake clock: the hero's first show is the zero, and the pawn's hop classes are logged with the clock's time.)
   await page.clock.install();
   await page.addInitScript(() => {
@@ -69,9 +75,16 @@ test("phone home: one shadow under your pawn; a hop 4 s after home shows and the
     const heroAt = await page.evaluate(() => (window as unknown as { __heroAt: number }).__heroAt);
     // (Freeze the clock a second after the hero shows, then run 70 s of it: the first hop at 4 s, the next at 34 s and at 64 s.)
     await page.clock.pauseAt(heroAt + 1000);
-    await page.clock.runFor(70_000);
+    // (Mid-hop, 4.5 s in: the hop's own animation is running on this layout, a phone's or a computer's.)
+    await page.clock.runFor(3_500);
+    const during = await page.evaluate(() => {
+      const hop = document.querySelector(".fd-hero .fd-pawn.hop .fd-hop");
+      return hop ? getComputedStyle(hop).animationName : null;
+    });
+    await page.clock.runFor(66_500);
     return {
       heroAt,
+      during,
       log: await page.evaluate(() => (window as unknown as { __hopLog: [number, number][] }).__hopLog),
       classNow: await page.locator(".fd-hero .fd-pawn.hop").count(),
     };
@@ -79,6 +92,7 @@ test("phone home: one shadow under your pawn; a hop 4 s after home shows and the
 
   const normal = await hopping(false);
   // Three hops of 1.8 s each: on, off, on, off, on, off, the next one 30 s after the one before.
+  expect(normal.during, `${test.info().project.name}: the hop's animation runs`).toBe("fd-hop");
   expect(normal.log.map((e) => e[1])).toEqual([1, 0, 1, 0, 1, 0]);
   const [firstOn, firstOff, secondOn, , thirdOn] = normal.log.map((e) => e[0]);
   // (The first hop 4 s after the pawn first shows. The pawn is seen by a DOM observer, and under the fake clock that reading can
@@ -93,5 +107,6 @@ test("phone home: one shadow under your pawn; a hop 4 s after home shows and the
   // Under reduced motion: no hop at all, not even the class.
   const reduced = await hopping(true);
   expect(reduced.log).toEqual([]);
+  expect(reduced.during).toBeNull();
   expect(reduced.classNow).toBe(0);
 });

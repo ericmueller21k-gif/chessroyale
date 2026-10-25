@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import { FRONT_DOOR, itemDef, ratingTier, type ItemLook, type ItemSlot, type RankEffect } from "@chessroyale/core";
+import { FRONT_DOOR, ratingTier, type ItemLook, type ItemSlot, type RankEffect } from "@chessroyale/core";
 import { Avatar } from "./Items.tsx";
 import { account } from "../account.ts";
 import type { LiveCounts } from "../live.ts";
@@ -46,13 +46,13 @@ export function DressedPawn({
   side?: "w" | "b";
 }) {
   const pawn = useRef<HTMLSpanElement>(null);
-  // Home's hero pawn hops on a phone, not under reduced motion (Eric: "add the bounce effect every 30 seconds like we have
-  // in autochess"): the first hop FRONT_DOOR.heroHopFirstSec after it shows, then one every FRONT_DOOR.heroHopEverySec. The
+  // Home's hero pawn hops, on a computer as on a phone, not under reduced motion (Eric: "add the bounce effect every 30
+  // seconds like we have in autochess"; Oct 24: it never hopped on a computer, because this check and the hop's CSS were
+  // phone-only): the first hop FRONT_DOOR.heroHopFirstSec after it shows, then one every FRONT_DOOR.heroHopEverySec. The
   // timers stop when the pawn goes (home closes).
   useEffect(() => {
     if (size !== "hero") return;
-    const canHop = () =>
-      !!window.matchMedia?.("(max-width: 899px)").matches && !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const canHop = () => !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     let next: ReturnType<typeof setTimeout>;
     let land: ReturnType<typeof setTimeout>;
     const hop = () => {
@@ -226,15 +226,6 @@ export function RankLine({ rating }: { rating: number | null }) {
 
 /** The order worn items are listed in. */
 export const WORN_ORDER: readonly ItemSlot[] = ["skin", "head", "face", "weapon"];
-
-/** What you wear, by name. */
-export function wearingNames(look: ItemLook | undefined): string {
-  return WORN_ORDER.flatMap((slot) => {
-    const it = look?.[slot];
-    const d = it && itemDef(it.def);
-    return d ? [d.name] : [];
-  }).join(", ");
-}
 
 /** The 44 px back button at the top left of a front-door page. */
 export function BackButton({ onClick, label = "Back" }: { onClick: () => void; label?: string }) {

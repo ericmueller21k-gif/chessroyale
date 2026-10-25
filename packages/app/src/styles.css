@@ -8363,25 +8363,24 @@ button.fd-logo {
   }
 }
 /*
- * Home's hero pawn hops on a phone (DressedPawn: the `hop` class for 1.8 s; FRONT_DOOR.heroHopEverySec): auto chess's hop,
- * the same steps (its ac-hop and ac-shade), with the shadow (the ::after) shrinking and fading as the pawn rises. The
- * wrapper .fd-hop is pawn-sized, so the hop moves the pawn and nothing in the layout; its z-index keeps the shadow under it.
+ * Home's hero pawn hops, on a phone and a computer (DressedPawn: the `hop` class for 1.8 s; FRONT_DOOR.heroHopEverySec):
+ * auto chess's hop, the same steps (its ac-hop and ac-shade), with the shadow (the ::after) shrinking and fading as the
+ * pawn rises. The wrapper .fd-hop is pawn-sized, so the hop moves the pawn and nothing in the layout; its z-index keeps
+ * the shadow under it. (Oct 24: these were inside a phone-only media query, so a computer never hopped.)
  */
-@media (max-width: 899px) {
-  .fd-hop {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    transform-origin: 50% 92%;
-  }
-  .fd-hero .fd-pawn.hop .fd-hop {
-    animation: fd-hop 1.8s linear 1;
-  }
-  .fd-hero .fd-pawn.hop.shadow::after {
-    animation: fd-shade 1.8s linear 1;
-  }
+.fd-hop {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  transform-origin: 50% 92%;
 }
-@media (max-width: 899px) and (prefers-reduced-motion: reduce) {
+.fd-hero .fd-pawn.hop .fd-hop {
+  animation: fd-hop 1.8s linear 1;
+}
+.fd-hero .fd-pawn.hop.shadow::after {
+  animation: fd-shade 1.8s linear 1;
+}
+@media (prefers-reduced-motion: reduce) {
   .fd-hero .fd-pawn.hop .fd-hop,
   .fd-hero .fd-pawn.hop.shadow::after {
     animation: none;
@@ -8599,12 +8598,17 @@ button.fd-logo {
   max-width: 100%;
   min-width: 0;
 }
+/*
+ * (Home: the icon is as tall as the two lines of text beside it, so the tag reads as one block: the name's line is 22 px
+ * and the rating's 16 px on a phone, 28 and 16 on a computer, and the icon is 38 px or 44 px to match.)
+ */
 .fd-hero-icon {
   flex: none;
-  width: 48px;
-  height: 48px;
-  display: grid;
-  place-items: center;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
   border-radius: 10px;
   background: var(--fd-panel-2);
@@ -8612,8 +8616,12 @@ button.fd-logo {
   line-height: 1;
 }
 .fd-hero-icon .user-icon.pixel {
-  width: 48px;
-  height: 48px;
+  width: 100%;
+  height: 100%;
+}
+/* Home: the tag above your pawn's head, centered (the DOM has the pawn first; the queue's small card keeps that order). */
+.fd-home:not(.queueing) .fd-hero-id {
+  order: -1;
 }
 .fd-hero-text {
   min-width: 0;
@@ -8621,6 +8629,7 @@ button.fd-logo {
 }
 .fd-hero-name {
   font-size: 20px;
+  line-height: 22px;
   font-weight: 800;
   /* (A long name ellipsizes, as everywhere else: a 16-character one ran 100 px off a 320 px phone, Oct 17.) */
   overflow: hidden;
@@ -8629,6 +8638,7 @@ button.fd-logo {
 }
 .fd-hero-sub {
   font-size: 14px;
+  line-height: 16px;
   color: var(--fd-sub);
 }
 .fd-play-col {
@@ -8769,7 +8779,8 @@ button.fd-logo {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 64px;
+  /* (Oct 24: a third shorter than 64 px; its width and text are as they were.) */
+  height: 43px;
   border: 0;
   border-radius: 18px;
   background: var(--fd-gold);
@@ -8819,7 +8830,7 @@ button.fd-logo {
     height: 1.3em;
     margin-bottom: 2.1px;
   }
-  .fd-play-col:has(> .fd-go > .fd-hint-line) > .rd-card {
+  .fd-play-col:has(> .fd-go > .fd-hint-line) > .fd-auto-card {
     margin-bottom: 14.8px;
   }
 }
@@ -8844,7 +8855,8 @@ button.fd-logo {
   }
   .fd-hero {
     flex: 1 1 0;
-    min-height: 100px;
+    /* (A pawn of 48 px at least, beside the tag on a short card: see the short-card rule below.) */
+    min-height: 64px;
     align-items: stretch;
     padding: 0;
     container: fd-hero / size;
@@ -8855,22 +8867,35 @@ button.fd-logo {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
     padding: 12px;
     min-height: 0;
   }
+  /*
+   * Your pawn (Oct 24: 75% bigger than 170 × 154, up to 298 × 270), as big as the room under the tag allows: the tag, its
+   * 6 px gap and the card's padding take 72 px of the card's height.
+   */
   .fd-hero .fd-pawn-hero {
     width: auto;
-    height: clamp(48px, calc(100cqh - 84px), 154px);
+    height: clamp(48px, calc(100cqh - 72px), 270px);
     aspect-ratio: 170 / 154;
   }
+  /*
+   * A short card (a phone 640 px tall, with a mode picked, or a shorter one): the tag beside the pawn, as the card had it
+   * when the room was short (Eric, Oct 18: "fits its screen, with no scrolling"). Above the head it would need ~80 px more
+   * than a 640 px phone has (the Auto chess card, the panel), so home would scroll.
+   */
   @container fd-hero (max-height: 189px) {
     .fd-hero-in {
       flex-direction: row;
       gap: 14px;
+      padding: 8px;
     }
     .fd-hero .fd-pawn-hero {
-      height: clamp(48px, calc(100cqh - 24px), 130px);
+      height: clamp(48px, calc(100cqh - 16px), 130px);
+    }
+    .fd-home:not(.queueing) .fd-hero-id {
+      order: 0;
     }
     .fd-hero-sub {
       display: -webkit-box;
@@ -8880,15 +8905,21 @@ button.fd-logo {
     }
   }
 }
+/* Under PLAY (Oct 24): "Other modes", the RANKED label's style at 11 px, over the Boss raid and Auto chess cards. */
+.fd-other-label {
+  font-size: 11px;
+  padding-left: 4px;
+}
 /* The RANKED row (Eric, Oct 16): its small label right above the three ranked modes. */
 .fd-ranked {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
+/* (Oct 24: centered over the three buttons.) */
 .fd-ranked .fd-label {
   font-size: 12px;
-  padding-left: 4px;
+  text-align: center;
 }
 
 /* Home, 1 v 1 picked: your rank in it, in the panel. */
@@ -8956,10 +8987,11 @@ button.fd-logo {
   gap: 3px;
   min-width: 0;
 }
+/* (Archivo, as the other titles: Archivo Black's lowercase i has no dot in our file, so "raid" read as "raId", Oct 24.) */
 .rd-card-text strong {
-  font-family: "Archivo Black", Archivo, sans-serif;
+  font-family: Archivo, system-ui, sans-serif;
   font-size: 20px;
-  font-weight: 400;
+  font-weight: 800;
   line-height: 1.15;
 }
 .rd-card-text span {
@@ -10752,6 +10784,14 @@ button.fd-seat {
     padding: 0 28px;
   }
 }
+@media (min-width: 1024px) {
+  /* Oct 24: 75% bigger than 170 × 154 (298 px wide), at most the card's width (the card is 564 px at 1024, 340 at 1280, 420 at 1440). */
+  .fd-root.framed .fd-hero .fd-pawn-hero {
+    width: min(298px, 100%);
+    height: auto;
+    aspect-ratio: 170 / 154;
+  }
+}
 @media (min-width: 1280px) {
   .fd-root.framed .fd-home-main {
     flex: none;
@@ -10769,11 +10809,15 @@ button.fd-seat {
     min-height: 0;
   }
   .fd-root.framed .fd-hero .fd-pawn-hero {
-    width: 240px;
-    height: 218px;
+    width: min(420px, 100%);
   }
   .fd-root.framed .fd-hero-name {
     font-size: 26px;
+    line-height: 28px;
+  }
+  .fd-root.framed .fd-hero-icon {
+    width: 44px;
+    height: 44px;
   }
   /*
    * The play column, the phone's order (Eric, Oct 18): the RANKED row, its panel, PLAY, the Boss raid card, Play with
@@ -10785,7 +10829,7 @@ button.fd-seat {
     gap: 12px;
   }
   .fd-root.framed .fd-play {
-    height: 88px;
+    height: 59px;
     font-size: 32px;
   }
   /* (A short window, a laptop's: the column closer, so the live window keeps a board worth seeing.) */
@@ -10794,7 +10838,7 @@ button.fd-seat {
       gap: 8px;
     }
     .fd-root.framed .fd-play {
-      height: 64px;
+      height: 43px;
       font-size: 26px;
     }
   }
@@ -10853,8 +10897,7 @@ button.fd-seat {
     grid-template-columns: minmax(0, 540px) 360px;
   }
   .fd-root.framed .fd-hero .fd-pawn-hero {
-    width: 290px;
-    height: 263px;
+    width: min(508px, 100%);
   }
   .fd-root.framed .fd-home.queueing .fd-home-main {
     grid-template-columns: 300px minmax(0, 1fr);

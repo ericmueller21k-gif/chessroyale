@@ -12,7 +12,7 @@ const run = Date.now().toString(36).slice(-5);
 const sideways = (p: Page) => p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const box = async (p: Page, sel: string) => (await p.locator(sel).first().boundingBox())!;
 
-test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal buttons whole at every width; PLAY under it, then the Boss raid card, full width (a phone and a computer alike)", async ({ page }) => {
+test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal buttons whole at every width; PLAY under it, then Other modes with the Boss raid card, full width (a phone and a computer alike)", async ({ page }) => {
   await named(page, "Ranked");
   const widths = desktop() ? [[1280, 800], [1024, 768]] : [[320, 640], [360, 740], [390, 844]];
   for (const [w, h] of widths) {
@@ -30,6 +30,14 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
     const r = (await row.boundingBox())!;
     expect(label.y + label.height, `${w}`).toBeLessThanOrEqual(r.y + 1);
     expect(r.y - (label.y + label.height), `${w}`).toBeLessThan(12);
+    // (Centered over the three buttons, Oct 24: the label's own text, its middle over the row's.)
+    const labelMid = await page.locator(".fd-ranked .fd-label").evaluate((e) => {
+      const range = document.createRange();
+      range.selectNodeContents(e);
+      const b = range.getBoundingClientRect();
+      return b.x + b.width / 2;
+    });
+    expect(Math.abs(labelMid - (r.x + r.width / 2)), `${w}: RANKED centered over the row`).toBeLessThan(2);
     const buttons = await row.getByRole("radio").evaluateAll((els) =>
       els.map((e) => {
         const b = e.getBoundingClientRect();
@@ -51,9 +59,13 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
     expect(Math.abs(c.width - r.width), `${w}: full width`).toBeLessThan(2);
     expect(await card.evaluate((e) => [...e.querySelectorAll(".rd-card-text > *")].every((x) => x.scrollWidth <= x.clientWidth + 0.5)), `${w}`).toBe(true);
     const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
-    // The row, then PLAY, then the card at the bottom (Eric, Oct 19: chess first), on a phone and a computer alike.
+    // The row, then PLAY, then "Other modes" and the card (Eric, Oct 19: chess first; Oct 24: Auto chess under it), on a
+    // phone and a computer alike.
     expect(play.y, `${w}`).toBeGreaterThan(r.y + r.height);
     expect(c.y, `${w}`).toBeGreaterThan(play.y + play.height);
+    const other = await box(page, ".fd-other-label");
+    expect(other.y, `${w}: Other modes under PLAY`).toBeGreaterThanOrEqual(play.y + play.height);
+    expect(c.y, `${w}: the Boss raid card under Other modes`).toBeGreaterThanOrEqual(other.y + other.height);
     expect(await sideways(page), `${w}`).toBe(0);
   }
 });
@@ -179,15 +191,38 @@ test("the hidden /bosses opens the solo boss picker straight away (a player too)
   expect(new URL(page.url()).search).toBe("");
 });
 
-test("home keeps still: no click on a mode, an option or the ⓘ moves or resizes the board preview, PLAY or the Boss raid card (phone and computer)", async ({ page }) => {
+test("Other modes under PLAY: the label, then the Boss raid card, then Auto chess (a knight's picture, the card's look); Auto chess opens /autochess, and its back button is home", async ({ page }) => {
+  await named(page, "Knight");
+  await page.goto("/");
+  const main = page.getByRole("main");
+  const label = main.getByRole("heading", { name: "Other modes", exact: true });
+  const boss = main.getByRole("button", { name: /^Boss raid/ });
+  const auto = main.getByRole("button", { name: /^Auto chess/ });
+  await expect(label).toBeVisible();
+  await expect(auto).toHaveText(/^Auto chessBuild an army, watch it fight›$/);
+  await expect(auto.locator("svg.fd-knight")).toBeVisible();
+  const at = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!;
+  const play = await at(main.getByRole("button", { name: "PLAY", exact: true }));
+  const [l, b, a] = [await at(label), await at(boss), await at(auto)];
+  expect(l.y).toBeGreaterThanOrEqual(play.y + play.height);
+  expect(b.y).toBeGreaterThanOrEqual(l.y + l.height);
+  expect(a.y).toBeGreaterThanOrEqual(b.y + b.height);
+  expect(Math.abs(a.width - b.width) + Math.abs(a.height - b.height), "the same size as the Boss raid card").toBeLessThan(2);
+  await auto.click();
+  await expect(page.locator(".ac-title strong")).toHaveText("Auto chess");
+  expect(new URL(page.url()).pathname).toBe("/autochess");
+  await page.getByRole("button", { name: "Back to home" }).click();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe("/");
+});
+
+test("home keeps still: after the first pick (the panel comes in), no click on a mode, an option or the ⓘ moves or resizes the board preview, PLAY or the Boss raid card (phone and computer)", async ({ page }) => {
   // (Eric, Oct 18: "nothing should actually be forced moving around the size of the board or where the play button
   // is"; docs/decisions/2026-10-18-home-steady-layout.md.)
   await named(page, "Still");
   const sizes = desktop() ? [[1280, 800], [1440, 900], [1920, 1080]] : [[390, 844], [320, 640]];
   const radio = (name: RegExp) => page.getByRole("radio", { name });
   const steps: [string, () => Promise<unknown>][] = [
-    // (Home opens with nothing picked, Eric, Oct 18: the first tap is a mode.)
-    ["50 v 50 first", () => radio(/^50 v 50/).click()],
     ["Default", () => radio(/^Default/).click()],
     ["Bots off", () => radio(/^Bots off/).click()],
     ["Solo", () => radio(/^Solo you/).click()],
@@ -206,7 +241,7 @@ test("home keeps still: no click on a mode, an option or the ⓘ moves or resize
     ["50 v 50", () => radio(/^50 v 50/).click()],
   ];
   // (The panel last: what moves is checked before what's new.)
-  const parts = { board: ".fd-livewin", play: ".fd-play", boss: ".rd-card", panel: ".fd-mode-panel" };
+  const parts = { board: ".fd-livewin", ranked: ".fd-ranked", play: ".fd-play", boss: ".rd-card", panel: ".fd-mode-panel" };
   const measure = async () => {
     const out: Record<string, { x: number; y: number; width: number; height: number }> = {};
     for (const [k, s] of Object.entries(parts)) if ((k !== "board" || desktop()) && (await page.locator(s).count())) out[k] = await box(page, s);
@@ -223,7 +258,17 @@ test("home keeps still: no click on a mode, an option or the ⓘ moves or resize
       await expect(page.locator(".fd-livewin-sq").first()).toBeVisible();
       expect((await box(page, ".fd-livewin-sq")).width, `${w}`).toBeGreaterThan(150);
     }
+    // Nothing picked: no panel (Oct 24). The first pick brings the panel in above PLAY: the RANKED row rises by its room,
+    // and PLAY, the cards and the line stay where they were. (The board above may take the room the panel needs.)
+    const before = await measure();
+    expect(before.panel, `${w}: no panel until a mode is picked`).toBeUndefined();
+    await radio(/^50 v 50/).click();
     const first = await measure();
+    expect(first.panel, `${w}: the panel once a mode is picked`).toBeDefined();
+    for (const k of ["play", "boss"] as const) for (const d of ["x", "y", "width", "height"] as const) expect(Math.abs(first[k]![d] - before[k]![d]), `${w}×${h}, the first pick: ${k}'s ${d}`).toBeLessThanOrEqual(1);
+    const rise = before.ranked!.y - first.ranked!.y;
+    expect(rise, `${w}×${h}: the RANKED row rises by the panel's room`).toBeGreaterThanOrEqual(first.panel!.height);
+    expect(rise, `${w}×${h}: the RANKED row rises by the panel's room`).toBeLessThanOrEqual(first.panel!.height + 20);
     for (const [step, act] of steps) {
       await act();
       const now: Awaited<ReturnType<typeof measure>> = {};

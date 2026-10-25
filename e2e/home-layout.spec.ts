@@ -83,7 +83,7 @@ test("light or dark lives in Settings (Match device / Light / Dark), not on home
   expect(await sideways(page)).toBe(0);
 });
 
-test("computer: the play column in the phone's order (the RANKED row, its panel, PLAY, the Boss raid card at the bottom); PLAY dimmed until a mode is picked; no Shop, Profile or Play with friends buttons", async ({ page }) => {
+test("computer: the play column in the phone's order (the RANKED row, its panel, PLAY, Other modes with the Boss raid card and Auto chess at the bottom); no panel and PLAY dimmed until a mode is picked; no Shop, Profile or Play with friends buttons", async ({ page }) => {
   test.skip(!desktop(), "the computer's layout");
   await named(page, "Columned");
   const main = page.getByRole("main");
@@ -96,10 +96,11 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     await page.goto("/");
     const play = main.getByRole("button", { name: "PLAY", exact: true });
     await expect(play).toBeVisible();
-    // Nothing picked yet: PLAY dimmed, the panel says to pick a mode (Eric, Oct 18).
+    // Nothing picked yet: PLAY dimmed, and no panel at all (Oct 24: it comes in with a mode).
     await expect(play).toBeDisabled();
-    await expect(page.locator(".fd-mode-panel")).toHaveText("Tap a mode above to play");
+    await expect(page.locator(".fd-mode-panel")).toHaveCount(0);
     await pickMode(page, "50 v 50");
+    await expect(page.locator(".fd-mode-panel")).toBeVisible();
     await expect(play).toBeEnabled();
     // The shop, your profile and Play with friends: the side menu's, not repeated on home.
     await expect(main.getByRole("button", { name: "Shop & crates" })).toHaveCount(0);
@@ -110,9 +111,11 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     await expect(menu.getByRole("button", { name: "Profile" })).toBeVisible();
     await expect(menu.getByRole("button", { name: "Play with friends" })).toBeVisible();
     // Top to bottom, as on a phone (Eric, Oct 19: chess first): the RANKED row, its panel (matchmaking), PLAY and its
-    // line, then the Boss raid card (full width) at the bottom.
+    // line, then "Other modes" (Oct 24), the Boss raid card and Auto chess (full width) at the bottom.
     const box = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!;
     const boss = await box(main.getByRole("button", { name: /^Boss raid/ }));
+    const auto = await box(main.getByRole("button", { name: /^Auto chess/ }));
+    const other = await box(main.getByRole("heading", { name: "Other modes", exact: true }));
     const modes = await box(main.getByRole("radiogroup", { name: "RANKED" }));
     const types = await box(main.getByRole("radiogroup", { name: "Matchmaking" }));
     const p = await box(play);
@@ -123,13 +126,16 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     expect(types.y + types.height, `${w}: the modes right above PLAY`).toBeLessThanOrEqual(p.y);
     expect(p.y - (types.y + types.height)).toBeLessThan(30);
     expect(hint.y).toBeGreaterThanOrEqual(p.y + p.height);
-    expect(boss.y, `${w}: the card below PLAY's line`).toBeGreaterThanOrEqual(hint.y + hint.height);
+    expect(other.y, `${w}: Other modes below PLAY's line`).toBeGreaterThanOrEqual(hint.y + hint.height);
+    expect(boss.y, `${w}: the Boss raid card under Other modes`).toBeGreaterThanOrEqual(other.y + other.height);
+    expect(auto.y, `${w}: Auto chess under the Boss raid card`).toBeGreaterThanOrEqual(boss.y + boss.height);
+    expect(Math.abs(auto.width - boss.width), `${w}: the same width`).toBeLessThan(2);
     await expect(page.locator(".fd-hint")).toHaveText(/Starts within|Usually about|Solo vs/);
     if (w >= 1280) {
       // Beside your card: the Boss raid card ends level with your card's bottom, and the room above is free (for a live
       // game).
       const card = await box(page.locator(".fd-hero"));
-      expect(Math.abs(boss.y + boss.height - (card.y + card.height)), `${w}: the column's foot level with the card's`).toBeLessThan(12);
+      expect(Math.abs(auto.y + auto.height - (card.y + card.height)), `${w}: the column's foot level with the card's`).toBeLessThan(12);
       expect(modes.y - card.y, `${w}: room above`).toBeGreaterThan(200);
       expect(p.x).toBeGreaterThanOrEqual(card.x + card.width);
     }
@@ -137,7 +143,7 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
   }
 });
 
-test("your icon sits to the left of your name and rating on your home card (a drawn icon, pixel-sharp)", async ({ page }) => {
+test("your tag sits above your pawn's head, centered over it: the icon left of your name and rating, as tall as those two lines (a drawn icon, pixel-sharp)", async ({ page }) => {
   await named(page, "Iconic");
   // A drawn icon (48 x 48 PNG) in the server's answer: gold with a blue diagonal.
   const png =
@@ -160,14 +166,28 @@ test("your icon sits to the left of your name and rating on your home card (a dr
     const i = (await icon.boundingBox())!;
     const name = (await hero.locator(".fd-hero-name").boundingBox())!;
     const sub = (await hero.locator(".fd-hero-sub").boundingBox())!;
-    // Left of the name and the rating line, level with them, under your pawn.
+    // Left of the name and the rating line, and as tall as the two lines together (name top to rating bottom).
     expect(i.x + i.width, `${width}`).toBeLessThanOrEqual(Math.min(name.x, sub.x));
-    expect(i.y).toBeLessThan(sub.y + sub.height);
-    expect(i.y + i.height).toBeGreaterThan(name.y);
-    expect(i.width).toBe(48);
+    expect(Math.abs(i.height - (sub.y + sub.height - name.y)), `${width}: the icon as tall as the two lines`).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(i.y - name.y), `${width}: the icon level with the name`).toBeLessThanOrEqual(1.5);
+    expect(i.width, `${width}: a square`).toBeCloseTo(i.height, 0);
+    // Above your pawn's head, centered over it (its top is the card's, the head sits under it). A short card (a 640 px
+    // phone or less, or a short window) puts the tag beside the pawn instead, so home still fits (styles.css).
     const pawn = (await hero.locator(".fd-pawn-hero").boundingBox())!;
-    expect(i.y).toBeGreaterThanOrEqual(pawn.y + pawn.height - 1);
+    const short = (await hero.boundingBox())!.height <= 189;
+    if (short) {
+      expect(i.x, `${width}: beside the pawn on a short card`).toBeGreaterThanOrEqual(pawn.x + pawn.width - 1);
+      expect(name.x, `${width}: the name beside the icon`).toBeGreaterThanOrEqual(i.x + i.width - 0.5);
+    } else {
+      const tagBottom = Math.max(i.y + i.height, sub.y + sub.height);
+      expect(tagBottom, `${width}: the tag above the pawn`).toBeLessThanOrEqual(pawn.y + 1);
+      const tagLeft = Math.min(i.x, name.x);
+      const tagRight = Math.max(name.x + name.width, sub.x + sub.width);
+      expect(Math.abs((tagLeft + tagRight) / 2 - (pawn.x + pawn.width / 2)), `${width}: the tag centered over the pawn`).toBeLessThanOrEqual(3);
+    }
     await expect(hero.locator(".fd-hero-sub")).toContainText(/No rating yet|·/);
+    // (No outfit line: the names of what you wear are gone from home.)
+    await expect(hero.locator(".fd-hero-sub")).not.toContainText(",");
     expect(await sideways(page), `${width}`).toBe(0);
   }
 });
@@ -349,7 +369,7 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   expect(await sideways(page)).toBe(0);
 });
 
-test("phone: home fits the screen with no scrolling from 360×640 up, in every mode, the Boss raid card at the bottom under PLAY; the shop, your profile and Friends are in the top bar", async ({ page }) => {
+test("phone: home fits the screen with no scrolling from 360×640 up, in every mode, the Boss raid and Auto chess cards at the bottom under PLAY; the shop, your profile and Friends are in the top bar", async ({ page }) => {
   test.skip(desktop(), "a phone's screen (Eric, Oct 18: \"should never have to be scrolling down on the phone\")");
   await named(page, LONG_NAME);
   for (const [width, height] of [[360, 640], [375, 667], [390, 664], [390, 844], [430, 932]] as const) {
@@ -360,14 +380,14 @@ test("phone: home fits the screen with no scrolling from 360×640 up, in every m
       if (mode) await pickMode(page, mode);
       const fit = await page.evaluate(() => ({
         scroll: document.documentElement.scrollHeight - innerHeight,
-        // (The Boss raid card, home's last box, on screen, under PLAY's line.)
-        foot: document.querySelector(".rd-card")!.getBoundingClientRect().bottom <= innerHeight,
-        order: document.querySelector(".rd-card")!.getBoundingClientRect().top >= document.querySelector(".fd-hint")!.getBoundingClientRect().bottom,
+        // (The last card, Auto chess, home's last box, on screen, under PLAY's line.)
+        foot: [...document.querySelectorAll(".rd-card")].pop()!.getBoundingClientRect().bottom <= innerHeight,
+        order: [...document.querySelectorAll(".rd-card")].pop()!.getBoundingClientRect().top >= document.querySelector(".fd-hint")!.getBoundingClientRect().bottom,
         pawn: document.querySelector(".fd-hero .fd-pawn")!.getBoundingClientRect().height,
       }));
       expect(fit.scroll, `${width}×${height}, ${mode || "no mode"}: scrolling`).toBeLessThanOrEqual(0);
-      expect(fit.foot, `${width}×${height}, ${mode || "no mode"}: the Boss raid card on screen`).toBe(true);
-      expect(fit.order, `${width}×${height}: the Boss raid card under PLAY`).toBe(true);
+      expect(fit.foot, `${width}×${height}, ${mode || "no mode"}: the Auto chess card on screen`).toBe(true);
+      expect(fit.order, `${width}×${height}: the cards under PLAY`).toBe(true);
       expect(fit.pawn, `${width}×${height}, ${mode || "no mode"}: your pawn`).toBeGreaterThanOrEqual(48);
     }
     await expect(page.getByRole("main").getByRole("button", { name: "Play with friends" })).toHaveCount(0);

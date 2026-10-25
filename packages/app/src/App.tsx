@@ -276,8 +276,8 @@ export function App() {
   const [raidOpen, setRaidOpen] = useState(raidInUrl);
   const [legal, setLegal] = useState<LegalPage | null>(() => legalPageOf(location.pathname));
   /**
-   * Auto chess, the demo (/autochess; client-only, no account needed). Shelved (Eric, Oct 19): no button on home, only
-   * Settings' Testing section (admins) opens it.
+   * Auto chess, the demo (/autochess; client-only, no account needed). Home's card opens it (Eric, Oct 24; shelved on Oct
+   * 19 until then), and Settings' Testing row does too.
    */
   const [showAutoChess, setShowAutoChess] = useState(() => location.pathname === "/autochess");
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
@@ -1328,6 +1328,10 @@ export function App() {
           }
         }}
         onRanked1v1={startRanked1v1}
+        onAutoChess={() => {
+          setShowAutoChess(true);
+          history.replaceState(null, "", "/autochess");
+        }}
         loading={loading}
         error={error}
         joinCode={mustSignInToPlayOnline() ? undefined : inviteCode}
