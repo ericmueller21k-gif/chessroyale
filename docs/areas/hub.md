@@ -16,8 +16,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   - **The RANKED row:** a small "RANKED" label over three buttons, a radio group: **50 v 50** ("Crowd chess"), **1 v 1**
     ("Classic chess") and **Squads** ("8 squads of 4"). Home opens with **none picked** and PLAY dimmed: you tap the mode
     you want, then PLAY (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)). The pick holds until the app is opened again
-    (a reload), and `?mode=` picks one from a link. Classic still plays with `?mode=classic`. With none picked there is no
-    panel (Oct 24: no "Tap a mode above to play"). Under the row, **the panel**, once a mode is picked: one box of one fixed size for every mode (Eric, Oct 18:
+    (a reload), and `?mode=` picks one from a link. Classic still plays with `?mode=classic`. Under the row, **the panel**,
+    always there (Eric, Oct 25: "the menu buttons should never be like invisible"): with none picked it shows 50 v 50's
+    options greyed, none selected and none tappable (`aria-disabled`, the `idle` class; no "Tap a mode above to play"
+    text). One box of one fixed size for every mode (Eric, Oct 18:
     "it should never change size";
     [docs/decisions/2026-10-18-home-steady-layout.md](../decisions/2026-10-18-home-steady-layout.md)), holding the
     pick's options or words: 50 v 50's Matchmaking (Default, Bots off, Solo) with its ⓘ (its words float over the RANKED
@@ -26,9 +28,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     45 RP" or "Your rank: Placement 2/5" (`ranked1v1Label`, from your profile; whole on one line at 320 px at its
     widest), over "Ranked chess vs one player near your level". Then PLAY and its line, a fixed height whatever it says
     (two lines' room on a phone, one line on a computer). After the first pick no click on home moves or resizes anything
-    (a mode, an option, the ⓘ). The first pick brings the panel in above PLAY (Oct 24): the RANKED row rises by the
-    panel's room (58 px and its 10 px gap on a phone; the board above a computer's gives up its room), and PLAY, the
-    cards and the line stay put. 1 v 1's PLAY is
+    (a mode, an option, the ⓘ). The first pick wakes the greyed options (their default selected) and moves nothing: the
+    panel was there from the first view (Oct 25; it used to come in with the first pick, Oct 24, which raised the RANKED
+    row and the board). PLAY, the cards and the line stay put. 1 v 1's PLAY is
     `startRanked1v1()`: its queue at once, at `/1v1` ([ranked.md](ranked.md)); resting (`PAUSE_RANKED1V1`), PLAY is
     off with its line, as the other modes.
   - **Other modes** (Oct 24, Eric: "a tiny text that says other modes, right below play"): an 11 px muted label under
@@ -80,8 +82,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     and its line, then Other modes with the Boss raid card and Auto chess at the bottom. Your pawn's card takes the room
     left: your tag (icon, name, "Weighty · 1580") centered above your pawn's head, the pawn 75% bigger than before
     (170 × 154 → up to 298 × 270) and sized to the room the tag leaves (Oct 24). On a short card (under 190 px tall: a
-    640 px phone with a mode picked) the tag stands beside the pawn instead, as it did when the room was short (Oct 18), so
-    home fits with no scrolling from 360×640 up in every mode. At 320×568 home fits too, with a small pawn (about 51 px).
+    640 px phone, or a 740 px one (measured at 320, 375 and 430 px wide), since the options panel is there from the first view, Oct 25)
+    the tag stands beside the pawn instead, as it did when the room was short (Oct 18), so home fits with no scrolling
+    from 360×640 up in every mode. At 320×568 home fits too, with a small pawn (about 51 px).
     ([docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)). Big tap targets, no
     sideways scroll at 320–430 px; a long name on your home card ellipsizes.
   - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the RANKED

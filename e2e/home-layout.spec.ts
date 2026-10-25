@@ -83,7 +83,7 @@ test("light or dark lives in Settings (Match device / Light / Dark), not on home
   expect(await sideways(page)).toBe(0);
 });
 
-test("computer: the play column in the phone's order (the RANKED row, its panel, PLAY, Other modes with the Boss raid card and Auto chess at the bottom); no panel and PLAY dimmed until a mode is picked; no Shop, Profile or Play with friends buttons", async ({ page }) => {
+test("computer: the play column in the phone's order (the RANKED row, its panel, PLAY, Other modes with the Boss raid card and Auto chess at the bottom); the panel greyed (none selected, not tappable) and PLAY dimmed until a mode is picked; no Shop, Profile or Play with friends buttons", async ({ page }) => {
   test.skip(!desktop(), "the computer's layout");
   await named(page, "Columned");
   const main = page.getByRole("main");
@@ -96,11 +96,13 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     await page.goto("/");
     const play = main.getByRole("button", { name: "PLAY", exact: true });
     await expect(play).toBeVisible();
-    // Nothing picked yet: PLAY dimmed, and no panel at all (Oct 24: it comes in with a mode).
+    // Nothing picked yet: PLAY dimmed, and the panel there, greyed with nothing selected (Eric, Oct 25).
     await expect(play).toBeDisabled();
-    await expect(page.locator(".fd-mode-panel")).toHaveCount(0);
+    await expect(page.locator(".fd-mode-panel.idle")).toBeVisible();
+    await expect(page.getByRole("radio", { name: /^Default/ })).toBeDisabled();
     await pickMode(page, "50 v 50");
     await expect(page.locator(".fd-mode-panel")).toBeVisible();
+    await expect(page.locator(".fd-mode-panel.idle")).toHaveCount(0);
     await expect(play).toBeEnabled();
     // The shop, your profile and Play with friends: the side menu's, not repeated on home.
     await expect(main.getByRole("button", { name: "Shop & crates" })).toHaveCount(0);
@@ -166,15 +168,20 @@ test("your tag sits above your pawn's head, centered over it: the icon left of y
     const i = (await icon.boundingBox())!;
     const name = (await hero.locator(".fd-hero-name").boundingBox())!;
     const sub = (await hero.locator(".fd-hero-sub").boundingBox())!;
-    // Left of the name and the rating line, and as tall as the two lines together (name top to rating bottom).
+    // Left of the name and the rating line, and a square.
     expect(i.x + i.width, `${width}`).toBeLessThanOrEqual(Math.min(name.x, sub.x));
-    expect(Math.abs(i.height - (sub.y + sub.height - name.y)), `${width}: the icon as tall as the two lines`).toBeLessThanOrEqual(1.5);
-    expect(Math.abs(i.y - name.y), `${width}: the icon level with the name`).toBeLessThanOrEqual(1.5);
     expect(i.width, `${width}: a square`).toBeCloseTo(i.height, 0);
     // Above your pawn's head, centered over it (its top is the card's, the head sits under it). A short card (a 640 px
     // phone or less, or a short window) puts the tag beside the pawn instead, so home still fits (styles.css).
     const pawn = (await hero.locator(".fd-pawn-hero").boundingBox())!;
     const short = (await hero.boundingBox())!.height <= 189;
+    // (As tall as the two lines together, level with the name: the tall card's tag. Oct 25: the options panel is there in
+    // the first view, so a 320 px phone's card is short from the start, and beside the pawn its rating line can wrap,
+    // which leaves the icon shorter than the two lines, as home with a mode picked has always been.)
+    if (!short) {
+      expect(Math.abs(i.height - (sub.y + sub.height - name.y)), `${width}: the icon as tall as the two lines`).toBeLessThanOrEqual(1.5);
+      expect(Math.abs(i.y - name.y), `${width}: the icon level with the name`).toBeLessThanOrEqual(1.5);
+    }
     if (short) {
       expect(i.x, `${width}: beside the pawn on a short card`).toBeGreaterThanOrEqual(pawn.x + pawn.width - 1);
       expect(name.x, `${width}: the name beside the icon`).toBeGreaterThanOrEqual(i.x + i.width - 0.5);

@@ -575,8 +575,9 @@ export function HomeScreen({
   const [picked, setPicked] = useState<MatchmakingType>(chosenMatchmaking);
   const soloOnly = !!onlineLocked;
   const type: MatchmakingType = soloOnly ? "solo" : picked;
+  // (Nothing picked yet: the options show greyed, none selected and none tappable: Eric, Oct 25.)
   const pickType = (t: MatchmakingType) => {
-    if (soloOnly && t !== "solo") return;
+    if (!mode || (soloOnly && t !== "solo")) return;
     setPicked(t);
     saveMatchmaking(t);
   };
@@ -827,10 +828,11 @@ export function HomeScreen({
   // need there to explain what that is, or if there needs to be options for it"): one box, the same size for every
   // mode, holding the pick's options or words. 50 v 50: Matchmaking (Default, Bots off, Solo) and its ⓘ. 1 v 1 (always
   // people, one tap to queue): your rank in it and what it is. Squads: Solo queue or Party. Nothing in it changes the
-  // page's layout: the ⓘ's words float over it. (Oct 24: no panel until a mode is picked, so nothing says "tap a mode".)
+  // page's layout: the ⓘ's words float over it. Always there (Eric, Oct 25: "the menu buttons should never be like invisible"):
+  // with no mode picked it shows 50 v 50's options greyed, none selected and none tappable; the first pick wakes them.
   const rank1v1 = mode === "1v1" ? ranked1v1Label() : null;
-  const panel = !mode ? null : (
-    <div class="fd-mode-panel">
+  const panel = (
+    <div class={`fd-mode-panel${mode ? "" : " idle"}`}>
       {mode === "squads" ? (
         <div class="fd-modes fd-types fd-squad-pick" role="radiogroup" aria-label="Squads">
           {(
@@ -867,14 +869,15 @@ export function HomeScreen({
           <div class="fd-modes fd-types" role="radiogroup" aria-label="Matchmaking">
             {types(fill).map((t) => {
               const off = soloOnly && t.id !== "solo";
+              const idle = !mode;
               return (
                 <button
                   type="button"
                   role="radio"
                   key={t.id}
-                  aria-checked={type === t.id}
-                  aria-disabled={off || undefined}
-                  class={`${type === t.id ? "on" : ""}${off ? " off" : ""}`}
+                  aria-checked={!idle && type === t.id}
+                  aria-disabled={idle || off || undefined}
+                  class={`${type === t.id && !idle ? "on" : ""}${off ? " off" : ""}`}
                   title={off ? "Online: sign in to play" : undefined}
                   onClick={() => pickType(t.id)}
                 >
@@ -891,7 +894,8 @@ export function HomeScreen({
             aria-label="About matchmaking"
             aria-expanded={info}
             aria-controls="fd-types-info"
-            onClick={() => setInfo(!info)}
+            aria-disabled={!mode || undefined}
+            onClick={() => mode && setInfo(!info)}
           >
             i
           </button>

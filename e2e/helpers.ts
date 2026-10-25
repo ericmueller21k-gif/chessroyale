@@ -91,8 +91,8 @@ export async function pickMode(page: Page, mode?: string) {
   const row = page.getByRole("radiogroup", { name: "RANKED" });
   await row.getByRole("radio").first().waitFor();
   if (mode) return row.getByRole("radio", { name: new RegExp(`^${mode}`) }).click();
-  // (Nothing picked: no panel yet (Oct 24). ?mode=classic picks Classic, which has no button in the row, but has its panel.)
-  if (!(await page.locator(".fd-mode-panel").count())) await row.getByRole("radio", { name: /^50 v 50/ }).click();
+  // (Nothing picked: the panel is there, greyed (Eric, Oct 25: its class `idle`). ?mode=classic picks Classic, which has no button in the row, but has its panel.)
+  if (await page.locator(".fd-mode-panel.idle").count()) await row.getByRole("radio", { name: /^50 v 50/ }).click();
 }
 
 /** Home → Matchmaking: Solo → PLAY (in the mode the URL or the picker chose, else 50 v 50): you and bots, after the seats fill. */
