@@ -31,8 +31,8 @@ removed (old → new) and says whether any of them guards a rule here.
 - **The options panel is always there.** On first load nothing is selected: the mode row (50 v 50 / 1 v 1 / Squads) shows
   unselected, and the options row under it shows too, nothing picked in it, a little greyer and not tappable, until a mode is
   picked. PLAY stays dimmed until then. Picking a mode moves nothing on the page. (Eric, Oct 18 and Oct 25.)
-  - Guard: the home spec's test "Eric's rule (Oct 18, Oct 25): home's options panel is always there, greyed until a mode is
-    picked, and home never moves", phone and computer.
+  - Guard: `e2e/home-ranked.spec.ts`, "Eric's rule (Oct 18, Oct 25): home's options panel is always there, greyed until a
+    mode is picked, and home never moves", phone and computer.
 
 ## A match
 
