@@ -449,6 +449,82 @@ describe("Balloons: placed at his turn's start, landing or popping only at his t
   });
 });
 
+describe("Balloons: no long runs of landings (Oct 25, docs/decisions/2026-10-25-tiger-pops.md)", () => {
+  it("rollBalloon: after balloonLandsInRow landings in a row every balloon pops but a real queen; fewer, the plain roll; the shape and color unchanged; the test switch's balloons exempt", () => {
+    expect(S.balloonLandsInRow).toBe(2);
+    let queens = 0;
+    let turned = 0;
+    for (let i = 0; i < 3000; i++) {
+      const [seed, secret, n] = [300 + i, 9000 + 7 * i, i % 11];
+      const plain = rollBalloon(seed, secret, n);
+      for (let k = 0; k < S.balloonLandsInRow; k++) expect(rollBalloon(seed, secret, n, undefined, S, k)).toEqual(plain);
+      for (const k of [S.balloonLandsInRow, S.balloonLandsInRow + 3]) {
+        const after = rollBalloon(seed, secret, n, undefined, S, k);
+        expect(after).toEqual({ ...plain, dud: plain.kind !== "queen" });
+      }
+      if (plain.kind === "queen") queens++;
+      if (!plain.dud && plain.kind !== "queen") turned++;
+    }
+    expect(queens).toBeGreaterThan(30);
+    expect(turned).toBeGreaterThan(900);
+    for (const forced of ["pawn", "knight", "bishop", "rook", "queen"] as const) expect(rollBalloon(9, 5, 0, forced, S, 5).dud).toBe(false);
+    expect(rollBalloon(9, 5, 0, "fakequeen", S, 0).dud).toBe(true);
+  });
+
+  /** The first balloon of a battle that, on the plain roll, would land (not a dud, not a real queen). */
+  const landingSeed = (): number => {
+    for (let seed = 400; ; seed++) {
+      const p = powersOf(battle(seed, { stage: 4 }).r);
+      const r = rollBalloon(p.seed, p.balloon!.secret!, 0);
+      if (!r.dud && r.kind !== "queen") return seed;
+    }
+  };
+
+  it("in a battle: each landing adds one to the count, and after two in a row the same balloon that would have landed pops (no square needed: the steps a dud takes)", async () => {
+    const seed = landingSeed();
+    const endWith = async (inRow: number) => {
+      const b = battle(seed, { stage: 4 });
+      onPosition(b.r, fenOf(b.r), "w", { balloon: { ...powersOf(b.r).balloon!, inRow } });
+      await onQuiet(b);
+      b.r.balloonAsk();
+      b.r.applyBossMove("g8f8", false, { balloon: "a6" });
+      return b;
+    };
+    const one = await endWith(0);
+    expect(powersOf(one.r).balloon).toMatchObject({ last: { outcome: "land", square: "a6" }, landed: 1, popped: 0, inRow: 1 });
+    expect(powersOf((await endWith(1)).r).balloon).toMatchObject({ last: { outcome: "land", square: "a6" }, inRow: 2 });
+    const three = await endWith(2);
+    const st = powersOf(three.r).balloon!;
+    expect(st).toMatchObject({ last: { outcome: "pop", square: null }, landed: 0, popped: 1, inRow: 0 });
+    expect(st.last!.nine).toBeUndefined();
+    // (Shown as any pop: the pop and his wince as the crowd's turn begins.)
+    expect(tigerEvents(powersOf(three.r).events).map((e) => e.kind)).toEqual(["pop", "wince"]);
+    // (Nothing a device gets says it will pop: the view and the ask are the plain balloon's.)
+    const plain = battle(seed, { stage: 4 });
+    await onQuiet(plain);
+    const guarded = battle(seed, { stage: 4 });
+    onPosition(guarded.r, fenOf(guarded.r), "w", { balloon: { ...powersOf(guarded.r).balloon!, inRow: 2 } });
+    await onQuiet(guarded);
+    expect(guarded.r.bossView()!.powers!.balloon).toEqual(plain.r.bossView()!.powers!.balloon);
+    expect(guarded.r.balloonAsk()).toEqual(plain.r.balloonAsk());
+  });
+
+  it("any pop starts the count again: a dud's, and a shape he can't have (`nine`)", async () => {
+    // (From the starting position, his full set and eight pawns: it pops, `nine`.)
+    const b = battle(landingSeed(), { stage: 4 });
+    onPosition(b.r, fenOf(b.r), "w", { balloon: { ...powersOf(b.r).balloon!, inRow: 1 } });
+    await crowdMove(b.r);
+    await b.r.playBoss(fakeEngine());
+    expect(powersOf(b.r).balloon).toMatchObject({ last: { outcome: "pop", nine: true }, inRow: 0 });
+    const f = battle(22, { balloon: "fakequeen", stage: 4 });
+    onPosition(f.r, fenOf(f.r), "w", { balloon: { ...powersOf(f.r).balloon!, inRow: 1 } });
+    await onQuiet(f);
+    f.r.balloonAsk();
+    f.r.applyBossMove("g8f8", false, { balloon: "a6" });
+    expect(powersOf(f.r).balloon).toMatchObject({ last: { outcome: "pop", square: null }, inRow: 0 });
+  });
+});
+
 describe("Balloons: where they land (the bands and the guards)", () => {
   // Him Black, the crowd White to move; quiet, no queens; his pawns seven.
   const QUIET = "1nb3k1/pp3pp1/2p1p3/3p4/3P4/2P1P3/PP3PPP/1NB3K1 w - - 0 13";

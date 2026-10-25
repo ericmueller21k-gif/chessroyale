@@ -1214,6 +1214,13 @@ export const BOSS_POWERS = {
   balloonStageSec: 12,
   balloonOdds: { pawn: 55, knight: 13, bishop: 13, rook: 6, fakeQueen: 10, queen: 3 } as Readonly<Record<"pawn" | "knight" | "bishop" | "rook" | "fakeQueen" | "queen", number>>,
   balloonPops: { pawn: 50, knight: 65, bishop: 65, rook: 65, fakeQueen: 100, queen: 0 } as Readonly<Record<"pawn" | "knight" | "bishop" | "rook" | "fakeQueen" | "queen", number>>,
+  /**
+   * No long runs of landings (Oct 25, the director's suggestion after Eric's "none of his pieces are popping… they're not
+   * popping as much as I think we had planned": docs/decisions/2026-10-25-tiger-pops.md): after this many of his balloons
+   * landed in a row, the next one pops, whatever its roll, unless it's a real queen (which never pops). A pop of any kind
+   * (a dud or `nine`) starts the count again. The test switch's balloons (?balloon=) are exempt.
+   */
+  balloonLandsInRow: 2,
   /** How many colors a balloon can be (seeded, not tied to its shape: the art's six). */
   balloonColors: 6,
   /**

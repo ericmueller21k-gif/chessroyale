@@ -13,7 +13,8 @@
  *   same balloon) lands as one of his pieces, or pops. Then the nozzle is empty until his next turn begins. One not ready then
  *   keeps blowing up and is looked at again at the end of his next turn.
  * - **What it is**, rolled as it goes on (balloonOdds): a pawn, knight, bishop, rook, a fake queen or a queen; and whether
- *   it pops (balloonPops of that shape's: a fake queen always, a queen never: about half). The shape and color come from
+ *   it pops (balloonPops of that shape's: a fake queen always, a queen never: about half; and after balloonLandsInRow landings
+ *   in a row, the next pops unless it's a real queen: no long runs, Oct 25). The shape and color come from
  *   the battle's seed and are public from the start (a fake queen is "q" everywhere); a queen's being fake and every pop
  *   (`dud`) come only from the battle's own secret (BalloonState.secret, a draw from the match's random source, never in a
  *   view, moment or request): it shows only as it pops at the end of his turn.
@@ -98,7 +99,7 @@ export const HOOPS_BEATS = {
  */
 export const TIGER_FX = { place: 0, balloonLand: 0, pop: 0, balloonCheer: 0, balloonBigCheer: 0, wince: 0, hoops: HOOPS_BEATS.total, hoopsOut: 0 } as const;
 
-type BalloonSettings = Pick<BossPowerSettings, "balloonStages" | "balloonStageSec" | "balloonOdds" | "balloonPops" | "balloonColors">;
+type BalloonSettings = Pick<BossPowerSettings, "balloonStages" | "balloonStageSec" | "balloonOdds" | "balloonPops" | "balloonColors" | "balloonLandsInRow">;
 type LandSettings = Pick<BossPowerSettings, "balloonBands" | "balloonLooks" | "balloonNodes" | "balloonTimeMs" | "bouncePawnLogit">;
 type HoopsSettings = Pick<BossPowerSettings, "hoopsCount" | "hoopsBand" | "hoopsTarget" | "hoopsLooks" | "hoopsNodes" | "hoopsTimeMs" | "bouncePawnLogit">;
 
@@ -324,10 +325,11 @@ const FORCED: Record<NonNullable<Settings["bossBalloonTest"]>, BalloonKind> = { 
 /**
  * Balloon `n` of a battle: its shape as everyone sees it and its color, from the battle's seed; whether it pops when ready
  * (balloonPops of its kind's), from the battle's `secret` alone (BalloonState.secret: a fake queen's kind is the secret's,
- * not the seed's, so its shape "q" says nothing of it). `forced` (the test switch ?balloon=): that kind, never a dud but
- * the fake queen.
+ * not the seed's, so its shape "q" says nothing of it). `inRow`: his balloons landed in a row before it (BalloonState.inRow):
+ * balloonLandsInRow of them, and it pops unless it's a real queen. `forced` (the test switch ?balloon=): that kind, never a
+ * dud but the fake queen.
  */
-export function rollBalloon(seed: number, secret: number, n: number, forced?: Settings["bossBalloonTest"], s: BalloonSettings = BOSS_POWERS): { kind: BalloonKind; shape: BalloonShape; dud: boolean; color: number } {
+export function rollBalloon(seed: number, secret: number, n: number, forced?: Settings["bossBalloonTest"], s: BalloonSettings = BOSS_POWERS, inRow = 0): { kind: BalloonKind; shape: BalloonShape; dud: boolean; color: number } {
   let kind: BalloonKind;
   if (forced) kind = FORCED[forced];
   else {
@@ -339,7 +341,7 @@ export function rollBalloon(seed: number, secret: number, n: number, forced?: Se
     const shown = (["pawn", "knight", "bishop", "rook"] as const).find((k) => r < (edge += o[k])) ?? "queen";
     kind = shown !== "queen" ? shown : powerRoll(secret, "balloon-queen", n) * queens < o.fakeQueen ? "fakeQueen" : "queen";
   }
-  const dud = forced ? kind === "fakeQueen" : powerRoll(secret, "balloon-pop", n) * 100 < s.balloonPops[kind];
+  const dud = forced ? kind === "fakeQueen" : (kind !== "queen" && inRow >= s.balloonLandsInRow) || powerRoll(secret, "balloon-pop", n) * 100 < s.balloonPops[kind];
   const color = Math.floor(powerRoll(seed, "balloon-color", n) * s.balloonColors) % s.balloonColors;
   return { kind, shape: SHAPE_OF[kind], dud, color };
 }
@@ -729,7 +731,7 @@ export const tigerBattle = {
     }
     const st = balloonsOf(p);
     if (!st.nozzle && !boss.result && b.bossToMove() && boss.crowdMoves < b.settings.bossMaxMoves) {
-      const roll = rollBalloon(p.seed, st.secret ?? Math.imul(p.seed ^ 0x5bd1e995, 0x01000193) >>> 0, st.placed, b.settings.bossBalloonTest, s);
+      const roll = rollBalloon(p.seed, st.secret ?? Math.imul(p.seed ^ 0x5bd1e995, 0x01000193) >>> 0, st.placed, b.settings.bossBalloonTest, s, st.inRow ?? 0);
       const stageMs = s.balloonStageSec * 1000;
       const ahead = Math.max(0, Math.min(s.balloonStages, Math.round(b.settings.bossStageTest ?? 0)));
       const at = b.now() - ahead * stageMs;
@@ -807,7 +809,8 @@ export const tigerBattle = {
     }
     setPowers(b, (q) => {
       const s2 = balloonsOf(q);
-      return { ...q, balloon: { ...s2, nozzle: null, last: result, landed: s2.landed + (result.outcome === "land" ? 1 : 0), popped: s2.popped + (result.outcome === "pop" ? 1 : 0) } };
+      const land = result.outcome === "land";
+      return { ...q, balloon: { ...s2, nozzle: null, last: result, landed: s2.landed + (land ? 1 : 0), popped: s2.popped + (land ? 0 : 1), inRow: land ? (s2.inRow ?? 0) + 1 : 0 } };
     });
     return result;
   },
