@@ -322,10 +322,12 @@ test("the admins' ⚡ and 🐟: on a phone, tiny icons beside the God King's hea
   await expect(ult).toBeVisible();
   await expect(fish).toBeVisible();
   if (!phone) {
-    // A computer: both in the title line, with their words, and the brain's pill there too.
-    await expect(page.locator(".match-tools .ult-test")).toHaveText("Trigger ultimate (testing)");
-    await expect(page.locator(".match-tools .engine-move")).toHaveText("Engine move");
-    await expect(page.locator(".match-tools .brain-debug")).toBeVisible();
+    // A computer (Eric, Oct 25: as on a phone): the same tiny ⚡ and 🐟, in the title line; the brain's line hidden, its words
+    // the 🐟's title.
+    await expect(page.locator(".match-tools > .ult-test.gk-tool")).toHaveText("⚡");
+    await expect(page.locator(".match-tools > .engine-move.gk-tool")).toHaveText("🐟");
+    await expect(page.locator(".match-tools .brain-debug")).toBeHidden();
+    await expect(fish).toHaveAttribute("title", /^Engine move · .*Maia/, { timeout: 30_000 });
     await expect(page.locator(".boss-dock .gk-tool")).toHaveCount(0);
     return;
   }

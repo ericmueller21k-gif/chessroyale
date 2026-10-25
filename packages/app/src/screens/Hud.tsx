@@ -131,13 +131,14 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
           )}
           {crowd ? <span class="hud-spacer" /> : <BankTime match={match} />}
         </button>
-        {/* A computer, admins only: the boss's brain and the ultimate's test trigger, before the player's buttons (Eric,
-            Oct 13; a phone has them under the boss dock). */}
+        {/* A computer, admins only: the ultimate's test trigger and Engine move as the tiny ⚡ and 🐟, before the player's
+            buttons; the brain's line hidden, its words the 🐟's title (Eric, Oct 25: as on a phone, where they stand by the
+            God King). */}
         {computer && boss && (
           <span class="match-tools">
-            <BrainDebug match={match} />
-            <UltimateTest match={match} />
-            <EngineMove match={match} />
+            <BrainDebug match={match} hidden />
+            <UltimateTest match={match} icon />
+            <EngineMove match={match} icon />
           </span>
         )}
         {/* Sound, and Resign (a phone: the gear and its list; a computer: the sound button, then the flag). A crowd match (Crowd, a raid) adds the motion rows. */}
