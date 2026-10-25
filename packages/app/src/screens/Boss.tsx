@@ -296,12 +296,11 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
       live = false;
     };
   }, [boss.board.fen, thinking]);
-  // The boss takes your queen: its banner and face, once for his move. His capture stays his lastMove until he moves
-  // again, so the turn after your next move (the Slam's, a step's) brought it back: it shows only while his capture is
-  // still the board's last move, not after your move (Eric, Oct 25: "the queen capture banner happened again").
+  // The boss takes your queen: its banner and face, once for his move. His lastMove stays that capture until he moves
+  // again, so the turn after your move (the Slam's, a step's) brought it back: it shows only while his move is still
+  // the board's last move (Eric, Oct 25: "the queen capture banner happened again").
   const lastOnBoard = boss.board.history[boss.board.history.length - 1];
-  const tookQueen =
-    !intro && !thinking && !victim && !funhouse && !bounce && boss.lastMove?.captured === "q" && !!lastOnBoard && pieceAt(boss.board.fen, lastOnBoard.slice(2, 4))?.color !== boss.crowdSide;
+  const tookQueen = !intro && !thinking && !victim && !funhouse && !bounce && boss.lastMove?.captured === "q" && !!lastOnBoard && lastOnBoard === boss.lastMove.move;
   // You take the boss's queen: your banner (the God King's face), while the boss "thinks" (it waits for it). Only your
   // capture, and only in the thinking straight after it (queenSlain: not again after Big Boy's bounce).
   const slewQueen = !intro && !!thinkingNow && !victim && queenSlain(boss);

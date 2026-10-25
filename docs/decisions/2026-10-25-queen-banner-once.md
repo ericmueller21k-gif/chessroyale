@@ -32,16 +32,25 @@ The director's guess was right: the banner had no once-only guard, and the Slam'
 
 ## The fix
 
-`tookQueen` now also requires that his capture is still the board's last move: the piece on the last move's
-destination square belongs to him (not the crowd's). Once you move, the last move is yours, the check is false, and the
-banner cannot come back for that capture. His next move makes a new capture or none, so a later capture still shows.
+`tookQueen` now also requires that his move is still the board's last move: the board's last move (UCI in
+`boss.board.history`) equals his `boss.lastMove.move`. Once the crowd moves, the last move is theirs, the check is false,
+and the banner cannot come back for that capture. His next move makes a new capture or none, so a later capture still
+shows.
 
     const lastOnBoard = boss.board.history[boss.board.history.length - 1];
-    const tookQueen = ... && !!lastOnBoard && pieceAt(boss.board.fen, lastOnBoard.slice(2, 4))?.color !== boss.crowdSide;
+    const tookQueen = ... && boss.lastMove?.captured === "q" && !!lastOnBoard && lastOnBoard === boss.lastMove.move;
+
+A first version compared the piece on the last move's destination with the crowd's colour. The Mammoth Slam lifts the
+crowd's pawns and minors at the start of his turn, so the crowd's just-moved piece could be lifted: that square is empty,
+the check passed, and the banner came back (the director's review of this PR). The move comparison has no such hole.
+
+Edge: Pig's long pull (his first move, `specialMove`) is shown as its three squares but played as the double step, so
+the two strings differ and a queen capture by that move would not show its banner. I did not check whether a long pull can
+take a queen; left as is and flagged. Smudgy's hidden-rook moves are played as named (`play` is the move), so they match.
 
 Why this and not a remembered ply: `match.seen` lives on the match, but `BossScreen` unmounts during your turn, and a
 `useRef` would reset. A ply key needs the capture's own ply, which the view doesn't carry (`bossLast` has no ply). The
-board's last move is already in the view and is the exact condition: his capture is the latest thing that happened.
+board's last move is already in the view and is the exact condition: his move is the latest thing that happened.
 
 `slewQueen` (QUEEN SLAIN!) already had its once-only guard (`queenSlain`: the crowd's capture is the last move, and no
 step of his has played since). It is unchanged. Its own repro (a trade, with QUEEN SLAIN! then the Slam) was not reached
