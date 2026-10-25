@@ -1916,9 +1916,8 @@ p {
 }
 
 /* ---- A computer's title line: the admins' testing items (Hud.tsx), then sound, then the flag (Eric, Oct 13) ----
-   One row, on the title's line. When it's tight (900 to 1100 px) the brain's pill shrinks and ellipsizes first (its
-   whole text on hover: the title line keeps one row, so the boards below never move); the title, the test button and
-   the player's buttons keep their size. A phone's line, under the dock, wraps instead. */
+   One row, on the title's line: the tiny ⚡ and 🐟 (Eric, Oct 25: as on a phone; the brain's line hidden, its words the
+   🐟's title). A phone has them by the God King instead. */
 .match-tools {
   flex: 0 1 auto;
   min-width: 0;
@@ -1948,6 +1947,29 @@ p {
   flex: none;
   margin: 0;
   white-space: nowrap;
+}
+.match-tools > .gk-tool {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  line-height: 28px;
+  text-align: center;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.match-tools > .gk-tool:hover,
+.match-tools > .gk-tool:active {
+  opacity: 1;
+}
+.match-tools > .gk-tool:disabled {
+  opacity: 0.25;
+  cursor: default;
 }
 
 /* ---- Resign and leave (components/MatchMenu.tsx; Eric, Oct 13; the match's options, Eric, Oct 24) ----
@@ -5451,6 +5473,18 @@ button.history-label {
   }
   .screen.game:has(> .boss-dock) .board-row .eval-bar ~ .board-wrap {
     width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--bd-h));
+  }
+  /* The title line and the boss's bar: the board's width, straight with its edges, as the dock under it (Eric, Oct 25:
+     they had the whole column, wider than the board, most of all where the window's height limits the board). */
+  .screen.game:has(> .boss-dock) > .hud-row,
+  .screen.game:has(> .boss-dock) > .boss-bar {
+    justify-self: center;
+    width: 100%;
+    max-width: min(100% - 2 * max(0px, var(--bs-need)), var(--bd-h));
+  }
+  .screen.game:has(> .boss-dock):has(.board-row > .eval-bar) > .hud-row,
+  .screen.game:has(> .boss-dock):has(.board-row > .eval-bar) > .boss-bar {
+    max-width: min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--bd-h));
   }
   .screen.game:has(> .boss-dock) > .under-board,
   .screen.game:has(> .boss-dock) > .mini-tower {

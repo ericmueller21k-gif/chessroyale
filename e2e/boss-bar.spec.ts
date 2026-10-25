@@ -265,3 +265,30 @@ test("his level is slashed for the move the King's strike weakens, then back (re
   await expect(page.locator(".boss-level.lv-down")).toHaveCount(0);
   expect((await levelNow(page)).n).toBe(first.base);
 });
+
+/**
+ * A computer (Eric, Oct 25: "why is the boss bar not flush with the board like it used to be?… It should just be straight with the
+ * board"): the boss's bar and the title line over it have the board's width, their edges straight with its edges, whether the
+ * window's width or its height limits the board.
+ */
+test("a computer: the boss bar and the title line are the board's width, straight with its edges", async ({ page }) => {
+  test.skip(!desktop(), "a computer's layout");
+  for (const [w, h] of [[1280, 800], [1440, 900], [1024, 768], [1920, 1080]] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto(`${BASE}&boss=tiger`);
+    await bossAloneFromHome(page);
+    await expect(page.locator(".boss-bar")).toBeVisible({ timeout: 60_000 });
+    const m = await page.evaluate(() => {
+      const r = (s: string) => {
+        const b = document.querySelector(s)!.getBoundingClientRect();
+        return { l: b.left, r: b.right };
+      };
+      return { bar: r(".screen.game > .boss-bar"), hud: r(".screen.game > .hud-row"), board: r(".board-area .board-wrap") };
+    });
+    const at = `${w}x${h}`;
+    expect(Math.abs(m.bar.l - m.board.l), `${at}: the bar's left edge on the board's`).toBeLessThanOrEqual(1);
+    expect(Math.abs(m.bar.r - m.board.r), `${at}: the bar's right edge on the board's`).toBeLessThanOrEqual(1);
+    expect(Math.abs(m.hud.l - m.board.l), `${at}: the title line's left edge on the board's`).toBeLessThanOrEqual(1);
+    expect(Math.abs(m.hud.r - m.board.r), `${at}: the title line's right edge on the board's`).toBeLessThanOrEqual(1);
+  }
+});
