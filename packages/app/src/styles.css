@@ -5519,12 +5519,10 @@ button.history-label {
   display: grid;
   place-items: end center;
 }
+/* (Ready to be tapped: no glow or ring round him any more, Eric, Oct 25: "not this white container that appears around him".
+   His own idle motion and his words say it.) */
 .gk-unit.ready .gk-unit-btn {
   cursor: pointer;
-  background:
-    radial-gradient(ellipse at 50% 92%, rgba(0, 0, 0, 0.18) 0 28%, transparent 30%),
-    radial-gradient(circle at 50% 60%, rgba(242, 193, 78, 0.35), transparent 65%);
-  animation: gk-ready 1.8s ease-in-out infinite;
 }
 .gk-unit-btn:disabled {
   opacity: 1;
@@ -5576,11 +5574,6 @@ button.history-label {
   letter-spacing: -2px;
   line-height: 12px;
   white-space: nowrap;
-}
-@keyframes gk-ready {
-  50% {
-    box-shadow: 0 0 0 2px rgba(242, 193, 78, 0.55), 0 0 14px rgba(242, 193, 78, 0.45);
-  }
 }
 /* Idle, like a unit in an RPG: his own frames breathe, ripple his cape and flicker his flame (the `idle` animation). */
 
