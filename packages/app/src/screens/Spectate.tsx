@@ -2,13 +2,17 @@ import { cutLabel, scoreDp, type BoardView, type GameView } from "../game.ts";
 import { MiniBoard } from "../components/MiniBoard.tsx";
 import { RaceTower } from "../components/RaceTower.tsx";
 import { ChatSection } from "../components/QuickChat.tsx";
-import { exitMatch } from "../match-exit.ts";
+import { exitFor, exitMatch } from "../match-exit.ts";
+import { MatchMenu } from "../components/MatchMenu.tsx";
 
 /** For knocked-out players: the boards in play and the live standings. */
 export function SpectateScreen({ match, boards, note }: { match: GameView; boards: BoardView[]; note?: string }) {
   const st = match.standings();
   return (
-    <div class="screen spectate">
+    <div class="screen spectate mm-screen">
+      <div class="mm-corner">
+        <MatchMenu exit={exitFor(match)} />
+      </div>
       <h1>Watching</h1>
       {note && <p class="status">{note}</p>}
       {boards.length > 0 && (

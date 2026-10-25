@@ -97,6 +97,10 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
   (`damagePerRound`, `piecesPerDamage`, `hp`; the Monte Carlo behind it is a unit test). **Nothing carries over but gold, HP, the win streak, the bench and each side's level and XP:**
   each round starts with the two kings only. Each side gets back 25% of the price of its pieces still on the board; income 100 then +20
   a round (max 200), interest, win streak gold; the result line shows the next round's gold.
+- **The gear (Eric, Oct 25; docs/decisions/2026-10-25-gear-everywhere.md):** the title row's back button stays, and the same gear as
+  every match sits at the top right of the title row: Sound, **Animations** (off: the board's pieces jump to their squares
+  instead of gliding, in the move and fight steps; the pawns' hops and the other effects are as they were), **Leave** (the back
+  button's action, asked first: "Leave this game?"; nothing is recorded) and Report a bug.
 - **The screen** (v7, from Eric's approved round-4 mock; v7.1 below): kitty-corner. At the top, the title row, **their bench** (left) and **their custom pawn** (right: its name and level beside it, thin HP and XP
   bars); the board in its curved frame with **the move clock's bars** (the app's own `TimerBar`, quiet, along its top and bottom in the buy and move steps); under it **your pawn** (left, the dressed pawn of
   your profile, a gold level badge, thin HP and XP bars) and **your bench** (right, the same distance from the board as theirs). **Benches on the board's edges** (v7.1, Eric Oct 22): their bench's left edge is the

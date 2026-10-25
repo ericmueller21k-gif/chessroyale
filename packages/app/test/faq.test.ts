@@ -546,10 +546,10 @@ describe("the FAQ on Squads' modes and Mercenary", () => {
 });
 
 describe("the FAQ: leaving or resigning", () => {
-  it("says how to resign on a phone and a computer, what it does, and how long a seat waits (LEAVING)", () => {
+  it("says how to resign (the gear, on a phone and a computer), what it does, and how long a seat waits (LEAVING)", () => {
     const t = text();
     expect(t).toContain("Leaving or resigning");
-    expect(t).toContain("on a phone, tap the gear at the top right of the match, then Resign; on a computer, click the flag");
+    expect(t).toContain("tap the gear at the top right of the match (on a computer, click it), then Resign");
     expect(t).toContain(`Back within ${LEAVING.awayMs / 60_000} minutes, you're still in your seat`);
     expect(text({ ...FAQ_DEFAULTS, leaving: { awayMs: 90_000 } })).toContain("Back within 90 seconds, you're still in your seat");
     expect(faqAnchors(faqPage())).toContain("leaving");

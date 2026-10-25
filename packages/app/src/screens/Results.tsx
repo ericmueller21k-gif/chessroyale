@@ -9,7 +9,8 @@ import { PlayerName } from "../components/PlayerName.tsx";
 import { ChatSection } from "../components/QuickChat.tsx";
 import { bossInText, crowdFinalists, rankedMinHumans } from "@chessroyale/core";
 import { BossCharacter, hasCharacter } from "../components/BossCharacter.tsx";
-import { FlagIcon } from "../components/MatchMenu.tsx";
+import { FlagIcon, MatchMenu } from "../components/MatchMenu.tsx";
+import { exitFor } from "../match-exit.ts";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
   const played = match.moves.filter((m) => m.move !== null);
@@ -48,7 +49,10 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
     return w ? <PlayerName name={winner} uid={w.uid} bot={w.isBot} /> : winner;
   })();
   return (
-    <div class="screen results">
+    <div class="screen results mm-screen">
+      <div class="mm-corner">
+        <MatchMenu exit={exitFor(match)} />
+      </div>
       <div class={`trophy${resigned ? " resigned" : ""}`} aria-hidden="true">
         {resigned ? <FlagIcon size={56} /> : bossResult ? (bossResult === "crowd" ? "🏆" : bossResult === "boss" ? "💀" : "🤝") : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
       </div>

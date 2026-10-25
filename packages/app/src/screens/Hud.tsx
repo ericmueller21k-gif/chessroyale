@@ -141,7 +141,7 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
             <EngineMove match={match} icon />
           </span>
         )}
-        {/* Sound, and Resign (a phone: the gear and its list; a computer: the sound button, then the flag). A crowd match (Crowd, a raid) adds the motion rows. */}
+        {/* The gear: its list has Sound, Animations, Resign and Report a bug (a crowd match, Crowd or a raid, adds the Motion trail row). */}
         <MatchMenu exit={exitFor(match)} crowd={crowd} />
       </div>
       {boss ? <BossBar boss={boss} match={match} /> : <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />}

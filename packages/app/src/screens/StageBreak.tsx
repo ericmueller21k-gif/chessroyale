@@ -1,7 +1,8 @@
 import type { BoardView, GameView, Standing } from "../game.ts";
 import { MiniBoard } from "../components/MiniBoard.tsx";
 import { RaceTower } from "../components/RaceTower.tsx";
-import { exitMatch } from "../match-exit.ts";
+import { exitFor, exitMatch } from "../match-exit.ts";
+import { MatchMenu } from "../components/MatchMenu.tsx";
 
 export function StageBreakScreen(props: {
   match: GameView;
@@ -15,7 +16,10 @@ export function StageBreakScreen(props: {
   const { match, stage, standings, knockedOut, cutoff, youOut, nextBoards: boards } = props;
   const finalStage = stage === match.settings.knockoutsPerStage.length - 1;
   return (
-    <div class="screen break">
+    <div class="screen break mm-screen">
+      <div class="mm-corner">
+        <MatchMenu exit={exitFor(match)} />
+      </div>
       <h1>Stage {stage + 1} complete</h1>
       <p class={youOut ? "out-msg" : "safe-msg"}>
         {youOut

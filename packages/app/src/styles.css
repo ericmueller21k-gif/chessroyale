@@ -1983,8 +1983,7 @@ p {
   align-items: stretch;
   gap: 6px;
 }
-.mm-more,
-.mm-flag {
+.mm-more {
   flex: none;
   width: 44px;
   min-height: 42px;
@@ -2002,33 +2001,22 @@ p {
   display: grid;
   place-items: center;
 }
-.mm-flag {
-  color: var(--muted);
-}
-.mm-flag:hover,
-.mm-flag.on {
-  color: var(--text);
-}
-.mm-more.on,
-.mm-flag.on {
+.mm-more.on {
   background: var(--surface-2);
 }
 .mm-flag-icon,
 .mm-gear-icon {
   display: block;
 }
-/* An invisible layer over the page while the confirm is open on a computer: a tap outside closes it, nothing dims. */
+/* The layer over the match while the list or a confirm is open: the match behind it is faded and blurred, and the list or
+   the confirm sits in the middle. A tap on the layer itself closes it. */
 .mm-scrim {
   position: fixed;
   inset: 0;
   z-index: 65;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-/* A phone's layer: the match behind it is faded and blurred, and the list or the confirm sits in the middle. */
-.mm-scrim.mm-full {
   align-items: center;
+  justify-content: center;
   background: rgba(0, 0, 0, 0.45);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
@@ -2039,9 +2027,9 @@ p {
     opacity: 0;
   }
 }
-/* The list (a card in the middle; 320 px, or the screen less 16 px a side). */
+/* The list and the confirm (a card in the middle; 320 px, or the screen less 16 px a side). */
 .mm-panel,
-.mm-confirm.mm-center {
+.mm-confirm {
   width: min(320px, calc(100vw - 32px));
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -2187,60 +2175,27 @@ p {
   background: var(--danger);
   color: #fff;
 }
-.mm-confirm.mm-center {
+.mm-confirm {
   display: grid;
   gap: 14px;
   padding: 18px 16px 16px;
   text-align: left;
   white-space: normal;
 }
-.mm-center .mm-confirm-title {
+.mm-confirm .mm-confirm-title {
   display: flex;
   margin-bottom: 4px;
   font-size: 18px;
 }
-.mm-center .mm-confirm-text {
-  font-size: 15px;
-}
-/* (A computer's: beside the flag, out into the column next to the board, its top level with the title line. The flag
-   sits over the board's right edge, so a confirm dropping under it would cover the board; Eric, Oct 13.) */
-.mm-confirm.mm-pop {
-  position: absolute;
-  top: 0;
-  left: calc(100% + 28px);
-  z-index: 66;
-  width: 300px;
-  display: grid;
-  gap: 10px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
-  box-shadow: var(--shadow), 0 8px 28px rgba(0, 0, 0, 0.3);
-  text-align: left;
-  white-space: normal;
-}
-/* A computer's: the question on its own line, bigger. */
-.mm-pop .mm-confirm-title {
-  display: flex;
-  margin-bottom: 4px;
-  font-size: 18px;
-}
-.mm-pop .mm-btn {
-  min-height: 40px;
+.mm-confirm .mm-confirm-text {
   font-size: 15px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .mm-scrim.mm-full,
+  .mm-scrim,
   .mm-panel,
-  .mm-confirm.mm-center {
+  .mm-confirm {
     animation: none;
   }
-}
-/* A computer's title line with an admin's testing items has no room for one more button (they'd run over the title):
-   the report button gives way there; Settings and the phone's list still have it. */
-.match-tools:not(:empty) ~ .mm .mm-report {
-  display: none;
 }
 /* The error boundary's screen (components/Problems.tsx): its Reload button at its own height (.btn grows in a row). */
 .crash .btn {
@@ -2891,9 +2846,7 @@ button.history-label {
     flex: none;
   }
   .screen.game .hud,
-  .screen.game .mute-btn,
-  .screen.game .mm-more,
-  .screen.game .mm-flag {
+  .screen.game .mm-more {
     min-height: 36px;
   }
   .screen.game .opening-name {
@@ -2954,11 +2907,9 @@ button.history-label {
   }
 }
 
-/* The strip above the boards: one clean line, no box (sound toggle, the gear and the flag too). */
+/* The strip above the boards: one clean line, no box (the match's gear too). */
 .screen.game .hud,
-.screen.game .mute-btn,
-.screen.game .mm-more,
-.screen.game .mm-flag {
+.screen.game .mm-more {
   border: none;
   background: transparent;
   box-shadow: none;
@@ -2966,14 +2917,23 @@ button.history-label {
 .screen.game .hud {
   padding: 0 2px;
 }
-.screen.game .mute-btn,
-.screen.game .mm-more,
-.screen.game .mm-flag {
+.screen.game .mm-more {
   width: 36px;
 }
-.screen.game .mm-more.on,
-.screen.game .mm-flag.on {
+.screen.game .mm-more.on {
   background: var(--surface-2);
+}
+
+/* A screen with a chessboard and no top line of its own (the openings, a stage break, the spectators' and the results):
+   the match's gear in its top right corner, over the screen (its own padding). */
+.screen.mm-screen {
+  position: relative;
+}
+.mm-corner {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 10px);
+  right: calc(var(--gutter) + env(safe-area-inset-right));
+  z-index: 2;
 }
 
 /* The evaluation bar sits left of the board; a matching gap on the right keeps the board centered. */
@@ -18352,12 +18312,18 @@ button.sq-tiny {
   height: var(--top-h);
 }
 .ac-titlebar {
-  grid-area: 1 / 1 / 2 / 4;
+  /* (Columns 1 and 2 only: the gear at the title row's right end sits left of their pawn, in column 3.) */
+  grid-area: 1 / 1 / 2 / 3;
   align-self: center;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
+}
+/* The gear here is the match top line's size (36 px), so it clears the opponent's name beside it at a phone's width. */
+.ac-titlebar .mm-more {
+  width: 36px;
+  min-height: 36px;
 }
 .ac-title {
   flex: 1 1 auto;

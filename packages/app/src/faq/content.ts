@@ -319,7 +319,7 @@ function leaving(src: FaqSources): string {
   const gone = away % 60 ? n(away, "second") : n(away / 60, "minute");
   return `### Leaving or resigning {#leaving}
 
-- **To resign:** on a phone, tap the **gear** at the top right of the match, then **Resign**; on a computer, click the **flag** beside the sound button. It asks once more, so a stray tap never resigns. (There's no undo; only [1 v 1](#mode-1v1) has draw offers.)
+- **To resign:** tap the **gear** at the top right of the match (on a computer, click it), then **Resign**. It asks once more, so a stray tap never resigns. (There's no undo; only [1 v 1](#mode-1v1) has draw offers.)
 - **1 v 1:** resigning ends the game, a loss. Before both first moves are made it's **Leave** instead: the game is called off, with no result and no rank change.
 - **Solo games and Boss alone:** the game ends there, and it counts as a loss.
 - **Online (Crowd, boss raids, Squads):** you can't end the game for everyone else, so resigning means you leave it. You're out in the last place still open, it counts as a loss (in a match that counts for ranking, for your ranking too), and a bot plays your seat so your team isn't a player short (with Bots off, only when your side would otherwise have nobody left). In Squads your squad plays on with a bot in your seat, and your record has the worst place your squad could still finish.

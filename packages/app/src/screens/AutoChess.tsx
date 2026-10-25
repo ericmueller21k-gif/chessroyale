@@ -7,6 +7,8 @@ import { Board } from "../components/Board.tsx";
 import type { PieceDecor } from "../board/types.ts";
 import { COUNT_FROM_SECONDS, TimerBar } from "../components/Countdown.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
+import { MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
+import { useBoardAnimations } from "../hooks.ts";
 import { Avatar } from "../components/Items.tsx";
 import { StarArt } from "../components/AcStarArt.tsx";
 import { cellOf, dragStarted, squareAtPoint } from "../board/logic.ts";
@@ -385,6 +387,10 @@ export function AutoChessScreen({ onBack }: { onBack: () => void }) {
 
 function AutoChessGame({ onBack }: { onBack: () => void }) {
   const params = testParams();
+  // (Settings → Board, "Animations": off, the board's pieces jump to their squares instead of gliding; the gear's row too.)
+  const animOn = useBoardAnimations();
+  // (The gear's Leave: the back button's action, asked first. Nothing is kept: this game is client-only.)
+  const leave: MatchExit = { kind: "leave", note: "You go home, and this game ends. Nothing is recorded.", go: onBack, row: "Leave", ask: "Leave this game?" };
   const quick = params.get("quick") === "1";
   const extraGold = Math.max(0, Math.floor(Number(params.get("gold")) || 0));
   const modeParam = params.get("adjustmode");
@@ -1207,6 +1213,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 Round {g.match.round} · you play {colorName(mine)}
               </span>
             </div>
+            <MatchMenu exit={leave} />
           </header>
           <div class="ac-bench them" aria-label="Their bench">
             {Array.from({ length: cfg.benchSlots }, (_, i) => {
@@ -1258,7 +1265,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
         <div class="ac-frame">
           {timerBars && <TimerBar key={`${g.match.round}-${g.phase}`} startsAt={g.wallStart} deadline={g.wallStart + stepMs} total={stepMs} quiet />}
           <div class="ac-board">
-            <Board fen={fen} orientation={orientation} lastMove={lastMove} animate={g.phase === "adjust" || g.phase === "fight"} silent={g.phase !== "fight"} decor={starDecor}>
+            <Board fen={fen} orientation={orientation} lastMove={lastMove} animate={animOn && (g.phase === "adjust" || g.phase === "fight")} silent={g.phase !== "fight"} decor={starDecor}>
               <div
                 ref={layerRef}
                 class={`ac-layer${interactiveLayer ? " live" : ""}`}

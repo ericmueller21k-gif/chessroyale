@@ -1,12 +1,12 @@
 import { devices, expect, type Browser, type Page } from "@playwright/test";
-import { BOARD_SEL, named, test, bossAloneFromHome, openBossRaid, pickMode } from "./helpers.ts";
+import { named, test, bossAloneFromHome, openBossRaid, pickMode } from "./helpers.ts";
 
 /**
- * Resign in every mode (Eric, Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): a phone's gear in the top
- * line opens a list (Sound, Resign; Eric, Oct 24), a computer's flag sits beside the sound button; either way a second
- * step says what happens. On a computer nothing covers the board meanwhile; on a phone the confirm sits in the middle,
- * over the match, which is faded and blurred (docs/decisions/2026-10-24-match-menu.md). Solo stops at once; online, a bot takes your seat and the
- * others play on; Squads' squad plays on with a bot in your seat.
+ * Resign in every mode (Eric, Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): the gear in the top line
+ * opens a list (Sound, Animations, Resign or Leave; Eric, Oct 24 and 25), and a second step says what happens, in the
+ * middle of the screen over the match, which is faded and blurred (docs/decisions/2026-10-24-match-menu.md and
+ * 2026-10-25-gear-everywhere.md). Solo stops at once; online, a bot takes your seat and the others play on; Squads'
+ * squad plays on with a bot in your seat.
  */
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
@@ -15,64 +15,29 @@ const run = Date.now().toString(36).slice(-5);
 const pool = (name: string) => `${name}-${test.info().project.name[0]}${run}`;
 const phone = () => test.info().project.name === "phone";
 
-/** Boxes don't overlap (with a pixel to spare). */
-const apart = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }) =>
-  a.x + a.width <= b.x + 1 || b.x + b.width <= a.x + 1 || a.y + a.height <= b.y + 1 || b.y + b.height <= a.y + 1;
-
 /**
- * Opens the match's control the way this device has it (a phone: the gear, then Resign or Leave in its list; a computer:
- * the flag) and checks the confirm says `title` and `note`. A computer's confirm leaves the board, its moves and the
- * clock clear; a phone's sits in the middle over the blurred match.
+ * Opens the match's gear, then Resign or Leave in its list, and checks the confirm says `title` and `note`: Cancel has the
+ * focus, and the confirm sits in the middle, over the match, which is faded and blurred behind it (the same on a phone and
+ * a computer: docs/decisions/2026-10-25-gear-everywhere.md).
  */
 async function openConfirm(page: Page, title: RegExp, note: RegExp) {
   const resign = title.source.replace(/^\^/, "").startsWith("Resign");
-  if (phone()) {
-    await page.getByRole("button", { name: "Match options" }).click();
-    const sheet = page.getByRole("dialog", { name: "Match options" });
-    await expect(sheet).toBeVisible();
-    await expect(sheet.getByRole("switch", { name: /Sound/ })).toBeVisible();
-    await sheet.getByRole("button", { name: resign ? /^Resign$/ : /^Leave the match$/ }).click();
-  } else {
-    await expect(page.getByRole("button", { name: "Match options" })).toHaveCount(0);
-    // (Eric, Oct 13: on the title's line, at its right end over the board's column: sound, then the flag.)
-    const flag = page.getByRole("button", { name: resign ? "Resign" : "Leave the match", exact: true });
-    const [f, s, title, board] = await Promise.all([
-      flag.boundingBox(),
-      page.locator(".hud-row .mute-btn").boundingBox(),
-      page.locator(".hud-row > .hud").boundingBox(),
-      page.locator(".board-area").first().boundingBox(),
-    ]);
-    expect(s!.x + s!.width, "sound before the flag").toBeLessThanOrEqual(f!.x + 1);
-    expect(s!.x, "after the title").toBeGreaterThanOrEqual(title!.x + title!.width - 1);
-    expect(Math.abs(f!.y + f!.height / 2 - (title!.y + title!.height / 2)), "on the title's line").toBeLessThanOrEqual(2);
-    expect(f!.x + f!.width, "over the board's column").toBeLessThanOrEqual(board!.x + board!.width + 1);
-    await flag.click();
-  }
+  await page.getByRole("button", { name: "Match options" }).click();
+  const sheet = page.getByRole("dialog", { name: "Match options" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("switch", { name: /Sound/ })).toBeVisible();
+  await sheet.getByRole("button", { name: resign ? /^Resign$/ : /^Leave the match$/ }).click();
   const confirm = page.getByRole("alertdialog");
   await expect(confirm).toBeVisible();
   await expect(confirm.locator(".mm-confirm-title")).toHaveText(title);
   await expect(confirm.locator(".mm-confirm-note")).toHaveText(note);
   // (Cancel has the focus: Enter never resigns by itself.)
   await expect(confirm.getByRole("button", { name: "Cancel" })).toBeFocused();
-  // Nothing over the board (its moves), the line above it (the move's count, a clock), the move's timer bars, the
-  // board's clock (Crowd) or the squads' clocks under the board (Squads).
-  if (phone()) {
-    // Eric, Oct 24: on a phone the confirm is centered, over the match, which is faded and blurred behind it.
-    const c = (await confirm.boundingBox())!;
-    const view = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
-    expect(Math.abs(c.x + c.width / 2 - view.w / 2), "centered across").toBeLessThanOrEqual(8);
-    expect(Math.abs(c.y + c.height / 2 - view.h / 2), "centered down").toBeLessThanOrEqual(8);
-    expect(await page.locator(".mm-scrim.mm-full").evaluate((el) => getComputedStyle(el).backdropFilter), "blurred behind").toContain("blur");
-    return confirm;
-  }
-  const box = (await confirm.boundingBox())!;
-  // (A boss battle's line above the board is gone (Eric, Oct 24): its dock's status box stands in for it.)
-  for (const sel of [`.board-area ${BOARD_SEL.wrap}`, ".board-area .opening-name", ".boss-dock-status", ".timer-bar", ".board-clock", ".sq-clockline"]) {
-    for (const el of await page.locator(sel).all()) {
-      const b = await el.boundingBox();
-      if (b && b.height > 0) expect(apart(box, b), `the confirm covers ${sel}`).toBe(true);
-    }
-  }
+  const c = (await confirm.boundingBox())!;
+  const view = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
+  expect(Math.abs(c.x + c.width / 2 - view.w / 2), "centered across").toBeLessThanOrEqual(8);
+  expect(Math.abs(c.y + c.height / 2 - view.h / 2), "centered down").toBeLessThanOrEqual(8);
+  expect(await page.locator(".mm-scrim").evaluate((el) => getComputedStyle(el).backdropFilter), "blurred behind").toContain("blur");
   return confirm;
 }
 
