@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { BOARD_SEL, asAdmin, named, test } from "./helpers.ts";
+import { QUICK_CHAT } from "../packages/app/src/autochess/chat.ts";
 
 /**
  * Auto chess, the demo (/autochess; docs/areas/autochess.md; shelved: Settings' Testing section, for admins, opens it): a
@@ -8,6 +9,8 @@ import { BOARD_SEL, asAdmin, named, test } from "./helpers.ts";
  * off; `?seed=` fixes the kings, the shop and the bot; `?gold=N` adds gold; `?level=N` starts both sides at level N (rooks and queens in the shop at
  * once); `?lockin=1` turns lock-in on (it is off since v7), `?adjustmode=legal` brings back v7's move step (one piece lit at random, 7 s) and `=teleport` the v6 adjust step; v8's
  * stars: `?stars=n@c2:1,b@d2:2` puts pieces on your board (kind, square, stars 1 to 3), `?benchstars=b@f3:2` holds them for you and `?botbench=n@c7:2` for the bot; `?fightglow=1` keeps the stars' outlines on through the fight.
+ * v9's meeting before round 1 (both pawns in the middle, the quick chat, a 10 s countdown; `?quick=1` makes it 2 s) is on in every game; `?intro=0` skips it (the tests
+ * that aren't about it use that).
  *
  * The screen is v7's (docs/decisions/2026-10-21-autochess-v7.md): their bench top left, their pawn top right, the board in its frame with the move clock's
  * bars, your pawn bottom left, the clock's small numbers and your bench bottom right, then the dock (gold and the odds pill, Buy XP, Reroll, four cards).
@@ -27,14 +30,14 @@ test.use({ actionTimeout: 15_000 });
 //       onto e2 too: the two ways an offer can meet a held piece's square (v8: the roll with a starrable piece held is the new one, so the seed was found again: 6298 before).
 // 24 (quick): knight e2, pawn a3, pawn h3, bishop a1; king d1. Buying the first three, the move step lights the knight on e2 (c1, c3, d4, f4, g1, g3) with `?adjustmode=legal`.
 // 1291 (quick, gold=600): the bot (king f8, yours f1) holds a bishop for f6 and a rook for b5 by 3 s, and nothing more (v8: the star-ups changed its rolls; 316 before).
-const PLAIN = "/autochess?quick=1&seed=9";
+const PLAIN = "/autochess?quick=1&seed=9&intro=0";
 const NEVER = PLAIN;
-const LATE = "/autochess?quick=1&seed=5";
-const EARLY = "/autochess?quick=1&seed=11";
-const FIGHT = "/autochess?quick=1&seed=3";
-const TWOQ = "/autochess?quick=1&seed=60&level=10";
-const MOVE = "/autochess?quick=1&seed=24";
-const HELD = "/autochess?quick=1&seed=1291&gold=600";
+const LATE = "/autochess?quick=1&seed=5&intro=0";
+const EARLY = "/autochess?quick=1&seed=11&intro=0";
+const FIGHT = "/autochess?quick=1&seed=3&intro=0";
+const TWOQ = "/autochess?quick=1&seed=60&level=10&intro=0";
+const MOVE = "/autochess?quick=1&seed=24&intro=0";
+const HELD = "/autochess?quick=1&seed=1291&gold=600&intro=0";
 /** Every way a fight's result line can begin (the reason it ended), then the HP line. */
 const RESULT_WHY =
   /^(Checkmate\.|Stalemate\.|(You|Your opponent) gained 3\+ pawns and held it for 6 moves\.|Fight stalled \((moves repeated|10 moves each, no capture|60 moves each)\): ((you|your opponent) gained (\d+ pawns?|the edge|a winning edge)|neither side gained the edge, a draw)\.|Draw by the fifty-move rule\.|Draw: not enough pieces left to mate\.|A side left with only its king loses at once\.|Both sides are down to a king: a draw\.) /;
@@ -209,7 +212,7 @@ test("shelved (Eric, Oct 19; home's card came on Oct 24, home-ranked.spec.ts): n
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
   // The address works by itself too (nothing is signed in or sent).
-  await page.goto("/autochess");
+  await page.goto("/autochess?intro=0");
   await expect(root(page)).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -322,7 +325,7 @@ test("the reroll's price climbs 5, 6, 7 ... up to 10 as the Reroll button shows 
   test.setTimeout(4 * 60_000);
   const errors = watchErrors(page);
   // (Gold enough for the whole climb: 5 + 6 + 7 + 8 + 9 + 10 + 10 = 55.)
-  await page.goto("/autochess?quick=1&seed=9&adjust=0&gold=100");
+  await page.goto("/autochess?quick=1&seed=9&adjust=0&gold=100&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const price = async () => Number(await reroll(page).locator(".ac-cost b").innerText());
   let gold = await goldOf(page);
@@ -374,7 +377,7 @@ test("one offer to a square (Eric, Oct 21): over several seeds, rerolls and buys
   };
   // (`gold=900` pays for the rerolls and the buys.)
   for (const seed of [9, 5, 60, 3, 11, 3328, 21, 33]) {
-    await page.goto(`/autochess?seed=${seed}&gold=900`);
+    await page.goto(`/autochess?seed=${seed}&gold=900&intro=0`);
     await expect(root(page)).toHaveAttribute("data-phase", "buy");
     await check(`seed ${seed}`);
     for (let i = 0; i < 4; i++) {
@@ -518,7 +521,7 @@ test("buying: a greyed offer says why (gold, the one-queen limit), in a few word
 test("the bench: drag an offer onto it to hold it (it keeps its square), tap it to place it when its square is free, sell it by dragging it onto the shop", async ({ page }) => {
   const errors = watchErrors(page);
   // (The full 30 s step: a drag takes a while, and the quick step's 5 open seconds are a tap-test's. Seed 19512: see the list at the top.)
-  await page.goto("/autochess?seed=19512");
+  await page.goto("/autochess?seed=19512&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const before = await offers(page);
   expect(before.map((o) => `${o.kind}${o.square}`)).toEqual(["bb4", "ph4", "pg2", "pe2"]);
@@ -588,7 +591,7 @@ test("the bench: drag an offer onto it to hold it (it keeps its square), tap it 
 
 test("while you drag an offer, your whole bench row lights up (gold ring), and only yours: theirs never takes a drag", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/autochess?seed=9");
+  await page.goto("/autochess?seed=9&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await expect(youBench(page)).not.toHaveClass(/lit/);
   const card0 = middle((await card(page, 1).boundingBox())!);
@@ -609,7 +612,7 @@ test("while you drag an offer, your whole bench row lights up (gold ring), and o
 
 test("the bench holds 4: a fifth is refused with the reason; the shop's offers stay holdable when the board has no room", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/autochess?seed=9&gold=300");
+  await page.goto("/autochess?seed=9&gold=300&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   expect(await goldOf(page)).toBe(430);
   // Four pawns onto the bench (a pawn offer each time).
@@ -635,7 +638,7 @@ test("the bench holds 4: a fifth is refused with the reason; the shop's offers s
 
 test("levels: you start at level 4 (4 pieces on the board), the 5th is refused with the reason, Buy XP (4 XP for 20 gold) makes room, and the number pops", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/autochess?seed=9&gold=800");
+  await page.goto("/autochess?seed=9&gold=800&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   // 800 more, the income 100 and the interest, 30 at the most: 930. Round 1's free 2 XP: level 4, 2 of 4.
   expect(await goldOf(page)).toBe(930);
@@ -695,7 +698,7 @@ test("levels: you start at level 4 (4 pieces on the board), the 5th is refused w
 
 test("the odds pill in the gold row: each piece's icon with its percent under it at your level (no 'Odds' word, no strip of its own), on the gold number's baseline, and it follows a level-up", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/autochess?seed=9&gold=200");
+  await page.goto("/autochess?seed=9&gold=200&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const pill = page.locator(".ac-odds");
   const shownOdds = () => page.locator(".ac-od").evaluateAll((els) => els.map((e) => ({ kind: (e as HTMLElement).dataset.kind!, pct: e.querySelector("b")!.textContent!, faded: e.classList.contains("none") })));
@@ -755,7 +758,7 @@ test("the odds pill in the gold row: each piece's icon with its percent under it
     { kind: "q", pct: "1%", faded: false },
   ]);
   // The rows come from the same table the shop rolls by: a game started at level 10 shows 36/21/20/16/7.
-  await page.goto("/autochess?seed=9&level=10");
+  await page.goto("/autochess?seed=9&level=10&intro=0");
   await expect(page.locator(".ac-od b")).toHaveText(["36%", "21%", "20%", "16%", "7%"]);
   expect(errors).toEqual([]);
 });
@@ -863,7 +866,7 @@ test("each custom pawn hops once, then waits a random 7 to 10 s (its own draws, 
   // (A fake clock: seven to ten seconds take no time. The screen's own steps run on it too: the buy step is 30 s, so what follows stays inside it.)
   await recordHops(page);
   await page.clock.install();
-  await page.goto("/autochess?seed=9");
+  await page.goto("/autochess?seed=9&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const mountedAt = await page.evaluate(() => performance.now());
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
@@ -945,7 +948,7 @@ test("the pawns stay still under reduced motion: no hop at all", async ({ page }
   await recordHops(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.clock.install();
-  await page.goto("/autochess?seed=9");
+  await page.goto("/autochess?seed=9&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
   for (let t = 0; t < 20_000; t += 1000) {
@@ -1066,7 +1069,7 @@ test("mute is respected: with sound off every one of these sounds is asked for m
   const errors = watchErrors(page);
   await page.addInitScript(() => localStorage.setItem("brc.muted", "1"));
   // (Lock-in is off since v7; `?lockin=1` turns it back on, for its sound.)
-  await page.goto("/autochess?seed=9&lockin=1");
+  await page.goto("/autochess?seed=9&lockin=1&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await tap(page, card(page, 2));
   await dragMouse(page, middle((await card(page, 3).boundingBox())!), await benchMiddle(page));
@@ -1086,7 +1089,7 @@ test("lock-in is off (v7): no button, no bonus for anyone (the bot never locks),
   test.setTimeout(90_000);
   const errors = watchErrors(page);
   // (Seed 5: with lock-in on, the bot would lock in at about 21 s of the 30's open 26. The real step, not the quick one.)
-  await page.goto("/autochess?seed=5");
+  await page.goto("/autochess?seed=5&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const t0 = Date.now();
   await expect(lockButton(page)).toHaveCount(0);
@@ -1204,7 +1207,7 @@ test("lock in (behind `?lockin=1`): you lock before the opponent, and when it lo
 test("while you buy their pieces are plain circles (pawns too), 2 s behind; every few seconds one is revealed at random and stays shown", async ({ page }) => {
   const errors = watchErrors(page);
   // (Quick: a reveal every 1.5 s, the circles half a second behind.)
-  await page.goto("/autochess?quick=1&seed=9");
+  await page.goto("/autochess?quick=1&seed=9&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await expect.poll(() => page.locator(".ac-circle").count(), { timeout: 6000 }).toBeGreaterThan(0);
   // Watch the board for the step's open part: the real black pieces (not the king) only ever grow, by one at a time, never a pawn drawn as a pawn without being revealed,
@@ -1253,7 +1256,7 @@ test("while you buy their pieces are plain circles (pawns too), 2 s behind; ever
 
 test("the reveals come every 5 seconds of the 30 (the first at 5 s, the next at 10 s)", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/autochess?seed=9");
+  await page.goto("/autochess?seed=9&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const t0 = Date.now();
   const real = () => page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count();
@@ -1342,7 +1345,7 @@ test("tap one of their bench pieces: a red ring on it and its landing square lig
 test("a drag with a finger: a placed piece onto the shop sells it", async ({ page }) => {
   test.skip(!phone(), "real touch events, as a phone makes them");
   const errors = watchErrors(page);
-  await page.goto("/autochess?seed=9");
+  await page.goto("/autochess?seed=9&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await card(page, 3).tap();
   await expect(piece(page, "white", "pawn", "h3")).toBeVisible();
@@ -1537,7 +1540,7 @@ test("the v7 move step (`?adjustmode=legal`) with no piece of yours able to move
 test("the move step off (?adjust=0): the buy step goes straight to the fight, with both boards in full from the first move", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
-  await page.goto("/autochess?quick=1&seed=11&adjust=0");
+  await page.goto("/autochess?quick=1&seed=11&adjust=0&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await page.evaluate(() => {
     const root = document.querySelector<HTMLElement>(".ac-root")!;
@@ -1718,7 +1721,7 @@ test("a pawn reaching the far end cashes in: it lands, a coin sounds, \"+5\" flo
   // (The screen never loads Stockfish: the HunChess engine plays the fight.)
   const stockfish: string[] = [];
   page.on("request", (r) => /stockfish/i.test(r.url()) && stockfish.push(r.url()));
-  await page.goto(`/autochess?quick=1&seed=3&adjust=0&fightfen=${encodeURIComponent(fen)}`);
+  await page.goto(`/autochess?quick=1&seed=3&adjust=0&fightfen=${encodeURIComponent(fen)}&intro=0`);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   // Every frame from here: a pawn drawn on b8, and the floating gold (its amount and the square it sits on).
   await page.evaluate(() => {
@@ -1750,7 +1753,7 @@ test("a pawn reaching the far end cashes in: it lands, a coin sounds, \"+5\" flo
 test("a fight always ends even if the engine never answers (?stall=1): its looks time out to stand-in moves", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
-  await page.goto("/autochess?quick=1&seed=3&adjust=0&stall=1");
+  await page.goto("/autochess?quick=1&seed=3&adjust=0&stall=1&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await buyAll(page, 4);
   await expect(root(page)).toHaveAttribute("data-phase", "fight", { timeout: 15_000 });
@@ -1773,7 +1776,7 @@ test("the result says why, by the gains: a side that gained 3 pawns wins early, 
     { fen: "2k3r1/8/pp6/5p2/1P6/8/6PP/R1K5 w - - 0 1", head: "The round is a draw.", why: "Fight stalled (10 moves each, no capture): neither side gained the edge, a draw. Nobody loses HP." },
   ];
   for (const c of cases) {
-    await page.goto(`/autochess?quick=1&seed=3&adjust=0&fightfen=${encodeURIComponent(c.fen)}`);
+    await page.goto(`/autochess?quick=1&seed=3&adjust=0&fightfen=${encodeURIComponent(c.fen)}&intro=0`);
     await expect(root(page)).toHaveAttribute("data-phase", "buy");
     await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 60_000 });
     await expect(page.locator(".ac-card-head")).toHaveText(c.head);
@@ -2265,7 +2268,7 @@ for (const via of ["a shop card", "a piece on the board", "a held piece"] as con
   test(`a drag from ${via} that is still held when the buy step locks ends there with no action, and stays ended through the end of the step`, async ({ page }) => {
     test.setTimeout(60_000);
     const errors = watchErrors(page);
-    await page.goto("/autochess?quick=1&seed=9");
+    await page.goto("/autochess?quick=1&seed=9&intro=0");
     await expect(root(page)).toHaveAttribute("data-phase", "buy");
     const shown = await offers(page);
     const pawn = shown.findIndex((o) => o.kind === "p");
@@ -2328,7 +2331,7 @@ test("locking in under a drag ends the drag: the bonus is the only gold that mov
 test("a drag whose pointer is cancelled or loses its capture ends with no action: nothing bought, held or sold, no ghost", async ({ page }) => {
   const errors = watchErrors(page);
   await page.addInitScript(() => document.addEventListener("pointerdown", (e) => ((window as any).__pointer = e.pointerId), true));
-  await page.goto("/autochess?seed=9");
+  await page.goto("/autochess?seed=9&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const shown = await offers(page);
   const pawn = shown.findIndex((o) => o.kind === "p");
@@ -2360,7 +2363,7 @@ test("a drag whose pointer is cancelled or loses its capture ends with no action
 
 test("a silhouette on the board is only tapped: pressing it and dragging it picks nothing up and drops nothing, on the sell zone, the bench or the board (Eric: 'it just sold a piece that didn't exist')", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/autochess?seed=9");
+  await page.goto("/autochess?seed=9&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const shown = await offers(page);
   const pawns = shown.flatMap((o, slot) => (o.kind === "p" ? [slot] : []));
@@ -2407,7 +2410,7 @@ test("a silhouette on the board is only tapped: pressing it and dragging it pick
 
 test("a sale only pays for a piece of yours that is there: selling a piece the pointer is still carrying (the Sell button, the keyboard) pays once, not again at the drop", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/autochess?seed=9");
+  await page.goto("/autochess?seed=9&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const shown = await offers(page);
   const pawn = shown.findIndex((o) => o.kind === "p");
@@ -2443,10 +2446,10 @@ test("a sale only pays for a piece of yours that is there: selling a piece the p
 // 43, `stars=n@g3:2,b@d2:3,r@a1:1,n@c2:1`: the move step with a 2-star knight on g3 (its squares e2, e4, f1, h1), a 3-star bishop on d2, a plain rook and a plain knight; nobody else is starred, so 5 s + 3 s x 2.
 // 16, `benchstars=b@f3:1` (a bishop held for f3): king a2; shop pawn b3, knight c4, bishop f3*2, pawn e3: a gold card for the held bishop. The bot (king a7) has no star.
 // 1, `botbench=n@c7:2,b@f8:3`: the bot (king b7) places a 2-star knight on c7 (shown at 1.5 s) and a 3-star bishop on f8 (shown at 4.5 s) for nothing, and buys nothing starred; you (king b2) have none.
-const STARS = "/autochess?quick=1&seed=43&stars=n@c2:1,b@d2:2,r@a1:1,n@g3:2";
-const STARMOVE = "/autochess?quick=1&seed=43&stars=n@g3:2,b@d2:3,r@a1:1,n@c2:1";
-const STARBENCH = "/autochess?quick=1&seed=16&benchstars=b@f3:1";
-const BOTSTARS = "/autochess?quick=1&seed=1&botbench=n@c7:2,b@f8:3";
+const STARS = "/autochess?quick=1&seed=43&stars=n@c2:1,b@d2:2,r@a1:1,n@g3:2&intro=0";
+const STARMOVE = "/autochess?quick=1&seed=43&stars=n@g3:2,b@d2:3,r@a1:1,n@c2:1&intro=0";
+const STARBENCH = "/autochess?quick=1&seed=16&benchstars=b@f3:1&intro=0";
+const BOTSTARS = "/autochess?quick=1&seed=1&botbench=n@c7:2,b@f8:3&intro=0";
 const GOLD = "242, 193, 78";
 /** The stars drawn on the board by square, each with its count: they are drawn inside their piece's own element (so they slide with it). */
 const marks = (p: Page) => p.locator(`${BOARD_SEL.piece} .ac-art`).evaluateAll((els) => Object.fromEntries(els.map((e) => [(e.closest("piece") as HTMLElement).dataset.square!, Number((e as HTMLElement).dataset.stars)])));
@@ -2880,7 +2883,7 @@ test("the stars' size and place (v8, Eric Oct 22: very tiny, in the body of the 
       expect(Math.abs(box.y + box.height / 2 - sq.y)).toBeLessThan(1);
     }
     // The bench: a held 2-star and 3-star, stars in the tile, clear of the square's name.
-    await page.goto("/autochess?quick=1&seed=16&benchstars=q@h3:3,b@f3:2");
+    await page.goto("/autochess?quick=1&seed=16&benchstars=q@h3:3,b@f3:2&intro=0");
     await expect(root(page)).toHaveAttribute("data-phase", "buy");
     await expect(held(page)).toHaveCount(2);
     check(await starBoxes(page, ".ac-bench.you .ac-slot .ac-art"), `${w}: bench`);
@@ -3027,5 +3030,147 @@ test("a star-up's sound is asked for muted when sound is off, and unmuted when i
   expect(log.some((l) => l.startsWith("acStar2:"))).toBe(true);
   expect(log.some((l) => l.startsWith("acStar3:"))).toBe(true);
   expect(log.every((l) => l.endsWith(":muted"))).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+// ---- The meeting before round 1 (v9, Eric Oct 24) ----
+
+/** The corners' pawns, names and bars: hidden in the meeting, back as the middle pawns puff away. */
+const corners = (p: Page) => p.locator(".ac-stage, .ac-who, .ac-bars");
+
+test("the meeting before round 1 (Eric, Oct 24): both custom pawns stand in the board's middle, side by side, the corners' pawns, names and bars hidden, a countdown and the quick chat; then they puff away, the corners come in and ACTION PHASE begins", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await page.goto("/autochess?quick=1&seed=9");
+  await expect(root(page)).toHaveAttribute("data-phase", "meet");
+  for (const c of await corners(page).all()) await expect(c).toBeHidden();
+  const frame = (await page.locator(".ac-frame").boundingBox())!;
+  const corner = (await page.locator(".ac-me .ac-pawn").boundingBox())!;
+  // (The pawns drop in first, a moment: measure them at rest.)
+  await page.waitForFunction(() => [...document.querySelectorAll(".ac-meet-pawn")].every((e) => e.getAnimations().every((a) => a.playState !== "running")));
+  const mine = (await page.locator(".ac-meet-side.you .ac-meet-pawn").boundingBox())!;
+  const theirs = (await page.locator(".ac-meet-side.them .ac-meet-pawn").boundingBox())!;
+  const mid = (b: { x: number; width: number }) => b.x + b.width / 2;
+  const fx = frame.x + frame.width / 2;
+  const fy = frame.y + frame.height / 2;
+  // In the middle of the board, yours on the left and theirs on the right, side by side and not overlapping.
+  expect(Math.abs((mid(mine) + mid(theirs)) / 2 - fx), "the pair is centered across the board").toBeLessThanOrEqual(3);
+  expect(mid(mine), "yours is left").toBeLessThan(fx);
+  expect(mid(theirs), "theirs is right").toBeGreaterThan(fx);
+  expect(mine.x + mine.width, "they don't overlap").toBeLessThanOrEqual(theirs.x);
+  expect(Math.abs(mine.y + mine.height / 2 - fy), "they stand on the board's middle row").toBeLessThanOrEqual(frame.height * 0.2);
+  // About twice a corner pawn's size.
+  expect(mine.height / corner.height, "each about twice a corner pawn").toBeGreaterThanOrEqual(1.6);
+  // The countdown under them, the quick chat: four lines from the list.
+  await expect(page.locator(".ac-meet-count")).toHaveText(/^Starting in [12]$/);
+  const lines = await page.locator(".ac-meet-chat .ac-chat").allInnerTexts();
+  expect(lines).toEqual([...QUICK_CHAT]);
+  const count = (await page.locator(".ac-meet-count").boundingBox())!;
+  const chat = (await page.locator(".ac-meet-chat").boundingBox())!;
+  for (const b of [mine, theirs, count, chat]) {
+    expect(b.x >= frame.x - 0.5 && b.x + b.width <= frame.x + frame.width + 0.5, "inside the board, across").toBe(true);
+    expect(b.y >= frame.y - 0.5 && b.y + b.height <= frame.y + frame.height + 0.5, "inside the board, down").toBe(true);
+  }
+  expect(count.y, "the countdown is under the pawns").toBeGreaterThanOrEqual(mine.y + mine.height - 1);
+  expect(chat.y, "the quick chat is under the countdown").toBeGreaterThanOrEqual(count.y + count.height - 1);
+  // Then the buying begins: the middle pawns are gone, the corners and bars are back, and ACTION PHASE shows.
+  await expect(root(page)).toHaveAttribute("data-phase", "buy", { timeout: 8000 });
+  await expect(page.locator(".ac-meet")).toHaveCount(0, { timeout: 3000 });
+  for (const c of await corners(page).all()) await expect(c).toBeVisible();
+  await expect(page.locator(".ac-who .ac-name")).toHaveText("Bot");
+  await expect(page.locator(".ac-banner .cc-num.ac-phase")).toHaveText("ACTION PHASE");
+  expect(errors).toEqual([]);
+});
+
+test("the quick chat (v9): a tap shows its line in a bubble over your pawn; the bot answers once with a line from the same list; the next tap replaces the bubble; the shop can't be used in the meeting", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/autochess?quick=1&seed=9");
+  await expect(root(page)).toHaveAttribute("data-phase", "meet");
+  // The shop is shut: a tap on a card buys nothing, and the gold and the bench stay as they were.
+  const gold = await goldOf(page);
+  await tapGreyed(page, card(page, 0));
+  expect(await goldOf(page)).toBe(gold);
+  await expect(held(page)).toHaveCount(0);
+  // A line of yours: its bubble, over your pawn.
+  const yours = page.locator(".ac-meet-side.you .ac-say");
+  const theirs = page.locator(".ac-meet-side.them .ac-say");
+  await tap(page, page.getByRole("button", { name: "Hello!" }));
+  await expect(yours).toHaveText("Hello!");
+  const bubble = (await yours.boundingBox())!;
+  // (The pawn drops in first: measure it at rest.)
+  await page.waitForFunction(() => [...document.querySelectorAll(".ac-meet-pawn")].every((e) => e.getAnimations().every((a) => a.playState !== "running")));
+  const pawn = (await page.locator(".ac-meet-side.you .ac-meet-pawn").boundingBox())!;
+  expect(bubble.y + bubble.height, "the bubble is over the pawn").toBeLessThanOrEqual(pawn.y + 2);
+  // The bot answers once, with a line of the same list, in a bubble over its pawn.
+  await expect(theirs).toHaveCount(1, { timeout: 4000 });
+  expect(QUICK_CHAT).toContain(await theirs.innerText());
+  // The next line replaces yours: one bubble at a time.
+  await tap(page, page.getByRole("button", { name: "Nice outfit." }));
+  await expect(yours).toHaveText("Nice outfit.");
+  await expect(yours).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
+test("the meeting fits the board: at 320, 390, 428 px wide and on a computer, the pawns, the countdown, the quick chat and the bubbles stay inside the board (and the screen)", async ({ page }) => {
+  test.setTimeout(180_000);
+  // (The full 10 s meeting, so there is time to look at it.)
+  for (const [w, h] of [
+    [320, 568],
+    [390, 844],
+    [428, 926],
+    [1280, 800],
+  ] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/autochess?seed=9");
+    await expect(root(page)).toHaveAttribute("data-phase", "meet");
+    await tap(page, page.getByRole("button", { name: "Hello!" }));
+    await expect(page.locator(".ac-meet-side.them .ac-say")).toHaveCount(1, { timeout: 4000 });
+    const frame = (await page.locator(".ac-frame").boundingBox())!;
+    const inside = async (sel: string) => {
+      for (const b of await page.locator(sel).evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()))) {
+        expect(b.x >= frame.x - 0.5 && b.x + b.width <= frame.x + frame.width + 0.5, `${sel} inside the board, across at ${w}`).toBe(true);
+        expect(b.y >= frame.y - 0.5 && b.y + b.height <= frame.y + frame.height + 0.5, `${sel} inside the board, down at ${w}`).toBe(true);
+      }
+    };
+    await inside(".ac-meet-pawn");
+    await inside(".ac-meet-count");
+    await inside(".ac-meet-chat");
+    // The bubbles: over the board, and on the screen.
+    for (const b of await page.locator(".ac-say").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()))) {
+      expect(b.x >= 0 && b.x + b.width <= w, `a bubble on the screen at ${w}`).toBe(true);
+      expect(b.y >= frame.y - 0.5, `a bubble below the board's top at ${w}`).toBe(true);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `no sideways scroll at ${w}`).toBe(true);
+    await expect(root(page)).toHaveAttribute("data-phase", "buy", { timeout: 15000 });
+  }
+});
+
+test("the shop area is one panel (v9): the gold row, Buy XP, Reroll and the four cards inside its rounded edge with about 10 px to spare, and on a phone the board keeps the column's width", async ({ page }) => {
+  const errors = watchErrors(page);
+  // (A phone at 390 x 844: a taller screen than the project's own 390 x 664, where the board is the height's, not the column's.)
+  if (phone()) await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(PLAIN);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const box = async (sel: string) => (await page.locator(sel).first().boundingBox())!;
+  const dock = await box(".ac-dock");
+  const goldRow = await box(".ac-goldrow");
+  const cards = await box(".ac-cards");
+  const btns = await box(".ac-btns");
+  // The gold row, the buttons and the cards sit inside the panel's edge (its 10 px of padding and 1 px of border).
+  expect(goldRow.x - dock.x, "the gold row's left inset").toBeCloseTo(11, 0);
+  expect(dock.x + dock.width - (cards.x + cards.width), "the cards' right inset").toBeCloseTo(11, 0);
+  expect(btns.x - dock.x, "the buttons' left inset").toBeCloseTo(11, 0);
+  expect(cards.y + cards.height, "the cards' bottom inset").toBeLessThanOrEqual(dock.y + dock.height - 10);
+  // The home panels' surface, edge and corners.
+  const look = await page.locator(".ac-dock").evaluate((e) => {
+    const s = getComputedStyle(e);
+    return { bg: s.backgroundColor, edge: s.borderTopColor, radius: s.borderTopLeftRadius, pad: s.paddingTop, panel: getComputedStyle(document.documentElement).getPropertyValue("--fd-panel").trim() };
+  });
+  expect(look.pad).toBe("10px");
+  expect(look.radius).toBe("14px");
+  expect(look.bg).not.toBe("rgba(0, 0, 0, 0)");
+  // The board: on a phone it is as wide as the column (it doesn't shrink for the panel).
+  const frame = await box(".ac-frame");
+  if (phone()) expect(Math.abs(frame.width - 366), "the board's width on a 390 phone").toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });
