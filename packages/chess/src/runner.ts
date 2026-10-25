@@ -998,7 +998,8 @@ export class MatchRunner {
   }
 
   /**
-   * Crowd 50 v 50's scoring on a board's move (settings.crowdScoring): the stage (its cap), whether streaks count (from
+   * Crowd 50 v 50's and a raid's scoring on a board's move (settings.crowdScoring): the stage (its cap; a boss battle's
+   * crowd move too, by which a raid's cap widens), whether streaks count (from
    * the first picked move: the game's move number less the opening the board was dealt, so Random opening's move 5 is
    * the first) and each player's streak so far. Undefined in every other mode.
    */
@@ -1006,7 +1007,9 @@ export class MatchRunner {
     const cs = this.settings.crowdScoring;
     if (!cs) return undefined;
     const picked = moveNumber(board.fen) - Math.floor(board.openingPlies / 2);
-    return { stage: this.state.stage, streaks: streakCounts(cs, this.settings.crowdStart, picked, this.state.stage), streakOf: (id) => this.player(id).streak ?? 0 };
+    // (A raid's cap widens by the crowd's move, this one 1 up: RAID_SCORING's capFromMove.)
+    const move = this.state.boss ? this.state.boss.crowdMoves + 1 : undefined;
+    return { stage: this.state.stage, ...(move !== undefined ? { move } : {}), streaks: streakCounts(cs, this.settings.crowdStart, picked, this.state.stage), streakOf: (id) => this.player(id).streak ?? 0 };
   }
 
   /** Test switch (?shoutout=1 in solo): the next round's people who picked get a brilliant find's bonus and shoutout. */

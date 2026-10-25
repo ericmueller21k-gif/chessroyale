@@ -357,6 +357,11 @@ export interface CrowdScoring {
    */
   capCurve: "tanh" | "ratio";
   capFrom: readonly number[];
+  /**
+   * A raid (no cuts, so no stages): the cap widens by the crowd's move instead, `cap[i]` from crowd move `capFromMove[i]`
+   * (1 up: the raid's first crowd move is 1). Unset: by stage (`capFrom`).
+   */
+  capFromMove?: readonly number[];
   /** A pick that gives up this many pawns of material or more by the exchange check (a piece) isn't capped. */
   uncapPawns: number;
   sharedFrom: number;
@@ -367,6 +372,12 @@ export interface CrowdScoring {
   streakStrong: number;
   streakFrom: number;
   streakFromMove: number;
+  /**
+   * A move counts for streaks only when the group gave away this many points or more on average (raw loss); below it
+   * the move plays itself (a decided game, every move scoring about the same) and a streak neither grows nor ends.
+   * Unset: every move counts.
+   */
+  streakMinAverage?: number;
   /** Testing in the sim only: streaks count from the first cut. */
   streakFromCut?: boolean;
   streakBonus: readonly number[];
@@ -399,6 +410,22 @@ export const CROWD_SCORING: CrowdScoring = {
   brilliantFewLeft: 10,
   missCaps: 2,
   cutGrace: 0.1,
+};
+
+/**
+ * A raid's scoring (Eric, Oct 25: "Raids should use the 50 v 50 math: the dampers and the early forgiveness";
+ * docs/decisions/2026-10-25-raid-scoring.md, measured in reports/raid-scoring.md): 50 v 50's, but a raid has no cuts, so
+ * the cap widens by the crowd's move (`capFromMove`): +-2 for the first 10 crowd moves, as 50 v 50's first 10 picks,
+ * then +-3.5, +-5 and +-8 on the same picks as 50 v 50's cuts 1, 5 and 9. A raid often plays on in a decided game, where
+ * every move is "strong", so a move counts for streaks only when the crowd gave away `streakMinAverage` points or more on
+ * average. No bubble: nothing is cut. The boss's strike still goes by the points given away (strikeVictim), never by
+ * these. Boss alone keeps the old scoring (BOSS_ALONE_SCORING).
+ */
+export const RAID_SCORING: CrowdScoring = {
+  ...CROWD_SCORING,
+  capFromMove: [1, 11, 15, 19],
+  streakMinAverage: 1,
+  cutGrace: 0,
 };
 
 /**
@@ -637,8 +664,8 @@ export const RAID_SETTINGS: Partial<Settings> = {
   ...CROWD_SETTINGS,
   raid: true,
   crowdTeams: false,
-  // (A raid scores as before: the crowd's scoring is 50 v 50's.)
-  crowdScoring: undefined,
+  // (50 v 50's scoring, its cap widening by the crowd's move: RAID_SCORING. Boss alone: BOSS_ALONE_SCORING.)
+  crowdScoring: RAID_SCORING,
   augments: false,
   lobbySize: 50,
   groupSize: 50,
@@ -647,6 +674,12 @@ export const RAID_SETTINGS: Partial<Settings> = {
   powerUpsAtStart: 0,
   bossAloneUntimed: true,
 };
+
+/**
+ * Boss alone (you alone against a boss: a raid of one, on this device) scores as before (no cap, streaks or 2
+ * decimals): with nobody to compare with, every round score is 0 but a miss, and its scoreboard is going away.
+ */
+export const BOSS_ALONE_SCORING: Partial<Settings> = { crowdScoring: undefined };
 
 /**
  * Boss powers (boss-powers.ts in the chess package). Turns are the crowd's moves. Every power is decided on the

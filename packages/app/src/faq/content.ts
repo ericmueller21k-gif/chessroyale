@@ -236,7 +236,8 @@ function modes(src: FaqSources): FaqSection {
 
 - **Boss raid:** up to ${R.lobbySize} players pick the crowd's moves together against a [boss](#boss-brain); the most popular pick is played. Every boss starts from the starting position.
 - **Where:** tap **Boss raid** on the home screen. The bosses are at the top: tap one to see it on the stage below (its name and strength), or **?** for a random one. Under them, every way to play: **Join a raid** (bots fill any empty seats after a short wait) and **People only** (no bots) always meet a random boss; **Raid with bots** (you and ${R.lobbySize - 1} bots, at once), **Boss alone** and **Play with friends** (make a raid and share its code) meet the one you picked.
-- **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} it knocks out the player who gave away the most points since its last strike (after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
+- **Scoring:** the [50 v 50 way](#raid-scoring), its limit widening with the crowd's moves (Boss alone scores as before).
+- **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} it knocks out the player who gave away the most points since its last strike (as the judge counts them, before the [scoring's limit](#raid-scoring), after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
 - **The God King** fights on your side, with ${n(S.kingChargesMax, "charge")} ([more on him](#god-king)).
 - The battle ends in checkmate or a draw, or after ${n(S.bossMaxMoves, "crowd move")}, when the engine judges the position.
 - **Boss alone** (on the Boss raid screen): just you against the boss you picked there, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move, and there's no clock: take as long as you like.
@@ -379,6 +380,21 @@ export function crowdScoringWords(cs: CrowdScoring): string {
 - **The bubble:** at a cut, anyone within ${n(cs.cutGrace, "point")} of the last player through goes through too, like a tie (except at the last cut before the ending).`;
 }
 
+/**
+ * A boss raid's scoring in a player's words (docs/decisions/2026-10-25-raid-scoring.md): 50 v 50's, its limit widening
+ * by crowd move (CrowdScoring.capFromMove), no bubble; the strike as before; Boss alone as before. Numbers from RAID_SCORING.
+ */
+export function raidScoringWords(cs: CrowdScoring | undefined, missed: number): string {
+  if (!cs) return `A boss raid scores like Classic: no limit and no streaks. A missed move scores ${num(missed)}.`;
+  const from = cs.capFromMove ?? [];
+  const caps = cs.cap.map((c, i) => `${c === null ? "no limit" : `about ±${num(c)}`} from the ${ordinal(from[i] ?? 1)} crowd move`);
+  const firstCap = cs.cap[0] ?? null;
+  return `A boss raid scores the [50 v 50 way](#crowd-scoring), the whole crowd counting as your team (the limit, a piece hung, everyone falling for it, streaks and the fire, rare brilliant finds), but a raid has no cuts, so the limit widens with the crowd's moves instead: ${caps.slice(0, -1).join(", ")} and ${caps.at(-1)}. A missed move scores ${cs.missCaps} times the limit below zero${firstCap === null ? "" : ` (${num(-cs.missCaps * firstCap)} at first)`}.${cs.streakMinAverage ? ` A move that plays itself (the crowd giving away less than ${n(cs.streakMinAverage, "point")} on average, as in a game already decided) neither adds to a streak nor ends it.` : ""} Nobody is cut, so there's no bubble.
+
+- **The boss's strike** still goes by the points you gave away since its last strike, before the limit and the streaks: the [player who played worst](#mode-boss) is struck, never a tie on a coin flip.
+- **Boss alone** scores as before (no limit, no streaks, 1 decimal): with nobody to compare with, a move scores 0 and a missed one ${num(missed)}.`;
+}
+
 export function openingAllowanceWords(A: FaqSources["allowance"]): string {
   return `Through move ${A.flatThrough}, the first ${n(A.points, "point")} a move gives away don't count (less each move after that, and none from move ${A.goneBy}), so a sound move off the engine's line costs nothing early on: the reveal shows it as "1.2 forgiven · opening". A move that gives up ${A.materialPawns === 1 ? "a pawn" : n(A.materialPawns, "pawn")} or more by a simple exchange check, by leaving something to be taken or by missing a capture, gets no allowance, so all of it counts ("no allowance · gave up material", "no allowance · missed a capture").`;
 }
@@ -426,7 +442,7 @@ A loss is never below zero: if picks score above the engine's own choice, the hi
 
 $ round score = the group's average loss − your loss
 
-Positive means you beat your group (early in a game, every loss here is after the [opening allowance](#opening-allowance)). A missed move scores ${num(S.missedMoveScore)} (in 50 v 50, [less](#crowd-scoring)) and is left out of the average. In Crowd your round scores add up all game, and every cut goes by the total.
+Positive means you beat your group (early in a game, every loss here is after the [opening allowance](#opening-allowance)). A missed move scores ${num(S.missedMoveScore)} (in 50 v 50 and a boss raid, [less](#crowd-scoring)) and is left out of the average. In Crowd your round scores add up all game, and every cut goes by the total.
 
 ### The opening allowance {#opening-allowance}
 
@@ -435,6 +451,10 @@ ${openingAllowanceWords(src.allowance)}
 ### Scoring in 50 v 50 {#crowd-scoring}
 
 ${crowdScoringWords(src.crowdScoring)}
+
+### Scoring in a boss raid {#raid-scoring}
+
+${raidScoringWords(src.raid.crowdScoring, S.missedMoveScore)}
 
 ### A worked example {#worked-example}
 

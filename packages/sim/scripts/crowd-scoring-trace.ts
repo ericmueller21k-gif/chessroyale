@@ -14,13 +14,13 @@
  * popular pick of all 50, so the games are the same under every scoring (common random numbers: the variants differ
  * only in how they score, which is what is being compared).
  */
-import { spawn } from "node:child_process";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_SETTINGS, bestOf, botChoose, botSkillSpread, modeSettings, mulberry32, shuffle, type Settings } from "@chessroyale/core";
-import { applyMove, gameEnd, HumanUciEngine, legalMoves, materialSlips, START_FEN, type UciTransport } from "@chessroyale/chess";
+import { applyMove, gameEnd, HumanUciEngine, legalMoves, materialSlips, START_FEN } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import type { MatchRow, Ply } from "./crowd-scoring-sim.ts";
+import { maiaProcess } from "../src/maia-process.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const OUT = root + "reports/crowd-scoring/";
@@ -36,24 +36,6 @@ const JUDGE_NODES = 150_000;
  */
 const DECIDED = 0.05;
 const base: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd") };
-
-
-/** The Maia box as a separate process: text in, text out. */
-function maiaProcess(): UciTransport {
-  const child = spawn(process.execPath, ["--import", "tsx", root + "packages/maia-worker/src/cli.ts"], { stdio: ["pipe", "pipe", "inherit"] });
-  let buffer = "";
-  const listeners: ((line: string) => void)[] = [];
-  child.stdout.on("data", (chunk: Buffer) => {
-    buffer += chunk.toString();
-    let i: number;
-    while ((i = buffer.indexOf("\n")) >= 0) {
-      const line = buffer.slice(0, i).trim();
-      buffer = buffer.slice(i + 1);
-      for (const l of listeners) l(line);
-    }
-  });
-  return { send: (c) => child.stdin.write(c + "\n"), onLine: (l) => listeners.push(l), close: () => child.kill() };
-}
 
 async function trace(kind: "maia" | "bots", matches: number, seed: number) {
   mkdirSync(OUT, { recursive: true });

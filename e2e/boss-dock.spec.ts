@@ -216,7 +216,8 @@ test("your pick the best move: the dock's line says so (\"Best move · You: …\
   }
   const seen = await lines();
   const san = (fen: string, m: string) => new Chess(fen).move({ from: m.slice(0, 2), to: m.slice(2, 4), promotion: m[4] }).san;
-  const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
+  // (A raid's points are 50 v 50's, to 2 decimals since Oct 25: docs/decisions/2026-10-25-raid-scoring.md.)
+  const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(2);
   const best = seen.filter((l) => l.move === l.best);
   expect(best.length, JSON.stringify(seen)).toBeGreaterThan(0);
   for (const l of seen) {
@@ -275,12 +276,14 @@ test("the dock's line under the reveal: the verdict first and whole at 320, 360 
   const real = await measure();
   expect(real.first, JSON.stringify(real)).toBe(true);
   expect(real.verdict, JSON.stringify(real)).toMatch(/^(Best move|Best was \S+)$/);
-  expect(real.text, JSON.stringify(real)).toMatch(/^Best (move|was \S+) · You: \S+( ⚡)? \([+-]\d+\.\d\)$/);
-  // Then the widest: the longest SAN either side (a capture with both disambiguation and check) and a big score.
+  // (A raid's points to 2 decimals since Oct 25: docs/decisions/2026-10-25-raid-scoring.md.)
+  expect(real.text, JSON.stringify(real)).toMatch(/^Best (move|was \S+) · You: \S+( ⚡)? \([+-]\d+\.\d\d\)$/);
+  // Then the widest: the longest SAN either side (a capture with both disambiguation and check) and a big score (a raid's
+  // widest is a piece hung, which the cap leaves whole, to 2 decimals).
   const widest = [
-    { verdict: "Best was Nbxd7+", rest: " · You: Qxe7+ ⚡ (+45.3)" },
-    { verdict: "Best was Qxe7+", rest: " · You: Nbxd7+ ⚡ (+45.3)" },
-    { verdict: "Best move", rest: " · You: Nbxd7+ ⚡ (+45.3)" },
+    { verdict: "Best was Nbxd7+", rest: " · You: Qxe7+ ⚡ (-45.30)" },
+    { verdict: "Best was Qxe7+", rest: " · You: Nbxd7+ ⚡ (-45.30)" },
+    { verdict: "Best move", rest: " · You: Nbxd7+ ⚡ (-45.30)" },
   ];
   for (const width of [390, 360, 320]) {
     await page.setViewportSize({ width, height: 664 });
