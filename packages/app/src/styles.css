@@ -18225,12 +18225,12 @@ button.sq-tiny {
   --lock-h: 0px;
   /* The column's width, and the shop's height from it (the cards' tiles are square: a card's tile is its width less 6 px). */
   --colw: min(calc(100vw - 24px), 560px);
-  --shop-h: max(94px, calc((var(--colw) - 102px) / 4 + 39px));
+  --shop-h: max(94px, calc((var(--colw) - 102px - var(--panel-x)) / 4 + 39px));
   /*
    * A pawn's column: the hop's room, the pawn, and its two thin bars. The top row is as tall as that or the title and bench (44 + 4 + 44). The pawn is 72 px, or up
    * to 82 (the approved mock's) when the board is as wide as the column anyway and the room is there for it (`--pawn-fit`: what the two rows can have and still leave the board the column's width).
    */
-  --k: calc(var(--pad-t) + var(--free) + env(safe-area-inset-top) + env(safe-area-inset-bottom) + 3 * var(--gap) + 2 * var(--fm) + var(--gold-h) + var(--dock-gap) + var(--shop-h) + var(--lock-h));
+  --k: calc(var(--pad-t) + var(--free) + env(safe-area-inset-top) + env(safe-area-inset-bottom) + 3 * var(--gap) + 2 * var(--fm) + var(--gold-h) + var(--dock-gap) + var(--shop-h) + var(--lock-h) + var(--panel-y));
   --pawn-fit: calc((var(--app-h) - var(--colw) - var(--k)) / 2 - var(--hop) - 28px);
   --pawn: clamp(72px, var(--pawn-fit), 82px);
   --rowh: calc(var(--hop) + var(--pawn) + 28px);
@@ -18239,6 +18239,10 @@ button.sq-tiny {
   --chrome: calc(var(--k) + var(--top-h) + var(--bot-h));
   --fw: min(var(--colw), calc(var(--app-h) - var(--chrome)));
   --gut: calc((var(--colw) - var(--fw)) / 2);
+  /* The shop area is one panel (v9): its padding, and the border's 1 px each side, the room it takes beside the cards and above and below the rows. */
+  --panel-p: 10px;
+  --panel-x: calc(2 * var(--panel-p) + 2px);
+  --panel-y: calc(2 * var(--panel-p) + 2px);
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -18681,6 +18685,8 @@ button.sq-tiny {
 .ac-board {
   width: 100%;
   aspect-ratio: 1;
+  /* The meeting's sizes are a share of this board's width (cqw). */
+  container-type: inline-size;
 }
 .ac-board .board-wrap {
   width: 100%;
@@ -18885,6 +18891,221 @@ button.sq-tiny {
   text-shadow: none;
 }
 
+/* ---- The meeting before round 1 (v9, Eric Oct 24): both custom pawns stand in the middle of the board, with a countdown and the quick chat. The corners
+   (pawns, names, bars) wait out of sight (`data-phase="meet"`) and come in as the middle pawns puff away: a fade, and a slight scale-up, over 400 ms. ---- */
+.ac-stage,
+.ac-who,
+.ac-bars {
+  transition: opacity 400ms ease, visibility 400ms ease, scale 400ms ease;
+}
+.ac-root[data-phase="meet"] .ac-stage,
+.ac-root[data-phase="meet"] .ac-who,
+.ac-root[data-phase="meet"] .ac-bars {
+  opacity: 0;
+  visibility: hidden;
+}
+.ac-root[data-phase="meet"] .ac-stage {
+  scale: 0.92;
+}
+/* The middle pawns' size: twice a corner pawn, or as wide as the board allows (two of them side by side, with room). */
+.ac-meet {
+  --mp: min(calc(var(--pawn) * 2), 36cqw);
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  /* Top-aligned: room above the pawns for the bubbles (two lines of one), the pawns near the board's middle (a fifth of the board down), and the chat above the back two ranks. */
+  padding: clamp(50px, 20cqw, 110px) 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(4px, 2cqw, 8px);
+  pointer-events: none;
+}
+.ac-meet-row {
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--mp) * 0.1);
+}
+.ac-meet-side {
+  position: relative;
+  width: calc(var(--mp) * 1.107);
+}
+.ac-meet-pawn {
+  width: calc(var(--mp) * 1.107);
+  height: var(--mp);
+  animation: ac-meet-drop 900ms cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+/* Yours faces theirs: the pawn on the left is drawn as the mirror image (its items and all). */
+.ac-meet-side.you .ac-hop {
+  transform: scaleX(-1);
+}
+@keyframes ac-meet-drop {
+  0% {
+    transform: translateY(-45%);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  68% {
+    transform: translateY(-9%);
+  }
+  84% {
+    transform: translateY(0);
+  }
+  92% {
+    transform: translateY(-3%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+/* The puff: the pawn shrinks and fades in about 220 ms, and a cloud rises and thins over its place for 400 ms. */
+.ac-meet-pawn::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 60%;
+  width: 150%;
+  height: 80%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(236, 233, 226, 0.95), rgba(236, 233, 226, 0));
+  opacity: 0;
+  pointer-events: none;
+}
+.ac-meet.out .ac-meet-pawn {
+  animation: ac-meet-vanish 220ms ease-in forwards;
+}
+.ac-meet.out .ac-meet-pawn::after {
+  animation: ac-meet-puff 400ms ease-out forwards;
+}
+@keyframes ac-meet-vanish {
+  to {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+@keyframes ac-meet-puff {
+  0% {
+    opacity: 0.9;
+    scale: 0.3;
+  }
+  100% {
+    opacity: 0;
+    scale: 1.25;
+  }
+}
+/* A speech bubble over a pawn: at most one a side; a new line pops in (its id is its key). */
+.ac-say {
+  position: absolute;
+  bottom: 100%;
+  margin-bottom: 8px;
+  width: max-content;
+  min-width: calc(var(--mp) * 0.9);
+  max-width: 47cqw;
+  padding: 5px 9px;
+  border-radius: 12px;
+  background: var(--ac-card);
+  color: var(--fd-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  box-shadow: var(--ac-shadow);
+  animation: ac-say-pop 220ms ease-out both;
+  pointer-events: none;
+}
+.ac-say::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  background: inherit;
+  transform: rotate(45deg);
+  box-shadow: 2px 2px 2px rgba(0, 0, 0, 0.08);
+}
+.ac-meet-side.you .ac-say {
+  right: 0;
+}
+.ac-meet-side.you .ac-say::after {
+  right: calc(var(--mp) * 0.553 - 5px);
+}
+.ac-meet-side.them .ac-say {
+  left: 0;
+}
+.ac-meet-side.them .ac-say::after {
+  left: calc(var(--mp) * 0.553 - 5px);
+}
+@keyframes ac-say-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.92);
+  }
+}
+/* The countdown: small, under the pawns. */
+.ac-meet-count {
+  margin: 0;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--ac-card);
+  color: var(--fd-sub);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.ac-meet-count b {
+  font: 400 15px/1 "Archivo Black", Archivo, sans-serif;
+  color: var(--fd-text);
+  font-variant-numeric: tabular-nums;
+}
+/* The quick chat: a row of four, each as wide as it can be (the words wrap). */
+.ac-meet-chat {
+  width: 100%;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  pointer-events: auto;
+}
+.ac-chat {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 96px;
+  min-height: 38px;
+  padding: 3px 2px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--ac-card);
+  color: var(--fd-text);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.15;
+  box-shadow: 0 3px 0 var(--ac-lip);
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-meet-pawn,
+  .ac-say {
+    animation: none;
+  }
+  .ac-meet.out .ac-meet-pawn {
+    animation: ac-meet-gone 400ms linear forwards;
+  }
+  .ac-meet-pawn::after {
+    display: none;
+  }
+}
+@keyframes ac-meet-gone {
+  to {
+    opacity: 0;
+  }
+}
+
 /* ---- Under the board: your pawn (left), the clock's numbers (the gap), your bench (right, up against the board like theirs) ---- */
 .ac-bottom {
   position: relative;
@@ -18978,6 +19199,11 @@ button.sq-tiny {
   display: flex;
   flex-direction: column;
   gap: var(--dock-gap);
+  /* The shop area in one panel (v9, Eric Oct 24): the home panels' surface, edge and corners, light or dark. */
+  padding: var(--panel-p);
+  border: 1px solid var(--fd-line);
+  border-radius: 14px;
+  background: var(--fd-panel);
 }
 /* The gold row: gold, income, then (at the right) the odds pill and the win streak, all on one text baseline: the % under each icon and the gold number sit on the same line. */
 .ac-goldrow {
@@ -19215,7 +19441,7 @@ button.sq-tiny {
   min-height: var(--shop-h);
   padding: 8px 10px;
   border-radius: 14px;
-  background: var(--fd-panel);
+  background: var(--ac-card);
   display: grid;
   grid-template-columns: 78px minmax(0, 1fr);
   column-gap: 10px;
@@ -19528,16 +19754,19 @@ button.sq-tiny {
 @media (max-height: 760px) {
   .ac-root {
     --pawn: 46px;
-    --hop: 8px;
     --sidew: 80px;
-    --pad-t: 4px;
-    --gold-h: 36px;
-    --dock-gap: 4px;
-    --shop-h: max(92px, calc((var(--colw) - 94px) / 4 + 39px));
+    --hop: 7px;
+    --pad-t: 2px;
+    --gap: 4px;
+    --gold-h: 31px;
+    --dock-gap: 1px;
+    /* (The shop panel's padding is 6 px on a short phone: the room the board keeps, v7.1's size.) */
+    --panel-p: 6px;
+    --shop-h: max(92px, calc((var(--colw) - 94px - var(--panel-x)) / 4 + 39px));
     --top-h: 90px;
   }
   .ac-col {
-    gap: 5px;
+    gap: 4px;
   }
   .ac-top {
     row-gap: 2px;
@@ -19592,21 +19821,39 @@ button.sq-tiny {
   .ac-income {
     margin-left: 8px;
   }
+  .ac-odds {
+    padding: 3px 5px 2px;
+  }
   .ac-od {
-    min-width: 22px;
+    min-width: 20px;
+    margin: 0;
   }
   .ac-od .ac-pc {
     width: 19px;
   }
   .ac-streak {
-    padding: 3px 7px;
+    padding: 3px 5px;
   }
 }
 
 /* A phone 381 to 414 wide has room to spare in the gold row once "Income" is gone: the pill's numbers get a little air. */
 @media (min-width: 381px) and (max-width: 414px) {
   .ac-od {
-    min-width: 26px;
+    min-width: 24px;
+  }
+}
+
+/* A phone 415 to 899 wide: the panel takes 22 px of the gold row, so the row's gaps and the pill's icons take a little less (the word "Income" stays). */
+@media (min-width: 415px) and (max-width: 899px) {
+  .ac-goldrow {
+    gap: 8px;
+  }
+  .ac-odds {
+    padding: 3px 5px 2px;
+  }
+  .ac-od {
+    min-width: 22px;
+    margin: 0;
   }
 }
 
@@ -19619,6 +19866,7 @@ button.sq-tiny {
     --tw: 34px;
     --colw: calc(100vw - 16px);
     --shop-h: 92px;
+    --panel-p: 6px;
   }
   .ac-titlebar {
     gap: 6px;
@@ -19662,7 +19910,7 @@ button.sq-tiny {
   }
   /* The gold row at 320: gold, income, the clock, the odds pill and the streak in 304 px: a smaller coin and numbers, smaller icons in a tighter pill. */
   .ac-goldrow {
-    gap: 4px;
+    gap: 3px;
   }
   .ac-gold-you .ac-coin {
     width: 13px;
@@ -19680,7 +19928,7 @@ button.sq-tiny {
   }
   .ac-od {
     min-width: 21px;
-    margin: 0 1px;
+    margin: 0;
   }
   .ac-od .ac-pc {
     width: 17px;
@@ -19689,7 +19937,7 @@ button.sq-tiny {
     font-size: 10px;
   }
   .ac-streak {
-    padding: 3px 6px;
+    padding: 3px 5px;
     font-size: 11.5px;
   }
   .ac-shop {
@@ -19739,6 +19987,14 @@ button.sq-tiny {
   }
   .ac-card-fight .ac-card-text {
     font-size: 11px;
+    line-height: 1.25;
+  }
+  /* The result's words: a stall's reason is the longest text the card holds (3 lines of 12 px made the box 13 px taller than the shop's height, so the page scrolled 1 px at 320 x 568). A little smaller and tighter keeps the box at the shop's height. */
+  .ac-card-result .ac-card-text,
+  .ac-card-over .ac-card-text,
+  .ac-card-result .ac-card-gold,
+  .ac-card-over .ac-card-gold {
+    font-size: 11.5px;
     line-height: 1.25;
   }
 }
@@ -19843,11 +20099,12 @@ button.sq-tiny {
     padding: 4px 11px;
   }
   .ac-odds {
-    padding: 3px 9px 2px;
+    padding: 3px 7px 2px;
   }
+  /* (The shop panel takes 22 px of the row: the pill's five icons take 3 px less each, so a streak still fits.) */
   .ac-od {
-    min-width: 28px;
-    margin: 0 2px;
+    min-width: 25px;
+    margin: 0 1px;
   }
   .ac-od .ac-pc {
     width: 20px;

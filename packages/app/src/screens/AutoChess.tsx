@@ -76,6 +76,7 @@ import { botEvaluator, enginePick, newFight, stallEngine, warmEngine } from "../
 import { addXp, buyXp, xpBlock, xpToNext, xpWords } from "../autochess/level.ts";
 import { bonusFor, botLocked, bothLocked, buyFreeze, freezeWords, noLocks, tickLocks, youLock, type Locks } from "../autochess/lockin.ts";
 import { firstHopMs, hopWaitMs } from "../autochess/hop.ts";
+import { BOT_OPENER, QUICK_CHAT, chatLine, replyMs } from "../autochess/chat.ts";
 import { botSeen } from "../autochess/reveal.ts";
 import { buyFromSlot, holdFromSlot, newShop, oddsFor, replaceTaken, rerollFor, rerollPrice, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
 import { moveStars, playFight, thinFight, withPiece } from "../autochess/fight.ts";
@@ -100,6 +101,10 @@ import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline
  * pawn under it at the left and your bench at the right (each bench's outer edge on the board's), then a dock of gold, income, the clock (small, with the
  * step's name under it), the shop's odds in a pill, Buy XP, Reroll and the four cards. The Sell button sits in the gap beside your bench and a short
  * message under the bench's row. Both pawns hop now and then (hop.ts). The step's name comes as a banner on the board ("ACTION PHASE", the 3-2-1, "MOVE PHASE", "BATTLE PHASE").
+ *
+ * The meeting (v9, Eric Oct 24) comes first: before round 1 both custom pawns stand in the middle of the board, you and the bot trade a few quick lines
+ * (chat.ts) over a countdown (`introSeconds`), then they puff away to their corners and the buying begins. Phase "meet": nothing of the game runs; the corner
+ * pawns, names and bars wait out of sight and fade in as the middle pawns go.
  */
 
 /** How often the clock is read: the countdown, the circles 2 s behind and the end of each step. Nothing is drawn per frame but the move clock's bars (their own small component). */
@@ -119,8 +124,10 @@ const TAP_SLOP_PX = 10;
 const bannerMs = () => 1600 + bannerPlusMs();
 /** A merge (a star-up) pops and flashes its piece this long, and its new star pops in (styles.css, `.ac-merge`). */
 const MERGE_MS = 700;
+/** The meeting's pawns puff away, and the corner ones fade in, over this long (styles.css, `.ac-meet.out`, and the corners' transitions). */
+const MEET_OUT_MS = 400;
 
-type Phase = "buy" | "adjust" | "fight" | "result" | "over";
+type Phase = "meet" | "buy" | "adjust" | "fight" | "result" | "over";
 
 type BotPlan = ReturnType<typeof botPlan>;
 
@@ -164,6 +171,12 @@ interface Game {
   /** The fight: the position, the last move, the plies so far and the stars on the board by square (they move with their pieces; a star changes nothing in the fight). */
   fight: { fen: string; last: string | null; plies: number; stars: Record<string, StarCount> } | null;
   outcome: Outcome | null;
+}
+
+/** A speech bubble in the meeting: a new line gets a new id (it pops), and a bubble's timer clears only its own. */
+interface Say {
+  id: number;
+  text: string;
 }
 
 /** The bot's adjust step in progress: told to stop at the fight, and the army it has so far. */
@@ -223,6 +236,8 @@ function parsePresets(text: string | null): Preset[] {
 }
 
 function newGame(seed: number, cfg: AutoChessSettings, presets?: Presets): Game {
+  // (A game opens with the meeting, unless its introSeconds is 0.)
+  const first: Phase = cfg.introSeconds > 0 ? "meet" : "buy";
   let start = newMatch(seed, cfg);
   // (The bot's presets are held pieces it places for nothing as the round begins: stored turned, so they come in on the squares given.)
   if (presets?.bot.length) start = { ...start, bot: { ...start.bot, bench: presets.bot.slice(0, cfg.benchSlots).map((p) => ({ kind: p.kind, square: `${p.square[0]}${9 - Number(p.square[1])}`, ...(p.stars > 1 ? { stars: p.stars as StarCount } : {}) })) } };
@@ -237,9 +252,9 @@ function newGame(seed: number, cfg: AutoChessSettings, presets?: Presets): Game 
     const bench: Held[] = presets.bench.filter((p) => inHalf(p.square, you.color)).slice(0, cfg.benchSlots).map((p) => ({ kind: p.kind, square: p.square, ...(p.stars > 1 ? { stars: p.stars as StarCount } : {}) }));
     you = { ...you, bench };
     // (The shop rolls again for the army it has now, so a test can find the seed that shows a star-up.)
-    return { match, phase: "buy", ...stamp(), round: { ...round, you, shop: newShop(shopSeed(roundSeed(match)), you, cfg, match.you.level) }, fight: null, outcome: null };
+    return { match, phase: first, ...stamp(), round: { ...round, you, shop: newShop(shopSeed(roundSeed(match)), you, cfg, match.you.level) }, fight: null, outcome: null };
   }
-  return { match, phase: "buy", ...stamp(), round, fight: null, outcome: null };
+  return { match, phase: first, ...stamp(), round, fight: null, outcome: null };
 }
 
 /**
@@ -249,16 +264,18 @@ function newGame(seed: number, cfg: AutoChessSettings, presets?: Presets): Game 
  * start at level N (to see rooks and queens in the shop at once: the XP to each next level shifts with it). `?stars=n@c2:2,r@e3:3` puts those pieces on your
  * board at the start of round 1 (kind, square, stars 1 to 3; 1 is a plain piece), `?benchstars=b@f2:2` holds them for you on your bench, `?botbench=n@c7:2` holds
  * them for the bot (it places them for nothing as the round begins): the shop then rolls for that army, so a seed can be found that shows a star-up. `?fightglow=1`: the stars'
- * outlines stay on through the fight and the result (`fightGlow`; off by default: only the tiny stars stay).
+ * outlines stay on through the fight and the result (`fightGlow`; off by default: only the tiny stars stay). `?intro=0`: no meeting before round 1 (`introSeconds` 0);
+ * `?quick=1` makes the meeting 2 s, and the bot answers in 0.3 to 0.6 s so it still answers within it.
  */
-function settingsFor(quick: boolean, gold: number, adjust: boolean, lockIn: boolean, mode: AutoChessSettings["adjustMode"] | null, level: number, fightGlow: boolean): AutoChessSettings {
+function settingsFor(quick: boolean, gold: number, adjust: boolean, lockIn: boolean, mode: AutoChessSettings["adjustMode"] | null, level: number, fightGlow: boolean, introOff: boolean): AutoChessSettings {
   // (Two seconds locked, so a test has time to try buying in the lock before the reveal.)
-  const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, revealSeconds: 1.5, fightMoveMs: 60, fightFastMoveMs: 30 } : AUTOCHESS;
+  const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, revealSeconds: 1.5, fightMoveMs: 60, fightFastMoveMs: 30, introSeconds: 2, introReplyMs: [300, 600] as const } : AUTOCHESS;
   let out = gold > 0 ? { ...base, startGold: base.startGold + gold } : base;
   if (!adjust) out = { ...out, adjustStep: false };
   if (lockIn) out = { ...out, lockIn: true };
   if (mode) out = { ...out, adjustMode: mode };
   if (fightGlow) out = { ...out, fightGlow: true };
+  if (introOff) out = { ...out, introSeconds: 0 };
   if (level > out.levels.start && level <= out.levels.max) out = { ...out, levels: { ...out.levels, start: level, xpToNext: out.levels.xpToNext.slice(level - out.levels.start) } };
   return out;
 }
@@ -372,7 +389,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const extraGold = Math.max(0, Math.floor(Number(params.get("gold")) || 0));
   const modeParam = params.get("adjustmode");
   const cfg = useMemo(
-    () => settingsFor(quick, extraGold, params.get("adjust") !== "0", params.get("lockin") === "1", modeParam === "legal" || modeParam === "teleport" || modeParam === "stars" ? modeParam : null, Math.floor(Number(params.get("level")) || 0), params.get("fightglow") === "1"),
+    () => settingsFor(quick, extraGold, params.get("adjust") !== "0", params.get("lockin") === "1", modeParam === "legal" || modeParam === "teleport" || modeParam === "stars" ? modeParam : null, Math.floor(Number(params.get("level")) || 0), params.get("fightglow") === "1", params.get("intro") === "0"),
     [],
   );
   const legal = cfg.adjustMode === "legal";
@@ -412,6 +429,22 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     setMsg(text);
     if (msgTimer.current) clearTimeout(msgTimer.current);
     msgTimer.current = setTimeout(() => setMsg(""), SAY_MS);
+  };
+  // The meeting's speech bubbles (at most one a side) and the bot's one line in it: its answer to your first line, else its opening line when that is due.
+  const [says, setSays] = useState<{ you: Say | null; them: Say | null }>({ you: null, them: null });
+  const sayTimers = useRef<{ you: ReturnType<typeof setTimeout> | null; them: ReturnType<typeof setTimeout> | null }>({ you: null, them: null });
+  const sayId = useRef(0);
+  const meetBot = useRef<{ said: boolean; replyAt: number | null }>({ said: false, replyAt: null });
+  /** A bubble over a pawn: a new line replaces the one up, and it goes after `introBubbleMs`. */
+  const sayOver = (side: "you" | "them", text: string) => {
+    const id = ++sayId.current;
+    const old = sayTimers.current[side];
+    if (old) clearTimeout(old);
+    setSays((s) => ({ ...s, [side]: { id, text } }));
+    sayTimers.current[side] = setTimeout(() => {
+      sayTimers.current[side] = null;
+      setSays((s) => (s[side]?.id === id ? { ...s, [side]: null } : s));
+    }, cfg.introBubbleMs);
   };
   const cancelled = useRef(false);
   /** The first tap wakes the audio (browsers need a tap), and the sounds are made ahead. */
@@ -453,7 +486,16 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       const cur = gref.current;
       const t = performance.now();
       setNow(t);
-      if (cur.phase === "buy") {
+      if (cur.phase === "meet") {
+        // The meeting: the bot's one line (its answer to your first, else its opening line once it is due), then the buying begins with the countdown's end.
+        const at = t - cur.phaseStart;
+        const bot = meetBot.current;
+        if (!bot.said && (bot.replyAt !== null ? t >= bot.replyAt : at >= cfg.introOpenMs)) {
+          bot.said = true;
+          sayOver("them", bot.replyAt !== null ? chatLine(Math.random) : BOT_OPENER);
+        }
+        if (at >= cfg.introSeconds * 1000) commit({ ...cur, phase: "buy", ...stamp() });
+      } else if (cur.phase === "buy") {
         // With lock-in on, the bot locks in when its time comes (the first to lock gets the bonus), and both locked ends the step; the time up always does.
         const at = t - cur.phaseStart;
         const locks = tickLocks(cur.round.locks, at, cur.round.plan.lockAt, cfg);
@@ -483,6 +525,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       if (msgTimer.current) clearTimeout(msgTimer.current);
       if (mergeTimer.current) clearTimeout(mergeTimer.current);
       floatTimers.current.forEach(clearTimeout);
+      for (const t of Object.values(sayTimers.current)) if (t) clearTimeout(t);
     };
   }, []);
 
@@ -609,7 +652,26 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     cancelGesture();
     setMsg("");
     setTheirTap(null);
+    resetMeet();
     commit(newGame((Math.random() * 2 ** 31) | 0, cfg));
+  }
+
+  /** A new game's meeting starts clean: no bubbles, the bot not yet spoken. */
+  function resetMeet() {
+    for (const side of ["you", "them"] as const) {
+      const t = sayTimers.current[side];
+      if (t) clearTimeout(t);
+      sayTimers.current[side] = null;
+    }
+    meetBot.current = { said: false, replyAt: null };
+    setSays({ you: null, them: null });
+  }
+
+  /** A quick-chat line of yours in the meeting: its bubble over your pawn, and (your first line) the bot's answer on its way. */
+  function quickChat(line: string) {
+    if (gref.current.phase !== "meet") return;
+    sayOver("you", line);
+    if (meetBot.current.replyAt === null) meetBot.current.replyAt = performance.now() + replyMs(Math.random, cfg.introReplyMs);
   }
 
   // ---------------- Buying, selling ----------------
@@ -983,7 +1045,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   // While buying you see every piece of theirs (pawns too) as a plain circle, 2 s behind, and every few seconds one of them is revealed at random and stays shown.
   const seen = g.phase === "buy" ? botSeen(g.round.plan.events, revealSeed(g.match), elapsed / 1000, cfg) : null;
   // Their bench shows real pieces, each with the square it keeps (Eric, Oct 21: intentional): what it came in with and what it has held since, 2 s behind as the circles are.
-  const theirBench: Held[] = g.phase === "buy" ? botBenchAt(g.round.plan.events, g.round.botBench, Math.max(0, elapsed / 1000 - cfg.circlesDelaySeconds)) : (g.round.botStart ?? g.round.plan.army).bench;
+  const theirBench: Held[] = g.phase === "buy" ? botBenchAt(g.round.plan.events, g.round.botBench, Math.max(0, elapsed / 1000 - cfg.circlesDelaySeconds)) : g.phase === "meet" ? botBenchAt(g.round.plan.events, g.round.botBench, 0) : (g.round.botStart ?? g.round.plan.army).bench;
   // (A tap on one of their bench pieces holds only while that piece is still there, in that slot.)
   const theirTapped = theirTap && theirBench[theirTap.index]?.kind === theirTap.kind && theirBench[theirTap.index]?.square === theirTap.square && (g.phase === "buy" || g.phase === "adjust") ? theirTap : null;
 
@@ -1000,7 +1062,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   if ((g.phase === "fight" || g.phase === "result" || g.phase === "over") && g.fight) {
     fen = g.fight.fen;
     lastMove = g.fight.last;
-  } else if (g.phase === "buy") fen = fenFrom([...armyPieces(you), { square: botKing, color: theirs, kind: "k" }, ...(seen?.revealed ?? []).map((r) => ({ square: r.square, color: theirs, kind: r.kind }))]);
+  } else if (g.phase === "buy" || g.phase === "meet") fen = fenFrom([...armyPieces(you), { square: botKing, color: theirs, kind: "k" }, ...(seen?.revealed ?? []).map((r) => ({ square: r.square, color: theirs, kind: r.kind }))]);
   else fen = mine === "w" ? armiesFen(you, botArmy) : armiesFen(botArmy, you);
 
   const sq = (square: string) => {
@@ -1090,7 +1152,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   // The stars on the board (v8), drawn in their pieces' own elements (so they slide with them): yours, and theirs once shown (the pieces revealed while you buy, all of them in the move
   // step, and through the fight).
   const starMap: Record<string, number> = {};
-  if (g.phase === "buy" || g.phase === "adjust") {
+  if (g.phase === "buy" || g.phase === "meet" || g.phase === "adjust") {
     for (const [square, n] of Object.entries(you.stars ?? {})) starMap[square] = n;
     if (g.phase === "buy") for (const r of seen?.revealed ?? []) if (r.stars) starMap[r.square] = r.stars;
     if (g.phase === "adjust") for (const [square, n] of Object.entries(botArmy.stars ?? {})) starMap[square] = n;
@@ -1100,7 +1162,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   // The star-ups on offer (their cards say what they merge into: nothing is drawn on the board for one).
   const upTargets = offers.map((o) => starUpTarget(g.round.you, o, cfg));
   // The outlines of the starred pieces show while you buy, place and move; through the fight and the result only the tiny stars stay (`fightGlow`, `?fightglow=1`, keeps the outlines).
-  const ringOn = g.phase === "buy" || g.phase === "adjust" || cfg.fightGlow;
+  const ringOn = g.phase === "buy" || g.phase === "meet" || g.phase === "adjust" || cfg.fightGlow;
   const starDecor: PieceDecor = {
     key: `${ringOn ? "o" : "s"}${Object.entries(starMap).map(([sq, n]) => `${sq}${n}`).join(",")}`,
     of: (square, code) => {
@@ -1112,6 +1174,10 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const odds = oddsFor(g.match.you.level, cfg);
   const oddsWordsLine = KINDS.map((k) => `${KIND_NAME[k]} ${odds[k]}%`).join(", ");
   const shopShut = g.phase !== "buy" || locked;
+  // The meeting (v9): before round 1 both pawns stand in the middle of the board; they puff away at the start of the buying (`meetOut`, the first MEET_OUT_MS).
+  const meetOut = g.phase === "buy" && cfg.introSeconds > 0 && g.match.round === 1 && elapsed < MEET_OUT_MS;
+  const meeting = g.phase === "meet" || meetOut;
+  const introLeft = Math.max(1, Math.ceil((cfg.introSeconds * 1000 - elapsed) / 1000));
   const wins = g.match.you.wins;
   // The next reroll's price (v7.1: 5, then 1 more each time, up to 10; back to 5 each round).
   const rerollNow = rerollPrice(g.round.shop.rerolls, cfg);
@@ -1240,6 +1306,56 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                     </span>
                   ))}
               </div>
+              {meeting && (
+                <div class={`ac-meet${meetOut ? " out" : ""}`}>
+                  <div class="ac-meet-row">
+                    <div class="ac-meet-side you">
+                      <span class="fd-pawn ac-pawn ac-meet-pawn">
+                        <span class="ac-shadow" aria-hidden="true" />
+                        <span class="ac-hop">
+                          <span class="fd-pawn-box">
+                            <Avatar look={myLook} side={mine} />
+                          </span>
+                        </span>
+                      </span>
+                      {says.you && (
+                        <span key={says.you.id} class="ac-say">
+                          {says.you.text}
+                        </span>
+                      )}
+                    </div>
+                    <div class="ac-meet-side them">
+                      <span class="fd-pawn ac-pawn ac-meet-pawn">
+                        <span class="ac-shadow" aria-hidden="true" />
+                        <span class="ac-hop">
+                          <span class="fd-pawn-box">
+                            <Avatar look={theirLook} side={theirs} />
+                          </span>
+                        </span>
+                      </span>
+                      {says.them && (
+                        <span key={says.them.id} class="ac-say">
+                          {says.them.text}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {g.phase === "meet" && (
+                    <>
+                      <p class="ac-meet-count">
+                        Starting in <b>{introLeft}</b>
+                      </p>
+                      <div class="ac-meet-chat" role="group" aria-label="Quick chat">
+                        {QUICK_CHAT.map((line) => (
+                          <button key={line} type="button" class="ac-chat" onClick={() => quickChat(line)}>
+                            {line}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               {banner && (
                 <div class="center-count ac-banner" role="status" aria-live="polite" data-banner={"words" in banner ? "words" : "count"}>
                   {"words" in banner ? (
@@ -1369,7 +1485,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
           </div>
           )}
 
-          {g.phase === "buy" || g.phase === "adjust" ? (
+          {g.phase === "buy" || g.phase === "adjust" || g.phase === "meet" ? (
             <div class={`ac-shop${shopShut ? " shut" : ""}${dragPiece ? " selling" : ""}`} data-ac-drop="shop">
               <div class="ac-btns">
                 <button type="button" class={`ac-btn ac-xp${xpOff || shopShut ? " off" : ""}`} aria-disabled={xpOff || shopShut} aria-label={`Buy ${cfg.levels.buyXp} XP, ${cfg.levels.buyXpCost} gold`} onClick={buyXpNow}>

@@ -3072,6 +3072,16 @@ export interface AutoChessSettings {
   readonly hopEvery: readonly [number, number];
   readonly hopSeconds: number;
   /**
+   * The meeting before round 1 (Eric, Oct 24: "both pawns, you and your opponent's custom pawn, kind of meet... a 10-second countdown"): both custom
+   * pawns stand in the middle of the board with the quick chat, the countdown is `introSeconds` (0: no meeting), then they puff away to their
+   * corners and the game starts. `introReplyMs`: the bot answers your first line this many ms after it (a random time between the two), once;
+   * `introOpenMs`: with no line from you by then, the bot says its opening line (chat.ts). `introBubbleMs`: how long a speech bubble stays.
+   */
+  readonly introSeconds: number;
+  readonly introReplyMs: readonly [number, number];
+  readonly introOpenMs: number;
+  readonly introBubbleMs: number;
+  /**
    * The fight: one move about this often, each searched by the HunChess engine to this many nodes (the same for both sides,
    * deterministic; docs/decisions/2026-10-21-hunchess-engine.md). 600 ms since Oct 21 (was 350; Eric: "for fights, they should
    * take a little bit longer"; the fast pace 175 to 300 ms with it): the node budget was sized for 350 ms on a 4x-slowed phone, so
@@ -3219,6 +3229,10 @@ export const AUTOCHESS: AutoChessSettings = {
   kingRanks: 2,
   hopEvery: [7, 10],
   hopSeconds: 1.8,
+  introSeconds: 10,
+  introReplyMs: [1000, 2000],
+  introOpenMs: 3000,
+  introBubbleMs: 2500,
   fightMoveMs: 600,
   fightNodes: 30000,
   cashInGold: 5,
