@@ -21,6 +21,7 @@ import { Board } from "../components/Board.tsx";
 import { useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { UnderBoard } from "../components/QuickChat.tsx";
+import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import type { BossView, GameView, LightsView } from "../game.ts";
 import { LightsDock, LightsOutLayer, lightsStatus } from "../components/LightsOut.tsx";
@@ -208,6 +209,7 @@ function ClaimDark({ boss, since, now }: { boss: BossView; since: number; now: n
  */
 export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, loading, afterLoading, lights, fall }: { match: GameView; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; fall?: boolean }) {
   const now = useFrameNow();
+  const layout = useBossLayout();
   // (Hollow's Lights out comes before his move: as far as the rest of the screen goes, he hasn't moved yet.)
   const thinking = thinkingNow || !!lights;
   const [mountedAt] = useState(Date.now());
@@ -389,7 +391,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const still = useStillKey(match, now);
   const hud = useMemo(() => <Hud match={match} />, [match, still]);
   const bossSide = useMemo(() => <BossSide match={match} />, [match, still]);
-  const under = useMemo(() => <UnderBoard match={match} />, [match, still]);
+  // (Smudgy's reveal under the paint: the newest move isn't named yet, in the dock or the move list.)
+  const hush = !!smudgy?.hush;
+  const under = useMemo(() => besideBoard(match, layout, <UnderBoard match={match} />, hush), [match, still, layout.strip, layout.computer, hush]);
   // The dock's words change with the match and with these, read from the clock (a new word read from the clock goes in
   // this list): it's drawn again when one of them changes, not every frame (Lights out's prompt, every frame).
   const snacking = !!snack && t >= tl.claimAt + SNACK.grabAt && t < tl.bannerAt;
@@ -406,6 +410,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         side={boss.crowdSide}
         cues={kingCues}
         wide={!!lights && !lightsStart}
+        panel={layout.strip ? <BossPanel match={match} hushLast={hush} /> : undefined}
         status={
           lights && !lightsStart ? (
             // (Lights out: the round's prompt, whole, for the whole round, and the crowd's meter.)
@@ -488,7 +493,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         }
       />
     ),
-    [match, still, kingCues, lights, lights ? now : 0, snacking, funPlayed, momentLine, burnLine, left, noMove, !!smudgy?.hush],
+    [match, still, kingCues, lights, lights ? now : 0, snacking, funPlayed, momentLine, burnLine, left, noMove, hush, layout.strip],
   );
   return (
     <div class={`screen game boss-screen${victim ? " striking" : ""}`}>

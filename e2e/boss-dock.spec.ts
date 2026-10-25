@@ -75,10 +75,10 @@ test("the row is exactly the board's width under its edges at every width; the G
     expect(b.clock!.r, `${s.name}: clock inside the box`).toBeLessThanOrEqual(b.status!.r);
     expect(b.status!.r - b.clock!.r, `${s.name}: clock at the box's right`).toBeLessThan(16);
     await expect(page.locator(".dk-clock.running .dk-time")).toHaveText(/^\d:\d\d$/);
-    const kingMid = (b.king!.x + b.king!.r) / 2;
     if (s.king === "under") {
+      // (Under the row at the strip's far right, the panel to his left, since Oct 25: docs/decisions/2026-10-25-board-layout.md.)
       expect(b.king!.y, `${s.name}: the God King under the row`).toBeGreaterThanOrEqual(b.row!.b);
-      expect(Math.abs(kingMid - (b.row!.x + b.row!.r) / 2), `${s.name}: in the row's middle`).toBeLessThanOrEqual(1);
+      expect(Math.abs(b.king!.r - b.row!.r), `${s.name}: at the row's right edge`).toBeLessThanOrEqual(1);
     } else if (s.king === "beside") {
       expect(b.king!.x, `${s.name}: beside the row`).toBeGreaterThanOrEqual(b.row!.r);
       expect(b.king!.y, `${s.name}: on the row's line`).toBeLessThan(b.row!.b);
@@ -90,17 +90,9 @@ test("the row is exactly the board's width under its edges at every width; the G
     expect(b.king!.r, `${s.name}: the God King in view`).toBeLessThanOrEqual(s.viewport.width);
     await ctx.close();
   }
-  // A phone whose board is held back by its height: the board grows as the scoreboard is minimized, and the row with it.
-  const ctx = await browser.newContext({ ...devices["iPhone 13"], viewport: { width: 390, height: 600 } });
-  const page = await ctx.newPage();
-  await intoBattle(page);
-  const before = await boxes(page);
-  await page.getByRole("button", { name: "Minimize the leaderboard" }).click();
-  await expect.poll(async () => (await boxes(page)).board!.r - (await boxes(page)).board!.x).toBeGreaterThan(before.board!.r - before.board!.x + 10);
-  const after = await boxes(page);
-  expect(Math.abs(after.row!.x - after.board!.x)).toBeLessThanOrEqual(1);
-  expect(Math.abs(after.row!.r - after.board!.r)).toBeLessThanOrEqual(1);
-  await ctx.close();
+  // (A phone whose board grew as the scoreboard was minimized was checked here: since Oct 25 a boss screen on a phone has no
+  // scoreboard to minimize (the panel beside the God King keeps one size; Boss alone has none at all), so nothing changes
+  // the board's size there. The row's edges at each size are checked above. docs/decisions/2026-10-25-board-layout.md.)
 });
 
 test("your clock: bold at the box's right on every boss's screens, counting down on your move, holding what was left once it's in, never gone and never moving", async ({ page }) => {

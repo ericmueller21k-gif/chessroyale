@@ -1590,10 +1590,16 @@ p {
   justify-content: center;
   width: 100%;
 }
-.tower-side {
+.tower-side,
+.tower-space {
   display: none;
 }
 @media (min-width: 1100px) and (min-height: 600px) {
+  /* (Boss alone: the column, empty.) */
+  .tower-space {
+    display: block;
+    flex: 0 0 360px;
+  }
   .tower-side {
     display: block;
     flex: 0 0 360px;
@@ -5109,11 +5115,13 @@ button.history-label {
   width: var(--dk-w, 100%);
   margin-left: var(--dk-left, 0px);
 }
+/* (One line tall, Eric, Oct 25: "about half as tall… one line of text, never more", the clock on the same line; it was
+   62 px with two lines.) */
 .boss-dock-main {
   grid-template-columns: 40px minmax(0, 1fr) 40px;
   gap: 6px;
   min-width: 0;
-  height: 62px;
+  height: 34px;
 }
 .boss-dock-main > .nav-btn {
   height: 100%;
@@ -5139,12 +5147,30 @@ button.history-label {
   grid-template-columns: minmax(0, 1fr) auto;
   padding-right: 12px;
 }
+/* One line: the screen's lines side by side, " · " between them; the first keeps its room, what follows is cut ("…")
+   first. */
 .dk-text {
   min-width: 0;
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
   justify-content: center;
-  gap: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.dk-text > * {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dk-text > :first-child {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+.dk-text > .dock-line + .dock-line::before {
+  content: " · ";
+  white-space: pre;
 }
 .boss-dock-main:not(.wide) .dk-text {
   text-align: center;
@@ -5153,10 +5179,7 @@ button.history-label {
   align-self: center;
 }
 .dk-text > span:only-child:not(.dock-line) {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  display: block;
 }
 /* Your clock: bold, m:ss (whole seconds rounded up, as the big 3-2-1). Running on your move (red in its last
    TICK_FROM_SECONDS), dimmed while it holds between your moves. */
@@ -5251,7 +5274,7 @@ button.history-label {
   .boss-dock > .gk-unit {
     width: 58px;
     margin-left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) / 2 - 29px);
-    --gk-lift: 68px;
+    --gk-lift: 40px;
   }
   .boss-dock > .gk-unit > .gk-bubble,
   .boss-dock > .gk-unit > .gk-command {
@@ -5285,7 +5308,7 @@ button.history-label {
   .boss-dock > .gk-unit.gone {
     height: 0;
     margin-top: -6px;
-    --gk-lift: 62px;
+    --gk-lift: 34px;
   }
   .boss-dock.dk-beside > .gk-unit {
     position: absolute;
@@ -5318,7 +5341,7 @@ button.history-label {
 @media (max-width: 899px), (max-height: 599px) {
   .boss-dock > .gk-tool {
     position: absolute;
-    top: 72px;
+    top: 44px;
     display: block;
     width: 28px;
     height: 28px;
@@ -5369,14 +5392,6 @@ button.history-label {
 }
 .dock-line:empty {
   display: none;
-}
-/* The first line wraps to two rather than being cut ("The boss is think…" at 360 px): the box holds two of its lines and
-   the muted one under them. */
-.dk-text > .dock-line:first-child {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  white-space: normal;
 }
 .boss-dock-status .gold {
   color: #d4a531;
@@ -13540,6 +13555,15 @@ img.qicon {
    hold. The dock keeps its height (the board never moves); the « » give their room to it meanwhile. */
 .boss-dock-main.wide {
   grid-template-columns: minmax(0, 1fr);
+  /* (Lights out's rounds keep the room their prompt and meter need: the board above never moves.) */
+  height: 62px;
+}
+.boss-dock-main.wide .dk-text,
+.boss-dock-main.wide .dk-text > * {
+  white-space: normal;
+}
+.boss-dock-main.wide .dk-text > .lo-dock {
+  flex: 1 1 auto;
 }
 /* (Two lines for the prompt and one for the meter, always: nothing in the dock moves as the rounds change.) */
 .lo-dock {
@@ -14286,7 +14310,7 @@ img.qicon {
 /* The dock's race count (RaceBadge): the pixel carrot, his count and yours, each on a disc of its side's color (as the
    tokens on the board), your moves left under them. In the status box at its left where the box has the room (a
    computer, or the God King beside the row); else (`dk-race-below`) at the left of the God King's line under the row,
-   a box of its own, placed over that line so nothing moves (the row is 62 px, the gap 6). */
+   a box of its own, placed over that line so nothing moves (the row is 34 px, the gap 6). */
 .boss-dock-status:has(> .dk-race) {
   grid-template-columns: auto minmax(0, 1fr);
   padding-left: 8px;
@@ -14334,7 +14358,7 @@ img.qicon {
 }
 .boss-dock > .dk-race-below {
   position: absolute;
-  top: 82px;
+  top: 54px;
   left: var(--dk-left, 0px);
   padding: 5px 8px;
   border: 1px solid var(--line);
@@ -20607,4 +20631,399 @@ button.sq-tiny {
 .boss-bar .boss-next {
   position: relative;
   z-index: 4;
+}
+
+/* ---- The boss screens: the move list, and the panel it shares with the scoreboard (Eric, Oct 25;
+   docs/decisions/2026-10-25-board-layout.md; components/MovePanel.tsx) ---- */
+
+/* The list: one row per move, newest at the bottom, dark like the scoreboard in both themes. */
+.mv-box {
+  min-height: 0;
+  overflow: hidden;
+  background: #101216;
+  color: #eef0f4;
+}
+.mv-box.mv-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.mv-list {
+  margin: 0;
+  padding: 2px 0;
+  list-style: none;
+}
+.mv-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  animation: mv-in 220ms ease-out;
+}
+.mv-row:nth-child(even) {
+  background: #15181e;
+}
+@keyframes mv-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mv-row {
+    animation: none;
+  }
+}
+.mv-who {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  overflow: hidden;
+  font-size: 14px;
+}
+.mv-who img {
+  width: 20px;
+  height: 20px;
+  object-fit: cover;
+  object-position: top;
+  image-rendering: pixelated;
+}
+.mv-who .avatar {
+  width: 20px;
+  height: 20px;
+}
+.mv-no {
+  flex: none;
+  min-width: 26px;
+  color: #8a93a3;
+  font-weight: 700;
+}
+/* (The board's own pieces, one each.) */
+.mv-pc {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.mv-pc piece,
+.mv-who .mv-pc piece {
+  position: static;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mv-who .mv-pc {
+  width: 18px;
+  height: 18px;
+}
+.mv-sq {
+  font-weight: 800;
+}
+.mv-x {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  color: #f87171;
+  font-weight: 800;
+}
+.mv-gap {
+  flex: 1;
+}
+.mv-picks,
+.mv-time {
+  color: #8a93a3;
+  font-size: 11px;
+}
+.mv-time {
+  min-width: 26px;
+  text-align: right;
+}
+.mv-boss .mv-sq {
+  color: #fca5a5;
+}
+.mv-king .mv-sq {
+  color: #fcd34d;
+}
+.mv-opening {
+  height: 22px;
+  color: #8a93a3;
+  font-size: 11px;
+}
+.mv-open-words {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mv-empty {
+  margin: 0;
+  padding: 8px;
+  color: #8a93a3;
+  font-size: 12px;
+}
+
+/* The panel (a phone, left of the God King): a small switch on top when there are players to show, then the scoreboard or
+   the moves in the same box. */
+.bp {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #101216;
+}
+.bp-tabs {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  height: 28px;
+  padding: 3px;
+  background: #181b21;
+}
+.bp-tab {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: #9aa2b1;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.bp-tab.on {
+  background: #2b303a;
+  color: #eef0f4;
+}
+.bp-unread {
+  color: #fbbf24;
+}
+.bp-body {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.bp-body > * {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.bp-tower {
+  overflow: hidden;
+  cursor: pointer;
+}
+.bp-tower .tower,
+.bp-sheet-body .tower {
+  border-radius: 0;
+  box-shadow: none;
+}
+.bp-body .mv-box {
+  cursor: pointer;
+}
+.bp-body > .qchat {
+  border-radius: 0;
+}
+
+/* Full size, over the board (a tap on the panel): from the board's top (MovePanel.tsx sets it) to the screen's foot. */
+.bp-sheet-back {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.35);
+}
+.bp-sheet {
+  position: fixed;
+  top: 60px;
+  left: 8px;
+  right: 8px;
+  bottom: calc(env(safe-area-inset-bottom) + 8px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #101216;
+  color: #eef0f4;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.bp-sheet-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #181b21;
+}
+.bp-sheet-head .bp-tabs {
+  height: 40px;
+  padding: 6px;
+}
+.bp-sheet-title {
+  padding: 0 12px;
+  font-size: 14px;
+}
+.bp-x {
+  flex: none;
+  width: 44px;
+  height: 40px;
+  border: 0;
+  background: none;
+  color: #eef0f4;
+  font: inherit;
+  font-size: 18px;
+  cursor: pointer;
+}
+.bp-sheet-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.bp-sheet-body > .mv-box {
+  overflow: visible;
+}
+.bp-sheet .mv-row {
+  height: 30px;
+  font-size: 14px;
+}
+.bp-sheet .mv-pc {
+  width: 20px;
+  height: 20px;
+}
+
+/* A phone upright: under the row, one strip, the board's width: the panel, then the God King at its far right (his ⚡ and 🐟
+   under him, admins only). His menu opens above the row; his words to his left, over the panel, never over the board or
+   the box. The strip takes what the screen has left: the page never scrolls. */
+@media (max-width: 899px) and (min-height: 520px) {
+  .screen.game > .boss-dock.dk-strip {
+    flex: 1 1 0;
+    min-height: 0;
+    grid-template-columns: var(--dk-left, 0px) minmax(0, 1fr) 58px minmax(0, calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%)));
+    grid-template-rows: auto minmax(0, 1fr);
+    justify-items: stretch;
+  }
+  .boss-dock.dk-strip > .boss-dock-main {
+    grid-column: 2 / 4;
+    grid-row: 1;
+    width: auto;
+    margin-left: 0;
+  }
+  .boss-dock.dk-strip > .dk-panel {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    margin-right: 8px;
+  }
+  .boss-dock.dk-strip > .gk-unit {
+    grid-column: 3;
+    grid-row: 2;
+    align-self: start;
+    width: 58px;
+    margin-left: 0;
+    --gk-lift: 40px;
+  }
+  .boss-dock.dk-strip > .gk-unit > .gk-command {
+    right: 0;
+    left: auto;
+    translate: none;
+  }
+  .boss-dock.dk-strip > .gk-unit > .gk-command::after {
+    right: 20px;
+  }
+  .boss-dock.dk-strip > .gk-unit > .gk-bubble {
+    top: 0;
+    right: calc(100% + 18px);
+    bottom: auto;
+    left: auto;
+    translate: none;
+    max-width: calc(var(--dk-w, 100vw) - 58px - 30px);
+    padding: 8px 9px 7px;
+    font-size: 8px;
+  }
+  .boss-dock.dk-strip > .gk-unit > .gk-bubble::after {
+    top: 13px;
+    right: -11px;
+    bottom: auto;
+    left: auto;
+    border: 0;
+    border-top: 3px solid #1a1406;
+    border-right: 3px solid #1a1406;
+  }
+  /* (His ⚡ and 🐟 beside his head on his left, as before, over the panel's top right: its switch is at its left.) */
+  .boss-dock.dk-strip > .gk-tool {
+    top: 42px;
+    z-index: 2;
+  }
+  .boss-dock.dk-strip > .ult-test.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 58px - 34px);
+  }
+  .boss-dock.dk-strip > .engine-move.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 58px - 64px);
+  }
+  /* (Chub & Chirp's carrot count: at the strip's top, just left of him, or of an admin's icons.) */
+  .boss-dock.dk-strip > .dk-race-below {
+    top: 40px;
+    right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 66px);
+    left: auto;
+    z-index: 2;
+  }
+  .boss-dock.dk-strip:has(> .gk-tool) > .dk-race-below {
+    right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 128px);
+  }
+}
+
+/* A computer: the moves in the column right of the board, from the board's top to above the God King's head (his 134 px
+   and a gap; BossDock writes the board's size as --board-px on the screen). What the column had before (chat, or from 900
+   to 1099 px the scoreboard) starts under it. */
+.mv-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 220px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #101216;
+}
+.mv-side-head {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  background: #181b21;
+  color: #eef0f4;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 28px;
+  letter-spacing: 0.04em;
+}
+.mv-side > .mv-box {
+  flex: 1 1 0;
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game > .mv-side {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: start;
+    height: max(160px, calc(var(--board-px, 456px) - 146px));
+    max-height: none;
+  }
+  .screen.game:has(> .mv-side) > .under-board,
+  .screen.game:has(> .mv-side) > .mini-tower {
+    margin-top: calc(max(160px, var(--board-px, 456px) - 146px) + 12px);
+  }
+}
+/* (The panel beside the God King is narrower than the old table: the average goes, so the names keep their room; the
+   sheet has every column.) */
+.bp-tower .tower-mini .tower-head,
+.bp-tower .tower-mini .tower-row {
+  grid-template-columns: 26px minmax(0, 1fr) 50px 42px 18px;
+}
+.bp-tower .tower-mini .tower-head span:nth-child(4),
+.bp-tower .tower-mini .t-avg {
+  display: none;
 }

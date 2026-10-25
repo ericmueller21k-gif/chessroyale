@@ -9,6 +9,7 @@ import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { BoardClock } from "../components/BoardClock.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { ChatSection, UnderBoard } from "../components/QuickChat.tsx";
+import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
@@ -140,6 +141,7 @@ export function WatchScreen({
 export function CrowdReveal({ match, mine, board, until }: { match: GameView; mine: GroupReveal; board: BoardView; until: number }) {
   const [start] = useState(Date.now());
   const now = useFrameNow();
+  const layout = useBossLayout();
   const animate = useBoardAnimations();
   const trail = useMotionTrail();
   // Boss battle: the God King's Last Stand on this move (it plays out after the move lands, in its own extra time).
@@ -299,7 +301,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const still = useStillKey(match, now);
   const hud = useMemo(() => <Hud match={match} />, [match, still]);
   const bossSide = useMemo(() => (match.boss ? <BossSide match={match} /> : null), [match, still]);
-  const under = useMemo(() => <UnderBoard match={match} />, [match, still]);
+  const under = useMemo(() => (match.boss ? besideBoard(match, layout, <UnderBoard match={match} />) : <UnderBoard match={match} />), [match, still, layout.strip, layout.computer]);
   const boardClock = useMemo(() => (match.boss ? null : <BoardClock match={match} you={you} turn={null} />), [match, still, you]);
   // (The position after the move, worked out once it's played, not every frame.)
   const fenAfter = useMemo(() => (played ? applyMove(fen, mine.result.playedMove) : fen), [mine, played]);
@@ -322,6 +324,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           leaping={leaping}
           charges={charges}
           fallen={fallen}
+          panel={layout.strip ? <BossPanel match={match} /> : undefined}
           status={
             stand && played ? (
               warning ? (
@@ -352,63 +355,81 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                 </>
               )
             ) : (
-            <>
-              <span class="dock-line">
-                {!landed ? (
-                  mine.king ? (
-                    <strong>👑 The God King answers the call…</strong>
+            // One line (Eric, Oct 25: "one line of text, never more"): what leads has its room, what follows is cut first. Until
+            // the move lands, the count; then, when you picked, what your pick was worth leads (your move is on the board and
+            // in the move list, with how many picked it), the crowd's move after it.
+            (() => {
+              const crowdLine = (
+                <span class="dock-line">
+                  {!landed ? (
+                    mine.king ? (
+                      <strong>👑 The God King answers the call…</strong>
+                    ) : (
+                      <>
+                        <Dots /> <strong>Counting the votes…</strong>
+                        {!bossAlone(match) && <span class="muted"> · {voters} {voters === 1 ? "vote" : "votes"}</span>}
+                      </>
+                    )
+                  ) : mine.king ? (
+                    <>
+                      <strong class="gold">👑 God King plays {seenSan(fen, mine.result.playedMove)}</strong>
+                    </>
                   ) : (
                     <>
-                      <Dots /> <strong>Counting the votes…</strong>
-                      {!bossAlone(match) && <span class="muted"> · {voters} {voters === 1 ? "vote" : "votes"}</span>}
+                      <strong>Crowd plays {seenSan(fen, mine.result.playedMove)}</strong>{" "}
+                      <span class="muted">
+                        · {picks.filter((p) => p.move === mine.result.playedMove).length}/{voters}
+                      </span>
                     </>
-                  )
-                ) : mine.king ? (
-                  <>
-                    <strong class="gold">👑 God King plays {seenSan(fen, mine.result.playedMove)}</strong>
-                  </>
-                ) : (
-                  <>
-                    <strong>Crowd plays {seenSan(fen, mine.result.playedMove)}</strong>{" "}
-                    <span class="muted">
-                      · {picks.filter((p) => p.move === mine.result.playedMove).length}/{voters}
-                    </span>
-                  </>
-                )}
-              </span>
-              <span class={`dock-line muted${me && allowanceNote(me) ? " allowance-words" : ""}`}>
-                {!me
-                  ? `You watched · best ${seenSan(fen, mine.bestMove)}`
-                  : !me.move
-                    ? mine.king !== undefined && match.kingCalled
-                      ? picks.length > 1
-                        ? `${mine.kingCalls} of ${picks.length} called him · no score`
-                        : "You called him · no score"
-                      : "No move from you."
-                    : allowanceNote(me) ? (
-                      // The opening allowance on your pick, when it made a difference: the note alone (the line is short;
-                      // shorter still on the narrowest phones).
-                      <>
-                        <span class="wide-only">{allowanceNote(me)}</span>
-                        <span class="narrow-only">{allowanceNote(me, true)}</span>
-                      </>
-                    ) : (
-                      // The verdict first, in the reveal's words ("you found the best move", "best was X"), so the cut on
-                      // a narrow phone falls on your move and score, never on it: the line has 112 px at 320 wide, and
-                      // "You: Nbxd7+ ⚡ (+45.3) · the best" needed 182. (The reveal's own words don't fit at all:
-                      // docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md.)
-                      <>
-                        <span class="dk-verdict">{me.move === mine.bestMove ? "Best move" : `Best was ${seenSan(fen, mine.bestMove)}`}</span>
-                        {` · You: ${seenSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore, dp)})`}
-                      </>
-                    )}
-              </span>
-            </>
+                  )}
+                </span>
+              );
+              const youLine = (
+                <span class={`dock-line muted${me && allowanceNote(me) ? " allowance-words" : ""}`}>
+                  {!me
+                    ? `You watched · best ${seenSan(fen, mine.bestMove)}`
+                    : !me.move
+                      ? mine.king !== undefined && match.kingCalled
+                        ? picks.length > 1
+                          ? `${mine.kingCalls} of ${picks.length} called him · no score`
+                          : "You called him · no score"
+                        : "No move from you."
+                      : allowanceNote(me) ? (
+                        // The opening allowance on your pick, when it made a difference: the note alone (the line is short;
+                        // shorter still on the narrowest phones).
+                        <>
+                          <span class="wide-only">{allowanceNote(me)}</span>
+                          <span class="narrow-only">{allowanceNote(me, true)}</span>
+                        </>
+                      ) : (
+                        // The verdict first, in the reveal's words ("you found the best move", "best was X"), so the cut on
+                        // a narrow phone falls on your move and score, never on it: the line has 112 px at 320 wide, and
+                        // "You: Nbxd7+ ⚡ (+45.3) · the best" needed 182. (The reveal's own words don't fit at all:
+                        // docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md.)
+                        <>
+                          <span class="dk-verdict">{me.move === mine.bestMove ? "Best move" : `Best was ${seenSan(fen, mine.bestMove)}`}</span>
+                          {` · You: ${seenSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore, dp)})`}
+                        </>
+                      )}
+                </span>
+              );
+              return !landed ? crowdLine : me?.move ? (
+                <>
+                  {youLine}
+                  {crowdLine}
+                </>
+              ) : (
+                <>
+                  {crowdLine}
+                  {youLine}
+                </>
+              );
+            })()
             )
           }
         />
       ) : null,
-    [match, mine, still, landed, played, away, leaping, charges, fallen, warning, blow, dockCommand],
+    [match, mine, still, landed, played, away, leaping, charges, fallen, warning, blow, dockCommand, layout.strip],
   );
   // (Crowd: the vote bars count up as the ghosts come in, then hold.)
   const poll = useMemo(

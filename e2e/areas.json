@@ -186,10 +186,13 @@
         "packages/app/src/screens/Boss.tsx",
         "packages/app/src/components/BossDock.tsx",
         "packages/app/src/components/BossPowers.tsx",
-        "packages/app/src/boss-history.ts"
+        "packages/app/src/boss-history.ts",
+        "packages/app/src/components/MovePanel.tsx",
+        "packages/app/src/move-list.ts"
       ],
       "specs": [
         "e2e/banner-time.spec.ts",
+        "e2e/board-layout.spec.ts",
         "e2e/boss-bar.spec.ts",
         "e2e/boss-bar-same.spec.ts",
         "e2e/boss-character.spec.ts",
@@ -442,6 +445,7 @@
     "the stylesheet (one file for every screen: the specs that measure layouts)": {
       "paths": ["packages/app/src/styles.css"],
       "specs": [
+        "e2e/board-layout.spec.ts",
         "e2e/boss-bar.spec.ts",
         "e2e/boss-bar-same.spec.ts",
         "e2e/boss-dock.spec.ts",

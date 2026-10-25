@@ -476,17 +476,25 @@ build): online, phase 1 won is the crowd's victory):
   counts; running on your move, red in its last 10 s; once your move is in, it holds where it stopped, dimmed, through
   the boss's turn, the reveal and the moments, whichever screen shows it; under the bullet clock's increment a "+2"
   rises over it as each move begins. None during Lights out's rounds (their prompt and meter take the box: before the
-  first round, as the night falls, the dock keeps its layout and your held clock, "Remember where his pieces are." over
-  "Clocks stopped."), the phase change, or before your first move. Its first line wraps to two rather than being cut
-  (the box holds two and the muted line under them). The muted line under a reveal leads with the verdict, in the
-  reveal's words ("Best move · You: e4 (+2.1)", "Best was Qxe7+ · You: e4 (+0.0)"), so a cut on a narrow phone falls
+  first round, as the night falls, the dock keeps its layout and your held clock, "Remember where his pieces are." and
+  "Clocks stopped."), the phase change, or before your first move. Once the crowd's move lands, a reveal's line leads with
+  your verdict, in the reveal's words ("Best move · You: e4 (+2.1)", "Best was Qxe7+ · You: e4 (+0.0)"), so a cut on a narrow phone falls
   on your move and score, never on it. The words never carry the time, nor how many have
   picked (on your move, the dock's line says "Your move. 16/50 picked"; Eric, Oct 24: the boss screens have no line
-  above the board). On a phone the God King stands on a line of his own under the row, in its
-  middle, his menu opening above the row and his words beside him to his right, on his line (a long line runs down past
-  it), never over the board or the box; beside the row only where the screen's column has 66 px right of the board
-  (`KING_BESIDE_PX`: a phone on its side, his words above him as before). Tests: `e2e/boss-dock.spec.ts` (the edges
+  above the board). **One line** (Eric, Oct 25: the row 34 px, was 62; a screen's two lines side by side, " · " between,
+  the first keeping its room). On a phone upright the God King stands at the far right of a strip under the row, the
+  panel (the scoreboard and the move list) to his left; his menu opens above the row and his words to his left, over the
+  panel, never over the board or the box (docs/decisions/2026-10-25-board-layout.md). Beside the row only where there's no
+  locked phone layout and the screen's column has 66 px right of the board (`KING_BESIDE_PX`: a phone on its side, his
+  words above him as before; the Hidden Boss's phase change and phase 2 keep him under the row in its middle). Tests: `e2e/boss-dock.spec.ts` (the edges
   within 1 px at six sizes, the clock in every frame of three moves), `packages/app/test/boss-clock.test.ts`.
+- **The move list and the panel** (Eric, Oct 25; docs/decisions/2026-10-25-board-layout.md; `components/MovePanel.tsx`,
+  `move-list.ts`): one row per move of the battle (who moved, the move number, the piece and its square, a capture, a
+  raid's picks, the time it took as this device saw it), from the match's own history. A phone upright: the panel left of
+  the God King, "Players" / "Moves" (and "Chat" with chat on) with other players, the moves alone in Boss alone; a tap
+  opens it full size over the board (✕, Escape, a tap outside close it). A computer: right of the board, above the God
+  King; a raid's scoreboard stays on the left. Boss alone has no scoreboard anywhere. Tests: `e2e/board-layout.spec.ts`,
+  `packages/app/test/move-list.test.ts`.
 - **The boss screen on a computer** (Eric, Oct 11): the boss by the board's bottom-left corner, the God King by its
   bottom-right, mirroring him (feet level, as far from the board); the status box under the board at its width; the
   column beside the board starts after the God King. The eval bar draws behind them both. A phone is unchanged.

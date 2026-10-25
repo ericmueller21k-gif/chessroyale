@@ -34,7 +34,8 @@ test("Boingo the Clown: a raid boss as a character, across the board from the Go
     expect(box.x + box.width / 2).toBeLessThan(board.x + board.width / 2);
     const row = (await page.locator(".boss-dock-main").boundingBox())!;
     expect(king.y).toBeGreaterThanOrEqual(row.y + row.height);
-    expect(Math.abs(king.x + king.width / 2 - (board.x + board.width / 2))).toBeLessThanOrEqual(1);
+    // (At the far right of the strip under the row since Oct 25, the panel to his left: docs/decisions/2026-10-25-board-layout.md.)
+    expect(Math.abs(king.x + king.width - (board.x + board.width))).toBeLessThanOrEqual(1);
   } else {
     expect(box.x + box.width).toBeLessThanOrEqual(board.x);
     expect(box.y + box.height).toBeGreaterThan(board.y + board.height / 2);

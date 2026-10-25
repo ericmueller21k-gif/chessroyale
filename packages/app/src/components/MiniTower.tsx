@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { cutLabel, roundLive, scoreDp, towerView, type GameView } from "../game.ts";
 import { LeaderboardSheet } from "./LeaderboardSheet.tsx";
 import { RaceTower } from "./RaceTower.tsx";
@@ -99,3 +99,31 @@ export function MiniTower({
     </section>
   );
 }
+
+/**
+ * The scoreboard's rows that fit their box, as the phone's scoreboard shows them (you, the leaders, your neighbors and the
+ * cut line first), never scrolling: the boss battle's panel under the board (MovePanel.tsx, "Players"). A tap calls `onOpen`.
+ */
+export function TowerFit({ match, floats, onOpen }: { match: GameView; floats?: ReadonlyMap<string, ChatFloat>; onOpen?: () => void }) {
+  const [space, setSpace] = useState(0);
+  const body = useRef<HTMLDivElement>(null);
+  // (Measured before the first paint: a switch back to "Players" shows the rows that fit at once.)
+  useLayoutEffect(() => {
+    const el = body.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setSpace(el.clientHeight));
+    ro.observe(el);
+    setSpace(el.clientHeight);
+    return () => ro.disconnect();
+  }, []);
+  const view = towerView(match);
+  const alive = view.standings.filter((s) => !s.out);
+  const rank = alive.findIndex((s) => s.isYou);
+  const keep = pickRows(alive.length, rank, view.cutoff, (k) => towerHeight(k, view.cutoff, alive.length) <= Math.max(space, HEAD + ROW));
+  return (
+    <div class="bp-tower" ref={body} onClick={onOpen}>
+      <RaceTower standings={view.standings} cutoff={view.cutoff} mini keep={keep} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={floats} dp={scoreDp(match.settings)} />
+    </div>
+  );
+}
+

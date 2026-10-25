@@ -18,6 +18,7 @@ import { CenterCount, useFrameNow, useTicks } from "../components/Countdown.tsx"
 import { FightBanner } from "../components/FightBanner.tsx";
 import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
+import { STRIP_LAYOUT } from "../components/MovePanel.tsx";
 import type { GameView, SimulBoardView, SimulView } from "../game.ts";
 import type { ComponentChildren } from "preact";
 import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, phase2UltBannerMs, absorbKing, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
@@ -296,6 +297,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   const still = useStillKey(match, now);
   const hud = useMemo(() => <Hud match={match} />, [match, still]);
   const bossSide = useMemo(() => <BossSide match={match} />, [match, still]);
+  const strip = useMedia(STRIP_LAYOUT);
   if (!v) return null;
   const split = t >= C.partAt;
   const shuffled = t >= C.shuffleAt;
@@ -321,8 +323,9 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   const light = lightAt(t);
   const cracking = t >= C.crackAt && t < C.growAt;
   // (No scoreboard here: phase 1's, minimized, gave the board more of a phone's height, so its size is kept until the
-  // split by the same rule: styles.css, rc-folded.)
-  const folded = !underBoardView().open;
+  // split by the same rule: styles.css, rc-folded. A phone upright has no scoreboard to minimize in phase 1 since Oct 25,
+  // its panel beside the God King keeping one size: there a fold remembered from another match changes nothing.)
+  const folded = !strip && !underBoardView().open;
   return (
     <div class={`screen game boss-screen rc-change${away ? " rc-away" : ""}${folded ? " rc-folded" : ""}`}>
       {hud}
