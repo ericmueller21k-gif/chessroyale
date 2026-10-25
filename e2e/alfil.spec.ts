@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { fusionOptions } from "@chessroyale/chess";
-import { BOARD_SEL, engineTop, test, bossAloneFromHome, watchFor } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, engineTop, test, bossAloneFromHome, watchFor } from "./helpers.ts";
 
 /**
  * Alfil, the woolly mammoth (live since Oct 17), played alone with real taps on a phone and a computer: his tile and
@@ -241,6 +241,85 @@ test("Alfil's Mammoth Slam (the test switch): your pieces up for three turns, th
   }
   expect(total(fen)).toBeGreaterThan(0);
   for (const k of ["pawn", "knight", "bishop"] as const) await expect.poll(() => drawn(page, you, k)).toBe(counted(fen, crowd, k[0] === "k" ? "n" : k[0]!));
+  expect(errors).toEqual([]);
+});
+
+test("Alfil's Mammoth Slam right after a queen is taken: QUEEN DOWN! and QUEEN SLAIN! once each, the slam's own banner in its place", async ({ page }) => {
+  test.setTimeout(10 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  // (The admin's test trigger, not the power switch: it brings the Slam at the start of his turn after the next move of
+  // yours, so it can come right after his capture or yours.)
+  await asAdmin(page);
+  await page.goto("/?debug&clock=60&boss=alfil&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  // Every banner that comes on the page, each appearance once (a banner put on again is another one).
+  await page.evaluate(() => {
+    const w = window as any;
+    const shown: string[] = (w.__banners = []);
+    const seen = new WeakSet<Element>();
+    const look = () => {
+      for (const el of document.querySelectorAll(".fight-banner")) {
+        if (seen.has(el)) continue;
+        seen.add(el);
+        shown.push(el.querySelector(".fb-text")?.textContent ?? "");
+      }
+    };
+    new MutationObserver(look).observe(document.body, { subtree: true, childList: true });
+    look();
+  });
+  const count = (text: string) => page.evaluate((t) => ((window as any).__banners as string[]).filter((x) => x === t).length, text);
+  const state = () =>
+    page.evaluate(() => {
+      const m = (window as any).match;
+      return {
+        fen: m.phase.board.fen as string,
+        ply: m.boss.board.history.length as number,
+        captured: (m.boss.lastMove?.captured ?? null) as string | null,
+        allowed: (m.boss.powers?.allowed ?? null) as string[] | null,
+      };
+    });
+  // Your queen onto a square one of his lesser pieces attacks: he takes it (the Big Boy test's way).
+  const hangs = (fen: string, m: { from: string; to: string; color: string }) => {
+    const c = new Chess(fen);
+    c.move({ from: m.from, to: m.to });
+    return c.attackers(m.to as never, m.color === "w" ? "b" : "w").some((sq) => {
+      const t = c.get(sq)?.type;
+      return !!t && t !== "q" && t !== "k";
+    });
+  };
+  let tookAt = -1;
+  let took = 0;
+  let slew = 0;
+  for (let turn = 0; turn < 14; turn++) {
+    await yourMove(page);
+    // (His turn is over: the Slam came and his move after it.)
+    if ((await count("MAMMOTH SLAM!")) > 0) break;
+    const s = await state();
+    // His last move took your queen (counted once for that move): the Slam comes at the start of his next turn.
+    if (s.captured === "q" && s.ply !== tookAt) {
+      tookAt = s.ply;
+      took++;
+      await page.evaluate(() => (window as any).match.triggerUltimate());
+    }
+    const legal = new Chess(s.fen).moves({ verbose: true }).filter((m) => !m.promotion && (!s.allowed || s.allowed.includes(m.from + m.to)));
+    const takeQueen = legal.find((m) => m.captured === "q");
+    if (takeQueen) {
+      // Your queen takes his: the trade.
+      slew++;
+      await play(page, takeQueen.from + takeQueen.to);
+      continue;
+    }
+    const hang = legal.find((m) => m.piece === "q" && !m.captured && hangs(s.fen, m));
+    await play(page, hang ? hang.from + hang.to : await goodMove(page));
+  }
+  const order = await page.evaluate(() => (window as any).__banners as string[]);
+  console.log(`alfil slam after queens: his takes of yours ${took}, yours of his ${slew}; banners in order: ${order.join(" | ")}`);
+  expect(took, "he took your queen (the test's setup)").toBeGreaterThan(0);
+  expect(await count("MAMMOTH SLAM!"), "the Slam's own banner, once").toBe(1);
+  expect(await count("QUEEN DOWN!"), "his take of your queen: its banner, once").toBe(took);
+  expect(await count("QUEEN SLAIN!"), "your take of his queen: its banner, once").toBe(slew);
   expect(errors).toEqual([]);
 });
 
