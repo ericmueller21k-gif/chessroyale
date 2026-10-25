@@ -231,7 +231,8 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 
 - **An options panel that disappeared** (Oct 25, [story](../docs/history/lessons.md#an-options-panel-that-disappeared-oct-25-2026)):
   - Eric's standing rules are in [`docs/rules/eric.md`](../docs/rules/eric.md). A change that breaks one, or edits a test that
-    guards one, needs his OK first. Above all: nothing hidden behind another tap (greyed instead), nothing shifts.
+    guards one, needs his OK first. Above all, the default for every change: nothing hidden behind another tap (greyed
+    instead), nothing shifts; screens already built aren't swept for it, and exceptions are Eric's to name.
   - A brief lists the rules of the area it touches; a PR lists every test check it changed or removed and whether one guards
     a rule. A clash between Eric's new words and a standing rule is a question for him, not a call to make.
 

@@ -45,8 +45,9 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
 - **Simple beats flashy (Eric, Oct 14: "we want easier code and less lag over all else, fewer bug risks").** When an
   effect or feature can be built several ways, pick the one with the least code, the least lag on a phone and the
   fewest ways to break, and reuse what already works (e.g. an existing animation or effect) before writing new.
-- **Nothing hidden, nothing shifts (Eric, Oct 18 and Oct 25).** Containers keep their size and place; a button, option or
-  panel is never hidden behind another tap: it shows greyed until it applies. **Eric's standing rules** are in
+- **Nothing hidden, nothing shifts (Eric, Oct 18 and Oct 25; the default for every change, not a sweep of what's built).**
+  Containers keep their size and place; a button, option or panel isn't hidden behind another tap: it shows greyed until it
+  applies. Exceptions are Eric's to name. **Eric's standing rules** are in
   `docs/rules/eric.md`, each with the test that guards it: a change that breaks one, or edits a guard test, needs Eric's OK
   first, and every PR lists the test checks it changed or removed.
 - **Computing priorities (Eric, Oct 8), in this order:**

@@ -9,12 +9,17 @@ removed (old → new) and says whether any of them guards a rule here.
 
 ## Every screen
 
-- **Nothing hidden, nothing shifts.** Containers keep their size and their place. A button, an option or a panel is never
-  hidden until another tap makes it appear: it shows greyed (muted and not tappable) until it applies. Tapping a mode, a tab,
-  an ⓘ or an info bar never moves the things around it.
+- **Nothing hidden, nothing shifts (the default for every change from now on).** Containers keep their size and their place.
+  A button, an option or a panel isn't hidden until another tap makes it appear: it shows greyed (muted and not tappable)
+  until it applies. Tapping a mode, a tab, an ⓘ or an info bar doesn't move the things around it. It's the default, not a
+  sweep: screens already built a little differently aren't changed for it, but every new change is checked against it.
+  Where a case seems to call for the opposite, ask Eric; he names the exceptions.
   - Eric, Oct 18: "nothing should actually be forced moving around… those things need to be static."
   - Eric, Oct 25: "if we start making it where you have to press other things to make other options appear, it's just going
     to get sloppy over time… containers should never be getting shifted and… buttons hidden behind pressing other things."
+    Then: "this is not like a hard set thing per se, but this is like the default… we're not trying to go back and make
+    changes… moving forward, the default should always be to check that when we make changes, this mistake isn't happening
+    again. But there may be some use cases…"
   - Decisions: [2026-10-18-home-steady-layout.md](../decisions/2026-10-18-home-steady-layout.md),
     [2026-10-25-home-panel-back.md](../decisions/2026-10-25-home-panel-back.md).
 - **No platform named means both.** When Eric doesn't say "phone" or "computer", a change is for both. When unsure, ask.
