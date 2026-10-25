@@ -26,5 +26,6 @@ the two sets (0.6 = phone, 1.4 = computer).
   on a computer and 5.6 on a phone.
 - Zooming out raises the camera 1.75×, moves it back 1.45×, adds 6° of pitch and lets the rim reach 25% further.
 - The last 30% of the way to the rim blends toward the sky (93% at the rim); far sprites fade, haze and blur (a cheap
-  scale-down blur that works without `ctx.filter`).
+  scale-down blur that works without `ctx.filter`). Houses, bosses and pawns are drawn only once their square is inside
+  the rim, always whole, fading in over their first half square; the haze strip is drawn behind them.
 - Frame rate in a headless browser with software rendering: about 54–59 fps on both sizes. Not yet measured on a real phone.

@@ -539,7 +539,9 @@ function drawBattleTag(text, ax, ay) {
 // How far toward the horizon a point is (0 at the focus, 1 at the horizon), and the fade-in just before it.
 const farOf = (dz) => clamp(dz / Math.max(1, V.rim), 0, 1);
 const radial = (dx, dz) => Math.hypot(dx / V.rimX, dz);
-const SINK = 2.5;   // things up to this far past the rim still show their tops over the horizon
+// Things are drawn only once their base is on the ground inside the rim, and always whole. They fade in over their
+// first half square inside it, so nothing pops.
+const enterOf = (dx, dz) => clamp((V.rim - radial(dx, dz)) / 0.5, 0, 1);
 
 // A sprite standing on the ground: foot anchored at (fx, fy) of its own box; size in squares, scaled by the camera.
 function drawSprite(img, dx, dz, sq, fx, fy, aspect, o) {
@@ -550,7 +552,7 @@ function drawSprite(img, dx, dz, sq, fx, fy, aspect, o) {
   const x0 = p.x - fx * w, y0 = p.y - fy * h - lift;
   const s = bandOf(dx, dz);                      // in the far band: fade, haze and blur
   ctx.save();
-  ctx.globalAlpha = 1 - BAND_FADE * s;
+  ctx.globalAlpha = (1 - BAND_FADE * s) * enterOf(dx, dz);
   // a soft shadow on the ground
   ctx.fillStyle = `rgba(60,35,10,${(0.22 * (1 - s)).toFixed(3)})`;     // gone by the rim (no shadows on the sky)
   ctx.beginPath(); ctx.ellipse(p.x, p.y, Math.min(w * 0.42, p.k * 0.42 * (o.shadow || 1)), p.k * 0.12 * (o.shadow || 1), 0, 0, Math.PI * 2); ctx.fill();
@@ -617,7 +619,7 @@ function softenBand() {
   ctx.drawImage(bandCv, 0, y0, W, y1 - y0);
 }
 // A soft haze strip just under the horizon (sky colour, fading out downward over about 5% of the box height).
-// Drawn over the far band's sprites but under anything nearer.
+// Drawn right after the ground, so it never covers a house, boss or pawn.
 function drawHorizonHaze() {
   const rp = V.rimPts, d = H * 0.05, n = 10;
   ctx.save();
@@ -721,7 +723,7 @@ function drawHouse(p, dx, dz) {
     g.fillText(label, X, sy + 1);
   };
   ctx.save();
-  ctx.globalAlpha = 1 - 0.6 * s;
+  ctx.globalAlpha = (1 - 0.6 * s) * enterOf(dx, dz);
   // a soft shadow
   ctx.fillStyle = `rgba(60,35,10,${(0.18 * (1 - s)).toFixed(3)})`;
   ctx.beginPath(); ctx.ellipse(X, Y, bw * 0.62, pr.k * 0.35, 0, 0, Math.PI * 2); ctx.fill();
@@ -745,7 +747,7 @@ let ripples = [];
 
 // Can a thing at (dx, dz) be drawn? In front of the camera, before the curve, and roughly on screen sideways.
 function drawable(dx, dz, margin) {
-  if (radial(dx, dz) > V.rim + SINK || dz < -V.back + 0.6) return false;
+  if (radial(dx, dz) > V.rim || dz < -V.back + 0.6) return false;
   const p = proj(dx, dz, 0);
   if (!p || p.x < -margin * p.k || p.x > W + margin * p.k || p.y > H + p.k * 3.2) return false;
   return !pastCurve(dx, dz);
@@ -758,6 +760,7 @@ function draw(now) {
   drawSky();
   hits.length = 0;
   drawGround();
+  drawHorizonHaze();          // on the ground, behind every house, boss and pawn
 
   // billboards (houses, pawns, bosses), far to near
   const items = [];
@@ -765,7 +768,7 @@ function draw(now) {
     const q = rel(p.cx, p.cy);
     p.screen = null;
     if (!drawable(q.dx, q.dz, 2.5)) continue;
-    items.push({ dz: q.dz, past: radial(q.dx, q.dz) > V.rim, draw: () => drawHouse(p, q.dx, q.dz) });
+    items.push({ dz: q.dz, draw: () => drawHouse(p, q.dx, q.dz) });
   }
   for (const p of bosses) {
     const pos = p.walker.pos(now);
@@ -774,7 +777,7 @@ function draw(now) {
     if (!drawable(q.dx, q.dz, 2)) continue;
     const m = MANIFEST[p.id];
     const img = FRAME_IMG[m.frames[p.anim.i].k];
-    items.push({ dz: q.dz, past: radial(q.dx, q.dz) > V.rim, draw: () => {
+    items.push({ dz: q.dz, draw: () => {
       const e = drawSprite(img, q.dx, q.dz, BOSS_SQ, m.foot[0] / m.w, m.foot[1] / m.h, m.w / m.h,
         { kind: "boss", ref: p, flip: p.walker.facing, shadow: 1.6 });
       if (!e) return;
@@ -790,7 +793,7 @@ function draw(now) {
     n.head = null;
     if (!drawable(q.dx, q.dz, 1)) continue;
     const img = pawnImage(n.side, n.tint);
-    items.push({ dz: q.dz, past: radial(q.dx, q.dz) > V.rim, draw: () => {
+    items.push({ dz: q.dz, draw: () => {
       const e = drawSprite(img, q.dx, q.dz, PAWN_SQ, 0.5, 0.96, 1,
         { kind: "npc", ref: n, flip: w.facing, lift: pos.hop * 0.1, tilt: pos.tilt * 0.6 });
       if (!e) return;
@@ -810,19 +813,8 @@ function draw(now) {
       drawTag(PLAYER_NAME, e.x, e.headY - 2, true, clamp(11 * e.k / V.kf, 8, 12));
     } });
   }
-  items.push({ dz: BAND0 * V.rim, draw: drawHorizonHaze });
   items.sort((a, b) => b.dz - a.dz);
-  // Past the rim, only what rises above the horizon shows (clipped to the sky), so things sink out of sight.
-  for (const it of items) {
-    if (it.past) {
-      const rp = V.rimPts;
-      ctx.save(); ctx.beginPath(); ctx.moveTo(rp[0].x, -10);
-      for (const p of rp) ctx.lineTo(p.x, p.y);
-      ctx.lineTo(rp[rp.length - 1].x, -10); ctx.closePath(); ctx.clip();
-      const n = hits.length; it.draw(); ctx.restore();
-      for (let i = n; i < hits.length; i++) hits[i].y1 = Math.min(hits[i].y1, V.hy);
-    } else it.draw();
-  }
+  for (const it of items) it.draw();
 
   // the battle label between the two who are fighting
   if (challenge && challenge.phase === "fight" && you.head && challenge.boss.head) {
