@@ -598,7 +598,7 @@ ${offsets}
 
 **Worked example.** You're rated ${you}. The weakest tier above ${you} is ${tier}. ${ginger.name} at ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}: ${tier} ${term(ginger.offset)} = **${gingerElo}**. ${bigBoy.name} at ${hard.label}: ${tier} ${term(bigBoy.offset)} ${term(hard.elo)} = **${bigBoyElo}**.
 
-The Boss raid screen shows the boss you picked by its name, with your difficulty's name under it (unless it's ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}) and no number for now. Boss alone's menu shows the boss you picked at Boss alone's level, your difficulty's Maia rating, and how far it is from yours ("+200 vs you"); 1 to 5 skulls show how dangerous it is. A Solo raid (Raid with bots) has no difficulty on top.
+The Boss raid screen shows the boss you picked by its name, with your difficulty's name under it (unless it's ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}). Boss alone's menu shows the boss you picked at Boss alone's level, your difficulty's Maia rating, and how far it is from yours ("+200 vs you"); 1 to 5 skulls show how dangerous it is. A Solo raid (Raid with bots) has no difficulty on top.
 
 ### Brain 1: Stockfish at a set strength {#stockfish-brain}
 

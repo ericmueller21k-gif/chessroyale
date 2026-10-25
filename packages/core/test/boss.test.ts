@@ -140,7 +140,7 @@ describe("the level in a boss's bar (LVL 50)", () => {
     expect(bossLevelNow(50, 1400, 1400 - BOSS_LEVEL.weakDrop)).toBeLessThan(50);
   });
 
-  it("is made from Boss alone's Maia rating when there is one (the stage's 'Rating 1400'), else from his strength in the battle", () => {
+  it("is made from Boss alone's Maia rating when there is one (the number Boss alone's menu shows), else from his strength in the battle", () => {
     expect(bossRatingShown(2300, { bossAloneMaia: 1400 })).toBe(1400);
     expect(bossRatingShown(2300, { bossAloneMaia: 0 })).toBe(2300);
   });
