@@ -426,8 +426,8 @@ build): online, phase 1 won is the crowd's victory):
   row; a boss draws into it with `BossUi.barProp`, positioned inside it, nothing clipped; Babur's pump, components/Tiger.tsx); `?barslot=1` outlines it with a dashed line. **The level** is the rating over `BOSS_LEVEL.divisor` (28) plus a random
   offset of up to `spread` (10) either way drawn once from the battle's seed, from 1 to `max` (99): `bossLevelBase` (core
   `boss.ts`), computed in the runner's `bossView` (`level`, `levelBase`; the same on every screen and after a reload), "LVL ???"
-  for the Hidden Boss (`BossDef.levelUnknown`, in both phases). Its rating is Boss alone's Maia rating (what the Boss raid
-  stage shows as "Rating 1400": `bossRatingShown`), else his strength in the battle. **It follows his strength**
+  for the Hidden Boss (`BossDef.levelUnknown`, in both phases). Its rating is Boss alone's Maia rating (what Boss alone's
+  menu shows, `bossRatingShown`; the Boss raid stage shows no number since Oct 25), else his strength in the battle. **It follows his strength**
   (`runner.bossStrengthNow`): up to the engine's top (`ENGINE_MAX_ELO`) for the Full Moon's whole stretch (`BossRules.fullStretch`,
   the crowd's turns between his moves too) and for a power's engine-best reply when he's to move (`bestReply`: Wrangler's reply
   to the showdown), `weakDrop` (700 Elo, 25 levels) lower for the move the King's strike weakens (`staggerNext`); gold with a small

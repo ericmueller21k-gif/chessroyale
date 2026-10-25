@@ -67,6 +67,8 @@ The rule: **before a battle, a boss has one number on screen: Boss alone's stren
 (The examples are Sawyer's for a player rated 1580: tier 1600, offset −250. The skulls follow the number, as before.)
 The menu's own texts are unchanged.
 
+Oct 25 (Eric): the stage shows no number or skulls, only the difficulty's name when it isn't Normal. Boss alone's menu keeps its number. Later the stage will show the boss's level.
+
 ## Tests
 
 - `e2e/boss-select.spec.ts`, "fit any window": Boss alone's menu (an admin's, with the brain picker: its tallest) and

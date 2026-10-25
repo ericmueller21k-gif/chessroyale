@@ -235,7 +235,7 @@ function modes(src: FaqSources): FaqSection {
 ### Boss raid and Boss alone {#mode-boss}
 
 - **Boss raid:** up to ${R.lobbySize} players pick the crowd's moves together against a [boss](#boss-brain); the most popular pick is played. Every boss starts from the starting position.
-- **Where:** tap **Boss raid** on the home screen. The bosses are at the top: tap one to see it on the stage below (its name and strength), or **?** for a random one. Under them, every way to play: **Join a raid** (bots fill any empty seats after a short wait) and **People only** (no bots) always meet a random boss; **Raid with bots** (you and ${R.lobbySize - 1} bots, at once), **Boss alone** and **Play with friends** (make a raid and share its code) meet the one you picked.
+- **Where:** tap **Boss raid** on the home screen. The bosses are at the top: tap one to see it on the stage below (its name, and its difficulty when it isn't Normal), or **?** for a random one. Under them, every way to play: **Join a raid** (bots fill any empty seats after a short wait) and **People only** (no bots) always meet a random boss; **Raid with bots** (you and ${R.lobbySize - 1} bots, at once), **Boss alone** and **Play with friends** (make a raid and share its code) meet the one you picked.
 - **Scoring:** the [50 v 50 way](#raid-scoring), its limit widening with the crowd's moves (Boss alone scores as before).
 - **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} it knocks out the player who gave away the most points since its last strike (as the judge counts them, before the [scoring's limit](#raid-scoring), after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
 - **The God King** fights on your side, with ${n(S.kingChargesMax, "charge")} ([more on him](#god-king)).
@@ -598,7 +598,7 @@ ${offsets}
 
 **Worked example.** You're rated ${you}. The weakest tier above ${you} is ${tier}. ${ginger.name} at ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}: ${tier} ${term(ginger.offset)} = **${gingerElo}**. ${bigBoy.name} at ${hard.label}: ${tier} ${term(bigBoy.offset)} ${term(hard.elo)} = **${bigBoyElo}**.
 
-The Boss raid screen shows the boss you picked at Boss alone's level, your difficulty's Maia rating (named unless it's ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}), and Boss alone's menu shows the same number and how far it is from yours ("+200 vs you"); 1 to 5 skulls show how dangerous it is. A Solo raid (Raid with bots) has no difficulty on top.
+The Boss raid screen shows the boss you picked by its name, with your difficulty's name under it (unless it's ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}). Boss alone's menu shows the boss you picked at Boss alone's level, your difficulty's Maia rating, and how far it is from yours ("+200 vs you"); 1 to 5 skulls show how dangerous it is. A Solo raid (Raid with bots) has no difficulty on top.
 
 ### Brain 1: Stockfish at a set strength {#stockfish-brain}
 

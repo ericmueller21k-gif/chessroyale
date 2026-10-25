@@ -319,8 +319,8 @@ export function bossLevelBase(rating: number, seed: number, s: Pick<typeof BOSS_
 }
 
 /**
- * The rating the bar's level is made from: Boss alone's (`bossAloneMaia`, the difficulty's Maia rating: the number the Boss raid
- * screen's stage shows as "Rating 1400"), else the boss's strength in the battle (`elo`).
+ * The rating the bar's level is made from: Boss alone's (`bossAloneMaia`, the difficulty's Maia rating: the number Boss alone's
+ * menu shows), else the boss's strength in the battle (`elo`).
  */
 export const bossRatingShown = (elo: number, s: Pick<Settings, "bossAloneMaia">): number => (s.bossAloneMaia > 0 ? s.bossAloneMaia : elo);
 
