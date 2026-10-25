@@ -391,7 +391,9 @@ the building art and the names, which are wrong) and `chatgpt-town-square-overvi
 **The world**
 - A chessboard world seen from a **low camera looking out to a curved horizon**, with sky and clouds behind it. The clouds
   shift a little as you walk sideways. The far edge **dissolves into haze**, and things come into focus as you walk toward
-  them. The world **loops**: walk one way long enough and you're back where you started.
+  them. A house, boss or pawn near the edge is never cut off by it (Eric, from his phone test): it shows whole, faded into
+  the haze, and the haze is drawn behind it. The world **loops**: walk one way long enough and you're back where you
+  started.
 - **Every boss has a home** in its own corner of the world (13 now, plus a locked plot for the Hidden Boss). The bosses roam
   near home and sometimes say a line, in a new bubble style made for the square.
 - Small pawns, big bosses. Your own pawn is on the board, and your big dressed pawn with its name card sits at the lower
