@@ -2,20 +2,11 @@ import { BOSS_BRAIN, BOSS_BRAINS, BOSS_POWERS, type BossBrain } from "@chessroya
 import { account } from "./account.ts";
 
 /**
- * Testing, admins only: the boss's brain in Boss alone (the Brain picker in the boss menu, or ?brain=<id>), "" for
- * each boss's own (BOSS_BRAIN: every boss on Maia, no guard, the bridge band, Stockfish at the top). Remembered on
- * this device.
+ * Testing, admins only: the boss's brain in Boss alone (?brain=<id>), "" for each boss's own (BOSS_BRAIN: every boss
+ * on Maia, no guard, the bridge band, Stockfish at the top). (No picker in the boss menu any more, and an old pick
+ * remembered on a device no longer counts: Eric, Oct 25.)
  */
-const KEY = "brc.bossBrain";
 const known = (v: unknown): v is BossBrain => (BOSS_BRAINS as readonly unknown[]).includes(v);
-
-export const BRAIN_LABELS: Record<BossBrain, string> = {
-  stockfish: "Stockfish",
-  "maia-raw": "Maia, no guard",
-  "maia-light": "Maia, light guard",
-  "maia-full": "Maia, full guard",
-  "maia-strict": "Maia, strict guard",
-};
 
 export const isAdmin = () => !!account().profile?.admin;
 
@@ -25,26 +16,10 @@ export const isAdmin = () => !!account().profile?.admin;
  */
 export const engineMoveAllowed = (bossAlone: boolean) => BOSS_POWERS.engineMoveButton && bossAlone && isAdmin();
 
-/** The brain an admin picked ("" for the boss's own). */
+/** The brain an admin asked for in the link ("" for the boss's own). */
 export function pickedBrain(): BossBrain | "" {
   const q = new URLSearchParams(location.search).get("brain");
-  if (known(q)) return q;
-  try {
-    const v = localStorage.getItem(KEY);
-    if (known(v)) return v;
-  } catch {
-    // No storage.
-  }
-  return "";
-}
-
-export function rememberBrain(v: BossBrain | "") {
-  try {
-    if (v) localStorage.setItem(KEY, v);
-    else localStorage.removeItem(KEY);
-  } catch {
-    // Not important.
-  }
+  return known(q) ? q : "";
 }
 
 /**

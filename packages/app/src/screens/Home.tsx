@@ -4,8 +4,7 @@ import { useAccount } from "./Profile.tsx";
 import { bossAloneElo, chosenDifficulty, rememberDifficulty } from "../boss-difficulty.ts";
 import { powersLine } from "../power-words.ts";
 import { BossDifficulty } from "../components/BossDifficulty.tsx";
-import { BossBrainPicker } from "../components/BossBrain.tsx";
-import { isAdmin, maiaAllowed, maiaLikely, pickedBrain, rememberBrain } from "../boss-brain.ts";
+import { isAdmin, maiaAllowed, maiaLikely } from "../boss-brain.ts";
 import { prefetchMaia } from "../maia.ts";
 import type { ComponentChildren } from "preact";
 import { AccountBar, BackButton, DressedPawn, FdButton, FriendsIcon, GearIcon, LiveLine, Logo, RankLine, ShopIcon } from "../components/FrontDoor.tsx";
@@ -117,7 +116,7 @@ function versus(elo: number, you: number): { text: string; tone: "easy" | "even"
 }
 
 /**
- * Boss alone's menu: your difficulty (and, for admins, the boss's brain), and the boss to fight, each at your strength
+ * Boss alone's menu: your difficulty and the boss to fight, each at your strength
  * plus its own offset and your difficulty (`bossAloneElo`, as the Boss raid screen's stage shows it), with its threat
  * and its strength against yours. A tap on a boss starts. The difficulty is the screen's (`difficulty`,
  * `onDifficulty`), so the stage follows it as it changes.
@@ -148,9 +147,8 @@ export function BossMenu({
   // (Not the bosses resting: kill switches, status.ts.)
   useServerStatus();
   const bosses = menuBosses({ admin: isAdmin(), raid: false }).filter((b) => !isPaused(`boss:${b.id}`) && (only === undefined || b.id === only));
-  // Testing, admins (Boss alone): the boss's brain (Maia-3 or Stockfish). Maia's files are fetched ahead when it may
-  // play: Boss alone below Stockfish's strengths. (A raid you make fetches them as you make it: Play with friends.)
-  const [brain, setBrain] = useState(pickedBrain);
+  // Maia's files are fetched ahead when it may play: Boss alone below Stockfish's strengths. (A raid you make fetches
+  // them as you make it: Play with friends.)
   const picked = useRef<HTMLButtonElement>(null);
   const maiaAhead = () => maiaLikely(bosses.map((b) => bossAloneElo(rating, b, difficulty)));
   useEffect(() => {
@@ -176,16 +174,6 @@ export function BossMenu({
           </button>
         </div>
         <BossDifficulty value={difficulty} onChange={onDifficulty} />
-        {isAdmin() && (
-          <BossBrainPicker
-            value={brain}
-            onChange={(b) => {
-              rememberBrain(b);
-              setBrain(b);
-              if (maiaAhead()) prefetchMaia();
-            }}
-          />
-        )}
         <div class="boss-menu-list">
           {(only === undefined || only === "") && (
             <button type="button" class={`boss-row match${value === "" ? " on" : ""}`} ref={value === "" ? picked : undefined} onClick={() => onPick("")}>
