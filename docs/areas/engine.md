@@ -184,7 +184,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 | The positions refused (rules, cases) | `stockfishRefuses` in `packages/chess/src/uci.ts`; `packages/chess/test/stockfish-refuses-cases.ts` |
 | Ratings from move losses | `packages/core/src/rating.ts`, `rating-curve.ts` |
 | The boss's brain: the rule, the text client | `packages/chess/src/boss-brain.ts`, `human-uci.ts`; `bossMoveFrom` in `runner.ts` |
-| Maia in the browser (start, prefetch, free) | `packages/app/src/maia.ts`, `boss-brain.ts` (who may run it; the admins' pick), `solo.ts` (`startBrain`), `net.ts` (`useBrain`, `hostBoss`) |
+| Maia in the browser (start, prefetch, free) | `packages/app/src/maia.ts`, `boss-brain.ts` (who may run it; the admins' `?brain=` link), `solo.ts` (`startBrain`), `net.ts` (`useBrain`, `hostBoss`) |
 | The loading step (solo): Stockfish paused, Maia alone | `packages/app/src/maia-gate.ts`, `components/BrainLoading.tsx`; `pauseEngines` in `engine.ts`; `UciEngine.pause` (`uci.ts`), `HumanUciEngine.loaded` |
 | The online plan | `packages/server/src/lobby.ts` (`bossBrainNow`, the `bossBrain` message, the boss request's `brain`) |
 | The Maia box (AGPL: worker, conversion, model) | `packages/maia-worker/` (README.md), built into `/engine/maia/` |

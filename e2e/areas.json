@@ -380,7 +380,6 @@
         "packages/app/src/maia-gate.ts",
         "packages/app/src/boss-brain.ts",
         "packages/app/src/components/BrainLoading.tsx",
-        "packages/app/src/components/BossBrain.tsx",
         "packages/server/src/engine.ts",
         "packages/server/src/judges.ts"
       ],

@@ -7,7 +7,8 @@ import { createLobbyFromHome, joinFromInvite, named, test, watchFor, bossAloneFr
 /**
  * The Maia boss (DECISIONS.md, "A human-like boss: Maia-3 for Ginger", Oct 11; "Every boss on Maia", Oct 12): for an
  * admin every boss plays with Maia by default, in Boss alone and online (the host's device plays it, everyone gets its
- * one move); an admin can pick another brain in Boss alone's boss menu, and a debug line says what the brain did.
+ * one move); an admin can ask for another brain with ?brain=<id> (no picker in the boss menu since Eric's Oct 25 ask),
+ * and a debug line says what the brain did.
  * Maia's moves come through the Maia box's worker, spoken to in text. Players never load Maia.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
@@ -44,20 +45,17 @@ async function play(page: Page, timeout = 60_000) {
   await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
 }
 
-test("an admin's Brain picker: Ginger on Maia with the full guard, on a phone; Maia's moves come through", async ({ page }) => {
+test("an admin's ?brain= link: Ginger on Maia with the full guard, on a phone; Maia's moves come through", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
   test.setTimeout(4 * 60_000);
   await asAdmin(page);
   const maiaFiles: string[] = [];
   page.on("request", (r) => r.url().includes("/engine/maia/") && maiaFiles.push(new URL(r.url()).pathname));
-  await page.goto("/?debug&clock=40&bossMoves=6&laststand=0");
+  await page.goto("/?debug&clock=40&bossMoves=6&laststand=0&brain=maia-full");
   await bossAloneFromHome(page, "Ginger");
   const menu = page.getByRole("dialog", { name: "Boss alone" });
-  const brain = menu.getByRole("combobox", { name: "Boss brain (testing)" });
-  await expect(brain).toBeVisible();
-  // (Each boss's own is the default: Ginger's is Maia, no guard.)
-  await expect(brain).toHaveValue("");
-  await brain.selectOption("maia-full");
+  // (No picker in the menu any more, Eric, Oct 25: the link asks for the brain.)
+  await expect(menu.getByRole("combobox")).toHaveCount(0);
   // The menu fetches Maia's files ahead (into the service worker's cache).
   await expect.poll(() => maiaFiles.some((f) => f.endsWith(".onnx")), { timeout: 10_000 }).toBe(true);
   await menu.getByRole("button", { name: /Ginger/ }).click();

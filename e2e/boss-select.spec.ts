@@ -469,8 +469,8 @@ test("home's Boss raid card: a still portrait that moves on to the next boss you
 });
 
 /**
- * Your profile as the server would answer it, with a rating (and an admin's brain picker, the menu's tallest content):
- * Eric's, Oct 17 (1580).
+ * Your profile as the server would answer it, with a rating (and an admin's: the Hidden Boss in the full picker, its
+ * longest list): Eric's, Oct 17 (1580).
  */
 async function rated(page: Page, rating: number, admin = false) {
   await page.route("**/api/me*", async (route) => {
@@ -519,12 +519,15 @@ test("Boss alone's menu and the /bosses picker fit any window: whole, or their r
     : [[320, 568], [360, 640], [390, 844]];
   for (const [w, h] of sizes) {
     await page.setViewportSize({ width: w!, height: h! });
-    // Boss alone's menu, for the boss picked (an admin's: the brain picker too).
+    // Boss alone's menu, for the boss picked. An admin's has no brain picker any more (Eric, Oct 25: "get rid of that
+    // Maia, no guard thing"): the difficulty, then the boss.
     await page.goto("/?mode=raid");
     await tile(page, "Sawyer").click();
     await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
     const alone = page.getByRole("dialog", { name: "Boss alone" });
-    await expect(alone.getByRole("combobox")).toBeVisible();
+    await expect(alone.locator(".boss-difficulty")).toBeVisible();
+    await expect(alone.getByRole("combobox")).toHaveCount(0);
+    await expect(alone.getByText(/BRAIN|Maia/)).toHaveCount(0);
     await expectMenuFits(page, alone, `${w}x${h} Boss alone`);
     // The full picker (/bosses): every boss and a random one, for an admin the Hidden Boss too: the longest list.
     await page.goto("/bosses");
