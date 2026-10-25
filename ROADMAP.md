@@ -378,3 +378,21 @@ Added Oct 14, 2026 (Eric; notes only, nothing built):
     2,000 minutes a month; CI uses about 100-120 a day). The Maia and Stockfish source must be served from the site.
   - Test lanes: every logic change goes back to the full lane per PR (CLAUDE.md, "Test lanes": the targeted lane
     and batch full runs are pre-launch only).
+
+## Boss raid: where it's heading (Eric, Oct 25, 2026; ideas, nothing built yet)
+
+Eric: "I think we need to create some sort of lobby for boss raid that's sort of like an idle lobby… you can invite your
+friends… there might be some possible rewards… what you would expect from a normal sort of cool style lobby." Two rough
+mockups, as a starting point only ("not that we want to use this exactly"): `docs/mockups/boss-raid-lobby/gemini-lobby.png`
+(a lobby on a big board floor, the bosses standing about, "Players: 18/50", Invite friends, Ready, a game-mode box and the
+target boss) and `docs/mockups/boss-raid-lobby/eric-paint-crowd.png` (today's select screen with a pawn standing in for a
+crowd of 50).
+
+- **A raid with people starts in an idle lobby:** players gather (up to 50), invite friends, ready up; the room shows who's
+  in and which boss comes first. Maybe rewards. It likely shares the party and invite system planned for home.
+- **A gauntlet of bosses:** a raid with people picks **3 bosses at random**, each harder than the last; beat one to face the
+  next. The first should feel winnable (he blunders); it should feel good. Maybe 4 later.
+- **Solo keeps the select screen:** today's Boss raid screen (pick a boss) becomes the solo mode, where you pick the boss you
+  want and fight it.
+- To settle when it's built: how the three are ordered, what losing mid-gauntlet means, scoring across bosses, whether the
+  God King's charges carry over, time per boss, the rewards, and what players do while they wait.
