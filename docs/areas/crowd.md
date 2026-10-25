@@ -98,7 +98,9 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   start for the one board everyone shares. **Normal**: the starting position (nothing drawn: the board as made).
   **Random opening**: a balanced named line from the library, `CROWD_START.randomOpeningMoves` (4) moves a side in, drawn as
   Classic's boards are (`pickOpenings`, inside `openingBalance`); the board's history holds the opening's moves, so the
-  game's move number (and the opening allowance) starts at 5, and a phone new to the board replays them from the start.
+  game's move number (and the opening allowance) starts at 5, and a phone new to the board replays them from the start,
+  whether it first watches or plays (`WatchScreen` replays through `useReplay` too, Oct 25; the Animations setting doesn't
+  change it: docs/decisions/2026-10-25-opening-with-animations-off.md).
   **Freestyle** (FIDE's name for Chess960; the only name players see): a Chess960 start drawn from the match's own random
   source, never the usual one (`freestyleStart`), in a base at ply 0 (`freestyleBoard`, opening `FREESTYLE_OPENING`), so
   every replay, the history and a restored lobby start there; the rules, the judge (Stockfish's `UCI_Chess960`, from the
@@ -163,7 +165,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   top line of every screen with a chessboard ends in the match's control (`components/MatchMenu.tsx`): a gear (Eric, Oct 24
   and 25: the same on a phone and a computer; docs/decisions/2026-10-24-match-menu.md and
   2026-10-25-gear-everywhere.md) that opens a list in the middle of the screen over the blurred match: Sound, Animations
-  (every mode), Motion trail (a crowd match only), Resign or Leave, Report a bug, which asks first. On a computer the
+  (every mode), Motion trail (a crowd match only; the vote screen's and the openings' gears too, Oct 25), Resign or Leave,
+  Report a bug, which asks first. On a computer the
   gear sits at the right end of the title line over the board's column, after an admin's testing items in boss battles
   (the brain's pill, which ellipsizes first, and "Trigger ultimate (testing)": `Hud.tsx`, `.match-tools`; Eric, Oct 13);
   a phone keeps those as tiny icons beside the God King (Oct 24). The list's confirms are centered too (Cancel focused).

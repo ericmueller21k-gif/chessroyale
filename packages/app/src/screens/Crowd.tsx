@@ -24,7 +24,7 @@ import { Avatar } from "../components/Items.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { pawnLook } from "../looks.ts";
-import { seenKey, useBoardAnimations, useMotionTrail, useStillKey } from "../hooks.ts";
+import { seenKey, useBoardAnimations, useMotionTrail, useReplay, useStillKey } from "../hooks.ts";
 import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
 import { exitMatch } from "../match-exit.ts";
@@ -86,9 +86,11 @@ export function WatchScreen({
 }) {
   const side = sideToMove(board.fen);
   const team = myTeam(match) ?? (side === "w" ? "b" : "w");
-  useEffect(() => {
-    match.seen.set(seenKey(board), board.ply);
-  }, [board]);
+  // The moves of this board you haven't seen replay first, as on your own turn (Play): a board you first see watching
+  // plays out from its start, with the opening (Eric, Oct 25). The replay marks the board seen; nothing else does, so
+  // the replay isn't skipped as already seen (before, this screen marked it seen and the opening never played).
+  const [mountedAt] = useState(Date.now());
+  const shown = useReplay(match, board, Math.max(0, startsAt - mountedAt));
   const standings = match.standings();
   const choosing = standings.filter((s) => !s.out && s.team === side);
   const done = choosing.filter((s) => match.done.has(s.id)).length;
@@ -101,10 +103,11 @@ export function WatchScreen({
         </div>
         <div class="board-row">
           <EvalBar fen={board.fen} orientation={team} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={board.fen} orientation={team === "w" ? "white" : "black"} lastMove={board.lastMove}>
+          <Board fen={shown.fen} orientation={team === "w" ? "white" : "black"} lastMove={shown.lastMove}>
             {!counting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={Math.max(1, deadline - startsAt)} />}
             <BoardClock match={match} you={standings.find((s) => s.isYou)} turn={!counting && deadline > 0 ? { startsAt, deadline, yours: false } : null} />
-            <LiveGhosts match={match} fen={board.fen} orientation={team === "w" ? "white" : "black"} />
+            {/* (The picks come in over the board as it stands, once its replay is done.) */}
+            {!shown.replaying && <LiveGhosts match={match} fen={board.fen} orientation={team === "w" ? "white" : "black"} />}
           </Board>
         </div>
       </div>

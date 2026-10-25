@@ -408,6 +408,7 @@
         "e2e/crowd-scoring.spec.ts",
         "e2e/match-screen.spec.ts",
         "e2e/opening-vote.spec.ts",
+        "e2e/opening-animations.spec.ts",
         "e2e/panel.spec.ts",
         "e2e/vote-hint.spec.ts",
         "e2e/votes.spec.ts"
