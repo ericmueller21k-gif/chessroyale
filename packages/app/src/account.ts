@@ -94,10 +94,26 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     // A sign-in the age gate refused: ask the question again, saying why (the answer ran out), or too young after all.
     if (body.askAge) askAgeAgain(body.message ?? ASK_AGE_LINE);
     if (body.tooYoung) rememberTooYoung();
-    throw new Error(body.message ?? `Something went wrong (${res.status}).`);
+    throw Object.assign(new Error(body.message ?? `Something went wrong (${res.status}).`), { status: res.status });
   }
   return body;
 }
+
+/**
+ * Your profile, asked a second time after a moment when the first try fails on the way (no answer, or the server's own
+ * error): one hiccup shouldn't cost the page its account. A refusal (the age gate, a 4xx) isn't asked again.
+ */
+async function profileFrom(path: string): Promise<Profile> {
+  try {
+    return await api<Profile>(path);
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    if (status !== undefined && status < 500) throw e;
+    await new Promise((r) => setTimeout(r, PROFILE_RETRY_MS));
+    return api<Profile>(path);
+  }
+}
+const PROFILE_RETRY_MS = 400;
 
 /**
  * "Too young" is kept twice: in this device's storage and in the server's cookie (hc_age, which the page can't clear).
@@ -138,19 +154,21 @@ export function askAgeAgain(why: string = ASK_AGE_LINE) {
 
 /** Loads the sign-in options and your profile (making a guest account the first time). */
 export async function loadAccount(name?: string): Promise<void> {
+  let config: NonNullable<AccountState["config"]> | null = null;
   try {
-    const config = await api<NonNullable<AccountState["config"]>>("/api/auth/config");
+    config = await api<NonNullable<AccountState["config"]>>("/api/auth/config");
     const young = storedTooYoung() || config.age === "under";
     set({ config, age: young ? "under" : (config.age ?? null) });
     if (young) rememberTooYoung();
     if (!config.accounts) return;
     const q = name && !young ? `?name=${encodeURIComponent(name)}` : "";
-    set({ profile: await api<Profile>(`/api/me${q}`) });
+    set({ profile: await profileFrom(`/api/me${q}`) });
     // The server forgot (its cookie was cleared): tell it again, which also puts the guest back to the defaults.
     if (young && config.age !== "under") await sendAgeAnswer(false).catch(() => undefined);
   } catch {
-    // No server (local dev) or offline: play on without an account.
-    set({ config: { accounts: false, google: false, email: false } });
+    // No server (local dev) or offline: play on without an account. A server that did answer keeps its test switch when
+    // only your profile failed (Oct 25: a CI run lost its ?boss= link that way, the switch going with the profile).
+    set({ config: { accounts: false, google: false, email: false, ...(config?.testSwitches ? { testSwitches: true } : {}) } });
   }
 }
 
