@@ -116,15 +116,21 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   on stands you up. Bots head for a free stool now and then (`botSitChance`, `botSitReach`) and may stay a while
   (`botStaySeated`).
 
-- **The statues** (`town/houses/statues.ts`; Oct 26, `docs/decisions/2026-10-26-town-square-statues.md`): the marble
-  statue (the Hidden Boss in stone) on the gate's left and the bronze statue on its right, each on a pedestal of its own
-  before the Coliseum ground's end column, drawn by the game over the Coliseum's picture (not in it). No name on either.
+- **The statues** (`town/houses/statues.ts`; Oct 26, `docs/decisions/2026-10-26-town-square-statues.md` and
+  `-statues-2.md`): the marble statue (the Hidden Boss in stone: his own picture, `RECLUSE`'s idle without the book,
+  turned to marble shades by lightness, `bossFigure`) on the gate's left and the bronze statue on its right, each on a
+  pedestal about a piece's plinth's size (40 × 24) before the Coliseum ground's end column, drawn by the game over the
+  Coliseum's picture (not in it). No name on either. At the world's scale each pedestal's panel carries only a few
+  squiggly lines (like writing too small to read).
   Each has its square right in front (`STATUES` in `world.ts`, with its quote) where you stand to look at it; the bots
   never stop there. **Walking up zooms in**: stopping on it (or where a tap on the statue sent you) glides the camera in
-  close (`closeGlideMs`) through a longer lens (`mag` and `oy` in `camera.ts`; the − / + zoom is untouched), the close-up
+  close (`closeGlideMs`) through a longer lens (`mag`, `ox` and `oy` in `camera.ts`; the − / + zoom is untouched), the
+  statue whole and as big as fits (where it would reach the − / + and "Back to me" buttons, above them or moved beside
+  them, whichever is bigger), the close-up
   drawing (4 times finer, `CLOSE`, made ahead a slice a frame) crossfading in; the people in front of it fade. Once the
-  camera arrives the quote renders in, line by line, on the pedestal's panel in the signs' pixel capitals (engraved in
-  the marble, cast in the bronze plaque), and in an off-screen live region (`.town-sr`) for screen readers. A tap
+  camera arrives the squiggles fade and the quote renders in, line by line, on the pedestal's panel, written at the
+  screen's own resolution in the signs' pixel capitals as big as fit (engraved in the marble, cast in the bronze
+  plaque; 12.5 px or more on a 360 × 640 phone), and in an off-screen live region (`.town-sr`) for screen readers. A tap
   elsewhere, a drag, a chip, −, + or "Back to me" glides back to the zoom you had and the quote fades.
 
 - **You** (slice 5): your pawn wears your profile's crate items (`town/you-look.ts`: `Avatar` drawn once into a canvas,
@@ -180,7 +186,7 @@ noted wherever a slice changed one.
   symmetric), their quotes word for word, a tap on one walks you there (or beside it), the bots never stop there.
 - `e2e/town.spec.ts` (phone and desktop; `e2e/areas.json`, "the town square"): the page loads, the world is drawn and
   fills its box, a tap ahead walks you there, the zoom pair works (it opens zoomed out), back goes home; each statue (a
-  tap walks you up, the camera zooms in close on it, its quote word for word in the live region, its letters at least 14
+  tap walks you up, the camera zooms in close on it, its quote word for word in the live region, its letters at least 12
   pixels; a tap elsewhere glides back to the zoom you had, zoomed out or in, and clears it); `?sky=day` and
   `?sky=night` draw different skies; a boss's card, its confirm (Stay, then Leave to the Boss raid screen, his tile
   picked); a home's card (Shop greyed, "Coming soon", closed by a tap elsewhere); the Coliseum's (a tap on its gate walks

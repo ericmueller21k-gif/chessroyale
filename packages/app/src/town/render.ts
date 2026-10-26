@@ -32,7 +32,7 @@ import { CAP, LEADING, layout, lineWidth, renderLines } from "./sign-font.ts";
 import { look, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
 import { SkyPainter } from "./sky-draw.ts";
 import { PARK_BENCH, PARK_FOUNTAIN, PARK_TABLE, PARK_TREES, TABLE_TOP } from "./houses/park.ts";
-import { COLISEUM_PLACE, GRASS, PAVING, PROPS, STATUES, TABLES, groundAt, onColiseum, plotAt, seated, type Boss, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type Table, type Town } from "./world.ts";
+import { COLISEUM_PLACE, GRASS, PAVING, PROPS, STATUES, TABLES, groundAt, onColiseum, plotAt, seated, type Boss, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type Town } from "./world.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
 export const BOSS_ART: Record<HomeId, Character> = {
@@ -289,6 +289,20 @@ function wrapQuote(text: string, maxW: number): string[] | null {
   return lines;
 }
 
+/** A quote's lettering: its lines in `s` device pixels a font pixel, `lead` font pixels apart, over their edge (e pixels down and right). */
+function quoteArt(id: StatueId, lines: string[], s: number, e: number, lead: number): QuoteArt {
+  const lh = lines.length * CAP + (lines.length - 1) * lead;
+  const lw = Math.max(...lines.map(lineWidth));
+  const ink = QUOTE_INK[id];
+  const cv = document.createElement("canvas");
+  cv.width = lw * s + e;
+  cv.height = lh * s + e;
+  const g = cv.getContext("2d")!;
+  g.drawImage(renderLines(lines, lw, lh, s, ink.edge, lead), e, e);
+  g.drawImage(renderLines(lines, lw, lh, s, ink.ink, lead), 0, 0);
+  return { cv, s, n: lines.length, pitch: (CAP + lead) * s, lineH: CAP * s + e };
+}
+
 // Can the canvas blur (not in older iOS Safari; there the shrink alone does the work)?
 const BLUR_OK = (() => {
   try {
@@ -512,8 +526,9 @@ export class Renderer {
 
   /**
    * The camera's lens for the close-up: the statue and its pedestal, as the plain camera shows them, magnified to fill the
-   * box from `closeTop` to `closeBottom` (above the buttons where they'd meet), a longer lens the further the glide has
-   * come (M to the power e, so the zoom's pace is even), its middle gliding to the box's.
+   * box from `closeTop` to `closeBottom`, in its middle; where that would reach the buttons, round them whichever way
+   * lets it be bigger (above them, or beside them, moved off the middle). A longer lens the further the glide has come
+   * (M to the power e, so the zoom's pace is even), the statue's middle gliding to its place.
    */
   private lens(zoom: number): void {
     const { view: v, p, close: c, W, H } = this;
@@ -537,17 +552,23 @@ export class Renderer {
     const T = H * f.closeTop;
     let B = H * f.closeBottom;
     let M = Math.min((B - T) / h, (W * f.closeMaxWidth) / w);
+    let X = W / 2; // where its middle ends up
     const kc = this.keepClear;
-    const xT = W / 2 + M * (x0 + w / 2 - W / 2);
-    if (kc.w > 0 && xT + (M * w) / 2 > kc.x && xT - (M * w) / 2 < kc.x + kc.w && B > kc.y - f.closeAboveButtons) {
-      B = kc.y - f.closeAboveButtons;
-      M = Math.min((B - T) / h, (W * f.closeMaxWidth) / w);
+    if (kc.w > 0 && X + (M * w) / 2 > kc.x - f.closeBesideButtons && X - (M * w) / 2 < kc.x + kc.w && B > kc.y - f.closeAboveButtons) {
+      const above = Math.min((kc.y - f.closeAboveButtons - T) / h, (W * f.closeMaxWidth) / w);
+      const beside = Math.min((B - T) / h, (kc.x - f.closeBesideButtons - f.closeSide) / w);
+      if (beside > above) {
+        M = beside;
+        X = Math.min(X, kc.x - f.closeBesideButtons - (M * w) / 2);
+      } else ((M = above), (B = kc.y - f.closeAboveButtons));
     }
     M = Math.max(1, M);
     const mag = Math.pow(M, c.e);
     const c1 = y0 + h / 2;
     const cE = c1 + ((T + B) / 2 - c1) * c.e;
-    setView(v, W, H, zoom, mag, cE - v.cy - mag * (c1 - v.cy));
+    const x1 = x0 + w / 2;
+    const xE = x1 + (X - x1) * c.e;
+    setView(v, W, H, zoom, mag, cE - v.cy - mag * (c1 - v.cy), xE - W / 2 - mag * (x1 - W / 2));
     this.lensMag = mag;
     this.statueDz = dz - 0.25;
   }
@@ -641,21 +662,30 @@ export class Renderer {
   }
 
   /**
-   * A statue's quote on its pedestal's panel, in the signs' pixel capitals as big as fits in whole device pixels (wrapped
-   * to the panel), engraved in the marble or cast in the bronze plaque: line by line, each fading in, all fading as you
-   * leave.
+   * A statue's quote on its pedestal's panel, written at the screen's own resolution once the camera has arrived: in the
+   * signs' pixel capitals as big as fits in whole device pixels (wrapped to the panel), engraved in the marble or cast in
+   * the bronze plaque. The panel's squiggles fade under its flat field as the first line comes; then line by line, each
+   * fading in; all fading as you leave.
    */
   private drawQuote(i: number, sx: number, sy: number, px: number, alpha: number): void {
     const { ctx, DPR, close: c } = this;
     const f = TOWN_FEEL;
-    const face = quoteFace(STATUES[i]!.id);
+    const id = STATUES[i]!.id;
+    const face = quoteFace(id);
     const fx = sx + face.x * px;
     const fy = sy + face.y * px;
     const fw = face.w * px;
     const fh = face.h * px;
-    const q = this.quoteFor(i, fw * DPR, fh * DPR);
+    const m = f.quoteInset * px;
+    const q = this.quoteFor(i, (fw - 2 * m) * DPR, (fh - 2 * m) * DPR);
     if (!q) return;
     this.quoteCap = (q.s / DPR) * CAP;
+    const a0 = clamp(c.quoteMs / f.quoteFadeMs, 0, 1) * c.quoteLeft;
+    if (a0 <= 0) return;
+    ctx.globalAlpha = alpha * a0;
+    ctx.fillStyle = QUOTE_INK[id].field;
+    const e = 0.25 * px; // (inside the field: its rim stays as drawn)
+    ctx.fillRect(fx + e, fy + e, fw - 2 * e, fh - 2 * e);
     const w = q.cv.width / DPR;
     const h = q.cv.height / DPR;
     const ox = Math.round((fx + (fw - w) / 2) * DPR) / DPR;
@@ -670,32 +700,25 @@ export class Renderer {
     }
   }
 
-  /** The quote's lettering for a panel fw x fh device pixels: the biggest whole size whose wrapped lines fit; cached. */
+  /**
+   * The quote's lettering for a panel fw x fh device pixels: the biggest whole size whose wrapped lines fit (with the
+   * signs' leading, or a pixel less where that lets it be bigger); cached.
+   */
   private quoteFor(i: number, fw: number, fh: number): QuoteArt | null {
     const st = STATUES[i]!;
     for (let s = Math.floor(fh / CAP); s >= 1; s--) {
-      const key = `${i}:${s}`;
-      const done = this.quoteArt.get(key);
       const e = Math.max(1, Math.round(s / 3)); // the lettering's lit (or shadowed) edge, down and right
-      if (done) {
-        if (done.cv.width <= fw && done.cv.height <= fh) return done;
-        continue;
+      for (const lead of [LEADING, LEADING - 1]) {
+        const key = `${i}:${s}:${lead}`;
+        let art = this.quoteArt.get(key) ?? null;
+        if (!art) {
+          const lines = wrapQuote(st.quote, (fw - e) / s);
+          if (!lines) continue;
+          if ((lines.length * CAP + (lines.length - 1) * lead) * s + e > fh) continue;
+          this.quoteArt.set(key, (art = quoteArt(st.id, lines, s, e, lead)));
+        }
+        if (art.cv.width <= fw && art.cv.height <= fh) return art;
       }
-      const lines = wrapQuote(st.quote, (fw - e) / s);
-      if (!lines) continue;
-      const lh = lines.length * CAP + (lines.length - 1) * LEADING;
-      if (lh * s + e > fh) continue;
-      const lw = Math.max(...lines.map(lineWidth));
-      const ink = QUOTE_INK[st.id];
-      const cv = document.createElement("canvas");
-      cv.width = lw * s + e;
-      cv.height = lh * s + e;
-      const g = cv.getContext("2d")!;
-      g.drawImage(renderLines(lines, lw, lh, s, ink.edge), e, e);
-      g.drawImage(renderLines(lines, lw, lh, s, ink.ink), 0, 0);
-      const art = { cv, s, n: lines.length, pitch: (CAP + LEADING) * s, lineH: CAP * s + e };
-      this.quoteArt.set(key, art);
-      return art;
     }
     return null;
   }
