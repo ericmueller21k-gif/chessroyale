@@ -28,7 +28,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   then a walk of 4 rows (`WALK_ROWS`, the promenade paved across it), the park south of that (`PARK`, below; it stands back
   from the Coliseum since Oct 26: `docs/decisions/2026-10-26-town-square-park-stands-back.md`), and your start (`START`,
   22, 17) in the park on its promenade, between its two rows of tables nearest the Coliseum, facing it. Ginger Igloo and Jefferson's Fireworks stand side by side, and so do Hollow Peak and Moo &
-  Moon Meadow. The map: `docs/decisions/2026-10-26-town-square-slice-6.md` (slice 3's smaller one:
+  Moon Meadow. Placement is free to change while the town is a prototype (Eric, Oct 26: "where things are on the map is
+  not an issue. If we need to move buildings around… It's all prototype"). The map: `docs/decisions/2026-10-26-town-square-slice-6.md` (slice 3's smaller one:
   `docs/decisions/2026-10-26-town-square-slice-3.md`).
 - **The world** (`town/world.ts`): the homes (3 × 3 plots) and the Coliseum (`COLISEUM_PLACE`; homes and the Coliseum
   are `Place`s: a name, a chip color, a middle, a half-size and where the picture's foot stands), the walk (square to

@@ -4,6 +4,12 @@
 After trying slice 6: "The park is sick." Then: "just bring it away a bit more from the Coliseum. It shouldn't literally be
 right next to it. I'd say a good, 8 to 10 tiles away … drop it almost to where five tiles down".
 
+Afterward, seeing it: "where things are on the map is not an issue. If we need to move buildings around, this is all just
+being built. It's all prototype. I love how you put the gray kind of concrete … with the path that leads to the
+Colosseum."
+
+So while the town is a prototype, homes and buildings move freely to make room. Placement needs no OK from Eric.
+
 ## The calls (director)
 - **The Coliseum moved 5 rows north, not the park 5 rows south** (`COLISEUM.r0` 23 → 28). Dropping the park would have put
   it on Babur's Circus. Moving the Coliseum touches only one home: Alfil's Pyramid, behind it, moved one square back and one
