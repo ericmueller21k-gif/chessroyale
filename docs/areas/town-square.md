@@ -34,9 +34,10 @@ added the press, the trail and the cards; **slice 5 the Coliseum** in the middle
 - **The drawing** (`town/render.ts`): one canvas, one `requestAnimationFrame` loop (in `Town.tsx`), stopped when the screen
   closes or the tab is hidden; device pixel ratio capped at 2; nothing allocated per frame on the hot path (square colors,
   fonts, gradients, clouds, pawns and every boss and home frame are made once, the frames the first time they show).
-- **Taps** (slice 4: `town/press.ts`). A finger down presses the square you'd walk to like a button: it sinks a little,
-  darkens, and lights up with a bold glowing gold border while the finger is down; up on the same thing releases it with
-  one short pulse of the border and you set off; moving past `dragPx` first lets it go (no pulse, no walk) and becomes a
+- **Taps** (slice 4: `town/press.ts`; cleaned up in slice 5). A finger down presses the square you'd walk to like a
+  button: its face dims a little and one bold gold border lies on its edge, glowing outside only, while the finger is
+  down; up on the same thing releases it with one short pulse of that border (brighter, a little wider, fading) and you
+  set off; moving past `dragPx` first lets it go (no pulse, no walk) and becomes a
   look-around drag. No sound and no vibration (Eric). A small gold ring marks your destination until you arrive. As you
   run you leave about three soft white droplets on the squares you leave, fading out in about half a second (yours only).
   All their numbers are in `feel.ts`.
@@ -92,6 +93,11 @@ added the press, the trail and the cards; **slice 5 the Coliseum** in the middle
   (frames made once, one image a frame, only when its foot is inside the rim; `drawable`'s `below` lets its top draw
   while its foot is under the box). The design and the calls: `docs/decisions/2026-10-26-town-square-slice-5.md`.
 
+- **You** (slice 5): your pawn wears your profile's crate items (`town/you-look.ts`: `Avatar` drawn once into a canvas,
+  again only when your look changes; plain when signed out or wearing nothing; bots stay plain). Every pawn's base stands
+  on its square's middle, with a contact shadow under it that shrinks and fades as the hop lifts it; your gold ring lies
+  flat round your base in the ground's perspective, its front half over your base.
+
 ## The feel: `town/feel.ts`
 
 Every number that shapes how it feels is in `TOWN_FEEL`, one line each: the walk (90 ms a square, the hobble), the camera
@@ -114,7 +120,7 @@ noted wherever a slice changed one.
 ## Files
 
 - `packages/app/src/town/`: `TownPage.tsx` (the lazy load), `Town.tsx` (the screen, the loop, input, chips, cards, the sky's
-  clock), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `houses/`
+  clock), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `you-look.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `houses/`
   (one file per home, thirteen in all, the Coliseum's `coliseum.ts`, the kit of shared pieces and the index).
 - References: `docs/mockups/town-square/` (the prototype Eric tested, and the pictures for the homes: Eric's for the
   igloo, the peak and the meadow, his suggestions for seven more). Alfil's Pyramid has no picture: it's our design.
@@ -142,4 +148,5 @@ noted wherever a slice changed one.
 ## Not built yet
 
 The bottom strip, a bot's or player's card ("Invite to party"), the shop itself, the Coliseum's menu (raids with people,
-party), the Hidden Boss's statue on the empty plinth, dressed pawns, the Simple map setting, real players and rooms, sounds.
+party), the Hidden Boss's statue on the empty plinth, other people's dressed pawns, the Simple map setting, real players and
+rooms, sounds.

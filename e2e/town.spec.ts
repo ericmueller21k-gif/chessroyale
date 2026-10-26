@@ -128,11 +128,17 @@ async function toBabur(p: Page) {
   await p.getByRole("button", { name: "Go to Babur's Circus" }).click({ force: true });
   await expect.poll(() => tapPoint(p, "home"), { message: "the circus comes into view" }).not.toBeNull();
 }
-/** Taps Babur or his circus until its card opens (he may stroll a step between the look and the tap). */
+/**
+ * Taps Babur or his circus until its card opens (he may stroll a step between the look and the tap; the hook's point is
+ * one a tap would hit then).
+ */
 async function openCard(p: Page, kind: "boss" | "home", name: string) {
   const card = p.getByRole("dialog", { name, exact: true });
   await expect(async () => {
     if (await card.isVisible()) return;
+    // A tap that met someone else first (Babur strolling in front of his home) opened their card: close it, so the next
+    // tap can't land on its buttons.
+    if (await p.getByRole("dialog").isVisible()) await p.keyboard.press("Escape");
     const at = await tapPoint(p, kind);
     expect(at, "drawn").not.toBeNull();
     await p.mouse.click(at!.x, at!.y);

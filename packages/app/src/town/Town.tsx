@@ -17,14 +17,15 @@
  * docs/areas/town-square.md.
  */
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
-import { playerName } from "../account.ts";
+import { account, onAccountChange, playerName } from "../account.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 import { N, proj, wrapF } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { Press } from "./press.ts";
-import { BOSS_FACE, Renderer, type Hit } from "./render.ts";
+import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { COLISEUM_PLACE, HOMES, START, createTown, destFor, onColiseum, plotAt, tdist, tick, walkWalker, type HomeId, type Place, type Sq, type Target } from "./world.ts";
+import { dressedPawn, lookKey } from "./you-look.ts";
 import "./town.css";
 
 const CHIPS = TOWN_FEEL.maxChips;
@@ -167,6 +168,18 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
   let sky = pinned ?? clock();
   let skyAt = performance.now();
   r.setSky(sky);
+  // Your pawn as your profile shows it (your crate items), drawn again only when your look changes; plain meanwhile.
+  let youLook: string | null = null;
+  const dress = () => {
+    const look = account().profile?.locker?.look;
+    const key = lookKey(look);
+    if (key === youLook) return;
+    youLook = key;
+    if (!key) r.youArt = null;
+    else void dressedPawn(look, pawnImage("light", null), PAWN_PX).then((art) => youLook === key && alive && (r.youArt = art));
+  };
+  const offAccount = onAccountChange(dress);
+  dress();
   let raf = 0;
   let last = performance.now();
   let alive = true;
@@ -485,6 +498,7 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
     },
     stop: () => {
       alive = false;
+      offAccount();
       halt();
       ro.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);

@@ -121,11 +121,24 @@ const BUBBLE_FONT = `500 12px ${FONT}`;
 // ---- The pawn (cburnett's, as on the boards: src/board/pieces/SOURCES.md), drawn once per look at a good size.
 const PAWN_PATH =
   "m 22.5,9 c -2.21,0 -4,1.79 -4,4 0,0.89 0.29,1.71 0.78,2.38 C 17.33,16.5 16,18.59 16,21 c 0,2.03 0.94,3.84 2.41,5.03 C 15.41,27.09 11,31.58 11,39.5 H 34 C 34,31.58 29.59,27.09 26.59,26.03 28.06,24.84 29,23.03 29,21 29,18.59 27.67,16.5 25.72,15.38 26.21,14.71 26.5,13.89 26.5,13 c 0,-2.21 -1.79,-4 -4,-4 z";
-const PAWN_PX = 160;
+export const PAWN_PX = 160;
 /** The pawn's head is this far down its box (its top at y 9 of the piece's 45): name tags sit on it. */
 const PAWN_HEAD = 9 / 45;
+/**
+ * And its base's foot (the path's bottom at y 39.5, and half its outline): this point stands on the square's middle, so
+ * the base sits on the square. (Slices 1 to 4 stood it at 0.96, about a tenth of a square lower: it seemed to float.)
+ */
+const PAWN_FOOT = (39.5 + 0.75) / 45;
+
+/** Your own pawn's picture: the plain pawn, or your dressed pawn (`pad`: the margin round the pawn's box for its items). */
+export interface YouArt {
+  img: HTMLCanvasElement;
+  pad: number;
+  /** The top of what's drawn (a hat over the head), down its box: your name tag sits on it. */
+  top: number;
+}
 const pawnCache = new Map<string, HTMLCanvasElement>();
-function pawnImage(side: "light" | "dark", tint: string | null): HTMLCanvasElement {
+export function pawnImage(side: "light" | "dark", tint: string | null): HTMLCanvasElement {
   const key = side + (tint ?? "");
   let c = pawnCache.get(key);
   if (c) return c;
@@ -269,6 +282,12 @@ export class Renderer {
   /** The boss's items, by boss (for its card's place). */
   private readonly bossItems: Item[];
   private readonly q4 = new Float64Array(8);
+  /** Your ring's points this frame, its fade and its line's width. */
+  private readonly ringPts = new Float64Array(RING_N * 2);
+  private ringAlpha = 1;
+  private ringLine = 1.5;
+  /** Your dressed pawn (null: the plain pawn): set by Town.tsx when your look changes. */
+  youArt: YouArt | null = null;
   /** Tag widths by name and size; sign and bubble layouts by text. */
   private readonly tagW = new Map<string, number[]>();
   private readonly nameW = new Map<string, number[]>();
@@ -633,11 +652,17 @@ export class Renderer {
         const w = person.walker;
         w.pose(now, pose);
         if (person.you) {
-          this.drawRing(it);
-          this.drawSprite(it, pawnImage(person.look.side, person.look.tint), f.youSquares, 0.5, 0.96, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, w.facing, 0.6, PAWN_HEAD);
+          // Inside your ring: its back half on the ground behind you, its front half over your base.
+          const ring = this.ringAround(it);
+          if (ring) this.drawRingHalf(false);
+          const art = this.youArt;
+          const k = 1 + 2 * (art?.pad ?? 0);
+          const pad = art?.pad ?? 0;
+          this.drawSprite(it, art?.img ?? pawnImage(person.look.side, person.look.tint), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, w.facing, 0.6, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true);
+          if (ring) this.drawRingHalf(true);
           this.tag(person.name, it.fx, it.hy - 2, true, clamp((11 * this.p.k) / v.kf, 8, 12), 1);
         } else {
-          this.drawSprite(it, pawnImage(person.look.side, person.look.tint), f.botSquares, 0.5, 0.96, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, w.facing, 1, PAWN_HEAD);
+          this.drawSprite(it, pawnImage(person.look.side, person.look.tint), f.botSquares, 0.5, PAWN_FOOT, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, w.facing, 1, PAWN_HEAD, true);
           // Name tags on the near ones only.
           const far = farOf(v, it.dz);
           if (far < f.tagFar) this.tag(person.name, it.fx, it.hy - 2, false, clamp((11 * this.p.k) / v.kf, 8, 12), clamp((f.tagFar - far) / 0.12, 0, 1));
@@ -683,28 +708,60 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
-  /** Your gold ring on the ground, under your pawn. */
-  private drawRing(it: Item): void {
-    const { ctx, view: v, p } = this;
-    if (!proj(v, it.dx, it.dz, 0, p)) return;
+  /**
+   * Your gold ring, lying flat on the ground round your base in the ground's own perspective (a circle of `ringSize`
+   * squares across, projected point by point). Its points into `ringPts`; false if it isn't drawn.
+   */
+  private ringAround(it: Item): boolean {
+    const { view: v, p, ringPts } = this;
+    const r = TOWN_FEEL.ringSize / 2;
+    for (let i = 0; i < RING_N; i++) {
+      const a = (i / RING_N) * Math.PI * 2;
+      if (!proj(v, it.dx + r * Math.cos(a), it.dz + r * Math.sin(a), 0, p)) return false;
+      ringPts[i * 2] = p.x;
+      ringPts[i * 2 + 1] = p.y;
+    }
+    this.ringAlpha = enterOf(v, it.dx, it.dz);
+    proj(v, it.dx, it.dz, 0, p);
+    this.ringLine = Math.max(1.5, p.k * 0.06);
+    return true;
+  }
+
+  /** The ring's back half (with its fill, on the ground) or its front half (over your base). */
+  private drawRingHalf(front: boolean): void {
+    const { ctx, ringPts: q } = this;
     ctx.save();
-    ctx.globalAlpha = enterOf(v, it.dx, it.dz);
-    ctx.fillStyle = "rgba(255,215,106,.45)";
-    ctx.strokeStyle = "#c9962a";
-    ctx.lineWidth = Math.max(1.5, p.k * 0.06);
+    ctx.globalAlpha = this.ringAlpha;
+    ctx.lineWidth = this.ringLine;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = TOWN_FEEL.pressEdge;
+    if (!front) {
+      ctx.fillStyle = "rgba(255,215,106,.45)";
+      ctx.beginPath();
+      ctx.moveTo(q[0]!, q[1]!);
+      for (let i = 1; i < RING_N; i++) ctx.lineTo(q[i * 2]!, q[i * 2 + 1]!);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // The back half: the points from angle 0 round to half a turn (farther than its middle); the front half the rest.
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y, p.k * 0.42, p.k * 0.16, 0, 0, Math.PI * 2);
-    ctx.fill();
+    const from = front ? RING_N / 2 : 0;
+    ctx.moveTo(q[from * 2]!, q[from * 2 + 1]!);
+    for (let j = 1; j <= RING_N / 2; j++) {
+      const i = (from + j) % RING_N;
+      ctx.lineTo(q[i * 2]!, q[i * 2 + 1]!);
+    }
     ctx.stroke();
     ctx.restore();
   }
 
   /**
    * A sprite standing on the ground: its foot at (fx, fy) of its box, `sq` squares tall; lifted `lift` squares (the
-   * hop), tilted `tilt` degrees, flipped to face its walk; a soft shadow under it. Fills the item's box; its head is
-   * `head` of the way down the box.
+   * hop), tilted `tilt` degrees, flipped to face its walk; a soft shadow under it and a contact shadow right under its
+   * base (`pawn`: the base's width, else `shadow` sizes it), both tight and dark standing, smaller and lighter as it
+   * lifts. Fills the item's box; its head is `head` of the way down the box.
    */
-  private drawSprite(it: Item, img: CanvasImageSource, sq: number, fx: number, fy: number, aspect: number, lift: number, tilt: number, flip: number, shadow: number, head = 0): void {
+  private drawSprite(it: Item, img: CanvasImageSource, sq: number, fx: number, fy: number, aspect: number, lift: number, tilt: number, flip: number, shadow: number, head = 0, pawn = false): void {
     const { ctx, view: v, p } = this;
     if (!proj(v, it.dx, it.dz, 0, p)) return;
     const h = sq * p.k;
@@ -714,10 +771,21 @@ export class Renderer {
     const s = bandOf(v, it.dx, it.dz); // in the far band: fade, haze and blur
     const alpha = (1 - TOWN_FEEL.bandFade * s) * enterOf(v, it.dx, it.dz);
     ctx.save();
-    ctx.globalAlpha = alpha * 0.22 * (1 - s); // the shadow, gone by the rim (no shadows on the sky)
+    // The shadows follow the height: the higher it is, the smaller and lighter they are; gone by the rim.
+    const F = TOWN_FEEL;
+    const up = Math.max(0, lift);
+    const grow = 1 / (1 + up * F.shadowLiftShrink);
+    const fade = Math.max(0, 1 - up * F.shadowLiftFade);
     ctx.fillStyle = SHADOW;
+    const soft = shadow;
+    ctx.globalAlpha = alpha * F.shadowAlpha * (1 - s) * (0.5 + 0.5 * fade);
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y, Math.min(w * 0.42, p.k * 0.42 * shadow), p.k * 0.12 * shadow, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, p.y, Math.min(w * 0.42, p.k * 0.42 * soft) * grow, p.k * 0.12 * soft * grow, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const cw = pawn ? w * F.contactShadowW : p.k * F.contactShadowW * 1.45 * Math.min(shadow, 1.2);
+    ctx.globalAlpha = alpha * F.contactShadowAlpha * (1 - s) * fade;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, cw * grow, p.k * F.contactShadowDepth * grow, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = alpha;
     if (tilt) {
@@ -1026,50 +1094,45 @@ export class Renderer {
         ctx.stroke();
       }
     }
-    // The pressed square: in (darker, a little lower and smaller, its far wall in shadow) with a bold glowing gold border
-    // while the finger is down; then one pulse of the border, outward, as it lets go.
+    // The pressed square (Eric's slice 4 test: the border, the seam and an inner line read as layers): its face dims a
+    // little and evenly, and one bold gold border lies exactly on its edge, over its seam, with a soft glow outside it
+    // only. As the finger lifts, that same border brightens, widens a little and fades.
     const ps = this.pressSq;
-    if (ps.on) {
+    const a = ps.upAt < 0 ? 0 : (now - ps.upAt) / f.pulseMs;
+    if (ps.on && a >= 1) ps.on = false;
+    if (ps.on && this.squareQuad(ps.c, ps.r, 1, 0)) {
       const k = this.squarePx(ps.c, ps.r);
       const bold = Math.max(f.pressBorderMinPx, k * f.pressBorder);
-      if (ps.upAt < 0) {
-        if (this.squareQuad(ps.c, ps.r, 1, 0)) {
+      {
+        const fade = 1 - a;
+        if (ps.upAt < 0) {
           this.quadPath();
-          ctx.fillStyle = `rgba(40,24,8,${(f.pressDarken * 2).toFixed(3)})`; // the hole, its far wall darkest
+          ctx.fillStyle = `rgba(40,24,8,${f.pressDarken.toFixed(3)})`;
           ctx.fill();
         }
-        if (this.squareQuad(ps.c, ps.r, 1 - f.pressInset, f.pressDip)) {
-          this.quadPath();
-          ctx.fillStyle = `rgba(40,24,8,${f.pressDarken.toFixed(3)})`; // the face, sunk
-          ctx.fill();
-        }
-        if (this.squareQuad(ps.c, ps.r, 1, 0)) {
-          this.quadPath();
-          ctx.lineJoin = "round";
-          ctx.shadowColor = f.pressColor;
-          ctx.shadowBlur = f.pressGlowPx;
-          ctx.strokeStyle = f.pressColor;
-          ctx.lineWidth = bold;
-          ctx.stroke();
-          ctx.shadowBlur = 0;
-          ctx.shadowColor = "transparent";
-          ctx.strokeStyle = f.pressEdge;
-          ctx.lineWidth = Math.max(1, bold * 0.3);
-          ctx.stroke();
-        }
-      } else {
-        const a = (now - ps.upAt) / f.pulseMs;
-        if (a >= 1) ps.on = false;
-        else if (this.squareQuad(ps.c, ps.r, 1 + f.pulseGrow * a, 0)) {
-          this.quadPath();
-          ctx.lineJoin = "round";
-          ctx.globalAlpha = 1 - a;
-          ctx.shadowColor = f.pressColor;
-          ctx.shadowBlur = f.pressGlowPx * (1 + a);
-          ctx.strokeStyle = f.pressColor;
-          ctx.lineWidth = bold * (1 - 0.5 * a);
-          ctx.stroke();
-        }
+        ctx.lineJoin = "miter";
+        ctx.strokeStyle = ps.upAt < 0 ? f.pressColor : f.pulseColor;
+        ctx.lineWidth = bold * (1 + f.pulseWiden * a);
+        // The glow, outside the square only: everything but the square is clipped in (even-odd).
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, this.W, this.H);
+        const q = this.q4;
+        ctx.moveTo(q[0]!, q[1]!);
+        for (let i = 2; i < 8; i += 2) ctx.lineTo(q[i]!, q[i + 1]!);
+        ctx.closePath();
+        ctx.clip("evenodd");
+        ctx.globalAlpha = fade;
+        ctx.shadowColor = f.pressColor;
+        ctx.shadowBlur = f.pressGlowPx;
+        this.quadPath();
+        ctx.stroke();
+        ctx.restore();
+        // The border itself, crisp, on the edge.
+        ctx.globalAlpha = fade;
+        this.quadPath();
+        ctx.stroke();
+        ctx.globalAlpha = 1;
       }
     }
     ctx.restore();
@@ -1096,15 +1159,33 @@ export class Renderer {
   }
 
   /**
-   * A point to tap on a boss (its body's middle) or a place (low on its picture; the Coliseum's gate), on screen; false
-   * if it isn't drawn.
+   * A point to tap on a boss (its body's middle) or a place (low on its picture; the Coliseum's gate), on screen, where a
+   * tap lands on it: if something nearer stands over that point (a boss in front of its home, a bot at the gate), the
+   * first point of a grid over its picture that a tap would hit. False if it isn't drawn or none is clear. (For tests.)
    */
   tapPoint(kind: "boss" | "home", i: number, out: { x: number; y: number }): boolean {
     const it = kind === "boss" ? this.bossItems[i]! : this.houseItems[i]!;
     if (!it.on) return false;
+    const ok = (x: number, y: number) => {
+      if (!(x > 0 && x < this.W && y > 0 && y < this.H)) return false;
+      const h = this.pick(x, y);
+      if (kind === "boss") return h?.kind === "boss" && h.boss === this.town.bosses[i];
+      return i >= this.homes.length ? h?.kind === "coliseum" : h?.kind === "house" && h.home === this.homes[i];
+    };
     out.x = kind === "boss" ? (it.x0 + it.x1) / 2 : it.fx;
     out.y = kind === "boss" ? it.y0 + 0.6 * (it.y1 - it.y0) : it.y0 + (this.places[it.i] === COLISEUM_PLACE ? 0.88 : 0.8) * (it.y1 - it.y0);
-    return out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H;
+    if (ok(out.x, out.y)) return true;
+    for (let v = 0.9; v > 0.2; v -= 0.1)
+      for (let u = 0.5, n = 0; n < 9; n++, u = 0.5 + (n % 2 ? 1 : -1) * Math.ceil(n / 2) * 0.08) {
+        const x = it.x0 + u * (it.x1 - it.x0);
+        const y = it.y0 + v * (it.y1 - it.y0);
+        if (ok(x, y)) {
+          out.x = x;
+          out.y = y;
+          return true;
+        }
+      }
+    return false;
   }
 
   /** What's under (x, y) in the box: a home, a boss or a person (nearest first), else a square, else null (the sky). */
@@ -1228,6 +1309,8 @@ export class Renderer {
 }
 
 const SHADOW = "rgb(60,35,10)";
+/** The ring's points round its circle. */
+const RING_N = 32;
 /** A square's corners from its middle, in half-squares: far left, far right, near right, near left. */
 const CORNERS = [-1, 1, 1, 1, 1, -1, -1, -1] as const;
 const SCRATCH_ORDER: number[] = [];

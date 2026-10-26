@@ -104,3 +104,41 @@
   on it (or its ground) ends you at the gate, and everyone sent there gathers on the apron, a square each.
 - New e2e (`e2e/town.spec.ts`, phone and desktop): a tap on its gate walks you to the apron and opens its card, with
   "Raids with people" greyed and "Coming soon"; a tap elsewhere closes it.
+
+## The three fixes from Eric's slice 4 test (the director, Oct 26)
+
+1. **Your own pawn shows your profile pawn.** Eric: "My pawn isn't showing my profile pawn on the town url."
+   - Your pawn wears your equipped crate items (`locker.look`), drawn as `Avatar` draws them: the items behind the
+     piece, the pawn (or its skin), then the items in front.
+   - `town/you-look.ts` renders `Avatar` once off screen, turns each of its SVG layers into an image, and draws them in
+     order into one canvas over the town's plain pawn. That canvas is your sprite, at the same size and anchor.
+   - It's made again only when your look changes, on the account's change. Signed out or nothing on: the plain pawn,
+     as before. The bots stay plain.
+   - Calls:
+     - The canvas has a 15% margin round the pawn's box, so a hat or a weapon past the box isn't cut off. `Avatar`
+       lets items go 12% past it.
+     - A shiny item's moving glint is left out, because it's a CSS animation and the town's picture is still.
+     - Your name tag sits on top of your hat, not over it.
+2. **You stand on the square, not float over it.** Eric: "the shadows below never change and makes it look like I'm
+   floating, shadows should change according to distance from the tile."
+   - **The base now stands on the square's middle.** Slices 1 to 4 put a point a tenth of a square under the base
+     there, so every pawn, you and the bots, stood a little above its square.
+   - **A contact shadow** lies right under every pawn's base (you, the bots), and under each boss's feet. It's tight
+     and dark when standing.
+   - **As the hop lifts a pawn**, the contact shadow and the soft shadow both shrink and fade with the height, through
+     every step.
+   - **Your gold ring** lies flat on the ground in the ground's own perspective: a circle 0.84 squares across,
+     projected point by point. Its back half is drawn behind you and its front half over your base, so you stand
+     inside it.
+   - Checked at rest and mid-hop, zoomed in and out, on a phone and a computer.
+   - New numbers in `feel.ts`: `ringSize`, `shadowAlpha`, `contactShadowW`, `contactShadowDepth`,
+     `contactShadowAlpha`, `shadowLiftShrink`, `shadowLiftFade`.
+3. **The press is one clean thing.** Eric: "it's like yellow, brown, yellow, then the tile. Confusing and looks cheap."
+   The layers were an outer glow, the square's seam showing between the border and the sunk face, a fine inner line,
+   then the darkened face.
+   - Now the face dims a little and evenly (`pressDarken` 0.16 → 0.12).
+   - One bold gold border lies exactly on the square's edge, over its seam (`pressBorder` 0.12 → 0.1 of a square).
+   - A soft glow shows outside only (`pressGlowPx` 16 → 14).
+   - The sinking face, the hole and the inner line are gone (`pressDip`, `pressInset` removed).
+   - On release, that same border brightens (`pulseColor`), widens a little (`pulseWiden`, 0.4 of its width) and
+     fades over 300 ms. It no longer grows outward (`pulseGrow` removed).
